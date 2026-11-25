@@ -53,7 +53,9 @@ function MemoryImportCard({
   const dismiss = () => {
     try {
       safeLocalStorage()?.setItem(importDismissKey(teamId), '1');
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
     setDismissed(true);
   };
   return (

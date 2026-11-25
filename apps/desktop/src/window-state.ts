@@ -113,7 +113,9 @@ export function createWindowStateStore(io: {
     timer = null;
     try {
       io.write(serializeWindowState(state));
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
   };
   return {
     current: () => state,

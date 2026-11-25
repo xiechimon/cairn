@@ -1,14 +1,14 @@
 {
   "frozenFrom": {
-    "sha": "44bf1e8a799383f67e8d7979388930a49885a167",
-    "date": "2026-11-25"
+    "sha": "b748ab8fa4b768a15a1f7ff4ae7570bad03f5f4f",
+    "date": "2026-11-26"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
     "INVENTORY.md": {
       "kind": "adapter",
       "reason": "Documentation, not a component: the reuse inventory this directory ships (new-track list, old-track frozen list, which-piece-to-use rules), moved here from apps/web/COMPONENTS.md so it sits next to the code it lists. Registered so the gate sees the file; its content is prose, and the machine-readable markers it carries are checked by test/ui-reuse-inventory.test.ts.",
-      "hash": "06663d9a9497fa45399882fea7242b61f5f106b93091c12c2230c27ff5e8f07d"
+      "hash": "98fbc2dc89384de736b8f771045f4b9531515594233c524597294866215d5a54"
     },
     "alert-dialog-shell.tsx": {
       "kind": "adapter",

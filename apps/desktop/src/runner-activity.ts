@@ -18,7 +18,9 @@ export function runnerStepsInFlight(runnerHome: string): number {
     try {
       const record = JSON.parse(readFileSync(join(outbox, name), 'utf8')) as { state?: unknown };
       if (IN_FLIGHT.has(record.state)) count += 1;
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
   }
   return count;
 }

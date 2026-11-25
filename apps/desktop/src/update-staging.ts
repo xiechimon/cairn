@@ -56,7 +56,11 @@ export async function removeStagingFolders(
     entries
       .filter((name) => name.startsWith(STAGING_PREFIX))
       .filter((name) => !kept.some((path) => path.startsWith(join(directory, name, SEPARATOR))))
-      .map((name) => removeFolder(join(folder, name)).catch(() => {})),
+      .map((name) =>
+        removeFolder(join(folder, name)).catch((error) => {
+          console.debug('cairn: recoverable operation failed', error);
+        }),
+      ),
   );
 }
 

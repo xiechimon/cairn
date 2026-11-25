@@ -115,7 +115,9 @@ function ClerkSignInCard({
       if (node !== null && window.Clerk !== undefined) {
         try {
           window.Clerk.unmountSignIn(node);
-        } catch {}
+        } catch (error) {
+          console.debug('cairn: recoverable operation failed', error);
+        }
       }
     };
   }, [config.enabled, config.issuer, config.publishableKey, attempt, exchangeSession]);
@@ -123,7 +125,9 @@ function ClerkSignInCard({
   const switchAccount = async () => {
     try {
       await window.Clerk?.signOut();
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
     setAttempt((n) => n + 1);
   };
 

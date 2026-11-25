@@ -147,7 +147,9 @@ function startRemoteUpdateFallback(): void {
       .then((initial: RemoteVersionState | null) => {
         if (initial !== null) render(initial);
       })
-      .catch(() => {});
+      .catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      });
   };
   ipcRenderer.on('desktop-update:remote-state', (_event, state: RemoteVersionState) =>
     render(state),

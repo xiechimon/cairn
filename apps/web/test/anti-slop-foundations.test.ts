@@ -89,7 +89,7 @@ describe('V16 no texture or gradient surfaces', () => {
 
   test('the user bubble is one flat token fill', () => {
     const bubble =
-      sourceFiles.find(({ path }) => path === 'components/chat/user-message-bubble.tsx')?.text ?? '';
+      sourceFiles.find(({ path }) => path === 'components/chat/message-body.tsx')?.text ?? '';
     expect(bubble).toMatch(/bg-\(--bubble-fill\)/);
     expect(offenders(/bubble-gradient|--bubble-(base|wash|rim)/)).toEqual([]);
   });

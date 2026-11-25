@@ -26,7 +26,9 @@ export function setFixtureUnread(id: string, unread: boolean): void {
       STORAGE_KEY,
       JSON.stringify({ ...readOverrides(), [id]: unread }),
     );
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   for (const listener of listeners) listener();
 }
 

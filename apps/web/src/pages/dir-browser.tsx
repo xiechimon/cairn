@@ -41,7 +41,9 @@ function readLastDir(): string | null {
 function writeLastDir(path: string): void {
   try {
     window.localStorage.setItem(LAST_DIR_KEY, path);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 function readRecent(): string[] {
@@ -58,7 +60,9 @@ function rememberPick(path: string): void {
   try {
     const next = [path, ...readRecent().filter((p) => p !== path)].slice(0, RECENT_MAX);
     window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 function joinPath(dir: string, name: string): string {

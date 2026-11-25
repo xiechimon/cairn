@@ -102,13 +102,17 @@ export async function ensureUpdaterAgent(
   let current: string | null = null;
   try {
     current = readFileSync(paths.plistPath, 'utf8');
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   if (current === plist) return 'unchanged';
   mkdirSync(dirname(paths.plistPath), { recursive: true });
   mkdirSync(join(paths.userData, 'logs'), { recursive: true, mode: 0o700 });
   writeFileSync(paths.plistPath, plist, 'utf8');
   const domain = `gui/${uid}`;
-  await runLaunchctl(['bootout', `${domain}/${paths.label ?? UPDATER_LABEL}`]).catch(() => {});
+  await runLaunchctl(['bootout', `${domain}/${paths.label ?? UPDATER_LABEL}`]).catch((error) => {
+    console.debug('cairn: recoverable operation failed', error);
+  });
   await runLaunchctl(['bootstrap', domain, paths.plistPath]);
   return 'installed';
 }

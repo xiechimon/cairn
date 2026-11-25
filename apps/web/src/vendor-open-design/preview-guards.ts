@@ -19,7 +19,7 @@ export function buildPreviewSandboxShim(): string {
     catch (_) { works = false; }
     if (works) return;
     try { Object.defineProperty(window, name, { configurable: true, value: makeStore() }); }
-    catch (_) { try { window[name] = makeStore(); } catch (__) {} }
+    catch (_) { try { window[name] = makeStore(); } catch (__) { console.debug('cairn: recoverable operation failed', __); } }
   }
   tryShim('localStorage');
   tryShim('sessionStorage');
@@ -32,7 +32,7 @@ export function buildPreviewSandboxShim(): string {
         try { return original.call(h, state, title, url); }
         catch (_) { return undefined; }
       };
-    } catch (_) {}
+    } catch (_) { console.debug('cairn: recoverable operation failed', _); }
   }
   shimHistoryMethod('pushState');
   shimHistoryMethod('replaceState');
@@ -87,7 +87,7 @@ export function buildPreviewSandboxShim(): string {
         if (location.hash === hash) {
           window.dispatchEvent(new HashChangeEvent('hashchange', { oldURL: oldUrl, newURL: location.href }));
         }
-      } catch (_) {}
+      } catch (_) { console.debug('cairn: recoverable operation failed', _); }
       return;
     }
     location.hash = hash;
@@ -122,7 +122,7 @@ export function buildPreviewSandboxShim(): string {
       try {
         var parsedUrl = new URL(href, location.href);
         safe = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'mailto:';
-      } catch (_) {}
+      } catch (_) { console.debug('cairn: recoverable operation failed', _); }
       if (safe) window.open(href, '_blank', 'noopener,noreferrer');
     }
   });

@@ -36,7 +36,7 @@ import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { ProjectNotFound, ProjectsFailed, ProjectsLoading } from '../board/project-not-found.js';
 import { type SuggestableProject, suggestProjects } from '../board/project-suggestions.js';
-import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
+import { QuotaNotice, quotaNoticeInfo } from '../board/quota-notice.js';
 import { RemoteUpdateBar } from '../board/remote-update-bar.js';
 import { SideChat } from '../board/side-chat.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
@@ -161,7 +161,7 @@ export function BoardPage() {
   const searchResults = useSearchResults(search.query, live && search.open);
   const notifyBanner = useNotificationBanner(fixture.ui?.notificationBanner === true, live);
 
-  const quotaInfos = quotaBannerInfo(todos);
+  const quotaInfos = quotaNoticeInfo(todos);
   const backupWarning = backupQ.data ?? null;
   const loginWarnings = useClaudeLoginWarnings(now);
   const devinLoginWarnings = useDevinLoginWarnings(now);
@@ -188,7 +188,7 @@ export function BoardPage() {
         ]
       : []),
     ...(quotaInfos != null
-      ? [{ kind: 'quota' as const, node: <QuotaBanner key="quota" infos={quotaInfos} /> }]
+      ? [{ kind: 'quota' as const, node: <QuotaNotice key="quota" infos={quotaInfos} /> }]
       : []),
     ...(notifyBanner.visible
       ? [

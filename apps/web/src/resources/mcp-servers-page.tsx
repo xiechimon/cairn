@@ -88,7 +88,9 @@ const ATTEMPT_KEY = 'cairn.mcpSignInAttempt';
 function saveAttempt(attempt: SignInAttempt) {
   try {
     sessionStorage.setItem(ATTEMPT_KEY, JSON.stringify(attempt));
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 function readAttempt(): SignInAttempt | null {
@@ -109,7 +111,9 @@ function readAttempt(): SignInAttempt | null {
 function forgetAttempt() {
   try {
     sessionStorage.removeItem(ATTEMPT_KEY);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 function landingNotice(t: Translate, reason: string | null, attempt: SignInAttempt | null) {

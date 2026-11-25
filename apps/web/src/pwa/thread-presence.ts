@@ -21,7 +21,9 @@ export function startThreadPresence(
   const send = (visible: boolean) => {
     const pending = (presenceWrites.get(key) ?? Promise.resolve())
       .then(() => (visible ? api.post(path, { todoId, tabId }) : api.del(path, { todoId, tabId })))
-      .catch(() => {});
+      .catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      });
     presenceWrites.set(key, pending);
     void pending.then(() => {
       if (presenceWrites.get(key) === pending) presenceWrites.delete(key);

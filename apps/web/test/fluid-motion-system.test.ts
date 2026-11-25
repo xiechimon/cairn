@@ -54,7 +54,7 @@ describe('fluid motion system: unified disclosure & single-chevron rotation', ()
   test('SidebarProjectGroupHeader, FailureDetailToggle, PrCard, and ProviderConnectionDisclosure rotate a single chevron with Disclosure', () => {
     const sidebarProject = read('components/shell/sidebar-project.tsx');
     const sidebar = read('board/sidebar.tsx');
-    const failureMarker = read('components/chat/failure-marker.tsx');
+    const noticeLine = read('components/chat/notice-line.tsx');
     const prCard = read('components/thread/pr-card.tsx');
     const providerDisc = read('resources/provider-connection-disclosure.tsx');
     const approvalCard = read('chief/approval-card.tsx');
@@ -63,9 +63,9 @@ describe('fluid motion system: unified disclosure & single-chevron rotation', ()
     expect(sidebarProject).toContain("expanded && 'rotate-90'");
     expect(sidebar).toMatch(/<Disclosure\s+open=\{expanded\}/);
 
-    expect(failureMarker).not.toContain('ChevronUp');
-    expect(failureMarker).toContain("open && 'rotate-180'");
-    expect(failureMarker).toContain('<Disclosure open={open}>');
+    expect(noticeLine).not.toContain('ChevronUp');
+    expect(noticeLine).toContain("open && 'rotate-180'");
+    expect(noticeLine).toContain('<Disclosure open={open}>');
 
     expect(prCard).toContain('<Disclosure open={open}>');
 

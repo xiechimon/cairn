@@ -344,6 +344,20 @@
       }
     }
   ],
+  "plugins": [
+    {
+      "path": "scripts/biome-plugins/no-empty-catch-param.grit",
+      "includes": ["**/apps/web/src/**", "**/apps/desktop/src/**"]
+    },
+    {
+      "path": "scripts/biome-plugins/no-empty-catch.grit",
+      "includes": ["**/apps/web/src/**", "**/apps/desktop/src/**"]
+    },
+    {
+      "path": "scripts/biome-plugins/no-silent-promise-catch.grit",
+      "includes": ["**/apps/web/src/**", "**/apps/desktop/src/**"]
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

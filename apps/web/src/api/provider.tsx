@@ -3,6 +3,7 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useState
 import { Outlet, useLocation } from 'react-router';
 import { MachineIdentityContext } from '../components/machine-label.js';
 import { Badge } from '../components/ui/badge.js';
+import { toastError } from '../components/ui/toaster.js';
 import { DemoBanner } from '../demo/demo-banner.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { USER_NAME } from '../fixtures/core.js';
@@ -12,7 +13,10 @@ import {
   SCENARIO_PARAM,
   SCENARIOS_ENABLED,
 } from '../fixtures/scenario.js';
+import { EN } from '../i18n/en.js';
+import { activeLocale } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
+import { translate } from '../i18n/translate.js';
 import { ApiError } from './client.js';
 import { useMachines, useSession, useTeams } from './hooks.js';
 import { refreshQueriesOnGateClose } from './invalidate.js';
@@ -46,16 +50,25 @@ export function useLiveData(): LiveData {
   return useContext(LiveDataContext);
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: (failureCount, error) =>
-        failureCount < 1 && !(error instanceof ApiError && error.status === 401),
-      staleTime: 2_000,
+export function createProductQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      mutations: {
+        onError: (error) => {
+          toastError(translate(activeLocale(), EN, '操作失败，请重试。'), error);
+        },
+      },
+      queries: {
+        refetchOnWindowFocus: false,
+        retry: (failureCount, error) =>
+          failureCount < 1 && !(error instanceof ApiError && error.status === 401),
+        staleTime: 2_000,
+      },
     },
-  },
-});
+  });
+}
+
+const queryClient = createProductQueryClient();
 
 export function ApiProvider({ children }: { children: ReactNode }) {
   useEffect(() => refreshQueriesOnGateClose(queryClient), []);

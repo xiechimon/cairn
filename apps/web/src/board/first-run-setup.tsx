@@ -64,7 +64,9 @@ export function rememberFirstRun(open: boolean): void {
   try {
     if (open) safeLocalStorage()?.setItem(FIRST_RUN_OPEN_KEY, '1');
     else safeLocalStorage()?.removeItem(FIRST_RUN_OPEN_KEY);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 export function FirstRunFrame() {

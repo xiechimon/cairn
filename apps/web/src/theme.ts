@@ -65,7 +65,9 @@ export function applyTheme(
   paintTheme(preference);
   try {
     storage?.setItem(THEME_STORAGE_KEY, preference);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 export function followSystemTheme(storage: Storage | null = safeLocalStorage()): () => void {

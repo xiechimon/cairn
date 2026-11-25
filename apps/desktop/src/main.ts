@@ -320,7 +320,9 @@ function logSecrets(): string[] {
       ownerTokenLogSecret = parseAccessTokenFile(
         readFileSync(join(cairnHome(), ACCESS_TOKEN_FILE_NAME), 'utf8'),
       );
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
   }
   return ownerTokenLogSecret === null
     ? otelHeaderLogSecrets
@@ -431,7 +433,9 @@ async function serverPort(): Promise<number> {
   let saved = 0;
   try {
     saved = Number.parseInt(readFileSync(path, 'utf8'), 10);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   const port = await freeLoopbackPort(Number.isInteger(saved) && saved > 0 ? saved : 0).catch(() =>
     freeLoopbackPort(0),
   );
@@ -658,7 +662,9 @@ function takeRelaunchWindow(): RelaunchWindow | null {
   try {
     raw = readFileSync(path, 'utf8');
     rmSync(path, { force: true });
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   return parseRelaunchWindow(raw);
 }
 
@@ -1684,7 +1690,9 @@ function armVersionGuard(userData: string): VersionGuard | null {
   const bundle = runningBundle();
   if (installed === null || installed.version !== app.getVersion()) {
     if (installed !== null) writeUpdateState(statePath, { ...state, installed: null });
-    void removeFolder(previousAppPath(bundle)).catch(() => {});
+    void removeFolder(previousAppPath(bundle)).catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     return null;
   }
   const attempts =
@@ -1702,7 +1710,9 @@ function armVersionGuard(userData: string): VersionGuard | null {
           `${previousApp} is not the copy of ${installed.previousVersion} Cairn kept`,
         );
       }
-      await removeFolder(failedAppPath(bundle)).catch(() => {});
+      await removeFolder(failedAppPath(bundle)).catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      });
       const failed = await restorePrevious({ bundle, previousApp });
       removeFolderAfterExit(failed, process.pid);
       const at = Date.now();
@@ -1738,7 +1748,9 @@ function armVersionGuard(userData: string): VersionGuard | null {
   const confirm = async (): Promise<GuardAction> => {
     appendUpdateLog(userData, `${installed.version} started and stayed healthy`);
     writeUpdateState(statePath, { ...readUpdateState(statePath), installed: null });
-    await removeFolder(previousAppPath(bundle)).catch(() => {});
+    await removeFolder(previousAppPath(bundle)).catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     return 'confirm';
   };
   return {
@@ -1932,7 +1944,9 @@ async function boot(): Promise<void> {
           const body = (await response.json()) as { enabled?: boolean; issuer?: unknown };
           remoteClerkIssuer = body.enabled === true ? parseHttpsOrigin(body.issuer) : null;
         }
-      } catch {}
+      } catch (error) {
+        console.debug('cairn: recoverable operation failed', error);
+      }
     };
 
     let localHostOwned = false;

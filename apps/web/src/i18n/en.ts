@@ -1608,7 +1608,7 @@ export const EN: Record<string, string> = {
     '{why}; {when}. Tasks keep running; your messages are saved and handled in order once it is back.',
   详情: 'Details',
   '给 Coordinator 换模型': "Change the Coordinator's model",
-  'Coordinator 的主模型暂时不可用，本次改用备用模型 {model} 回复，判断可能不够准确。':
+  'Coordinator 的主模型暂时不可用，本次改用备用模型 {model} 回复，判断可能不够准确':
     'The Coordinator main model is unavailable, so backup model {model} is replying. Its judgment may be less accurate.',
   换模型: 'Change model',
   '可以继续说，恢复后按顺序处理': 'Keep typing; it resumes in order',

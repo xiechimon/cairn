@@ -70,13 +70,17 @@ export async function acquireUpdateLock(
         if (readLock(path)?.pid !== process.pid) return;
         try {
           unlinkSync(path);
-        } catch {}
+        } catch (error) {
+          console.debug('cairn: recoverable operation failed', error);
+        }
       };
     }
     if (!held(readLock(path), Date.now())) {
       try {
         unlinkSync(path);
-      } catch {}
+      } catch (error) {
+        console.debug('cairn: recoverable operation failed', error);
+      }
       continue;
     }
     if (Date.now() >= deadline) return null;

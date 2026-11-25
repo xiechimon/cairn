@@ -88,7 +88,9 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
       if (deps.appRunning()) return 'app-running';
       staged = await deps.stage(update, version);
       if (deps.appRunning()) {
-        await removeFolder(dirname(staged.app)).catch(() => {});
+        await removeFolder(dirname(staged.app)).catch((error) => {
+          console.debug('cairn: recoverable operation failed', error);
+        });
         return 'app-running';
       }
       writeUpdateState(statePath, { ...readUpdateState(statePath), staged });
@@ -107,7 +109,9 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
     } finally {
       release();
     }
-    await removeFolder(dirname(staged.app)).catch(() => {});
+    await removeFolder(dirname(staged.app)).catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     deps.log(`installed ${staged.version} over ${version} while Cairn was closed`);
     await deps.restartResident();
     return 'installed';
@@ -123,7 +127,9 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
       const latest = readUpdateState(statePath);
       if (latest.staged?.app === staged.app)
         writeUpdateState(statePath, { ...latest, staged: null });
-      await removeFolder(dirname(staged.app)).catch(() => {});
+      await removeFolder(dirname(staged.app)).catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      });
     }
     return 'failed';
   }

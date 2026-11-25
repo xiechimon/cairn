@@ -52,7 +52,9 @@ export async function restoreIfBundleMissing(bundle: string): Promise<boolean> {
   try {
     await access(join(bundle, APP_EXECUTABLE), constants.X_OK);
     return false;
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   try {
     await access(join(previousApp, APP_EXECUTABLE), constants.X_OK);
   } catch {

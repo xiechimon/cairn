@@ -91,7 +91,9 @@ function storedTasksTab(): TasksTab | null {
   let stored: string | null = null;
   try {
     stored = safeLocalStorage()?.getItem(TASKS_TAB_STORAGE_KEY) ?? null;
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   return TASKS_TABS.find((tab) => tab === stored) ?? null;
 }
 

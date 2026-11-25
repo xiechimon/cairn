@@ -260,7 +260,9 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
           clearFailedPending();
           if (fullDraftRef.current === fullDraft) writeFull('');
         })
-        .catch(() => {})
+        .catch((error) => {
+          console.debug('cairn: recoverable operation failed', error);
+        })
         .finally(() => {
           sending.current = false;
         });

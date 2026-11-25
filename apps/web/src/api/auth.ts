@@ -29,7 +29,9 @@ export function syncPushAuthToken(token: string | null): Promise<void> {
       const cache = await caches.open('push-auth');
       if (token === null) await cache.delete('/__push-auth');
       else await cache.put('/__push-auth', new Response(JSON.stringify({ token })));
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
   });
   return pushAuthWrites;
 }
@@ -38,7 +40,9 @@ export function clearLegacyBrowserToken(): void {
   void syncPushAuthToken(null);
   try {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 export type PairAttemptPhase = 'requesting' | 'pending' | 'denied' | 'expired' | 'unavailable';
@@ -152,7 +156,9 @@ export async function signInWithClerkToken(
           | (Window & { cairnDesktop?: { localRunner?: { reconnect?: () => Promise<void> } } })
           | undefined
       )?.cairnDesktop;
-      void desktop?.localRunner?.reconnect?.().catch(() => {});
+      void desktop?.localRunner?.reconnect?.().catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      });
       return 'ok';
     }
     if (response.status === 403) return 'not-allowed';
@@ -173,7 +179,9 @@ export async function signOutSession(): Promise<void> {
       redirect: 'error',
       headers: { [BROWSER_AUTH_HEADER]: '1' },
     });
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   clearLegacyBrowserToken();
 }
 
@@ -404,7 +412,9 @@ async function runPairAttempt(controller: AbortController): Promise<void> {
         expiresAt: number;
       };
     }
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   if (signal.aborted) return;
   if (issued === null) {
     pairAttempt = { phase: 'unavailable', code: null, expiresAt: null };
@@ -433,7 +443,9 @@ async function runPairAttempt(controller: AbortController): Promise<void> {
       else if (response.ok && !response.redirected) {
         outcome = ((await response.json()) as PairClaimResponse).status;
       }
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
     if (outcome === 'retry' || outcome === 'pending') continue;
     if (outcome === 'approved') {
       const verdict = await probeSession(signal);
@@ -560,7 +572,9 @@ export function redeemPairingCode(code: string, environmentId?: string): Promise
           headers: { 'content-type': 'application/json', [BROWSER_AUTH_HEADER]: '1' },
           body: JSON.stringify({ code, name: platform || 'Browser', environmentId }),
         });
-      } catch {}
+      } catch (error) {
+        console.debug('cairn: recoverable operation failed', error);
+      }
     }
     operation.phase = 'confirming';
     retrying = true;

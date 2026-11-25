@@ -157,7 +157,9 @@ function validateCandidate(candidate: AntigravityManagedBin): Promise<boolean> {
           const resumeOk =
             caps?.loadSession === true || caps?.sessionCapabilities?.resume !== undefined;
           finish(versionOk && resumeOk);
-        } catch {}
+        } catch (error) {
+          console.debug('cairn: recoverable operation failed', error);
+        }
       }
     });
     try {
@@ -255,7 +257,9 @@ export function readLocalAntigravityCredential(): AntigravityImportCredential | 
     try {
       const token = antigravityKeyFromText(readFileSync(path, 'utf8'));
       if (token !== null) return { token };
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
   }
   return null;
 }

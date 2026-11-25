@@ -14,7 +14,7 @@ import { I18nProvider } from '../src/i18n/provider.js';
 import { NOW, todo } from './helpers.js';
 
 const SRC = resolve(import.meta.dirname, '../src');
-const SHARED = 'components/chat/failure-marker.tsx';
+const SHARED = 'components/chat/notice-line.tsx';
 const ROW_DIRS = ['detail', 'components/chat'];
 const ROW_FILE = /^chief\/[\w-]*rows?\.tsx$/;
 const FAIL_TONE = /--fail-fg|--destructive|text-destructive|chat-para--fail/;
@@ -38,10 +38,10 @@ function offenders(): string[] {
   });
 }
 
-test('C32: a failure row in a conversation is drawn only by FailureMarker', () => {
+test('C32: a failure row in a conversation is drawn only by NoticeLine', () => {
   expect(
     offenders(),
-    `C32: these files draw their own failure row; render FailureMarker from src/${SHARED} instead`,
+    `C32: these files draw their own failure row; render NoticeLine from src/${SHARED} instead`,
   ).toEqual([]);
 });
 
@@ -150,13 +150,13 @@ const STATUS_ROWS: { name: string; html: () => string; reason: string }[] = [
 ];
 
 test.each(STATUS_ROWS)(
-  'C32: the $name row is one FailureMarker separator line with no typing dots',
+  'C32: the $name row is one NoticeLine separator line with no typing dots',
   ({ html, reason }) => {
     const markup = html();
     const labels = markerLabels(markup);
-    expect(labels, `C32: the transcript must show one FailureMarker line for "${reason}"`).toHaveLength(1);
+    expect(labels, `C32: the transcript must show one NoticeLine line for "${reason}"`).toHaveLength(1);
     expect(labels[0]).toContain(reason);
-    expect(markup.split(reason).length - 1, `C32: "${reason}" is drawn outside FailureMarker`).toBe(1);
+    expect(markup.split(reason).length - 1, `C32: "${reason}" is drawn outside NoticeLine`).toBe(1);
     expect(markup, 'C32: a waiting row carries no typing dots').not.toContain('typing-dot');
     expect(markup, 'C32: no own alert block beside the marker').not.toContain('role="alert"');
   },

@@ -14,7 +14,9 @@ function writeLocal(localKey: string, value: string): void {
   try {
     if (value === '') localStorage.removeItem(localKey);
     else localStorage.setItem(localKey, value);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 export function useServerDraft(options: {
