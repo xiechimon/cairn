@@ -250,7 +250,7 @@ export function desktopCapabilityState(
 export interface DesktopUpdateBridge {
   state: () => Promise<DesktopUpdateState | null>;
   check: () => Promise<void>;
-  install: () => Promise<DesktopUpdateInstallResult | void>;
+  install: () => Promise<DesktopUpdateInstallResult | undefined>;
   rollbackNotice: () => Promise<DesktopRollbackNotice | null>;
   subscribe: (listener: (state: DesktopUpdateState) => void) => () => void;
   remoteState: () => Promise<RemoteVersionState | null>;

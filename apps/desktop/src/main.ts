@@ -187,6 +187,7 @@ import {
   type GuardState,
   guardStep,
 } from './update-guard.js';
+import { installDesktopUpdate } from './update-ipc.js';
 import { acquireUpdateLock, updateLockPath } from './update-lock.js';
 import { appendUpdateLog, updateLogPath } from './update-log.js';
 import { removeFolder, removeFolderAfterExit } from './update-staging.js';
@@ -214,7 +215,6 @@ import {
 } from './updater.js';
 import { ensureUpdaterAgent, UPDATER_ENTRY, updaterPlistPath } from './updater-agent.js';
 import { createWakeAhead, earliestScheduleNextRunAt } from './wake-ahead.js';
-import { installDesktopUpdate } from './update-ipc.js';
 import {
   clampBounds,
   createWindowStateStore,

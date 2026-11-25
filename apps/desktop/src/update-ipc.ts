@@ -6,7 +6,9 @@ export interface UpdateInstallMessages {
   noPendingUpdate: string;
   offline: string;
   current: (version: string) => string;
-  unsupported: (blocker: Extract<DesktopUpdateState, { status: 'unsupported' }>['blocker']) => string;
+  unsupported: (
+    blocker: Extract<DesktopUpdateState, { status: 'unsupported' }>['blocker'],
+  ) => string;
 }
 
 export async function installDesktopUpdate(opts: {

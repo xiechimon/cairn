@@ -1765,7 +1765,14 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
     `Set :CFBundleShortVersionString ${nextVersion}`,
     join(nextAppBundle, 'Contents', 'Info.plist'),
   ]);
-  execFileSync('/usr/bin/ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', nextAppBundle, zipPath]);
+  execFileSync('/usr/bin/ditto', [
+    '-c',
+    '-k',
+    '--sequesterRsrc',
+    '--keepParent',
+    nextAppBundle,
+    zipPath,
+  ]);
   const zipSize = statSync(zipPath).size;
   const zipSha256 = createHash('sha256').update(readFileSync(zipPath)).digest('hex');
 
@@ -1833,7 +1840,9 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
     if (pathname === '/api/teams') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(
-        JSON.stringify([{ id: 't1', name: 'Remote Smoke', slug: 'remote-smoke', defaultMachineId: null }]),
+        JSON.stringify([
+          { id: 't1', name: 'Remote Smoke', slug: 'remote-smoke', defaultMachineId: null },
+        ]),
       );
       return;
     }
@@ -1890,9 +1899,10 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
     }
     const rel = pathname === '/' ? '/index.html' : pathname;
     const candidate = resolve(webRoot, `.${rel}`);
-    const file = candidate.startsWith(webRoot) && existsSync(candidate) && statSync(candidate).isFile()
-      ? candidate
-      : join(webRoot, 'index.html');
+    const file =
+      candidate.startsWith(webRoot) && existsSync(candidate) && statSync(candidate).isFile()
+        ? candidate
+        : join(webRoot, 'index.html');
     res.writeHead(200, { 'content-type': mimeTypes[extname(file)] ?? 'application/octet-stream' });
     createReadStream(file).pipe(res);
   });
@@ -1948,7 +1958,8 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
         await electronApp.whenReady();
         const originalFetch = globalThis.fetch.bind(globalThis);
         globalThis.fetch = (input, init) => {
-          const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+          const url =
+            typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
           if (url === args.manifestUrl) {
             return originalFetch(`${args.feedOrigin}/desktop-latest.json`, init);
           }
