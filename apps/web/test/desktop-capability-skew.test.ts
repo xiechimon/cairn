@@ -11,6 +11,7 @@ import {
   antigravityBridge,
   antigravityCapabilityState,
   desktopCapabilityState,
+  desktopShellDescriptor,
   devinBridge,
   devinCapabilityState,
   isDesktopShell,
@@ -225,5 +226,35 @@ describe('desktopUpdateSkewView and i18n cleanup', () => {
       false,
     );
     expect('请在这台 Mac 的 Cairn 桌面应用里完成权限授权与检查。' in EN).toBe(false);
+  });
+
+  it('coexists with fullscreen hooks on cairnDesktop.shell', () => {
+    const signIn = vi.fn();
+    vi.stubGlobal('window', {
+      cairnDesktop: {
+        shell: { isFullScreen: vi.fn(), onFullScreenChange: vi.fn() },
+        antigravity: { signIn },
+      },
+    });
+    expect(desktopShellDescriptor()).toBeNull();
+    expect(antigravityCapabilityState()).toBe('allowed');
+
+    const descriptor = createDesktopShellDescriptor({
+      shellVersion: '0.1.735',
+      localMode: false,
+      isMac: true,
+    });
+    vi.stubGlobal('window', {
+      cairnDesktop: {
+        shell: {
+          ...descriptor,
+          isFullScreen: vi.fn(),
+          onFullScreenChange: vi.fn(),
+        },
+        antigravity: { signIn },
+      },
+    });
+    expect(desktopShellDescriptor()).toEqual(descriptor);
+    expect(antigravityCapabilityState()).toBe('allowed');
   });
 });

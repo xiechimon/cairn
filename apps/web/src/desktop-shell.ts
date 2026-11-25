@@ -186,7 +186,7 @@ export type DesktopCapabilityState = 'allowed' | 'needs-update' | 'hidden';
 
 interface CairnDesktopWindow extends Window {
   cairnDesktop?: {
-    shell?: DesktopShellDescriptor;
+    shell?: DesktopShellBridge & Partial<DesktopShellDescriptor>;
     update?: DesktopUpdateBridge;
     antigravity?: AntigravityBridge;
     devin?: DevinBridge;
@@ -208,13 +208,18 @@ export function desktopShellDescriptor(): DesktopShellDescriptor | null {
   if (
     raw == null ||
     typeof raw !== 'object' ||
+    typeof raw.shellVersion !== 'string' ||
     typeof raw.bridgeVersion !== 'number' ||
     typeof raw.capabilities !== 'object' ||
     raw.capabilities === null
   ) {
     return null;
   }
-  return raw;
+  return {
+    shellVersion: raw.shellVersion,
+    bridgeVersion: raw.bridgeVersion,
+    capabilities: raw.capabilities,
+  };
 }
 
 export function desktopCapabilityState(

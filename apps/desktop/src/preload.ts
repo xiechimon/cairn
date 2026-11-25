@@ -217,7 +217,6 @@ function readShellDescriptor(): DesktopShellDescriptor | undefined {
 const shellDescriptor = readShellDescriptor();
 
 contextBridge.exposeInMainWorld('cairnDesktop', {
-  ...(shellDescriptor === undefined ? {} : { shell: shellDescriptor }),
   menu: {
     subscribe: (listener: (command: DesktopMenuCommand) => void): (() => void) => {
       const relay = (_event: unknown, command: DesktopMenuCommand) => listener(command);
@@ -315,6 +314,7 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     },
   },
   shell: {
+    ...(shellDescriptor ?? {}),
     isFullScreen: (): Promise<boolean> => ipcRenderer.invoke('desktop-shell:fullscreen'),
     onFullScreenChange: (listener: (fullScreen: boolean) => void): (() => void) => {
       const relay = (_event: unknown, fullScreen: boolean) => listener(fullScreen === true);

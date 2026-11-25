@@ -289,10 +289,11 @@ export async function runAntigravityRemoteAndSkewSmoke({
       hasBridge: typeof window.cairnDesktop,
       keys: window.cairnDesktop ? Object.keys(window.cairnDesktop) : null,
       shell: window.cairnDesktop?.shell ?? null,
+      shellKeys: window.cairnDesktop?.shell ? Object.keys(window.cairnDesktop.shell) : null,
     }));
     const shell = shellDiag.shell;
     assert.ok(
-      shell !== null,
+      shell !== null && typeof shell.bridgeVersion === 'number',
       `cairnDesktop.shell descriptor missing in packaged remote mode: ${JSON.stringify({ ...shellDiag, rendererLogs })}`,
     );
     assert.equal(shell.bridgeVersion, 1, `unexpected bridgeVersion: ${JSON.stringify(shell)}`);
