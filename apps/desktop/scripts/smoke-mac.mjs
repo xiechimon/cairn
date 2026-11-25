@@ -1846,6 +1846,24 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       );
       return;
     }
+    if (pathname === '/api/projects') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify([
+          {
+            id: 'p1',
+            teamId: 't1',
+            name: 'Remote Project',
+            archivedAt: null,
+            icon: null,
+            color: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ]),
+      );
+      return;
+    }
     if (pathname === '/api/teams/t1/stream') {
       res.writeHead(200, {
         'content-type': 'text/event-stream',
@@ -1879,12 +1897,26 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
     }
     if (pathname === '/api/teams/t1/chief') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ id: 'c1', model: null, threads: [] }));
+      res.end(
+        JSON.stringify({
+          agentActor: { machineId: null, modelId: 'm1' },
+          stream: [],
+          streamAt: [],
+        }),
+      );
       return;
     }
     if (pathname === '/api/user/me') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ id: 'u1', name: 'Owner', role: 'owner' }));
+      res.end(
+        JSON.stringify({
+          id: 'u1',
+          name: 'Owner',
+          displayName: 'Owner',
+          role: 'owner',
+          avatarUrl: null,
+        }),
+      );
       return;
     }
     if (pathname === '/api/capabilities') {
@@ -1981,51 +2013,55 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       `remote mode opened ${remoteWindow.url()} instead of ${remoteOrigin}`,
     );
 
-    const updateButton = remoteWindow.getByTestId('desktop-update');
-    await updateButton.waitFor({ timeout: GATE_SETTLE_MS * 4 });
-    await remoteWindow.evaluate(() => window.cairnDesktop.update.check());
-    await updateButton
-      .locator('xpath=self::*[@data-status="available"]')
-      .waitFor({ timeout: OPEN_TIMEOUT_MS * 3 });
-    assert.ok(manifestHits >= 1, 'remote mode never checked the update feed');
-    assert.equal(zipHits, 0, 'blocked version downloaded before user clicked update');
+    const remoteShot = baseShot.replace(/\.png$/, '-remote-update.png');
+    try {
+      const updateButton = remoteWindow.getByTestId('desktop-update');
+      await updateButton.waitFor({ timeout: GATE_SETTLE_MS * 4 });
+      await remoteWindow.evaluate(() => window.cairnDesktop.update.check());
+      await updateButton
+        .locator('xpath=self::*[@data-status="available"]')
+        .waitFor({ timeout: OPEN_TIMEOUT_MS * 3 });
+      assert.ok(manifestHits >= 1, 'remote mode never checked the update feed');
+      assert.equal(zipHits, 0, 'blocked version downloaded before user clicked update');
 
-    const observedStates = [];
-    await remoteWindow.exposeFunction('__cairnSmokeRecordUpdateState', (status) => {
-      observedStates.push(status);
-    });
-    await remoteWindow.evaluate(() => {
-      window.cairnDesktop.update.subscribe((state) => {
-        void window.__cairnSmokeRecordUpdateState(state.status);
+      const observedStates = [];
+      await remoteWindow.exposeFunction('__cairnSmokeRecordUpdateState', (status) => {
+        observedStates.push(status);
       });
-    });
+      await remoteWindow.evaluate(() => {
+        window.cairnDesktop.update.subscribe((state) => {
+          void window.__cairnSmokeRecordUpdateState(state.status);
+        });
+      });
 
-    await updateButton.click();
+      await updateButton.click();
 
-    const deadline = Date.now() + OPEN_TIMEOUT_MS * 4;
-    while (Date.now() < deadline) {
-      const status = await updateButton.getAttribute('data-status');
-      if (zipHits >= 1 && (status === 'error' || observedStates.includes('installing'))) break;
-      await remoteWindow.waitForTimeout(100);
+      const deadline = Date.now() + OPEN_TIMEOUT_MS * 4;
+      while (Date.now() < deadline) {
+        const status = await updateButton.getAttribute('data-status');
+        if (zipHits >= 1 && (status === 'error' || observedStates.includes('installing'))) break;
+        await remoteWindow.waitForTimeout(100);
+      }
+
+      assert.ok(zipHits >= 1, 'clicking update button in remote mode never downloaded the update');
+      assert.ok(
+        observedStates.includes('downloading') && observedStates.includes('installing'),
+        `clicking update button in remote mode did not start installing: ${JSON.stringify(observedStates)}`,
+      );
+      await updateButton
+        .locator('xpath=self::*[@data-status="error"]')
+        .waitFor({ timeout: OPEN_TIMEOUT_MS * 3 });
+      const refusalTitle = await updateButton.getAttribute('title');
+      assert.ok(
+        refusalTitle !== null && refusalTitle.trim() !== '',
+        'update button did not answer with a reason when install was refused',
+      );
+      console.log(
+        `remote update smoke passed: origin=${remoteOrigin} states=${JSON.stringify(observedStates)} refusal=${refusalTitle}`,
+      );
+    } finally {
+      await remoteWindow.screenshot({ path: remoteShot }).catch(() => {});
     }
-
-    assert.ok(zipHits >= 1, 'clicking update button in remote mode never downloaded the update');
-    assert.ok(
-      observedStates.includes('downloading') && observedStates.includes('installing'),
-      `clicking update button in remote mode did not start installing: ${JSON.stringify(observedStates)}`,
-    );
-    await updateButton
-      .locator('xpath=self::*[@data-status="error"]')
-      .waitFor({ timeout: OPEN_TIMEOUT_MS * 3 });
-    const refusalTitle = await updateButton.getAttribute('title');
-    assert.ok(
-      refusalTitle !== null && refusalTitle.trim() !== '',
-      'update button did not answer with a reason when install was refused',
-    );
-    await remoteWindow.screenshot({ path: baseShot.replace(/\.png$/, '-remote-update.png') });
-    console.log(
-      `remote update smoke passed: origin=${remoteOrigin} states=${JSON.stringify(observedStates)} refusal=${refusalTitle}`,
-    );
   } finally {
     if (remoteApp !== null) {
       await withDeadline(
