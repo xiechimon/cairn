@@ -1,6 +1,7 @@
 import {
   DESKTOP_SHELL_USER_AGENT,
   DESKTOP_TRAY_PATH,
+  type DesktopActivity,
   type DesktopMenuCommand,
   type DesktopNotifyPayload,
   type DesktopRollbackNotice,
@@ -65,6 +66,18 @@ export function desktopNotify(): DesktopNotifyBridge | null {
   return (
     (window as Window & { cairnDesktop?: { notify?: DesktopNotifyBridge } }).cairnDesktop?.notify ??
     null
+  );
+}
+
+interface DesktopActivityBridge {
+  report: (activity: DesktopActivity) => void;
+}
+
+export function desktopActivity(): DesktopActivityBridge | null {
+  if (typeof window === 'undefined') return null;
+  return (
+    (window as Window & { cairnDesktop?: { activity?: DesktopActivityBridge } }).cairnDesktop
+      ?.activity ?? null
   );
 }
 

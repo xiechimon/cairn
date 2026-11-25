@@ -2,6 +2,7 @@ import type {
   AntigravityLocalStatus,
   AntigravityLoginOutcome,
   AntigravityLoginPhase,
+  DesktopActivity,
   DesktopLocalProvider,
   DesktopMenuCommand,
   DesktopNotifyPayload,
@@ -132,5 +133,8 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
         ipcRenderer.removeListener('desktop-update:state', relay);
       };
     },
+  },
+  activity: {
+    report: (activity: DesktopActivity): void => ipcRenderer.send('desktop-activity', activity),
   },
 });

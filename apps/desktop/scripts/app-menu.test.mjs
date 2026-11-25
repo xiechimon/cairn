@@ -50,7 +50,7 @@ test('the menu bar carries the shortcuts a Mac user expects', () => {
   }
 });
 
-test('a staged update offers a restart that installs it', () => {
+test('a staged update waits for the user to step away and still offers to update now', () => {
   let installed = 0;
   const template = appMenuTemplate(
     { status: 'ready', version: '0.1.536' },
@@ -58,7 +58,7 @@ test('a staged update offers a restart that installs it', () => {
     { send: () => {}, back: () => {}, forward: () => {} },
   );
   const item = template[0].submenu.find((entry) => entry.label?.includes('0.1.536'));
-  assert.equal(item.label, 'Restart to Update 0.1.536…');
+  assert.equal(item.label, 'Update to 0.1.536 Now');
   item.click();
   assert.equal(installed, 1);
 });

@@ -47,7 +47,7 @@ export function desktopUpdateView(state: DesktopUpdateState, t: TFunc): DesktopU
     state.status === 'available'
       ? t('更新到 {version}', { version: state.version })
       : state.status === 'ready'
-        ? t('重新启动以更新到 {version}', { version: state.version })
+        ? t('离开时自动更新到 {version}', { version: state.version })
         : state.status === 'downloading'
           ? t('正在更新 {percent}%', { percent: Math.round(state.percent) })
           : state.status === 'installing'
@@ -72,11 +72,7 @@ export function desktopUpdateView(state: DesktopUpdateState, t: TFunc): DesktopU
     state.status === 'restarting' ||
     state.status === 'unsupported';
   const mark: UpdateMark =
-    state.status === 'available' || state.status === 'ready'
-      ? 'waiting'
-      : state.status === 'error'
-        ? 'failed'
-        : null;
+    state.status === 'available' ? 'waiting' : state.status === 'error' ? 'failed' : null;
   return { label, busy, mark };
 }
 

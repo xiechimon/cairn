@@ -150,6 +150,17 @@ export function isDesktopNotifyPayload(value: unknown): value is DesktopNotifyPa
   );
 }
 
+export interface DesktopActivity {
+  turnInFlight: boolean;
+  dialogOpen: boolean;
+}
+
+export function isDesktopActivity(value: unknown): value is DesktopActivity {
+  if (typeof value !== 'object' || value === null) return false;
+  const activity = value as Partial<Record<keyof DesktopActivity, unknown>>;
+  return typeof activity.turnInFlight === 'boolean' && typeof activity.dialogOpen === 'boolean';
+}
+
 export interface DesktopRollbackNotice {
   failedVersion: string;
   restoredVersion: string;

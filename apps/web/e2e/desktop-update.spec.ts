@@ -81,6 +81,13 @@ test.describe('desktop shell', () => {
     await update.click({ force: true });
     expect(await calls(page)).toEqual({ install: 1, check: 0 });
 
+    await emit(page, { status: 'ready', version: '0.43.0' });
+    await expect(glyph).toHaveAttribute('data-level', '100');
+    await expect(mark).toHaveCount(0);
+    await expect(update).toHaveAccessibleName('离开时自动更新到 0.43.0');
+    await update.click();
+    expect(await calls(page)).toEqual({ install: 2, check: 0 });
+
     await emit(page, { status: 'installing', version: '0.43.0' });
     await expect(glyph).toHaveAttribute('data-level', '100');
 
@@ -89,13 +96,13 @@ test.describe('desktop shell', () => {
     await expect(mark).toHaveCount(0);
     await expect(update).toHaveAccessibleName('无法连接网络，未能检查更新');
     await update.click();
-    expect(await calls(page)).toEqual({ install: 1, check: 1 });
+    expect(await calls(page)).toEqual({ install: 2, check: 1 });
 
     await emit(page, { status: 'error', message: '下载中断' });
     await expect(glyph).toHaveAttribute('data-level', '0');
     await expect(mark).toHaveAttribute('data-mark', 'failed');
     await update.click();
-    expect(await calls(page)).toEqual({ install: 1, check: 2 });
+    expect(await calls(page)).toEqual({ install: 2, check: 2 });
   });
 });
 

@@ -159,7 +159,7 @@ function fixture(t, stagedVersion = '9.9.9') {
 
 test('an ad-hoc installed copy passes the gate for a staged app the Cairn certificate signed', async (t) => {
   const { stagedApp, statePath } = fixture(t);
-  const updater = createUpdater(() => {});
+  const updater = createUpdater(() => {}, { beforeRelaunch: () => {} });
   await assert.rejects(updater.apply('none'), {
     message: 'the staged app is version 9.9.9, not 1.1.0',
   });
@@ -216,7 +216,7 @@ test('exit 3 clears only staging and skips the refused version until a newer off
     return new Response(zip);
   });
   const requested = () => fetch.mock.calls.map((call) => call.arguments[0]);
-  const updater = createUpdater(() => {});
+  const updater = createUpdater(() => {}, { beforeRelaunch: () => {} });
   await assert.rejects(updater.apply('none'), { message: SIGNATURE_ERROR });
   assert.deepEqual(updater.state(), { status: 'error', message: SIGNATURE_ERROR });
   const afterRefusal = readUpdateState(statePath);
@@ -267,7 +267,7 @@ for (const [description, error] of [
     verify = () => {
       throw error;
     };
-    const updater = createUpdater(() => {});
+    const updater = createUpdater(() => {}, { beforeRelaunch: () => {} });
     await assert.rejects(updater.apply('none'), { message: SIGNATURE_ERROR });
     assert.deepEqual(updater.state(), { status: 'error', message: SIGNATURE_ERROR });
     assert.deepEqual(readUpdateState(statePath), initial);
@@ -298,7 +298,7 @@ test('exit 3 keeps a record changed to a different app during verification', asy
     writeUpdateState(statePath, fresh);
     throw codesignFailure(3);
   };
-  const updater = createUpdater(() => {});
+  const updater = createUpdater(() => {}, { beforeRelaunch: () => {} });
   await assert.rejects(updater.apply('none'), { message: SIGNATURE_ERROR });
   assert.deepEqual(updater.state(), { status: 'error', message: SIGNATURE_ERROR });
   assert.deepEqual(readUpdateState(statePath), fresh);
@@ -311,7 +311,7 @@ test('exit 3 keeps a record changed to a different app during verification', asy
 test('exit 0 applies the staged build and keeps the previous bundle for rollback', async (t) => {
   const { root, bundle, staging, stagedApp, statePath, initial } = fixture(t, '1.1.0');
   const previousApp = join(root, '.cairn-previous', 'Cairn.app');
-  const updater = createUpdater(() => {});
+  const updater = createUpdater(() => {}, { beforeRelaunch: () => {} });
   await updater.apply('none');
   assert.equal(await readBundleVersion(bundle), initial.staged.version);
   assert.equal(await readBundleVersion(previousApp), initial.staged.previousVersion);

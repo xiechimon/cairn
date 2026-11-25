@@ -122,7 +122,14 @@ function relaunch(when: Exclude<ApplyWhen, 'none'>): void {
   app.quit();
 }
 
-export function createUpdater(publish: (state: DesktopUpdateState) => void): Updater {
+export interface UpdaterHooks {
+  beforeRelaunch(): void;
+}
+
+export function createUpdater(
+  publish: (state: DesktopUpdateState) => void,
+  hooks: UpdaterHooks,
+): Updater {
   const statePath = (): string => updateStatePath(app.getPath('userData'));
   const recorded = readUpdateState(statePath());
   const offered = stagedFor(recorded, app.getVersion());
@@ -346,6 +353,7 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
       removeFolderAfterExit(dirname(staged.app), process.pid);
       if (when === 'none') return;
       set({ status: 'restarting', version: staged.version });
+      hooks.beforeRelaunch();
       relaunch(when);
     } catch (error) {
       set({ status: 'error', message: messageOf(error) });

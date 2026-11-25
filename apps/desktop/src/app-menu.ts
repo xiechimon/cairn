@@ -16,7 +16,7 @@ function updateItem(
     case 'available':
       return { label: `Install Update ${state.version}…`, click: actions.install };
     case 'ready':
-      return { label: `Restart to Update ${state.version}…`, click: actions.install };
+      return { label: `Update to ${state.version} Now`, click: actions.install };
     case 'downloading':
       return { label: `Downloading Update ${state.version} (${state.percent}%)`, enabled: false };
     case 'installing':

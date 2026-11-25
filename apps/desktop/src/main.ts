@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir, release } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -9,6 +9,7 @@ import {
   ACCESS_TOKEN_FILE_NAME,
   DESKTOP_SHELL_USER_AGENT,
   DESKTOP_TRAY_PATH,
+  type DesktopActivity,
   type DesktopMenuCommand,
   type DesktopRunnerState,
   type DesktopTrayState,
@@ -16,6 +17,7 @@ import {
   desktopNotificationOptions,
   ENV_VARS,
   isAppPath,
+  isDesktopActivity,
   isDesktopNotifyPayload,
   type NativeTrayMenu,
   nativeTrayMenuSchema,
@@ -42,6 +44,8 @@ import {
   type IpcMainInvokeEvent,
   ipcMain,
   Menu,
+  type MessageBoxOptions,
+  type MessageBoxReturnValue,
   type NativeImage,
   Notification,
   nativeImage,
@@ -73,6 +77,7 @@ import {
 } from './connections.js';
 import { installContextMenu } from './context-menu.js';
 import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
+import { createIdleWatch } from './idle-update.js';
 import { createKeepAwake } from './keep-awake.js';
 import { desktopCredentialActions } from './local-credential-actions.js';
 import { scanLocalProviders } from './local-providers.js';
@@ -89,6 +94,13 @@ import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './
 import { type CapturePage, createPageCapture } from './page-capture.js';
 import { offscreenCaptureSurfaces, pageCaptureRequestOf } from './page-capture-window.js';
 import {
+  parseRelaunchWindow,
+  RELAUNCH_WINDOW_FILE_NAME,
+  type RelaunchWindow,
+  relaunchWindowOf,
+  restoredUrl,
+} from './relaunch-window.js';
+import {
   clearServerOwner,
   installResidentHost,
   isResidentInstalled,
@@ -98,6 +110,7 @@ import {
 } from './resident-host.js';
 import { createRestartBudget } from './restart-budget.js';
 import { type LocalRunner, readRunnerRegistration, startLocalRunner } from './runner.js';
+import { runnerStepsInFlight } from './runner-activity.js';
 import { migrateRunnerHome, runnerHomeFor } from './runner-home.js';
 import { createServerExitHandler } from './server-exit.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
@@ -120,6 +133,7 @@ import {
 } from './update-copy.js';
 import {
   armGuard,
+  GUARD_HEALTHY_AFTER_MS,
   type GuardAction,
   type GuardEvent,
   type GuardState,
@@ -170,7 +184,6 @@ const UPDATE_CHECK_EVERY_MS = 60 * 60 * 1000;
 const UPDATE_CHECK_ON_FOCUS_AFTER_MS = 10 * 60 * 1000;
 const HEALTH_PROBE_MS = 5_000;
 const HEALTH_PROBE_TIMEOUT_MS = 5_000;
-const IDLE_APPLY_MS = 10 * 60_000;
 const IDLE_TICK_MS = 60_000;
 const NEW_TASK_SHORTCUT = 'Control+Alt+N';
 const TRAY_FIRST_HEIGHT = 440;
@@ -223,6 +236,8 @@ const serverExited = createServerExitHandler<RunningServer>({
   },
 });
 let mainWindow: BrowserWindow | null = null;
+let appOrigin: string | null = null;
+let mainWindowShown = false;
 let windowState: WindowStateStore | null = null;
 let tray: { destroy: () => void } | null = null;
 let trayOpenUntil = 0;
@@ -230,7 +245,8 @@ let runner: LocalRunner | null = null;
 let runnerStarting: Promise<void> | null = null;
 let quitting = false;
 let updater: Updater | null = null;
-let hiddenSince: number | null = null;
+let pageActivity: DesktopActivity | null = null;
+let openMessageBoxes = 0;
 let launchActivationPending = BACKGROUND_LAUNCH;
 let activeGuard: VersionGuard | null = null;
 const otelHeaderLogSecrets: string[] = [];
@@ -494,7 +510,56 @@ function rememberWindow(window: BrowserWindow, store: WindowStateStore): void {
   window.on('hide', () => store.flush());
 }
 
-function openWindow(origin: string): BrowserWindow {
+function relaunchWindowPath(): string {
+  return join(app.getPath('userData'), RELAUNCH_WINDOW_FILE_NAME);
+}
+
+function rememberWindowForRelaunch(): void {
+  const window = mainWindow;
+  if (window === null || window.isDestroyed() || appOrigin === null) return;
+  const saved = relaunchWindowOf(
+    {
+      isVisible: () => mainWindowShown,
+      isMinimized: () => window.isMinimized(),
+      isMaximized: () => window.isMaximized(),
+      isFullScreen: () => window.isFullScreen(),
+      url: window.webContents.getURL(),
+    },
+    appOrigin,
+  );
+  try {
+    writeFileSync(relaunchWindowPath(), `${JSON.stringify(saved)}\n`);
+  } catch (error) {
+    console.error('could not remember the window for the relaunch:', messageOf(error));
+  }
+}
+
+function takeRelaunchWindow(): RelaunchWindow | null {
+  const path = relaunchWindowPath();
+  let raw: string | null = null;
+  try {
+    raw = readFileSync(path, 'utf8');
+    rmSync(path, { force: true });
+  } catch {}
+  return parseRelaunchWindow(raw);
+}
+
+function showRestored(window: BrowserWindow, restore: RelaunchWindow | null): void {
+  if (restore === null) {
+    window.show();
+    return;
+  }
+  if (!restore.visible && BACKGROUND_LAUNCH) return;
+  if (restore.maximized) window.maximize();
+  if (BACKGROUND_LAUNCH) window.showInactive();
+  else window.show();
+  if (restore.minimized) window.minimize();
+  if (!restore.fullScreen) return;
+  if (window.isFocused()) window.setFullScreen(true);
+  else window.once('focus', () => window.setFullScreen(true));
+}
+
+function openWindow(origin: string, restore: RelaunchWindow | null = null): BrowserWindow {
   const store = windowStateStore();
   const window = new BrowserWindow({
     ...restoredBounds(store),
@@ -527,7 +592,20 @@ function openWindow(origin: string): BrowserWindow {
   window.on('close', clearQueuedTrayOpen);
   window.on('minimize', clearQueuedTrayOpen);
   window.on('hide', clearQueuedTrayOpen);
-  window.once('ready-to-show', () => window.show());
+  window.on('show', () => {
+    if (mainWindow === window) mainWindowShown = true;
+  });
+  window.on('hide', () => {
+    if (mainWindow === window) mainWindowShown = false;
+  });
+  window.once('ready-to-show', () => showRestored(window, restore));
+  const forgetActivity = (): void => {
+    if (mainWindow === window) pageActivity = null;
+  };
+  window.webContents.on('render-process-gone', forgetActivity);
+  window.webContents.on('did-start-navigation', ({ isMainFrame, isSameDocument }) => {
+    if (isMainFrame && !isSameDocument) forgetActivity();
+  });
   window.on('close', (event) => {
     if (quitting) return;
     event.preventDefault();
@@ -543,10 +621,15 @@ function openWindow(origin: string): BrowserWindow {
     if (isWebUrl(url)) void shell.openExternal(url);
   });
   rememberWindow(window, store);
-  void window.loadURL(origin);
+  void window.loadURL(restore === null ? origin : restoredUrl(origin, restore.path));
   mainWindow = window;
+  mainWindowShown = false;
   window.on('closed', () => {
-    if (mainWindow === window) mainWindow = null;
+    if (mainWindow === window) {
+      mainWindow = null;
+      mainWindowShown = false;
+      pageActivity = null;
+    }
   });
   return window;
 }
@@ -554,7 +637,7 @@ function openWindow(origin: string): BrowserWindow {
 function focusWindow(): void {
   const window = mainWindow;
   if (window === null) {
-    if (server !== null) openWindow(server.origin);
+    if (appOrigin !== null) openWindow(appOrigin);
     return;
   }
   if (window.isMinimized()) window.restore();
@@ -949,12 +1032,35 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   };
 }
 
+async function messageBox(options: MessageBoxOptions): Promise<MessageBoxReturnValue> {
+  openMessageBoxes += 1;
+  try {
+    return await dialog.showMessageBox(options);
+  } finally {
+    openMessageBoxes -= 1;
+  }
+}
+
+function servePageActivity(origin: string): void {
+  ipcMain.on('desktop-activity', (event, activity: unknown) => {
+    if (
+      mainWindow?.webContents !== event.sender ||
+      event.senderFrame !== event.sender.mainFrame ||
+      event.senderFrame?.origin !== origin ||
+      !isDesktopActivity(activity)
+    ) {
+      return;
+    }
+    pageActivity = { turnInFlight: activity.turnInFlight, dialogOpen: activity.dialogOpen };
+  });
+}
+
 function serveNotifications(origin: string): void {
   ipcMain.on('desktop-notify', (event, payload: unknown) => {
     if (event.senderFrame?.origin !== origin || !isDesktopNotifyPayload(payload)) return;
     const fallback = (): void => {
       if (payload.dialog !== undefined) {
-        void dialog.showMessageBox({
+        void messageBox({
           type: 'warning',
           message: payload.dialog.title,
           detail: payload.dialog.detail,
@@ -999,12 +1105,15 @@ function serveUpdates(
         ),
       ),
     );
-  const created = createUpdater((state) => {
-    showMenu(state);
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send('desktop-update:state', state);
-    }
-  });
+  const created = createUpdater(
+    (state) => {
+      showMenu(state);
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send('desktop-update:state', state);
+      }
+    },
+    { beforeRelaunch: rememberWindowForRelaunch },
+  );
   updater = created;
   let lastCheckedAt = 0;
   const check = (): Promise<void> => {
@@ -1021,7 +1130,7 @@ function serveUpdates(
     const blocked =
       readUpdateState(updateStatePath(app.getPath('userData'))).blocked?.version === state.version;
     const copy = installUpdateCopy(await windowLocale(), state.version, app.getVersion(), blocked);
-    const { response } = await dialog.showMessageBox({
+    const { response } = await messageBox({
       type: 'question',
       message: copy.title,
       detail: copy.detail,
@@ -1040,16 +1149,16 @@ function serveUpdates(
     if (state.status === 'available' || state.status === 'ready') await installFromMenu();
     else if (state.status === 'current') {
       const copy = upToDateCopy(await windowLocale(), state.version);
-      await dialog.showMessageBox({ type: 'info', message: copy.title, detail: copy.detail });
+      await messageBox({ type: 'info', message: copy.title, detail: copy.detail });
     } else if (state.status === 'unsupported') {
       const copy = unsupportedUpdateCopy(await windowLocale(), state.blocker);
-      await dialog.showMessageBox({ type: 'info', message: copy.title, detail: copy.detail });
+      await messageBox({ type: 'info', message: copy.title, detail: copy.detail });
     } else if (state.status === 'offline') {
       const copy = updateOfflineCopy(await windowLocale());
-      await dialog.showMessageBox({ type: 'info', message: copy.title, detail: copy.detail });
+      await messageBox({ type: 'info', message: copy.title, detail: copy.detail });
     } else if (state.status === 'error') {
       const copy = updateCheckFailedCopy(await windowLocale(), state.message);
-      await dialog.showMessageBox({ type: 'warning', message: copy.title, detail: copy.detail });
+      await messageBox({ type: 'warning', message: copy.title, detail: copy.detail });
     }
   };
   showMenu(created.state());
@@ -1172,6 +1281,7 @@ const QUIT_FALLBACK_MS = 30_000;
 interface VersionGuard {
   step(event: GuardEvent, reason: string): Promise<GuardAction>;
   rollingBack(): boolean;
+  settled(): boolean;
 }
 
 function takeRollbackNotice(userData: string): UpdateNotice | null {
@@ -1232,6 +1342,7 @@ function armVersionGuard(userData: string): VersionGuard | null {
           at,
         },
       });
+      rememberWindowForRelaunch();
       app.relaunch({ args: relaunchArgs(true) });
       setTimeout(() => app.exit(1), QUIT_FALLBACK_MS).unref();
       app.quit();
@@ -1258,7 +1369,17 @@ function armVersionGuard(userData: string): VersionGuard | null {
       return 'none';
     },
     rollingBack: () => rolling,
+    settled: () => !rolling && guard.phase !== 'armed',
   };
+}
+
+function confirmAfterBoot(guard: VersionGuard | null): void {
+  if (guard === null) return;
+  void guard.step('health-ok', 'started without a server of its own');
+  setTimeout(
+    () => void guard.step('health-ok', 'stayed up without a server of its own'),
+    GUARD_HEALTHY_AFTER_MS,
+  ).unref();
 }
 
 function startHealthWatch(running: RunningServer, guard: VersionGuard | null): void {
@@ -1283,24 +1404,40 @@ function startHealthWatch(running: RunningServer, guard: VersionGuard | null): v
   void probe();
 }
 
-function watchIdleUpdate(): void {
-  const timer = setInterval(() => {
-    const visible = BrowserWindow.getAllWindows().some((window) => window.isVisible());
-    if (visible || updater === null || updater.state().status !== 'ready') {
-      hiddenSince = null;
-      return;
-    }
-    hiddenSince ??= Date.now();
-    if (Date.now() - hiddenSince < IDLE_APPLY_MS) return;
-    if (activeGuard?.rollingBack() === true) return;
-    hiddenSince = null;
-    void updater
+function watchIdleUpdate(runnerHome: string): void {
+  const watch = createIdleWatch();
+  const used = (): void => watch.cairnUsed(Date.now());
+  app.on('browser-window-focus', used);
+  app.on('browser-window-blur', used);
+  const tick = (): void => {
+    const current = updater;
+    if (current === null) return;
+    const state = current.state();
+    const verdict = watch.sample({
+      now: Date.now(),
+      ready: state.status === 'ready',
+      guardSettled: activeGuard === null || activeGuard.settled(),
+      locked: powerMonitor.getSystemIdleState(1) === 'locked',
+      inputIdleMs: powerMonitor.getSystemIdleTime() * 1000,
+      cairnFocused: BrowserWindow.getFocusedWindow() !== null,
+      turnInFlight: pageActivity?.turnInFlight === true,
+      dialogOpen: openMessageBoxes > 0 || pageActivity?.dialogOpen === true,
+      stepsInFlight: runner === null ? 0 : runnerStepsInFlight(runnerHome),
+    });
+    if (!verdict.apply || state.status !== 'ready') return;
+    appendUpdateLog(
+      app.getPath('userData'),
+      `applying ${state.version} while the user is away (${verdict.trigger})`,
+    );
+    void current
       .apply('background')
       .catch((error: unknown) =>
         console.error('applying the idle update failed:', messageOf(error)),
       );
-  }, IDLE_TICK_MS);
-  timer.unref();
+  };
+  setInterval(tick, IDLE_TICK_MS).unref();
+  powerMonitor.on('lock-screen', tick);
+  powerMonitor.on('resume', tick);
 }
 
 function captureMainConsole(): void {
@@ -1517,9 +1654,13 @@ async function boot(): Promise<void> {
     void removeLeftoverUpdates();
     serveUpdates(origin, notice, ownerToken, activeConn.kind === 'local');
     serveNotifications(origin);
+    servePageActivity(origin);
     serveOwnComputer(origin, agentDesktopBinary());
-    watchIdleUpdate();
-    if (!BACKGROUND_LAUNCH) openWindow(origin);
+    watchIdleUpdate(activeRunnerHome);
+    appOrigin = origin;
+    const restore = takeRelaunchWindow();
+    if (restore !== null || !BACKGROUND_LAUNCH) openWindow(origin, restore);
+    if (server === null) confirmAfterBoot(guard);
   } catch (error) {
     const reason = messageOf(error);
     if (guard !== null) {

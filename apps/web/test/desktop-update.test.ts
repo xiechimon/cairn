@@ -27,4 +27,14 @@ describe('desktop update button presentation', () => {
     expect(viewZh.busy).toBe(false);
     expect(viewZh.label).toBe('更新失败：下载中断');
   });
+
+  it('a downloaded update waits quietly for the user to step away, and a click still updates now', () => {
+    const viewZh = desktopUpdateView({ status: 'ready', version: '0.43.0' }, zh);
+    expect(viewZh.mark).toBeNull();
+    expect(viewZh.busy).toBe(false);
+    expect(viewZh.label).toBe('离开时自动更新到 0.43.0');
+    expect(desktopUpdateView({ status: 'ready', version: '0.43.0' }, en).label).toBe(
+      'Updates to 0.43.0 when you step away',
+    );
+  });
 });

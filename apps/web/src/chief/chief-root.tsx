@@ -19,6 +19,7 @@ import { isEditableTarget } from '../overlay/hotkeys.js';
 import { RouteDialogCloseProvider } from '../overlay/route-dialog.js';
 import { SETTINGS_HREF, settingsSectionOf } from '../settings/settings-href.js';
 import { useSettingsOverlay } from '../settings/use-settings-overlay.js';
+import { useDesktopActivityReport } from './desktop-activity.js';
 import { questionDockState } from './question-dock-state.js';
 import { questionDraftKey } from './question-drafts.js';
 import { type OriginChiefQuestion, originChiefQuestions } from './question-origin.js';
@@ -124,6 +125,7 @@ export function ChiefRoot({
   useOverlayFocusRestore(settings.open);
   useOpenCoordinatorKey();
   useOpenSettingsMenu();
+  useDesktopActivityReport();
   const pendingQuestions = useMemo(
     () =>
       originChiefQuestions(surface.chiefData.stream ?? [], {
