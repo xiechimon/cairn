@@ -1,4 +1,8 @@
-import type { AntigravityReport, MachineAntigravityVerifyBody } from '@cairn/shared';
+import {
+  type AntigravityReport,
+  type MachineAntigravityVerifyBody,
+  parseStoredCapabilities,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { machine } from '../db/schema.js';
@@ -147,8 +151,9 @@ export function receiveAntigravityVerify(
     const row = deps.db.select().from(machine).where(eq(machine.id, machineId)).get();
     if (row !== undefined) {
       const nextReport = antigravityReportOf(body);
-      const previousReport = row.capabilities?.antigravity;
-      const base = row.capabilities ?? { mcpServers: [], skills: [] };
+      const previousCapabilities = parseStoredCapabilities(row.capabilities);
+      const previousReport = previousCapabilities?.antigravity;
+      const base = previousCapabilities ?? { mcpServers: [], skills: [] };
       const nextCapabilities = { ...base, antigravity: nextReport };
       deps.db
         .update(machine)

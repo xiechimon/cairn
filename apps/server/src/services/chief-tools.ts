@@ -21,6 +21,7 @@ import {
   isRegisteredMachine,
   isWaitingPhase,
   MODEL_SOURCE_RUNTIME_LABELS,
+  parseStoredCapabilities,
   SECRET_NAME_PATTERN,
   SECRET_NAME_RULE,
   SHOW_CHART_TOOL,
@@ -28,7 +29,7 @@ import {
   SUGGEST_REPLIES_TOOL_NAME,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
-import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   attachment,
@@ -469,7 +470,7 @@ export async function executeChiefTool(
       const rows = db
         .select()
         .from(machine)
-        .where(eq(machine.teamId, ctx.teamId))
+        .where(and(eq(machine.teamId, ctx.teamId), isNull(machine.retiredAt)))
         .all()
         .filter(isRegisteredMachine);
       return json(
@@ -478,7 +479,7 @@ export async function executeChiefTool(
           name: m.name,
           online: m.online,
           latestCliVersion: m.latestCliVersion,
-          capabilities: m.capabilities,
+          capabilities: parseStoredCapabilities(m.capabilities) ?? null,
         })),
       );
     }

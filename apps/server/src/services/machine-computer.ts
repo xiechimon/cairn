@@ -513,7 +513,7 @@ export function teamOffersDesktop(db: Db, teamId: string): boolean {
   return db
     .select()
     .from(machine)
-    .where(eq(machine.teamId, teamId))
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .all()
     .some((row) => machineAcceptsTool(row, 'computer_observe'));
 }
@@ -540,7 +540,7 @@ function selectTarget(
   const fleet = db
     .select()
     .from(machine)
-    .where(eq(machine.teamId, teamId))
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .orderBy(desc(machine.lastSeenAt))
     .all()
     .filter(capable);

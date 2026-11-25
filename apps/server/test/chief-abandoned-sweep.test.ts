@@ -62,11 +62,13 @@ async function sendChiefTurn(content = '你好', provider = 'stub-gw'): Promise<
   return { s, teamId, threadId: thread.id, stepId: stepRow.id, sentAt };
 }
 
+let enrollSeq = 0;
+
 async function enrollMachine(s: TestServer, teamId: string): Promise<string> {
   const key = await issueApiKey(s);
   const res = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: readyMachine({ teamId, name: 'sweep-mbp', cliVersion: '0.1.0' }),
+    body: readyMachine({ teamId, name: `sweep-mbp-${++enrollSeq}`, cliVersion: '0.1.0' }),
   });
   const { token } = (await res.json()) as { token: string };
   return token;

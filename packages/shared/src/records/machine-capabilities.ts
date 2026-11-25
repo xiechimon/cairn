@@ -264,6 +264,12 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   };
 }
 
+export function parseStoredCapabilities(raw: unknown): MachineCapabilities | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  return parseReportedCapabilities(raw) ?? null;
+}
+
 export const requiredCapabilitiesSchema = z.object({
   mcpServers: z.array(z.string()).optional(),
   models: z.array(z.string()).optional(),

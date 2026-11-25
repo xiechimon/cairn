@@ -1,5 +1,5 @@
 import { type ComputerRecord, chiefIdFormat } from '@cairn/shared';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computer, machine } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -14,7 +14,7 @@ export function ensureCoordinatorComputer(db: Db, teamId: string, userId: string
   const host = db
     .select()
     .from(machine)
-    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
+    .where(and(eq(machine.teamId, teamId), eq(machine.online, true), isNull(machine.retiredAt)))
     .orderBy(desc(machine.lastSeenAt))
     .all()
     .find((row) => row.capabilities?.computer === true);

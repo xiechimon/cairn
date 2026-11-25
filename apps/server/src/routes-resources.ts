@@ -333,18 +333,25 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/machines', conditionalGet(), (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
-    const rows = ctx.db.select().from(machine).where(eq(machine.teamId, id)).all();
+    const rows = ctx.db
+      .select()
+      .from(machine)
+      .where(and(eq(machine.teamId, id), isNull(machine.retiredAt)))
+      .all();
     const running = runningThreadsByMachine(ctx.db, id);
     const queued = queuedThreadsByMachine(ctx.db, id);
     const now = nowMs();
     return c.json(
-      rows.map((r) => ({
-        ...toMachineRecord(r, machineRunningCount(ctx.db, r.id)),
-        starting: !r.online && ctx.machineHub.isStarting(r.id, now),
-        running: running.get(r.id) ?? [],
-        queued: queued.get(r.id) ?? [],
-        strain: machineStrain(r.capabilities?.hardware),
-      })),
+      rows.map((r) => {
+        const record = toMachineRecord(r, machineRunningCount(ctx.db, r.id));
+        return {
+          ...record,
+          starting: !r.online && ctx.machineHub.isStarting(r.id, now),
+          running: running.get(r.id) ?? [],
+          queued: queued.get(r.id) ?? [],
+          strain: machineStrain(record.capabilities?.hardware),
+        };
+      }),
     );
   });
 

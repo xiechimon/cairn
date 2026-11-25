@@ -10,7 +10,7 @@ import {
 } from '@cairn/shared';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, project, schedule, todo } from '../db/schema.js';
@@ -231,7 +231,7 @@ export async function executeMcpTool(
       const rows = db
         .select()
         .from(machine)
-        .where(eq(machine.teamId, ctx.teamId))
+        .where(and(eq(machine.teamId, ctx.teamId), isNull(machine.retiredAt)))
         .all()
         .filter(isRegisteredMachine);
       return json(

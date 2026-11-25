@@ -46,7 +46,7 @@ function namedMachineForStart(
       lastSeenAt: machine.lastSeenAt,
     })
     .from(machine)
-    .where(eq(machine.teamId, todoRecord.teamId))
+    .where(and(eq(machine.teamId, todoRecord.teamId), isNull(machine.retiredAt)))
     .all()
     .filter(isRegisteredMachine);
   const online = registered.filter((row) => row.online);

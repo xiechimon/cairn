@@ -23,6 +23,7 @@ import {
   machineStrain,
   PROGRESS_ACTIVITY_PHASES,
   parseReportedCapabilities,
+  parseStoredCapabilities,
   transcriptPromptRowId,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm';
@@ -250,7 +251,7 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     kind: row.kind,
     enabledRuntimes: availableRuntimes(row),
     ...(runningSteps !== undefined ? { runningSteps } : {}),
-    capabilities: row.capabilities,
+    capabilities: parseStoredCapabilities(row.capabilities),
     ...(login.success ? { claudeLogin: login.data } : {}),
   });
 }
@@ -377,7 +378,14 @@ function adoptAsDefaultIfUnset(db: Db, teamId: string, machineId: string): void 
   const otherEnrolled = db
     .select({ id: machine.id })
     .from(machine)
-    .where(and(eq(machine.teamId, teamId), ne(machine.id, machineId), isNotNull(machine.tokenHash)))
+    .where(
+      and(
+        eq(machine.teamId, teamId),
+        ne(machine.id, machineId),
+        isNotNull(machine.tokenHash),
+        isNull(machine.retiredAt),
+      ),
+    )
     .get();
   if (otherEnrolled !== undefined) return;
   db.update(team)
@@ -506,7 +514,13 @@ export function enrollMachine(
         .run();
       const updated = db.select().from(machine).where(eq(machine.id, existing.id)).get();
       if (updated === undefined) return [];
-      const retired = retireVerifiedDuplicatesInTx(deps, updated, { hostKeys: keys });
+      const retired = [
+        ...retireVerifiedDuplicatesInTx(deps, updated, { hostKeys: keys }),
+        ...retireHostnameDuplicatesInTx(deps, updated, {
+          hostKeys: keys,
+          ownerApproved: false,
+        }),
+      ];
       const postRetireHostKey = upgradedHostKeyOf(
         db,
         input.teamId,
@@ -554,9 +568,16 @@ export function enrollMachine(
       })
       .run();
     const inserted = db.select().from(machine).where(eq(machine.id, machineId)).get();
-    return inserted !== undefined && keys.length > 0
-      ? retireVerifiedDuplicatesInTx(deps, inserted, { hostKeys: keys })
-      : [];
+    if (inserted === undefined) return [];
+    const retired =
+      keys.length > 0 ? retireVerifiedDuplicatesInTx(deps, inserted, { hostKeys: keys }) : [];
+    return [
+      ...retired,
+      ...retireHostnameDuplicatesInTx(deps, inserted, {
+        hostKeys: keys,
+        ownerApproved: false,
+      }),
+    ];
   });
   notifyRetiredMachines(deps, input.teamId, retiredIds);
   beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
@@ -733,6 +754,10 @@ export function authorizeEnrollmentMachine(
             allowCrossApiKey: true,
             ...(retireToken !== undefined ? { retireToken } : {}),
           }),
+          ...retireHostnameDuplicatesInTx(deps, updated, {
+            hostKeys: keys,
+            ownerApproved: true,
+          }),
         );
         const postRetireHostKey = upgradedHostKeyOf(
           db,
@@ -779,7 +804,12 @@ export function authorizeEnrollmentMachine(
       .run();
     const inserted = db.select().from(machine).where(eq(machine.id, machineId)).get();
     if (inserted === undefined || !input.ownerApproved) return [];
-    if (keys.length === 0 && retireToken === undefined) return [];
+    if (keys.length === 0 && retireToken === undefined) {
+      return retireHostnameDuplicatesInTx(deps, inserted, {
+        hostKeys: keys,
+        ownerApproved: true,
+      });
+    }
     return retireVerifiedDuplicatesInTx(deps, inserted, {
       hostKeys: keys,
       allowCrossApiKey: true,
@@ -809,9 +839,10 @@ export function markPresence(
     (previousLogin?.state !== reportedLogin?.state ||
       previousLogin?.expiresAt !== reportedLogin?.expiresAt);
   const capabilities = parseCapabilitiesField(body.capabilities);
+  const previousCapabilities = parseStoredCapabilities(row.capabilities) ?? null;
   const merged =
     capabilities !== undefined
-      ? mergeReportedCapabilities(row.capabilities, capabilities)
+      ? mergeReportedCapabilities(previousCapabilities, capabilities)
       : undefined;
   const reportedHostKey = body.hostKey ?? null;
   const legacyHostKeys = body.legacyHostKeys ?? [];
@@ -886,7 +917,7 @@ export function markPresence(
   }
 }
 
-function mergeMachineRowInTx(
+function reassignMachineReferencesInTx(
   db: Db,
   target: Pick<typeof machine.$inferSelect, 'id' | 'teamId'>,
   dup: Pick<typeof machine.$inferSelect, 'id' | 'teamId'>,
@@ -942,7 +973,64 @@ function mergeMachineRowInTx(
     .set({ machineId: target.id })
     .where(eq(computerCall.machineId, dup.id))
     .run();
+}
+
+function mergeMachineRowInTx(
+  db: Db,
+  target: Pick<typeof machine.$inferSelect, 'id' | 'teamId'>,
+  dup: Pick<typeof machine.$inferSelect, 'id' | 'teamId'>,
+): void {
+  reassignMachineReferencesInTx(db, target, dup);
   db.delete(machine).where(eq(machine.id, dup.id)).run();
+}
+
+function normalizeHostname(name: string | null | undefined): string | null {
+  if (name == null) return null;
+  const normalized = name
+    .trim()
+    .replace(/\.local$/i, '')
+    .toLowerCase();
+  return normalized === '' ? null : normalized;
+}
+
+function retireHostnameDuplicatesInTx(
+  deps: Pick<MachineDeps, 'db' | 'machineHub'>,
+  target: typeof machine.$inferSelect,
+  opts: { hostKeys: readonly string[]; ownerApproved: boolean },
+): string[] {
+  if (opts.hostKeys.length > 0) return [];
+  const targetHost = normalizeHostname(target.name);
+  if (targetHost === null) return [];
+  const candidates = deps.db
+    .select()
+    .from(machine)
+    .where(
+      and(
+        eq(machine.teamId, target.teamId),
+        eq(machine.online, false),
+        isNull(machine.retiredAt),
+        ne(machine.id, target.id),
+        ne(machine.kind, 'local'),
+      ),
+    )
+    .all();
+  const retiredIds: string[] = [];
+  const retiredAt = nowMs();
+  for (const dup of candidates) {
+    if (deps.machineHub.isConnected(dup.id) || hasActiveMachineWork(deps.db, dup.id)) continue;
+    if (!opts.ownerApproved && dup.hostKey !== null) continue;
+    const matchesName = normalizeHostname(dup.name) === targetHost;
+    const matchesReported = normalizeHostname(dup.capabilities?.hostname) === targetHost;
+    if (!matchesName && !matchesReported) continue;
+    reassignMachineReferencesInTx(deps.db, target, dup);
+    deps.db
+      .update(machine)
+      .set({ online: false, tokenHash: null, retiredAt })
+      .where(eq(machine.id, dup.id))
+      .run();
+    retiredIds.push(dup.id);
+  }
+  return retiredIds;
 }
 
 function hasActiveMachineWork(db: Db, machineId: string): boolean {

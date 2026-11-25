@@ -10,6 +10,7 @@ import {
   machineStrain,
   osPlatformOf,
   parseReportedCapabilities,
+  parseStoredCapabilities,
   requiredCapabilitiesSchema,
   stepJournalRowSchema,
 } from '../src/index.js';
@@ -383,6 +384,41 @@ describe('computer capabilities (D75)', () => {
       mcpServers: [],
       skills: [],
     });
+  });
+
+  it('parseStoredCapabilities drops legacy or unknown computerKind while keeping host, on the wire and in storage', () => {
+    expect(parseStoredCapabilities(null)).toBeNull();
+    expect(parseStoredCapabilities(undefined)).toBeUndefined();
+    expect(
+      parseStoredCapabilities({
+        mcpServers: ['figma'],
+        skills: [],
+        computer: true,
+        computerKind: 'vm',
+      }),
+    ).toEqual({ mcpServers: ['figma'], skills: [], computer: true });
+    expect(
+      parseStoredCapabilities({
+        mcpServers: [],
+        skills: [],
+        computerKind: 'future-kind',
+      }),
+    ).toEqual({ mcpServers: [], skills: [] });
+    expect(
+      parseStoredCapabilities({
+        mcpServers: [],
+        skills: [],
+        computer: true,
+        computerKind: 'host',
+      }),
+    ).toEqual({ mcpServers: [], skills: [], computer: true, computerKind: 'host' });
+    expect(
+      machineCapabilitiesSchema.parse({
+        mcpServers: [],
+        skills: [],
+        computerKind: 'vm',
+      }),
+    ).toEqual({ mcpServers: [], skills: [] });
   });
 });
 

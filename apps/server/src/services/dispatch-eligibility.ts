@@ -11,7 +11,7 @@ import {
   runnerOsOf,
   type StepKind,
 } from '@cairn/shared';
-import { and, eq, isNotNull, ne } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { build, machine, provider, step, todo } from '../db/schema.js';
@@ -69,7 +69,7 @@ export function claudeCodeUsable(db: Pick<Db, 'select'>, teamId: string): boolea
   return db
     .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
     .from(machine)
-    .where(eq(machine.teamId, teamId))
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .all()
     .some((row) => machineRuntimeAvailable(row, 'claude-code'));
 }
@@ -79,7 +79,7 @@ export function devinUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
   return db
     .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
     .from(machine)
-    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
+    .where(and(eq(machine.teamId, teamId), eq(machine.online, true), isNull(machine.retiredAt)))
     .all()
     .some((row) => machineRuntimeAvailable(row, 'devin'));
 }
@@ -91,7 +91,7 @@ export function antigravityUsable(db: Pick<Db, 'select'>, teamId: string): boole
   return db
     .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
     .from(machine)
-    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
+    .where(and(eq(machine.teamId, teamId), eq(machine.online, true), isNull(machine.retiredAt)))
     .all()
     .some(
       (row) =>
