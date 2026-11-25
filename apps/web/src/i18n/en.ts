@@ -2430,8 +2430,6 @@ export const EN: Record<string, string> = {
   当前版本: 'Version',
   关于: 'About',
   当前主机版本: 'Current host version',
-  '远程主机版本较旧，需在该电脑上更新': 'The remote host is outdated; update it on that computer',
-  这台远程主机无法自动更新: 'This remote host cannot update automatically',
   '远程主机正忙，空闲后会自动更新到 {version}。':
     'The remote host is busy; it will update to {version} when idle.',
   '正在把远程主机更新到 {version}。': 'Updating the remote host to {version}.',

@@ -1,9 +1,20 @@
 import type { RemoteVersionState } from '@cairn/shared';
-import { describe, expect, it, vi } from 'vitest';
-import { formatServerVersion, remoteUpdatePresentation } from '../src/board/remote-update-bar.js';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  formatServerVersion,
+  RemoteUpdateBar,
+  remoteUpdatePresentation,
+} from '../src/board/remote-update-bar.js';
 import { EN } from '../src/i18n/en.js';
+import { I18nProvider } from '../src/i18n/provider.js';
 import { translate, type TFunc } from '../src/i18n/translate.js';
 import { DraftSync } from '../src/overlay/draft-sync.js';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const zh: TFunc = (key, vars) => translate('zh', EN, key, vars);
 const en: TFunc = (key, vars) => translate('en', EN, key, vars);
@@ -147,5 +158,34 @@ describe('remoteUpdatePresentation', () => {
     await sync.flush({ keepalive: true });
     expect(saves).toEqual([{ text: 'unsent remote reload draft', keepalive: true }]);
     sync.dispose();
+  });
+
+  it('renders nothing without throwing in an older shell missing remoteState and in a plain browser', () => {
+    vi.stubGlobal('window', {
+      cairnDesktop: {
+        update: {
+          state: async () => ({ status: 'available', version: '0.1.730' }),
+          check: async () => {},
+          install: async () => ({ ok: true }),
+          subscribe: () => () => {},
+        },
+      },
+    });
+    const oldShellHtml = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'en',
+        children: createElement(RemoteUpdateBar),
+      }),
+    );
+    expect(oldShellHtml).toBe('');
+
+    vi.stubGlobal('window', {});
+    const plainBrowserHtml = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'en',
+        children: createElement(RemoteUpdateBar),
+      }),
+    );
+    expect(plainBrowserHtml).toBe('');
   });
 });

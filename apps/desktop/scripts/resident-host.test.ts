@@ -14,6 +14,7 @@ import {
   RESIDENT_LABEL,
   readServerOwner,
   residentPlistPath,
+  residentWritingReply,
   resolveResidentAtBoot,
   type ServerOwnerRecord,
   uninstallResidentHost,
@@ -369,5 +370,74 @@ describe('resident host and ownership lock', () => {
     expect(afterUpdate).toEqual(freshRecord);
     expect(actions).toEqual(['kickstart']);
     expect(excludedPid).toBe(7001);
+  });
+
+  test('residentWritingReply holds when GET /api/server/version reports busy for a claimed step and falls back on 404', async () => {
+    const home = tempDir();
+    writeServerOwner(home, {
+      pid: process.pid,
+      port: 8787,
+      origin: 'http://127.0.0.1:8787',
+      managedBy: 'launchd',
+      startedAt: Date.now(),
+    });
+    const paths: string[] = [];
+    const busyByVersion = await residentWritingReply(home, 'tok', async (input) => {
+      const path = new URL(String(input)).pathname;
+      paths.push(path);
+      if (path === '/api/remote/descriptor') return new Response('{}', { status: 200 });
+      if (path === '/api/server/version') {
+        return new Response(
+          JSON.stringify({
+            version: '0.1.730',
+            commit: 'abc1234',
+            busy: true,
+            updater: { supported: true, state: 'idle', reason: null },
+          }),
+          { status: 200 },
+        );
+      }
+      if (path === '/api/teams') return new Response('[]', { status: 200 });
+      return new Response('', { status: 404 });
+    });
+    expect(busyByVersion).toBe(true);
+    expect(paths).toContain('/api/server/version');
+
+    const idleByVersion = await residentWritingReply(home, 'tok', async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/api/remote/descriptor') return new Response('{}', { status: 200 });
+      if (path === '/api/server/version') {
+        return new Response(
+          JSON.stringify({
+            version: '0.1.730',
+            commit: 'abc1234',
+            busy: false,
+            updater: { supported: true, state: 'idle', reason: null },
+          }),
+          { status: 200 },
+        );
+      }
+      if (path === '/api/teams') {
+        return new Response(JSON.stringify([{ id: 't1' }]), { status: 200 });
+      }
+      if (path === '/api/teams/t1/chief/threads') {
+        return new Response(JSON.stringify([{ activeRun: { id: 'run-1' } }]), { status: 200 });
+      }
+      return new Response('', { status: 404 });
+    });
+    expect(idleByVersion).toBe(false);
+
+    const legacyBusy = await residentWritingReply(home, 'tok', async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/api/remote/descriptor') return new Response('{}', { status: 200 });
+      if (path === '/api/server/version') return new Response('', { status: 404 });
+      if (path === '/api/teams')
+        return new Response(JSON.stringify([{ id: 't1' }]), { status: 200 });
+      if (path === '/api/teams/t1/chief/threads') {
+        return new Response(JSON.stringify([{ turnQueue: { id: 'q1' } }]), { status: 200 });
+      }
+      return new Response('', { status: 404 });
+    });
+    expect(legacyBusy).toBe(true);
   });
 });

@@ -1,5 +1,4 @@
 import {
-  type DesktopUpdateState,
   isRemoteServerOlder,
   isServerVersionNewer,
   type RemoteVersionState,
@@ -479,49 +478,26 @@ export function createRemoteVersionController(
   };
 }
 
-export function remoteToDesktopUpdateState(remote: RemoteVersionState): DesktopUpdateState {
-  switch (remote.phase) {
-    case 'probing':
-      return { status: 'checking' };
-    case 'current':
-    case 'reloading':
-      return remote.serverVersion !== null
-        ? { status: 'current', version: remote.serverVersion }
-        : { status: 'idle' };
-    case 'updating': {
-      const target = remote.targetVersion ?? remote.appVersion;
-      if (remote.updaterState === 'downloading') {
-        return { status: 'downloading', version: target, percent: remote.percent ?? 0 };
-      }
-      if (remote.updaterState === 'waiting-idle') {
-        return { status: 'ready', version: target };
-      }
-      if (remote.updaterState === 'installing') {
-        return { status: 'installing', version: target };
-      }
-      if (remote.updaterState === 'restarting') {
-        return { status: 'restarting', version: target };
-      }
-      return { status: 'checking' };
-    }
-    case 'restarting':
-      return { status: 'restarting', version: remote.targetVersion ?? remote.appVersion };
-    case 'old-server':
-      return { status: 'error', message: 'remote-old-server' };
-    case 'unsupported':
-      if (
-        remote.reason === 'development' ||
-        remote.reason === 'not-in-applications' ||
-        remote.reason === 'read-only'
-      ) {
-        return { status: 'unsupported', blocker: remote.reason };
-      }
-      return { status: 'error', message: remote.reason ?? 'no-updater' };
-    case 'failed':
-      return remote.reason === 'offline'
-        ? { status: 'offline' }
-        : { status: 'error', message: remote.reason ?? 'failed' };
-    default:
-      return { status: 'idle' };
-  }
+export interface UpdateChannelLocalUpdater<TState, TInstallResult> {
+  state: () => TState;
+  check: () => Promise<void>;
+  install: () => Promise<TInstallResult>;
+}
+
+export interface UpdateChannelRemoteSource {
+  state: () => RemoteVersionState;
+  retry: () => Promise<void>;
+}
+
+export function createUpdateChannelHandlers<TState, TInstallResult>(opts: {
+  localUpdater: UpdateChannelLocalUpdater<TState, TInstallResult>;
+  remote: () => UpdateChannelRemoteSource | null;
+}) {
+  return {
+    shellState: () => opts.localUpdater.state(),
+    shellCheck: () => opts.localUpdater.check(),
+    shellInstall: () => opts.localUpdater.install(),
+    remoteState: () => opts.remote()?.state() ?? null,
+    remoteRetry: () => opts.remote()?.retry(),
+  };
 }

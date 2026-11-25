@@ -130,8 +130,8 @@ import {
 } from './remote-auth.js';
 import {
   createRemoteVersionController,
+  createUpdateChannelHandlers,
   type RemoteVersionController,
-  remoteToDesktopUpdateState,
 } from './remote-version.js';
 import {
   clearServerOwner,
@@ -1363,11 +1363,9 @@ function serveUpdates(
     ) {
       hostIdleState.remoteRequested = false;
     }
-    if (remoteVersionState === null) {
-      showMenu(state);
-      for (const window of BrowserWindow.getAllWindows()) {
-        window.webContents.send('desktop-update:state', state);
-      }
+    showMenu(state);
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('desktop-update:state', state);
     }
     writeHostStatus(state);
   };
@@ -1375,10 +1373,7 @@ function serveUpdates(
   updater = created;
   writeHostStatus(created.state());
   publishRemoteState = (state) => {
-    const mapped = remoteToDesktopUpdateState(state);
-    showMenu(mapped);
     for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send('desktop-update:state', mapped);
       window.webContents.send('desktop-update:remote-state', state);
     }
   };
@@ -1397,6 +1392,9 @@ function serveUpdates(
     handledHostRequestId = request.id;
     hostIdleState.remoteRequested = true;
     writeHostStatus(created.state());
+    if (allowLocalCredentials) {
+      void probeLocalServerVersion(origin, ownerToken);
+    }
     void created.check().catch((error: unknown) => {
       console.error('the requested host update check failed:', messageOf(error));
     });
@@ -1407,9 +1405,17 @@ function serveUpdates(
   let lastCheckedAt = 0;
   const check = (): Promise<void> => {
     lastCheckedAt = Date.now();
-    if (remoteVersion !== null) return remoteVersion.retry();
     return created.check();
   };
+  const channels = createUpdateChannelHandlers({
+    localUpdater: {
+      state: () => created.state(),
+      check,
+      install: () =>
+        created.state().status === 'ready' ? created.apply('foreground') : created.install(),
+    },
+    remote: () => remoteVersion,
+  });
   const installFromMenu = async (): Promise<void> => {
     try {
       await installChosenUpdate();
@@ -1444,15 +1450,7 @@ function serveUpdates(
   const checkFromMenu = async (): Promise<void> => {
     await check();
     if (remoteVersion !== null) {
-      const currentRemote = remoteVersion.state();
-      if (currentRemote.phase === 'current' && currentRemote.serverVersion !== null) {
-        const copy = upToDateCopy(await windowLocale(), currentRemote.serverVersion);
-        await messageBox({ type: 'info', message: copy.title, detail: copy.detail });
-      } else if (currentRemote.phase === 'failed' && currentRemote.reason === 'offline') {
-        const copy = updateOfflineCopy(await windowLocale());
-        await messageBox({ type: 'info', message: copy.title, detail: copy.detail });
-      }
-      return;
+      void remoteVersion.retry();
     }
     const state = created.state();
     if (state.status === 'available' || state.status === 'ready') await installFromMenu();
@@ -1495,26 +1493,21 @@ function serveUpdates(
     if (!fromOwnPage(event)) return;
     BrowserWindow.fromWebContents(event.sender)?.setWindowButtonVisibility(visible === true);
   });
-  ipcMain.handle('desktop-update:state', (event) => {
-    if (!fromOwnPage(event)) return null;
-    return remoteVersionState !== null
-      ? remoteToDesktopUpdateState(remoteVersionState)
-      : created.state();
-  });
-  ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
-  ipcMain.handle('desktop-update:install', (event) => {
-    if (!fromOwnPage(event)) return undefined;
-    if (remoteVersion !== null) return remoteVersion.retry();
-    if (!allowLocalCredentials) return undefined;
-    return created.state().status === 'ready' ? created.apply('foreground') : created.install();
-  });
-  ipcMain.handle('desktop-update:remote-state', (event) =>
-    fromOwnPage(event) ? remoteVersionState : null,
+  ipcMain.handle('desktop-update:state', (event) =>
+    fromOwnPage(event) ? channels.shellState() : null,
   );
-  ipcMain.handle('desktop-update:remote-retry', (event) => {
-    if (!fromOwnPage(event) || remoteVersion === null) return undefined;
-    return remoteVersion.retry();
-  });
+  ipcMain.handle('desktop-update:check', (event) =>
+    fromOwnPage(event) ? channels.shellCheck() : undefined,
+  );
+  ipcMain.handle('desktop-update:install', (event) =>
+    fromOwnPage(event) ? channels.shellInstall() : undefined,
+  );
+  ipcMain.handle('desktop-update:remote-state', (event) =>
+    fromOwnPage(event) ? channels.remoteState() : null,
+  );
+  ipcMain.handle('desktop-update:remote-retry', (event) =>
+    fromOwnPage(event) ? channels.remoteRetry() : undefined,
+  );
   const workerPath = join(
     app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'dist'),
     'antigravity-login-worker.mjs',
@@ -1588,16 +1581,12 @@ function serveUpdates(
     if (fromMainPage(event)) antigravityCancelLogin();
   });
   const periodicCheck = (): void => {
-    if (remoteVersion === null) void created.check();
+    void created.check();
   };
   setTimeout(periodicCheck, UPDATE_FIRST_CHECK_MS);
   setInterval(periodicCheck, UPDATE_CHECK_EVERY_MS);
   app.on('browser-window-focus', () => {
-    if (
-      remoteVersion === null &&
-      lastCheckedAt !== 0 &&
-      Date.now() - lastCheckedAt >= UPDATE_CHECK_ON_FOCUS_AFTER_MS
-    ) {
+    if (lastCheckedAt !== 0 && Date.now() - lastCheckedAt >= UPDATE_CHECK_ON_FOCUS_AFTER_MS) {
       void created.check();
     }
   });

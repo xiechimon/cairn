@@ -14,7 +14,7 @@ import { desktopStateToHostStatus } from '../src/host-update.js';
 import { createIdleWatch, type IdleSample, REMOTE_REQUEST_IDLE_MS } from '../src/idle-update.js';
 import {
   createRemoteVersionController,
-  remoteToDesktopUpdateState,
+  createUpdateChannelHandlers,
 } from '../src/remote-version.js';
 import { SIGNATURE_REFUSAL } from '../src/update-core.js';
 
@@ -448,19 +448,42 @@ describe('createRemoteVersionController', () => {
     controller.stop();
   });
 
-  test('maps desktop update states and unsupported blockers cleanly', () => {
-    expect(
-      remoteToDesktopUpdateState({
-        phase: 'unsupported',
-        serverVersion: '0.1.720',
-        serverCommit: 'abc1234',
-        appVersion: '0.1.721',
-        targetVersion: '0.1.721',
-        updaterState: 'unsupported',
-        percent: null,
-        reason: 'read-only',
+  test('maps desktop host status cleanly and separates S5 remote channels from S7 local shell channels', async () => {
+    const calls: string[] = [];
+    const localState = { status: 'available' as const, version: '0.1.730' };
+    const remoteState = {
+      phase: 'updating' as const,
+      appVersion: '0.1.730',
+      serverVersion: '0.1.720',
+      serverCommit: '1111111',
+      targetVersion: '0.1.730',
+      updaterState: 'downloading' as const,
+      percent: 45,
+      reason: null,
+    };
+    const channels = createUpdateChannelHandlers({
+      localUpdater: {
+        state: () => localState,
+        check: async () => {
+          calls.push('local:check');
+        },
+        install: async () => {
+          calls.push('local:install');
+        },
+      },
+      remote: () => ({
+        state: () => remoteState,
+        retry: async () => {
+          calls.push('remote:retry');
+        },
       }),
-    ).toEqual({ status: 'unsupported', blocker: 'read-only' });
+    });
+    expect(channels.shellState()).toEqual(localState);
+    expect(channels.remoteState()).toEqual(remoteState);
+    await channels.shellCheck();
+    await channels.shellInstall();
+    await channels.remoteRetry();
+    expect(calls).toEqual(['local:check', 'local:install', 'remote:retry']);
 
     expect(
       desktopStateToHostStatus(

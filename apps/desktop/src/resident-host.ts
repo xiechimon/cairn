@@ -262,11 +262,22 @@ export async function residentWritingReply(
 ): Promise<boolean> {
   const record = await probeResidentServer(cairnHome, fetchImpl);
   if (record === null) return false;
-  const get = async (path: string): Promise<unknown> => {
-    const res = await fetchImpl(`${record.origin}${path}`, {
+  const authGet = (path: string): Promise<Response> =>
+    fetchImpl(`${record.origin}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(5_000),
     });
+  const versionRes = await authGet('/api/server/version');
+  if (versionRes.ok) {
+    const version = (await versionRes.json()) as { busy?: unknown };
+    if (typeof version.busy === 'boolean') return version.busy;
+  } else if (versionRes.status !== 404) {
+    throw new Error(
+      `the resident server answered HTTP ${versionRes.status} for /api/server/version`,
+    );
+  }
+  const get = async (path: string): Promise<unknown> => {
+    const res = await authGet(path);
     if (!res.ok) throw new Error(`the resident server answered HTTP ${res.status} for ${path}`);
     return res.json();
   };
