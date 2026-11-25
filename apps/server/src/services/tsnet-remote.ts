@@ -16,6 +16,7 @@ import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { TsnetSettings } from '../config.js';
 import { listenOnTailnetSocket, type TailnetListener } from '../lib/tailnet-listener.js';
+import { findTailscaleSockets, tailscaleSocketCandidates } from '../lib/tailscale-socket.js';
 import {
   type SidecarLogger,
   type SidecarStatus,
@@ -255,12 +256,8 @@ export function parseLocalStatus(body: string): unknown {
   );
 }
 
-function readSystemStatus(): Promise<unknown> {
+function readSystemStatusFromSocket(socketPath: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const socketPath =
-      process.platform === 'darwin'
-        ? '/var/run/tailscaled.socket'
-        : '/var/run/tailscale/tailscaled.sock';
     const req = request(
       {
         socketPath,
@@ -290,6 +287,21 @@ function readSystemStatus(): Promise<unknown> {
     req.on('error', reject);
     req.end();
   });
+}
+
+async function readSystemStatus(): Promise<unknown> {
+  const existing = findTailscaleSockets();
+  const candidates =
+    existing.length > 0 ? existing : tailscaleSocketCandidates(process.platform).slice(0, 1);
+  let lastError: unknown = new Error('LocalAPI socket unavailable');
+  for (const socketPath of candidates) {
+    try {
+      return await readSystemStatusFromSocket(socketPath);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 }
 
 export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<TsnetRemote | null> {

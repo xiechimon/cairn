@@ -1,8 +1,9 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PairResponse, TailscaleAccess } from '@cairn/shared';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { tailscaleSocketCandidates } from '../src/lib/tailscale-socket.js';
 import {
   createTailscaleServe,
   type RunResult,
@@ -287,6 +288,177 @@ describe('the Tailscale address a Runner uses to reach this server', () => {
     expect(tailscaleCliCandidates('win32', { PATH: '', ProgramFiles: 'D:\\Apps' })).toEqual([
       'D:\\Apps\\Tailscale\\tailscale.exe',
     ]);
+  });
+
+  test('falls back to a later working CLI candidate when an earlier binary on PATH cannot reach a daemon', async () => {
+    const dir = makeTestTempDir('ts-multi-cli-');
+    tmpDirs.push(dir);
+    const brokenDir = join(dir, 'broken');
+    const workingDir = join(dir, 'working');
+    mkdirSync(brokenDir, { recursive: true });
+    mkdirSync(workingDir, { recursive: true });
+    const brokenBin = join(brokenDir, 'tailscale');
+    const workingBin = join(workingDir, 'tailscale');
+    writeFileSync(brokenBin, '#!/bin/sh\nexit 1\n');
+    writeFileSync(workingBin, '#!/bin/sh\nexit 0\n');
+    chmodSync(brokenBin, 0o755);
+    chmodSync(workingBin, 0o755);
+    vi.stubEnv('PATH', `${brokenDir}:${workingDir}`);
+
+    const node = fakeNode();
+    const runner = runOn(node);
+    const serve = createTailscaleServe({
+      environmentId: ENVIRONMENT_ID,
+      listenPort: PORT,
+      recordPath: recordPath(),
+      fetch: descriptorFetch(ENVIRONMENT_ID),
+      run: async (bin, args, opts) => {
+        if (bin === brokenBin) {
+          return {
+            code: 1,
+            stdout: '',
+            stderr: 'dial unix /var/run/tailscaled.socket: connect: no such file or directory',
+          };
+        }
+        return runner(bin, args, opts);
+      },
+    });
+    try {
+      expect(await serve.status()).toMatchObject({ state: 'off', url: null });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  test('reports needs-operator instead of not-connected when serve status denies access on a running node', async () => {
+    const node = fakeNode();
+    const baseRun = runOn(node);
+    const serve = createTailscaleServe({
+      environmentId: ENVIRONMENT_ID,
+      listenPort: PORT,
+      recordPath: recordPath(),
+      findCli: () => '/usr/bin/tailscale',
+      fetch: descriptorFetch(ENVIRONMENT_ID),
+      run: async (bin, args, opts) => {
+        if (args[0] === 'serve' && args[1] === 'status') {
+          return {
+            code: 1,
+            stdout: '',
+            stderr:
+              "Access denied: serve config denied\nTo not require root, use 'sudo tailscale set --operator=$USER' once.",
+          };
+        }
+        return baseRun(bin, args, opts);
+      },
+    });
+    expect(await serve.status()).toMatchObject({ state: 'needs-operator', url: null });
+  });
+
+  test('reports needs-https when serve status returns a consent URL on a running node', async () => {
+    const node = fakeNode();
+    const baseRun = runOn(node);
+    const serve = createTailscaleServe({
+      environmentId: ENVIRONMENT_ID,
+      listenPort: PORT,
+      recordPath: recordPath(),
+      findCli: () => '/usr/bin/tailscale',
+      fetch: descriptorFetch(ENVIRONMENT_ID),
+      run: async (bin, args, opts) => {
+        if (args[0] === 'serve' && args[1] === 'status') {
+          return {
+            code: 1,
+            stdout: '',
+            stderr:
+              '\nServe is not enabled on your tailnet.\nTo enable, visit:\n\n https://login.tailscale.com/f/serve?node=nAbc\n',
+          };
+        }
+        return baseRun(bin, args, opts);
+      },
+    });
+    expect(await serve.status()).toEqual({
+      state: 'needs-https',
+      url: null,
+      consentUrl: 'https://login.tailscale.com/f/serve?node=nAbc',
+    });
+  });
+
+  test('falls back to an active tailscaled socket and carries --socket into status, enable and withdraw', async () => {
+    const sock = '/var/run/tailscaled.sock';
+    const node = fakeNode();
+    const baseRun = runOn(node);
+    const calls: string[][] = [];
+    const serve = createTailscaleServe({
+      environmentId: ENVIRONMENT_ID,
+      listenPort: PORT,
+      recordPath: recordPath(),
+      findCli: () => '/usr/local/bin/tailscale',
+      findSockets: () => [sock],
+      fetch: descriptorFetch(ENVIRONMENT_ID),
+      run: async (bin, args, opts) => {
+        calls.push([...args]);
+        if (args[0] !== `--socket=${sock}`) {
+          return {
+            code: 1,
+            stdout: '',
+            stderr:
+              'failed to connect to local tailscaled (which appears to be running as tailscaled, pid 310). Got error: dial unix /var/run/tailscaled.socket: connect: no such file or directory',
+          };
+        }
+        return baseRun(bin, args.slice(1), opts);
+      },
+    });
+
+    expect(await serve.status()).toEqual({ state: 'off', url: null, consentUrl: null });
+    expect(await serve.enable()).toEqual({
+      state: 'ready',
+      url: `https://${DNS}`,
+      consentUrl: null,
+    });
+    await serve.withdraw();
+
+    expect(node.serveCalls).toEqual([
+      ['serve', '--bg', '--https=443', `http://127.0.0.1:${PORT}`],
+      ['serve', '--https=443', 'off'],
+    ]);
+    expect(
+      calls.filter((args) => args[0] === `--socket=${sock}` && args[1] === 'serve').length,
+    ).toBeGreaterThanOrEqual(4);
+    expect(tailscaleSocketCandidates('darwin')).toContain(sock);
+  });
+
+  test('skips non-executable files on PATH when locating the Tailscale CLI', async () => {
+    const dir = makeTestTempDir('ts-nonexec-');
+    tmpDirs.push(dir);
+    const badDir = join(dir, 'bad');
+    const goodDir = join(dir, 'good');
+    mkdirSync(badDir, { recursive: true });
+    mkdirSync(goodDir, { recursive: true });
+    const nonExec = join(badDir, 'tailscale');
+    const execBin = join(goodDir, 'tailscale');
+    writeFileSync(nonExec, 'not executable');
+    chmodSync(nonExec, 0o644);
+    writeFileSync(execBin, '#!/bin/sh\nexit 0\n');
+    chmodSync(execBin, 0o755);
+    vi.stubEnv('PATH', `${badDir}:${goodDir}`);
+
+    const seenBins: string[] = [];
+    const runner = runOn(fakeNode());
+    const serve = createTailscaleServe({
+      environmentId: ENVIRONMENT_ID,
+      listenPort: PORT,
+      recordPath: recordPath(),
+      fetch: descriptorFetch(ENVIRONMENT_ID),
+      run: async (bin, args, opts) => {
+        seenBins.push(bin);
+        return runner(bin, args, opts);
+      },
+    });
+    try {
+      expect(await serve.status()).toMatchObject({ state: 'off' });
+      expect(seenBins.every((bin) => bin === execBin)).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

@@ -1,8 +1,16 @@
 import { spawn } from 'node:child_process';
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  accessSync,
+  constants,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { delimiter, join } from 'node:path';
 import type { TailscaleAccess } from '@cairn/shared';
 import { z } from 'zod';
+import { findTailscaleSockets } from '../lib/tailscale-socket.js';
 
 const SERVE_HTTPS_PORTS = [443, 8443, 10000] as const;
 const QUICK_TIMEOUT_MS = 5_000;
@@ -32,6 +40,7 @@ export interface TailscaleServeDeps {
   listenPort: number;
   recordPath: string;
   findCli?: () => string | null;
+  findSockets?: () => string[];
   run?: RunTailscale;
   fetch?: typeof fetch;
   now?: () => number;
@@ -75,7 +84,7 @@ const recordSchema = z.object({
   target: z.string(),
 });
 
-type Online = { bin: string; dnsName: string; config: ServeConfig };
+type Online = { bin: string; prefixArgs: string[]; dnsName: string; config: ServeConfig };
 type Snapshot = Online | { early: TailscaleAccess };
 
 export function tailscaleCliCandidates(
@@ -101,13 +110,30 @@ export function tailscaleCliCandidates(
   return [...fromPath, '/usr/bin/tailscale', '/usr/sbin/tailscale', '/usr/local/bin/tailscale'];
 }
 
-function findInstalledCli(): string | null {
-  for (const candidate of tailscaleCliCandidates(process.platform, process.env)) {
-    try {
-      if (statSync(candidate).isFile()) return candidate;
-    } catch {}
+function isExecutableFile(path: string): boolean {
+  try {
+    if (!statSync(path).isFile()) return false;
+    if (process.platform !== 'win32') accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
-  return null;
+}
+
+function findInstalledClis(): string[] {
+  const found: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of tailscaleCliCandidates(process.platform, process.env)) {
+    if (!isExecutableFile(candidate)) continue;
+    let resolved = candidate;
+    try {
+      resolved = realpathSync(candidate);
+    } catch {}
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    found.push(candidate);
+  }
+  return found;
 }
 
 const runTailscale: RunTailscale = (bin, args, { timeoutMs, onOutput }) =>
@@ -124,10 +150,11 @@ const runTailscale: RunTailscale = (bin, args, { timeoutMs, onOutput }) =>
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
       stdout += chunk;
-      onOutput?.(stdout);
+      onOutput?.(`${stdout}\n${stderr}`);
     });
     child.stderr.on('data', (chunk: string) => {
       stderr += chunk;
+      onOutput?.(`${stdout}\n${stderr}`);
     });
     child.once('error', (error) => settle({ code: null, stdout, stderr: error.message }));
     child.once('close', (code) => settle({ code, stdout, stderr }));
@@ -146,7 +173,13 @@ function access(state: TailscaleAccess['state'], extra: Partial<TailscaleAccess>
 }
 
 function webEntry(config: ServeConfig, dnsName: string, port: number) {
-  return config?.Web?.[`${dnsName}:${port}`];
+  const web = config?.Web;
+  if (!web) return undefined;
+  const exact = `${dnsName}:${port}`;
+  if (web[exact] !== undefined) return web[exact];
+  const lower = exact.toLowerCase();
+  const matched = Object.keys(web).find((key) => key.toLowerCase() === lower);
+  return matched === undefined ? undefined : web[matched];
 }
 
 function urlFor(dnsName: string, port: number): string {
@@ -155,7 +188,13 @@ function urlFor(dnsName: string, port: number): string {
 
 export function createTailscaleServe(deps: TailscaleServeDeps): TailscaleServe {
   const run = deps.run ?? runTailscale;
-  const findCli = deps.findCli ?? findInstalledCli;
+  const listClis = deps.findCli
+    ? () => {
+        const bin = deps.findCli?.();
+        return bin === null || bin === undefined ? [] : [bin];
+      }
+    : findInstalledClis;
+  const listSockets = deps.findSockets ?? (() => findTailscaleSockets());
   const fetchUrl = deps.fetch ?? globalThis.fetch;
   const now = deps.now ?? Date.now;
   const target = `http://127.0.0.1:${deps.listenPort}`;
@@ -176,23 +215,52 @@ export function createTailscaleServe(deps: TailscaleServeDeps): TailscaleServe {
     }
   };
 
-  const snapshot = async (): Promise<Snapshot> => {
-    const bin = findCli();
-    if (bin === null) return { early: access('not-installed') };
-    const status = statusSchema.safeParse(
-      parseJson((await run(bin, ['status', '--json'], { timeoutMs: QUICK_TIMEOUT_MS })).stdout),
-    );
-    if (!status.success || status.data.BackendState !== 'Running') {
-      return { early: access('not-connected') };
+  const probeStatus = async (bin: string, prefixArgs: string[]) => {
+    const result = await run(bin, [...prefixArgs, 'status', '--json', '--peers=false'], {
+      timeoutMs: QUICK_TIMEOUT_MS,
+    });
+    return statusSchema.safeParse(parseJson(result.stdout));
+  };
+
+  const findRunningClient = async (bins: string[]) => {
+    const sockets = listSockets();
+    for (const bin of bins) {
+      const direct = await probeStatus(bin, []);
+      if (direct.success && direct.data.BackendState === 'Running') {
+        return { bin, prefixArgs: [] as string[], status: direct.data };
+      }
+      for (const socketPath of sockets) {
+        const prefixArgs = [`--socket=${socketPath}`];
+        const viaSocket = await probeStatus(bin, prefixArgs);
+        if (viaSocket.success && viaSocket.data.BackendState === 'Running') {
+          return { bin, prefixArgs, status: viaSocket.data };
+        }
+      }
     }
-    const dnsName = status.data.Self?.DNSName?.replace(/\.$/, '') ?? '';
+    return null;
+  };
+
+  const snapshot = async (): Promise<Snapshot> => {
+    const bins = listClis();
+    if (bins.length === 0) return { early: access('not-installed') };
+    const client = await findRunningClient(bins);
+    if (client === null) return { early: access('not-connected') };
+    const dnsName = client.status.Self?.DNSName?.replace(/\.$/, '') ?? '';
     if (dnsName === '') {
       return { early: access('needs-https', { consentUrl: MAGIC_DNS_SETTINGS_URL }) };
     }
-    const served = await run(bin, ['serve', 'status', '--json'], { timeoutMs: QUICK_TIMEOUT_MS });
+    const served = await run(client.bin, [...client.prefixArgs, 'serve', 'status', '--json'], {
+      timeoutMs: QUICK_TIMEOUT_MS,
+    });
     const config = serveConfigSchema.safeParse(parseJson(served.stdout));
-    if (served.code !== 0 || !config.success) return { early: access('not-connected') };
-    return { bin, dnsName, config: config.data };
+    if (served.code !== 0 || !config.success) {
+      const output = `${served.stderr}\n${served.stdout}`;
+      if (ACCESS_DENIED_PATTERN.test(output)) return { early: access('needs-operator') };
+      const consent = CONSENT_URL_PATTERN.exec(output)?.[0];
+      if (consent !== undefined) return { early: access('needs-https', { consentUrl: consent }) };
+      return { early: access('not-connected') };
+    }
+    return { bin: client.bin, prefixArgs: client.prefixArgs, dnsName, config: config.data };
   };
 
   const servedPort = (online: Online): number | null =>
@@ -272,7 +340,7 @@ export function createTailscaleServe(deps: TailscaleServeDeps): TailscaleServe {
     timeoutMs: number,
     onOutput?: (out: string) => void,
   ) =>
-    run(online.bin, ['serve', '--bg', `--https=${port}`, target], {
+    run(online.bin, [...online.prefixArgs, 'serve', '--bg', `--https=${port}`, target], {
       timeoutMs,
       ...(onOutput !== undefined ? { onOutput } : {}),
     }).then((result) => {
@@ -331,7 +399,7 @@ export function createTailscaleServe(deps: TailscaleServeDeps): TailscaleServe {
     if (record === null) return;
     const snap = await snapshot();
     if ('early' in snap || !recordedMapping(snap, record.httpsPort)) return;
-    await run(snap.bin, ['serve', `--https=${record.httpsPort}`, 'off'], {
+    await run(snap.bin, [...snap.prefixArgs, 'serve', `--https=${record.httpsPort}`, 'off'], {
       timeoutMs: QUICK_TIMEOUT_MS,
     });
     verified = null;

@@ -15,6 +15,7 @@ import { ENV_VARS } from '@cairn/shared';
 import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig, type TsnetSettings } from '../src/config.js';
+import { tailscaleSocketCandidates } from '../src/lib/tailscale-socket.js';
 import type { SidecarProcess } from '../src/lib/tsnet-sidecar.js';
 import {
   createTsnetRemote,
@@ -155,6 +156,9 @@ describe('config: off unless explicitly enabled, log upload off unless opted in'
       mode: 'socket',
       allowedLogins: ['owner@example.com', 'second@example.com'],
     });
+    expect(tailscaleSocketCandidates('darwin')).toEqual(
+      expect.arrayContaining(['/var/run/tailscaled.socket', '/var/run/tailscaled.sock']),
+    );
   });
   test('a fresh install has tsnet disabled and log upload off', () => {
     const home = freshHome();
