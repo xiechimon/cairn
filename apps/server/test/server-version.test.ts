@@ -403,4 +403,33 @@ describe('GET /api/server/version and POST /api/server/update', () => {
     const bad = await req(s.app, 'POST', '/api/server/update', { targetVersion: 'not-semver' });
     expect(bad.status).toBe(400);
   });
+
+  test('resolveBuildVersion uses env first, then exact desktop-v tag, and never falls back to stale tags', async () => {
+    const { resolveBuildVersion } = (await import('../build-info-resolve.mjs')) as {
+      resolveBuildVersion: (opts?: {
+        env?: Record<string, string | undefined>;
+        gitDescribeExact?: () => string;
+      }) => string | null;
+    };
+    expect(
+      resolveBuildVersion({
+        env: { CAIRN_BUILD_VERSION: '0.1.731' },
+        gitDescribeExact: () => 'desktop-v0.1.700',
+      }),
+    ).toBe('0.1.731');
+    expect(
+      resolveBuildVersion({
+        env: {},
+        gitDescribeExact: () => 'desktop-v0.1.730',
+      }),
+    ).toBe('0.1.730');
+    expect(
+      resolveBuildVersion({
+        env: {},
+        gitDescribeExact: () => {
+          throw new Error('fatal: no tag exactly matches');
+        },
+      }),
+    ).toBeNull();
+  });
 });

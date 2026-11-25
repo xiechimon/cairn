@@ -489,6 +489,23 @@ export interface UpdateChannelRemoteSource {
   retry: () => Promise<void>;
 }
 
+export function formatAboutVersion(
+  version: string | null,
+  commit: string | null,
+): { applicationVersion: string; version: string } {
+  const shortCommit = commit === null ? null : commit.slice(0, 7);
+  if (version === null) {
+    return {
+      applicationVersion: shortCommit === null ? 'Unknown' : 'Dev',
+      version: shortCommit ?? '',
+    };
+  }
+  return {
+    applicationVersion: version,
+    version: shortCommit ?? '',
+  };
+}
+
 export function createUpdateChannelHandlers<TState, TInstallResult>(opts: {
   localUpdater: UpdateChannelLocalUpdater<TState, TInstallResult>;
   remote: () => UpdateChannelRemoteSource | null;

@@ -15,6 +15,7 @@ import { createIdleWatch, type IdleSample, REMOTE_REQUEST_IDLE_MS } from '../src
 import {
   createRemoteVersionController,
   createUpdateChannelHandlers,
+  formatAboutVersion,
 } from '../src/remote-version.js';
 import { SIGNATURE_REFUSAL } from '../src/update-core.js';
 
@@ -484,6 +485,19 @@ describe('createRemoteVersionController', () => {
     await channels.shellInstall();
     await channels.remoteRetry();
     expect(calls).toEqual(['local:check', 'local:install', 'remote:retry']);
+
+    expect(formatAboutVersion('0.1.730', '606d9c2ef')).toEqual({
+      applicationVersion: '0.1.730',
+      version: '606d9c2',
+    });
+    expect(formatAboutVersion(null, '606d9c2ef')).toEqual({
+      applicationVersion: 'Dev',
+      version: '606d9c2',
+    });
+    expect(formatAboutVersion(null, null)).toEqual({
+      applicationVersion: 'Unknown',
+      version: '',
+    });
 
     expect(
       desktopStateToHostStatus(

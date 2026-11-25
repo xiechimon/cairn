@@ -131,6 +131,7 @@ import {
 import {
   createRemoteVersionController,
   createUpdateChannelHandlers,
+  formatAboutVersion,
   type RemoteVersionController,
 } from './remote-version.js';
 import {
@@ -328,10 +329,7 @@ function cairnHome(): string {
 }
 
 function setAboutServerVersion(version: string | null, commit: string | null): void {
-  app.setAboutPanelOptions({
-    applicationVersion: version ?? 'Unknown',
-    version: commit ?? '',
-  });
+  app.setAboutPanelOptions(formatAboutVersion(version, commit));
 }
 
 async function probeLocalServerVersion(origin: string, ownerToken: string): Promise<void> {

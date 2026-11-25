@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { resolveBuildVersion } from './build-info-resolve.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 
@@ -16,11 +17,6 @@ const bundleFormFlag = {
     }));
   },
 };
-
-function resolveBuildVersion() {
-  const raw = (process.env.CAIRN_BUILD_VERSION || process.env.VERSION || '').trim();
-  return raw !== '' && raw !== '0.0.0' ? raw : null;
-}
 
 function resolveBuildCommit() {
   const fromEnv = (
@@ -45,7 +41,7 @@ function resolveBuildCommit() {
 const serverBuildInfoPlugin = {
   name: 'cairn-server-build-info',
   setup(b) {
-    const version = resolveBuildVersion();
+    const version = resolveBuildVersion({ cwd: root });
     const commit = resolveBuildCommit();
     b.onLoad({ filter: /src[\\/]build-info\.ts$/ }, () => ({
       contents: [
