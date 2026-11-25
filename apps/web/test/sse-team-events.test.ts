@@ -48,6 +48,7 @@ const cases: { event: StreamQueryEvent; cancel: Key[]; stale?: Key[] }[] = [
   { event: { type: 'notification', teamId: TEAM }, cancel: ['notifications', 'chiefThreads', 'chief'] },
   { event: { type: 'machine_presence', teamId: TEAM }, cancel: ['machines', 'computers', 'routing'] },
   { event: { type: 'computer.state', teamId: TEAM }, cancel: ['computers'] },
+  { event: { type: 'schedule', teamId: TEAM }, cancel: ['schedules'] },
 ];
 
 test.each(cases)('$event.type event × query key', ({ event, cancel, stale = [] }) => {

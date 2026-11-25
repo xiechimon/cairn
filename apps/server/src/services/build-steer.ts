@@ -196,8 +196,12 @@ export async function sendBuildSteer(
         if (!current?.enabled || current.nextRunAt === null || current.nextRunAt > wake.at) {
           throw new HttpError(409, 'Scheduled wake is no longer enabled or due');
         }
-        if (wake.createdBy.startsWith('worker:') && isWaitingPhase(todoRow?.phase ?? '')) {
-          throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
+        if (
+          (wake.createdBy.startsWith('worker:') && isWaitingPhase(todoRow?.phase ?? '')) ||
+          todoRow?.phase === 'confirm' ||
+          todoRow?.phase === 'needs_input'
+        ) {
+          throw new HttpError(409, 'Schedule is waiting at a confirmation or review gate');
         }
       }
       if (

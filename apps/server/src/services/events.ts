@@ -58,6 +58,13 @@ export class TeamStreamHub {
     this.publish(teamId, () => ({ type: 'notification', notification: record }));
   }
 
+  publishScheduleChange(teamId: string, scheduleId?: string): void {
+    this.publish(teamId, () => ({
+      type: 'schedule',
+      ...(scheduleId === undefined ? {} : { scheduleId }),
+    }));
+  }
+
   publishPrivate(teamId: string, userId: string, frame: () => object): void {
     if (!userId) return;
     const set = this.byTeam.get(teamId);

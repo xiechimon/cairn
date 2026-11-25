@@ -92,6 +92,13 @@ export function TasksScheduleList({
   const row = (schedule: ScheduleRecord) => {
     const deletedHere = editingDeleted && editing.todoId === schedule.todoId;
     const reason = schedule.enabled === false ? (schedule.pausedReason ?? null) : null;
+    const runIssue =
+      schedule.enabled !== false &&
+      (schedule.lastRunStatus === 'failed' || schedule.lastRunStatus === 'skipped') &&
+      schedule.lastRunError != null &&
+      schedule.lastRunError !== ''
+        ? schedule.lastRunError
+        : null;
     const cron = scheduleUnnamedCron(schedule, t);
     const cadence =
       cron === null ? (
@@ -112,10 +119,17 @@ export function TasksScheduleList({
         {cadence} · {t('已暂停')}
       </>
     ) : cron === null ? (
-      scheduleSummary(schedule, now, t)
+      runIssue === null ? (
+        scheduleSummary(schedule, now, t)
+      ) : (
+        <>
+          {scheduleSummary(schedule, now, t)} · {schedulePauseReason(runIssue, t)}
+        </>
+      )
     ) : (
       <>
         {cadence} · {scheduleNext(schedule, now, t)}
+        {runIssue === null ? null : ` · ${schedulePauseReason(runIssue, t)}`}
       </>
     );
     return (
@@ -149,7 +163,7 @@ export function TasksScheduleList({
             </span>
             <span
               className="truncate text-meta leading-4.5 text-content-tertiary"
-              title={reason ?? undefined}
+              title={reason ?? runIssue ?? undefined}
             >
               {status}
             </span>

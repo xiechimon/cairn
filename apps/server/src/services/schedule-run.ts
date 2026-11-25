@@ -5,7 +5,7 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { hasActiveStep } from './builds.js';
-import { toScheduleRecord } from './schedules.js';
+import { notifyScheduleClock, publishScheduleChange, toScheduleRecord } from './schedules.js';
 
 export function runScheduleNow(deps: BuildDeps, teamId: string, id: string): ScheduleRecord {
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
@@ -13,14 +13,22 @@ export function runScheduleNow(deps: BuildDeps, teamId: string, id: string): Sch
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) throw new HttpError(404, `schedule ${id} not found`);
   if (todoRow.archivedAt !== null) {
-    throw new HttpError(409, 'This schedule belongs to an archived thread');
+    throw new HttpError(
+      409,
+      'This schedule belongs to an archived thread',
+      'schedule-thread-archived',
+    );
   }
   const projectRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
   if (!projectRow || projectRow.teamId !== teamId) {
     throw new HttpError(404, `schedule ${id} not found`);
   }
   if (projectRow.archivedAt !== null) {
-    throw new HttpError(409, 'This schedule belongs to an archived project');
+    throw new HttpError(
+      409,
+      'This schedule belongs to an archived project',
+      'schedule-project-archived',
+    );
   }
   if (!row.enabled) throw new HttpError(409, 'This schedule is paused; resume it first');
   if (todoRow.latestBuildId !== null && hasActiveStep(deps, todoRow.latestBuildId)) {
@@ -35,6 +43,8 @@ export function runScheduleNow(deps: BuildDeps, teamId: string, id: string): Sch
     .set({ nextRunAt: now, retryNotBefore: null })
     .where(eq(schedule.id, id))
     .run();
+  notifyScheduleClock(deps.db, deps);
+  publishScheduleChange(deps, teamId, id);
   const current = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = current ? toScheduleRecord(deps, current) : null;
   if (!record) throw new HttpError(404, `schedule ${id} not found`);

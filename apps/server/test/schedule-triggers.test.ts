@@ -384,7 +384,7 @@ describe('trigger claim races and isolation (seq 31 review)', () => {
       .run();
     s.db
       .update(todo)
-      .set({ phase: 'confirm', latestBuildId: started?.id })
+      .set({ phase: 'done', latestBuildId: started?.id })
       .where(eq(todo.id, todoId))
       .run();
     const created = await req(s.app, 'POST', '/api/schedules', { todoId, kind: 'webhook' });
@@ -418,7 +418,7 @@ describe('trigger claim races and isolation (seq 31 review)', () => {
       .set({ status: 'done', finishedAt: Date.now() })
       .where(eq(step.id, firstRun[0]!.id))
       .run();
-    s.db.update(todo).set({ phase: 'confirm' }).where(eq(todo.id, todoId)).run();
+    s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, todoId)).run();
     await scheduler.tick();
     expect(routineSteps(s, body.id)).toHaveLength(2);
   });

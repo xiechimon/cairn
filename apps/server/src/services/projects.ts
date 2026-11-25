@@ -55,6 +55,7 @@ import { retireTodoDeliverables } from './machine-deliverables.js';
 import { moveProjectMemoriesToTeam } from './memory.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { pairedDeviceExists } from './paired-devices.js';
+import { notifyScheduleClock, pauseProjectSchedules } from './schedules.js';
 import { insertMessageRow } from './transcript.js';
 
 type ProjectRow = typeof project.$inferSelect;
@@ -92,6 +93,9 @@ export function setProjectArchived(
   if (row === undefined || (row.archivedAt !== null) === archived) return row;
   const archivedAt = archived ? nowMs() : null;
   db.update(project).set({ archivedAt }).where(eq(project.id, id)).run();
+  if (archived && pauseProjectSchedules(db, id) > 0) {
+    notifyScheduleClock(db);
+  }
   return { ...row, archivedAt };
 }
 

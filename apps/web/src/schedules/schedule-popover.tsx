@@ -22,8 +22,9 @@ import { describeError } from '../lib/error-copy.js';
 import { scheduleWhen } from '../pages/schedule-summary.js';
 import { ScheduleFields } from './schedule-fields.js';
 import {
-  cronHasFiveFields,
   isTriggerSchedule,
+  previewCronNextRun,
+  SCHEDULE_VALIDATION_ERROR_KEYS,
   scheduleBody,
   scheduleDraft,
   schedulePauseReason,
@@ -42,12 +43,6 @@ const RUN_STATUS: Record<string, string> = {
   completed: '成功',
   failed: '失败',
   skipped: '已跳过',
-};
-
-const SCHEDULE_VALIDATION_KEYS: Record<string, true> = {
-  'Cron 需要 5 段：分 时 日 月 周。': true,
-  '请选择这个时区里有效的日期和时间。': true,
-  '单次定时要选一个将来的时间。': true,
 };
 
 export function WebhookUrlRevealDialog({
@@ -229,11 +224,8 @@ function ScheduleEditor({
       ? candidates.find((candidate) => candidate.id === todoId)
       : { id: schedule.todoId, title: schedule.todo.title, projectId: schedule.projectId };
   const busy = mutations.createSchedule.isPending || mutations.updateSchedule.isPending;
-  const savable =
-    !busy &&
-    !deleted &&
-    target !== undefined &&
-    (draft.trigger !== 'custom' || cronHasFiveFields(draft.cron));
+  const cronValid = draft.trigger !== 'custom' || previewCronNextRun(draft.cron, tz, now).ok;
+  const savable = !busy && !deleted && target !== undefined && cronValid;
   const save = async () => {
     if (!savable || target === undefined) return;
     if (!live) {
@@ -262,7 +254,7 @@ function ScheduleEditor({
     } catch (failure) {
       setError(
         describeError(failure, t) ??
-          (failure instanceof Error && failure.message in SCHEDULE_VALIDATION_KEYS
+          (failure instanceof Error && SCHEDULE_VALIDATION_ERROR_KEYS.has(failure.message)
             ? t(failure.message)
             : t('定时未能保存，请重试。')),
       );
@@ -317,7 +309,9 @@ function ScheduleEditor({
     record === null
       ? null
       : record.lastRunAt === null
-        ? t('尚未运行')
+        ? record.lastRunStatus === null
+          ? t('尚未运行')
+          : t(RUN_STATUS[record.lastRunStatus] ?? record.lastRunStatus)
         : joinMeta([
             relativeTime(record.lastRunAt, now, t),
             record.lastRunStatus === null
@@ -329,7 +323,7 @@ function ScheduleEditor({
       ? null
       : target === undefined
         ? t('先选择任务')
-        : draft.trigger === 'custom' && !cronHasFiveFields(draft.cron)
+        : !cronValid
           ? t('Cron 表达式有误')
           : null;
   const problem = record?.pausedReason ?? record?.lastRunError ?? null;
@@ -408,6 +402,7 @@ function ScheduleEditor({
             value={draft}
             onChange={setDraft}
             tz={tz}
+            now={now}
             disabled={busy || deleted}
             webhookMasked={schedule?.kind === 'webhook' ? (schedule.webhookMasked ?? null) : null}
             onRotateWebhook={

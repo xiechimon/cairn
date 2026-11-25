@@ -118,7 +118,11 @@ export function computeNextRunAt(
       .next()
       .getTime();
   } catch {
-    throw new HttpError(400, 'invalid schedule cron expression or timezone');
+    throw new HttpError(
+      400,
+      'invalid schedule cron expression or timezone',
+      'invalid-schedule-cron',
+    );
   }
 }
 
@@ -168,6 +172,39 @@ export function listSchedules(deps: ScheduleDeps, teamId: string): ScheduleRecor
     .filter((r): r is ScheduleRecord => r !== null);
 }
 
+function assertScheduleTargetUnarchived(
+  deps: Pick<ScheduleDeps, 'db'>,
+  todoId: string,
+  projectId: string,
+): void {
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
+  if (todoRow?.archivedAt != null) {
+    throw new HttpError(
+      409,
+      'This schedule belongs to an archived thread',
+      'schedule-thread-archived',
+    );
+  }
+  const projectRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
+  if (projectRow?.archivedAt != null) {
+    throw new HttpError(
+      409,
+      'This schedule belongs to an archived project',
+      'schedule-project-archived',
+    );
+  }
+}
+
+export function publishScheduleChange(
+  deps: ScheduleDeps,
+  teamId: string,
+  scheduleId?: string,
+): void {
+  runAfterCommit(deps, `publishScheduleChange:${scheduleId ?? teamId}`, () =>
+    deps.hub.publishScheduleChange(teamId, scheduleId),
+  );
+}
+
 export function createSchedule(
   deps: ScheduleDeps,
   input: CreateScheduleBody & { teamId: string; createdBy: string },
@@ -181,11 +218,12 @@ export function createSchedule(
   if (projectId !== todoRow.projectId) {
     throw new HttpError(400, 'invalid projectId: todo belongs to another project');
   }
+  if (input.enabled ?? true) assertScheduleTargetUnarchived(deps, todoRow.id, projectId);
   const tz = input.tz ?? serverTimezone();
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: tz }).format();
   } catch {
-    throw new HttpError(400, 'invalid schedule timezone');
+    throw new HttpError(400, 'invalid schedule timezone', 'invalid-schedule-tz');
   }
   if (input.kind === 'once' && !options.allowAnyMinute) assertMinuteStep(input.at, tz);
   const now = nowMs();
@@ -235,6 +273,7 @@ export function createSchedule(
   const record = row ? toScheduleRecord(deps, row) : null;
   if (!record) throw new Error('schedule missing after insert');
   notifyScheduleClock(deps.db, deps);
+  publishScheduleChange(deps, record.teamId, record.id);
   return record;
 }
 
@@ -257,17 +296,26 @@ export function updateSchedule(
   if (input.projectId !== undefined && input.projectId !== existing.projectId) {
     throw new HttpError(400, 'invalid projectId: todo belongs to another project');
   }
+  const enabled = input.enabled ?? existing.enabled;
+  if (enabled) assertScheduleTargetUnarchived(deps, existing.todoId, existing.projectId);
   const tz = input.tz ?? existing.tz;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: tz }).format();
   } catch {
-    throw new HttpError(400, 'invalid schedule timezone');
+    throw new HttpError(400, 'invalid schedule timezone', 'invalid-schedule-tz');
   }
-  if (input.kind === 'once' && !options.allowAnyMinute) assertMinuteStep(input.at, tz);
+  const existingMinute =
+    existing.at !== null ? wallClockParts(existing.at, existing.tz).minute : null;
+  const preservingOffGridMinute =
+    existingMinute !== null &&
+    input.kind === 'once' &&
+    wallClockParts(input.at, tz).minute === existingMinute;
+  if (input.kind === 'once' && !options.allowAnyMinute && !preservingOffGridMinute) {
+    assertMinuteStep(input.at, tz);
+  }
   const now = nowMs();
   const at = input.at ?? null;
   const cron = cronExpressionFor(input.kind, at, tz, input.cron ?? null);
-  const enabled = input.enabled ?? existing.enabled;
   const isWebhook = input.kind === 'webhook';
   const rotate = isWebhook && input.rotateWebhook === true;
   const needsFreshWebhook =
@@ -321,6 +369,7 @@ export function updateSchedule(
   const record = row ? toScheduleRecord(deps, row) : null;
   if (!record) return null;
   notifyScheduleClock(deps.db, deps);
+  publishScheduleChange(deps, record.teamId, record.id);
   return { record, webhookToken: issuedToken };
 }
 
@@ -333,6 +382,7 @@ export function deleteSchedule(
   if (!row || row.teamId !== teamId) return false;
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();
   notifyScheduleClock(deps.db, deps);
+  publishScheduleChange(deps, row.teamId, id);
   return true;
 }
 
@@ -344,6 +394,7 @@ export function setScheduleEnabled(
 ): ScheduleRecord | null {
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   if (!row || row.teamId !== teamId) return null;
+  if (body.enabled) assertScheduleTargetUnarchived(deps, row.todoId, row.projectId);
   if (row.enabled !== body.enabled) {
     if (body.enabled) {
       const now = nowMs();
@@ -364,6 +415,7 @@ export function setScheduleEnabled(
         .where(eq(schedule.id, id))
         .run();
     }
+    publishScheduleChange(deps, row.teamId, id);
   }
   const updated = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   notifyScheduleClock(deps.db, deps);
@@ -426,23 +478,75 @@ export function updateNextRunAtIfUnmoved(
 }
 
 export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): void {
+  const row = deps.db
+    .select({ teamId: schedule.teamId })
+    .from(schedule)
+    .where(eq(schedule.id, id))
+    .get();
   deps.db
     .update(schedule)
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.id, id))
     .run();
   notifyScheduleClock(deps.db, deps);
+  if (row !== undefined) publishScheduleChange(deps, row.teamId, id);
+}
+
+export function recordScheduleSkip(
+  deps: ScheduleDeps,
+  id: string,
+  reason: string,
+  nextRunAt: number | null,
+): void {
+  const row = deps.db
+    .select({ teamId: schedule.teamId })
+    .from(schedule)
+    .where(eq(schedule.id, id))
+    .get();
+  deps.db
+    .update(schedule)
+    .set({
+      nextRunAt,
+      lastRunStatus: 'skipped',
+      lastRunError: reason,
+      retryNotBefore: null,
+    })
+    .where(eq(schedule.id, id))
+    .run();
+  notifyScheduleClock(deps.db, deps);
+  if (row !== undefined) publishScheduleChange(deps, row.teamId, id);
 }
 
 export const ARCHIVED_SCHEDULE_PAUSE_REASON = 'Task archived';
+export const ARCHIVED_PROJECT_SCHEDULE_PAUSE_REASON = 'Project archived';
+export const SCHEDULE_GATE_CONFIRM_SKIP_REASON = 'Task is waiting for plan confirmation';
+export const SCHEDULE_GATE_INPUT_SKIP_REASON = 'Task is waiting for user answer';
 
 export function pauseTodoSchedule(deps: ScheduleDeps, todoId: string, reason: string): void {
+  const rows = deps.db
+    .select({ id: schedule.id, teamId: schedule.teamId })
+    .from(schedule)
+    .where(eq(schedule.todoId, todoId))
+    .all();
   deps.db
     .update(schedule)
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.todoId, todoId))
     .run();
   notifyScheduleClock(deps.db, deps);
+  for (const row of rows) publishScheduleChange(deps, row.teamId, row.id);
+}
+
+export function pauseProjectSchedules(
+  db: Pick<Db, 'update'>,
+  projectId: string,
+  reason = ARCHIVED_PROJECT_SCHEDULE_PAUSE_REASON,
+): number {
+  return db
+    .update(schedule)
+    .set({ enabled: false, nextRunAt: null, pausedReason: reason })
+    .where(and(eq(schedule.projectId, projectId), eq(schedule.enabled, true)))
+    .run().changes;
 }
 
 export function parseThreadCadence(
@@ -590,16 +694,27 @@ export function recordScheduleFailure(
   reason: string,
   at = nowMs(),
 ): void {
+  const row = deps.db
+    .select({ teamId: schedule.teamId })
+    .from(schedule)
+    .where(eq(schedule.id, id))
+    .get();
+  const transient = scheduleFailureIsTransient(reason);
   deps.db
     .update(schedule)
     .set({
       lastRunStatus: 'failed',
       lastRunError: reason,
-      retryNotBefore: scheduleFailureIsTransient(reason) ? at + 5 * 60_000 : null,
+      retryNotBefore: transient ? at + 5 * 60_000 : null,
     })
     .where(eq(schedule.id, id))
     .run();
-  if (!scheduleFailureIsTransient(reason)) pauseSchedule(deps, id, reason);
+  if (!transient) {
+    pauseSchedule(deps, id, reason);
+  } else {
+    notifyScheduleClock(deps.db, deps);
+    if (row !== undefined) publishScheduleChange(deps, row.teamId, id);
+  }
 }
 
 export const MISSED_RUN_WINDOW_MS = 12 * 60 * 60_000;
@@ -627,6 +742,7 @@ export function applyMissedRunWindow(deps: ScheduleDeps, row: ScheduleRow, now: 
     .where(eq(schedule.id, row.id))
     .run();
   updateNextRunAtIfUnmoved(deps, row.id, row.nextRunAt, nextRunAt);
+  publishScheduleChange(deps, row.teamId, row.id);
   return true;
 }
 
@@ -714,4 +830,5 @@ export function finishScheduledStep(
     .set({ lastRunStatus: outcome.status, lastRunError: null, retryNotBefore: null })
     .where(eq(schedule.id, row.id))
     .run();
+  publishScheduleChange(deps, row.teamId, row.id);
 }

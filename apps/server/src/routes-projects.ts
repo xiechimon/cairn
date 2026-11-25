@@ -187,7 +187,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
       const row = requireProject(ctx, c.req.param('id'));
       if (row.teamId !== ctx.team.id) throw notFound(`project ${row.id}`);
       executeAction(
-        { db: ctx.db, reposDir: ctx.reposDir },
+        { db: ctx.db, reposDir: ctx.reposDir, hub: ctx.hub },
         {
           id,
           input: { projectId: row.id },

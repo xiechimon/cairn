@@ -12,9 +12,10 @@ import {
 } from '../components/ui/select.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
+import { scheduleWhen } from '../pages/schedule-summary.js';
 import {
-  cronHasFiveFields,
   isTriggerSchedule,
+  previewCronNextRun,
   type ScheduleDraft,
   type ScheduleTrigger,
 } from './schedule-model.js';
@@ -29,6 +30,15 @@ const TRIGGER_LABELS: Record<ScheduleTrigger, string> = {
   event: '事件',
   webhook: 'Webhook',
 };
+const WEEKDAY_OPTIONS: readonly { value: string; label: string }[] = [
+  { value: '1', label: '周一' },
+  { value: '2', label: '周二' },
+  { value: '3', label: '周三' },
+  { value: '4', label: '周四' },
+  { value: '5', label: '周五' },
+  { value: '6', label: '周六' },
+  { value: '0', label: '周日' },
+];
 const HOURS = Array.from({ length: 24 }, (_, value) => String(value).padStart(2, '0'));
 const MINUTES = ['00', '15', '30', '45'];
 const TIME_TRIGGER = 'w-16 justify-between tabular-nums pointer-coarse:h-11';
@@ -52,6 +62,7 @@ export function ScheduleFields({
   value,
   onChange,
   tz,
+  now = Date.now(),
   disabled = false,
   webhookMasked = null,
   onRotateWebhook,
@@ -59,14 +70,19 @@ export function ScheduleFields({
   value: ScheduleDraft;
   onChange: (value: ScheduleDraft) => void;
   tz: string;
+  now?: number;
   disabled?: boolean;
   webhookMasked?: string | null;
   onRotateWebhook?: () => void;
 }) {
   const { t, locale } = useI18n();
   const id = useId();
-  const cronValid = cronHasFiveFields(value.cron);
+  const cronPreview = value.trigger === 'custom' ? previewCronNextRun(value.cron, tz, now) : null;
+  const cronValid = cronPreview === null || cronPreview.ok;
   const zone = zoneName(tz, locale);
+  const minuteOptions = MINUTES.includes(value.minute)
+    ? MINUTES
+    : [...MINUTES, value.minute].sort();
   const maskedWebhookUrl =
     webhookMasked !== null && webhookMasked !== ''
       ? `/api/webhook/schedule/${webhookMasked}`
@@ -87,7 +103,16 @@ export function ScheduleFields({
         <SegmentedRadio
           label={t('频率')}
           value={value.trigger}
-          onChange={(trigger) => onChange({ ...value, trigger })}
+          onChange={(trigger) =>
+            onChange({
+              ...value,
+              trigger,
+              minute:
+                trigger === 'once' && value.trigger !== 'once' && !MINUTES.includes(value.minute)
+                  ? '00'
+                  : value.minute,
+            })
+          }
           options={(
             ['once', 'hourly', 'daily', 'weekdays', 'weekly', 'custom', 'event', 'webhook'] as const
           ).map((trigger) => ({ value: trigger, label: t(TRIGGER_LABELS[trigger]), disabled }))}
@@ -139,7 +164,14 @@ export function ScheduleFields({
           label={t('Cron 表达式')}
           htmlFor={`${id}-cron`}
           disabled={disabled}
-          help={cronValid ? t('服务器按{timezone}计算 Cron。', { timezone: zone }) : undefined}
+          help={
+            cronPreview?.ok
+              ? t('下次运行：{when}（{timezone}）', {
+                  when: scheduleWhen(cronPreview.nextRunAt, tz, now, t),
+                  timezone: zone,
+                })
+              : undefined
+          }
         >
           <Input
             id={`${id}-cron`}
@@ -151,20 +183,16 @@ export function ScheduleFields({
             aria-describedby={!cronValid ? `${id}-cron-error` : undefined}
             onChange={(event) => onChange({ ...value, cron: event.target.value })}
           />
-          {!cronValid && (
+          {cronPreview !== null && !cronPreview.ok && (
             <span id={`${id}-cron-error`} role="alert" className="text-meta text-destructive">
-              {t('Cron 需要 5 段：分 时 日 月 周。')}
+              {t(cronPreview.errorKey)}
             </span>
           )}
         </FormField>
       ) : (
         <>
-          {(value.trigger === 'once' || value.trigger === 'weekly') && (
-            <FormField
-              label={t(value.trigger === 'weekly' ? '从哪天开始每周重复' : '日期')}
-              htmlFor={`${id}-date`}
-              disabled={disabled}
-            >
+          {value.trigger === 'once' && (
+            <FormField label={t('日期')} htmlFor={`${id}-date`} disabled={disabled}>
               <Input
                 type="date"
                 id={`${id}-date`}
@@ -174,6 +202,26 @@ export function ScheduleFields({
                 onChange={(event) => onChange({ ...value, date: event.target.value })}
               />
             </FormField>
+          )}
+          {value.trigger === 'weekly' && (
+            <div className="flex flex-col gap-2">
+              <span
+                className={`text-ui font-medium text-foreground ${disabled ? 'opacity-50' : ''}`}
+              >
+                {t('每周重复日')}
+              </span>
+              <SegmentedRadio
+                label={t('每周重复日')}
+                value={String(value.weekday)}
+                onChange={(weekday) => onChange({ ...value, weekday: Number(weekday) })}
+                options={WEEKDAY_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: t(option.label),
+                  disabled,
+                }))}
+                className="grid h-auto w-full grid-cols-7 pointer-coarse:h-auto dark:[--seg-active:color-mix(in_oklch,var(--popover),white_10%)] [&_button]:w-full [&_button]:px-1 [&_button]:text-meta pointer-coarse:[&_button]:h-11"
+              />
+            </div>
           )}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
@@ -213,7 +261,7 @@ export function ScheduleFields({
                   <SelectValue>{value.minute}</SelectValue>
                 </SelectTrigger>
                 <SelectContent aria-label={t('分')}>
-                  {MINUTES.map((minute) => (
+                  {minuteOptions.map((minute) => (
                     <SelectItem key={minute} value={minute}>
                       {minute}
                     </SelectItem>

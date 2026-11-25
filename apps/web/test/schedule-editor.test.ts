@@ -92,10 +92,13 @@ describe('schedule editor wire values', () => {
     expect(scheduleViewState({ ...record, enabled: false })).toBe('paused');
     expect(scheduleViewState({ ...record, enabled: false, pausedReason: 'Host removed' })).toBe('disabled');
   });
-  test('only one-time schedules that are off or have no next run count as ended', () => {
+  test('only finished or auto-disabled one-time schedules without a next run count as ended', () => {
     expect(scheduleEnded({ kind: 'once', enabled: true, nextRunAt: NOW })).toBe(false);
-    expect(scheduleEnded({ kind: 'once', enabled: false, nextRunAt: NOW })).toBe(true);
+    expect(scheduleEnded({ kind: 'once', enabled: false, nextRunAt: NOW })).toBe(false);
+    expect(scheduleEnded({ kind: 'once', enabled: false, nextRunAt: null })).toBe(false);
     expect(scheduleEnded({ kind: 'once', enabled: true, nextRunAt: null })).toBe(true);
+    expect(scheduleEnded({ kind: 'once', enabled: false, nextRunAt: null, lastRunAt: NOW })).toBe(true);
+    expect(scheduleEnded({ kind: 'once', enabled: false, nextRunAt: null, pausedReason: 'Task archived' })).toBe(true);
     expect(scheduleEnded({ kind: 'daily', enabled: false, nextRunAt: null })).toBe(false);
   });
   test('pause reasons read as plain Chinese and an agent-written reason is kept', () => {

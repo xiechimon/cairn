@@ -28,13 +28,16 @@ import {
   SEND_CHOICE,
   settlePendingProposal,
 } from './action-proposals.js';
+import type { TeamStreamHub } from './events.js';
 import { isOwner } from './instance-owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { deleteProject } from './projects.js';
+import { notifyScheduleClock, pauseProjectSchedules } from './schedules.js';
 
 export interface ExecuteActionDeps {
   db: Db;
   reposDir: string;
+  hub?: TeamStreamHub;
 }
 
 export interface ExecuteActionRequest {
@@ -360,14 +363,15 @@ function archiveOn(
   projectId: string,
   teamId: string,
   archived: boolean,
-): { projectId: string; archivedAt: number | null } {
+): { projectId: string; archivedAt: number | null; pausedSchedules: number } {
   const row = requireOwnedProject(tx, projectId, teamId);
   if ((row.archivedAt !== null) === archived) {
-    return { projectId: row.id, archivedAt: row.archivedAt };
+    return { projectId: row.id, archivedAt: row.archivedAt, pausedSchedules: 0 };
   }
   const archivedAt = archived ? nowMs() : null;
   tx.update(project).set({ archivedAt }).where(eq(project.id, row.id)).run();
-  return { projectId: row.id, archivedAt };
+  const pausedSchedules = archived ? pauseProjectSchedules(tx, row.id) : 0;
+  return { projectId: row.id, archivedAt, pausedSchedules };
 }
 
 export function executeAction(
@@ -442,14 +446,23 @@ export function executeAction(
     throw new HttpError(400, `unknown action ${entry.id}`);
   }
   const row = journalRow(request, entry.id, targetId, hash);
+  let pausedSchedules = 0;
   const output = deps.db.transaction(
     (tx) => {
       const next = archiveOn(tx, targetId, request.teamId, archived);
+      pausedSchedules = next.pausedSchedules;
       tx.insert(actionJournal).values(row).run();
-      return entry.outputSchema.parse(next);
+      return entry.outputSchema.parse({
+        projectId: next.projectId,
+        archivedAt: next.archivedAt,
+      });
     },
     { behavior: 'immediate' },
   );
+  if (pausedSchedules > 0) {
+    notifyScheduleClock(deps.db);
+    deps.hub?.publishScheduleChange(request.teamId);
+  }
   return { status: 'executed', journalId: row.id, output };
 }
 
@@ -461,9 +474,13 @@ export interface UndoJournalInput {
   registry?: readonly ActionEntry[];
 }
 
-export function undoJournalEntry(deps: { db: Db }, input: UndoJournalInput): { journalId: string } {
+export function undoJournalEntry(
+  deps: { db: Db; hub?: TeamStreamHub },
+  input: UndoJournalInput,
+): { journalId: string } {
   const registry: readonly ActionEntry[] = input.registry ?? SLICE1_ACTIONS;
   let conflictJournalId: string | undefined;
+  let pausedSchedules = 0;
   const undoRowId = deps.db.transaction(
     (tx) => {
       const found = tx
@@ -519,7 +536,12 @@ export function undoJournalEntry(deps: { db: Db }, input: UndoJournalInput): { j
         return null;
       }
       const inverseInput = parseWith(inverse.inputSchema, { projectId: row.targetId }, 'input');
-      archiveOn(tx, row.targetId, row.teamId, inverse.id === projectArchiveAction.id);
+      pausedSchedules = archiveOn(
+        tx,
+        row.targetId,
+        row.teamId,
+        inverse.id === projectArchiveAction.id,
+      ).pausedSchedules;
       const undoId = newRecordId();
       tx.insert(actionJournal)
         .values({
@@ -545,6 +567,10 @@ export function undoJournalEntry(deps: { db: Db }, input: UndoJournalInput): { j
       'undo-refused',
       { conflictJournalId },
     );
+  }
+  if (pausedSchedules > 0) {
+    notifyScheduleClock(deps.db);
+    deps.hub?.publishScheduleChange(input.teamId);
   }
   return { journalId: undoRowId };
 }

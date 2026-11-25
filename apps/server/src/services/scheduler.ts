@@ -1,6 +1,6 @@
 import { ACTIVE_STEP_STATUSES, type Scheduler, WAITING_PHASES } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
-import { build, chief, dueEvent, project, schedule, step, todo } from '../db/schema.js';
+import { chief, dueEvent, project, schedule, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { dispatchActionWakes, sweepExpiredActionProposals } from './action-proposals.js';
@@ -21,7 +21,6 @@ import {
   startBuilds,
   sweepPlanAutoConfirm,
   sweepZombieQueuedTodos,
-  toBuildRecord,
 } from './builds.js';
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
@@ -39,7 +38,7 @@ import { sweepStaleMachines } from './machines.js';
 import { purgeExpiredMemoryVersions } from './memory.js';
 import { sweepAbandonedMemoryEditSteps } from './memory-edit-turns.js';
 import { sweepFailedRetries } from './needs-you.js';
-import { sweepIdleChiefUnread } from './notifications.js';
+import { notifyScheduleRun, sweepIdleChiefUnread } from './notifications.js';
 import { handoffUnclaimedOwnershipWake, ownershipHandoffEventId } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
 import { createPrWatch, PR_WATCH_INTERVAL_MS } from './pr-watch.js';
@@ -49,6 +48,7 @@ import { sweepQuotaWaitSteps } from './quota-wait.js';
 import { releaseResearchReworkHolds } from './research-stuck.js';
 import { sweepOfflineRunners } from './runner-offline.js';
 import {
+  ARCHIVED_PROJECT_SCHEDULE_PAUSE_REASON,
   ARCHIVED_SCHEDULE_PAUSE_REASON,
   applyMissedRunWindow,
   assertWorkerScheduleInterval,
@@ -59,7 +59,12 @@ import {
   isWorkerSchedule,
   notifyScheduleClock,
   pauseSchedule,
+  publishScheduleChange,
   recordScheduleFailure,
+  recordScheduleSkip,
+  SCHEDULE_GATE_CONFIRM_SKIP_REASON,
+  SCHEDULE_GATE_INPUT_SKIP_REASON,
+  scheduleFailureIsTransient,
   setScheduleClockListener,
   updateNextRunAt,
   WORKER_SCHEDULE_MIN_INTERVAL_MS,
@@ -87,6 +92,11 @@ export interface AttachmentGcRun {
 }
 
 const SCHEDULE_GATE_PHASES: ReadonlySet<string> = new Set(WAITING_PHASES);
+const OWNER_GATE_PHASES: ReadonlySet<string> = new Set(['confirm', 'needs_input']);
+
+function gateSkipReason(phase: string): string {
+  return phase === 'confirm' ? SCHEDULE_GATE_CONFIRM_SKIP_REASON : SCHEDULE_GATE_INPUT_SKIP_REASON;
+}
 
 export function createScheduler(
   deps: BuildDeps,
@@ -160,15 +170,17 @@ export function createScheduler(
       pauseSchedule(deps, row.id, ARCHIVED_SCHEDULE_PAUSE_REASON);
       return;
     }
+    if (projectRow.archivedAt !== null) {
+      pauseSchedule(deps, row.id, ARCHIVED_PROJECT_SCHEDULE_PAUSE_REASON);
+      return;
+    }
     const workerCreated = isWorkerSchedule(row.createdBy);
     const runLimited = workerCreated || isTriggerKind(row.kind);
     const history = runLimited ? workerScheduleRunHistory(deps, row.todoId) : null;
     if (history !== null && history.consecutive >= WORKER_SCHEDULE_RUN_LIMIT) {
-      pauseSchedule(
-        deps,
-        row.id,
-        'Paused after 10 consecutive scheduled runs without a human message',
-      );
+      const reason = 'Paused after 10 consecutive scheduled runs without a human message';
+      pauseSchedule(deps, row.id, reason);
+      notifyScheduleRun(deps, todoRow, reason);
       return;
     }
     if (workerCreated && history !== null) {
@@ -177,7 +189,12 @@ export function createScheduler(
           const next = isRecurring(row.kind)
             ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
             : now + WORKER_SCHEDULE_MIN_INTERVAL_MS;
-          updateNextRunAt(deps, row.id, next);
+          if (OWNER_GATE_PHASES.has(todoRow.phase)) {
+            recordScheduleSkip(deps, row.id, gateSkipReason(todoRow.phase), next);
+          } else {
+            updateNextRunAt(deps, row.id, next);
+            publishScheduleChange(deps, row.teamId, row.id);
+          }
         } catch (err) {
           pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
         }
@@ -193,6 +210,17 @@ export function createScheduler(
         updateNextRunAt(deps, row.id, history.lastRunAt + WORKER_SCHEDULE_MIN_INTERVAL_MS);
         return;
       }
+    }
+    if (!workerCreated && OWNER_GATE_PHASES.has(todoRow.phase)) {
+      try {
+        const next = isRecurring(row.kind)
+          ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
+          : null;
+        recordScheduleSkip(deps, row.id, gateSkipReason(todoRow.phase), next);
+      } catch (err) {
+        pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
+      }
+      return;
     }
     let nextRunAt: number | null = row.nextRunAt;
     if (isRecurring(row.kind)) {
@@ -223,7 +251,6 @@ export function createScheduler(
       ? `Scheduled follow-up you set earlier:\n\n${row.prompt}`
       : row.prompt || 'Continue this task.';
     let buildId = todoRow.latestBuildId;
-    const freshAtConfirm = !workerCreated && todoRow.phase === 'confirm';
     const wake = {
       id: row.id,
       createdBy: row.createdBy,
@@ -232,7 +259,7 @@ export function createScheduler(
       next: isRecurring(row.kind) ? nextRunAt : null,
       triggered: isTriggerKind(row.kind),
     };
-    if (buildId !== null && !freshAtConfirm) {
+    if (buildId !== null) {
       await sendBuildSteer(
         deps,
         buildId,
@@ -240,11 +267,6 @@ export function createScheduler(
         { afterTurn: true, human: false, schedule: wake },
       );
     } else {
-      if (freshAtConfirm && buildId !== null) {
-        deps.db.update(build).set({ errorMessage: 'Cancelled' }).where(eq(build.id, buildId)).run();
-        const cancelled = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-        if (cancelled) deps.hub.publishBuildDoc(todoRow.teamId, toBuildRecord(cancelled));
-      }
       const [started] = startBuilds(deps, {
         projectId: row.projectId,
         todoIds: [row.todoId],
@@ -262,6 +284,7 @@ export function createScheduler(
       buildId = started?.id ?? null;
     }
     notifyScheduleClock(deps.db);
+    publishScheduleChange(deps, row.teamId, row.id);
   }
 
   function runSchedule(row: ReturnType<typeof dueSchedules>[number], now: number): Promise<void> {
@@ -277,11 +300,16 @@ export function createScheduler(
           current.nextRunAt !== row.nextRunAt
         )
           return;
-        const task = deps.db
-          .select({ phase: todo.phase })
-          .from(todo)
-          .where(eq(todo.id, row.todoId))
-          .get();
+        const task = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+        if (task && OWNER_GATE_PHASES.has(task.phase)) {
+          const next = isRecurring(row.kind)
+            ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
+            : isWorkerSchedule(row.createdBy)
+              ? now + WORKER_SCHEDULE_MIN_INTERVAL_MS
+              : null;
+          recordScheduleSkip(deps, row.id, gateSkipReason(task.phase), next);
+          return;
+        }
         if (isWorkerSchedule(row.createdBy) && task && SCHEDULE_GATE_PHASES.has(task.phase)) {
           updateNextRunAt(
             deps,
@@ -290,33 +318,30 @@ export function createScheduler(
               ? computeNextRunAt(row.kind, row.at, row.tz, now, row.cron)
               : now + WORKER_SCHEDULE_MIN_INTERVAL_MS,
           );
+          publishScheduleChange(deps, row.teamId, row.id);
           return;
         }
         if (
           !isWorkerSchedule(row.createdBy) &&
           (err instanceof BuildContinuationPhaseError || err instanceof PhaseTransitionError)
         ) {
-          if (isRecurring(row.kind))
+          if (isRecurring(row.kind)) {
             updateNextRunAt(
               deps,
               row.id,
               computeNextRunAt(row.kind, row.at, row.tz, now, row.cron),
             );
-          else if (!isTriggerKind(row.kind))
-            deps.db
-              .update(schedule)
-              .set({
-                nextRunAt: null,
-                lastRunStatus: 'skipped',
-                lastRunError: err.message,
-                retryNotBefore: null,
-              })
-              .where(eq(schedule.id, row.id))
-              .run();
+            publishScheduleChange(deps, row.teamId, row.id);
+          } else if (!isTriggerKind(row.kind)) {
+            recordScheduleSkip(deps, row.id, err.message, null);
+          }
           return;
         }
         const reason = err instanceof Error ? err.message : String(err);
         recordScheduleFailure(deps, row.id, reason, now);
+        if (task && !scheduleFailureIsTransient(reason)) {
+          notifyScheduleRun(deps, task, `Scheduled run failed: ${reason}`);
+        }
         process.stderr.write(`Schedule ${row.id} failed: ${reason}\n`);
       })
       .catch(() => {

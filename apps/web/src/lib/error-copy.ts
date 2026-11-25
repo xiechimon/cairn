@@ -16,6 +16,10 @@ const REASON_COPY: Record<string, string> = {
   conflict: '当前状态已变化，请刷新后重试。',
   rate_limited: '请求过于频繁，请稍后重试。',
   timeout: '请求超时，请检查网络后重试。',
+  'schedule-project-archived': '所属项目已归档，请先取消归档。',
+  'schedule-thread-archived': '所属任务已归档，请先取消归档。',
+  'invalid-schedule-cron': 'Cron 表达式或时区有误，请检查后重试。',
+  'invalid-schedule-tz': '时区设置无效，请检查后重试。',
 };
 
 const NETWORK_ERROR_RE = /failed to fetch|networkerror|load failed|network request failed/i;

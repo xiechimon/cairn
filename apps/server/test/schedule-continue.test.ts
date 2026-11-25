@@ -465,21 +465,22 @@ test.each(['failure', 'direct-residual'] as const)(
   },
 );
 
-test('an owner schedule at confirm cancels the old build and starts a build without planning', async () => {
+test('an owner schedule at confirm skips the slot without cancelling the pending plan', async () => {
   const s = await world();
   s.db.update(schedule).set({ createdBy: s.user.id }).where(eq(schedule.id, s.saved.id)).run();
   s.db.update(step).set({ kind: 'plan' }).where(eq(step.id, s.first.id)).run();
   s.db.update(todo).set({ phase: 'confirm', phaseAt: s.due }).where(eq(todo.id, s.todoId)).run();
   await s.scheduler.tick(s.due);
-  expect(s.db.select().from(build).where(eq(build.id, s.buildId)).get()?.errorMessage).toBe(
-    'Cancelled',
-  );
-  const fresh = s.db.select().from(build).all().at(-1)!;
-  expect(fresh).toMatchObject({ withPlan: false, triggerSource: 'schedule', prevPhase: 'confirm' });
-  expect(fresh.id).not.toBe(s.buildId);
-  expect(s.db.select().from(step).all().at(-1)).toMatchObject({
-    buildId: fresh.id,
-    kind: 'session',
+  expect(s.db.select().from(build).where(eq(build.id, s.buildId)).get()?.errorMessage).toBeNull();
+  expect(s.db.select().from(build).all()).toHaveLength(1);
+  expect(s.db.select().from(step).all()).toHaveLength(1);
+  expect(s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()?.phase).toBe('confirm');
+  expect(s.stored()).toMatchObject({
+    enabled: true,
+    pausedReason: null,
+    lastRunStatus: 'skipped',
+    lastRunError: expect.stringMatching(/confirm/i),
+    nextRunAt: s.due + 900_000,
   });
 });
 
