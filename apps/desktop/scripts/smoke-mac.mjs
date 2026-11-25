@@ -2077,13 +2077,24 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       await updateButton.click();
 
       const deadline = Date.now() + OPEN_TIMEOUT_MS * 4;
+      let lastStatus = null;
       while (Date.now() < deadline) {
-        const status = await updateButton.getAttribute('data-status');
-        if (zipHits >= 1 && (status === 'error' || observedStates.includes('installing'))) break;
+        lastStatus = await updateButton.getAttribute('data-status');
+        if (zipHits >= 1 && (lastStatus === 'error' || observedStates.includes('installing'))) {
+          break;
+        }
         await remoteWindow.waitForTimeout(100);
       }
+      const mainLogTail = (() => {
+        const path = join(remoteUserData, 'logs', 'main.log');
+        if (!existsSync(path)) return '';
+        return readFileSync(path, 'utf8').split('\n').slice(-15).join(' | ');
+      })();
 
-      assert.ok(zipHits >= 1, 'clicking update button in remote mode never downloaded the update');
+      assert.ok(
+        zipHits >= 1,
+        `clicking update button in remote mode never downloaded the update (status=${lastStatus} states=${JSON.stringify(observedStates)} mainLog=${mainLogTail})`,
+      );
       assert.ok(
         observedStates.includes('downloading') && observedStates.includes('installing'),
         `clicking update button in remote mode did not start installing: ${JSON.stringify(observedStates)}`,

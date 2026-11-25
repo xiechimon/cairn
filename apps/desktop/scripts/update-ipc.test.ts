@@ -1,5 +1,6 @@
 import type { DesktopUpdateState } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
+import { resolveWindowLocale } from '../src/locale.js';
 import { registerOwnComputerIpc } from '../src/own-computer.js';
 import { installDesktopUpdate, type UpdateInstallMessages } from '../src/update-ipc.js';
 
@@ -118,5 +119,49 @@ describe('desktop update install IPC', () => {
     );
     expect(await handlers.get('own-computer:permissions')?.({})).toBeNull();
     expect(await handlers.get('own-computer:guide')?.({})).toBeNull();
+  });
+
+  test('resolveWindowLocale skips unloaded hidden tray windows and caps stalled renderers', async () => {
+    const neverSettles = () => new Promise<unknown>(() => {});
+    const locale = await resolveWindowLocale(
+      [
+        { destroyed: false, loading: false, url: '', readLang: neverSettles },
+        {
+          destroyed: false,
+          loading: true,
+          url: 'http://127.0.0.1:4310/app',
+          readLang: neverSettles,
+        },
+        {
+          destroyed: true,
+          loading: false,
+          url: 'http://127.0.0.1:4310/app',
+          readLang: neverSettles,
+        },
+        {
+          destroyed: false,
+          loading: false,
+          url: 'http://127.0.0.1:4310/app',
+          readLang: async () => 'zh-CN',
+        },
+      ],
+      'en-US',
+      20,
+    );
+    expect(locale).toBe('zh');
+
+    const fallback = await resolveWindowLocale(
+      [
+        {
+          destroyed: false,
+          loading: false,
+          url: 'http://127.0.0.1:4310/app',
+          readLang: neverSettles,
+        },
+      ],
+      'zh-TW',
+      20,
+    );
+    expect(fallback).toBe('zh');
   });
 });
