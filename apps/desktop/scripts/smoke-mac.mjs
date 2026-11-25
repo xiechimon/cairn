@@ -121,6 +121,10 @@ function runnerProcesses() {
 const serverProcesses = () =>
   matchingPids(`${appRoot}/${SERVER_ENTRY}`).filter((pid) => isServerHelper(commandOf(pid)));
 
+const builtSnapshotDir = realpathSync(mkdtempSync(join(tmpdir(), 'cairn-built-smoke-')));
+const builtAppSnapshot = join(builtSnapshotDir, 'Cairn.app');
+execFileSync('/usr/bin/ditto', [appRoot, builtAppSnapshot]);
+
 await runAntigravityRemoteAndSkewSmoke({
   appPath,
   appRoot,
@@ -1724,7 +1728,7 @@ try {
     }
   }
 
-  await verifyRemoteUpdate({ appRoot, screenshotPath });
+  await verifyRemoteUpdate({ appRoot: builtAppSnapshot, screenshotPath });
 
   console.log(
     `desktop smoke passed: ${origin} signed in, no pairing gate, Runner online, the tray opened in ${verified.length} verified cases, not covered: ${skipped.map((outcome) => outcome.name).join(', ') || 'none'}, quit stops the server and Runner, remote-mode update installs`,
@@ -1738,6 +1742,7 @@ try {
     );
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
   }
+  rmSync(builtSnapshotDir, { recursive: true, force: true });
 }
 
 async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot }) {
@@ -2124,17 +2129,8 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       );
       if (lastStatus !== 'error') {
         const readMaybe = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : null);
-        const stateNow = await remoteWindow
-          .evaluate(() => window.cairnDesktop.update.state())
-          .catch((error) => `err:${error.message}`);
-        const secondInstall = await Promise.race([
-          remoteWindow
-            .evaluate(() => window.cairnDesktop.update.install())
-            .catch((error) => `err:${error.message}`),
-          new Promise((resolve) => setTimeout(() => resolve('timeout-10s'), 10_000)),
-        ]);
         console.error(
-          `remote update failure debug: status=${lastStatus} stateNow=${JSON.stringify(stateNow)} secondInstall=${JSON.stringify(secondInstall)} console=${JSON.stringify(consoleErrors.slice(-8))} updateState=${JSON.stringify(readMaybe(join(remoteUserData, 'update-state.json')))} hostStatus=${JSON.stringify(readMaybe(join(remoteHome, '.cairn', 'host-update-status.json')))} mainLog=${JSON.stringify(readMaybe(join(remoteUserData, 'logs', 'main.log')))}`,
+          `remote update failure debug: status=${lastStatus} console=${JSON.stringify(consoleErrors.slice(-8))} updateState=${JSON.stringify(readMaybe(join(remoteUserData, 'update-state.json')))} mainLog=${JSON.stringify(readMaybe(join(remoteUserData, 'logs', 'main.log')))}`,
         );
       }
       assert.equal(
