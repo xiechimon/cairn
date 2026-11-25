@@ -182,7 +182,7 @@ close never fails the landing. Both the workflow run and a local
   incremental push, so a docs-only push on top of broken code cannot skip
   the e2e/integration tiers and green-wash the stack.
 
-## One candidate at a time (pilot, 2026-11-19)
+## Legacy single-candidate model (retired, 2026-11-19)
 
 Problem: stacked candidates cancelled each other's `ci` run, so only the chain
 head was ever tested; a red head blocked every lane and only its owner could
