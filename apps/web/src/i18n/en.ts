@@ -2950,6 +2950,12 @@ export const EN: Record<string, string> = {
   '此项目文件夹仅在该执行机本地。确认电脑已开机、Cairn 正在运行，上线后本轮会自动继续。':
     'This project folder exists only on that Runner. Check that it is awake and running Cairn.',
   '切换执行机失败，请重试。': 'Could not switch Runner. Try again.',
+  连通两台电脑: 'Connect the two computers',
+  '另一台电脑可通过当前远程地址连接到这台电脑，这台电脑要保持开机联网。':
+    'Another computer can connect to this computer over the active remote address. Keep this computer awake and online.',
+  '负载 {pct}%': 'Load {pct}%',
+  '上次在线 {ago}': 'Last seen {ago}',
+  屏幕连接已断开: 'Screen connection lost',
   用访问令牌登录: 'Sign in with access token',
   粘贴服务器访问令牌: 'Paste server access token',
   服务器访问令牌: 'Server access token',

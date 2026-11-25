@@ -281,17 +281,20 @@ export interface CandidateResolution {
   alternateMachines: Array<{ machineId: string; name: string }>;
   failover?: { fromMachineId: string; reason: 'offline' | 'busy' };
   lockReason?: RouteLockReason;
+  retryAfterMs?: number;
 }
 
-function inOfflineGrace(
+function offlineGraceExpiresAt(
   preferred: MachineRow | undefined,
   stepCreatedAt: number,
   now: number,
-): boolean {
-  if (preferred === undefined || preferred.online) return false;
-  if (now - stepCreatedAt >= OFFLINE_FAILOVER_GRACE_MS) return false;
-  if (preferred.lastSeenAt == null) return true;
-  return now - preferred.lastSeenAt < OFFLINE_FAILOVER_GRACE_MS;
+): number | null {
+  if (preferred === undefined || preferred.online) return null;
+  const byStep = stepCreatedAt + OFFLINE_FAILOVER_GRACE_MS;
+  const bySeen =
+    preferred.lastSeenAt == null ? byStep : preferred.lastSeenAt + OFFLINE_FAILOVER_GRACE_MS;
+  const expiresAt = Math.min(byStep, bySeen);
+  return now < expiresAt ? expiresAt : null;
 }
 
 function underLoad(row: Pick<MachineRow, 'capabilities'>): boolean {
@@ -363,14 +366,16 @@ function poolResolution(input: {
     };
   }
 
-  if (
-    (preferred !== undefined && inOfflineGrace(preferred, input.stepCreatedAt, input.now)) ||
-    backups.length === 0
-  ) {
+  const graceExpiresAt =
+    preferred !== undefined && backups.length > 0
+      ? offlineGraceExpiresAt(preferred, input.stepCreatedAt, input.now)
+      : null;
+  if (graceExpiresAt !== null || backups.length === 0) {
     return {
       claimableIds: [],
       waitingForId: preferredId,
       alternateMachines: toAlternates(preferredId),
+      ...(graceExpiresAt !== null ? { retryAfterMs: Math.max(1, graceExpiresAt - input.now) } : {}),
     };
   }
 
@@ -396,7 +401,9 @@ export function resolveChiefCandidates(input: {
 }): CandidateResolution {
   const { db, teamId, teamMachines, agentRow, provider, stepCreatedAt, now } = input;
   const isOnline = (m: MachineRow) => m.online || m.id === input.claimingMachineId;
-  const activeMachines = teamMachines.filter((m) => m.retiredAt === null && isRegisteredMachine(m));
+  const activeMachines = teamMachines.filter(
+    (m) => m.teamId === teamId && m.retiredAt === null && isRegisteredMachine(m),
+  );
   const eligibleOnline = activeMachines.filter(
     (m) => isOnline(m) && chiefIneligibility(db, m, agentRow, provider, now) === null,
   );
@@ -451,7 +458,9 @@ export function resolveWorkerCandidates(input: {
 }): CandidateResolution {
   const { db, teamId, teamMachines, facts, catalog, stepCreatedAt, now } = input;
   const isOnline = (m: MachineRow) => m.online || m.id === input.claimingMachineId;
-  const activeMachines = teamMachines.filter((m) => m.retiredAt === null && isRegisteredMachine(m));
+  const activeMachines = teamMachines.filter(
+    (m) => m.teamId === teamId && m.retiredAt === null && isRegisteredMachine(m),
+  );
   const eligibleOnline = activeMachines.filter(
     (m) => isOnline(m) && workerIneligibility(db, m, facts, catalog, now) === null,
   );

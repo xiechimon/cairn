@@ -15,6 +15,22 @@ export interface RouteInputs {
   listenPort: number;
   interfaces: InterfaceTable;
   tailnet: TailnetAccess | null;
+  tailscaleUrl?: string | null;
+  publicOrigin?: string | null;
+}
+
+function normalizeRemoteOrigin(raw: string | null | undefined): string | null {
+  if (raw == null || raw === '') return null;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    if (parsed.username !== '' || parsed.password !== '') return null;
+    const host = parsed.hostname.toLowerCase();
+    if (host === '' || host === 'cairn.local' || isLoopbackHost(host)) return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
 }
 
 function lanAddresses(host: string, interfaces: InterfaceTable): string[] {
@@ -43,11 +59,19 @@ export function buildRemoteRoutes(
   environmentId: string,
   inputs: RouteInputs,
 ): RemoteRoutesResponse {
-  const routes: RemoteRoute[] = lanAddresses(inputs.listenHost, inputs.interfaces).map(
-    (address) => ({ kind: 'lan', url: `http://${address}:${inputs.listenPort}` }),
-  );
-  const tailnetRoute = tailnetUrl(inputs.tailnet);
-  if (tailnetRoute !== null) routes.push({ kind: 'tailnet', url: tailnetRoute });
+  const routes: RemoteRoute[] = [];
+  const seen = new Set<string>();
+  const add = (kind: RemoteRoute['kind'], url: string | null) => {
+    if (url === null || seen.has(url)) return;
+    seen.add(url);
+    routes.push({ kind, url });
+  };
+  for (const address of lanAddresses(inputs.listenHost, inputs.interfaces)) {
+    add('lan', `http://${address}:${inputs.listenPort}`);
+  }
+  add('tailnet', tailnetUrl(inputs.tailnet));
+  add('tailnet', normalizeRemoteOrigin(inputs.tailscaleUrl));
+  add('public', normalizeRemoteOrigin(inputs.publicOrigin));
   const status = inputs.tailnet;
   return {
     environmentId,

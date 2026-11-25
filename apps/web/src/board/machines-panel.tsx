@@ -28,6 +28,7 @@ import {
 } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { settingsHref } from '../settings/settings-href.js';
@@ -167,7 +168,7 @@ function LineRow({
 
 const RENAME_FORM = 'machine-rename-form';
 
-function RenameMachineDialog({
+export function RenameMachineDialog({
   machineId,
   name,
   onClose,
@@ -177,7 +178,7 @@ function RenameMachineDialog({
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const { teamId } = useLiveData();
+  const { live, teamId } = useLiveData();
   const { patchMachine } = useApiMutations(teamId);
   const [draft, setDraft] = useState(name);
   const trimmed = draft.trim();
@@ -185,6 +186,11 @@ function RenameMachineDialog({
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (unchanged) return;
+    if (!live) {
+      blockDemoWrite();
+      onClose();
+      return;
+    }
     patchMachine.mutate(
       { id: machineId, body: { name: trimmed } },
       { onSuccess: onClose, onError: (error) => toastError(t('重命名失败，请重试。'), error) },
@@ -232,10 +238,12 @@ function useCardLine({
   machine,
   computer,
   controlFailed,
+  controlFailedAction,
 }: {
   machine: MachineRow;
   computer: ComputerRecord | null;
   controlFailed: boolean;
+  controlFailedAction: 'acquire' | 'release' | null;
 }): CardLine | null {
   const { t } = useI18n();
   if (machine.online !== true) {
@@ -246,7 +254,13 @@ function useCardLine({
       title: t('在这台执行机上打开 Cairn，它就会上线'),
     };
   }
-  if (controlFailed) return { kind: 'fail', node: t('未能接管，电脑没有响应') };
+  if (controlFailed) {
+    return {
+      kind: 'fail',
+      node:
+        controlFailedAction === 'release' ? t('交还失败，请重试。') : t('未能接管，电脑没有响应'),
+    };
+  }
   if (computer?.state === 'failed') return { kind: 'fail', node: t('电脑无响应，文件均保留') };
   if (computer?.handoffReason != null)
     return {
@@ -316,6 +330,7 @@ function MachineCard({
     machine,
     computer,
     controlFailed: control.failed,
+    controlFailedAction: control.failedAction,
   });
   const watch = screenLive ? () => setFullscreen(true) : null;
   const takeOver = () => {

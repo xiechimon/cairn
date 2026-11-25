@@ -37,7 +37,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `E`, `N`, `V`
-- Test ids in its code: `chief-takeover`, `chief-takeover-failed`, `chief-takeover-handback`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-time-left`, `machine-activity`, `machine-card`, `machine-line`, `machine-list-row`, `machine-menu`, `machine-rename`, `machine-rename-input`, `machine-screen`, `machine-screen-bar`, `machine-screen-control`, `machine-screen-enlarged`, `machine-screen-exit`, `machine-screen-last-frame`, `machine-screen-note`, `machine-screen-status`, `machine-settings`, `machine-status-dot`, `machine-step`, `machine-step-click`, `machine-step-no-shot`, `machine-step-shot`, `machine-step-watch`, `machine-take-over`, `machine-watch`, `machines-add`, `machines-button`, `own-computer-browser-hint`, `own-computer-drawer`, `own-computer-guide`, `own-computer-meta`, `own-computer-recheck`, `own-computer-status`
+- Test ids in its code: `chief-takeover`, `chief-takeover-failed`, `chief-takeover-handback`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-time-left`, `disconnected`, `machine-activity`, `machine-card`, `machine-line`, `machine-list-row`, `machine-menu`, `machine-rename`, `machine-rename-input`, `machine-screen`, `machine-screen-bar`, `machine-screen-control`, `machine-screen-disconnected`, `machine-screen-enlarged`, `machine-screen-exit`, `machine-screen-last-frame`, `machine-screen-note`, `machine-screen-reconnect`, `machine-screen-status`, `machine-settings`, `machine-status-dot`, `machine-step`, `machine-step-click`, `machine-step-no-shot`, `machine-step-shot`, `machine-step-watch`, `machine-take-over`, `machine-watch`, `machines-add`, `machines-button`, `own-computer-browser-hint`, `own-computer-drawer`, `own-computer-guide`, `own-computer-meta`, `own-computer-recheck`, `own-computer-status`
 - Research: [docs/research/coordinator-computer.md](../../../docs/research/coordinator-computer.md) (not on main), [docs/research/agent-small-computer-2026-11-08.md](../../../docs/research/agent-small-computer-2026-11-08.md) (not on main), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main), [docs/research/resident-cloakbrowser-2026-11-16.md](../../../docs/research/resident-cloakbrowser-2026-11-16.md)
 - Frontend design: **gap**: the screen view and control handover have no design
 - Backend design: [docs/design/computer-login-handoff.md](../../../docs/design/computer-login-handoff.md), [docs/design/cloakbrowser-computer.md](../../../docs/design/cloakbrowser-computer.md), [docs/design/own-mac-computer.md](../../../docs/design/own-mac-computer.md)
@@ -467,7 +467,7 @@ Reach:
 
 - Web routes: `/app/machines/authorize`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `enrollment-code-hint`, `phone-pair-entry`, `tailscale-ready`
+- Test ids in its code: `enroll-poll-retry`, `enrollment-code-hint`, `phone-pair-entry`, `tailscale-ready`
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md)
 - Frontend design: **gap**: the add-machine dialog and authorize page have no design
 - Backend design: **gap**: no design for the browser enrollment handshake and its failure modes

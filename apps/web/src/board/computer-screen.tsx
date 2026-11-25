@@ -3,9 +3,10 @@ import { MonitorSmartphone } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { computerScreenWsUrl, openComputerScreen } from '../api/computer-screen.js';
+import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 
-type ScreenStatus = 'connecting' | 'connected' | 'placeholder' | 'failed';
+type ScreenStatus = 'connecting' | 'connected' | 'disconnected' | 'placeholder' | 'failed';
 type NovncRfb = import('@novnc/novnc').default;
 
 const lastFrames = new Map<string, string>();
@@ -40,6 +41,7 @@ export function MachineScreenSurface({
   const host = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<NovncRfb | null>(null);
   const [status, setStatus] = useState<ScreenStatus>('connecting');
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [lastFrame, setLastFrame] = useState(() => lastFrames.get(computer.id) ?? null);
   const online = computer.machine.online && computer.state !== 'failed';
   const controlLease = interactive ? leaseId : null;
@@ -87,7 +89,7 @@ export function MachineScreenSurface({
           if (cancelled) return;
           rememberFrame(computer.id, target);
           setLastFrame(lastFrames.get(computer.id) ?? null);
-          setStatus('placeholder');
+          setStatus('disconnected');
         });
         rfb.addEventListener('securityfailure', () => {
           if (!cancelled) setStatus('failed');
@@ -110,7 +112,15 @@ export function MachineScreenSurface({
       rfb?.disconnect();
       target.replaceChildren();
     };
-  }, [teamId, computer.id, computer.machine.online, interactive, controlLease, online]);
+  }, [
+    teamId,
+    computer.id,
+    computer.machine.online,
+    interactive,
+    controlLease,
+    online,
+    reconnectAttempt,
+  ]);
 
   useEffect(() => {
     const rfb = rfbRef.current;
@@ -132,12 +142,13 @@ export function MachineScreenSurface({
       </div>
     );
 
+  const showReconnectOverlay = status === 'disconnected' || status === 'failed';
   return (
     <div
       data-testid="machine-screen"
       data-status={status}
       data-interactive={interactive ? 'true' : 'false'}
-      className={`relative h-full w-full overflow-hidden ${interactive ? 'cursor-none touch-none' : 'cursor-default'}`}
+      className={`relative h-full w-full overflow-hidden ${interactive && status === 'connected' ? 'cursor-none touch-none' : 'cursor-default'}`}
     >
       {status !== 'connected' && lastFrame !== null && (
         <img
@@ -149,15 +160,38 @@ export function MachineScreenSurface({
         />
       )}
       <div ref={host} className="h-full w-full overflow-hidden [&_canvas]:outline-none" />
-      {status !== 'connected' && (lastFrame === null || status === 'failed') && (
-        <div className="absolute inset-0 grid place-items-center px-6 text-center text-meta text-content-tertiary">
+      {status !== 'connected' && (lastFrame === null || showReconnectOverlay) && (
+        <div
+          data-testid={status === 'disconnected' ? 'machine-screen-disconnected' : undefined}
+          className={`absolute inset-0 grid place-items-center px-6 text-center text-meta ${
+            showReconnectOverlay && lastFrame !== null
+              ? 'bg-background/80 text-foreground'
+              : 'text-content-tertiary'
+          }`}
+        >
           <span className="flex flex-col items-center gap-2">
             <MonitorSmartphone aria-hidden="true" className="size-5.5 opacity-60" />
-            {status === 'connecting'
-              ? t('正在连接屏幕')
-              : status === 'failed'
-                ? t('暂时无法连接屏幕')
-                : t('这台电脑现在没有画面')}
+            <span>
+              {status === 'connecting'
+                ? t('正在连接屏幕')
+                : status === 'disconnected'
+                  ? t('屏幕连接已断开')
+                  : status === 'failed'
+                    ? t('暂时无法连接屏幕')
+                    : t('这台电脑现在没有画面')}
+            </span>
+            {showReconnectOverlay && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid="machine-screen-reconnect"
+                className="mt-1 pointer-coarse:h-11 pointer-coarse:px-4"
+                onClick={() => setReconnectAttempt((count) => count + 1)}
+              >
+                {t('重连')}
+              </Button>
+            )}
           </span>
         </div>
       )}

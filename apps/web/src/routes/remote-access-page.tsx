@@ -43,6 +43,7 @@ export const REMOTE_ACCESS_ROUTE = 'remote-access';
 
 function sourceName(source: PairingCandidate['source'], t: (key: string) => string): string {
   if (source === 'page') return t('当前页面地址');
+  if (source === 'public') return t('外部网络');
   return source === 'tailnet' ? t('Tailscale') : t('局域网');
 }
 
@@ -394,7 +395,13 @@ export function RemoteAccessPage() {
             <ResourceRow key={route.url}>
               <RowText>
                 <RowTitle className="font-mono">{route.url}</RowTitle>
-                <RowDesc>{route.kind === 'tailnet' ? t('Tailscale') : t('局域网')}</RowDesc>
+                <RowDesc>
+                  {route.kind === 'public'
+                    ? t('外部网络')
+                    : route.kind === 'tailnet'
+                      ? t('Tailscale')
+                      : t('局域网')}
+                </RowDesc>
               </RowText>
             </ResourceRow>
           ))}

@@ -1,14 +1,15 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { enrollDisplayName } from '@cairn/shared';
+import { enrollDisplayName, stripAnsiEscapes } from '@cairn/shared';
 import { z } from 'zod';
 import type { MachineClient } from './machine-client.js';
 import { writePrivateFile } from './private-fs.js';
 import type { StatePaths } from './state.js';
-import { saveMachineJson } from './state.js';
+import { loadMachineJson, saveMachineJson } from './state.js';
 
 const ENROLL_TTL_MS = 10 * 60 * 1000;
 const POLL_INTERVAL_MS = 2_000;
+export const ENROLLMENT_PRINT_WAIT_MS = 15_000;
 
 const pendingSchema = z.object({
   enrollId: z.string().min(1),
@@ -22,7 +23,19 @@ const pendingSchema = z.object({
   legacyHostKeys: z.array(z.string()).optional(),
 });
 
+const enrollErrorSchema = z.object({
+  serverUrl: z.string(),
+  message: z.string().min(1),
+  at: z.number(),
+});
+
 export type PendingEnrollment = z.infer<typeof pendingSchema>;
+
+export type PendingEnrollmentOutcome =
+  | { kind: 'pending'; url: string; code?: string }
+  | { kind: 'enrolled' }
+  | { kind: 'error'; message: string }
+  | { kind: 'timeout' };
 
 export interface EnrollIo {
   now: () => number;
@@ -42,6 +55,10 @@ function pendingPath(paths: StatePaths): string {
   return join(paths.home, 'enroll.json');
 }
 
+function enrollErrorPath(paths: StatePaths): string {
+  return join(paths.home, 'enroll-error.json');
+}
+
 function readPending(path: string): PendingEnrollment | null {
   if (!existsSync(path)) return null;
   try {
@@ -50,6 +67,43 @@ function readPending(path: string): PendingEnrollment | null {
   } catch {
     return null;
   }
+}
+
+function readEnrollError(path: string): z.infer<typeof enrollErrorSchema> | null {
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = enrollErrorSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearEnrollError(paths: StatePaths): void {
+  rmSync(enrollErrorPath(paths), { force: true });
+}
+
+export function sanitizeEnrollErrorMessage(raw: string): string {
+  const cleaned = stripAnsiEscapes(raw)
+    .replace(/\p{Cc}+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return (cleaned || 'unknown error').slice(0, 300);
+}
+
+function recordEnrollError(paths: StatePaths, serverUrl: string, err: unknown, at: number): void {
+  const message = sanitizeEnrollErrorMessage(err instanceof Error ? err.message : String(err));
+  try {
+    writePrivateFile(
+      enrollErrorPath(paths),
+      `${JSON.stringify({ serverUrl, message, at }, null, 2)}\n`,
+    );
+  } catch {}
+}
+
+export function formatApprovalCode(code: string): string {
+  const clean = code.replace(/[\s-]+/g, '').toUpperCase();
+  return clean.length === 8 ? `${clean.slice(0, 4)}-${clean.slice(4)}` : code;
 }
 
 export type EnrollApi = Pick<MachineClient, 'enrollStart' | 'enrollPoll'>;
@@ -86,11 +140,18 @@ export async function enrollThroughBrowser(
     pending = null;
   }
   if (pending === null) {
-    const started = await api.enrollStart({
-      name,
-      ...(hostKey !== undefined ? { hostKey } : {}),
-      ...(normalizedLegacy.length > 0 ? { legacyHostKeys: normalizedLegacy } : {}),
-    });
+    clearEnrollError(paths);
+    let started: Awaited<ReturnType<EnrollApi['enrollStart']>>;
+    try {
+      started = await api.enrollStart({
+        name,
+        ...(hostKey !== undefined ? { hostKey } : {}),
+        ...(normalizedLegacy.length > 0 ? { legacyHostKeys: normalizedLegacy } : {}),
+      });
+    } catch (err) {
+      recordEnrollError(paths, serverUrl, err, io.now());
+      throw err;
+    }
     pending = {
       enrollId: started.enrollId,
       url: started.url,
@@ -107,12 +168,15 @@ export async function enrollThroughBrowser(
       `Open ${pending.url} and approve this machine${machineNameSuffix(name)} (expires in 10 minutes).`,
     );
   } else {
+    clearEnrollError(paths);
     io.log(
       `Waiting for approval of the pending enrollment: ${pending.url}${machineNameSuffix(name)}`,
     );
   }
   if (pending.code !== undefined) {
-    io.log(`Or type approval code ${pending.code} in Add Runner on the Cairn desktop.`);
+    io.log(
+      `Or type approval code ${formatApprovalCode(pending.code)} in Add Runner on the Cairn desktop.`,
+    );
   }
   for (;;) {
     if (io.stop?.aborted === true) throw new Error('enrollment stopped before approval');
@@ -163,14 +227,15 @@ export function machineNameSuffix(name: string): string {
   return shown === undefined ? '' : ` (machine name: ${shown})`;
 }
 
-export async function pendingEnrollmentUrl(
+export async function waitForPendingEnrollment(
   paths: StatePaths,
   serverUrl: string,
   waitMs: number,
   sleep: (ms: number) => Promise<void>,
   now: () => number,
   name?: string,
-): Promise<string | null> {
+  startedAt = 0,
+): Promise<PendingEnrollmentOutcome> {
   const deadline = now() + waitMs;
   for (;;) {
     const pending = readPending(pendingPath(paths));
@@ -179,9 +244,35 @@ export async function pendingEnrollmentUrl(
       pending.expiresAt > now() &&
       (pending.serverUrl === undefined || pending.serverUrl === serverUrl) &&
       (pending.name === undefined || name === undefined || pending.name === name)
-    )
-      return pending.url;
-    if (now() >= deadline) return null;
+    ) {
+      return {
+        kind: 'pending',
+        url: pending.url,
+        ...(pending.code !== undefined ? { code: formatApprovalCode(pending.code) } : {}),
+      };
+    }
+    if (loadMachineJson(paths) !== null) return { kind: 'enrolled' };
+    const enrollError = readEnrollError(enrollErrorPath(paths));
+    if (
+      enrollError !== null &&
+      enrollError.serverUrl === serverUrl &&
+      enrollError.at >= startedAt
+    ) {
+      return { kind: 'error', message: sanitizeEnrollErrorMessage(enrollError.message) };
+    }
+    if (now() >= deadline) return { kind: 'timeout' };
     await sleep(200);
   }
+}
+
+export async function pendingEnrollmentUrl(
+  paths: StatePaths,
+  serverUrl: string,
+  waitMs: number,
+  sleep: (ms: number) => Promise<void>,
+  now: () => number,
+  name?: string,
+): Promise<string | null> {
+  const outcome = await waitForPendingEnrollment(paths, serverUrl, waitMs, sleep, now, name);
+  return outcome.kind === 'pending' ? outcome.url : null;
 }

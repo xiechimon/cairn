@@ -1,9 +1,10 @@
-import { PUBLISHED_PACKAGES, type TailscaleAccess } from '@cairn/shared';
+import { PUBLISHED_PACKAGES, type RemoteRoute, type TailscaleAccess } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import {
   useApproveMachineEnrollment,
   useEnableTailscaleAccess,
+  useRemoteRoutes,
   useTailscaleAccess,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -14,6 +15,7 @@ import { Input } from '../components/ui/input.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
+import { isLoopbackOrigin } from '../lib/pairing-origin.js';
 import { PhonePairDialog } from './phones-panel.js';
 
 const CMD_CLS =
@@ -82,19 +84,84 @@ function fixtureAccess(search: string): TailscaleAccess {
   };
 }
 
+export type RunnerServerSource = 'tailscale' | 'tailnet' | 'public' | 'page' | 'lan';
+
+function normalizeOrigin(raw: string | null | undefined): string | null {
+  if (raw == null || raw === '') return null;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    if (isLoopbackOrigin(parsed.origin)) return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveRunnerServerUrl(input: {
+  routes?: readonly RemoteRoute[];
+  tailscale?: TailscaleAccess;
+  pageOrigin?: string;
+}): { url: string; source: RunnerServerSource } | null {
+  const tsUrl = input.tailscale?.state === 'ready' ? normalizeOrigin(input.tailscale.url) : null;
+  if (tsUrl !== null) return { url: tsUrl, source: 'tailscale' };
+  const routes = input.routes ?? [];
+  for (const route of routes) {
+    if (route.kind !== 'public') continue;
+    const url = normalizeOrigin(route.url);
+    if (url !== null) return { url, source: 'public' };
+  }
+  for (const route of routes) {
+    if (route.kind !== 'tailnet') continue;
+    const url = normalizeOrigin(route.url);
+    if (url !== null) return { url, source: 'tailnet' };
+  }
+  const pageUrl = normalizeOrigin(input.pageOrigin);
+  if (pageUrl !== null) return { url: pageUrl, source: 'page' };
+  for (const route of routes) {
+    if (route.kind !== 'lan') continue;
+    const url = normalizeOrigin(route.url);
+    if (url !== null) return { url, source: 'lan' };
+  }
+  return null;
+}
+
 export function useRunnerServerAccess(enabled: boolean): {
   access: TailscaleAccess | undefined;
+  serverUrl: string | null;
+  source: RunnerServerSource | null;
   failed: boolean;
   recheck: () => void;
 } {
   const { search } = useLocation();
   const { live } = useLiveData();
-  const query = useTailscaleAccess(live && enabled);
-  if (!live) return { access: fixtureAccess(search), failed: false, recheck: () => {} };
+  const tailscaleQuery = useTailscaleAccess(live && enabled);
+  const routesQuery = useRemoteRoutes(live && enabled);
+  if (!live) {
+    const access = fixtureAccess(search);
+    const serverUrl = access.state === 'ready' ? access.url : null;
+    return {
+      access,
+      serverUrl,
+      source: serverUrl !== null ? 'tailscale' : null,
+      failed: false,
+      recheck: () => {},
+    };
+  }
+  const resolved = resolveRunnerServerUrl({
+    routes: routesQuery.data?.routes,
+    tailscale: tailscaleQuery.data,
+    pageOrigin: typeof window === 'undefined' ? undefined : window.location.origin,
+  });
   return {
-    access: query.data,
-    failed: query.isError,
-    recheck: () => void query.refetch(),
+    access: tailscaleQuery.data,
+    serverUrl: resolved?.url ?? null,
+    source: resolved?.source ?? null,
+    failed: resolved === null && tailscaleQuery.isError,
+    recheck: () => {
+      void tailscaleQuery.refetch();
+      void routesQuery.refetch();
+    },
   };
 }
 
@@ -277,14 +344,14 @@ export function CreateMachineDialog({
   const [apiKeyOpen, setApiKeyOpen] = useState(false);
   const [pairOpen, setPairOpen] = useState(false);
   const apiKeyRef = useRef<HTMLDivElement>(null);
-  const { access, failed, recheck } = useRunnerServerAccess(open !== false);
+  const { access, serverUrl, source, failed, recheck } = useRunnerServerAccess(open !== false);
   const enable = useEnableTailscaleAccess();
   useEffect(() => {
     if (apiKeyOpen) apiKeyRef.current?.scrollIntoView({ block: 'nearest' });
   }, [apiKeyOpen]);
-  const serverUrl = access?.state === 'ready' ? access.url : null;
   const startCmd = serverUrl === null ? null : startCommand(serverUrl);
-  const state = failed ? 'failed' : access?.state;
+  const nonTailscaleReady = serverUrl !== null && source !== 'tailscale';
+  const state = serverUrl !== null ? 'ready' : failed ? 'failed' : access?.state;
   const footer = (() => {
     if (state !== undefined && ENABLE_STATES.has(state)) {
       return (
@@ -336,14 +403,24 @@ export function CreateMachineDialog({
       >
         <div className="flex flex-col gap-4">
           <p className="m-0 text-ui text-content-secondary">
-            {t('两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。')}
+            {nonTailscaleReady
+              ? t('另一台电脑可通过当前远程地址连接到这台电脑，这台电脑要保持开机联网。')
+              : t('两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。')}
           </p>
           <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
             <li className={STEP_CLS}>
               <span className={STEP_NUM_CLS}>1</span>
               <div className={STEP_BODY_CLS}>
-                <span className={STEP_TITLE_CLS}>{t('用 Tailscale 连通两台电脑')}</span>
-                <TailscaleStatus access={access} failed={failed} />
+                <span className={STEP_TITLE_CLS}>
+                  {nonTailscaleReady ? t('连通两台电脑') : t('用 Tailscale 连通两台电脑')}
+                </span>
+                {serverUrl !== null ? (
+                  <p className={STEP_NOTE_CLS} data-testid="tailscale-ready">
+                    {t('已连通，另一台电脑用这个地址连回来：{url}', { url: serverUrl })}
+                  </p>
+                ) : (
+                  <TailscaleStatus access={access} failed={failed} />
+                )}
               </div>
             </li>
             {startCmd !== null && (

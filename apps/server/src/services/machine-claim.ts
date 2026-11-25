@@ -549,7 +549,12 @@ async function claimChiefTurn(
       now: nowMs(),
       claimingMachineId: machineId,
     });
-    if (!resolution.claimableIds.includes(machineId)) continue;
+    if (!resolution.claimableIds.includes(machineId)) {
+      if (resolution.retryAfterMs !== undefined) {
+        deps.machineHub.scheduleWake(teamId, resolution.retryAfterMs);
+      }
+      continue;
+    }
     const claimed = await buildChiefClaim(
       deps,
       machineId,
@@ -735,7 +740,12 @@ async function tryClaim(
       now,
       claimingMachineId: machineId,
     });
-    if (!resolution.claimableIds.includes(machineId)) continue;
+    if (!resolution.claimableIds.includes(machineId)) {
+      if (resolution.retryAfterMs !== undefined) {
+        deps.machineHub.scheduleWake(teamId, resolution.retryAfterMs);
+      }
+      continue;
+    }
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);
     const guardPr =
       cand.stepRow.kind === 'plan' || isBuildStepKind(cand.stepRow.kind)

@@ -300,6 +300,48 @@ describe('F-R1 routes: listeners, interfaces and tailnet', () => {
     });
   });
 
+  test('aggregates ready tailscale serve and non-loopback public webOrigin while ignoring cairn.local', async () => {
+    const s = bootServer({
+      authToken: OWNER,
+      webOrigin: 'https://cairn.example.com/app',
+      remote: {
+        listenHost: '127.0.0.1',
+        tailnetStatus: () => null,
+        tailscale: {
+          status: async () => ({
+            state: 'ready',
+            url: 'https://studio-mac.tail4c2a.ts.net',
+            consentUrl: null,
+          }),
+          enable: async () => ({
+            state: 'ready',
+            url: 'https://studio-mac.tail4c2a.ts.net',
+            consentUrl: null,
+          }),
+          reapply: async () => {},
+          withdraw: async () => {},
+        },
+      },
+    });
+    const res = await call(s, 'GET', '/api/remote/routes', { headers: ownerHeaders });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as RemoteRoutesResponse;
+    expect(body.routes).toEqual([
+      { kind: 'tailnet', url: 'https://studio-mac.tail4c2a.ts.net' },
+      { kind: 'public', url: 'https://cairn.example.com' },
+    ]);
+
+    const localDefault = bootServer({
+      authToken: OWNER,
+      webOrigin: 'https://cairn.local',
+      remote: { listenHost: '127.0.0.1', tailnetStatus: () => null },
+    });
+    const localRes = await call(localDefault, 'GET', '/api/remote/routes', {
+      headers: ownerHeaders,
+    });
+    expect(((await localRes.json()) as RemoteRoutesResponse).routes).toEqual([]);
+  });
+
   test('request headers never reach the advertised origin', async () => {
     const body = await routesOf(
       { tailnetStatus: () => readyStatus() },

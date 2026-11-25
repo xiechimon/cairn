@@ -20,7 +20,7 @@ export function useComputerControl({
   const qc = useQueryClient();
   const [leaseId, setLeaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failedAction, setFailedAction] = useState<'acquire' | 'release' | null>(null);
   const controlHeld = leaseId !== null || computer?.controlHolder === 'user';
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function useComputerControl({
   const setHeld = (checked: boolean) => {
     if (teamId === undefined || computer === null || busy) return;
     setBusy(true);
-    setFailed(false);
+    setFailedAction(null);
     const releaseWithFreshLease = () =>
       acquireComputerControl(teamId, computer.id).then((lease) =>
         releaseComputerControl(teamId, computer.id, lease.leaseId),
@@ -58,9 +58,9 @@ export function useComputerControl({
         });
     void run
       .then(() => refreshQueries(qc, { queryKey: ['computers', teamId] }))
-      .catch(() => setFailed(true))
+      .catch(() => setFailedAction(checked ? 'acquire' : 'release'))
       .finally(() => setBusy(false));
   };
 
-  return { leaseId, busy, failed, controlHeld, setHeld };
+  return { leaseId, busy, failed: failedAction !== null, failedAction, controlHeld, setHeld };
 }

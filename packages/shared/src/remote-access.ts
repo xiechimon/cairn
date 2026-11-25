@@ -56,7 +56,7 @@ export const remoteDescriptorSchema = z
   .strict();
 export type RemoteDescriptor = z.infer<typeof remoteDescriptorSchema>;
 
-export const remoteRouteKindSchema = z.enum(['lan', 'tailnet']);
+export const remoteRouteKindSchema = z.enum(['lan', 'tailnet', 'public']);
 export type RemoteRouteKind = z.infer<typeof remoteRouteKindSchema>;
 
 export const remoteRouteSchema = z.object({

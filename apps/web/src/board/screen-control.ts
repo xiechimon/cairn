@@ -44,7 +44,11 @@ export function useScreenControl(control: ComputerControl): ScreenControl {
 }
 
 export function screenControlStatus(control: ComputerControl, held: boolean, t: TFunc): string {
-  if (control.failed) return t('未能接管，电脑没有响应');
+  if (control.failed) {
+    return control.failedAction === 'release'
+      ? t('交还失败，请重试。')
+      : t('未能接管，电脑没有响应');
+  }
   if (held) return t('你在操作，Coordinator 先等着');
   return t('只看画面，Coordinator 照常工作');
 }

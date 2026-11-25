@@ -28,6 +28,10 @@ export class MachineWakeHub {
   private readonly disconnectListeners = new Set<(machineId: string) => void>();
   private readonly connectListeners = new Set<(machineId: string) => void>();
   private readonly wakeSeqs = new Map<string, number>();
+  private readonly scheduledWakes = new Map<
+    string,
+    { at: number; timer: ReturnType<typeof setTimeout> }
+  >();
   private readonly streamsByMachine = new Map<
     string,
     {
@@ -95,6 +99,23 @@ export class MachineWakeHub {
       } catch {}
     }
     for (const fn of [...(this.waiters.get(teamId) ?? [])]) fn();
+  }
+
+  scheduleWake(teamId: string, delayMs: number): void {
+    if (!Number.isFinite(delayMs)) return;
+    const clamped = Math.max(1, Math.min(Math.ceil(delayMs), 60_000));
+    const targetAt = Date.now() + clamped;
+    const existing = this.scheduledWakes.get(teamId);
+    if (existing !== undefined && existing.at <= targetAt) return;
+    if (existing !== undefined) clearTimeout(existing.timer);
+    const timer = setTimeout(() => {
+      if (this.scheduledWakes.get(teamId)?.timer === timer) {
+        this.scheduledWakes.delete(teamId);
+      }
+      this.wake(teamId);
+    }, clamped);
+    timer.unref?.();
+    this.scheduledWakes.set(teamId, { at: targetAt, timer });
   }
 
   subscribe(teamId: string, send: (ev: MachineStreamEvent) => void): () => void {

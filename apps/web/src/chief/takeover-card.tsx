@@ -189,7 +189,9 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
             ) : (
               control.failed && (
                 <span className="text-meta text-destructive" data-testid="chief-takeover-failed">
-                  {t('未能接管，电脑没有响应')}
+                  {control.failedAction === 'release'
+                    ? t('交还失败，请重试。')
+                    : t('未能接管，电脑没有响应')}
                 </span>
               )
             )}

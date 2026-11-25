@@ -28,7 +28,11 @@ import {
 import { realDoctorEnv, runDoctorCommand } from './doctor.js';
 import { importAgentConfig } from './import-agent-config.js';
 import { createDaemonLogger } from './log.js';
-import { machineNameSuffix, pendingEnrollmentUrl } from './machine-enroll.js';
+import {
+  ENROLLMENT_PRINT_WAIT_MS,
+  machineNameSuffix,
+  waitForPendingEnrollment,
+} from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { claudeConfigHome } from './runtime-homes.js';
@@ -174,13 +178,14 @@ export function buildProgram(): Command {
         }
         throw err;
       }
+      const startedAt = Date.now();
       reportStarted(
         spawnSupervisor({
           home: config.home,
           runnerArgv: passthroughArgv(opts),
         }),
       );
-      await printEnrollmentUrl(config.home, config.serverUrl, config.name);
+      await printEnrollmentUrl(config.home, config.serverUrl, config.name, startedAt);
     });
 
   program
@@ -214,13 +219,14 @@ export function buildProgram(): Command {
       await ensureDaemonShellEnv();
       const config = loadDaemonConfig(configInput(cmd.opts<StartOptions>()));
       await stopSupervisor(config.home);
+      const startedAt = Date.now();
       reportStarted(
         spawnSupervisor({
           home: config.home,
           runnerArgv: passthroughArgv(cmd.opts<StartOptions>()),
         }),
       );
-      await printEnrollmentUrl(config.home, config.serverUrl, config.name);
+      await printEnrollmentUrl(config.home, config.serverUrl, config.name, startedAt);
     });
 
   program
@@ -432,15 +438,40 @@ function isMainModule(): boolean {
 
 if (isMainModule()) void main();
 
-async function printEnrollmentUrl(home: string, serverUrl: string, name: string): Promise<void> {
-  const url = await pendingEnrollmentUrl(
+async function printEnrollmentUrl(
+  home: string,
+  serverUrl: string,
+  name: string,
+  startedAt: number,
+): Promise<void> {
+  const outcome = await waitForPendingEnrollment(
     statePaths(home),
     serverUrl,
-    2_000,
+    ENROLLMENT_PRINT_WAIT_MS,
     sleep,
     () => Date.now(),
     name,
+    startedAt,
   );
-  if (url !== null)
-    process.stdout.write(`Approve this machine in a browser: ${url}${machineNameSuffix(name)}\n`);
+  if (outcome.kind === 'pending') {
+    if (outcome.code !== undefined) {
+      process.stdout.write(`Approval code: ${outcome.code}\n`);
+    }
+    process.stdout.write(
+      `Approve this machine in a browser: ${outcome.url}${machineNameSuffix(name)}\n`,
+    );
+    return;
+  }
+  if (outcome.kind === 'error') {
+    process.stderr.write(
+      `Could not connect to ${serverUrl} to start enrollment: ${outcome.message}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  if (outcome.kind === 'timeout') {
+    process.stderr.write(
+      `Could not obtain an enrollment code from ${serverUrl} within ${Math.round(ENROLLMENT_PRINT_WAIT_MS / 1000)}s. Run "${BRAND.cliCommandName} logs" to inspect connection errors.\n`,
+    );
+  }
 }

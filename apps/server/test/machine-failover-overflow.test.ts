@@ -284,4 +284,30 @@ describe('multi-machine failover and overflow', () => {
     expect(claimed?.step.id).toBe(pendingStep.id);
     expect(claimed?.step.machineId).toBe(laptop.id);
   });
+
+  test('schedules a wake when offline failover grace window expires so backup runner claims automatically', async () => {
+    const { s, mini, laptop, projectId } = await setupPair();
+    const almostExpired = Date.now() - (OFFLINE_FAILOVER_GRACE_MS - 150);
+    s.db
+      .update(machineTable)
+      .set({ online: false, lastSeenAt: almostExpired })
+      .where(eq(machineTable.id, mini.id))
+      .run();
+
+    const { stepId } = await createAndStartTodo(s, projectId, 'grace wake');
+    const events: string[] = [];
+    const unsubscribe = s.machineHub.subscribeMachine(s.team.id, laptop.id, (ev) => {
+      events.push(ev.type);
+    });
+    try {
+      expect(await claim(s.app, laptop.token)).toBeNull();
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      expect(events).toContain('wake');
+      const claimed = await claim(s.app, laptop.token);
+      expect(claimed?.step.id).toBe(stepId);
+      expect(claimed?.step.machineId).toBe(laptop.id);
+    } finally {
+      unsubscribe();
+    }
+  });
 });

@@ -36,12 +36,14 @@ export function MachinesPage() {
   const machines = orderMachines(rawMachines, defaultMachineId);
   const [addOpen, setAddOpen] = useState(false);
   const targetMachineId = searchParams.get('machine');
+  const now = live ? Date.now() : fixture.now;
   useEffect(() => {
     if (targetMachineId === null || targetMachineId === '') return;
     const node = document.querySelector<HTMLElement>(
       `[data-machine-id="${CSS.escape(targetMachineId)}"]`,
     );
-    node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    node?.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
   }, [targetMachineId, machines.length]);
   const phoneHost =
     machines.find(
@@ -108,6 +110,7 @@ export function MachinesPage() {
                     machines={machines}
                     isDefault={machine.id != null && machine.id === defaultMachineId}
                     highlighted={machine.id != null && machine.id === targetMachineId}
+                    now={now}
                   />
                   <MachinePhoneRows machine={machine} />
                 </Fragment>

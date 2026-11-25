@@ -33,8 +33,9 @@ export function MachineAuthorizePage() {
   const [code, setCode] = useState<string | null>(null);
   const [polled, setPolled] = useState(false);
   const [pollFailed, setPollFailed] = useState(false);
-  const { access } = useRunnerServerAccess(phase === 'idle');
+  const { serverUrl } = useRunnerServerAccess(phase === 'idle');
   const stopped = useRef(false);
+  const retryPollRef = useRef<(() => Promise<void>) | null>(null);
   useEffect(() => {
     stopped.current = false;
     return () => {
@@ -43,7 +44,10 @@ export function MachineAuthorizePage() {
   }, []);
 
   useEffect(() => {
-    if (enrollId === null || phase !== 'pending' || DEMO_MODE) return;
+    if (enrollId === null || phase !== 'pending' || DEMO_MODE) {
+      retryPollRef.current = null;
+      return;
+    }
     const tick = async () => {
       try {
         const res = await api.post<MachineEnrollPollResponse>('/api/machine/enroll/poll', {
@@ -64,9 +68,13 @@ export function MachineAuthorizePage() {
         if (!stopped.current) setPollFailed(true);
       }
     };
+    retryPollRef.current = tick;
     void tick();
     const timer = setInterval(() => void tick(), POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
+    return () => {
+      retryPollRef.current = null;
+      clearInterval(timer);
+    };
   }, [enrollId, phase]);
 
   const confirm = async (): Promise<void> => {
@@ -87,7 +95,6 @@ export function MachineAuthorizePage() {
     }
   };
 
-  const serverUrl = access?.state === 'ready' ? access.url : null;
   const backSearch = new URLSearchParams(search);
   backSearch.delete('enroll');
   const waiting = phase === 'pending' || phase === 'authorizing';
@@ -143,9 +150,21 @@ export function MachineAuthorizePage() {
                     : t('正在连接执行机…')}
               </Button>
               {pollFailed && !polled && (
-                <p className="m-0 text-meta text-content-secondary" role="status">
-                  {t('无法连接服务器，正在重试。请检查网络。')}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="m-0 text-meta text-content-secondary" role="status">
+                    {t('无法连接服务器，正在重试。请检查网络。')}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    data-testid="enroll-poll-retry"
+                    className="shrink-0 pointer-coarse:h-11 pointer-coarse:px-3"
+                    onClick={() => void retryPollRef.current?.()}
+                  >
+                    {t('立即重试')}
+                  </Button>
+                </div>
               )}
               {failed !== null && (
                 <p

@@ -2,7 +2,12 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { enrollThroughBrowser, pendingEnrollmentUrl } from '../src/machine-enroll.js';
+import {
+  ENROLLMENT_PRINT_WAIT_MS,
+  enrollThroughBrowser,
+  pendingEnrollmentUrl,
+  waitForPendingEnrollment,
+} from '../src/machine-enroll.js';
 import { statePaths } from '../src/state.js';
 
 const SERVER = 'https://cairn.example';
@@ -438,4 +443,35 @@ test('browser enrollment stores pollSecret privately, sends it on poll, and fail
   ).rejects.toThrow(/already claimed/);
   expect(existsSync(join(second.home, 'enroll.json'))).toBe(false);
   releaseTestTempDir(second.home);
+});
+
+test('enrollStart failure writes enroll-error.json and waitForPendingEnrollment surfaces it immediately', async () => {
+  expect(ENROLLMENT_PRINT_WAIT_MS).toBeGreaterThanOrEqual(15_000);
+  const { home, paths } = world();
+  await expect(
+    enrollThroughBrowser(
+      {
+        enrollStart: async () => {
+          throw new Error('\x1b[31mfetch failed: ECONNREFUSED\x1b]52;c;ZWF2aWw=\x07\x1b[0m');
+        },
+        enrollPoll: async () => ({ status: 'pending' as const }),
+      },
+      paths,
+      SERVER,
+      'omarchy',
+      { now: () => 5_000, sleep: async () => {}, log: () => {} },
+    ),
+  ).rejects.toThrow(/ECONNREFUSED/);
+
+  const outcome = await waitForPendingEnrollment(
+    paths,
+    SERVER,
+    ENROLLMENT_PRINT_WAIT_MS,
+    async () => {},
+    () => 5_100,
+    'omarchy',
+    4_500,
+  );
+  expect(outcome).toEqual({ kind: 'error', message: 'fetch failed: ECONNREFUSED' });
+  releaseTestTempDir(home);
 });

@@ -62,13 +62,17 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     return c.json(descriptor);
   });
 
-  app.get('/api/remote/routes', (c) => {
+  app.get('/api/remote/routes', async (c) => {
     c.header('cache-control', 'no-store');
+    const tailscaleAccess =
+      remote.tailscale !== undefined ? await remote.tailscale.status().catch(() => null) : null;
     const routes = buildRemoteRoutes(remote.environmentId, {
       listenHost: remote.listenHost,
       listenPort: remote.listenPort,
       interfaces: (remote.networkInterfaces ?? networkInterfaces)(),
       tailnet: remote.tailnetStatus(),
+      tailscaleUrl: tailscaleAccess?.state === 'ready' ? tailscaleAccess.url : null,
+      publicOrigin: ctx.webOrigin ?? null,
     });
     if (ctx.authToken !== null && c.get('ownerIdentity') === undefined) {
       routes.tailnet.authUrl = null;
