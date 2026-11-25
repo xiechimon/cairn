@@ -37,10 +37,13 @@ const CANCEL_LABEL_RE = /^(?:Cancel|取消)$/;
 
 function remoteApiPayload(pathname) {
   if (pathname === '/api/auth/clerk/config') return { enabled: false };
+  if (pathname === '/api/auth/stream-ticket') return { ticket: 'smoke-ticket' };
   if (pathname === '/api/teams') return [{ id: 't1', name: 'Remote Team' }];
   if (pathname === '/api/user/me') return { id: 'u1', displayName: 'ian', avatarUrl: null };
   if (pathname === '/api/teams/t1/notifications') return { unreadThreadIds: [] };
   if (pathname === '/api/teams/t1/routing-settings') return { rules: [], policies: [] };
+  if (pathname === '/api/teams/t1/model-sources') return { sources: [] };
+  if (pathname === '/api/teams/t1/model-routing') return { connections: [] };
   if (pathname === '/api/teams/t1/chief/threads') {
     return [
       {
@@ -149,6 +152,11 @@ function startRemoteBundleServer(publicDir) {
       req.on('close', () => sseSockets.delete(res));
       return;
     }
+    if (url.pathname === '/api/auth/session' || url.pathname === '/api/auth/access') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
     if (url.pathname.startsWith('/api/')) {
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(remoteApiPayload(url.pathname)));
@@ -238,7 +246,7 @@ export async function runAntigravityRemoteAndSkewSmoke({
   quitTimeoutMs,
   withDeadline,
 }) {
-  const publicDir = join(appRoot, 'Contents', 'Resources', 'server', 'public');
+  const publicDir = join(appRoot, 'Contents', 'Resources', 'server', 'web');
   assert.equal(
     existsSync(join(publicDir, 'index.html')),
     true,
