@@ -329,15 +329,21 @@ describe('the coordinator route (D70 C5, now read from the coordinator routing r
     seedRoute(w.s, 'coordinator', {
       provider: 'vani',
       modelId: 'deepseek/deepseek-v4.1-flash',
-      machineId: w.machineId,
-    });
-    seedRoute(w.s, 'compaction', {
-      provider: 'anthropic',
-      modelId: 'claude-haiku-5-5',
+      thinkingLevel: 'max',
       machineId: w.machineId,
     });
     const deps = { db: w.s.db, box: w.s.secretBox };
-    expect(coordinatorProviders(deps, w.teamId)?.summary.provider).toBe('anthropic');
+    expect(coordinatorProviders(deps, w.teamId)?.summary.thinkingLevel).toBeNull();
+    seedRoute(w.s, 'compaction', {
+      provider: 'anthropic',
+      modelId: 'claude-haiku-5-5',
+      thinkingLevel: 'high',
+      machineId: w.machineId,
+    });
+    expect(coordinatorProviders(deps, w.teamId)?.summary).toMatchObject({
+      provider: 'anthropic',
+      thinkingLevel: 'high',
+    });
     setCoordinatorInServer(false);
   });
   test('a project Coordinator model drives its own channel, and a removed provider falls back to the team model', async () => {

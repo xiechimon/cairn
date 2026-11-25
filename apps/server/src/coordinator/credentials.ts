@@ -88,7 +88,7 @@ export function coordinatorProviders(
           compaction.thinkingLevel ?? null,
         )
       : null;
-  const summary = compactionRoute ?? router;
+  const summary = compactionRoute ?? { ...router, thinkingLevel: null };
   return { router, summary };
 }
 

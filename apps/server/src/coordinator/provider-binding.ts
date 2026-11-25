@@ -1,4 +1,4 @@
-import type { SecretBox } from '@cairn/shared';
+import { type SecretBox, thinkingLevelSchema } from '@cairn/shared';
 import type { Db } from '../db/client.js';
 import { unifiedRateLimitNotices } from '../services/claude-subscription-verification.js';
 import {
@@ -38,9 +38,11 @@ export function providerBinding(
   route: CoordinatorModelRoute,
 ): ProviderBinding {
   const observe = quotaObserver(deps, teamId, route);
+  const thinkingLevel = thinkingLevelSchema.safeParse(route.thinkingLevel);
   return {
     config: route.config,
     modelId: route.modelId,
+    ...(thinkingLevel.success ? { thinkingLevel: thinkingLevel.data } : {}),
     ...(observe === undefined ? {} : { observe }),
     resolveKey: async () => {
       const key = coordinatorApiKey(deps, teamId, route.provider);

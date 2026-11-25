@@ -6,7 +6,7 @@ import {
   COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
   shortEvent,
 } from '@cairn/shared';
-import type { AssistantMessage, Message } from '@earendil-works/pi-ai';
+import type { AssistantMessage, Message, ModelThinkingLevel } from '@earendil-works/pi-ai';
 import type { Models } from '@earendil-works/pi-ai/models';
 import {
   type CompactionSettings,
@@ -31,6 +31,7 @@ const SUMMARY_SYSTEM_PROMPT = "You are Cairn's Coordinator summarization step.";
 export interface ModelRef {
   provider: string;
   modelId: string;
+  thinkingLevel?: ModelThinkingLevel | null;
 }
 
 export type Summarize = (prompt: string) => Promise<string>;
@@ -181,6 +182,7 @@ export function summarizerFor(
     let failure: unknown;
     let httpStatus: number | undefined;
     try {
+      const reasoning = ref?.thinkingLevel ?? 'low';
       reply = await models.completeSimple(
         model,
         {
@@ -188,7 +190,7 @@ export function summarizerFor(
           messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
         },
         {
-          reasoning: 'low',
+          ...(reasoning === 'off' ? {} : { reasoning }),
           onResponse: (response) => {
             httpStatus = response.status;
           },

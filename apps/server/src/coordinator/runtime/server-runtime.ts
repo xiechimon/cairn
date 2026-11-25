@@ -8,7 +8,13 @@ import {
   WORKER_MEMORY_REMOTE_TOOLS,
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
-import type { Api, Model, Provider, ProviderResponse } from '@earendil-works/pi-ai';
+import type {
+  Api,
+  Model,
+  ModelThinkingLevel,
+  Provider,
+  ProviderResponse,
+} from '@earendil-works/pi-ai';
 import { createRegistry, type Harness } from '@earendil-works/pi-durable';
 import {
   coordinatorCompactionExtension,
@@ -69,6 +75,7 @@ export interface ServerRuntimeConfig {
 export interface ProviderBinding {
   config: ProviderConfig;
   modelId: string;
+  thinkingLevel?: ModelThinkingLevel | null;
   resolveKey(): string | null | Promise<string | null>;
   observe?(response: ProviderResponse, model: Model<Api>): void;
 }
@@ -327,6 +334,9 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         target.summary.ref = {
           provider: turn.summary.config.providerId,
           modelId: turn.summary.modelId,
+          ...(turn.summary.thinkingLevel !== undefined
+            ? { thinkingLevel: turn.summary.thinkingLevel }
+            : {}),
         };
         return target;
       };

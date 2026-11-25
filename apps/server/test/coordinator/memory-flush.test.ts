@@ -260,4 +260,24 @@ describe('summarizerFor', () => {
     expect(await summarize('x')).toBe('done');
     expect(seen).toEqual([expect.objectContaining({ reasoning: 'low' })]);
   });
+
+  it('honors an explicit thinkingLevel on the compaction model ref and omits reasoning for off', async () => {
+    const seen: Record<string, unknown>[] = [];
+    const model = { provider: 'p', id: 'm' };
+    const models = {
+      getModel: () => model,
+      completeSimple: async (
+        _model: unknown,
+        _context: unknown,
+        options: Record<string, unknown>,
+      ) => {
+        seen.push(options);
+        return { stopReason: 'stop', content: [{ type: 'text', text: 'done' }] };
+      },
+    } as never;
+    await summarizerFor(models, { provider: 'p', modelId: 'm', thinkingLevel: 'high' })('x');
+    await summarizerFor(models, { provider: 'p', modelId: 'm', thinkingLevel: 'off' })('y');
+    expect(seen[0]).toMatchObject({ reasoning: 'high' });
+    expect(seen[1]?.reasoning).toBeUndefined();
+  });
 });
