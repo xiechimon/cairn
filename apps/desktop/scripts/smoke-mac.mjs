@@ -1,9 +1,25 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
-import { dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, extname, join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
+import {
+  DESKTOP_MANIFEST_URL,
+  DESKTOP_RELEASES_BASE,
+} from '../../../packages/shared/src/desktop-shell.ts';
 import { isServerHelper } from '../src/server-process.ts';
 import { TRAY_POPOVER_WIDTH } from '../src/tray-popover.ts';
 import { isTrayPage, mainWindow } from './main-window.mjs';
@@ -1708,8 +1724,10 @@ try {
     }
   }
 
+  await verifyRemoteUpdate({ appRoot, screenshotPath });
+
   console.log(
-    `desktop smoke passed: ${origin} signed in, no pairing gate, Runner online, the tray opened in ${verified.length} verified cases, not covered: ${skipped.map((outcome) => outcome.name).join(', ') || 'none'}, quit stops the server and Runner`,
+    `desktop smoke passed: ${origin} signed in, no pairing gate, Runner online, the tray opened in ${verified.length} verified cases, not covered: ${skipped.map((outcome) => outcome.name).join(', ') || 'none'}, quit stops the server and Runner, remote-mode update installs`,
   );
 } finally {
   driver?.close();
@@ -1719,5 +1737,302 @@ try {
       QUIT_TIMEOUT_MS,
     );
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  }
+}
+
+async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot }) {
+  const webRoot = join(sourceApp, 'Contents', 'Resources', 'server', 'web');
+  assert.equal(existsSync(join(webRoot, 'index.html')), true, 'staged web assets are missing');
+
+  const remoteRoot = realpathSync(mkdtempSync(join(tmpdir(), 'cairn-remote-smoke-')));
+  const remoteHome = join(remoteRoot, 'home');
+  const remoteUserData = join(remoteRoot, 'userData');
+  const applicationsDir = join(remoteRoot, 'Applications');
+  const remoteAppBundle = join(applicationsDir, 'Cairn.app');
+  const nextAppBundle = join(remoteRoot, 'next', 'Cairn.app');
+  const nextVersion = '99.0.0';
+  const zipName = `Cairn-${nextVersion}.zip`;
+  const zipPath = join(remoteRoot, zipName);
+  mkdirSync(remoteHome, { recursive: true });
+  mkdirSync(remoteUserData, { recursive: true });
+  mkdirSync(applicationsDir, { recursive: true });
+  mkdirSync(join(remoteRoot, 'next'), { recursive: true });
+
+  execFileSync('/usr/bin/ditto', [sourceApp, remoteAppBundle]);
+  execFileSync('/usr/bin/ditto', [sourceApp, nextAppBundle]);
+  execFileSync('/usr/libexec/PlistBuddy', [
+    '-c',
+    `Set :CFBundleShortVersionString ${nextVersion}`,
+    join(nextAppBundle, 'Contents', 'Info.plist'),
+  ]);
+  execFileSync('/usr/bin/ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', nextAppBundle, zipPath]);
+  const zipSize = statSync(zipPath).size;
+  const zipSha256 = createHash('sha256').update(readFileSync(zipPath)).digest('hex');
+
+  let manifestHits = 0;
+  let zipHits = 0;
+  const feedServer = createServer((req, res) => {
+    const pathname = (req.url ?? '/').split('?')[0];
+    if (pathname === '/desktop-latest.json') {
+      manifestHits += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          version: nextVersion,
+          files: {
+            [process.arch]: { name: zipName, size: zipSize, sha256: zipSha256 },
+          },
+        }),
+      );
+      return;
+    }
+    if (pathname === `/download/desktop-v${nextVersion}/${zipName}`) {
+      zipHits += 1;
+      res.writeHead(200, {
+        'content-type': 'application/zip',
+        'content-length': String(zipSize),
+      });
+      createReadStream(zipPath).pipe(res);
+      return;
+    }
+    res.writeHead(404).end();
+  });
+
+  const mimeTypes = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.woff2': 'font/woff2',
+    '.ico': 'image/x-icon',
+  };
+  const sseClients = new Set();
+  const remoteServer = createServer((req, res) => {
+    const pathname = (req.url ?? '/').split('?')[0];
+    if (pathname === '/api/remote/descriptor') {
+      res.writeHead(404).end();
+      return;
+    }
+    if (pathname === '/api/auth/clerk/config') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ enabled: false, publishableKey: null, issuer: null }));
+      return;
+    }
+    if (pathname === '/api/auth/access') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ mode: 'token', authenticated: true }));
+      return;
+    }
+    if (pathname === '/api/auth/stream-ticket') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ticket: 'smoke-ticket' }));
+      return;
+    }
+    if (pathname === '/api/teams') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify([{ id: 't1', name: 'Remote Smoke', slug: 'remote-smoke', defaultMachineId: null }]),
+      );
+      return;
+    }
+    if (pathname === '/api/teams/t1/stream') {
+      res.writeHead(200, {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
+      });
+      res.write(': ok\n\n');
+      sseClients.add(res);
+      req.on('close', () => sseClients.delete(res));
+      return;
+    }
+    if (pathname === '/api/teams/t1/providers') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ providers: [] }));
+      return;
+    }
+    if (pathname === '/api/teams/t1/model-sources') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ sources: [] }));
+      return;
+    }
+    if (pathname === '/api/teams/t1/model-routing') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ connections: [], rules: [], policies: [] }));
+      return;
+    }
+    if (pathname === '/api/teams/t1/routing-settings') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ rules: [], policies: [] }));
+      return;
+    }
+    if (pathname === '/api/teams/t1/chief') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ id: 'c1', model: null, threads: [] }));
+      return;
+    }
+    if (pathname === '/api/user/me') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ id: 'u1', name: 'Owner', role: 'owner' }));
+      return;
+    }
+    if (pathname === '/api/capabilities') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({}));
+      return;
+    }
+    if (pathname.startsWith('/api/')) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('[]');
+      return;
+    }
+    const rel = pathname === '/' ? '/index.html' : pathname;
+    const candidate = resolve(webRoot, `.${rel}`);
+    const file = candidate.startsWith(webRoot) && existsSync(candidate) && statSync(candidate).isFile()
+      ? candidate
+      : join(webRoot, 'index.html');
+    res.writeHead(200, { 'content-type': mimeTypes[extname(file)] ?? 'application/octet-stream' });
+    createReadStream(file).pipe(res);
+  });
+
+  await Promise.all([
+    new Promise((done) => feedServer.listen(0, '127.0.0.1', done)),
+    new Promise((done) => remoteServer.listen(0, '127.0.0.1', done)),
+  ]);
+
+  const feedPort = feedServer.address().port;
+  const remotePort = remoteServer.address().port;
+  const remoteOrigin = `http://127.0.0.1:${remotePort}`;
+  const feedOrigin = `http://127.0.0.1:${feedPort}`;
+
+  writeFileSync(
+    join(remoteUserData, 'connections.json'),
+    JSON.stringify(
+      {
+        activeId: 'remote-smoke',
+        items: [{ id: 'remote-smoke', name: 'Remote Smoke', url: remoteOrigin }],
+      },
+      null,
+      2,
+    ),
+  );
+  writeFileSync(
+    join(remoteUserData, 'update-state.json'),
+    JSON.stringify(
+      {
+        staged: null,
+        installed: null,
+        blocked: { version: nextVersion, at: 1, reason: 'smoke-check', attempts: 1 },
+        notice: null,
+        knownVersion: null,
+      },
+      null,
+      2,
+    ),
+  );
+
+  let remoteApp = null;
+  let remoteChild = null;
+  try {
+    remoteApp = await electron.launch({
+      executablePath: join(remoteAppBundle, 'Contents', 'MacOS', 'Cairn'),
+      args: [`--user-data-dir=${remoteUserData}`],
+      env: { ...process.env, HOME: remoteHome },
+      timeout: LAUNCH_TIMEOUT_MS,
+    });
+    remoteChild = remoteApp.process();
+    await remoteApp.evaluate(
+      async ({ app: electronApp }, args) => {
+        await electronApp.whenReady();
+        const originalFetch = globalThis.fetch.bind(globalThis);
+        globalThis.fetch = (input, init) => {
+          const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+          if (url === args.manifestUrl) {
+            return originalFetch(`${args.feedOrigin}/desktop-latest.json`, init);
+          }
+          if (url.startsWith(`${args.releasesBase}/download/`)) {
+            const path = url.slice(args.releasesBase.length);
+            return originalFetch(`${args.feedOrigin}${path}`, init);
+          }
+          return originalFetch(input, init);
+        };
+      },
+      { manifestUrl: DESKTOP_MANIFEST_URL, releasesBase: DESKTOP_RELEASES_BASE, feedOrigin },
+    );
+
+    const remoteWindow = await mainWindow(remoteApp, LAUNCH_TIMEOUT_MS);
+    await remoteWindow.waitForLoadState('load');
+    assert.equal(
+      new URL(remoteWindow.url()).origin,
+      remoteOrigin,
+      `remote mode opened ${remoteWindow.url()} instead of ${remoteOrigin}`,
+    );
+
+    const updateButton = remoteWindow.getByTestId('desktop-update');
+    await updateButton.waitFor({ timeout: GATE_SETTLE_MS * 4 });
+    await remoteWindow.evaluate(() => window.cairnDesktop.update.check());
+    await updateButton
+      .locator('xpath=self::*[@data-status="available"]')
+      .waitFor({ timeout: OPEN_TIMEOUT_MS * 3 });
+    assert.ok(manifestHits >= 1, 'remote mode never checked the update feed');
+    assert.equal(zipHits, 0, 'blocked version downloaded before user clicked update');
+
+    const observedStates = [];
+    await remoteWindow.exposeFunction('__cairnSmokeRecordUpdateState', (status) => {
+      observedStates.push(status);
+    });
+    await remoteWindow.evaluate(() => {
+      window.cairnDesktop.update.subscribe((state) => {
+        void window.__cairnSmokeRecordUpdateState(state.status);
+      });
+    });
+
+    await updateButton.click();
+
+    const deadline = Date.now() + OPEN_TIMEOUT_MS * 4;
+    while (Date.now() < deadline) {
+      const status = await updateButton.getAttribute('data-status');
+      if (zipHits >= 1 && (status === 'error' || observedStates.includes('installing'))) break;
+      await remoteWindow.waitForTimeout(100);
+    }
+
+    assert.ok(zipHits >= 1, 'clicking update button in remote mode never downloaded the update');
+    assert.ok(
+      observedStates.includes('downloading') && observedStates.includes('installing'),
+      `clicking update button in remote mode did not start installing: ${JSON.stringify(observedStates)}`,
+    );
+    await updateButton
+      .locator('xpath=self::*[@data-status="error"]')
+      .waitFor({ timeout: OPEN_TIMEOUT_MS * 3 });
+    const refusalTitle = await updateButton.getAttribute('title');
+    assert.ok(
+      refusalTitle !== null && refusalTitle.trim() !== '',
+      'update button did not answer with a reason when install was refused',
+    );
+    await remoteWindow.screenshot({ path: baseShot.replace(/\.png$/, '-remote-update.png') });
+    console.log(
+      `remote update smoke passed: origin=${remoteOrigin} states=${JSON.stringify(observedStates)} refusal=${refusalTitle}`,
+    );
+  } finally {
+    if (remoteApp !== null) {
+      await withDeadline(
+        remoteApp.close().catch(() => {}),
+        QUIT_TIMEOUT_MS,
+      );
+    }
+    if (remoteChild !== null && remoteChild.exitCode === null && remoteChild.signalCode === null) {
+      remoteChild.kill('SIGKILL');
+    }
+    for (const client of sseClients) client.end();
+    feedServer.close();
+    remoteServer.close();
+    for (const pid of matchingPids(`^${remoteAppBundle}/`)) {
+      try {
+        process.kill(Number(pid), 'SIGKILL');
+      } catch {}
+    }
+    rmSync(remoteRoot, { recursive: true, force: true });
   }
 }
