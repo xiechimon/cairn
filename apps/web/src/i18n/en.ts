@@ -1287,16 +1287,57 @@ export const EN: Record<string, string> = {
   数据库备份已停止: 'Database backup stopped',
   数据库备份失败: 'Database backup failed',
   无法确认数据库备份状态: 'Backup status unknown',
-  '服务器数据库备份状态文件无法读取，无法确认备份是否在运行。':
-    'The server database backup status file cannot be read, so the backup cannot be confirmed as running.',
-  '{host} 上的服务器数据库备份已有 {hours} 小时没有成功，备份可能已停止。在该主机上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。':
-    'The server database backup on {host} has not succeeded for {hours## hour|# hours} and may have stopped. On that host run `systemctl --user list-timers cairn-db-backup.timer` to check the timer.',
-  '{host} 上的服务器数据库备份最近一次运行失败（{detail}），尚无成功的备份。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
-    'The latest server database backup run on {host} failed ({detail}), and no backup has succeeded yet. On that host run `systemctl --user status cairn-db-backup.service` to see why.',
-  '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在不到 1 小时前。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
-    'The latest server database backup run on {host} failed ({detail}); the last successful backup was less than an hour ago. On that host run `systemctl --user status cairn-db-backup.service` to see why.',
-  '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
-    'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours## hour|# hours} ago. On that host run `systemctl --user status cairn-db-backup.service` to see why.',
+  '自动备份状态暂时无法读取，请打开设置查看或立即备份。':
+    'Automatic backup status cannot be read right now. Open Settings to inspect or run a backup.',
+  '自动备份已有 {hours} 小时未完成，请打开设置检查并重试。':
+    'Automatic backup has not completed for {hours## hour|# hours}. Open Settings to check and retry.',
+  '最近一次自动备份失败（{detail}），尚无成功的备份。请打开设置重试。':
+    'The latest automatic backup failed ({detail}), and no backup has succeeded yet. Open Settings to retry.',
+  '最近一次自动备份失败（{detail}），上次成功备份在不到 1 小时前。请打开设置查看或重试。':
+    'The latest automatic backup failed ({detail}); the last successful backup was less than an hour ago. Open Settings to inspect or retry.',
+  '最近一次自动备份失败（{detail}），上次成功备份在 {hours} 小时前。请打开设置查看或重试。':
+    'The latest automatic backup failed ({detail}); the last successful backup was {hours## hour|# hours} ago. Open Settings to inspect or retry.',
+  数据与备份: 'Data and backups',
+  自动备份: 'Automatic backups',
+  尚未完成首次备份: 'No backup completed yet',
+  状态无法读取: 'Status unavailable',
+  '最近备份：{time} · 正常': 'Last backup: {time} · Healthy',
+  '最近备份：{time} · 失败': 'Last backup: {time} · Failed',
+  '每天自动加密备份到独立存储空间，可随时恢复或下载全部数据':
+    'Backed up daily with encryption to separate storage. Restore or download everything at any time.',
+  '每天自动备份，可随时恢复或下载全部数据':
+    'Backed up daily. Restore or download everything at any time.',
+  查看原因: 'Show details',
+  收起原因: 'Hide details',
+  立即备份: 'Back up now',
+  '正在备份…': 'Backing up…',
+  备份已完成: 'Backup complete',
+  '备份失败，请重试。': 'Backup failed. Try again.',
+  下载全部数据: 'Download all data',
+  '导出所有对话、任务、附件和配置到本地文件（不含密钥文件）':
+    'Export all conversations, tasks, attachments, and settings to a local file (excluding key files).',
+  '正在打包…': 'Preparing…',
+  已开始下载全部数据: 'Download started',
+  '下载失败，请重试。': 'Download failed. Try again.',
+  历史备份: 'Backup history',
+  '恢复前会自动保存当前状态，选错可一键撤回':
+    'Current state is saved before restoring so you can revert in one click.',
+  暂无历史备份: 'No backups yet',
+  收起历史备份: 'Hide history',
+  '查看历史备份 ({count})': 'View backups ({count})',
+  恢复前自动快照: 'Pre-restore snapshot',
+  手动备份: 'Manual backup',
+  每日自动备份: 'Daily backup',
+  恢复到这份备份: 'Restore this backup',
+  '将把全部对话、任务与设置回滚到 {time} 的状态。':
+    'This rolls back all conversations, tasks, and settings to {time}.',
+  确认恢复: 'Confirm restore',
+  '执行恢复前，系统会自动为当前数据留存一份快照。如果恢复后发现选错，随时可以从历史备份一键撤回。':
+    'Before restoring, the system automatically saves a snapshot of your current data. You can revert from backup history at any time.',
+  '已保存当前状态并开始恢复，服务正在重启':
+    'Current state saved and restore started. The server is restarting.',
+  '已保存当前状态并完成恢复准备，重启服务后生效':
+    'Current state saved and restore staged. Restart the server to apply.',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
   '该 Agent 执行任务时可读取的团队技能范围。开启「不限制」= 全量可读；关闭后仅勾选的技能可读，未勾选一律拒绝——「不限制」与全不勾是两种状态，可随时互转。':
     'Which team skills this Agent may read. Unrestricted reads everything; once restricted, only the checked skills are readable and every unchecked one is denied. Unrestricted and nothing-checked are two different states, switchable either way.',

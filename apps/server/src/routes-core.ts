@@ -31,6 +31,7 @@ import {
   sameOriginPageWrite,
 } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
+import { BackupInProgressError, BackupNotFoundError } from './services/backup-service.js';
 import { readBackupHealth } from './services/backup-status.js';
 import {
   AUTH_COOKIE,
@@ -217,7 +218,82 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(ctx.user);
   });
 
-  app.get('/api/server/backup', (c) => c.json(readBackupHealth(ctx.backupStatusPath)));
+  app.get('/api/server/backup', async (c) => {
+    if (ctx.backupService !== undefined) {
+      return c.json(await ctx.backupService.health());
+    }
+    return c.json(readBackupHealth(ctx.backupStatusPath));
+  });
+
+  app.post('/api/server/backup/run', async (c) => {
+    if (ctx.backupService === undefined) {
+      throw new HttpError(503, 'Built-in backup is not enabled on this server.');
+    }
+    if (getCookie(c, AUTH_COOKIE) !== undefined && !sameOriginPageWrite(c, ctx.webOrigin)) {
+      return c.body(null, 403);
+    }
+    try {
+      const snapshot = await ctx.backupService.runBackup('manual');
+      const health = await ctx.backupService.health();
+      return c.json({ snapshot, health });
+    } catch (error) {
+      if (error instanceof BackupInProgressError) {
+        throw new HttpError(409, error.message);
+      }
+      ctx.logger?.warn({ err: error }, 'manual backup failed');
+      throw new HttpError(500, 'Backup failed.');
+    }
+  });
+
+  app.post('/api/server/backup/export', async (c) => {
+    if (ctx.backupService === undefined) {
+      throw new HttpError(503, 'Built-in backup is not enabled on this server.');
+    }
+    if (getCookie(c, AUTH_COOKIE) !== undefined && !sameOriginPageWrite(c, ctx.webOrigin)) {
+      return c.body(null, 403);
+    }
+    try {
+      const exported = await ctx.backupService.exportArchive();
+      return new Response(new Uint8Array(exported.buffer), {
+        status: 200,
+        headers: {
+          'content-type': 'application/gzip',
+          'content-disposition': `attachment; filename="${exported.filename}"`,
+          'cache-control': 'no-store',
+        },
+      });
+    } catch (error) {
+      if (error instanceof BackupInProgressError) {
+        throw new HttpError(409, error.message);
+      }
+      ctx.logger?.warn({ err: error }, 'backup export failed');
+      throw new HttpError(500, 'Backup export failed.');
+    }
+  });
+
+  app.post('/api/server/backup/:id/restore', async (c) => {
+    if (ctx.backupService === undefined) {
+      throw new HttpError(503, 'Built-in backup is not enabled on this server.');
+    }
+    if (getCookie(c, AUTH_COOKIE) !== undefined && !sameOriginPageWrite(c, ctx.webOrigin)) {
+      return c.body(null, 403);
+    }
+    const id = c.req.param('id');
+    try {
+      const result = await ctx.backupService.prepareRestore(id);
+      return c.json(result);
+    } catch (error) {
+      if (error instanceof BackupNotFoundError) {
+        throw new HttpError(404, error.message);
+      }
+      if (error instanceof BackupInProgressError) {
+        throw new HttpError(409, error.message);
+      }
+      ctx.logger?.warn({ err: error, snapshotId: id }, 'backup restore failed');
+      throw new HttpError(500, 'Backup restore failed.');
+    }
+  });
+
   app.get('/api/server/deploy', (c) => c.json(readDeployStatus(ctx.deployRecordPath)));
 
   app.get('/api/teams', (c) => {

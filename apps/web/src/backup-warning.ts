@@ -4,29 +4,28 @@ type Translate = (key: string, params?: Record<string, string | number>) => stri
 
 export function formatBackupWarning(notice: BackupNotice, t: Translate): string {
   if (notice.kind === 'unreadable') {
-    return t('服务器数据库备份状态文件无法读取，无法确认备份是否在运行。');
+    return t('自动备份状态暂时无法读取，请打开设置查看或立即备份。');
   }
   if (notice.kind === 'stale') {
-    return t(
-      '{host} 上的服务器数据库备份已有 {hours} 小时没有成功，备份可能已停止。在该主机上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。',
-      { host: notice.host, hours: notice.hours },
-    );
+    return t('自动备份已有 {hours} 小时未完成，请打开设置检查并重试。', {
+      hours: notice.hours,
+    });
   }
-  const params = { host: notice.host, detail: notice.detail };
+  const params = { detail: notice.detail };
   if (notice.hours === null) {
-    return t(
-      '{host} 上的服务器数据库备份最近一次运行失败（{detail}），尚无成功的备份。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
-      params,
-    );
+    return t('最近一次自动备份失败（{detail}），尚无成功的备份。请打开设置重试。', params);
   }
   if (notice.hours === 0) {
     return t(
-      '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在不到 1 小时前。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
+      '最近一次自动备份失败（{detail}），上次成功备份在不到 1 小时前。请打开设置查看或重试。',
       params,
     );
   }
   return t(
-    '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
-    { ...params, hours: notice.hours },
+    '最近一次自动备份失败（{detail}），上次成功备份在 {hours} 小时前。请打开设置查看或重试。',
+    {
+      ...params,
+      hours: notice.hours,
+    },
   );
 }

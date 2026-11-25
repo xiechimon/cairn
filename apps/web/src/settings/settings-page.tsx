@@ -74,7 +74,14 @@ const GROUPS: Group[] = [
   {
     heading: null,
     sections: [
-      { id: 'account', label: '账号', Icon: User, rows: true, element: () => <AccountPage /> },
+      {
+        id: 'account',
+        label: '账号',
+        Icon: User,
+        keywords: ['backup', 'restore', 'export', '自动备份', '历史备份', '数据与备份', '导出'],
+        rows: true,
+        element: () => <AccountPage />,
+      },
     ],
   },
   {

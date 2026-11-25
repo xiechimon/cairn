@@ -2571,10 +2571,14 @@
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/board/backup-banner.tsx"
+          "apps/web/src/board/backup-banner.tsx",
+          "apps/web/src/resources/backup-settings-section.tsx"
         ],
         "server": [
           "apps/server/src/services/backup-status.ts",
+          "apps/server/src/services/backup-service.ts",
+          "apps/server/src/services/backup-archive.ts",
+          "apps/server/src/services/backup-s3.ts",
           "apps/server/src/services/deploy-status.ts",
           "apps/server/src/routes-deploy.ts",
           "apps/server/src/services/deploy-lease.ts"
@@ -2583,6 +2587,9 @@
       "routes": {
         "server": [
           "/api/server/backup",
+          "/api/server/backup/run",
+          "/api/server/backup/export",
+          "/api/server/backup/:id/restore",
           "/api/server/deploy",
           "/api/server/deploy/lease"
         ]

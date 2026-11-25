@@ -112,6 +112,9 @@ import type {
   XaiDeviceStartResponse,
 } from '@cairn/shared';
 import {
+  type BackupHealth,
+  type BackupRestoreResult,
+  type BackupSnapshotSummary,
   backupHealthSchema,
   backupNotice,
   IN_PROGRESS_PHASES,
@@ -470,17 +473,48 @@ export function usePhoneHandoffs(enabled: boolean) {
   });
 }
 
-export const useBackupNotice = (enabled: boolean) =>
+export const useServerBackup = (enabled: boolean) =>
   useQuery({
     queryKey: ['server-backup'],
-    queryFn: async () =>
-      backupNotice(
-        backupHealthSchema.safeParse(await api.get('/api/server/backup')).data,
-        Date.now(),
-      ),
+    queryFn: async (): Promise<BackupHealth | null> =>
+      backupHealthSchema.safeParse(await api.get('/api/server/backup')).data ?? null,
     enabled,
     refetchInterval: BACKUP_HEALTH_POLL_MS,
   });
+
+export const useBackupNotice = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['server-backup'],
+    queryFn: async (): Promise<BackupHealth | null> =>
+      backupHealthSchema.safeParse(await api.get('/api/server/backup')).data ?? null,
+    select: (health) => backupNotice(health, Date.now()),
+    enabled,
+    refetchInterval: BACKUP_HEALTH_POLL_MS,
+  });
+
+export function useBackupMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['server-backup'] });
+  return {
+    runNow: useMutation({
+      mutationFn: () =>
+        api.post<{ snapshot: BackupSnapshotSummary; health: BackupHealth }>(
+          '/api/server/backup/run',
+        ),
+      onSuccess: (data) => {
+        qc.setQueryData(['server-backup'], data.health);
+      },
+      onSettled: invalidate,
+    }),
+    restore: useMutation({
+      mutationFn: (snapshotId: string) =>
+        api.post<BackupRestoreResult>(
+          `/api/server/backup/${encodeURIComponent(snapshotId)}/restore`,
+        ),
+      onSettled: invalidate,
+    }),
+  };
+}
 
 export const useProviders = (teamId: string | undefined, enabled: boolean) =>
   useQuery({

@@ -4,6 +4,7 @@ import {
   type BackupStatus,
   backupHealthSchema,
   backupNotice,
+  DAILY_BACKUP_STALE_AFTER_MS,
 } from '../src/records/backup-status.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -23,6 +24,27 @@ describe('backupNotice', () => {
     expect(
       backupNotice({ state: 'recorded', status: succeeded(NOW - BACKUP_STALE_AFTER_MS) }, NOW),
     ).toBeNull();
+    expect(
+      backupNotice(
+        {
+          state: 'recorded',
+          status: { ...succeeded(NOW - 24 * HOUR), staleAfterMs: DAILY_BACKUP_STALE_AFTER_MS },
+        },
+        NOW,
+      ),
+    ).toBeNull();
+    expect(
+      backupNotice(
+        {
+          state: 'recorded',
+          status: {
+            ...succeeded(NOW - DAILY_BACKUP_STALE_AFTER_MS - 1),
+            staleAfterMs: DAILY_BACKUP_STALE_AFTER_MS,
+          },
+        },
+        NOW,
+      ),
+    ).toEqual({ kind: 'stale', host: 'omarchy', hours: 36 });
   });
 
   test('a last success older than 2 hours warns as stale with whole hours', () => {

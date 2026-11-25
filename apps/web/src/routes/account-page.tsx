@@ -37,6 +37,7 @@ import {
   subscribeDevicePush,
   unsubscribeDevicePush,
 } from '../pwa/push-device.js';
+import { BackupSettingsSection } from '../resources/backup-settings-section.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
 
@@ -226,6 +227,7 @@ export function AccountPage() {
             </SettingsRow>
           </SettingsCard>
         </SettingsSection>
+        <BackupSettingsSection />
       </div>
     </PageShell>
   );

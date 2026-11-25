@@ -1011,7 +1011,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `backup-warning`
+- Test ids in its code: `account-backup`, `backup-export-all`, `backup-history-list`, `backup-history-toggle`, `backup-restore-confirm`, `backup-run-now`, `backup-snapshot-row`, `backup-status-text`, `backup-warning`
 - Research: [docs/research/deploy-drain-2026-11-09.md](../../../docs/research/deploy-drain-2026-11-09.md)
 - Frontend design: **gap**: the banners have no design
 - Backend design: [docs/ops/deploy-drain-design.md](../../../docs/ops/deploy-drain-design.md)

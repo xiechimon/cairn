@@ -7,6 +7,7 @@ import type { AccessVerifier } from './lib/cloudflare-access.js';
 import type { FetchLike } from './lib/github.js';
 import type { OwnerChannel } from './lib/owner-channel.js';
 import type { KeySecretBox } from './lib/secret-box.js';
+import type { BackupService } from './services/backup-service.js';
 import type { StreamTicketBook } from './services/browser-session.js';
 import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
@@ -83,6 +84,7 @@ export interface AppContext {
   attachmentsDir: string;
   pageThumbnails?: PageThumbnails;
   backupStatusPath?: string;
+  backupService?: BackupService;
   deployRecordPath?: string;
   skillsDir: string;
   skillSourcesPath: string;

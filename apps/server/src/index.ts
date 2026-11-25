@@ -40,6 +40,8 @@ import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
 import { clearLaunchdServerOwner, writeLaunchdServerOwner } from './server-owner.js';
 import { loadApnsConfig } from './services/apns.js';
+import { createS3BackupStore, loadBackupS3Config } from './services/backup-s3.js';
+import { applyPendingRestoreIfAny, createBackupService } from './services/backup-service.js';
 import {
   createStreamTicketBook,
   revokeAllExternalBrowserSessions,
@@ -75,7 +77,7 @@ import { capturePageOver, createPageThumbnails, parentPortOf } from './services/
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import { createScheduler } from './services/scheduler.js';
-import { sharedAgentSkillRoots } from './services/skills.js';
+import { pathsOverlap, sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
 import { fillSystemAvatar } from './services/system-avatar.js';
 import { createTailscaleServe } from './services/tailscale-serve.js';
@@ -120,8 +122,15 @@ if (refusal !== null) {
 const config = ensureAccessToken(loadedConfig);
 logSecrets.push(config.authToken ?? '');
 
+const managedBackupSkillsDir = sharedAgentSkillRoots().some((root) =>
+  pathsOverlap(config.skillsDir, root),
+)
+  ? undefined
+  : config.skillsDir;
+
 const opened = (() => {
   try {
+    applyPendingRestoreIfAny(config.dataDir, config.dbPath, managedBackupSkillsDir, logger);
     return openDbWithHandle(config.dbPath);
   } catch (error) {
     logger.fatal(
@@ -131,7 +140,7 @@ const opened = (() => {
     process.exit(1);
   }
 })();
-const { db, close } = opened;
+const { db, sqlite, close } = opened;
 const skillsHome = await prepareSkillsHome({
   db,
   skillsDir: config.skillsDir,
@@ -253,6 +262,26 @@ const pageThumbnails = createPageThumbnails({
   attachmentsDir,
   capture: desktopPort === undefined ? undefined : capturePageOver(desktopPort),
 });
+const backupS3Config = loadBackupS3Config();
+logSecrets.push(backupS3Config?.secretAccessKey ?? '', envStr('CAIRN_BACKUP_ENCRYPTION_KEY') ?? '');
+const backupService =
+  process.env.CAIRN_BACKUP_DISABLED === '1' || config.dbPath === ':memory:'
+    ? undefined
+    : createBackupService({
+        dataDir: config.dataDir,
+        dbPath: config.dbPath,
+        statusPath: backupStatusPathOf(config),
+        skillsDir: managedBackupSkillsDir,
+        sqlite,
+        encryptionKeyEnv: envStr('CAIRN_BACKUP_ENCRYPTION_KEY'),
+        objectStore: backupS3Config === null ? null : createS3BackupStore(backupS3Config),
+        objectPrefix: backupS3Config?.prefix,
+        onRestart: () => {
+          void shutdown();
+        },
+        logger,
+      });
+
 const mcpOAuthState = newMcpOAuthState();
 const app = createApp(
   {
@@ -297,6 +326,7 @@ const app = createApp(
     attachmentsDir,
     pageThumbnails,
     backupStatusPath: backupStatusPathOf(config),
+    backupService,
     deployRecordPath: deployRecordPathOf(config),
     skillsDir: config.skillsDir,
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
@@ -439,6 +469,8 @@ const server = serve(
   },
 );
 
+backupService?.start();
+
 const drainHttp = createHttpDrain(server);
 const computerScreens = computerScreensOf({ db, machineHub, secretBox });
 computerScreens.recover();
@@ -466,6 +498,7 @@ let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  backupService?.stop();
   scheduler.stop();
   killInFlightPick();
   computerScreens.close();

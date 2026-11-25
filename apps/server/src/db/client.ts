@@ -54,6 +54,7 @@ export function migrateDatabase(
 
 export interface OpenedDb {
   db: Db;
+  sqlite: Database.Database;
   close(): void;
 }
 
@@ -64,7 +65,7 @@ export function openDbWithHandle(dbPath: string): OpenedDb {
   const sqlite = openConnection(dbPath);
   const db = drizzle(sqlite, { schema });
   migrateDatabase(db, sqlite);
-  return { db, close: () => sqlite.close() };
+  return { db, sqlite, close: () => sqlite.close() };
 }
 
 function openConnection(source: string | Buffer): Database.Database {

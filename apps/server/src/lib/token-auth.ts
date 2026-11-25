@@ -44,6 +44,9 @@ export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
     pathname === '/api/remote/pairing-requests' ||
     pathname.startsWith('/api/remote/pairing-requests/') ||
     pathname === '/api/remote/tailnet' ||
+    pathname === '/api/server/backup/run' ||
+    pathname === '/api/server/backup/export' ||
+    /^\/api\/server\/backup\/[^/]+\/restore$/.test(pathname) ||
     (pathname === '/api/remote/tailscale' && !read) ||
     (pathname.startsWith('/api/remote/devices') && !read) ||
     OWNER_ONLY_READ_PATTERNS.some((pattern) => pattern.test(pathname))
