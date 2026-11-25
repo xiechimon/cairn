@@ -29,10 +29,11 @@ import {
   rankMailEvent,
   transitionMailAccount,
 } from '../src/services/mail.js';
+import { createMailAccount, updateMailAccount } from '../src/services/mail-accounts.js';
 import { validateMemoryText } from '../src/services/memory.js';
 import { pushToUserSafely } from '../src/services/push.js';
 import { refuseRestrictedTurnTool } from '../src/services/report-turn.js';
-import { createSecret, openSecretValues } from '../src/services/secrets.js';
+import { createSecret, openMailPassword, openSecretValues } from '../src/services/secrets.js';
 import {
   bootServer,
   claimedGeneration,
@@ -599,5 +600,39 @@ describe('mail connector slice 1', () => {
     expect(() =>
       refuseRestrictedTurnTool(s.db, '[wake:wake] provenance=watch:todo\n', 'schedule_todo'),
     ).not.toThrow();
+  });
+
+  test('updating mailbox password and servers updates the secret and requests reconnect', () => {
+    const created = createMailAccount(deps(), {
+      teamId: s.team.id,
+      userId: s.user.id,
+      body: {
+        address: 'owner@qq.com',
+        imapHost: 'imap.qq.com',
+        imapPort: 993,
+        smtpHost: 'smtp.qq.com',
+        smtpPort: 465,
+        password: 'old-auth-code',
+        wakeMode: 'all',
+      },
+    });
+    s.db
+      .update(mailAccount)
+      .set({ status: 'revoked', lastError: 'auth-rejected' })
+      .where(eq(mailAccount.id, created.id))
+      .run();
+
+    const updated = updateMailAccount(deps(), s.team.id, created.id, {
+      password: 'new-auth-code',
+      imapPort: 1993,
+    });
+    expect(updated.reconnect).toBe(true);
+    expect(updated.account.status).toBe('connecting');
+    expect(updated.account.lastError).toBeNull();
+    expect(updated.account.imapPort).toBe(1993);
+
+    const row = s.db.select().from(mailAccount).where(eq(mailAccount.id, created.id)).get();
+    expect(row?.generation).toBe(2);
+    expect(openMailPassword(deps(), s.team.id, row?.secretId ?? '')).toBe('new-auth-code');
   });
 });

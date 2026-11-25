@@ -1,16 +1,16 @@
 import type {
   MailAccountCreateBody,
+  MailAccountPatchBody,
   MailAccountRecord,
   MailErrorCode,
   MailRuleCreateBody,
-  MailWakeMode,
 } from '@cairn/shared';
 import { and, asc, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { mailAccount, mailRule } from '../db/schema.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { createSecret, type SecretDeps } from './secrets.js';
+import { createSecret, type SecretDeps, updateSecret } from './secrets.js';
 
 type AccountRow = typeof mailAccount.$inferSelect;
 
@@ -126,18 +126,51 @@ export function createMailAccount(
   return toRecord(deps.db, row);
 }
 
-export function setMailWakeMode(
-  db: Db,
+export function updateMailAccount(
+  deps: SecretDeps,
   teamId: string,
   id: string,
-  mode: MailWakeMode,
-): MailAccountRecord {
-  requireMailAccount(db, teamId, id);
-  db.update(mailAccount)
-    .set({ defaultRank: WAKE_RANK[mode], updatedAt: nowMs() })
-    .where(eq(mailAccount.id, id))
-    .run();
-  return toRecord(db, requireMailAccount(db, teamId, id));
+  body: MailAccountPatchBody,
+): { account: MailAccountRecord; reconnect: boolean } {
+  const row = requireMailAccount(deps.db, teamId, id);
+  const reconnect =
+    body.password !== undefined ||
+    body.imapHost !== undefined ||
+    body.imapPort !== undefined ||
+    body.smtpHost !== undefined ||
+    body.smtpPort !== undefined;
+  deps.db.transaction(() => {
+    let secretId = row.secretId;
+    if (body.password !== undefined) {
+      if (secretId !== null) {
+        updateSecret(deps, teamId, secretId, { value: body.password });
+      } else {
+        const created = createSecret(deps, {
+          teamId,
+          name: `mail.imap.${id}`,
+          value: body.password,
+        });
+        secretId = created.id;
+      }
+    }
+    deps.db
+      .update(mailAccount)
+      .set({
+        ...(body.wakeMode !== undefined ? { defaultRank: WAKE_RANK[body.wakeMode] } : {}),
+        ...(body.imapHost !== undefined ? { imapHost: body.imapHost.toLowerCase() } : {}),
+        ...(body.imapPort !== undefined ? { imapPort: body.imapPort } : {}),
+        ...(body.smtpHost !== undefined ? { smtpHost: body.smtpHost.toLowerCase() } : {}),
+        ...(body.smtpPort !== undefined ? { smtpPort: body.smtpPort } : {}),
+        ...(secretId !== row.secretId ? { secretId } : {}),
+        ...(reconnect
+          ? { status: 'connecting', lastError: null, generation: row.generation + 1 }
+          : {}),
+        updatedAt: nowMs(),
+      })
+      .where(eq(mailAccount.id, id))
+      .run();
+  });
+  return { account: toRecord(deps.db, requireMailAccount(deps.db, teamId, id)), reconnect };
 }
 
 export function addMailRule(

@@ -1557,7 +1557,11 @@ export function mapMachines(
 }
 
 export function mapSkills(rows: SkillRecord[]): SkillRow[] {
-  return rows.map((s) => ({ name: s.name, description: s.description ?? '' }));
+  return rows.map((s) => ({
+    name: s.name,
+    description: s.description ?? '',
+    ...(s.imported === true ? { imported: true } : {}),
+  }));
 }
 
 export function mapMcpServers(rows: McpServerRecord[], now: number): McpRow[] {

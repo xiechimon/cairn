@@ -309,27 +309,41 @@ function CatalogConnectDialog({
   const { t } = useI18n();
   const mutations = useApiMutations(teamId);
   const [token, setToken] = useState('');
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const local = isLocalCatalogEntry(entry);
   const tokenRequired = !entry.auth.includes('none');
-  const pending = mutations.createMcpConnector.isPending;
+  const pending =
+    mutations.createMcpConnector.isPending ||
+    mutations.patchMcpConnector.isPending ||
+    mutations.checkMcpConnector.isPending;
   const submit = () => {
     if (!live) return onClose();
+    const callbacks = {
+      onSuccess: (record: McpConnectorRecord) => {
+        setCreatedId(record.id);
+        const message = connectorProblem(t, record);
+        if (message === null) onClose();
+        else setProblem(message);
+      },
+      onError: (error: unknown) => setProblem(submitError(t, error)),
+    };
+    setProblem(null);
+    if (createdId !== null) {
+      if (token !== '') {
+        mutations.patchMcpConnector.mutate({ id: createdId, body: { token } }, callbacks);
+      } else {
+        mutations.checkMcpConnector.mutate(createdId, callbacks);
+      }
+      return;
+    }
     const body: CreateMcpConnectorBody = {
       kind: 'catalog',
       catalogId: entry.id,
       slug: entry.id,
       ...(token !== '' ? { token } : {}),
     };
-    setProblem(null);
-    mutations.createMcpConnector.mutate(body, {
-      onSuccess: (record) => {
-        const message = connectorProblem(t, record);
-        if (message === null) onClose();
-        else setProblem(message);
-      },
-      onError: (error) => setProblem(submitError(t, error)),
-    });
+    mutations.createMcpConnector.mutate(body, callbacks);
   };
   if (local)
     return (
@@ -406,33 +420,52 @@ function CustomServerDialog({
   const [slugTouched, setSlugTouched] = useState(false);
   const [url, setUrl] = useState('');
   const [headers, setHeaders] = useState<HeaderDraft[]>([{ name: 'Authorization', value: '' }]);
+  const [created, setCreated] = useState<McpConnectorRecord | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const pending = mutations.createMcpConnector.isPending;
+  const pending = mutations.createMcpConnector.isPending || mutations.patchMcpConnector.isPending;
   const filled = headers.filter((header) => header.name.trim() !== '' && header.value !== '');
   const valid = label.trim() !== '' && SLUG_RE.test(slug) && url.startsWith('https://');
   const setHeader = (index: number, patch: Partial<HeaderDraft>) =>
     setHeaders((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   const submit = () => {
     if (!live) return onClose();
+    const callbacks = {
+      onSuccess: (record: McpConnectorRecord) => {
+        setCreated(record);
+        const message = connectorProblem(t, record);
+        if (message === null) onClose();
+        else setProblem(message);
+      },
+      onError: (error: unknown) => setProblem(submitError(t, error)),
+    };
+    const headerPayload =
+      filled.length > 0
+        ? { headers: Object.fromEntries(filled.map((h) => [h.name.trim(), h.value])) }
+        : {};
     setProblem(null);
+    if (created !== null) {
+      mutations.patchMcpConnector.mutate(
+        {
+          id: created.id,
+          body: {
+            label: label.trim(),
+            url: url.trim(),
+            ...headerPayload,
+          },
+        },
+        callbacks,
+      );
+      return;
+    }
     mutations.createMcpConnector.mutate(
       {
         kind: 'custom',
         slug,
         label: label.trim(),
         url: url.trim(),
-        ...(filled.length > 0
-          ? { headers: Object.fromEntries(filled.map((h) => [h.name.trim(), h.value])) }
-          : {}),
+        ...headerPayload,
       },
-      {
-        onSuccess: (record) => {
-          const message = connectorProblem(t, record);
-          if (message === null) onClose();
-          else setProblem(message);
-        },
-        onError: (error) => setProblem(submitError(t, error)),
-      },
+      callbacks,
     );
   };
   return (
@@ -450,7 +483,12 @@ function CustomServerDialog({
           }}
           secondary={{
             label: t('用浏览器登录'),
-            onClick: () => onSignIn({ kind: 'custom', slug, label: label.trim(), url: url.trim() }),
+            onClick: () =>
+              onSignIn(
+                created !== null
+                  ? { kind: 'reconnect', connector: created }
+                  : { kind: 'custom', slug, label: label.trim(), url: url.trim() },
+              ),
             disabled: pending || !valid || filled.length > 0,
           }}
           onCancel={onClose}
@@ -466,7 +504,7 @@ function CustomServerDialog({
             placeholder={t('例如：团队知识库')}
             onChange={(event) => {
               setLabel(event.target.value);
-              if (!slugTouched) setSlug(slugOf(event.target.value));
+              if (!slugTouched && created === null) setSlug(slugOf(event.target.value));
             }}
           />
         </FormField>
@@ -479,6 +517,7 @@ function CustomServerDialog({
             id="mcp-slug"
             className={FIELD_CLS}
             value={slug}
+            disabled={created !== null}
             placeholder={t('例如：team-wiki')}
             onChange={(event) => {
               setSlugTouched(true);

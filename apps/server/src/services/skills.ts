@@ -5,6 +5,7 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   type Stats,
   statSync,
@@ -376,7 +377,7 @@ function insertSkillAudit(
   row: {
     skillId: string;
     actor: SkillAuditActor;
-    action: 'create' | 'update';
+    action: 'create' | 'update' | 'delete';
     bytes: number;
   },
 ): void {
@@ -465,16 +466,38 @@ export function updateLocalSkill(
   const entry = body.files.find((f) => f.path === SKILL_ENTRY_FILE);
   let name: string;
   let description: string;
+  let nextDir = resolved.dir;
   if (entry) {
     const truth = assertFrontmatterCoherence(entry.content, body);
     name = truth.name;
     description = truth.description;
     if (name !== resolved.skill.id) {
+      if (!SKILL_DIR_NAME_RE.test(name)) {
+        throw new HttpError(
+          400,
+          `invalid body.name: expected a directory-safe skill name (starts with a letter or digit; letters, digits, dot, dash, underscore; 64 chars max), got ${JSON.stringify(name)}`,
+        );
+      }
       const clash = scanLocalSkills(opts.skillsDir).find(
         (s) => s.id === name && s.dirName !== resolved.skill.dirName,
       );
       if (clash) {
         throw new HttpError(409, `skill id ${name} already exists (directory ${clash.dirName})`);
+      }
+      const candidateDir = join(opts.skillsDir, name);
+      assertCairnWritable(candidateDir);
+      if (candidateDir !== resolved.dir) {
+        const existing = lstatSync(candidateDir, { throwIfNoEntry: false });
+        if (existing !== undefined) {
+          let sameTarget = false;
+          try {
+            sameTarget = realpathSync(candidateDir) === realpathSync(resolved.dir);
+          } catch {}
+          if (!sameTarget) {
+            throw new HttpError(409, `skill directory ${name} already exists`);
+          }
+        }
+        nextDir = candidateDir;
       }
     }
   } else {
@@ -494,11 +517,33 @@ export function updateLocalSkill(
     description = resolved.skill.description ?? body.description;
   }
   for (const file of body.files) writeSkillFile(resolved.dir, file);
+  if (nextDir !== resolved.dir) {
+    renameSync(resolved.dir, nextDir);
+  }
   insertSkillAudit(opts.db, { skillId: name, actor: opts.actor, action: 'update', bytes });
   return skillRecordSchema.parse({
     id: name,
     teamId: opts.teamId,
     name,
     description,
+  });
+}
+
+export function deleteLocalSkill(
+  opts: { db: Db; skillsDir: string; actor: SkillAuditActor },
+  skillId: string,
+): void {
+  const resolved = resolveLocalSkill(opts.skillsDir, skillId);
+  if (!resolved) throw new NotFoundError(`skill ${skillId}`);
+  if (lstatSync(resolved.dir).isSymbolicLink()) {
+    throw new HttpError(409, `skill ${skillId} is a symlink; remove it at its source`);
+  }
+  assertCairnWritable(resolved.dir);
+  rmSync(resolved.dir, { recursive: true, force: true });
+  insertSkillAudit(opts.db, {
+    skillId: resolved.skill.id,
+    actor: opts.actor,
+    action: 'delete',
+    bytes: 0,
   });
 }

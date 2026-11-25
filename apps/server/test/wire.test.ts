@@ -80,6 +80,7 @@ const INFERRED_ROUTES = [
   'GET /api/teams/{id}/im/connections',
   'POST /api/teams/{id}/im/telegram',
   'POST /api/teams/{id}/im/slack',
+  'PATCH /api/teams/{id}/im/slack/{connId}',
   'POST /api/teams/{id}/im/imessage',
   'POST /api/teams/{id}/im/wechat/login',
   'GET /api/teams/{id}/im/wechat/login/{loginId}',

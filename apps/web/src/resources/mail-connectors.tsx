@@ -1,4 +1,5 @@
 import {
+  type MailAccountPatchBody,
   type MailAccountRecord,
   type MailErrorCode,
   type MailRuleKind,
@@ -249,6 +250,163 @@ function AddMailboxDialog({
   );
 }
 
+function EditMailboxDialog({
+  account,
+  onClose,
+  onSubmit,
+  pending,
+}: {
+  account: MailAccountRecord;
+  onClose: () => void;
+  onSubmit: (body: MailAccountPatchBody) => void;
+  pending: boolean;
+}) {
+  const { t } = useI18n();
+  const provider = mailProviderOf(account.address);
+  const form = PROVIDER_FORM[provider];
+  const [password, setPassword] = useState('');
+  const [servers, setServers] = useState({
+    imapHost: account.imapHost,
+    imapPort: String(account.imapPort),
+    smtpHost: account.smtpHost,
+    smtpPort: String(account.smtpPort),
+  });
+  const [serversOpen, setServersOpen] = useState(provider === 'other');
+  const imapPort = Number(servers.imapPort);
+  const smtpPort = Number(servers.smtpPort);
+  const serversChanged =
+    servers.imapHost.trim().toLowerCase() !== account.imapHost.toLowerCase() ||
+    imapPort !== account.imapPort ||
+    servers.smtpHost.trim().toLowerCase() !== account.smtpHost.toLowerCase() ||
+    smtpPort !== account.smtpPort;
+  const portsValid =
+    Number.isInteger(imapPort) &&
+    imapPort >= 1 &&
+    imapPort <= 65535 &&
+    Number.isInteger(smtpPort) &&
+    smtpPort >= 1 &&
+    smtpPort <= 65535;
+  const ready =
+    (password !== '' || serversChanged) &&
+    servers.imapHost.trim() !== '' &&
+    servers.smtpHost.trim() !== '' &&
+    portsValid;
+  const submit = () => {
+    if (pending || !ready) return;
+    const body: MailAccountPatchBody = {
+      ...(password !== '' ? { password } : {}),
+      ...(servers.imapHost.trim().toLowerCase() !== account.imapHost.toLowerCase()
+        ? { imapHost: servers.imapHost.trim() }
+        : {}),
+      ...(imapPort !== account.imapPort ? { imapPort } : {}),
+      ...(servers.smtpHost.trim().toLowerCase() !== account.smtpHost.toLowerCase()
+        ? { smtpHost: servers.smtpHost.trim() }
+        : {}),
+      ...(smtpPort !== account.smtpPort ? { smtpPort } : {}),
+    };
+    onSubmit(body);
+  };
+  return (
+    <DialogShell
+      title={t('更新邮箱凭据')}
+      subtitle={account.address}
+      stacked
+      onClose={onClose}
+      footer={
+        <Button
+          className={DIALOG_PRIMARY_BUTTON}
+          disabled={pending || !ready}
+          onClick={submit}
+          data-testid="mail-edit-submit"
+        >
+          {t('保存')}
+        </Button>
+      }
+    >
+      <FormStack>
+        <FormField label={t(form.secretLabel)} htmlFor="mail-edit-password" help={t(form.help)}>
+          <Input
+            id="mail-edit-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder={t('留空则保持当前凭据不变')}
+            autoComplete="new-password"
+            data-testid="mail-edit-password-input"
+          />
+        </FormField>
+        {provider !== 'other' && !serversOpen ? (
+          <div className="flex items-center justify-between gap-2 text-meta text-content-tertiary">
+            <span className="min-w-0 truncate font-mono">
+              {servers.imapHost}:{servers.imapPort} · {servers.smtpHost}:{servers.smtpPort}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="flex-none text-content-secondary"
+              onClick={() => setServersOpen(true)}
+            >
+              {t('自定义服务器和端口')}
+            </Button>
+          </div>
+        ) : (
+          <>
+            <FormField label={t('收信服务器（IMAP）')} htmlFor="mail-edit-imap-host">
+              <div className="flex gap-2">
+                <Input
+                  id="mail-edit-imap-host"
+                  value={servers.imapHost}
+                  onChange={(event) =>
+                    setServers((current) => ({ ...current, imapHost: event.target.value }))
+                  }
+                  placeholder="imap.example.com"
+                  autoComplete="off"
+                  data-testid="mail-edit-imap-host-input"
+                />
+                <Input
+                  aria-label={t('IMAP 端口')}
+                  className="w-24 flex-none"
+                  inputMode="numeric"
+                  value={servers.imapPort}
+                  onChange={(event) =>
+                    setServers((current) => ({ ...current, imapPort: event.target.value }))
+                  }
+                  data-testid="mail-edit-imap-port-input"
+                />
+              </div>
+            </FormField>
+            <FormField label={t('发信服务器（SMTP）')} htmlFor="mail-edit-smtp-host">
+              <div className="flex gap-2">
+                <Input
+                  id="mail-edit-smtp-host"
+                  value={servers.smtpHost}
+                  onChange={(event) =>
+                    setServers((current) => ({ ...current, smtpHost: event.target.value }))
+                  }
+                  placeholder="smtp.example.com"
+                  autoComplete="off"
+                  data-testid="mail-edit-smtp-host-input"
+                />
+                <Input
+                  aria-label={t('SMTP 端口')}
+                  className="w-24 flex-none"
+                  inputMode="numeric"
+                  value={servers.smtpPort}
+                  onChange={(event) =>
+                    setServers((current) => ({ ...current, smtpPort: event.target.value }))
+                  }
+                  data-testid="mail-edit-smtp-port-input"
+                />
+              </div>
+            </FormField>
+          </>
+        )}
+      </FormStack>
+    </DialogShell>
+  );
+}
+
 function RulesDialog({
   account,
   onClose,
@@ -460,6 +618,7 @@ function ManageMailboxDialog({
   busy,
   onClose,
   onAdd,
+  onEdit,
   onRules,
   onRetry,
   onRemove,
@@ -470,6 +629,7 @@ function ManageMailboxDialog({
   busy: boolean;
   onClose: () => void;
   onAdd: () => void;
+  onEdit: (id: string) => void;
   onRules: (id: string) => void;
   onRetry: (id: string) => void;
   onRemove: (id: string) => void;
@@ -515,6 +675,14 @@ function ManageMailboxDialog({
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => onEdit(account.id)}
+                  data-testid={`mail-edit-${account.id}`}
+                >
+                  {t('更新凭据')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => onRules(account.id)}
                   data-testid={`mail-rules-${account.id}`}
                 >
@@ -557,11 +725,13 @@ export function useMailConnectors({
   const accounts = live ? (accountsQ.data?.accounts ?? []) : fixtureAccounts;
   const [managing, setManaging] = useState<MailProvider | null>(null);
   const [adding, setAdding] = useState<MailProvider | null>(null);
+  const [editingFor, setEditingFor] = useState<string | null>(null);
   const [rulesFor, setRulesFor] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<MailAccountRecord | null>(null);
   const failed = (message: string) => (error: unknown) => toastError(t(message), error);
   const byProvider = (provider: MailProvider) =>
     accounts.filter((account) => mailProviderOf(account.address) === provider);
+  const editAccount = accounts.find((account) => account.id === editingFor);
   const ruleAccount = accounts.find((account) => account.id === rulesFor);
   const managedAccounts = managing === null ? [] : byProvider(managing);
 
@@ -588,6 +758,7 @@ export function useMailConnectors({
           busy={mutations.remove.isPending || mutations.retry.isPending}
           onClose={() => setManaging(null)}
           onAdd={() => setAdding(managing)}
+          onEdit={setEditingFor}
           onRules={setRulesFor}
           onRetry={(id) =>
             mutations.retry.mutate(id, {
@@ -612,6 +783,23 @@ export function useMailConnectors({
               {
                 onSuccess: () => setAdding(null),
                 onError: failed('连接失败，请检查填写的内容。'),
+              },
+            )
+          }
+        />
+      )}
+      {editAccount !== undefined && (
+        <EditMailboxDialog
+          key={editAccount.id}
+          account={editAccount}
+          pending={mutations.updateAccount.isPending || !live}
+          onClose={() => setEditingFor(null)}
+          onSubmit={(body) =>
+            mutations.updateAccount.mutate(
+              { id: editAccount.id, body },
+              {
+                onSuccess: () => setEditingFor(null),
+                onError: failed('保存失败，请重试。'),
               },
             )
           }

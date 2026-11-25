@@ -19,13 +19,11 @@ import {
 import { useLiveData } from '../api/provider.js';
 import { FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { InfoTip } from '../components/info-tip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QrCode } from '../components/qr-code.js';
-import {
-  SETTINGS_SELECT_TRIGGER_CLS,
-  SettingsCard,
-  SettingsSection,
-} from '../components/settings-list.js';
+import { QueryBoundary } from '../components/query-state.js';
+import { SETTINGS_SELECT_TRIGGER_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
@@ -37,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -149,10 +148,12 @@ function ConnectDialog({
 }
 
 function SlackConnectDialog({
+  editing,
   onClose,
   onSubmit,
   pending,
 }: {
+  editing?: ImConnectionRecord;
   onClose: () => void;
   onSubmit: (appToken: string, botToken: string) => void;
   pending: boolean;
@@ -166,21 +167,26 @@ function SlackConnectDialog({
     if (pending || !ready) return;
     onSubmit(appToken.trim(), botToken.trim());
   };
+  const updating = editing !== undefined;
   return (
     <DialogShell
-      title={t('连接 Slack')}
+      title={updating ? t('更新 Slack 凭据') : t('连接 Slack')}
       subtitle={
-        <>
-          <span className="block">{t('新建一个 Slack App，把两个 token 粘贴到这里。')}</span>
-          <a
-            className="flex min-h-6 w-fit items-center text-foreground pointer-coarse:min-h-11"
-            href={SLACK_APP_CREATE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {t('用 Cairn 的设置创建 Slack App')}
-          </a>
-        </>
+        updating ? (
+          t('粘贴新的 App-Level Token 和 Bot Token 以替换当前凭据。')
+        ) : (
+          <>
+            <span className="block">{t('新建一个 Slack App，把两个 token 粘贴到这里。')}</span>
+            <a
+              className="flex min-h-6 w-fit items-center text-foreground pointer-coarse:min-h-11"
+              href={SLACK_APP_CREATE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t('用 Cairn 的设置创建 Slack App')}
+            </a>
+          </>
+        )
       }
       onClose={onClose}
       initialFocus={appTokenRef}
@@ -188,7 +194,7 @@ function SlackConnectDialog({
         <FormActions
           className="pt-0"
           primary={{
-            label: t('连接 Slack'),
+            label: updating ? t('保存') : t('连接 Slack'),
             onClick: submit,
             disabled: pending || !ready,
             testId: 'im-connect-submit',
@@ -245,18 +251,25 @@ function SlackConnectDialog({
 
 function ImessageConnectDialog({
   machines,
+  loading,
+  error,
+  onRetryMachines,
   onClose,
   onSubmit,
   pending,
 }: {
   machines: MachineRecord[];
+  loading: boolean;
+  error: boolean;
+  onRetryMachines: () => void;
   onClose: () => void;
   onSubmit: (machineId: string) => void;
   pending: boolean;
 }) {
   const { t } = useI18n();
-  const [machineId, setMachineId] = useState(machines[0]?.id ?? '');
-  const ready = machineId !== '';
+  const [pickedId, setPickedId] = useState('');
+  const machineId = machines.some((m) => m.id === pickedId) ? pickedId : (machines[0]?.id ?? '');
+  const ready = !loading && !error && machineId !== '';
   return (
     <DialogShell
       title={t('连接 iMessage')}
@@ -281,15 +294,34 @@ function ImessageConnectDialog({
             '选择一台始终开机的 Mac。这台 Mac 需要安装 imsg 并授予 iMessage 读取权限；首次连接时会自动安装受管版本。',
           )}
         >
-          {machines.length === 0 ? (
+          {loading ? (
+            <div aria-busy="true" data-testid="im-machines-loading">
+              <span role="status" className="sr-only">
+                {t('正在加载执行机')}
+              </span>
+              <Skeleton className="h-9 w-full" />
+            </div>
+          ) : error ? (
+            <div
+              className="flex items-center justify-between gap-2"
+              data-testid="im-machines-error"
+            >
+              <p role="alert" className="m-0 text-meta text-destructive">
+                {t('执行机列表未能加载。')}
+              </p>
+              <Button variant="outline" size="sm" onClick={onRetryMachines}>
+                {t('重试')}
+              </Button>
+            </div>
+          ) : machines.length === 0 ? (
             <p className="m-0 text-meta text-content-secondary" data-testid="im-no-machines">
-              {t('暂无已注册的执行机。请先在一台 Mac 上启动执行机。')}
+              {t('暂无在线的 Mac 执行机。请先在一台 Mac 上启动执行机。')}
             </p>
           ) : (
             <Select
               value={machineId}
               onValueChange={(next) => {
-                if (next !== null) setMachineId(next);
+                if (next !== null) setPickedId(next);
               }}
             >
               <SelectTrigger
@@ -336,6 +368,7 @@ function WechatLoginDialog({
   const [expired, setExpired] = useState(false);
   const failed = expired || login.qr === undefined;
   const poll = useImWechatLoginPoll(teamId, login.loginId, !failed);
+  const pollError = !failed && poll.isError;
   const failedText =
     login.qr === undefined ? t('二维码获取失败，请重新扫码。') : t('二维码已过期，请重新扫码。');
   useEffect(() => {
@@ -359,6 +392,15 @@ function WechatLoginDialog({
           >
             {t('重新扫码')}
           </Button>
+        ) : pollError ? (
+          <Button
+            className={DIALOG_PRIMARY_BUTTON}
+            disabled={poll.isFetching}
+            onClick={() => void poll.refetch()}
+            data-testid="im-wechat-poll-retry"
+          >
+            {t('重试')}
+          </Button>
         ) : undefined
       }
     >
@@ -372,9 +414,19 @@ function WechatLoginDialog({
       ) : (
         <div className="flex flex-col items-center gap-3">
           <QrCode text={login.qr ?? ''} label={t('微信登录二维码')} />
-          <p className="m-0 max-w-full text-center text-meta text-content-tertiary">
-            {t('等待微信确认…')}
-          </p>
+          {pollError ? (
+            <p
+              role="alert"
+              className="m-0 max-w-full text-center text-meta text-destructive"
+              data-testid="im-wechat-poll-error"
+            >
+              {t('网络中断，未能确认扫码状态。请检查网络后重试。')}
+            </p>
+          ) : (
+            <p className="m-0 max-w-full text-center text-meta text-content-tertiary">
+              {t('等待微信确认…')}
+            </p>
+          )}
         </div>
       )}
     </DialogShell>
@@ -402,22 +454,26 @@ export function ImConnectionsPage() {
   const mutations = useImMutations(teamId);
   const [connecting, setConnecting] = useState(false);
   const [connectingSlack, setConnectingSlack] = useState(false);
+  const [editingSlack, setEditingSlack] = useState<ImConnectionRecord | null>(null);
   const [connectingImessage, setConnectingImessage] = useState(false);
-  const [wechatLogin, setWechatLogin] = useState<ImWechatLoginStart | null>(null);
+  const [wechatLogin, setWechatLogin] = useState<{
+    login: ImWechatLoginStart;
+    connId?: string;
+  } | null>(null);
   const [deleting, setDeleting] = useState<ImConnectionRecord | null>(null);
   const machinesQ = useMachines(teamId, live && connectingImessage);
-  const allMachines = registeredMachines(machinesQ.data ?? []);
-  const macMachines = allMachines.filter((m) => m.capabilities?.osPlatform === 'darwin');
+  const onlineMachines = registeredMachines(machinesQ.data ?? []).filter((m) => m.online);
+  const macMachines = onlineMachines.filter((m) => m.capabilities?.osPlatform === 'darwin');
   const machines =
-    macMachines.length > 0 || allMachines.some((m) => m.capabilities?.osPlatform !== undefined)
+    macMachines.length > 0 || onlineMachines.some((m) => m.capabilities?.osPlatform !== undefined)
       ? macMachines
-      : allMachines;
+      : onlineMachines;
   const connections = connectionsQ.data?.connections ?? [];
   const requests = (requestsQ.data?.requests ?? []).filter((row) => row.status === 'pending');
   const connectionIds = new Set(connections.map((conn) => conn.id));
-  const startWechatLogin = () =>
-    mutations.startWechatLogin.mutate(undefined, {
-      onSuccess: setWechatLogin,
+  const startWechatLogin = (connId?: string) =>
+    mutations.startWechatLogin.mutate(connId, {
+      onSuccess: (login) => setWechatLogin(connId === undefined ? { login } : { login, connId }),
       onError: (error) => toastError(t('微信登录失败，请重试。'), error),
     });
   const connect = (platform: ImPlatform) =>
@@ -492,10 +548,19 @@ export function ImConnectionsPage() {
         variant="outline"
         size="sm"
         disabled={mutations.startWechatLogin.isPending}
-        onClick={startWechatLogin}
+        onClick={() => startWechatLogin(conn.id)}
         data-testid={`im-rescan-${conn.id}`}
       >
         {t('重新扫码')}
+      </Button>
+    ) : conn.status === 'expired' && conn.platform === 'slack' ? (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setEditingSlack(conn)}
+        data-testid={`im-update-slack-${conn.id}`}
+      >
+        {t('更新凭据')}
       </Button>
     ) : conn.status === 'expired' || conn.status === 'error' ? (
       <Button
@@ -561,6 +626,15 @@ export function ImConnectionsPage() {
                 sideOffset={4}
                 className="w-auto min-w-40"
               >
+                {live && conn.platform === 'slack' && (
+                  <KeyedMenuItem
+                    shortcut="E"
+                    data-testid={`im-edit-${conn.id}`}
+                    onClick={() => setEditingSlack(conn)}
+                  >
+                    {t('更新凭据')}
+                  </KeyedMenuItem>
+                )}
                 {live && (
                   <KeyedMenuItem
                     shortcut="C"
@@ -629,17 +703,31 @@ export function ImConnectionsPage() {
   };
 
   return (
-    <PageShell route={IM_ROUTE} fixture={fixture} selected="none" title={t('聊天应用')}>
-      <SettingsSection
+    <PageShell
+      route={IM_ROUTE}
+      fixture={fixture}
+      selected="none"
+      title={t('聊天应用')}
+      actions={
+        <InfoTip
+          info={t(
+            '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。',
+          )}
+        />
+      }
+    >
+      <QueryBoundary
+        query={live ? connectionsQ : undefined}
+        isEmpty={false}
+        empty={null}
+        loadingLabel={t('正在加载聊天应用')}
+        errorTitle={t('聊天应用未能加载')}
         className="mt-6"
-        title={t('聊天应用')}
-        info={t(
-          '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。',
-        )}
-        testId="im-platforms"
       >
-        <SettingsCard>{PLATFORM_ORDER.flatMap(platformRows)}</SettingsCard>
-      </SettingsSection>
+        <section data-testid="im-platforms" className="mt-6">
+          <SettingsCard>{PLATFORM_ORDER.flatMap(platformRows)}</SettingsCard>
+        </section>
+      </QueryBoundary>
       {connecting && (
         <ConnectDialog
           pending={mutations.connectTelegram.isPending}
@@ -652,24 +740,41 @@ export function ImConnectionsPage() {
           }
         />
       )}
-      {connectingSlack && (
+      {(connectingSlack || editingSlack !== null) && (
         <SlackConnectDialog
-          pending={mutations.connectSlack.isPending}
-          onClose={() => setConnectingSlack(false)}
-          onSubmit={(appToken, botToken) =>
+          {...(editingSlack !== null ? { editing: editingSlack } : {})}
+          pending={mutations.connectSlack.isPending || mutations.updateSlack.isPending}
+          onClose={() => {
+            setConnectingSlack(false);
+            setEditingSlack(null);
+          }}
+          onSubmit={(appToken, botToken) => {
+            if (editingSlack !== null) {
+              mutations.updateSlack.mutate(
+                { id: editingSlack.id, appToken, botToken },
+                {
+                  onSuccess: () => setEditingSlack(null),
+                  onError: (error) => toastError(t('保存失败，请重试。'), error),
+                },
+              );
+              return;
+            }
             mutations.connectSlack.mutate(
               { appToken, botToken },
               {
                 onSuccess: () => setConnectingSlack(false),
                 onError: (error) => toastError(t('连接失败，请重试。'), error),
               },
-            )
-          }
+            );
+          }}
         />
       )}
       {connectingImessage && (
         <ImessageConnectDialog
           machines={machines}
+          loading={live && machinesQ.isPending}
+          error={live && machinesQ.isError}
+          onRetryMachines={() => void machinesQ.refetch()}
           pending={mutations.connectImessage.isPending}
           onClose={() => setConnectingImessage(false)}
           onSubmit={(machineId) =>
@@ -682,16 +787,16 @@ export function ImConnectionsPage() {
       )}
       {wechatLogin !== null && (
         <WechatLoginDialog
-          key={wechatLogin.loginId}
+          key={wechatLogin.login.loginId}
           teamId={teamId}
-          login={wechatLogin}
+          login={wechatLogin.login}
           restarting={mutations.startWechatLogin.isPending}
           onClose={() => setWechatLogin(null)}
           onDone={() => {
             void connectionsQ.refetch();
             setWechatLogin(null);
           }}
-          onRetry={startWechatLogin}
+          onRetry={() => startWechatLogin(wechatLogin.connId)}
         />
       )}
       <DeleteConfirm

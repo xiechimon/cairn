@@ -606,7 +606,7 @@ Reach:
 
 - Web routes: `/app/usage`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `usage-current-month`, `usage-date-filter`, `usage-empty`, `usage-error`, `usage-heatmap`, `usage-heatmap-frame`, `usage-legend`, `usage-mix`, `usage-models`, `usage-projects`, `usage-readout`, `usage-since`, `usage-stats`, `usage-year`
+- Test ids in its code: `usage-current-month`, `usage-date-filter`, `usage-day-empty`, `usage-empty`, `usage-error`, `usage-heatmap`, `usage-heatmap-frame`, `usage-legend`, `usage-mix`, `usage-models`, `usage-projects`, `usage-readout`, `usage-since`, `usage-stats`, `usage-year`
 - Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar)
 - Backend design: [docs/design/step-usage-daily.md](../../../docs/design/step-usage-daily.md)
@@ -829,8 +829,8 @@ Reach:
 
 - Web routes: none
 - Settings: `设置` (Settings) › `消息` (Messages) › `聊天应用` (Chat apps)
-- Keyboard shortcuts in its code: `C`, `D`
-- Test ids in its code: `im-app-token-input`, `im-approve-*`, `im-bot-token-input`, `im-connect-*`, `im-connect-another-*`, `im-connect-submit`, `im-connection-*`, `im-delete-*`, `im-machine-select`, `im-menu-*`, `im-no-machines`, `im-pairing-*`, `im-platform-*`, `im-platforms`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-wechat-expired`, `im-wechat-retry`
+- Keyboard shortcuts in its code: `C`, `D`, `E`
+- Test ids in its code: `im-app-token-input`, `im-approve-*`, `im-bot-token-input`, `im-connect-*`, `im-connect-another-*`, `im-connect-submit`, `im-connection-*`, `im-delete-*`, `im-edit-*`, `im-machine-select`, `im-machines-error`, `im-machines-loading`, `im-menu-*`, `im-no-machines`, `im-pairing-*`, `im-platform-*`, `im-platforms`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-update-slack-*`, `im-wechat-expired`, `im-wechat-poll-error`, `im-wechat-poll-retry`, `im-wechat-retry`
 - Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/design/im-connections.md](../../../docs/design/im-connections.md), [docs/design/im-bridge.md](../../../docs/design/im-bridge.md)
@@ -849,7 +849,7 @@ Reach:
 - Web routes: none
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `应用` (Apps)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `mail-account-*`, `mail-add`, `mail-address-input`, `mail-connect-submit`, `mail-imap-host-input`, `mail-imap-port-input`, `mail-password-input`, `mail-remove-*`, `mail-retry-*`, `mail-rule-*`, `mail-rule-add`, `mail-rule-pattern-input`, `mail-rule-remove-*`, `mail-rules-*`, `mail-smtp-host-input`, `mail-smtp-port-input`
+- Test ids in its code: `mail-account-*`, `mail-add`, `mail-address-input`, `mail-connect-submit`, `mail-edit-*`, `mail-edit-imap-host-input`, `mail-edit-imap-port-input`, `mail-edit-password-input`, `mail-edit-smtp-host-input`, `mail-edit-smtp-port-input`, `mail-edit-submit`, `mail-imap-host-input`, `mail-imap-port-input`, `mail-password-input`, `mail-remove-*`, `mail-retry-*`, `mail-rule-*`, `mail-rule-add`, `mail-rule-pattern-input`, `mail-rule-remove-*`, `mail-rules-*`, `mail-smtp-host-input`, `mail-smtp-port-input`
 - Research: n/a: the binding contract is docs/design/mail-connector.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/design/mail-connector.md](../../../docs/design/mail-connector.md)
@@ -1053,7 +1053,7 @@ Reach:
 - Web routes: `/app/resources/skills`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`, `resource-import`, `skill-candidate`, `skill-candidate-all`, `skill-candidates`, `skill-candidates-empty`, `skill-import-source`, `skill-search-empty`
+- Test ids in its code: `resource-empty`, `resource-import`, `skill-candidate`, `skill-candidate-all`, `skill-candidates`, `skill-candidates-empty`, `skill-delete-*`, `skill-import-source`, `skill-refresh-*`, `skill-search-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/skills-page.md](features/skills-page.md), [.claude/skills/verify-cairn/features/skill-import.md](features/skill-import.md), [.claude/skills/verify-cairn/features/skills-injection.md](features/skills-injection.md)
 - Research: **gap**: no current note on how Amp, t3code and Claude Code manage skills across machines
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)

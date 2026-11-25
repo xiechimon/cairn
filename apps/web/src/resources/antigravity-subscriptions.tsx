@@ -9,7 +9,10 @@ import type {
 } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import type { CreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
-import { defaultRunnerTarget, extractAntigravityToken } from '../api/antigravity-subscriptions.js';
+import {
+  extractAntigravityToken,
+  localAntigravityTarget,
+} from '../api/antigravity-subscriptions.js';
 import { useMachines, useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
@@ -213,7 +216,7 @@ export function AddAntigravitySubscriptionDialog({
   const defaultMachineId =
     (teamsQ.data?.find((team) => team.id === resolvedTeamId) ?? teamsQ.data?.[0])
       ?.defaultMachineId ?? null;
-  const target = defaultRunnerTarget(machinesQ.data, defaultMachineId, local?.runnerId);
+  const target = localAntigravityTarget(machinesQ.data, defaultMachineId, local?.runnerId);
 
   const loginActive = login.phase === 'waiting' || login.phase === 'installing';
   const showLocalRow = bridge !== null && (local === null || local.loggedIn || local.canLogin);
@@ -313,7 +316,12 @@ export function AddAntigravitySubscriptionDialog({
           className="pt-0"
           primary={{
             label: t('保存'),
-            disabled: busy || !label.trim() || (pasteOpen && !token.trim()),
+            disabled:
+              busy ||
+              !label.trim() ||
+              (pasteOpen
+                ? !token.trim()
+                : bridge !== null && (local?.loggedIn !== true || importFailed)),
             onClick: () => {
               if (!pasteOpen && bridge !== null) {
                 void importLocal();

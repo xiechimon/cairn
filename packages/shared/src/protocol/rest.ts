@@ -306,6 +306,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'XMON-109（spec 13 回摆）：写路径——覆写式更新（列出者覆写、未列者保留；改名须携带新 SKILL.md）',
   },
   {
+    method: 'DELETE',
+    path: '/api/teams/{id}/skills/{sid}',
+    note: 'delete a Cairn-owned local skill directory and its source metadata; returns 204',
+  },
+  {
     method: 'POST',
     path: '/api/teams/{id}/skills/import',
     note: '#1170：导入通道——body {localPath} 或 {url} 二选一（本地目录 / GitHub 公共仓子目录）；落盘复用 createLocalSkill 校验；SSRF/路径守卫见 services/skill-import.ts',

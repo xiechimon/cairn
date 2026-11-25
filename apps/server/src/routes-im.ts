@@ -2,6 +2,7 @@ import {
   imImessageConnectBodySchema,
   imSlackConnectBodySchema,
   imTelegramConnectBodySchema,
+  imWechatLoginStartBodySchema,
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
@@ -40,6 +41,18 @@ export function registerImRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ connection: record });
   });
 
+  app.patch('/api/teams/:id/im/slack/:connId', async (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    const body = parseWith(imSlackConnectBodySchema, await jsonBody(c), 'body');
+    const record = await requireIm(ctx).updateConnection(
+      ctx.team.id,
+      c.req.param('connId'),
+      { appToken: body.appToken, botToken: body.botToken },
+      { platform: 'slack' },
+    );
+    return c.json({ connection: record });
+  });
+
   app.post('/api/teams/:id/im/imessage', async (c) => {
     requireTeam(ctx, c.req.param('id'));
     const body = parseWith(imImessageConnectBodySchema, await jsonBody(c), 'body');
@@ -51,7 +64,14 @@ export function registerImRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/teams/:id/im/wechat/login', async (c) => {
     requireTeam(ctx, c.req.param('id'));
-    return c.json(await requireIm(ctx).startWechatLogin());
+    const raw = await jsonBody(c);
+    const body = raw === null ? {} : parseWith(imWechatLoginStartBodySchema, raw, 'body');
+    return c.json(
+      await requireIm(ctx).startWechatLogin(
+        ctx.team.id,
+        body.connId === undefined ? undefined : { connId: body.connId },
+      ),
+    );
   });
 
   app.get('/api/teams/:id/im/wechat/login/:loginId', async (c) => {

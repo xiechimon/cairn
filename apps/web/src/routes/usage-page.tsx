@@ -581,32 +581,45 @@ function UsageBody({ usage, today }: { usage: DailyUsage; today: string }) {
           </Button>
         </div>
       )}
-      <TokenMix summary={scoped} />
-      <div className="grid grid-cols-2 gap-8 max-sm:grid-cols-1 max-sm:gap-6">
-        <Ranking
-          testId="usage-models"
-          title={t('模型')}
-          total={scoped.total}
-          rows={scoped.models.map(([key, tokens]) => ({
-            id: key,
-            name: modelName(key),
-            note: models.get(key)?.provider,
-            tokens,
-          }))}
-        />
-        {scoped.projects.length > 0 && (
-          <Ranking
-            testId="usage-projects"
-            title={t('项目')}
-            total={scoped.projects.reduce((sum, [, tokens]) => sum + tokens, 0)}
-            rows={scoped.projects.map(([id, tokens]) => ({
-              id,
-              name: projects.get(id) ?? t('已删除的项目'),
-              tokens,
-            }))}
-          />
-        )}
-      </div>
+      {selected !== null && scoped.total === 0 ? (
+        <p
+          data-testid="usage-day-empty"
+          className={cn('m-0 px-4 py-6 text-center text-meta text-content-tertiary', CARD_CLS)}
+        >
+          {t('这一天没有用量记录。')}
+        </p>
+      ) : (
+        <>
+          <TokenMix summary={scoped} />
+          <div className="grid grid-cols-2 gap-8 max-sm:grid-cols-1 max-sm:gap-6">
+            {scoped.models.length > 0 && (
+              <Ranking
+                testId="usage-models"
+                title={t('模型')}
+                total={scoped.total}
+                rows={scoped.models.map(([key, tokens]) => ({
+                  id: key,
+                  name: modelName(key),
+                  note: models.get(key)?.provider,
+                  tokens,
+                }))}
+              />
+            )}
+            {scoped.projects.length > 0 && (
+              <Ranking
+                testId="usage-projects"
+                title={t('项目')}
+                total={scoped.projects.reduce((sum, [, tokens]) => sum + tokens, 0)}
+                rows={scoped.projects.map(([id, tokens]) => ({
+                  id,
+                  name: projects.get(id) ?? t('已删除的项目'),
+                  tokens,
+                }))}
+              />
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

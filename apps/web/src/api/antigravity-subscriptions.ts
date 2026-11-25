@@ -316,3 +316,14 @@ export function defaultRunnerTarget(
       : runner.name;
   return { isThisComputer: false, label };
 }
+
+export function localAntigravityTarget(
+  machines: readonly RunnerTargetMachine[] | undefined,
+  defaultMachineId: string | null | undefined,
+  localRunnerId?: string,
+): AntigravityRunnerTarget {
+  if (localRunnerId !== undefined) {
+    return { isThisComputer: true, label: null };
+  }
+  return defaultRunnerTarget(machines, defaultMachineId);
+}

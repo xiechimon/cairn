@@ -12,6 +12,7 @@ export const skillRecordSchema = z.object({
   teamId: recordId,
   name: z.string(),
   description: z.string().nullable(),
+  imported: z.boolean().optional(),
 });
 export type SkillRecord = z.infer<typeof skillRecordSchema>;
 

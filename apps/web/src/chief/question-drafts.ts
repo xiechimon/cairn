@@ -1,3 +1,5 @@
+import { safeLocalStorage } from '../safe-storage.js';
+
 export type QuestionDraft =
   | { kind: 'choices'; picked: string[]; other: boolean; otherText: string }
   | { kind: 'text'; value: string };
@@ -19,7 +21,64 @@ export type QuestionPrompt = {
 
 type Listener = () => void;
 
-const records = new Map<string, QuestionDraftRecord>();
+const STORAGE_KEY = 'cairn.question-drafts.v1';
+
+function isQuestionDraft(value: unknown): value is QuestionDraft {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  if (candidate.kind === 'text') {
+    return typeof candidate.value === 'string';
+  }
+  if (candidate.kind === 'choices') {
+    return (
+      Array.isArray(candidate.picked) &&
+      candidate.picked.every((item) => typeof item === 'string') &&
+      typeof candidate.other === 'boolean' &&
+      typeof candidate.otherText === 'string'
+    );
+  }
+  return false;
+}
+
+function isQuestionDraftRecord(value: unknown): value is QuestionDraftRecord {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.step === 'number' &&
+    Number.isInteger(candidate.step) &&
+    candidate.step >= 0 &&
+    Array.isArray(candidate.drafts) &&
+    candidate.drafts.every(isQuestionDraft)
+  );
+}
+
+function loadStoredRecords(): Map<string, QuestionDraftRecord> {
+  const out = new Map<string, QuestionDraftRecord>();
+  try {
+    const raw = safeLocalStorage()?.getItem(STORAGE_KEY);
+    if (raw == null || raw === '') return out;
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return out;
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (isQuestionDraftRecord(value)) out.set(key, value);
+    }
+  } catch {}
+  return out;
+}
+
+function persistRecords(map: Map<string, QuestionDraftRecord>): void {
+  try {
+    const storage = safeLocalStorage();
+    if (storage === null) return;
+    if (map.size === 0) {
+      storage.removeItem(STORAGE_KEY);
+      return;
+    }
+    storage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(map)));
+  } catch {}
+}
+
+const records = loadStoredRecords();
 const submits = new Map<string, QuestionSubmitState>();
 const listeners = new Set<Listener>();
 
@@ -103,15 +162,19 @@ export const questionDraftStore = {
   },
   set(key: string, record: QuestionDraftRecord): void {
     records.set(key, record);
+    persistRecords(records);
     emit();
   },
   clear(key: string): void {
     if (!records.delete(key)) return;
+    persistRecords(records);
     emit();
   },
   clearAll(): void {
-    if (records.size === 0) return;
+    const had = records.size > 0;
     records.clear();
+    persistRecords(records);
+    if (!had) return;
     emit();
   },
   subscribe(listener: Listener): () => void {

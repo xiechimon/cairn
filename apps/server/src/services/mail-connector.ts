@@ -40,6 +40,7 @@ export interface MailConnectorOptions {
 export interface MailConnector {
   resume(): void;
   connect(accountId: string): void;
+  reconnect(accountId: string): Promise<void>;
   retryNow(teamId: string, accountId: string): void;
   retryState(accountId: string): { nextRetryAt: number | null; retryAttempt: number };
   disconnect(teamId: string, accountId: string): Promise<void>;
@@ -368,6 +369,10 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
       for (const row of rows) connect(row.id);
     },
     connect,
+    async reconnect(accountId) {
+      await stopRunner(accountId);
+      connect(accountId);
+    },
     retryNow(teamId, accountId) {
       const row = account(accountId);
       if (

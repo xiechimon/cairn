@@ -1,5 +1,5 @@
 import { KEY_NAME_PATTERN, MCP_TOOL_REGISTRY } from '@cairn/shared';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
@@ -38,17 +38,23 @@ export function ApiKeyCreateDialog({
 }: ApiKeyCreateDialogProps) {
   const { t } = useI18n();
   const [name, setName] = useState('');
+  const submittingRef = useRef(false);
+  useEffect(() => {
+    if (!pending) submittingRef.current = false;
+  }, [pending]);
   const trimmed = name.trim();
   const badName = trimmed !== '' && !KEY_NAME_PATTERN.test(trimmed);
   const ready = trimmed !== '' && !badName;
   const close = () => {
-    if (pending) return;
+    if (pending || submittingRef.current) return;
     setName('');
     onClose();
   };
   const submit = () => {
-    if (!ready || pending) return;
+    if (!ready || pending || submittingRef.current) return;
+    submittingRef.current = true;
     onCreate({ name: trimmed, ...API_KEY_ACCESS }, () => {
+      submittingRef.current = false;
       setName('');
       onClose();
     });
@@ -90,6 +96,7 @@ export function ApiKeyCreateDialog({
             id="apikey-name-input"
             className={`${FORM_CONTROL_CLS} font-mono`}
             value={name}
+            disabled={pending}
             aria-invalid={badName}
             aria-describedby="apikey-name-rule"
             autoCapitalize="characters"

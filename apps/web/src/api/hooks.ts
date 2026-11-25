@@ -51,6 +51,7 @@ import type {
   ImWechatLoginStart,
   MachineRecord,
   MailAccountCreateBody,
+  MailAccountPatchBody,
   MailAccountRecord,
   MailRuleCreateBody,
   MailWakeMode,
@@ -852,6 +853,14 @@ export function useImMutations(teamId: string | undefined) {
         api.post<{ connection: ImConnectionRecord }>(`/api/teams/${teamId}/im/slack`, fields),
       onSuccess: invalidate,
     }),
+    updateSlack: useMutation({
+      mutationFn: (input: { id: string; appToken: string; botToken: string }) =>
+        api.patch<{ connection: ImConnectionRecord }>(
+          `/api/teams/${teamId}/im/slack/${encodeURIComponent(input.id)}`,
+          { appToken: input.appToken, botToken: input.botToken },
+        ),
+      onSuccess: invalidate,
+    }),
     connectImessage: useMutation({
       mutationFn: (machineId: string) =>
         api.post<{ connection: ImConnectionRecord }>(`/api/teams/${teamId}/im/imessage`, {
@@ -860,7 +869,11 @@ export function useImMutations(teamId: string | undefined) {
       onSuccess: invalidate,
     }),
     startWechatLogin: useMutation({
-      mutationFn: () => api.post<ImWechatLoginStart>(`/api/teams/${teamId}/im/wechat/login`, {}),
+      mutationFn: (connId?: string) =>
+        api.post<ImWechatLoginStart>(
+          `/api/teams/${teamId}/im/wechat/login`,
+          connId === undefined ? {} : { connId },
+        ),
     }),
     deleteConnection: useMutation({
       mutationFn: (id: string) =>
@@ -919,6 +932,11 @@ export function useMailMutations(teamId: string | undefined) {
         api.patch<{ account: MailAccountRecord }>(`${base}/${encodeURIComponent(id)}`, {
           wakeMode,
         }),
+      onSuccess: invalidate,
+    }),
+    updateAccount: useMutation({
+      mutationFn: ({ id, body }: { id: string; body: MailAccountPatchBody }) =>
+        api.patch<{ account: MailAccountRecord }>(`${base}/${encodeURIComponent(id)}`, body),
       onSuccess: invalidate,
     }),
     addRule: useMutation({
@@ -1780,6 +1798,16 @@ export function useApiMutations(teamId: string | undefined) {
     importSkill: useMutation({
       mutationFn: (body: ImportSkillBody) =>
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
+      onSuccess: invalidateAll,
+    }),
+    deleteSkill: useMutation({
+      mutationFn: (id: string) =>
+        api.del<void>(`/api/teams/${teamId}/skills/${encodeURIComponent(id)}`),
+      onSuccess: invalidateAll,
+    }),
+    refreshSkill: useMutation({
+      mutationFn: (id: string) =>
+        api.post<SkillRecord>(`/api/teams/${teamId}/skills/${encodeURIComponent(id)}/refresh`, {}),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({

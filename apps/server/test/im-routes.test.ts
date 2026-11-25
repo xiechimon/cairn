@@ -331,4 +331,83 @@ describe('im routes', () => {
     );
     expect(await expired.json()).toEqual({ status: 'expired' });
   });
+
+  test('wechat re-scan with connId updates the existing connection in place and preserves paired contacts', async () => {
+    adapters.wechat = wechatAdapterFake;
+    const firstStart = await req(s.app, 'POST', `/api/teams/${teamId}/im/wechat/login`);
+    const firstLogin = (await firstStart.json()) as { loginId: string };
+    wechatWaits.set(firstLogin.loginId, {
+      status: 'done',
+      fields: {
+        token: 'TOKEN-1',
+        ilinkBotId: 'bot@im.bot',
+        ilinkUserId: 'owner@im.wechat',
+        baseUrl: 'https://ilink.example/',
+      },
+    });
+    const firstDone = (await (
+      await req(s.app, 'GET', `/api/teams/${teamId}/im/wechat/login/${firstLogin.loginId}`)
+    ).json()) as { connection: { id: string } };
+    const connId = firstDone.connection.id;
+
+    const rescanStart = await req(s.app, 'POST', `/api/teams/${teamId}/im/wechat/login`, {
+      connId,
+    });
+    expect(rescanStart.status).toBe(200);
+    const rescanLogin = (await rescanStart.json()) as { loginId: string };
+    wechatWaits.set(rescanLogin.loginId, {
+      status: 'done',
+      fields: {
+        token: 'TOKEN-2',
+        ilinkBotId: 'bot@im.bot',
+        ilinkUserId: 'second@im.wechat',
+        baseUrl: 'https://ilink.example/',
+      },
+    });
+    const rescanDone = await req(
+      s.app,
+      'GET',
+      `/api/teams/${teamId}/im/wechat/login/${rescanLogin.loginId}`,
+    );
+    expect(rescanDone.status).toBe(200);
+    const updated = (await rescanDone.json()) as {
+      status: string;
+      connection: { id: string; pairedSenders: { id: string }[] };
+    };
+    expect(updated.connection.id).toBe(connId);
+    expect(updated.connection.pairedSenders.map((sender) => sender.id)).toEqual([
+      'owner@im.wechat',
+      'second@im.wechat',
+    ]);
+
+    const listed = (await (
+      await req(s.app, 'GET', `/api/teams/${teamId}/im/connections`)
+    ).json()) as { connections: { id: string }[] };
+    expect(listed.connections).toHaveLength(1);
+    expect(listed.connections[0]?.id).toBe(connId);
+  });
+
+  test('PATCH updates an existing slack connection tokens in place', async () => {
+    adapters.slack = slackAdapterFake;
+    const created = await req(s.app, 'POST', `/api/teams/${teamId}/im/slack`, {
+      appToken: 'xapp-first',
+      botToken: 'xoxb-first',
+    });
+    const { connection } = (await created.json()) as { connection: { id: string } };
+
+    const bad = await req(s.app, 'PATCH', `/api/teams/${teamId}/im/slack/${connection.id}`, {
+      appToken: 'bad-app',
+      botToken: 'xoxb-second',
+    });
+    expect(bad.status).toBe(400);
+
+    const updated = await req(s.app, 'PATCH', `/api/teams/${teamId}/im/slack/${connection.id}`, {
+      appToken: 'xapp-second',
+      botToken: 'xoxb-second',
+    });
+    expect(updated.status).toBe(200);
+    const body = (await updated.json()) as { connection: { id: string; platform: string } };
+    expect(body.connection.id).toBe(connection.id);
+    expect(body.connection.platform).toBe('slack');
+  });
 });

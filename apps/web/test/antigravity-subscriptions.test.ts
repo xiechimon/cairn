@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   defaultRunnerTarget,
   extractAntigravityToken,
+  localAntigravityTarget,
 } from '../src/api/antigravity-subscriptions.js';
 
 describe('extractAntigravityToken', () => {
@@ -72,6 +73,17 @@ describe('defaultRunnerTarget', () => {
       capabilities: { hostname: 'ians-mac-mini.local', computerName: 'Ians-Mac-mini' },
     };
     expect(defaultRunnerTarget([localMac, mini], mini.id)).toEqual({
+      isThisComputer: false,
+      label: 'Ians-Mac-mini',
+    });
+  });
+
+  test('localAntigravityTarget binds to this computer whenever localRunnerId is present', () => {
+    expect(localAntigravityTarget([localMac, macMini], macMini.id, localMac.id)).toEqual({
+      isThisComputer: true,
+      label: null,
+    });
+    expect(localAntigravityTarget([localMac, macMini], macMini.id, undefined)).toEqual({
       isThisComputer: false,
       label: 'Ians-Mac-mini',
     });

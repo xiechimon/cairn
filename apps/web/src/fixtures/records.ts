@@ -290,6 +290,7 @@ export interface GithubFixture {
 export interface SkillRow {
   name: string;
   description: string;
+  imported?: boolean;
 }
 
 export interface McpRow {

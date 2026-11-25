@@ -322,6 +322,7 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
       }
       try {
         const auth = await slackApi<SlackAuthTest>(checkEnv, botToken, 'auth.test', {});
+        await slackApi<{ url: string }>(checkEnv, appToken, 'apps.connections.open', {});
         return { ok: true, accountLabel: workspaceLabel(auth) };
       } catch (err) {
         return {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   applyQuestionPick,
   emptyQuestionDrafts,
@@ -155,5 +155,78 @@ describe('the pending set is request status, not presentation', () => {
         item: expect.objectContaining({ requestId: 'q-pending', status: 'pending' }),
       }),
     ]);
+  });
+});
+
+function memoryStorage(): Storage {
+  const backing = new Map<string, string>();
+  return {
+    get length() {
+      return backing.size;
+    },
+    clear: () => backing.clear(),
+    getItem: (key: string) => backing.get(key) ?? null,
+    key: (index: number) => [...backing.keys()][index] ?? null,
+    removeItem: (key: string) => {
+      backing.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      backing.set(key, value);
+    },
+  };
+}
+
+describe('question drafts persist across page reload', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  test('saved draft survives a fresh module reload via localStorage and clears cleanly', async () => {
+    const localStorage = memoryStorage();
+    vi.stubGlobal('window', { localStorage });
+    vi.resetModules();
+    const first = await import('../src/chief/question-drafts.js');
+    const key = first.questionDraftKey({ teamId: 't1', conversationId: 'c1', requestId: 'q-save' });
+    first.questionDraftStore.set(key, {
+      drafts: [{ kind: 'text', value: 'keep this answer' }],
+      step: 0,
+    });
+
+    vi.resetModules();
+    const reloaded = await import('../src/chief/question-drafts.js');
+    expect(reloaded.questionDraftStore.get(key)).toEqual({
+      drafts: [{ kind: 'text', value: 'keep this answer' }],
+      step: 0,
+    });
+
+    reloaded.questionDraftStore.clear(key);
+    vi.resetModules();
+    const afterClear = await import('../src/chief/question-drafts.js');
+    expect(afterClear.questionDraftStore.get(key)).toBeUndefined();
+  });
+
+  test('falls back to memory when localStorage throws', async () => {
+    const broken: Storage = {
+      ...memoryStorage(),
+      getItem: () => {
+        throw new Error('storage blocked');
+      },
+      setItem: () => {
+        throw new Error('quota exceeded');
+      },
+      removeItem: () => {
+        throw new Error('storage blocked');
+      },
+    };
+    vi.stubGlobal('window', { localStorage: broken });
+    vi.resetModules();
+    const mod = await import('../src/chief/question-drafts.js');
+    const key = mod.questionDraftKey({ teamId: 't1', conversationId: 'c1', requestId: 'q-mem' });
+    mod.questionDraftStore.set(key, { drafts: [{ kind: 'text', value: 'in memory' }], step: 0 });
+    expect(mod.questionDraftStore.get(key)).toEqual({
+      drafts: [{ kind: 'text', value: 'in memory' }],
+      step: 0,
+    });
   });
 });

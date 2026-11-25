@@ -208,7 +208,13 @@ import {
   type SkillImportOpts,
 } from './services/skill-import.js';
 import {
+  deleteSkillSource,
+  listSkillSources,
+  renameSkillSource,
+} from './services/skill-source-store.js';
+import {
   createLocalSkill,
+  deleteLocalSkill,
   listSkillFiles,
   readSkillFile,
   resolveLocalSkill,
@@ -479,6 +485,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/skills', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     requireTeam(ctx, teamId);
+    const sources = listSkillSources(ctx.skillSourcesPath);
     return c.json(
       scanLocalSkills(ctx.skillsDir).map((s) =>
         skillRecordSchema.parse({
@@ -486,6 +493,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
           teamId,
           name: s.name,
           description: s.description,
+          ...(sources[s.id]?.teamId === teamId ? { imported: true } : {}),
         }),
       ),
     );
@@ -511,6 +519,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.put('/api/teams/:id/skills/:sid', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    const sid = c.req.param('sid');
     const body = parseWith(createSkillBodySchema, await jsonBody(c), 'body');
     const record = updateLocalSkill(
       {
@@ -519,10 +528,25 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         teamId,
         actor: { type: 'member', id: ctx.user.id },
       },
-      c.req.param('sid'),
+      sid,
       body,
     );
+    if (record.id !== sid) {
+      await renameSkillSource(ctx.skillSourcesPath, sid, record.id);
+    }
     return c.json(record);
+  });
+
+  app.delete('/api/teams/:id/skills/:sid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const sid = c.req.param('sid');
+    deleteLocalSkill(
+      { db: ctx.db, skillsDir: ctx.skillsDir, actor: { type: 'member', id: ctx.user.id } },
+      sid,
+    );
+    await deleteSkillSource(ctx.skillSourcesPath, sid);
+    return c.body(null, 204);
   });
 
   app.get('/api/teams/:id/skills/:sid', (c) => {

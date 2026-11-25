@@ -244,6 +244,7 @@ async function slackQuestionWorld() {
     await im.shutdown();
   });
   slack.queue('auth.test', AUTH_OK);
+  slack.queue('apps.connections.open', OPEN_OK);
   slack.queue('auth.test', AUTH_OK);
   slack.queue('apps.connections.open', OPEN_OK);
   await im.createConnection(
@@ -760,12 +761,14 @@ describe('slack adapter', () => {
 
   test('check returns the workspace name from auth.test', async () => {
     slack.queue('auth.test', AUTH_OK);
+    slack.queue('apps.connections.open', OPEN_OK);
     const checked = await createSlackAdapter(slack.env).check({
       appToken: APP_TOKEN,
       botToken: BOT_TOKEN,
     });
     expect(checked).toEqual({ ok: true, accountLabel: 'Cairn HQ' });
     expect(slack.calls[0]?.authorization).toBe(`Bearer ${BOT_TOKEN}`);
+    expect(slack.calls[1]?.authorization).toBe(`Bearer ${APP_TOKEN}`);
   });
 
   test('check rejects malformed tokens without a request', async () => {
@@ -790,6 +793,19 @@ describe('slack adapter', () => {
     });
     expect(checked.ok).toBe(false);
     if (!checked.ok) expect(checked.reason).toContain('invalid_auth');
+  });
+
+  test('check validates appToken with apps.connections.open and rejects refused socket tokens', async () => {
+    slack.queue('auth.test', AUTH_OK);
+    slack.queue('apps.connections.open', { ok: false, error: 'not_allowed_token_type' });
+    const checked = await createSlackAdapter(slack.env).check({
+      appToken: APP_TOKEN,
+      botToken: BOT_TOKEN,
+    });
+    expect(checked.ok).toBe(false);
+    if (!checked.ok) expect(checked.reason).toContain('not_allowed_token_type');
+    expect(slack.calls.map((call) => call.method)).toEqual(['auth.test', 'apps.connections.open']);
+    expect(slack.calls[1]?.authorization).toBe(`Bearer ${APP_TOKEN}`);
   });
 
   test('opens a socket from apps.connections.open and is ready on hello', async () => {

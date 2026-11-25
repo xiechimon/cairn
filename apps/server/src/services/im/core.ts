@@ -109,7 +109,13 @@ export interface ImService {
     fields: Record<string, string>,
     opts?: { pairedSenders?: ImPairedSender[] },
   ): Promise<ImConnectionRecord>;
-  startWechatLogin(): Promise<ImWechatLoginStart>;
+  updateConnection(
+    teamId: string,
+    connId: string,
+    fields: Record<string, string>,
+    opts?: { platform?: ImPlatform; mergePairedSenders?: ImPairedSender[] },
+  ): Promise<ImConnectionRecord>;
+  startWechatLogin(teamId?: string, opts?: { connId?: string }): Promise<ImWechatLoginStart>;
   pollWechatLogin(teamId: string, loginId: string): Promise<ImWechatLoginPoll>;
   deleteConnection(teamId: string, connId: string): Promise<{ ok: true }>;
   reconnectConnection(teamId: string, connId: string): Promise<ImConnectionRecord>;
@@ -207,6 +213,7 @@ export function createImService(deps: ImServiceDeps): ImService {
   const imOwnedMessageIds = new Set<string>();
   const queueChains = new Map<string, Promise<void>>();
   const sendErrors = new Map<string, string>();
+  const wechatRelogins = new Map<string, { teamId: string; connId: string }>();
 
   const connRow = (connId: string): ConnectionRow | undefined =>
     deps.db.select().from(imConnection).where(eq(imConnection.id, connId)).get();
@@ -1036,16 +1043,90 @@ export function createImService(deps: ImServiceDeps): ImService {
       return recordOf(row);
     },
 
-    async startWechatLogin(): Promise<ImWechatLoginStart> {
-      return wechatLoginAdapter().loginStart(deps.env);
+    async updateConnection(
+      teamId: string,
+      connId: string,
+      fields: Record<string, string>,
+      opts?: { platform?: ImPlatform; mergePairedSenders?: ImPairedSender[] },
+    ): Promise<ImConnectionRecord> {
+      const existing = requireConn(teamId, connId);
+      if (opts?.platform !== undefined && existing.platform !== opts.platform) {
+        throw new HttpError(400, `im connection ${connId} is not ${opts.platform}`);
+      }
+      const adapter = deps.adapters[existing.platform];
+      if (adapter === undefined) {
+        throw new HttpError(400, `im platform ${existing.platform} is not available yet`);
+      }
+      const checked = await adapter.check(fields, { teamId });
+      if (!checked.ok) throw new HttpError(400, checked.reason);
+      const session = live.get(connId);
+      if (session !== undefined) {
+        live.delete(connId);
+        await session.stop().catch(() => {});
+      }
+      sendErrors.delete(connId);
+      const current = requireConn(teamId, connId);
+      const merged = [...current.pairedSenders];
+      for (const sender of opts?.mergePairedSenders ?? []) {
+        if (!merged.some((entry) => entry.id === sender.id)) {
+          merged.push(sender);
+        }
+      }
+      deps.db
+        .update(imConnection)
+        .set({
+          accountLabel: checked.accountLabel,
+          secretCipher: deps.box.seal(JSON.stringify(fields)),
+          pairedSenders: merged,
+          status: 'connecting',
+          statusDetail: null,
+          pollOffset: null,
+          updatedAt: nowMs(),
+        })
+        .where(eq(imConnection.id, connId))
+        .run();
+      await startConnection(connId);
+      const fresh = connRow(connId);
+      if (fresh === undefined) throw new HttpError(404, `im connection ${connId}`);
+      return recordOf(fresh);
+    },
+
+    async startWechatLogin(
+      teamId?: string,
+      opts?: { connId?: string },
+    ): Promise<ImWechatLoginStart> {
+      if (opts?.connId !== undefined) {
+        if (teamId === undefined) throw new HttpError(400, 'teamId is required for re-login');
+        const row = requireConn(teamId, opts.connId);
+        if (row.platform !== 'wechat') {
+          throw new HttpError(400, `im connection ${opts.connId} is not wechat`);
+        }
+      }
+      const started = await wechatLoginAdapter().loginStart(deps.env);
+      if (opts?.connId !== undefined && teamId !== undefined) {
+        wechatRelogins.set(started.loginId, { teamId, connId: opts.connId });
+      }
+      return started;
     },
 
     async pollWechatLogin(teamId: string, loginId: string): Promise<ImWechatLoginPoll> {
       const result = await wechatLoginAdapter().loginWait(loginId, deps.env);
-      if (result.status !== 'done') return result;
+      if (result.status !== 'done') {
+        if (result.status === 'expired') wechatRelogins.delete(loginId);
+        return result;
+      }
+      const target = wechatRelogins.get(loginId);
+      wechatRelogins.delete(loginId);
       const scanner = result.fields.ilinkUserId?.trim() ?? '';
       const pairedSenders: ImPairedSender[] =
         scanner === '' ? [] : [{ id: scanner, name: null, chatKey: scanner, addedAt: nowMs() }];
+      if (target !== undefined && target.teamId === teamId) {
+        const connection = await service.updateConnection(teamId, target.connId, result.fields, {
+          platform: 'wechat',
+          mergePairedSenders: pairedSenders,
+        });
+        return { status: 'done', connection };
+      }
       const connection = await service.createConnection(teamId, 'wechat', result.fields, {
         pairedSenders,
       });

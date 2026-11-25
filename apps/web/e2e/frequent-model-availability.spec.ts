@@ -89,7 +89,7 @@ test('a stored SWE-2 row resolves against the live model sources', async ({ page
   const icon = row.locator('svg').first();
   await expect(icon.locator('path').first()).toHaveAttribute('d', LOBEHUB_MONO.devin.paths[0]!);
 
-  await expectThinkingLevels(row, 'SWE-2', ['Default (High)', 'Medium', 'High', 'Max']);
+  await expectThinkingLevels(row, 'SWE-2', ['默认（高）', '中', '高', '最高']);
 });
 
 test('a stored Claude Sonnet 5.5 row resolves against the live model sources', async ({ page }) => {
@@ -103,11 +103,11 @@ test('a stored Claude Sonnet 5.5 row resolves against the live model sources', a
   await expect(icon.locator('path').first()).toHaveAttribute('fill', '#D97757');
 
   await expectThinkingLevels(row, 'Claude Sonnet 5.5', [
-    'Default (Medium)',
-    'Low',
-    'Medium',
-    'High',
-    'Xhigh',
-    'Max',
+    '默认（中）',
+    '低',
+    '中',
+    '高',
+    '极高',
+    '最高',
   ]);
 });

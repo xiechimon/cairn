@@ -2750,6 +2750,7 @@
           "/api/teams/:id/im/pairing-requests/:requestId/reject",
           "/api/teams/:id/im/telegram",
           "/api/teams/:id/im/slack",
+          "/api/teams/:id/im/slack/:connId",
           "/api/teams/:id/im/imessage",
           "/api/teams/:id/im/wechat/login",
           "/api/teams/:id/im/wechat/login/:loginId",

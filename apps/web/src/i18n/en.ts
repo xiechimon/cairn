@@ -2508,8 +2508,8 @@ export const EN: Record<string, string> = {
   '运行桥接的 Mac': 'Mac running the bridge',
   '选择一台始终开机的 Mac。这台 Mac 需要安装 imsg 并授予 iMessage 读取权限；首次连接时会自动安装受管版本。':
     'Pick an always-on Mac. It needs imsg installed with Messages read access; a managed copy installs automatically on first connect.',
-  '暂无已注册的执行机。请先在一台 Mac 上启动执行机。':
-    'No Runners registered. Start a Runner on a Mac first.',
+  '暂无在线的 Mac 执行机。请先在一台 Mac 上启动执行机。':
+    'No online Mac Runners. Start a Runner on a Mac first.',
   '在 @BotFather 里创建机器人，把 bot token 粘贴到这里。':
     'Create a bot in @BotFather and paste the bot token here.',
   '新建一个 Slack App，把两个 token 粘贴到这里。':
@@ -3104,4 +3104,29 @@ export const EN: Record<string, string> = {
   '这台主机仅接受其他设备使用配对码登录，请返回使用配对码。':
     'This host accepts only pairing-code sign-in from other devices. Return and use the pairing code.',
   仅限主机设备查看: 'Visible on host device only',
+  刷新: 'Refresh',
+  '刷新中…': 'Refreshing…',
+  '刷新技能失败，请重试。': 'Could not refresh the skill. Try again.',
+  '删除技能失败，请重试。': 'Could not delete the skill. Try again.',
+  '确定删除这个技能？此操作不可撤销。': 'Delete this skill? This cannot be undone.',
+  '更新 Slack 凭据': 'Update Slack credentials',
+  '粘贴新的 App-Level Token 和 Bot Token 以替换当前凭据。':
+    'Paste a new App-Level Token and Bot Token to replace the current credentials.',
+  '执行机列表未能加载。': 'Could not load Runners.',
+  '网络中断，未能确认扫码状态。请检查网络后重试。':
+    'Network disconnected while checking scan status. Check your connection and try again.',
+  更新凭据: 'Update credentials',
+  正在加载聊天应用: 'Loading chat apps',
+  聊天应用未能加载: 'Could not load chat apps',
+  更新邮箱凭据: 'Update mailbox credentials',
+  留空则保持当前凭据不变: 'Leave blank to keep the current credential',
+  '这一天没有用量记录。': 'No usage recorded on this day.',
+  关闭思考: 'Off',
+  极低: 'Minimal',
+  低: 'Low',
+  中: 'Medium',
+  高: 'High',
+  极高: 'Xhigh',
+  最高: 'Max',
+  '默认（{level}）': 'Default ({level})',
 };

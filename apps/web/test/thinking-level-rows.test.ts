@@ -85,4 +85,22 @@ describe('frequently used model rows', () => {
     );
     expect(html).toBe('');
   });
+
+  test('ThinkingLevelSelect localizes Default and levels in Chinese locale', () => {
+    const html = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(ThinkingLevelSelect, {
+          levels: ['low', 'medium', 'high'],
+          resolvesTo: 'high',
+          value: null,
+          onChange: () => {},
+          label: '思考强度',
+          className: '',
+        }),
+      }),
+    );
+    expect(html).toContain('默认（高）');
+    expect(html).not.toContain('Default');
+  });
 });

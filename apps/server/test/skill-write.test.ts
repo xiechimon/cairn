@@ -938,3 +938,48 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
     }
   });
 });
+
+describe('skill rename directory sync and delete lifecycle', () => {
+  test('renaming a skill moves its directory so the old slug can be created again without 409', async () => {
+    const skillsDir = makeRoot();
+    const s = bootServer({ skillsDir });
+    try {
+      const created = await req(s.app, 'POST', '/api/skills', createBody('alpha', '旧描述'));
+      expect(created.status).toBe(201);
+      expect(existsSync(join(skillsDir, 'alpha', 'SKILL.md'))).toBe(true);
+
+      const renamed = await req(
+        s.app,
+        'PUT',
+        `/api/teams/${s.team.id}/skills/alpha`,
+        createBody('beta', '新描述'),
+      );
+      expect(renamed.status).toBe(200);
+      expect(existsSync(join(skillsDir, 'alpha'))).toBe(false);
+      expect(existsSync(join(skillsDir, 'beta', 'SKILL.md'))).toBe(true);
+
+      const recreated = await req(s.app, 'POST', '/api/skills', createBody('alpha', '重新创建'));
+      expect(recreated.status).toBe(201);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('DELETE removes the skill directory and returns 404 when already deleted', async () => {
+    const skillsDir = makeRoot();
+    const s = bootServer({ skillsDir });
+    try {
+      const created = await req(s.app, 'POST', '/api/skills', createBody('obsolete', '待删除'));
+      expect(created.status).toBe(201);
+
+      const removed = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/skills/obsolete`);
+      expect(removed.status).toBe(204);
+      expect(existsSync(join(skillsDir, 'obsolete'))).toBe(false);
+
+      const again = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/skills/obsolete`);
+      expect(again.status).toBe(404);
+    } finally {
+      s.dispose();
+    }
+  });
+});

@@ -128,6 +128,11 @@ export const machineImEventBodySchema = z.discriminatedUnion('kind', [
 ]);
 export type MachineImEventBody = z.infer<typeof machineImEventBodySchema>;
 
+export const imWechatLoginStartBodySchema = z
+  .object({ connId: z.string().min(1).max(128).optional() })
+  .strict();
+export type ImWechatLoginStartBody = z.infer<typeof imWechatLoginStartBodySchema>;
+
 export const imWechatLoginStartSchema = z.object({
   loginId: z.string().min(1),
   qr: z.string().optional(),

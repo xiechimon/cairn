@@ -53,12 +53,43 @@ export function readSkillSource(path: string, skillId: string): SkillSourceRecor
   return readFile(path).sources[skillId] ?? null;
 }
 
+export function listSkillSources(path: string): Record<string, SkillSourceRecord> {
+  return readFile(path).sources;
+}
+
 export function writeSkillSource(path: string, record: SkillSourceRecord): Promise<void> {
   const task = writeChain.then(() => {
     const file = readFile(path);
     writeFileAtomic(path, {
       version: 1,
       sources: { ...file.sources, [record.skillId]: record },
+    });
+  });
+  writeChain = task.catch(() => {});
+  return task;
+}
+
+export function deleteSkillSource(path: string, skillId: string): Promise<void> {
+  const task = writeChain.then(() => {
+    const file = readFile(path);
+    if (!(skillId in file.sources)) return;
+    const { [skillId]: _removed, ...rest } = file.sources;
+    writeFileAtomic(path, { version: 1, sources: rest });
+  });
+  writeChain = task.catch(() => {});
+  return task;
+}
+
+export function renameSkillSource(path: string, oldId: string, newId: string): Promise<void> {
+  if (oldId === newId) return Promise.resolve();
+  const task = writeChain.then(() => {
+    const file = readFile(path);
+    const existing = file.sources[oldId];
+    if (existing === undefined) return;
+    const { [oldId]: _removed, ...rest } = file.sources;
+    writeFileAtomic(path, {
+      version: 1,
+      sources: { ...rest, [newId]: { ...existing, skillId: newId } },
     });
   });
   writeChain = task.catch(() => {});

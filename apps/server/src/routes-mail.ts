@@ -14,7 +14,7 @@ import {
   listMailAccounts,
   removeMailRule,
   requireMailAccount,
-  setMailWakeMode,
+  updateMailAccount,
 } from './services/mail-accounts.js';
 import type { MailConnector } from './services/mail-connector.js';
 
@@ -66,10 +66,13 @@ export function registerMailRoutes(app: Hono, ctx: AppContext): void {
   app.patch('/api/teams/:id/mail/accounts/:accountId', async (c) => {
     requireTeam(ctx, c.req.param('id'));
     requireOwnerSession(c);
+    const accountId = c.req.param('accountId');
     const body = parseWith(mailAccountPatchBodySchema, await jsonBody(c), 'body');
-    return c.json({
-      account: setMailWakeMode(ctx.db, ctx.team.id, c.req.param('accountId'), body.wakeMode),
-    });
+    const { account, reconnect } = updateMailAccount(secrets, ctx.team.id, accountId, body);
+    if (reconnect) {
+      await requireMail(ctx).reconnect(accountId);
+    }
+    return c.json({ account });
   });
 
   app.delete('/api/teams/:id/mail/accounts/:accountId', async (c) => {

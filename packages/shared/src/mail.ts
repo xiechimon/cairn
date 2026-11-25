@@ -102,7 +102,17 @@ export const mailAccountCreateBodySchema = z
   .strict();
 export type MailAccountCreateBody = z.infer<typeof mailAccountCreateBodySchema>;
 
-export const mailAccountPatchBodySchema = z.object({ wakeMode: z.enum(MAIL_WAKE_MODES) }).strict();
+export const mailAccountPatchBodySchema = z
+  .object({
+    wakeMode: z.enum(MAIL_WAKE_MODES).optional(),
+    password: z.string().min(1).max(512).optional(),
+    imapHost: mailHost.optional(),
+    imapPort: mailPort.optional(),
+    smtpHost: mailHost.optional(),
+    smtpPort: mailPort.optional(),
+  })
+  .strict()
+  .refine((body) => Object.keys(body).length > 0, { message: 'empty patch' });
 export type MailAccountPatchBody = z.infer<typeof mailAccountPatchBodySchema>;
 
 export const mailRuleCreateBodySchema = z

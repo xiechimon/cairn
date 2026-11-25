@@ -2,7 +2,7 @@ import { SKILL_PAGE_COPY } from '@cairn/shared';
 import { ChevronDown, Download, Puzzle, Search } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useSkills } from '../api/hooks.js';
+import { useApiMutations, useSkills } from '../api/hooks.js';
 import { mapSkills } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
@@ -16,8 +16,11 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
+import { toastError } from '../components/ui/toaster.js';
+import type { SkillRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { SKILLS_HREF } from './hrefs.js';
 import {
@@ -47,6 +50,7 @@ export function SkillsPage() {
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const skillsQ = useSkills(teamId, live);
+  const mutations = useApiMutations(teamId);
   const rows = live ? mapSkills(skillsQ.data ?? []) : (fixture.resources?.skills ?? []);
   const empty = (!live || skillsQ.isSuccess) && rows.length === 0;
   const [sort, setSort] = useState<SortKind>('默认');
@@ -61,6 +65,35 @@ export function SkillsPage() {
   const [dialog, setDialog] = useState<{ skill?: SkillEditTarget } | null>(null);
   const openCreate = () => setDialog({});
   const [importOpen, setImportOpen] = useState(false);
+  const [deleting, setDeleting] = useState<SkillRow | null>(null);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+
+  const openEdit = (skill: SkillRow) =>
+    setDialog({
+      skill: {
+        id: skill.name,
+        name: skill.name,
+        description: skill.description,
+        ...(skill.imported === true ? { imported: true } : {}),
+      },
+    });
+
+  const refreshSkill = (name: string) => {
+    setRefreshingId(name);
+    mutations.refreshSkill.mutate(name, {
+      onError: (error) => toastError(t('刷新技能失败，请重试。'), error),
+      onSettled: () => setRefreshingId((current) => (current === name ? null : current)),
+    });
+  };
+
+  const confirmDelete = () => {
+    if (deleting === null) return;
+    const target = deleting;
+    setDeleting(null);
+    mutations.deleteSkill.mutate(target.name, {
+      onError: (error) => toastError(t('删除技能失败，请重试。'), error),
+    });
+  };
 
   return (
     <PageShell
@@ -149,17 +182,41 @@ export function SkillsPage() {
             {skills.map((skill) => (
               <ResourceRow
                 key={skill.name}
-                onOpen={() =>
-                  setDialog({
-                    skill: { id: skill.name, name: skill.name, description: skill.description },
-                  })
-                }
+                className="gap-2 py-0 pr-2 hover:bg-menu-hover first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) dark:hover:bg-menu-hover"
               >
-                <RowText>
-                  <RowTitle>{skill.name}</RowTitle>
-                  <RowDesc>{skill.description}</RowDesc>
-                </RowText>
-                <RowChevron />
+                <Button
+                  variant="ghost"
+                  onClick={() => openEdit(skill)}
+                  className="h-auto min-h-13 min-w-0 flex-1 justify-between gap-3 border-0 px-0 py-1.5 text-left font-normal hover:bg-transparent dark:hover:bg-transparent"
+                >
+                  <RowText>
+                    <RowTitle>{skill.name}</RowTitle>
+                    <RowDesc>{skill.description}</RowDesc>
+                  </RowText>
+                  {!live && <RowChevron />}
+                </Button>
+                {live && skill.imported === true && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={refreshingId === skill.name}
+                    onClick={() => refreshSkill(skill.name)}
+                    data-testid={`skill-refresh-${skill.name}`}
+                  >
+                    {refreshingId === skill.name ? t('刷新中…') : t('刷新')}
+                  </Button>
+                )}
+                {live && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={mutations.deleteSkill.isPending}
+                    onClick={() => setDeleting(skill)}
+                    data-testid={`skill-delete-${skill.name}`}
+                  >
+                    {t('删除')}
+                  </Button>
+                )}
               </ResourceRow>
             ))}
           </ResourceList>
@@ -169,6 +226,14 @@ export function SkillsPage() {
         <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />
       </Suspense>
       <SkillImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
+      <DeleteConfirm
+        open={deleting !== null}
+        title={t('确定删除这个技能？此操作不可撤销。')}
+        summary={deleting?.name ?? ''}
+        ariaLabel={t('删除 {name}', { name: deleting?.name ?? '' })}
+        onClose={() => setDeleting(null)}
+        onConfirm={confirmDelete}
+      />
     </PageShell>
   );
 }
