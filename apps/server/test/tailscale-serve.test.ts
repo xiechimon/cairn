@@ -298,7 +298,7 @@ describe('who may turn Tailscale access on', () => {
     return (await res.json()) as PairResponse;
   }
 
-  test('the owner turns it on; a paired device can read it but cannot turn it on', async () => {
+  test('a paired device can read and turn Tailscale access on like the owner session', async () => {
     const node = fakeNode();
     const s = bootServer({ authToken: OWNER, remote: { tailscale: serveFor(node) } });
     const device = await pairDevice(s);
@@ -307,10 +307,8 @@ describe('who may turn Tailscale access on', () => {
     expect((await call(s, 'GET', '/api/remote/tailscale')).status).toBe(401);
     const read = await call(s, 'GET', '/api/remote/tailscale', deviceHeaders);
     expect(((await read.json()) as TailscaleAccess).state).toBe('off');
-    expect((await call(s, 'POST', '/api/remote/tailscale', deviceHeaders)).status).toBe(403);
-    expect(node.serveCalls).toEqual([]);
 
-    const enabled = await call(s, 'POST', '/api/remote/tailscale', ownerHeaders);
+    const enabled = await call(s, 'POST', '/api/remote/tailscale', deviceHeaders);
     expect(enabled.status).toBe(200);
     expect(((await enabled.json()) as TailscaleAccess).url).toBe(`https://${DNS}`);
   });

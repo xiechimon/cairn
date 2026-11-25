@@ -95,7 +95,18 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
     accessExchange: ctx.accessVerifier != null || ctx.clerkAuth != null,
     webOrigin: ctx.webOrigin,
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
-    resolveSession: (cookie) => resolveBrowserSession(ctx.db, cookie),
+    resolveSession: (cookie) => {
+      const resolved = resolveBrowserSession(ctx.db, cookie);
+      if (resolved?.kind !== 'device') return resolved;
+      if (
+        resolved.deviceId === null ||
+        deviceStreamsOf(ctx.db).isRevoked(resolved.deviceId) ||
+        !pairedDeviceExists(ctx.db, resolved.deviceId)
+      ) {
+        return null;
+      }
+      return resolved;
+    },
     redeemTicket: (ticket) => {
       const session = ctx.streamTickets.redeem(ticket);
       if (session?.kind !== 'device') return session;

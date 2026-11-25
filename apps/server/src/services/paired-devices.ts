@@ -10,7 +10,13 @@ import {
 import { and, asc, count, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Context } from 'hono';
 import type { Db } from '../db/client.js';
-import { apnsDevice, pairedDevice, pairingGrant, pushSubscription } from '../db/schema.js';
+import {
+  apnsDevice,
+  browserSession,
+  pairedDevice,
+  pairingGrant,
+  pushSubscription,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -124,6 +130,10 @@ export function createDeviceStreamRegistry(): DeviceStreamRegistry {
   return {
     bind(deviceId, close) {
       if (deviceId === null) return () => {};
+      if (revoked.has(deviceId)) {
+        close();
+        return () => {};
+      }
       const closers = open.get(deviceId) ?? new Set<() => void>();
       closers.add(close);
       open.set(deviceId, closers);
@@ -286,6 +296,7 @@ export function revokePairedDevice(db: Db, teamId: string, id: string): boolean 
   const row = db.select().from(pairedDevice).where(eq(pairedDevice.id, id)).get();
   if (row === undefined || row.teamId !== teamId) return false;
   db.transaction((tx) => {
+    tx.delete(browserSession).where(eq(browserSession.deviceId, id)).run();
     tx.delete(pushSubscription).where(eq(pushSubscription.pairedDeviceId, id)).run();
     tx.delete(apnsDevice).where(eq(apnsDevice.pairedDeviceId, id)).run();
     tx.delete(pairedDevice).where(eq(pairedDevice.id, id)).run();

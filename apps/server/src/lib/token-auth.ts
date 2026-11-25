@@ -14,51 +14,6 @@ const STREAM_PATH_PATTERNS = [
 ];
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const PAIRED_DIAGNOSTIC_PATTERNS = [
-  /^\/api\/teams\/[^/]+\/claude-subscriptions\/[^/]+\/(?:upstream-models|test|verify)$/,
-  /^\/api\/teams\/[^/]+\/devin-subscriptions\/[^/]+\/(?:upstream-models|verify)$/,
-  /^\/api\/teams\/[^/]+\/antigravity-subscriptions\/[^/]+\/(?:upstream-models|verify)$/,
-];
-const OWNER_ONLY_PATTERNS = [
-  /^\/api\/computers(?:\/[^/]+)?$/,
-  /^\/api\/machine\/enroll\/confirm$/,
-  /^\/api\/teams\/[^/]+$/,
-  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|provider-order|claude-subscriptions|devin-subscriptions|antigravity-subscriptions|mcp-connectors|routing-rules|work-policies|im|skills|schedules)(?:\/|$)/,
-  /^\/api\/im(?:\/|$)/,
-  /^\/api\/skills(?:\/|$)/,
-  /^\/api\/schedules(?:\/|$)/,
-  /^\/api\/design-shares(?:\/|$)/,
-  /^\/api\/todos\/[^/]+\/design\/[^/]+\/share$/,
-  /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection|webhook)(?:\/|$)/,
-  /^\/api\/machines\/[^/]+(?:\/|$)/,
-];
-
-const OWNER_ONLY_READ_PATTERNS = [/^\/api\/teams\/[^/]+\/im\/wechat\/login\/[^/]+$/];
-
-export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
-  const verb = method.toUpperCase();
-  const read = READ_METHODS.has(verb);
-  if (
-    pathname === '/api/remote/pairing' ||
-    pathname.startsWith('/api/remote/pairing/') ||
-    pathname === '/api/remote/pairing-requests' ||
-    pathname.startsWith('/api/remote/pairing-requests/') ||
-    pathname === '/api/remote/tailnet' ||
-    pathname === '/api/server/backup/run' ||
-    pathname === '/api/server/backup/export' ||
-    /^\/api\/server\/backup\/[^/]+\/restore$/.test(pathname) ||
-    (pathname === '/api/remote/tailscale' && !read) ||
-    (pathname.startsWith('/api/remote/devices') && !read) ||
-    OWNER_ONLY_READ_PATTERNS.some((pattern) => pattern.test(pathname))
-  )
-    return true;
-  if (read) return false;
-  if (verb === 'DELETE' && /^\/api\/projects\/[^/]+$/.test(pathname)) return true;
-  if (verb === 'POST' && PAIRED_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(pathname))) {
-    return false;
-  }
-  return OWNER_ONLY_PATTERNS.some((pattern) => pattern.test(pathname));
-}
 
 function makeVerifier(token: string): (provided: string) => boolean {
   const expected = Buffer.from(sha256Hex(token));
@@ -81,7 +36,7 @@ export interface TokenAuthOptions {
   webOrigin?: string;
 }
 
-export type OwnerIdentity = { via: 'session' | 'access' };
+export type OwnerIdentity = { via: 'session' | 'access' | 'device' };
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -144,6 +99,7 @@ function applySession(c: Context, session: ResolvedBrowserSession): Response | n
   }
   if (session.deviceId === null) return c.json({ error: 'Unauthorized' }, 401);
   c.set('pairedDeviceId', session.deviceId);
+  c.set('ownerIdentity', { via: 'device' });
   return null;
 }
 
@@ -172,15 +128,13 @@ export function registerTokenAuth(
       const deviceId = options.resolveDeviceId?.(provided) ?? null;
       if (deviceId === null) return false;
       c.set('pairedDeviceId', deviceId);
+      c.set('ownerIdentity', { via: 'device' });
       return true;
     };
     const url = new URL(c.req.url);
     const pathname = url.pathname;
     if (isBrowserAuthExempt(pathname)) return next();
     const admit = () => {
-      if (pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, c.req.path)) {
-        return c.json({ error: 'only the owner token can do this' }, 403);
-      }
       if (!READ_METHODS.has(c.req.method.toUpperCase())) {
         return (
           ownerChannelAdmits(c, options.ownerChannel, options.accessExchange === true) ?? next()

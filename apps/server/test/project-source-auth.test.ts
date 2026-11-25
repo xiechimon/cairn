@@ -96,8 +96,9 @@ async function fakeAppTokenSocket(): Promise<{
 }
 
 describe('project repository source authorization', () => {
-  test('P-SEC1: a paired device credential cannot bind a project to a local path (403); the owner token can', async () => {
+  test('P-SEC1: a paired device credential can bind a project to a local path like the owner token', async () => {
     const localDir = makeRoot();
+    const localDir2 = makeRoot();
     const s = bootServer({ authToken: OWNER });
     try {
       const { token, cookie } = await pairDevice(s);
@@ -105,17 +106,17 @@ describe('project repository source authorization', () => {
         cred: token,
         body: { name: 'device-local', kind: 'local', localPath: localDir },
       });
-      expect(deviceCreate.status).toBe(403);
+      expect(deviceCreate.status).toBe(201);
       if (cookie !== null) {
         const sessionCreate = await call(s.app, 'POST', '/api/projects', {
-          body: { name: 'device-local', kind: 'local', localPath: localDir },
+          body: { name: 'device-local-cookie', kind: 'local', localPath: localDir2 },
           headers: { cookie, 'sec-fetch-site': 'same-origin' },
         });
-        expect(sessionCreate.status).toBe(403);
+        expect(sessionCreate.status).toBe(201);
       }
       const ownerCreate = await call(s.app, 'POST', '/api/projects', {
         cred: OWNER,
-        body: { name: 'device-local', kind: 'local', localPath: localDir },
+        body: { name: 'owner-local', kind: 'local', localPath: makeRoot() },
       });
       expect(ownerCreate.status).toBe(201);
     } finally {
@@ -352,7 +353,7 @@ describe('project repository source authorization', () => {
     }
   });
 
-  test('P-SEC13: project records omit localPath for a paired device — the owner still sees it', async () => {
+  test('P-SEC13: project records include localPath for both owner and paired devices', async () => {
     const localDir = makeRoot();
     const s = bootServer({ authToken: OWNER });
     try {
@@ -371,18 +372,17 @@ describe('project repository source authorization', () => {
 
       const deviceList = await call(s.app, 'GET', '/api/projects', { cred: token });
       expect(deviceList.status).toBe(200);
-      const deviceRows = (await deviceList.json()) as Record<string, unknown>[];
+      const deviceRows = (await deviceList.json()) as { id: string; localPath?: string }[];
       const deviceRow = deviceRows.find((r) => r.id === projectId);
-      expect(deviceRow).toBeDefined();
-      expect(deviceRow === undefined || 'localPath' in deviceRow).toBe(false);
+      expect(deviceRow?.localPath).toBe(realpathSync(localDir));
 
       const devicePatch = await call(s.app, 'PATCH', `/api/projects/${projectId}`, {
         cred: token,
         body: { name: 'p-local-renamed' },
       });
       expect(devicePatch.status).toBe(200);
-      const patched = (await devicePatch.json()) as Record<string, unknown>;
-      expect('localPath' in patched).toBe(false);
+      const patched = (await devicePatch.json()) as { localPath?: string };
+      expect(patched.localPath).toBe(realpathSync(localDir));
     } finally {
       s.dispose();
     }
@@ -606,7 +606,7 @@ describe('project repository source authorization', () => {
     }
   });
 
-  test('P-SEC11: repository read errors hide the localPath from a paired device; the owner keeps the detail', async () => {
+  test('P-SEC11: repository read errors disclose the localPath to both paired devices and owner', async () => {
     const s = bootServer({ authToken: OWNER });
     const missing = join(makeRoot(), 'gone');
     const notGit = makeRoot();
@@ -624,22 +624,22 @@ describe('project repository source authorization', () => {
         cred: token,
       });
       expect(deviceMissing.status).toBe(404);
-      expect(await errorOf(deviceMissing)).not.toContain(missing);
+      expect(await errorOf(deviceMissing)).toContain(missing);
       const deviceNotGit = await call(s.app, 'GET', '/api/projects/proj-notgit/files', {
         cred: token,
       });
       expect(deviceNotGit.status).toBe(404);
-      expect(await errorOf(deviceNotGit)).not.toContain(notGit);
+      expect(await errorOf(deviceNotGit)).toContain(notGit);
       const deviceBranches = await call(s.app, 'GET', '/api/projects/proj-missing/branches', {
         cred: token,
       });
-      expect(await errorOf(deviceBranches)).not.toContain(missing);
+      expect(await errorOf(deviceBranches)).toContain(missing);
       const deviceImport = await call(s.app, 'POST', `/api/teams/${s.team.id}/memory-imports`, {
         cred: token,
         body: { projectId: 'proj-missing', file: 'CLAUDE.md' },
       });
       expect(deviceImport.status).toBe(404);
-      expect(await errorOf(deviceImport)).not.toContain(missing);
+      expect(await errorOf(deviceImport)).toContain(missing);
 
       const ownerMissing = await call(s.app, 'GET', '/api/projects/proj-missing/files', {
         cred: OWNER,

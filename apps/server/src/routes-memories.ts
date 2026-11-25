@@ -9,7 +9,6 @@ import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { agentMemory } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
-import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam, svcOf, toMemoryRecord } from './routes-helpers.js';
 import { isOwner } from './services/instance-owner.js';
 import {
@@ -34,7 +33,6 @@ import {
 
 export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
   const isOwnerSession = (c: Context): boolean =>
-    pairedDeviceIdOf(c) === null &&
     (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
     isOwner(ctx.db, ctx.user.id);
   app.get('/api/teams/:id/memories', (c) => {

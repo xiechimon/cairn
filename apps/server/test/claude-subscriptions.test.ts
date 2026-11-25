@@ -774,9 +774,7 @@ test('a paired device runs subscription checks, and the check bookkeeping is sto
       body: JSON.stringify({ model: 'claude-haiku-5-5' }),
     });
     expect(response.status).not.toBe(403);
-    expect((await response.json()) as { error?: string }).not.toEqual({
-      error: 'only the owner token can do this',
-    });
+    expect(response.status).not.toBe(401);
   }
   expect(
     s.db.select().from(claudeSubscription).where(eq(claudeSubscription.id, id)).get()?.lastCheck,

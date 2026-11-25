@@ -81,7 +81,7 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
     expect(res.status).toBe(200);
   });
 
-  test('a paired device is refused on owner-only escalation routes while reads stay open', async () => {
+  test('a paired device is admitted on the same routes as the owner session', async () => {
     const s = bootServer({ authToken: TOKEN });
     try {
       const issued = await reqWith(s, 'POST', '/api/remote/pairing', authHeaders);
@@ -112,7 +112,7 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
       expect(started.status).toBe(200);
       const { enrollId } = (await started.json()) as { enrollId: string };
 
-      const forbidden: Array<[string, string, unknown?]> = [
+      const routes: Array<[string, string, unknown?]> = [
         ['POST', '/api/machine/enroll/confirm', { enrollId }],
         ['PATCH', `/api/teams/${s.team.id}/routing-rules/session`, { provider: 'openai' }],
         ['PATCH', `/api/teams/${s.team.id}/work-policies/session`, { tools: [] }],
@@ -120,7 +120,7 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
         ['GET', `/api/teams/${s.team.id}/im/wechat/login/wx_test`],
         ['DELETE', `/api/teams/${s.team.id}/im/connections/c1`],
         ['POST', '/api/im/test', {}],
-        ['POST', '/api/skills', { name: 'evil', description: 'd', files: [] }],
+        ['POST', '/api/skills', { name: 'paired-skill', description: 'd', files: [] }],
         [
           'PUT',
           `/api/teams/${s.team.id}/skills/import`,
@@ -138,9 +138,10 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
         ['POST', '/api/design-shares', {}],
       ];
 
-      for (const [method, path, body] of forbidden) {
+      for (const [method, path, body] of routes) {
         const res = await reqWith(s, method, path, deviceHeaders, body);
-        expect(res.status, `${method} ${path}`).toBe(403);
+        expect(res.status, `${method} ${path}`).not.toBe(403);
+        expect(res.status, `${method} ${path}`).not.toBe(401);
       }
 
       expect(

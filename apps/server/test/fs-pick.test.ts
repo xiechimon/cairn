@@ -1,7 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import { afterAll, describe, expect, test } from 'vitest';
-import { pairedDevice } from '../src/db/schema.js';
-import { issueBrowserSession } from '../src/services/browser-session.js';
 import { bootServer, req } from './helpers.js';
 
 function hasGuiSession(): boolean {
@@ -30,27 +28,12 @@ describe.skipIf(hasGuiSession())(
   },
 );
 
-describe('POST /api/fs/pick -- owner-only', () => {
-  test('a paired device gets 403 before the picker is ever consulted', async () => {
+describe('POST /api/fs/pick -- authentication', () => {
+  test('anonymous caller gets 401 while paired device passes auth', async () => {
     const authed = bootServer({ authToken: 'owner-secret-0123456789abcdef' });
     try {
-      authed.db
-        .insert(pairedDevice)
-        .values({
-          id: 'phone',
-          teamId: authed.team.id,
-          name: 'phone',
-          tokenHash: 'synthetic',
-          masked: 'phone',
-          createdAt: 1,
-        })
-        .run();
-      const cookie = `cairn_auth=${issueBrowserSession(authed.db, 'device', 'phone').token}`;
-      const res = await authed.app.request('/api/fs/pick', {
-        method: 'POST',
-        headers: { cookie, 'sec-fetch-site': 'same-origin' },
-      });
-      expect(res.status).toBe(403);
+      const anon = await authed.app.request('/api/fs/pick', { method: 'POST' });
+      expect(anon.status).toBe(401);
     } finally {
       authed.dispose();
     }

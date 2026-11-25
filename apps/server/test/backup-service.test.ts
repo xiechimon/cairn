@@ -9,7 +9,6 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { openDbWithHandle } from '../src/db/client.js';
 import { project, secret, team } from '../src/db/schema.js';
 import { createKeyfileSecretBox } from '../src/lib/secret-box.js';
-import { isOwnerOnlyRoute } from '../src/lib/token-auth.js';
 import {
   decryptBackupPayload,
   encryptBackupPayload,
@@ -274,14 +273,19 @@ describe('createBackupService end-to-end backup, export, and restore', () => {
     });
   });
 
-  test('protects backup write/export/restore routes as owner-only and serves routes cleanly', async () => {
-    expect(isOwnerOnlyRoute('POST', '/api/server/backup/run')).toBe(true);
-    expect(isOwnerOnlyRoute('POST', '/api/server/backup/export')).toBe(true);
-    expect(isOwnerOnlyRoute('POST', '/api/server/backup/snap-1/restore')).toBe(true);
-    expect(isOwnerOnlyRoute('GET', '/api/server/backup')).toBe(false);
-
+  test('serves backup write/export/restore routes cleanly when disabled', async () => {
     const s = bootServer();
-    const runRes = await s.app.request('/api/server/backup/run', { method: 'POST' });
-    expect(runRes.status).toBe(503);
+    try {
+      const runRes = await s.app.request('/api/server/backup/run', { method: 'POST' });
+      expect(runRes.status).toBe(503);
+      const exportRes = await s.app.request('/api/server/backup/export', { method: 'POST' });
+      expect(exportRes.status).toBe(503);
+      const restoreRes = await s.app.request('/api/server/backup/snap-1/restore', {
+        method: 'POST',
+      });
+      expect(restoreRes.status).toBe(503);
+    } finally {
+      s.dispose();
+    }
   });
 });

@@ -3138,7 +3138,6 @@ export const EN: Record<string, string> = {
   确认码: 'Confirmation code',
   '这台主机仅接受其他设备使用配对码登录，请返回使用配对码。':
     'This host accepts only pairing-code sign-in from other devices. Return and use the pairing code.',
-  仅限主机设备查看: 'Visible on host device only',
   '已完成（部分结果）': 'Done (partial)',
   已超时: 'Timed out',
   已失败: 'Failed',

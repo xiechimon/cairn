@@ -478,17 +478,17 @@ describe('sensitive list endpoints stay uncacheable', () => {
     expect(deviceRes.headers.get('cache-control')).toBe('no-store');
     expect(deviceRes.headers.get('etag')).toBeNull();
     const deviceBody = (await deviceRes.json()) as RemoteRoutesResponse;
-    expect(deviceBody.tailnet.authUrl).toBeNull();
+    expect(deviceBody.tailnet.authUrl).toBe('https://login.tailscale.com/a/abc');
 
     const conditional = await s.app.request('/api/remote/routes', {
       headers: { ...device, 'if-none-match': BOGUS_TAG },
     });
     expect(conditional.status).toBe(200);
     const conditionalBody = (await conditional.json()) as RemoteRoutesResponse;
-    expect(conditionalBody.tailnet.authUrl).toBeNull();
+    expect(conditionalBody.tailnet.authUrl).toBe('https://login.tailscale.com/a/abc');
   });
 
-  test('pairing grants stay owner-only and uncacheable', async () => {
+  test('pairing grants stay uncacheable for owner and paired devices', async () => {
     const s = bootServer({ authToken: 'owner-token' });
     const owner = { authorization: 'Bearer owner-token' };
     const grant = issuePairingGrant(s.db);
@@ -510,7 +510,9 @@ describe('sensitive list endpoints stay uncacheable', () => {
     const deviceRes = await s.app.request('/api/remote/pairing', {
       headers: { authorization: `Bearer ${paired.token}` },
     });
-    expect(deviceRes.status).toBe(403);
+    expect(deviceRes.status).toBe(200);
+    expect(deviceRes.headers.get('cache-control')).toBe('no-store');
+    expect(deviceRes.headers.get('etag')).toBeNull();
   });
 
   test('mail accounts stay uncacheable', async () => {

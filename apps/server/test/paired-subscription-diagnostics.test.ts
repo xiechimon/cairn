@@ -77,12 +77,13 @@ describe('paired devices reach read-only subscription diagnostics', () => {
     ['DELETE', 'providers/missing-provider'],
     ['POST', 'providers/missing-provider/test'],
     ['GET', 'providers/missing-provider/upstream-models'],
-  ])('%s /api/teams/:t/%s with a device token -> 403 owner-only', async (method, path) => {
+  ])('%s /api/teams/:t/%s with a device token -> admitted (not 403)', async (method, path) => {
     const res = await call(s, method, `/api/teams/${s.team.id}/${path}`, {
       headers: deviceHeaders,
       body: method === 'POST' || method === 'PATCH' ? {} : undefined,
     });
-    expect(res.status).toBe(403);
+    expect(res.status).not.toBe(403);
+    expect(res.status).not.toBe(401);
   });
 
   test('the owner token still reaches the diagnostics (control)', async () => {

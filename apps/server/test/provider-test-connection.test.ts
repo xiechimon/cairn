@@ -396,7 +396,7 @@ describe('provider connection check', () => {
     expect(data.reason).toContain('in time');
   });
 
-  test('withholds the owner capability from a paired-device credential', async () => {
+  test('grants the same connection-test capability to a paired-device credential', async () => {
     const owner = 'fixture-owner-credential';
     const s = bootServer({ authToken: owner });
     const issued = await s.app.request('/api/remote/pairing', {
@@ -412,14 +412,14 @@ describe('provider connection check', () => {
     const envelope = await s.app.request(path, { headers: { authorization: `Bearer ${token}` } });
     expect(envelope.status).toBe(200);
     expect(((await envelope.json()) as { canTestConnection: boolean }).canTestConnection).toBe(
-      false,
+      true,
     );
-    const denied = await s.app.request(`${path}/missing/test`, {
+    const probed = await s.app.request(`${path}/missing/test`, {
       method: 'POST',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: '{}',
     });
-    expect(denied.status).toBe(403);
+    expect(probed.status).toBe(404);
   });
 
   test('requires the session bearer token before running a check', async () => {

@@ -43,7 +43,7 @@ import {
   validateHostShellEscalationApproval,
 } from './host-shell-escalation.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
-import { isOwner } from './instance-owner.js';
+import { isOwnerDecider } from './instance-owner.js';
 import { deleteProject, type ProjectTx } from './projects.js';
 import { deleteTodo } from './todos.js';
 
@@ -525,10 +525,16 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
       if (row?.status !== 'pending') {
         throw new HttpError(409, `proposal ${input.proposalId} is not pending`);
       }
-      if (row.actionId === BROWSER_PASSWORD_ACTION && !isOwner(deps.db, input.decidedBy)) {
+      if (
+        row.actionId === BROWSER_PASSWORD_ACTION &&
+        !isOwnerDecider(tx, input.decidedBy, input.teamId)
+      ) {
         throw new HttpError(403, 'only the owner can authorize a browser password website');
       }
-      if (row.actionId === HOST_SHELL_ESCALATION_ACTION && !isOwner(deps.db, input.decidedBy)) {
+      if (
+        row.actionId === HOST_SHELL_ESCALATION_ACTION &&
+        !isOwnerDecider(tx, input.decidedBy, input.teamId)
+      ) {
         throw new HttpError(
           403,
           'only the owner can approve running a command without the sandbox',

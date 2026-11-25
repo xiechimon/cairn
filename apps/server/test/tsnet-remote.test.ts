@@ -898,7 +898,7 @@ describe('POST /api/remote/tailnet', () => {
     expect((await callTailnet(s, { enabled: true }, ownerHeaders)).status).toBe(404);
   });
 
-  test('a paired-device token cannot flip the switch', async () => {
+  test('a paired-device token passes auth on /api/remote/tailnet like the owner token', async () => {
     const s = bootServer({ authToken: TOKEN });
     const grant = await s.app.request('/api/remote/pairing', {
       method: 'POST',
@@ -908,7 +908,7 @@ describe('POST /api/remote/tailnet', () => {
     const pair = await redeemTestPairing(s.app, code, 'phone');
     const { token } = (await pair.json()) as { token: string };
     const deviceHeaders = { authorization: `Bearer ${token}` };
-    expect((await callTailnet(s, { enabled: true }, deviceHeaders)).status).toBe(403);
-    expect((await callTailnet(s, { enabled: false }, deviceHeaders)).status).toBe(403);
+    expect((await callTailnet(s, { enabled: true }, deviceHeaders)).status).toBe(404);
+    expect((await callTailnet(s, { enabled: false }, deviceHeaders)).status).toBe(404);
   });
 });

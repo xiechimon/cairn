@@ -51,7 +51,6 @@ import {
   isGithubAppUserToken,
 } from './lib/github.js';
 import { nowMs } from './lib/ids.js';
-import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { newWebhookToken } from './lib/webhook-token.js';
 import {
   createApiKeyBodySchema,
@@ -197,7 +196,7 @@ import { answerSecretRequest } from './services/secret-requests.js';
 import {
   createSecret,
   deleteSecret,
-  listRedactedSecrets,
+  listSecrets,
   listSecretsWithEnvValues,
   updateSecret,
 } from './services/secrets.js';
@@ -222,7 +221,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
 
   const isOwnerSession = (c: Context): boolean =>
-    pairedDeviceIdOf(c) === null &&
     (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
     isOwner(ctx.db, ctx.user.id);
 
@@ -863,7 +861,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     return c.json({
       ...getProvidersEnvelope(keysvc, teamId),
-      canTestConnection: pairedDeviceIdOf(c) === null && isOwner(ctx.db, ctx.user.id),
+      canTestConnection: isOwnerSession(c),
     });
   });
 
@@ -927,7 +925,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/providers/:pid/test', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    if (!isOwner(ctx.db, ctx.user.id)) {
+    if (!isOwnerSession(c)) {
       throw new HttpError(
         403,
         redactSecrets('Only the owner can test a provider connection.').value as string,
@@ -946,7 +944,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/providers/:pid/upstream-models', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    if (pairedDeviceIdOf(c) !== null || !isOwner(ctx.db, ctx.user.id)) {
+    if (!isOwnerSession(c)) {
       throw new HttpError(
         403,
         redactSecrets('Only the owner can list upstream models.').value as string,
@@ -1465,12 +1463,10 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/secrets', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const ownerCaller =
-      pairedDeviceIdOf(c) === null &&
-      (ctx.authToken === null || c.get('ownerIdentity') !== undefined);
+    const ownerCaller = isOwnerSession(c);
     c.header('Cache-Control', 'no-store');
     return c.json(
-      ownerCaller ? listSecretsWithEnvValues(keysvc, teamId) : listRedactedSecrets(keysvc, teamId),
+      ownerCaller ? listSecretsWithEnvValues(keysvc, teamId) : listSecrets(keysvc, teamId),
     );
   });
 

@@ -318,7 +318,7 @@ describe('F-P3 pair by approval', () => {
     expect(claimed.status).toBe('approved');
   });
 
-  test('paired devices and anonymous callers cannot see or decide requests', async () => {
+  test('paired devices can see and decide requests while anonymous callers get 401', async () => {
     const s = bootServer({ authToken: OWNER });
     const req = await requestPair(s);
     const grantRes = await call(s, 'POST', '/api/remote/pairing', { headers: ownerHeaders });
@@ -327,13 +327,12 @@ describe('F-P3 pair by approval', () => {
     const { token } = (await pairRes.json()) as { token: string };
     const device = { authorization: `Bearer ${token}` };
 
-    expect((await call(s, 'GET', '/api/remote/pairing-requests', { headers: device })).status).toBe(
-      403,
-    );
-    expect((await decide(s, req.id, 'approve', device)).status).toBe(403);
-    expect((await decide(s, req.id, 'deny', device)).status).toBe(403);
     expect((await call(s, 'GET', '/api/remote/pairing-requests')).status).toBe(401);
     expect((await decide(s, req.id, 'approve', {})).status).toBe(401);
+    expect((await call(s, 'GET', '/api/remote/pairing-requests', { headers: device })).status).toBe(
+      200,
+    );
+    expect((await decide(s, req.id, 'approve', device)).status).toBe(200);
   });
 
   test('the open requester routes still require the browser-origin proof header', async () => {

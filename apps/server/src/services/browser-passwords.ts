@@ -5,7 +5,7 @@ import type { Db } from '../db/client.js';
 import { actionProposal, machine, mailAccount, secret } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
-import { isOwner } from './instance-owner.js';
+import { isOwnerDecider } from './instance-owner.js';
 
 export const BROWSER_PASSWORD_ACTION = 'browser.secret.authorize';
 
@@ -80,7 +80,7 @@ export function hasBrowserPasswordGrant(
     )
     .all()
     .some((row) => {
-      if (row.decidedBy === null || !isOwner(db, row.decidedBy)) return false;
+      if (row.decidedBy === null || !isOwnerDecider(db, row.decidedBy, teamId)) return false;
       const saved = browserPasswordBindingSchema.parse(JSON.parse(row.inputJson));
       return (
         saved.secretId === binding.secretId &&
@@ -139,7 +139,7 @@ export function listBrowserPasswordGrants(db: Db, teamId: string): BrowserPasswo
     .orderBy(desc(actionProposal.createdAt))
     .all()
     .flatMap((row) => {
-      if (row.decidedBy === null || !isOwner(db, row.decidedBy)) return [];
+      if (row.decidedBy === null || !isOwnerDecider(db, row.decidedBy, teamId)) return [];
       const bound = browserPasswordBindingSchema.safeParse(JSON.parse(row.inputJson));
       if (!bound.success) return [];
       const saved = secretsById.get(bound.data.secretId);
@@ -184,7 +184,7 @@ export function revokeBrowserPasswordGrant(
       ),
     )
     .get();
-  if (row === undefined || row.decidedBy === null || !isOwner(db, row.decidedBy))
+  if (row === undefined || row.decidedBy === null || !isOwnerDecider(db, row.decidedBy, teamId))
     throw notFound(`grant ${grantId}`);
   db.update(actionProposal)
     .set({ revokedAt: now })

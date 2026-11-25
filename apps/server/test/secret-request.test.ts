@@ -216,7 +216,7 @@ describe('answering a secret request from the chat card', () => {
   });
 
   test.each(['bearer', 'session'] as const)(
-    'a paired %s cannot answer, the owner can',
+    'a paired %s can answer a secret request like the owner session',
     async (kind) => {
       const ownerToken = 'synthetic-owner-token';
       const deviceToken = 'cairn_dev_synthetic-device-token';
@@ -239,18 +239,9 @@ describe('answering a secret request from the chat card', () => {
               cookie: `cairn_auth=${issueBrowserSession(s.db, 'device', 'paired-phone').token}`,
               'sec-fetch-site': 'same-origin',
             };
-      const owner: Record<string, string> =
-        kind === 'bearer'
-          ? { authorization: `Bearer ${ownerToken}` }
-          : {
-              cookie: `cairn_auth=${issueBrowserSession(s.db, 'owner').token}`,
-              'sec-fetch-site': 'same-origin',
-            };
       const pending = hold(s);
-      expect((await answer(s, save(SENTINEL), device)).status).toBe(403);
-      expect(rows(s)).toEqual([]);
       await vi.waitFor(async () =>
-        expect((await answer(s, save(SENTINEL), owner)).status).toBe(200),
+        expect((await answer(s, save(SENTINEL), device)).status).toBe(200),
       );
       expect(await pending).toBe(secretRequestSaved(NAME, 'team'));
     },

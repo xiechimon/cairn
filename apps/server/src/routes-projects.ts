@@ -36,7 +36,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
 
   const isOwnerSession = (c: Context): boolean =>
-    pairedDeviceIdOf(c) === null &&
     (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
     isOwner(ctx.db, ctx.user.id);
 

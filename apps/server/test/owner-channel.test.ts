@@ -371,7 +371,7 @@ describe('owner channel gate', () => {
       authorization: `Bearer ${deviceToken}`,
     });
     expect(deviceTicket.status).toBe(200);
-    const deviceOnOwnerOnly = await post(
+    const devicePairing = await post(
       s,
       '/api/remote/pairing',
       {},
@@ -379,10 +379,7 @@ describe('owner channel gate', () => {
         authorization: `Bearer ${deviceToken}`,
       },
     );
-    expect(deviceOnOwnerOnly.status).toBe(403);
-    expect(await deviceOnOwnerOnly.json()).toEqual({
-      error: 'only the owner token can do this',
-    });
+    expect(devicePairing.status).toBe(201);
     const access = issueBrowserSession(s.db, 'external');
     const accessWrite = await s.app.request(`/api/teams/${s.team.id}/top-models`, {
       method: 'PUT',

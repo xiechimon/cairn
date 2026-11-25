@@ -55,7 +55,7 @@ export function ownerChannelAdmits(
   accessExchange: boolean,
 ): Response | null {
   if (channel === undefined) return null;
-  if ((c.get('pairedDeviceId') ?? null) !== null) return null;
+  if (c.get('ownerIdentity')?.via === 'device') return null;
   if (accessExchange && c.get('ownerIdentity')?.via === 'access') return null;
   if (channel.key === null) return c.json({ error: 'owner channel is not established' }, 503);
   const provided = c.req.header(OWNER_CHANNEL_HEADER);

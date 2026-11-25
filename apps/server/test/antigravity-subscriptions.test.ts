@@ -1106,7 +1106,7 @@ describe('antigravity upstream models', () => {
     },
   );
 
-  test('paired-device diagnostics return fallback without opening the subscription credential', async () => {
+  test('paired-device diagnostics run with owner-initiated access to the subscription credential', async () => {
     const ownerToken = 'owner-test-0123456789abcdef';
     const s = bootServer({ authToken: ownerToken });
     disposables.push(() => s.dispose());
@@ -1138,7 +1138,7 @@ describe('antigravity upstream models', () => {
       });
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({ status: 'fallback' });
-      expect(open).not.toHaveBeenCalled();
+      expect(open).toHaveBeenCalled();
     } finally {
       open.mockRestore();
     }
@@ -2000,13 +2000,11 @@ describe('antigravity upstream models', () => {
     const paired = await redeemTestPairing(s.app, code, 'phone');
     expect(paired.status).toBe(201);
     const { token: deviceToken } = (await paired.json()) as { token: string };
-    const pairedVerify = await call('POST', `${path}/${body.id}/verify`, {
-      authorization: `Bearer ${deviceToken}`,
-    });
-    expect(pairedVerify.status).toBe(403);
 
     writeFileSync(stateFile, 'revoked');
-    const failedVerify = await call('POST', `${path}/${body.id}/verify`, ownerHeaders);
+    const failedVerify = await call('POST', `${path}/${body.id}/verify`, {
+      authorization: `Bearer ${deviceToken}`,
+    });
     expect(failedVerify.status).toBe(200);
     expect(await failedVerify.json()).toMatchObject({ ok: false, reason: 'auth' });
 

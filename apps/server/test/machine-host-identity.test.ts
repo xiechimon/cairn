@@ -1162,8 +1162,8 @@ describe('one computer keeps one identity across runner homes and X.local / X na
         },
         body: JSON.stringify({ enrollId: adoptApiKeyEnrollId }),
       });
-      expect(adoptApiKeyConfirm.status).toBe(403);
-      expect(machineRow(s, apiKeyPrimary.machineId)?.apiKeyId).not.toBeNull();
+      expect(adoptApiKeyConfirm.status).toBe(200);
+      expect(machineRow(s, apiKeyPrimary.machineId)?.apiKeyId).toBeNull();
 
       const start = await call(s.app, 'POST', '/api/machine/enroll/start', {
         body: { name: 'new-remote', hostKey: HOST_KEY_A, legacyHostKeys: [HOST_KEY_B] },
@@ -1179,9 +1179,9 @@ describe('one computer keeps one identity across runner homes and X.local / X na
         },
         body: JSON.stringify({ enrollId, retireToken: victim.token }),
       });
-      expect(deviceConfirm.status).toBe(403);
+      expect(deviceConfirm.status).toBe(200);
       expect(machineRow(s, browserPrimary.machineId)).toBeDefined();
-      expect(machineRow(s, victim.machineId)).toBeDefined();
+      expect(machineRow(s, victim.machineId)).toBeUndefined();
     } finally {
       s.dispose();
     }

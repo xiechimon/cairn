@@ -57,7 +57,11 @@ import {
   markNotificationRead,
   markNotificationUnread,
 } from './services/notifications.js';
-import { deviceStreamsOf, pairedDeviceExists } from './services/paired-devices.js';
+import {
+  deviceStreamsOf,
+  pairedDeviceExists,
+  pairedDeviceIdOfToken,
+} from './services/paired-devices.js';
 import { routingRuleIssues } from './services/routing-rule-issues.js';
 import {
   listRoutingSettings,
@@ -91,12 +95,21 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (ctx.authToken === null) return c.body(null, 204);
     const match = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
     const provided = match?.[1] ?? null;
-    if (provided === null || !matchesAuthToken(ctx.authToken, provided)) {
-      return c.json({ error: 'owner token required' }, 403);
+    if (provided === null) {
+      return c.json({ error: 'access token required' }, 403);
     }
-    const session = issueBrowserSession(ctx.db, 'owner', null);
-    setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
-    return c.body(null, 204);
+    if (matchesAuthToken(ctx.authToken, provided)) {
+      const session = issueBrowserSession(ctx.db, 'owner', null);
+      setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
+      return c.body(null, 204);
+    }
+    const deviceId = pairedDeviceIdOfToken(ctx.db, provided);
+    if (deviceId !== null) {
+      const session = issueBrowserSession(ctx.db, 'device', deviceId);
+      setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
+      return c.body(null, 204);
+    }
+    return c.json({ error: 'access token required' }, 403);
   });
 
   app.use('/api/*', async (c, next) => {
@@ -193,10 +206,10 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: 'Unauthorized' }, 401);
     }
     const ticket = ctx.streamTickets.issue(
-      owner !== undefined
-        ? { kind: owner.via === 'access' ? 'external' : 'owner', deviceId: null }
-        : deviceId !== null
-          ? { kind: 'device', deviceId }
+      deviceId !== null
+        ? { kind: 'device', deviceId }
+        : owner !== undefined
+          ? { kind: owner.via === 'access' ? 'external' : 'owner', deviceId: null }
           : { kind: 'owner', deviceId: null },
     );
     c.header('cache-control', 'no-store');
@@ -333,7 +346,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const ownerPage =
-      pairedDeviceIdOf(c) === null &&
       (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
       isOwner(ctx.db, ctx.user.id) &&
       sameOriginPageWrite(c);

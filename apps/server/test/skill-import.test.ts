@@ -1310,7 +1310,7 @@ describe('GET /api/teams/{id}/skills/import-candidates', () => {
     }
   });
 
-  test('C4: a paired device gets 403 — listing the machine skill sources is owner-only', async () => {
+  test('C4: a paired device can list machine skill sources like the owner', async () => {
     put(agentsRoot(), 'deploy', skillMd('deploy', '部署'));
     const authed = bootServer({
       authToken: 'owner-secret-0123456789abcdef',
@@ -1330,11 +1330,11 @@ describe('GET /api/teams/{id}/skills/import-candidates', () => {
         })
         .run();
       const device = `cairn_auth=${issueBrowserSession(authed.db, 'device', 'phone').token}`;
-      const refused = await authed.app.request(
+      const pairedRes = await authed.app.request(
         `/api/teams/${authed.team.id}/skills/import-candidates`,
         { headers: { cookie: device } },
       );
-      expect(refused.status).toBe(403);
+      expect(pairedRes.status).toBe(200);
       const owner = `cairn_auth=${issueBrowserSession(authed.db, 'owner').token}`;
       const allowed = await authed.app.request(
         `/api/teams/${authed.team.id}/skills/import-candidates`,
@@ -1360,7 +1360,7 @@ describe('local-directory import authorization (the source is owner data)', () =
     return { token, cookie: paired.headers.get('set-cookie') };
   }
 
-  test('SEC1: a paired device credential gets 403 on the import and refresh routes; the owner token still works', async () => {
+  test('SEC1: a paired device credential can import and refresh skills like the owner session', async () => {
     const s = bootServer({
       authToken: OWNER,
       skillsDir: makeRoot(),
@@ -1373,27 +1373,23 @@ describe('local-directory import authorization (the source is owner data)', () =
         cred: deviceToken,
         body: { localPath: source },
       });
-      expect(deviceImport.status).toBe(403);
+      expect(deviceImport.status).toBe(201);
 
-      const imported = await call(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
-        cred: OWNER,
-        body: { localPath: source },
-      });
-      expect(imported.status).toBe(201);
       const deviceRefresh = await call(
         s.app,
         'POST',
         `/api/teams/${s.team.id}/skills/device-import/refresh`,
         { cred: deviceToken, body: {} },
       );
-      expect(deviceRefresh.status).toBe(403);
+      expect(deviceRefresh.status).toBe(200);
 
       if (cookie !== null) {
+        const source2 = makeSourceDir({ 'SKILL.md': skillMd('device-import-cookie', 'd') });
         const sessionImport = await call(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
-          body: { localPath: source },
+          body: { localPath: source2 },
           headers: { cookie, 'sec-fetch-site': 'same-origin' },
         });
-        expect(sessionImport.status).toBe(403);
+        expect(sessionImport.status).toBe(201);
       }
     } finally {
       s.dispose();

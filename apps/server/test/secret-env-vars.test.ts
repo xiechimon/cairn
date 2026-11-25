@@ -238,36 +238,30 @@ describe('environment variables next to secrets', () => {
 });
 
 describe('who sees env values', () => {
-  test('owner token and owner session see values; paired device token and device session do not', async () => {
+  test('owner and paired device credentials all see env values', async () => {
     s = bootServer({ authToken: OWNER });
     createSecret(deps(), { teamId: s.team.id, name: 'E', value: SENTINEL, kind: 'env' });
     const grant = issuePairingGrant(s.db);
     const paired = pairFromGrant(s.db, { code: grant.code, teamId: s.team.id, name: 'phone' });
     if (!paired) throw new Error('pairing failed');
     const ownerSession = issueBrowserSession(s.db, 'owner').token;
-    const callers: [string, Record<string, string>, boolean][] = [
-      ['owner token', { authorization: `Bearer ${OWNER}` }, true],
-      ['owner session', { cookie: `cairn_auth=${ownerSession}` }, true],
-      ['paired token', { authorization: `Bearer ${paired.token}` }, false],
-      ['device session', { cookie: `cairn_auth=${paired.sessionToken}` }, false],
+    const callers: [string, Record<string, string>][] = [
+      ['owner token', { authorization: `Bearer ${OWNER}` }],
+      ['owner session', { cookie: `cairn_auth=${ownerSession}` }],
+      ['paired token', { authorization: `Bearer ${paired.token}` }],
+      ['device session', { cookie: `cairn_auth=${paired.sessionToken}` }],
     ];
-    for (const [label, headers, sees] of callers) {
+    for (const [label, headers] of callers) {
       const res = await s.app.request(path(), { headers });
       expect(res.status, label).toBe(200);
       const entries = (await res.json()) as Array<{
         kind?: string;
         value?: string;
-        redacted?: boolean;
       }>;
       const body = JSON.stringify(entries);
-      expect(body.includes(SENTINEL), label).toBe(sees);
+      expect(body.includes(SENTINEL), label).toBe(true);
       expect(body, label).toContain('"kind":"env"');
-      if (sees) {
-        expect(entries[0]?.redacted, label).toBeUndefined();
-      } else {
-        expect(entries[0]?.value, label).toBeUndefined();
-        expect(entries[0]?.redacted, label).toBe(true);
-      }
+      expect(entries[0]?.value, label).toBe(SENTINEL);
     }
   });
 });

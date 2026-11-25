@@ -8,7 +8,6 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { githubConnection, mcpConnector, step as stepTable } from '../src/db/schema.js';
-import { isOwnerOnlyRoute } from '../src/lib/token-auth.js';
 import {
   adoptGithubConnectorGrants,
   pollGithubConnectorDevice,
@@ -316,16 +315,6 @@ describe('MCP connectors', () => {
     expect(calls).toBeGreaterThan(1);
     expect(result).toMatchObject({ status: 'error', statusReason: 'timeout' });
     expect(Date.now() - started).toBeLessThan(3_000);
-  });
-
-  test('every write route is owner-only and reads are not', () => {
-    const path = '/api/teams/t1/mcp-connectors';
-    expect(isOwnerOnlyRoute('POST', path)).toBe(true);
-    expect(isOwnerOnlyRoute('PATCH', `${path}/c1`)).toBe(true);
-    expect(isOwnerOnlyRoute('DELETE', `${path}/c1`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${path}/c1/check`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${path}/oauth/start`)).toBe(true);
-    expect(isOwnerOnlyRoute('GET', path)).toBe(false);
   });
 });
 
@@ -1395,16 +1384,6 @@ describe('GitHub connector device sign-in', () => {
       204,
     );
     expect((await t.call('POST', path)).status).toBe(409);
-  });
-
-  test('device routes are owner-only and the availability read is not', () => {
-    const path = '/api/teams/t1/mcp-connectors';
-    expect(isOwnerOnlyRoute('POST', `${path}/github/device`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${path}/github/device/a1`)).toBe(true);
-    expect(isOwnerOnlyRoute('DELETE', `${path}/github/device/a1`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${path}/github/bind`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${path}/c1/github/installations`)).toBe(true);
-    expect(isOwnerOnlyRoute('GET', `${path}/github`)).toBe(false);
   });
 });
 

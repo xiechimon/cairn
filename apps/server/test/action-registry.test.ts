@@ -480,16 +480,14 @@ describe('owner journal and proposal routes', () => {
     );
   }
 
-  test('a paired device token gets 403 on the journal, proposals and undo routes; the owner token passes', async () => {
+  test('a paired device token passes the journal, proposals and undo routes like the owner token', async () => {
     const s = bootServer({ authToken: TOKEN });
     const device = createPairedDevice(s.db, { teamId: s.team.id, name: 'phone' });
-    for (const [method, path] of [
-      ['GET', '/api/actions/journal'],
-      ['GET', '/api/actions/proposals'],
-      ['POST', '/api/actions/journal/j1/undo'],
-    ] as const) {
-      expect((await bearerReq(s, device.token, method, path)).status).toBe(403);
-    }
+    expect((await bearerReq(s, device.token, 'GET', '/api/actions/journal')).status).toBe(200);
+    expect((await bearerReq(s, device.token, 'GET', '/api/actions/proposals')).status).toBe(200);
+    expect((await bearerReq(s, device.token, 'POST', '/api/actions/journal/j1/undo')).status).toBe(
+      404,
+    );
     expect((await bearerReq(s, TOKEN, 'GET', '/api/actions/journal')).status).toBe(200);
     expect((await bearerReq(s, TOKEN, 'GET', '/api/actions/proposals')).status).toBe(200);
     s.dispose();

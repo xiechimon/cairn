@@ -16,7 +16,7 @@ describe('signInWithOwnerToken', () => {
     expect(await signInWithOwnerToken('valid-token')).toBe('owner-channel-required');
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: 'owner token required' }), {
+      new Response(JSON.stringify({ error: 'access token required' }), {
         status: 403,
         headers: { 'content-type': 'application/json' },
       }),

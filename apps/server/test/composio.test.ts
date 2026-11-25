@@ -4,7 +4,6 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test } from 'vitest';
 import { mcpConnector, secret } from '../src/db/schema.js';
-import { isOwnerOnlyRoute } from '../src/lib/token-auth.js';
 import { openSecretGrants } from '../src/services/secrets.js';
 import { bootServer, req } from './helpers.js';
 
@@ -304,18 +303,6 @@ describe('composio connector routes', () => {
     expect(isDaemonReadSecretName('composio.api-key')).toBe(true);
     const secretsList = await (await req(s.app, 'GET', `/api/teams/${s.team.id}/secrets`)).text();
     expect(secretsList).not.toContain('ck-test');
-  });
-
-  test('composio mutations are owner-only routes', () => {
-    const base = '/api/teams/t1/mcp-connectors/composio';
-    expect(isOwnerOnlyRoute('PUT', `${base}/key`)).toBe(true);
-    expect(isOwnerOnlyRoute('DELETE', `${base}/key`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${base}/toolkits`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${base}/c1/authorize`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${base}/c1/poll`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${base}/c1/reconnect`)).toBe(true);
-    expect(isOwnerOnlyRoute('POST', `${base}/c1/revoke`)).toBe(true);
-    expect(isOwnerOnlyRoute('GET', base)).toBe(false);
   });
 
   test('a missing key fails fast before any upstream call, then a bad slug fails validation', async () => {

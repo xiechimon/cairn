@@ -28,7 +28,7 @@ import {
   SEND_CHOICE,
   settlePendingProposal,
 } from './action-proposals.js';
-import { isOwner } from './instance-owner.js';
+import { isOwnerDecider } from './instance-owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { deleteProject } from './projects.js';
 
@@ -343,7 +343,7 @@ function coveringGrant(
       ),
     )
     .all()
-    .filter((row) => row.decidedBy !== null && isOwner(db, row.decidedBy));
+    .filter((row) => row.decidedBy !== null && isOwnerDecider(db, row.decidedBy, teamId));
   const standing = rows.find((row) => row.decision === 'always');
   if (standing !== undefined) return standing;
   const hash = inputHash(input);

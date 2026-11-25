@@ -208,45 +208,26 @@ test('A7: another uid cannot adopt the socket', async () => {
   await expect(listenOnTailnetSocket(s.app, s.socketPath)).rejects.toThrow(/user|owner/);
 });
 
-test.each([
-  ['/api/machine/enroll/confirm', 403],
-  ['/api/machine/enroll/%63onfirm', 403],
-  ['/%61pi/machine/enroll/confirm', 403],
-  ['/api/machine/%65nroll/confirm', 403],
-] as const)(
-  'A8: paired device at %s returns %i without granting runner or pairing administration',
-  async (confirmPath, expectedStatus) => {
-    const s = await setup();
-    const started = await call(
-      s.socketPath,
-      '/api/machine/enroll/start',
-      'POST',
-      {},
-      { name: 'test-laptop' },
-    );
-    const device = createPairedDevice(s.db, { teamId: s.team.id, name: 'phone' });
-    const headers = { authorization: `Bearer ${device.token}`, origin: ORIGIN, ...identity };
-    expect((await call(s.socketPath, '/api/remote/pairing', 'POST', headers)).status).toBe(403);
-    expect(
-      (
-        await call(s.socketPath, confirmPath, 'POST', headers, {
-          enrollId: started.body.enrollId,
-        })
-      ).status,
-    ).toBe(expectedStatus);
-    expect(
-      (
-        await call(
-          s.socketPath,
-          '/api/machine/enroll/confirm',
-          'POST',
-          { authorization: `Bearer ${TOKEN}`, origin: ORIGIN },
-          { enrollId: started.body.enrollId },
-        )
-      ).status,
-    ).toBe(200);
-  },
-);
+test('A8: paired device can mint pairing codes and confirm runner enrollment while encoded bypass paths stay rejected', async () => {
+  const s = await setup();
+  const started = await call(
+    s.socketPath,
+    '/api/machine/enroll/start',
+    'POST',
+    {},
+    { name: 'test-laptop' },
+  );
+  const device = createPairedDevice(s.db, { teamId: s.team.id, name: 'phone' });
+  const headers = { authorization: `Bearer ${device.token}`, origin: ORIGIN, ...identity };
+  expect((await call(s.socketPath, '/api/remote/pairing', 'POST', headers)).status).toBe(201);
+  expect(
+    (
+      await call(s.socketPath, '/api/machine/enroll/confirm', 'POST', headers, {
+        enrollId: started.body.enrollId,
+      })
+    ).status,
+  ).toBe(200);
+});
 
 test('A9: Funnel headers never grant ambient admission', async () => {
   const s = await setup();

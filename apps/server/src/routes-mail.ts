@@ -6,7 +6,6 @@ import {
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { HttpError, parseWith } from './lib/errors.js';
-import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam } from './routes-helpers.js';
 import {
   addMailRule,
@@ -25,9 +24,7 @@ function requireMail(ctx: AppContext): MailConnector {
 
 export function registerMailRoutes(app: Hono, ctx: AppContext): void {
   const requireOwnerSession = (c: Context): void => {
-    const owner =
-      pairedDeviceIdOf(c) === null &&
-      (ctx.authToken === null || c.get('ownerIdentity') !== undefined);
+    const owner = ctx.authToken === null || c.get('ownerIdentity') !== undefined;
     if (!owner) throw new HttpError(403, 'owner session required');
   };
   const secrets = { db: ctx.db, box: ctx.secretBox };

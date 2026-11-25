@@ -23,7 +23,7 @@ describe('managed runtime updates (server)', () => {
     }
   });
 
-  test('refuses non-owner paired device with 403', async () => {
+  test('allows a paired device to trigger a managed runtime update', async () => {
     const owner = 'owner-secret';
     const s = bootServer({ authToken: owner });
     const issued = await s.app.request('/api/remote/pairing', {
@@ -45,7 +45,7 @@ describe('managed runtime updates (server)', () => {
           headers: { authorization: `Bearer ${token}` },
         },
       );
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
     } finally {
       unsubscribe();
     }

@@ -393,7 +393,7 @@ describe('pair, forget and offer', () => {
     expect(row?.lastError).toContain('wrong code');
   });
 
-  test('a paired device cannot pair a phone, the owner session can', async () => {
+  test('a paired device can pair a phone like the owner session', async () => {
     const ownerToken = 'synthetic-owner-token';
     const deviceToken = 'cairn_dev_synthetic-device-token';
     const w = world(MAC, ownerToken);
@@ -409,15 +409,9 @@ describe('pair, forget and offer', () => {
       })
       .run();
     const body = { endpoint: '192.168.1.20:37001', code: '123456', consent: true };
-    const denied = await w.s.app.request('/api/machines/users-mac/phones', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${deviceToken}` },
-      body: JSON.stringify(body),
-    });
-    expect(denied.status).toBe(403);
     const allowed = w.s.app.request('/api/machines/users-mac/phones', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${ownerToken}` },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${deviceToken}` },
       body: JSON.stringify(body),
     });
     const pushed = await until(() => w.pushed.at(-1));

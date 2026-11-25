@@ -410,7 +410,7 @@ describe('browser password grants', () => {
     });
   });
 
-  test('grant endpoints refuse a paired device bearer token', async () => {
+  test('grant endpoints admit a paired device bearer token like the owner session', async () => {
     const { s, deps } = boot('synthetic-owner-token');
     s.db
       .insert(pairedDevice)
@@ -433,12 +433,12 @@ describe('browser password grants', () => {
     const listed = await s.app.request(`/api/teams/${s.team.id}/browser-password-grants`, {
       headers,
     });
-    expect(listed.status).toBe(403);
+    expect(listed.status).toBe(200);
     const revoked = await s.app.request(
       `/api/teams/${s.team.id}/browser-password-grants/${grant.grantId}`,
       { method: 'DELETE', headers },
     );
-    expect(revoked.status).toBe(403);
-    expect(listBrowserPasswordGrants(s.db, s.team.id)[0]).toMatchObject({ state: 'active' });
+    expect(revoked.status).toBe(204);
+    expect(listBrowserPasswordGrants(s.db, s.team.id)[0]).toMatchObject({ state: 'revoked' });
   });
 });

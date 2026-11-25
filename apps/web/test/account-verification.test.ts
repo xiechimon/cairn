@@ -23,7 +23,7 @@ describe('runVerification', () => {
 
   it('a residual 403 is still not a verification result', async () => {
     const outcome = await runVerification(() =>
-      Promise.reject(new ApiError(403, 'only the owner token can do this')),
+      Promise.reject(new ApiError(403, 'owner session required')),
     );
     expect(outcome).toEqual({ phase: 'not-run', cause: 'error' });
   });

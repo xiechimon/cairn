@@ -7,7 +7,6 @@ import { machine, phone } from './db/schema.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
-import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { requireTeam } from './routes-helpers.js';
 import { isOwner } from './services/instance-owner.js';
 import { managePhone } from './services/machine-computer.js';
@@ -35,7 +34,6 @@ export function registerPhoneRoutes(app: Hono, ctx: AppContext): void {
     }
   };
   const isOwnerSession = (c: Context): boolean =>
-    pairedDeviceIdOf(c) === null &&
     (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
     isOwner(ctx.db, ctx.user.id);
 

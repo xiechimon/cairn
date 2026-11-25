@@ -49,7 +49,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     if (c.get('ownerIdentity') !== undefined) return;
     const provided = bearerToken(c);
     if (provided === null || !matchesAuthToken(ctx.authToken, provided)) {
-      throw new HttpError(403, 'only the owner token can manage pairing');
+      throw new HttpError(403, 'owner session required');
     }
   };
 

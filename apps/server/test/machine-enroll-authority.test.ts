@@ -453,7 +453,7 @@ describe('machine enrollment authority (#2054)', () => {
     }
   });
 
-  test('a paired-device confirm cannot resurrect a revoked machine, an owner confirm can', async () => {
+  test('a paired-device confirm can resurrect a revoked machine like an owner confirm', async () => {
     const s = bootServer({ authToken: OWNER_TOKEN });
     try {
       s.db
@@ -500,23 +500,11 @@ describe('machine enrollment authority (#2054)', () => {
       const firstStart = await start();
       expect(firstStart.status).toBe(200);
       const { enrollId: deviceEnrollId } = (await firstStart.json()) as { enrollId: string };
-      const denied = await deviceConfirm(deviceEnrollId);
-      expect(denied.status).toBe(403);
-      const afterDeny = machineRow(s, victim.machineId);
-      expect(afterDeny?.tokenHash).toBeNull();
-      expect(afterDeny?.retiredAt).not.toBeNull();
-
-      const secondStart = await start();
-      expect(secondStart.status).toBe(200);
-      const { enrollId: ownerEnrollId } = (await secondStart.json()) as { enrollId: string };
-      const allowed = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
-        cred: OWNER_TOKEN,
-        body: { enrollId: ownerEnrollId },
-      });
+      const allowed = await deviceConfirm(deviceEnrollId);
       expect(allowed.status).toBe(200);
-      const afterOwner = machineRow(s, victim.machineId);
-      expect(afterOwner?.tokenHash).not.toBeNull();
-      expect(afterOwner?.retiredAt).toBeNull();
+      const afterDevice = machineRow(s, victim.machineId);
+      expect(afterDevice?.tokenHash).not.toBeNull();
+      expect(afterDevice?.retiredAt).toBeNull();
     } finally {
       s.dispose();
     }

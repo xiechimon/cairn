@@ -209,7 +209,7 @@ describe('GET /api/fs/list -- route wire surface (R family)', () => {
     expect(((await empty.json()) as { path: string }).path).toBe(home);
   });
 
-  test('R4 a paired device gets 403 — browsing the machine filesystem is owner-only', async () => {
+  test('R4 a paired device can browse the machine filesystem like the owner', async () => {
     const authed = bootServer({ authToken: 'owner-secret-0123456789abcdef' });
     try {
       authed.db
@@ -225,10 +225,10 @@ describe('GET /api/fs/list -- route wire surface (R family)', () => {
         .run();
       const device = `cairn_auth=${issueBrowserSession(authed.db, 'device', 'phone').token}`;
       const dir = encodeURIComponent(makeRoot());
-      const refused = await authed.app.request(`/api/fs/list?dir=${dir}`, {
+      const pairedRes = await authed.app.request(`/api/fs/list?dir=${dir}`, {
         headers: { cookie: device },
       });
-      expect(refused.status).toBe(403);
+      expect(pairedRes.status).toBe(200);
       const owner = `cairn_auth=${issueBrowserSession(authed.db, 'owner').token}`;
       const allowed = await authed.app.request(`/api/fs/list?dir=${dir}`, {
         headers: { cookie: owner },

@@ -314,7 +314,7 @@ describe('login handoff gate', () => {
   });
 
   test.each(['bearer', 'session'] as const)(
-    'a paired %s cannot approve a password website, but the owner can',
+    'a paired %s can approve a password website like the owner session',
     async (kind) => {
       const ownerToken = 'synthetic-owner-token';
       const deviceToken = 'cairn_dev_synthetic-device-token';
@@ -342,26 +342,16 @@ describe('login handoff gate', () => {
         });
       const headers: Record<string, string> =
         kind === 'bearer'
-          ? { authorization: `Bearer ${deviceToken}` }
+          ? { authorization: `Bearer ${deviceToken}`, 'sec-fetch-site': 'same-origin' }
           : {
               cookie: `cairn_auth=${issueBrowserSession(s.db, 'device', 'paired-phone').token}`,
               'sec-fetch-site': 'same-origin',
             };
-      expect((await post(headers)).status).toBe(403);
-      expect(pendingApproval(s).id).toBe(pending.id);
-      expect(calls).toHaveLength(0);
-      const ownerHeaders: Record<string, string> =
-        kind === 'bearer'
-          ? { authorization: `Bearer ${ownerToken}`, 'sec-fetch-site': 'same-origin' }
-          : {
-              cookie: `cairn_auth=${issueBrowserSession(s.db, 'owner').token}`,
-              'sec-fetch-site': 'same-origin',
-            };
-      expect((await post(ownerHeaders)).status).toBe(200);
+      expect((await post(headers)).status).toBe(200);
       expect(
         s.db.select().from(actionProposal).where(eq(actionProposal.id, pending.id)).get(),
-      ).toMatchObject({ status: 'executed', decidedBy: s.user.id });
-      const filled = forwardComputerCall(deps, 'sidecar', 'step-a', fill('owner-approved'));
+      ).toMatchObject({ status: 'executed', decidedBy: 'device:paired-phone' });
+      const filled = forwardComputerCall(deps, 'sidecar', 'step-a', fill('device-approved'));
       expect(calls).toHaveLength(1);
       receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1)], s.secretBox);
       await filled;

@@ -49,7 +49,6 @@ import { newRecordId } from './lib/ids.js';
 import { isDirectLoopbackPeer, isLoopbackPeer, pairRequestPeerOf } from './lib/request-origin.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
-import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody } from './routes-helpers.js';
 import {
   claimAntigravityModelProbe,
@@ -458,7 +457,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       teamId: entry.teamId,
       name: entry.name ?? 'machine',
       serverUrl: originOf(c),
-      ownerApproved: pairedDeviceIdOf(c) === null,
+      ownerApproved: ctx.authToken === null || c.get('ownerIdentity') !== undefined,
       fromLocalHost: entry.fromLocalHost === true,
       ...(entry.hostKey !== undefined ? { hostKey: entry.hostKey } : {}),
       ...(entry.legacyHostKeys !== undefined ? { legacyHostKeys: entry.legacyHostKeys } : {}),

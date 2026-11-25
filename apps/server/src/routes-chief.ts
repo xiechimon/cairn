@@ -321,7 +321,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/chief/steps/:stepId/switch-machine', async (c) => {
     const isOwnerSession =
-      pairedDeviceIdOf(c) === null &&
       (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
       isOwner(ctx.db, ctx.user.id);
     if (!isOwnerSession) {

@@ -24,7 +24,7 @@ import {
   resultOfComputerCallRow,
   storedComputerParams,
 } from './computer-call-store.js';
-import { isOwner } from './instance-owner.js';
+import { isOwnerDecider } from './instance-owner.js';
 
 export const HOST_SHELL_ESCALATION_ACTION = 'host.shell.escalate';
 export const HOST_SHELL_ESCALATION_TOOL_CALL_ID = 'host-shell-escalate';
@@ -265,7 +265,7 @@ export function pollOrStartApprovedHostShellEscalation(
   }
   if (
     proposal.decidedBy === null ||
-    !isOwner(deps.db, proposal.decidedBy) ||
+    !isOwnerDecider(deps.db, proposal.decidedBy, proposal.teamId) ||
     proposal.revokedAt !== null
   ) {
     return { state: 'ready', resultText: 'escalation was not approved by the owner' };

@@ -45,7 +45,6 @@ export function SecretsPage() {
   const secretsQ = useSecrets(teamId, live);
   const rawSecrets = live ? (secretsQ.data ?? []) : (fixture.resources?.secrets ?? []);
   const secrets = rawSecrets.filter((row) => row.kind !== 'pair');
-  const readOnly = rawSecrets.some((row) => row.redacted === true);
   const mutations = useApiMutations(teamId);
   const projectsQ = useProjects(teamId, live);
   const projects = (projectsQ.data ?? []).map((project) => ({
@@ -128,20 +127,18 @@ export function SecretsPage() {
       title={t('密钥与环境变量')}
       selected={SECRETS_HREF}
       actions={
-        readOnly ? undefined : (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={TOPBAR_TEXT_BUTTON}
-              onClick={() => setBulkOpen(true)}
-              data-testid="secret-bulk"
-            >
-              {t('批量添加')}
-            </Button>
-            {!empty && <ResourceNewButton onClick={() => openDialog(null)} />}
-          </>
-        )
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={TOPBAR_TEXT_BUTTON}
+            onClick={() => setBulkOpen(true)}
+            data-testid="secret-bulk"
+          >
+            {t('批量添加')}
+          </Button>
+          {!empty && <ResourceNewButton onClick={() => openDialog(null)} />}
+        </>
       }
       fixture={fixture}
     >
@@ -166,7 +163,7 @@ export function SecretsPage() {
             icon={ShieldEllipsis}
             title={t('暂无密钥或环境变量')}
             description={t('执行机运行任务时会获取它们。')}
-            action={readOnly ? undefined : { label: t('添加'), onClick: () => openDialog(null) }}
+            action={{ label: t('添加'), onClick: () => openDialog(null) }}
           />
         }
       >
@@ -243,15 +240,7 @@ export function SecretsPage() {
                     )}
                   </span>
                   <span className="min-w-0 max-sm:col-start-1 max-sm:row-start-2">
-                    {isEnv && secret.redacted === true ? (
-                      <span
-                        data-testid="secret-value"
-                        className="inline-flex items-center gap-1.5 text-ui text-content-tertiary"
-                      >
-                        <Lock aria-hidden strokeWidth={1.75} className="size-4 flex-none" />
-                        {t('仅限主机设备查看')}
-                      </span>
-                    ) : isEnv && envValue !== '' ? (
+                    {isEnv && envValue !== '' ? (
                       <span
                         data-testid="secret-value"
                         title={envValue}
@@ -274,60 +263,58 @@ export function SecretsPage() {
                     {secret.updatedAt == null ? t('较早') : relativeTime(secret.updatedAt, now, t)}
                   </span>
                   <span className="flex justify-end max-sm:col-start-2 max-sm:row-span-3 max-sm:row-start-1">
-                    {secret.redacted !== true && (
-                      <DropdownMenu>
-                        <IconTooltip
-                          label={t('{name} 的菜单', { name: secret.name })}
-                          trigger={
-                            <DropdownMenuTrigger
-                              render={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  data-testid="secret-menu"
-                                  className="text-content-tertiary hover:bg-transparent hover:text-foreground aria-expanded:bg-menu-hover aria-expanded:text-foreground pointer-coarse:size-11 dark:hover:bg-transparent dark:aria-expanded:bg-menu-hover"
-                                />
-                              }
-                            />
-                          }
-                        >
-                          <Ellipsis aria-hidden strokeWidth={1.75} />
-                        </IconTooltip>
-                        <KeyedMenuContent
-                          side="bottom"
-                          align="end"
-                          sideOffset={4}
-                          className="w-auto min-w-40"
-                        >
-                          {isEnv && (
-                            <KeyedMenuItem
-                              shortcut="S"
-                              data-testid="secret-menu-convert"
-                              onClick={() =>
-                                envValue === '' ? openDialog(secret, true) : setConverting(secret)
-                              }
-                            >
-                              {t('转为机密')}
-                            </KeyedMenuItem>
-                          )}
+                    <DropdownMenu>
+                      <IconTooltip
+                        label={t('{name} 的菜单', { name: secret.name })}
+                        trigger={
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                data-testid="secret-menu"
+                                className="text-content-tertiary hover:bg-transparent hover:text-foreground aria-expanded:bg-menu-hover aria-expanded:text-foreground pointer-coarse:size-11 dark:hover:bg-transparent dark:aria-expanded:bg-menu-hover"
+                              />
+                            }
+                          />
+                        }
+                      >
+                        <Ellipsis aria-hidden strokeWidth={1.75} />
+                      </IconTooltip>
+                      <KeyedMenuContent
+                        side="bottom"
+                        align="end"
+                        sideOffset={4}
+                        className="w-auto min-w-40"
+                      >
+                        {isEnv && (
                           <KeyedMenuItem
-                            shortcut="E"
-                            data-testid="secret-menu-edit"
-                            onClick={() => openDialog(secret)}
+                            shortcut="S"
+                            data-testid="secret-menu-convert"
+                            onClick={() =>
+                              envValue === '' ? openDialog(secret, true) : setConverting(secret)
+                            }
                           >
-                            {t('编辑')}
+                            {t('转为机密')}
                           </KeyedMenuItem>
-                          <KeyedMenuItem
-                            shortcut="D"
-                            confirms
-                            data-testid="secret-menu-delete"
-                            onClick={() => setDeleting(secret)}
-                          >
-                            {t('删除')}
-                          </KeyedMenuItem>
-                        </KeyedMenuContent>
-                      </DropdownMenu>
-                    )}
+                        )}
+                        <KeyedMenuItem
+                          shortcut="E"
+                          data-testid="secret-menu-edit"
+                          onClick={() => openDialog(secret)}
+                        >
+                          {t('编辑')}
+                        </KeyedMenuItem>
+                        <KeyedMenuItem
+                          shortcut="D"
+                          confirms
+                          data-testid="secret-menu-delete"
+                          onClick={() => setDeleting(secret)}
+                        >
+                          {t('删除')}
+                        </KeyedMenuItem>
+                      </KeyedMenuContent>
+                    </DropdownMenu>
                   </span>
                 </span>
               </ResourceRow>

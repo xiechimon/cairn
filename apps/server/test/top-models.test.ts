@@ -228,7 +228,7 @@ describe('only the owner page changes the list', () => {
     expect(await read(s, bearer)).toEqual({ models: [SOL] });
   });
 
-  test('a paired device cannot write even with the page header', async () => {
+  test('a paired device can write with the page header and is refused without it', async () => {
     const s = bootServer({ authToken: OWNER_TOKEN });
     const ownerHeaders = { authorization: `Bearer ${OWNER_TOKEN}` };
     const pairing = await call(s, 'POST', '/api/remote/pairing', { headers: ownerHeaders });
@@ -237,11 +237,16 @@ describe('only the owner page changes the list', () => {
     const paired = await redeemTestPairing(s.app, code, 'phone');
     expect(paired.status).toBe(201);
     const { token } = (await paired.json()) as PairResponse;
+    const withoutPage = await call(s, 'PUT', path(s.team.id), {
+      headers: { authorization: `Bearer ${token}` },
+      body: { models: [SOL] },
+    });
+    expect(withoutPage.status).toBe(403);
     const res = await call(s, 'PUT', path(s.team.id), {
       headers: { authorization: `Bearer ${token}`, ...PAGE },
       body: { models: [SOL] },
     });
-    expect(res.status).toBe(403);
-    expect(await read(s, ownerHeaders)).toEqual({ models: null });
+    expect(res.status).toBe(200);
+    expect(await read(s, ownerHeaders)).toEqual({ models: [SOL] });
   });
 });

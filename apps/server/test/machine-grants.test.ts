@@ -49,7 +49,7 @@ function call(
   return s.app.request(path, { method, headers, body: JSON.stringify(body) });
 }
 
-test('only the owner moves the default Runner, and only to an enrolled machine', async () => {
+test('owner and paired devices move the default Runner, and only to an enrolled machine', async () => {
   boot();
   s.db
     .insert(machine)
@@ -57,10 +57,15 @@ test('only the owner moves the default Runner, and only to an enrolled machine',
     .run();
   const defaultOf = () =>
     s.db.select().from(team).where(eq(team.id, s.team.id)).get()?.defaultMachineId ?? null;
-  expect((await call('/api/machines/enrolled', { isDefault: true }, 'device')).status).toBe(403);
+  expect((await call('/api/machines/enrolled', { isDefault: true }, 'agent')).status).toBe(401);
   expect(defaultOf()).toBeNull();
+  expect((await call('/api/machines/grant-machine', { isDefault: true }, 'device')).status).toBe(
+    409,
+  );
+  expect(defaultOf()).toBeNull();
+  expect((await call('/api/machines/enrolled', { isDefault: true }, 'device')).status).toBe(200);
+  expect(defaultOf()).toBe('enrolled');
   expect((await call('/api/machines/grant-machine', { isDefault: true })).status).toBe(409);
-  expect(defaultOf()).toBeNull();
   expect((await call('/api/machines/enrolled', { isDefault: true })).status).toBe(200);
   expect(defaultOf()).toBe('enrolled');
 });
