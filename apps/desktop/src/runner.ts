@@ -76,6 +76,7 @@ async function postJson(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
+    redirect: 'error',
   });
   if (response.status === 401 || response.status === 403) {
     throw new RunnerAuthPendingError(response.status);
@@ -92,6 +93,7 @@ async function verifyStoredMachine(
   try {
     const response = await fetchImpl(`${origin}/api/machine/me`, {
       headers: { Authorization: `Bearer ${token}` },
+      redirect: 'error',
       signal: AbortSignal.timeout(5_000),
     });
     return response.ok;

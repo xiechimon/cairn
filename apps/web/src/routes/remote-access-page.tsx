@@ -32,6 +32,7 @@ import {
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { loadClerkScript } from '../lib/clerk-loader.js';
 import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
@@ -214,11 +215,30 @@ export function RemoteAccessPage() {
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
+    const clerkConfig = clerkConfigQ.data;
+    if (
+      clerkConfig?.enabled === true &&
+      clerkConfig.issuer !== null &&
+      clerkConfig.publishableKey !== null
+    ) {
+      try {
+        const clerk =
+          window.Clerk ?? (await loadClerkScript(clerkConfig.issuer, clerkConfig.publishableKey));
+        await clerk.load();
+        await clerk.signOut();
+      } catch (error) {
+        setSigningOut(false);
+        toastError(t('退出登录失败，请重试。'), error);
+        return;
+      }
+    }
     try {
-      await window.Clerk?.signOut();
-    } catch {}
-    await signOutSession();
-    window.location.reload();
+      await signOutSession();
+      window.location.reload();
+    } catch (error) {
+      setSigningOut(false);
+      toastError(t('退出登录失败，请重试。'), error);
+    }
   };
 
   return (
@@ -282,7 +302,7 @@ export function RemoteAccessPage() {
       ))}
       {live && clerkConfigQ.data?.enabled === true && (
         <SettingsCard className="mt-3" data-testid="clerk-account-card">
-          <SettingsRow label={t('账号登录')} hint={t('已通过 Clerk 验证登录此实例')}>
+          <SettingsRow label={t('账号登录')} hint={t('已通过账号验证登录此实例')}>
             <Button
               size="sm"
               variant="ghost"

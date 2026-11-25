@@ -89,6 +89,7 @@ export interface AppContext {
   skillImportFetch?: SkillImportFetch;
   skillImportTimeoutMs?: number;
   webDir?: string | null;
+  webOrigin?: string;
   githubFetch?: FetchLike;
   githubBaseFetch?: FetchLike;
   oauthStates: Map<string, OAuthStateEntry>;

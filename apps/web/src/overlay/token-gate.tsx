@@ -17,57 +17,13 @@ import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { Separator } from '../components/ui/separator.js';
 import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
-
-interface ClerkBrowserGlobal {
-  load: () => Promise<void>;
-  user: unknown;
-  session: { getToken: () => Promise<string | null> } | null;
-  mountSignIn: (node: HTMLDivElement) => void;
-  unmountSignIn: (node: HTMLDivElement) => void;
-  signOut: () => Promise<void>;
-  addListener: (listener: () => void) => () => void;
-}
-
-declare global {
-  interface Window {
-    Clerk?: ClerkBrowserGlobal;
-  }
-}
+import { type ClerkBrowserGlobal, loadClerkScript } from '../lib/clerk-loader.js';
 
 function formatCode(code: string): string {
   return code.length > 4 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
 }
 
 const stayOpen = () => undefined;
-
-function loadClerkScript(issuer: string, publishableKey: string): Promise<ClerkBrowserGlobal> {
-  if (window.Clerk !== undefined) return Promise.resolve(window.Clerk);
-  const host = new URL(issuer).host;
-  const src = `https://${host}/npm/@clerk/clerk-js@5/dist/clerk.browser.js`;
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[data-cairn-clerk="1"]');
-    if (existing !== null) {
-      existing.addEventListener('load', () => {
-        if (window.Clerk !== undefined) resolve(window.Clerk);
-        else reject(new Error('clerk unavailable'));
-      });
-      existing.addEventListener('error', () => reject(new Error('clerk script failed')));
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.crossOrigin = 'anonymous';
-    script.dataset.cairnClerk = '1';
-    script.dataset.clerkPublishableKey = publishableKey;
-    script.onload = () => {
-      if (window.Clerk !== undefined) resolve(window.Clerk);
-      else reject(new Error('clerk unavailable'));
-    };
-    script.onerror = () => reject(new Error('clerk script failed'));
-    document.head.appendChild(script);
-  });
-}
 
 type ClerkPhase = 'loading' | 'ready' | 'exchanging' | 'not-allowed' | 'invalid' | 'unavailable';
 

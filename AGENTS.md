@@ -16,7 +16,7 @@ Before any change under `apps/web/src`, invoke the `design-cairn` skill and run 
 
 Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
-- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,owner-channel,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth,github-connection,github-connection-device,github-device-core}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
+- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,clerk-auth,owner-channel,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth,github-connection,github-connection-device,github-device-core}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
 - Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/host-shell-confinement.ts`
 - MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers,composio,composio-connectors,github-webhook,schedule-webhook,connector-broker}.ts`, `apps/server/src/lib/webhook-token.ts`, `apps/server/src/{routes-github-webhook,routes-schedule-webhook,routes-design-share}.ts`
 

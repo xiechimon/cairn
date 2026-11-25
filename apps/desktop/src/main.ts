@@ -103,7 +103,7 @@ import {
   relaunchWindowOf,
   restoredUrl,
 } from './relaunch-window.js';
-import { isAllowedRemoteAuthUrl } from './remote-auth.js';
+import { isAllowedRemoteAuthUrl, parseHttpsOrigin } from './remote-auth.js';
 import {
   clearServerOwner,
   installResidentHost,
@@ -252,6 +252,7 @@ let mainWindow: BrowserWindow | null = null;
 let appOrigin: string | null = null;
 let remoteClerkIssuer: string | null = null;
 let showingOfflinePage = false;
+let expectedOfflineUrl: string | null = null;
 let activeRemoteHostName: string | null = null;
 let mainWindowShown = false;
 let windowState: WindowStateStore | null = null;
@@ -611,8 +612,10 @@ function showOfflineFallback(window: BrowserWindow, origin: string): void {
     ],
     activeId: catalog.activeId,
   });
+  const offlineUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  expectedOfflineUrl = offlineUrl;
   showingOfflinePage = true;
-  void window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  void window.loadURL(offlineUrl);
   if (!window.isVisible() && !BACKGROUND_LAUNCH) window.show();
 }
 
@@ -687,9 +690,22 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
     if (isWebUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
+  window.webContents.on('did-create-window', (child) => {
+    child.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    child.webContents.on('will-navigate', (event, url) => {
+      if (isAllowedRemoteAuthUrl(url, origin, remoteClerkIssuer)) return;
+      event.preventDefault();
+      if (isWebUrl(url)) void shell.openExternal(url);
+    });
+  });
   window.webContents.on('will-navigate', (event, url) => {
-    if (url.startsWith('data:text/html')) return;
-    if (new URL(url).origin === origin) return;
+    let targetOrigin: string | null = null;
+    try {
+      targetOrigin = new URL(url).origin;
+    } catch {
+      targetOrigin = null;
+    }
+    if (targetOrigin !== null && targetOrigin === origin) return;
     if (activeRemoteHostName !== null && isAllowedRemoteAuthUrl(url, origin, remoteClerkIssuer)) {
       return;
     }
@@ -697,7 +713,10 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
     if (isWebUrl(url)) void shell.openExternal(url);
   });
   window.webContents.on('did-navigate', (_event, url) => {
-    if (!url.startsWith('data:text/html')) showingOfflinePage = false;
+    if (expectedOfflineUrl === null || url !== expectedOfflineUrl) {
+      showingOfflinePage = false;
+      expectedOfflineUrl = null;
+    }
   });
   window.webContents.on(
     'did-fail-load',
@@ -1654,16 +1673,19 @@ async function boot(): Promise<void> {
     if (activeConn.kind === 'remote') {
       origin = activeConn.url;
       activeRemoteHostName = activeConn.name;
-      void session.defaultSession
-        .fetch(`${origin}/api/auth/clerk/config`, { signal: AbortSignal.timeout(5_000) })
-        .then(async (response) => {
-          if (!response.ok) return;
+      remoteClerkIssuer = null;
+      try {
+        const response = await session.defaultSession.fetch(`${origin}/api/auth/clerk/config`, {
+          redirect: 'error',
+          signal: AbortSignal.timeout(2_500),
+        });
+        if (response.ok) {
           const body = (await response.json()) as { enabled?: boolean; issuer?: unknown };
-          if (body.enabled === true && typeof body.issuer === 'string') {
-            remoteClerkIssuer = body.issuer;
+          if (body.enabled === true) {
+            remoteClerkIssuer = parseHttpsOrigin(body.issuer);
           }
-        })
-        .catch(() => {});
+        }
+      } catch {}
     } else {
       activeRemoteHostName = null;
       remoteClerkIssuer = null;
@@ -1744,7 +1766,7 @@ async function boot(): Promise<void> {
       return runnerStarting;
     };
     if (activeConn.kind === 'remote') {
-      const originHost = new URL(origin).hostname;
+      const originHost = new URL(origin).hostname.toLowerCase();
       session.defaultSession.cookies.on('changed', (_event, cookie, _cause, removed) => {
         if (
           removed ||
@@ -1755,8 +1777,13 @@ async function boot(): Promise<void> {
         ) {
           return;
         }
-        const domain = cookie.domain?.replace(/^\./, '') ?? '';
-        if (domain === originHost || originHost.endsWith(`.${domain}`)) {
+        const rawDomain = cookie.domain?.toLowerCase() ?? '';
+        const domain = rawDomain.replace(/^\./, '');
+        if (
+          domain !== '' &&
+          (domain === originHost ||
+            (rawDomain.startsWith('.') && originHost.endsWith(`.${domain}`)))
+        ) {
           void bringRunnerUp();
         }
       });
@@ -1787,9 +1814,10 @@ async function boot(): Promise<void> {
     const fromOfflinePage = (event: IpcMainInvokeEvent): boolean =>
       !quitting &&
       showingOfflinePage &&
+      expectedOfflineUrl !== null &&
       mainWindow?.webContents === event.sender &&
       event.senderFrame === event.sender.mainFrame &&
-      (event.senderFrame?.url.startsWith('data:text/html') ?? false);
+      event.senderFrame?.url === expectedOfflineUrl;
     const fromHostMainPage = (event: IpcMainInvokeEvent): boolean =>
       !quitting &&
       mainWindow?.webContents === event.sender &&
@@ -1848,6 +1876,7 @@ async function boot(): Promise<void> {
     ipcMain.handle('desktop-host:retry', (event) => {
       if (!fromHostMainPage(event) && !fromOfflinePage(event)) return;
       showingOfflinePage = false;
+      expectedOfflineUrl = null;
       void mainWindow?.loadURL(origin);
     });
     ipcMain.handle('desktop-host:set-resident', async (event, enabled: unknown) => {

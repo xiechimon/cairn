@@ -6,6 +6,7 @@ export interface ClerkAuthConfig {
   jwksUrl: string;
   ownerSubs: readonly string[];
   ownerEmails: readonly string[];
+  authorizedParties?: readonly string[];
 }
 
 export type ClerkVerdict =
@@ -38,6 +39,11 @@ export function createClerkVerifier(
 ): ClerkVerifier {
   const subs = new Set(config.ownerSubs.map((sub) => sub.trim()).filter((sub) => sub !== ''));
   const emails = new Set(config.ownerEmails.map(normalizedEmail).filter((email) => email !== ''));
+  const authorizedParties = new Set(
+    (config.authorizedParties ?? [])
+      .map((origin) => origin.trim().replace(/\/+$/, ''))
+      .filter(Boolean),
+  );
   const issuer = config.issuer.replace(/\/+$/, '');
 
   return async (token) => {
@@ -48,17 +54,26 @@ export function createClerkVerifier(
         algorithms: ['RS256'],
         requiredClaims: ['exp', 'sub'],
       });
+      if (payload.aud !== undefined) return { kind: 'invalid' };
+      const azp = typeof payload.azp === 'string' ? payload.azp.trim().replace(/\/+$/, '') : null;
+      if (authorizedParties.size > 0 && azp !== null && !authorizedParties.has(azp)) {
+        return { kind: 'invalid' };
+      }
       const sub = typeof payload.sub === 'string' ? payload.sub.trim() : '';
       if (sub === '') return { kind: 'invalid' };
       const rawEmail = typeof payload.email === 'string' ? normalizedEmail(payload.email) : null;
-      const emailVerified = payload.email_verified !== false;
+      const emailVerified = payload.email_verified === true;
       const verifiedEmail = rawEmail !== null && emailVerified ? rawEmail : null;
       const subAllowed = subs.has(sub);
       const emailAllowed = verifiedEmail !== null && emails.has(verifiedEmail);
       if (!subAllowed && !emailAllowed) return { kind: 'not-allowed' };
       return { kind: 'owner', sub, email: verifiedEmail };
     } catch (error) {
-      if (error instanceof errors.JWKSTimeout || !(error instanceof errors.JOSEError)) {
+      if (
+        error instanceof errors.JWKSTimeout ||
+        !(error instanceof errors.JOSEError) ||
+        (error.code === 'ERR_JOSE_GENERIC' && error.message.includes('JSON Web Key Set'))
+      ) {
         return { kind: 'unavailable' };
       }
       return { kind: 'invalid' };

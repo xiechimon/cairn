@@ -64,7 +64,7 @@ export function pairRequestPeerOf(c: Context): { source: PairRequestSource; peer
   return { source: 'public', peer };
 }
 
-export function requestOrigin(c: Context): string {
+export function requestOrigin(c: Context, trustedWebOrigin?: string): string {
   const tailnet = tailnetOriginOf(c);
   if (tailnet !== null) return new URL(tailnet).origin;
 
@@ -79,10 +79,23 @@ export function requestOrigin(c: Context): string {
         : 'http:';
   const host = c.req.header('host') ?? requestUrl.host;
   const url = URL.parse(`${protocol}//${host}`) ?? requestUrl;
-  return forwardedOrigin({
+  const forwarded = forwardedOrigin({
     url: url.href,
     loopbackPeer: isLoopbackPeer(c),
     proto: c.req.header('x-forwarded-proto'),
     host,
   });
+  if (trustedWebOrigin !== undefined) {
+    const trusted = URL.parse(trustedWebOrigin);
+    const forwardedProto = c.req.header('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase();
+    if (
+      trusted !== null &&
+      trusted.protocol === 'https:' &&
+      forwardedProto === 'https' &&
+      new URL(forwarded).host.toLowerCase() === trusted.host.toLowerCase()
+    ) {
+      return trusted.origin;
+    }
+  }
+  return forwarded;
 }

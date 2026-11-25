@@ -95,6 +95,7 @@ export const serverConfigSchema = z.object({
         .refine((value) => new URL(value).protocol === 'https:'),
       ownerSubs: z.array(z.string().min(1)),
       ownerEmails: z.array(z.string().email()),
+      authorizedParties: z.array(z.string().url()).default([]),
     })
     .refine((value) => value.ownerSubs.length > 0 || value.ownerEmails.length > 0)
     .nullable()
@@ -157,24 +158,27 @@ function splitCsv(raw: string | null): string[] {
     .filter((entry) => entry !== '');
 }
 
-function envClerkAuth(): {
+function envClerkAuth(explicitWebOrigin: string | null): {
   publishableKey: string;
   issuer: string;
   jwksUrl: string;
   ownerSubs: string[];
   ownerEmails: string[];
+  authorizedParties: string[];
 } | null {
   const publishableKey = envStr('CAIRN_CLERK_PUBLISHABLE_KEY');
   const rawIssuer = envStr('CAIRN_CLERK_ISSUER');
   const rawJwksUrl = envStr('CAIRN_CLERK_JWKS_URL');
   const rawSubs = envStr('CAIRN_CLERK_OWNER_SUBS');
   const rawEmails = envStr('CAIRN_CLERK_OWNER_EMAILS');
+  const rawAuthorizedParties = envStr('CAIRN_CLERK_AUTHORIZED_PARTIES');
   if (
     publishableKey === null &&
     rawIssuer === null &&
     rawJwksUrl === null &&
     rawSubs === null &&
-    rawEmails === null
+    rawEmails === null &&
+    rawAuthorizedParties === null
   ) {
     return null;
   }
@@ -191,12 +195,20 @@ function envClerkAuth(): {
   }
   const issuer = rawIssuer.trim().replace(/\/+$/, '');
   const jwksUrl = rawJwksUrl === null ? `${issuer}/.well-known/jwks.json` : rawJwksUrl.trim();
+  const explicitParties = splitCsv(rawAuthorizedParties).map((entry) => entry.replace(/\/+$/, ''));
+  const authorizedParties =
+    explicitParties.length > 0
+      ? explicitParties
+      : explicitWebOrigin !== null
+        ? [explicitWebOrigin.trim().replace(/\/+$/, '')]
+        : [];
   return {
     publishableKey: publishableKey.trim(),
     issuer,
     jwksUrl,
     ownerSubs,
     ownerEmails,
+    authorizedParties,
   };
 }
 
@@ -316,6 +328,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     }
   }
   const githubAppTokenSocket = envStr('CAIRN_APP_TOKEN_SOCKET');
+  const explicitWebOrigin = envStr('CAIRN_WEB_ORIGIN');
   return serverConfigSchema.parse({
     port: envPort() ?? 8787,
     homeDir: home,
@@ -325,7 +338,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     keyfilePath: join(dataDir, 'secretbox.key'),
     vapidKeysPath: join(dataDir, 'vapid.json'),
     vapidSubject: envStr('CAIRN_VAPID_SUBJECT') ?? 'mailto:push@cairn.dev',
-    webOrigin: envStr('CAIRN_WEB_ORIGIN') ?? 'https://cairn.local',
+    webOrigin: explicitWebOrigin ?? 'https://cairn.local',
     apns: {
       keyPath: envStr('CAIRN_APNS_KEY_PATH'),
       keyId: envStr('CAIRN_APNS_KEY_ID'),
@@ -338,7 +351,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     webDir: webDirEnv !== undefined && webDirEnv !== '' ? resolve(webDirEnv) : defaultWebDir(),
     githubAppTokenSocket,
     cloudflareAccess: envCloudflareAccess(),
-    clerkAuth: envClerkAuth(),
+    clerkAuth: envClerkAuth(explicitWebOrigin),
     disableExternalConnectors: envFlag('CAIRN_DISABLE_EXTERNAL_CONNECTORS'),
     githubAppIdentity: envGithubAppIdentity(githubAppTokenSocket),
     githubOauth:

@@ -2786,9 +2786,10 @@ export const EN: Record<string, string> = {
   返回账号登录: 'Back to account sign-in',
   '服务器地址 {host}': 'Server {host}',
   账号登录: 'Account sign-in',
-  '已通过 Clerk 验证登录此实例': 'Signed in to this instance with Clerk',
+  已通过账号验证登录此实例: 'Signed in to this instance with your account',
   退出登录: 'Sign out',
   '正在退出…': 'Signing out…',
+  '退出登录失败，请重试。': 'Could not sign out. Try again.',
   标注: 'Mark up',
   标注画布: 'Mark-up canvas',
   标注文字: 'Mark-up text',
@@ -3012,7 +3013,6 @@ export const EN: Record<string, string> = {
   '无法发起登录，请重试。': 'Could not start sign-in. Try again.',
   '有效期至 {time}': 'Valid until {time}',
   '作废配对码失败，请重试。': 'Could not revoke the pairing code. Try again.',
-  'Tailscale 远程访问': 'Tailscale remote access',
   'Coordinator 与任务': 'Coordinator and tasks',
   '已解散分组「{group}」': 'Ungrouped {group}',
   '无法撤销解散分组。': 'Could not restore the group.',
@@ -3053,8 +3053,6 @@ export const EN: Record<string, string> = {
   '删除后，该邮箱的凭据与唤醒规则都会移除，此操作无法撤销':
     'Credentials and wake rules for this mailbox will be removed and cannot be undone',
   '接入失败，请重试。': 'Could not connect. Try again.',
-  '开启公网隧道失败，请重试。': 'Could not enable public tunnel. Try again.',
-  '退出失败，请重试。': 'Could not sign out. Try again.',
   '撤销后，这台已配对设备需要重新扫码配对才能访问':
     'This paired device will need a new QR code scan to reconnect',
   '完成请求未送出，请重试。': 'Could not mark task complete. Try again.',

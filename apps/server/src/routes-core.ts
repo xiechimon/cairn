@@ -3,6 +3,7 @@ import {
   BROWSER_AUTH_HEADER,
   type ClerkAuthConfigResponse,
   dailyUsageQuerySchema,
+  isBrowserAuthExempt,
   patchRoutingRuleBodySchema,
   patchTeamBodySchema,
   patchUserBodySchema,
@@ -36,6 +37,7 @@ import {
   clearAuthCookie,
   issueBrowserSession,
   requestIsSecure,
+  revokeAllExternalBrowserSessions,
   revokeBrowserSession,
   setAuthCookie,
 } from './services/browser-session.js';
@@ -92,12 +94,16 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: 'owner token required' }, 403);
     }
     const session = issueBrowserSession(ctx.db, 'owner', null);
-    setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
+    setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
     return c.body(null, 204);
   });
 
   app.use('/api/*', async (c, next) => {
-    if (!getCookie(c, SESSION_COOKIE) && !isOpenRemotePath(c.req.path)) {
+    if (
+      !getCookie(c, SESSION_COOKIE) &&
+      !isOpenRemotePath(c.req.path) &&
+      !isBrowserAuthExempt(c.req.path)
+    ) {
       setCookie(c, SESSION_COOKIE, ctx.user.id, { httpOnly: true, path: '/' });
     }
     await next();
@@ -117,7 +123,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     }
     ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'access exchange');
     const session = issueBrowserSession(ctx.db, 'external', null, undefined, verdict.expiresAt);
-    setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
+    setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
     return c.json({ ok: true });
   });
 
@@ -145,7 +151,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: 'same-origin proof required' }, 403);
     }
     const origin = c.req.header('origin');
-    if (origin !== undefined && origin !== requestOrigin(c)) {
+    if (origin !== undefined && origin !== requestOrigin(c, ctx.webOrigin)) {
       return c.json({ error: 'same-origin proof required' }, 403);
     }
     const match = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
@@ -157,7 +163,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     }
     ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'clerk auth exchange');
     const session = issueBrowserSession(ctx.db, 'external', null);
-    setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
+    setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
     return c.json({ ok: true });
   });
 
@@ -172,7 +178,10 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     }
     const token = getCookie(c, AUTH_COOKIE);
     if (token !== undefined && token !== '') revokeBrowserSession(ctx.db, token);
-    clearAuthCookie(c, requestIsSecure(c));
+    if (c.req.query('all') === '1' && c.get('ownerIdentity') !== undefined) {
+      revokeAllExternalBrowserSessions(ctx.db);
+    }
+    clearAuthCookie(c, requestIsSecure(c, ctx.webOrigin));
     return c.body(null, 204);
   });
 

@@ -14,7 +14,7 @@ import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { buildRemoteRoutes } from './lib/remote-routes.js';
 import { pairRequestPeerOf } from './lib/request-origin.js';
-import { matchesAuthToken } from './lib/token-auth.js';
+import { matchesAuthToken, pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
 import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
 import { submitFeedbackReport } from './services/feedback.js';
@@ -118,9 +118,23 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     return c.json(await remote.tailnet.setEnabled(body.enabled));
   });
 
+  const FEEDBACK_WINDOW_MS = 60_000;
+  const FEEDBACK_MAX_PER_WINDOW = 10;
+  const feedbackHits = new Map<string, number[]>();
+
   app.post('/api/feedback', async (c) => {
     c.header('cache-control', 'no-store');
+    const callerKey = pairedDeviceIdOf(c) ?? 'owner';
+    const now = Date.now();
+    const recent = (feedbackHits.get(callerKey) ?? []).filter(
+      (ts) => now - ts < FEEDBACK_WINDOW_MS,
+    );
+    if (recent.length >= FEEDBACK_MAX_PER_WINDOW) {
+      return c.json({ error: 'too many feedback submissions' }, 429);
+    }
     const body = parseWith(feedbackSubmitBodySchema, await jsonBody(c), 'body');
+    recent.push(now);
+    feedbackHits.set(callerKey, recent);
     const isOwner = !ctx.authToken || c.get('ownerIdentity') !== undefined;
     const result = await submitFeedbackReport({
       body: isOwner ? body : { ...body, includeLogs: false },

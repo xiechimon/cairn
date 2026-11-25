@@ -70,12 +70,47 @@ describe('createClerkVerifier', () => {
     expect(verdict).toEqual({ kind: 'owner', sub: 'user_other', email: OWNER_EMAIL });
   });
 
-  test('rejects an unverified email claim even when the email matches allowlist', async () => {
+  test('rejects unverified, missing, or non-boolean email_verified even when email matches allowlist', async () => {
     const verify = createClerkVerifier({ ...CONFIG, ownerSubs: [] }, keys);
-    const verdict = await verify(
-      await mintJwt({ sub: 'user_other', email: OWNER_EMAIL, email_verified: false }),
+    for (const claims of [
+      { sub: 'user_other', email: OWNER_EMAIL, email_verified: false },
+      { sub: 'user_other', email: OWNER_EMAIL },
+      { sub: 'user_other', email: OWNER_EMAIL, email_verified: null },
+      { sub: 'user_other', email: OWNER_EMAIL, email_verified: 'true' },
+    ]) {
+      expect(await verify(await mintJwt(claims))).toEqual({ kind: 'not-allowed' });
+    }
+  });
+
+  test('validates azp against authorizedParties and rejects unexpected aud', async () => {
+    const verify = createClerkVerifier(
+      { ...CONFIG, authorizedParties: ['https://cloud.example.com'] },
+      keys,
     );
-    expect(verdict).toEqual({ kind: 'not-allowed' });
+    expect(
+      await verify(
+        await mintJwt({
+          sub: OWNER_SUB,
+          azp: 'https://cloud.example.com',
+        }),
+      ),
+    ).toEqual({ kind: 'owner', sub: OWNER_SUB, email: null });
+    expect(
+      await verify(
+        await mintJwt({
+          sub: OWNER_SUB,
+          azp: 'https://other-app.example.com',
+        }),
+      ),
+    ).toEqual({ kind: 'invalid' });
+    expect(
+      await verify(
+        await mintJwt({
+          sub: OWNER_SUB,
+          aud: 'other-service',
+        }),
+      ),
+    ).toEqual({ kind: 'invalid' });
   });
 
   test('refuses a valid token whose sub and email are not on the allowlist', async () => {
@@ -111,14 +146,17 @@ describe('createClerkVerifier', () => {
     expect((await verify(undefined)).kind).toBe('invalid');
   });
 
-  test('returns unavailable when JWKS cannot be fetched or times out', async () => {
+  test('returns unavailable when JWKS cannot be fetched, returns non-200, or times out', async () => {
     const down: JWTVerifyGetKey = async () => {
       throw new TypeError('fetch failed');
     };
     const slow: JWTVerifyGetKey = async () => {
       throw new errors.JWKSTimeout();
     };
-    for (const keySet of [down, slow]) {
+    const badHttp: JWTVerifyGetKey = async () => {
+      throw new errors.JOSEError('Expected 200 OK from the JSON Web Key Set HTTP response');
+    };
+    for (const keySet of [down, slow, badHttp]) {
       expect(await createClerkVerifier(CONFIG, keySet)(await mintJwt())).toEqual({
         kind: 'unavailable',
       });
@@ -162,10 +200,11 @@ describe('Clerk auth HTTP endpoints', () => {
       },
     });
 
-  test('GET /api/auth/clerk/config reports enabled status and public fields without auth', async () => {
+  test('GET /api/auth/clerk/config reports enabled status without leaking SESSION_COOKIE', async () => {
     const enabled = boot(true);
     const res = await enabled.app.request('/api/auth/clerk/config');
     expect(res.status).toBe(200);
+    expect(res.headers.getSetCookie?.() ?? []).toEqual([]);
     expect(await res.json()).toEqual({
       enabled: true,
       publishableKey: PUBLISHABLE_KEY,
@@ -183,7 +222,7 @@ describe('Clerk auth HTTP endpoints', () => {
     });
   });
 
-  test('POST /api/auth/clerk exchanges valid Bearer JWT for a 30-day owner cookie and signout revokes it', async () => {
+  test('POST /api/auth/clerk exchanges valid Bearer JWT for a 7-day external owner cookie and signout revokes it', async () => {
     const s = boot(true);
     expect((await s.app.request('/api/teams')).status).toBe(401);
 
@@ -194,7 +233,8 @@ describe('Clerk auth HTTP endpoints', () => {
     const setCookieHeader =
       (res.headers.getSetCookie?.() ?? []).find((v) => v.startsWith('cairn_auth=')) ?? '';
     const maxAge = Number(/Max-Age=(\d+)/i.exec(setCookieHeader)?.[1]);
-    expect(maxAge).toBeGreaterThan(29 * 24 * 60 * 60);
+    expect(maxAge).toBeGreaterThan(6 * 24 * 60 * 60);
+    expect(maxAge).toBeLessThanOrEqual(7 * 24 * 60 * 60);
 
     expect((await s.app.request('/api/teams', { headers: { cookie } })).status).toBe(200);
 
@@ -208,6 +248,33 @@ describe('Clerk auth HTTP endpoints', () => {
     });
     expect(out.status).toBe(204);
     expect((await s.app.request('/api/teams', { headers: { cookie } })).status).toBe(401);
+  });
+
+  test('POST /api/auth/clerk sets Secure cookie behind trusted https CAIRN_WEB_ORIGIN reverse proxy', async () => {
+    server = bootServer({
+      authToken: 'owner-token',
+      webOrigin: 'https://cloud.example.com',
+      clerkAuth: {
+        publishableKey: PUBLISHABLE_KEY,
+        issuer: ISSUER,
+        verify: createClerkVerifier(CONFIG, keys),
+      },
+    });
+    const res = await server.app.request('http://cloud.example.com/api/auth/clerk', {
+      method: 'POST',
+      headers: {
+        host: 'cloud.example.com',
+        origin: 'https://cloud.example.com',
+        'x-forwarded-proto': 'https',
+        'sec-fetch-site': 'same-origin',
+        [BROWSER_AUTH_HEADER]: '1',
+        authorization: `Bearer ${await mintJwt()}`,
+      },
+    });
+    expect(res.status).toBe(200);
+    const setCookieHeader =
+      (res.headers.getSetCookie?.() ?? []).find((v) => v.startsWith('cairn_auth=')) ?? '';
+    expect(setCookieHeader).toContain('Secure');
   });
 
   test('rejects token passed in query string without Bearer header', async () => {
@@ -302,6 +369,8 @@ describe('Clerk & migration config parsing', () => {
     'CAIRN_CLERK_JWKS_URL',
     'CAIRN_CLERK_OWNER_SUBS',
     'CAIRN_CLERK_OWNER_EMAILS',
+    'CAIRN_CLERK_AUTHORIZED_PARTIES',
+    'CAIRN_WEB_ORIGIN',
     'CAIRN_DISABLE_EXTERNAL_CONNECTORS',
   ] as const;
 
@@ -342,6 +411,7 @@ describe('Clerk & migration config parsing', () => {
       jwksUrl: JWKS_URL,
       ownerSubs: [OWNER_SUB, 'user_2'],
       ownerEmails: [OWNER_EMAIL],
+      authorizedParties: [],
     });
     expect(cfg.disableExternalConnectors).toBe(true);
   });

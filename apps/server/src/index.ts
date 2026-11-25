@@ -39,7 +39,10 @@ import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
 import { loadApnsConfig } from './services/apns.js';
-import { createStreamTicketBook } from './services/browser-session.js';
+import {
+  createStreamTicketBook,
+  revokeAllExternalBrowserSessions,
+} from './services/browser-session.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import { setCoordinatorInServer, setCoordinatorWake } from './services/coordinator-context.js';
@@ -299,6 +302,7 @@ const app = createApp(
     homeDir: config.homeDir,
     dataDir: config.dataDir,
     webDir: config.webDir,
+    webOrigin: config.webOrigin,
     authToken: config.authToken,
     ownerChannel,
     accessVerifier:
@@ -410,6 +414,9 @@ if (config.disableExternalConnectors) {
   });
 }
 
+if (config.cloudflareAccess === null && config.clerkAuth === null) {
+  revokeAllExternalBrowserSessions(db);
+}
 if (config.authToken === null) {
   await tailscale.withdraw().catch((error: unknown) => {
     logger.warn({ err: error }, 'tailscale serve mapping could not be withdrawn with auth off');

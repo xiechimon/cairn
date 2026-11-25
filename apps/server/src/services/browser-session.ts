@@ -10,6 +10,7 @@ import { requestOrigin } from '../lib/request-origin.js';
 
 export const AUTH_COOKIE = 'cairn_auth';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const EXTERNAL_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TICKET_TTL_MS = 60_000;
 const TOKEN_BYTES = 32;
 
@@ -28,7 +29,8 @@ export function issueBrowserSession(
   notAfter = Number.POSITIVE_INFINITY,
 ): { token: string; expiresAt: number } {
   const token = randomBytes(TOKEN_BYTES).toString('hex');
-  const expiresAt = Math.min(now + SESSION_TTL_MS, notAfter);
+  const ttlMs = kind === 'external' ? EXTERNAL_SESSION_TTL_MS : SESSION_TTL_MS;
+  const expiresAt = Math.min(now + ttlMs, notAfter);
   db.delete(browserSession).where(lte(browserSession.expiresAt, now)).run();
   db.insert(browserSession)
     .values({
@@ -64,6 +66,10 @@ export function revokeBrowserSession(db: Db, token: string): void {
     .run();
 }
 
+export function revokeAllExternalBrowserSessions(db: Db): void {
+  db.delete(browserSession).where(eq(browserSession.kind, 'external')).run();
+}
+
 export function clearAuthCookie(c: Context, secure: boolean): void {
   setCookie(c, AUTH_COOKIE, '', {
     httpOnly: true,
@@ -89,8 +95,8 @@ export function setAuthCookie(
   });
 }
 
-export function requestIsSecure(c: Context): boolean {
-  return new URL(requestOrigin(c)).protocol === 'https:';
+export function requestIsSecure(c: Context, trustedWebOrigin?: string): boolean {
+  return new URL(requestOrigin(c, trustedWebOrigin)).protocol === 'https:';
 }
 
 interface Ticket {

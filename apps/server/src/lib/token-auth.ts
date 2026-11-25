@@ -66,6 +66,7 @@ export interface TokenAuthOptions {
   redeemTicket?: (ticket: string) => ResolvedBrowserSession | null;
   ownerChannel?: OwnerChannel;
   accessExchange?: boolean;
+  webOrigin?: string;
 }
 
 export type OwnerIdentity = { via: 'session' | 'access' };
@@ -77,27 +78,33 @@ declare module 'hono' {
   }
 }
 
-const requireBrowserOriginProof: MiddlewareHandler = async (c, next) => {
-  c.header('cache-control', 'no-store');
-  const site = c.req.header('sec-fetch-site');
-  if (c.req.header(BROWSER_AUTH_HEADER) !== '1' || (site !== undefined && site !== 'same-origin')) {
-    return c.body(null, 403);
-  }
-  const origin = c.req.header('origin');
-  if (origin !== undefined && origin !== requestOrigin(c)) return c.body(null, 403);
-  return next();
-};
+function browserOriginProofMiddleware(trustedWebOrigin?: string): MiddlewareHandler {
+  return async (c, next) => {
+    c.header('cache-control', 'no-store');
+    const site = c.req.header('sec-fetch-site');
+    if (
+      c.req.header(BROWSER_AUTH_HEADER) !== '1' ||
+      (site !== undefined && site !== 'same-origin')
+    ) {
+      return c.body(null, 403);
+    }
+    const origin = c.req.header('origin');
+    if (origin !== undefined && origin !== requestOrigin(c, trustedWebOrigin)) {
+      return c.body(null, 403);
+    }
+    return next();
+  };
+}
 
-export function sameOriginPageWrite(c: Context): boolean {
+export function sameOriginPageWrite(c: Context, trustedWebOrigin?: string): boolean {
   const site = c.req.header('sec-fetch-site');
   if (site === 'same-origin' || site === 'none') return true;
   if (site !== undefined) return false;
   const origin = c.req.header('origin');
   if (origin === undefined) return false;
   try {
-    const expected = new URL(c.req.url);
-    const actual = new URL(origin);
-    return actual.protocol === expected.protocol && actual.host === expected.host;
+    const actual = new URL(origin).origin;
+    return actual === requestOrigin(c, trustedWebOrigin);
   } catch {
     return false;
   }
@@ -137,6 +144,7 @@ export function registerTokenAuth(
   token: string | null,
   options: TokenAuthOptions = {},
 ): void {
+  const requireBrowserOriginProof = browserOriginProofMiddleware(options.webOrigin);
   app.use(BROWSER_SESSION_PATH, requireBrowserOriginProof);
   app.on('POST', '/api/remote/pair', requireBrowserOriginProof);
   app.on('POST', '/api/remote/pair/request', requireBrowserOriginProof);
@@ -188,7 +196,10 @@ export function registerTokenAuth(
       if (session !== null) {
         const denied = applySession(c, session);
         if (denied !== null) return denied;
-        if (!READ_METHODS.has(c.req.method.toUpperCase()) && !sameOriginPageWrite(c)) {
+        if (
+          !READ_METHODS.has(c.req.method.toUpperCase()) &&
+          !sameOriginPageWrite(c, options.webOrigin)
+        ) {
           return c.json({ error: 'same-origin proof required' }, 403);
         }
         return admit();

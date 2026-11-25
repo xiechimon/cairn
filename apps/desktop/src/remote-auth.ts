@@ -1,11 +1,23 @@
-const TRUSTED_OAUTH_ORIGINS = new Set([
+const DEDICATED_OAUTH_ORIGINS = new Set([
   'https://accounts.google.com',
-  'https://github.com',
   'https://appleid.apple.com',
   'https://login.microsoftonline.com',
 ]);
 
-function originOf(raw: string): string | null {
+const GITHUB_AUTH_PATH_PREFIXES = ['/login', '/sessions', '/session', '/signup'];
+
+export function parseHttpsOrigin(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:' || parsed.hostname === '') return null;
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
+function parseAppOrigin(raw: string): string | null {
   try {
     const parsed = new URL(raw);
     if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
@@ -20,11 +32,23 @@ export function isAllowedRemoteAuthUrl(
   appOrigin: string,
   clerkIssuer: string | null,
 ): boolean {
-  const targetOrigin = originOf(rawUrl);
-  if (targetOrigin === null) return false;
-  if (targetOrigin === originOf(appOrigin)) return true;
-  if (clerkIssuer !== null && targetOrigin === originOf(clerkIssuer)) return true;
-  if (TRUSTED_OAUTH_ORIGINS.has(targetOrigin)) return true;
-  const host = new URL(targetOrigin).hostname.toLowerCase();
-  return host.endsWith('.clerk.accounts.dev') || host.endsWith('.accounts.dev');
+  let target: URL;
+  try {
+    target = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  const app = parseAppOrigin(appOrigin);
+  if (app !== null && target.origin === app) return true;
+  if (target.protocol !== 'https:') return false;
+  const issuerOrigin = parseHttpsOrigin(clerkIssuer);
+  if (issuerOrigin !== null && target.origin === issuerOrigin) return true;
+  if (DEDICATED_OAUTH_ORIGINS.has(target.origin)) return true;
+  if (target.origin === 'https://github.com') {
+    const path = target.pathname.toLowerCase();
+    return GITHUB_AUTH_PATH_PREFIXES.some(
+      (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+    );
+  }
+  return false;
 }

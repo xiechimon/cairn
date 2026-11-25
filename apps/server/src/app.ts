@@ -93,6 +93,7 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
   registerTokenAuth(app, ctx.authToken, {
     ownerChannel: ctx.ownerChannel,
     accessExchange: ctx.accessVerifier != null || ctx.clerkAuth != null,
+    webOrigin: ctx.webOrigin,
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
     resolveSession: (cookie) => resolveBrowserSession(ctx.db, cookie),
     redeemTicket: (ticket) => {

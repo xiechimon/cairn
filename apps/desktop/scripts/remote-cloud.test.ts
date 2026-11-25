@@ -50,12 +50,9 @@ describe('isAllowedRemoteAuthUrl', () => {
   const origin = 'https://cloud.example.com';
   const issuer = 'https://auth.example.com';
 
-  test('allows app origin, configured Clerk issuer, clerk accounts domains, and standard OAuth IdPs', () => {
+  test('allows app origin, exact https Clerk issuer, and dedicated OAuth auth paths', () => {
     expect(isAllowedRemoteAuthUrl('https://cloud.example.com/app', origin, issuer)).toBe(true);
     expect(isAllowedRemoteAuthUrl('https://auth.example.com/v1/oauth', origin, issuer)).toBe(true);
-    expect(
-      isAllowedRemoteAuthUrl('https://sample-app-1.clerk.accounts.dev/sign-in', origin, null),
-    ).toBe(true);
     expect(
       isAllowedRemoteAuthUrl('https://accounts.google.com/o/oauth2/v2/auth', origin, issuer),
     ).toBe(true);
@@ -64,7 +61,22 @@ describe('isAllowedRemoteAuthUrl', () => {
     );
   });
 
-  test('rejects arbitrary external sites and non-http protocols', () => {
+  test('rejects wildcard accounts.dev, http auth issuers, non-auth github repos, data URLs, and arbitrary sites', () => {
+    expect(isAllowedRemoteAuthUrl('https://attacker.accounts.dev/sign-in', origin, issuer)).toBe(
+      false,
+    );
+    expect(
+      isAllowedRemoteAuthUrl('https://attacker.clerk.accounts.dev/sign-in', origin, null),
+    ).toBe(false);
+    expect(
+      isAllowedRemoteAuthUrl('http://auth.example.com/v1/oauth', origin, 'http://auth.example.com'),
+    ).toBe(false);
+    expect(isAllowedRemoteAuthUrl('https://github.com/org/repo/pull/1', origin, issuer)).toBe(
+      false,
+    );
+    expect(isAllowedRemoteAuthUrl('data:text/html,<script>alert(1)</script>', origin, issuer)).toBe(
+      false,
+    );
     expect(isAllowedRemoteAuthUrl('https://evil.example.net/phish', origin, issuer)).toBe(false);
     expect(isAllowedRemoteAuthUrl('javascript:alert(1)', origin, issuer)).toBe(false);
     expect(isAllowedRemoteAuthUrl('file:///etc/passwd', origin, issuer)).toBe(false);

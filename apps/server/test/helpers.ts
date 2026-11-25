@@ -238,6 +238,7 @@ export function bootServer(
         return opts.resolveWorkspacesDir?.() ?? workspacesDir;
       },
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
+      ...(opts.webOrigin !== undefined ? { webOrigin: opts.webOrigin } : {}),
       authToken: opts.authToken ?? null,
       ownerChannel: opts.ownerChannel,
       accessVerifier: opts.accessVerifier ?? null,
