@@ -63,7 +63,13 @@ export function desktopUpdateView(state: DesktopUpdateState, t: TFunc): DesktopU
                     : state.status === 'offline'
                       ? t('无法连接网络，未能检查更新')
                       : state.status === 'error'
-                        ? t('更新失败，点击重试')
+                        ? state.message === 'remote-old-server'
+                          ? t('远程主机版本较旧，需在该电脑上更新')
+                          : state.message === 'no-updater'
+                            ? t('这台远程主机无法自动更新')
+                            : state.message === 'no-release'
+                              ? t('远程主机尚无可用的新版本。')
+                              : t('更新失败，点击重试')
                         : t('检查更新');
   const busy =
     state.status === 'checking' ||
@@ -196,7 +202,6 @@ export function DesktopUpdateButton({
             data-testid="desktop-update"
             data-status={state.status}
             aria-label={label}
-            title={state.status === 'error' ? state.message : undefined}
             aria-disabled={busy || undefined}
             className={cn(idleClassName, busy && 'cursor-default')}
             onClick={() => {

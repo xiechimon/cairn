@@ -1,10 +1,11 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useServerVersion } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
 import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
+import { formatServerVersion } from '../board/remote-update-bar.js';
 import { ProfileHeader } from '../components/profile-card.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -73,6 +74,7 @@ export function AccountPage() {
     notifyPref === null ? desktopShell || notifyPermission === 'granted' : notifyPref === 'on';
   const notifyBlocked = !desktopShell && notifyPrefOn && notifyPermission === 'denied';
   const devicePushLive = live && teamId !== undefined && !desktopShell && pushDeviceSupported();
+  const serverVersion = useServerVersion(live);
   const [theme, setTheme] = useState<ThemePreference>(() => readStoredTheme(safeLocalStorage()));
   const [deviceSubscribed, setDeviceSubscribed] = useState<boolean | null>(null);
   const deviceActual = useRef<boolean | null>(null);
@@ -227,6 +229,24 @@ export function AccountPage() {
             </SettingsRow>
           </SettingsCard>
         </SettingsSection>
+        {live && !serverVersion.isPending && (
+          <SettingsSection title={t('关于')} testId="account-about">
+            <SettingsCard>
+              <SettingsRow label={t('当前版本')}>
+                <span
+                  className="text-ui text-content-secondary tabular-nums"
+                  data-testid="server-version"
+                >
+                  {formatServerVersion(
+                    serverVersion.data?.version ?? null,
+                    serverVersion.data?.commit ?? null,
+                    t,
+                  )}
+                </span>
+              </SettingsRow>
+            </SettingsCard>
+          </SettingsSection>
+        )}
         <BackupSettingsSection />
       </div>
     </PageShell>

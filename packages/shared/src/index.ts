@@ -44,6 +44,7 @@ export * from './scheduler.js';
 export * from './search-syntax.js';
 export * from './secret-box.js';
 export * from './secret-redaction.js';
+export * from './server-version.js';
 export * from './skill-facts.js';
 export * from './skill-inject.js';
 export * from './skill-injection-check.js';

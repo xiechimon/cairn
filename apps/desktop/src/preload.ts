@@ -18,8 +18,169 @@ import type {
   DevinLoginOutcome,
   HostPermissions,
   NativeTrayMenu,
+  RemoteVersionState,
 } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
+
+type RemoteFallbackCopy = { message: string; action: string | null; quiet: boolean };
+
+function remoteFallbackCopy(state: RemoteVersionState, zh: boolean): RemoteFallbackCopy | null {
+  const target = state.targetVersion ?? state.appVersion;
+  if (state.phase === 'updating') {
+    if (state.updaterState === 'waiting-idle') {
+      return {
+        message: zh
+          ? `远程主机正忙，空闲后会自动更新到 ${target}。`
+          : `The remote host is busy; it will update to ${target} when idle.`,
+        action: null,
+        quiet: true,
+      };
+    }
+    return {
+      message: zh ? `正在把远程主机更新到 ${target}。` : `Updating the remote host to ${target}.`,
+      action: null,
+      quiet: true,
+    };
+  }
+  if (state.phase === 'restarting' || state.phase === 'reloading') {
+    return {
+      message: zh ? '远程主机正在重启。' : 'The remote host is restarting.',
+      action: null,
+      quiet: true,
+    };
+  }
+  if (state.phase === 'old-server') {
+    return {
+      message: zh
+        ? '这台远程主机版本较旧，无法自动更新，请在该电脑上更新 Cairn。'
+        : 'This remote host is too old to update automatically. Update Cairn on that computer.',
+      action: zh ? '重新检查' : 'Check again',
+      quiet: false,
+    };
+  }
+  if (state.phase === 'unsupported') {
+    return {
+      message: zh
+        ? '这台远程主机无法自动更新，请在该电脑上手动更新 Cairn。'
+        : 'This remote host cannot update automatically. Update Cairn on that computer.',
+      action: zh ? '重新检查' : 'Check again',
+      quiet: false,
+    };
+  }
+  if (state.phase === 'failed') {
+    const message =
+      state.reason === 'offline'
+        ? zh
+          ? '远程主机无法连接更新服务，请稍后重试。'
+          : 'The remote host could not reach the update service. Try again later.'
+        : state.reason === 'no-release'
+          ? zh
+            ? '远程主机尚无可用的新版本。'
+            : 'No newer release is available for the remote host yet.'
+          : zh
+            ? '远程主机未能完成更新。'
+            : 'The remote host could not finish updating.';
+    return { message, action: zh ? '重试' : 'Retry', quiet: false };
+  }
+  return null;
+}
+
+function startRemoteUpdateFallback(): void {
+  let bar: HTMLDivElement | null = null;
+  const remove = (): void => {
+    bar?.remove();
+    bar = null;
+  };
+  const render = (state: RemoteVersionState): void => {
+    if (document.querySelector('[data-testid="remote-update-bar"]') !== null) {
+      remove();
+      return;
+    }
+    const copy = remoteFallbackCopy(state, navigator.language.toLowerCase().startsWith('zh'));
+    if (copy === null || document.body === null) {
+      remove();
+      return;
+    }
+    if (bar === null) {
+      bar = document.createElement('div');
+      bar.dataset.cairnRemoteFallback = 'true';
+      bar.setAttribute('role', 'status');
+      bar.style.position = 'fixed';
+      bar.style.left = '0';
+      bar.style.right = '0';
+      bar.style.bottom = '0';
+      bar.style.zIndex = '2147483000';
+      bar.style.display = 'flex';
+      bar.style.justifyContent = 'center';
+      bar.style.padding = '8px 16px';
+      bar.style.font = '13px -apple-system, BlinkMacSystemFont, sans-serif';
+      bar.style.color = '#343633';
+      bar.style.borderTop = '1px solid rgb(0 0 0 / 0.1)';
+      document.body.append(bar);
+    }
+    bar.style.background = copy.quiet ? '#ecebe6' : '#f9e8e3';
+    bar.textContent = copy.message;
+    if (copy.action !== null) {
+      const action = document.createElement('button');
+      action.type = 'button';
+      action.textContent = copy.action;
+      action.style.marginLeft = '12px';
+      action.style.minHeight = '24px';
+      action.addEventListener('click', () => {
+        void ipcRenderer.invoke('desktop-update:remote-retry');
+      });
+      bar.append(action);
+    }
+  };
+  const sync = (): void => {
+    void ipcRenderer
+      .invoke('desktop-update:remote-state')
+      .then((initial: RemoteVersionState | null) => {
+        if (initial !== null) render(initial);
+      })
+      .catch(() => {});
+  };
+  ipcRenderer.on('desktop-update:remote-state', (_event, state: RemoteVersionState) =>
+    render(state),
+  );
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', sync, { once: true });
+  } else {
+    sync();
+  }
+}
+
+let activeCompositions = 0;
+window.addEventListener(
+  'compositionstart',
+  () => {
+    activeCompositions += 1;
+  },
+  true,
+);
+window.addEventListener(
+  'compositionend',
+  () => {
+    activeCompositions = Math.max(0, activeCompositions - 1);
+  },
+  true,
+);
+ipcRenderer.on('desktop-update:prepare-reload', (_event, token: number) => {
+  window.dispatchEvent(new Event('cairn:prepare-reload'));
+  const started = Date.now();
+  const finish = (): void => {
+    ipcRenderer.send('desktop-update:prepare-reload-done', token);
+  };
+  const wait = (): void => {
+    if ((activeCompositions === 0 && Date.now() - started >= 150) || Date.now() - started >= 1000) {
+      finish();
+      return;
+    }
+    setTimeout(wait, 50);
+  };
+  wait();
+});
+startRemoteUpdateFallback();
 
 contextBridge.exposeInMainWorld('cairnDesktop', {
   menu: {
@@ -129,6 +290,16 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
       ipcRenderer.on('desktop-update:state', relay);
       return () => {
         ipcRenderer.removeListener('desktop-update:state', relay);
+      };
+    },
+    remoteState: (): Promise<RemoteVersionState | null> =>
+      ipcRenderer.invoke('desktop-update:remote-state'),
+    retryRemote: (): Promise<void> => ipcRenderer.invoke('desktop-update:remote-retry'),
+    subscribeRemote: (listener: (state: RemoteVersionState) => void): (() => void) => {
+      const relay = (_event: unknown, state: RemoteVersionState) => listener(state);
+      ipcRenderer.on('desktop-update:remote-state', relay);
+      return () => {
+        ipcRenderer.removeListener('desktop-update:remote-state', relay);
       };
     },
   },

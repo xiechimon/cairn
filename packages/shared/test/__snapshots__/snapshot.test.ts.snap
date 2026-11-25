@@ -11536,6 +11536,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
+    "note": "build version, short commit, busy flag and host updater status",
+    "path": "/api/server/version",
+  },
+  {
+    "method": "POST",
+    "note": "asks the host updater to update the server when safe",
+    "path": "/api/server/update",
+  },
+  {
+    "method": "GET",
     "note": "presets[] 38 项原样（r3 §2）",
     "path": "/api/teams/{id}/providers",
   },

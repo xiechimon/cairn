@@ -112,6 +112,7 @@ export function bootServer(
     mcpGithubApp?: AppContext['mcpGithubApp'];
     backupStatusPath?: string;
     deployRecordPath?: string;
+    hostUpdate?: AppContext['hostUpdate'];
     capturePage?: CapturePage;
     remote?: Partial<NonNullable<AppContext['remote']>>;
     im?: AppContext['im'];
@@ -231,6 +232,7 @@ export function bootServer(
       pageThumbnails: createPageThumbnails({ attachmentsDir, capture: opts.capturePage }),
       ...(opts.backupStatusPath !== undefined ? { backupStatusPath: opts.backupStatusPath } : {}),
       ...(opts.deployRecordPath !== undefined ? { deployRecordPath: opts.deployRecordPath } : {}),
+      ...(opts.hostUpdate !== undefined ? { hostUpdate: opts.hostUpdate } : {}),
       skillsDir,
       skillSourcesPath,
       homeDir,

@@ -2572,6 +2572,7 @@
       "code": {
         "web": [
           "apps/web/src/board/backup-banner.tsx",
+          "apps/web/src/board/remote-update-bar.tsx",
           "apps/web/src/resources/backup-settings-section.tsx"
         ],
         "server": [
@@ -2581,7 +2582,8 @@
           "apps/server/src/services/backup-s3.ts",
           "apps/server/src/services/deploy-status.ts",
           "apps/server/src/routes-deploy.ts",
-          "apps/server/src/services/deploy-lease.ts"
+          "apps/server/src/services/deploy-lease.ts",
+          "apps/server/src/services/server-version.ts"
         ]
       },
       "routes": {
@@ -2591,7 +2593,9 @@
           "/api/server/backup/export",
           "/api/server/backup/:id/restore",
           "/api/server/deploy",
-          "/api/server/deploy/lease"
+          "/api/server/deploy/lease",
+          "/api/server/version",
+          "/api/server/update"
         ]
       },
       "reach": [

@@ -8,6 +8,7 @@ import {
 } from 'react-router';
 import { ApiProvider, LiveDataBridge } from './api/provider.js';
 import { sidePanelOpen } from './board/app-sidebar.js';
+import { RemoteUpdateBar } from './board/remote-update-bar.js';
 import { THREAD_PARAM } from './board/thread-copy.js';
 import { useNarrow, usePanelDocked } from './board/use-narrow.js';
 import { ChiefRoot } from './chief/chief-root.js';
@@ -140,6 +141,7 @@ export function App() {
         <TooltipProvider>
           <RouterProvider router={router} />
           <PairingRequestBanner />
+          <RemoteUpdateBar />
           <TokenGate />
         </TooltipProvider>
         <PanelAwareToaster />

@@ -22,6 +22,7 @@ import type { GithubAppRegistration, McpOAuthState } from './services/mcp-server
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
 import type { PageThumbnails } from './services/page-thumbnails.js';
 import type { VapidKeys } from './services/push.js';
+import type { HostUpdateContext } from './services/server-version.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 import type { TailscaleServe } from './services/tailscale-serve.js';
 import type { TailnetRemote } from './services/tsnet-remote.js';
@@ -86,6 +87,7 @@ export interface AppContext {
   backupStatusPath?: string;
   backupService?: BackupService;
   deployRecordPath?: string;
+  hostUpdate?: HostUpdateContext;
   skillsDir: string;
   skillSourcesPath: string;
   homeDir: string;

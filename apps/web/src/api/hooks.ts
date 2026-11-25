@@ -92,6 +92,7 @@ import type {
   SecretRecord,
   SecretRequestAnswer,
   SecretRequestAnswered,
+  ServerVersionResponse,
   SetSecretBody,
   SkillImportCandidatesResponse,
   SkillRecord,
@@ -514,6 +515,16 @@ export function useBackupMutations() {
       onSettled: invalidate,
     }),
   };
+}
+
+export function useServerVersion(enabled: boolean) {
+  return useQuery({
+    queryKey: ['server-version'],
+    queryFn: () => api.get<ServerVersionResponse>('/api/server/version'),
+    enabled,
+    refetchInterval: 60_000,
+    retry: false,
+  });
 }
 
 export const useProviders = (teamId: string | undefined, enabled: boolean) =>

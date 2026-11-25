@@ -53,6 +53,7 @@ export function useServerDraft(options: {
       if (document.visibilityState === 'visible') void sync.refresh();
     };
     const persist = () => void sync.flush({ keepalive: true });
+    const prepareReload = () => void sync.flush({ keepalive: true });
     const leave = () => {
       if (document.visibilityState === 'hidden') persist();
     };
@@ -61,12 +62,14 @@ export function useServerDraft(options: {
     document.addEventListener('visibilitychange', refresh);
     document.addEventListener('visibilitychange', leave);
     window.addEventListener('pagehide', persist);
+    window.addEventListener('cairn:prepare-reload', prepareReload);
     return () => {
       window.removeEventListener('focus', refresh);
       window.removeEventListener('online', refresh);
       document.removeEventListener('visibilitychange', refresh);
       document.removeEventListener('visibilitychange', leave);
       window.removeEventListener('pagehide', persist);
+      window.removeEventListener('cairn:prepare-reload', prepareReload);
       sync.dispose();
       if (syncRef.current === sync) syncRef.current = null;
     };

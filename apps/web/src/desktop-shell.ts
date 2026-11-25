@@ -9,6 +9,7 @@ import {
   type DesktopTrayState,
   type DesktopUpdateState,
   type NativeTrayMenu,
+  type RemoteVersionState,
 } from '@cairn/shared';
 import { useEffect } from 'react';
 import { EN } from './i18n/en.js';
@@ -146,6 +147,9 @@ export interface DesktopUpdateBridge {
   install: () => Promise<void>;
   rollbackNotice: () => Promise<DesktopRollbackNotice | null>;
   subscribe: (listener: (state: DesktopUpdateState) => void) => () => void;
+  remoteState: () => Promise<RemoteVersionState | null>;
+  retryRemote: () => Promise<void>;
+  subscribeRemote: (listener: (state: RemoteVersionState) => void) => () => void;
 }
 
 export function desktopUpdates(): DesktopUpdateBridge | null {

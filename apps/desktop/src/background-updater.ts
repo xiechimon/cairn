@@ -3,8 +3,14 @@ import { readFileSync, readlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { ACCESS_TOKEN_FILE_NAME, parseAccessTokenFile } from '@cairn/shared';
+import {
+  ACCESS_TOKEN_FILE_NAME,
+  parseAccessTokenFile,
+  type ServerUpdateReason,
+  type ServerUpdateState,
+} from '@cairn/shared';
 import { parseBatteryLow, runBackgroundUpdate } from './background-update.js';
+import { readHostUpdateRequest, writeHostUpdateStatus } from './host-update.js';
 import { residentWritingReply, restartResidentHost } from './resident-host.js';
 import { verifyCairnSignature } from './signature.js';
 import {
@@ -49,6 +55,32 @@ async function main(): Promise<void> {
   const bundle = canonicalPath(resolve(process.execPath, '..', '..', '..'));
   const cairnHome = join(userData, 'home');
   const log = (line: string): void => appendUpdateLog(userData, `background updater: ${line}`);
+  const request = readHostUpdateRequest(cairnHome);
+  const appWasRunning = appRunning(userData);
+  const writeStatus = (
+    state: ServerUpdateState,
+    targetVersion: string | null = null,
+    percent: number | null = null,
+    reason: ServerUpdateReason | null = null,
+    supported = true,
+  ): void => {
+    if (appWasRunning) return;
+    try {
+      writeHostUpdateStatus(cairnHome, {
+        pid: process.pid,
+        kind: 'background-agent',
+        supported,
+        blocker: null,
+        state,
+        targetVersion,
+        percent,
+        reason,
+        handledRequestId: request?.id ?? null,
+        updatedAt: Date.now(),
+      });
+    } catch {}
+  };
+  writeStatus('checking', request?.requestedVersion ?? null);
   const outcome = await runBackgroundUpdate({
     bundle,
     userData,
@@ -64,19 +96,25 @@ async function main(): Promise<void> {
       ),
     offeredUpdate: (version) => fetchOfferedUpdate(version),
     stage: (update, version) =>
-      stageBundle(bundle, update, version, { downloading: () => {}, extracting: () => {} }),
+      stageBundle(bundle, update, version, {
+        downloading: (percent) => writeStatus('downloading', update.version, Math.round(percent)),
+        extracting: () => writeStatus('installing', update.version, 100),
+      }),
     verify: (staged) => verifyStaged(bundle, staged),
     swap: (staged, version) => swapInStaged(bundle, staged, version),
     lock: () => acquireUpdateLock(updateLockPath(userData), 'background-updater', 0),
     residentBusy: async () => {
       const token = ownerToken(cairnHome);
       if (token === null) return false;
-      return residentWritingReply(cairnHome, token).catch((error: unknown) => {
+      const busy = await residentWritingReply(cairnHome, token).catch((error: unknown) => {
         log(`could not ask the resident server about replies: ${String(error)}`);
         return false;
       });
+      if (busy) writeStatus('waiting-idle', request?.requestedVersion ?? null);
+      return busy;
     },
     restartResident: async () => {
+      writeStatus('restarting', request?.requestedVersion ?? null, 100);
       await restartResidentHost({ homeDir: homedir() }).then(
         (restarted) => restarted && log('restarted the resident server'),
         (error: unknown) => log(`could not restart the resident server: ${String(error)}`),
@@ -84,6 +122,24 @@ async function main(): Promise<void> {
     },
     log,
   });
+  if (outcome === 'installed') writeStatus('restarting', request?.requestedVersion ?? null, 100);
+  else if (outcome === 'current') {
+    writeStatus('up-to-date', null, null, request === null ? null : 'no-release');
+  } else if (outcome === 'resident-busy') {
+    writeStatus('waiting-idle', request?.requestedVersion ?? null);
+  } else if (outcome === 'low-battery') {
+    writeStatus('waiting-idle', request?.requestedVersion ?? null, null, 'low-battery');
+  } else if (outcome === 'blocked') {
+    writeStatus('failed', request?.requestedVersion ?? null, null, 'blocked');
+  } else if (outcome === 'failed') {
+    writeStatus('failed', request?.requestedVersion ?? null, null, 'failed');
+  } else if (outcome === 'read-only') {
+    writeStatus('unsupported', null, null, 'read-only', false);
+  } else if (outcome === 'not-cairn') {
+    writeStatus('unsupported', null, null, 'development', false);
+  } else if (outcome === 'lock-busy') {
+    writeStatus('waiting-idle', request?.requestedVersion ?? null, null, 'blocked');
+  }
   console.log(`${new Date().toISOString()} ${outcome}`);
 }
 

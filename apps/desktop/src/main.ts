@@ -16,6 +16,7 @@ import {
   type DesktopUpdateState,
   desktopNotificationOptions,
   ENV_VARS,
+  HOST_UPDATE_REQUEST_MESSAGE,
   isAppPath,
   isDesktopActivity,
   isDesktopNotifyPayload,
@@ -26,6 +27,8 @@ import {
   OWNER_CHANNEL_READY,
   PAGE_CAPTURE_RESULT,
   parseAccessTokenFile,
+  type RemoteVersionState,
+  serverVersionResponseSchema,
 } from '@cairn/shared';
 import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import {
@@ -80,6 +83,13 @@ import {
 import { installContextMenu } from './context-menu.js';
 import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
 import { canInvokeHostIpc, probeRemoteReachable } from './host-lifecycle.js';
+import {
+  desktopStateToHostStatus,
+  initialHandledHostRequestId,
+  readHostUpdateRequest,
+  shouldHandleHostUpdateRequest,
+  writeHostUpdateStatus,
+} from './host-update.js';
 import { createIdleWatch } from './idle-update.js';
 import { createKeepAwake } from './keep-awake.js';
 import { LAUNCH_SETTLED_FLAG, type LaunchVerdict, settleBundleAtLaunch } from './launch-update.js';
@@ -118,6 +128,11 @@ import {
   isSameOriginUrl,
   parseHttpsOrigin,
 } from './remote-auth.js';
+import {
+  createRemoteVersionController,
+  type RemoteVersionController,
+  remoteToDesktopUpdateState,
+} from './remote-version.js';
 import {
   clearServerOwner,
   handoffFromResidentHost,
@@ -283,6 +298,11 @@ let runner: LocalRunner | null = null;
 let runnerStarting: Promise<void> | null = null;
 let quitting = false;
 let updater: Updater | null = null;
+let remoteVersion: RemoteVersionController | null = null;
+let remoteVersionState: RemoteVersionState | null = null;
+let publishRemoteState: ((state: RemoteVersionState) => void) | null = null;
+let hostUpdateRequestHandler: (() => void) | null = null;
+const hostIdleState = { remoteRequested: false, serverBusy: false };
 let pageActivity: DesktopActivity | null = null;
 let openMessageBoxes = 0;
 let launchActivationPending = BACKGROUND_LAUNCH;
@@ -305,6 +325,55 @@ function logSecrets(): string[] {
 
 function cairnHome(): string {
   return join(app.getPath('userData'), 'home');
+}
+
+function setAboutServerVersion(version: string | null, commit: string | null): void {
+  app.setAboutPanelOptions({
+    applicationVersion: version ?? 'Unknown',
+    version: commit ?? '',
+  });
+}
+
+async function probeLocalServerVersion(origin: string, ownerToken: string): Promise<void> {
+  try {
+    const response = await fetch(`${origin}/api/server/version`, {
+      cache: 'no-store',
+      headers: ownerToken === '' ? {} : { authorization: `Bearer ${ownerToken}` },
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!response.ok) {
+      setAboutServerVersion(null, null);
+      return;
+    }
+    const parsed = serverVersionResponseSchema.safeParse(await response.json());
+    if (!parsed.success) {
+      setAboutServerVersion(null, null);
+      return;
+    }
+    hostIdleState.serverBusy = parsed.data.busy;
+    setAboutServerVersion(parsed.data.version, parsed.data.commit);
+  } catch {
+    setAboutServerVersion(null, null);
+  }
+}
+
+function reloadMainWindowPreserveDrafts(): void {
+  const window = mainWindow;
+  if (window === null || window.isDestroyed()) return;
+  const token = Date.now();
+  const done = (event: IpcMainEvent, received: unknown): void => {
+    if (event.sender !== window.webContents || received !== token) return;
+    ipcMain.removeListener('desktop-update:prepare-reload-done', done);
+    clearTimeout(timeout);
+    if (!window.isDestroyed()) window.webContents.reload();
+  };
+  const timeout = setTimeout(() => {
+    ipcMain.removeListener('desktop-update:prepare-reload-done', done);
+    if (!window.isDestroyed()) window.webContents.reload();
+  }, 1_200);
+  timeout.unref();
+  ipcMain.on('desktop-update:prepare-reload-done', done);
+  window.webContents.send('desktop-update:prepare-reload', token);
 }
 
 function runnerHome(): string {
@@ -423,6 +492,14 @@ function startServer(
       (data as { type?: unknown }).type === OWNER_CHANNEL_READY
     ) {
       child.postMessage({ type: OWNER_CHANNEL_MESSAGE, key: ownerChannelKey });
+      return;
+    }
+    if (
+      data !== null &&
+      typeof data === 'object' &&
+      (data as { type?: unknown }).type === HOST_UPDATE_REQUEST_MESSAGE
+    ) {
+      hostUpdateRequestHandler?.();
     }
   });
   const log = createServerLog(serverLogPath(app.getPath('userData')), logSecrets);
@@ -1248,7 +1325,8 @@ function serveUpdates(
           state,
           {
             check: () => void checkFromMenu(),
-            install: () => void installFromMenu(),
+            install: () =>
+              remoteVersion !== null ? void remoteVersion.retry() : void installFromMenu(),
           },
           {
             send: (command) => sendToWindow('desktop-menu', command),
@@ -1264,19 +1342,72 @@ function serveUpdates(
         ),
       ),
     );
-  const created = createUpdater(
-    (state) => {
+  let handledHostRequestId = initialHandledHostRequestId(cairnHome());
+  const writeHostStatus = (state: DesktopUpdateState): void => {
+    try {
+      writeHostUpdateStatus(
+        cairnHome(),
+        desktopStateToHostStatus(state, { handledRequestId: handledHostRequestId }),
+      );
+    } catch (error) {
+      console.error('could not write the host update status:', messageOf(error));
+    }
+  };
+  const publishLocalState = (state: DesktopUpdateState): void => {
+    if (
+      state.status === 'idle' ||
+      state.status === 'current' ||
+      state.status === 'error' ||
+      state.status === 'offline' ||
+      state.status === 'unsupported'
+    ) {
+      hostIdleState.remoteRequested = false;
+    }
+    if (remoteVersionState === null) {
       showMenu(state);
       for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send('desktop-update:state', state);
       }
-    },
-    { beforeRelaunch: rememberWindowForRelaunch },
-  );
+    }
+    writeHostStatus(state);
+  };
+  const created = createUpdater(publishLocalState, { beforeRelaunch: rememberWindowForRelaunch });
   updater = created;
+  writeHostStatus(created.state());
+  publishRemoteState = (state) => {
+    const mapped = remoteToDesktopUpdateState(state);
+    showMenu(mapped);
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('desktop-update:state', mapped);
+      window.webContents.send('desktop-update:remote-state', state);
+    }
+  };
+  if (remoteVersionState !== null) publishRemoteState(remoteVersionState);
+  const handleHostUpdateRequest = (): void => {
+    const request = readHostUpdateRequest(cairnHome());
+    if (
+      request === null ||
+      !shouldHandleHostUpdateRequest(request, {
+        appVersion: app.getVersion(),
+        handledRequestId: handledHostRequestId,
+      })
+    ) {
+      return;
+    }
+    handledHostRequestId = request.id;
+    hostIdleState.remoteRequested = true;
+    writeHostStatus(created.state());
+    void created.check().catch((error: unknown) => {
+      console.error('the requested host update check failed:', messageOf(error));
+    });
+  };
+  hostUpdateRequestHandler = handleHostUpdateRequest;
+  handleHostUpdateRequest();
+  setInterval(handleHostUpdateRequest, 5_000).unref();
   let lastCheckedAt = 0;
   const check = (): Promise<void> => {
     lastCheckedAt = Date.now();
+    if (remoteVersion !== null) return remoteVersion.retry();
     return created.check();
   };
   const installFromMenu = async (): Promise<void> => {
@@ -1312,6 +1443,17 @@ function serveUpdates(
   };
   const checkFromMenu = async (): Promise<void> => {
     await check();
+    if (remoteVersion !== null) {
+      const currentRemote = remoteVersion.state();
+      if (currentRemote.phase === 'current' && currentRemote.serverVersion !== null) {
+        const copy = upToDateCopy(await windowLocale(), currentRemote.serverVersion);
+        await messageBox({ type: 'info', message: copy.title, detail: copy.detail });
+      } else if (currentRemote.phase === 'failed' && currentRemote.reason === 'offline') {
+        const copy = updateOfflineCopy(await windowLocale());
+        await messageBox({ type: 'info', message: copy.title, detail: copy.detail });
+      }
+      return;
+    }
     const state = created.state();
     if (state.status === 'available' || state.status === 'ready') await installFromMenu();
     else if (state.status === 'current') {
@@ -1353,11 +1495,25 @@ function serveUpdates(
     if (!fromOwnPage(event)) return;
     BrowserWindow.fromWebContents(event.sender)?.setWindowButtonVisibility(visible === true);
   });
-  ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? created.state() : null));
+  ipcMain.handle('desktop-update:state', (event) => {
+    if (!fromOwnPage(event)) return null;
+    return remoteVersionState !== null
+      ? remoteToDesktopUpdateState(remoteVersionState)
+      : created.state();
+  });
   ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
   ipcMain.handle('desktop-update:install', (event) => {
-    if (!allowLocalCredentials || !fromOwnPage(event)) return undefined;
+    if (!fromOwnPage(event)) return undefined;
+    if (remoteVersion !== null) return remoteVersion.retry();
+    if (!allowLocalCredentials) return undefined;
     return created.state().status === 'ready' ? created.apply('foreground') : created.install();
+  });
+  ipcMain.handle('desktop-update:remote-state', (event) =>
+    fromOwnPage(event) ? remoteVersionState : null,
+  );
+  ipcMain.handle('desktop-update:remote-retry', (event) => {
+    if (!fromOwnPage(event) || remoteVersion === null) return undefined;
+    return remoteVersion.retry();
   });
   const workerPath = join(
     app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'dist'),
@@ -1431,11 +1587,18 @@ function serveUpdates(
   ipcMain.handle('antigravity:cancel-login', (event) => {
     if (fromMainPage(event)) antigravityCancelLogin();
   });
-  setTimeout(() => void check(), UPDATE_FIRST_CHECK_MS);
-  setInterval(() => void check(), UPDATE_CHECK_EVERY_MS);
+  const periodicCheck = (): void => {
+    if (remoteVersion === null) void created.check();
+  };
+  setTimeout(periodicCheck, UPDATE_FIRST_CHECK_MS);
+  setInterval(periodicCheck, UPDATE_CHECK_EVERY_MS);
   app.on('browser-window-focus', () => {
-    if (lastCheckedAt !== 0 && Date.now() - lastCheckedAt >= UPDATE_CHECK_ON_FOCUS_AFTER_MS) {
-      void check();
+    if (
+      remoteVersion === null &&
+      lastCheckedAt !== 0 &&
+      Date.now() - lastCheckedAt >= UPDATE_CHECK_ON_FOCUS_AFTER_MS
+    ) {
+      void created.check();
     }
   });
 }
@@ -1588,12 +1751,15 @@ function watchIdleUpdate(runnerHome: string): void {
       turnInFlight: pageActivity?.turnInFlight === true,
       dialogOpen: openMessageBoxes > 0 || pageActivity?.dialogOpen === true,
       stepsInFlight: runner === null ? 0 : runnerStepsInFlight(runnerHome),
+      remoteRequested: hostIdleState.remoteRequested,
+      serverBusy: hostIdleState.serverBusy,
     });
     if (!verdict.apply || state.status !== 'ready') return;
     appendUpdateLog(
       app.getPath('userData'),
       `applying ${state.version} while the user is away (${verdict.trigger})`,
     );
+    hostIdleState.remoteRequested = false;
     void current
       .apply('background')
       .catch((error: unknown) =>
@@ -1742,6 +1908,30 @@ async function boot(): Promise<void> {
         origin = activeConn.url;
         await refreshRemoteClerkIssuer(origin);
       }
+      setAboutServerVersion(null, null);
+      const fetchForRemote = ((input: RequestInfo | URL, init?: RequestInit) => {
+        if (ownerToken === '') {
+          return session.defaultSession.fetch(input as string, init);
+        }
+        const headers = new Headers(init?.headers);
+        if (!headers.has('authorization')) {
+          headers.set('authorization', `Bearer ${ownerToken}`);
+        }
+        return session.defaultSession.fetch(input as string, { ...init, headers });
+      }) as typeof fetch;
+      remoteVersion = createRemoteVersionController({
+        origin,
+        appVersion: app.getVersion(),
+        fetchImpl: fetchForRemote,
+        onState: (state) => {
+          remoteVersionState = state;
+          publishRemoteState?.(state);
+        },
+        onAbout: (info) => setAboutServerVersion(info.version, info.commit),
+        onReloadReady: reloadMainWindowPreserveDrafts,
+      });
+      remoteVersionState = remoteVersion.state();
+      void remoteVersion.check();
     } else {
       activeRemoteHostName = null;
       remoteClerkIssuer = null;
@@ -1853,13 +2043,7 @@ async function boot(): Promise<void> {
     if (activeConn.kind === 'remote' && !localHostOwned) {
       const originHost = new URL(origin).hostname.toLowerCase();
       session.defaultSession.cookies.on('changed', (_event, cookie, _cause, removed) => {
-        if (
-          removed ||
-          !runnerWanted ||
-          runner !== null ||
-          runnerStarting !== null ||
-          cookie.name !== 'cairn_auth'
-        ) {
+        if (removed || cookie.name !== 'cairn_auth') {
           return;
         }
         const rawDomain = cookie.domain?.toLowerCase() ?? '';
@@ -1869,7 +2053,10 @@ async function boot(): Promise<void> {
           (domain === originHost ||
             (rawDomain.startsWith('.') && originHost.endsWith(`.${domain}`)))
         ) {
-          void bringRunnerUp();
+          remoteVersion?.onAuthChanged();
+          if (runnerWanted && runner === null && runnerStarting === null) {
+            void bringRunnerUp();
+          }
         }
       });
     }
@@ -2058,6 +2245,10 @@ async function boot(): Promise<void> {
     });
     void removeLeftoverUpdates();
     serveUpdates(origin, notice, ownerToken, activeConn.kind === 'local');
+    if (activeConn.kind === 'local') {
+      void probeLocalServerVersion(origin, ownerToken);
+      setInterval(() => void probeLocalServerVersion(origin, ownerToken), 15_000).unref();
+    }
     serveNotifications(origin);
     servePageActivity(origin);
     if (activeConn.kind === 'local') serveOwnComputer(origin, agentDesktopBinary());

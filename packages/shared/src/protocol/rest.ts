@@ -51,6 +51,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/server/deploy',
     note: 'deploy.json next to server.db, written by deploy-self.sh (#2427)',
   },
+  {
+    method: 'GET',
+    path: '/api/server/version',
+    note: 'build version, short commit, busy flag and host updater status',
+  },
+  {
+    method: 'POST',
+    path: '/api/server/update',
+    note: 'asks the host updater to update the server when safe',
+  },
   { method: 'GET', path: '/api/teams/{id}/providers', note: 'presets[] 38 项原样（r3 §2）' },
   { method: 'GET', path: '/api/teams/{id}/mcp-servers' },
   { method: 'GET', path: '/api/teams/{id}/models' },

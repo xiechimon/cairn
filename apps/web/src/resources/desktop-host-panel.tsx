@@ -1,4 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react';
+import { useServerVersion } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
+import { formatServerVersion } from '../board/remote-update-bar.js';
 import { SettingsPanel } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
@@ -13,6 +16,7 @@ import { addAndSwitchRemoteHost, parseRemoteHostOrigin } from './remote-host.js'
 
 export function DesktopHostPanel() {
   const { t } = useI18n();
+  const { live } = useLiveData();
   const bridge = desktopHost();
   const [status, setStatus] = useState<DesktopHostStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,6 +29,7 @@ export function DesktopHostPanel() {
   } | null>(null);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+  const serverVersion = useServerVersion(live);
 
   useEffect(() => {
     if (bridge === null) return;
@@ -141,6 +146,21 @@ export function DesktopHostPanel() {
       }
     >
       <div data-testid="desktop-host-panel" className="flex min-w-0 flex-col">
+        {live && !serverVersion.isPending && (
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <span className="text-ui font-medium text-foreground">{t('当前主机版本')}</span>
+            <span
+              className="text-meta text-content-secondary tabular-nums"
+              data-testid="host-server-version"
+            >
+              {formatServerVersion(
+                serverVersion.data?.version ?? null,
+                serverVersion.data?.commit ?? null,
+                t,
+              )}
+            </span>
+          </div>
+        )}
         {status.residentSupported && (
           <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <div className="flex min-w-0 flex-col gap-0.5">

@@ -77,6 +77,7 @@ import { capturePageOver, createPageThumbnails, parentPortOf } from './services/
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import { createScheduler } from './services/scheduler.js';
+import { maybeRetriggerIdleHostUpdate } from './services/server-version.js';
 import { pathsOverlap, sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
 import { fillSystemAvatar } from './services/system-avatar.js';
@@ -498,12 +499,20 @@ const tailnetReady = tailnet.resume().catch((error: unknown) => {
   logger.warn({ err: error }, 'tsnet remote access could not be resumed');
 });
 
+const hostUpdateIdleWatch = setInterval(() => {
+  void maybeRetriggerIdleHostUpdate({ db, homeDir: config.homeDir }).catch((error: unknown) => {
+    logger.warn({ err: error }, 'idle host update trigger failed');
+  });
+}, 15_000);
+hostUpdateIdleWatch.unref();
+
 const COORDINATOR_CLOSE_MS = 5_000;
 const TAILSCALE_WITHDRAW_MS = 3_000;
 let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(hostUpdateIdleWatch);
   backupService?.stop();
   scheduler.stop();
   killInFlightPick();

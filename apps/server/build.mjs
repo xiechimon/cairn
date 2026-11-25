@@ -17,6 +17,46 @@ const bundleFormFlag = {
   },
 };
 
+function resolveBuildVersion() {
+  const raw = (process.env.CAIRN_BUILD_VERSION || process.env.VERSION || '').trim();
+  return raw !== '' && raw !== '0.0.0' ? raw : null;
+}
+
+function resolveBuildCommit() {
+  const fromEnv = (
+    process.env.CAIRN_BUILD_COMMIT ||
+    process.env.RELEASE_SHA ||
+    process.env.GITHUB_SHA ||
+    ''
+  ).trim();
+  if (fromEnv !== '') return fromEnv.slice(0, 7);
+  try {
+    const head = execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return head !== '' ? head : null;
+  } catch {
+    return null;
+  }
+}
+
+const serverBuildInfoPlugin = {
+  name: 'cairn-server-build-info',
+  setup(b) {
+    const version = resolveBuildVersion();
+    const commit = resolveBuildCommit();
+    b.onLoad({ filter: /src[\\/]build-info\.ts$/ }, () => ({
+      contents: [
+        `export const SERVER_BUILD_VERSION = ${JSON.stringify(version)};`,
+        `export const SERVER_BUILD_COMMIT = ${JSON.stringify(commit)};`,
+      ].join('\n'),
+      loader: 'js',
+    }));
+  },
+};
+
 const banner = [
   '#!/usr/bin/env node',
   "import { createRequire } from 'node:module';",
@@ -31,7 +71,7 @@ await build({
   target: 'node22',
   format: 'esm',
   external: ['better-sqlite3'],
-  plugins: [bundleFormFlag],
+  plugins: [bundleFormFlag, serverBuildInfoPlugin],
   banner: { js: banner },
   sourcemap: true,
   logLevel: 'info',

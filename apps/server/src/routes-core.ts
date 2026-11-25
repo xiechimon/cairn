@@ -11,6 +11,7 @@ import {
   policyUseSchema,
   putTopModelsBodySchema,
   routeUseSchema,
+  serverUpdateRequestBodySchema,
   streamConversationsBodySchema,
   type TeamMember,
 } from '@cairn/shared';
@@ -68,6 +69,7 @@ import {
   upsertRoutingRule,
   upsertWorkPolicy,
 } from './services/routing-rules.js';
+import { buildServerVersionResponse, requestHostUpdate } from './services/server-version.js';
 import { filterKnownSkillIds } from './services/skills.js';
 import { readTopModels, writeTopModels } from './services/top-models.js';
 import { dailyUsage } from './services/usage-daily.js';
@@ -337,6 +339,28 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.get('/api/server/deploy', (c) => c.json(readDeployStatus(ctx.deployRecordPath)));
+  app.get('/api/server/version', (c) => {
+    c.header('cache-control', 'no-store');
+    return c.json(
+      buildServerVersionResponse({
+        db: ctx.db,
+        homeDir: ctx.homeDir,
+        deployRecordPath: ctx.deployRecordPath,
+        now: ctx.hostUpdate?.now?.(),
+      }),
+    );
+  });
+  app.post('/api/server/update', async (c) => {
+    c.header('cache-control', 'no-store');
+    const raw = await jsonBody(c);
+    const body = parseWith(serverUpdateRequestBodySchema, raw ?? {}, 'body');
+    const result = await requestHostUpdate({
+      homeDir: ctx.homeDir,
+      targetVersion: body.targetVersion,
+      hostUpdate: ctx.hostUpdate,
+    });
+    return c.json(result, result.accepted ? 202 : 200);
+  });
 
   app.get('/api/teams', (c) => {
     const row = ctx.db.select().from(team).where(eq(team.id, ctx.team.id)).get();

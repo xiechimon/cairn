@@ -2426,6 +2426,26 @@ export const EN: Record<string, string> = {
   '确定删除这个连接？此操作不可撤销。': 'Delete this connection? This cannot be undone.',
   '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。':
     'Create a fine-grained token, pick the repositories, and give Contents, Issues and Pull requests read and write access.',
+  未知版本: 'Unknown version',
+  当前版本: 'Version',
+  关于: 'About',
+  当前主机版本: 'Current host version',
+  '远程主机版本较旧，需在该电脑上更新': 'The remote host is outdated; update it on that computer',
+  这台远程主机无法自动更新: 'This remote host cannot update automatically',
+  '远程主机正忙，空闲后会自动更新到 {version}。':
+    'The remote host is busy; it will update to {version} when idle.',
+  '正在把远程主机更新到 {version}。': 'Updating the remote host to {version}.',
+  '正在把远程主机更新到 {version}（{percent}%）。':
+    'Updating the remote host to {version} ({percent}%).',
+  '远程主机正在重启。': 'The remote host is restarting.',
+  '这台远程主机版本较旧，无法自动更新，请在该电脑上更新 Cairn。':
+    'This remote host is too old to update automatically. Update Cairn on that computer.',
+  '这台远程主机无法自动更新，请在该电脑上手动更新 Cairn。':
+    'This remote host cannot update automatically. Update Cairn on that computer.',
+  '远程主机无法连接更新服务，请稍后重试。':
+    'The remote host could not reach the update service. Try again later.',
+  '远程主机尚无可用的新版本。': 'No newer release is available for the remote host yet.',
+  '远程主机未能完成更新。': 'The remote host could not finish updating.',
   检查更新: 'Check for updates',
   '正在检查更新…': 'Checking for updates…',
   '已是最新版本 {version}': 'Up to date ({version})',

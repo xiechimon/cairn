@@ -625,7 +625,7 @@ Reach:
 - Web routes: `/app/account`
 - Settings: `设置` (Settings) › `账号` (Account)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `account-appearance`
+- Test ids in its code: `account-about`, `account-appearance`, `server-version`
 - Verify recipes: [.claude/skills/verify-cairn/features/avatars.md](features/avatars.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
@@ -1011,7 +1011,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `account-backup`, `backup-export-all`, `backup-history-list`, `backup-history-toggle`, `backup-restore-confirm`, `backup-run-now`, `backup-snapshot-row`, `backup-status-text`, `backup-warning`
+- Test ids in its code: `account-backup`, `backup-export-all`, `backup-history-list`, `backup-history-toggle`, `backup-restore-confirm`, `backup-run-now`, `backup-snapshot-row`, `backup-status-text`, `backup-warning`, `remote-update-action`, `remote-update-bar`
 - Research: [docs/research/deploy-drain-2026-11-09.md](../../../docs/research/deploy-drain-2026-11-09.md)
 - Frontend design: **gap**: the banners have no design
 - Backend design: [docs/ops/deploy-drain-design.md](../../../docs/ops/deploy-drain-design.md)
