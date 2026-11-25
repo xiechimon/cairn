@@ -45,7 +45,19 @@ const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const RELATIVE_RE = /^(\d+)([dh])$/i;
 const COST_RE = /^([<>])(\d+(?:\.\d+)?)$/;
 const PR_RE = /^\d+$/;
+const SEQ_NUM_RE = /^#?(\d+)$/;
 const MS_PER_UNIT = { d: 86_400_000, h: 3_600_000 } as const;
+
+export function foldSearchText(value: string): string {
+  return value.normalize('NFKC').toLowerCase();
+}
+
+export function searchSeqNum(word: string): number | null {
+  const match = SEQ_NUM_RE.exec(word.normalize('NFKC').trim());
+  if (!match) return null;
+  const num = Number(match[1]);
+  return Number.isSafeInteger(num) && num > 0 ? num : null;
+}
 
 function scanTokens(input: string): RawToken[] {
   const tokens: RawToken[] = [];
@@ -87,9 +99,10 @@ function conditionFor(
   nowMs: number,
 ): { condition: SearchFilterCondition | null; problem: SearchFilterProblem | null } {
   if (value === '') return { condition: null, problem: 'empty' };
+  const folded = value.normalize('NFKC');
   switch (key) {
     case 'is': {
-      const state = SEARCH_IS_STATES.find((s) => s === value.toLowerCase());
+      const state = SEARCH_IS_STATES.find((s) => s === folded.toLowerCase());
       return state
         ? { condition: { key, state }, problem: null }
         : { condition: null, problem: 'unknown_state' };
@@ -99,13 +112,13 @@ function conditionFor(
     case 'by':
       return { condition: { key, name: value }, problem: null };
     case 'pr': {
-      if (value.toLowerCase() === 'any')
+      if (folded.toLowerCase() === 'any')
         return { condition: { key, number: 'any' }, problem: null };
-      if (!PR_RE.test(value) || Number(value) < 1) return { condition: null, problem: 'bad_pr' };
-      return { condition: { key, number: Number(value) }, problem: null };
+      if (!PR_RE.test(folded) || Number(folded) < 1) return { condition: null, problem: 'bad_pr' };
+      return { condition: { key, number: Number(folded) }, problem: null };
     }
     case 'after': {
-      const relative = RELATIVE_RE.exec(value);
+      const relative = RELATIVE_RE.exec(folded);
       if (relative) {
         const unit = (relative[2] as string).toLowerCase() as 'd' | 'h';
         return {
@@ -113,7 +126,7 @@ function conditionFor(
           problem: null,
         };
       }
-      const date = DATE_RE.exec(value);
+      const date = DATE_RE.exec(folded);
       if (date) {
         const [year, month, day] = [Number(date[1]), Number(date[2]), Number(date[3])];
         const at = new Date(Date.UTC(year, month - 1, day));
@@ -124,7 +137,7 @@ function conditionFor(
       return { condition: null, problem: 'bad_date' };
     }
     case 'cost': {
-      const cost = COST_RE.exec(value);
+      const cost = COST_RE.exec(folded);
       if (!cost) return { condition: null, problem: 'bad_cost' };
       return {
         condition: { key, op: cost[1] as '>' | '<', dollars: Number(cost[2]) },

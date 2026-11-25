@@ -131,8 +131,8 @@ export function AppSidebar({
   const projectsPhase = live
     ? queryPhase(withTeamsFailure(projectsQ, teamsQuery), (projectsQ.data ?? []).length === 0)
     : undefined;
-  const search = useSearchState(false, '');
-  const searchResults = useSearchResults(search.query, live && search.open);
+  const search = useSearchState(false, '', searchPanel);
+  const searchResults = useSearchResults(search.query, live && searchPanel && search.open);
   const [collapsed, setCollapsed] = useState(() => readCollapsed(safeLocalStorage()));
   const narrow = useNarrow();
   const docked = usePanelDocked();
@@ -343,7 +343,7 @@ export function AppSidebar({
           query={search.query}
           onQuery={search.setQuery}
           onClose={() => search.setOpen(false)}
-          server={live ? searchResults.data : undefined}
+          server={live ? searchResults.settledData : undefined}
           serverQuery={live ? searchResults : undefined}
         />
       )}

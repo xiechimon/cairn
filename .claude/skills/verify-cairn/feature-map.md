@@ -968,7 +968,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `Mod+K`
-- Test ids in its code: `chip-problems`, `query-chip`, `search-context`, `search-error`, `syntax-help`
+- Test ids in its code: `chip-problems`, `first-run-setup`, `query-chip`, `search-archived-badge`, `search-context`, `search-error`, `search-loading`, `syntax-help`
 - Verify recipes: [.claude/skills/verify-cairn/features/search.md](features/search.md)
 - Research: **gap**: no note on Amp's search syntax and filters
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)

@@ -1,5 +1,21 @@
-import { parseSearchQuery, type SearchResponse } from '@cairn/shared';
-import { CircleHelp, Clock, Kanban, Search, Settings, TriangleAlert, X } from 'lucide-react';
+import {
+  foldSearchText,
+  parseSearchQuery,
+  type SearchMemoryHit,
+  type SearchMessageHit,
+  type SearchResponse,
+} from '@cairn/shared';
+import {
+  BookOpen,
+  CircleHelp,
+  Clock,
+  Kanban,
+  MessageSquare,
+  Search,
+  Settings,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
@@ -7,7 +23,7 @@ import { useLiveData } from '../api/provider.js';
 import { coordinatorSearch } from '../board/open-composer.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
-import { threadHrefFrom } from '../board/thread-copy.js';
+import { threadHref, threadHrefFrom } from '../board/thread-copy.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import type { QueryLike } from '../components/query-state.js';
 import { ShortcutHint } from '../components/shortcut-hint.js';
@@ -15,12 +31,12 @@ import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useDesktopMenu } from '../desktop-shell.js';
-import { PROJECT_ID, PROJECT_NAME } from '../fixtures/core.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
-import { searchTodosLocally } from '../search/local-search.js';
+import { matchesSearchWords, searchTodosLocally } from '../search/local-search.js';
 import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
 import {
   chipProblem,
@@ -56,6 +72,8 @@ function rowLitClasses(selected: boolean, kbd: boolean): string {
 export const GROUP_LABEL = 'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary';
 export const ROW_END =
   'ml-auto flex flex-none items-center gap-1.5 pl-3 text-meta text-content-tertiary';
+const ARCHIVED_BADGE_CLS =
+  'rounded-sm bg-secondary px-1.5 py-0.5 text-caption text-content-tertiary';
 
 export interface SearchCommand {
   id: string;
@@ -70,6 +88,10 @@ export interface SearchContext {
   commands: SearchCommand[];
 }
 
+export interface SearchQueryState extends Pick<QueryLike, 'isError' | 'isFetching' | 'refetch'> {
+  isSearching?: boolean;
+}
+
 interface SearchPanelProps {
   fixture: FixtureSet;
   query: string;
@@ -77,7 +99,7 @@ interface SearchPanelProps {
   open: boolean;
   onClose: () => void;
   server?: SearchResponse;
-  serverQuery?: Pick<QueryLike, 'isError' | 'isFetching' | 'refetch'>;
+  serverQuery?: SearchQueryState;
   context?: SearchContext;
 }
 
@@ -89,10 +111,13 @@ interface TodoRowItem {
   phaseAt: number;
   projectId?: string;
   projectName?: string;
+  archived?: boolean;
+  archivedAt?: number | null;
 }
 interface ProjectRowItem {
   id: string;
   name: string;
+  archived?: boolean;
 }
 
 function TodoRow({
@@ -113,6 +138,7 @@ function TodoRow({
   const projectMark = useProjectMark();
   const { t } = useI18n();
   const { glyph, ink } = PHASE_STATUS[todo.phase];
+  const isArchived = todo.archived === true || todo.archivedAt != null;
   return (
     <Button
       variant="ghost"
@@ -125,6 +151,11 @@ function TodoRow({
       <StatusGlyph kind={glyph} label={t(PHASE_UI[todo.phase].chip)} className={ink} />
       <span className="min-w-0 truncate">{todo.title}</span>
       <span className={ROW_END}>
+        {isArchived && (
+          <span data-testid="search-archived-badge" className={ARCHIVED_BADGE_CLS}>
+            {t('已归档')}
+          </span>
+        )}
         {projectName !== undefined && (
           <>
             <ProjectAvatar name={projectName} {...projectMark(projectName)} bare />
@@ -149,6 +180,37 @@ function useSingleLitSurface(open: boolean) {
   }, [open]);
 }
 
+function effectiveZIndex(el: Element): number {
+  let node: Element | null = el;
+  while (node !== null) {
+    const parsed = Number.parseInt(getComputedStyle(node).zIndex, 10);
+    if (!Number.isNaN(parsed)) return parsed;
+    node = node.parentElement;
+  }
+  return 0;
+}
+
+export function isSearchShortcutBlocked(root: Document = document): boolean {
+  if (root.querySelector('[data-testid="first-run-setup"], .token-gate') !== null) return true;
+  const modalZRaw = getComputedStyle(root.documentElement).getPropertyValue('--z-modal').trim();
+  const modalZ = Number.parseInt(modalZRaw, 10) || 41;
+  const dialogs = root.querySelectorAll('[role="dialog"], [role="alertdialog"]');
+  for (const el of dialogs) {
+    if (el.classList.contains('search-panel')) continue;
+    if (el.querySelector('.search-panel') !== null) continue;
+    if (el.closest('.app-drawer') !== null) continue;
+    if (el.hasAttribute('data-closed') || el.hasAttribute('data-ending-style')) continue;
+    if (el.closest('[data-closed], [data-ending-style]') !== null) continue;
+    const visible =
+      typeof el.checkVisibility === 'function'
+        ? el.checkVisibility()
+        : getComputedStyle(el).display !== 'none';
+    if (!visible) continue;
+    if (effectiveZIndex(el) > modalZ) return true;
+  }
+  return false;
+}
+
 export function SearchPanel({
   fixture,
   query,
@@ -162,7 +224,7 @@ export function SearchPanel({
   const projectMark = useProjectMark();
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const openRef = useRef(open);
   openRef.current = open;
@@ -182,56 +244,57 @@ export function SearchPanel({
     }
   }, []);
   useSingleLitSurface(open);
-  const q = query.trim().toLowerCase();
-  const { chips, text } = splitQuery(query, Date.now());
-  const hasFilters = parseSearchQuery(query, Date.now()).filters.length > 0;
-  const useServer = server !== undefined && q !== '';
-  const localSearch =
-    !useServer && hasFilters
-      ? searchTodosLocally(
-          fixture.todos,
-          (projectId) => fixture.projectNames?.[projectId] ?? PROJECT_NAME,
-          parseSearchQuery(query, Date.now()),
-        )
-      : undefined;
-  const todos: TodoRowItem[] = useServer
-    ? server.todos
-    : localSearch !== undefined
-      ? localSearch.todos
-      : q === ''
-        ? []
-        : fixture.todos.filter((t) => t.title.toLowerCase().includes(q));
-  const chipProblems = chips.map((chip) =>
-    chipProblem(chip, useServer ? server.filters : localSearch?.filters),
-  );
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const liveProjects = live ? (projectsQ.data ?? []) : undefined;
-  const projectName = fixture.projectNames
-    ? (Object.values(fixture.projectNames)[0] ?? PROJECT_NAME)
-    : PROJECT_NAME;
-  const clientProjectName = (projectId: string | undefined): string | undefined =>
-    liveProjects
-      ? liveProjects.find((project) => project.id === projectId)?.name
-      : ((projectId !== undefined ? fixture.projectNames?.[projectId] : undefined) ?? projectName);
+  const fixtureProjectEntries = Object.entries(fixture.projectNames ?? {});
+  const clientProjectName = (projectId: string | undefined): string | undefined => {
+    if (live) return liveProjects?.find((project) => project.id === projectId)?.name;
+    if (projectId !== undefined && fixture.projectNames?.[projectId] !== undefined) {
+      return fixture.projectNames[projectId];
+    }
+    return fixtureProjectEntries[0]?.[1];
+  };
+  const firstProjectName = live
+    ? (liveProjects?.find((project) => project.archivedAt == null)?.name ??
+      liveProjects?.[0]?.name ??
+      null)
+    : (fixtureProjectEntries[0]?.[1] ?? null);
+
+  const now = Date.now();
+  const q = foldSearchText(query.trim());
+  const parsedQuery = parseSearchQuery(query, now);
+  const { chips, text } = splitQuery(query, now);
+  const hasFilters = parsedQuery.filters.length > 0;
+  const pendingFilterToken = endsInFilter(text, now);
+  const useServer = server !== undefined && q !== '';
+  const localSearch =
+    !useServer && q !== ''
+      ? searchTodosLocally(fixture.todos, clientProjectName, parsedQuery)
+      : undefined;
+  const todos: TodoRowItem[] = useServer ? server.todos : (localSearch?.todos ?? []);
+  const chipProblems = chips.map((chip) =>
+    chipProblem(chip, useServer ? server.filters : localSearch?.filters),
+  );
   const projects: ProjectRowItem[] = useServer
     ? server.projects
     : q === '' || hasFilters
       ? []
       : liveProjects
         ? liveProjects
-            .filter((project) => project.name.toLowerCase().includes(q))
-            .map(({ id, name }) => ({ id, name }))
-        : projectName.toLowerCase().includes(q)
-          ? [
-              {
-                id: fixture.projectNames
-                  ? (Object.keys(fixture.projectNames)[0] ?? PROJECT_ID)
-                  : PROJECT_ID,
-                name: projectName,
-              },
-            ]
-          : [];
+            .filter((project) =>
+              matchesSearchWords([project.name, project.githubRepo], parsedQuery.words),
+            )
+            .map(({ id, name, archivedAt }) => ({
+              id,
+              name,
+              ...(archivedAt != null ? { archived: true } : {}),
+            }))
+        : fixtureProjectEntries
+            .filter(([, name]) => matchesSearchWords([name], parsedQuery.words))
+            .map(([id, name]) => ({ id, name }));
+  const messages: SearchMessageHit[] = useServer ? (server.messages ?? []) : [];
+  const memories: SearchMemoryHit[] = useServer ? (server.memories ?? []) : [];
   const [contextOn, setContextOn] = useState(true);
   useEffect(() => {
     if (open) setContextOn(true);
@@ -243,38 +306,62 @@ export function SearchPanel({
   };
   const commands =
     activeContext?.commands.filter(
-      (command) => q === '' || command.label.toLowerCase().includes(q),
+      (command) => q === '' || foldSearchText(command.label).includes(q),
     ) ?? [];
   const navMatches =
     hasFilters || q === ''
       ? []
       : NAV_ROWS.filter(
-          (row) => row.label.toLowerCase().includes(q) || t(row.label).toLowerCase().includes(q),
+          (row) =>
+            foldSearchText(row.label).includes(q) || foldSearchText(t(row.label)).includes(q),
         );
-  const hitCount = commands.length + navMatches.length + todos.length + projects.length;
+  const hitCount =
+    commands.length +
+    navMatches.length +
+    todos.length +
+    projects.length +
+    messages.length +
+    memories.length;
 
-  const go = (pathname: string) => {
+  const finishNavigation = () => {
+    onQuery('');
+    onClose();
+  };
+
+  const go = (targetPathname: string) => {
     const nextSearch =
-      pathname === '/app' || pathname === '/app/schedules' || pathname.startsWith('/app/project/')
+      targetPathname === '/app' ||
+      targetPathname === '/app/schedules' ||
+      targetPathname.startsWith('/app/project/')
         ? coordinatorSearch(search)
         : search;
     if (
-      pathname !== SETTINGS_HREF ||
+      targetPathname !== SETTINGS_HREF ||
       !isSettingsSectionId(settingsSectionOf(window.location.pathname))
     )
-      navigate({ pathname, search: nextSearch });
-    onClose();
+      navigate({ pathname: targetPathname, search: nextSearch });
+    finishNavigation();
   };
   const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
     if (!open) setHelpOpen(false);
   }, [open]);
   const goThread = (id: string) => {
-    navigate(threadHrefFrom(id, search));
-    onClose();
+    navigate(pathname === '/app' ? threadHref(id, search) : threadHrefFrom(id, search));
+    finishNavigation();
+  };
+  const goCoordinatorThread = (threadId: string, projectId?: string | null) => {
+    if (projectId != null) {
+      go(`/app/project/${projectId}`);
+      return;
+    }
+    const params = new URLSearchParams(coordinatorSearch(search));
+    params.set('chief', threadId);
+    navigate({ pathname: '/app', search: `?${params.toString()}` });
+    finishNavigation();
   };
   const runCommand = (command: SearchCommand) => {
-    onClose();
+    finishNavigation();
     command.run();
   };
   const actions: Array<() => void> = [
@@ -284,15 +371,30 @@ export function SearchPanel({
       : [
           ...todos.map((todo) => () => goThread(todo.id)),
           ...projects.map((project) => () => go(`/app/project/${project.id}`)),
+          ...messages.map(
+            (message) => () => goCoordinatorThread(message.threadId, message.projectId),
+          ),
+          ...memories.map(
+            (memory) => () =>
+              go(memory.projectId != null ? `/app/project/${memory.projectId}` : '/app'),
+          ),
           ...navMatches.map((row) => () => go(row.href)),
         ]),
   ];
   const base = commands.length;
+  const projectBase = base + todos.length;
+  const messageBase = projectBase + projects.length;
+  const memoryBase = messageBase + messages.length;
+  const navBase = memoryBase + memories.length;
   const releaseCursor = () => setCursor(null);
 
   useEffect(() => {
-    setCursor(null);
-  }, [query, open]);
+    if (open && q !== '' && actions.length > 0 && !pendingFilterToken) {
+      setCursor(0);
+    } else {
+      setCursor(null);
+    }
+  }, [query, open, actions.length, pendingFilterToken, q]);
 
   useEffect(() => {
     if (cursor == null) return;
@@ -303,6 +405,7 @@ export function SearchPanel({
 
   const kbd = cursor != null;
   const searchFailed = q !== '' && serverQuery?.isError === true;
+  const isSearching = live && q !== '' && serverQuery?.isSearching === true && !searchFailed;
 
   return (
     <DialogShell
@@ -415,8 +518,10 @@ export function SearchPanel({
               ) {
                 event.preventDefault();
                 onQuery(`${query} `);
-              } else if (event.key === 'Enter' && cursor != null) {
-                const action = actions[cursor];
+              } else if (event.key === 'Enter') {
+                const index = cursor ?? (q !== '' ? 0 : null);
+                if (index == null) return;
+                const action = actions[index];
                 if (action == null) return;
                 event.preventDefault();
                 action();
@@ -443,7 +548,16 @@ export function SearchPanel({
             </Button>
           </div>
         )}
-        {q !== '' && hitCount === 0 && !searchFailed ? (
+        {q !== '' && hitCount === 0 && isSearching ? (
+          <div
+            role="status"
+            data-testid="search-loading"
+            className="flex items-center gap-2 px-4 py-6 text-ui text-content-tertiary"
+          >
+            <RingSpinner aria-hidden="true" className="size-4" />
+            <span>{t('正在搜索…')}</span>
+          </div>
+        ) : q !== '' && hitCount === 0 && !searchFailed ? (
           <div className="flex flex-col gap-2 px-4 py-6 text-ui text-content-tertiary">
             <span>
               {chips.length > 0
@@ -526,7 +640,7 @@ export function SearchPanel({
                   <>
                     <div className={GROUP_LABEL}>{t('项目')}</div>
                     {projects.map((project, index) => {
-                      const rowIndex = base + todos.length + index;
+                      const rowIndex = projectBase + index;
                       return (
                         <Button
                           variant="ghost"
@@ -538,7 +652,75 @@ export function SearchPanel({
                           onClick={() => go(`/app/project/${project.id}`)}
                         >
                           <ProjectAvatar name={project.name} {...projectMark(project.id)} bare />
-                          <span className="truncate">{project.name}</span>
+                          <span className="min-w-0 truncate">{project.name}</span>
+                          {project.archived === true && (
+                            <span className={ROW_END}>
+                              <span
+                                data-testid="search-archived-badge"
+                                className={ARCHIVED_BADGE_CLS}
+                              >
+                                {t('已归档')}
+                              </span>
+                            </span>
+                          )}
+                        </Button>
+                      );
+                    })}
+                  </>
+                )}
+                {messages.length > 0 && (
+                  <>
+                    <div className={GROUP_LABEL}>{t('对话')}</div>
+                    {messages.map((message, index) => {
+                      const rowIndex = messageBase + index;
+                      return (
+                        <Button
+                          variant="ghost"
+                          key={message.id}
+                          data-row-kind="message"
+                          data-row-index={rowIndex}
+                          data-selected={cursor === rowIndex ? '' : undefined}
+                          className={`${ROW_BASE} ${rowLitClasses(cursor === rowIndex, kbd)}`}
+                          onClick={() => goCoordinatorThread(message.threadId, message.projectId)}
+                        >
+                          <MessageSquare className="size-4" />
+                          <span className="min-w-0 truncate">{message.snippet}</span>
+                          {message.projectName != null && (
+                            <span className={ROW_END}>
+                              <span className="max-w-32 truncate">{message.projectName}</span>
+                            </span>
+                          )}
+                        </Button>
+                      );
+                    })}
+                  </>
+                )}
+                {memories.length > 0 && (
+                  <>
+                    <div className={GROUP_LABEL}>{t('记忆')}</div>
+                    {memories.map((memory, index) => {
+                      const rowIndex = memoryBase + index;
+                      return (
+                        <Button
+                          variant="ghost"
+                          key={memory.id}
+                          data-row-kind="memory"
+                          data-row-index={rowIndex}
+                          data-selected={cursor === rowIndex ? '' : undefined}
+                          className={`${ROW_BASE} ${rowLitClasses(cursor === rowIndex, kbd)}`}
+                          onClick={() =>
+                            go(
+                              memory.projectId != null
+                                ? `/app/project/${memory.projectId}`
+                                : '/app',
+                            )
+                          }
+                        >
+                          <BookOpen className="size-4" />
+                          <span className="min-w-0 truncate">{memory.title}</span>
+                          <span className={ROW_END}>
+                            <span className="max-w-44 truncate">{memory.snippet}</span>
+                          </span>
                         </Button>
                       );
                     })}
@@ -548,7 +730,7 @@ export function SearchPanel({
                   <>
                     <div className={GROUP_LABEL}>{t('前往')}</div>
                     {navMatches.map(({ label, Icon, href }, index) => {
-                      const rowIndex = base + todos.length + projects.length + index;
+                      const rowIndex = navBase + index;
                       return (
                         <Button
                           variant="ghost"
@@ -573,6 +755,7 @@ export function SearchPanel({
         {helpOpen && (
           <SyntaxHelp
             onClose={() => setHelpOpen(false)}
+            projectExample={firstProjectName}
             className="mx-1.5 mb-1.5 max-h-64 min-h-24 shrink overflow-y-auto shadow-none ring-1 ring-border"
           />
         )}
@@ -615,14 +798,21 @@ export function SearchPanel({
   );
 }
 
-export function useSearchState(initialOpen: boolean, initialQuery: string) {
+export function useSearchState(initialOpen: boolean, initialQuery: string, enabled = true) {
   const [open, setOpen] = useState(initialOpen);
   const [query, setQuery] = useState(initialQuery);
-  const openSearch = useCallback(() => setOpen(true), []);
+  const openRef = useRef(open);
+  openRef.current = open;
+  const openSearch = useCallback(() => {
+    if (!enabled || isSearchShortcutBlocked()) return;
+    setOpen(true);
+  }, [enabled]);
   useLayoutEffect(() => {
+    if (!enabled) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.isComposing || event.keyCode === 229) return;
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'k') {
+        if (!openRef.current && isSearchShortcutBlocked()) return;
         event.preventDefault();
         setOpen((value) => !value);
       } else if (event.key === 'Escape' && !event.defaultPrevented) {
@@ -631,7 +821,7 @@ export function useSearchState(initialOpen: boolean, initialQuery: string) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [enabled]);
   useDesktopMenu('search', openSearch);
   return { open, setOpen, query, setQuery };
 }

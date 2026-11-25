@@ -5,7 +5,12 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { MENU_SURFACE_CLS } from '../components/ui/menu.js';
 import { useI18n } from '../i18n/provider.js';
-import { CHIP_PROBLEM_COPY, type ChipProblem, SYNTAX_ROWS } from './search-query.js';
+import {
+  CHIP_PROBLEM_COPY,
+  type ChipProblem,
+  projectSyntaxExample,
+  SYNTAX_ROWS,
+} from './search-query.js';
 
 export function QueryChip({
   chip,
@@ -77,7 +82,15 @@ export function ChipProblems({
   );
 }
 
-export function SyntaxHelp({ className, onClose }: { className?: string; onClose?: () => void }) {
+export function SyntaxHelp({
+  className,
+  onClose,
+  projectExample,
+}: {
+  className?: string;
+  onClose?: () => void;
+  projectExample?: string | null;
+}) {
   const { t } = useI18n();
   return (
     <section
@@ -98,18 +111,24 @@ export function SyntaxHelp({ className, onClose }: { className?: string; onClose
         )}
       </div>
       <dl className="m-0 grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1.5 max-[640px]:grid-cols-[4.5rem_minmax(0,1fr)]">
-        {SYNTAX_ROWS.map((row) => (
-          <div key={row.key} className="contents">
-            <dt className="font-mono text-code text-foreground">{row.key}</dt>
-            <dd className="m-0 text-meta text-content-secondary">{t(row.meaning)}</dd>
-            <dd className="m-0 font-mono text-code text-content-tertiary max-[640px]:hidden">
-              {row.example}
-            </dd>
-          </div>
-        ))}
+        {SYNTAX_ROWS.map((row) => {
+          const example =
+            row.key === 'project:' && projectExample !== undefined
+              ? projectSyntaxExample(projectExample)
+              : row.example;
+          return (
+            <div key={row.key} className="contents">
+              <dt className="font-mono text-code text-foreground">{row.key}</dt>
+              <dd className="m-0 text-meta text-content-secondary">{t(row.meaning)}</dd>
+              <dd className="m-0 font-mono text-code text-content-tertiary max-[640px]:hidden">
+                {example}
+              </dd>
+            </div>
+          );
+        })}
       </dl>
       <p className="m-0 border-t border-border pt-2 text-meta text-content-tertiary">
-        {t('没有筛选的词匹配标题。在筛选前加 - 表示排除。')}
+        {t('没有筛选的词匹配标题、内容和编号。在词或筛选前加 - 表示排除。')}
       </p>
     </section>
   );

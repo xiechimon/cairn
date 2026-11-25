@@ -156,8 +156,21 @@ export function BoardPage() {
     return listed.map((p) => ({ ...p, lastActiveAt: lastActive.get(p.id) ?? 0 }));
   }, [live, projectsQ.data, fixture, todos]);
 
-  const search = useSearchState(fixture.ui?.searchOpen === true, fixture.ui?.searchQuery ?? '');
-  const searchResults = useSearchResults(search.query, live && search.open);
+  const setup = useFirstRunSetup();
+  const setupHome = live && homeProjectId === null && threadId === null;
+  const setupDecision = setupShown({
+    projects: setup.projects,
+    progress: setup.progress,
+  });
+  const showSetup = setupHome && setupDecision === true;
+  const searchEnabled =
+    !showSetup && !(setupHome && setupDecision === undefined && firstRunRemembered());
+  const search = useSearchState(
+    fixture.ui?.searchOpen === true,
+    fixture.ui?.searchQuery ?? '',
+    searchEnabled,
+  );
+  const searchResults = useSearchResults(search.query, live && searchEnabled && search.open);
   const notifyBanner = useNotificationBanner(fixture.ui?.notificationBanner === true, live);
 
   const quotaInfos = quotaBannerInfo(todos);
@@ -165,7 +178,6 @@ export function BoardPage() {
   const loginWarnings = useClaudeLoginWarnings(now);
   const devinLoginWarnings = useDevinLoginWarnings(now);
   const antigravityLoginWarnings = useAntigravityLoginWarnings(now);
-  const setup = useFirstRunSetup();
   const bannerCandidates: { kind: HomeBannerKind; node: ReactNode }[] = [
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
@@ -209,12 +221,6 @@ export function BoardPage() {
     picked.length === 0 ? undefined : (
       <div className="flex flex-col gap-2">{picked.map((entry) => entry.node)}</div>
     );
-  const setupHome = live && homeProjectId === null && threadId === null;
-  const setupDecision = setupShown({
-    projects: setup.projects,
-    progress: setup.progress,
-  });
-  const showSetup = setupHome && setupDecision === true;
   useEffect(() => {
     if (setupHome && setupDecision !== undefined) rememberFirstRun(setupDecision);
   }, [setupHome, setupDecision]);
@@ -341,7 +347,7 @@ export function BoardPage() {
         query={search.query}
         onQuery={search.setQuery}
         onClose={() => search.setOpen(false)}
-        server={live ? searchResults.data : undefined}
+        server={live ? searchResults.settledData : undefined}
         serverQuery={live ? searchResults : undefined}
       />
     </div>

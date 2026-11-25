@@ -186,12 +186,19 @@ export const useProjects = (teamId: string | undefined, enabled: boolean) =>
 export function useSearchResults(query: string, enabled: boolean) {
   const debounced = useDebouncedValue(query, 250);
   const trimmed = debounced.trim();
-  return useQuery({
+  const result = useQuery({
     queryKey: ['search', trimmed],
     queryFn: ({ signal }) =>
       api.get<SearchResponse>(`/api/search?q=${encodeURIComponent(trimmed)}`, signal),
     enabled: enabled && trimmed !== '',
   });
+  const current = query.trim();
+  const settled = result.data !== undefined && current === trimmed;
+  return {
+    ...result,
+    settledData: settled ? result.data : undefined,
+    isSearching: enabled && current !== '' && !result.isError && !settled,
+  };
 }
 
 function useDebouncedValue(value: string, delayMs: number): string {

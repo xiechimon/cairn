@@ -124,14 +124,17 @@ test('live, projects loaded: pre-response rows carry each todo’s own project',
   await expect.poll(() => search.queries()).toContain('atlas');
   await expect(projectRows(page)).toHaveCount(1);
   await expect(projectRows(page)).toContainText('atlas');
-  // a query that only the fixture project name matches finds nothing live
   await typeQuery(page, 'lifecycle');
   await expect.poll(() => search.queries()).toContain('lifecycle');
+  await expect(panel(page).getByTestId('search-loading')).toBeVisible();
+  await expect(panel(page)).not.toContainText('没有与“lifecycle”匹配的结果');
+  await expect(panel(page)).not.toContainText(FIXTURE_PROJECT);
+  await search.release();
   await expect(panel(page)).toContainText('没有与“lifecycle”匹配的结果');
   await expect(panel(page)).not.toContainText(FIXTURE_PROJECT);
 
-  // server frame: same names once /api/search answers
   await typeQuery(page, 'search probe');
+  await expect.poll(() => search.queries()).toContain('search probe');
   await search.release();
   await expect(todoRow(page, 'search probe alpha')).toContainText('verify-1400');
   await expect(todoRow(page, 'search probe beta')).toContainText('atlas');

@@ -7300,10 +7300,95 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
       },
       "type": "array",
     },
+    "memories": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "projectName": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "snippet": {
+            "type": "string",
+          },
+          "title": {
+            "type": "string",
+          },
+          "updatedAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+        },
+        "required": [
+          "id",
+          "title",
+          "snippet",
+          "updatedAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
+    "messages": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "id": {
+            "type": "string",
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "projectName": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "snippet": {
+            "type": "string",
+          },
+          "threadId": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "threadId",
+          "snippet",
+          "createdAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "projects": {
       "items": {
         "additionalProperties": false,
         "properties": {
+          "archived": {
+            "type": "boolean",
+          },
           "id": {
             "type": "string",
           },
@@ -7323,6 +7408,9 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
       "items": {
         "additionalProperties": false,
         "properties": {
+          "archived": {
+            "type": "boolean",
+          },
           "id": {
             "type": "string",
           },

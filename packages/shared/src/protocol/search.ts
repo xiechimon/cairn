@@ -22,6 +22,26 @@ export const searchFilterResultSchema = z.object({
 });
 export type SearchFilterResult = z.infer<typeof searchFilterResultSchema>;
 
+export const searchMessageHitSchema = z.object({
+  id: recordId,
+  threadId: recordId,
+  snippet: z.string(),
+  projectId: recordId.nullable().optional(),
+  projectName: z.string().nullable().optional(),
+  createdAt: epochMs,
+});
+export type SearchMessageHit = z.infer<typeof searchMessageHitSchema>;
+
+export const searchMemoryHitSchema = z.object({
+  id: recordId,
+  title: z.string(),
+  snippet: z.string(),
+  projectId: recordId.nullable().optional(),
+  projectName: z.string().nullable().optional(),
+  updatedAt: epochMs,
+});
+export type SearchMemoryHit = z.infer<typeof searchMemoryHitSchema>;
+
 export const searchResponseSchema = z.object({
   todos: z.array(
     z.object({
@@ -31,9 +51,18 @@ export const searchResponseSchema = z.object({
       phase: phaseSchema,
       phaseAt: epochMs,
       projectName: z.string(),
+      archived: z.boolean().optional(),
     }),
   ),
-  projects: z.array(z.object({ id: recordId, name: z.string() })),
+  projects: z.array(
+    z.object({
+      id: recordId,
+      name: z.string(),
+      archived: z.boolean().optional(),
+    }),
+  ),
+  messages: z.array(searchMessageHitSchema).optional(),
+  memories: z.array(searchMemoryHitSchema).optional(),
   filters: z.array(searchFilterResultSchema).optional(),
 });
 export type SearchResponse = z.infer<typeof searchResponseSchema>;

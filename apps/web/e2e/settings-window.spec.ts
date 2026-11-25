@@ -125,7 +125,7 @@ test('search lists matching sections and rows, jumps to the pick and highlights 
   const search = settings(page).getByLabel('搜索设置');
   await search.fill('机');
   await expect(settings(page).getByTestId('settings-search-results')).toBeVisible();
-  await expect(settings(page).locator('[data-settings-result="machines"]')).toBeVisible();
+  await expect(settings(page).locator('[data-settings-result="machines"]').first()).toBeVisible();
   await search.fill('color');
   const option = settings(page).getByRole('option');
   await expect(option).toHaveCount(1);

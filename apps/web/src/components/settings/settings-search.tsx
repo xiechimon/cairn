@@ -1,6 +1,7 @@
+import { foldSearchText } from '@cairn/shared';
 import { cn } from 'cn';
 import { Search } from 'lucide-react';
-import { type ComponentType, type Ref, type SVGProps, useId, useState } from 'react';
+import { type ComponentType, type Ref, type SVGProps, useId, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { SETTINGS_ROW_INDEX } from '../../settings/settings-index.js';
 import { Button } from '../ui/button.js';
@@ -30,7 +31,7 @@ type Line = { kind: 'result'; result: Result } | { kind: 'more'; key: string; co
 const ROWS_PER_SECTION = 4;
 
 function includes(haystack: string, needle: string): boolean {
-  return haystack.toLowerCase().includes(needle);
+  return foldSearchText(haystack).includes(needle);
 }
 
 export function SettingsSearch({
@@ -44,10 +45,11 @@ export function SettingsSearch({
 }) {
   const { t } = useI18n();
   const listId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const needle = query.trim().toLowerCase();
+  const needle = foldSearchText(query.trim());
 
   const lines: Line[] = [];
   if (needle !== '') {
@@ -124,7 +126,7 @@ export function SettingsSearch({
   };
   const showPopover = open && needle !== '';
   return (
-    <div className="relative flex-none">
+    <div ref={rootRef} className="relative flex-none">
       <div
         data-testid="settings-search"
         className="flex h-7 items-center gap-2 pointer-coarse:h-11 rounded-(--radius-control) border border-border px-2.5 text-content-tertiary transition-colors duration-(--dur-fast) focus-within:border-(--focus-field-border) hover:bg-sidebar-hover"
@@ -150,7 +152,9 @@ export function SettingsSearch({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
+          onBlur={(event) => {
+            if (!rootRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
+          }}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
             if (event.key === 'Escape') {
@@ -197,8 +201,11 @@ export function SettingsSearch({
                 role="option"
                 tabIndex={-1}
                 aria-selected={current?.key === line.result.key}
-                data-settings-result={line.result.section}
-                onMouseDown={(event) => event.preventDefault()}
+                data-settings-result={line.result.Icon !== null ? line.result.section : undefined}
+                data-settings-row={
+                  line.result.Icon === null ? (line.result.row ?? undefined) : undefined
+                }
+                onPointerDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActive(results.indexOf(line.result))}
                 onClick={() => choose(line.result)}
                 className={cn(

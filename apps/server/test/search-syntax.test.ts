@@ -101,15 +101,15 @@ function corpus() {
 describe('search filters: is:', () => {
   test('is:failed matches failed only', async () => {
     const { s } = corpus();
-    expect(titles(await run(s, 'is:failed'))).toEqual(['web failed', 'api failed']);
+    expect(titles(await run(s, 'is:failed'))).toEqual(['api failed', 'web failed']);
   });
 
   test('is:waiting matches confirm, needs_input and review (the web needs-you phases)', async () => {
     const { s } = corpus();
     expect(titles(await run(s, 'is:waiting'))).toEqual([
-      'web confirm',
-      'web needs_input',
       'web review',
+      'web needs_input',
+      'web confirm',
     ]);
   });
 
@@ -121,15 +121,15 @@ describe('search filters: is:', () => {
   test('is:running matches queued, planning and building', async () => {
     const { s } = corpus();
     expect(titles(await run(s, 'is:running'))).toEqual([
-      'web queued',
-      'web planning',
       'web building',
+      'web planning',
+      'web queued',
     ]);
   });
 
   test('is:done matches done and closed', async () => {
     const { s } = corpus();
-    expect(titles(await run(s, 'is:done'))).toEqual(['web done', 'web closed']);
+    expect(titles(await run(s, 'is:done'))).toEqual(['web closed', 'web done']);
   });
 
   test('is:snoozed is an unknown state now that snooze is gone', async () => {
@@ -151,9 +151,9 @@ describe('search filters: is:', () => {
   test('multiple positive is: filters are ORed', async () => {
     const { s } = corpus();
     expect(titles(await run(s, 'is:failed is:review'))).toEqual([
-      'web review',
-      'web failed',
       'api failed',
+      'web failed',
+      'web review',
     ]);
   });
 
@@ -162,10 +162,10 @@ describe('search filters: is:', () => {
     const hit = await run(s, 'is:failed -project:api');
     expect(titles(hit)).toEqual(['web failed']);
     expect(titles(await run(s, '-is:failed -is:done -is:running'))).toEqual([
-      'web todo',
-      'web confirm',
-      'web needs_input',
       'web review',
+      'web needs_input',
+      'web confirm',
+      'web todo',
     ]);
   });
 });
@@ -214,7 +214,7 @@ describe('search filters: project:', () => {
   test('a negated unknown project is flagged but excludes nothing', async () => {
     const { s } = corpus();
     const hit = await run(s, '-project:nope is:failed');
-    expect(titles(hit)).toEqual(['web failed', 'api failed']);
+    expect(titles(hit)).toEqual(['api failed', 'web failed']);
     expect(hit.filters?.[0]).toMatchObject({ valid: false, reason: 'unknown_project' });
   });
 });
@@ -364,11 +364,11 @@ describe('search syntax: combinations and legacy behaviour', () => {
     expect(hit.projects).toEqual([]);
   });
 
-  test('queries with no recognised filter keep the legacy literal substring search and omit filters', async () => {
+  test('queries with no recognised filter use multi-word AND matching and omit filters', async () => {
     const { s } = corpus();
     const plain = await run(s, 'fail web');
-    expect(plain.todos).toEqual([]);
-    const phrase = await run(s, 'web failed');
+    expect(titles(plain)).toEqual(['web failed']);
+    const phrase = await run(s, '"web failed"');
     expect(titles(phrase)).toEqual(['web failed']);
     expect(phrase.filters).toBeUndefined();
     expect((await run(s, 'label:bug')).filters).toBeUndefined();

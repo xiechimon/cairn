@@ -1,5 +1,4 @@
 import { expect, type Page, test } from '@playwright/test';
-import { pressAndExpect } from './helpers.js';
 
 
 async function installEscapeTap(page: Page) {
@@ -42,7 +41,7 @@ const confirmDialog = (page: Page) => page.getByRole('alertdialog');
 
 const searchPanel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
-test('the confirm sheet is not re-wired by root re-render: a single Escape still closes it after a ⌘K round trip', async ({
+test('⌘K stays blocked behind the confirm sheet and a single Escape still closes it cleanly', async ({
   page,
 }) => {
   await page.goto(DETAIL);
@@ -51,8 +50,8 @@ test('the confirm sheet is not re-wired by root re-render: a single Escape still
   await expect(confirmDialog(page)).toBeVisible();
   await installEscapeTap(page);
 
-  await pressAndExpect(page, 'Meta+k', searchPanel(page));
-  await pressAndExpect(page, 'Meta+k', searchPanel(page), 'hidden');
+  await page.keyboard.press('Meta+k');
+  await expect(searchPanel(page)).toHaveCount(0);
 
   await expect
     .poll(async () => {
@@ -60,7 +59,6 @@ test('the confirm sheet is not re-wired by root re-render: a single Escape still
       return { win: { winAdds: t.winAdds, winRems: t.winRems }, balanced: t.docAdds === t.docRems };
     })
     .toEqual({ win: { winAdds: 0, winRems: 0 }, balanced: true });
-  const tap = await readEscapeTap(page);
   await page.keyboard.press('Escape');
   await expect(confirmDialog(page)).not.toBeVisible();
 });

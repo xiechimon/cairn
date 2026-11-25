@@ -59,42 +59,45 @@ test('clicking a go-to row → panel closes + jumps to the matching route', asyn
   ).toHaveAttribute('aria-selected', 'true');
 });
 
-test('idle: no always-on; hovering a row lights exactly that one row', async ({ page }) => {
+test('idle: hovering a row lights exactly that one row; typed results default-select row 0', async ({
+  page,
+}) => {
   await page.goto(BOARD);
-  await searchProbe(page);
-
-  // typed-in results at rest: no fixed lit row (#159 replaces the r7 05
-  // default-selected keyboard-cursor row)
+  await openPanel(page);
   await expect(panel(page).locator('[data-selected]')).toHaveCount(0);
 
+  await page.keyboard.type(PROBE);
+  await expect(todoRows(page).first()).toContainText(PROBE);
   const first = todoRows(page).first();
   const second = todoRows(page).nth(1);
-  await first.hover();
-  await expect.poll(() => isLit(first)).toBe(true);
+  await expect(first).toHaveAttribute('data-selected', '');
 
   await second.hover();
+  await expect(panel(page).locator('[data-selected]')).toHaveCount(0);
   await expect.poll(() => isLit(second)).toBe(true);
   await expect.poll(() => rowBg(first)).toBe(TRANSPARENT);
+
+  await first.hover();
+  await expect.poll(() => isLit(first)).toBe(true);
+  await expect.poll(() => rowBg(second)).toBe(TRANSPARENT);
 });
 
-test('↑↓ keyboard cursor takes over the highlight; Enter jumps to the cursor row', async ({ page }) => {
+test('Enter immediately opens row 0; ArrowDown moves to row 1 and Enter jumps there', async ({
+  page,
+}) => {
   await page.goto(BOARD);
   await searchProbe(page);
-  await expect(panel(page).getByText('打开', { exact: true })).toHaveCount(0);
-
-  await page.keyboard.press('ArrowDown');
   const first = todoRows(page).first();
+  const second = todoRows(page).nth(1);
   await expect(first).toHaveAttribute('data-selected', '');
   await expect(panel(page).getByText('打开', { exact: true })).toBeVisible();
   await expect.poll(() => isLit(first)).toBe(true);
 
   await page.keyboard.press('ArrowDown');
-  const second = todoRows(page).nth(1);
   await expect(second).toHaveAttribute('data-selected', '');
   await expect(first).not.toHaveAttribute('data-selected');
 
   await page.keyboard.press('Enter');
-  // second result = the probe2 sibling, fixture order
   await expect(page).toHaveURL('/app?scenario=01&thread=r3-legacy-2');
   await expect(panel(page)).toBeHidden();
 });
@@ -104,13 +107,10 @@ test('mouse movement yields: keyboard cursor hands back to hover', async ({ page
   await searchProbe(page);
 
   await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('ArrowDown');
   const first = todoRows(page).first();
   const second = todoRows(page).nth(1);
   await expect(second).toHaveAttribute('data-selected', '');
 
-  // a real pointer move over another row drops the keyboard cursor — hover
-  // owns the highlight again, and it is the only lit row
   await first.hover();
   await expect(panel(page).locator('[data-selected]')).toHaveCount(0);
   await expect.poll(() => isLit(first)).toBe(true);

@@ -88,6 +88,12 @@ export function chipProblem(
   return answered?.reason ?? null;
 }
 
+export function projectSyntaxExample(projectName: string | null | undefined): string {
+  const trimmed = projectName?.trim() ?? '';
+  if (trimmed === '') return '';
+  return /\s/.test(trimmed) ? `project:"${trimmed}"` : `project:${trimmed}`;
+}
+
 export const SYNTAX_ROWS = [
   {
     key: 'is:',
@@ -96,7 +102,7 @@ export const SYNTAX_ROWS = [
   },
   { key: 'project:', meaning: '项目名', example: 'project:cairn' },
   { key: 'pr:', meaning: 'PR 编号，或 any', example: 'pr:2271' },
-  { key: 'by:', meaning: '发起它的成员', example: 'by:builder' },
+  { key: 'by:', meaning: '发起它的成员', example: 'by:alex' },
   { key: 'after:', meaning: '日期，或距今的时间段', example: 'after:7d' },
   { key: 'cost:', meaning: '花费，用 > 或 <', example: 'cost:>5' },
 ] as const;

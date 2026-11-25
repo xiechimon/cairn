@@ -1862,8 +1862,15 @@ export const EN: Record<string, string> = {
   '移除筛选 {filter}': 'Remove filter {filter}',
   搜索筛选: 'Search filters',
   '可以任意组合，需同时满足': 'Combine any; they all apply',
-  '没有筛选的词匹配标题。在筛选前加 - 表示排除。':
-    'Words without a filter match titles. Prefix a filter with - to exclude it.',
+  '没有筛选的词匹配标题、内容和编号。在词或筛选前加 - 表示排除。':
+    'Words without a filter match titles, content, and numbers. Prefix a word or filter with - to exclude it.',
+  '正在搜索…': 'Searching…',
+  执行机权限: 'Runner permissions',
+  订阅与用量: 'Subscriptions and usage',
+  技能库: 'Skills',
+  'MCP 连接器': 'MCP connectors',
+  配对设备: 'Paired devices',
+  个人资料: 'Profile',
   '状态：failed、waiting、review、running、done': 'State: failed, waiting, review, running, done',
   项目名: 'A project name',
   'PR 编号，或 any': 'A pull request number, or any',

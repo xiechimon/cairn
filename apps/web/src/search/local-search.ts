@@ -1,10 +1,13 @@
-import type {
-  ParsedSearchQuery,
-  SearchFilterCondition,
-  SearchFilterResult,
-  SearchIsState,
+import {
+  foldSearchText,
+  isWaitingPhase,
+  type ParsedSearchQuery,
+  type SearchFilterCondition,
+  type SearchFilterResult,
+  type SearchIsState,
+  type SearchWord,
+  searchSeqNum,
 } from '@cairn/shared';
-import { isWaitingPhase } from '@cairn/shared';
 import { usageCostKnown } from '../api/mappers.js';
 import type { TodoRecord } from '../fixtures/records.js';
 
@@ -16,6 +19,24 @@ const IS_PHASES: Record<SearchIsState, (todo: TodoRecord) => boolean> = {
   done: (todo) => todo.phase === 'done' || todo.phase === 'closed',
 };
 
+export function matchesSearchWords(
+  haystacks: readonly (string | null | undefined)[],
+  words: readonly SearchWord[],
+  seqNum?: number,
+): boolean {
+  const foldedHaystacks = haystacks
+    .filter((value): value is string => value != null && value !== '')
+    .map(foldSearchText);
+  return words.every((word) => {
+    const needle = foldSearchText(word.text);
+    const seq = seqNum !== undefined ? searchSeqNum(word.text) : null;
+    const hit =
+      (seq !== null && seqNum === seq) ||
+      foldedHaystacks.some((haystack) => haystack.includes(needle));
+    return word.negated ? !hit : hit;
+  });
+}
+
 function matchesCondition(
   condition: SearchFilterCondition,
   todo: TodoRecord,
@@ -25,11 +46,13 @@ function matchesCondition(
     case 'is':
       return IS_PHASES[condition.state](todo);
     case 'project':
-      return projectName?.toLowerCase() === condition.name.toLowerCase();
+      return (
+        projectName !== undefined && foldSearchText(projectName) === foldSearchText(condition.name)
+      );
     case 'pr':
       return false;
     case 'by':
-      return (todo.agent?.displayName ?? '').toLowerCase().includes(condition.name.toLowerCase());
+      return foldSearchText(todo.agent?.displayName ?? '').includes(foldSearchText(condition.name));
     case 'after':
       return todo.phaseAt >= condition.sinceMs;
     case 'cost': {
@@ -53,11 +76,16 @@ export function searchTodosLocally(
   projectName: (projectId: string) => string | undefined,
   parsed: ParsedSearchQuery,
 ): LocalSearch {
-  const projectNames = new Set(todos.map((todo) => projectName(todo.projectId)?.toLowerCase()));
+  const projectNames = new Set(
+    todos
+      .map((todo) => projectName(todo.projectId))
+      .filter((name): name is string => name !== undefined)
+      .map(foldSearchText),
+  );
   const resolved = parsed.filters.map((filter) => {
     const condition = filter.condition;
     let reason: SearchFilterResult['reason'] = filter.problem ?? undefined;
-    if (condition?.key === 'project' && !projectNames.has(condition.name.toLowerCase())) {
+    if (condition?.key === 'project' && !projectNames.has(foldSearchText(condition.name))) {
       reason = 'unknown_project';
     }
     return { filter, condition: reason === undefined ? condition : null, reason };
@@ -88,10 +116,7 @@ export function searchTodosLocally(
       }
     }
     if ([...positive.values()].some((hit) => !hit)) return false;
-    return parsed.words.every((word) => {
-      const contains = todo.title.toLowerCase().includes(word.text.toLowerCase());
-      return word.negated ? !contains : contains;
-    });
+    return matchesSearchWords([todo.title, todo.spec], parsed.words, todo.seqNum);
   });
   return { todos: matched, filters };
 }

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { foldSearchText } from '@cairn/shared';
 import Database from 'better-sqlite3';
 import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
@@ -8,6 +9,49 @@ import { foldMemoryIndexes } from '../services/memory.js';
 import * as schema from './schema.js';
 
 export type Db = BetterSQLite3Database<typeof schema>;
+
+export function extractMessageText(raw: unknown): string {
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']'))
+    ) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        return raw;
+      }
+    } else {
+      return raw;
+    }
+  }
+  if (typeof parsed === 'string') return parsed;
+  if (Array.isArray(parsed)) {
+    return parsed
+      .map((part) => {
+        if (typeof part === 'string') return part;
+        if (
+          part !== null &&
+          typeof part === 'object' &&
+          'text' in part &&
+          typeof part.text === 'string'
+        ) {
+          return part.text;
+        }
+        return '';
+      })
+      .filter((s) => s !== '')
+      .join(' ');
+  }
+  if (parsed !== null && typeof parsed === 'object') {
+    if ('text' in parsed && typeof parsed.text === 'string') return parsed.text;
+    if ('content' in parsed && typeof parsed.content === 'string') return parsed.content;
+  }
+  return '';
+}
 
 function resolveMigrationsFolder(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -73,6 +117,12 @@ function openConnection(source: string | Buffer): Database.Database {
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('cache_size = -131072');
   sqlite.pragma('foreign_keys = ON');
+  sqlite.function('nfkc_lower', { deterministic: true }, (value: unknown) =>
+    typeof value === 'string' ? foldSearchText(value) : '',
+  );
+  sqlite.function('nfkc_message_text', { deterministic: true }, (value: unknown) =>
+    foldSearchText(extractMessageText(value)),
+  );
   return sqlite;
 }
 
