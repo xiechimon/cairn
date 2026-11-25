@@ -73,7 +73,10 @@ check_lag() {
   touch "$STATE/alarms/$head"
 }
 
-git -C "$BUILD_CHECKOUT" fetch -q origin main
+git -C "$BUILD_CHECKOUT" fetch -q --tags --force origin main
+if [ ! -e "$STATE/lock" ]; then
+  git -C "$BUILD_CHECKOUT" checkout -q --detach origin/main >/dev/null 2>&1 || true
+fi
 raw=""
 [ -f "$APP_ROOT/DEPLOYED_SHA" ] && raw="$(head -n1 "$APP_ROOT/DEPLOYED_SHA" | tr -d '[:space:]')"
 [ -n "$raw" ] || { echo "cannot read $APP_ROOT/DEPLOYED_SHA" >&2; exit 1; }

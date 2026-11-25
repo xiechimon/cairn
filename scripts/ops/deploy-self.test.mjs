@@ -74,15 +74,20 @@ export function openDbWithHandle(path) {
   );
   writeFileSync(
     join(work, 'apps/server/build.mjs'),
-    `import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-mkdirSync('apps/server/dist', { recursive: true });
-writeFileSync('apps/server/dist/index.mjs', 'artifact:' + readFileSync('marker.txt', 'utf8'));
-writeFileSync('apps/server/dist/index.mjs.map', '{}');
-writeFileSync('apps/server/dist/photon_rs_bg.wasm', 'wasm');
+    `import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+if (!existsSync('src/index.ts')) throw new Error('Could not resolve "src/index.ts"');
+mkdirSync('dist', { recursive: true });
+writeFileSync('dist/index.mjs', 'artifact:' + readFileSync('../../marker.txt', 'utf8'));
+writeFileSync('dist/index.mjs.map', '{}');
+writeFileSync('dist/photon_rs_bg.wasm', 'wasm');
 const config = { external: ['better-sqlite3'] };
 void config;
 `,
   );
+  mkdirSync(join(work, 'apps/server/src'), { recursive: true });
+  writeFileSync(join(work, 'apps/server/src/index.ts'), 'export const ok = true;\n');
+  mkdirSync(join(work, 'apps/daemon/src'), { recursive: true });
+  writeFileSync(join(work, 'apps/daemon/src/cli.ts'), `// ${message}\n`);
   mkdirSync(join(work, 'apps/server/drizzle/meta'), { recursive: true });
   mkdirSync(join(work, 'scripts/ops'), { recursive: true });
   writeFileSync(join(work, 'scripts/ops/deploy-watch.sh'), '#!/usr/bin/env bash\nexit 0\n');
@@ -126,12 +131,16 @@ function writeRelease(releases, sha, label) {
 async function fixture({
   manager = 'systemd',
   claimedCoordinator = 0,
+  claimedRunner = 0,
   openComputerCalls = 0,
+  runner = false,
+  journalMode = 'WAL',
 } = {}) {
   const dir = makeTestTempDir('artifact-deploy-');
   const origin = join(dir, 'origin.git');
   const work = join(dir, 'work');
   const checkout = join(dir, 'build-checkout');
+  const runnerCheckout = join(dir, 'runner-checkout');
   const data = join(dir, 'data');
   const state = join(dir, 'state');
   const backups = join(dir, 'backups');
@@ -149,6 +158,10 @@ async function fixture({
   git(work, 'push', '-q', 'origin', 'main');
   git(dir, 'clone', '-q', origin, checkout);
   git(checkout, 'checkout', '-q', '--detach', previous);
+  if (runner) {
+    git(dir, 'clone', '-q', origin, runnerCheckout);
+    git(runnerCheckout, 'checkout', '-q', '--detach', previous);
+  }
 
   const previousRelease = writeRelease(releases, previous, 'previous');
   symlinkSync(previousRelease, root, 'dir');
@@ -156,7 +169,8 @@ async function fixture({
   const db = join(data, 'server.db');
   sqlite(
     db,
-    `create table step(id text primary key, kind text default 'build', status text, machineId text, note text);
+    `pragma journal_mode=${journalMode};
+     create table step(id text primary key, kind text default 'build', status text, machineId text, note text);
      create table machine(id text primary key, name text, lastSeenAt integer, maxConcurrent integer default 1);
      create table deploy_lease(id text primary key, owner text not null, status text not null, expiresAt integer not null);
      create table computer_call(id text primary key, tool text not null, state text not null);
@@ -166,6 +180,8 @@ async function fixture({
   );
   for (let i = 0; i < claimedCoordinator; i++)
     sqlite(db, `insert into step values ('c${i}', 'chief', 'claimed', null, null)`);
+  for (let i = 0; i < claimedRunner; i++)
+    sqlite(db, `insert into step values ('r${i}', 'build', 'claimed', 'm1', null)`);
   for (let i = 0; i < openComputerCalls; i++)
     sqlite(db, `insert into computer_call values ('cc${i}', 'click', 'running')`);
 
@@ -174,6 +190,10 @@ async function fixture({
     'npx',
     `echo "npx $* @ $(pwd)" >> "${fake}/npx.log"
 if [[ "$*" == *install* ]]; then
+  if [ -f "${fake}/fail-install-$(basename "$(pwd)")" ] || [ -f "${fake}/fail-install-$(git rev-parse HEAD 2>/dev/null || true)" ]; then
+    echo "simulated install failure" >&2
+    exit 1
+  fi
   mkdir -p node_modules/tsx apps/server/node_modules/better-sqlite3/lib
   printf '{"type":"module","exports":"./index.mjs"}' > node_modules/tsx/package.json
   printf 'export {};\n' > node_modules/tsx/index.mjs
@@ -224,37 +244,101 @@ else printf 000; fi`,
   );
 
   const serviceBody = `echo "$1 $2 $3 $4" >> "${fake}/service.log"
-if [[ " $* " == *" stop "* ]]; then rm -f "${fake}/up"; fi
-if [[ " $* " == *" start "* ]]; then
-  sha=$(cat "${root}/DEPLOYED_SHA" 2>/dev/null || true)
-  if [ -n "$sha" ] && [ ! -f "${fake}/broken-$sha" ]; then
-    touch "${fake}/up"
-  else rm -f "${fake}/up"; fi
-  [ ! -f "${fake}/write-on-start-$sha" ] || sqlite3 "${db}" "insert into step values ('written-after', 'build', 'done', null, null)"
+if [[ " $* " == *" is-active "* ]]; then
+  if [[ " $* " == *" cairn-daemon"* ]]; then
+    [ -f "${fake}/runner-up" ] && exit 0 || exit 3
+  fi
+  [ -f "${fake}/up" ] && exit 0 || exit 3
 fi
-exit 0`;
-  fakeTool(bin, 'systemctl', serviceBody);
-  if (manager === 'launchd') writeFileSync(join(fake, 'launchd-loaded'), '');
-  fakeTool(
-    bin,
-    'launchctl',
-    `echo "$1 $2 $3 $4" >> "${fake}/service.log"
-case "$1" in
-  print) [ -f "${fake}/launchd-loaded" ] && exit 0 || exit 113 ;;
-  bootout) rm -f "${fake}/launchd-loaded" "${fake}/up" ;;
-  bootstrap)
-    touch "${fake}/launchd-loaded"
+if [[ " $* " == *" stop "* ]]; then
+  if [[ " $* " == *" cairn-daemon"* ]]; then
+    rm -f "${fake}/runner-up"
+  else
+    rm -f "${fake}/up"
+    sqlite3 "${db}" "pragma wal_checkpoint(truncate);" >/dev/null 2>&1 || true
+    rm -f "${db}-shm" "${db}-wal"
+  fi
+fi
+if [[ " $* " == *" start "* ]]; then
+  if [[ " $* " == *" cairn-daemon"* ]]; then
+    rsha=$(git -C "${runnerCheckout}" rev-parse HEAD 2>/dev/null || true)
+    if [ -n "$rsha" ] && [ ! -f "${fake}/runner-broken-$rsha" ]; then
+      touch "${fake}/runner-up"
+    else rm -f "${fake}/runner-up"; fi
+  else
     sha=$(cat "${root}/DEPLOYED_SHA" 2>/dev/null || true)
     if [ -n "$sha" ] && [ ! -f "${fake}/broken-$sha" ]; then
       touch "${fake}/up"
     else rm -f "${fake}/up"; fi
     [ ! -f "${fake}/write-on-start-$sha" ] || sqlite3 "${db}" "insert into step values ('written-after', 'build', 'done', null, null)"
+  fi
+fi
+exit 0`;
+  fakeTool(bin, 'systemctl', serviceBody);
+  if (manager === 'launchd') {
+    writeFileSync(join(fake, 'launchd-loaded-server'), '');
+    if (runner) {
+      writeFileSync(join(fake, 'launchd-loaded-daemon'), '');
+      writeFileSync(join(fake, 'runner-up'), '');
+    }
+  } else if (runner) {
+    writeFileSync(join(fake, 'runner-up'), '');
+  }
+  fakeTool(
+    bin,
+    'launchctl',
+    `echo "$1 $2 $3 $4" >> "${fake}/service.log"
+kind="server"
+if [[ "$*" == *"cairn-daemon"* ]]; then kind="daemon"; fi
+case "$1" in
+  print)
+    if [ -f "${fake}/launchd-loaded-$kind" ]; then
+      if [ "$kind" = "daemon" ] && [ ! -f "${fake}/runner-up" ]; then
+        echo "state = not running"
+      else
+        echo "state = running"
+      fi
+      exit 0
+    fi
+    exit 113
+    ;;
+  bootout)
+    rm -f "${fake}/launchd-loaded-$kind"
+    if [ "$kind" = "daemon" ]; then
+      rm -f "${fake}/runner-up"
+    else
+      rm -f "${fake}/up"
+      sqlite3 "${db}" "pragma wal_checkpoint(truncate);" >/dev/null 2>&1 || true
+      rm -f "${db}-shm" "${db}-wal"
+    fi
+    ;;
+  bootstrap)
+    touch "${fake}/launchd-loaded-$kind"
+    if [ "$kind" = "daemon" ]; then
+      rsha=$(git -C "${runnerCheckout}" rev-parse HEAD 2>/dev/null || true)
+      if [ -n "$rsha" ] && [ ! -f "${fake}/runner-broken-$rsha" ]; then
+        touch "${fake}/runner-up"
+      else rm -f "${fake}/runner-up"; fi
+    else
+      sha=$(cat "${root}/DEPLOYED_SHA" 2>/dev/null || true)
+      if [ -n "$sha" ] && [ ! -f "${fake}/broken-$sha" ]; then
+        touch "${fake}/up"
+      else rm -f "${fake}/up"; fi
+      [ ! -f "${fake}/write-on-start-$sha" ] || sqlite3 "${db}" "insert into step values ('written-after', 'build', 'done', null, null)"
+    fi
     ;;
   kickstart)
-    sha=$(cat "${root}/DEPLOYED_SHA" 2>/dev/null || true)
-    if [ -n "$sha" ] && [ ! -f "${fake}/broken-$sha" ]; then
-      touch "${fake}/up"
-    else rm -f "${fake}/up"; fi
+    if [ "$kind" = "daemon" ]; then
+      rsha=$(git -C "${runnerCheckout}" rev-parse HEAD 2>/dev/null || true)
+      if [ -n "$rsha" ] && [ ! -f "${fake}/runner-broken-$rsha" ]; then
+        touch "${fake}/runner-up"
+      else rm -f "${fake}/runner-up"; fi
+    else
+      sha=$(cat "${root}/DEPLOYED_SHA" 2>/dev/null || true)
+      if [ -n "$sha" ] && [ ! -f "${fake}/broken-$sha" ]; then
+        touch "${fake}/up"
+      else rm -f "${fake}/up"; fi
+    fi
     ;;
 esac
 exit 0`,
@@ -328,8 +412,19 @@ exit 0`,
     CAIRN_DEPLOY_LAUNCHD_LABEL: 'com.fixture.cairn-server',
     CAIRN_DEPLOY_LAUNCHD_PLIST: join(dir, 'com.fixture.cairn-server.plist'),
     CAIRN_DEPLOY_COORDINATOR_WAIT_SECONDS: '0',
+    CAIRN_RUNNER_HEALTH_TRIES: '2',
+    CAIRN_RUNNER_HEALTH_INTERVAL: '0',
+    ...(runner
+      ? {
+          CAIRN_DEPLOY_RUNNER_CHECKOUT: runnerCheckout,
+          CAIRN_DEPLOY_RUNNER_SYSTEMD_UNIT: 'cairn-daemon.service',
+          CAIRN_DEPLOY_RUNNER_LAUNCHD_LABEL: 'com.fixture.cairn-daemon',
+          CAIRN_DEPLOY_RUNNER_LAUNCHD_PLIST: join(dir, 'com.fixture.cairn-daemon.plist'),
+        }
+      : {}),
   };
   writeFileSync(env.CAIRN_DEPLOY_LAUNCHD_PLIST, 'plist');
+  if (runner) writeFileSync(env.CAIRN_DEPLOY_RUNNER_LAUNCHD_PLIST, 'daemon-plist');
   const run = (script, args = [], extra = {}) =>
     new Promise((resolve) => {
       const child = spawn('/bin/bash', [script, ...args], { env: { ...env, ...extra } });
@@ -353,6 +448,7 @@ exit 0`,
     dir,
     work,
     checkout,
+    runnerCheckout,
     data,
     db,
     state,
@@ -495,7 +591,7 @@ test('a failed health check rolls back to the previous release and restores an u
     writeFileSync(join(f.fake, `broken-${target}`), '');
     const result = await f.run(DEPLOY, [target]);
     assert.equal(result.status, 1, result.stderr + result.stdout);
-    assert.equal(readlinkSync(f.root), realpathSync(f.previousRelease));
+    assert.equal(realpathSync(f.root), realpathSync(f.previousRelease));
     assert.equal(readFileSync(join(f.root, 'DEPLOYED_SHA'), 'utf8').trim(), f.previous);
     const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
     assert.equal(record.result, 'rolled-back');
@@ -515,7 +611,7 @@ test('a failed health check keeps a database that received writes after the snap
     writeFileSync(join(f.fake, `write-on-start-${target}`), '');
     const result = await f.run(DEPLOY, [target]);
     assert.equal(result.status, 1, result.stderr + result.stdout);
-    assert.equal(readlinkSync(f.root), realpathSync(f.previousRelease));
+    assert.equal(realpathSync(f.root), realpathSync(f.previousRelease));
     const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
     assert.equal(record.result, 'rolled-back-code');
     assert.equal(sqlite(f.db, "select count(*) from step where id='written-after'"), '1');
@@ -650,6 +746,303 @@ test('the installer writes a two-minute launchd watcher and a systemd timer with
     );
     assert.match(timer, /OnUnitActiveSec=2min/);
     assert.match(timer, /AccuracySec=30s/);
+  } finally {
+    f.close();
+  }
+});
+
+test('watcher does not mark a SHA failed on GitHub API outage and reuses cached green evidence offline', async () => {
+  const f = await fixture();
+  try {
+    const target = pushTarget(f, 'offline-target');
+    const outage = await f.run(WATCH, [], { CAIRN_GITHUB_API_BASE: 'http://127.0.0.1:9' });
+    assert.equal(outage.status, 0, outage.stderr + outage.stdout);
+    assert.ok(!existsSync(join(f.state, 'failed', target)));
+    assert.equal(readFileSync(join(f.root, 'DEPLOYED_SHA'), 'utf8').trim(), f.previous);
+    const cacheDir = join(f.state, 'github-evidence');
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(
+      join(cacheDir, `${target}.json`),
+      JSON.stringify({ green: true, sha: target, at: new Date().toISOString() }),
+    );
+    const cached = await f.run(WATCH, [], { CAIRN_GITHUB_API_BASE: 'http://127.0.0.1:9' });
+    assert.equal(cached.status, 0, cached.stderr + cached.stdout);
+    assert.equal(readFileSync(join(f.root, 'DEPLOYED_SHA'), 'utf8').trim(), target);
+  } finally {
+    f.close();
+  }
+});
+
+test('build_target runs from apps/server and aborts before snapshot or restart when server build fails', async () => {
+  const f = await fixture();
+  try {
+    const target = pushTarget(f, 'bad-server-build', {
+      'apps/server/build.mjs': "console.error('broken build'); process.exit(1);\n",
+    });
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.equal(serviceLog(f), '');
+    assert.equal(readdirSync(f.backups).length, 0);
+    assert.ok(existsSync(join(f.state, 'failed', target)));
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+  } finally {
+    f.close();
+  }
+});
+
+test('snapshots and rolls back a WAL-mode database when snapshot and stopped DB lack shm files', async () => {
+  const f = await fixture({ journalMode: 'WAL' });
+  try {
+    const target = pushTarget(f, 'wal-broken');
+    writeFileSync(join(f.fake, `broken-${target}`), '');
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.equal(realpathSync(f.root), realpathSync(f.previousRelease));
+    const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
+    assert.equal(record.result, 'rolled-back');
+    assert.equal(record.failed, target);
+  } finally {
+    f.close();
+  }
+});
+
+test('pre-switch failure on a legacy real directory restarts it in place without EISDIR', async () => {
+  const f = await fixture();
+  try {
+    rmSync(f.root, { force: true });
+    cpSync(f.previousRelease, f.root, { recursive: true });
+    const target = pushTarget(f, 'legacy-pre-switch-fail');
+    fakeTool(
+      f.bin,
+      'sqlite3',
+      `for a in "$@"; do
+  if [[ "$a" == *".backup"* ]]; then exit 1; fi
+done
+exec /usr/bin/sqlite3 "$@"`,
+    );
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.doesNotMatch(result.stderr, /EISDIR/);
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+    assert.equal(readFileSync(join(f.root, 'DEPLOYED_SHA'), 'utf8').trim(), f.previous);
+  } finally {
+    f.close();
+  }
+});
+
+test('an unhealthy rollback records rollback-unhealthy, preserves DB backups, releases lease, and exits 3', async () => {
+  const f = await fixture();
+  try {
+    const target = pushTarget(f, 'double-broken');
+    writeFileSync(join(f.fake, `broken-${target}`), '');
+    writeFileSync(join(f.fake, `broken-${f.previous}`), '');
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 3, result.stderr + result.stdout);
+    assert.match(result.stderr, /CRITICAL:/);
+    const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
+    assert.equal(record.result, 'rollback-unhealthy');
+    assert.equal(record.failed, target);
+    assert.ok(readdirSync(f.backups).some((name) => name.startsWith('predeploy-')));
+    assert.ok(readdirSync(f.backups).some((name) => name.startsWith('failed-')));
+    assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+  } finally {
+    f.close();
+  }
+});
+
+test('a failed migration rehearsal marks target failed without touching running service or DB', async () => {
+  const f = await fixture();
+  try {
+    const target = pushTarget(f, 'bad-migration', {
+      'apps/server/src/db/client.ts':
+        "export function openDbWithHandle() { throw new Error('migration failed'); }\n",
+    });
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.equal(serviceLog(f), '');
+    assert.equal(readdirSync(f.backups).length, 0);
+    assert.ok(existsSync(join(f.state, 'failed', target)));
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+  } finally {
+    f.close();
+  }
+});
+
+test('recovery clears an interrupted building phase without stopping the running server', async () => {
+  const f = await fixture();
+  try {
+    const target = pushTarget(f);
+    mkdirSync(f.state, { recursive: true });
+    writeFileSync(
+      join(f.state, 'in-progress'),
+      `phase=building\ntarget=${target}\nprevious=${f.previous}\nsnapshot=\nrelease=\nprevious_release=${realpathSync(f.previousRelease)}\n`,
+    );
+    const result = await f.run(DEPLOY, ['--recover']);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.equal(serviceLog(f), '');
+    assert.ok(!existsSync(join(f.state, 'in-progress')));
+  } finally {
+    f.close();
+  }
+});
+
+test('recovery rolls back interrupted switching, unhealthy switched, and restoring phases', async () => {
+  for (const phase of ['switching', 'switched', 'restoring']) {
+    const f = await fixture();
+    try {
+      const target = pushTarget(f, `interrupted-${phase}`);
+      const targetRelease = writeRelease(f.releases, target, 'target');
+      writeFileSync(join(f.fake, `broken-${target}`), '');
+      rmSync(f.root, { force: true });
+      symlinkSync(targetRelease, f.root, 'dir');
+      mkdirSync(f.state, { recursive: true });
+      mkdirSync(f.backups, { recursive: true });
+      const snapshot = join(f.backups, `predeploy-${phase}.db`);
+      cpSync(f.db, snapshot);
+      writeFileSync(
+        join(f.state, 'in-progress'),
+        [
+          `phase=${phase}`,
+          `target=${target}`,
+          `previous=${f.previous}`,
+          `snapshot=${snapshot}`,
+          `release=${targetRelease}`,
+          `previous_release=${realpathSync(f.previousRelease)}`,
+          '',
+        ].join('\n'),
+      );
+      const result = await f.run(DEPLOY, ['--recover']);
+      assert.equal(result.status, 1, `${phase}: ${result.stderr}${result.stdout}`);
+      assert.equal(realpathSync(f.root), realpathSync(f.previousRelease));
+      const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
+      assert.equal(record.result, 'rolled-back');
+      assert.ok(!existsSync(join(f.state, 'in-progress')));
+    } finally {
+      f.close();
+    }
+  }
+});
+
+test('refuses before snapshot or restart when server lacks /api/server/deploy/lease (404)', async () => {
+  const f = await fixture();
+  try {
+    const target = pushTarget(f);
+    fakeTool(
+      f.bin,
+      'curl',
+      `url="\${@: -1}"
+if [[ "$url" == */api/server/deploy/lease ]]; then printf 404; exit 0; fi
+printf 200`,
+    );
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 2, result.stderr + result.stdout);
+    assert.match(result.stderr, /deployment lease endpoint/);
+    assert.equal(serviceLog(f), '');
+    assert.equal(readdirSync(f.backups).length, 0);
+  } finally {
+    f.close();
+  }
+});
+
+test('failed or older target deployment restores build checkout to origin/main for subsequent watcher ticks', async () => {
+  const f = await fixture();
+  try {
+    const target = pushTarget(f, 'bad-target-checkout', {
+      'apps/server/build.mjs': 'process.exit(1);\n',
+    });
+    const newer = pushTarget(f, 'newer-good');
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.equal(git(f.checkout, 'rev-parse', 'HEAD'), newer);
+  } finally {
+    f.close();
+  }
+});
+
+test('deploys runner checkout to the exact target SHA alongside the server', async () => {
+  const f = await fixture({ runner: true, manager: 'launchd' });
+  try {
+    const target = pushTarget(f, 'with-runner');
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.equal(readFileSync(join(f.root, 'DEPLOYED_SHA'), 'utf8').trim(), target);
+    assert.equal(git(f.runnerCheckout, 'rev-parse', 'HEAD'), target);
+    assert.match(serviceLog(f), /bootout gui\/\d+\/com\.fixture\.cairn-daemon/);
+    assert.match(serviceLog(f), /bootstrap gui\/\d+ .*com\.fixture\.cairn-daemon\.plist/);
+  } finally {
+    f.close();
+  }
+});
+
+test('a failed runner install aborts before touching the running server or runner', async () => {
+  const f = await fixture({ runner: true });
+  try {
+    const target = pushTarget(f, 'runner-install-fail');
+    writeFileSync(join(f.fake, `fail-install-runner-checkout`), '');
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.equal(serviceLog(f), '');
+    assert.equal(readdirSync(f.backups).length, 0);
+    assert.equal(git(f.runnerCheckout, 'rev-parse', 'HEAD'), f.previous);
+    assert.ok(existsSync(join(f.state, 'failed', target)));
+  } finally {
+    f.close();
+  }
+});
+
+test('a failed runner restart rolls back both the runner checkout and the server release', async () => {
+  const f = await fixture({ runner: true });
+  try {
+    const target = pushTarget(f, 'runner-crash');
+    writeFileSync(join(f.fake, `runner-broken-${target}`), '');
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.equal(realpathSync(f.root), realpathSync(f.previousRelease));
+    assert.equal(git(f.runnerCheckout, 'rev-parse', 'HEAD'), f.previous);
+    assert.ok(existsSync(join(f.fake, 'runner-up')));
+    const record = JSON.parse(readFileSync(join(f.data, 'deploy.json'), 'utf8'));
+    assert.equal(record.result, 'rolled-back');
+  } finally {
+    f.close();
+  }
+});
+
+test('an active claimed runner step makes runner-coupled self-deploy wait and exit busy on timeout without restarting', async () => {
+  const f = await fixture({ runner: true, claimedRunner: 1 });
+  try {
+    const target = pushTarget(f, 'runner-busy');
+    const result = await f.run(DEPLOY, [target]);
+    assert.equal(result.status, 75, result.stderr + result.stdout);
+    assert.equal(serviceLog(f), '');
+    assert.equal(readdirSync(f.backups).length, 0);
+    assert.equal(git(f.runnerCheckout, 'rev-parse', 'HEAD'), f.previous);
+    assert.equal(sqlite(f.db, "select status from deploy_lease where id='server'"), 'accepting');
+  } finally {
+    f.close();
+  }
+});
+
+test('check_out_target fetches tags so build.mjs sees the latest desktop-v tag', async () => {
+  const f = await fixture();
+  try {
+    const tagged = pushTarget(f, 'tagged-release', {
+      'apps/server/build.mjs': `import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+const desc = execFileSync('git', ['describe', '--tags', '--match', 'desktop-v*'], { encoding: 'utf8' }).trim();
+if (!desc.startsWith('desktop-v0.1.999')) throw new Error('missing desktop tag: ' + desc);
+mkdirSync('dist', { recursive: true });
+writeFileSync('dist/index.mjs', desc + ':' + readFileSync('../../marker.txt', 'utf8'));
+writeFileSync('dist/index.mjs.map', '{}');
+writeFileSync('dist/photon_rs_bg.wasm', 'wasm');
+const config = { external: ['better-sqlite3'] };
+void config;
+`,
+    });
+    git(f.work, 'tag', 'desktop-v0.1.999');
+    git(f.work, 'push', '-q', 'origin', 'tag', 'desktop-v0.1.999');
+    const result = await f.run(DEPLOY, [tagged]);
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.match(readFileSync(join(f.root, 'dist', 'index.mjs'), 'utf8'), /^desktop-v0\.1\.999/);
   } finally {
     f.close();
   }

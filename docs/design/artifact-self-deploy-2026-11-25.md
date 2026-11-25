@@ -4,7 +4,7 @@ Status: owner-approved goal, 2026-11-25. Research: `docs/research/self-deploy-ar
 
 ## One mechanism
 
-`deploy-watch.sh` is the only scheduler entry. `deploy-self.sh` is the only deployer. `install-self-deploy.sh` only installs scheduler configuration for the same two scripts. The mechanism is a server-only artifact deploy: it never builds or restarts a Runner daemon. Runner claims survive the server restart; an in-server Coordinator turn is different because it runs inside the server process, so the deploy pauses new claims and waits for active in-server turns before restarting.
+`deploy-watch.sh` is the only scheduler entry. `deploy-self.sh` is the only deployer. `install-self-deploy.sh` only installs scheduler configuration for the same two scripts. When `CAIRN_DEPLOY_RUNNER_CHECKOUT` is configured in host env, `deploy-self.sh` also keeps that runner checkout on the exact deployed SHA and restarts the runner unit in lockstep with the server, waiting for both active in-server Coordinator turns and active claimed runner steps before swapping. When `CAIRN_DEPLOY_RUNNER_CHECKOUT` is unset, it operates in server-only mode (runner claims survive the server restart).
 
 The running application path is a symlink to an immutable release containing `dist/`, `web/`, `drizzle/`, `node_modules/` and `DEPLOYED_SHA`. An unmanaged `tsnet-sidecar*` binary already present in the active release is carried forward unchanged; it is host runtime machinery, not source-built server output. The database, keys, attachments, repositories, Coordinator stores, logs, state and backups live outside every release. A release switch creates a temporary symlink to the new release and renames it over the application path.
 

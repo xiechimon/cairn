@@ -192,6 +192,7 @@ One consistent rule across every surface (sidebar update control, top status bar
 | **10. Remote update failure or restart timeout** | Quiet status line explains failure (`The remote host could not finish updating.`) with a single **`Retry`** button; no auto-retry storm. | `remote-version` stops polling on `failed` or `120 s` restart timeout for that `(appVersion, serverVersion)` pair until user clicks `Retry`. | Stops on failure | `remote-version.test.ts` on `remote-version`: `updater.state === 'failed'` or 120 s restart timeout transitions to `failed` and halts polling until `retry()`. |
 
 > **Edge-case matrix (`part = remote-version`):** [`docs/design/version-skew-edge-cases/remote-version.md`](version-skew-edge-cases/remote-version.md).
+> **Edge-case matrix (`part = server-self-deploy`):** [`docs/design/version-skew-edge-cases/server-self-deploy.md`](version-skew-edge-cases/server-self-deploy.md).
 
 ## In-Flight Lanes Mapped to This Contract
 
