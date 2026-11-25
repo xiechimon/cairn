@@ -2122,6 +2122,21 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
         observedStates.includes('downloading') && observedStates.includes('installing'),
         `clicking update button in remote mode did not start installing: ${JSON.stringify(observedStates)}`,
       );
+      if (lastStatus !== 'error') {
+        const readMaybe = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : null);
+        const stateNow = await remoteWindow
+          .evaluate(() => window.cairnDesktop.update.state())
+          .catch((error) => `err:${error.message}`);
+        const secondInstall = await Promise.race([
+          remoteWindow
+            .evaluate(() => window.cairnDesktop.update.install())
+            .catch((error) => `err:${error.message}`),
+          new Promise((resolve) => setTimeout(() => resolve('timeout-10s'), 10_000)),
+        ]);
+        console.error(
+          `remote update failure debug: status=${lastStatus} stateNow=${JSON.stringify(stateNow)} secondInstall=${JSON.stringify(secondInstall)} console=${JSON.stringify(consoleErrors.slice(-8))} updateState=${JSON.stringify(readMaybe(join(remoteUserData, 'update-state.json')))} hostStatus=${JSON.stringify(readMaybe(join(remoteHome, '.cairn', 'host-update-status.json')))} mainLog=${JSON.stringify(readMaybe(join(remoteUserData, 'logs', 'main.log')))}`,
+        );
+      }
       assert.equal(
         lastStatus,
         'error',
