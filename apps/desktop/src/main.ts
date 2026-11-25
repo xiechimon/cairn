@@ -70,6 +70,7 @@ import {
   activeConnectionOf,
   addRemoteConnection,
   LOCAL_CONNECTION_ID,
+  normalizeRemoteUrl,
   readConnectionCatalog,
   removeRemoteConnection,
   runnerHomeForConnection,
@@ -77,6 +78,7 @@ import {
 } from './connections.js';
 import { installContextMenu } from './context-menu.js';
 import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
+import { canInvokeHostIpc, probeRemoteReachable } from './host-lifecycle.js';
 import { createIdleWatch } from './idle-update.js';
 import { createKeepAwake } from './keep-awake.js';
 import { LAUNCH_SETTLED_FLAG, type LaunchVerdict, settleBundleAtLaunch } from './launch-update.js';
@@ -1353,7 +1355,7 @@ function serveUpdates(
   ipcMain.handle('desktop-update:state', (event) => (fromOwnPage(event) ? created.state() : null));
   ipcMain.handle('desktop-update:check', (event) => (fromOwnPage(event) ? check() : undefined));
   ipcMain.handle('desktop-update:install', (event) => {
-    if (!fromOwnPage(event)) return undefined;
+    if (!allowLocalCredentials || !fromOwnPage(event)) return undefined;
     return created.state().status === 'ready' ? created.apply('foreground') : created.install();
   });
   const workerPath = join(
@@ -1886,7 +1888,10 @@ async function boot(): Promise<void> {
         if (on) await bringRunnerUp();
         else await runner?.stop();
       },
-      nextRunAt: () => earliestScheduleNextRunAt(origin, ownerToken),
+      nextRunAt:
+        activeConn.kind === 'local'
+          ? () => earliestScheduleNextRunAt(origin, ownerToken)
+          : undefined,
     });
     powerMonitor.on('resume', () => {
       if (runnerWanted) void bringRunnerUp();
@@ -1927,11 +1932,11 @@ async function boot(): Promise<void> {
       };
     };
     ipcMain.handle('desktop-host:status', (event) => {
-      if (!fromHostMainPage(event)) return null;
+      if (!fromHostMainPage(event) || !canInvokeHostIpc(activeConn.kind, 'status')) return null;
       return hostStatus();
     });
-    ipcMain.handle('desktop-host:add-remote', (event, input: unknown) => {
-      if (!fromHostMainPage(event)) return null;
+    ipcMain.handle('desktop-host:add-remote', async (event, input: unknown) => {
+      if (!fromHostMainPage(event) || !canInvokeHostIpc(activeConn.kind, 'add-remote')) return null;
       if (
         typeof input !== 'object' ||
         input === null ||
@@ -1940,21 +1945,30 @@ async function boot(): Promise<void> {
       ) {
         throw new Error('Invalid remote connection input');
       }
+      const normalizedUrl = normalizeRemoteUrl((input as { url: string }).url);
+      await probeRemoteReachable(normalizedUrl);
       addRemoteConnection(userData, {
         name: (input as { name: string }).name,
-        url: (input as { url: string }).url,
+        url: normalizedUrl,
       });
       return hostStatus();
     });
     ipcMain.handle('desktop-host:remove-remote', (event, id: unknown) => {
-      if (!fromHostMainPage(event)) return null;
+      if (!fromHostMainPage(event) || !canInvokeHostIpc(activeConn.kind, 'remove-remote'))
+        return null;
       if (typeof id !== 'string' || id === '') throw new Error('Invalid connection id');
       removeRemoteConnection(userData, id);
+      if (id === activeConn.id) {
+        switchDesktopHost(userData, LOCAL_CONNECTION_ID);
+      }
       return hostStatus();
     });
     ipcMain.handle('desktop-host:switch', (event, id: unknown) => {
-      if (!fromHostMainPage(event) && !fromOfflinePage(event)) return null;
+      const offline = fromOfflinePage(event);
+      if (!fromHostMainPage(event) && !offline) return null;
       if (typeof id !== 'string' || id === '') throw new Error('Invalid connection id');
+      if (!offline && !canInvokeHostIpc(activeConn.kind, 'switch', id)) return null;
+      if (offline && id !== LOCAL_CONNECTION_ID) return null;
       switchDesktopHost(userData, id);
       return hostStatus();
     });
@@ -1985,7 +1999,8 @@ async function boot(): Promise<void> {
       }, 50).unref();
     };
     ipcMain.handle('desktop-host:set-resident', async (event, enabled: unknown) => {
-      if (!fromHostMainPage(event) || activeConn.kind !== 'local') return null;
+      if (!fromHostMainPage(event) || !canInvokeHostIpc(activeConn.kind, 'set-resident'))
+        return null;
       if (typeof enabled !== 'boolean') throw new Error('enabled must be boolean');
       if (residentTransitionInFlight) return hostStatus();
       residentTransitionInFlight = true;
@@ -2047,7 +2062,7 @@ async function boot(): Promise<void> {
     serveUpdates(origin, notice, ownerToken, activeConn.kind === 'local');
     serveNotifications(origin);
     servePageActivity(origin);
-    serveOwnComputer(origin, agentDesktopBinary());
+    if (activeConn.kind === 'local') serveOwnComputer(origin, agentDesktopBinary());
     watchIdleUpdate(activeRunnerHome);
     const restore = takeRelaunchWindow();
     if (restore !== null || !BACKGROUND_LAUNCH) openWindow(origin, restore);

@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
 import { type DesktopHostStatus, desktopHost } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
-import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { hostRemoveConfirmCopy, hostSwitchConfirmCopy } from './desktop-host-confirm.js';
 
 export function DesktopHostPanel() {
   const { t } = useI18n();
@@ -17,7 +17,11 @@ export function DesktopHostPanel() {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const [switching, setSwitching] = useState<{ id: string; label: string } | null>(null);
-  const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
+  const [removing, setRemoving] = useState<{
+    id: string;
+    label: string;
+    isActive: boolean;
+  } | null>(null);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
 
@@ -29,6 +33,11 @@ export function DesktopHostPanel() {
   }, [bridge]);
 
   if (bridge === null || status === null) return null;
+
+  const isLocalActive = status.activeId === 'local';
+  const switchCopy = switching === null ? null : hostSwitchConfirmCopy(switching.label, t);
+  const removeCopy =
+    removing === null ? null : hostRemoveConfirmCopy(removing.label, removing.isActive, t);
 
   const toggleResident = async (checked: boolean) => {
     if (busy) return;
@@ -93,7 +102,7 @@ export function DesktopHostPanel() {
           <h2 className="m-0 text-card-title font-semibold text-foreground">
             {t('主机连接与常驻')}
           </h2>
-          {!adding && (
+          {isLocalActive && !adding && (
             <Button
               variant="ghost"
               size="sm"
@@ -127,6 +136,7 @@ export function DesktopHostPanel() {
         )}
         {status.connections.map((conn) => {
           const active = conn.id === status.activeId;
+          const canSwitchTo = !active && (isLocalActive || conn.kind === 'local');
           return (
             <div
               key={conn.id}
@@ -147,7 +157,7 @@ export function DesktopHostPanel() {
                 )}
               </div>
               <div className="flex flex-none items-center gap-2">
-                {!active && (
+                {canSwitchTo && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -163,13 +173,13 @@ export function DesktopHostPanel() {
                     {t('切换')}
                   </Button>
                 )}
-                {conn.kind === 'remote' && (
+                {isLocalActive && conn.kind === 'remote' && (
                   <Button
                     size="sm"
                     variant="ghost"
                     disabled={busy}
                     className="pointer-coarse:h-11"
-                    onClick={() => setRemoving({ id: conn.id, label: conn.name })}
+                    onClick={() => setRemoving({ id: conn.id, label: conn.name, isActive: active })}
                   >
                     {t('移除')}
                   </Button>
@@ -178,7 +188,7 @@ export function DesktopHostPanel() {
             </div>
           );
         })}
-        {adding && (
+        {isLocalActive && adding && (
           <form
             onSubmit={(e) => void handleAddRemote(e)}
             className="flex flex-col gap-2 border-t border-border px-4 py-3"
@@ -220,8 +230,8 @@ export function DesktopHostPanel() {
         )}
       </div>
       <AlertDialogShell
-        open={switching !== null}
-        title={t('切换到 {name}？', { name: switching?.label ?? '' })}
+        open={switchCopy !== null}
+        title={switchCopy?.title ?? ''}
         ariaLabel={t('切换主机')}
         onClose={() => {
           if (!busy) setSwitching(null);
@@ -229,7 +239,7 @@ export function DesktopHostPanel() {
         footer={
           <AlertDialogActions
             cancelLabel={t('取消')}
-            confirmLabel={t('切换并重启')}
+            confirmLabel={switchCopy?.confirmLabel ?? t('切换并重启')}
             confirmDisabled={busy}
             onCancel={() => {
               if (!busy) setSwitching(null);
@@ -243,25 +253,34 @@ export function DesktopHostPanel() {
           />
         }
       >
-        <p className="m-0 text-ui text-content-secondary">
-          {t('切换后应用会立即重启并连接到选定主机。')}
-        </p>
+        <p className="m-0 text-ui text-content-secondary">{switchCopy?.summary ?? ''}</p>
       </AlertDialogShell>
-      <DeleteConfirm
-        open={removing !== null}
-        title={t('移除这台远程主机配置？此操作不会关闭远端服务。')}
-        summary={removing?.label ?? ''}
+      <AlertDialogShell
+        open={removeCopy !== null}
+        title={removeCopy?.title ?? ''}
         ariaLabel={t('移除 {name}', { name: removing?.label ?? '' })}
         onClose={() => {
           if (!busy) setRemoving(null);
         }}
-        onConfirm={() => {
-          if (removing === null) return;
-          const target = removing.id;
-          setRemoving(null);
-          void handleRemove(target);
-        }}
-      />
+        footer={
+          <AlertDialogActions
+            cancelLabel={t('取消')}
+            confirmLabel={removeCopy?.confirmLabel ?? t('移除')}
+            confirmDisabled={busy}
+            onCancel={() => {
+              if (!busy) setRemoving(null);
+            }}
+            onConfirm={() => {
+              if (removing === null) return;
+              const target = removing.id;
+              setRemoving(null);
+              void handleRemove(target);
+            }}
+          />
+        }
+      >
+        <p className="m-0 text-ui text-content-secondary">{removeCopy?.summary ?? ''}</p>
+      </AlertDialogShell>
     </SettingsPanel>
   );
 }

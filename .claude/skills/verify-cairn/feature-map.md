@@ -587,7 +587,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `clerk-auth-error`, `clerk-auth-not-allowed`, `clerk-auth-status`, `clerk-fallback-toggle`, `clerk-sign-in-gate`, `denied`, `expired`, `owner-token-error`, `owner-token-input`, `owner-token-submit`, `owner-token-toggle`, `pair-request-code`, `pair-request-denied`, `pair-request-expired`, `pair-request-retry`, `pair-request-unavailable`
+- Test ids in its code: `clerk-auth-error`, `clerk-auth-not-allowed`, `clerk-auth-status`, `clerk-fallback-toggle`, `clerk-sign-in-gate`, `denied`, `desktop-host-switch-local`, `expired`, `owner-token-error`, `owner-token-input`, `owner-token-submit`, `owner-token-toggle`, `pair-request-code`, `pair-request-denied`, `pair-request-expired`, `pair-request-retry`, `pair-request-unavailable`
 - Research: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design
 - Backend design: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main), [docs/design/pairing-gate-close.md](../../../docs/design/pairing-gate-close.md)
