@@ -8,6 +8,7 @@ import {
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { withCodeSpans } from '../components/notice-banner.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
@@ -26,6 +27,8 @@ export const INSTALL_COMMAND = `npm install -g ${PUBLISHED_PACKAGES.cli.name}@la
 const OPERATOR_COMMAND = 'sudo tailscale set --operator=$USER';
 
 const TAILSCALE_DOWNLOAD_URL = 'https://tailscale.com/download';
+
+const DESKTOP_RELEASES_URL = 'https://github.com/xiechimon/cairn/releases/latest';
 
 const FIXTURE_TAILSCALE_URL = 'https://studio-mac.tail4c2a.ts.net';
 
@@ -274,6 +277,7 @@ export function CreateMachineDialog({
 }: CreateMachineDialogProps) {
   const { t } = useI18n();
   const { search } = useLocation();
+  const [mode, setMode] = useState<'desktop' | 'cli'>('desktop');
   const [apiKeyOpen, setApiKeyOpen] = useState(false);
   const [pairOpen, setPairOpen] = useState(false);
   const apiKeyRef = useRef<HTMLDivElement>(null);
@@ -346,61 +350,119 @@ export function CreateMachineDialog({
                 <TailscaleStatus access={access} failed={failed} />
               </div>
             </li>
-            {startCmd !== null && (
-              <>
-                <li className={STEP_CLS}>
-                  <span className={STEP_NUM_CLS}>2</span>
-                  <div className={STEP_BODY_CLS}>
-                    <span className={STEP_TITLE_CLS}>{t('在另一台电脑上安装 CLI')}</span>
-                    <CopyCommand command={INSTALL_COMMAND} />
-                  </div>
-                </li>
-                <li className={STEP_CLS}>
-                  <span className={STEP_NUM_CLS}>3</span>
-                  <div className={STEP_BODY_CLS}>
-                    <span className={STEP_TITLE_CLS}>{t('在另一台电脑上启动执行机')}</span>
-                    <CopyCommand command={startCmd} />
-                    <p className="m-0 text-meta text-content-tertiary">
-                      {t('之后它在后台运行，可以关掉终端。')}
-                    </p>
-                  </div>
-                </li>
-                <li className={STEP_CLS}>
-                  <span className={STEP_NUM_CLS}>4</span>
-                  <div className={STEP_BODY_CLS}>
-                    <span className={STEP_TITLE_CLS}>{t('在这里批准')}</span>
-                    <p className={STEP_NOTE_CLS} data-testid="enrollment-code-hint">
-                      {t('终端会显示一个批准码。把它填在下面，确认把那台电脑加入团队 {team}。', {
-                        team: teamName,
-                      })}
-                    </p>
-                    <ApproveByCode teamId={teamId} />
-                  </div>
-                </li>
-              </>
-            )}
           </ol>
-          {startCmd !== null && (
-            <>
-              <Button
-                variant="ghost"
-                className={`${INLINE_ACTION_CLS} px-0 text-content-secondary hover:bg-transparent hover:text-content-secondary aria-expanded:bg-transparent aria-expanded:text-content-secondary dark:hover:bg-transparent font-normal`}
-                aria-expanded={apiKeyOpen}
-                onClick={() => setApiKeyOpen((value) => !value)}
-              >
-                {t('在云服务器上运行？改用 API key 注册')}
-              </Button>
-              {apiKeyOpen && (
-                <div ref={apiKeyRef} className="flex flex-col gap-2">
-                  <CopyCommand
-                    command={`${startCmd} --api-key <key> --team ${teamId ?? '<teamId>'}`}
-                  />
-                  <Link className={INLINE_ACTION_CLS} to={{ pathname: '/app/api-keys', search }}>
-                    {t('获取 API key →')}
-                  </Link>
+          {startCmd !== null && serverUrl !== null && (
+            <div data-testid="add-machine-mode-tabs" className="flex flex-col gap-3.5">
+              <SegmentedTabs
+                value={mode}
+                onChange={setMode}
+                label={t('添加方式')}
+                className="grid w-full grid-cols-2"
+                optionHandle="flex-1"
+                options={[
+                  { value: 'desktop', label: t('安装桌面端') },
+                  { value: 'cli', label: t('仅装命令行') },
+                ]}
+              />
+              {mode === 'desktop' ? (
+                <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
+                  <li className={STEP_CLS}>
+                    <span className={STEP_NUM_CLS}>2</span>
+                    <div className={STEP_BODY_CLS}>
+                      <span className={STEP_TITLE_CLS}>
+                        {t('在另一台电脑安装并打开 Cairn 桌面端')}
+                      </span>
+                      <p className={STEP_NOTE_CLS}>{t('支持 macOS、Windows 和 Linux。')}</p>
+                      <a
+                        className={INLINE_ACTION_CLS}
+                        href={DESKTOP_RELEASES_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t('下载 Cairn 桌面端 →')}
+                      </a>
+                    </div>
+                  </li>
+                  <li className={STEP_CLS}>
+                    <span className={STEP_NUM_CLS}>3</span>
+                    <div className={STEP_BODY_CLS}>
+                      <span className={STEP_TITLE_CLS}>{t('复制这台主机的地址')}</span>
+                      <CopyCommand command={serverUrl} />
+                    </div>
+                  </li>
+                  <li className={STEP_CLS}>
+                    <span className={STEP_NUM_CLS}>4</span>
+                    <div className={STEP_BODY_CLS}>
+                      <span className={STEP_TITLE_CLS}>{t('在另一台电脑连接并登录')}</span>
+                      <p className={STEP_NOTE_CLS} data-testid="desktop-connect-hint">
+                        {t(
+                          '新装打开后点击「连接已有 Cairn 主机」粘贴上面的地址并重启；已初始化的桌面端可在「执行机」页底部的「主机连接与常驻」中连接。完成登录后，那台电脑会自动作为执行机加入团队 {team}。',
+                          { team: teamName },
+                        )}
+                      </p>
+                    </div>
+                  </li>
+                </ol>
+              ) : (
+                <div className="flex flex-col gap-3.5">
+                  <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
+                    <li className={STEP_CLS}>
+                      <span className={STEP_NUM_CLS}>2</span>
+                      <div className={STEP_BODY_CLS}>
+                        <span className={STEP_TITLE_CLS}>{t('在另一台电脑上安装 CLI')}</span>
+                        <CopyCommand command={INSTALL_COMMAND} />
+                      </div>
+                    </li>
+                    <li className={STEP_CLS}>
+                      <span className={STEP_NUM_CLS}>3</span>
+                      <div className={STEP_BODY_CLS}>
+                        <span className={STEP_TITLE_CLS}>{t('在另一台电脑上启动执行机')}</span>
+                        <CopyCommand command={startCmd} />
+                        <p className="m-0 text-meta text-content-tertiary">
+                          {t('之后它在后台运行，可以关掉终端。')}
+                        </p>
+                      </div>
+                    </li>
+                    <li className={STEP_CLS}>
+                      <span className={STEP_NUM_CLS}>4</span>
+                      <div className={STEP_BODY_CLS}>
+                        <span className={STEP_TITLE_CLS}>{t('在这里批准')}</span>
+                        <p className={STEP_NOTE_CLS} data-testid="enrollment-code-hint">
+                          {t(
+                            '终端会显示一个批准码。把它填在下面，确认把那台电脑加入团队 {team}。',
+                            {
+                              team: teamName,
+                            },
+                          )}
+                        </p>
+                        <ApproveByCode teamId={teamId} />
+                      </div>
+                    </li>
+                  </ol>
+                  <Button
+                    variant="ghost"
+                    className={`${INLINE_ACTION_CLS} px-0 text-content-secondary hover:bg-transparent hover:text-content-secondary aria-expanded:bg-transparent aria-expanded:text-content-secondary dark:hover:bg-transparent font-normal`}
+                    aria-expanded={apiKeyOpen}
+                    onClick={() => setApiKeyOpen((value) => !value)}
+                  >
+                    {t('在云服务器上运行？改用 API key 注册')}
+                  </Button>
+                  {apiKeyOpen && (
+                    <div ref={apiKeyRef} className="flex flex-col gap-2">
+                      <CopyCommand
+                        command={`${startCmd} --api-key <key> --team ${teamId ?? '<teamId>'}`}
+                      />
+                      <Link
+                        className={INLINE_ACTION_CLS}
+                        to={{ pathname: '/app/api-keys', search }}
+                      >
+                        {t('获取 API key →')}
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
-            </>
+            </div>
           )}
           {phoneHost !== null && (
             <div className="border-t border-border pt-4">

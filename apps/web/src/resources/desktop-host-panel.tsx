@@ -9,6 +9,7 @@ import { toastError } from '../components/ui/toaster.js';
 import { type DesktopHostStatus, desktopHost } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import { hostRemoveConfirmCopy, hostSwitchConfirmCopy } from './desktop-host-confirm.js';
+import { addAndSwitchRemoteHost, parseRemoteHostOrigin } from './remote-host.js';
 
 export function DesktopHostPanel() {
   const { t } = useI18n();
@@ -52,12 +53,19 @@ export function DesktopHostPanel() {
     }
   };
 
-  const handleAddRemote = async (event: FormEvent) => {
-    event.preventDefault();
-    if (busy || name.trim() === '' || url.trim() === '') return;
+  const handleSaveRemote = async () => {
+    if (busy) return;
+    const parsed = parseRemoteHostOrigin(url);
+    if (parsed === null) {
+      toastError(t('请输入以 http:// 或 https:// 开头的完整主机地址。'), null);
+      return;
+    }
     setBusy(true);
     try {
-      const next = await bridge.addRemote({ name: name.trim(), url: url.trim() });
+      const next = await bridge.addRemote({
+        name: name.trim() === '' ? parsed.defaultName : name.trim(),
+        url: parsed.origin,
+      });
       if (next !== null) {
         setStatus(next);
         setName('');
@@ -67,6 +75,22 @@ export function DesktopHostPanel() {
     } catch (error) {
       toastError(t('添加远程主机失败，请检查地址后重试。'), error);
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConnectRemote = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    if (parseRemoteHostOrigin(url) === null) {
+      toastError(t('请输入以 http:// 或 https:// 开头的完整主机地址。'), null);
+      return;
+    }
+    setBusy(true);
+    try {
+      await addAndSwitchRemoteHost(bridge, { url, name });
+    } catch (error) {
+      toastError(t('连接远程主机失败，请检查地址后重试。'), error);
       setBusy(false);
     }
   };
@@ -190,40 +214,49 @@ export function DesktopHostPanel() {
         })}
         {isLocalActive && adding && (
           <form
-            onSubmit={(e) => void handleAddRemote(e)}
+            onSubmit={(e) => void handleConnectRemote(e)}
             className="flex flex-col gap-2 border-t border-border px-4 py-3"
           >
             <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('主机名称，例如 Mac mini')}
-              aria-label={t('主机名称')}
-              disabled={busy}
-            />
-            <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder={t('主机地址，例如 http://mac-mini.ts.net:8787')}
+              placeholder={t('主机地址，例如 https://studio-mac.tail4c2a.ts.net')}
               aria-label={t('主机地址')}
               disabled={busy}
             />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('主机名称（可选），例如 Mac mini')}
+              aria-label={t('主机名称')}
+              disabled={busy}
+            />
+            <p className="m-0 text-meta text-content-secondary">
+              {t('连接并登录后，这台电脑会自动注册为该主机的执行机。')}
+            </p>
             <div className="flex items-center justify-end gap-2">
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
                 className="pointer-coarse:h-11"
+                disabled={busy}
                 onClick={() => setAdding(false)}
               >
                 {t('取消')}
               </Button>
               <Button
-                type="submit"
+                type="button"
                 size="sm"
+                variant="outline"
                 className="pointer-coarse:h-11"
-                disabled={busy || name.trim() === '' || url.trim() === ''}
+                disabled={busy}
+                onClick={() => void handleSaveRemote()}
               >
                 {t('保存')}
+              </Button>
+              <Button type="submit" size="sm" className="pointer-coarse:h-11" disabled={busy}>
+                {busy ? t('正在连接…') : t('连接并重启')}
               </Button>
             </div>
           </form>

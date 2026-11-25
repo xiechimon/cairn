@@ -449,3 +449,74 @@ test('the change menu groups models by provider name without a generic heading',
   await expect(menu).not.toContainText('服务商');
   await expect(menu.getByText('Claude token', { exact: true })).toHaveCount(1);
 });
+
+test('desktop first run lets a new machine connect directly to an existing Cairn host', async ({
+  page,
+}) => {
+  await open(page, { ...fresh(), bound: false });
+  await expect(page.getByTestId('first-run-connect-host')).toHaveCount(0);
+
+  const calls: Array<{ method: string; arg?: unknown }> = [];
+  await page.exposeFunction('recordHostCall', (method: string, arg: unknown) => {
+    calls.push({ method, arg });
+    if (method === 'addRemote') {
+      const input = arg as { name: string; url: string };
+      return {
+        activeId: 'local',
+        connections: [
+          { id: 'local', kind: 'local', name: 'This computer', url: null },
+          { id: 'remote-studio', kind: 'remote', name: input.name, url: input.url },
+        ],
+        residentSupported: false,
+        residentInstalled: false,
+        attachedToResident: false,
+      };
+    }
+    return {
+      activeId: 'local',
+      connections: [{ id: 'local', kind: 'local', name: 'This computer', url: null }],
+      residentSupported: false,
+      residentInstalled: false,
+      attachedToResident: false,
+    };
+  });
+  await page.addInitScript(() => {
+    const win = window as Window & {
+      recordHostCall: (method: string, arg?: unknown) => Promise<unknown>;
+    };
+    Object.assign(window, {
+      cairnDesktop: {
+        host: {
+          status: () => win.recordHostCall('status'),
+          addRemote: (input: unknown) => win.recordHostCall('addRemote', input),
+          removeRemote: (id: string) => win.recordHostCall('removeRemote', id),
+          switch: (id: string) => win.recordHostCall('switch', id),
+          setResident: (enabled: boolean) => win.recordHostCall('setResident', enabled),
+        },
+      },
+    });
+  });
+
+  await open(page, { ...fresh(), bound: false });
+  const entry = page.getByTestId('first-run-connect-host');
+  await expect(entry).toBeVisible();
+  await entry.click();
+
+  const dialog = page.getByRole('dialog', { name: '连接已有 Cairn 主机' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByTestId('connect-remote-host-submit').click();
+  await expect(dialog.getByText('请输入以 http:// 或 https:// 开头的完整主机地址。')).toBeVisible();
+  expect(calls.filter((c) => c.method === 'addRemote')).toHaveLength(0);
+
+  await dialog.getByTestId('connect-remote-host-url').fill('https://studio-mac.tail4c2a.ts.net/app');
+  await dialog.getByTestId('connect-remote-host-submit').click();
+  await expect
+    .poll(() => calls.filter((c) => c.method !== 'status'))
+    .toEqual([
+      {
+        method: 'addRemote',
+        arg: { name: 'studio-mac', url: 'https://studio-mac.tail4c2a.ts.net' },
+      },
+      { method: 'switch', arg: 'remote-studio' },
+    ]);
+});

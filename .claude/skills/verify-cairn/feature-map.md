@@ -449,7 +449,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `first-run-add-provider`, `first-run-back-models`, `first-run-confirm`, `first-run-continue-confirm`, `first-run-frame`, `first-run-pick-coordinator`, `first-run-remove-provider-*`, `first-run-setup`, `first-run-step-*`, `first-run-task-model-note`, `setup-prompt`, `setup-prompt-action`, `setup-prompt-hint`, `setup-prompt-label`, `setup-prompt-reconnect`
+- Test ids in its code: `first-run-add-provider`, `first-run-back-models`, `first-run-confirm`, `first-run-connect-host`, `first-run-continue-confirm`, `first-run-frame`, `first-run-pick-coordinator`, `first-run-remove-provider-*`, `first-run-setup`, `first-run-step-*`, `first-run-task-model-note`, `setup-prompt`, `setup-prompt-action`, `setup-prompt-hint`, `setup-prompt-label`, `setup-prompt-reconnect`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state and the 10-minute path
@@ -467,7 +467,7 @@ Reach:
 
 - Web routes: `/app/machines/authorize`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `enrollment-code-hint`, `phone-pair-entry`, `tailscale-ready`
+- Test ids in its code: `add-machine-mode-tabs`, `desktop-connect-hint`, `enrollment-code-hint`, `phone-pair-entry`, `tailscale-ready`
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md)
 - Frontend design: **gap**: the add-machine dialog and authorize page have no design
 - Backend design: **gap**: no design for the browser enrollment handshake and its failure modes

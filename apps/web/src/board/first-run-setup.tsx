@@ -21,10 +21,12 @@ import { SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError } from '../components/ui/toaster.js';
+import { type DesktopHostStatus, desktopHost } from '../desktop-shell.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { AddProviderFlow, type AddProviderView } from '../resources/add-provider-flow.js';
+import { ConnectRemoteHostDialog } from '../resources/connect-remote-host-dialog.js';
 import { ModelPicker } from '../resources/routing-settings-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import {
@@ -566,8 +568,23 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
   const { t } = useI18n();
   const checks = useModelChecks(setup.teamId);
   const { deleteProvider } = useApiMutations(setup.teamId);
+  const hostBridge = desktopHost();
+  const [hostStatus, setHostStatus] = useState<DesktopHostStatus | null>(null);
+  const [connectHostOpen, setConnectHostOpen] = useState(false);
   const [imported, setImported] = useState<readonly string[]>([]);
   const [returnBaseline, setReturnBaseline] = useState<readonly string[] | null>(null);
+  useEffect(() => {
+    if (hostBridge === null) return;
+    let active = true;
+    void hostBridge.status().then((next) => {
+      if (active && next !== null) setHostStatus(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [hostBridge]);
+  const canConnectRemoteHost =
+    hostBridge !== null && hostStatus !== null && hostStatus.activeId === 'local';
   const sourceKeys = modelSourceKeys(setup.providers, setup.connections);
   const addedAfterReturn =
     returnBaseline !== null && hasAddedModelSource(returnBaseline, sourceKeys);
@@ -640,6 +657,20 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
             <InkSpiral hangs={NO_HANGS} drawn={open === 'models' ? 1 / 3 : 2 / 3} size={150} />
           </div>
         </div>
+        {canConnectRemoteHost && (
+          <div className="mt-5 flex flex-wrap items-center gap-2 lg:mt-auto lg:pt-6">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="pointer-coarse:h-11"
+              data-testid="first-run-connect-host"
+              onClick={() => setConnectHostOpen(true)}
+            >
+              {t('连接已有 Cairn 主机')}
+            </Button>
+          </div>
+        )}
       </aside>
       <div className="flex flex-1 flex-col px-5 pt-8 pb-[calc(env(safe-area-inset-bottom)+2rem)] lg:items-center lg:overflow-y-auto lg:px-16 lg:pt-28 lg:pb-15">
         <section
@@ -692,6 +723,13 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
           )}
         </section>
       </div>
+      {hostBridge !== null && (
+        <ConnectRemoteHostDialog
+          open={connectHostOpen}
+          onClose={() => setConnectHostOpen(false)}
+          bridge={hostBridge}
+        />
+      )}
     </main>
   );
 }

@@ -487,6 +487,7 @@ test('machine: disclosure expanded (tallest content state) bottom link stays in 
   await page.getByRole('button', { name: '添加执行机' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
+  await dialog.getByRole('tab', { name: '仅装命令行' }).click();
   await dialog.getByRole('button', { name: '在云服务器上运行？改用 API key 注册' }).click();
   const keylink = dialog.getByRole('link', { name: '获取 API key →' });
   await expect(keylink).toBeVisible();

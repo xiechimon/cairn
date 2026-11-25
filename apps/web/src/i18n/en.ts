@@ -3040,9 +3040,10 @@ export const EN: Record<string, string> = {
   '添加远程主机失败，请检查地址后重试。': 'Could not add remote host. Check the URL and try again.',
   '切换主机失败，请重试。': 'Could not switch host. Try again.',
   '移除远程主机失败，请重试。': 'Could not remove remote host. Try again.',
-  '主机名称，例如 Mac mini': 'Host name, e.g. Mac mini',
+  '主机名称（可选），例如 Mac mini': 'Host name (optional), e.g. Mac mini',
   主机名称: 'Host name',
-  '主机地址，例如 http://mac-mini.ts.net:8787': 'Host URL, e.g. http://mac-mini.ts.net:8787',
+  '主机地址，例如 https://studio-mac.tail4c2a.ts.net':
+    'Host URL, e.g. https://studio-mac.tail4c2a.ts.net',
   主机地址: 'Host URL',
   '切换到「{name}」？': 'Switch to {name}?',
   '每台主机的项目、对话和任务彼此独立。切换后应用会重启并连接到「{name}」，原主机的数据均保留。':
@@ -3198,4 +3199,28 @@ export const EN: Record<string, string> = {
   '这条提问已结束，无需重复提交。': 'This question has already ended.',
   'Coordinator 正在运行，请停止后再恢复。': 'Coordinator is running. Stop it before restoring.',
   '其他范围有一条记忆修改正在进行。': 'A memory edit is running in another scope.',
+  '连接已有 Cairn 主机': 'Connect existing Cairn host',
+  '连接到另一台运行中的 Cairn 主机，登录后本机自动注册为执行机。':
+    'Connect to another running Cairn host. After sign-in, this computer registers as a Runner automatically.',
+  连接并重启: 'Connect and restart',
+  '保存后应用会重启并打开该主机。完成登录后，这台电脑会自动作为执行机接入。':
+    'Saving restarts the app and opens that host. After sign-in, this computer enrolls as a Runner automatically.',
+  '主机名称（可选）': 'Host name (optional)',
+  留空时自动使用地址中的主机名: 'Uses the hostname from the URL when blank',
+  '请输入以 http:// 或 https:// 开头的完整主机地址。':
+    'Enter a full host URL starting with http:// or https://.',
+  '连接远程主机失败，请检查地址后重试。':
+    'Could not connect to the remote host. Check the URL and try again.',
+  安装桌面端: 'Install desktop app',
+  添加方式: 'Connection method',
+  仅装命令行: 'CLI only',
+  '在另一台电脑安装并打开 Cairn 桌面端': 'Install and open Cairn desktop on the other computer',
+  '支持 macOS、Windows 和 Linux。': 'Available for macOS, Windows, and Linux.',
+  '下载 Cairn 桌面端 →': 'Download Cairn desktop →',
+  复制这台主机的地址: 'Copy this host URL',
+  在另一台电脑连接并登录: 'Connect and sign in on the other computer',
+  '新装打开后点击「连接已有 Cairn 主机」粘贴上面的地址并重启；已初始化的桌面端可在「执行机」页底部的「主机连接与常驻」中连接。完成登录后，那台电脑会自动作为执行机加入团队 {team}。':
+    'On a fresh launch, click Connect existing Cairn host, paste this URL, and restart; an existing setup can connect under Host connection and resident service at the bottom of the Runners page. After sign-in, that computer automatically joins team {team}, ready as a Runner.',
+  '连接并登录后，这台电脑会自动注册为该主机的执行机。':
+    'After connecting and signing in, this computer registers as a Runner on that host automatically.',
 };
