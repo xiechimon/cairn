@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "6e956b024cc6b72eedfe26780395669b0dd72ef9",
+    "sha": "44bf1e8a799383f67e8d7979388930a49885a167",
     "date": "2026-11-25"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -13,7 +13,7 @@
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer). Optional finalFocus forwards the Base UI focus target so memory deletion can return to a surviving row or its stable summary after the refreshed list settles (#3666). The backdrop force-renders so a confirm nested in a route dialog (Project settings delete) keeps its own backdrop close.",
-      "hash": "9c04cb6c47361770425b62eee0ee47b954c90d3fd69f144cd513b53e2c368a05"
+      "hash": "851fe97d74862063255f082965d27fecb7f2fe2ac365ac880532b1af4eefb7aa"
     },
     "alert-dialog.tsx": {
       "kind": "registry",

@@ -35,6 +35,7 @@ import {
   startMcpConnectorOAuthBodySchema,
   THINKING_LEVELS,
   testProviderBodySchema,
+  updateScheduleBodySchema,
 } from '@cairn/shared';
 import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
@@ -189,6 +190,7 @@ import {
   deleteSchedule,
   listSchedules,
   setScheduleEnabled,
+  updateSchedule,
 } from './services/schedules.js';
 import { search } from './services/search.js';
 import { answerSecretRequest } from './services/secret-requests.js';
@@ -291,6 +293,19 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       },
       201,
     );
+  });
+
+  app.put('/api/schedules/:id', async (c) => {
+    const id = c.req.param('id');
+    const body = parseWith(updateScheduleBodySchema, await jsonBody(c), 'body');
+    const updated = updateSchedule(svc, id, { ...body, teamId: ctx.team.id });
+    if (!updated) throw notFound(`schedule ${id}`);
+    if (updated.webhookToken === null) return c.json(updated.record);
+    return c.json({
+      ...updated.record,
+      webhookToken: updated.webhookToken,
+      webhookUrl: `${requestOrigin(c)}/api/webhook/schedule/${updated.webhookToken}`,
+    });
   });
 
   app.patch('/api/schedules/:id', async (c) => {

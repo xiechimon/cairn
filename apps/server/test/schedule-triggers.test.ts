@@ -483,3 +483,233 @@ describe('trigger claim races and isolation (seq 31 review)', () => {
     expect(deleteSchedule({ ...s.svc, user: s.user }, record.id, s.team.id)).toBe(true);
   });
 });
+
+describe('editing an existing schedule preserves identity, history and webhook token', () => {
+  test('updating a webhook schedule prompt keeps id, run history, and working webhook token', async () => {
+    const s = boot();
+    const { todoId } = await makeTodo(s, 'hook-edit-keep');
+    const created = await req(s.app, 'POST', '/api/schedules', {
+      todoId,
+      kind: 'webhook',
+      prompt: 'initial prompt',
+    });
+    expect(created.status).toBe(201);
+    const initial = (await created.json()) as {
+      id: string;
+      createdAt: number | null;
+      webhookMasked: string | null;
+      webhookToken: string;
+    };
+
+    expect((await hook(s, initial.webhookToken, 'del-before')).status).toBe(202);
+    const lastRunAt = Date.now() - 60_000;
+    s.db
+      .update(scheduleTable)
+      .set({
+        lastRunAt,
+        lastRunStatus: 'completed',
+        lastRunError: 'previous note',
+      })
+      .where(eq(scheduleTable.id, initial.id))
+      .run();
+    const beforeRow = stored(s, initial.id)!;
+
+    const updatedRes = await req(s.app, 'PUT', `/api/schedules/${initial.id}`, {
+      todoId,
+      kind: 'webhook',
+      prompt: 'updated prompt',
+      enabled: true,
+    });
+    expect(updatedRes.status).toBe(200);
+    const updated = (await updatedRes.json()) as {
+      id: string;
+      createdAt: number | null;
+      prompt: string;
+      lastRunAt: number | null;
+      lastRunStatus: string | null;
+      lastRunError: string | null;
+      webhookMasked: string | null;
+      webhookLastUsedAt: number | null;
+      webhookToken?: string;
+      webhookUrl?: string;
+    };
+    expect(updated.id).toBe(initial.id);
+    expect(updated.createdAt).toBe(beforeRow.createdAt);
+    expect(updated.prompt).toBe('updated prompt');
+    expect(updated.lastRunAt).toBe(lastRunAt);
+    expect(updated.lastRunStatus).toBe('completed');
+    expect(updated.lastRunError).toBe('previous note');
+    expect(updated.webhookMasked).toBe(beforeRow.webhookMasked);
+    expect(updated.webhookLastUsedAt).toBe(beforeRow.webhookLastUsedAt);
+    expect(updated.webhookToken).toBeUndefined();
+    expect(updated.webhookUrl).toBeUndefined();
+
+    const afterRow = stored(s, initial.id)!;
+    expect(afterRow.webhookTokenHash).toBe(beforeRow.webhookTokenHash);
+    expect(afterRow.webhookDeliveries).toEqual(['del-before']);
+
+    const stillWorks = await hook(s, initial.webhookToken, 'del-after');
+    expect(stillWorks.status).toBe(202);
+    expect(await stillWorks.json()).toEqual({ result: 'fired', deliveryId: 'del-after' });
+  });
+
+  test('rotateWebhook: true replaces the webhook token, invalidates the old one, and preserves run history', async () => {
+    const s = boot();
+    const { todoId } = await makeTodo(s, 'hook-edit-rotate');
+    const created = await req(s.app, 'POST', '/api/schedules', {
+      todoId,
+      kind: 'webhook',
+      prompt: 'keep me',
+    });
+    const initial = (await created.json()) as {
+      id: string;
+      webhookMasked: string | null;
+      webhookToken: string;
+    };
+    expect((await hook(s, initial.webhookToken, 'del-1')).status).toBe(202);
+    const lastRunAt = Date.now() - 120_000;
+    s.db
+      .update(scheduleTable)
+      .set({ lastRunAt, lastRunStatus: 'failed', lastRunError: 'timeout' })
+      .where(eq(scheduleTable.id, initial.id))
+      .run();
+    const beforeRow = stored(s, initial.id)!;
+
+    const rotatedRes = await req(s.app, 'PUT', `/api/schedules/${initial.id}`, {
+      todoId,
+      kind: 'webhook',
+      prompt: 'keep me',
+      rotateWebhook: true,
+    });
+    expect(rotatedRes.status).toBe(200);
+    const rotated = (await rotatedRes.json()) as {
+      id: string;
+      createdAt: number | null;
+      lastRunAt: number | null;
+      lastRunStatus: string | null;
+      lastRunError: string | null;
+      webhookMasked: string | null;
+      webhookLastUsedAt: number | null;
+      webhookToken?: string;
+      webhookUrl?: string;
+    };
+    expect(rotated.id).toBe(initial.id);
+    expect(rotated.createdAt).toBe(beforeRow.createdAt);
+    expect(rotated.lastRunAt).toBe(lastRunAt);
+    expect(rotated.lastRunStatus).toBe('failed');
+    expect(rotated.lastRunError).toBe('timeout');
+    expect(rotated.webhookToken).toMatch(/^cairn-wh-/);
+    expect(rotated.webhookToken).not.toBe(initial.webhookToken);
+    expect(rotated.webhookUrl).toContain(`/api/webhook/schedule/${rotated.webhookToken}`);
+    expect(rotated.webhookMasked).not.toBe(initial.webhookMasked);
+    expect(rotated.webhookLastUsedAt).toBeNull();
+
+    const afterRow = stored(s, initial.id)!;
+    expect(afterRow.webhookTokenHash).not.toBe(beforeRow.webhookTokenHash);
+    expect(afterRow.webhookDeliveries).toEqual([]);
+
+    expect((await hook(s, initial.webhookToken, 'del-old')).status).toBe(401);
+    const fresh = await hook(s, rotated.webhookToken as string, 'del-new');
+    expect(fresh.status).toBe(202);
+    expect(await fresh.json()).toEqual({ result: 'fired', deliveryId: 'del-new' });
+  });
+
+  test('switching between webhook and cron clears or issues the webhook token while keeping id and history', async () => {
+    const s = boot();
+    const { todoId } = await makeTodo(s, 'hook-edit-switch');
+    const created = await req(s.app, 'POST', '/api/schedules', {
+      todoId,
+      kind: 'webhook',
+      prompt: 'first',
+    });
+    const initial = (await created.json()) as { id: string; webhookToken: string };
+    const lastRunAt = Date.now() - 30_000;
+    s.db
+      .update(scheduleTable)
+      .set({ lastRunAt, lastRunStatus: 'completed', lastRunError: null })
+      .where(eq(scheduleTable.id, initial.id))
+      .run();
+
+    const toCronRes = await req(s.app, 'PUT', `/api/schedules/${initial.id}`, {
+      todoId,
+      kind: 'cron',
+      cron: '0 9 * * *',
+      tz: 'UTC',
+      prompt: 'now cron',
+    });
+    expect(toCronRes.status).toBe(200);
+    const toCron = (await toCronRes.json()) as {
+      id: string;
+      kind: string;
+      cron: string | null;
+      lastRunAt: number | null;
+      lastRunStatus: string | null;
+      webhookMasked: string | null;
+      webhookToken?: string;
+      webhookUrl?: string;
+    };
+    expect(toCron.id).toBe(initial.id);
+    expect(toCron.kind).toBe('cron');
+    expect(toCron.cron).toBe('0 9 * * *');
+    expect(toCron.lastRunAt).toBe(lastRunAt);
+    expect(toCron.lastRunStatus).toBe('completed');
+    expect(toCron.webhookMasked).toBeNull();
+    expect(toCron.webhookToken).toBeUndefined();
+    expect(toCron.webhookUrl).toBeUndefined();
+    expect(stored(s, initial.id)?.webhookTokenHash).toBeNull();
+    expect((await hook(s, initial.webhookToken, 'del-revoked')).status).toBe(401);
+
+    const backToWebhookRes = await req(s.app, 'PUT', `/api/schedules/${initial.id}`, {
+      todoId,
+      kind: 'webhook',
+      prompt: 'back to hook',
+    });
+    expect(backToWebhookRes.status).toBe(200);
+    const backToWebhook = (await backToWebhookRes.json()) as {
+      id: string;
+      lastRunAt: number | null;
+      webhookToken?: string;
+      webhookUrl?: string;
+    };
+    expect(backToWebhook.id).toBe(initial.id);
+    expect(backToWebhook.lastRunAt).toBe(lastRunAt);
+    expect(backToWebhook.webhookToken).toMatch(/^cairn-wh-/);
+    expect(backToWebhook.webhookToken).not.toBe(initial.webhookToken);
+    expect(backToWebhook.webhookUrl).toContain(
+      `/api/webhook/schedule/${backToWebhook.webhookToken}`,
+    );
+    expect((await hook(s, backToWebhook.webhookToken as string, 'del-fresh')).status).toBe(202);
+  });
+
+  test('updating an unknown schedule returns 404 and moving todoId or rotating non-webhook returns 400', async () => {
+    const s = boot();
+    const { todoId } = await makeTodo(s, 'hook-edit-guard');
+    const created = await req(s.app, 'POST', '/api/schedules', {
+      todoId,
+      kind: 'webhook',
+    });
+    const initial = (await created.json()) as { id: string };
+
+    expect((await req(s.app, 'PUT', '/api/schedules/missing-id', { kind: 'webhook' })).status).toBe(
+      404,
+    );
+    expect(
+      (
+        await req(s.app, 'PUT', `/api/schedules/${initial.id}`, {
+          todoId: 'other-todo',
+          kind: 'webhook',
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await req(s.app, 'PUT', `/api/schedules/${initial.id}`, {
+          todoId,
+          kind: 'cron',
+          cron: '0 9 * * *',
+          rotateWebhook: true,
+        })
+      ).status,
+    ).toBe(400);
+  });
+});

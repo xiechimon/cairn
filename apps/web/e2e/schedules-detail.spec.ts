@@ -45,6 +45,7 @@ async function setup(page: Page, patch: Partial<ProbeSchedule> = {}) {
     if (failNext) { failNext = false; return json({ error: 'Schedule update failed' }, 409); }
     if (request.method() === 'PATCH') schedule = { ...schedule, ...request.postDataJSON(), pausedReason: request.postDataJSON().enabled ? null : schedule.pausedReason, nextRunAt: request.postDataJSON().enabled ? NOW + 3_600_000 : null };
     else if (path.endsWith('/run')) schedule = { ...schedule, nextRunAt: NOW };
+    else if (request.method() === 'PUT') schedule = { ...schedule, ...request.postDataJSON() };
     else if (request.method() === 'POST') schedule = { ...schedule, ...request.postDataJSON(), id: 'schedule-2' };
     return json(schedule);
     })();

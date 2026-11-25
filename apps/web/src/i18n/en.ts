@@ -682,8 +682,15 @@ export const EN: Record<string, string> = {
   '任务上的一次构建完成后运行一次。': 'Runs once when a build on this task completes.',
   '保存后会生成一个 Webhook 地址，外部请求打到它就运行一次。':
     'Saving creates a webhook URL — an external POST to it runs the schedule once.',
-  '这个地址只显示这一次，请立即保存。外部 POST 请求打到它就运行一次。':
-    'This URL is shown only once — copy it now. An external POST to it runs the schedule.',
+  'Webhook 地址': 'Webhook URL',
+  轮换地址: 'Rotate URL',
+  '轮换 Webhook 地址': 'Rotate webhook URL',
+  '轮换后，当前 Webhook 地址会立即失效，已接入的外部调用需要改为新地址。':
+    'Rotating invalidates the current webhook URL immediately. Update existing callers to use the new URL.',
+  '外部 POST 请求打到它就运行一次。保存其他修改不会改变当前地址。':
+    'An external POST to this URL runs the schedule once. Saving other changes keeps the current URL.',
+  '保存 Webhook 地址': 'Save your webhook URL',
+  '外部 POST 请求打到它就运行一次。': 'An external POST to this URL runs the schedule once.',
   '示例数据（场景 {id}）': 'Sample data (scenario {id})',
   演示数据: 'Demo data',
   '只读演示，改动不会被保存。': 'Read-only demo — changes are not saved.',

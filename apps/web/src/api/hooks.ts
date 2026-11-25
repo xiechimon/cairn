@@ -104,6 +104,7 @@ import type {
   ThreadMessageResult,
   TodoRecord,
   TranscriptRow,
+  UpdateScheduleBody,
   UpdateSkillBody,
   UpstreamModelsResult,
   UserRecord,
@@ -1246,6 +1247,14 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<ScheduleRecord & { webhookToken?: string; webhookUrl?: string }>(
           '/api/schedules',
           body,
+        ),
+      onSuccess: invalidateAll,
+    }),
+    updateSchedule: useMutation({
+      mutationFn: (input: { id: string; body: UpdateScheduleBody }) =>
+        api.put<ScheduleRecord & { webhookToken?: string; webhookUrl?: string }>(
+          `/api/schedules/${encodeURIComponent(input.id)}`,
+          input.body,
         ),
       onSuccess: invalidateAll,
     }),

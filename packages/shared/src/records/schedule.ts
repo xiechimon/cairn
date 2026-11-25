@@ -67,6 +67,42 @@ export const createScheduleBodySchema = z.discriminatedUnion('kind', [
 ]);
 export type CreateScheduleBody = z.infer<typeof createScheduleBodySchema>;
 
+const updateScheduleInputSchema = scheduleInputSchema.extend({
+  todoId: recordId.optional(),
+});
+
+export const updateScheduleBodySchema = z.discriminatedUnion('kind', [
+  updateScheduleInputSchema.extend({
+    kind: scheduleKindSchema.exclude(['cron', 'event', 'webhook']),
+    at: epochMs,
+    cron: z.never().optional(),
+    triggerSpec: z.never().optional(),
+    rotateWebhook: z.never().optional(),
+  }),
+  updateScheduleInputSchema.extend({
+    kind: z.literal('cron'),
+    cron: z.string().trim().min(1),
+    at: z.null().optional(),
+    triggerSpec: z.never().optional(),
+    rotateWebhook: z.never().optional(),
+  }),
+  updateScheduleInputSchema.extend({
+    kind: z.literal('event'),
+    triggerSpec: scheduleTriggerSpecSchema,
+    at: z.null().optional(),
+    cron: z.never().optional(),
+    rotateWebhook: z.never().optional(),
+  }),
+  updateScheduleInputSchema.extend({
+    kind: z.literal('webhook'),
+    triggerSpec: z.never().optional(),
+    at: z.null().optional(),
+    cron: z.never().optional(),
+    rotateWebhook: z.boolean().optional(),
+  }),
+]);
+export type UpdateScheduleBody = z.infer<typeof updateScheduleBodySchema>;
+
 export const patchScheduleBodySchema = z.object({ enabled: z.boolean() }).strict();
 export type PatchScheduleBody = z.infer<typeof patchScheduleBodySchema>;
 

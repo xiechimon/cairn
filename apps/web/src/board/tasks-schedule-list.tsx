@@ -16,7 +16,11 @@ import {
   scheduleUnnamedCron,
 } from '../pages/schedule-summary.js';
 import { scheduleEnded, schedulePauseReason } from '../schedules/schedule-model.js';
-import { type ScheduleCandidate, SchedulePopover } from '../schedules/schedule-popover.js';
+import {
+  type ScheduleCandidate,
+  SchedulePopover,
+  WebhookUrlRevealDialog,
+} from '../schedules/schedule-popover.js';
 import { TasksEmpty } from './tasks-empty.js';
 import { ScheduleRowMenu } from './tasks-schedule-menu.js';
 
@@ -44,6 +48,7 @@ export function TasksScheduleList({
   const [editing, setEditing] = useState<ScheduleRecord | null>(null);
   const [creating, setCreating] = useState(false);
   const [endedOpen, setEndedOpen] = useState(false);
+  const [revealedWebhookUrl, setRevealedWebhookUrl] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const fixture = resolveScenario(searchParams);
   const listed = withoutClosed(
@@ -63,6 +68,7 @@ export function TasksScheduleList({
       now={now}
       open={creating}
       onOpenChange={setCreating}
+      onWebhookUrl={setRevealedWebhookUrl}
       trigger={
         empty ? (
           <Button variant="secondary" size="sm" data-testid="schedule-new" />
@@ -125,6 +131,7 @@ export function TasksScheduleList({
           now={now}
           open={editing?.todoId === schedule.todoId}
           onOpenChange={(open) => setEditing(open ? schedule : null)}
+          onWebhookUrl={setRevealedWebhookUrl}
           trigger={
             <Button
               variant="ghost"
@@ -160,51 +167,57 @@ export function TasksScheduleList({
     );
   };
   return (
-    <QueryBoundary
-      query={live ? query : undefined}
-      isEmpty={rows.length === 0}
-      loadingLabel={t('正在加载定时')}
-      errorTitle={t('定时未能加载')}
-      empty={
-        <TasksEmpty
-          title={t('暂无定时任务')}
-          hint={t('也可以告诉 Coordinator 某个任务多久重新运行一次，它会替你写好规则')}
-          action={newSchedule(true)}
-        />
-      }
-    >
-      <div ref={listRef} className="flex flex-col">
-        <section
-          data-testid="tasks-section"
-          data-section="scheduled"
-          className="flex flex-col gap-0.5"
-        >
-          {current.map(row)}
-          {newSchedule(false)}
-        </section>
-        {ended.length > 0 && (
-          <section data-testid="schedules-ended" className="mt-2 flex flex-col gap-0.5">
-            <Button
-              variant="ghost"
-              aria-expanded={endedOpen}
-              onClick={() => setEndedOpen((open) => !open)}
-              className="h-8 justify-start gap-4 rounded-(--radius-tile) px-2.5 text-ui font-normal text-foreground aria-expanded:bg-transparent pointer-coarse:h-11 dark:aria-expanded:bg-transparent"
-            >
-              <span className={ROW_ICON}>
-                <ChevronRight
-                  aria-hidden
-                  className={`size-4 text-content-tertiary transition-transform ${endedOpen ? 'rotate-90' : ''}`}
-                />
-              </span>
-              <span className="flex items-baseline gap-2">
-                {t('已结束')}
-                <span className="text-content-tertiary tabular-nums">{ended.length}</span>
-              </span>
-            </Button>
-            {endedOpen && ended.map(row)}
+    <>
+      <QueryBoundary
+        query={live ? query : undefined}
+        isEmpty={rows.length === 0}
+        loadingLabel={t('正在加载定时')}
+        errorTitle={t('定时未能加载')}
+        empty={
+          <TasksEmpty
+            title={t('暂无定时任务')}
+            hint={t('也可以告诉 Coordinator 某个任务多久重新运行一次，它会替你写好规则')}
+            action={newSchedule(true)}
+          />
+        }
+      >
+        <div ref={listRef} className="flex flex-col">
+          <section
+            data-testid="tasks-section"
+            data-section="scheduled"
+            className="flex flex-col gap-0.5"
+          >
+            {current.map(row)}
+            {newSchedule(false)}
           </section>
-        )}
-      </div>
-    </QueryBoundary>
+          {ended.length > 0 && (
+            <section data-testid="schedules-ended" className="mt-2 flex flex-col gap-0.5">
+              <Button
+                variant="ghost"
+                aria-expanded={endedOpen}
+                onClick={() => setEndedOpen((open) => !open)}
+                className="h-8 justify-start gap-4 rounded-(--radius-tile) px-2.5 text-ui font-normal text-foreground aria-expanded:bg-transparent pointer-coarse:h-11 dark:aria-expanded:bg-transparent"
+              >
+                <span className={ROW_ICON}>
+                  <ChevronRight
+                    aria-hidden
+                    className={`size-4 text-content-tertiary transition-transform ${endedOpen ? 'rotate-90' : ''}`}
+                  />
+                </span>
+                <span className="flex items-baseline gap-2">
+                  {t('已结束')}
+                  <span className="text-content-tertiary tabular-nums">{ended.length}</span>
+                </span>
+              </Button>
+              {endedOpen && ended.map(row)}
+            </section>
+          )}
+        </div>
+      </QueryBoundary>
+      <WebhookUrlRevealDialog
+        webhookUrl={revealedWebhookUrl}
+        onDone={() => setRevealedWebhookUrl(null)}
+      />
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { FORM_CONTROL_CLS, FormField } from '../components/form-layout.js';
 import { SegmentedRadio } from '../components/segmented.js';
+import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import {
   Select,
@@ -52,16 +53,24 @@ export function ScheduleFields({
   onChange,
   tz,
   disabled = false,
+  webhookMasked = null,
+  onRotateWebhook,
 }: {
   value: ScheduleDraft;
   onChange: (value: ScheduleDraft) => void;
   tz: string;
   disabled?: boolean;
+  webhookMasked?: string | null;
+  onRotateWebhook?: () => void;
 }) {
   const { t, locale } = useI18n();
   const id = useId();
   const cronValid = cronHasFiveFields(value.cron);
   const zone = zoneName(tz, locale);
+  const maskedWebhookUrl =
+    webhookMasked !== null && webhookMasked !== ''
+      ? `/api/webhook/schedule/${webhookMasked}`
+      : null;
   const lateHint =
     !disabled &&
     (value.trigger === 'custom'
@@ -86,13 +95,45 @@ export function ScheduleFields({
         />
       </div>
       {isTriggerSchedule(value.trigger) ? (
-        <p className="m-0 text-meta text-content-tertiary">
-          {t(
-            value.trigger === 'event'
-              ? '任务上的一次构建完成后运行一次。'
-              : '保存后会生成一个 Webhook 地址，外部请求打到它就运行一次。',
-          )}
-        </p>
+        value.trigger === 'webhook' && maskedWebhookUrl !== null ? (
+          <FormField
+            label={t('Webhook 地址')}
+            htmlFor={`${id}-webhook`}
+            disabled={disabled}
+            help={t('外部 POST 请求打到它就运行一次。保存其他修改不会改变当前地址。')}
+          >
+            <div className="flex items-center gap-2 rounded-(--radius-control) bg-muted px-3 py-2">
+              <code
+                id={`${id}-webhook`}
+                data-testid="schedule-webhook-masked"
+                className="min-w-0 flex-1 break-all font-mono text-meta text-foreground"
+              >
+                {maskedWebhookUrl}
+              </code>
+              {onRotateWebhook !== undefined && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  data-testid="schedule-webhook-rotate"
+                  disabled={disabled}
+                  className="shrink-0 px-2 pointer-coarse:h-11 pointer-coarse:px-3.5"
+                  onClick={onRotateWebhook}
+                >
+                  {t('轮换地址')}
+                </Button>
+              )}
+            </div>
+          </FormField>
+        ) : (
+          <p className="m-0 text-meta text-content-tertiary">
+            {t(
+              value.trigger === 'event'
+                ? '任务上的一次构建完成后运行一次。'
+                : '保存后会生成一个 Webhook 地址，外部请求打到它就运行一次。',
+            )}
+          </p>
+        )
       ) : value.trigger === 'custom' ? (
         <FormField
           label={t('Cron 表达式')}

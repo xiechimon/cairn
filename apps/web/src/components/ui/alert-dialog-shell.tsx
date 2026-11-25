@@ -31,6 +31,7 @@ interface AlertDialogShellProps {
   hint?: ReactNode;
   className?: string;
   size?: DialogSize;
+  dismissible?: boolean;
   finalFocus?: AlertDialogPrimitive.Popup.Props['finalFocus'];
 }
 
@@ -45,16 +46,17 @@ export function AlertDialogShell({
   hint,
   className,
   size = 's',
+  dismissible = true,
   finalFocus,
 }: AlertDialogShellProps) {
   const { t } = useI18n();
-  useEscClose(onClose, open);
+  useEscClose(onClose, open && dismissible);
 
   return (
     <AlertDialogPrimitive.Root
       open={open}
       onOpenChange={(next: boolean) => {
-        if (!next) onClose();
+        if (!next && dismissible) onClose();
       }}
     >
       <AlertDialogPrimitive.Portal>
@@ -62,7 +64,7 @@ export function AlertDialogShell({
           forceRender
           data-slot="alert-dialog-overlay"
           className="overlay-backdrop fixed inset-0 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
-          onClick={onClose}
+          onClick={dismissible ? onClose : undefined}
         />
         <AlertDialogPrimitive.Popup
           finalFocus={finalFocus}
@@ -91,18 +93,20 @@ export function AlertDialogShell({
             {children}
           </div>
           <DialogFootRow hint={hint}>{footer}</DialogFootRow>
-          <IconTooltip
-            label={t('关闭')}
-            side="bottom"
-            trigger={
-              <AlertDialogPrimitive.Close
-                render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
-                onClick={onClose}
-              />
-            }
-          >
-            <X width={20} height={20} />
-          </IconTooltip>
+          {dismissible && (
+            <IconTooltip
+              label={t('关闭')}
+              side="bottom"
+              trigger={
+                <AlertDialogPrimitive.Close
+                  render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
+                  onClick={onClose}
+                />
+              }
+            >
+              <X width={20} height={20} />
+            </IconTooltip>
+          )}
         </AlertDialogPrimitive.Popup>
       </AlertDialogPrimitive.Portal>
     </AlertDialogPrimitive.Root>

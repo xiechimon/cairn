@@ -3,6 +3,7 @@ import type {
   PatchScheduleBody,
   ScheduleKind,
   ScheduleRecord,
+  UpdateScheduleBody,
   UserRecord,
 } from '@cairn/shared';
 import {
@@ -235,6 +236,92 @@ export function createSchedule(
   if (!record) throw new Error('schedule missing after insert');
   notifyScheduleClock(deps.db, deps);
   return record;
+}
+
+export interface UpdateScheduleResult {
+  record: ScheduleRecord;
+  webhookToken: string | null;
+}
+
+export function updateSchedule(
+  deps: ScheduleDeps,
+  id: string,
+  input: UpdateScheduleBody & { teamId: string },
+  options: { allowAnyMinute?: boolean; webhookToken?: string } = {},
+): UpdateScheduleResult | null {
+  const existing = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+  if (!existing || existing.teamId !== input.teamId) return null;
+  if (input.todoId !== undefined && input.todoId !== existing.todoId) {
+    throw new HttpError(400, 'invalid todoId: schedule belongs to another todo');
+  }
+  if (input.projectId !== undefined && input.projectId !== existing.projectId) {
+    throw new HttpError(400, 'invalid projectId: todo belongs to another project');
+  }
+  const tz = input.tz ?? existing.tz;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz }).format();
+  } catch {
+    throw new HttpError(400, 'invalid schedule timezone');
+  }
+  if (input.kind === 'once' && !options.allowAnyMinute) assertMinuteStep(input.at, tz);
+  const now = nowMs();
+  const at = input.at ?? null;
+  const cron = cronExpressionFor(input.kind, at, tz, input.cron ?? null);
+  const enabled = input.enabled ?? existing.enabled;
+  const isWebhook = input.kind === 'webhook';
+  const rotate = isWebhook && input.rotateWebhook === true;
+  const needsFreshWebhook =
+    isWebhook && (existing.kind !== 'webhook' || existing.webhookTokenHash === null || rotate);
+  const issuedToken = needsFreshWebhook ? (options.webhookToken ?? newWebhookToken().token) : null;
+  const webhook = issuedToken !== null ? webhookSecretOf(issuedToken) : null;
+  const nextRunAt = !enabled
+    ? null
+    : isTriggerKind(input.kind)
+      ? existing.kind === input.kind && !rotate
+        ? existing.nextRunAt
+        : null
+      : computeNextRunAt(input.kind, at, tz, now, cron);
+  const webhookPatch = !isWebhook
+    ? {
+        webhookTokenHash: null,
+        webhookMasked: null,
+        webhookDeliveries: null,
+        webhookLastUsedAt: null,
+      }
+    : webhook !== null
+      ? {
+          webhookTokenHash: webhook.hash,
+          webhookMasked: webhook.masked,
+          webhookDeliveries: [],
+          webhookLastUsedAt: null,
+        }
+      : {};
+  deps.db
+    .update(schedule)
+    .set({
+      kind: input.kind,
+      at,
+      cron,
+      prompt: input.prompt ?? existing.prompt,
+      enabled,
+      tz,
+      triggerSpec: input.kind === 'event' ? input.triggerSpec : null,
+      missedRunWindowMs:
+        input.missedRunWindowMs !== undefined
+          ? input.missedRunWindowMs
+          : existing.missedRunWindowMs,
+      nextRunAt,
+      pausedReason: enabled ? null : existing.pausedReason,
+      retryNotBefore: enabled ? null : existing.retryNotBefore,
+      ...webhookPatch,
+    })
+    .where(eq(schedule.id, id))
+    .run();
+  const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+  const record = row ? toScheduleRecord(deps, row) : null;
+  if (!record) return null;
+  notifyScheduleClock(deps.db, deps);
+  return { record, webhookToken: issuedToken };
 }
 
 export function deleteSchedule(

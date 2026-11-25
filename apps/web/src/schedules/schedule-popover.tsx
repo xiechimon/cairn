@@ -6,17 +6,18 @@ import { useLiveData } from '../api/provider.js';
 import { joinMeta, relativeTime } from '../board/rel-time.js';
 import { useThreadHref } from '../board/thread-link.js';
 import { useNarrow } from '../board/use-narrow.js';
+import { CopyIconButton } from '../components/copy-icon-button.js';
 import { FilterPicker } from '../components/filter-picker.js';
-import { FormField } from '../components/form-layout.js';
+import { FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../components/ui/popover.js';
-import { toastSuccess } from '../components/ui/toaster.js';
+import { Textarea } from '../components/ui/textarea.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
-import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { describeError } from '../lib/error-copy.js';
 import { scheduleWhen } from '../pages/schedule-summary.js';
 import { ScheduleFields } from './schedule-fields.js';
@@ -49,6 +50,62 @@ const SCHEDULE_VALIDATION_KEYS: Record<string, true> = {
   '单次定时要选一个将来的时间。': true,
 };
 
+export function WebhookUrlRevealDialog({
+  webhookUrl,
+  onDone,
+}: {
+  webhookUrl: string | null;
+  onDone: () => void;
+}) {
+  const { t } = useI18n();
+  const fieldId = useId();
+  return (
+    <AlertDialogShell
+      title={t('保存 Webhook 地址')}
+      subtitle={t('关闭后无法再次查看，请现在复制并妥善保存。')}
+      ariaLabel={t('保存 Webhook 地址')}
+      open={webhookUrl !== null}
+      onClose={onDone}
+      dismissible={false}
+      size="s"
+      footer={
+        <FormActions
+          className="pt-0"
+          primary={{ label: t('我已保存'), onClick: onDone, testId: 'schedule-webhook-saved' }}
+        />
+      }
+    >
+      <FormStack className="max-w-none">
+        <FormField
+          label={t('Webhook 地址')}
+          htmlFor={fieldId}
+          help={t('外部 POST 请求打到它就运行一次。')}
+        >
+          <div className="flex items-start gap-1">
+            <Textarea
+              id={fieldId}
+              readOnly
+              rows={3}
+              value={webhookUrl ?? ''}
+              data-testid="schedule-webhook-url"
+              className="min-h-0 min-w-0 flex-1 resize-none font-mono break-all"
+              onFocus={(event) => {
+                event.currentTarget.select();
+                event.currentTarget.scrollTop = 0;
+              }}
+            />
+            <CopyIconButton
+              text={webhookUrl ?? ''}
+              testId="schedule-webhook-copy"
+              className="pointer-coarse:size-11"
+            />
+          </div>
+        </FormField>
+      </FormStack>
+    </AlertDialogShell>
+  );
+}
+
 export function SchedulePopover({
   schedule,
   candidates = [],
@@ -57,6 +114,7 @@ export function SchedulePopover({
   now,
   open,
   onOpenChange,
+  onWebhookUrl,
   trigger,
   children,
 }: {
@@ -67,62 +125,74 @@ export function SchedulePopover({
   now: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onWebhookUrl?: (url: string) => void;
   trigger: ReactElement;
   children: ReactNode;
 }) {
   const narrow = useNarrow();
   const [locked, setLocked] = useState(false);
+  const [localWebhookUrl, setLocalWebhookUrl] = useState<string | null>(null);
+  const handleWebhookUrl = onWebhookUrl ?? setLocalWebhookUrl;
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        if (!next && locked) return;
-        onOpenChange(next);
-      }}
-    >
-      <PopoverTrigger render={trigger}>{children}</PopoverTrigger>
-      <PopoverContent
-        data-testid="schedule-popover"
-        {...(narrow
-          ? {
-              anchor,
-              side: 'bottom' as const,
-              align: 'start' as const,
-              sideOffset: ({ anchor }: { anchor: { height: number } }) => -anchor.height,
-              collisionPadding: {
-                top: anchor?.current?.getBoundingClientRect().top ?? 72,
-                bottom: 96,
-                left: 8,
-                right: 8,
-              },
-              collisionAvoidance: { side: 'shift' as const, align: 'shift' as const },
-              className:
-                'max-h-(--available-height) w-(--available-width) gap-3 overflow-hidden p-3 pb-0',
-            }
-          : {
-              side: 'left' as const,
-              align: 'start' as const,
-              sideOffset: 16,
-              collisionPadding: { top: 60, right: 8, left: 8, bottom: 104 },
-              collisionAvoidance: { side: 'flip' as const, align: 'shift' as const },
-              className: 'max-h-(--available-height) w-80 gap-3 overflow-hidden p-3 pb-0',
-            })}
+    <>
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          if (!next && locked) return;
+          onOpenChange(next);
+        }}
       >
-        {open && (
-          <ScheduleEditor
-            schedule={schedule}
-            candidates={candidates}
-            deleted={deleted}
-            now={now}
-            onLockChange={setLocked}
-            onDone={() => {
-              setLocked(false);
-              onOpenChange(false);
-            }}
-          />
-        )}
-      </PopoverContent>
-    </Popover>
+        <PopoverTrigger render={trigger}>{children}</PopoverTrigger>
+        <PopoverContent
+          data-testid="schedule-popover"
+          {...(narrow
+            ? {
+                anchor,
+                side: 'bottom' as const,
+                align: 'start' as const,
+                sideOffset: ({ anchor }: { anchor: { height: number } }) => -anchor.height,
+                collisionPadding: {
+                  top: anchor?.current?.getBoundingClientRect().top ?? 72,
+                  bottom: 96,
+                  left: 8,
+                  right: 8,
+                },
+                collisionAvoidance: { side: 'shift' as const, align: 'shift' as const },
+                className:
+                  'max-h-(--available-height) w-(--available-width) gap-3 overflow-hidden p-3 pb-0',
+              }
+            : {
+                side: 'left' as const,
+                align: 'start' as const,
+                sideOffset: 16,
+                collisionPadding: { top: 60, right: 8, left: 8, bottom: 104 },
+                collisionAvoidance: { side: 'flip' as const, align: 'shift' as const },
+                className: 'max-h-(--available-height) w-80 gap-3 overflow-hidden p-3 pb-0',
+              })}
+        >
+          {open && (
+            <ScheduleEditor
+              schedule={schedule}
+              candidates={candidates}
+              deleted={deleted}
+              now={now}
+              onLockChange={setLocked}
+              onWebhookUrl={handleWebhookUrl}
+              onDone={() => {
+                setLocked(false);
+                onOpenChange(false);
+              }}
+            />
+          )}
+        </PopoverContent>
+      </Popover>
+      {onWebhookUrl === undefined && (
+        <WebhookUrlRevealDialog
+          webhookUrl={localWebhookUrl}
+          onDone={() => setLocalWebhookUrl(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -132,6 +202,7 @@ function ScheduleEditor({
   deleted,
   now,
   onLockChange,
+  onWebhookUrl,
   onDone,
 }: {
   schedule: ScheduleRecord | null;
@@ -139,6 +210,7 @@ function ScheduleEditor({
   deleted: boolean;
   now: number;
   onLockChange: (locked: boolean) => void;
+  onWebhookUrl: (url: string) => void;
   onDone: () => void;
 }) {
   const { t } = useI18n();
@@ -151,12 +223,12 @@ function ScheduleEditor({
   const [draft, setDraft] = useState(() => scheduleDraft(record, now, tz));
   const [todoId, setTodoId] = useState(schedule?.todoId ?? candidates[0]?.id ?? '');
   const [error, setError] = useState<string | null>(null);
-  const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
+  const [confirmRotate, setConfirmRotate] = useState(false);
   const target =
     schedule === null
       ? candidates.find((candidate) => candidate.id === todoId)
       : { id: schedule.todoId, title: schedule.todo.title, projectId: schedule.projectId };
-  const busy = mutations.createSchedule.isPending;
+  const busy = mutations.createSchedule.isPending || mutations.updateSchedule.isPending;
   const savable =
     !busy &&
     !deleted &&
@@ -171,23 +243,22 @@ function ScheduleEditor({
     }
     setError(null);
     try {
-      const created = await mutations.createSchedule.mutateAsync(
-        scheduleBody(
-          draft,
-          {
-            todoId: target.id,
-            projectId: target.projectId,
-            tz,
-            enabled: record?.enabled ?? true,
-          },
-          now,
-        ),
+      const body = scheduleBody(
+        draft,
+        {
+          todoId: target.id,
+          projectId: target.projectId,
+          tz,
+          enabled: record?.enabled ?? true,
+        },
+        now,
       );
-      if (created.webhookUrl === undefined) onDone();
-      else {
-        onLockChange(true);
-        setWebhookUrl(created.webhookUrl);
-      }
+      const saved =
+        schedule === null
+          ? await mutations.createSchedule.mutateAsync(body)
+          : await mutations.updateSchedule.mutateAsync({ id: schedule.id, body });
+      if (saved.webhookUrl !== undefined) onWebhookUrl(saved.webhookUrl);
+      onDone();
     } catch (failure) {
       setError(
         describeError(failure, t) ??
@@ -195,6 +266,39 @@ function ScheduleEditor({
             ? t(failure.message)
             : t('定时未能保存，请重试。')),
       );
+    }
+  };
+  const closeRotateConfirm = () => {
+    setConfirmRotate(false);
+    onLockChange(false);
+  };
+  const rotateWebhook = async () => {
+    if (schedule === null || target === undefined || busy || deleted) return;
+    if (!live) {
+      blockDemoWrite();
+      closeRotateConfirm();
+      return;
+    }
+    setError(null);
+    try {
+      const rotated = await mutations.updateSchedule.mutateAsync({
+        id: schedule.id,
+        body: {
+          todoId: target.id,
+          projectId: target.projectId,
+          tz,
+          prompt: draft.prompt,
+          enabled: record?.enabled ?? true,
+          kind: 'webhook',
+          rotateWebhook: true,
+        },
+      });
+      closeRotateConfirm();
+      if (rotated.webhookUrl !== undefined) onWebhookUrl(rotated.webhookUrl);
+      onDone();
+    } catch (failure) {
+      closeRotateConfirm();
+      setError(describeError(failure, t) ?? t('定时未能保存，请重试。'));
     }
   };
   const state = record === null ? null : scheduleViewState(record);
@@ -299,32 +403,22 @@ function ScheduleEditor({
             )}
           </dl>
         )}
-        {webhookUrl !== null ? (
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <div className="flex items-center gap-2 rounded-(--radius-control) bg-muted px-3 py-2">
-              <code
-                data-testid="schedule-webhook-url"
-                className="min-w-0 flex-1 break-all font-mono text-meta text-foreground"
-              >
-                {webhookUrl}
-              </code>
-              <Button
-                variant="outline"
-                size="xs"
-                className="shrink-0 px-2 pointer-coarse:h-11 pointer-coarse:px-3.5"
-                onClick={() => copyTextWithFeedback(webhookUrl, () => toastSuccess(t('已复制')))}
-              >
-                {t('复制')}
-              </Button>
-            </div>
-            <p className="m-0 text-meta text-content-tertiary">
-              {t('这个地址只显示这一次，请立即保存。外部 POST 请求打到它就运行一次。')}
-            </p>
-          </div>
-        ) : (
-          (schedule !== null || candidates.length > 0) && (
-            <ScheduleFields value={draft} onChange={setDraft} tz={tz} disabled={busy || deleted} />
-          )
+        {(schedule !== null || candidates.length > 0) && (
+          <ScheduleFields
+            value={draft}
+            onChange={setDraft}
+            tz={tz}
+            disabled={busy || deleted}
+            webhookMasked={schedule?.kind === 'webhook' ? (schedule.webhookMasked ?? null) : null}
+            onRotateWebhook={
+              schedule?.kind === 'webhook'
+                ? () => {
+                    onLockChange(true);
+                    setConfirmRotate(true);
+                  }
+                : undefined
+            }
+          />
         )}
         {error !== null && (
           <p role="alert" className="m-0 break-words text-meta text-destructive">
@@ -354,9 +448,9 @@ function ScheduleEditor({
           className={`${blocker === null ? 'ml-auto' : ''} ${DIALOG_TEXT_BUTTON} pointer-coarse:h-11 dark:bg-(--menu-hover) dark:hover:bg-(--sidebar-press)`}
           onClick={onDone}
         >
-          {deleted ? t('关闭') : webhookUrl !== null ? t('完成') : t('取消')}
+          {deleted ? t('关闭') : t('取消')}
         </Button>
-        {!deleted && webhookUrl === null && (
+        {!deleted && (
           <Button
             size="sm"
             className="text-ui pointer-coarse:h-11 dark:disabled:bg-(--menu-hover)/50"
@@ -367,6 +461,25 @@ function ScheduleEditor({
           </Button>
         )}
       </div>
+      <AlertDialogShell
+        title={t('轮换 Webhook 地址')}
+        ariaLabel={t('轮换 Webhook 地址')}
+        open={confirmRotate}
+        onClose={closeRotateConfirm}
+        footer={
+          <AlertDialogActions
+            cancelLabel={t('取消')}
+            confirmLabel={t('轮换地址')}
+            confirmDisabled={busy}
+            onCancel={closeRotateConfirm}
+            onConfirm={() => void rotateWebhook()}
+          />
+        }
+      >
+        <p className="m-0 text-ui text-content-secondary">
+          {t('轮换后，当前 Webhook 地址会立即失效，已接入的外部调用需要改为新地址。')}
+        </p>
+      </AlertDialogShell>
     </>
   );
 }
