@@ -6,6 +6,7 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import {
   autonomousMergeAdmission,
   build,
+  machine as machineTable,
   message,
   project,
   provider as providerTable,
@@ -88,6 +89,11 @@ async function setupWorld(
   });
   expect(enrollRes.status).toBe(200);
   const machineJson = (await enrollRes.json()) as { token: string; machineId: string };
+  s.db
+    .update(machineTable)
+    .set({ online: true })
+    .where(eq(machineTable.id, machineJson.machineId))
+    .run();
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '探针任务', spec: '写一行探针到 README.md' },

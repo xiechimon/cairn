@@ -49,6 +49,12 @@ async function runningTask(opts: { githubFetch?: FetchLike } = {}) {
   });
   const machine = (await enrolled.json()) as { machineId: string; token: string };
   s.db
+    .update(machineTable)
+    .set({ online: true })
+    .where(eq(machineTable.id, machine.machineId))
+    .run();
+  const now = Date.now();
+  s.db
     .insert(step)
     .values({
       id: 'running',
@@ -57,8 +63,8 @@ async function runningTask(opts: { githubFetch?: FetchLike } = {}) {
       status: 'claimed',
       machineId: machine.machineId,
       sessionId: 'builder-session',
-      createdAt: 2,
-      claimedAt: 2,
+      createdAt: now,
+      claimedAt: now,
     })
     .run();
   const send = (body: object) => req(s.app, 'POST', '/api/conversations/build/messages', body);

@@ -38,6 +38,7 @@ const BOARD = [
   'task-panel',
   'thread-route-override',
   'route-override-capabilities',
+  'task-send-dead-turn',
 ];
 const SIDEBAR = [
   'usage-page',
@@ -112,6 +113,7 @@ const DETAIL = [
   'task-panel',
   'thread-route-override',
   'route-override-capabilities',
+  'task-send-dead-turn',
 ];
 const CHIEF = [
   'composer-tool-tips',
@@ -141,6 +143,7 @@ export const LIVE_SERVER = [
   'live-server-',
   'agent-fallback-models',
   'frequent-model-',
+  'task-send-dead-turn',
 ];
 const OVERLAY = [
   'menu-keys',
@@ -164,6 +167,7 @@ const OVERLAY = [
   'storage-unavailable',
   'thread-route-override',
   'route-override-capabilities',
+  'task-send-dead-turn',
 ];
 const OVERLAYS = [
   'chip-',

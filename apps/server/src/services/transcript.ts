@@ -29,7 +29,13 @@ export function insertMessageRow(
     .run();
   const published = { ...row, actor: row.actor ?? null, origin: row.origin ?? null };
   const publish = () => {
-    deps.convHub?.publishMessage(conversationId, published, deliveredQueue, clientMessageId);
+    if (clientMessageId !== undefined) {
+      deps.convHub?.publishMessage(conversationId, published, deliveredQueue, clientMessageId);
+    } else if (deliveredQueue !== undefined) {
+      deps.convHub?.publishMessage(conversationId, published, deliveredQueue);
+    } else {
+      deps.convHub?.publishMessage(conversationId, published);
+    }
   };
   if (deps.afterCommit === undefined) publish();
   else deps.afterCommit.push(publish);

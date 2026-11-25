@@ -26,7 +26,7 @@ import { nowMs } from '../lib/ids.js';
 import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
 import { queueCoordinatorInput, STEER_WITHDRAW_HOLD } from './coordinator-inputs.js';
 import { signalCoordinator } from './coordinator-signal.js';
-import { DEAD_TURN_MS, isClaimedStepDead, stepActivityAt } from './dispatch-timeouts.js';
+import { isClaimedStepDead, stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { settleMemoryEditTurn } from './memory-edit-turns.js';
@@ -46,7 +46,6 @@ export { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 
 export const CHIEF_TURN_MAX_MS = 30 * 60_000;
 export const CHIEF_TURN_STOP_GRACE_MS = 120_000;
-export const CHIEF_DEAD_TURN_MS = DEAD_TURN_MS;
 
 export interface ChiefTurnDeps {
   db: Db;

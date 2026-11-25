@@ -438,11 +438,9 @@ test('detail face: a failed upload toasts and the draft survives untouched', asy
   await expect(input).toHaveValue('words that must survive');
 });
 
-test('detail face: Enter during the upload does not send; after it lands, Enter sends the token', async ({
+test('detail face: Enter during the upload waits until it lands and then sends the token', async ({
   page,
 }) => {
-  // Route order matters: page.route matches in reverse registration order,
-  // so the stubBoot catch-all goes first and the POST-only handlers last.
   await stubBoot(page);
   await stubDetailSurface(page);
   const deferred = await deferUploads(page);
@@ -463,19 +461,14 @@ test('detail face: Enter during the upload does not send; after it lands, Enter 
   await setCaret(page, COMPOSER, 12);
   await pasteFiles(page, COMPOSER, [{ name: 'image.png', type: 'image/png' }]);
 
-  // FM3: the grant is still held — Enter must not send a tokenless message.
   await input.press('Enter');
   expect(steers).toBe(0);
   await expect(input).toHaveValue('look at this');
 
   await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // grant
+  await deferred.releaseAll();
   await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // upload
-  await expect(input).toHaveValue('look at this');
-  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
-
-  await input.press('Enter');
+  await deferred.releaseAll();
   await expect.poll(() => steers).toBe(1);
   expect(lastContent).toBe(`${TOKEN_1}\nlook at this`);
   await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(0);

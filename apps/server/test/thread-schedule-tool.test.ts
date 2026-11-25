@@ -59,7 +59,8 @@ async function world() {
     key,
   );
   expect(enrolled.status).toBe(200);
-  const { token } = (await enrolled.json()) as { token: string };
+  const { token, machineId } = (await enrolled.json()) as { token: string; machineId: string };
+  s.db.update(machine).set({ online: true }).where(eq(machine.id, machineId)).run();
   seedSessionRoute(s, { provider: 'p', modelId: 'm' });
   const projectId = await postProject(s.app, 'Thread schedules');
   const response = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
