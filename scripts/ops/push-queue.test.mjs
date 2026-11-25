@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
-import { preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
+import {
+  fastGateInvocation,
+  preflightRef,
+  preflightRun,
+  runFastGateBeforePush,
+  watchVerdict,
+} from './preflight.mjs';
 import {
   classifyWaitStatus,
   commitCommentsApiArgs,
@@ -316,6 +322,14 @@ test('preflight stamps unowned commits with Lane: before pushing the preflight r
     git(work, ['config', 'user.name', 'Test']);
     git(work, ['commit', '--allow-empty', '-m', 'init']);
     git(work, ['push', '-u', 'origin', 'main']);
+    mkdirSync(join(work, 'scripts/ops'), { recursive: true });
+    copyFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'preflight-fast-gate.mjs'),
+      join(work, 'scripts/ops/preflight-fast-gate.mjs'),
+    );
+    git(work, ['add', 'scripts/ops/preflight-fast-gate.mjs']);
+    git(work, ['commit', '-m', 'add fast gate']);
+    git(work, ['push', 'origin', 'main']);
     git(work, ['checkout', '-b', 'feature']);
     git(work, ['commit', '--allow-empty', '-m', 'unowned change']);
 
@@ -331,6 +345,10 @@ console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_b
 `,
     );
     chmodSync(ghStub, 0o755);
+    const pnpmStub = join(bin, 'pnpm');
+    writeFileSync(pnpmStub, '#!/bin/sh\nexit 0\n');
+    chmodSync(pnpmStub, 0o755);
+    mkdirSync(join(root, 'home'), { recursive: true });
 
     const preflightScript = join(dirname(fileURLToPath(import.meta.url)), 'preflight.mjs');
     const run = spawnSync(process.execPath, [preflightScript], {
@@ -340,6 +358,7 @@ console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_b
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         EXPECTED_PREFLIGHT_REF: `preflight/${laneName(execFileSync('hostname', { encoding: 'utf8' }).trim(), 'wt')}`,
+        CAIRN_PREFLIGHT_GATE_WRAPPER: '',
       },
     });
     assert.equal(run.status, 0, run.stderr);
@@ -521,4 +540,29 @@ test('isTransientGitNetworkError and pollWaitStep retry transient TLS or network
       initialMainSha: X,
     }),
   );
+});
+
+test('preflight fast gate invokes preflight-fast-gate locally or via CAIRN_PREFLIGHT_GATE_WRAPPER', () => {
+  const local = fastGateInvocation({ env: {} });
+  assert.equal(local.command, process.execPath);
+  assert.deepEqual(local.args, ['scripts/ops/preflight-fast-gate.mjs']);
+  assert.equal(local.runner, 'local exact tree');
+
+  const wrapped = fastGateInvocation({ env: { CAIRN_PREFLIGHT_GATE_WRAPPER: 'runner --' } });
+  assert.equal(wrapped.command, process.execPath);
+  assert.deepEqual(wrapped.args, ['scripts/ops/preflight-fast-gate.mjs']);
+  assert.equal(wrapped.runner, 'CAIRN_PREFLIGHT_GATE_WRAPPER');
+
+  const calls = [];
+  const result = runFastGateBeforePush({
+    root: '/wt',
+    invocation: wrapped,
+    spawn: (command, args, options) => {
+      calls.push({ command, args, options });
+      return { status: 0 };
+    },
+  });
+  assert.equal(result.status, 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.cwd, '/wt');
 });
