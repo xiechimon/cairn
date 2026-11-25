@@ -3,6 +3,7 @@ import type {
   AntigravityLoginOutcome,
   AntigravityOAuthStepCredential,
   AntigravityRunnerLogin,
+  AntigravitySignInOutcome,
   AntigravitySubscriptionListEntry,
   DesktopSubscriptionMetadata,
 } from '@cairn/shared';

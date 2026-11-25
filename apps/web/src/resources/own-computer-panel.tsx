@@ -1,3 +1,4 @@
+import type { HostPermissions } from '@cairn/shared';
 import { cn } from 'cn';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
