@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
 import { isServerHelper } from '../src/server-process.ts';
 import { TRAY_POPOVER_WIDTH } from '../src/tray-popover.ts';
 import { isTrayPage, mainWindow } from './main-window.mjs';
+import { runAntigravityRemoteAndSkewSmoke } from './smoke-remote-antigravity.mjs';
 import { matchingPopover, TrayDriver, TrayDriverStopped } from './tray-click.mjs';
 
 const LAUNCH_TIMEOUT_MS = 120_000;
@@ -1697,6 +1698,15 @@ try {
       } catch {}
     }
   }
+
+  await runAntigravityRemoteAndSkewSmoke({
+    appPath,
+    appRoot,
+    screenshotDir: dirname(resolve(screenshotPath)),
+    launchTimeoutMs: LAUNCH_TIMEOUT_MS,
+    quitTimeoutMs: QUIT_TIMEOUT_MS,
+    withDeadline,
+  });
 
   console.log(
     `desktop smoke passed: ${origin} signed in, no pairing gate, Runner online, the tray opened in ${verified.length} verified cases, not covered: ${skipped.map((outcome) => outcome.name).join(', ') || 'none'}, quit stops the server and Runner`,
