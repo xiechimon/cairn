@@ -2092,91 +2092,41 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       assert.ok(manifestHits >= 1, 'remote mode never checked the update feed');
       assert.equal(zipHits, 0, 'blocked version downloaded before user clicked update');
 
-      const t0 = Date.now();
       const observedStates = [];
       await remoteWindow.exposeFunction('__cairnSmokeRecordUpdateState', (status) => {
-        observedStates.push(`${Date.now() - t0}:${status}`);
+        observedStates.push(status);
       });
       await remoteWindow.evaluate(() => {
-        const w = window;
-        w.__clickTrace = [];
-        document.addEventListener(
-          'click',
-          (event) => {
-            const target = event.target instanceof Element ? event.target.closest('button') : null;
-            w.__clickTrace.push(
-              `doc-click:${target?.getAttribute('data-testid') ?? event.target?.tagName ?? 'unknown'}:${target?.getAttribute('data-status') ?? ''}`,
-            );
-          },
-          true,
-        );
         window.cairnDesktop.update.subscribe((state) => {
           void window.__cairnSmokeRecordUpdateState(state.status);
         });
       });
 
-      const box = await updateButton.boundingBox();
-      const hitTarget =
-        box === null
-          ? 'no-box'
-          : await remoteWindow.evaluate(
-              ({ x, y }) => {
-                const el = document.elementFromPoint(x, y);
-                return el?.outerHTML.slice(0, 120) ?? 'null';
-              },
-              { x: box.x + box.width / 2, y: box.y + box.height / 2 },
-            );
-
-      const clickAt = Date.now() - t0;
       await updateButton.click();
-      const clickDoneAt = Date.now() - t0;
 
-      const deadline = Date.now() + OPEN_TIMEOUT_MS * 4;
+      const deadline = Date.now() + OPEN_TIMEOUT_MS * 12;
       let lastStatus = null;
       while (Date.now() < deadline) {
         lastStatus = await updateButton.getAttribute('data-status');
-        if (
-          zipHits >= 1 &&
-          (lastStatus === 'error' || observedStates.some((s) => s.endsWith(':installing')))
-        ) {
+        if (zipHits >= 1 && lastStatus === 'error') {
           break;
         }
         await remoteWindow.waitForTimeout(100);
       }
-      const clickTrace = await remoteWindow
-        .evaluate(() => window.__clickTrace ?? [])
-        .catch(() => []);
-      const directProbe =
-        zipHits >= 1
-          ? 'skipped'
-          : await Promise.race([
-              remoteWindow
-                .evaluate(async () => ({
-                  stateBefore: await window.cairnDesktop.update.state(),
-                  installResult: await window.cairnDesktop.update.install(),
-                  stateAfter: await window.cairnDesktop.update.state(),
-                }))
-                .catch((error) => `probe-err:${error.message}`),
-              new Promise((resolve) => setTimeout(() => resolve('probe-timeout-3s'), 3000)),
-            ]);
-      const mainLogTail = (() => {
-        const path = join(remoteUserData, 'logs', 'main.log');
-        if (!existsSync(path)) return '';
-        return readFileSync(path, 'utf8').split('\n').slice(-15).join(' | ');
-      })();
 
       assert.ok(
         zipHits >= 1,
-        `clicking update button in remote mode never downloaded the update (click=${clickAt}..${clickDoneAt}ms status=${lastStatus} states=${JSON.stringify(observedStates)} clicks=${JSON.stringify(clickTrace)} probe=${JSON.stringify(directProbe)} zipAfterProbe=${zipHits} hit=${hitTarget} console=${JSON.stringify(consoleErrors.slice(-6))} mainLog=${mainLogTail})`,
+        `clicking update button in remote mode never downloaded the update (status=${lastStatus} states=${JSON.stringify(observedStates)} console=${JSON.stringify(consoleErrors.slice(-6))})`,
       );
       assert.ok(
-        observedStates.some((s) => s.endsWith(':downloading')) &&
-          observedStates.some((s) => s.endsWith(':installing')),
+        observedStates.includes('downloading') && observedStates.includes('installing'),
         `clicking update button in remote mode did not start installing: ${JSON.stringify(observedStates)}`,
       );
-      await updateButton
-        .locator('xpath=self::*[@data-status="error"]')
-        .waitFor({ timeout: OPEN_TIMEOUT_MS * 3 });
+      assert.equal(
+        lastStatus,
+        'error',
+        `expected refused install to settle in error (status=${lastStatus} states=${JSON.stringify(observedStates)})`,
+      );
       const refusalTitle = await updateButton.getAttribute('title');
       assert.ok(
         refusalTitle !== null && refusalTitle.trim() !== '',

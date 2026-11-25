@@ -1636,13 +1636,16 @@ function serveUpdates(
     if (fromMainPage(event)) antigravityCancelLogin();
   });
   const periodicCheck = (): void => {
-    void created.check();
+    if (lastCheckedAt !== 0 && Date.now() - lastCheckedAt < UPDATE_CHECK_ON_FOCUS_AFTER_MS) {
+      return;
+    }
+    void check();
   };
   setTimeout(periodicCheck, UPDATE_FIRST_CHECK_MS);
   setInterval(periodicCheck, UPDATE_CHECK_EVERY_MS);
   app.on('browser-window-focus', () => {
     if (lastCheckedAt !== 0 && Date.now() - lastCheckedAt >= UPDATE_CHECK_ON_FOCUS_AFTER_MS) {
-      void created.check();
+      void check();
     }
   });
 }
