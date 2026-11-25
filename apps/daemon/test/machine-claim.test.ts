@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { MachineApiError } from '../src/machine-client.js';
 import { nextBackoffMs } from '../src/machine-loop.js';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
@@ -11,6 +12,21 @@ describe('claim loop and backoff (r3 §1.5: exponential backoff capped at 30s on
     expect(lines.some((l) => l.includes('backoff 10ms'))).toBe(true);
     expect(lines.some((l) => l.includes('backoff 20ms'))).toBe(true);
     await waitFor(() => api.parked !== null);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a server that no longer accepts this runner gets one update line, not a failure per retry', async () => {
+    const api = new FakeMachineApi();
+    api.claimQueue = [
+      new MachineApiError(426, 'too old'),
+      new MachineApiError(426, 'too old'),
+      new MachineApiError(426, 'too old'),
+    ];
+    const { handle, lines } = await boot({ api });
+    await waitFor(() => api.parked !== null);
+    expect(lines.filter((l) => l.includes('update Cairn on this computer'))).toHaveLength(1);
+    expect(lines.some((l) => l.includes('claim failed'))).toBe(false);
     await handle.stop();
     await handle.done;
   });

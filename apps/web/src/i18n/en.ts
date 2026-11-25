@@ -1059,6 +1059,10 @@ export const EN: Record<string, string> = {
     'Queued: no Runner meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed',
   '排队中：暂无 {platform} 执行机 · 需要 {platform}':
     'Queued: no {platform} Runner · needs {platform}',
+  '排队中：执行机上的 Cairn 版本过旧，更新后自动继续':
+    'Queued: Cairn on the Runner is too old. This continues once it is updated',
+  '排队中：{machine} 上的 Cairn 版本过旧，更新后自动继续':
+    'Queued: Cairn on {machine} is too old. This continues once it is updated',
   '排队中：执行机上未检测到 {runtime}，安装后重启执行机':
     'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner',
   '排队中：执行机无法使用这一步的模型——在「设置 → 模型」中更换模型':
@@ -1529,6 +1533,7 @@ export const EN: Record<string, string> = {
   '{model}（已下架）': '{model} (delisted)',
   '{model}（需要更新 Cairn）': '{model} (needs a Cairn update)',
   '需要更新 Cairn': 'Needs a Cairn update',
+  '更新 Cairn 后才能接新任务': 'Takes new tasks after a Cairn update',
   '{n} 个模型需要新版 Cairn': '{n#1 model needs|# models need} a Cairn update',
   '更新 Cairn 后再重试。': 'Update Cairn, then try again.',
   '更新 Cairn 后重新运行这个任务。': 'Update Cairn, then run this task again.',

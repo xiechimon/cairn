@@ -22,6 +22,7 @@ import {
   type ManagedUpdateRuntime,
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
+  RUNNER_PROTOCOL_VERSION,
   type RuntimeUpdateStatus,
   sleep,
 } from '@cairn/shared';
@@ -557,6 +558,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         : {}),
       mcpConnectors: true,
       claimGeneration: true,
+      runnerProtocolVersion: RUNNER_PROTOCOL_VERSION,
       ...(orbComputer ? { computer: true as const } : {}),
       ...(hostDesktops?.offersBrowser()
         ? { browser: true as const, browserSecretFill: true as const }
@@ -1090,7 +1092,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     } else {
       logger.recover(`${recovered.steps.length} pending step(s) found — resuming`);
       for (const stepRecord of recovered.steps) {
-        const entry = journal.get(stepRecord.id);
+        const journaled = journal.get(stepRecord.id);
+        const entry =
+          journaled?.claimed != null &&
+          journaled.claimed.step.generation === undefined &&
+          stepRecord.generation !== undefined
+            ? journal.update(stepRecord.id, {
+                claimed: {
+                  ...journaled.claimed,
+                  step: { ...journaled.claimed.step, generation: stepRecord.generation },
+                },
+              })
+            : journaled;
         if (entry?.claimed) {
           if (entry.state === 'awaiting-upload' && entry.doneBody != null) {
             await resumePendingUpload(stepDeps(), entry, { running: 1 });
@@ -1616,6 +1629,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const done = (async () => {
     const backoffBase = opts.claimBackoffBaseMs ?? 1_000;
     let backoff = backoffBase;
+    let refusedAsOutdated = false;
     while (!stopping) {
       let step: ClaimedStep | null = null;
       try {
@@ -1623,11 +1637,21 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           AbortSignal.any([claimCtrl.signal, AbortSignal.timeout(claimTimeoutMs)]),
         );
         backoff = backoffBase;
+        refusedAsOutdated = false;
       } catch (err) {
         if (stopping) break;
-        logger.machine(
-          `claim failed: ${err instanceof Error ? err.message : String(err)} (backoff ${backoff}ms)`,
-        );
+        if (err instanceof MachineApiError && err.status === 426) {
+          if (!refusedAsOutdated) {
+            logger.machine(
+              'the server no longer accepts this version of Cairn for new tasks — update Cairn on this computer; steps already running here still finish',
+            );
+          }
+          refusedAsOutdated = true;
+        } else {
+          logger.machine(
+            `claim failed: ${err instanceof Error ? err.message : String(err)} (backoff ${backoff}ms)`,
+          );
+        }
         await sleep(backoff);
         backoff = Math.min(backoff * 2, CLAIM_BACKOFF_CAP_MS);
         continue;

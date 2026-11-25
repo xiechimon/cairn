@@ -81,6 +81,26 @@ describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
     await handle.done;
   });
 
+  test('after updating from a runner that kept no claim generation, the resumed step reports with the server one', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [
+      { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1, generation: 42 },
+    ];
+    const { handle } = await boot({
+      api,
+      seedJournal: (paths) =>
+        seedS1Journal(paths, {
+          state: 'awaiting-upload',
+          planContent: '# 方案',
+          doneBody: { status: 'success', sessionId: 'pi-sess-1' },
+        }),
+    });
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.generation).toBe(42);
+    await handle.stop();
+    await handle.done;
+  });
+
   test('a finished step the server restart left in awaiting-upload is re-delivered while the daemon keeps running', async () => {
     const api = new FakeMachineApi();
     const { handle, paths, lines } = await boot({

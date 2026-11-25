@@ -5,6 +5,7 @@ import {
   computerCallIdSchema,
   enrollDisplayName,
   MACHINE_ENROLL_TTL_MS,
+  MIN_SUPPORTED_RUNNER_PROTOCOL,
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
   machineAntigravityModelProbeBodySchema,
@@ -35,6 +36,7 @@ import {
   PLAN_FILE_NAME,
   REPO_ARCHIVE_FAILED_FILE_NAME,
   REPO_ARCHIVE_FILE_NAME,
+  runnerOutOfWindow,
   SESSION_FILE_NAME,
   transcriptUploadSchema,
 } from '@cairn/shared';
@@ -538,6 +540,14 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       () => jsonBody(c),
       async (row, decoded) => {
         const body = parseWith(machineClaimBodySchema, decoded ?? {}, 'body');
+        if (runnerOutOfWindow(row.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL)) {
+          throw new HttpError(
+            426,
+            'Cairn on this Runner is too old for this server; update Cairn on that computer',
+            undefined,
+            { code: 'runner-out-of-window' },
+          );
+        }
         const token = bearer(c) ?? '';
         const stillAuthorized = () => findMachineByToken(ctx.db, token)?.id === row.id;
         const step = await claimStep(

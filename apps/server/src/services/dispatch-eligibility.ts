@@ -5,10 +5,12 @@ import {
   MACHINE_RUNTIMES,
   type MachineCapabilities,
   type MachineRuntime,
+  MIN_SUPPORTED_RUNNER_PROTOCOL,
   MODEL_SOURCE_RUNTIME_LABELS,
   type RequiredCapabilities,
   type RunnerOs,
   runnerOsOf,
+  runnerOutOfWindow,
   type StepKind,
 } from '@cairn/shared';
 import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm';
@@ -253,6 +255,7 @@ export interface EligibilityInput {
 export type MachineIneligibility =
   | {
       kind:
+        | 'runner-outdated'
         | 'runtime'
         | 'local-path'
         | 'claude-blocked'
@@ -266,6 +269,9 @@ export type MachineIneligibility =
 export function machineEligibility(input: EligibilityInput): MachineIneligibility | null {
   const { machine: machineRow, agent: agentRow, model } = input;
   const runtime = stepRuntimeFor(model.provider);
+  if (runnerOutOfWindow(machineRow.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL)) {
+    return { kind: 'runner-outdated' };
+  }
   if (!machineRuntimeClaimable(machineRow, runtime)) return { kind: 'runtime' };
   const modelReject =
     agentRow.machineId === machineRow.id

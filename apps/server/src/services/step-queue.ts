@@ -48,6 +48,8 @@ import {
 
 function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueueBlocked {
   switch (gap.kind) {
+    case 'runner-outdated':
+      return { kind: 'runner-outdated', missing: [] };
     case 'capability':
       return { kind: 'capability-missing', missing: gap.missing };
     case 'runtime':

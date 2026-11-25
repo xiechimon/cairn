@@ -41,7 +41,7 @@ Measured in live use on 2026-11-25:
 | **Desktop Shell ↔ Server (local embedded)** | **1:1 bundled.** `apps/desktop` spawns the `apps/server` and embedded `apps/daemon` inside its own `.app` bundle. | Never skews unless attached to a resident `launchd` host (`attachedToResident`), which behaves like a local-origin resident server. |
 | **Desktop Shell ↔ Remote Server** | **Server is workspace authority; Shell is native host.** Neither side forces a 1:1 commit match. Both expose versions (`appVersion` vs `GET /api/server/version`) and negotiate over an explicit bridge contract. | Multiple clients (laptop, mobile browser, desktop) share one persistent server database; VS Code-style per-commit server spawning would fragment state. |
 | **Page (`apps/web`) ↔ Shell (`apps/desktop/src/preload.ts`)** | **Capability-negotiated bridge.** `preload.ts` exposes a frozen `window.cairnDesktop.shell` descriptor (`shellVersion`, `bridgeVersion`, `capabilities`); the page adapts or prompts **"Update Cairn"**. | The page advances on the server's clock while `preload.ts` advances on the desktop shell's restart clock. |
-| **Runner (`apps/daemon`) ↔ Server** | **Server is claim authority; Runner declares protocol & capabilities.** Runners send `daemonVersion`, `runnerProtocolVersion`, and `capabilities.*`; the server selects compatible behavior inside the window and refuses claims below the floor. | Prevents older runners from taking steps whose fences or endpoints they cannot complete. |
+| **Runner (`apps/daemon`) ↔ Server** | **Server is claim authority; Runner declares protocol & capabilities.** Runners send `cliVersion` and `capabilities.*`, including `runnerProtocolVersion`; the server selects compatible behavior inside the window and refuses claims below the floor. | Prevents older runners from taking steps whose fences or endpoints they cannot complete. |
 
 ### 2. Protocol version negotiation
 
@@ -73,20 +73,30 @@ For `fix-ag-banner-skew` (`bbf7d78bd`), `antigravityBridge()` currently checks `
 
 #### B. Runner ↔ Server claim & registration (`apps/daemon` ↔ `apps/server`)
 
-Runners send on `POST /api/machine/enroll`, `POST /api/machine/presence`, and `POST /api/machine/tasks/claim`:
+Runners report on `POST /api/machine/enroll` and `POST /api/machine/presence` (implemented in `packages/shared/src/records/machine-capabilities.ts`):
 
-- `daemonVersion: string` (from `apps/daemon/src/version.ts`)
-- `runnerProtocolVersion: number` (monotonic integer, starting at `1`; pre-field legacy runners implicitly map to `0`)
-- `capabilities: MachineCapabilities` (`packages/shared/src/records/machine-capabilities.ts`, e.g., `claimGeneration: true`, `secretGateway: true`, `mcpConnectors: true`)
+- `cliVersion: string` (the daemon version, `apps/daemon/src/version.ts`)
+- `capabilities.runnerProtocolVersion: number`: `RUNNER_PROTOCOL_VERSION`, a monotonic integer starting at `1`. A runner that omits it, or sends anything other than a non-negative integer, is protocol `0`. It travels inside `capabilities`, so it is stored and replaced with every presence like the other flags, and an older binary started on the same machine (a rollback) lowers it at once.
+- `capabilities.claimGeneration: true`: the claim-generation fence, unchanged.
 
-Server negotiation rules (`apps/server/src/services/machine-claim.ts`, `machine-claim-scope.ts`, `machine-presence.ts`):
+A runner sends presence before it claims or recovers anything after every start, so the claim path reads the stored row and needs no field of its own.
 
-1. **Before claiming (`POST /api/machine/tasks/claim`):**
-   - Check `runnerProtocolVersion >= MIN_SUPPORTED_RUNNER_PROTOCOL` (and any step-required capability).
-   - If `runnerProtocolVersion < MIN_SUPPORTED_RUNNER_PROTOCOL`, return `426 Upgrade Required` (`{ code: 'runner-out-of-window', minProtocolVersion, minDaemonVersion, updateRequired: true }`) and **do not claim the step**. Keep the machine record `online: true` with `outOfWindow: true` so the owner sees it in the Runners list with **"Update Cairn"** instead of silently disappearing or stranding tasks.
-2. **Inside window (`MIN_SUPPORTED_RUNNER_PROTOCOL <= v <= CURRENT_RUNNER_PROTOCOL`):**
-   - Use additive capability flags to bridge transitions cleanly, following `fix-claim-gen-compat` (`0aa637eac`): `claimGenerationAccepted` enforces `claimedAt === generation` whenever `capabilities.claimGeneration === true`, and accepts legacy generationless calls only from runners that do not declare `claimGeneration`.
-   - If `v < RECOMMENDED_RUNNER_PROTOCOL` (or a required capability like `claimGeneration` is missing), the server includes `{ updateAvailable: true, recommendedVersion }` in `/presence` and `/claim` responses and the UI displays **"Needs a Cairn update"** (`machine-row.tsx`).
+Server rules:
+
+1. **Below the floor** (`runnerProtocolOf(capabilities) < MIN_SUPPORTED_RUNNER_PROTOCOL`):
+   - `POST /api/machine/tasks/claim` answers `426` with `{ code: 'runner-out-of-window' }` before it touches any step (`apps/server/src/routes-machine.ts`).
+   - Routing treats the runner as ineligible (`runner-outdated` in `dispatch-eligibility.ts` and `machine-routing.ts`), so an unpinned step goes to another runner and a step pinned to it waits with the queue reason `runner-outdated`: "Queued: Cairn on {machine} is too old. This continues once it is updated".
+   - Heartbeat, token, tool, upload and done calls for a step the runner already holds are not refused: the floor stops new work, never work in flight.
+   - The machine stays online; the Runners list shows "Takes new tasks after a Cairn update" instead of "Needs a Cairn update".
+   - The runner logs one line ("update Cairn on this computer") and keeps its normal claim backoff, capped at 30 s; it does not crash or log a failure per retry.
+2. **Inside the window, below current** (`MIN_SUPPORTED_RUNNER_PROTOCOL <= v < RUNNER_PROTOCOL_VERSION`): the runner claims and finishes normally; `claimGenerationAccepted` accepts generationless calls only while the stored row lacks `claimGeneration`; the Runners list shows "Needs a Cairn update" (`runnerNeedsUpdate`).
+3. **Current**: fenced claims; every step call carries the generation.
+
+`MIN_SUPPORTED_RUNNER_PROTOCOL` is `0` today: no runner in use is below the floor. It is raised only by a change that removes a server path older runners need, and that change keeps at least 30 days of runner releases inside the window.
+
+#### Runner ↔ Server edge cases
+
+Every pairing, mode and condition for this part, with the expected result, its test and the red-on-main evidence: [`version-skew-edge-cases/runner-claim.md`](version-skew-edge-cases/runner-claim.md) (R1–R17).
 
 ### 3. Compatibility windows
 
@@ -150,7 +160,7 @@ One consistent rule across every surface (sidebar update control, top status bar
 ### Runner Claim Negotiation (`apps/daemon` ↔ `apps/server`)
 
 ```
-[runner boots] ──▶ POST /api/machine/presence (daemonVersion, runnerProtocolVersion, capabilities)
+[runner boots] ──▶ POST /api/machine/presence (cliVersion, capabilities incl. runnerProtocolVersion)
                       │
                       ├─ v < MIN_SUPPORTED_RUNNER_PROTOCOL
                       │     ──▶ server marks outOfWindow=true; claim returns 426 (never claims step)
@@ -173,7 +183,7 @@ One consistent rule across every surface (sidebar update control, top status bar
 | `GET /api/server/version` & `POST /api/server/update` | `server-version.ts` (`remote-version` branch), `apps/server/src/routes-core.ts` | `remote-version.ts` (`remote-version` branch), `apps/web` (`AccountPage`, `DesktopHostPanel`, `RemoteUpdateBar`) |
 | `<CAIRN_HOME>/host-update-request.json` | `apps/server` (`POST /api/server/update`) | `apps/server`, `apps/desktop/src/main.ts`, `apps/desktop/src/background-updater.ts` |
 | `<CAIRN_HOME>/host-update-status.json` | `apps/desktop/src/main.ts` (local host), `apps/desktop/src/background-updater.ts` | `apps/server` (`GET /api/server/version`, `POST /api/server/update`) |
-| `machine.capabilities` & `runnerProtocolVersion` | `apps/daemon/src/machine-loop.ts` (`POST /presence`, `POST /enroll`) | `apps/server` (`machine-claim.ts`, `machine-claim-scope.ts`), `apps/web/src/resources/machine-row.tsx` |
+| `machine.capabilities` (incl. `runnerProtocolVersion`, `claimGeneration`) | `apps/daemon/src/machine-loop.ts` (`POST /presence`, `POST /enroll`) | `apps/server` (`routes-machine.ts` claim, `machine-claim-scope.ts`, `dispatch-eligibility.ts`, `machine-routing.ts`, `step-queue.ts`), `apps/web/src/resources/machine-row.tsx` |
 | `<userData>/update-state.json` & `update.lock` | `apps/desktop/src/updater.ts`, `apps/desktop/src/launch-update.ts`, `apps/desktop/src/background-update.ts` | `apps/desktop/src/updater.ts`, `apps/desktop/src/main.ts` (`VersionGuard` rollback & notice) |
 
 ## Scenarios and Tests (One Test per Path)
@@ -185,7 +195,7 @@ One consistent rule across every surface (sidebar update control, top status bar
 | **3. New desktop app + Old server (remote host with updater)** | About & Settings show the **remote server's** older version; quiet status line (`Updating remote host…` → `Remote host is restarting…`), then seamless reload with typed text intact. | `createRemoteVersionController` (`remote-version`) probes `GET /api/server/version`, posts `POST /api/server/update`, waits if `busy === true`, polls until new version answers, flushes drafts (`cairn:prepare-reload`), reloads `webContents`. | Download + 1 remote restart | `remote-version.test.ts` on `remote-version` (`apps/desktop/scripts`): older remote `GET /api/server/version` triggers `POST /api/server/update`, waits through `waiting-idle` while `busy: true`, reloads on version bump. |
 | **4. New desktop app + Old server (pre-`/api/server/version` 404)** | About shows `Unknown` (never the laptop app's version); one quiet line (`This remote host is too old to update automatically. Update Cairn on that computer.`) + **`Check again`**. | `remote-version` handles HTTP `404` once without retry loop; `preload.ts` renders quiet fallback bar if old web bundle lacks `RemoteUpdateBar`. | 1 GET | `remote-version.test.ts` on `remote-version` (`apps/desktop/scripts`): HTTP `404` enters `old-server` state, sets About to `Unknown`, stops polling until user clicks `Check again`. |
 | **5. Old runner daemon + New server (within window, pre-`claimGeneration`)** | Task runs and finishes normally; Runners list shows **`Needs a Cairn update`** (`fix-claim-gen-compat`). | Server `claimGenerationAccepted` accepts generationless requests only when `capabilities.claimGeneration !== true`; managed runner schedules idle self-update after step completion. | 0 extra wait | `machine-claim-protocol-skew.test.ts` on `fix-claim-gen-compat` (`0aa637eac`): legacy runner without `claimGeneration` claims and finishes step without `409`; `machine-row` renders `machine-needs-update`. |
-| **6. Old runner daemon + New server (out of window, `v < MIN_SUPPORTED_RUNNER_PROTOCOL`)** | Task does **not** get stranded on that runner (routes to a capable runner or waits clearly); Runners list marks the old runner **`Update Cairn`** (`out-of-window`). | `POST /api/machine/tasks/claim` returns `426` without claiming; runner stays `online` for visibility, stops claiming in a loop, and triggers idle updater if supported. | 0 stranded steps | Planned in `apps/server/test` (`machine-claim-window.test.ts`): runner with `runnerProtocolVersion < MIN_SUPPORTED_RUNNER_PROTOCOL` gets `426` on claim, step stays `pending`, machine row surfaces `Update Cairn`. |
+| **6. Old runner daemon + New server (out of window, `v < MIN_SUPPORTED_RUNNER_PROTOCOL`)** | Task does **not** get stranded on that runner (routes to a capable runner or waits clearly); Runners list marks the old runner **`Update Cairn`** (`out-of-window`). | `POST /api/machine/tasks/claim` returns `426` without claiming; runner stays `online` for visibility, stops claiming in a loop, and triggers idle updater if supported. | 0 stranded steps | `apps/server/test/machine-claim-window.test.ts`: runner below the floor gets `426` on claim, the step stays `pending` with queue reason `runner-outdated`, the machine stays online. Edge cases R1–R17 in `version-skew-edge-cases/runner-claim.md`. |
 | **7. Remote mode (desktop shell connected to remote server — bridge + update + runner isolation)** | Sidebar Update button updates the laptop shell; Antigravity re-sign-in signs in directly on the Mac and saves to the remote server (`fix-ag-banner-skew`); laptop local runner stays isolated from any CLI runner on the same Mac (`692e7d5d8`). | `desktop-update:install` allowed in remote mode (`fix-remote-update`); `antigravity:sign-in` active in remote mode (`bbf7d78bd`); desktop uses its own `runner-home` when `~/.cairn` belongs to another server (`692e7d5d8`). | 0 dead buttons | [`apps/web/e2e/providers-subscription-relogin.spec.ts`](../../apps/web/e2e/providers-subscription-relogin.spec.ts) + `local-runner-home.test.ts` (`692e7d5d8`) + planned remote-mode update IPC test. |
 | **8. Self-hosted server owner who updates late (`updater.supported === false` / Docker / CLI)** | About & Settings show the self-hosted server's real version; one plain sentence (`This remote host cannot update automatically. Update Cairn on that computer.`) + **`Check again`**. No endless spinner or broken auto-update loop. | `GET /api/server/version` returns `updater: { supported: false, reason: 'no-updater' \| 'development' }`; client stops auto-triggering; server stays usable inside compatibility window and warns cleanly when shell or runner crosses floor. | 1 GET | `server-version.test.ts` + `remote-version.test.ts` on `remote-version`: `supported: false` enters `unsupported` state, sends zero `POST /api/server/update` requests. |
 | **9. Plain browser (no desktop shell)** | Settings shows connected server's version + commit; desktop-only native flows (local Antigravity sign-in) keep `"Open in Cairn desktop app"`; no shell update bar. | `window.cairnDesktop` is `undefined` and UA lacks `DESKTOP_SHELL_USER_AGENT`. | 1 GET | `remote-version.test.ts` on `remote-version` & planned `desktop-bridge-skew.test.ts`: browser UA without `cairnDesktop` renders browser-only copy and hides shell update triggers. |
@@ -196,7 +206,7 @@ One consistent rule across every surface (sidebar update control, top status bar
 
 ## In-Flight Lanes Mapped to This Contract
 
-- **`fix-claim-gen-compat`** (`0aa637eac`, `692e7d5d8`): Implements the runner-side compatibility bridge (`capabilities.claimGeneration`, `claimGenerationAccepted` fence, immediate crash `done(failed)`, 45 s / 2 min dead-claim sweep, `"Needs a Cairn update"` badge in `machine-row.tsx`, and separate desktop `runner-home` so dual local+remote runners stop 401 crash loops). Remaining follow-up from this contract: add `runnerProtocolVersion` floor (`426` pre-claim refusal) and idle self-update for standalone CLI/`launchd` runners.
+- **`fix-claim-gen-compat`** (`0aa637eac`, `692e7d5d8`): Implements the runner-side compatibility bridge (`capabilities.claimGeneration`, `claimGenerationAccepted` fence, immediate crash `done(failed)`, 45 s / 2 min dead-claim sweep, `"Needs a Cairn update"` badge in `machine-row.tsx`, and separate desktop `runner-home` so dual local+remote runners stop 401 crash loops). It also adds the `runnerProtocolVersion` floor (`426` before claiming, `runner-outdated` routing and queue reason). Remaining follow-up from this contract: idle self-update for standalone CLI/`launchd` runners.
 - **`fix-ag-banner-skew`** (`bbf7d78bd`): Fixes Antigravity re-sign-in across local and remote mode (`antigravity:sign-in` IPC enabled in remote mode; `AntigravityReloginDialog` with no dead Save button). Remaining follow-up from this contract: when `isDesktopShell()` is true and `antigravityBridge()` is `null` (an older shell `< desktop-v0.1.729`), show **`Update Cairn`** instead of `"Open this page in the Cairn desktop app"`.
 - **`fix-remote-update`**: Removes the `!allowLocalCredentials` block on `desktop-update:install` in `apps/desktop/src/main.ts` so remote-mode users can update their desktop shell instead of clicking a dead button.
 - **`remote-version`** (`1a7ac932d`, design note `remote-server-version.md` on that branch): Implements `GET /api/server/version`, `POST /api/server/update`, `createRemoteVersionController`, server version display in About/Settings/update control, and idle-safe automatic update of older remote hosts. Remaining follow-up from this contract: enforce `minBridgeVersion` / `recommendedBridgeVersion` negotiation on the shell ↔ server boundary.

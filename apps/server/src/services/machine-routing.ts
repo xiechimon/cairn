@@ -2,9 +2,11 @@ import {
   claudeRateBlock,
   isBuildStepKind,
   isRegisteredMachine,
+  MIN_SUPPORTED_RUNNER_PROTOCOL,
   machineStrain,
   type RunnerOs,
   runnerOsOf,
+  runnerOutOfWindow,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -73,6 +75,9 @@ export function chiefIneligibility(
   now: number,
 ): MachineIneligibility | null {
   const runtime = stepRuntimeFor(provider);
+  if (runnerOutOfWindow(machineRow.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL)) {
+    return { kind: 'runner-outdated' };
+  }
   if (!machineRuntimeClaimable(machineRow, runtime)) return { kind: 'runtime' };
   if (runtime === 'claude-code' && claudeRateBlock(machineRow.claudeRateLimits ?? [], now) !== null)
     return { kind: 'claude-blocked' };

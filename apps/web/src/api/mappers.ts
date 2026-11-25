@@ -130,6 +130,7 @@ import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
+  'runner-outdated': '排队中：{machine} 上的 Cairn 版本过旧，更新后自动继续',
   'runtime-disabled': '排队中：{machine} 上未检测到 {runtime}，安装后重启执行机',
   'model-unavailable': '排队中：{machine} 无法使用这一步的模型——在「设置 → 模型」中更换模型',
   'local-path': '排队中：本地项目只在它所在的执行机上运行，{machine} 无法运行',
@@ -150,6 +151,7 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
 };
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
+  'runner-outdated': '排队中：执行机上的 Cairn 版本过旧，更新后自动继续',
   'runtime-disabled': '排队中：执行机上未检测到 {runtime}，安装后重启执行机',
   'model-unavailable': '排队中：执行机无法使用这一步的模型——在「设置 → 模型」中更换模型',
   'local-path': '排队中：本地项目只在它所在的执行机上运行，这台执行机无法运行',

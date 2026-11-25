@@ -187,6 +187,7 @@ export const machineCapabilitiesSchema = z.object({
   secretGateway: z.literal(true).optional(),
   mcpConnectors: z.literal(true).optional(),
   claimGeneration: z.literal(true).optional(),
+  runnerProtocolVersion: z.number().int().nonnegative().max(1_000_000).optional(),
   codexLogin: codexLoginSchema.optional(),
   devin: devinReportSchema.optional(),
   gemini: geminiReportSchema.optional(),
@@ -227,6 +228,9 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const phones = z.array(machinePhoneReportSchema).max(32).safeParse(rec.phones);
   const computerName = machineCapabilitiesSchema.shape.computerName.safeParse(rec.computerName);
   const reportedHostname = machineCapabilitiesSchema.shape.hostname.safeParse(rec.hostname);
+  const runnerProtocolVersion = machineCapabilitiesSchema.shape.runnerProtocolVersion.safeParse(
+    rec.runnerProtocolVersion,
+  );
   return {
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
@@ -261,13 +265,30 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
     ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
     ...(rec.claimGeneration === true ? { claimGeneration: true as const } : {}),
+    ...(runnerProtocolVersion.success && runnerProtocolVersion.data !== undefined
+      ? { runnerProtocolVersion: runnerProtocolVersion.data }
+      : {}),
     ...(rec.phoneHost === true ? { phoneHost: true as const } : {}),
     ...(phones.success && phones.data !== undefined ? { phones: phones.data } : {}),
   };
 }
 
+export const RUNNER_PROTOCOL_VERSION = 1;
+export const MIN_SUPPORTED_RUNNER_PROTOCOL = 0;
+
+export function runnerProtocolOf(capabilities: MachineCapabilities | null | undefined): number {
+  return capabilities?.runnerProtocolVersion ?? 0;
+}
+
+export function runnerOutOfWindow(
+  capabilities: MachineCapabilities | null | undefined,
+  floor: number,
+): boolean {
+  return runnerProtocolOf(capabilities) < floor;
+}
+
 export function runnerNeedsUpdate(capabilities: MachineCapabilities | null | undefined): boolean {
-  return capabilities != null && capabilities.claimGeneration !== true;
+  return capabilities != null && runnerProtocolOf(capabilities) < RUNNER_PROTOCOL_VERSION;
 }
 
 export function parseStoredCapabilities(raw: unknown): MachineCapabilities | null | undefined {
@@ -302,6 +323,7 @@ export const stepQueueBlockedSchema = z.object({
   kind: z.enum([
     'machine-offline',
     'machine-retired',
+    'runner-outdated',
     'capability-missing',
     'runtime-disabled',
     'model-unavailable',

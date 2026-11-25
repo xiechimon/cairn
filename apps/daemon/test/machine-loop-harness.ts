@@ -86,6 +86,7 @@ export class FakeMachineApi implements MachineApi {
     kind: 'plan' | 'build' | 'merge';
     machineId: string | null;
     createdAt: number;
+    generation?: number;
   }[] = [];
   failClaims = 0;
   steerResponse: string | null = null;

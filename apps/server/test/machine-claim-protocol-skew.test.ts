@@ -96,6 +96,27 @@ describe('a runner older than the claim generation protocol', () => {
     expect(w.row()?.status).toBe('claimed');
   });
 
+  test('a runner rolled back to an older Cairn finishes the step it claimed before the rollback', async () => {
+    const w = await runnerWorld({
+      mcpServers: [],
+      skills: [],
+      claimGeneration: true,
+      runnerProtocolVersion: 1,
+    });
+    const stepId = w.claimed.step.id;
+    const presence = await call(w.s.app, 'POST', '/api/machine/presence', {
+      cred: w.token,
+      body: { cliVersion: '0.2.3', capabilities: { mcpServers: [], skills: [] } },
+    });
+    expect(presence.status).toBe(200);
+    const done = await call(w.s.app, 'POST', `/api/machine/done/${stepId}`, {
+      cred: w.token,
+      body: { status: 'failed', errorMessage: 'agent exited' },
+    });
+    expect(done.status).toBe(200);
+    expect(w.row()?.status).toBe('failed');
+  });
+
   test('an older runner cannot report on a step that is no longer its own', async () => {
     const w = await runnerWorld({ mcpServers: [], skills: [] });
     const stepId = w.claimed.step.id;

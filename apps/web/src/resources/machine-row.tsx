@@ -1,4 +1,4 @@
-import { runnerNeedsUpdate } from '@cairn/shared';
+import { MIN_SUPPORTED_RUNNER_PROTOCOL, runnerNeedsUpdate, runnerOutOfWindow } from '@cairn/shared';
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import { useState } from 'react';
@@ -34,6 +34,8 @@ export function MachineRowView({
   const machineId = machine.id ?? '';
   const online = machine.online !== false;
   const needsUpdate = online && runnerNeedsUpdate(machine.capabilities);
+  const outOfWindow =
+    needsUpdate && runnerOutOfWindow(machine.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -129,9 +131,10 @@ export function MachineRowView({
                 </span>
                 <span
                   data-testid="machine-needs-update"
+                  data-out-of-window={outOfWindow || undefined}
                   className="whitespace-nowrap text-content-secondary"
                 >
-                  {t('需要更新 Cairn')}
+                  {outOfWindow ? t('更新 Cairn 后才能接新任务') : t('需要更新 Cairn')}
                 </span>
               </>
             )}
