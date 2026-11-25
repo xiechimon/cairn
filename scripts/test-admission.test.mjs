@@ -100,6 +100,7 @@ test('actual worker admission', async () => {
     CI: '',
     CAIRN_HEAVY_SLOTS_DIR: join(root, 'locks'),
     CAIRN_CPU_SATURATION_PERCENT: '0',
+    CAIRN_LOCAL_HEAVY: '1',
   };
   delete env.CAIRN_HEAVY_SLOT;
   delete env.CAIRN_HEAVY_SLOT_OWNER;
@@ -392,3 +393,68 @@ for (const kind of ['slot', 'ticket']) {
     assert.equal(await run.done, 0, run.output);
   });
 }
+
+test('local heavy-run guard allows one file, CI, mini-test and the explicit escape only', async () => {
+  const mod = await import('./test-admission.mjs?guard');
+  const vitestArgv = ['node', '/repo/node_modules/vitest/vitest.mjs', 'run'];
+  assert.throws(
+    () => mod.assertLocalTestRunAllowed('vitest', vitestArgv, { CI: '' }),
+    /refuses a multi-file local run/,
+  );
+  assert.throws(
+    () =>
+      mod.assertLocalTestRunAllowed('vitest', [...vitestArgv, 'one.test.ts', 'two.test.ts'], {
+        CI: '',
+      }),
+    /refuses a multi-file local run/,
+  );
+  assert.doesNotThrow(() =>
+    mod.assertLocalTestRunAllowed('vitest', [...vitestArgv, 'one.test.ts'], { CI: '' }),
+  );
+  assert.doesNotThrow(() => mod.assertLocalTestRunAllowed('vitest', vitestArgv, { CI: 'true' }));
+  assert.doesNotThrow(() =>
+    mod.assertLocalTestRunAllowed('vitest', vitestArgv, { CI: '', CAIRN_MINI_TEST: '1' }),
+  );
+  assert.doesNotThrow(() =>
+    mod.assertLocalTestRunAllowed('vitest', vitestArgv, { CI: '', CAIRN_LOCAL_HEAVY: '1' }),
+  );
+
+  const playwrightArgv = ['node', '/repo/node_modules/@playwright/test/cli.js', 'test'];
+  assert.throws(
+    () => mod.assertLocalTestRunAllowed('playwright', playwrightArgv, { CI: '' }),
+    /Playwright refuses/,
+  );
+  assert.doesNotThrow(() =>
+    mod.assertLocalTestRunAllowed('playwright', [...playwrightArgv, 'e2e/one.spec.ts'], { CI: '' }),
+  );
+  assert.doesNotThrow(() =>
+    mod.assertLocalTestRunAllowed('playwright', [...playwrightArgv, '--list'], { CI: '' }),
+  );
+});
+
+test('runner detection follows the pnpm shim target paths', async () => {
+  const mod = await import('./test-admission.mjs?runner-paths');
+  assert.equal(
+    mod.isPlaywrightRunner(['node', '/repo/node_modules/.bin/../@playwright/test/cli.js']),
+    true,
+  );
+  assert.equal(mod.isVitestRunner(['node', '/repo/node_modules/.bin/../vitest/vitest.mjs']), true);
+});
+
+test('every vitest project config and the Playwright config invoke the local heavy-run guard', () => {
+  for (const file of [
+    'vitest.config.ts',
+    'apps/daemon/vitest.config.ts',
+    'apps/desktop/vitest.config.ts',
+    'apps/server/vitest.config.ts',
+    'apps/web/vitest.config.ts',
+    'integration/vitest.config.ts',
+    'packages/shared/vitest.config.ts',
+  ]) {
+    assert.match(readFileSync(join(repo, file), 'utf8'), /assertLocalTestRunAllowed\('vitest'\)/);
+  }
+  assert.match(
+    readFileSync(join(repo, 'apps/web/playwright.config.ts'), 'utf8'),
+    /assertLocalTestRunAllowed\('playwright'\)/,
+  );
+});

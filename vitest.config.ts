@@ -1,8 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { scrubGitEnv } from './scripts/scrub-git-env.mjs';
-import { testRunWorkers } from './scripts/test-admission.mjs';
+import { assertLocalTestRunAllowed, testRunWorkers } from './scripts/test-admission.mjs';
 import { TimedShardSequencer } from './scripts/vitest-timed-shard.mjs';
 
+assertLocalTestRunAllowed('vitest');
 const workers = await testRunWorkers();
 
 scrubGitEnv();

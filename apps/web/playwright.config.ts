@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test';
 import { slotPortReport, slotResources, slotWorkerBudget } from '../../scripts/heavy-slots.mjs';
-import { admitTestRun } from '../../scripts/test-admission.mjs';
+import { admitTestRun, assertLocalTestRunAllowed } from '../../scripts/test-admission.mjs';
 
+assertLocalTestRunAllowed('playwright');
 const lease = await admitTestRun();
 const workers = slotWorkerBudget(lease) ?? undefined;
 const resources = lease === null ? null : slotResources(lease.slot, { ...process.env, E2E_PORT: process.env.E2E_PORT ?? '8399' });

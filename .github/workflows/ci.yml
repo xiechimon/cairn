@@ -197,6 +197,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Regression inversion gate (light tests)
+        env:
+          PREPUSH_BASE_SHA: ${{ needs.changes.outputs.base-sha || github.event.pull_request.base.sha || github.event.before }}
+        run: node scripts/ops/ci-failed-only.mjs step --key regression-inversion-light -- node scripts/regression-inversion-gate.mjs --mode light
+
       - name: Prepush checks (#1533)
         env:
           PREPUSH_BASE_SHA: ${{ needs.changes.outputs.base-sha || github.event.pull_request.base.sha || github.event.before }}
@@ -294,6 +299,12 @@ jobs:
       # The integration vitest suites launch real Chromium; a missing executable fails browserType.launch.
       - name: Install Playwright chromium
         uses: ./.github/actions/playwright-chromium
+
+      - name: Regression inversion gate (integration tests)
+        if: matrix.shard == 1
+        env:
+          PREPUSH_BASE_SHA: ${{ needs.changes.outputs.base-sha || github.event.pull_request.base.sha || github.event.before }}
+        run: node scripts/ops/ci-failed-only.mjs step --key regression-inversion-integration -- node scripts/regression-inversion-gate.mjs --mode integration
 
       - name: Test (vitest, integration stack)
         run: VITEST_PROJECT_SET=integration node scripts/test-temp-run.mjs -- pnpm test --shard=${{ matrix.shard }}/${{ strategy.job-total }}

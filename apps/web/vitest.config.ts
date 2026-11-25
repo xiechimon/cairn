@@ -1,7 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
-import { testRunWorkers } from '../../scripts/test-admission.mjs';
+import { assertLocalTestRunAllowed, testRunWorkers } from '../../scripts/test-admission.mjs';
 
+assertLocalTestRunAllowed('vitest');
 const workers = await testRunWorkers();
 
 export default defineConfig({

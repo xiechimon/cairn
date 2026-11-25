@@ -16,6 +16,7 @@ import {
   stripShardArgs,
   toRepoRelative,
 } from '../ci-failed-only-state.mjs';
+import { reportRetryGreen } from '../flake-ledger.mjs';
 
 export {
   contextFromEnv,
@@ -211,7 +212,11 @@ function runNodeTest({ stepKey, rest, cwd = process.cwd(), env = process.env }) 
       stdio: 'inherit',
     },
   );
-  const code = child.status ?? 1;
+  let code = child.status ?? 1;
+  if (code === 0 && selection.rerunOnly && existsSync(resolve(cwd, 'scripts/flake-ledger.json'))) {
+    const retry = reportRetryGreen(selection.rerunOnly, { cwd, label: 'node:test' });
+    if (retry.failed) code = 1;
+  }
   const failedFiles = code === 0 ? [] : extractNodeTestFailedFiles(failLog, declaredFiles, cwd);
   recordStepState({
     ...ctx,

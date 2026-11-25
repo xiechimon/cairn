@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "regressions": [
+    {
+      "id": "runner-retired-rows-hidden",
+      "owner": "xiechimon",
+      "regression": "Retired runner rows reappeared in machine, chief, MCP and model-source lists.",
+      "file": "apps/server/test/machines-legacy-capabilities.test.ts",
+      "testTitle": "a retired machine row is not returned by GET /api/teams/:id/machines, chief tools, MCP face, or model sources",
+      "addedAt": "2026-11-25"
+    },
+    {
+      "id": "runner-re-enroll-dedupes-hostnames",
+      "owner": "xiechimon",
+      "regression": "Re-enrolling one computer as X and X.local produced duplicate visible runner rows.",
+      "file": "apps/server/test/machines-legacy-capabilities.test.ts",
+      "testTitle": "re-enrolling the same computer without hostKey (X then X.local) retires the old row, migrates default and routing rules, and leaves one visible row",
+      "addedAt": "2026-11-25"
+    },
+    {
+      "id": "expired-subscription-sign-in-again",
+      "owner": "xiechimon",
+      "regression": "Expired subscriptions had no direct sign-in-again path and remote-mode behavior was only shallowly verified.",
+      "file": "apps/web/test/subscription-relogin.test.ts",
+      "testTitle": "renders direct Sign in again action on Coordinator login banners",
+      "addedAt": "2026-11-25"
+    },
+    {
+      "id": "expired-antigravity-relogin-flow",
+      "owner": "xiechimon",
+      "regression": "Expired Antigravity subscriptions must complete the sign-in-again flow and become healthy without a reload.",
+      "file": "apps/web/e2e/providers-subscription-relogin.spec.ts",
+      "testTitle": "expired Antigravity card shows primary Sign in again, starts Google sign-in, and returns healthy without reload",
+      "addedAt": "2026-11-25"
+    }
+  ]
+}

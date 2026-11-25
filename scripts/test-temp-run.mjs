@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'no
 import { basename, dirname, join } from 'node:path';
 import { createTempEnvironment } from '../packages/shared/src/node/temp-environment.ts';
 import { finalizeVitestRun, prepareVitestRun } from './ci-failed-only-state.mjs';
+import { reportRetryGreen } from './flake-ledger.mjs';
 import { spawnOwned } from './owned-process.mjs';
 
 const [separator, command, ...args] = process.argv.slice(2);
@@ -89,7 +90,11 @@ function finish(code) {
     console.error('test-temp-run: survivor inspection or cleanup failed');
     failed = true;
   }
-  const finalCode = code || (failed ? 1 : 0);
+  let finalCode = code || (failed ? 1 : 0);
+  if (finalCode === 0 && prep.rerunOnly) {
+    const retry = reportRetryGreen(prep.rerunOnly, { cwd: process.cwd(), label: 'vitest' });
+    if (retry.failed) finalCode = 1;
+  }
   finalizeVitestRun({ prep, code: finalCode });
   process.exitCode = finalCode;
 }

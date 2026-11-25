@@ -13,6 +13,7 @@ const selectorDeps = [
   'scripts/e2e-affected-select.mjs',
   'scripts/e2e-shard-run.mjs',
   'scripts/ci-failed-only-state.mjs',
+  'scripts/flake-ledger.mjs',
   'scripts/timed-partition.mjs',
 ];
 for (const [file, code] of [

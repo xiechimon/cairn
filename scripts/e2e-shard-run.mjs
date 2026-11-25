@@ -6,6 +6,7 @@ import {
   readPrevState,
   recordStepState,
 } from './ci-failed-only-state.mjs';
+import { playwrightSpecFilesFromIds, reportRetryGreen } from './flake-ledger.mjs';
 import { runOwned } from './owned-process.mjs';
 import { partitionByWeight } from './timed-partition.mjs';
 
@@ -64,7 +65,14 @@ export async function runPlaywright(specs, { full = false, port = '8398' } = {})
   } else {
     args.push('--last-failed-file', currLastRun);
   }
-  const code = await runOwned('pnpm', args, { cwd: WEB_DIR, env, name: 'e2e' });
+  let code = await runOwned('pnpm', args, { cwd: WEB_DIR, env, name: 'e2e' });
+  if (code === 0 && failedIds) {
+    const retry = reportRetryGreen(playwrightSpecFilesFromIds(failedIds, WEB_DIR), {
+      cwd: REPO_ROOT,
+      label: 'Playwright spec',
+    });
+    if (retry.failed) code = 1;
+  }
   const nextFailed = code === 0 ? null : readPlaywrightLastFailed(currLastRun);
   recordStepState({
     ...ctx,
