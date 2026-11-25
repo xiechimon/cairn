@@ -11,6 +11,22 @@ export interface MachineClaimScope {
   tokenHash?: string | null;
 }
 
+export function claimGenerationAccepted(
+  db: MachineDeps['db'],
+  machineId: string | null,
+  claimedAt: number | null,
+  generation: number | undefined,
+): boolean {
+  if (generation !== undefined) return claimedAt === generation;
+  if (machineId === null) return false;
+  const runner = db
+    .select({ capabilities: machine.capabilities })
+    .from(machine)
+    .where(eq(machine.id, machineId))
+    .get();
+  return runner !== undefined && runner.capabilities?.claimGeneration !== true;
+}
+
 export function assertMachineClaim(deps: Pick<MachineDeps, 'db'>, claim: MachineClaimScope): void {
   const row = deps.db.select().from(step).where(eq(step.id, claim.stepId)).get();
   if (!row) throw new HttpError(404, `step ${claim.stepId} no longer exists`);
@@ -22,7 +38,7 @@ export function assertMachineClaim(deps: Pick<MachineDeps, 'db'>, claim: Machine
     if (runner?.tokenHash !== claim.tokenHash || runner.retiredAt !== null)
       throw new HttpError(401, 'unauthorized');
   }
-  if (claim.generation === undefined || row.claimedAt !== claim.generation)
+  if (!claimGenerationAccepted(deps.db, claim.machineId, row.claimedAt, claim.generation))
     throw new HttpError(409, `step ${claim.stepId} requires its current claim generation`);
 }
 

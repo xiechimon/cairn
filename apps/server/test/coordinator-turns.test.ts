@@ -479,6 +479,7 @@ describe('a daemon that heartbeats but ignores its stop request is force-stopped
     expect(stepRow(stepId).status).toBe('claimed');
 
     await beat();
+    setStep(stepId, { lastHeartbeatAt: t0 + STOP_GRACE_MS - 30_000 });
     sweepOverlongChiefTurns(H.s.svc, t0 + STOP_GRACE_MS - 1);
     expect(stepRow(stepId).status).toBe('claimed');
     expect(
@@ -490,6 +491,7 @@ describe('a daemon that heartbeats but ignores its stop request is force-stopped
     ).toEqual([t0]);
 
     await beat();
+    setStep(stepId, { lastHeartbeatAt: t0 + STOP_GRACE_MS - 1 });
     sweepOverlongChiefTurns(H.s.svc, t0 + STOP_GRACE_MS + 1);
     expect(stepRow(stepId).status).toBe('stopped');
     expect(H.s.db.select().from(stopPending).all()).toEqual([]);

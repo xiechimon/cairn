@@ -524,6 +524,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         ? { antigravitySubscriptionModels: true as const }
         : {}),
       mcpConnectors: true,
+      claimGeneration: true,
       ...(orbComputer ? { computer: true as const } : {}),
       ...(hostDesktops?.offersBrowser()
         ? { browser: true as const, browserSecretFill: true as const }

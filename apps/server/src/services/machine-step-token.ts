@@ -29,6 +29,7 @@ import { projectOfTodo } from './git.js';
 import { appTokenOrNull } from './github-app-token.js';
 import { softwareCommitIdentity } from './github-autonomous-token.js';
 import { stepMcpGrant } from './machine-claim.js';
+import { claimGenerationAccepted } from './machine-claim-scope.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -48,7 +49,7 @@ export async function stepToken(
   refresh = false,
 ): Promise<MachineTokenResponse> {
   const owned = ownedStepRow(deps, machineId, stepId);
-  fenceClaimSnapshot(owned, generation);
+  fenceClaimSnapshot(deps, machineId, owned, generation);
   const response = isChiefConversation(owned.buildId)
     ? await chiefStepToken(deps, stepId, owned.buildId, true)
     : await workerStepToken(deps, machineId, stepId, surface, owned, refresh);
@@ -57,10 +58,15 @@ export async function stepToken(
 }
 
 function fenceClaimSnapshot(
+  deps: MachineDeps,
+  machineId: string,
   owned: ReturnType<typeof ownedStepRow>,
   generation: number | undefined,
 ): void {
-  if (owned.status !== 'claimed' || generation === undefined || owned.claimedAt !== generation)
+  if (
+    owned.status !== 'claimed' ||
+    !claimGenerationAccepted(deps.db, machineId, owned.claimedAt, generation)
+  )
     throw new HttpError(409, 'step claim no longer matches this runner', 'claim-moved');
 }
 
@@ -79,8 +85,7 @@ function fenceLiveClaim(
     current === undefined ||
     current.status !== 'claimed' ||
     current.machineId !== machineId ||
-    generation === undefined ||
-    current.claimedAt !== generation
+    !claimGenerationAccepted(deps.db, machineId, current.claimedAt, generation)
   )
     throw new HttpError(409, 'step claim no longer matches this runner', 'claim-moved');
 }

@@ -4,6 +4,7 @@ import { machine } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 
 export const DEAD_TURN_MS = 45_000;
+export const ABANDONED_CLAIM_QUARANTINE_LIMIT = 3;
 
 export function stepActivityAt(row: {
   lastHeartbeatAt: number | null;
@@ -11,6 +12,26 @@ export function stepActivityAt(row: {
   createdAt: number;
 }): number {
   return row.lastHeartbeatAt ?? row.claimedAt ?? row.createdAt;
+}
+
+export function claimIsDead(
+  db: Db,
+  row: {
+    machineId: string | null;
+    lastHeartbeatAt: number | null;
+    claimedAt: number | null;
+    createdAt: number;
+  },
+  now: number,
+): boolean {
+  if (now - stepActivityAt(row) > DEAD_TURN_MS) return true;
+  if (row.machineId === null) return false;
+  const runner = db
+    .select({ retiredAt: machine.retiredAt })
+    .from(machine)
+    .where(eq(machine.id, row.machineId))
+    .get();
+  return runner === undefined || runner.retiredAt !== null;
 }
 
 export function isClaimedStepDead(
@@ -26,7 +47,10 @@ export function isClaimedStepDead(
 ): boolean {
   if (head.machineId == null) return false;
   const runner = db.select().from(machine).where(eq(machine.id, head.machineId)).get();
-  const reachable = runner?.online === true && machineHub?.silentSinceDrop(runner.id) !== true;
+  const reachable =
+    runner?.online === true &&
+    runner.retiredAt === null &&
+    machineHub?.silentSinceDrop(runner.id) !== true;
   return !reachable || now - stepActivityAt(head) > DEAD_TURN_MS;
 }
 

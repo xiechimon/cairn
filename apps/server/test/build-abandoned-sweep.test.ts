@@ -10,10 +10,10 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import {
-  ABANDONED_CLAIM_QUARANTINE_LIMIT,
   BUILD_ABANDONED_STEP_MS,
   sweepAbandonedBuildSteps,
 } from '../src/services/build-abandoned-sweep.js';
+import { ABANDONED_CLAIM_QUARANTINE_LIMIT } from '../src/services/dispatch-timeouts.js';
 import { claimStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {

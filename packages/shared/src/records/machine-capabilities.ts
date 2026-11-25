@@ -186,6 +186,7 @@ export const machineCapabilitiesSchema = z.object({
   ),
   secretGateway: z.literal(true).optional(),
   mcpConnectors: z.literal(true).optional(),
+  claimGeneration: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
   devin: devinReportSchema.optional(),
   gemini: geminiReportSchema.optional(),
@@ -259,9 +260,14 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.computerKind === 'host' ? { computerKind: 'host' as const } : {}),
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
     ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
+    ...(rec.claimGeneration === true ? { claimGeneration: true as const } : {}),
     ...(rec.phoneHost === true ? { phoneHost: true as const } : {}),
     ...(phones.success && phones.data !== undefined ? { phones: phones.data } : {}),
   };
+}
+
+export function runnerNeedsUpdate(capabilities: MachineCapabilities | null | undefined): boolean {
+  return capabilities != null && capabilities.claimGeneration !== true;
 }
 
 export function parseStoredCapabilities(raw: unknown): MachineCapabilities | null | undefined {

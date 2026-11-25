@@ -91,7 +91,12 @@ async function setupWorld(opts: Parameters<typeof bootServer>[0] = {}): Promise<
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: readyMachine({ teamId: s.team.id, name: 'gen-runner', cliVersion: '0.1.0' }),
+    body: readyMachine({
+      teamId: s.team.id,
+      name: 'gen-runner',
+      cliVersion: '0.1.0',
+      capabilities: { mcpServers: [], skills: [], claimGeneration: true },
+    }),
   });
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = s.db.select({ id: machineTable.id }).from(machineTable).get()!.id;

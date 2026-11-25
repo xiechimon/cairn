@@ -137,7 +137,22 @@ export async function runStep(
   opts: RunStepOptions = {},
 ): Promise<void> {
   const stepId = claimed.step.id;
-  deps = { ...deps, client: bindMachineClaim(deps.client, stepId, claimed.step.generation) };
+  const claimClient = bindMachineClaim(deps.client, stepId, claimed.step.generation);
+  let reported = false;
+  deps = {
+    ...deps,
+    client: new Proxy(claimClient, {
+      get(target, key) {
+        if (key === 'done')
+          return async (...args: Parameters<MachineApi['done']>) => {
+            await target.done(...args);
+            reported = true;
+          };
+        const member: unknown = Reflect.get(target, key, target);
+        return typeof member === 'function' ? member.bind(target) : member;
+      },
+    }),
+  };
   const stop = (deps.stops ?? new StepStops()).enter(stepId, (stopRequest) => {
     try {
       deps.journal.update(stepId, { stopRequest });
@@ -171,7 +186,7 @@ export async function runStep(
   try {
     await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance, stepCleanups);
   } catch (error) {
-    errors.push(error);
+    if (reported || !(await reportCrash(deps, claimed, error))) errors.push(error);
   }
   for (const cleanup of [
     ...stepCleanups.reverse(),
@@ -749,6 +764,30 @@ async function runClaimedStep(
     now,
     reap: reapTree,
   });
+}
+
+async function reportCrash(
+  deps: RunStepDeps,
+  claimed: ClaimedStep,
+  error: unknown,
+): Promise<boolean> {
+  const stepId = claimed.step.id;
+  const message = error instanceof Error ? error.message : String(error);
+  deps.logger.step(`crashed after claim, reporting failure: ${message}`);
+  try {
+    await deps.client.done(stepId, {
+      status: 'failed',
+      errorMessage: `Runner error: ${message}`,
+      generation: claimed.step.generation,
+    });
+    deps.journal.remove(stepId);
+    return true;
+  } catch (reportError) {
+    deps.logger.step(
+      `done(failed) after crash unreachable: ${reportError instanceof Error ? reportError.message : String(reportError)}`,
+    );
+    return false;
+  }
 }
 
 async function failStep(

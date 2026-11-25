@@ -1,3 +1,4 @@
+import { runnerNeedsUpdate } from '@cairn/shared';
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import { useState } from 'react';
@@ -32,6 +33,7 @@ export function MachineRowView({
   const mutations = useApiMutations(teamId);
   const machineId = machine.id ?? '';
   const online = machine.online !== false;
+  const needsUpdate = online && runnerNeedsUpdate(machine.capabilities);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -120,6 +122,19 @@ export function MachineRowView({
             >
               {online ? t('在线') : t('离线')}
             </span>
+            {needsUpdate && (
+              <>
+                <span aria-hidden className="text-content-dim">
+                  ·
+                </span>
+                <span
+                  data-testid="machine-needs-update"
+                  className="whitespace-nowrap text-content-secondary"
+                >
+                  {t('需要更新 Cairn')}
+                </span>
+              </>
+            )}
             {ownComputer.meta}
           </div>
         </div>

@@ -12993,6 +12993,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "const": true,
               "type": "boolean",
             },
+            "claimGeneration": {
+              "const": true,
+              "type": "boolean",
+            },
             "codexLogin": {
               "additionalProperties": false,
               "properties": {

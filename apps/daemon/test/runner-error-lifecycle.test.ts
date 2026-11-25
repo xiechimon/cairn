@@ -537,6 +537,24 @@ describe('step credential acquisition', () => {
   });
 });
 
+describe('a runner crash after claim', () => {
+  test('reports the step failed at once instead of leaving it claimed for the stale sweep', async () => {
+    let crash: unknown = null;
+    const { client, providers } = await runLifecycleCase([], {
+      providerId: 'gw-lc-crash',
+      tokenError: new MachineApiError(500, '{"error":"internal"}'),
+    }).catch((error: unknown) => {
+      crash = error;
+      return { client: null, providers: [] };
+    });
+    expect(crash).toBeNull();
+    expect(client?.doneBodies).toHaveLength(1);
+    expect(client?.doneBodies[0]?.body).toMatchObject({ status: 'failed' });
+    expect(client?.doneBodies[0]?.body.errorMessage).toContain('internal');
+    expect(providers).toHaveLength(0);
+  });
+});
+
 describe('runner noOutput signal (#1493)', () => {
   test('success but zero assistant output → done carries noOutput', async () => {
     const { client } = await runLifecycleCase(

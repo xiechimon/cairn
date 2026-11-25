@@ -66,6 +66,7 @@ import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTod
 import { githubReadToken } from './github-autonomous-token.js';
 import { acceptedInfoReport } from './info-card.js';
 import { applyLocalMergeReport } from './local-merge.js';
+import { claimGenerationAccepted } from './machine-claim-scope.js';
 import { closeInfoCardTab, stopStepComputer } from './machine-computer.js';
 import { deliverableManifestOf, failUnpublishedDeliverables } from './machine-deliverables.js';
 import {
@@ -292,8 +293,16 @@ function prepareStepReport(
 ) {
   const { db } = deps;
   const found = db.select().from(step).where(eq(step.id, stepId)).get();
-  if (machineId !== null && body.generation === undefined) {
-    throw conflict(`step ${stepId} completion requires its claim generation`);
+  if (
+    machineId !== null &&
+    (!claimGenerationAccepted(db, machineId, found?.claimedAt ?? null, body.generation) ||
+      (body.generation === undefined && found?.machineId !== machineId))
+  ) {
+    throw conflict(
+      body.generation === undefined
+        ? `step ${stepId} completion requires its claim generation`
+        : `step ${stepId} was claimed again after generation ${body.generation}`,
+    );
   }
   if (body.generation !== undefined && found?.claimedAt !== body.generation) {
     throw conflict(`step ${stepId} was claimed again after generation ${body.generation}`);

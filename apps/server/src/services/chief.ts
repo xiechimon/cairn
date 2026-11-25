@@ -95,6 +95,7 @@ import {
   endDeadChiefTurn,
   settleChiefActiveRun,
   steerChiefMessage,
+  stopAbandonedChiefTurn,
 } from './chief-turns.js';
 import {
   claimClientMessage,
@@ -109,7 +110,7 @@ import {
   wakeCoordinator,
 } from './coordinator-context.js';
 import { runtimeGatePasses } from './dispatch-eligibility.js';
-import { stepActivityAt } from './dispatch-timeouts.js';
+import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -2305,27 +2306,33 @@ export function sweepAbandonedChiefSteps(
       ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
       : undefined;
     const stale = now - stepActivityAt(row) > CHIEF_ABANDONED_STEP_MS;
+    if (!stale) continue;
     const live = machineRow?.online === true && !deps.machineHub?.silentSinceDrop(machineRow.id);
-    if (!live) {
-      if (!stale) continue;
-      deps.db
-        .update(step)
-        .set({ status: 'pending', machineId: null, mcpGrant: null })
-        .where(eq(step.id, row.id))
-        .run();
-      deps.convHub?.publishStep(thread.id, {
-        id: row.id,
-        buildId: row.buildId,
-        kind: row.kind,
-        machineId: null,
-        createdAt: row.createdAt,
-        status: 'pending',
-        checkpointCommit: row.checkpointCommit,
-        skillInjection: row.skillInjection ?? null,
-      });
-      deps.machineHub?.wake(thread.teamId);
-      cancelPendingQuestions(deps, thread.id, CHIEF_TURN_END_REASON);
+    const progressed =
+      row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
+    if (live && progressed) continue;
+    const claims = live ? row.claimCount + 1 : row.claimCount;
+    if (claims >= ABANDONED_CLAIM_QUARANTINE_LIMIT) {
+      stopAbandonedChiefTurn(deps, thread, row, now);
+      continue;
     }
+    deps.db
+      .update(step)
+      .set({ status: 'pending', machineId: null, mcpGrant: null, claimCount: claims })
+      .where(eq(step.id, row.id))
+      .run();
+    deps.convHub?.publishStep(thread.id, {
+      id: row.id,
+      buildId: row.buildId,
+      kind: row.kind,
+      machineId: null,
+      createdAt: row.createdAt,
+      status: 'pending',
+      checkpointCommit: row.checkpointCommit,
+      skillInjection: row.skillInjection ?? null,
+    });
+    deps.machineHub?.wake(thread.teamId);
+    cancelPendingQuestions(deps, thread.id, CHIEF_TURN_END_REASON);
   }
 }
 

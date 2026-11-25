@@ -82,7 +82,12 @@ async function setupGitWorld(opts: Parameters<typeof bootServer>[0] = {}): Promi
   const key = await issueApiKey(s);
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
-    body: readyMachine({ teamId: s.team.id, name: 'm3b-mbp', cliVersion: '0.1.0' }),
+    body: readyMachine({
+      teamId: s.team.id,
+      name: 'm3b-mbp',
+      cliVersion: '0.1.0',
+      capabilities: { mcpServers: [], skills: [], claimGeneration: true },
+    }),
   });
   const machineJson = (await enrollRes.json()) as { token: string };
   seedSessionRoute(s, {

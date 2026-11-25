@@ -339,6 +339,26 @@ describe('#881 home machine online but blocked by the runtime gate (sweepAbandon
   });
 });
 
+describe('a claimed turn its online runner never picked up', () => {
+  test('is released within the abandoned window and stopped after repeated no-progress claims', async () => {
+    const w = await sendChiefTurn();
+    const token = await enrollMachine(w.s, w.teamId);
+    const machineId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
+    bindChiefAgent(w.s, machineId);
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await claimStep(w.s, token);
+      setMachineOnline(w.s, machineId, true);
+      sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).claimedAt! + CHIEF_ABANDONED_STEP_MS + 1);
+      if (attempt < 3) {
+        expect(stepRowOf(w).status).toBe('pending');
+        expect(stepRowOf(w).machineId).toBeNull();
+      }
+    }
+    expect(stepRowOf(w).status).toBe('stopped');
+    expect(threadRowOf(w).activeRun).toBeNull();
+  });
+});
+
 describe('Runner offline grace keeps baseline Coordinator recovery (docs/design/runner-offline-grace.md)', () => {
   test.each([
     ['no presence', 'pending'],
@@ -352,6 +372,11 @@ describe('Runner offline grace keeps baseline Coordinator recovery (docs/design/
       bindChiefAgent(w.s, w.s.db.select().from(machineTable).limit(1).all()[0]!.id);
       const claimed = await claimStep(w.s, token);
       const machineId = claimed.step.machineId!;
+      w.s.db
+        .update(stepTable)
+        .set({ lastHeartbeatAt: stepRowOf(w).claimedAt! + 30_000 })
+        .where(eq(stepTable.id, w.stepId))
+        .run();
       setMachineOnline(w.s, machineId, true);
       const hub = w.s.machineHub;
       hub.subscribeMachine(w.teamId, machineId, () => {});

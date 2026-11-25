@@ -8,7 +8,7 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
-import { and, asc, eq, gt, inArray, lt, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, lt, lte, notInArray, or, sql } from 'drizzle-orm';
 import { steerWithdrawals } from '../coordinator/steer-withdrawals.js';
 import type { Db } from '../db/client.js';
 import {
@@ -26,7 +26,7 @@ import { nowMs } from '../lib/ids.js';
 import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
 import { queueCoordinatorInput, STEER_WITHDRAW_HOLD } from './coordinator-inputs.js';
 import { signalCoordinator } from './coordinator-signal.js';
-import { isClaimedStepDead, stepActivityAt } from './dispatch-timeouts.js';
+import { claimIsDead, isClaimedStepDead } from './dispatch-timeouts.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { settleMemoryEditTurn } from './memory-edit-turns.js';
@@ -34,7 +34,6 @@ import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
 import { coordinatorMemoryOwner, coordinatorProfile } from './routing-rules.js';
-import { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -615,15 +614,28 @@ export function sweepOverlongChiefTurns(deps: ChiefTurnDeps, now: number = nowMs
     .select({ step, thread: chiefThread })
     .from(step)
     .innerJoin(chiefThread, eq(chiefThread.id, step.buildId))
+    .leftJoin(stopPending, eq(stopPending.stepId, step.id))
     .where(
       and(
         eq(step.kind, 'chief'),
         eq(step.status, 'claimed'),
-        lt(step.claimedAt, now - CHIEF_TURN_MAX_MS),
+        or(
+          lt(step.claimedAt, now - CHIEF_TURN_MAX_MS),
+          lte(stopPending.createdAt, now - CHIEF_TURN_STOP_GRACE_MS),
+        ),
       ),
     )
     .all();
   for (const row of overlong) stopClaimedChiefStep(deps, row.thread, row.step, now);
+}
+
+export function stopAbandonedChiefTurn(
+  deps: ChiefTurnDeps,
+  thread: typeof chiefThread.$inferSelect,
+  head: StepRow,
+  now: number,
+): void {
+  stopClaimedChiefStep(deps, thread, head, now);
 }
 
 function stopClaimedChiefStep(
@@ -639,7 +651,7 @@ function stopClaimedChiefStep(
     .from(stopPending)
     .where(eq(stopPending.conversationId, threadId))
     .get();
-  const abandoned = dead || now - stepActivityAt(head) > CHIEF_ABANDONED_STEP_MS;
+  const abandoned = dead || claimIsDead(deps.db, head, now);
   const ignored =
     requested?.stepId === head.id && now - requested.createdAt >= CHIEF_TURN_STOP_GRACE_MS;
   if (!abandoned && !ignored) {

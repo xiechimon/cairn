@@ -289,8 +289,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   const generationOf = (c: Context): number | undefined => {
     const raw = c.req.query('generation');
-    const generation = raw !== undefined && /^\d{1,20}$/.test(raw) ? Number(raw) : undefined;
-    return Number.isSafeInteger(generation) ? generation : undefined;
+    if (raw === undefined) return undefined;
+    const generation = /^\d{1,20}$/.test(raw) ? Number(raw) : Number.NaN;
+    return Number.isSafeInteger(generation) ? generation : -1;
   };
   const claimDeps = (c: Context, row: MachineRow, stepId = c.req.param('stepId') ?? '') => {
     if (c.req.path.startsWith('/api/machine/heartbeat/')) {
@@ -773,8 +774,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/machine/token/:stepId', async (c) => {
     const row = me(c);
     c.header('cache-control', 'no-store');
-    const raw = c.req.query('generation');
-    const generation = raw !== undefined && /^\d{1,20}$/.test(raw) ? Number(raw) : undefined;
+    const generation = generationOf(c);
     const refresh = c.req.query('refresh') === '1';
     return c.json(
       await stepToken(deps, row.id, c.req.param('stepId'), generation, 'host', refresh),

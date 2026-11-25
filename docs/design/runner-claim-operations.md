@@ -67,3 +67,36 @@ A step-local registry deduplicates plaintext, removes expired entries, has a fix
 ## Verification
 
 Use same-machine G1-to-G2 reclaim tests for missing/stale requests, stale upload grants and asynchronous relay application; assert G2 rows remain unchanged. Use nested rollback tests with mocked push providers and GitHub transport. Verify permission refusal with simultaneous quota metadata. Exercise registry expiry, capacity, live-secret redaction and cleanup. The preservation integration fixture must carry the generation it actually claimed, without weakening production authorization.
+
+## Protocol skew
+
+A runner built before claim generations sends none. A server that demanded one answered every claim-scoped call from it with 409 after handing it the claim, so the step stayed `claimed` and the Coordinator thread blocked until the 30-minute turn cap. Claim-then-409 is never allowed.
+
+The runner declares `capabilities.claimGeneration: true` in its enroll and presence reports; the server stores it in the machine row (`machine-capabilities.ts`). `claimGenerationAccepted` (`machine-claim-scope.ts`) is the one rule every fence uses: `assertMachineClaim`, `fenceClaimSnapshot` and `fenceLiveClaim` in `machine-step-token.ts`, and `prepareStepReport` in `machine-finish-step.ts`.
+
+| Request | Runner declares `claimGeneration` | Result |
+| --- | --- | --- |
+| Carries a generation | Either | Accepted only when it equals the step's `claimedAt` |
+| Carries none | Yes | 409: this runner speaks the protocol, so a missing generation is a stale or broken caller |
+| Carries none | No (older runner) | Machine ownership, claimed status and token decide, as before generations |
+
+Generation is a staleness fence, not an authorization boundary: the token holder receives the generation in the claim response, so accepting a missing one from an older runner grants nothing the token did not. The alternative, refusing to hand claims to runners without the flag, was rejected: it keeps every older runner's Coordinator down until the user updates, and it needs a new claim-body marker that runners speaking generations today do not send. The runners list shows "Needs a Cairn update" on an online runner whose stored capabilities lack the flag (`runnerNeedsUpdate`).
+
+## Dead claims
+
+A claim is dead when its runner no longer runs the step. The server cannot ask; it reads the evidence it has.
+
+| Evidence | Where it is read | Effect |
+| --- | --- | --- |
+| No heartbeat for 45 s (`DEAD_TURN_MS`; runners beat every 30 s, and a beat rejected by a fence never lands), or the owning machine was removed | `claimIsDead` in `dispatch-timeouts.ts`, on an owner stop | The first stop settles the turn as stopped; no grace |
+| Same evidence, or the runner is offline or silent since its channel dropped | `endDeadChiefTurn` in `chief-turns.ts`, on a new message to the thread | The turn ends and the message starts the next one |
+| Stop delegated to a live runner that never answers | `sweepOverlongChiefTurns`, 2 min after the stop | Settled as stopped |
+| Chief step claimed by an online runner, no heartbeat since the claim for 2 min | `sweepAbandonedChiefSteps` | Released to pending; the third such release stops the turn, so a runner that drops it every time cannot loop it |
+| Chief step on an offline runner, stale for 2 min | `sweepAbandonedChiefSteps` | Released to pending (unchanged; offline is suspension, not death) |
+| Runner's `runStep` throws after the claim | `reportCrash` in the daemon's `runner.ts` | Reports `failed` with the error at once; if that report fails, the abandoned sweeps above apply |
+
+A stop broadcast reaches every runner of the team; runners that do not own the step get 404 "not yours" and drop it. That 404 is not evidence about the owner and settles nothing.
+
+## Credentials of another server
+
+`machine.json` belongs to the server its `serverUrl` names. The installed desktop app shares `~/.cairn` with the CLI runner; when that home already holds a registration for a different server, the desktop runs its runner in its own `runner-home` instead of enrolling over it (`localRunnerHome` in `apps/desktop/src/runner-home.ts`). The CLI runner enrolls only when no valid `machine.json` exists. A runner whose stored credentials get 401 at startup logs which server they belong to and how to re-enroll, then waits until `machine.json` changes and restarts once, instead of exiting into a launchd crash loop.

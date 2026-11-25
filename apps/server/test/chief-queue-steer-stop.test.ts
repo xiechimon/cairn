@@ -15,6 +15,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { sendChiefMessage } from '../src/services/chief.js';
+import { CHIEF_TURN_STOP_GRACE_MS, sweepOverlongChiefTurns } from '../src/services/chief-turns.js';
 import { providerHealth } from '../src/services/provider-health.js';
 import {
   bootServer,
@@ -639,6 +640,51 @@ describe('stop (T5)', () => {
     expect(w.stepRow(running!.step.id)?.archiveStop).toBeNull();
     expect(w.messages().some((m) => m.id === `chief-stop-${running!.step.id}`)).toBe(true);
     expect((await w.thread()).activeRun).toBeNull();
+  });
+
+  test('stop on a turn whose runner was removed ends it right away', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    w.s.db.update(machineTable).set({ retiredAt: Date.now(), tokenHash: null }).run();
+    const res = await w.stop();
+    expect(await res.json()).toEqual({ delegated: false });
+    expect(w.stepRow(running!.step.id)?.status).toBe('stopped');
+    expect((await w.thread()).activeRun).toBeNull();
+  });
+
+  test('the first stop on a turn its runner stopped heartbeating ends it right away', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    w.s.db
+      .update(stepTable)
+      .set({ claimedAt: Date.now() - 60_000, lastHeartbeatAt: Date.now() - 60_000 })
+      .where(eq(stepTable.id, running!.step.id))
+      .run();
+    const res = await w.stop();
+    expect(await res.json()).toEqual({ delegated: false });
+    expect(w.stepRow(running!.step.id)?.status).toBe('stopped');
+    expect((await w.thread()).activeRun).toBeNull();
+  });
+
+  test('a stop the runner never acknowledges settles once the grace passes, not at the turn cap', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    const res = await w.stop();
+    expect(await res.json()).toEqual({ delegated: true });
+    w.s.db
+      .update(stepTable)
+      .set({ lastHeartbeatAt: Date.now() + CHIEF_TURN_STOP_GRACE_MS })
+      .where(eq(stepTable.id, running!.step.id))
+      .run();
+    sweepOverlongChiefTurns(
+      { db: w.s.db, machineHub: w.s.machineHub },
+      Date.now() + CHIEF_TURN_STOP_GRACE_MS + 1_000,
+    );
+    expect(w.stepRow(running!.step.id)?.status).toBe('stopped');
+    expect(w.s.db.select().from(stopPending).all()).toEqual([]);
   });
 
   test('stop while queued turns wait: the next queued message still runs', async () => {
