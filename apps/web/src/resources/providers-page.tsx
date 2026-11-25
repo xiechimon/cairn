@@ -69,6 +69,7 @@ import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
+import { isDesktopShell } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
@@ -669,7 +670,8 @@ export function ProvidersSection() {
     const canSignInAgain =
       !inlineRelogin &&
       needsSubscriptionSignIn(account, verifications[account.id]) &&
-      (account.vendor === 'antigravity' ||
+      ((account.vendor === 'antigravity' &&
+        (!live || typeof window === 'undefined' || isDesktopShell())) ||
         account.vendor === 'claude' ||
         account.vendor === 'devin');
     return {

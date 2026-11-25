@@ -181,7 +181,7 @@ test('a re-registering Runner counts as a Runner already, so its startup shows n
       es.emit({ type: 'machine_presence', machineId: 'm1', online: false });
   });
   await expect(label(page)).toHaveText('xmonsMac 离线');
-  await expect(hint(page)).toHaveText(/^在 xmonsMac 上运行 .+ start 让它重新上线$/);
+  await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
 });
 
 test('opening the desktop app shows no Runner hint while its own Runner re-registers, and a reported offline state shows at once', async ({
@@ -230,6 +230,17 @@ test('in the desktop app its own offline machine reconnects instead of asking fo
 test('when the localRunner desktop bridge is absent an offline local machine offers Update Cairn', async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    (window as Window & { cairnDesktop?: unknown }).cairnDesktop = {
+      update: {
+        state: async () => ({ status: 'idle' }),
+        check: async () => {},
+        install: async () => {},
+        rollbackNotice: async () => null,
+        subscribe: () => () => {},
+      },
+    };
+  });
   await open(page, {
     ...fresh(),
     providers: [{ id: 'p1', name: 'gw' }],

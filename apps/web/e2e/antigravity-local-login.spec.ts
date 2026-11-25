@@ -314,6 +314,17 @@ test('timed-out login falls back to pasting GEMINI_API_KEY', async ({ page }) =>
 test('when the antigravity desktop bridge is absent it offers Update Cairn and still allows saving', async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    (window as Window & { cairnDesktop?: unknown }).cairnDesktop = {
+      update: {
+        state: async () => ({ status: 'idle' }),
+        check: async () => {},
+        install: async () => {},
+        rollbackNotice: async () => null,
+        subscribe: () => () => {},
+      },
+    };
+  });
   const { dialog, calls } = await openDialog(page, { status: null });
   await expect(dialog.getByTestId('desktop-skew-update')).toHaveText('更新 Cairn');
   await dialog.getByRole('button', { name: '保存', exact: true }).click();

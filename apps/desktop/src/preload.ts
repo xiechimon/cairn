@@ -10,6 +10,7 @@ import type {
   DesktopProviderImportInput,
   DesktopProviderImportResult,
   DesktopRollbackNotice,
+  DesktopShellDescriptor,
   DesktopSubscriptionInput,
   DesktopTrayOpen,
   DesktopTrayState,
@@ -22,6 +23,7 @@ import type {
 } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 
+<<<<<<< HEAD
 type RemoteFallbackCopy = { message: string; action: string | null; quiet: boolean };
 
 function remoteFallbackCopy(state: RemoteVersionState, zh: boolean): RemoteFallbackCopy | null {
@@ -182,7 +184,27 @@ ipcRenderer.on('desktop-update:prepare-reload', (_event, token: number) => {
 });
 startRemoteUpdateFallback();
 
+function readShellDescriptor(): DesktopShellDescriptor | undefined {
+  try {
+    const raw = ipcRenderer.sendSync('desktop-shell:descriptor') as
+      | DesktopShellDescriptor
+      | null
+      | undefined;
+    if (raw == null || typeof raw !== 'object') return undefined;
+    return Object.freeze({
+      shellVersion: raw.shellVersion,
+      bridgeVersion: raw.bridgeVersion,
+      capabilities: Object.freeze({ ...raw.capabilities }),
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+const shellDescriptor = readShellDescriptor();
+
 contextBridge.exposeInMainWorld('cairnDesktop', {
+  ...(shellDescriptor === undefined ? {} : { shell: shellDescriptor }),
   menu: {
     subscribe: (listener: (command: DesktopMenuCommand) => void): (() => void) => {
       const relay = (_event: unknown, command: DesktopMenuCommand) => listener(command);

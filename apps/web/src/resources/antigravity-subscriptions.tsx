@@ -26,7 +26,11 @@ import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { Skeleton } from '../components/ui/skeleton.js';
-import { type AntigravityBridge, antigravityBridge } from '../desktop-shell.js';
+import {
+  type AntigravityBridge,
+  antigravityBridge,
+  antigravityCapabilityState,
+} from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -178,11 +182,13 @@ export function AntigravityReloginDialog({
   onSignedIn: (subscription: DesktopSubscriptionMetadata) => void;
 }) {
   const { t } = useI18n();
+  const [capability] = useState(antigravityCapabilityState);
   const [bridge] = useState(antigravityBridge);
   const { local } = useAntigravityLocalStatus(bridge);
   const login = useAntigravityLogin(bridge);
   const autoStartedRef = useRef(false);
   const canSignIn =
+    capability === 'allowed' &&
     bridge !== null &&
     teamId !== undefined &&
     local !== null &&
@@ -209,7 +215,9 @@ export function AntigravityReloginDialog({
     void startSignInRef.current();
   }, [canSignIn]);
 
-  const checking = bridge !== null && local === null;
+  if (capability === 'hidden') return null;
+
+  const checking = capability === 'allowed' && bridge !== null && local === null;
 
   return (
     <DialogShell
@@ -235,7 +243,7 @@ export function AntigravityReloginDialog({
     >
       <FormStack className="max-w-none">
         <div data-testid="antigravity-relogin-state" className="flex min-w-0 flex-col gap-2">
-          {bridge === null ? (
+          {capability === 'needs-update' ? (
             <UpdateCairnNotice message={t('更新 Cairn 后即可重新登录 Antigravity。')} />
           ) : checking ? (
             <div aria-busy="true" className="flex min-h-8 items-center gap-2">
@@ -296,6 +304,7 @@ export function AddAntigravitySubscriptionDialog({
   const machinesQ = useMachines(resolvedTeamId, live);
   const [label, setLabel] = useState(t('Antigravity 订阅'));
   const [token, setToken] = useState('');
+  const [capability] = useState(antigravityCapabilityState);
   const [bridge] = useState(antigravityBridge);
   const { local } = useAntigravityLocalStatus(bridge);
   const login = useAntigravityLogin(bridge);
@@ -355,7 +364,9 @@ export function AddAntigravitySubscriptionDialog({
   const target = defaultRunnerTarget(machinesQ.data, defaultMachineId, local?.runnerId);
 
   const loginActive = login.phase === 'waiting' || login.phase === 'installing';
-  const showLocalRow = bridge === null || local === null || local.loggedIn || local.canLogin;
+  const showLocalRow =
+    capability === 'needs-update' ||
+    (capability === 'allowed' && (local === null || local.loggedIn || local.canLogin));
   const loginLabel = target.isThisComputer
     ? t('在这台 Mac 上登录 Antigravity')
     : t('在 {machine} 上登录 Antigravity', { machine: target.label ?? '' });
@@ -368,7 +379,7 @@ export function AddAntigravitySubscriptionDialog({
 
   const localAction = showLocalRow ? (
     <div data-testid="antigravity-local-row" className="flex min-w-0 flex-col">
-      {bridge === null ? (
+      {capability === 'needs-update' ? (
         <UpdateCairnNotice message={t('更新 Cairn 后即可在这里直接登录。')} />
       ) : local === null ? (
         <div

@@ -9,6 +9,7 @@ import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { coordinatorProviderOf } from '../coordinator-provider.js';
+import { isDesktopShell } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import { AntigravityReloginDialog } from '../resources/antigravity-subscriptions.js';
 import {
@@ -85,13 +86,16 @@ export function AntigravityLoginBanner({
     void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
   };
 
+  const canOpenRelogin =
+    (typeof window === 'undefined' || isDesktopShell()) && primary !== undefined;
+
   return (
     <>
       <SubscriptionLoginBanner
         testIdPrefix="antigravity"
         warnings={warnings}
         singleTitle={t('Antigravity 登录需要处理')}
-        onSignInAgain={primary === undefined ? undefined : () => setReloginOpen(true)}
+        onSignInAgain={canOpenRelogin ? () => setReloginOpen(true) : undefined}
         summary={(items) => {
           const expired = items.filter((warning) => warning.kind === 'expired').length;
           const signedOut = items.filter((warning) => warning.kind === 'signed-out').length;

@@ -67,8 +67,16 @@ export function UpdateCairnButton({
   testId?: string;
 }) {
   const { t } = useI18n();
+  const [bridge] = useState(desktopUpdates);
   const state = useDesktopUpdateState();
   const [starting, setStarting] = useState(false);
+  if (bridge === null) {
+    return (
+      <span data-testid={testId} className={cn('text-meta text-content-secondary', className)}>
+        {t('请下载安装最新版 Cairn。')}
+      </span>
+    );
+  }
   const view = desktopUpdateSkewView(state, t);
   const busy = starting || view.busy;
   return (
@@ -101,6 +109,15 @@ export function UpdateCairnNotice({
   testId?: string;
   buttonTestId?: string;
 }) {
+  const { t } = useI18n();
+  const [bridge] = useState(desktopUpdates);
+  if (bridge === null) {
+    return (
+      <p data-testid={testId} className={cn('m-0 text-meta text-content-secondary', className)}>
+        {t('请下载安装最新版 Cairn。')}
+      </p>
+    );
+  }
   return (
     <div
       data-testid={testId}

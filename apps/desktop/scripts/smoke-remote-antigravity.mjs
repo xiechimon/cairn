@@ -31,7 +31,7 @@ const MIME_BY_EXT = {
 const BROWSER_FALLBACK_RE =
   /open this page in the cairn desktop app|在 Cairn 桌面 App 中打开这一页/i;
 const LOGIN_STARTED_RE =
-  /Opened Antigravity sign-in in your browser|已在浏览器中打开 Antigravity 登录页/;
+  /The Antigravity sign-in page is open in your browser|已在浏览器中打开 Antigravity 登录页/;
 const UPDATE_CAIRN_RE = /Update Cairn|更新 Cairn/;
 const CANCEL_LABEL_RE = /^(?:Cancel|取消)$/;
 
@@ -278,6 +278,10 @@ export async function runAntigravityRemoteAndSkewSmoke({
   try {
     const win = await mainWindow(remoteApp, launchTimeoutMs);
     await win.waitForLoadState('load');
+    const shell = await win.evaluate(() => window.cairnDesktop?.shell ?? null);
+    assert.ok(shell !== null, 'cairnDesktop.shell descriptor missing in packaged remote mode');
+    assert.equal(shell.bridgeVersion, 1, `unexpected bridgeVersion: ${JSON.stringify(shell)}`);
+    assert.equal(shell.capabilities?.antigravitySignIn, true);
     const banner = win.getByTestId('antigravity-login-banner');
     await banner.waitFor({ state: 'visible', timeout: 20_000 });
     await win.getByTestId('antigravity-login-relogin').click();

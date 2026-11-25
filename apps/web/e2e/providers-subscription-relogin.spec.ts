@@ -172,6 +172,13 @@ test('Antigravity re-sign-in without a desktop sign-in bridge explains where to 
 }) => {
   await page.addInitScript(() => {
     (window as Window & { cairnDesktop?: unknown }).cairnDesktop = {
+      update: {
+        state: async () => ({ status: 'idle' }),
+        check: async () => {},
+        install: async () => {},
+        rollbackNotice: async () => null,
+        subscribe: () => () => {},
+      },
       antigravity: {
         status: async () => ({ installed: false, loggedIn: false, canLogin: false }),
         import: async () => ({ ok: false, reason: 'cancelled' }),

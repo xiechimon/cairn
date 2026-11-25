@@ -12,6 +12,8 @@ import {
   type DesktopProviderImportInput,
   type DesktopProviderImportResult,
   type DesktopRollbackNotice,
+  type DesktopShellCapabilities,
+  type DesktopShellDescriptor,
   type DesktopSubscriptionInput,
   type DesktopTrayOpen,
   type DesktopTrayState,
@@ -19,6 +21,7 @@ import {
   type DevinLocalStatus,
   type DevinLoginOutcome,
   type HostPermissions,
+  MIN_SUPPORTED_BRIDGE_VERSION,
   type NativeTrayMenu,
   type RemoteVersionState,
 } from '@cairn/shared';
@@ -179,6 +182,65 @@ export function desktopHost(): DesktopHostBridge | null {
   );
 }
 
+export type DesktopCapabilityState = 'allowed' | 'needs-update' | 'hidden';
+
+interface CairnDesktopWindow extends Window {
+  cairnDesktop?: {
+    shell?: DesktopShellDescriptor;
+    update?: DesktopUpdateBridge;
+    antigravity?: AntigravityBridge;
+    devin?: DevinBridge;
+    localProviders?: LocalProviderBridge;
+    localRunner?: LocalRunnerBridge;
+    ownComputer?: OwnComputerBridge;
+  };
+}
+
+export function isDesktopShell(): boolean {
+  if (typeof window === 'undefined') return false;
+  if ((window as CairnDesktopWindow).cairnDesktop !== undefined) return true;
+  return typeof navigator !== 'undefined' && navigator.userAgent.includes(DESKTOP_SHELL_USER_AGENT);
+}
+
+export function desktopShellDescriptor(): DesktopShellDescriptor | null {
+  if (typeof window === 'undefined') return null;
+  const raw = (window as CairnDesktopWindow).cairnDesktop?.shell;
+  if (
+    raw == null ||
+    typeof raw !== 'object' ||
+    typeof raw.bridgeVersion !== 'number' ||
+    typeof raw.capabilities !== 'object' ||
+    raw.capabilities === null
+  ) {
+    return null;
+  }
+  return raw;
+}
+
+export function desktopCapabilityState(
+  capability: keyof DesktopShellCapabilities,
+  methodPresent: boolean,
+  opts?: { localOnly?: boolean; minBridgeVersion?: number },
+): DesktopCapabilityState {
+  if (!isDesktopShell()) return 'hidden';
+  const minBridgeVersion = opts?.minBridgeVersion ?? MIN_SUPPORTED_BRIDGE_VERSION;
+  const descriptor = desktopShellDescriptor();
+  if (descriptor !== null) {
+    if (descriptor.bridgeVersion < minBridgeVersion) return 'needs-update';
+    if (
+      opts?.localOnly === true &&
+      descriptor.capabilities[capability] === false &&
+      methodPresent
+    ) {
+      return 'hidden';
+    }
+    return descriptor.capabilities[capability] === true && methodPresent
+      ? 'allowed'
+      : 'needs-update';
+  }
+  return methodPresent ? 'allowed' : 'needs-update';
+}
+
 export interface DesktopUpdateBridge {
   state: () => Promise<DesktopUpdateState | null>;
   check: () => Promise<void>;
@@ -191,10 +253,8 @@ export interface DesktopUpdateBridge {
 }
 
 export function desktopUpdates(): DesktopUpdateBridge | null {
-  return (
-    (window as Window & { cairnDesktop?: { update?: DesktopUpdateBridge } }).cairnDesktop?.update ??
-    null
-  );
+  if (typeof window === 'undefined') return null;
+  return (window as CairnDesktopWindow).cairnDesktop?.update ?? null;
 }
 
 export interface AntigravityBridge {
@@ -205,10 +265,19 @@ export interface AntigravityBridge {
   onLoginProgress?: (listener: (phase: AntigravityLoginPhase) => void) => () => void;
 }
 
+export function antigravityCapabilityState(minBridgeVersion?: number): DesktopCapabilityState {
+  const bridge =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as CairnDesktopWindow).cairnDesktop?.antigravity;
+  return desktopCapabilityState('antigravitySignIn', typeof bridge?.signIn === 'function', {
+    minBridgeVersion,
+  });
+}
+
 export function antigravityBridge(): AntigravityBridge | null {
-  const bridge = (window as Window & { cairnDesktop?: { antigravity?: AntigravityBridge } })
-    .cairnDesktop?.antigravity;
-  return typeof bridge?.signIn === 'function' ? bridge : null;
+  if (antigravityCapabilityState() !== 'allowed') return null;
+  return (window as CairnDesktopWindow).cairnDesktop?.antigravity ?? null;
 }
 
 export interface DevinBridge {
@@ -218,10 +287,18 @@ export interface DevinBridge {
   cancelLogin: () => Promise<void>;
 }
 
+export function devinCapabilityState(minBridgeVersion?: number): DesktopCapabilityState {
+  const bridge =
+    typeof window === 'undefined' ? undefined : (window as CairnDesktopWindow).cairnDesktop?.devin;
+  return desktopCapabilityState('devinSignIn', typeof bridge?.login === 'function', {
+    localOnly: true,
+    minBridgeVersion,
+  });
+}
+
 export function devinBridge(): DevinBridge | null {
-  return (
-    (window as Window & { cairnDesktop?: { devin?: DevinBridge } }).cairnDesktop?.devin ?? null
-  );
+  if (devinCapabilityState() !== 'allowed') return null;
+  return (window as CairnDesktopWindow).cairnDesktop?.devin ?? null;
 }
 
 export interface LocalProviderBridge {
@@ -230,21 +307,33 @@ export interface LocalProviderBridge {
 }
 
 export function localProviderBridge(): LocalProviderBridge | null {
-  return (
-    (window as Window & { cairnDesktop?: { localProviders?: LocalProviderBridge } }).cairnDesktop
-      ?.localProviders ?? null
-  );
+  const bridge =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as CairnDesktopWindow).cairnDesktop?.localProviders;
+  const state = desktopCapabilityState('localProviders', typeof bridge?.scan === 'function', {
+    localOnly: true,
+  });
+  return state === 'allowed' ? (bridge ?? null) : null;
 }
 
 export interface LocalRunnerBridge {
   reconnect: () => Promise<void>;
 }
 
+export function localRunnerCapabilityState(minBridgeVersion?: number): DesktopCapabilityState {
+  const bridge =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as CairnDesktopWindow).cairnDesktop?.localRunner;
+  return desktopCapabilityState('localRunner', typeof bridge?.reconnect === 'function', {
+    minBridgeVersion,
+  });
+}
+
 export function localRunnerBridge(): LocalRunnerBridge | null {
-  return (
-    (window as Window & { cairnDesktop?: { localRunner?: LocalRunnerBridge } }).cairnDesktop
-      ?.localRunner ?? null
-  );
+  if (localRunnerCapabilityState() !== 'allowed') return null;
+  return (window as CairnDesktopWindow).cairnDesktop?.localRunner ?? null;
 }
 
 export interface OwnComputerBridge {
@@ -252,9 +341,20 @@ export interface OwnComputerBridge {
   permissions: () => Promise<HostPermissions | null>;
 }
 
+export function ownComputerCapabilityState(minBridgeVersion?: number): DesktopCapabilityState {
+  const bridge =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as CairnDesktopWindow).cairnDesktop?.ownComputer;
+  return desktopCapabilityState('ownComputer', typeof bridge?.permissions === 'function', {
+    localOnly: true,
+    minBridgeVersion,
+  });
+}
+
 export function ownComputerBridge(): OwnComputerBridge | undefined {
-  return (window as Window & { cairnDesktop?: { ownComputer?: OwnComputerBridge } }).cairnDesktop
-    ?.ownComputer;
+  if (ownComputerCapabilityState() !== 'allowed') return undefined;
+  return (window as CairnDesktopWindow).cairnDesktop?.ownComputer;
 }
 
 export async function showPendingRollbackNotice(): Promise<void> {

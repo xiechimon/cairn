@@ -124,6 +124,7 @@ export const EN: Record<string, string> = {
   '更新 Cairn 后即可重新登录 Antigravity。': 'Update Cairn to sign in to Antigravity again.',
   '更新 Cairn 后即可在这里直接登录。': 'Update Cairn to sign in directly from here.',
   '更新 Cairn 后即可在这里授权并检查。': 'Update Cairn to grant permissions and recheck here.',
+  '请下载安装最新版 Cairn。': 'Download and install the latest Cairn.',
   '已在浏览器中打开 Antigravity 登录页，完成后会自动继续。':
     'The Antigravity sign-in page is open in your browser; this continues automatically when it finishes.',
   '这台 Mac 已登录 Antigravity。': 'This Mac is signed in to Antigravity.',

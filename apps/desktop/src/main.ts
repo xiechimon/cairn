@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
+  createDesktopShellDescriptor,
   DESKTOP_SHELL_USER_AGENT,
   DESKTOP_TRAY_PATH,
   type DesktopActivity,
@@ -2106,6 +2107,14 @@ async function boot(): Promise<void> {
       mainWindow?.webContents === event.sender &&
       event.senderFrame === event.sender.mainFrame &&
       event.senderFrame?.origin === origin;
+    ipcMain.on('desktop-shell:descriptor', (event) => {
+      const localMode = activeConnectionOf(readConnectionCatalog(userData)).kind === 'local';
+      event.returnValue = createDesktopShellDescriptor({
+        shellVersion: app.getVersion(),
+        localMode,
+        isMac: IS_MAC,
+      });
+    });
     const hostStatus = () => {
       const current = readConnectionCatalog(userData);
       return {

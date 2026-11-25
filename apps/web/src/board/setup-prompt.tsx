@@ -8,7 +8,7 @@ import { useLiveData } from '../api/provider.js';
 import { BANNER_CLS } from '../chief/chief-outage-banner.js';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
-import { localRunnerBridge } from '../desktop-shell.js';
+import { localRunnerBridge, localRunnerCapabilityState } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { settingsHref } from '../settings/settings-href.js';
@@ -163,6 +163,7 @@ function MachinePrompt() {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
+  const [runnerCapability] = useState(localRunnerCapabilityState);
   const [bridge] = useState(localRunnerBridge);
   const [reconnecting, setReconnecting] = useState(false);
   const { label, hint, reconnect } = runnerStep(
@@ -188,7 +189,7 @@ function MachinePrompt() {
         </span>
       </span>
       {reconnect ? (
-        bridge !== null ? (
+        runnerCapability === 'allowed' && bridge !== null ? (
           <Button
             variant="outline"
             size="sm"
@@ -205,9 +206,9 @@ function MachinePrompt() {
           >
             {t(reconnecting ? '正在重新连接…' : '重新连接')}
           </Button>
-        ) : (
+        ) : runnerCapability === 'needs-update' ? (
           <UpdateCairnButton testId="setup-prompt-update-cairn" className="px-3" />
-        )
+        ) : null
       ) : (
         <Button
           variant="outline"

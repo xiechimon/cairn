@@ -2,6 +2,50 @@ import semver from 'semver';
 import { z } from 'zod';
 
 export const DESKTOP_SHELL_USER_AGENT = 'CairnDesktop/mac';
+export const DESKTOP_BRIDGE_VERSION = 1;
+export const MIN_SUPPORTED_BRIDGE_VERSION = 1;
+
+export interface DesktopShellCapabilities {
+  updateInstall: boolean;
+  remoteServerUpdate: boolean;
+  antigravitySignIn: boolean;
+  hostSwitch: boolean;
+  localProviders: boolean;
+  devinSignIn: boolean;
+  localRunner: boolean;
+  ownComputer: boolean;
+}
+
+export interface DesktopShellDescriptor {
+  shellVersion: string;
+  bridgeVersion: number;
+  capabilities: DesktopShellCapabilities;
+}
+
+export function createDesktopShellDescriptor({
+  shellVersion,
+  localMode,
+  isMac,
+}: {
+  shellVersion: string;
+  localMode: boolean;
+  isMac: boolean;
+}): DesktopShellDescriptor {
+  return {
+    shellVersion,
+    bridgeVersion: DESKTOP_BRIDGE_VERSION,
+    capabilities: {
+      updateInstall: localMode,
+      remoteServerUpdate: false,
+      antigravitySignIn: true,
+      hostSwitch: true,
+      localProviders: localMode,
+      devinSignIn: localMode,
+      localRunner: true,
+      ownComputer: localMode && isMac,
+    },
+  };
+}
 export const DESKTOP_RELEASE_TAG_PREFIX = 'desktop-v';
 export const DESKTOP_RELEASE_MANIFEST = 'desktop-latest.json';
 export const DESKTOP_RELEASES_BASE = 'https://github.com/xiechimon/cairn/releases';

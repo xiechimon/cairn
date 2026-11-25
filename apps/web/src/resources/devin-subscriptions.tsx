@@ -15,7 +15,7 @@ import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
-import { devinBridge } from '../desktop-shell.js';
+import { devinBridge, devinCapabilityState } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -45,6 +45,7 @@ export function AddDevinSubscriptionDialog({
   const { t } = useI18n();
   const [label, setLabel] = useState(reloginTarget?.label ?? t('Devin 订阅'));
   const [token, setToken] = useState('');
+  const [capability] = useState(devinCapabilityState);
   const [bridge] = useState(devinBridge);
   const [local, setLocal] = useState<DevinLocalStatus | null>(null);
   const [phase, setPhase] = useState<'idle' | 'waiting' | 'failed' | 'import-failed'>('idle');
@@ -153,9 +154,9 @@ export function AddDevinSubscriptionDialog({
   }, [reloginTarget, bridge, local]);
 
   const localAction =
-    bridge === null ? (
+    capability === 'needs-update' ? (
       <UpdateCairnNotice message={t('更新 Cairn 后即可在这里直接登录。')} />
-    ) : local !== null && (local.loggedIn || local.canLogin) ? (
+    ) : capability === 'allowed' && local !== null && (local.loggedIn || local.canLogin) ? (
       phase === 'waiting' ? (
         <p className="m-0 flex items-center gap-2">
           <RingSpinner className="size-4" />

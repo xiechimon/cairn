@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useLiveData } from '../api/provider.js';
 import { UpdateCairnNotice } from '../board/desktop-update.js';
 import { Button } from '../components/ui/button.js';
-import { ownComputerBridge } from '../desktop-shell.js';
+import { ownComputerBridge, ownComputerCapabilityState } from '../desktop-shell.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
@@ -72,6 +72,7 @@ export function useOwnComputerRow(machine: MachineRow): {
   const { t } = useI18n();
   const { live } = useLiveData();
   const shown = shouldShowOwnComputer(machine);
+  const capability = live ? ownComputerCapabilityState() : 'allowed';
   const bridge = live ? ownComputerBridge() : undefined;
   const [localPermissions, setLocalPermissions] = useState<HostPermissions | null>(null);
   const [checking, setChecking] = useState(false);
@@ -146,12 +147,12 @@ export function useOwnComputerRow(machine: MachineRow): {
         {stateText(state, t)}
       </p>
       {NEEDS_ACTION.has(state) &&
-        (live && bridge === undefined ? (
+        (live && capability === 'needs-update' ? (
           <UpdateCairnNotice
             message={t('更新 Cairn 后即可在这里授权并检查。')}
             buttonTestId="own-computer-update-cairn"
           />
-        ) : (
+        ) : live && capability === 'hidden' ? null : (
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
