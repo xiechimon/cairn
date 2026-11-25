@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useCreateDevinSubscription, useDevinSubscriptions } from '../api/devin-subscriptions.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
+import { coordinatorProviderOf } from '../coordinator-provider.js';
 import { devinSubscriptionLoginWarning } from '../devin-login-warning.js';
 import { useI18n } from '../i18n/provider.js';
 import { AddDevinSubscriptionDialog } from '../resources/devin-subscriptions.js';
@@ -21,8 +23,10 @@ export function useDevinLoginWarnings(now: number): DevinLoginWarning[] {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const subscriptions = useDevinSubscriptions(teamId, live);
+  const coordinatorUsesIt =
+    coordinatorProviderOf(useRoutingSettings(teamId, live).data) === 'devin';
   return (subscriptions.data ?? []).flatMap((subscription) => {
-    const text = devinSubscriptionLoginWarning(subscription, now, t);
+    const text = devinSubscriptionLoginWarning(subscription, now, t, coordinatorUsesIt);
     return text === null
       ? []
       : [

@@ -22,14 +22,15 @@ const subscription = {
 
 describe('devin subscription brief warning', () => {
   test('warns within 30 days, including the boundary, with credentials.toml instructions', () => {
-    expect(devinSubscriptionLoginWarning(subscription, NOW, t)).toContain('30');
+    expect(devinSubscriptionLoginWarning(subscription, NOW, t, true)).toContain('30');
     expect(
-      devinSubscriptionLoginWarning({ ...subscription, expiresAt: NOW + DAY }, NOW, t),
+      devinSubscriptionLoginWarning({ ...subscription, expiresAt: NOW + DAY }, NOW, t, true),
     ).toContain('credentials.toml');
     const expired = devinSubscriptionLoginWarning(
       { ...subscription, expiresAt: NOW - DAY },
       NOW,
       t,
+      true,
     );
     expect(expired).toContain('已过期');
     expect(expired).toContain('Coordinator 和任务暂时无法使用');
@@ -42,15 +43,16 @@ describe('devin subscription brief warning', () => {
         { ...subscription, enabled: false, expiresAt: NOW - DAY },
         NOW,
         t,
+        true,
       ),
     ).toBeNull();
   });
   test('does not warn beyond 30 days or without a known expiry', () => {
     expect(
-      devinSubscriptionLoginWarning({ ...subscription, expiresAt: NOW + 30 * DAY + 1 }, NOW, t),
+      devinSubscriptionLoginWarning({ ...subscription, expiresAt: NOW + 30 * DAY + 1 }, NOW, t, true),
     ).toBeNull();
     expect(
-      devinSubscriptionLoginWarning({ ...subscription, expiresAt: null }, NOW, t),
+      devinSubscriptionLoginWarning({ ...subscription, expiresAt: null }, NOW, t, true),
     ).toBeNull();
   });
 });

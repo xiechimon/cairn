@@ -62,6 +62,8 @@ export const EN: Record<string, string> = {
     'The Coordinator and tasks both use this subscription. It cannot be viewed after saving.',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
+  '{name}：已过期，使用它的任务暂时无法运行。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型」。':
+    '{name}: expired, so tasks that use it cannot run for now. Run `claude setup-token` in a terminal and add the new token under Settings → Model.',
   '{name}：已过期，Coordinator 和任务暂时无法使用。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型」。':
     '{name}: expired, so the Coordinator and tasks cannot run for now. Run `claude setup-token` in a terminal and add the new token under Settings → Model.',
   '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型」。':
@@ -84,6 +86,8 @@ export const EN: Record<string, string> = {
   '没有读到这台 Mac 上的 Devin 登录，请改用下方粘贴。':
     'Could not read a Devin sign-in on this Mac. Paste below instead.',
   '服务器上找不到 devin 命令': 'The devin command was not found on the server.',
+  '{name}：已过期，使用它的任务暂时无法运行。在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型」。':
+    '{name}: expired, so tasks that use it cannot run for now. Run `cat ~/.local/share/devin/credentials.toml` on a computer signed in to Devin and add the whole output under Settings → Model.',
   '{name}：已过期，Coordinator 和任务暂时无法使用。在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型」。':
     '{name}: expired, so the Coordinator and tasks cannot run for now. Run `cat ~/.local/share/devin/credentials.toml` on a computer signed in to Devin and add the whole output under Settings → Model.',
   '{name}：将在 {days} 天后过期。到期前在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型」。':
@@ -139,6 +143,8 @@ export const EN: Record<string, string> = {
   '使用这台 Mac 的登录': 'Use this Mac sign-in',
   '绑定这台 Mac 并立即验证。': 'Binds this Mac and verifies now.',
   '登录完成后会重新验证。': 'Re-verifies after sign-in.',
+  '{name}：执行机上没有可用的 Antigravity 登录，使用它的任务暂时无法运行。重新登录后即可恢复。':
+    '{name}: no usable Antigravity sign-in on the Runner, so tasks that use it cannot run for now. Sign in again to resume.',
   '{name}：执行机上没有可用的 Antigravity 登录，Coordinator 和任务暂时无法使用。重新登录后即可恢复。':
     '{name}: no usable Antigravity sign-in on the Runner, so the Coordinator and tasks cannot run for now. Sign in again to resume.',
   '{count} 处已过期': '{count} expired',
@@ -175,6 +181,8 @@ export const EN: Record<string, string> = {
   '{signedOut} 未登录，已在 {signedIn} 登录':
     'Not signed in on {signedOut}, signed in on {signedIn}',
   '{machine} 无法验证': 'Could not verify on {machine}',
+  '{name}：已过期，使用它的任务暂时无法运行。重新登录后即可恢复。':
+    '{name}: expired, so tasks that use it cannot run for now. Sign in again to resume.',
   '{name}：已过期，Coordinator 和任务暂时无法使用。重新登录后即可恢复。':
     '{name}: expired, so the Coordinator and tasks cannot run for now. Sign in again to resume.',
   '{name}：将在 {days} 天后过期。到期前重新登录，任务才不会中断。':
@@ -1520,6 +1528,7 @@ export const EN: Record<string, string> = {
   '更新 Cairn': 'Update Cairn',
   '{model}（已下架）': '{model} (delisted)',
   '{model}（需要更新 Cairn）': '{model} (needs a Cairn update)',
+  '需要更新 Cairn': 'Needs a Cairn update',
   '{n} 个模型需要新版 Cairn': '{n#1 model needs|# models need} a Cairn update',
   '更新 Cairn 后再重试。': 'Update Cairn, then try again.',
   '更新 Cairn 后重新运行这个任务。': 'Update Cairn, then run this task again.',

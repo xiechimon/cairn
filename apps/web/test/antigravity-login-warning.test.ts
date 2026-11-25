@@ -26,7 +26,7 @@ describe('antigravity subscription login warning', () => {
   test.each(['missing_local_login', 'unavailable'] as const)(
     'uses the existing sign-in copy when the subscription status is %s',
     (runnerLogin) => {
-      const text = antigravitySubscriptionSignedOutWarning({ ...subscription, runnerLogin }, t);
+      const text = antigravitySubscriptionSignedOutWarning({ ...subscription, runnerLogin }, t, true);
       expect(text).toContain('Antigravity 订阅');
       expect(text).toContain('重新登录');
     },
@@ -35,12 +35,12 @@ describe('antigravity subscription login warning', () => {
   test('uses the existing offline copy when the bound Runner is offline', () => {
     expect(antigravitySubscriptionSignedOutWarning({
       ...subscription, runnerLogin: 'unavailable', runnerOffline: true,
-    }, t)).toBe('执行机离线');
+    }, t, true)).toBe('执行机离线');
   });
 
   test('does not warn a token subscription, a disabled subscription, or an authenticated Runner', () => {
-    expect(antigravitySubscriptionSignedOutWarning({ ...subscription, hasToken: true }, t)).toBeNull();
-    expect(antigravitySubscriptionSignedOutWarning({ ...subscription, enabled: false }, t)).toBeNull();
-    expect(antigravitySubscriptionSignedOutWarning({ ...subscription, runnerLogin: 'ok' }, t)).toBeNull();
+    expect(antigravitySubscriptionSignedOutWarning({ ...subscription, hasToken: true }, t, true)).toBeNull();
+    expect(antigravitySubscriptionSignedOutWarning({ ...subscription, enabled: false }, t, true)).toBeNull();
+    expect(antigravitySubscriptionSignedOutWarning({ ...subscription, runnerLogin: 'ok' }, t, true)).toBeNull();
   });
 });

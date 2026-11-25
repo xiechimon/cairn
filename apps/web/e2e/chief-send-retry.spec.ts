@@ -142,6 +142,7 @@ async function mockCoordinator(
     if (path === '/api/teams/t1/providers') {
       return json({ presets: [], providers: [{ id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' }] });
     }
+    if (path === '/api/teams/t1/routing-settings') return json({ rules: [], policies: [] });
     return json([]);
   });
   return { posts, ledger };

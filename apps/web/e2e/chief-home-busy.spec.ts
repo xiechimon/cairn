@@ -165,6 +165,7 @@ async function mockLive(page: Page, state: State) {
     if (p === '/api/teams/t1/providers') {
       return json({ presets: [], providers: [{ id: 'p-ready', providerId: 'r3-gw', label: 'r3-gw' }] });
     }
+    if (p === '/api/teams/t1/routing-settings') return json({ rules: [], policies: [] });
     return json([]);
   });
   return calls;

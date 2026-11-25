@@ -16,9 +16,9 @@ const subscription = { id: 'subscription-1', kind: 'claude-subscription' as cons
 
 describe('subscription brief warning', () => {
   test('warns within 30 days, including the boundary, with setup-token instructions', () => {
-    expect(subscriptionLoginWarning(subscription, NOW, t)).toContain('30');
-    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW + DAY }, NOW, t)).toContain('claude setup-token');
-    const expired = subscriptionLoginWarning({ ...subscription, expiresAt: NOW - DAY }, NOW, t);
+    expect(subscriptionLoginWarning(subscription, NOW, t, true)).toContain('30');
+    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW + DAY }, NOW, t, true)).toContain('claude setup-token');
+    const expired = subscriptionLoginWarning({ ...subscription, expiresAt: NOW - DAY }, NOW, t, true);
     expect(expired).toContain('已过期');
     expect(expired).not.toContain('Claude 订阅已过期');
     expect(expired).toContain('Coordinator 和任务暂时无法使用');
@@ -27,11 +27,11 @@ describe('subscription brief warning', () => {
   });
   test('does not warn about a stored subscription that is not the enabled one', () => {
     expect(
-      subscriptionLoginWarning({ ...subscription, enabled: false, expiresAt: NOW - DAY }, NOW, t),
+      subscriptionLoginWarning({ ...subscription, enabled: false, expiresAt: NOW - DAY }, NOW, t, true),
     ).toBeNull();
   });
   test('does not warn beyond 30 days or without a known expiry', () => {
-    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW + 30 * DAY + 1 }, NOW, t)).toBeNull();
-    expect(subscriptionLoginWarning({ ...subscription, expiresAt: null }, NOW, t)).toBeNull();
+    expect(subscriptionLoginWarning({ ...subscription, expiresAt: NOW + 30 * DAY + 1 }, NOW, t, true)).toBeNull();
+    expect(subscriptionLoginWarning({ ...subscription, expiresAt: null }, NOW, t, true)).toBeNull();
   });
 });

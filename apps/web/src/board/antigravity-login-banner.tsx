@@ -7,6 +7,8 @@ import {
 import { useAntigravitySubscriptions } from '../api/antigravity-subscriptions.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
+import { coordinatorProviderOf } from '../coordinator-provider.js';
 import { useI18n } from '../i18n/provider.js';
 import { AntigravityReloginDialog } from '../resources/antigravity-subscriptions.js';
 import {
@@ -27,13 +29,20 @@ export function useAntigravityLoginWarnings(now: number): AntigravityLoginWarnin
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const subscriptions = useAntigravitySubscriptions(teamId, live);
+  const coordinatorUsesIt =
+    coordinatorProviderOf(useRoutingSettings(teamId, live).data) === 'antigravity';
   return (subscriptions.data ?? []).flatMap((subscription): AntigravityLoginWarning[] => {
     const target = {
       subscriptionId: subscription.id,
       label: subscription.label,
       attachInPlace: subscription.hasToken === false || subscription.oauthPersonal === true,
     };
-    const expiringText = antigravitySubscriptionLoginWarning(subscription, now, t);
+    const expiringText = antigravitySubscriptionLoginWarning(
+      subscription,
+      now,
+      t,
+      coordinatorUsesIt,
+    );
     if (expiringText !== null) {
       return [
         {
@@ -44,7 +53,11 @@ export function useAntigravityLoginWarnings(now: number): AntigravityLoginWarnin
         },
       ];
     }
-    const signedOutText = antigravitySubscriptionSignedOutWarning(subscription, t);
+    const signedOutText = antigravitySubscriptionSignedOutWarning(
+      subscription,
+      t,
+      coordinatorUsesIt,
+    );
     return signedOutText === null
       ? []
       : [{ key: subscription.id, kind: 'signed-out' as const, text: signedOutText, ...target }];

@@ -6,7 +6,9 @@ import {
 } from '../api/claude-subscriptions.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
+import { useRoutingSettings } from '../api/routing-settings.js';
 import { subscriptionLoginWarning } from '../claude-login-warning.js';
+import { coordinatorProviderOf } from '../coordinator-provider.js';
 import { useI18n } from '../i18n/provider.js';
 import { AddClaudeSubscriptionDialog } from '../resources/claude-subscriptions.js';
 import {
@@ -24,8 +26,10 @@ export function useClaudeLoginWarnings(now: number): ClaudeLoginWarning[] {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const subscriptions = useClaudeSubscriptions(teamId, live);
+  const coordinatorUsesIt =
+    coordinatorProviderOf(useRoutingSettings(teamId, live).data) === 'claude-code';
   return (subscriptions.data ?? []).flatMap((connection) => {
-    const text = subscriptionLoginWarning(connection, now, t);
+    const text = subscriptionLoginWarning(connection, now, t, coordinatorUsesIt);
     return text === null
       ? []
       : [
