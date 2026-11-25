@@ -7,7 +7,10 @@ const execFileAsync = promisify(execFile);
 
 export const RESIDENT_LABEL = 'app.cairn.host';
 export const SERVER_OWNER_FILE = 'server-owner.json';
+export const DEFAULT_RESIDENT_HOST = '127.0.0.1';
 export const DEFAULT_RESIDENT_PORT = 8787;
+export const RESIDENT_MANAGED_BY_ENV = 'CAIRN_MANAGED_BY';
+export const RESIDENT_MANAGED_BY_VALUE = 'launchd';
 
 export interface ServerOwnerRecord {
   pid: number;
@@ -99,9 +102,11 @@ export function buildResidentPlist(opts: {
   cairnHome: string;
   port: number;
   logDir: string;
+  host?: string;
 }): string {
   const outLog = join(opts.logDir, 'resident-host.out.log');
   const errLog = join(opts.logDir, 'resident-host.err.log');
+  const host = opts.host ?? DEFAULT_RESIDENT_HOST;
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
@@ -119,11 +124,13 @@ export function buildResidentPlist(opts: {
     '    <key>ELECTRON_RUN_AS_NODE</key>',
     '    <string>1</string>',
     '    <key>HOST</key>',
-    '    <string>0.0.0.0</string>',
+    `    <string>${escapeXml(host)}</string>`,
     '    <key>PORT</key>',
     `    <string>${opts.port}</string>`,
     '    <key>CAIRN_HOME</key>',
     `    <string>${escapeXml(opts.cairnHome)}</string>`,
+    `    <key>${RESIDENT_MANAGED_BY_ENV}</key>`,
+    `    <string>${RESIDENT_MANAGED_BY_VALUE}</string>`,
     '  </dict>',
     '  <key>RunAtLoad</key>',
     '  <true/>',
@@ -148,6 +155,37 @@ export function isResidentInstalled(homeDir: string): boolean {
   return existsSync(residentPlistPath(homeDir));
 }
 
+export function residentPlistNeedsUpdate(opts: {
+  homeDir: string;
+  executablePath: string;
+  serverEntry: string;
+  cairnHome: string;
+  logDir: string;
+  port?: number;
+  host?: string;
+}): boolean {
+  const path = residentPlistPath(opts.homeDir);
+  if (!existsSync(path)) return false;
+  try {
+    const current = readFileSync(path, 'utf8');
+    const expected = buildResidentPlist({
+      executablePath: opts.executablePath,
+      serverEntry: opts.serverEntry,
+      cairnHome: opts.cairnHome,
+      port: opts.port ?? DEFAULT_RESIDENT_PORT,
+      logDir: opts.logDir,
+      host: opts.host,
+    });
+    return current !== expected;
+  } catch {
+    return true;
+  }
+}
+
+export type InstallResidentResult =
+  | { ok: true; plistPath: string; port: number }
+  | { ok: false; reason: string };
+
 export async function installResidentHost(opts: {
   homeDir: string;
   executablePath: string;
@@ -155,9 +193,10 @@ export async function installResidentHost(opts: {
   cairnHome: string;
   logDir: string;
   port?: number;
+  host?: string;
   uid?: number;
   runLaunchctl?: (args: string[]) => Promise<void>;
-}): Promise<{ ok: true; plistPath: string; port: number } | { ok: false; reason: string }> {
+}): Promise<InstallResidentResult> {
   if (process.platform !== 'darwin' && opts.runLaunchctl === undefined) {
     return { ok: false, reason: 'resident host launchd is only supported on macOS' };
   }
@@ -173,6 +212,7 @@ export async function installResidentHost(opts: {
       cairnHome: opts.cairnHome,
       port,
       logDir: opts.logDir,
+      host: opts.host,
     }),
     'utf8',
   );
@@ -242,11 +282,12 @@ export async function residentWritingReply(
   return false;
 }
 
-export async function restartResidentHost(opts: {
+export async function kickstartResidentHost(opts: {
   homeDir: string;
   uid?: number;
   runLaunchctl?: (args: string[]) => Promise<void>;
 }): Promise<boolean> {
+  if (process.platform !== 'darwin' && opts.runLaunchctl === undefined) return false;
   if (!isResidentInstalled(opts.homeDir)) return false;
   const run =
     opts.runLaunchctl ??
@@ -255,4 +296,156 @@ export async function restartResidentHost(opts: {
     });
   await run(['kickstart', '-k', `gui/${opts.uid ?? process.getuid?.() ?? 501}/${RESIDENT_LABEL}`]);
   return true;
+}
+
+export const restartResidentHost = kickstartResidentHost;
+
+export interface WaitForResidentOptions {
+  timeoutMs?: number;
+  pollMs?: number;
+  excludePid?: number;
+  probe?: (cairnHome: string) => Promise<ServerOwnerRecord | null>;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+}
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function waitForResidentServer(
+  cairnHome: string,
+  opts: WaitForResidentOptions = {},
+): Promise<ServerOwnerRecord | null> {
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+  const pollMs = opts.pollMs ?? 250;
+  const probe = opts.probe ?? probeResidentServer;
+  const sleep = opts.sleep ?? defaultSleep;
+  const now = opts.now ?? Date.now;
+  const deadline = now() + timeoutMs;
+  while (true) {
+    const record = await probe(cairnHome);
+    if (record !== null && record.pid !== opts.excludePid) return record;
+    if (now() >= deadline) return null;
+    await sleep(pollMs);
+  }
+}
+
+export async function waitForResidentExit(
+  cairnHome: string,
+  opts: {
+    timeoutMs?: number;
+    pollMs?: number;
+    sleep?: (ms: number) => Promise<void>;
+    now?: () => number;
+  } = {},
+): Promise<boolean> {
+  const timeoutMs = opts.timeoutMs ?? 10_000;
+  const pollMs = opts.pollMs ?? 150;
+  const sleep = opts.sleep ?? defaultSleep;
+  const now = opts.now ?? Date.now;
+  const deadline = now() + timeoutMs;
+  while (true) {
+    const record = readServerOwner(cairnHome);
+    if (record === null || record.managedBy !== 'launchd' || !pidAlive(record.pid)) return true;
+    if (now() >= deadline) return false;
+    await sleep(pollMs);
+  }
+}
+
+export async function handoffToResidentHost(opts: {
+  hasEmbeddedServer: boolean;
+  stopEmbeddedServer: () => Promise<void>;
+  restoreEmbeddedServer: () => Promise<void>;
+  install: () => Promise<InstallResidentResult>;
+  uninstall: () => Promise<{ ok: true }>;
+  waitForHealthy: () => Promise<ServerOwnerRecord | null>;
+  relaunch: () => void;
+}): Promise<ServerOwnerRecord> {
+  let stoppedEmbedded = false;
+  if (opts.hasEmbeddedServer) {
+    await opts.stopEmbeddedServer();
+    stoppedEmbedded = true;
+  }
+  let installed: InstallResidentResult;
+  try {
+    installed = await opts.install();
+  } catch (error) {
+    await opts.uninstall().catch(() => {});
+    if (stoppedEmbedded) await opts.restoreEmbeddedServer();
+    throw error;
+  }
+  if (!installed.ok) {
+    if (stoppedEmbedded) await opts.restoreEmbeddedServer();
+    throw new Error(installed.reason);
+  }
+  const resident = await opts.waitForHealthy();
+  if (resident === null) {
+    await opts.uninstall().catch(() => {});
+    if (stoppedEmbedded) await opts.restoreEmbeddedServer();
+    throw new Error('The resident host did not become healthy in time.');
+  }
+  opts.relaunch();
+  return resident;
+}
+
+export async function handoffFromResidentHost(opts: {
+  attachedToResident: boolean;
+  uninstall: () => Promise<{ ok: true }>;
+  waitForExit: () => Promise<boolean>;
+  relaunch: () => void;
+}): Promise<void> {
+  await opts.uninstall();
+  await opts.waitForExit();
+  if (opts.attachedToResident) opts.relaunch();
+}
+
+export async function resolveResidentAtBoot(opts: {
+  homeDir: string;
+  executablePath: string;
+  serverEntry: string;
+  cairnHome: string;
+  logDir: string;
+  port?: number;
+  host?: string;
+  versionChanged: boolean;
+  updatedAt: number | null;
+  probe: (cairnHome: string) => Promise<ServerOwnerRecord | null>;
+  waitForHealthy: (waitOpts?: WaitForResidentOptions) => Promise<ServerOwnerRecord | null>;
+  install: () => Promise<InstallResidentResult>;
+  kickstart: () => Promise<boolean>;
+}): Promise<ServerOwnerRecord | null> {
+  if (!isResidentInstalled(opts.homeDir)) return opts.probe(opts.cairnHome);
+  if (
+    residentPlistNeedsUpdate({
+      homeDir: opts.homeDir,
+      executablePath: opts.executablePath,
+      serverEntry: opts.serverEntry,
+      cairnHome: opts.cairnHome,
+      logDir: opts.logDir,
+      port: opts.port,
+      host: opts.host,
+    })
+  ) {
+    const installed = await opts.install();
+    if (!installed.ok) return opts.probe(opts.cairnHome);
+    return opts.waitForHealthy({ timeoutMs: 15_000 });
+  }
+  const existing = await opts.probe(opts.cairnHome);
+  const needsRefresh =
+    opts.versionChanged ||
+    (opts.updatedAt !== null && (existing === null || existing.startedAt < opts.updatedAt));
+  if (existing !== null && !needsRefresh) return existing;
+  if (existing !== null && needsRefresh) {
+    await opts.kickstart();
+    return (
+      (await opts.waitForHealthy({ excludePid: existing.pid, timeoutMs: 15_000 })) ??
+      (await opts.probe(opts.cairnHome))
+    );
+  }
+  if (!needsRefresh) {
+    const booting = await opts.waitForHealthy({ timeoutMs: 3_000 });
+    if (booting !== null) return booting;
+  }
+  await opts.kickstart();
+  return opts.waitForHealthy({ timeoutMs: 15_000 });
 }

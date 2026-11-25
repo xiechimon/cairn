@@ -106,10 +106,17 @@ import {
 import { isAllowedRemoteAuthUrl, parseHttpsOrigin } from './remote-auth.js';
 import {
   clearServerOwner,
+  handoffFromResidentHost,
+  handoffToResidentHost,
   installResidentHost,
   isResidentInstalled,
+  kickstartResidentHost,
   probeResidentServer,
+  readServerOwner,
+  resolveResidentAtBoot,
   uninstallResidentHost,
+  waitForResidentExit,
+  waitForResidentServer,
   writeServerOwner,
 } from './resident-host.js';
 import { createRestartBudget } from './restart-budget.js';
@@ -1538,7 +1545,7 @@ function startHealthWatch(running: RunningServer, guard: VersionGuard | null): v
     if (action !== 'none') clearInterval(timer);
   };
   const timer = setInterval(() => {
-    if (running.exitCode === null) void probe();
+    if (running.exitCode === null && server === running) void probe();
   }, HEALTH_PROBE_MS);
   timer.unref();
   void probe();
@@ -1654,10 +1661,15 @@ async function boot(): Promise<void> {
     desktopShellEnv = discoveredShell.patch;
     applyShellEnvironment(process.env, discoveredShell.patch, process.platform);
     process.env[SHELL_ENV_RESOLVED_VAR] = '1';
+    const preLaunchUpdateState = readUpdateState(updateStatePath(userData));
+    const bundleVersionChanged =
+      preLaunchUpdateState.knownVersion !== null &&
+      preLaunchUpdateState.knownVersion !== app.getVersion();
     if ((await settleLaunch(userData)) === 'relaunch') return;
     const notice = takeRollbackNotice(userData);
     guard = armVersionGuard(userData);
     activeGuard = guard;
+    const residentUpdatedAt = preLaunchUpdateState.installed?.at ?? notice?.at ?? null;
     const otelEnvPath = join(userData, 'otel.env');
     const otelEnv = desktopOtelEnv(otelEnvPath, console.error);
     const otelFile = otelEnv.CAIRN_OTEL_ENDPOINT === undefined ? null : otelEnvPath;
@@ -1689,7 +1701,31 @@ async function boot(): Promise<void> {
     } else {
       activeRemoteHostName = null;
       remoteClerkIssuer = null;
-      const resident = await probeResidentServer(cairnHome());
+      const resident = IS_MAC
+        ? await resolveResidentAtBoot({
+            homeDir: homedir(),
+            executablePath: process.execPath,
+            serverEntry: join(bundledRoot('server'), 'dist', 'index.mjs'),
+            cairnHome: cairnHome(),
+            logDir: join(userData, 'logs'),
+            versionChanged: bundleVersionChanged,
+            updatedAt: residentUpdatedAt,
+            probe: (home) => probeResidentServer(home),
+            waitForHealthy: (opts) => waitForResidentServer(cairnHome(), opts),
+            install: () =>
+              installResidentHost({
+                homeDir: homedir(),
+                executablePath: process.execPath,
+                serverEntry: join(bundledRoot('server'), 'dist', 'index.mjs'),
+                cairnHome: cairnHome(),
+                logDir: join(userData, 'logs'),
+              }),
+            kickstart: () => kickstartResidentHost({ homeDir: homedir() }),
+          }).catch((error: unknown) => {
+            console.warn('Could not attach to resident host at boot:', messageOf(error));
+            return null;
+          })
+        : await probeResidentServer(cairnHome());
       if (resident !== null) {
         origin = resident.origin;
         attachedToResident = true;
@@ -1879,21 +1915,73 @@ async function boot(): Promise<void> {
       expectedOfflineUrl = null;
       void mainWindow?.loadURL(origin);
     });
+    let residentTransitionInFlight = false;
+    const relaunchForHostTransition = (): void => {
+      rememberWindowForRelaunch();
+      setTimeout(() => {
+        app.relaunch({ args: relaunchArgs(false) });
+        setTimeout(() => app.exit(0), STOP_TIMEOUT_MS + 3_000).unref();
+        app.quit();
+      }, 50).unref();
+    };
     ipcMain.handle('desktop-host:set-resident', async (event, enabled: unknown) => {
       if (!fromHostMainPage(event) || activeConn.kind !== 'local') return null;
       if (typeof enabled !== 'boolean') throw new Error('enabled must be boolean');
-      if (enabled) {
-        await installResidentHost({
-          homeDir: homedir(),
-          executablePath: process.execPath,
-          serverEntry: join(bundledRoot('server'), 'dist', 'index.mjs'),
-          cairnHome: cairnHome(),
-          logDir: join(userData, 'logs'),
-        });
-      } else {
-        await uninstallResidentHost({ homeDir: homedir() });
+      if (residentTransitionInFlight) return hostStatus();
+      residentTransitionInFlight = true;
+      try {
+        if (enabled) {
+          const running = server;
+          const previousPort = running === null ? null : serverPortOf(running);
+          const previousOwner = readServerOwner(cairnHome());
+          const excludePid = previousOwner?.managedBy === 'launchd' ? previousOwner.pid : undefined;
+          await handoffToResidentHost({
+            hasEmbeddedServer: running !== null,
+            stopEmbeddedServer: async () => {
+              if (running === null) return;
+              server = null;
+              await stopServer(running);
+              clearServerOwner(cairnHome(), process.pid);
+            },
+            restoreEmbeddedServer: async () => {
+              const port = previousPort ?? (await serverPort());
+              const restored = startServer(port, otelFile, serverExited, desktopShellEnv);
+              server = restored;
+              await waitUntilServing(restored);
+              writeServerOwner(cairnHome(), {
+                pid: process.pid,
+                port,
+                origin: restored.origin,
+                managedBy: 'desktop',
+                startedAt: Date.now(),
+              });
+              startHealthWatch(restored, activeGuard);
+            },
+            install: () =>
+              installResidentHost({
+                homeDir: homedir(),
+                executablePath: process.execPath,
+                serverEntry: join(bundledRoot('server'), 'dist', 'index.mjs'),
+                cairnHome: cairnHome(),
+                logDir: join(userData, 'logs'),
+              }),
+            uninstall: () => uninstallResidentHost({ homeDir: homedir() }),
+            waitForHealthy: () =>
+              waitForResidentServer(cairnHome(), { excludePid, timeoutMs: 20_000 }),
+            relaunch: relaunchForHostTransition,
+          });
+        } else {
+          await handoffFromResidentHost({
+            attachedToResident,
+            uninstall: () => uninstallResidentHost({ homeDir: homedir() }),
+            waitForExit: () => waitForResidentExit(cairnHome(), { timeoutMs: STOP_TIMEOUT_MS }),
+            relaunch: relaunchForHostTransition,
+          });
+        }
+        return hostStatus();
+      } finally {
+        residentTransitionInFlight = false;
       }
-      return hostStatus();
     });
     void removeLeftoverUpdates();
     serveUpdates(origin, notice, ownerToken, activeConn.kind === 'local');

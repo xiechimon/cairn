@@ -38,6 +38,7 @@ import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
+import { clearLaunchdServerOwner, writeLaunchdServerOwner } from './server-owner.js';
 import { loadApnsConfig } from './services/apns.js';
 import {
   createStreamTicketBook,
@@ -430,6 +431,7 @@ const server = serve(
     hostname: config.host,
   },
   (info) => {
+    writeLaunchdServerOwner(config.homeDir, info.port);
     logger.info(
       { host: info.address, port: info.port, dataDir: config.dataDir, teamId: seeded.team.id },
       startupMessage(),
@@ -487,6 +489,7 @@ async function shutdown(): Promise<void> {
     logger.warn({ spans: dropped }, 'spans dropped after the final tracing shutdown');
   }
   close();
+  clearLaunchdServerOwner(config.homeDir);
   process.exit(0);
 }
 
