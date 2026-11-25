@@ -30,8 +30,9 @@ const MAC_NEEDING_ACCESS: MachineRow = {
   name: 'Mac mini',
   kind: 'local',
   online: true,
-  version: '0.1.730',
   capabilities: {
+    mcpServers: [],
+    skills: [],
     ownComputer: true,
     osPlatform: 'darwin',
     hostPermissions: {
@@ -40,7 +41,6 @@ const MAC_NEEDING_ACCESS: MachineRow = {
       screenRecording: 'granted',
     },
   },
-  stepsLast24h: 0,
   lastSeenAt: 1,
 };
 
