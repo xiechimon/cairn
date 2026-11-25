@@ -55,11 +55,11 @@ import { useThreadPresence } from '../pwa/thread-presence.js';
 import type { EngineRun, EngineRunStage } from './engine-run.js';
 import { liveEngineRun } from './live-engine-run.js';
 import {
-  consumeTaskRollover,
+  consumeTaskReadyToSettle,
   discardTaskFailed,
   enqueueTaskSend,
   failedTaskOutbox,
-  markTaskRollover,
+  markTaskReadyToSettle,
   taskOutbox,
   taskOutboxErrors,
   unlandedTaskBubbles,
@@ -183,21 +183,33 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   useConversationStream(buildId ?? undefined, live, streamHandlers);
   useEffect(() => {
     if (!live || buildId == null) return;
+    const messagesState = qc.getQueryState(['messages', buildId, 'pages']);
+    const fetchSettled =
+      !messagesQ.isPending && !messagesQ.isFetching && messagesState?.isInvalidated !== true;
     for (const entry of outbox) {
       if (
         entry.scope === todoId &&
         entry.state === 'sent' &&
         entry.threadId === buildId &&
         entry.messageId === null &&
-        !messagesQ.isPending &&
-        !messagesQ.isFetching &&
-        consumeTaskRollover(entry.key)
+        fetchSettled &&
+        consumeTaskReadyToSettle(entry.key)
       ) {
         taskOutbox.markRefetched(entry.key);
       }
     }
     taskOutbox.settle(buildId, known, todoId);
-  }, [live, outbox, todoId, buildId, known, messagesQ.isPending, messagesQ.isFetching]);
+  }, [
+    live,
+    qc,
+    outbox,
+    todoId,
+    buildId,
+    known,
+    messagesQ.isPending,
+    messagesQ.isFetching,
+    messagesQ.dataUpdatedAt,
+  ]);
 
   const steps = stepsQ.data ?? [];
   const running = live
@@ -382,12 +394,12 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
                 clientMessageId: entry.key,
               });
               const targetId = result?.conversationId ?? buildId;
+              markTaskReadyToSettle(entry.key);
               if (targetId === buildId) {
-                void qc
-                  .refetchQueries({ queryKey: ['messages', targetId, 'pages'], type: 'active' })
-                  .finally(() => taskOutbox.markRefetched(entry.key));
-              } else {
-                markTaskRollover(entry.key);
+                void qc.refetchQueries(
+                  { queryKey: ['messages', targetId, 'pages'], type: 'active' },
+                  { cancelRefetch: false },
+                );
               }
               return { threadId: targetId, messageId: null };
             },

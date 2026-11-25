@@ -102,6 +102,7 @@ test('a task message sent while the running turn lost its runner shows at once a
     (db.prepare('select status from step where id = ?').get(id) as { status: string } | undefined)
       ?.status ?? null;
 
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.goto(`${server.base}/app?project=${project.id}&thread=${todo.id}`);
   const sidePanel = page.getByTestId('side-chat-panel');
   const composer = sidePanel.locator('[data-testid="composer-card"] textarea');
@@ -128,6 +129,9 @@ test('a task message sent while the running turn lost its runner shows at once a
   await expect
     .poll(() => nextTurnRow()?.status ?? 'none', { timeout: 5_000 })
     .not.toMatch(/^(none|pending)$/);
+  await expect(sidePanel.getByTestId('user-bubble').filter({ hasText: text })).toBeVisible({
+    timeout: 5_000,
+  });
   await shot(page, 'dead-turn-started.png');
   db.close();
   runnerStream.abort();
@@ -194,6 +198,7 @@ test('task thread rapid repeated sends stay optimistic and in order, and failure
     return route.fallback();
   });
 
+  await page.emulateMedia({ colorScheme: 'light' });
   await page.goto(`${server.base}/app?project=${project.id}&thread=${todo.id}`);
   const sidePanel = page.getByTestId('side-chat-panel');
   const composer = sidePanel.locator('[data-testid="composer-card"] textarea');

@@ -231,7 +231,7 @@ export function createOutbox({
                 ...other,
                 state: 'sent',
                 threadId: delivered.threadId,
-                messageId: delivered.messageId,
+                messageId: delivered.messageId ?? other.messageId,
               }
             : other.state !== 'sent' &&
                 other.threadId === null &&
@@ -302,8 +302,8 @@ export function createOutbox({
     },
     land(key, messageId) {
       pendingRefetchKeys.delete(key);
-      const entry = sendingEntry(key);
-      if (entry === null) return;
+      const entry = list.find((candidate) => candidate.key === key && candidate.state !== 'failed');
+      if (entry === undefined) return;
       sentKeys.set(messageId, key);
       replace(
         list.map((other) => (other === entry ? { ...other, state: 'sent', messageId } : other)),
@@ -320,9 +320,8 @@ export function createOutbox({
         (entry) =>
           (scope !== undefined && entry.scope !== scope) ||
           entry.state !== 'sent' ||
-          (entry.threadId === threadId &&
-            ((entry.messageId !== null && !known.has(entry.messageId)) ||
-              pendingRefetchKeys.has(entry.key))),
+          pendingRefetchKeys.has(entry.key) ||
+          (entry.threadId === threadId && entry.messageId !== null && !known.has(entry.messageId)),
       );
       if (kept.length !== list.length) replace(kept);
     },

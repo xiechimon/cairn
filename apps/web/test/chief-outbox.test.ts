@@ -98,6 +98,37 @@ describe('chief outbox', () => {
     expect(box.entries()[0]).toMatchObject({ state: 'sent', messageId: 'm9' });
   });
 
+  test('landed messageId survives a deliver response that returns messageId null, and late land binds messageId after deliver', async () => {
+    const box = outbox();
+    const calls: { entry: OutboxEntry; resolve: (value: { threadId: string; messageId: string | null }) => void }[] = [];
+    const deliver: Deliver = (entry) =>
+      new Promise((resolve) => {
+        calls.push({ entry, resolve });
+      });
+
+    box.enqueue({ scope: 'todo-1', globalThreadId: null, threadId: 'b1', projectId: null, text: 'first' }, deliver, { awaitRefetch: true });
+    await flush();
+    box.land('key-1', 'm1');
+    calls[0]?.resolve({ threadId: 'b1', messageId: null });
+    await flush();
+    box.settle('b1', new Set(), 'todo-1');
+    expect(box.entries()[0]).toMatchObject({ key: 'key-1', state: 'sent', messageId: 'm1' });
+
+    box.enqueue({ scope: 'todo-1', globalThreadId: null, threadId: 'b1', projectId: null, text: 'second' }, deliver, { awaitRefetch: true });
+    await flush();
+    calls[1]?.resolve({ threadId: 'b1', messageId: null });
+    await flush();
+    box.land('key-2', 'm2');
+    box.settle('b1', new Set(), 'todo-1');
+    expect(box.entries().find((entry) => entry.key === 'key-2')).toMatchObject({
+      state: 'sent',
+      messageId: 'm2',
+    });
+    expect(box.sentKey('m2')).toBe('key-2');
+    box.settle('b1', new Set(['m1', 'm2']), 'todo-1');
+    expect(box.entries()).toEqual([]);
+  });
+
   test('a rejected message turns failed and keeps its text and key', async () => {
     const box = outbox();
     const { calls, deliver } = gate();

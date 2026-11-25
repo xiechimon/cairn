@@ -9,7 +9,7 @@ export interface OptimisticTaskUser {
 }
 
 const queueOnlyKeys = new Set<string>();
-const rolloverKeys = new Set<string>();
+const readyToSettleKeys = new Set<string>();
 const errorsByTodo = new Map<string, string>();
 const errorListeners = new Set<() => void>();
 
@@ -69,17 +69,17 @@ export function enqueueTaskSend(input: {
   return key;
 }
 
-export function markTaskRollover(key: string): void {
-  rolloverKeys.add(key);
+export function markTaskReadyToSettle(key: string): void {
+  readyToSettleKeys.add(key);
 }
 
-export function consumeTaskRollover(key: string): boolean {
-  return rolloverKeys.delete(key);
+export function consumeTaskReadyToSettle(key: string): boolean {
+  return readyToSettleKeys.delete(key);
 }
 
 export function discardTaskFailed(key: string): string | null {
   queueOnlyKeys.delete(key);
-  rolloverKeys.delete(key);
+  readyToSettleKeys.delete(key);
   return taskOutbox.discard(key)?.text ?? null;
 }
 
