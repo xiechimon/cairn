@@ -132,3 +132,23 @@ test('Enter during an upload that fails keeps the draft and sends nothing', asyn
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(onSend).not.toHaveBeenCalled();
 });
+
+test('active IME composition suppresses Enter send until compositionend', () => {
+  const wire = composer();
+  wire.handleCompositionStart();
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).not.toHaveBeenCalled();
+  wire.handleCompositionEnd();
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).toHaveBeenCalledExactlyOnceWith('Next message');
+});
+
+test('blur during IME composition without compositionend resets composing so subsequent Enter sends', () => {
+  const wire = composer();
+  wire.handleCompositionStart();
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).not.toHaveBeenCalled();
+  wire.handleBlur();
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).toHaveBeenCalledExactlyOnceWith('Next message');
+});

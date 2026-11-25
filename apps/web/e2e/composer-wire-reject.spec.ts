@@ -243,3 +243,107 @@ test('chief face: an accepted send clears the draft', async ({ page }) => {
   await expect(input).toHaveValue('');
   await evidenceShot(page, 'chief-send-clears-draft.png');
 });
+
+test('chief face: blur during IME composition without compositionend lets subsequent Enter send', async ({
+  page,
+}) => {
+  const input = await openChiefHome(page);
+  let posts = 0;
+  await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
+    if (request.method() !== 'POST') return route.fallback();
+    posts += 1;
+    return route.fulfill({
+      status: 200,
+      json: { thread: { id: 'chief-ime-blur', teamId: TEAM_ID, title: CHIEF_DRAFT, createdAt: 0 } },
+    });
+  });
+
+  await input.click();
+  await input.fill(CHIEF_DRAFT);
+  await input.evaluate((el) => {
+    el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+  });
+  await input.press('Enter');
+  expect(posts).toBe(0);
+
+  await input.evaluate((el) => {
+    (el as HTMLTextAreaElement).blur();
+  });
+  await input.click();
+  await input.press('Enter');
+
+  await expect.poll(() => posts).toBe(1);
+  await expect(input).toHaveValue('');
+});
+
+test('chief face: window blur and document visibilitychange during IME composition reset stuck state', async ({
+  page,
+}) => {
+  const input = await openChiefHome(page);
+  let posts = 0;
+  await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
+    if (request.method() !== 'POST') return route.fallback();
+    posts += 1;
+    return route.fulfill({
+      status: 200,
+      json: { thread: { id: `chief-ime-${posts}`, teamId: TEAM_ID, title: CHIEF_DRAFT, createdAt: 0 } },
+    });
+  });
+
+  await input.click();
+  await input.fill(CHIEF_DRAFT);
+  await input.evaluate((el) => {
+    el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+    window.dispatchEvent(new Event('blur'));
+  });
+  await input.press('Enter');
+  await expect.poll(() => posts).toBe(1);
+  await expect(input).toHaveValue('');
+
+  await input.click();
+  await input.fill(CHIEF_DRAFT);
+  await input.evaluate((el) => {
+    el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await input.press('Enter');
+  await expect.poll(() => posts).toBe(2);
+  await expect(input).toHaveValue('');
+});
+
+test('detail face: blur during IME composition without compositionend lets subsequent Enter send', async ({
+  page,
+}) => {
+  await stubBoot(page);
+  await stubDetailSurface(page);
+  let posts = 0;
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`),
+    (route, request) => {
+      if (request.method() !== 'POST') return route.fallback();
+      posts += 1;
+      return route.fulfill({ status: 201, json: { message: { id: 'msg-ime-blur' } } });
+    },
+  );
+
+  await page.goto(`/app/todo/${CARD_ID}`);
+  const input = page.locator('[data-testid="composer-card"] textarea');
+  await expect(input).toBeVisible();
+  await input.click();
+  await input.fill(DETAIL_DRAFT);
+  await input.evaluate((el) => {
+    el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+  });
+  await input.press('Enter');
+  expect(posts).toBe(0);
+
+  await input.evaluate((el) => {
+    (el as HTMLTextAreaElement).blur();
+  });
+  await input.click();
+  await input.press('Enter');
+
+  await expect.poll(() => posts).toBe(1);
+  await expect(input).toHaveValue('');
+});

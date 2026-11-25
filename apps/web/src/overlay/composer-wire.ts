@@ -561,6 +561,11 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [inlineOpen, closeInline]);
 
+  const resetComposition = useCallback(() => {
+    composingRef.current = false;
+    setSuppressedListLines(null);
+  }, []);
+
   const handleCompositionStart = useCallback(() => {
     composingRef.current = true;
     const ta = textareaRef.current;
@@ -571,10 +576,23 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   }, []);
 
   const handleCompositionEnd = useCallback(() => {
-    composingRef.current = false;
-    setSuppressedListLines(null);
+    resetComposition();
     reevaluate();
-  }, [reevaluate]);
+  }, [resetComposition, reevaluate]);
+
+  const handleBlur = useCallback(() => {
+    closeInline();
+    resetComposition();
+  }, [closeInline, resetComposition]);
+
+  useEffect(() => {
+    window.addEventListener('blur', resetComposition);
+    document.addEventListener('visibilitychange', resetComposition);
+    return () => {
+      window.removeEventListener('blur', resetComposition);
+      document.removeEventListener('visibilitychange', resetComposition);
+    };
+  }, [resetComposition]);
 
   return {
     draft,
@@ -589,7 +607,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     handleCompositionStart,
     handleCompositionEnd,
     suppressedListLines,
-    handleBlur: closeInline,
+    handleBlur,
     textareaRef,
     fileInputRef,
     openFilePicker,

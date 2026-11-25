@@ -148,6 +148,21 @@ test.describe('Coordinator composer unified list markers and keys', () => {
     await composer.fill('');
     await composer.evaluate((el) => {
       const ta = el as HTMLTextAreaElement;
+      ta.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+      setter.call(ta, '1. ');
+      ta.setSelectionRange(3, 3);
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await expect(mirror.locator('[data-list-marker]')).toHaveCount(0);
+    await composer.evaluate((el) => {
+      (el as HTMLTextAreaElement).blur();
+    });
+    await expect(mirror.locator('[data-list-marker="ordered"]')).toHaveCount(1);
+
+    await composer.fill('');
+    await composer.evaluate((el) => {
+      const ta = el as HTMLTextAreaElement;
       const dt = new DataTransfer();
       dt.setData('text/plain', '1. 粘贴甲\n2. 粘贴乙');
       const pasteEvent = new ClipboardEvent('paste', {
