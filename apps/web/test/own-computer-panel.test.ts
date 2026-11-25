@@ -36,6 +36,7 @@ const MAC_NEEDING_ACCESS: MachineRow = {
     osPlatform: 'darwin',
     hostPermissions: {
       accessibility: 'denied',
+      automation: 'granted',
       screenRecording: 'granted',
     },
   },
@@ -49,7 +50,11 @@ describe('own-computer panel host boundary', () => {
       cairnDesktop: {
         ownComputer: {
           guide: async () => true,
-          permissions: async () => ({ accessibility: 'denied', screenRecording: 'granted' }),
+          permissions: async () => ({
+            accessibility: 'denied',
+            automation: 'granted',
+            screenRecording: 'granted',
+          }),
         },
         host: {
           status: async () => ({
