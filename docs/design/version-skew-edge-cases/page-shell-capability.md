@@ -5,7 +5,7 @@
 
 ## Conflict Resolution with Owner 19:30 Directive
 
-- `docs/design/version-skew.md` Row 9 originally kept `"Open in Cairn desktop app"` copy in plain browsers. Per the owner's 19:30 directive, Cairn UI is desktop-only for desktop-exclusive operations: all browser-fallback branches and `"Open this page in the Cairn desktop app"` copy are deleted, plain browsers (`window.cairnDesktop === undefined` without `DESKTOP_SHELL_USER_AGENT`) do not render desktop-exclusive controls, and older desktop shells missing a capability or lacking the `window.cairnDesktop.shell` descriptor uniformly surface **"Update Cairn"** / **"更新 Cairn"** via one shared helper wired to `desktopUpdates()`.
+- `docs/design/version-skew.md` Row 9 originally kept `"Open in Cairn desktop app"` copy in plain browsers. Per the owner's 19:30 directive, Cairn UI is desktop-only for desktop-exclusive operations: all browser-fallback branches and `"Open this page in the Cairn desktop app"` copy are deleted, plain browsers (`window.cairnDesktop === undefined` without `DESKTOP_SHELL_USER_AGENT`) do not render desktop-exclusive controls, and older desktop shells missing a capability or lacking the `window.cairnDesktop.shell` descriptor uniformly surface **"Update Cairn"** (`更新 Cairn` in `zh`) via one shared helper wired to `desktopUpdates()`.
 
 ## Full Boundary Matrix (8 Required Columns)
 
