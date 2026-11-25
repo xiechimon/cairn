@@ -7,7 +7,7 @@ import {
   type StepQueueBlocked,
   WORKER_ASK_USER_TOOL,
 } from '@cairn/shared';
-import { and, desc, eq, gte } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment, machine, type step, type todo } from '../db/schema.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
@@ -24,7 +24,7 @@ export function infoComputerHosts(db: Pick<Db, 'select'>, teamId: string) {
   return db
     .select()
     .from(machine)
-    .where(eq(machine.teamId, teamId))
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .all()
     .filter((row) => row.online)
     .sort(

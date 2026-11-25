@@ -1,0 +1,2 @@
+UPDATE `machine` SET `retiredAt` = CAST(strftime('%s', 'now') * 1000 AS INTEGER) WHERE `online` = 0 AND `retiredAt` IS NULL AND `capabilities` IS NOT NULL AND json_valid(`capabilities`) = 1 AND json_extract(`capabilities`, '$.computerKind') = 'vm';--> statement-breakpoint
+UPDATE `machine` SET `capabilities` = json_remove(`capabilities`, '$.computerKind') WHERE `capabilities` IS NOT NULL AND json_valid(`capabilities`) = 1 AND json_type(`capabilities`, '$.computerKind') IS NOT NULL AND json_extract(`capabilities`, '$.computerKind') IS NOT 'host';

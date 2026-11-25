@@ -18,7 +18,7 @@ import {
   type SecretBox,
   topModelsSchema,
 } from '@cairn/shared';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import {
   builtinModelIds,
   inServerThinking,
@@ -157,7 +157,7 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
   return db
     .select()
     .from(machine)
-    .where(eq(machine.teamId, teamId))
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .orderBy(asc(machine.name))
     .all()
     .flatMap((row) => {
@@ -236,7 +236,7 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
   const machines = db
     .select()
     .from(machine)
-    .where(eq(machine.teamId, teamId))
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .orderBy(asc(machine.name))
     .all()
     .filter((row) => {
@@ -268,7 +268,7 @@ export function listGeminiSources(db: Db, teamId: string): ModelSourcesEnvelope[
   return db
     .select()
     .from(machine)
-    .where(eq(machine.teamId, teamId))
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .orderBy(asc(machine.name))
     .all()
     .flatMap((row) => {
@@ -311,7 +311,7 @@ export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnve
   return db
     .select()
     .from(machine)
-    .where(eq(machine.teamId, teamId))
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .orderBy(asc(machine.name))
     .all()
     .flatMap((row) => {

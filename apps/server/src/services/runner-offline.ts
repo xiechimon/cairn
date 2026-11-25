@@ -142,6 +142,7 @@ function alternativeFor(
         eq(machine.teamId, offline.teamId),
         eq(machine.online, true),
         isNotNull(machine.tokenHash),
+        isNull(machine.retiredAt),
       ),
     )
     .all()

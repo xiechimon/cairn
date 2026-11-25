@@ -9,7 +9,7 @@ import {
   routeWork,
   type StepKind,
 } from '@cairn/shared';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { machine, step, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
@@ -99,7 +99,11 @@ export function capabilityCandidates(
   const subscribed = hasActiveClaudeSubscription({ db }, teamId);
   const codexProvider = codexProviderKeyed(db, teamId);
   const candidates: CapabilityCandidate[] = [];
-  for (const row of db.select().from(machine).where(eq(machine.teamId, teamId)).all()) {
+  for (const row of db
+    .select()
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
+    .all()) {
     if (!machineSatisfies(row, constraints)) continue;
     const claudeInstalled = machineRuntimeAvailable(row, 'claude-code');
     const claudeUsable =
