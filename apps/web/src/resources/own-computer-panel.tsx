@@ -176,7 +176,8 @@ export function useOwnComputerRow(machine: MachineRow): {
             message={t('更新 Cairn 后即可在这里授权并检查。')}
             buttonTestId="own-computer-update-cairn"
           />
-        ) : live && (capability === 'hidden' || (hostBridge !== null && hostLocal !== true)) ? null : (
+        ) : live &&
+          (capability === 'hidden' || (hostBridge !== null && hostLocal !== true)) ? null : (
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
