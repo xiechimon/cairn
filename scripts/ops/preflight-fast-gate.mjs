@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, posix, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const PACKAGE_ORDER = [
@@ -39,12 +40,55 @@ export function typecheckPackagesForPaths(paths) {
   return PACKAGE_ORDER.filter((name) => selected.has(name));
 }
 
-export function fastGatePlan(paths) {
-  return [
+export function fastGatePlan(paths, lastFailedTests = []) {
+  const plan = [
     ['pnpm', 'lint'],
     ...typecheckPackagesForPaths(paths).map((name) => ['pnpm', '--filter', name, 'typecheck']),
     ['pnpm', 'test:changed'],
   ];
+  if (lastFailedTests.length > 0) {
+    plan.unshift(['pnpm', 'exec', 'vitest', 'run', ...lastFailedTests]);
+  }
+  return plan;
+}
+
+export function lastFailedCachePath(cwd, gitExec = git) {
+  try {
+    const gitDir = gitExec(['rev-parse', '--git-dir'], cwd);
+    return resolve(cwd, gitDir, 'cairn-fast-gate-last-failed.json');
+  } catch {
+    return null;
+  }
+}
+
+export function readLastFailedTests(cachePath, cwd, exists = existsSync) {
+  if (!cachePath || !exists(cachePath)) return [];
+  try {
+    const data = JSON.parse(readFileSync(cachePath, 'utf8'));
+    if (!Array.isArray(data?.failedTests)) return [];
+    return data.failedTests.filter(
+      (file) => typeof file === 'string' && file.length > 0 && exists(resolve(cwd, file)),
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function extractFailedTestFiles(reportPath, cwd) {
+  try {
+    const parsed = JSON.parse(readFileSync(reportPath, 'utf8'));
+    const out = new Set();
+    for (const suite of parsed?.testResults ?? []) {
+      if (suite?.status !== 'failed' || typeof suite?.name !== 'string') continue;
+      const rel = relative(cwd, suite.name).split('\\').join(posix.sep);
+      if (rel && !rel.startsWith('..') && existsSync(resolve(cwd, rel))) {
+        out.add(rel);
+      }
+    }
+    return [...out].sort();
+  } catch {
+    return [];
+  }
 }
 
 export function parseGateWrapper(wrapper = '') {
@@ -84,10 +128,14 @@ export function runFastGate({
   log = console.log,
   checkTree = exactTreeError,
   listPaths = committedPaths,
+  lastFailedTests,
+  cachePath = lastFailedCachePath(cwd),
 }) {
   const dirty = checkTree(cwd);
   if (dirty !== null) return { ok: false, error: dirty };
-  const plan = fastGatePlan(listPaths(cwd));
+  const resolvedFailed =
+    lastFailedTests ?? (wrapper.trim() ? [] : readLastFailedTests(cachePath, cwd));
+  const plan = fastGatePlan(listPaths(cwd), resolvedFailed);
   const wrapperTokens = parseGateWrapper(wrapper);
   if (wrapperTokens.length > 0) {
     const [wrapperCommand, ...wrapperArgs] = wrapperTokens;
@@ -104,17 +152,39 @@ export function runFastGate({
     }
     return { ok: true, plan, wrapped: true };
   }
+  const reportPath = cachePath ? `${cachePath}.report.json` : null;
   for (const [command, ...args] of plan) {
     log(`[preflight-fast-gate] ${command} ${args.join(' ')}`);
-    const result = spawn(command, args, { cwd, stdio: 'inherit' });
+    const isTestChanged = command === 'pnpm' && args[0] === 'test:changed' && reportPath !== null;
+    const env = isTestChanged
+      ? { ...process.env, CAIRN_TEST_CHANGED_JSON_OUT: reportPath }
+      : undefined;
+    if (isTestChanged) {
+      mkdirSync(dirname(reportPath), { recursive: true });
+      rmSync(reportPath, { force: true });
+    }
+    const result = spawn(
+      command,
+      args,
+      env ? { cwd, stdio: 'inherit', env } : { cwd, stdio: 'inherit' },
+    );
     if (result.status !== 0) {
+      if (isTestChanged && cachePath && reportPath && existsSync(reportPath)) {
+        const failed = extractFailedTestFiles(reportPath, cwd);
+        rmSync(reportPath, { force: true });
+        if (failed.length > 0) {
+          writeFileSync(cachePath, JSON.stringify({ failedTests: failed }));
+        }
+      }
       return {
         ok: false,
         error: `${command} ${args.join(' ')} failed on the exact HEAD tree; fix it before preflight pushes`,
         status: result.status ?? 1,
       };
     }
+    if (isTestChanged && reportPath) rmSync(reportPath, { force: true });
   }
+  if (cachePath) rmSync(cachePath, { force: true });
   return { ok: true, plan, wrapped: false };
 }
 

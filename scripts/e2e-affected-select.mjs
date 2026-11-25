@@ -1,11 +1,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, posix, relative, resolve } from 'node:path';
+import { createScanner, LanguageVariant, SyntaxKind } from 'typescript/unstable/ast';
 import { parseAllDocuments } from 'yaml';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_DIR = join(REPO_ROOT, 'apps/web');
 const E2E_DIR = join(WEB_DIR, 'e2e');
 export const E2E_PREFIX = 'apps/web/e2e/';
+export const I18N_EN_PATH = 'apps/web/src/i18n/en.ts';
 export const DEPENDENCY_FILES = ['pnpm-lock.yaml', 'pnpm-workspace.yaml'];
 const SNAPSHOT_DIR = /^apps\/web\/e2e\/([^/]+\.spec\.ts)-snapshots\//;
 
@@ -366,11 +368,12 @@ const FULL_PATH_PREFIXES = [
   'scripts/timed-partition.mjs',
 ];
 
-function classify(path, dependencies, workspace) {
+function classify(path, dependencies, workspace, i18n) {
   if (path.startsWith(E2E_PREFIX) && path.endsWith('.spec.ts')) {
     return { specs: [path.slice(E2E_PREFIX.length)], why: 'the spec itself' };
   }
   if (DEPENDENCY_FILES.includes(path)) return dependencies();
+  if (path === I18N_EN_PATH) return i18n();
   const snapshotOwner = path.match(SNAPSHOT_DIR)?.[1];
   if (snapshotOwner != null) return { specs: [snapshotOwner], why: 'a baseline of that spec' };
   const fileRule = FILE_RULES.get(path);
@@ -468,7 +471,7 @@ function expand(prefixes, allSpecs) {
   return [...matched].sort();
 }
 
-export function selectSpecs({ paths, allSpecs, dependencies, workspace }) {
+export function selectSpecs({ paths, allSpecs, dependencies, workspace, i18n }) {
   let impact = null;
   const dependencyImpact = () => {
     impact ??= dependencies();
@@ -479,11 +482,21 @@ export function selectSpecs({ paths, allSpecs, dependencies, workspace }) {
     reach ??= workspace();
     return reach;
   };
+  let enImpact = null;
+  const i18nCheck = () => {
+    enImpact ??= i18n
+      ? i18n()
+      : i18nImpact({
+          base: null,
+          head: null,
+        });
+    return enImpact;
+  };
   let full = false;
   const picked = new Set();
   const reasons = [];
   for (const path of paths) {
-    const { specs, why } = classify(path, dependencyImpact, workspaceReach);
+    const { specs, why } = classify(path, dependencyImpact, workspaceReach, i18nCheck);
     const axe = specs !== null && path.startsWith('apps/web/src/') && !path.endsWith('.md');
     reasons.push(
       `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? `none (${why})` : why}${axe ? ' + a11y-axe' : ''}`,
@@ -493,6 +506,216 @@ export function selectSpecs({ paths, allSpecs, dependencies, workspace }) {
     if (axe) picked.add('a11y-axe');
   }
   return { full, selection: full ? [...allSpecs].sort() : expand([...picked], allSpecs), reasons };
+}
+
+function scanEnTokens(text) {
+  const scanner = createScanner(true, LanguageVariant.Standard, text);
+  const tokens = [];
+  let braceDepth = 0;
+  const templateStack = [];
+  let lastTok = SyntaxKind.Unknown;
+  for (;;) {
+    const prevEnd = scanner.getTokenEnd();
+    let tok = scanner.scan();
+    if (
+      tok === SyntaxKind.CloseBraceToken &&
+      templateStack.length > 0 &&
+      templateStack[templateStack.length - 1] === braceDepth
+    ) {
+      templateStack.pop();
+      braceDepth -= 1;
+      tok = scanner.reScanTemplateToken(false);
+    } else if (
+      (tok === SyntaxKind.SlashToken || tok === SyntaxKind.SlashEqualsToken) &&
+      lastTok !== SyntaxKind.Identifier &&
+      lastTok !== SyntaxKind.NumericLiteral &&
+      lastTok !== SyntaxKind.StringLiteral &&
+      lastTok !== SyntaxKind.NoSubstitutionTemplateLiteral &&
+      lastTok !== SyntaxKind.TemplateTail &&
+      lastTok !== SyntaxKind.CloseParenToken &&
+      lastTok !== SyntaxKind.CloseBracketToken &&
+      lastTok !== SyntaxKind.CloseBraceToken
+    ) {
+      tok = scanner.reScanSlashToken();
+    }
+    if (tok === SyntaxKind.EndOfFile) break;
+    if (scanner.getTokenEnd() <= prevEnd || tok === SyntaxKind.Unknown) return null;
+    let sig;
+    if (tok === SyntaxKind.StringLiteral || tok === SyntaxKind.NoSubstitutionTemplateLiteral) {
+      sig = `S:${scanner.getTokenValue()}`;
+    } else if (
+      tok === SyntaxKind.TemplateHead ||
+      tok === SyntaxKind.TemplateMiddle ||
+      tok === SyntaxKind.TemplateTail
+    ) {
+      sig = `T:${scanner.getTokenText()}`;
+    } else {
+      sig = `K:${tok}:${scanner.getTokenText()}`;
+    }
+    tokens.push({ tok, sig, text: scanner.getTokenText(), value: scanner.getTokenValue() });
+    if (tok === SyntaxKind.TemplateHead || tok === SyntaxKind.TemplateMiddle) {
+      braceDepth += 1;
+      templateStack.push(braceDepth);
+    } else if (tok === SyntaxKind.OpenBraceToken) {
+      braceDepth += 1;
+    } else if (tok === SyntaxKind.CloseBraceToken) {
+      braceDepth -= 1;
+      if (braceDepth < 0) return null;
+    }
+    lastTok = tok;
+  }
+  if (braceDepth !== 0 || templateStack.length !== 0) return null;
+  return tokens;
+}
+
+function parseEnDictionary(text) {
+  if (typeof text !== 'string' || text.length === 0) return null;
+  const tokens = scanEnTokens(text);
+  if (tokens === null) return null;
+  const exportIdx = tokens.findIndex(
+    (t, i) =>
+      t.tok === SyntaxKind.ExportKeyword &&
+      tokens[i + 1]?.tok === SyntaxKind.ConstKeyword &&
+      tokens[i + 2]?.tok === SyntaxKind.Identifier &&
+      tokens[i + 2]?.text === 'EN',
+  );
+  if (exportIdx === -1) return null;
+  let equalsIdx = -1;
+  let typeDepth = 0;
+  for (let i = exportIdx + 3; i < tokens.length; i++) {
+    const t = tokens[i].tok;
+    if (
+      t === SyntaxKind.LessThanToken ||
+      t === SyntaxKind.OpenBraceToken ||
+      t === SyntaxKind.OpenParenToken ||
+      t === SyntaxKind.OpenBracketToken
+    ) {
+      typeDepth += 1;
+    } else if (
+      t === SyntaxKind.GreaterThanToken ||
+      t === SyntaxKind.CloseBraceToken ||
+      t === SyntaxKind.CloseParenToken ||
+      t === SyntaxKind.CloseBracketToken
+    ) {
+      typeDepth = Math.max(0, typeDepth - 1);
+    } else if (t === SyntaxKind.EqualsToken && typeDepth === 0) {
+      equalsIdx = i;
+      break;
+    }
+  }
+  if (equalsIdx === -1 || tokens[equalsIdx + 1]?.tok !== SyntaxKind.OpenBraceToken) return null;
+  const openBrace = equalsIdx + 1;
+  let closeBrace = -1;
+  let depth = 0;
+  for (let i = openBrace; i < tokens.length; i++) {
+    const t = tokens[i].tok;
+    if (t === SyntaxKind.OpenBraceToken || t === SyntaxKind.TemplateHead) depth += 1;
+    else if (t === SyntaxKind.CloseBraceToken || t === SyntaxKind.TemplateTail) {
+      depth -= 1;
+      if (depth === 0) {
+        closeBrace = i;
+        break;
+      }
+    }
+  }
+  if (closeBrace === -1) return null;
+  const epilogue = tokens.slice(closeBrace + 1);
+  if (
+    epilogue.length > 1 ||
+    (epilogue.length === 1 && epilogue[0].tok !== SyntaxKind.SemicolonToken)
+  ) {
+    return null;
+  }
+  const preamble = tokens.slice(0, openBrace).map((t) => t.sig);
+  const body = tokens.slice(openBrace + 1, closeBrace);
+  const rawEntries = [];
+  let start = 0;
+  let brace = 0;
+  let paren = 0;
+  let bracket = 0;
+  for (let i = 0; i < body.length; i++) {
+    const t = body[i].tok;
+    if (t === SyntaxKind.OpenBraceToken || t === SyntaxKind.TemplateHead) brace += 1;
+    else if (t === SyntaxKind.CloseBraceToken || t === SyntaxKind.TemplateTail) brace -= 1;
+    else if (t === SyntaxKind.OpenParenToken) paren += 1;
+    else if (t === SyntaxKind.CloseParenToken) paren -= 1;
+    else if (t === SyntaxKind.OpenBracketToken) bracket += 1;
+    else if (t === SyntaxKind.CloseBracketToken) bracket -= 1;
+    else if (t === SyntaxKind.CommaToken && brace === 0 && paren === 0 && bracket === 0) {
+      rawEntries.push(body.slice(start, i));
+      start = i + 1;
+    }
+  }
+  if (start < body.length) rawEntries.push(body.slice(start));
+  const entries = new Map();
+  for (const item of rawEntries) {
+    if (item.length === 0) continue;
+    if (item[0].tok === SyntaxKind.DotDotDotToken) return null;
+    let colonIdx = -1;
+    let dBrace = 0;
+    let dParen = 0;
+    let dBracket = 0;
+    for (let i = 0; i < item.length; i++) {
+      const t = item[i].tok;
+      if (t === SyntaxKind.OpenBraceToken || t === SyntaxKind.TemplateHead) dBrace += 1;
+      else if (t === SyntaxKind.CloseBraceToken || t === SyntaxKind.TemplateTail) dBrace -= 1;
+      else if (t === SyntaxKind.OpenParenToken) dParen += 1;
+      else if (t === SyntaxKind.CloseParenToken) dParen -= 1;
+      else if (t === SyntaxKind.OpenBracketToken) dBracket += 1;
+      else if (t === SyntaxKind.CloseBracketToken) dBracket -= 1;
+      else if (t === SyntaxKind.ColonToken && dBrace === 0 && dParen === 0 && dBracket === 0) {
+        colonIdx = i;
+        break;
+      }
+    }
+    if (colonIdx <= 0 || colonIdx === item.length - 1) return null;
+    const keyTokens = item.slice(0, colonIdx);
+    const valTokens = item.slice(colonIdx + 1);
+    let keySig;
+    if (
+      keyTokens.length === 1 &&
+      (keyTokens[0].tok === SyntaxKind.Identifier ||
+        keyTokens[0].tok === SyntaxKind.StringLiteral ||
+        keyTokens[0].tok === SyntaxKind.NoSubstitutionTemplateLiteral ||
+        keyTokens[0].tok === SyntaxKind.NumericLiteral)
+    ) {
+      keySig = `P:${keyTokens[0].tok === SyntaxKind.Identifier || keyTokens[0].tok === SyntaxKind.NumericLiteral ? keyTokens[0].text : keyTokens[0].value}`;
+    } else if (
+      keyTokens.length >= 3 &&
+      keyTokens[0].tok === SyntaxKind.OpenBracketToken &&
+      keyTokens[keyTokens.length - 1].tok === SyntaxKind.CloseBracketToken
+    ) {
+      keySig = `C:${keyTokens.map((t) => t.sig).join('\0')}`;
+    } else {
+      return null;
+    }
+    if (entries.has(keySig)) return null;
+    entries.set(keySig, valTokens.map((t) => t.sig).join('\0'));
+  }
+  return { preamble: preamble.join('\0'), entries };
+}
+
+export function i18nImpact({ base, head }) {
+  const before = parseEnDictionary(base);
+  const after = parseEnDictionary(head);
+  if (before === null || after === null) {
+    return { specs: null, why: 'cannot compare i18n/en.ts' };
+  }
+  if (before.preamble !== after.preamble) {
+    return { specs: null, why: 'i18n/en.ts preamble or exports changed' };
+  }
+  for (const [key, val] of before.entries) {
+    if (!after.entries.has(key)) {
+      return { specs: null, why: 'i18n/en.ts removed an existing translation key' };
+    }
+    if (after.entries.get(key) !== val) {
+      return { specs: null, why: 'i18n/en.ts modified an existing translation value' };
+    }
+  }
+  return {
+    specs: [],
+    why: 'additive-only i18n/en.ts entries (existing copy unchanged)',
+  };
 }
 
 const WEB_IMPORTERS = ['.', 'apps/web'];

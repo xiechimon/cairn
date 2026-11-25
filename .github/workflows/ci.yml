@@ -171,6 +171,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: check-core
+
       - name: Conflict markers
         run: |
           if git grep -nE '^(<<<<<<< |>>>>>>> )' -- . ; then
@@ -181,10 +186,10 @@ jobs:
       - name: UI registry gate (#989)
         env:
           UI_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node scripts/ui-registry-gate.mjs
+        run: node scripts/ops/ci-failed-only.mjs step --key ui-registry-gate -- node scripts/ui-registry-gate.mjs
 
       - name: UI consumer shape gate (#1054)
-        run: node scripts/ui-consumer-shape-gate.mjs
+        run: node scripts/ops/ci-failed-only.mjs step --key ui-consumer-shape-gate -- node scripts/ui-consumer-shape-gate.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -202,18 +207,21 @@ jobs:
 
       - name: verify-cairn CLI self-test (#1402)
         if: needs.changes.outputs.ops-selftests == 'true'
-        run: node .claude/skills/verify-cairn/scripts/vp-selftest.mjs
+        run: node scripts/ops/ci-failed-only.mjs step --key vp-selftest -- node .claude/skills/verify-cairn/scripts/vp-selftest.mjs
 
       - name: Drizzle snapshot chain guard
         if: needs.changes.outputs.has-code != 'false'
-        run: pnpm --filter @xiechimon/cairn db:check
+        run: node scripts/ops/ci-failed-only.mjs step --key db-check -- pnpm --filter @xiechimon/cairn db:check
 
       - name: Drizzle migration drift check
         if: needs.changes.outputs.has-code != 'false'
-        run: |
-          pnpm --filter @xiechimon/cairn db:generate
-          git add -N apps/server/drizzle
-          git diff --exit-code apps/server/drizzle
+        run: node scripts/ops/ci-failed-only.mjs step --key db-drift -- sh -c 'pnpm --filter @xiechimon/cairn db:generate && git add -N apps/server/drizzle && git diff --exit-code apps/server/drizzle'
+
+      - name: Save failed-only CI state
+        if: failure()
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: check-core
 
   vitest-light:
     needs: changes
@@ -235,11 +243,22 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: vitest-light-${{ matrix.shard }}
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Test (vitest, light project)
         run: VITEST_PROJECT_SET=light node scripts/test-temp-run.mjs -- pnpm test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+
+      - name: Save failed-only CI state
+        if: failure()
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: vitest-light-${{ matrix.shard }}
 
   vitest-integration:
     needs: changes
@@ -261,6 +280,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: vitest-integration-${{ matrix.shard }}
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -270,6 +294,12 @@ jobs:
 
       - name: Test (vitest, integration stack)
         run: VITEST_PROJECT_SET=integration node scripts/test-temp-run.mjs -- pnpm test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+
+      - name: Save failed-only CI state
+        if: failure()
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: vitest-integration-${{ matrix.shard }}
 
   e2e:
     needs: changes
@@ -290,6 +320,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: e2e-${{ matrix.shard }}
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -303,6 +338,12 @@ jobs:
 
       - name: CSS mechanism gate (#747)
         run: node scripts/css-mechanism-gate.mjs
+
+      - name: Save failed-only CI state
+        if: failure()
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: e2e-${{ matrix.shard }}
 
   e2e-affected:
     needs: changes
@@ -325,6 +366,11 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: e2e-affected-${{ matrix.shard }}
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -344,6 +390,12 @@ jobs:
       - name: CSS mechanism gate (#747)
         if: ${{ !cancelled() && matrix.shard == 1 }}
         run: node scripts/css-mechanism-gate.mjs
+
+      - name: Save failed-only CI state
+        if: ${{ !cancelled() && failure() }}
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: e2e-affected-${{ matrix.shard }}
 
   e2e-gate:
     needs: [changes, e2e, e2e-affected]
@@ -386,19 +438,30 @@ jobs:
           go-version-file: apps/tsnet-sidecar/go.mod
           cache-dependency-path: apps/tsnet-sidecar/go.sum
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: tsnet-sidecar
+
       - name: Verify module files are tidy
         run: |
           go mod tidy
           git diff --exit-code -- go.mod go.sum
 
       - name: Format
-        run: test -z "$(gofmt -l .)"
+        run: node ../../scripts/ops/ci-failed-only.mjs step --key gofmt -- test -z "$(gofmt -l .)"
 
       - name: Test
-        run: go test ./...
+        run: node ../../scripts/ops/ci-failed-only.mjs go-test --key go-test -- go test ./...
 
       - name: Vet
-        run: go vet ./...
+        run: node ../../scripts/ops/ci-failed-only.mjs step --key govet -- go vet ./...
+
+      - name: Save failed-only CI state
+        if: failure()
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: tsnet-sidecar
 
       - name: Build all targets
         run: |
@@ -462,12 +525,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: gates
+
       - name: Migration additions stay ahead of current main (#3692)
         if: ${{ !cancelled() }}
         run: |
           git fetch origin +refs/heads/main:refs/remotes/origin/main
-          node --test scripts/migration-main-gate.test.mjs
-          node scripts/migration-main-gate.mjs
+          node scripts/ops/ci-failed-only.mjs node-test --key gates-migration-test -- node --test scripts/migration-main-gate.test.mjs
+          node scripts/ops/ci-failed-only.mjs step --key gates-migration-check -- node scripts/migration-main-gate.mjs
 
       - name: "Comment discipline gate (advisory, #1520)"
         continue-on-error: true
@@ -476,8 +544,8 @@ jobs:
           COMMENT_DISCIPLINE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch origin "${COMMENT_DISCIPLINE_BASE_SHA:-main}"
-          node --test scripts/comment-discipline-gate.test.mjs
-          node scripts/comment-discipline-gate.mjs
+          node scripts/ops/ci-failed-only.mjs node-test --key gates-comment-test -- node --test scripts/comment-discipline-gate.test.mjs
+          node scripts/ops/ci-failed-only.mjs step --key gates-comment-check -- node scripts/comment-discipline-gate.mjs
 
       - name: "Probe reach gate (advisory, #1542)"
         if: ${{ !cancelled() }}
@@ -485,36 +553,36 @@ jobs:
           VP_REACH_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           git fetch origin "${VP_REACH_BASE_SHA:-main}"
-          node --test scripts/probe-reach.test.mjs
-          node .claude/skills/verify-cairn/scripts/vp-registry-gate.mjs --check-reach
+          node scripts/ops/ci-failed-only.mjs node-test --key gates-probe-test -- node --test scripts/probe-reach.test.mjs
+          node scripts/ops/ci-failed-only.mjs step --key gates-probe-check -- node .claude/skills/verify-cairn/scripts/vp-registry-gate.mjs --check-reach
 
       - name: Dispatch agent start/check round trip (#1556)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-dispatch -- node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
 
       - name: Workflow concurrency, scalars and queue promotion
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/speculative-queue.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/ci-reuse-verified.test.mjs scripts/ops/merge-queue-invariants.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-workflows -- node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/speculative-queue.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/ci-reuse-verified.test.mjs scripts/ops/ci-failed-only.test.mjs scripts/ops/merge-queue-invariants.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
 
       - name: Commit identity allowlist and hooks (#2289)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/commit-identity.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-identity -- node --test scripts/commit-identity.test.mjs
 
       - name: UI debt ledger only shrinks against main
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ui-debt-gate.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-ui-debt -- node --test scripts/ui-debt-gate.test.mjs
 
       - name: Vitest shards split by recorded file times
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/vitest-timed-shard.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-vitest-shard -- node --test scripts/vitest-timed-shard.test.mjs
 
       - name: E2E selection and timed shards
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/e2e-affected.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-e2e-affected -- node --test scripts/e2e-affected.test.mjs
 
       - name: Pages keep to tokens
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ui-page-style-gate.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-page-style -- node --test scripts/ui-page-style-gate.test.mjs
 
       - name: Feature map covers every route and stays in step with the code
         if: ${{ !cancelled() }}
@@ -522,47 +590,47 @@ jobs:
           FEATURE_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$FEATURE_REGISTRY_BASE_SHA" ]; then git fetch origin "$FEATURE_REGISTRY_BASE_SHA"; fi
-          node scripts/generate-feature-map.mjs --check
+          node scripts/ops/ci-failed-only.mjs step --key gates-feature-map -- node scripts/generate-feature-map.mjs --check
 
       - name: Canon digest stays in step with the rulings registry
         if: ${{ !cancelled() }}
-        run: node scripts/generate-canon.mjs --check
+        run: node scripts/ops/ci-failed-only.mjs step --key gates-canon -- node scripts/generate-canon.mjs --check
 
       - name: Gardener sweep self-test (#1617)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs scripts/feature-map-maintain.test.mjs scripts/generate-feature-map.test.mjs scripts/generate-canon.test.mjs scripts/ops/repo-hygiene.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-gardener -- node --test scripts/gardener-weekly.test.mjs scripts/doc-drift.test.mjs scripts/evidence-prune.test.mjs scripts/delivery-metrics.test.mjs scripts/issue-coverage.test.mjs scripts/feature-map-maintain.test.mjs scripts/generate-feature-map.test.mjs scripts/generate-canon.test.mjs scripts/ops/repo-hygiene.test.mjs
 
       - name: Nightly scan self-test (§11.1)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/nightly-scan/nightly-scan.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-nightly -- node --test scripts/nightly-scan/nightly-scan.test.mjs
 
       - name: CI tier conditions
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ci-tiers.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-ci-tiers -- node --test scripts/ci-tiers.test.mjs
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/real-smoke.test.mjs scripts/smoke/post-install.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-real-smoke -- node --test scripts/ops/real-smoke.test.mjs scripts/smoke/post-install.test.mjs
 
       - name: Host control script fixtures (#2380)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/host/brake.test.mjs scripts/ops/host/surface-stuck-rebase.test.mjs scripts/ops/host/lane-replaced.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/main-watch.test.mjs scripts/ops/host/identity-compat.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-host -- node --test scripts/ops/host/brake.test.mjs scripts/ops/host/surface-stuck-rebase.test.mjs scripts/ops/host/lane-replaced.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/main-watch.test.mjs scripts/ops/host/identity-compat.test.mjs
 
       - name: Test temp guard fixtures (#1954)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/host/test-temp-guard.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-temp-guard -- node --test scripts/ops/host/test-temp-guard.test.mjs
 
       - name: Runner secret isolation fixtures (#2189)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs scripts/ops/secret-reach/batch-sandbox.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-secret-reach -- node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs scripts/ops/secret-reach/batch-sandbox.test.mjs
 
       - name: Scoped root runner for ops scripts (#2362)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/cairn-ops/run.test.mjs scripts/ops/cairn-ops/install.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-cairn-ops -- node --test scripts/ops/cairn-ops/run.test.mjs scripts/ops/cairn-ops/install.test.mjs
 
       - name: Langfuse code evaluator isolation
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/langfuse-code-eval.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-langfuse -- node --test scripts/ops/langfuse-code-eval.test.mjs
 
       - name: Server backup script against an rrsync receiver (#2163)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
@@ -570,11 +638,17 @@ jobs:
           command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q sqlite3; }
           curl -fsSL -o "$RUNNER_TEMP/rrsync" https://raw.githubusercontent.com/RsyncProject/rsync/v3.4.1/support/rrsync
           echo "0bb743f8155907ed2a337c12a4672c67269e372803939ec98dac497edc714c9b  $RUNNER_TEMP/rrsync" | sha256sum -c -
-          RRSYNC="$RUNNER_TEMP/rrsync" node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
+          RRSYNC="$RUNNER_TEMP/rrsync" node scripts/ops/ci-failed-only.mjs node-test --key gates-server-backup -- node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
 
       - name: Self-deploy and deploy-lag watch fixtures (#2288)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-self-deploy -- node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs
+
+      - name: Save failed-only CI state
+        if: ${{ !cancelled() && failure() }}
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: gates
 
   eval:
     needs: [changes, check-core]

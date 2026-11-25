@@ -1,6 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { contextFromEnv, readPrevState, recordStepState } from './ci-failed-only-state.mjs';
 import { mergeBase } from './diff-base.mjs';
 import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 import { OWNED_PROCESS_CLI } from './owned-process.mjs';
@@ -10,6 +11,7 @@ const root = resolve(import.meta.dirname, '..');
 
 export const prepushModules = [
   'scripts/prepush.mjs',
+  'scripts/ci-failed-only-state.mjs',
   'scripts/heavy-slots.mjs',
   'scripts/owned-process.mjs',
   'scripts/english-only-gate.mjs',
@@ -39,6 +41,7 @@ export const selfTests = [
   'scripts/ops/push-test.test.mjs',
   'scripts/ops/push-worker.test.mjs',
   'scripts/ops/ci-reuse-verified.test.mjs',
+  'scripts/ops/ci-failed-only.test.mjs',
   'scripts/ops/merge-queue-invariants.test.mjs',
   'scripts/ops/preflight-fast-gate.test.mjs',
   'scripts/prepush.test.mjs',
@@ -229,6 +232,14 @@ export const NODE_TEST_TIMEOUT_MS = 300_000;
 const STEP_TIMED_OUT = 124;
 export const NODE_TEST_STEP_TIMEOUT_MS = 15 * 60_000;
 
+function scrubPlanChildEnv(env) {
+  const clean = scrubGitEnv({ ...env });
+  for (const key of Object.keys(clean)) {
+    if (key.startsWith('CI_FAILED_ONLY_')) delete clean[key];
+  }
+  return clean;
+}
+
 export function runPlan(
   plan,
   {
@@ -237,10 +248,23 @@ export function runPlan(
     exit = (code) => process.exit(code),
     testTimeoutMs = NODE_TEST_TIMEOUT_MS,
     stepTimeoutMs = NODE_TEST_STEP_TIMEOUT_MS,
+    stepKey = 'prepush-ci',
   },
 ) {
+  const ctx = contextFromEnv(env);
+  const tracking = Boolean(ctx.currDir);
+  const prevState = tracking ? readPrevState(ctx) : null;
+  const prevPassed = new Set(prevState?.steps?.[stepKey]?.passedChecks ?? []);
+  const childEnv = scrubPlanChildEnv(env);
+  const passedChecks = [];
   for (const step of plan) {
     const [command, ...commandArgs] = step;
+    const stepId = step.join(' ');
+    if (tracking && prevPassed.has(stepId)) {
+      console.log(`[prepush][failed-only] skipping passed check: ${stepId}`);
+      passedChecks.push(stepId);
+      continue;
+    }
     console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);
     const nodeTest = command === 'node' && commandArgs[0] === '--test';
     const result = nodeTest
@@ -259,24 +283,46 @@ export function runPlan(
             `--test-timeout=${testTimeoutMs}`,
             ...commandArgs.slice(1),
           ],
-          { cwd, stdio: 'inherit', env: scrubGitEnv({ ...env }) },
+          { cwd, stdio: 'inherit', env: childEnv },
         )
       : spawnSync(command, commandArgs, {
           cwd,
           stdio: 'inherit',
-          env: scrubGitEnv({ ...env }),
+          env: childEnv,
         });
     if (nodeTest && result.status === STEP_TIMED_OUT) {
       console.error(
         `[prepush] ${command} ${commandArgs.join(' ')} did not exit within ${stepTimeoutMs / 60_000} min; killed its process group`,
       );
+      if (tracking) {
+        recordStepState({
+          ...ctx,
+          stepKey,
+          outcome: { status: 'failed', failedCheck: stepId, passedChecks },
+        });
+      }
       exit(1);
       return;
     }
     if (result.status !== 0) {
+      if (tracking) {
+        recordStepState({
+          ...ctx,
+          stepKey,
+          outcome: { status: 'failed', failedCheck: stepId, passedChecks },
+        });
+      }
       exit(result.status ?? 1);
       return;
     }
+    passedChecks.push(stepId);
+  }
+  if (tracking) {
+    recordStepState({
+      ...ctx,
+      stepKey,
+      outcome: { status: 'passed', passedChecks },
+    });
   }
 }
 
@@ -347,6 +393,10 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
           );
   const lease = await acquireSlot({ label: 'prepush' });
   if (lease !== null) Object.assign(process.env, leaseEnv(lease));
-  runPlan(plan, { cwd: root, env: process.env });
+  runPlan(plan, {
+    cwd: root,
+    env: process.env,
+    stepKey: args[0] === '--self-test' ? 'prepush-self-test' : 'prepush-ci',
+  });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }

@@ -11,6 +11,7 @@ export function scrubGateEnv(env = process.env) {
     Object.entries(env).filter(
       ([key]) =>
         !/_BASE_SHA$/.test(key) &&
+        !/^CI_FAILED_ONLY_/.test(key) &&
         key !== 'PREPUSH_FORCE_FULL' &&
         key !== 'GITHUB_REF' &&
         key !== 'GITHUB_EVENT_NAME',

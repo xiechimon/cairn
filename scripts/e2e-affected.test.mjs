@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   dependencyImpact,
+  i18nImpact,
   LIVE_SERVER,
   listSpecs,
   parseYamlDocuments,
@@ -567,5 +568,61 @@ test('successfulE2eJobs reads every jobs page', () => {
   assert.deepEqual(
     successfulE2eJobs(gh, '123').map((job) => job.name),
     ['e2e (1)', 'e2e-affected (2)'],
+  );
+});
+
+const EN_BASE = `import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/core.js';
+
+export const EN: Record<string, string> = {
+  hello: 'Hello',
+  'with spaces': 'With spaces',
+  [PROBE_TOOL_CALL_LABEL]: \`Calling tool: \${PROBE_TOOL_PILLS[1]}\`,
+};
+`;
+
+test('additive-only i18n/en.ts edits skip full e2e fallback while edits/deletions still trigger full', () => {
+  const additive = EN_BASE.replace('};', "  'new key': 'New copy',\n  numKey: 'More copy',\n};");
+  const resAdd = i18nImpact({ base: EN_BASE, head: additive });
+  assert.deepEqual(resAdd.specs, []);
+
+  const selAdd = selectSpecs({
+    paths: ['apps/web/src/i18n/en.ts', 'apps/web/src/routes/usage-page.tsx'],
+    allSpecs: ALL_SPECS,
+    dependencies: () => assert.fail('no dependency change'),
+    workspace: () => workspacePackages(LOCKFILE),
+    i18n: () => resAdd,
+  });
+  assert.equal(selAdd.full, false);
+  assert.deepEqual(selAdd.selection, ['a11y-axe.spec.ts']);
+
+  const modified = EN_BASE.replace("hello: 'Hello'", "hello: 'Hi'");
+  assert.equal(i18nImpact({ base: EN_BASE, head: modified }).specs, null);
+
+  const deleted = EN_BASE.replace("  'with spaces': 'With spaces',\n", '');
+  assert.equal(i18nImpact({ base: EN_BASE, head: deleted }).specs, null);
+
+  const duplicated = EN_BASE.replace('};', "  hello: 'Override',\n};");
+  assert.equal(i18nImpact({ base: EN_BASE, head: duplicated }).specs, null);
+
+  const spread = EN_BASE.replace('};', '  ...EXTRA,\n};');
+  assert.equal(i18nImpact({ base: EN_BASE, head: spread }).specs, null);
+
+  const preambleChanged = `import { OTHER } from './other.js';\n${EN_BASE}`;
+  assert.equal(i18nImpact({ base: EN_BASE, head: preambleChanged }).specs, null);
+
+  assert.equal(i18nImpact({ base: null, head: additive }).specs, null);
+
+  const realEn = readFileSync(new URL('../apps/web/src/i18n/en.ts', import.meta.url), 'utf8');
+  assert.deepEqual(
+    i18nImpact({
+      base: realEn,
+      head: realEn.replace(/\};\s*$/, "  'ci probe key': 'CI probe copy',\n};\n"),
+    }).specs,
+    [],
+  );
+  assert.equal(
+    select(['apps/web/src/i18n/translate.ts']).full,
+    true,
+    'runtime i18n logic still runs full e2e',
   );
 });

@@ -244,7 +244,15 @@ async function main() {
       ? { ...process.env, CAIRN_TEST_TEMP_ROOT: '/tmp' }
       : process.env;
   const lease = await acquireSlot({ label: 'test:changed' });
-  const child = spawn('pnpm', ['exec', 'vitest', 'run', ...selected], {
+  const vitestArgs = ['exec', 'vitest', 'run', ...selected];
+  if (process.env.CAIRN_TEST_CHANGED_JSON_OUT) {
+    vitestArgs.push(
+      '--reporter=default',
+      '--reporter=json',
+      `--outputFile=${process.env.CAIRN_TEST_CHANGED_JSON_OUT}`,
+    );
+  }
+  const child = spawn('pnpm', vitestArgs, {
     stdio: 'inherit',
     env: leaseEnv(lease, env),
   });

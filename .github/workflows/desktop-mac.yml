@@ -33,6 +33,11 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: desktop-mac-signature
+
       - name: Import two throwaway signing certificates with the same name
         shell: bash
         run: |
@@ -59,7 +64,13 @@ jobs:
         env:
           CAIRN_REQUIRE_MAC_SIGNATURE_TESTS: '1'
           NODE_OPTIONS: --test-reporter=spec
-        run: node --test apps/desktop/scripts/signature-mac.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key signature-mac -- node --test apps/desktop/scripts/signature-mac.test.mjs
+
+      - name: Save failed-only CI state
+        if: failure()
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: desktop-mac-signature
 
   package:
     runs-on: macos-latest
@@ -77,6 +88,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Restore failed-only CI state
+        uses: ./.github/actions/failed-only-restore
+        with:
+          key: desktop-mac-package
+
       - name: Build the web UI, the server and the Runner
         run: |
           pnpm --filter @cairn/web build
@@ -90,7 +106,7 @@ jobs:
           pnpm --filter @cairn/desktop stage-runner
 
       - name: Run the desktop unit tests
-        run: node --test apps/desktop/scripts/check-virtual-store.test.mjs apps/desktop/scripts/check-signature.test.mjs apps/desktop/scripts/keep-awake.test.mjs apps/desktop/scripts/otel-config.test.mjs apps/desktop/scripts/app-menu.test.mjs apps/desktop/scripts/context-menu.test.mjs apps/desktop/scripts/restart-budget.test.mjs apps/desktop/scripts/server-log.test.mjs apps/desktop/scripts/server-exit.test.mjs apps/desktop/scripts/runner-home.test.mjs apps/desktop/scripts/smoke-mac.test.mjs apps/desktop/scripts/own-computer.test.mjs apps/desktop/scripts/tray-popover.test.mjs apps/desktop/scripts/update-apply.test.mjs apps/desktop/scripts/update-staging.test.mjs apps/desktop/scripts/update-log.test.mjs apps/desktop/scripts/update-state.test.mjs apps/desktop/scripts/update-error.test.mjs apps/desktop/scripts/update-guard.test.mjs apps/desktop/scripts/update-swap.test.mjs apps/desktop/scripts/signature.test.mjs apps/desktop/scripts/desktop-copy.test.mjs apps/desktop/scripts/update-copy.test.mjs apps/desktop/scripts/page-capture.test.mjs apps/desktop/scripts/window-state.test.mjs apps/desktop/scripts/native-tray.test.mjs apps/desktop/scripts/tray-helper.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key desktop-unit-tests -- node --test apps/desktop/scripts/check-virtual-store.test.mjs apps/desktop/scripts/check-signature.test.mjs apps/desktop/scripts/keep-awake.test.mjs apps/desktop/scripts/otel-config.test.mjs apps/desktop/scripts/app-menu.test.mjs apps/desktop/scripts/context-menu.test.mjs apps/desktop/scripts/restart-budget.test.mjs apps/desktop/scripts/server-log.test.mjs apps/desktop/scripts/server-exit.test.mjs apps/desktop/scripts/runner-home.test.mjs apps/desktop/scripts/smoke-mac.test.mjs apps/desktop/scripts/own-computer.test.mjs apps/desktop/scripts/tray-popover.test.mjs apps/desktop/scripts/update-apply.test.mjs apps/desktop/scripts/update-staging.test.mjs apps/desktop/scripts/update-log.test.mjs apps/desktop/scripts/update-state.test.mjs apps/desktop/scripts/update-error.test.mjs apps/desktop/scripts/update-guard.test.mjs apps/desktop/scripts/update-swap.test.mjs apps/desktop/scripts/signature.test.mjs apps/desktop/scripts/desktop-copy.test.mjs apps/desktop/scripts/update-copy.test.mjs apps/desktop/scripts/page-capture.test.mjs apps/desktop/scripts/window-state.test.mjs apps/desktop/scripts/native-tray.test.mjs apps/desktop/scripts/tray-helper.test.mjs
 
       - name: Import a throwaway signing certificate
         run: |
@@ -168,3 +184,9 @@ jobs:
           path: apps/desktop/release/tray-native-walk*
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Save failed-only CI state
+        if: failure()
+        uses: ./.github/actions/failed-only-save
+        with:
+          key: desktop-mac-package

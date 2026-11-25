@@ -1,0 +1,16 @@
+name: Save CI failed-only state
+description: Upload failed-only test manifest so a retry of the same run skips passing checks and tests
+inputs:
+  key:
+    description: Stable per-job and shard identifier within the workflow run
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Upload failed-only manifest on failure
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: failed-only-${{ inputs.key }}-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/ci-failed-only/curr
+        retention-days: 1
+        if-no-files-found: ignore

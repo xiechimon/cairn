@@ -1,0 +1,35 @@
+name: Restore CI failed-only state
+description: Restore the previous attempt's failed-only test manifest on GitHub Actions retries
+inputs:
+  key:
+    description: Stable per-job and shard identifier within the workflow run
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Prepare failed-only state directories
+      id: meta
+      shell: bash
+      run: |
+        prev_dir="${{ runner.temp }}/ci-failed-only/prev"
+        curr_dir="${{ runner.temp }}/ci-failed-only/curr"
+        mkdir -p "$prev_dir" "$curr_dir"
+        echo "CI_FAILED_ONLY_PREV_DIR=$prev_dir" >> "$GITHUB_ENV"
+        echo "CI_FAILED_ONLY_CURR_DIR=$curr_dir" >> "$GITHUB_ENV"
+        echo "CI_FAILED_ONLY_JOB_KEY=${{ inputs.key }}" >> "$GITHUB_ENV"
+        attempt="${{ github.run_attempt }}"
+        if [ "$attempt" -gt 1 ]; then
+          prev_attempt=$((attempt - 1))
+          echo "should-restore=true" >> "$GITHUB_OUTPUT"
+          echo "prev-name=failed-only-${{ inputs.key }}-attempt-${prev_attempt}" >> "$GITHUB_OUTPUT"
+        else
+          echo "should-restore=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Download previous attempt failed-only manifest
+      if: steps.meta.outputs.should-restore == 'true'
+      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      with:
+        name: ${{ steps.meta.outputs.prev-name }}
+        path: ${{ runner.temp }}/ci-failed-only/prev

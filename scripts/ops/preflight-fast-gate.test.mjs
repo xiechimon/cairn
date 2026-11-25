@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import {
   committedPaths,
   exactTreeError,
+  extractFailedTestFiles,
   fastGatePlan,
   fastGateShellCommand,
   parseGateWrapper,
+  readLastFailedTests,
   runFastGate,
   typecheckPackagesForPaths,
 } from './preflight-fast-gate.mjs';
@@ -149,4 +151,70 @@ test('CAIRN_PREFLIGHT_GATE_WRAPPER runs the full fast-gate plan in one sh -c cal
   assert.equal(failed.ok, false);
   assert.equal(failed.status, 2);
   assert.match(failed.error, /remote-runner failed on the exact HEAD tree/);
+});
+
+test('fastGatePlan puts previously failed vitest files first and runFastGate clears cache on pass', () => {
+  assert.deepEqual(fastGatePlan(['apps/web/src/App.tsx'], ['apps/web/test/remote-host.test.ts']), [
+    ['pnpm', 'exec', 'vitest', 'run', 'apps/web/test/remote-host.test.ts'],
+    ['pnpm', 'lint'],
+    ['pnpm', '--filter', '@cairn/web', 'typecheck'],
+    ['pnpm', 'test:changed'],
+  ]);
+
+  const root = makeTestTempDir('preflight-fail-first-');
+  try {
+    mkdirSync(join(root, 'apps/web/test'), { recursive: true });
+    const testRel = 'apps/web/test/sample.test.ts';
+    writeFileSync(join(root, testRel), 'export {};\n');
+    const cachePath = join(root, 'cache.json');
+    const reportPath = `${cachePath}.report.json`;
+    writeFileSync(
+      cachePath,
+      JSON.stringify({ failedTests: [testRel, 'apps/web/test/gone.test.ts'] }),
+    );
+    assert.deepEqual(readLastFailedTests(cachePath, root), [testRel]);
+
+    const calls = [];
+    const failFirst = runFastGate({
+      cwd: root,
+      wrapper: '',
+      checkTree: () => null,
+      listPaths: () => ['apps/web/src/App.tsx'],
+      cachePath,
+      spawn: (command, args) => {
+        calls.push([command, ...args].join(' '));
+        return { status: args.includes(testRel) ? 1 : 0 };
+      },
+      log: () => {},
+    });
+    assert.equal(failFirst.ok, false);
+    assert.deepEqual(calls, [`pnpm exec vitest run ${testRel}`]);
+    assert.equal(existsSync(cachePath), true);
+
+    writeFileSync(
+      reportPath,
+      JSON.stringify({
+        testResults: [
+          { name: join(root, testRel), status: 'failed' },
+          { name: join(root, 'apps/web/test/ok.test.ts'), status: 'passed' },
+        ],
+      }),
+    );
+    assert.deepEqual(extractFailedTestFiles(reportPath, root), [testRel]);
+
+    const passed = runFastGate({
+      cwd: root,
+      wrapper: '',
+      checkTree: () => null,
+      listPaths: () => ['apps/web/src/App.tsx'],
+      cachePath,
+      spawn: () => ({ status: 0 }),
+      log: () => {},
+    });
+    assert.equal(passed.ok, true);
+    assert.equal(existsSync(cachePath), false);
+    assert.equal(existsSync(reportPath), false);
+  } finally {
+    releaseTestTempDir(root);
+  }
 });

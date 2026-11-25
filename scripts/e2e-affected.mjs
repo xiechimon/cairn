@@ -10,6 +10,8 @@ import {
   dependencyImpact,
   E2E_PREFIX,
   FILE_RULES,
+  I18N_EN_PATH,
+  i18nImpact,
   listSpecs,
   SHARED_SURFACE_ONLY,
   selectSpecs,
@@ -109,6 +111,7 @@ const { full, selection, reasons } = selectSpecs({
       head: { lockfile: readInTree(lockfile), workspace: readInTree(workspace) },
     });
   },
+  i18n: () => i18nImpact({ base: readAtBase(base, I18N_EN_PATH), head: readInTree(I18N_EN_PATH) }),
   workspace: () => workspacePackages(readInTree(DEPENDENCY_FILES[0])),
 });
 console.log(`[e2e:affected] changed paths (${source}):`);

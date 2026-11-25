@@ -77,3 +77,52 @@ test('governance invariant: AGENTS.md locks merge-queue edits to invariant and e
   assert.match(agents, /scripts\/ops\/merge-queue-invariants\.test\.mjs/);
   assert.match(agents, /green-main/);
 });
+
+test('efficiency & safety invariant: failed-only rerun binds to exact sha/run/attempt and covers every ci test job', () => {
+  const ci = read('.github/workflows/ci.yml');
+  for (const jobName of [
+    'check-core',
+    'vitest-light',
+    'vitest-integration',
+    'e2e',
+    'e2e-affected',
+    'tsnet-sidecar',
+    'gates',
+  ]) {
+    const block = ci.split(`\n  ${jobName}:`)[1]?.split(/\n {2}[a-z][\w-]*:/)[0] ?? '';
+    assert.match(
+      block,
+      /uses:\s*\.\/\.github\/actions\/failed-only-restore/,
+      `${jobName} restores state`,
+    );
+    assert.match(
+      block,
+      /if:\s*[^\n]*failure\(\)[\s\S]*?uses:\s*\.\/\.github\/actions\/failed-only-save/,
+      `${jobName} saves state on job failure`,
+    );
+  }
+  const saveAction = read('.github/actions/failed-only-save/action.yml');
+  assert.doesNotMatch(
+    saveAction,
+    /\bif:\s*failure\(\)/,
+    'composite save action must not guard itself with if: failure() because caller step owns failure condition',
+  );
+  const mac = read('.github/workflows/desktop-mac.yml');
+  for (const jobName of ['update-signature', 'package']) {
+    const block = mac.split(`\n  ${jobName}:`)[1]?.split(/\n {2}[a-z][\w-]*:/)[0] ?? '';
+    assert.match(
+      block,
+      /uses:\s*\.\/\.github\/actions\/failed-only-restore/,
+      `mac.${jobName} restores state`,
+    );
+    assert.match(
+      block,
+      /uses:\s*\.\/\.github\/actions\/failed-only-save/,
+      `mac.${jobName} saves state`,
+    );
+  }
+  const state = read('scripts/ci-failed-only-state.mjs');
+  assert.match(state, /parsed\.sha !== sha/);
+  assert.match(state, /parsed\.attempt !== attempt - 1/);
+  assert.match(state, /parsed\.jobKey !== jobKey/);
+});

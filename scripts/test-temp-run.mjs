@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { createTempEnvironment } from '../packages/shared/src/node/temp-environment.ts';
+import { finalizeVitestRun, prepareVitestRun } from './ci-failed-only-state.mjs';
 import { spawnOwned } from './owned-process.mjs';
 
 const [separator, command, ...args] = process.argv.slice(2);
@@ -10,12 +11,24 @@ if (separator !== '--' || !command) {
   process.exit(2);
 }
 
+const prep = prepareVitestRun({ command, args });
+if (prep.skip) {
+  console.log(`[failed-only] skipping vitest: passed in attempt ${prep.ctx.attempt - 1}`);
+  finalizeVitestRun({ prep, code: 0 });
+  process.exit(0);
+}
+if (prep.rerunOnly) {
+  console.log(
+    `[failed-only] rerunning ${prep.rerunOnly.length} failed vitest file(s): ${prep.rerunOnly.join(' ')}`,
+  );
+}
+
 const runId = randomUUID();
 const temporary = createTempEnvironment();
 const root = temporary.root;
 const report = join(root, 'allocations.jsonl');
 writeFileSync(report, '', { flag: 'wx', mode: 0o600 });
-const owned = spawnOwned(command, args, {
+const owned = spawnOwned(command, prep.args, {
   env: {
     ...process.env,
     ...temporary.env,
@@ -76,7 +89,9 @@ function finish(code) {
     console.error('test-temp-run: survivor inspection or cleanup failed');
     failed = true;
   }
-  process.exitCode = code || (failed ? 1 : 0);
+  const finalCode = code || (failed ? 1 : 0);
+  finalizeVitestRun({ prep, code: finalCode });
+  process.exitCode = finalCode;
 }
 
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
