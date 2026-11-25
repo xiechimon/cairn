@@ -153,6 +153,16 @@ export const machinePhoneReportSchema = z.object({
 });
 export type MachinePhoneReport = z.infer<typeof machinePhoneReportSchema>;
 
+export const legacyConfinementReportSchema = z
+  .object({
+    state: z.enum(['checking', 'ready', 'not-applicable', 'unavailable']),
+    invocation: z.uuid(),
+    generation: z.number().int().positive(),
+    revision: z.number().int().positive(),
+    reason: z.enum(['startup-failed', 'cleanup-failed', 'unsupported-platform']).optional(),
+  })
+  .strict();
+
 export const machineCapabilitiesSchema = z.object({
   osPlatform: machineOsPlatformSchema.optional(),
   osDistribution: z
@@ -199,6 +209,7 @@ export const machineCapabilitiesSchema = z.object({
   hostPermissions: hostPermissionsSchema.optional(),
   phoneHost: z.literal(true).optional(),
   phones: z.array(machinePhoneReportSchema).optional(),
+  confinement: legacyConfinementReportSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -231,6 +242,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const runnerProtocolVersion = machineCapabilitiesSchema.shape.runnerProtocolVersion.safeParse(
     rec.runnerProtocolVersion,
   );
+  const confinement = legacyConfinementReportSchema.safeParse(rec.confinement);
   return {
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
@@ -270,6 +282,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
       : {}),
     ...(rec.phoneHost === true ? { phoneHost: true as const } : {}),
     ...(phones.success && phones.data !== undefined ? { phones: phones.data } : {}),
+    ...(confinement.success ? { confinement: confinement.data } : {}),
   };
 }
 
