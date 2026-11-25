@@ -20,13 +20,16 @@ A lane verifies on GitHub before it occupies `queue/main`:
   push, never `github.event.before` (which would make a second push to the
   same ref compare only the newest commits and could greenlight an untested
   diff).
-- `queue/` is untouched: `queue-guard` watches only `queue/main`, and
-  `promote-queue.mjs` reads runs whose `head_branch` starts with `queue/` —
-  a preflight run can never be promoted, deleted or counted as the live
-  candidate.
-- `scripts/ops/push-queue.mjs` refuses to push a head with no green
+- `queue/` is untouched during preflight: `speculative-queue.mjs` reads
+  `refs/heads/enqueue/*` and builds `refs/heads/queue/try/*` only after a head
+  is preflight-green — a `preflight/*` run can never be promoted or counted as a
+  live queue candidate.
+- `scripts/ops/push-queue.mjs` refuses to land a head with no green
   pre-flight evidence; local `pnpm prepush` / `pnpm test:changed` stay
-  recommended but are no longer the gate.
+  recommended but are no longer the gate. When the queue is empty and HEAD
+  contains `origin/main` with exact-SHA preflight checks, it fast-forwards
+  `main` in 0s; otherwise it enqueues `HEAD` into `refs/heads/enqueue/*` for
+  parallel `scripts/ops/speculative-queue.mjs` promotion.
 
 ## Gate predicate
 
