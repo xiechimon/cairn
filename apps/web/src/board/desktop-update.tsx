@@ -1,11 +1,15 @@
 import type { DesktopUpdateBlocker, DesktopUpdateState } from '@cairn/shared';
 import { cn } from 'cn';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
+import { toastError } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { desktopUpdates } from '../desktop-shell.js';
+import { EN } from '../i18n/en.js';
+import { activeLocale } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
-import type { TFunc } from '../i18n/translate.js';
+import { type TFunc, translate } from '../i18n/translate.js';
+import { safeLocalStorage } from '../safe-storage.js';
 
 export function canUpdateDesktop(): boolean {
   return desktopUpdates() !== null;
@@ -15,11 +19,42 @@ function installable(state: DesktopUpdateState | null): boolean {
   return state?.status === 'available' || state?.status === 'ready';
 }
 
+const REFUSAL_HINTS: Record<string, string> = {
+  'the staged update is not signed by the Cairn certificate': '更新包签名验证未通过，无法安装',
+  'the staged update is missing': '安装包已失效，请重新检查更新',
+  'another Cairn update is being installed': '另一个更新正在安装中，请稍候',
+  'no update is pending to install': '当前没有可安装的更新，请先检查更新',
+  'Update installation can only be started from the main Cairn window.':
+    '请在 Cairn 主窗口里安装更新',
+  'No update is ready to install yet.': '当前没有可安装的更新，请先检查更新',
+};
+
+export function updateInstallRefusalCopy(reason: string, t: TFunc): string {
+  const mapped = REFUSAL_HINTS[reason];
+  if (mapped !== undefined) return t(mapped);
+  return t('未能安装更新，点击重试');
+}
+
 export async function updateDesktopNow(): Promise<void> {
   const bridge = desktopUpdates();
   if (bridge === null) return;
-  if (!installable(await bridge.state())) await bridge.check();
-  if (installable(await bridge.state())) await bridge.install();
+  const t: TFunc = (source, vars) =>
+    translate(activeLocale(safeLocalStorage()), EN, source, vars);
+  try {
+    if (!installable(await bridge.state())) await bridge.check();
+    const current = await bridge.state();
+    if (!installable(current)) {
+      if (current !== null) toastError(desktopUpdateView(current, t).label, null);
+      return;
+    }
+    const result = await bridge.install();
+    if (result !== undefined && !result.ok) {
+      toastError(updateInstallRefusalCopy(result.reason, t), null);
+    }
+  } catch (error) {
+    const raw = error instanceof Error ? error.message : String(error);
+    toastError(updateInstallRefusalCopy(raw, t), null);
+  }
 }
 
 export interface DesktopUpdateSkewView {
@@ -279,11 +314,59 @@ export function DesktopUpdateButton({
 }) {
   const { t } = useI18n();
   const [bridge] = useState(desktopUpdates);
-  const state = useDesktopUpdateState();
+  const subscribedState = useDesktopUpdateState();
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const latestStatusRef = useRef(subscribedState.status);
+  latestStatusRef.current = subscribedState.status;
+
+  useEffect(() => {
+    setRefusal(null);
+  }, [subscribedState]);
+
+  const state: DesktopUpdateState =
+    refusal !== null &&
+    subscribedState.status !== 'error' &&
+    subscribedState.status !== 'offline' &&
+    subscribedState.status !== 'unsupported'
+      ? { status: 'error', message: refusal }
+      : subscribedState;
 
   if (bridge === null) return null;
 
   const { label, busy, mark } = desktopUpdateView(state, t);
+  const errorDetail = state.status === 'error' ? updateInstallRefusalCopy(state.message, t) : null;
+
+  const showRefusal = (reason: string): void => {
+    const current = latestStatusRef.current;
+    if (current !== 'error' && current !== 'offline' && current !== 'unsupported') {
+      setRefusal(reason);
+    }
+    toastError(updateInstallRefusalCopy(reason, t), null);
+  };
+
+  const handleClick = async (): Promise<void> => {
+    if (state.status === 'unsupported') {
+      toastError(label, null);
+      return;
+    }
+    if (busy) return;
+    if (state.status === 'available' || state.status === 'ready') {
+      try {
+        const result = await bridge.install();
+        if (result !== undefined && !result.ok) {
+          showRefusal(result.reason);
+        }
+      } catch (error) {
+        showRefusal(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
+    try {
+      await bridge.check();
+    } catch (error) {
+      showRefusal(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   return (
     <Tooltip>
@@ -298,19 +381,21 @@ export function DesktopUpdateButton({
             title={state.status === 'error' ? state.message : undefined}
             aria-disabled={busy || undefined}
             className={cn(idleClassName, busy && 'cursor-default')}
-            onClick={() => {
-              if (busy) return;
-              void (state.status === 'available' || state.status === 'ready'
-                ? bridge.install()
-                : bridge.check());
-            }}
+            onClick={() => void handleClick()}
           >
             <UpdateGlyph level={fillLevel(state)} mark={mark} className={iconClassName} />
           </Button>
         }
       />
       <TooltipContent side="top" sideOffset={6}>
-        {label}
+        {errorDetail !== null && errorDetail !== label ? (
+          <span className="flex flex-col gap-0.5">
+            <span>{label}</span>
+            <span className="text-caption opacity-80">{errorDetail}</span>
+          </span>
+        ) : (
+          label
+        )}
       </TooltipContent>
     </Tooltip>
   );

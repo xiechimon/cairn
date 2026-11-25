@@ -13,6 +13,16 @@ export function canInvokeHostIpc(
   return false;
 }
 
+export function canSwitchHost(
+  activeKind: 'local' | 'remote',
+  offline: boolean,
+  targetId: string,
+): boolean {
+  if (targetId === '') return false;
+  if (offline) return true;
+  return canInvokeHostIpc(activeKind, 'switch', targetId);
+}
+
 export async function probeRemoteReachable(url: string, timeoutMs = 5_000): Promise<void> {
   try {
     await fetch(url, {

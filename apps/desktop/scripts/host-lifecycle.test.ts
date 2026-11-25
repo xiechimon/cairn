@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { describe, expect, test } from 'vitest';
 import { LOCAL_CONNECTION_ID } from '../src/connections.js';
-import { canInvokeHostIpc, probeRemoteReachable } from '../src/host-lifecycle.js';
+import { canInvokeHostIpc, canSwitchHost, probeRemoteReachable } from '../src/host-lifecycle.js';
 
 describe('desktop host IPC boundary and reachability probe', () => {
   test('remote pages can only read host status or switch back to local', () => {
@@ -16,6 +16,11 @@ describe('desktop host IPC boundary and reachability probe', () => {
     expect(canInvokeHostIpc('local', 'remove-remote')).toBe(true);
     expect(canInvokeHostIpc('local', 'switch', 'remote-1')).toBe(true);
     expect(canInvokeHostIpc('local', 'set-resident')).toBe(true);
+
+    expect(canSwitchHost('remote', false, LOCAL_CONNECTION_ID)).toBe(true);
+    expect(canSwitchHost('remote', false, 'remote-2')).toBe(false);
+    expect(canSwitchHost('remote', true, 'remote-2')).toBe(true);
+    expect(canSwitchHost('remote', true, '')).toBe(false);
   });
 
   test('probeRemoteReachable accepts a reachable server even on 401 and rejects unreachable URLs', async () => {

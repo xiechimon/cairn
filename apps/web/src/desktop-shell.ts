@@ -17,6 +17,7 @@ import {
   type DesktopSubscriptionInput,
   type DesktopTrayOpen,
   type DesktopTrayState,
+  type DesktopUpdateInstallResult,
   type DesktopUpdateState,
   type DevinLocalStatus,
   type DevinLoginOutcome,
@@ -249,7 +250,7 @@ export function desktopCapabilityState(
 export interface DesktopUpdateBridge {
   state: () => Promise<DesktopUpdateState | null>;
   check: () => Promise<void>;
-  install: () => Promise<void>;
+  install: () => Promise<DesktopUpdateInstallResult | void>;
   rollbackNotice: () => Promise<DesktopRollbackNotice | null>;
   subscribe: (listener: (state: DesktopUpdateState) => void) => () => void;
   remoteState: () => Promise<RemoteVersionState | null>;

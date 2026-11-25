@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useLiveData } from '../api/provider.js';
 import { UpdateCairnNotice } from '../board/desktop-update.js';
 import { Button } from '../components/ui/button.js';
-import { ownComputerBridge, ownComputerCapabilityState } from '../desktop-shell.js';
+import { desktopHost, ownComputerBridge, ownComputerCapabilityState } from '../desktop-shell.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
@@ -73,7 +73,31 @@ export function useOwnComputerRow(machine: MachineRow): {
   const { live } = useLiveData();
   const shown = shouldShowOwnComputer(machine);
   const capability = live ? ownComputerCapabilityState() : 'allowed';
-  const bridge = live ? ownComputerBridge() : undefined;
+  const hostBridge = live ? desktopHost() : null;
+  const [hostLocal, setHostLocal] = useState<boolean | null>(() =>
+    hostBridge === null ? true : null,
+  );
+
+  useEffect(() => {
+    if (hostBridge === null) {
+      setHostLocal(true);
+      return;
+    }
+    let mounted = true;
+    void hostBridge.status().then(
+      (status) => {
+        if (mounted) setHostLocal(status === null || status.activeId === 'local');
+      },
+      () => {
+        if (mounted) setHostLocal(false);
+      },
+    );
+    return () => {
+      mounted = false;
+    };
+  }, [hostBridge]);
+
+  const bridge = live && hostLocal === true ? ownComputerBridge() : undefined;
   const [localPermissions, setLocalPermissions] = useState<HostPermissions | null>(null);
   const [checking, setChecking] = useState(false);
   const screen = machine.capabilities?.ownComputer === true;
@@ -152,7 +176,7 @@ export function useOwnComputerRow(machine: MachineRow): {
             message={t('更新 Cairn 后即可在这里授权并检查。')}
             buttonTestId="own-computer-update-cairn"
           />
-        ) : live && capability === 'hidden' ? null : (
+        ) : live && (capability === 'hidden' || (hostBridge !== null && hostLocal !== true)) ? null : (
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"

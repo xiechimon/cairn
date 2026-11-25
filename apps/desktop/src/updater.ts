@@ -195,12 +195,15 @@ export function createUpdater(
 
   async function install(): Promise<void> {
     const update = pending;
-    if (
-      update === null ||
-      busy() ||
-      current.status === 'ready' ||
-      signatureRefusedVersions.has(update.version)
-    ) {
+    if (busy() || current.status === 'ready') {
+      return;
+    }
+    if (update === null) {
+      set({ status: 'error', message: 'no update is pending to install' });
+      return;
+    }
+    if (signatureRefusedVersions.has(update.version)) {
+      set({ status: 'error', message: SIGNATURE_REFUSAL });
       return;
     }
     await stage(update);
@@ -218,6 +221,11 @@ export function createUpdater(
     const staged = stagedFor(state, app.getVersion());
     if (staged === null) {
       if (state.staged !== null) await discardStaged(state);
+      if (when === 'foreground') {
+        const message = 'the staged update is missing';
+        set({ status: 'error', message });
+        throw new Error(message);
+      }
       return;
     }
     if (current.status === 'restarting') return;
