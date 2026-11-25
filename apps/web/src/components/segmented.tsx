@@ -1,5 +1,12 @@
 import { cn } from 'cn';
-import { type KeyboardEvent, type ReactNode, useRef } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { IconTooltip } from './icon-tooltip.js';
 import { Button } from './ui/button.js';
 import { Tabs, TabsIndicator, TabsList, TabsTrigger } from './ui/tabs.js';
@@ -50,7 +57,10 @@ const OPTION_UNDER_PILL_CLS =
   'z-[1] data-active:bg-transparent data-active:shadow-none dark:data-active:bg-transparent group-data-[variant=default]/tabs-list:data-active:shadow-none';
 
 const PILL_CLS =
-  'pointer-events-none absolute top-(--active-tab-top) left-(--active-tab-left) z-0 h-(--active-tab-height) w-(--active-tab-width) rounded-(--cds-radius-sm) bg-(--seg-active) shadow-xs ring-1 ring-border [transition:left_var(--dur-fast)_ease,top_var(--dur-fast)_ease,width_var(--dur-fast)_ease,height_var(--dur-fast)_ease] motion-reduce:[transition:none]';
+  'pointer-events-none absolute top-(--active-tab-top) left-(--active-tab-left) z-0 h-(--active-tab-height) w-(--active-tab-width) rounded-(--cds-radius-sm) bg-(--seg-active) shadow-xs ring-1 ring-border [transition:left_var(--dur-overlay)_var(--ease-out-strong),top_var(--dur-overlay)_var(--ease-out-strong),width_var(--dur-overlay)_var(--ease-out-strong),height_var(--dur-overlay)_var(--ease-out-strong)] motion-reduce:[transition:none]';
+
+const RADIO_PILL_CLS =
+  'pointer-events-none absolute top-0 left-0 z-0 rounded-(--cds-radius-sm) bg-(--seg-active) shadow-xs ring-1 ring-border transition-[transform,width] duration-(--dur-overlay) ease-(--ease-out-strong) motion-reduce:transition-none';
 
 function optionClass(option: SegmentedOption<string>) {
   return cn(OPTION_CLS, option.label === undefined && OPTION_ICON_CLS, OPTION_SELECTED_CLS);
@@ -72,8 +82,8 @@ export function SegmentedTabs<T extends string>({
   label,
   className,
   optionHandle,
-  slide = false,
   quiet = false,
+  slide = !quiet,
   onPick,
 }: SegmentedProps<T> & {
   label?: string;
@@ -81,14 +91,15 @@ export function SegmentedTabs<T extends string>({
   quiet?: boolean;
   onPick?: (picked: T) => void;
 }) {
+  const sliding = slide && !quiet;
   return (
     <Tabs className="contents" value={value} onValueChange={(next: unknown) => onChange(next as T)}>
       <TabsList
         aria-label={label}
         data-segmented="track"
-        className={cn(quiet ? QUIET_TRACK_CLS : TRACK_CLS, slide && 'relative', className)}
+        className={cn(quiet ? QUIET_TRACK_CLS : TRACK_CLS, sliding && 'relative', className)}
       >
-        {slide && <TabsIndicator data-segmented="indicator" className={PILL_CLS} />}
+        {sliding && <TabsIndicator data-segmented="indicator" className={PILL_CLS} />}
         {options.map((option) => (
           <TabsTrigger
             key={option.value}
@@ -101,7 +112,7 @@ export function SegmentedTabs<T extends string>({
             {...option.data}
             className={cn(
               optionClass(option),
-              quiet ? QUIET_OPTION_CLS : slide ? OPTION_UNDER_PILL_CLS : OPTION_SELECTED_FACE_CLS,
+              quiet ? QUIET_OPTION_CLS : sliding ? OPTION_UNDER_PILL_CLS : OPTION_SELECTED_FACE_CLS,
               optionHandle,
             )}
           >
@@ -123,10 +134,56 @@ export function SegmentedRadio<T extends string>({
 }: SegmentedProps<T> & {
   label: string;
 }) {
+  const trackRef = useRef<HTMLDivElement>(null);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const mounted = useRef(false);
+  const [pill, setPill] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+    animate: boolean;
+  } | null>(null);
   const enabled = options.flatMap((option, index) => (option.disabled === true ? [] : [index]));
   const checkedIndex = options.findIndex((option) => option.value === value);
   const tabStop = checkedIndex >= 0 ? checkedIndex : (enabled[0] ?? -1);
+  const measure = useCallback(
+    (animate: boolean) => {
+      const target = checkedIndex >= 0 ? refs.current[checkedIndex] : null;
+      if (target == null || target.offsetWidth === 0 || target.offsetHeight === 0) {
+        setPill(null);
+        return;
+      }
+      const next = {
+        left: target.offsetLeft,
+        top: target.offsetTop,
+        width: target.offsetWidth,
+        height: target.offsetHeight,
+        animate,
+      };
+      setPill((prev) =>
+        prev !== null &&
+        prev.left === next.left &&
+        prev.top === next.top &&
+        prev.width === next.width &&
+        prev.height === next.height
+          ? prev
+          : next,
+      );
+    },
+    [checkedIndex],
+  );
+  useLayoutEffect(() => {
+    measure(mounted.current);
+    mounted.current = true;
+  }, [measure, options]);
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (track == null) return;
+    const observer = new ResizeObserver(() => measure(false));
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, [measure]);
   const move = (event: KeyboardEvent, index: number) => {
     const last = enabled.length - 1;
     const at = enabled.indexOf(index);
@@ -149,11 +206,25 @@ export function SegmentedRadio<T extends string>({
   };
   return (
     <div
+      ref={trackRef}
       role="radiogroup"
       aria-label={label}
       data-segmented="track"
-      className={cn(TRACK_CLS, className)}
+      className={cn(TRACK_CLS, 'relative', className)}
     >
+      {pill !== null && (
+        <span
+          aria-hidden="true"
+          data-segmented="indicator"
+          style={{
+            width: `${pill.width}px`,
+            height: `${pill.height}px`,
+            transform: `translate3d(${pill.left}px, ${pill.top}px, 0)`,
+            ...(pill.animate ? {} : { transition: 'none' }),
+          }}
+          className={RADIO_PILL_CLS}
+        />
+      )}
       {options.map((option, index) => {
         const checked = option.value === value;
         const button = (
@@ -175,7 +246,7 @@ export function SegmentedRadio<T extends string>({
             className={cn(
               optionClass(option),
               RADIO_BUTTON_NEUTRAL_CLS,
-              OPTION_SELECTED_FACE_CLS,
+              pill !== null ? OPTION_UNDER_PILL_CLS : OPTION_SELECTED_FACE_CLS,
               optionHandle,
             )}
             onClick={() => onChange(option.value)}

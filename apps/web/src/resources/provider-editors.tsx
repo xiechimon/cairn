@@ -251,7 +251,7 @@ export function CheckResultPopover({
         }
         className="w-96 max-w-[calc(100vw-24px)] gap-2 p-3"
       >
-        <div role="status" className="flex flex-col gap-2">
+        <div key={`${tone}:${phase ?? ''}`} role="status" className="text-swap flex flex-col gap-2">
           <span
             className={cn(
               'flex items-start gap-1.5 text-ui font-medium',

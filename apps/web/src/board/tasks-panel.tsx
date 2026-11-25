@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { questionDockState } from '../chief/question-dock-state.js';
-import { useArrivals } from '../components/growth.js';
+import { RollNumber, useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
@@ -163,13 +163,16 @@ function SelectionBar({
     onClear();
   };
   const running = todos.some((todo) => todo.phase !== 'todo' && todo.phase !== 'review');
+  const selectedParts = t('已选 {n} 个', { n: '__COUNT__' }).split('__COUNT__');
   return (
     <div
       data-slot="tasks-selection-bar"
-      className="sticky bottom-2 z-10 mx-auto mt-auto flex h-11 w-fit items-center rounded-xl bg-foreground px-1.5 text-ui text-background shadow-(--e3)"
+      className="dock-enter sticky bottom-2 z-10 mx-auto mt-auto flex h-11 w-fit items-center rounded-xl bg-foreground px-1.5 text-ui text-background shadow-(--e3)"
     >
       <span className="px-3 text-background/60 tabular-nums">
-        {t('已选 {n} 个', { n: todos.length })}
+        {selectedParts[0]}
+        <RollNumber value={todos.length} />
+        {selectedParts[1] ?? ''}
       </span>
       <span aria-hidden className="h-5 w-px bg-background/20" />
       <Button

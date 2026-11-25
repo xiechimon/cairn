@@ -1,7 +1,8 @@
 import { cn } from 'cn';
 import { ChevronRight } from 'lucide-react';
-import { type ComponentProps, type ReactNode, useEffect, useState } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import type { TFunc } from '../../i18n/translate.js';
+import { Disclosure } from '../disclosure.js';
 import { Button } from '../ui/button.js';
 
 export interface TraceCounts {
@@ -87,7 +88,10 @@ export function TraceChevron({ open }: { open: boolean }) {
     <ChevronRight
       aria-hidden="true"
       data-trace-triangle={open ? 'open' : 'closed'}
-      className={cn('size-4 flex-none text-(--text-tertiary)', open && 'rotate-90')}
+      className={cn(
+        'size-4 flex-none text-(--text-tertiary) transition-transform duration-(--dur-fast) ease-(--ease-out-strong) motion-reduce:transition-none',
+        open && 'rotate-90',
+      )}
     />
   );
 }
@@ -162,27 +166,11 @@ export function TraceGroupSummary({
   );
 }
 
-const TRACE_COLLAPSE_MS = 200;
-
 export function TraceCollapse({ open, children }: { open: boolean; children: ReactNode }) {
-  const [mounted, setMounted] = useState(open);
-  if (open && !mounted) setMounted(true);
-  useEffect(() => {
-    if (open) return;
-    const id = setTimeout(() => setMounted(false), TRACE_COLLAPSE_MS);
-    return () => clearTimeout(id);
-  }, [open]);
   return (
-    <div
-      data-trace-collapse={open ? 'open' : 'closed'}
-      inert={!open}
-      className={cn(
-        'grid transition-[grid-template-rows,opacity] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
-        open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
-      )}
-    >
-      <div className="min-h-0 overflow-hidden">{mounted && children}</div>
-    </div>
+    <Disclosure open={open} dataAttr={{ 'data-trace-collapse': open ? 'open' : 'closed' }}>
+      {children}
+    </Disclosure>
   );
 }
 

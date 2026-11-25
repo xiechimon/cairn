@@ -2,6 +2,7 @@ import { ArrowUp, Check, Clock, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useI18n } from '../i18n/provider.js';
+import { useArrivals } from './growth.js';
 import { IconTooltip } from './icon-tooltip.js';
 import { Button } from './ui/button.js';
 import { Input } from './ui/input.js';
@@ -52,6 +53,7 @@ export function QueuedCapsules({
   useEffect(() => {
     if (editingGone) keepAfterSent(draft.trim());
   });
+  const arrived = useArrivals(messages.map((message) => message.id));
   if (messages.length === 0) return null;
   const startEdit = (message: QueuedCapsule) => {
     setDraft(message.content);
@@ -165,7 +167,7 @@ export function QueuedCapsules({
             data-testid="queued-message"
             data-state={failed ? 'failed' : 'queued'}
             title={message.note ?? message.label ?? message.content}
-            className={`${CAPSULE_CLS} ${failed ? CAPSULE_FAILED_CLS : CAPSULE_QUEUED_CLS}`}
+            className={`${CAPSULE_CLS} ${failed ? CAPSULE_FAILED_CLS : CAPSULE_QUEUED_CLS} ${arrived.has(message.id) ? 'grow-enter' : ''}`}
           >
             <Clock
               className={`size-4 flex-none ${failed ? 'text-destructive' : 'text-content-tertiary'}`}

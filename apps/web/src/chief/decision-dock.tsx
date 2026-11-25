@@ -146,11 +146,17 @@ function CheckBox({ on }: { on: boolean }) {
       aria-hidden
       data-slot="dock-check"
       className={cn(
-        'm-1 grid size-4 place-items-center rounded-sm',
+        'm-1 grid size-4 place-items-center rounded-sm transition-colors duration-(--dur-fast) ease-(--ease-out-strong) motion-reduce:transition-none',
         on ? 'bg-primary text-primary-foreground' : 'shadow-[inset_0_0_0_1.5px_var(--input)]',
       )}
     >
-      {on && <Check strokeWidth={1.75} className="size-4" />}
+      <Check
+        strokeWidth={1.75}
+        className={cn(
+          'size-4 transition-[opacity,transform] duration-(--dur-fast) ease-(--ease-out-strong) motion-reduce:transition-none',
+          on ? 'scale-100 opacity-100' : 'scale-50 opacity-0',
+        )}
+      />
     </span>
   );
 }

@@ -162,7 +162,7 @@ export function SettingsTabStrip({
             aria-description={item.note}
             aria-current={current === item.id ? 'page' : undefined}
             className={cn(
-              'flex h-7.75 flex-none items-center gap-1.5 rounded-(--radius-control) px-2.5 text-ui whitespace-nowrap text-foreground no-underline outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'flex h-7.75 flex-none items-center gap-1.5 rounded-(--radius-control) px-2.5 text-ui whitespace-nowrap text-foreground no-underline outline-none transition-colors duration-(--dur-fast) ease-(--ease-standard) motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring',
               current === item.id ? 'bg-(--sidebar-active)' : 'hover:bg-sidebar-hover',
             )}
           >

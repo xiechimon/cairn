@@ -28,6 +28,7 @@ import { useRemoteRoutes } from '../api/hooks.js';
 import { CoordinatorGlyph } from '../chief/chief-status-mark.js';
 import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
+import { Disclosure } from '../components/disclosure.js';
 import { FeedbackDialog } from '../components/feedback-dialog.js';
 import { createdHere, useArrivals } from '../components/growth.js';
 import { InfoTip } from '../components/info-tip.js';
@@ -582,7 +583,7 @@ export function BoardSidebar({
                 : !groupsCollapsed.has(previous.name) && previous.projects.length > 0;
             const groupWaiting = group.projects.some((row) => waiting.has(row.id));
             return (
-              <div key={group.name} className="flex flex-col gap-0.5">
+              <div key={group.name} className="flex flex-col">
                 <GroupHeaderItem
                   name={group.name}
                   expanded={expanded}
@@ -592,7 +593,9 @@ export function BoardSidebar({
                   onToggle={() => toggleGroup(group.name)}
                   actions={actions}
                 />
-                {expanded && projectRows(group.projects)}
+                <Disclosure open={expanded} contentClassName="flex flex-col gap-0.5 pt-0.5">
+                  {projectRows(group.projects)}
+                </Disclosure>
               </div>
             );
           })}

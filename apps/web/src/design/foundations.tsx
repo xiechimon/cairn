@@ -171,8 +171,8 @@ const RADII = [
 
 const MOTION = [
   { name: 'Hover and press', dur: '--dur-fast', ease: '--ease-standard' },
-  { name: 'Dialog opens', dur: '--dur-overlay', ease: '--ease-standard' },
-  { name: 'Card lifts', dur: null, ease: '--ease-out-expo' },
+  { name: 'Dialog, disclosure, slide', dur: '--dur-overlay', ease: '--ease-out-strong' },
+  { name: 'Popovers, tooltips, menus', dur: null, ease: '--ease-out-expo' },
 ];
 
 const ELEVATIONS = [

@@ -4,17 +4,15 @@ The stone is quiet. Motion only says where a surface came from or that something
 
 | Kind | Surface | Duration | Easing | Animated properties |
 |---|---|---|---|---|
-| Micro-interaction | Hover and press tint on rows, cards and buttons; segmented controls; disclosure chevrons | 150ms (`--dur-fast`) | `--ease-standard` (same as tw `ease-out`) | `background-color` / `color` / `box-shadow` / `transform` |
+| Micro-interaction | Hover and press tint on rows, cards and buttons; segmented controls & phone tabs glide indicator; disclosure chevrons | 150ms–200ms (`--dur-fast` / `--dur-overlay`) | `--ease-standard` / `--ease-out-strong` | `background-color` / `color` / `box-shadow` / `transform` |
 | Micro-interaction | Press on a labelled `Button` (default / secondary / outline / destructive): instant tint plus a scale dip to 0.97 from the centre, out and back | 150ms (`--dur-fast`) | `--ease-out-strong` | `scale`; no scale under reduced motion or a coarse pointer; icon buttons, links, ghost rows and disabled buttons never move |
 | Micro-interaction | Task card hover lift and shadow | 200ms | `--ease-out-expo` | `box-shadow` / `translate` |
-| Overlay | Dialog, confirmation surface | 200ms in and out (`--dur-overlay` / `duration-200`) | Default tw `ease` | `opacity` + `scale(.95→1)` |
+| Overlay | Dialog, confirmation surface | 200ms in (`--dur-overlay`), 150ms out (`--dur-fast`) | `--ease-out-strong` | `opacity` + `scale(.98→1 in, 1→.99 out)` |
 | Overlay | ⌘K search panel | 100ms in and out (`duration-100`) | `--ease-out-expo` | `opacity` + `scale(.98→1)` |
-| Overlay | Menu | 100ms in, no exit | `--ease-out-expo` | `opacity` + `scale(.95→1)` + 8px offset |
-| Overlay | Popover, Select | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
-| Overlay | Tooltip | 150ms in (tw-animate default), no exit | Default tw `ease` | `opacity` + `scale(.95→1)` + 8px offset |
-| Overlay | Inline popovers (mention, slash, chip) | 100ms in, no exit | Default tw `ease` | `opacity` + `scale(.98→1)` |
-| Overlay | Side panel floating over the scrim (1100px and below) | 220ms in, scrim 200ms | `--ease-standard` | `opacity` + `translate(12px→0)` |
-| Overlay | Jump-to-latest button in the transcript | 200ms in, 150ms out (`--dur-fast`) | tw arbitrary ease in and out | `opacity` + `scale` + `translate` |
+| Overlay | Anchored popovers, menus, selects, inline popovers, tooltips | 100ms in, no exit | `--ease-out-expo` | `opacity` + `scale(.97→1)` from `var(--transform-origin)` + 4px side offset |
+| Overlay | Side panel floating over the scrim (1100px and below) and mobile drawer | 220ms float / 260ms drawer, scrim 200ms (`--dur-overlay`) | `--ease-out-strong` | `opacity` + `translate(20px→0)` |
+| Overlay | Disclosures (`Disclosure` grid expand/collapse across sidebar groups, trace, PR, approval, failure, provider cards) | 200ms in/out (`--dur-overlay`) | `--ease-out-strong` | `grid-template-rows` + `opacity` |
+| Overlay | Jump-to-latest button in the transcript | 160ms in (`--ease-out-expo`), no delay out | `--ease-out-expo` | `opacity` + `scale` + `translate` |
 | Loop | Running task card footer and the busy Coordinator: the spiral mark spins | 2.4s per turn | `linear` | `transform: rotate`; static under reduced motion |
 | Loop | `RingSpinner` (ring-spinner.tsx): the loading.dev Ring — a 20%-opacity track with a 16-unit arc on a 62.8 circumference, round cap — spins inside busy buttons and inline loading rows | 800ms per turn (`--dur-spin`) | `linear` | `transform: rotate`; static under reduced motion |
 | Entrance | First-run setup: the greeting, rail, segments, spiral and the settings section each rise 12px, unblur 4px and fade in, staggered 100ms with delays capped at 200ms so the entrance finishes in about 600ms | 400ms per block (`--dur-enter`) | `--ease-out-strong` | `opacity` / `translate(12px→0)` / `blur(4px→0)`; none under reduced motion |

@@ -1,8 +1,10 @@
 import { cn } from 'cn';
 import { ChevronDown, Clock, GitMerge, GitPullRequest, GitPullRequestClosed } from 'lucide-react';
+import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible.js';
+import { Disclosure } from '../disclosure.js';
+import { Collapsible, CollapsibleTrigger } from '../ui/collapsible.js';
 import { isVerdictStale, type PrCardModel, type PrCardResult } from './pr-card-model.js';
 import { PrLink } from './pr-link.js';
 import { PrRowMenu } from './pr-row-menu.js';
@@ -194,6 +196,7 @@ function Details({ pr }: { pr: PrCardModel }) {
 export function PrCard(props: PrCardProps) {
   const { pr, className, githubHref, onViewDiff, onResolve, readOnly } = props;
   const { t } = useI18n();
+  const [open, setOpen] = useState(false);
   const pill = pillOf(pr, t);
   const needsResolve =
     readOnly !== true &&
@@ -205,7 +208,7 @@ export function PrCard(props: PrCardProps) {
       data-stale={isVerdictStale(pr) ? '' : undefined}
       className={cn('@container/pr min-w-0 rounded-(--radius-control) py-1.5 pr-1 pl-2', className)}
     >
-      <Collapsible className="group/details">
+      <Collapsible open={open} onOpenChange={setOpen} className="group/details">
         <div data-slot="pr-card-row" className="flex items-center gap-2">
           {stateIcon(pr)}
           <div className="flex min-w-0 flex-1 items-center gap-1.5 text-meta text-content-secondary">
@@ -234,7 +237,7 @@ export function PrCard(props: PrCardProps) {
           </div>
           <CollapsibleTrigger
             aria-label={t('详情')}
-            className="inline-flex size-6 flex-none items-center justify-center rounded-md text-content-tertiary outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="inline-flex size-6 flex-none items-center justify-center rounded-md text-content-tertiary transition-colors duration-(--dur-fast) outline-none hover:text-content-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <ChevronDown className="size-4 group-data-[open]/details:rotate-180" />
           </CollapsibleTrigger>
@@ -256,9 +259,9 @@ export function PrCard(props: PrCardProps) {
             {t('{n} 分钟前读取，GitHub 可能被限流或延迟', { n: pr.readAgoMinutes })}
           </p>
         )}
-        <CollapsibleContent>
+        <Disclosure open={open}>
           <Details pr={pr} />
-        </CollapsibleContent>
+        </Disclosure>
       </Collapsible>
     </article>
   );

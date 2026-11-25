@@ -32,7 +32,7 @@ const ARROW = ['M12 8v8', 'm8 12 4 4 4-4'];
 const FILL_TOP = 2;
 const FILL_SPAN = 20;
 const WATERLINE =
-  'fill-(--mask-keep) transition-transform duration-200 ease-out motion-reduce:transition-none';
+  'fill-(--mask-keep) transition-transform duration-(--dur-overlay) ease-(--ease-out-strong) motion-reduce:transition-none';
 
 type UpdateMark = 'waiting' | 'failed' | null;
 

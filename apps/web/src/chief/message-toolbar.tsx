@@ -1,6 +1,13 @@
 import { cn } from 'cn';
-import { Ellipsis, Undo } from 'lucide-react';
-import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
+import { Check, Ellipsis, Undo } from 'lucide-react';
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { flushSync } from 'react-dom';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
@@ -18,7 +25,7 @@ const TOOL_BTN_CLS =
 const TOOLS_CLS = 'flex flex-none items-center';
 
 const HOVER_REVEAL =
-  'pointer-events-none opacity-0 group-hover/reply-block:pointer-events-auto group-hover/reply-block:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[aria-expanded=true]]:pointer-events-auto has-[[aria-expanded=true]]:opacity-100 pointer-coarse:hidden';
+  'pointer-events-none opacity-0 transition-opacity duration-(--dur-fast) ease-(--ease-standard) group-hover/reply-block:pointer-events-auto group-hover/reply-block:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[aria-expanded=true]]:pointer-events-auto has-[[aria-expanded=true]]:opacity-100 motion-reduce:transition-none pointer-coarse:hidden';
 
 const TOUCH_REVEAL = 'pointer-coarse:group-data-[tools-open]/message:flex';
 
@@ -150,8 +157,18 @@ export function MessageToolbar({
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement | null>(null);
   const armed = useArmed(ref);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   useKeepInside(ref, placement);
   const hasMenu = onWithdraw !== undefined || onRewind !== undefined;
+  const handleCopy = () => {
+    onCopy();
+    setCopied(true);
+  };
   const pill = !armed ? (
     <div className={TOOLS_CLS} data-slot="message-toolbar-tools" data-unarmed>
       <PlainButton
@@ -182,7 +199,7 @@ export function MessageToolbar({
   ) : (
     <div className={TOOLS_CLS} data-slot="message-toolbar-tools">
       <IconTooltip
-        label={t('复制')}
+        label={copied ? t('已复制') : t('复制')}
         trigger={
           <Button
             variant="ghost"
@@ -190,11 +207,31 @@ export function MessageToolbar({
             className={TOOL_BTN_CLS}
             data-testid="chief-msg-copy"
             data-tool="copy"
-            onClick={onCopy}
+            data-copied={copied ? '' : undefined}
+            onClick={handleCopy}
           />
         }
       >
-        <Copy width={20} height={20} />
+        <span className="relative inline-grid place-items-center" aria-hidden="true">
+          <span
+            data-slot="copy-icon"
+            className={cn(
+              'col-start-1 row-start-1 grid place-items-center transition-[opacity,scale] duration-(--dur-fast) ease-(--ease-out-strong) motion-reduce:transition-none',
+              copied ? 'scale-50 opacity-0' : 'scale-100 opacity-100',
+            )}
+          >
+            <Copy width={20} height={20} />
+          </span>
+          <span
+            data-slot="check-icon"
+            className={cn(
+              'check-scale col-start-1 row-start-1 grid place-items-center',
+              copied ? 'scale-100 opacity-100' : 'scale-50 opacity-0',
+            )}
+          >
+            <Check width={20} height={20} />
+          </span>
+        </span>
       </IconTooltip>
       {hasMenu && (
         <DropdownMenu>

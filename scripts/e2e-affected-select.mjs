@@ -221,6 +221,7 @@ export const SHARED_SURFACE_ONLY = [
   'button-press',
   'button-press-contrast',
   'color-freeze',
+  'fluid-motion',
   'fixture-mode-chip',
   'orientation-variants',
   'shared-controls-a11y',

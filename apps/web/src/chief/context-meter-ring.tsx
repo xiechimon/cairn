@@ -246,14 +246,14 @@ export function ContextMeterPanel({
       </div>
       <div
         aria-hidden="true"
-        className="relative mt-1.5 mb-2 h-1.5 rounded-full bg-(--menu-hover) shadow-[inset_0_0_0_1px_var(--border)]"
+        className="relative mt-1.5 mb-2 h-1.5 overflow-hidden rounded-full bg-(--menu-hover) shadow-[inset_0_0_0_1px_var(--border)]"
       >
         <div
           className={cn(
-            'absolute inset-y-0 left-0 rounded-full',
+            'absolute inset-y-0 left-0 w-full origin-left rounded-full transition-transform duration-(--dur-enter) ease-(--ease-out-strong) motion-reduce:transition-none',
             near ? 'bg-foreground' : 'bg-content-tertiary',
           )}
-          style={{ width: `${fill}%` }}
+          style={{ transform: `scaleX(${fill / 100})` }}
         />
         {tick !== null && (
           <div

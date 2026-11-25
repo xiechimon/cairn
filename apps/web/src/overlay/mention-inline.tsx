@@ -63,7 +63,7 @@ export function MentionInline({
     <div
       ref={listboxRef}
       id={listboxId}
-      className={`${INLINE_PANEL_CLS} duration-100 ease-out animate-in fade-in-0 zoom-in-98`}
+      className={`${INLINE_PANEL_CLS} origin-bottom-left duration-100 ease-(--ease-out-expo) animate-in fade-in-0 zoom-in-98`}
       role="listbox"
       aria-label={t('提及')}
       data-caret={caret ?? ''}

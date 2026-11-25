@@ -209,7 +209,7 @@ export function TaskRow({
       {menu != null && (
         <div
           data-slot="task-row-menu"
-          className="absolute top-3 right-2 opacity-0 group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 pointer-coarse:top-0.5 pointer-coarse:right-0 pointer-coarse:opacity-100"
+          className="absolute top-3 right-2 opacity-0 transition-opacity duration-(--dur-fast) ease-(--ease-standard) group-focus-within/task:opacity-100 group-hover/task:opacity-100 has-aria-expanded:opacity-100 motion-reduce:transition-none pointer-coarse:top-0.5 pointer-coarse:right-0 pointer-coarse:opacity-100"
         >
           {menu}
         </div>

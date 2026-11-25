@@ -51,7 +51,9 @@ export function CopyIconButton({
   };
   return (
     <IconTooltip
-      label={copied && copiedLabel !== undefined ? copiedLabel : (label ?? t('复制'))}
+      label={
+        copied ? (copiedLabel ?? (label === undefined ? t('已复制') : label)) : (label ?? t('复制'))
+      }
       side={side}
       trigger={
         <Button
@@ -65,9 +67,26 @@ export function CopyIconButton({
         />
       }
     >
-      {copied
-        ? (icons?.copied ?? <Check className="size-4" />)
-        : (icons?.copy ?? <Copy className="size-4" />)}
+      <span className="relative inline-grid place-items-center" aria-hidden="true">
+        <span
+          data-slot="copy-icon"
+          className={cn(
+            'col-start-1 row-start-1 grid place-items-center transition-[opacity,scale] duration-(--dur-fast) ease-(--ease-out-strong) motion-reduce:transition-none',
+            copied ? 'scale-50 opacity-0' : 'scale-100 opacity-100',
+          )}
+        >
+          {icons?.copy ?? <Copy className="size-4" />}
+        </span>
+        <span
+          data-slot="check-icon"
+          className={cn(
+            'check-scale col-start-1 row-start-1 grid place-items-center',
+            copied ? 'scale-100 opacity-100' : 'scale-50 opacity-0',
+          )}
+        >
+          {icons?.copied ?? <Check className="size-4" />}
+        </span>
+      </span>
     </IconTooltip>
   );
 }

@@ -295,7 +295,7 @@ export function AppSidebar({
                 const target = event.target as Element;
                 if (target.closest(DRAWER_NAV_TARGETS) != null) closeDrawer();
               }}
-              className="app-drawer top-0 left-0 flex h-full w-[85vw] max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-(--sidebar-surface) p-0 ring-0 duration-200 ease-(--ease-standard) sm:max-w-[85vw] data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100 [&>.board-sidebar]:w-full"
+              className="app-drawer top-0 left-0 flex h-full w-[85vw] max-w-[85vw] translate-x-0 translate-y-0 gap-0 rounded-none bg-(--sidebar-surface) p-0 ring-0 duration-(--dur-overlay) ease-(--ease-out-strong) sm:max-w-[85vw] data-open:slide-in-from-left data-open:zoom-in-100 data-closed:duration-(--dur-fast) data-closed:slide-out-to-left data-closed:zoom-out-100 [&>.board-sidebar]:w-full"
             >
               <DialogTitle className="sr-only">{t('侧边栏')}</DialogTitle>
               <BoardSidebar

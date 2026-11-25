@@ -1,7 +1,9 @@
-import { ChevronDown, ChevronUp, CircleAlert, Clock, Copy } from 'lucide-react';
+import { cn } from 'cn';
+import { ChevronDown, CircleAlert, Clock, Copy } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { copyTextWithFeedback } from '../../lib/clipboard.js';
+import { Disclosure } from '../disclosure.js';
 import { Button } from '../ui/button.js';
 import { DialogShell } from '../ui/dialog-shell.js';
 import { Marker, MarkerContent, MarkerIcon } from '../ui/marker.js';
@@ -35,7 +37,13 @@ export function FailureDetailToggle({
       onClick={onToggle}
     >
       {t('详情')}
-      {open ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
+      <ChevronDown
+        aria-hidden="true"
+        className={cn(
+          'transition-transform duration-(--dur-fast) ease-(--ease-out-strong) motion-reduce:transition-none',
+          open && 'rotate-180',
+        )}
+      />
     </Button>
   );
 }
@@ -116,8 +124,10 @@ export function FailureMarker({
           />
         )}
       </Marker>
-      {detail !== undefined && open && (
-        <RawError id={detailId} text={detail.raw} lines={detail.lines} testId="fail-raw-error" />
+      {detail !== undefined && (
+        <Disclosure open={open}>
+          <RawError id={detailId} text={detail.raw} lines={detail.lines} testId="fail-raw-error" />
+        </Disclosure>
       )}
     </div>
   );

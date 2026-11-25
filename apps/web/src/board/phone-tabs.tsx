@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { ListChecks, MessageCircle, PackageCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
+import { RollNumber } from '../components/growth.js';
 import { useI18n } from '../i18n/provider.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { PANE_PARAM, TASKS_TAB_PARAM, type WorkPane } from './work-panel.js';
@@ -15,11 +16,11 @@ export function NeedsYouCount({ count, className }: { count: number; className?:
     <span
       data-testid="tasks-badge"
       className={cn(
-        'absolute grid h-4.5 min-w-4.5 place-items-center rounded-full bg-(--count-badge) px-1 text-caption leading-none font-semibold tabular-nums text-(--count-badge-ink) ring-2 ring-popover',
+        'absolute grid h-4.5 min-w-4.5 place-items-center overflow-hidden rounded-full bg-(--count-badge) px-1 text-caption leading-none font-semibold tabular-nums text-(--count-badge-ink) ring-2 ring-popover',
         className,
       )}
     >
-      {count}
+      <RollNumber value={count} />
     </span>
   );
 }
@@ -39,8 +40,8 @@ function TabLink({
       replace
       aria-current={current ? 'page' : undefined}
       className={cn(
-        'flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full text-caption text-content-secondary no-underline outline-none focus-visible:ring-2 focus-visible:ring-(--focus-ring)',
-        current && 'bg-(--hover-1) font-semibold text-foreground',
+        'relative z-1 flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full text-caption text-content-secondary no-underline transition-colors duration-(--dur-fast) outline-none focus-visible:ring-2 focus-visible:ring-(--focus-ring)',
+        current && 'font-semibold text-foreground',
       )}
     >
       {children}
@@ -59,6 +60,7 @@ export function PhoneTabs({
 }) {
   const { t } = useI18n();
   const { search } = useLocation();
+  const activeIndex = pane === 'tasks' ? 1 : pane === 'made' ? 2 : 0;
   const withPane = (next: WorkPane | null) => {
     const params = new URLSearchParams(search);
     params.delete(THREAD_PARAM);
@@ -79,9 +81,18 @@ export function PhoneTabs({
         aria-label={t('对话、任务和成果')}
         className={cn(
           NARROW_FLOAT_CLS,
-          'flex h-16.5 max-w-82.5 min-w-0 flex-1 rounded-full p-1.25',
+          'relative flex h-16.5 max-w-82.5 min-w-0 flex-1 rounded-full p-1.25',
         )}
       >
+        <span
+          aria-hidden="true"
+          data-slot="phone-tabs-indicator"
+          style={{
+            width: 'calc((100% - 10px) / 3)',
+            transform: `translateX(${activeIndex * 100}%)`,
+          }}
+          className="pointer-events-none absolute inset-y-1.25 left-1.25 z-0 rounded-full bg-(--hover-1) transition-transform duration-(--dur-overlay) ease-(--ease-out-strong) motion-reduce:transition-none"
+        />
         <TabLink search={withPane(null)} current={pane === null}>
           <MessageCircle aria-hidden className={NARROW_ICON_CLS} strokeWidth={1.75} />
           {t('对话')}

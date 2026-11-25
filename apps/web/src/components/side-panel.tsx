@@ -6,6 +6,7 @@ import {
   type PointerEvent,
   type ReactNode,
   type Ref,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -76,19 +77,53 @@ function useViewportWidth(): number {
 
 function ResizeHandle({
   width,
-  onPreview,
+  panelRef,
 }: {
   width: number;
-  onPreview: (next: number | null) => void;
+  panelRef: { current: HTMLElement | null };
 }) {
   const { t } = useI18n();
   const drag = useRef<Drag | null>(null);
+  const handleRef = useRef<HTMLHRElement | null>(null);
   const [tip, setTip] = useState(false);
+  const setLiveWidth = (next: number | null) => {
+    const panel = panelRef.current;
+    if (panel == null) return;
+    if (next === null) delete panel.dataset.resizing;
+    else panel.dataset.resizing = '';
+    const shown = next === null ? width : clampPanelWidth(next, viewportWidth());
+    panel.style.setProperty('--side-panel-w', `${shown}px`);
+    handleRef.current?.setAttribute('aria-valuenow', String(shown));
+  };
+  const setDragCursor = (active: boolean) => {
+    document.documentElement.classList.toggle('select-none', active);
+    document.documentElement.classList.toggle('cursor-col-resize', active);
+  };
+  useEffect(() => {
+    const onWindowResize = () => {
+      if (drag.current === null) return;
+      const panel = panelRef.current;
+      if (panel == null) return;
+      const shown = clampPanelWidth(drag.current.to, viewportWidth());
+      panel.style.setProperty('--side-panel-w', `${shown}px`);
+      handleRef.current?.setAttribute('aria-valuenow', String(shown));
+    };
+    window.addEventListener('resize', onWindowResize);
+    return () => {
+      window.removeEventListener('resize', onWindowResize);
+      if (drag.current !== null) {
+        drag.current = null;
+        setDragCursor(false);
+      }
+    };
+  }, [panelRef]);
   const onPointerDown = (event: PointerEvent<HTMLHRElement>) => {
     if (event.button !== 0 || drag.current !== null) return;
     setTip(false);
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    setDragCursor(true);
+    setLiveWidth(width);
     drag.current = { pointerId: event.pointerId, x: event.clientX, width, moved: false, to: width };
   };
   const onPointerMove = (event: PointerEvent<HTMLHRElement>) => {
@@ -99,29 +134,38 @@ function ResizeHandle({
       drag.current.width + drag.current.x - event.clientX,
       viewportWidth(),
     );
-    onPreview(drag.current.to);
+    setLiveWidth(drag.current.to);
   };
   const onPointerUp = (event: PointerEvent<HTMLHRElement>) => {
     if (drag.current?.pointerId !== event.pointerId) return;
     const ended = drag.current;
     drag.current = null;
-    onPreview(null);
+    setDragCursor(false);
     event.currentTarget.releasePointerCapture(event.pointerId);
-    if (ended.moved) commitWidth(ended.to);
+    if (ended.moved) {
+      setLiveWidth(ended.to);
+      delete panelRef.current?.dataset.resizing;
+      commitWidth(ended.to);
+    } else {
+      setLiveWidth(null);
+    }
   };
   const onPointerCancel = (event: PointerEvent<HTMLHRElement>) => {
     if (drag.current?.pointerId !== event.pointerId) return;
     drag.current = null;
-    onPreview(null);
+    setDragCursor(false);
+    setLiveWidth(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const commitEndingDrag = (handle: HTMLHRElement, next: number) => {
     const active = drag.current;
     drag.current = null;
+    setDragCursor(false);
     if (active !== null && handle.hasPointerCapture(active.pointerId))
       handle.releasePointerCapture(active.pointerId);
-    onPreview(null);
+    setLiveWidth(next);
+    delete panelRef.current?.dataset.resizing;
     commitWidth(next);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLHRElement>) => {
@@ -150,6 +194,7 @@ function ResizeHandle({
         }
       >
         <hr
+          ref={handleRef}
           aria-orientation="vertical"
           aria-label={t('调整面板宽度')}
           aria-valuenow={width}
@@ -163,7 +208,7 @@ function ResizeHandle({
           onPointerCancel={onPointerCancel}
           onDoubleClick={(event) => commitEndingDrag(event.currentTarget, PANEL_WIDTH_DEFAULT)}
           onKeyDown={onKeyDown}
-          className="absolute inset-0 m-0 h-auto w-full border-0 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-[19px] after:w-0.5 after:bg-transparent after:transition-colors hover:after:bg-(--border) focus-visible:after:bg-(--focus-ring) active:after:bg-(--focus-ring)"
+          className="absolute inset-0 m-0 h-auto w-full border-0 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-[19px] after:w-0.5 after:bg-transparent after:transition-colors after:duration-(--dur-fast) after:ease-(--ease-standard) hover:after:bg-(--border) focus-visible:after:bg-(--focus-ring) active:after:bg-(--focus-ring)"
         />
       </TooltipTrigger>
       <TooltipContent
@@ -229,14 +274,15 @@ export function SidePanel({
   children: ReactNode;
 }) {
   const committedWidth = useSidePanelWidth();
-  const [preview, setPreview] = useState<number | null>(null);
   const viewport = useViewportWidth();
-  const width = docked || preview === null ? committedWidth : clampPanelWidth(preview, viewport);
+  const width = clampPanelWidth(committedWidth, viewport);
   const [node, setNode] = useState<HTMLElement | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
   const dockRow = useDockRow(docked ? node : null);
   const besideWidth = dockRow?.panel ?? width;
   const layout = dockRow === null ? null : dockedThreadLayout(dockRow.row, besideWidth);
   const setRef = (element: HTMLElement | null) => {
+    asideRef.current = element;
     setNode(element);
     if (typeof ref === 'function') ref(element);
     else if (ref != null) ref.current = element;
@@ -273,14 +319,14 @@ export function SidePanel({
         onClick={onDismiss}
       />
       <aside
-        ref={ref}
+        ref={setRef}
         aria-label={label}
         data-testid={testId}
         data-phone-tab={phoneTab || undefined}
         style={{ '--side-panel-w': `${width}px` } as CSSProperties}
         className="side-panel relative flex w-(--side-panel-w) min-w-0 flex-none flex-col border-l border-border bg-background max-[1100px]:absolute max-[1100px]:inset-y-0 max-[1100px]:right-0 max-[1100px]:z-(--z-panel-low) max-[1100px]:w-[min(420px,100%)] max-[1100px]:border-l-0 max-[1100px]:shadow-(--floating-shadow) max-[640px]:w-full"
       >
-        <ResizeHandle width={width} onPreview={setPreview} />
+        <ResizeHandle width={width} panelRef={asideRef} />
         {children}
       </aside>
     </>

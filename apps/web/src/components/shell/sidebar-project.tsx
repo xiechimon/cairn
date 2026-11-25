@@ -1,6 +1,6 @@
 import { type ProjectIcon, projectIconOrAuto } from '@cairn/shared';
 import { cn } from 'cn';
-import { Archive, Box, ChevronDown, ChevronRight, Folder } from 'lucide-react';
+import { Archive, Box, ChevronRight, Folder } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { PROJECT_ICON_COMPONENTS } from '../../board/project-icon-map.js';
 import { GrowText } from '../growth.js';
@@ -334,23 +334,18 @@ export function SidebarProjectGroupHeader({
         <Folder className="size-5 flex-none text-sidebar-ink" strokeWidth={1.75} />
         <span className="flex min-w-0 items-center gap-1">
           <span className="min-w-0 truncate">{name}</span>
-          {expanded ? (
-            <ChevronDown
-              aria-hidden
-              className="size-4 flex-none text-content-tertiary"
-              strokeWidth={1.75}
-            />
-          ) : (
-            <>
-              <ChevronRight
-                aria-hidden
-                className="size-4 flex-none text-content-tertiary"
-                strokeWidth={1.75}
-              />
-              <span data-slot="group-count" className="text-content-tertiary tabular-nums">
-                {count}
-              </span>
-            </>
+          <ChevronRight
+            aria-hidden
+            className={cn(
+              'size-4 flex-none text-content-tertiary transition-transform duration-(--dur-fast) ease-(--ease-out-strong) motion-reduce:transition-none',
+              expanded && 'rotate-90',
+            )}
+            strokeWidth={1.75}
+          />
+          {!expanded && (
+            <span data-slot="group-count" className="text-content-tertiary tabular-nums">
+              {count}
+            </span>
           )}
         </span>
         {!expanded && waiting != null && (

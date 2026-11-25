@@ -1,6 +1,7 @@
 import { cn } from 'cn';
 import { CircleAlert, KeyRound, Mail, Monitor, Send, Terminal } from 'lucide-react';
 import { type ComponentType, Fragment, type ReactNode, type SVGProps, useState } from 'react';
+import { Disclosure } from '../components/disclosure.js';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
@@ -194,7 +195,9 @@ export function ApprovalCard({
         <Preview value={card.preview} mono={card.mono} allowFold={card.kind !== 'shell'} />
       )}
       {children}
-      {raw && <RawArguments fields={card.details} />}
+      <Disclosure open={raw}>
+        <RawArguments fields={card.details} />
+      </Disclosure>
       {problem !== null && (
         <p
           role="alert"
@@ -229,7 +232,7 @@ export function ApprovalHistoryLine({
       data-testid={testId}
       data-slot="approval-history"
       data-outcome={outcome}
-      className="flex w-full min-w-0 flex-col gap-2"
+      className="flex w-full min-w-0 flex-col"
     >
       <p className="m-0 flex min-w-0 items-center gap-1.5 text-meta text-content-secondary">
         <span aria-hidden className="flex size-4 flex-none items-center justify-center">
@@ -249,7 +252,9 @@ export function ApprovalHistoryLine({
           {open ? t('收起') : t('详情')}
         </Button>
       </p>
-      {open && <ApprovalCard card={card} />}
+      <Disclosure open={open} contentClassName="pt-2">
+        <ApprovalCard card={card} />
+      </Disclosure>
     </div>
   );
 }

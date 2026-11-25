@@ -166,7 +166,7 @@ export function SidebarPeek({
         data-testid="sidebar-peek"
         data-open={open ? '' : undefined}
         inert={!open}
-        className="invisible fixed inset-y-0 left-0 z-(--z-floating) flex [&_.sidebar-team-collapse]:invisible -translate-x-full opacity-0 shadow-(--e3) transition-[translate,opacity,visibility] duration-(--dur-fast) ease-(--ease-standard) motion-reduce:transition-none data-open:visible data-open:translate-x-0 data-open:opacity-100 data-open:transition-[translate,opacity]"
+        className="invisible fixed inset-y-0 left-0 z-(--z-floating) flex [&_.sidebar-team-collapse]:invisible -translate-x-full opacity-0 shadow-(--e3) transition-[translate,opacity,visibility] duration-(--dur-fast) ease-(--ease-out-strong) motion-reduce:transition-none data-open:visible data-open:translate-x-0 data-open:opacity-100 data-open:duration-(--dur-overlay) data-open:transition-[translate,opacity] motion-reduce:data-open:transition-none"
         onPointerEnter={enterPanel}
         onPointerLeave={leave}
         onBlur={closeOnBlurOutside}
