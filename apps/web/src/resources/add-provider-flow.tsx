@@ -8,7 +8,10 @@ import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { describeError } from '../lib/error-copy.js';
-import { AddAntigravitySubscriptionDialog } from './antigravity-subscriptions.js';
+import {
+  AddAntigravitySubscriptionDialog,
+  type AntigravityReloginTarget,
+} from './antigravity-subscriptions.js';
 import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
 import type { CreateProviderDialog as CreateProviderDialogModule } from './create-provider-dialog.js';
 import { AddDevinSubscriptionDialog } from './devin-subscriptions.js';
@@ -23,6 +26,11 @@ export type AddProviderView =
 export type CreatedSubscription = { id: string; label: string };
 
 export type SubscriptionSource = 'claude' | 'devin' | 'antigravity';
+
+export type SubscriptionRelogin =
+  | { source: 'claude'; id: string; label: string }
+  | { source: 'devin'; id: string; label: string }
+  | ({ source: 'antigravity' } & AntigravityReloginTarget);
 
 interface DeviceLogin {
   state: string;
@@ -108,6 +116,9 @@ export function AddProviderFlow({
   connectError,
   onConnectError,
   onSubscriptionCreated,
+  relogin = null,
+  autoStartCodex = false,
+  onCodexStarted,
   inline = false,
   testId,
   lead,
@@ -119,6 +130,9 @@ export function AddProviderFlow({
   connectError: string | null;
   onConnectError: (message: string | null) => void;
   onSubscriptionCreated?: (created: CreatedSubscription, source: SubscriptionSource) => void;
+  relogin?: SubscriptionRelogin | null;
+  autoStartCodex?: boolean;
+  onCodexStarted?: () => void;
   inline?: boolean;
   testId?: string;
   lead?: ReactNode;
@@ -167,9 +181,23 @@ export function AddProviderFlow({
     };
   }, []);
 
+  const codexBeginRef = useRef(codex.begin);
+  codexBeginRef.current = codex.begin;
+  const startCodexDeviceRef = useRef(mutations.startCodexDevice);
+  startCodexDeviceRef.current = mutations.startCodexDevice;
+  const onCodexStartedRef = useRef(onCodexStarted);
+  onCodexStartedRef.current = onCodexStarted;
+
+  useEffect(() => {
+    if (!live || !pickerOpen || !autoStartCodex) return;
+    codexBeginRef.current(startCodexDeviceRef.current);
+    onCodexStartedRef.current?.();
+  }, [live, pickerOpen, autoStartCodex]);
+
   const finishSubscription = (created: CreatedSubscription, source: SubscriptionSource) => {
     onViewChange('closed');
     void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+    void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
     if (source !== 'claude') {
       void client.invalidateQueries({ queryKey: [`${source}-subscriptions`, teamId] });
     }
@@ -251,6 +279,7 @@ export function AddProviderFlow({
       ) : null}
       {view === 'subscription' && (
         <AddClaudeSubscriptionDialog
+          {...(relogin?.source === 'claude' ? { reloginTarget: relogin } : {})}
           onClose={() => {
             createSubscription.reset();
             onViewChange('closed');
@@ -260,6 +289,7 @@ export function AddProviderFlow({
               onSuccess: (created) => {
                 createSubscription.reset();
                 onViewChange('closed');
+                void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
                 void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
                 onSubscriptionCreated?.(created, 'claude');
               },
@@ -272,6 +302,7 @@ export function AddProviderFlow({
       {view === 'devin-subscription' && (
         <AddDevinSubscriptionDialog
           teamId={teamId}
+          {...(relogin?.source === 'devin' ? { reloginTarget: relogin } : {})}
           onLocalCreated={(created) => finishSubscription(created, 'devin')}
           onClose={() => {
             createDevinSubscription.reset();
@@ -292,6 +323,7 @@ export function AddProviderFlow({
       {view === 'antigravity-subscription' && (
         <AddAntigravitySubscriptionDialog
           teamId={teamId}
+          {...(relogin?.source === 'antigravity' ? { reloginTarget: relogin } : {})}
           onLocalCreated={(created) => finishSubscription(created, 'antigravity')}
           onClose={() => {
             createAntigravitySubscription.reset();

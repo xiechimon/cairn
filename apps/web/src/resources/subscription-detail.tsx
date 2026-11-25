@@ -31,6 +31,7 @@ import {
   ProviderEditorHead,
   type ProviderItem,
   type ProviderTone,
+  SignInAgainButton,
   TONE_DOT,
 } from '../components/providers/provider-panel.js';
 import { isLowQuota } from '../components/settings/quota-row.js';
@@ -60,21 +61,20 @@ const WINDOW_LABELS = new Map([
 const AUTH_RENEWAL: Record<AccountVendor, string> = {
   claude:
     '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
-  codex: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
-  grok: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
-  devin:
-    '这个订阅的登录已失效。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出重新添加。',
-  antigravity:
-    '这个订阅的登录已失效。在执行机重新登录 Google 账号或更新 API key 后，移除并重新添加。',
+  codex: '这个订阅的登录已失效。点击「重新登录」更新凭据。',
+  grok: '这个订阅的登录已失效。点击「重新登录」更新凭据。',
+  devin: '这个订阅的登录已失效。点击「重新登录」更新凭据。',
+  antigravity: '这个订阅的登录已失效。点击「重新登录」更新凭据。',
 };
 
+const EXPIRED_RENEWAL_COPY = '这个订阅已过期。点击「重新登录」更新凭据。';
+
 const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
-  claude: '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。',
-  codex: '这个订阅已过期。先移除它，再重新添加新的 token。',
-  grok: '这个订阅已过期。先移除它，再重新添加新的 token。',
-  devin:
-    '这个订阅已过期。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出重新添加。',
-  antigravity: '这个订阅已过期。在执行机重新登录 Google 账号或更新 API key 后，移除并重新添加。',
+  claude: EXPIRED_RENEWAL_COPY,
+  codex: EXPIRED_RENEWAL_COPY,
+  grok: EXPIRED_RENEWAL_COPY,
+  devin: EXPIRED_RENEWAL_COPY,
+  antigravity: EXPIRED_RENEWAL_COPY,
 };
 
 const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
@@ -172,7 +172,11 @@ export function teamProviderStatusView(
     return { tone: 'ok', label: null, reason: null };
   }
   const owned = connections.filter((connection) => connection.id === record.id);
-  if (record.authHeader && owned.length > 0 && owned.every((connection) => !connection.available)) {
+  if (
+    (record.authHeader || oauth) &&
+    owned.length > 0 &&
+    owned.every((connection) => !connection.available)
+  ) {
     return { tone: 'warn', label: oauth ? t('未登录') : t('填写 API key'), reason: null };
   }
   return { tone: 'off', label: t('未检查'), reason: null };
@@ -751,6 +755,8 @@ function VerifyResultPopover({
 }
 
 export interface SubscriptionActions {
+  onSignInAgain?: () => void;
+  signingInAgain?: boolean;
   onVerify?: () => void;
   onUpdateRuntime?: () => void;
   updatingRuntime?: boolean;
@@ -760,6 +766,29 @@ export interface SubscriptionActions {
   onRemoveModel?: (id: string) => void;
   onTestModel?: (id: string) => Promise<ProviderTestResult>;
   modelsBusy?: boolean;
+}
+
+export function needsSubscriptionSignIn(
+  account: SubscriptionAccount,
+  verification: Verification | undefined,
+): boolean {
+  if (account.state === 'expired') return true;
+  if (
+    verification?.phase === 'failed' &&
+    (verification.reason === 'auth' || verification.reason === 'missing_local_login')
+  ) {
+    return true;
+  }
+  if (
+    account.vendor === 'antigravity' &&
+    account.hasToken === false &&
+    account.runnerOffline !== true &&
+    (account.runnerLogin === 'missing_local_login' ||
+      (account.runnerLogin === 'unavailable' && account.runnerId == null))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 const TEST_CONCURRENCY = 2;
@@ -858,8 +887,16 @@ export function SubscriptionDetail({
         ].join(' · ')}
         {...(actions.onRename === undefined ? {} : { onRename: actions.onRename })}
         aside={
-          (showRuntimeUpdate || actions.onVerify !== undefined) && (
+          (actions.onSignInAgain !== undefined ||
+            showRuntimeUpdate ||
+            actions.onVerify !== undefined) && (
             <span className="flex items-center gap-2">
+              {actions.onSignInAgain !== undefined && (
+                <SignInAgainButton
+                  onClick={actions.onSignInAgain}
+                  pending={actions.signingInAgain === true}
+                />
+              )}
               {showRuntimeUpdate && (
                 <Button
                   variant="outline"

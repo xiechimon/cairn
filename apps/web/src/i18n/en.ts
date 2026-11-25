@@ -15,8 +15,6 @@ export const EN: Record<string, string> = {
     'After removal, later steps no longer use this subscription.',
   '这个订阅的登录已失效。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
     'This subscription is no longer signed in. Remove it, then run `claude setup-token` in a terminal and add the new token.',
-  '这个订阅的登录已失效。先移除它，再重新添加新的 token。':
-    'This subscription is no longer signed in. Remove it, then add a new token.',
   '验证超时，请重试': 'Verification timed out. Try again.',
   '暂时无法连接 Claude 服务，请检查网络后重试。':
     'Cannot connect to the Claude service right now. Check your network and try again.',
@@ -53,10 +51,6 @@ export const EN: Record<string, string> = {
   '服务器未能运行本次验证，订阅状态未改变。请重试。':
     'The server could not run this check. The subscription status is unchanged. Try again.',
   验证失败: 'Verification failed',
-  '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
-    'This subscription has expired. Remove it, then run `claude setup-token` in a terminal and add the new token.',
-  '这个订阅已过期。先移除它，再重新添加新的 token。':
-    'This subscription has expired. Remove it, then add a new token.',
   使用: 'Usage',
   '无法取消归档任务。': 'Could not unarchive the task.',
   '无法归档任务。': 'Could not archive the task.',
@@ -89,10 +83,6 @@ export const EN: Record<string, string> = {
     'Devin sign-in did not finish. Try again, or paste below instead.',
   '没有读到这台 Mac 上的 Devin 登录，请改用下方粘贴。':
     'Could not read a Devin sign-in on this Mac. Paste below instead.',
-  '这个订阅的登录已失效。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出重新添加。':
-    'This subscription is no longer signed in. Remove it, then run `cat ~/.local/share/devin/credentials.toml` and add the whole output back.',
-  '这个订阅已过期。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出重新添加。':
-    'This subscription has expired. Remove it, then run `cat ~/.local/share/devin/credentials.toml` and add the whole output back.',
   '服务器上找不到 devin 命令': 'The devin command was not found on the server.',
   '{name}：已过期，Coordinator 和任务暂时无法使用。在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型路由」。':
     '{name}: expired, so the Coordinator and tasks cannot run for now. Run `cat ~/.local/share/devin/credentials.toml` on a computer signed in to Devin and add the whole output under Settings → Model routing.',
@@ -102,6 +92,14 @@ export const EN: Record<string, string> = {
   'ChatGPT 订阅': 'ChatGPT subscription',
   'GitHub Copilot 订阅': 'GitHub Copilot subscription',
   '添加 Antigravity 订阅': 'Add Antigravity subscription',
+  重新登录: 'Sign in again',
+  '重新登录 Antigravity': 'Sign in to Antigravity again',
+  '重新登录 Claude': 'Sign in to Claude again',
+  '重新登录 Devin': 'Sign in to Devin again',
+  '这个订阅已过期。点击「重新登录」更新凭据。':
+    'This subscription has expired. Click Sign in again to renew it.',
+  '这个订阅的登录已失效。点击「重新登录」更新凭据。':
+    'This subscription is no longer signed in. Click Sign in again to renew it.',
   '等待 Antigravity 登录超时。请重试，或改用下方粘贴。':
     'Signing in to Antigravity timed out. Try again, or paste below instead.',
   'Antigravity 登录未完成。请重试，或改用下方粘贴。':
@@ -125,8 +123,8 @@ export const EN: Record<string, string> = {
   '使用这台 Mac 的登录': 'Use this Mac sign-in',
   '绑定这台 Mac 并立即验证。': 'Binds this Mac and verifies now.',
   '登录完成后会重新验证。': 'Re-verifies after sign-in.',
-  '{name}：执行机上没有可用的 Antigravity 登录，Coordinator 和任务暂时无法使用。在「设置 → 模型路由」重新登录。':
-    '{name}: no usable Antigravity sign-in on the Runner, so the Coordinator and tasks cannot run for now. Sign in again under Settings → Model routing.',
+  '{name}：执行机上没有可用的 Antigravity 登录，Coordinator 和任务暂时无法使用。重新登录后即可恢复。':
+    '{name}: no usable Antigravity sign-in on the Runner, so the Coordinator and tasks cannot run for now. Sign in again to resume.',
   '{count} 处已过期': '{count} expired',
   '{count} 处登录失效': '{count} signed out',
   '{count} 处即将过期': '{count} about to expire',
@@ -137,10 +135,6 @@ export const EN: Record<string, string> = {
   '改用 API key': 'Use an API key instead',
   '粘贴 `GEMINI_API_KEY` 或 `.env` 片段。保存后无法再查看。':
     'Paste a `GEMINI_API_KEY` or `.env` snippet. It cannot be viewed after saving.',
-  '这个订阅的登录已失效。在执行机重新登录 Google 账号或更新 API key 后，移除并重新添加。':
-    'This subscription is no longer signed in. Sign in with Google on your Runner or update the API key, then remove and add it again.',
-  '这个订阅已过期。在执行机重新登录 Google 账号或更新 API key 后，移除并重新添加。':
-    'This subscription has expired. Sign in with Google on your Runner or update the API key, then remove and add it again.',
   '执行机尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key':
     'Antigravity is not signed in on the Runner; run `agy acp --login` or paste an API key',
   '{machine} 尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key':
@@ -165,10 +159,10 @@ export const EN: Record<string, string> = {
   '{signedOut} 未登录，已在 {signedIn} 登录':
     'Not signed in on {signedOut}, signed in on {signedIn}',
   '{machine} 无法验证': 'Could not verify on {machine}',
-  '{name}：已过期，Coordinator 和任务暂时无法使用。在执行机重新登录 Google 账号或更新 API key 后，添加到「设置 → 模型路由」。':
-    '{name}: expired, so the Coordinator and tasks cannot run for now. Sign in with Google on your Runner or update the API key under Settings → Model routing.',
-  '{name}：将在 {days} 天后过期。到期前在执行机重新登录 Google 账号或更新 API key 后，添加到「设置 → 模型路由」。':
-    '{name}: expires in {days## day|# days}. Before then, sign in with Google on your Runner or update the API key under Settings → Model routing.',
+  '{name}：已过期，Coordinator 和任务暂时无法使用。重新登录后即可恢复。':
+    '{name}: expired, so the Coordinator and tasks cannot run for now. Sign in again to resume.',
+  '{name}：将在 {days} 天后过期。到期前重新登录，任务才不会中断。':
+    '{name}: expires in {days## day|# days}. Sign in again before then so tasks do not stall.',
   'Antigravity 登录需要处理': 'Antigravity sign-in needs attention',
   '{count} 处 Antigravity 登录已过期': '{count} Antigravity logins have expired',
   '{count} 处 Antigravity 登录即将过期': '{count} Antigravity logins are about to expire',

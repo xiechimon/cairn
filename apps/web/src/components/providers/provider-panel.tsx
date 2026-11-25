@@ -36,6 +36,7 @@ import { useI18n } from '../../i18n/provider.js';
 import { SettingsPanel } from '../settings-list.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
+import { RingSpinner } from '../ui/ring-spinner.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
 
 export type ProviderMark = ComponentType<SVGProps<SVGSVGElement>>;
@@ -499,5 +500,23 @@ export function ProviderEditorHead({
       {version != null && <code className="text-meta text-content-tertiary">v{version}</code>}
       {aside}
     </div>
+  );
+}
+
+export function SignInAgainButton({
+  onClick,
+  pending = false,
+  testId = 'subscription-sign-in-again',
+}: {
+  onClick: () => void;
+  pending?: boolean;
+  testId?: string;
+}) {
+  const { t } = useI18n();
+  return (
+    <Button variant="default" size="sm" data-testid={testId} disabled={pending} onClick={onClick}>
+      {pending && <RingSpinner aria-hidden data-icon="inline-start" />}
+      {t('重新登录')}
+    </Button>
   );
 }

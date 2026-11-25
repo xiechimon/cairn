@@ -20,24 +20,39 @@ export function SubscriptionLoginBanner<Kind extends string>({
   warnings,
   singleTitle,
   summary,
+  onSignInAgain,
 }: {
   testIdPrefix: string;
   warnings: readonly SubscriptionLoginWarning<Kind>[];
   singleTitle: string;
   summary: (warnings: readonly SubscriptionLoginWarning<Kind>[]) => { title: string; body: string };
+  onSignInAgain?: () => void;
 }) {
   const { t } = useI18n();
   const [only] = warnings;
   if (only === undefined) return null;
   const action = (
-    <Button
-      variant="outline"
-      size="sm"
-      className="px-3"
-      render={<Link to={settingsHref('routing')} />}
-    >
-      {t('查看')}
-    </Button>
+    <div className="flex items-center gap-2">
+      {onSignInAgain !== undefined && (
+        <Button
+          variant="default"
+          size="sm"
+          className="px-3"
+          data-testid={`${testIdPrefix}-login-relogin`}
+          onClick={onSignInAgain}
+        >
+          {t('重新登录')}
+        </Button>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="px-3"
+        render={<Link to={settingsHref('routing')} />}
+      >
+        {t('查看')}
+      </Button>
+    </div>
   );
   if (warnings.length === 1) {
     return (

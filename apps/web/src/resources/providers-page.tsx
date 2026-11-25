@@ -6,6 +6,8 @@ import {
   type ModelSource,
   type ModelSourceModel,
   orderByKeys,
+  PROVIDER_CODEX_PRESET,
+  PROVIDER_OAUTH_PRESET_IDS,
   type ProviderRecord,
   type ProviderTestResult,
   type RoutingConnection,
@@ -71,7 +73,12 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
+import { describeError } from '../lib/error-copy.js';
+import {
+  AddProviderFlow,
+  type AddProviderView,
+  type SubscriptionRelogin,
+} from './add-provider-flow.js';
 import { AntigravityRelogin, antigravityBridge } from './antigravity-subscriptions.js';
 import {
   applyListResponse,
@@ -89,6 +96,7 @@ import {
   TeamProviderEditor,
 } from './provider-editors.js';
 import {
+  needsSubscriptionSignIn,
   providerRowStatus,
   QuotaMark,
   type RuntimeUpdateSummary,
@@ -285,8 +293,11 @@ export function ProvidersSection() {
   const [verifyAfterCreate, setVerifyAfterCreate] = useState<{
     id: string;
     vendor: AccountVendor;
+    force?: boolean;
   } | null>(null);
   const [addView, setAddView] = useState<AddProviderView>('closed');
+  const [reloginTarget, setReloginTarget] = useState<SubscriptionRelogin | null>(null);
+  const [autoStartCodex, setAutoStartCodex] = useState(false);
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
   );
@@ -440,62 +451,92 @@ export function ProvidersSection() {
     }
   };
 
-  const actionsFor = (record: ProviderRecord): ProviderEditActions =>
-    !live
-      ? {
-          patch: (body) => Promise.resolve({ ...record, ...body }),
-          test: (model) => {
-            if (record.configurationFingerprint === undefined)
-              return Promise.resolve(SAMPLE_TEST_RESULT);
-            const result = {
-              ...SAMPLE_TEST_RESULT,
-              configurationFingerprint: record.configurationFingerprint,
-            };
-            writeProviderCheck(record.id, model, result);
-            return Promise.resolve(result);
-          },
-          listUpstream: () =>
-            Promise.resolve({
-              status: 'ok' as const,
-              models: record.models.map((model) => ({ id: model.id, name: model.name })),
-            }),
-          remove: () => undefined,
-        }
-      : {
-          patch: (body) =>
-            mutations.patchProvider.mutateAsync({ id: record.id, body }).catch((error) => {
-              toastError(t('保存失败，请重试。'), error);
-              throw error;
-            }),
-          latest: () =>
-            client
-              .getQueryData<ProvidersEnvelope>(['providers', teamId])
-              ?.providers.find((provider) => provider.id === record.id),
-          ...(providersQ.data?.canTestConnection === true
-            ? {
-                test: async (model: string) => {
-                  const result = await mutations.testProvider.mutateAsync({
-                    id: record.id,
-                    model,
-                  });
-                  writeProviderCheck(record.id, model, result);
-                  void reconcileProviderList(record.id, result.configurationFingerprint);
-                  return result;
-                },
-                listUpstream: () => mutations.upstreamModels.mutateAsync(record.id),
+  const connections = live
+    ? (routingQ.data?.connections ?? [])
+    : (fixtureAccounts?.routing.connections ?? []);
+
+  const actionsFor = (record: ProviderRecord): ProviderEditActions => {
+    const statusView = teamProviderStatusView(record, connections, providerChecks[record.id], t);
+    const isOAuth = (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(record.providerId);
+    const needsOAuthSignIn = isOAuth && (statusView.tone === 'fail' || statusView.tone === 'warn');
+    if (!live) {
+      return {
+        patch: (body) => Promise.resolve({ ...record, ...body }),
+        test: (model) => {
+          if (record.configurationFingerprint === undefined)
+            return Promise.resolve(SAMPLE_TEST_RESULT);
+          const result = {
+            ...SAMPLE_TEST_RESULT,
+            configurationFingerprint: record.configurationFingerprint,
+          };
+          writeProviderCheck(record.id, model, result);
+          return Promise.resolve(result);
+        },
+        listUpstream: () =>
+          Promise.resolve({
+            status: 'ok' as const,
+            models: record.models.map((model) => ({ id: model.id, name: model.name })),
+          }),
+        ...(needsOAuthSignIn ? { onSignInAgain: () => setAddView('picker') } : {}),
+        remove: () => undefined,
+      };
+    }
+    return {
+      patch: (body) =>
+        mutations.patchProvider.mutateAsync({ id: record.id, body }).catch((error) => {
+          toastError(t('保存失败，请重试。'), error);
+          throw error;
+        }),
+      latest: () =>
+        client
+          .getQueryData<ProvidersEnvelope>(['providers', teamId])
+          ?.providers.find((provider) => provider.id === record.id),
+      ...(providersQ.data?.canTestConnection === true
+        ? {
+            test: async (model: string) => {
+              const result = await mutations.testProvider.mutateAsync({
+                id: record.id,
+                model,
+              });
+              writeProviderCheck(record.id, model, result);
+              void reconcileProviderList(record.id, result.configurationFingerprint);
+              return result;
+            },
+            listUpstream: () => mutations.upstreamModels.mutateAsync(record.id),
+          }
+        : {}),
+      ...(needsOAuthSignIn
+        ? {
+            onSignInAgain: () => {
+              if (record.providerId === PROVIDER_CODEX_PRESET.id) {
+                setAutoStartCodex(true);
+                setAddView('picker');
+                return;
               }
-            : {}),
-          ...(record.providerId === 'gemini' && providersQ.data?.canTestConnection === true
-            ? {
-                onUpdateRuntime: () => triggerRuntimeUpdate('gemini'),
-                updatingRuntime: updatingRuntimes.has('gemini'),
-              }
-            : {}),
-          remove: () =>
-            mutations.deleteProvider.mutate(record.id, {
-              onError: (error) => toastError(t('移除失败，请重试。'), error),
-            }),
-        };
+              setConnectError(null);
+              mutations.startProviderOAuth.mutate(record.providerId, {
+                onSuccess: (data) => window.location.assign(data.authorizationUrl),
+                onError: (err) =>
+                  toastError(describeError(err, t) ?? t('无法发起登录，请重试。'), err),
+              });
+            },
+            signingInAgain:
+              record.providerId !== PROVIDER_CODEX_PRESET.id &&
+              mutations.startProviderOAuth.isPending,
+          }
+        : {}),
+      ...(record.providerId === 'gemini' && providersQ.data?.canTestConnection === true
+        ? {
+            onUpdateRuntime: () => triggerRuntimeUpdate('gemini'),
+            updatingRuntime: updatingRuntimes.has('gemini'),
+          }
+        : {}),
+      remove: () =>
+        mutations.deleteProvider.mutate(record.id, {
+          onError: (error) => toastError(t('移除失败，请重试。'), error),
+        }),
+    };
+  };
 
   const saveSubscriptionModels = (account: SubscriptionAccount, models: SubscriptionModel[]) => {
     const update =
@@ -544,12 +585,13 @@ export function ProvidersSection() {
 
   const startVerification = (
     ref: { id: string; vendor: AccountVendor; runnerName?: string | null },
-    opts: { retryOnMissingLogin?: boolean } = {},
+    opts: { retryOnMissingLogin?: boolean; force?: boolean } = {},
   ) => {
     if (ref.vendor === 'antigravity') {
       void antigravityVerification.verify(ref.id, {
         ...(ref.runnerName === undefined ? {} : { runnerName: ref.runnerName }),
         ...(opts.retryOnMissingLogin === true ? { retryOnMissingLogin: true } : {}),
+        ...(opts.force === true ? { force: true } : {}),
       });
       return;
     }
@@ -558,13 +600,81 @@ export function ProvidersSection() {
 
   const claudeModels = subscriptionModels(sources, 'claude');
 
+  const verifications: Record<string, Verification> = {
+    ...verification.states,
+    ...devinVerification.states,
+    ...antigravityVerification.states,
+  };
+
+  const antigravityReloginFor = (account: SubscriptionAccount) => {
+    if (!live || teamId === undefined || antigravityBridge() === null) return undefined;
+    if (account.state === 'expired' || account.hasToken !== false) return undefined;
+    return (
+      <AntigravityRelogin
+        teamId={teamId}
+        subscription={account}
+        renewOAuth={false}
+        runnerId={account.runnerId}
+        runnerLogin={account.runnerLogin}
+        runnerLogins={account.runnerLogins}
+        onLoggedIn={(bindRunnerId) => {
+          const targetId = account.runnerId == null ? bindRunnerId : undefined;
+          const targetName =
+            targetId !== undefined
+              ? (account.runnerLogins?.find((entry) => entry.runnerId === targetId)?.name ??
+                account.runnerName)
+              : undefined;
+          void client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] });
+          void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+          void antigravityVerification.verify(account.id, {
+            ...(targetId === undefined ? {} : { runnerId: targetId }),
+            ...(targetName === undefined ? {} : { runnerName: targetName }),
+            retryOnMissingLogin: true,
+            force: true,
+          });
+        }}
+      />
+    );
+  };
+
+  const openSubscriptionRelogin = (account: SubscriptionAccount) => {
+    if (account.vendor === 'antigravity') {
+      setReloginTarget({
+        source: 'antigravity',
+        id: account.id,
+        label: account.label,
+        attachInPlace: account.hasToken === false || antigravityOAuthIds.has(account.id),
+      });
+      setAddView('antigravity-subscription');
+      return;
+    }
+    if (account.vendor === 'devin') {
+      setReloginTarget({ source: 'devin', id: account.id, label: account.label });
+      setAddView('devin-subscription');
+      return;
+    }
+    if (account.vendor === 'claude') {
+      setReloginTarget({ source: 'claude', id: account.id, label: account.label });
+      setAddView('subscription');
+    }
+  };
+
   const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => {
     const rename = renameByVendor[account.vendor] ?? renameSubscription;
     const apiIds = apiIdsByVendor[account.vendor] ?? subscriptionApiIds;
     const managedRuntime: ManagedUpdateRuntime | null =
       account.vendor === 'claude' ? 'claude-code' : account.vendor === 'devin' ? 'devin' : null;
+    const inlineRelogin =
+      account.vendor === 'antigravity' && antigravityReloginFor(account) !== undefined;
+    const canSignInAgain =
+      !inlineRelogin &&
+      needsSubscriptionSignIn(account, verifications[account.id]) &&
+      (account.vendor === 'antigravity' ||
+        account.vendor === 'claude' ||
+        account.vendor === 'devin');
     return {
       onRemove: () => setRemovingSubscription(account),
+      ...(canSignInAgain ? { onSignInAgain: () => openSubscriptionRelogin(account) } : {}),
       ...(managedRuntime !== null && (!live || providersQ.data?.canTestConnection === true)
         ? {
             onUpdateRuntime: () => triggerRuntimeUpdate(managedRuntime),
@@ -627,11 +737,7 @@ export function ProvidersSection() {
 
   const subscriptionDeps = {
     now,
-    verifications: {
-      ...verification.states,
-      ...devinVerification.states,
-      ...antigravityVerification.states,
-    },
+    verifications,
     actionsFor: subscriptionActionsFor,
     t,
     clock,
@@ -663,42 +769,12 @@ export function ProvidersSection() {
     ...subscriptionEntries(antigravitySubscriptions, {
       ...subscriptionDeps,
       models: subscriptionModels(sources, 'antigravity'),
-      reloginFor: (account) => {
-        if (!live || teamId === undefined || antigravityBridge() === null) return undefined;
-        const renewOAuth = account.state === 'expired' && antigravityOAuthIds.has(account.id);
-        if (!renewOAuth && account.hasToken !== false) return undefined;
-        return (
-          <AntigravityRelogin
-            teamId={teamId}
-            subscription={account}
-            renewOAuth={renewOAuth}
-            runnerId={account.runnerId}
-            runnerLogin={account.runnerLogin}
-            runnerLogins={account.runnerLogins}
-            onLoggedIn={(bindRunnerId) => {
-              const targetId = !renewOAuth && account.runnerId == null ? bindRunnerId : undefined;
-              const targetName =
-                targetId !== undefined
-                  ? (account.runnerLogins?.find((entry) => entry.runnerId === targetId)?.name ??
-                    account.runnerName)
-                  : undefined;
-              void client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] });
-              void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
-              void antigravityVerification.verify(account.id, {
-                ...(targetId === undefined ? {} : { runnerId: targetId }),
-                ...(targetName === undefined ? {} : { runnerName: targetName }),
-                retryOnMissingLogin: true,
-                force: true,
-              });
-            }}
-          />
-        );
-      },
+      reloginFor: antigravityReloginFor,
     }),
     ...teamEntries(
       providers,
       deadModelIds(sources),
-      live ? (routingQ.data?.connections ?? []) : (fixtureAccounts?.routing.connections ?? []),
+      connections,
       providerChecks,
       geminiUpdate,
       actionsFor,
@@ -720,7 +796,10 @@ export function ProvidersSection() {
     const target = `subscription:${verifyAfterCreate.id}`;
     if (itemParam !== target || selectedId !== target) return;
     setVerifyAfterCreate(null);
-    startVerification(verifyAfterCreate, { retryOnMissingLogin: true });
+    startVerification(verifyAfterCreate, {
+      retryOnMissingLogin: true,
+      ...(verifyAfterCreate.force === true ? { force: true } : {}),
+    });
   }, [itemParam, selectedId, startVerification, verifyAfterCreate]);
 
   return (
@@ -794,12 +873,22 @@ export function ProvidersSection() {
         teamId={teamId}
         live={live}
         view={addView}
-        onViewChange={setAddView}
+        onViewChange={(next) => {
+          setAddView(next);
+          if (next === 'closed') {
+            setReloginTarget(null);
+            setAutoStartCodex(false);
+          }
+        }}
+        relogin={reloginTarget}
+        autoStartCodex={autoStartCodex}
+        onCodexStarted={() => setAutoStartCodex(false)}
         connectError={connectError}
         onConnectError={setConnectError}
         onSubscriptionCreated={(created, source) => {
+          setReloginTarget(null);
           setParams({ item: `subscription:${created.id}` }, true);
-          setVerifyAfterCreate({ id: created.id, vendor: source });
+          setVerifyAfterCreate({ id: created.id, vendor: source, force: true });
         }}
       />
       {pickingSubscription !== null && live && teamId !== undefined && (

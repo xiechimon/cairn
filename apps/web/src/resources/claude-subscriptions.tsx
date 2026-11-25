@@ -14,18 +14,20 @@ export function AddClaudeSubscriptionDialog({
   onCreate,
   pending,
   error,
+  reloginTarget,
 }: {
   onClose: () => void;
   onCreate: (body: CreateClaudeSubscription) => void;
   pending: boolean;
   error: boolean;
+  reloginTarget?: { id: string; label: string };
 }) {
   const { t } = useI18n();
-  const [label, setLabel] = useState(t('Claude 订阅'));
+  const [label, setLabel] = useState(reloginTarget?.label ?? t('Claude 订阅'));
   const [token, setToken] = useState('');
   return (
     <DialogShell
-      title={t('添加 Claude 订阅')}
+      title={reloginTarget !== undefined ? t('重新登录 Claude') : t('添加 Claude 订阅')}
       open
       onClose={onClose}
       size="s"

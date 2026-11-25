@@ -20,6 +20,7 @@ import {
   ProviderEditorHead,
   type ProviderMark,
   type ProviderTone,
+  SignInAgainButton,
   TONE_DOT,
 } from '../components/providers/provider-panel.js';
 import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
@@ -173,6 +174,8 @@ export interface ProviderEditActions {
   latest?: () => ProviderRecord | undefined;
   test?: (model: string) => Promise<ProviderTestResult>;
   listUpstream?: () => Promise<UpstreamModelsResult>;
+  onSignInAgain?: () => void;
+  signingInAgain?: boolean;
   onUpdateRuntime?: () => void;
   updatingRuntime?: boolean;
   remove?: () => void;
@@ -708,21 +711,32 @@ export function TeamProviderEditor({
         version={runtimeUpdate?.installedVersion ?? null}
         kind={t(providerKind(record))}
         aside={
-          showRuntimeUpdate && (
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="runtime-update"
-              disabled={runtimeUpdating}
-              aria-label={
-                runtimeUpdate.availableVersion !== null
-                  ? t('更新到 {version}', { version: `v${runtimeUpdate.availableVersion}` })
-                  : t('更新')
-              }
-              onClick={actions.onUpdateRuntime}
-            >
-              {runtimeUpdating ? t('更新中…') : t('更新')}
-            </Button>
+          (actions.onSignInAgain !== undefined || showRuntimeUpdate) && (
+            <span className="flex items-center gap-2">
+              {actions.onSignInAgain !== undefined && (
+                <SignInAgainButton
+                  onClick={actions.onSignInAgain}
+                  pending={actions.signingInAgain === true}
+                  testId="provider-sign-in-again"
+                />
+              )}
+              {showRuntimeUpdate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="runtime-update"
+                  disabled={runtimeUpdating}
+                  aria-label={
+                    runtimeUpdate.availableVersion !== null
+                      ? t('更新到 {version}', { version: `v${runtimeUpdate.availableVersion}` })
+                      : t('更新')
+                  }
+                  onClick={actions.onUpdateRuntime}
+                >
+                  {runtimeUpdating ? t('更新中…') : t('更新')}
+                </Button>
+              )}
+            </span>
           )
         }
       />

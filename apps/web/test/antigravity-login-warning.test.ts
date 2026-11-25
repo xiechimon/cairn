@@ -28,7 +28,6 @@ describe('antigravity subscription login warning', () => {
     (runnerLogin) => {
       const text = antigravitySubscriptionSignedOutWarning({ ...subscription, runnerLogin }, t);
       expect(text).toContain('Antigravity 订阅');
-      expect(text).toContain('模型路由');
       expect(text).toContain('重新登录');
     },
   );

@@ -43,6 +43,7 @@ export function AddDevinSubscriptionDialog({
   onLocalCreated,
   pending,
   error,
+  reloginTarget,
 }: {
   teamId: string | undefined;
   onClose: () => void;
@@ -50,9 +51,10 @@ export function AddDevinSubscriptionDialog({
   onLocalCreated: (subscription: DesktopSubscriptionMetadata) => void;
   pending: boolean;
   error: boolean;
+  reloginTarget?: { id: string; label: string };
 }) {
   const { t } = useI18n();
-  const [label, setLabel] = useState(t('Devin 订阅'));
+  const [label, setLabel] = useState(reloginTarget?.label ?? t('Devin 订阅'));
   const [token, setToken] = useState('');
   const [bridge] = useState(devinBridge);
   const [local, setLocal] = useState<DevinLocalStatus | null>(null);
@@ -62,6 +64,7 @@ export function AddDevinSubscriptionDialog({
   const submittedRef = useRef(false);
   const waitingRef = useRef(false);
   const importingRef = useRef(false);
+  const autoStartedRef = useRef(false);
   const [importing, setImporting] = useState(false);
   const busy = pending || importing || phase === 'waiting';
 
@@ -143,6 +146,23 @@ export function AddDevinSubscriptionDialog({
     setPhase('failed');
   };
 
+  const startLoginRef = useRef(startLogin);
+  startLoginRef.current = startLogin;
+
+  useEffect(() => {
+    if (
+      reloginTarget === undefined ||
+      autoStartedRef.current ||
+      bridge === null ||
+      local === null ||
+      !local.canLogin
+    ) {
+      return;
+    }
+    autoStartedRef.current = true;
+    void startLoginRef.current();
+  }, [reloginTarget, bridge, local]);
+
   const localAction =
     local !== null && (local.loggedIn || local.canLogin) ? (
       phase === 'waiting' ? (
@@ -160,7 +180,7 @@ export function AddDevinSubscriptionDialog({
             {t('取消')}
           </Button>
         </p>
-      ) : local.loggedIn ? (
+      ) : local.loggedIn && reloginTarget === undefined ? (
         <p className="m-0 flex items-center gap-2">
           <span className="min-w-0 flex-1">{t('这台 Mac 已登录 Devin。')}</span>
           <Button
@@ -193,7 +213,7 @@ export function AddDevinSubscriptionDialog({
 
   return (
     <DialogShell
-      title={t('添加 Devin 订阅')}
+      title={reloginTarget !== undefined ? t('重新登录 Devin') : t('添加 Devin 订阅')}
       open
       onClose={onClose}
       size="s"

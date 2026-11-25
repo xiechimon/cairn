@@ -138,6 +138,12 @@ function useAntigravityLocalStatus(bridge: AntigravityBridge | null) {
   return { local, refresh };
 }
 
+export interface AntigravityReloginTarget {
+  id: string;
+  label: string;
+  attachInPlace: boolean;
+}
+
 export function AddAntigravitySubscriptionDialog({
   teamId,
   onClose,
@@ -145,6 +151,7 @@ export function AddAntigravitySubscriptionDialog({
   onLocalCreated,
   pending,
   error,
+  reloginTarget,
 }: {
   teamId: string | undefined;
   onClose: () => void;
@@ -152,13 +159,14 @@ export function AddAntigravitySubscriptionDialog({
   onLocalCreated: (subscription: DesktopSubscriptionMetadata) => void;
   pending: boolean;
   error: boolean;
+  reloginTarget?: AntigravityReloginTarget;
 }) {
   const { t } = useI18n();
   const { live, teamId: liveTeamId } = useLiveData();
   const resolvedTeamId = teamId ?? liveTeamId;
   const teamsQ = useTeams(live);
   const machinesQ = useMachines(resolvedTeamId, live);
-  const [label, setLabel] = useState(t('Antigravity 订阅'));
+  const [label, setLabel] = useState(reloginTarget?.label ?? t('Antigravity 订阅'));
   const [token, setToken] = useState('');
   const [bridge] = useState(antigravityBridge);
   const { local } = useAntigravityLocalStatus(bridge);
@@ -168,6 +176,7 @@ export function AddAntigravitySubscriptionDialog({
   const [importing, setImporting] = useState(false);
   const localActionRef = useRef(false);
   const submittedRef = useRef(false);
+  const autoStartedRef = useRef(false);
   const busy = pending || importing || login.phase === 'waiting' || login.phase === 'installing';
 
   useEffect(() => {
@@ -203,12 +212,32 @@ export function AddAntigravitySubscriptionDialog({
     localActionRef.current = true;
     setImportFailed(false);
     try {
-      const outcome = await login.start({ teamId, label: label.trim() });
+      const outcome = await login.start(
+        { teamId, label: label.trim() },
+        reloginTarget?.attachInPlace === true ? reloginTarget.id : undefined,
+      );
       if (outcome.ok) onLocalCreated(outcome.subscription);
     } finally {
       localActionRef.current = false;
     }
   };
+
+  const startLoginRef = useRef(startLogin);
+  startLoginRef.current = startLogin;
+
+  useEffect(() => {
+    if (
+      reloginTarget === undefined ||
+      autoStartedRef.current ||
+      bridge === null ||
+      local === null ||
+      (!local.installed && !local.canLogin)
+    ) {
+      return;
+    }
+    autoStartedRef.current = true;
+    void startLoginRef.current();
+  }, [reloginTarget, bridge, local]);
 
   const defaultMachineId =
     (teamsQ.data?.find((team) => team.id === resolvedTeamId) ?? teamsQ.data?.[0])
@@ -261,7 +290,7 @@ export function AddAntigravitySubscriptionDialog({
             {t('取消')}
           </Button>
         </div>
-      ) : local.loggedIn && !importFailed ? (
+      ) : local.loggedIn && !importFailed && reloginTarget === undefined ? (
         <div className="flex h-8 min-w-0 items-center justify-between gap-2 pointer-coarse:h-11">
           <span className="min-w-0 truncate text-meta text-content-secondary" title={loggedInNote}>
             {loggedInNote}
@@ -304,7 +333,7 @@ export function AddAntigravitySubscriptionDialog({
 
   return (
     <DialogShell
-      title={t('添加 Antigravity 订阅')}
+      title={reloginTarget !== undefined ? t('重新登录 Antigravity') : t('添加 Antigravity 订阅')}
       open
       onClose={onClose}
       size="s"
@@ -316,6 +345,10 @@ export function AddAntigravitySubscriptionDialog({
             disabled: busy || !label.trim() || (pasteOpen && !token.trim()),
             onClick: () => {
               if (!pasteOpen && bridge !== null) {
+                if (reloginTarget !== undefined) {
+                  void startLogin();
+                  return;
+                }
                 void importLocal();
                 return;
               }
