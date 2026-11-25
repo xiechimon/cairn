@@ -56,15 +56,17 @@ export function AddClaudeSubscriptionDialog({
           {t('Coordinator 和任务都会用这个订阅。保存后无法再查看。')}{' '}
           <InfoTip info={t('不用再配 API key，Token 加密保存')} />
         </p>
-        <FormField label={t('名称')} htmlFor="subscription-label">
-          <Input
-            className={FORM_CONTROL_CLS}
-            id="subscription-label"
-            data-testid="subscription-label"
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-        </FormField>
+        {reloginTarget === undefined && (
+          <FormField label={t('名称')} htmlFor="subscription-label">
+            <Input
+              className={FORM_CONTROL_CLS}
+              id="subscription-label"
+              data-testid="subscription-label"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+            />
+          </FormField>
+        )}
         <FormField label="Token" htmlFor="subscription-token">
           <Input
             className={FORM_CONTROL_CLS}

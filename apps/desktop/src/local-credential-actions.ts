@@ -1,13 +1,12 @@
 import {
   type AntigravityLoginOutcome,
-  type AntigravityLoginPhase,
   DEVIN_TOKEN_LIFETIME_MS,
   type DesktopProviderImportResult,
   type DesktopSubscriptionInput,
   type DesktopSubscriptionMetadata,
   OWNER_CHANNEL_HEADER,
 } from '@cairn/shared';
-import { antigravityLogin, readLocalAntigravityCredential } from './antigravity-auth.js';
+import { readLocalAntigravityCredential } from './antigravity-auth.js';
 import { devinImport, devinLogin } from './devin-auth.js';
 import { readLocalProviders } from './local-providers.js';
 
@@ -89,49 +88,6 @@ export function desktopCredentialActions(
       } catch {
         return { ok: false, reason: 'save' };
       }
-    },
-    async loginAntigravity(
-      input: unknown,
-      onPhase: (phase: AntigravityLoginPhase) => void,
-      signal: AbortSignal,
-      subscriptionId?: unknown,
-    ): Promise<AntigravityLoginOutcome> {
-      const target = subscriptionInput(input);
-      if (target === null || (subscriptionId !== undefined && !isId(subscriptionId))) {
-        return { ok: false, reason: 'save' };
-      }
-      return antigravityLogin(
-        ({ token, expiresAt, refreshToken, authMethod }, loginSignal) =>
-          subscriptionId === undefined
-            ? post(
-                target.teamId,
-                'antigravity-subscriptions',
-                {
-                  label: target.label,
-                  ...(token !== undefined ? { token } : {}),
-                  ...(expiresAt !== undefined ? { expiresAt } : {}),
-                  ...(refreshToken !== undefined ? { refreshToken } : {}),
-                  ...(authMethod !== undefined ? { authMethod } : {}),
-                },
-                loginSignal,
-              )
-            : post(
-                target.teamId,
-                `antigravity-subscriptions/${subscriptionId}/attach-oauth`,
-                {
-                  kind: 'oauth-personal',
-                  ...(token !== undefined ? { token } : {}),
-                  ...(expiresAt !== undefined ? { expiresAt } : {}),
-                  ...(refreshToken !== undefined ? { refreshToken } : {}),
-                  ...(authMethod !== undefined ? { authMethod } : {}),
-                },
-                loginSignal,
-              ),
-        appData,
-        onPhase,
-        signal,
-        workerPath,
-      );
     },
     importDevin(input: unknown) {
       const target = subscriptionInput(input);

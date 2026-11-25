@@ -18,7 +18,7 @@ import { createCredentialProfile, reapCredentialProfiles } from '@cairn/shared/c
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import {
   antigravityLocalStatus,
-  antigravityLogin,
+  antigravitySignIn,
   stopAntigravityLogin,
 } from '../../apps/desktop/src/antigravity-auth.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
@@ -110,7 +110,7 @@ test('desktop credential channels do not forward local secrets to the renderer',
   expect(preload.match(oldChannels)).toBeNull();
 });
 
-test('login saves in the privileged process with full CLI ACP args and removes its private profile after exit', async () => {
+test('sign-in returns the credential with full CLI ACP args and removes its private profile after exit', async () => {
   const child = Object.assign(new EventEmitter(), {
     stdin: new PassThrough(),
     stdout: new PassThrough(),
@@ -123,9 +123,7 @@ test('login saves in the privileged process with full CLI ACP args and removes i
     token: `ya29.${'x'.repeat(64)}`,
     expiresAt: Date.now() + 60_000,
   };
-  const subscription = { id: 'synthetic-sub', label: 'Synthetic account' };
-  const save = vi.fn(async () => subscription);
-  const pending = antigravityLogin(save, appData);
+  const pending = antigravitySignIn(appData);
   const args = vi.mocked(spawn).mock.calls[0]?.[1];
   const options = vi.mocked(spawn).mock.calls[0]?.[2] as
     | { env: NodeJS.ProcessEnv; cwd: string }
@@ -159,18 +157,15 @@ test('login saves in the privileged process with full CLI ACP args and removes i
     child.emit('close', 0, null);
     await pending;
   }
-  expect(save).toHaveBeenCalledWith(credential, expect.any(AbortSignal));
-  await expect(pending).resolves.toEqual({ ok: true, subscription });
+  await expect(pending).resolves.toEqual({ ok: true, credential });
   expect(existsSync(cwd)).toBe(false);
 });
 
 test('the desktop login returns an exit outcome and can be retried after ACP closes stdin', async () => {
   closeStdinOnInitialize();
-  const save = vi.fn();
-  await expect(antigravityLogin(save, appData)).resolves.toEqual({ ok: false, reason: 'exit' });
+  await expect(antigravitySignIn(appData)).resolves.toEqual({ ok: false, reason: 'exit' });
   closeStdinOnInitialize();
-  await expect(antigravityLogin(save, appData)).resolves.toEqual({ ok: false, reason: 'exit' });
-  expect(save).not.toHaveBeenCalled();
+  await expect(antigravitySignIn(appData)).resolves.toEqual({ ok: false, reason: 'exit' });
 });
 
 test('cancellation and an ACP crash both remove the temporary profile without saving', async () => {
@@ -185,8 +180,7 @@ test('cancellation and an ACP crash both remove the temporary profile without sa
       }),
     });
     vi.mocked(spawn).mockReturnValueOnce(child as unknown as ReturnType<typeof spawn>);
-    const save = vi.fn();
-    const started = antigravityLogin(save, appData);
+    const started = antigravitySignIn(appData);
     const options = vi.mocked(spawn).mock.calls.at(-1)?.[2] as { cwd: string } | undefined;
     if (options === undefined) throw new Error('Expected the login process to start');
     const { cwd } = options;
@@ -194,7 +188,6 @@ test('cancellation and an ACP crash both remove the temporary profile without sa
     else child.emit('close', 1, null);
     await expect(started).resolves.toEqual({ ok: false, reason: outcome });
     expect(existsSync(cwd)).toBe(false);
-    expect(save).not.toHaveBeenCalled();
   }
 });
 
@@ -253,14 +246,12 @@ test('a successful sign-in does not accept credentials reached through a linked 
     },
   });
   vi.mocked(spawn).mockReturnValueOnce(child as unknown as ReturnType<typeof spawn>);
-  const save = vi.fn();
-  const pending = antigravityLogin(save, appData);
+  const pending = antigravitySignIn(appData);
   const cwd = vi.mocked(spawn).mock.calls[0]?.[2]?.cwd;
   if (typeof cwd !== 'string') throw new Error('Expected a private profile');
   symlinkSync(join(home, '.gemini'), join(cwd, '.gemini'));
   child.stdout.write('{"id":1,"result":{}}\n{"id":2,"result":{}}\n');
   await expect(pending).resolves.toEqual({ ok: false, reason: 'failed' });
-  expect(save).not.toHaveBeenCalled();
   expect(existsSync(hostAcp)).toBe(true);
 });
 
@@ -330,18 +321,11 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
     { mode: 0o700 },
   );
   vi.stubEnv('CAIRN_AGY_PATH', bin);
-  const save = vi.fn(async () => {
-    const options = vi.mocked(spawn).mock.calls.at(-1)?.[2] as { cwd: string } | undefined;
-    if (options === undefined) throw new Error('Expected the login worker to start');
-    expect(existsSync(options.cwd)).toBe(false);
-    return { id: 'synthetic-sub', label: 'Account' };
-  });
-  await expect(antigravityLogin(save, appData, undefined, undefined, workerPath)).resolves.toEqual({
+  await expect(antigravitySignIn(appData, undefined, undefined, workerPath)).resolves.toEqual({
     ok: true,
-    subscription: { id: 'synthetic-sub', label: 'Account' },
+    credential: { kind: 'oauth-personal', token, expiresAt },
   });
-  expect(save).toHaveBeenCalledWith(
-    { kind: 'oauth-personal', token, expiresAt },
-    expect.any(AbortSignal),
-  );
+  const options = vi.mocked(spawn).mock.calls.at(-1)?.[2] as { cwd: string } | undefined;
+  if (options === undefined) throw new Error('Expected the login worker to start');
+  expect(existsSync(options.cwd)).toBe(false);
 });

@@ -10,6 +10,7 @@ import { useI18n } from '../i18n/provider.js';
 import { describeError } from '../lib/error-copy.js';
 import {
   AddAntigravitySubscriptionDialog,
+  AntigravityReloginDialog,
   type AntigravityReloginTarget,
 } from './antigravity-subscriptions.js';
 import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
@@ -320,27 +321,34 @@ export function AddProviderFlow({
           error={createDevinSubscription.isError}
         />
       )}
-      {view === 'antigravity-subscription' && (
-        <AddAntigravitySubscriptionDialog
-          teamId={teamId}
-          {...(relogin?.source === 'antigravity' ? { reloginTarget: relogin } : {})}
-          onLocalCreated={(created) => finishSubscription(created, 'antigravity')}
-          onClose={() => {
-            createAntigravitySubscription.reset();
-            onViewChange('closed');
-          }}
-          onCreate={(body) =>
-            createAntigravitySubscription.mutate(body, {
-              onSuccess: (created) => {
-                createAntigravitySubscription.reset();
-                finishSubscription(created, 'antigravity');
-              },
-            })
-          }
-          pending={createAntigravitySubscription.isPending}
-          error={createAntigravitySubscription.isError}
-        />
-      )}
+      {view === 'antigravity-subscription' &&
+        (relogin?.source === 'antigravity' ? (
+          <AntigravityReloginDialog
+            teamId={teamId}
+            target={relogin}
+            onSignedIn={(created) => finishSubscription(created, 'antigravity')}
+            onClose={() => onViewChange('closed')}
+          />
+        ) : (
+          <AddAntigravitySubscriptionDialog
+            teamId={teamId}
+            onLocalCreated={(created) => finishSubscription(created, 'antigravity')}
+            onClose={() => {
+              createAntigravitySubscription.reset();
+              onViewChange('closed');
+            }}
+            onCreate={(body) =>
+              createAntigravitySubscription.mutate(body, {
+                onSuccess: (created) => {
+                  createAntigravitySubscription.reset();
+                  finishSubscription(created, 'antigravity');
+                },
+              })
+            }
+            pending={createAntigravitySubscription.isPending}
+            error={createAntigravitySubscription.isError}
+          />
+        ))}
     </>
   );
 }

@@ -240,16 +240,18 @@ export function AddDevinSubscriptionDialog({
                 : loginFailCopy(failReason, t)}
           </p>
         )}
-        <FormField label={t('名称')} htmlFor="devin-subscription-label">
-          <Input
-            className={FORM_CONTROL_CLS}
-            id="devin-subscription-label"
-            data-testid="devin-subscription-label"
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-        </FormField>
-        {bridge !== null && !pasteOpen ? (
+        {reloginTarget === undefined && (
+          <FormField label={t('名称')} htmlFor="devin-subscription-label">
+            <Input
+              className={FORM_CONTROL_CLS}
+              id="devin-subscription-label"
+              data-testid="devin-subscription-label"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+            />
+          </FormField>
+        )}
+        {bridge !== null && (local === null || localAction !== null) && !pasteOpen ? (
           <Button
             variant="link"
             size="sm"

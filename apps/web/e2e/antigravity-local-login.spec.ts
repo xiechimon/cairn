@@ -47,15 +47,22 @@ async function installBridge(
             importOk
               ? w.saveAntigravityOnDesktop(input)
               : { ok: false, reason: 'no-key' },
-          login: (input: DesktopSubscriptionInput, subscriptionId?: string) => {
+          signIn: () => {
             w.__antigravity!.loginCalls += 1;
             return new Promise((resolve) => {
               w.__antigravity!.resolve = (outcome) => {
-                if ((outcome as { ok?: boolean }).ok === true) {
-                  void w.saveAntigravityOnDesktop(input, subscriptionId).then(resolve);
-                } else {
-                  resolve(outcome);
-                }
+                resolve(
+                  (outcome as { ok?: boolean }).ok === true
+                    ? {
+                        ok: true,
+                        credential: {
+                          kind: 'oauth-personal',
+                          token: `ya29.${'s'.repeat(64)}`,
+                          expiresAt: Date.now() + 3_600_000,
+                        },
+                      }
+                    : outcome,
+                );
               };
             });
           },
@@ -125,6 +132,17 @@ async function openDialog(
     if (path === '/api/teams/t1/antigravity-subscriptions') {
       if (route.request().method() === 'POST') {
         const body = route.request().postDataJSON();
+        if (typeof body.token === 'string' && body.token.startsWith('ya29.')) {
+          expect(body.label).toEqual(expect.any(String));
+          calls.desktopLabels.push(body.label);
+          const id = `ag-sub-${subscriptions.length + 1}`;
+          const signedIn: AntigravitySubscriptionListEntry = {
+            id, kind: 'antigravity-subscription', label: body.label, hasToken: true,
+            expiresAt: OAUTH_EXPIRES_AT, enabled: subscriptions.length === 0, createdAt: Date.now(),
+          };
+          subscriptions.push(signedIn);
+          return json(signedIn, 201);
+        }
         calls.created.push({ token: body.token ?? null, runnerId: body.runnerId });
         const created: AntigravitySubscriptionListEntry = {
           id: 'ag-sub-1',
@@ -355,14 +373,18 @@ test('a host-keyring subscription detail offers re-login and verifies green afte
   let attached = false;
   await installBridge(page, {
     status: { installed: true, loggedIn: false, canLogin: true },
-  }, ({ teamId, label }, subscriptionId) => {
-    expect(teamId).toBe('t1');
-    expect(subscriptionId).toBe('ag-sub-1');
-    attached = true;
-    return { ok: true, subscription: { id: subscriptionId, label } };
   });
   let verifyCalls = 0;
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/attach-oauth') {
+      expect(route.request().method()).toBe('POST');
+      expect(route.request().postDataJSON()).toMatchObject({ kind: 'oauth-personal' });
+      attached = true;
+      return json({
+        id: 'ag-sub-1', kind: 'antigravity-subscription', label: 'Antigravity 订阅',
+        hasToken: true, expiresAt: OAUTH_EXPIRES_AT, enabled: true, createdAt: 1,
+      });
+    }
     if (path === '/api/teams/t1/antigravity-subscriptions') {
       return json([
         {
@@ -754,18 +776,20 @@ test('local Mac sign-in while a manual Verify is running supersedes the stale ch
   page,
 }) => {
   let attached = false;
-  await installBridge(
-    page,
-    { status: { installed: true, loggedIn: false, canLogin: true, runnerId: 'm-mac' } },
-    ({ label }, subscriptionId) => {
-      attached = true;
-      return { ok: true, subscription: { id: subscriptionId ?? 'ag-sub-1', label } };
-    },
-  );
+  await installBridge(page, {
+    status: { installed: true, loggedIn: false, canLogin: true, runnerId: 'm-mac' },
+  });
   let verifyAttempt = 0;
   const { promise: holdFirst, resolve: releaseFirst } = Promise.withResolvers<void>();
 
   await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/attach-oauth') {
+      attached = true;
+      return json({
+        id: 'ag-sub-1', kind: 'antigravity-subscription', label: 'Antigravity 订阅',
+        hasToken: true, oauthPersonal: true, expiresAt: OAUTH_EXPIRES_AT, enabled: true, createdAt: 1,
+      });
+    }
     if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     if (path === '/api/teams/t1/antigravity-subscriptions') {
@@ -922,7 +946,7 @@ test('window focus updates local Mac sign-in button and creation shows checking 
       antigravity: {
         status: async () => ({ ...w.__localStatus! }),
         import: (input: DesktopSubscriptionInput) => w.importAntigravityFocusTest(input),
-        login: (input: DesktopSubscriptionInput) => w.importAntigravityFocusTest(input),
+        signIn: async () => ({ ok: false, reason: 'cancelled' }),
         cancelLogin: async () => {},
         onLoginProgress: () => () => {},
       },

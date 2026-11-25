@@ -4,14 +4,11 @@ import {
   antigravitySubscriptionLoginWarning,
   antigravitySubscriptionSignedOutWarning,
 } from '../antigravity-login-warning.js';
-import {
-  useAntigravitySubscriptions,
-  useCreateAntigravitySubscription,
-} from '../api/antigravity-subscriptions.js';
+import { useAntigravitySubscriptions } from '../api/antigravity-subscriptions.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useI18n } from '../i18n/provider.js';
-import { AddAntigravitySubscriptionDialog } from '../resources/antigravity-subscriptions.js';
+import { AntigravityReloginDialog } from '../resources/antigravity-subscriptions.js';
 import {
   expiryWarningKind,
   SubscriptionLoginBanner,
@@ -62,7 +59,6 @@ export function AntigravityLoginBanner({
   const { t } = useI18n();
   const { teamId } = useLiveData();
   const client = useQueryClient();
-  const createSubscription = useCreateAntigravitySubscription(teamId);
   const [reloginOpen, setReloginOpen] = useState(false);
 
   const primary =
@@ -70,7 +66,6 @@ export function AntigravityLoginBanner({
     warnings[0];
 
   const finishRelogin = () => {
-    createSubscription.reset();
     setReloginOpen(false);
     void client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] });
     void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
@@ -109,25 +104,15 @@ export function AntigravityLoginBanner({
         }}
       />
       {reloginOpen && primary !== undefined && (
-        <AddAntigravitySubscriptionDialog
+        <AntigravityReloginDialog
           teamId={teamId}
-          reloginTarget={{
+          target={{
             id: primary.subscriptionId,
             label: primary.label,
             attachInPlace: primary.attachInPlace,
           }}
-          onLocalCreated={() => finishRelogin()}
-          onClose={() => {
-            createSubscription.reset();
-            setReloginOpen(false);
-          }}
-          onCreate={(body) =>
-            createSubscription.mutate(body, {
-              onSuccess: () => finishRelogin(),
-            })
-          }
-          pending={createSubscription.isPending}
-          error={createSubscription.isError}
+          onSignedIn={() => finishRelogin()}
+          onClose={() => setReloginOpen(false)}
         />
       )}
     </>

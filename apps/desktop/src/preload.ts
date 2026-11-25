@@ -2,6 +2,7 @@ import type {
   AntigravityLocalStatus,
   AntigravityLoginOutcome,
   AntigravityLoginPhase,
+  AntigravitySignInOutcome,
   DesktopActivity,
   DesktopLocalProvider,
   DesktopMenuCommand,
@@ -102,11 +103,7 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     status: (): Promise<AntigravityLocalStatus> => ipcRenderer.invoke('antigravity:status'),
     import: (input: DesktopSubscriptionInput): Promise<AntigravityLoginOutcome> =>
       ipcRenderer.invoke('antigravity:import', input),
-    login: (
-      input: DesktopSubscriptionInput,
-      subscriptionId?: string,
-    ): Promise<AntigravityLoginOutcome> =>
-      ipcRenderer.invoke('antigravity:login', input, subscriptionId),
+    signIn: (): Promise<AntigravitySignInOutcome> => ipcRenderer.invoke('antigravity:sign-in'),
     cancelLogin: (): Promise<void> => ipcRenderer.invoke('antigravity:cancel-login'),
     onLoginProgress: (listener: (phase: AntigravityLoginPhase) => void): (() => void) => {
       const relay = (_event: unknown, phase: AntigravityLoginPhase) => listener(phase);

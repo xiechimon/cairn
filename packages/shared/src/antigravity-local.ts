@@ -1,5 +1,9 @@
 import semver from 'semver';
-import { ANTIGRAVITY_TOKEN_REGEX, type AntigravityOAuth } from './antigravity-subscription.js';
+import {
+  ANTIGRAVITY_TOKEN_REGEX,
+  type AntigravityOAuth,
+  type AntigravityOAuthStepCredential,
+} from './antigravity-subscription.js';
 import type { DesktopSubscriptionMetadata } from './desktop-local-credentials.js';
 
 export function serializeAntigravityOAuthTokenFile(
@@ -40,6 +44,10 @@ export type AntigravityLoginFailure =
 
 export type AntigravityLoginOutcome =
   | { ok: true; subscription: DesktopSubscriptionMetadata; runnerId?: string }
+  | { ok: false; reason: AntigravityLoginFailure };
+
+export type AntigravitySignInOutcome =
+  | { ok: true; credential: AntigravityOAuthStepCredential }
   | { ok: false; reason: AntigravityLoginFailure };
 
 export type AntigravityLoginPhase = 'installing' | 'authenticating';

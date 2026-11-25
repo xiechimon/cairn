@@ -60,7 +60,7 @@ async function openDelayedDialog(
             return status;
           },
           import: async () => ({ ok: false, reason: 'no-key' }),
-          login: async () => ({ ok: false, reason: 'cancelled' }),
+          signIn: async () => ({ ok: false, reason: 'cancelled' }),
           cancelLogin: async () => {},
         },
       };

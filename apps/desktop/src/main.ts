@@ -63,6 +63,7 @@ import {
 import {
   antigravityCancelLogin,
   antigravityLocalStatus,
+  antigravitySignIn,
   stopAntigravityLogin,
 } from './antigravity-auth.js';
 import { appMenuTemplate } from './app-menu.js';
@@ -1396,8 +1397,9 @@ function serveUpdates(
     if (fromLocalMainPage(event)) devinCancelLogin();
   });
   ipcMain.handle('antigravity:status', async (event) => {
-    if (!fromLocalMainPage(event)) return { installed: false, loggedIn: false, canLogin: false };
+    if (!fromMainPage(event)) return { installed: false, loggedIn: false, canLogin: false };
     const status = await antigravityLocalStatus();
+    if (!allowLocalCredentials) return { ...status, loggedIn: false };
     const runnerId = readRunnerRegistration(runnerHome())?.machineId;
     return runnerId === undefined ? status : { ...status, runnerId };
   });
@@ -1406,25 +1408,21 @@ function serveUpdates(
       ? credentials.importAntigravity(input)
       : { ok: false, reason: 'cancelled' },
   );
-  ipcMain.handle('antigravity:login', async (event, input: unknown, subscriptionId?: unknown) => {
-    if (!fromLocalMainPage(event) || credentials === null) {
-      return { ok: false, reason: 'cancelled' };
-    }
+  ipcMain.handle('antigravity:sign-in', async (event) => {
+    if (!fromMainPage(event)) return { ok: false, reason: 'cancelled' };
     const controller = new AbortController();
     const cancel = () => controller.abort();
     event.sender.once('render-process-gone', cancel);
     event.sender.once('destroyed', cancel);
     try {
-      const outcome = await credentials.loginAntigravity(
-        input,
+      return await antigravitySignIn(
+        app.getPath('userData'),
         (phase) => {
           if (!event.sender.isDestroyed()) event.sender.send('antigravity:login-progress', phase);
         },
         controller.signal,
-        subscriptionId,
+        workerPath,
       );
-      const runnerId = readRunnerRegistration(runnerHome())?.machineId;
-      return outcome.ok && runnerId !== undefined ? { ...outcome, runnerId } : outcome;
     } finally {
       event.sender.removeListener('render-process-gone', cancel);
       event.sender.removeListener('destroyed', cancel);

@@ -37,7 +37,7 @@ export function FormField({ label, htmlFor, help, className, disabled, children 
 }
 
 interface FormActionsProps {
-  primary: {
+  primary?: {
     label: string;
     type?: 'submit' | 'button';
     onClick?: () => void;
@@ -70,15 +70,17 @@ export function FormActions({ primary, secondary, hint, className }: FormActions
           {secondary.label}
         </Button>
       )}
-      <Button
-        type={primary.type ?? 'button'}
-        className={cn(DIALOG_PRIMARY_BUTTON, 'flex-none pointer-coarse:h-11')}
-        disabled={primary.disabled}
-        data-testid={primary.testId}
-        onClick={primary.onClick}
-      >
-        {primary.label}
-      </Button>
+      {primary != null && (
+        <Button
+          type={primary.type ?? 'button'}
+          className={cn(DIALOG_PRIMARY_BUTTON, 'flex-none pointer-coarse:h-11')}
+          disabled={primary.disabled}
+          data-testid={primary.testId}
+          onClick={primary.onClick}
+        >
+          {primary.label}
+        </Button>
+      )}
     </div>
   );
 }

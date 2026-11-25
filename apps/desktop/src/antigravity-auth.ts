@@ -5,15 +5,14 @@ import { join } from 'node:path';
 import {
   ANTIGRAVITY_REFRESH_TOKEN_REGEX,
   type AntigravityLocalStatus,
-  type AntigravityLoginOutcome,
   type AntigravityLoginPhase,
   type AntigravityOAuthAuthMethod,
   type AntigravityOAuthStepCredential,
+  type AntigravitySignInOutcome,
   antigravityCliDir,
   antigravityKeyFromText,
   antigravityOAuthStepCredentialSchema,
   compareVersions,
-  type DesktopSubscriptionMetadata,
   isAntigravityOAuthAccessToken,
 } from '@cairn/shared';
 import {
@@ -261,7 +260,7 @@ export function readLocalAntigravityCredential(): AntigravityImportCredential | 
   return null;
 }
 
-let flight: { cancel: () => void; done: Promise<AntigravityLoginOutcome> } | null = null;
+let flight: { cancel: () => void; done: Promise<AntigravitySignInOutcome> } | null = null;
 
 export function antigravityCancelLogin(): void {
   flight?.cancel();
@@ -273,16 +272,12 @@ export async function stopAntigravityLogin(): Promise<void> {
   await current?.done;
 }
 
-export function antigravityLogin(
-  save: (
-    credential: AntigravityOAuthStepCredential,
-    signal: AbortSignal,
-  ) => Promise<DesktopSubscriptionMetadata>,
+export function antigravitySignIn(
   appData: string,
   onPhase?: (phase: AntigravityLoginPhase) => void,
   callerSignal?: AbortSignal,
   workerPath?: string,
-): Promise<AntigravityLoginOutcome> {
+): Promise<AntigravitySignInOutcome> {
   if (flight !== null) return Promise.resolve({ ok: false, reason: 'busy' });
   const controller = new AbortController();
   const signal =
@@ -290,14 +285,14 @@ export function antigravityLogin(
       ? controller.signal
       : AbortSignal.any([controller.signal, callerSignal]);
   const done = runLogin()
-    .catch((): AntigravityLoginOutcome => ({ ok: false, reason: 'failed' }))
+    .catch((): AntigravitySignInOutcome => ({ ok: false, reason: 'failed' }))
     .finally(() => {
       flight = null;
     });
   flight = { cancel: () => controller.abort(), done };
   return done;
 
-  async function runLogin(): Promise<AntigravityLoginOutcome> {
+  async function runLogin(): Promise<AntigravitySignInOutcome> {
     if (signal.aborted) return { ok: false, reason: 'cancelled' };
     let resolved = resolveAntigravityBinary();
     if (resolved === null) {
@@ -336,10 +331,7 @@ export function antigravityLogin(
     if (signal.aborted) return { ok: false, reason: 'cancelled' };
     const credential = parseOAuthCredential(auth.text);
     if (credential === null) return { ok: false, reason: 'failed' };
-    try {
-      return { ok: true, subscription: await save(credential, signal) };
-    } catch {
-      return { ok: false, reason: signal.aborted ? 'cancelled' : 'save' };
-    }
+    if (signal.aborted) return { ok: false, reason: 'cancelled' };
+    return { ok: true, credential };
   }
 }

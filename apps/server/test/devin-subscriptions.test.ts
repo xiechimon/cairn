@@ -344,7 +344,7 @@ test('expired enabled subscription does not verify and no run reaches it', async
     .where(eq(devinSubscription.id, id))
     .run();
   const verified = await req(s.app, 'POST', `${path}/${id}/verify`);
-  expect(await verified.json()).toEqual({ ok: false });
+  expect(await verified.json()).toEqual({ ok: false, reason: 'auth' });
   const enabled = await req(s.app, 'POST', `${path}/${id}/enable`);
   expect(enabled.status).toBe(409);
   expect(await enabled.json()).toMatchObject({ code: 'expired' });

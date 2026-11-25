@@ -1,4 +1,5 @@
 import type {
+  AntigravityOAuthStepCredential,
   AntigravitySubscription,
   AntigravitySubscriptionListEntry,
   AntigravitySubscriptionVerifyResult,
@@ -89,6 +90,22 @@ export function useCreateAntigravitySubscription(teamId: string | undefined) {
       api.post<AntigravitySubscription>(`/api/teams/${teamId}/antigravity-subscriptions`, body),
     gcTime: 0,
   });
+}
+
+export function saveAntigravitySignIn(
+  teamId: string,
+  credential: AntigravityOAuthStepCredential,
+  target: { attachTo: string } | { label: string },
+): Promise<AntigravitySubscription> {
+  return 'attachTo' in target
+    ? api.post<AntigravitySubscription>(
+        `/api/teams/${teamId}/antigravity-subscriptions/${target.attachTo}/attach-oauth`,
+        credential,
+      )
+    : api.post<AntigravitySubscription>(`/api/teams/${teamId}/antigravity-subscriptions`, {
+        label: target.label,
+        ...credential,
+      });
 }
 
 export function useDeleteAntigravitySubscription(teamId: string | undefined) {

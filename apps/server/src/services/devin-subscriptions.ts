@@ -282,7 +282,7 @@ export async function verifyDevinSubscriptionConnection(
   if (!row) throw notFound('Devin subscription connection');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
     invalidateUpstreamModels(deps.db, row.id);
-    return { ok: false };
+    return { ok: false, reason: 'auth' };
   }
   claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
   const result = await timedCheck(

@@ -487,7 +487,7 @@ export async function verifySubscriptionConnection(
     .where(and(eq(claudeSubscription.teamId, teamId), eq(claudeSubscription.id, id)))
     .get();
   if (!row) throw notFound('Claude subscription connection');
-  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false, reason: 'auth' };
   claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
   const result = await timedCheck(
     () =>

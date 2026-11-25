@@ -2,14 +2,21 @@ import type {
   AntigravityLocalStatus,
   AntigravityLoginOutcome,
   AntigravityLoginPhase,
+  AntigravityOAuthStepCredential,
   AntigravityRunnerLogin,
+  AntigravitySignInOutcome,
   AntigravitySubscriptionListEntry,
   DesktopSubscriptionInput,
   DesktopSubscriptionMetadata,
 } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import type { CreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
-import { defaultRunnerTarget, extractAntigravityToken } from '../api/antigravity-subscriptions.js';
+import {
+  defaultRunnerTarget,
+  extractAntigravityToken,
+  saveAntigravitySignIn,
+} from '../api/antigravity-subscriptions.js';
+import { ApiError } from '../api/client.js';
 import { useMachines, useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
@@ -26,10 +33,7 @@ import type { TFunc } from '../i18n/translate.js';
 interface AntigravityBridge {
   status: () => Promise<AntigravityLocalStatus>;
   import: (input: DesktopSubscriptionInput) => Promise<AntigravityLoginOutcome>;
-  login: (
-    input: DesktopSubscriptionInput,
-    subscriptionId?: string,
-  ) => Promise<AntigravityLoginOutcome>;
+  signIn: () => Promise<AntigravitySignInOutcome>;
   cancelLogin: () => Promise<void>;
   onLoginProgress?: (listener: (phase: AntigravityLoginPhase) => void) => () => void;
 }
@@ -37,7 +41,8 @@ interface AntigravityBridge {
 export function antigravityBridge(): AntigravityBridge | null {
   const desktop = (window as Window & { cairnDesktop?: { antigravity?: AntigravityBridge } })
     .cairnDesktop;
-  return desktop?.antigravity ?? null;
+  const bridge = desktop?.antigravity;
+  return typeof bridge?.signIn === 'function' ? bridge : null;
 }
 
 type LoginPhase = 'idle' | 'installing' | 'waiting' | 'failed';
@@ -63,15 +68,24 @@ function useAntigravityLogin(bridge: AntigravityBridge | null) {
   );
 
   const start = async (
-    input: DesktopSubscriptionInput,
-    subscriptionId?: string,
+    save: (credential: AntigravityOAuthStepCredential) => Promise<DesktopSubscriptionMetadata>,
   ): Promise<AntigravityLoginOutcome> => {
     if (bridge === null || activeRef.current) return { ok: false, reason: 'busy' };
     activeRef.current = true;
     setPhase('waiting');
-    const outcome = await bridge
-      .login(input, subscriptionId)
-      .catch((): AntigravityLoginOutcome => ({ ok: false, reason: 'failed' }));
+    const signedIn = await bridge
+      .signIn()
+      .catch((): AntigravitySignInOutcome => ({ ok: false, reason: 'failed' }));
+    let saveFailure = 'save';
+    const outcome: AntigravityLoginOutcome = signedIn.ok
+      ? await save(signedIn.credential).then(
+          (subscription): AntigravityLoginOutcome => ({ ok: true, subscription }),
+          (error: unknown): AntigravityLoginOutcome => {
+            saveFailure = saveFailureReason(error);
+            return { ok: false, reason: 'save' };
+          },
+        )
+      : signedIn;
     activeRef.current = false;
     if (outcome.ok) {
       setPhase('idle');
@@ -81,7 +95,7 @@ function useAntigravityLogin(bridge: AntigravityBridge | null) {
       setPhase('idle');
       return outcome;
     }
-    setFailReason(outcome.reason);
+    setFailReason(outcome.reason === 'save' ? saveFailure : outcome.reason);
     setPhase('failed');
     return outcome;
   };
@@ -89,16 +103,37 @@ function useAntigravityLogin(bridge: AntigravityBridge | null) {
   return { phase, failReason, start, cancel: () => void bridge?.cancelLogin() };
 }
 
-function loginFailCopy(reason: string, t: TFunc): string {
+function saveFailureReason(error: unknown): string {
+  if (!(error instanceof ApiError)) return 'save';
+  if ((error.data as { code?: unknown } | undefined)?.code === 'running-tasks')
+    return 'save-running';
+  return error.message.startsWith('Sign in with the Google account originally used')
+    ? 'save-account'
+    : 'save';
+}
+
+function loginFailCopy(reason: string, t: TFunc, offerPaste: boolean): string {
   switch (reason) {
+    case 'save-account':
+      return t('登录的 Google 账号和这个订阅原来的账号不同。请用原来的账号重试。');
+    case 'save-running':
+      return t('这个订阅上还有任务在运行。等任务结束或停止后再重试。');
     case 'no-binary':
-      return t('Antigravity 未能安装。请重试，或改用下方粘贴。');
+      return offerPaste
+        ? t('Antigravity 未能安装。请重试，或改用下方粘贴。')
+        : t('Antigravity 未能安装。请检查网络后重试。');
     case 'busy':
       return t('另一个 Antigravity 登录正在进行，结束后请重试。');
     case 'timeout':
-      return t('等待 Antigravity 登录超时。请重试，或改用下方粘贴。');
+      return offerPaste
+        ? t('等待 Antigravity 登录超时。请重试，或改用下方粘贴。')
+        : t('等待 Antigravity 登录超时。请重试。');
+    case 'save':
+      return t('已完成 Google 登录，但未能保存到服务器。请重试。');
     default:
-      return t('Antigravity 登录未完成。请重试，或改用下方粘贴。');
+      return offerPaste
+        ? t('Antigravity 登录未完成。请重试，或改用下方粘贴。')
+        : t('Antigravity 登录未完成。请重试。');
   }
 }
 
@@ -144,6 +179,114 @@ export interface AntigravityReloginTarget {
   attachInPlace: boolean;
 }
 
+export function AntigravityReloginDialog({
+  teamId,
+  target,
+  onClose,
+  onSignedIn,
+}: {
+  teamId: string | undefined;
+  target: AntigravityReloginTarget;
+  onClose: () => void;
+  onSignedIn: (subscription: DesktopSubscriptionMetadata) => void;
+}) {
+  const { t } = useI18n();
+  const [bridge] = useState(antigravityBridge);
+  const { local } = useAntigravityLocalStatus(bridge);
+  const login = useAntigravityLogin(bridge);
+  const autoStartedRef = useRef(false);
+  const canSignIn =
+    bridge !== null &&
+    teamId !== undefined &&
+    local !== null &&
+    (local.installed || local.canLogin);
+  const loginActive = login.phase === 'waiting' || login.phase === 'installing';
+
+  const startSignIn = async () => {
+    if (!canSignIn || loginActive) return;
+    const outcome = await login.start((credential) =>
+      saveAntigravitySignIn(
+        teamId,
+        credential,
+        target.attachInPlace ? { attachTo: target.id } : { label: target.label },
+      ),
+    );
+    if (outcome.ok) onSignedIn(outcome.subscription);
+  };
+  const startSignInRef = useRef(startSignIn);
+  startSignInRef.current = startSignIn;
+
+  useEffect(() => {
+    if (!canSignIn || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    void startSignInRef.current();
+  }, [canSignIn]);
+
+  const checking = bridge !== null && local === null;
+  const unavailableCopy =
+    bridge === null
+      ? t('在 Cairn 桌面 App 中打开这一页，即可重新登录 Antigravity。')
+      : t('这台电脑无法安装 Antigravity。请在 Mac 上的 Cairn 桌面 App 中重新登录。');
+
+  return (
+    <DialogShell
+      title={t('重新登录 Antigravity')}
+      open
+      onClose={onClose}
+      size="s"
+      footer={
+        <FormActions
+          className="pt-0"
+          {...(canSignIn && !loginActive
+            ? {
+                primary: {
+                  label: login.phase === 'failed' ? t('重试') : t('重新登录'),
+                  testId: 'antigravity-relogin-start',
+                  onClick: () => void startSignIn(),
+                },
+              }
+            : {})}
+          secondary={{ label: t('取消'), onClick: onClose }}
+        />
+      }
+    >
+      <FormStack className="max-w-none">
+        <div data-testid="antigravity-relogin-state" className="flex min-w-0 flex-col gap-2">
+          {checking ? (
+            <div aria-busy="true" className="flex min-h-8 items-center gap-2">
+              <RingSpinner className="size-4 flex-none" />
+              <span role="status" className="text-meta text-content-secondary">
+                {t('正在检查 Antigravity 登录状态')}
+              </span>
+            </div>
+          ) : !canSignIn ? (
+            <p className="m-0 text-meta text-content-secondary">{unavailableCopy}</p>
+          ) : loginActive ? (
+            <div className="flex min-h-8 items-center gap-2">
+              <RingSpinner className="size-4 flex-none" />
+              <span role="status" className="min-w-0 flex-1 text-meta text-content-secondary">
+                {login.phase === 'installing'
+                  ? t('正在下载安装 Antigravity，完成后会打开浏览器登录。')
+                  : t('已在浏览器中打开 Antigravity 登录页，完成后会自动继续。')}
+              </span>
+            </div>
+          ) : login.phase === 'failed' ? (
+            <p role="alert" className="m-0 text-meta text-content-secondary">
+              {loginFailCopy(login.failReason, t, false)}
+            </p>
+          ) : (
+            <p className="m-0 text-meta text-content-secondary">
+              {t('会在浏览器中打开 Google 登录，完成后自动更新「{label}」。', {
+                label: target.label,
+              })}
+            </p>
+          )}
+        </div>
+      </FormStack>
+    </DialogShell>
+  );
+}
+
 export function AddAntigravitySubscriptionDialog({
   teamId,
   onClose,
@@ -151,7 +294,6 @@ export function AddAntigravitySubscriptionDialog({
   onLocalCreated,
   pending,
   error,
-  reloginTarget,
 }: {
   teamId: string | undefined;
   onClose: () => void;
@@ -159,14 +301,13 @@ export function AddAntigravitySubscriptionDialog({
   onLocalCreated: (subscription: DesktopSubscriptionMetadata) => void;
   pending: boolean;
   error: boolean;
-  reloginTarget?: AntigravityReloginTarget;
 }) {
   const { t } = useI18n();
   const { live, teamId: liveTeamId } = useLiveData();
   const resolvedTeamId = teamId ?? liveTeamId;
   const teamsQ = useTeams(live);
   const machinesQ = useMachines(resolvedTeamId, live);
-  const [label, setLabel] = useState(reloginTarget?.label ?? t('Antigravity 订阅'));
+  const [label, setLabel] = useState(t('Antigravity 订阅'));
   const [token, setToken] = useState('');
   const [bridge] = useState(antigravityBridge);
   const { local } = useAntigravityLocalStatus(bridge);
@@ -176,7 +317,6 @@ export function AddAntigravitySubscriptionDialog({
   const [importing, setImporting] = useState(false);
   const localActionRef = useRef(false);
   const submittedRef = useRef(false);
-  const autoStartedRef = useRef(false);
   const busy = pending || importing || login.phase === 'waiting' || login.phase === 'installing';
 
   useEffect(() => {
@@ -211,33 +351,16 @@ export function AddAntigravitySubscriptionDialog({
       return;
     localActionRef.current = true;
     setImportFailed(false);
+    const name = label.trim();
     try {
-      const outcome = await login.start(
-        { teamId, label: label.trim() },
-        reloginTarget?.attachInPlace === true ? reloginTarget.id : undefined,
+      const outcome = await login.start((credential) =>
+        saveAntigravitySignIn(teamId, credential, { label: name }),
       );
       if (outcome.ok) onLocalCreated(outcome.subscription);
     } finally {
       localActionRef.current = false;
     }
   };
-
-  const startLoginRef = useRef(startLogin);
-  startLoginRef.current = startLogin;
-
-  useEffect(() => {
-    if (
-      reloginTarget === undefined ||
-      autoStartedRef.current ||
-      bridge === null ||
-      local === null ||
-      (!local.installed && !local.canLogin)
-    ) {
-      return;
-    }
-    autoStartedRef.current = true;
-    void startLoginRef.current();
-  }, [reloginTarget, bridge, local]);
 
   const defaultMachineId =
     (teamsQ.data?.find((team) => team.id === resolvedTeamId) ?? teamsQ.data?.[0])
@@ -290,7 +413,7 @@ export function AddAntigravitySubscriptionDialog({
             {t('取消')}
           </Button>
         </div>
-      ) : local.loggedIn && !importFailed && reloginTarget === undefined ? (
+      ) : local.loggedIn && !importFailed ? (
         <div className="flex h-8 min-w-0 items-center justify-between gap-2 pointer-coarse:h-11">
           <span className="min-w-0 truncate text-meta text-content-secondary" title={loggedInNote}>
             {loggedInNote}
@@ -333,7 +456,7 @@ export function AddAntigravitySubscriptionDialog({
 
   return (
     <DialogShell
-      title={reloginTarget !== undefined ? t('重新登录 Antigravity') : t('添加 Antigravity 订阅')}
+      title={t('添加 Antigravity 订阅')}
       open
       onClose={onClose}
       size="s"
@@ -344,11 +467,7 @@ export function AddAntigravitySubscriptionDialog({
             label: t('保存'),
             disabled: busy || !label.trim() || (pasteOpen && !token.trim()),
             onClick: () => {
-              if (!pasteOpen && bridge !== null) {
-                if (reloginTarget !== undefined) {
-                  void startLogin();
-                  return;
-                }
+              if (!pasteOpen && local?.loggedIn === true && !importFailed) {
                 void importLocal();
                 return;
               }
@@ -366,7 +485,7 @@ export function AddAntigravitySubscriptionDialog({
         {localAction}
         {login.phase === 'failed' && (
           <p role="alert" className="m-0 text-meta text-content-tertiary">
-            {loginFailCopy(login.failReason, t)}
+            {loginFailCopy(login.failReason, t, true)}
           </p>
         )}
         {importFailed && (
@@ -502,7 +621,9 @@ export function AntigravityRelogin({
                   return;
                 }
                 void login
-                  .start({ teamId, label: subscription.label }, subscription.id)
+                  .start((credential) =>
+                    saveAntigravitySignIn(teamId, credential, { attachTo: subscription.id }),
+                  )
                   .then((outcome) => {
                     if (!outcome.ok) return;
                     refresh();
@@ -522,7 +643,7 @@ export function AntigravityRelogin({
       </p>
       {login.phase === 'failed' && (
         <p role="alert" className="m-0 text-meta text-content-tertiary">
-          {loginFailCopy(login.failReason, t)}
+          {loginFailCopy(login.failReason, t, false)}
         </p>
       )}
     </div>

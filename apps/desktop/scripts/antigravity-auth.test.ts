@@ -3,12 +3,13 @@ import { EventEmitter } from 'node:events';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { OWNER_CHANNEL_HEADER } from '@cairn/shared';
+import { type AntigravitySignInOutcome, OWNER_CHANNEL_HEADER } from '@cairn/shared';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { antigravitySubscription } from '../../server/src/db/schema.js';
 import { openAntigravitySubscription } from '../../server/src/services/antigravity-subscriptions.js';
 import { bootServer } from '../../server/test/helpers.js';
+import { antigravitySignIn } from '../src/antigravity-auth.js';
 import { desktopCredentialActions } from '../src/local-credential-actions.js';
 import { scanLocalProviders } from '../src/local-providers.js';
 
@@ -16,6 +17,7 @@ const origin = 'http://localhost:3210';
 const owner = 'synthetic-owner-token';
 const channel = 'synthetic-owner-channel';
 let actions: ReturnType<typeof desktopCredentialActions>;
+let appData: string;
 const tokenFor = (value: string) => `ya29.${value.repeat(64)}`;
 let home: string;
 
@@ -73,7 +75,8 @@ function mockLogin() {
 
 beforeEach(() => {
   home = makeTestTempDir('agy-desktop-tests-');
-  actions = desktopCredentialActions(origin, owner, channel, makeTestTempDir('agy-desktop-data-'));
+  appData = makeTestTempDir('agy-desktop-data-');
+  actions = desktopCredentialActions(origin, owner, channel, appData);
   vi.stubEnv('HOME', home);
   vi.stubEnv('TMPDIR', home);
   vi.stubEnv('CAIRN_AGY_PATH', process.execPath);
@@ -85,6 +88,26 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+
+async function saveSignedIn(
+  teamId: string,
+  label: string,
+  pending: Promise<AntigravitySignInOutcome>,
+) {
+  const outcome = await pending;
+  if (!outcome.ok) return outcome;
+  const response = await fetch(`${origin}/api/teams/${teamId}/antigravity-subscriptions`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${owner}`,
+      [OWNER_CHANNEL_HEADER]: channel,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ label, ...outcome.credential }),
+  });
+  const saved = (await response.json()) as { id: string; label: string };
+  return { ok: true as const, subscription: { id: saved.id, label: saved.label } };
+}
 
 function completeLogin(
   child: ReturnType<typeof mockLogin>,
@@ -109,13 +132,9 @@ test('two default desktop sign-ins save distinct encrypted credentials and read 
   const expiresAt = Date.now() + 3_600_000;
   for (const account of ['a', 'b']) {
     const child = mockLogin();
-    const pending = actions.loginAntigravity(
-      { teamId: s.team.id, label: `Account ${account}` },
-      () => {},
-      new AbortController().signal,
-    );
+    const pending = antigravitySignIn(appData, () => {}, new AbortController().signal);
     const profile = completeLogin(child, tokenFor(account), expiresAt);
-    const outcome = await pending;
+    const outcome = await saveSignedIn(s.team.id, `Account ${account}`, pending);
     expect(outcome).toEqual({
       ok: true,
       subscription: { id: expect.any(String), label: `Account ${account}` },
@@ -221,14 +240,10 @@ test('local Antigravity, Devin and Pi imports return metadata only and use the b
 test.each(['missing', 'expired', 'malformed'] as const)(
   'does not reuse a real-home fixture when the private profile has a %s credential',
   async (failure) => {
-    const s = offlineServer();
+    offlineServer();
     oauthFile(home, tokenFor('c'), Date.now() + 60_000);
     const child = mockLogin();
-    const pending = actions.loginAntigravity(
-      { teamId: s.team.id, label: 'Account' },
-      () => {},
-      new AbortController().signal,
-    );
+    const pending = antigravitySignIn(appData, () => {}, new AbortController().signal);
     const profile = completeLogin(
       child,
       failure === 'missing' ? undefined : tokenFor('a'),
@@ -296,11 +311,7 @@ test('desktop sign-in captures durable 1// refresh token with AGY_CLI_FORCE_FILE
   const expiresAt = Date.now() + 3_600_000;
   const child = mockLogin();
   mockServerRefreshProbe(accessToken);
-  const pending = actions.loginAntigravity(
-    { teamId: s.team.id, label: 'Durable Google' },
-    () => {},
-    new AbortController().signal,
-  );
+  const pending = antigravitySignIn(appData, () => {}, new AbortController().signal);
   const spawnCall = vi.mocked(spawn).mock.calls.at(-1);
   const options = spawnCall?.[2] as { cwd: string; env?: Record<string, string> } | undefined;
   if (options === undefined) throw new Error('Expected login spawn');
@@ -320,7 +331,7 @@ test('desktop sign-in captures durable 1// refresh token with AGY_CLI_FORCE_FILE
   );
   child.stdout.write('{"id":1,"result":{"authMethods":[{"id":"oauth-personal"}]}}\n');
   child.stdout.write('{"id":2,"result":{}}\n');
-  const outcome = await pending;
+  const outcome = await saveSignedIn(s.team.id, 'Durable Google', pending);
   expect(outcome).toEqual({
     ok: true,
     subscription: { id: expect.any(String), label: 'Durable Google' },

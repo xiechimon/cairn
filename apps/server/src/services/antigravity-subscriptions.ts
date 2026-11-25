@@ -1003,7 +1003,7 @@ export async function verifyAntigravitySubscriptionConnection(
   if (options.ownerInitiated === false && isRefreshRow) {
     throw new HttpError(403, 'Only the instance owner can verify portable Google OAuth sign-in.');
   }
-  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false, reason: 'auth' };
   const inFlight = activeVerifications.get(deps.db) ?? new Set<string>();
   if (inFlight.has(row.id)) {
     throw new HttpError(

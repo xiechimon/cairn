@@ -104,6 +104,22 @@ export const EN: Record<string, string> = {
     'Signing in to Antigravity timed out. Try again, or paste below instead.',
   'Antigravity 登录未完成。请重试，或改用下方粘贴。':
     'Antigravity sign-in did not finish. Try again, or paste below instead.',
+  'Antigravity 登录未完成。请重试。': 'Antigravity sign-in did not finish. Try again.',
+  '等待 Antigravity 登录超时。请重试。': 'Signing in to Antigravity timed out. Try again.',
+  'Antigravity 未能安装。请检查网络后重试。':
+    'Antigravity could not be installed. Check your network and try again.',
+  '登录的 Google 账号和这个订阅原来的账号不同。请用原来的账号重试。':
+    'That Google account is not the one this subscription was created with. Try again with the original account.',
+  '这个订阅上还有任务在运行。等任务结束或停止后再重试。':
+    'Tasks are still running on this subscription. Try again once they finish or are stopped.',
+  '已完成 Google 登录，但未能保存到服务器。请重试。':
+    'Google sign-in finished, but the server did not save it. Try again.',
+  '会在浏览器中打开 Google 登录，完成后自动更新「{label}」。':
+    'Google sign-in opens in your browser; “{label}” updates when it finishes.',
+  '在 Cairn 桌面 App 中打开这一页，即可重新登录 Antigravity。':
+    'Open this page in the Cairn desktop app to sign in to Antigravity again.',
+  '这台电脑无法安装 Antigravity。请在 Mac 上的 Cairn 桌面 App 中重新登录。':
+    'Antigravity cannot be installed on this computer. Sign in again from the Cairn desktop app on a Mac.',
   '已在浏览器中打开 Antigravity 登录页，完成后会自动继续。':
     'The Antigravity sign-in page is open in your browser; this continues automatically when it finishes.',
   '这台 Mac 已登录 Antigravity。': 'This Mac is signed in to Antigravity.',

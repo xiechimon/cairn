@@ -650,8 +650,10 @@ function VerifyResultPopover({
   runnerOffline,
   runnerName,
   multiRunnerUnbound,
+  expired,
 }: {
   vendor: AccountVendor;
+  expired: boolean;
   verification: Verification | undefined;
   anchor: Element | null;
   runnerId: string | null | undefined;
@@ -738,14 +740,16 @@ function VerifyResultPopover({
                       vendor === 'antigravity' &&
                       checkedRunner !== null
                     ? t('{machine} 上的 Antigravity 验证超时，请重试', { machine: checkedRunner })
-                    : verification.reason === 'missing_local_login' && checkedRunner !== null
-                      ? t(
-                          '{machine} 尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key',
-                          {
-                            machine: checkedRunner,
-                          },
-                        )
-                      : t(failureCopy(vendor)[verification.reason]),
+                    : verification.reason === 'auth' && expired
+                      ? t(EXPIRED_RENEWAL[vendor])
+                      : verification.reason === 'missing_local_login' && checkedRunner !== null
+                        ? t(
+                            '{machine} 尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key',
+                            {
+                              machine: checkedRunner,
+                            },
+                          )
+                        : t(failureCopy(vendor)[verification.reason]),
       )}
       detail={verifyDetailFacts(vendor, verification, at, Date.now(), t)}
       testId="subscription-verify-feedback"
@@ -963,6 +967,7 @@ export function SubscriptionDetail({
       <QuotaSection account={account} now={now} />
       <VerifyResultPopover
         vendor={account.vendor}
+        expired={account.state === 'expired'}
         runnerId={account.runnerId}
         runnerLogin={account.runnerLogin}
         runnerOffline={account.runnerOffline}
