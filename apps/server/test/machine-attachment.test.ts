@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   attachment as attachmentTable,
+  machine as machineTable,
   message as messageTable,
   step as stepTable,
   team as teamTable,
@@ -40,6 +41,11 @@ async function setupWorld(): Promise<World> {
   });
   expect(enrollAuth.status).toBe(200);
   const machineJson = machineEnrollResponseSchema.parse(await enrollAuth.json());
+  s.db
+    .update(machineTable)
+    .set({ online: true })
+    .where(eq(machineTable.id, machineJson.machineId))
+    .run();
   seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
   const projectId = await postProject(s.app);
   const todoRes = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
