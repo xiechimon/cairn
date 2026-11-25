@@ -222,7 +222,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -279,7 +279,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
@@ -298,8 +298,8 @@ jobs:
 
       # #765: pnpm forwards `--` to the script, so `e2e -- --shard=...` makes Playwright ignore sharding.
       # Flags after the script name are forwarded without the extra positional `--`.
-      - name: "E2E (shard ${{ matrix.shard }}/5, #693)"
-        run: pnpm prepush --e2e-shard ${{ matrix.shard }}/5
+      - name: "E2E (shard ${{ matrix.shard }}/8, #693)"
+        run: pnpm prepush --e2e-shard ${{ matrix.shard }}/8
 
       - name: CSS mechanism gate (#747)
         run: node scripts/css-mechanism-gate.mjs
