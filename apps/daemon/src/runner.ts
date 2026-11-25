@@ -97,6 +97,31 @@ export interface RunStepOptions {
 
 export const PROVIDER_NETWORK_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
 const STEP_REAP_GRACE_MS = 3_000;
+const MIN_SECRET_REDACT_LENGTH = 8;
+
+function extractPairSecretValues(value: string): string[] {
+  if (!value.startsWith('{')) return [value];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      'username' in parsed &&
+      'password' in parsed &&
+      typeof parsed.username === 'string' &&
+      typeof parsed.password === 'string'
+    ) {
+      return [value, parsed.password];
+    }
+  } catch {}
+  return [value];
+}
+
+function redactionVariants(value: string | undefined, minLength = 1): string[] {
+  if (!value || value.length < minLength) return [];
+  const escaped = JSON.stringify(value).slice(1, -1);
+  return escaped === value ? [value] : [escaped, value];
+}
 
 export {
   RETRY_STORM_MAX,
@@ -270,19 +295,37 @@ async function runClaimedStep(
   if (tokenRes === null) return;
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
   stepCleanups.push(() => clearCredentials(creds));
-  const credentials = new CredentialRegistry(now);
+  const gitExpiresAt =
+    creds.git?.expiresAt ?? (creds.git?.kind === 'app' ? now() + 60 * 60_000 : Infinity);
+  const stepSecretEntries: { value: string; expiresAt: number }[] = [
+    ...[
+      creds.claudeSubscriptionToken,
+      creds.devinToken,
+      ...credentialSecretValues(creds.antigravityToken),
+    ].flatMap((value) =>
+      redactionVariants(value).map((variant) => ({ value: variant, expiresAt: Infinity })),
+    ),
+    ...[
+      creds.provider?.apiKey,
+      ...Object.values(tokenRes.secrets ?? {}).flatMap(extractPairSecretValues),
+      ...(tokenRes.httpSecrets ?? []).map((grant) => grant.value),
+    ].flatMap((value) =>
+      redactionVariants(value, MIN_SECRET_REDACT_LENGTH).map((variant) => ({
+        value: variant,
+        expiresAt: Infinity,
+      })),
+    ),
+    ...(tokenRes.mcpConnectors ?? [])
+      .flatMap((c) => mcpConnectorSecretValues(c.headers))
+      .map((value) => ({ value, expiresAt: Infinity })),
+    ...redactionVariants(creds.git?.password).map((value) => ({
+      value,
+      expiresAt: gitExpiresAt,
+    })),
+  ].sort((a, b) => b.value.length - a.value.length);
+  const credentials = new CredentialRegistry(now, Math.max(128, stepSecretEntries.length + 16));
   stepCleanups.push(() => credentials.dispose());
-  for (const value of [
-    creds.claudeSubscriptionToken,
-    creds.devinToken,
-    ...credentialSecretValues(creds.antigravityToken),
-    ...(tokenRes.mcpConnectors ?? []).flatMap((c) => mcpConnectorSecretValues(c.headers)),
-  ])
-    credentials.remember(value);
-  credentials.remember(
-    creds.git?.password,
-    creds.git?.expiresAt ?? (creds.git?.kind === 'app' ? now() + 60 * 60_000 : Infinity),
-  );
+  for (const entry of stepSecretEntries) credentials.remember(entry.value, entry.expiresAt);
   const redact = <T>(value: T): T => credentials.redact(value);
   client = guardCredentialOutputs(client, redact);
   journal = guardCredentialOutputs(journal, redact);

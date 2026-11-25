@@ -355,9 +355,17 @@ export class HostComputerProvider implements ComputerProvider {
     const listed = await Promise.all(
       entries.map(async (entry): Promise<ComputerFileEntry | undefined> => {
         const child = path.join(directory, entry.name);
+        if (this.options.confinement?.denied(child) === true) return undefined;
         const real = await realpath(child).catch(() => undefined);
-        if (real === undefined || !isInside(realHome, real)) return undefined;
-        const info = await stat(real);
+        if (
+          real === undefined ||
+          !isInside(realHome, real) ||
+          this.options.confinement?.denied(real) === true
+        ) {
+          return undefined;
+        }
+        const info = await lstat(real).catch(() => undefined);
+        if (info === undefined || info.isSymbolicLink()) return undefined;
         return {
           path: path.relative(realHome, child),
           kind: info.isDirectory() ? 'dir' : 'file',

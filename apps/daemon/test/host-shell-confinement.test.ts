@@ -83,6 +83,36 @@ describe('host shell file verbs', () => {
       ComputerRefusal,
     );
   });
+
+  test('listFiles hides confined directories, files, and symlinks to or from denied paths', async () => {
+    const { home, serverHome } = layout();
+    const cairnDir = join(home, '.cairn');
+    mkdirSync(join(home, '.aws'), { recursive: true });
+    writeFileSync(join(home, '.aws', 'credentials'), 'secret');
+    mkdirSync(cairnDir, { recursive: true });
+    writeFileSync(join(cairnDir, 'access-token'), 'secret');
+    writeFileSync(join(home, 'notes.txt'), 'hello');
+    const dotfiles = join(home, 'dotfiles');
+    mkdirSync(dotfiles, { recursive: true });
+    writeFileSync(join(dotfiles, 'netrc'), 'secret-netrc');
+    symlinkSync(join(dotfiles, 'netrc'), join(home, '.netrc'));
+    symlinkSync(join(home, '.ssh'), join(home, 'work', 'ssh-link'));
+    symlinkSync(join(home, '.ssh', 'id_ed25519'), join(home, 'work', 'key-link'));
+    writeFileSync(join(home, 'work', 'visible.txt'), 'ok');
+
+    const host = provider(home, [serverHome, cairnDir]);
+    const homeEntries = (await host.listFiles('')).map((entry) => entry.path);
+    expect(homeEntries).toContain('work');
+    expect(homeEntries).toContain('notes.txt');
+    expect(homeEntries).toContain('dotfiles');
+    expect(homeEntries).not.toContain('.ssh');
+    expect(homeEntries).not.toContain('.aws');
+    expect(homeEntries).not.toContain('.cairn');
+    expect(homeEntries).not.toContain('.netrc');
+
+    const workEntries = (await host.listFiles('work')).map((entry) => entry.path);
+    expect(workEntries).toEqual(['work/visible.txt']);
+  });
 });
 
 describe('host shell command environment', () => {
