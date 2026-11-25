@@ -50,12 +50,30 @@ async function redeemViaLink(page: Page, request: APIRequestContext, base: strin
   await page.goto(`${base}/app#pair=${encodeURIComponent(code)}&env=${encodeURIComponent(env)}`);
 }
 
+async function seedExistingInstall(
+  request: APIRequestContext,
+  base: string,
+  token: string | null,
+): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (token !== null) headers.authorization = `Bearer ${token}`;
+  const res = await request.post(`${base}/api/projects`, {
+    data: { name: 'Token gate existing install' },
+    headers,
+  });
+  expect(res.status()).toBe(201);
+}
+
 let authed: LiveServer;
 let openServer: LiveServer;
 
-test.beforeAll(async () => {
+test.beforeAll(async ({ request }) => {
   authed = await bootLiveServer(GATE_TOKEN);
   openServer = await bootLiveServer(null);
+  await Promise.all([
+    seedExistingInstall(request, authed.base, GATE_TOKEN),
+    seedExistingInstall(request, openServer.base, null),
+  ]);
 });
 
 test.afterAll(async () => {
