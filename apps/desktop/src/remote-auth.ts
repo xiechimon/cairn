@@ -2,6 +2,7 @@ const DEDICATED_OAUTH_ORIGINS = new Set([
   'https://accounts.google.com',
   'https://appleid.apple.com',
   'https://login.microsoftonline.com',
+  'https://clerk.shared.lcl.dev',
 ]);
 
 const GITHUB_AUTH_PATH_PREFIXES = ['/login', '/sessions', '/session', '/signup'];

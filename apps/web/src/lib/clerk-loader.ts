@@ -2,7 +2,7 @@ export interface ClerkBrowserGlobal {
   load: () => Promise<void>;
   user: unknown;
   session: { getToken: () => Promise<string | null> } | null;
-  mountSignIn: (node: HTMLDivElement) => void;
+  mountSignIn: (node: HTMLDivElement, props?: Record<string, unknown>) => void;
   unmountSignIn: (node: HTMLDivElement) => void;
   signOut: () => Promise<void>;
   addListener: (listener: () => void) => () => void;

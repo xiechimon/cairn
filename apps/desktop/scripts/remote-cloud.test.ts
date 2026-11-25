@@ -59,6 +59,9 @@ describe('isAllowedRemoteAuthUrl', () => {
     expect(isAllowedRemoteAuthUrl('https://github.com/login/oauth/authorize', origin, issuer)).toBe(
       true,
     );
+    expect(
+      isAllowedRemoteAuthUrl('https://clerk.shared.lcl.dev/v1/oauth_callback', origin, issuer),
+    ).toBe(true);
   });
 
   test('rejects wildcard accounts.dev, http auth issuers, non-auth github repos, data URLs, and arbitrary sites', () => {

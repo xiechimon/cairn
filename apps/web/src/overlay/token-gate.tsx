@@ -79,7 +79,23 @@ function ClerkSignInCard({
           return;
         }
         setPhase('ready');
-        if (node !== null) clerk.mountSignIn(node);
+        if (node !== null) {
+          clerk.mountSignIn(node, {
+            appearance: {
+              elements: {
+                rootBox: { width: '100%' },
+                cardBox: { width: '100%', boxShadow: 'none' },
+                card: {
+                  width: '100%',
+                  boxShadow: 'none',
+                  border: 'none',
+                  background: 'transparent',
+                  padding: '0',
+                },
+              },
+            },
+          });
+        }
         unsubscribe = clerk.addListener(() => {
           if (active && clerk.user !== null && clerk.session !== null) {
             void exchangeSession(clerk);

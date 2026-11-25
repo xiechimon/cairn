@@ -180,7 +180,10 @@ export const machineCapabilitiesSchema = z.object({
   browserSecretFill: z.literal(true).optional(),
   stealthBrowser: z.literal(true).optional(),
   screenHandoff: z.literal(true).optional(),
-  computerKind: z.literal('host').optional(),
+  computerKind: z.preprocess(
+    (value) => (value === 'host' ? 'host' : undefined),
+    z.literal('host').optional(),
+  ),
   secretGateway: z.literal(true).optional(),
   mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
