@@ -1964,6 +1964,25 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       res.end(JSON.stringify({}));
       return;
     }
+    if (pathname === '/api/server/version') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          version: nextVersion,
+          commit: 'smoke',
+          busy: false,
+          updater: {
+            supported: true,
+            state: 'idle',
+            targetVersion: null,
+            percent: null,
+            reason: null,
+            updatedAt: null,
+          },
+        }),
+      );
+      return;
+    }
     if (pathname.startsWith('/api/')) {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end('[]');
