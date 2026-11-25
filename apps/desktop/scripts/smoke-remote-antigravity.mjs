@@ -275,6 +275,12 @@ export async function runAntigravityRemoteAndSkewSmoke({
     timeout: launchTimeoutMs,
   });
   const remoteChild = remoteApp.process();
+  const rendererLogs = [];
+  remoteApp.on('window', (page) => {
+    page.on('console', (msg) => {
+      rendererLogs.push(`[${msg.type()}] ${msg.text()}`);
+    });
+  });
   try {
     const win = await mainWindow(remoteApp, launchTimeoutMs);
     await win.waitForLoadState('load');
@@ -287,7 +293,7 @@ export async function runAntigravityRemoteAndSkewSmoke({
     const shell = shellDiag.shell;
     assert.ok(
       shell !== null,
-      `cairnDesktop.shell descriptor missing in packaged remote mode: ${JSON.stringify(shellDiag)}`,
+      `cairnDesktop.shell descriptor missing in packaged remote mode: ${JSON.stringify({ ...shellDiag, rendererLogs })}`,
     );
     assert.equal(shell.bridgeVersion, 1, `unexpected bridgeVersion: ${JSON.stringify(shell)}`);
     assert.equal(shell.capabilities?.antigravitySignIn, true);

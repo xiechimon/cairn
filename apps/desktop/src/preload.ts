@@ -188,18 +188,28 @@ const SHELL_DESCRIPTOR_ARG_PREFIX = '--cairn-shell=';
 function readShellDescriptor(): DesktopShellDescriptor | undefined {
   try {
     const arg = process.argv.find((entry) => entry.startsWith(SHELL_DESCRIPTOR_ARG_PREFIX));
-    if (arg === undefined) return undefined;
+    if (arg === undefined) {
+      console.error(
+        '[cairn-preload] missing --cairn-shell arg; argv prefixes:',
+        process.argv.map((entry) => entry.split('=')[0]),
+      );
+      return undefined;
+    }
     const raw = JSON.parse(arg.slice(SHELL_DESCRIPTOR_ARG_PREFIX.length)) as
       | DesktopShellDescriptor
       | null
       | undefined;
-    if (raw == null || typeof raw !== 'object') return undefined;
+    if (raw == null || typeof raw !== 'object') {
+      console.error('[cairn-preload] invalid --cairn-shell payload:', typeof raw);
+      return undefined;
+    }
     return Object.freeze({
       shellVersion: raw.shellVersion,
       bridgeVersion: raw.bridgeVersion,
       capabilities: Object.freeze({ ...raw.capabilities }),
     });
-  } catch {
+  } catch (error) {
+    console.error('[cairn-preload] failed reading shell descriptor:', error);
     return undefined;
   }
 }
