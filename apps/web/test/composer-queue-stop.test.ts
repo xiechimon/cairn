@@ -89,3 +89,46 @@ test('a rejected queue request retains the draft and permits retry', async () =>
   expect(wire.onQueue).toHaveBeenCalledTimes(2);
   expect(wire.onDraftChange).toHaveBeenCalledExactlyOnceWith('');
 });
+
+test('Enter during an attachment upload sends the message with the attachment once the upload lands', async () => {
+  let finish: (tokens: string[]) => void = () => {};
+  const onSend = vi.fn();
+  const onDraftChange = vi.fn();
+  const wire = useComposerWire({
+    editable: true,
+    draft: '你是什么 llm',
+    onDraftChange,
+    onSend,
+    onAttachment: () => new Promise<string[]>((resolve) => {
+      finish = resolve;
+    }),
+  });
+  wire.attachFiles([new File(['x'], 'shot.png', { type: 'image/png' })]);
+  wire.handleKeyDown(keyboard('Enter'));
+  await Promise.resolve();
+  expect(onSend).not.toHaveBeenCalled();
+  finish(['[shot.png](attachment://a1)']);
+  await vi.waitFor(() => expect(onSend).toHaveBeenCalledOnce());
+  expect(onSend.mock.calls[0]?.[0]).toContain('你是什么 llm');
+  expect(onSend.mock.calls[0]?.[0]).toContain('attachment://a1');
+});
+
+test('Enter during an upload that fails keeps the draft and sends nothing', async () => {
+  let finish: (tokens: string[]) => void = () => {};
+  const onSend = vi.fn();
+  const wire = useComposerWire({
+    editable: true,
+    draft: '你是什么 llm',
+    onDraftChange: vi.fn(),
+    onSend,
+    onAttachment: () => new Promise<string[]>((resolve) => {
+      finish = resolve;
+    }),
+  });
+  wire.attachFiles([new File(['x'], 'shot.png', { type: 'image/png' })]);
+  wire.handleKeyDown(keyboard('Enter'));
+  await Promise.resolve();
+  finish([]);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(onSend).not.toHaveBeenCalled();
+});

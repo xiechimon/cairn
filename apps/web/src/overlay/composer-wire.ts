@@ -128,6 +128,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const { tokens, text: draft } = useMemo(() => splitDraft(fullDraft), [fullDraft]);
   const writeFull = (display: string) => {
     if (staticFace) return;
+    fullDraftRef.current = display;
     const wire = toWire(display, registry);
     if (controlled) (onDraftChange as (value: string) => void)(wire);
     else setInternalDraft(wire);
@@ -222,8 +223,15 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
 
   const escapeAt = useRef<number | null>(null);
   const sending = useRef(false);
+  const sendAfterUploadRef = useRef<typeof onSend>(undefined);
+  const uploadFailedRef = useRef(false);
   const submit = (callback: typeof onSend) => {
-    if (attachInFlightRef.current > 0 || sending.current) return;
+    if (attachInFlightRef.current > 0) {
+      sendAfterUploadRef.current = callback;
+      return;
+    }
+    if (sending.current) return;
+    const fullDraft = fullDraftRef.current;
     const text = toWire(fullDraft, registry).trim();
     if (text === '' && !editable) {
       callback?.(text);
@@ -258,6 +266,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       also?.();
       return;
     }
+    if (attachInFlightRef.current === 0) uploadFailedRef.current = false;
     attachInFlightRef.current += 1;
     setAttaching(true);
     const pendingUids = trackPending(files);
@@ -267,6 +276,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         return [] as string[];
       });
       if (tokens.length === 0) {
+        uploadFailedRef.current = true;
         failPending(uid, takeAttachmentErrorReason(file));
         return;
       }
@@ -289,6 +299,11 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         attachInFlightRef.current = Math.max(0, attachInFlightRef.current - 1);
         if (attachInFlightRef.current === 0) setAttaching(false);
         also?.();
+        const deferred = sendAfterUploadRef.current;
+        if (attachInFlightRef.current === 0 && deferred !== undefined) {
+          sendAfterUploadRef.current = undefined;
+          if (!uploadFailedRef.current) submit(deferred);
+        }
       });
   };
 

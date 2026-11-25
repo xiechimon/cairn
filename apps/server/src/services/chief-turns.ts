@@ -16,6 +16,7 @@ import {
   chiefMessage,
   chiefThread,
   coordinatorInput,
+  machine,
   steerPending,
   step,
   stopPending,
@@ -46,6 +47,7 @@ export { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 
 export const CHIEF_TURN_MAX_MS = 30 * 60_000;
 export const CHIEF_TURN_STOP_GRACE_MS = 120_000;
+export const CHIEF_DEAD_TURN_MS = 45_000;
 
 export interface ChiefTurnDeps {
   db: Db;
@@ -582,6 +584,24 @@ export function releaseUnconsumedSteer(db: Db, finished: StepRow): void {
   db.update(step).set({ holdReason: null }).where(unread).run();
 }
 
+export function endDeadChiefTurn(
+  deps: ChiefTurnDeps,
+  teamId: string,
+  threadId: string,
+  now: number = nowMs(),
+): boolean {
+  const head = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
+  if (head?.machineId == null) return false;
+  const runner = deps.db.select().from(machine).where(eq(machine.id, head.machineId)).get();
+  const reachable = runner?.online === true && deps.machineHub?.silentSinceDrop(runner.id) !== true;
+  if (reachable && now - stepActivityAt(head) <= CHIEF_DEAD_TURN_MS) return false;
+  const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
+  if (thread?.teamId !== teamId) return false;
+  stopClaimedChiefStep(deps, thread, head, now, { dead: true });
+  deps.machineHub?.wake(thread.teamId);
+  return true;
+}
+
 export function stopChiefTurn(
   deps: ChiefTurnDeps,
   teamId: string,
@@ -616,6 +636,7 @@ function stopClaimedChiefStep(
   thread: typeof chiefThread.$inferSelect,
   head: StepRow,
   now: number,
+  { dead = false }: { dead?: boolean } = {},
 ): { delegated: boolean } {
   const threadId = thread.id;
   const requested = deps.db
@@ -623,7 +644,7 @@ function stopClaimedChiefStep(
     .from(stopPending)
     .where(eq(stopPending.conversationId, threadId))
     .get();
-  const abandoned = now - stepActivityAt(head) > CHIEF_ABANDONED_STEP_MS;
+  const abandoned = dead || now - stepActivityAt(head) > CHIEF_ABANDONED_STEP_MS;
   const ignored =
     requested?.stepId === head.id && now - requested.createdAt >= CHIEF_TURN_STOP_GRACE_MS;
   if (!abandoned && !ignored) {

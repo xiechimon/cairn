@@ -92,6 +92,7 @@ import {
   chiefOutage,
   chiefPendingMessages,
   chiefThreadFallbackModel,
+  endDeadChiefTurn,
   settleChiefActiveRun,
   steerChiefMessage,
 } from './chief-turns.js';
@@ -995,6 +996,7 @@ export function sendChiefMessageFromComposer(
   teamId: string,
   body: ChiefSendBody,
 ): { result: ChiefSendResult; replayed: boolean } {
+  if (body.threadId !== null) endDeadChiefTurn(deps, teamId, body.threadId);
   const sent = submitChiefMessage(deps, teamId, body);
   if (sent.replayed) return sent;
   steerChiefMessage(deps, teamId, sent.result.thread.id, sent.result.message.id);

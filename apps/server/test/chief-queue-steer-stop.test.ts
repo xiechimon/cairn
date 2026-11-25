@@ -653,6 +653,45 @@ describe('stop (T5)', () => {
   });
 });
 
+describe('a message sent to a dead turn starts a new turn at once', () => {
+  test('the claimed turn stopped heartbeating: sending ends it and the message runs as the next turn', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const dead = await w.claim();
+    w.s.db
+      .update(stepTable)
+      .set({ lastHeartbeatAt: Date.now() - 60_000 })
+      .where(eq(stepTable.id, dead!.step.id))
+      .run();
+    const second = await w.send('你是什么 llm');
+    expect(w.stepRow(dead!.step.id)?.status).toBe('stopped');
+    expect(w.stepRow(second)?.holdReason ?? null).toBeNull();
+    expect(w.messages().find((m) => m.id === second)?.delivery ?? null).toBeNull();
+    const next = await w.claim();
+    expect(stripTurnContext(next?.instruction ?? '')).toBe('你是什么 llm');
+  });
+
+  test('the machine that claimed the turn went offline: sending ends the turn at once', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const dead = await w.claim();
+    w.s.db.update(machineTable).set({ online: false }).run();
+    const second = await w.send('还在吗');
+    expect(w.stepRow(dead!.step.id)?.status).toBe('stopped');
+    expect(w.stepRow(second)?.status).toBe('pending');
+    expect(w.stepRow(second)?.holdReason ?? null).toBeNull();
+  });
+
+  test('a turn that is still heartbeating is steered, not ended', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    await w.send('第二句');
+    expect(w.stepRow(running!.step.id)?.status).toBe('claimed');
+    expect(await w.fetchSteer(running!.step.id)).toBe('第二句');
+  });
+});
+
 describe('chief unavailable (T4)', () => {
   test('a quota failure parks the turn, reports an outage, and the held messages resume together', async () => {
     const w = await setupWorld();
