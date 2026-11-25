@@ -14,7 +14,6 @@ import { newRecordId } from '../src/lib/ids.js';
 import { startBuilds } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
-import { toTodoRecord } from '../src/services/todos.js';
 import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -369,7 +368,7 @@ describe('a worker step runs only on its named machine', () => {
     expect(queue?.waitingFor).not.toHaveProperty('fallbackAt');
   });
 
-  test('two machines racing for an unnamed step with no default Runner: neither wins', async () => {
+  test('two machines racing for an unnamed step with no default Runner: one wins without deadlock', async () => {
     const w = await world();
     const a = await machineOf(w, 'a');
     const b = await machineOf(w, 'b');
@@ -377,9 +376,10 @@ describe('a worker step runs only on its named machine', () => {
     routeOf(w, null);
     const stepId = pendingStep(w);
     const [ra, rb] = await Promise.all([claimOn(w, a), claimOn(w, b)]);
-    expect(ra).toBeNull();
-    expect(rb).toBeNull();
-    expect(statusOf(w, stepId)).toBe('pending');
+    const claimed = [ra, rb].filter((r) => r !== null);
+    expect(claimed).toHaveLength(1);
+    expect(claimed[0]?.step.id).toBe(stepId);
+    expect(statusOf(w, stepId)).toBe('claimed');
   });
 
   test('the only online machine claims an unnamed step while another machine is offline', async () => {
@@ -548,7 +548,7 @@ describe('the default Runner', () => {
     ).toBeNull();
   });
 
-  test('revoking or deleting the default Runner clears it, and a later enroll does not take it over', async () => {
+  test('revoking the default Runner clears it, and deleting the default Runner promotes a remaining enrolled machine until none remain', async () => {
     const w = await world();
     const linux = await machineOf(w, 'linux');
     const mac = await machineOf(w, 'mac');
@@ -556,10 +556,12 @@ describe('the default Runner', () => {
       (await w.s.app.request(`/api/machines/${linux}/revoke`, { method: 'POST' })).status,
     ).toBe(204);
     expect(defaultOf(w)).toBeNull();
-    await machineOf(w, 'late');
+    const late = await machineOf(w, 'late');
     expect(defaultOf(w)).toBeNull();
     setDefault(w, mac);
     expect((await w.s.app.request(`/api/machines/${mac}`, { method: 'DELETE' })).status).toBe(204);
+    expect(defaultOf(w)).toBe(late);
+    expect((await w.s.app.request(`/api/machines/${late}`, { method: 'DELETE' })).status).toBe(204);
     expect(defaultOf(w)).toBeNull();
   });
 });

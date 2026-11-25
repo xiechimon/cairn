@@ -1352,6 +1352,7 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['machines', teamId] });
         void qc.invalidateQueries({ queryKey: ['routing-settings', teamId] });
         void qc.invalidateQueries({ queryKey: ['model-routing', teamId] });
+        void qc.invalidateQueries({ queryKey: ['teams'] });
       },
     }),
     switchChiefStepMachine: useMutation({

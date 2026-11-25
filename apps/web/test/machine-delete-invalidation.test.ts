@@ -27,7 +27,7 @@ afterEach(() => {
   for (const qc of clients.splice(0)) qc.clear();
 });
 
-it('deleteMachine calls DELETE /api/machines/{id} and invalidates machines, routing-settings, and model-routing', async () => {
+it('deleteMachine calls DELETE /api/machines/{id} and invalidates machines, routing-settings, model-routing, and teams', async () => {
   const { qc, mutations } = setup('team-1');
   const delSpy = vi.spyOn(api, 'del').mockResolvedValue(undefined);
   const invalidateSpy = vi.spyOn(qc, 'invalidateQueries').mockResolvedValue(undefined);
@@ -38,5 +38,6 @@ it('deleteMachine calls DELETE /api/machines/{id} and invalidates machines, rout
   expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['machines', 'team-1'] });
   expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['routing-settings', 'team-1'] });
   expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['model-routing', 'team-1'] });
+  expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['teams'] });
   expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['members', 'team-1'] });
 });

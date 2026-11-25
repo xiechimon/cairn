@@ -324,7 +324,19 @@ function poolResolution(input: {
 }): CandidateResolution {
   const { db, preferredId, eligibleOnline, toAlternates } = input;
   if (preferredId === null) {
-    return { claimableIds: [], waitingForId: null, alternateMachines: toAlternates(null) };
+    const ranked = eligibleOnline
+      .map((m) => ({ id: m.id, calm: !underLoad(m), running: machineRunningCount(db, m.id) }))
+      .sort(
+        (a, b) =>
+          Number(b.calm) - Number(a.calm) ||
+          a.running - b.running ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      );
+    return {
+      claimableIds: ranked.map((m) => m.id),
+      waitingForId: null,
+      alternateMachines: toAlternates(null),
+    };
   }
   const preferred = input.activeMachines.find((m) => m.id === preferredId);
   const backups = eligibleOnline

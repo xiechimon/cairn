@@ -36,7 +36,7 @@ import {
   THINKING_LEVELS,
   testProviderBodySchema,
 } from '@cairn/shared';
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import type { Db } from './db/client.js';
@@ -377,11 +377,43 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       .set({ machineId: null, updatedAt: nowMs() })
       .where(eq(routingRule.machineId, id))
       .run();
-    ctx.db.update(team).set({ defaultMachineId: null }).where(eq(team.defaultMachineId, id)).run();
+    const isCurrentDefault =
+      ctx.db
+        .select({ defaultMachineId: team.defaultMachineId })
+        .from(team)
+        .where(eq(team.id, row.teamId))
+        .get()?.defaultMachineId === id;
+    let nextDefaultId: string | null = null;
+    if (isCurrentDefault) {
+      const remaining = ctx.db
+        .select({ id: machine.id, online: machine.online })
+        .from(machine)
+        .where(
+          and(
+            eq(machine.teamId, row.teamId),
+            ne(machine.id, id),
+            isNull(machine.retiredAt),
+            isNotNull(machine.tokenHash),
+          ),
+        )
+        .all()
+        .sort(
+          (a, b) => Number(b.online) - Number(a.online) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+        );
+      nextDefaultId = remaining[0]?.id ?? null;
+      ctx.db
+        .update(team)
+        .set({ defaultMachineId: nextDefaultId })
+        .where(and(eq(team.id, row.teamId), eq(team.defaultMachineId, id)))
+        .run();
+    }
     const releasePendingOutput = pendingComputerOutputRelease(ctx.db, id);
     ctx.db.delete(machine).where(eq(machine.id, id)).run();
     releasePendingOutput();
     ctx.machineHub.revokeMachine(id);
+    if (isCurrentDefault && nextDefaultId !== null) {
+      ctx.machineHub.wake(row.teamId);
+    }
     return c.body(null, 204);
   });
 
