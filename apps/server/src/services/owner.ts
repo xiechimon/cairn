@@ -214,10 +214,10 @@ export function sectionOf(
   now = Date.now(),
   waitsOnBlockers = false,
 ): TodoSection | null {
+  if (row.archivedAt !== null) return null;
   if (isEndedPhase(row.phase)) {
     return row.phaseAt >= now - TASKS_RECENT_MS ? 'resolved' : null;
   }
-  if (row.archivedAt !== null) return null;
   if (ownership?.owner === 'owner') {
     const reason = ownership.reason === 'handoff' ? ownership.from : ownership.reason;
     return reason === 'review' ? 'ready_for_review' : 'needs_input';

@@ -47,7 +47,6 @@ interface ComposerProps {
   stopping?: boolean;
   onSend?: (text: string) => void | Promise<void>;
   onQueue?: (text: string) => void | Promise<void>;
-  onStopAndSend?: (text: string) => void | Promise<void>;
   editable?: boolean;
   readOnly?: boolean;
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
@@ -70,7 +69,6 @@ export function Composer({
   stopping = false,
   onSend,
   onQueue,
-  onStopAndSend,
   editable,
   readOnly = false,
   onAttachment,
@@ -124,14 +122,9 @@ export function Composer({
     onDraftChange,
     onSend,
     onQueue,
-    onStopAndSend,
     onAttachment,
     mentionGroups,
     mentionFiles,
-    stop: {
-      available: streaming && onStop !== undefined,
-      ...(onStop !== undefined ? { onStop } : {}),
-    },
     growCap: 384,
   });
 

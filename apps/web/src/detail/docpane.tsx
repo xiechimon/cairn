@@ -28,7 +28,7 @@ export function unmodifiedBefore(hunks: readonly { header: string }[], index: nu
 
 const DIFF_LINE =
   'flex items-center font-mono text-code leading-5 text-(--foreground) [font-variant-ligatures:none]';
-const DIFF_NO = 'w-8 flex-none pr-2 text-right text-(--text-tertiary) select-none';
+const DIFF_NO = 'w-11 flex-none pr-2 text-right text-(--text-tertiary) tabular-nums select-none';
 const DIFF_KIND_SKIN: Record<string, string> = {
   add: 'bg-(--diff-add-bg) shadow-[inset_2px_0_0_var(--diff-add-fg)]',
   del: 'bg-(--diff-del-bg) shadow-[inset_2px_0_0_var(--destructive)]',
@@ -94,6 +94,11 @@ export function DiffFileBody({
   const lineRow = wrap ? `${DIFF_LINE} items-start` : DIFF_LINE;
   return (
     <>
+      {full.kind === 'hidden' && file.hunks.length === 0 && (
+        <div data-testid="diff-empty" className="py-2 pr-3 pl-3 text-meta text-(--text-tertiary)">
+          {t('无文本差异')}
+        </div>
+      )}
       {full.kind === 'hidden' &&
         file.hunks.map((hunk, hi) => {
           const wordDiff = wordDiffs[hi];
@@ -151,10 +156,10 @@ export function DiffFileBody({
                       </span>
                     ) : (
                       <>
-                        <span data-no="old" className={`${DIFF_NO} w-5`}>
+                        <span data-no="old" className={DIFF_NO}>
                           {line.oldNo ?? ''}
                         </span>
-                        <span data-no="new" className={`${DIFF_NO} w-5`}>
+                        <span data-no="new" className={DIFF_NO}>
                           {line.newNo ?? ''}
                         </span>
                         <span className="sr-only">
@@ -188,8 +193,8 @@ export function DiffFileBody({
             .split('\n')
             .map((text, i) => (
               <div key={i} className={lineRow} data-kind="context">
-                <span data-no="old" className={`${DIFF_NO} w-5`} />
-                <span data-no="new" className={`${DIFF_NO} w-5`}>
+                <span data-no="old" className={DIFF_NO} />
+                <span data-no="new" className={DIFF_NO}>
                   {i + 1}
                 </span>
                 <span className={lineText}>{text}</span>

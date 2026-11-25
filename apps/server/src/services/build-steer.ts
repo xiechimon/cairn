@@ -64,6 +64,7 @@ function continuationTodo(
   const resumable =
     row?.phase === 'done' ||
     row?.phase === 'building' ||
+    row?.phase === 'stopped' ||
     (options.allowReviewContinuation === true && row?.phase === 'review') ||
     row?.phase === 'needs_input' ||
     (options.afterTurn === true &&

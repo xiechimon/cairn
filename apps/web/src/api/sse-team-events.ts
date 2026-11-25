@@ -12,6 +12,7 @@ import type { QueryKey } from '@tanstack/react-query';
 
 export type StreamQueryEvent =
   | { type: 'todo'; teamId: string; doc: TodoRecord; previous?: TodoRecord | undefined }
+  | { type: 'todo_deleted'; teamId: string; todoId: string; projectId?: string | undefined }
   | {
       type: 'build';
       teamId: string;
@@ -172,6 +173,16 @@ export function streamEventQueryEffect(
         (kind === 'computers' && id === event.teamId)
         ? 'cancel'
         : 'ignore';
+    case 'todo_deleted': {
+      const { teamId, projectId } = event;
+      if (kind === 'search') return 'cancel';
+      if (kind === 'projectBuilds') {
+        return projectId === undefined || id === projectId ? 'cancel' : 'ignore';
+      }
+      return ((kind === 'todos' || kind === 'tasks') && id === teamId) || kind === 'schedules'
+        ? 'cancel'
+        : 'ignore';
+    }
     case 'todo': {
       const { doc, previous, teamId } = event;
       if (kind === 'search') return searchEffect(event, id, data);

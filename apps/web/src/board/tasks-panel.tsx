@@ -1,10 +1,11 @@
 import { IN_PROGRESS_PHASES, type PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
-import { CircleCheck, Plus, X } from 'lucide-react';
+import { ChevronRight, CircleCheck, Plus, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
+import { useApiMutations, useArchivedTodos, useProjects, usePrs } from '../api/hooks.js';
+import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { questionDockState } from '../chief/question-dock-state.js';
 import { RollNumber, useArrivals } from '../components/growth.js';
@@ -22,6 +23,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { newTaskRequest } from './open-composer.js';
+import { splitProjectsByArchive } from './project-archive.js';
 import { compactAge, relativeTime, shortDate } from './rel-time.js';
 import { StopAndDoneConfirm } from './stop-and-done-confirm.js';
 import { TaskRowMenu } from './task-row-menu.js';
@@ -421,6 +423,10 @@ export function TasksPanel({
     (pr) => projectId === null || pr.projectId === projectId,
   );
   const projects = useProjects(teamId, connected && projectId === null).data;
+  const activeProjects = splitProjectsByArchive(projects ?? []).active;
+  const routesToCoordinator =
+    connected && projectId === null && projects !== undefined && activeProjects.length !== 1;
+  const [showArchived, setShowArchived] = useState(false);
   const ambiguous = titlesNeedingProject(entries);
   const placeOf = (entry: TaskEntry) =>
     projectId === null ? projects?.find((p) => p.id === entry.todo.projectId)?.name : undefined;
@@ -487,6 +493,11 @@ export function TasksPanel({
     if (chosenTab === null && loaded) setChosenTab(openingTab);
   }, [chosenTab, loaded, openingTab]);
   const tab = linkedToScheduled ? 'scheduled' : (chosenTab ?? openingTab);
+  const archivedQuery = useArchivedTodos(teamId, connected && tab === 'resolved');
+  const archivedEntries: TaskEntry[] = (archivedQuery.data ?? [])
+    .filter((todo) => projectId === null || todo.projectId === projectId)
+    .map((todo) => ({ todo: toDisplayTodo(todo), section: 'resolved' as const }))
+    .sort((a, b) => (b.todo.archivedAt ?? b.todo.phaseAt) - (a.todo.archivedAt ?? a.todo.phaseAt));
   const addAction = adding ? null : (
     <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
       {t('添加任务')}
@@ -543,22 +554,48 @@ export function TasksPanel({
         {groups[section].map(row)}
       </section>
     );
+  const archivedSection =
+    archivedEntries.length === 0 ? null : (
+      <section data-testid="tasks-archived-section" className="mt-2 flex flex-col gap-0.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={showArchived}
+          data-testid="tasks-archived-toggle"
+          onClick={() => setShowArchived((value) => !value)}
+          className="h-8 justify-start gap-2 px-2.5 text-ui font-normal text-content-secondary hover:text-foreground"
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className={cn('size-4 flex-none text-content-tertiary', showArchived && 'rotate-90')}
+          />
+          <span>{t('已归档')}</span>
+          <span className="tabular-nums text-content-tertiary">{archivedEntries.length}</span>
+        </Button>
+        {showArchived && archivedEntries.map(row)}
+      </section>
+    );
   const body =
-    tab === 'active'
-      ? active
-      : tab === 'next'
-        ? listOf(
-            'up_next',
-            <TasksEmpty title={t('接下来没有安排')} hint={tellCoordinator} action={addAction} />,
-          )
-        : listOf(
-            'resolved',
-            <TasksEmpty
-              title={t('暂无已完成的任务')}
-              hint={t('任务完成后会出现在这里。')}
-              action={null}
-            />,
-          );
+    tab === 'active' ? (
+      active
+    ) : tab === 'next' ? (
+      listOf(
+        'up_next',
+        <TasksEmpty title={t('接下来没有安排')} hint={tellCoordinator} action={addAction} />,
+      )
+    ) : (
+      <>
+        {listOf(
+          'resolved',
+          <TasksEmpty
+            title={t('暂无已完成的任务')}
+            hint={t('任务完成后会出现在这里。')}
+            action={null}
+          />,
+        )}
+        {archivedSection}
+      </>
+    );
   return (
     <SidePanel label={t('任务')} onDismiss={onClose} phoneTab>
       <SidePanelHead
@@ -619,6 +656,15 @@ export function TasksPanel({
       {adding && addBlocked === null && (
         <TasksAddInput
           onClose={() => setAdding(false)}
+          {...(routesToCoordinator
+            ? {
+                placeholder: t('发给 Coordinator 安排任务…'),
+                hint:
+                  activeProjects.length === 0
+                    ? t('暂无项目，将发给 Coordinator 处理')
+                    : t('未选定项目，将发给 Coordinator 分配到对应项目'),
+              }
+            : {})}
           onSubmit={async (text) => {
             const choicesAtSubmit = tabChoices.current;
             if ((await onAddTask(text)) !== 'saved') setAdding(false);
@@ -656,7 +702,7 @@ export function TasksPanel({
         ) : (
           <QueryBoundary
             query={query}
-            isEmpty={nothingAtAll}
+            isEmpty={nothingAtAll && (tab !== 'resolved' || archivedEntries.length === 0)}
             loadingLabel={t('正在加载任务')}
             skeleton={<TasksSkeleton />}
             errorTitle={t('任务未能加载')}

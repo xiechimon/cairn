@@ -5,6 +5,7 @@ import { useI18n } from '../i18n/provider.js';
 interface DeleteConfirmProps {
   title: string;
   summary: ReactNode;
+  detail?: ReactNode;
   ariaLabel: string;
   open: boolean;
   onClose: () => void;
@@ -14,6 +15,7 @@ interface DeleteConfirmProps {
 export function DeleteConfirm({
   title,
   summary,
+  detail,
   ariaLabel,
   open,
   onClose,
@@ -38,6 +40,7 @@ export function DeleteConfirm({
       <div className="delete-confirm-summary flex items-center gap-2 overflow-hidden text-ui whitespace-nowrap text-foreground">
         {summary}
       </div>
+      {detail != null && <p className="m-0 mt-2 text-meta text-content-tertiary">{detail}</p>}
     </AlertDialogShell>
   );
 }

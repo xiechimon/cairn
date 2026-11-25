@@ -1,4 +1,4 @@
-import { RUNNER_OS_LABELS } from '@cairn/shared';
+import { type ProjectRepoKind, RUNNER_OS_LABELS } from '@cairn/shared';
 import { cn } from 'cn';
 import {
   ChevronLeft,
@@ -9,10 +9,11 @@ import {
   UnfoldVertical,
   X,
 } from 'lucide-react';
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { useApiMutations, usePrs } from '../api/hooks.js';
+import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { onTodoDeleted } from '../api/team-stream-cache.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
 import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
 import { isFinalReportPhase, ReportThreadContext } from '../chief/research-report.js';
@@ -46,6 +47,7 @@ import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
 import {
+  composerPlaceholderOf,
   reviewOwnedByCoordinator,
   THREAD_PARAM,
   threadCopy,
@@ -80,18 +82,29 @@ export const THREAD_HEAD_BUTTON =
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
+export function canShowFullFile(
+  live: boolean,
+  repoKind: ProjectRepoKind | undefined,
+  hasFixtureContent: boolean,
+): boolean {
+  if (!live) return hasFixtureContent;
+  return repoKind === 'hosted' || repoKind === 'local';
+}
+
 function StatusLine({
   todo,
   platformWait,
   now,
   waitingOnChecks,
   updates,
+  onOpenUpdates,
 }: {
   todo: TodoRecord;
   platformWait: ThreadChat['platformWait'];
   now: number;
   waitingOnChecks: boolean;
   updates: ThreadUpdates | null;
+  onOpenUpdates: (() => void) | undefined;
 }) {
   const { t } = useI18n();
   const needsYou = threadStatus(todo) === 'needs-you';
@@ -144,7 +157,23 @@ function StatusLine({
       {meta !== '' && (
         <>
           <span aria-hidden="true">·</span>
-          <span className="min-w-0 truncate">{meta}</span>
+          {platformWait === null &&
+          retryText === null &&
+          needsYou &&
+          updates !== null &&
+          onOpenUpdates !== undefined ? (
+            <Button
+              variant="ghost"
+              size="xs"
+              data-testid="side-chat-updates"
+              onClick={onOpenUpdates}
+              className="h-auto min-w-0 truncate px-1 py-0 text-meta font-normal text-content-tertiary hover:text-foreground"
+            >
+              {meta}
+            </Button>
+          ) : (
+            <span className="min-w-0 truncate">{meta}</span>
+          )}
         </>
       )}
       {platformWait !== null && platformWait.machine === null && (
@@ -159,7 +188,7 @@ function StatusLine({
   );
 }
 
-function Unavailable({ chat }: { chat: ThreadChat }) {
+function Unavailable({ chat, onBackToTasks }: { chat: ThreadChat; onBackToTasks: () => void }) {
   const { t } = useI18n();
   return (
     <div
@@ -182,6 +211,16 @@ function Unavailable({ chat }: { chat: ThreadChat }) {
       {chat.load === 'error' && (
         <Button size="sm" onClick={chat.retry}>
           {t('重试')}
+        </Button>
+      )}
+      {chat.load === 'missing' && (
+        <Button
+          size="sm"
+          variant="secondary"
+          data-testid="side-chat-back-to-tasks"
+          onClick={onBackToTasks}
+        >
+          {t('返回任务列表')}
         </Button>
       )}
     </div>
@@ -268,17 +307,20 @@ function toggled(set: ReadonlySet<string>, key: string): ReadonlySet<string> {
 function ChangesCard({
   changes,
   buildId,
+  repoKind,
   open,
   onOpenChange,
   onRetry,
 }: {
   changes: ThreadChanges;
   buildId: string | null;
+  repoKind: ProjectRepoKind | undefined;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRetry: () => void;
 }) {
   const { t } = useI18n();
+  const { live } = useLiveData();
   const [openFiles, setOpenFiles] = useState<ReadonlySet<string>>(new Set());
   const [fullFiles, setFullFiles] = useState<ReadonlySet<string>>(new Set());
   const arrived = useArrivals(
@@ -329,10 +371,12 @@ function ChangesCard({
         </Button>
         {open &&
           (single !== undefined ? (
-            <FullFileToggle
-              on={fullFiles.has(single.path)}
-              onToggle={() => setFullFiles((set) => toggled(set, single.path))}
-            />
+            canShowFullFile(live, repoKind, single.fullContent != null) && (
+              <FullFileToggle
+                on={fullFiles.has(single.path)}
+                onToggle={() => setFullFiles((set) => toggled(set, single.path))}
+              />
+            )
           ) : (
             <Button
               variant="ghost"
@@ -388,7 +432,7 @@ function ChangesCard({
                         <ChangeCounts added={file.added} removed={file.removed ?? 0} />
                       </span>
                     </Button>
-                    {fileOpen && (
+                    {fileOpen && canShowFullFile(live, repoKind, file.fullContent != null) && (
                       <FullFileToggle
                         on={fullFiles.has(file.path)}
                         onToggle={() => setFullFiles((set) => toggled(set, file.path))}
@@ -418,6 +462,7 @@ function ChangesCard({
 function ThreadBody({
   chat,
   todo,
+  repoKind,
   actions,
   view,
   changesOpen,
@@ -431,6 +476,7 @@ function ThreadBody({
 }: {
   chat: ThreadChat;
   todo: TodoRecord;
+  repoKind: ProjectRepoKind | undefined;
   actions: ThreadActions;
   view: ThreadView;
   changesOpen: boolean;
@@ -493,6 +539,7 @@ function ThreadBody({
                       key={todo.id}
                       changes={chat.changes}
                       buildId={chat.buildId}
+                      repoKind={repoKind}
                       open={changesOpen}
                       onOpenChange={onChangesOpen}
                       onRetry={chat.retryChanges}
@@ -534,7 +581,7 @@ function ThreadBody({
       )}
       {!archived && (
         <Composer
-          placeholder={chat.started ? t('回复这个任务') : t('开始后才能回复')}
+          placeholder={t(composerPlaceholderOf(todo, chat.started))}
           streaming={chat.running}
           stopping={chat.stopping}
           editable={chat.send !== undefined}
@@ -543,7 +590,6 @@ function ThreadBody({
           onDraftChange={setDraft}
           {...(chat.send !== undefined ? { onSend: chat.send } : {})}
           {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
-          {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}
           {...(chat.stop !== undefined ? { onStop: chat.stop } : {})}
           {...(chat.attach !== undefined ? { onAttachment: chat.attach } : {})}
           mentionGroups={mentions.groups}
@@ -597,6 +643,34 @@ export function SideChat({
       },
       { replace: true },
     );
+  const backToTasks = () =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(THREAD_PARAM);
+        params.delete(VIEW_PARAM);
+        params.delete(TASKS_TAB_PARAM);
+        params.set(PANE_PARAM, 'tasks');
+        return params;
+      },
+      { replace: true },
+    );
+  const hadTodoRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (chat.load === 'ready' && todo?.id === todoId) {
+      hadTodoRef.current = todoId;
+    } else if (chat.load === 'missing' && hadTodoRef.current === todoId) {
+      hadTodoRef.current = null;
+      onClose();
+    }
+  }, [chat.load, todo?.id, todoId, onClose]);
+  useEffect(
+    () =>
+      onTodoDeleted((deletedId) => {
+        if (deletedId === todoId) onClose();
+      }),
+    [todoId, onClose],
+  );
   const [view, setView] = useState<ThreadView>('chat');
   const [changesOpenFor, setChangesOpenFor] = useState<string | null>(
     searchParams.get(VIEW_PARAM) === 'changes' ? todoId : null,
@@ -685,7 +759,7 @@ export function SideChat({
             onClose={closeAll}
             {...(docked ? { onCollapse: onClose } : {})}
           />
-          <Unavailable chat={chat} />
+          <Unavailable chat={chat} onBackToTasks={backToTasks} />
         </>
       )}
     </SidePanel>
@@ -726,15 +800,19 @@ function ReadyThread({
     chat.planDoc !== undefined || updates !== null ? () => setPlanOpen(true) : undefined;
   const usage = useThreadUsage(todo);
   const { live, teamId } = useLiveData();
+  const projectsQ = useProjects(teamId, live);
+  const repoKind = projectsQ.data?.find((project) => project.id === todo.projectId)?.repoKind;
+  const prs = usePrs(teamId, todo.id, live);
+  const prRows = prs.data ?? [];
+  const hasOpenPr = prRows.some((row) => row.state !== 'merged' && row.state !== 'closed');
   const actions = useThreadActions({
     todo,
     chat,
     onGone: onClose,
     onViewPlan: openPlan,
+    hasOpenPr,
     engine: engine === undefined ? undefined : { onViewRaw: () => onView('raw') },
   });
-  const prs = usePrs(teamId, todo.id, live);
-  const prRows = prs.data ?? [];
   const origin = threadOrigin(todo.request, chatStream);
   const jumpToOrigin = () => {
     if (origin === null) return;
@@ -767,11 +845,13 @@ function ReadyThread({
           now={now}
           waitingOnChecks={chat.waitingOnChecks}
           updates={updates}
+          onOpenUpdates={openPlan}
         />
       </Head>
       <ThreadBody
         chat={chat}
         todo={todo}
+        repoKind={repoKind}
         actions={actions}
         view={view}
         changesOpen={changesOpen}

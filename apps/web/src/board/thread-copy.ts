@@ -107,3 +107,11 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
       return { state: STATUS_WORDS.idle, reason: '尚未开始。' };
   }
 }
+
+export function composerPlaceholderOf(todo: TodoRecord, started: boolean): string {
+  if (!started) return '开始后才能回复';
+  if (todo.phase === 'review' && !reviewOwnedByCoordinator(todo)) {
+    return '需要修改？回复返工意见…';
+  }
+  return '回复这个任务';
+}

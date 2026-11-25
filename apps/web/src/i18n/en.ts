@@ -3104,4 +3104,22 @@ export const EN: Record<string, string> = {
   '这台主机仅接受其他设备使用配对码登录，请返回使用配对码。':
     'This host accepts only pairing-code sign-in from other devices. Return and use the pairing code.',
   仅限主机设备查看: 'Visible on host device only',
+  返回任务列表: 'Back to tasks',
+  '此任务正在运行中，删除会停止当前执行并一并移除关联的定时任务。':
+    'This task is currently running. Deleting it stops the active run and removes its linked schedules.',
+  '此任务正在运行中，删除会立即停止当前执行。':
+    'This task is currently running. Deleting it stops the active run immediately.',
+  '关联的定时任务也会一并删除。': 'Linked schedules will also be deleted.',
+  '发给 Coordinator 安排任务…': 'Send to Coordinator to create a task…',
+  '暂无项目，将发给 Coordinator 处理': 'No projects available. This will be sent to Coordinator.',
+  '未选定项目，将发给 Coordinator 分配到对应项目':
+    'No project selected. Coordinator will assign it to a project.',
+  '接受结果并结束这个任务，需要修改时直接在下面回复。':
+    'Accept the result and complete this task. Reply below to request changes.',
+  '已发起合并。': 'Merge requested.',
+  '合并请求未送出，请重试。': 'Could not request merge. Try again.',
+  '将改动合并到目标分支并完成任务。':
+    'Merge changes into the target branch and complete this task.',
+  '需要修改？回复返工意见…': 'Need changes? Reply with revision notes…',
+  无文本差异: 'No text diff',
 };

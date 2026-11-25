@@ -86,15 +86,15 @@ test('a thread with no originating message shows no origin line', async ({ page 
   await expect(page.getByTestId('thread-origin')).toHaveCount(0);
 });
 
-test('a task waiting for review has no chip above the composer; finishing lives in the more menu', async ({
+test('a task waiting for review offers explicit completion above the composer and in the more menu', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(panel(page)).toBeVisible();
-  await expect(page.getByTestId('side-chat-action')).toHaveCount(0);
+  await expect(page.getByTestId('side-chat-action')).toHaveAttribute('data-action', 'review');
   await expect(
-    page.locator('.side-panel').getByRole('button', { name: /^(完成…|完成|标记完成)$/ }),
-  ).toHaveCount(0);
+    page.getByTestId('side-chat-action').getByRole('button', { name: '标记完成' }),
+  ).toBeVisible();
   await panel(page).getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '完成' }).click();
   await expect(page.getByRole('dialog', { name: '完成任务' })).toHaveCount(0);
@@ -317,7 +317,7 @@ test('the head is one calm row: a one-line title, the status in the task tone, c
   expect(geometry.titleHeight).toBeLessThanOrEqual(22);
   expect(Math.abs(geometry.closeMid - geometry.titlesMid)).toBeLessThanOrEqual(2);
   expect(Math.abs(geometry.menuMid - geometry.titlesMid)).toBeLessThanOrEqual(2);
-  expect(geometry.controls).toEqual(['返回', '更多操作…', '关闭']);
+  expect(geometry.controls).toEqual(['返回', '1 条更新', '更多操作…', '关闭']);
   expect(geometry.statusInk).toBe(geometry.waitInk);
   await expect(title).toHaveText('Fold finished turns into purpose and duration');
   await expect(title).toHaveAccessibleName('Fold finished turns into purpose and duration');

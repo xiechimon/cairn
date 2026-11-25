@@ -9,11 +9,16 @@ import { useI18n } from '../i18n/provider.js';
 export function TasksAddInput({
   onSubmit,
   onClose,
+  placeholder,
+  hint,
 }: {
   onSubmit: (text: string) => Promise<void>;
   onClose: () => void;
+  placeholder?: string;
+  hint?: string;
 }) {
   const { t } = useI18n();
+  const resolvedPlaceholder = placeholder ?? t('添加任务…');
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const ref = useRef<HTMLInputElement | null>(null);
@@ -45,10 +50,10 @@ export function TasksAddInput({
     onClose();
   };
   return (
-    <form ref={formRef} onSubmit={submit} className="flex flex-none px-2">
+    <form ref={formRef} onSubmit={submit} className="flex flex-none flex-col px-2">
       <div
         data-testid="tasks-add-field"
-        className="flex h-10.5 min-w-0 flex-1 items-center gap-4 rounded-(--radius-tile) border border-transparent bg-(--hover-1) pr-1.5 pl-2.5 focus-within:[outline:var(--focus-width)_solid_var(--focus-ring)]"
+        className="flex h-10.5 w-full min-w-0 flex-none items-center gap-4 rounded-(--radius-tile) border border-transparent bg-(--hover-1) pr-1.5 pl-2.5 focus-within:[outline:var(--focus-width)_solid_var(--focus-ring)]"
       >
         <span className="flex size-7 flex-none items-center justify-center">
           <span
@@ -61,8 +66,8 @@ export function TasksAddInput({
         <Input
           ref={ref}
           data-testid="tasks-add-input"
-          aria-label={t('添加任务…')}
-          placeholder={t('添加任务…')}
+          aria-label={resolvedPlaceholder}
+          placeholder={resolvedPlaceholder}
           value={text}
           readOnly={sending}
           onChange={(event) => setText(event.target.value)}
@@ -86,6 +91,14 @@ export function TasksAddInput({
           <ArrowUp aria-hidden className="size-5" strokeWidth={1.75} />
         </IconTooltip>
       </div>
+      {hint !== undefined && (
+        <p
+          data-testid="tasks-add-hint"
+          className="m-0 px-2.5 pt-1.5 text-meta text-content-tertiary"
+        >
+          {hint}
+        </p>
+      )}
     </form>
   );
 }

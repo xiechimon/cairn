@@ -67,12 +67,12 @@ describe('sectionOf first-match table', () => {
       for (const age of [0, WEEK, WEEK + 1]) {
         test(`${entry.phase}/${entry.owner}/${entry.reason}${entry.from === undefined ? '' : `:${entry.from}`} archived=${archived} age=${age}`, () => {
           const terminal = entry.phase === 'done' || entry.phase === 'closed';
-          const expected = terminal
-            ? age > WEEK
-              ? null
-              : 'resolved'
-            : archived
-              ? null
+          const expected = archived
+            ? null
+            : terminal
+              ? age > WEEK
+                ? null
+                : 'resolved'
               : entry.section;
           const owner =
             entry.owner === null
@@ -135,7 +135,8 @@ test('one Tasks read includes open rows and recently archived rows; section uses
   const now = Date.now();
   for (const [id, phase, archivedAt, phaseAt] of [
     ['open', 'todo', null, now - 10 * WEEK],
-    ['recent', 'done', now, now],
+    ['recent', 'done', null, now],
+    ['recent-archived', 'done', now, now],
     ['old-resolution', 'closed', now, now - WEEK - 1000],
     ['old-archive', 'done', now - WEEK - 1000, now],
     ['abandoned', 'building', now, now],
@@ -170,6 +171,7 @@ test('one Tasks read includes open rows and recently archived rows; section uses
     ['old-resolution', null],
     ['open', 'up_next'],
     ['recent', 'resolved'],
+    ['recent-archived', null],
     ['unarchived-old', null],
   ]);
   const sectioned = (await (

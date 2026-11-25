@@ -253,12 +253,13 @@ test.describe('phone width', () => {
 
 const action = (page: Page) => page.getByTestId('side-chat-action');
 
-test('start, approve and retry put the next step in a chip above the composer; review does not', async ({
+test('start, approve, review and retry put the next step in a chip above the composer; working does not', async ({
   page,
 }) => {
   const cases = [
     ['home-c-idle', 'start', '开始'],
     ['home-c-confirm', 'approve', '批准计划'],
+    ['home-c-review', 'review', '标记完成'],
     ['home-c-failed', 'retry', '重试'],
   ] as const;
   for (const [id, kind, label] of cases) {
@@ -266,11 +267,9 @@ test('start, approve and retry put the next step in a chip above the composer; r
     await expect(action(page), id).toHaveAttribute('data-action', kind);
     await expect(action(page).getByRole('button', { name: label })).toBeVisible();
   }
-  for (const id of ['home-c-working-a', 'home-c-review']) {
-    await page.goto(`${HOME}&thread=${id}`);
-    await expect(sideChat(page)).toBeVisible();
-    await expect(action(page), id).toHaveCount(0);
-  }
+  await page.goto(`${HOME}&thread=home-c-working-a`);
+  await expect(sideChat(page), 'home-c-working-a').toBeVisible();
+  await expect(action(page), 'home-c-working-a').toHaveCount(0);
 });
 
 test('the more menu holds archive and delete, and Escape closes the menu first', async ({

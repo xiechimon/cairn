@@ -87,7 +87,6 @@ export interface ThreadChat {
   retry: () => void;
   send?: (text: string) => Promise<void>;
   queue?: (text: string) => Promise<void>;
-  stopAndSend?: (text: string) => Promise<void>;
   stop?: () => void;
   attach?: (files: File[]) => Promise<string[]>;
   sendQueuedNow?: (id: string, content: string) => Promise<unknown>;
@@ -105,7 +104,6 @@ export function replyRouteOf(
   phase: TodoRecord['phase'],
   steps: readonly { status: string }[],
 ): 'queue' | 'message' {
-  if (phase === 'stopped') return 'queue';
   const waitingForMachine =
     (phase === 'queued' || phase === 'planning') &&
     !steps.some((step) => step.status === 'claimed') &&
@@ -434,7 +432,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     ...(queueSteer !== undefined && running
       ? {
           queue: (text: string) => queueSteer(text, false),
-          stopAndSend: (text: string) => queueSteer(text, true),
         }
       : {}),
     ...(stop !== undefined ? { stop } : {}),

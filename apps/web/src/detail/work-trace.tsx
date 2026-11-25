@@ -243,6 +243,7 @@ function WorkStepRow({
   t: TFunc;
 }) {
   const [open, setOpen] = useState(false);
+  const [showAllOutput, setShowAllOutput] = useState(false);
   const [animate] = useState(enter);
   const call = step.kind === 'call' ? step : null;
   const lines = call
@@ -368,7 +369,7 @@ function WorkStepRow({
                 </span>
               )}
               {changeLines !== null
-                ? changeLines.slice(0, 40).map((line, index) => (
+                ? (showAllOutput ? changeLines : changeLines.slice(0, 40)).map((line, index) => (
                     <span
                       className={`block ${line.kind === 'added' ? 'text-(--diff-add-fg)' : 'text-destructive'}`}
                       key={`${index}:${line.text}`}
@@ -376,11 +377,17 @@ function WorkStepRow({
                       {line.text}
                     </span>
                   ))
-                : lines.slice(0, 40).join('\n')}
+                : (showAllOutput ? lines : lines.slice(0, 40)).join('\n')}
               {lineCount > 40 && (
-                <span className="block text-(--text-tertiary)">
-                  {t('还有 {n} 行', { n: lineCount - 40 })}
-                </span>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  data-testid={showAllOutput ? 'tool-output-collapse' : 'tool-output-expand'}
+                  onClick={() => setShowAllOutput((value) => !value)}
+                  className="mt-1 block h-6 px-1.5 font-sans text-meta text-(--text-tertiary) hover:text-(--foreground)"
+                >
+                  {showAllOutput ? t('收起') : t('还有 {n} 行', { n: lineCount - 40 })}
+                </Button>
               )}
             </TraceOutput>
           </div>

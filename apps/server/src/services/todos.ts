@@ -1106,14 +1106,22 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
   const { db } = deps;
   const row = getRow(deps, id);
   if (!row) return false;
+  let buildIds: string[] = [];
+  let claimedStepIds: string[] = [];
   db.transaction(() => {
-    const buildIds = db
+    buildIds = db
       .select({ id: build.id })
       .from(build)
       .where(eq(build.todoId, id))
       .all()
       .map((r) => r.id);
     if (buildIds.length > 0) {
+      claimedStepIds = db
+        .select({ id: step.id })
+        .from(step)
+        .where(and(inArray(step.buildId, buildIds), eq(step.status, 'claimed')))
+        .all()
+        .map((r) => r.id);
       db.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
       db.delete(step).where(inArray(step.buildId, buildIds)).run();
     }
@@ -1124,6 +1132,9 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
     retireTodoDeliverables(db, [id]);
     db.delete(todo).where(eq(todo.id, id)).run();
   });
+  for (const stepId of claimedStepIds) deps.machineHub?.stopSignal(row.teamId, stepId);
+  for (const buildId of buildIds) deps.convHub?.clearConversationBuffer(buildId);
+  deps.hub.publishTodoDeleted(row.teamId, row.id, row.projectId);
   return true;
 }
 

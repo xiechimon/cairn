@@ -381,25 +381,13 @@ test('Stop preserves changes without a dialog and cancelled tools show cancelled
   await expect(page.getByTestId('work-spinner')).toHaveCount(0);
 });
 
-test('Escape stops and a second Escape queues the draft after cancellation', async ({ page }) => {
+test('Escape never silently stops a running task or submits an unfinished draft', async ({ page }) => {
   const task = await runningTask(page);
-  await task.input.fill('A stays queued');
-  await task.input.press('Control+Enter');
-  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toBeVisible();
   await task.input.fill('Use this draft next');
   await task.input.press('Escape');
-  await task.input.press('Escape');
-  await expect.poll(() => task.stops).toEqual([{ discard: false }]);
-  await expect(task.input).toHaveValue('');
-  expect(task.stops).toHaveLength(1);
-  expect(task.sent).toEqual([{ content: 'A stays queued', mode: 'queue', clientMessageId: expect.any(String) }, { content: 'Use this draft next', mode: 'queue', deliverAfterStop: true, clientMessageId: expect.any(String) }]);
+  expect(task.stops).toEqual([]);
+  expect(task.sent).toEqual([]);
   expect(task.steerPending).toEqual([]);
-  expect(task.turns()).toBe(0);
-  task.finish('stopped');
-  await page.reload();
-  await expect(page.getByTestId('user-bubble').filter({ hasText: 'Use this draft next' })).toHaveCount(1);
-  expect(task.turns()).toBe(1);
-  await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toContainText('A stays queued');
 });
 
 test('discard is available during a running step only and requires confirmation', async ({ page }) => {

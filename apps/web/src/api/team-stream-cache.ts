@@ -10,6 +10,37 @@ import type { QueryClient } from '@tanstack/react-query';
 import { invalidateEventQueries, patchQueryData } from './invalidate.js';
 import { hasPendingTodoPatch, holdTodoPatch, withPendingTodoPatch } from './todo-freshness.js';
 
+const deletedTodoListeners = new Set<(todoId: string) => void>();
+
+export function onTodoDeleted(listener: (todoId: string) => void): () => void {
+  deletedTodoListeners.add(listener);
+  return () => {
+    deletedTodoListeners.delete(listener);
+  };
+}
+
+export function notifyTodoDeleted(todoId: string): void {
+  for (const listener of deletedTodoListeners) listener(todoId);
+}
+
+function applyTodoDeleted(qc: QueryClient, teamId: string, todoId: string): void {
+  qc.removeQueries({ queryKey: ['todo', todoId], exact: true });
+  patchQueryData<TodoRecord[]>(qc, ['todos', teamId], (records) =>
+    records?.filter((row) => row.id !== todoId),
+  );
+  patchQueryData<TodoRecord[]>(qc, ['todos', teamId, 'archived'], (records) =>
+    records?.filter((row) => row.id !== todoId),
+  );
+  patchQueryData<TasksQuery>(qc, ['tasks', teamId], (data) =>
+    data === undefined
+      ? data
+      : {
+          entries: data.entries.filter((entry) => !(entry.kind === 'todo' && entry.id === todoId)),
+        },
+  );
+  notifyTodoDeleted(todoId);
+}
+
 function patchTodo(records: TodoRecord[] | undefined, doc: TodoRecord): TodoRecord[] | undefined {
   if (records === undefined) return records;
   const present = records.find((row) => row.id === doc.id);
@@ -148,6 +179,15 @@ export function applyTeamStreamEvent(
   ev: Record<string, unknown>,
 ): NotificationRecord | undefined {
   switch (ev.type) {
+    case 'todo_deleted': {
+      const todoId = typeof ev.todoId === 'string' && ev.todoId !== '' ? ev.todoId : null;
+      if (todoId === null) break;
+      const projectId = typeof ev.projectId === 'string' ? ev.projectId : undefined;
+      void invalidateEventQueries(qc, { type: 'todo_deleted', teamId, todoId, projectId }, () =>
+        applyTodoDeleted(qc, teamId, todoId),
+      );
+      break;
+    }
     case 'todo': {
       const { data: doc } = todoRecordSchema.safeParse(ev.doc);
       if (doc === undefined || doc.teamId !== teamId) break;

@@ -1,9 +1,12 @@
 import { canOrchestrate } from '@cairn/shared';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { useApiMutations, useChiefThreads } from '../api/hooks.js';
+import { api } from '../api/client.js';
+import { useApiMutations, useChiefThreads, useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { notifyTodoDeleted } from '../api/team-stream-cache.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
@@ -11,7 +14,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
@@ -22,11 +25,16 @@ import { MoreMenu } from '../overlay/more-menu.js';
 import { toastArchived } from './archive-toast.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
 import { MoveToProjectSub } from './task-move-menu.js';
-import { RenameDialog } from './task-row-menu.js';
+import { deleteTaskDetailKey, RenameDialog } from './task-row-menu.js';
+import { reviewOwnedByCoordinator } from './thread-copy.js';
 import { canMarkDone, useMarkDone } from './use-mark-done.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
-export type ThreadActionKind = 'start' | 'approve' | 'retry' | 'unarchive';
+export type ThreadActionKind = 'start' | 'approve' | 'review' | 'retry' | 'unarchive';
+
+export function completeMenuIntent(phase: TodoRecord['phase']): 'complete' | 'stop-and-done' {
+  return phase === 'review' ? 'complete' : 'stop-and-done';
+}
 
 export function threadActionOf(todo: TodoRecord, running: boolean): ThreadActionKind | null {
   if (todo.archivedAt != null) return 'unarchive';
@@ -37,6 +45,8 @@ export function threadActionOf(todo: TodoRecord, running: boolean): ThreadAction
       return 'start';
     case 'confirm':
       return 'approve';
+    case 'review':
+      return reviewOwnedByCoordinator(todo) ? null : 'review';
     case 'failed':
       return 'retry';
     default:
@@ -47,6 +57,7 @@ export function threadActionOf(todo: TodoRecord, running: boolean): ThreadAction
 const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }> = {
   start: { reason: '尚未开始。', primary: '开始' },
   approve: { reason: '计划已就绪。要改计划，直接在下面回复。', primary: '批准计划' },
+  review: { reason: '接受结果并结束这个任务，需要修改时直接在下面回复。', primary: '标记完成' },
   retry: { reason: '立即重新运行这个任务，或在下面回复说明怎么改。', primary: '立即重试' },
   unarchive: { reason: '这个任务已归档。取消归档后才能发消息。', primary: '取消归档' },
 };
@@ -65,17 +76,26 @@ export function useThreadActions({
   chat,
   onGone,
   onViewPlan,
+  hasOpenPr = false,
   engine,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   onGone: () => void;
   onViewPlan: (() => void) | undefined;
+  hasOpenPr?: boolean;
   engine?: EngineMenu | undefined;
 }): ThreadActions {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
+  const qc = useQueryClient();
   const mutations = useApiMutations(teamId);
+  const mergeBuild = useMutation({
+    mutationFn: (id: string) => api.post<{ delegated: true }>(`/api/builds/${id}/merge`, {}),
+    onSuccess: () => {
+      void qc.invalidateQueries();
+    },
+  });
   const { markDone, dialogs: markDoneDialogs } = useMarkDone(todo);
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
@@ -83,6 +103,9 @@ export function useThreadActions({
   const [dialog, setDialog] = useState<'delete' | 'stop' | 'route-override' | 'rename' | null>(
     null,
   );
+  const schedulesQ = useSchedules(live && dialog === 'delete');
+  const hasSchedules = (schedulesQ.data ?? []).some((s) => s.todoId === todo.id);
+  const deleteDetailKey = deleteTaskDetailKey(todo, hasSchedules);
   const { buildId, running } = chat;
   const phase = todo.phase;
   const archived = todo.archivedAt != null;
@@ -133,10 +156,20 @@ export function useThreadActions({
       { onError: (error) => toastError(t('完成请求未送出，请重试。'), error) },
     );
   });
+  const merge = guard(() => {
+    if (buildId == null) return;
+    mergeBuild.mutate(buildId, {
+      onSuccess: () => toastSuccess(t('已发起合并。')),
+      onError: (error) => toastError(t('合并请求未送出，请重试。'), error),
+    });
+  });
   const deleteTask = guard(() => {
     setDialog(null);
     mutations.deleteTodo.mutate(todo.id, {
-      onSuccess: onGone,
+      onSuccess: () => {
+        notifyTodoDeleted(todo.id);
+        onGone();
+      },
       onError: (error) => toastError(t('删除任务失败，请重试。'), error),
     });
   });
@@ -160,13 +193,17 @@ export function useThreadActions({
     orchestrateStart.pendingId === todo.id ||
     mutations.stepAction.isPending ||
     mutations.retryBuildNow.isPending ||
+    mutations.patchTodo.isPending ||
     mutations.setTodoArchived.isPending;
   const runPrimary: Record<ThreadActionKind, () => void> = {
     start: orchestrate,
     approve,
+    review: complete,
     retry: retryNow,
     unarchive: setArchived(false),
   };
+  const canMerge =
+    kind === 'review' && buildId != null && !chat.infoOutput && (todo.hasChanges || hasOpenPr);
 
   const card =
     kind === null ? null : kind === 'unarchive' ? (
@@ -218,6 +255,27 @@ export function useThreadActions({
             {t('查看计划')}
           </Button>
         )}
+        {canMerge && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  onClick={merge}
+                  disabled={pending || mergeBuild.isPending}
+                  aria-description={t('将改动合并到目标分支并完成任务。')}
+                  className={cn(REPLY_CHIP_CLS, 'w-auto')}
+                />
+              }
+            >
+              {mergeBuild.isPending && <RingSpinner data-icon="inline-start" />}
+              {t('合并')}
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={6}>
+              {t('将改动合并到目标分支并完成任务。')}
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
     );
 
@@ -252,8 +310,7 @@ export function useThreadActions({
         }}
         onComplete={() => {
           setMenuOpen(false);
-          if (phase === 'confirm') approve();
-          else if (phase === 'review') complete();
+          if (completeMenuIntent(phase) === 'complete') complete();
           else markDone();
         }}
         canComplete={canComplete}
@@ -301,6 +358,7 @@ export function useThreadActions({
         open={dialog === 'delete'}
         title={t('确定删除该任务？此操作不可撤销。')}
         summary={todo.title}
+        {...(deleteDetailKey !== null ? { detail: t(deleteDetailKey) } : {})}
         ariaLabel={t('删除任务')}
         onClose={() => setDialog(null)}
         onConfirm={deleteTask}

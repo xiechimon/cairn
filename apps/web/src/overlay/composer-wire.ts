@@ -48,7 +48,6 @@ export interface ComposerWireOptions {
   readDraft?: () => string;
   onSend?: (text: string) => void | Promise<void>;
   onQueue?: (text: string) => void | Promise<void>;
-  onStopAndSend?: (text: string) => void | Promise<void>;
   onAttachment?: (files: File[]) => string[] | Promise<string[]>;
   mentionGroups?: MentionGroups;
   mentionFiles?: FileMentionEntry[];
@@ -106,7 +105,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     readDraft,
     onSend,
     onQueue,
-    onStopAndSend,
     onAttachment,
     mentionGroups,
     mentionFiles,
@@ -219,7 +217,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     return buildInlineRows(inlineRange.query, mentionGroups, mentionFiles);
   }, [inlineRange, mentionGroups, mentionFiles]);
 
-  const escapeAt = useRef<number | null>(null);
   const sending = useRef(false);
   const submit = (callback: typeof onSend) => {
     if (attachInFlightRef.current > 0 || sending.current) return;
@@ -447,34 +444,18 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       if (picked !== undefined) acceptInlineRow(picked);
       return;
     }
-    if (
-      event.key === 'Escape' &&
-      (isComposing || event.repeat) &&
-      (stopOptions?.available || escapeAt.current !== null)
-    ) {
-      if (!isComposing) event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    if (event.key === 'Escape' && !isComposing && !event.repeat) {
-      const now = Date.now();
-      const secondEscape = escapeAt.current !== null && now - escapeAt.current <= 500;
-      if (secondEscape && onStopAndSend !== undefined) {
-        event.preventDefault();
+    if (event.key === 'Escape' && stopOptions?.available === true) {
+      if (isComposing || event.repeat) {
+        if (!isComposing) event.preventDefault();
         event.stopPropagation();
-        escapeAt.current = null;
-        submit(onStopAndSend);
         return;
       }
-      if (stopOptions?.available && stopOptions.onStop !== undefined) {
+      if (stopOptions.onStop !== undefined) {
         event.preventDefault();
         event.stopPropagation();
-        escapeAt.current = now;
         stopOptions.onStop();
         return;
       }
-    } else if (event.key !== 'Escape') {
-      escapeAt.current = null;
     }
     if (
       event.key === 'Backspace' &&

@@ -26,8 +26,9 @@ describe('the side chat action card', () => {
     ).toBe('retry');
   });
 
-  it('leaves finishing a reviewed thread to the more menu', () => {
-    expect(threadActionOf(todo({ phase: 'review' }), false)).toBeNull();
+  it('offers explicit review completion when waiting on the owner, not when owned by Coordinator', () => {
+    expect(threadActionOf(todo({ phase: 'review' }), false)).toBe('review');
+    expect(threadActionOf(todo({ phase: 'review', owner: 'coordinator' }), false)).toBeNull();
   });
 
   it('shows nothing while the thread works or is finished', () => {

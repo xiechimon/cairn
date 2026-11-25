@@ -934,10 +934,20 @@ export async function readBuildChangeFile(
   const todoRow = ctx.db.select().from(todoTable).where(eq(todoTable.id, buildRow.todoId)).get();
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
   const projRow = projectOfTodo(ctx.db, todoRow);
-  if (projRow?.repoKind !== 'hosted' || projRow.repoName === null) {
-    throw notFound(`hosted repo for build ${buildId}`);
+  let dir: string | null = null;
+  if (projRow?.repoKind === 'hosted' && projRow.repoName !== null) {
+    dir = repoDirFor(ctx.reposDir, projRow.teamId, projRow.repoName);
+  } else if (
+    projRow?.repoKind === 'local' &&
+    projRow.localPath !== null &&
+    existsSync(projRow.localPath) &&
+    (await systemGitOps.isGitRepo(projRow.localPath))
+  ) {
+    dir = projRow.localPath;
   }
-  const dir = repoDirFor(ctx.reposDir, projRow.teamId, projRow.repoName);
+  if (dir === null) {
+    throw notFound(`repo for build ${buildId}`);
+  }
   const ref = conversationBranch(buildId);
   const commit = await systemGitOps.resolveCommit(dir, `refs/heads/${ref}`);
   if (commit === null) throw notFound(`ref ${ref}`);

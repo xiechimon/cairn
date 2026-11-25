@@ -121,7 +121,7 @@ export function taskRowCopy(
       return { ...base, running, word: '进行中', what, where: null };
     }
     case 'resolved': {
-      const word = todo.phase === 'closed' ? '已归档' : '已完成';
+      const word = todo.archivedAt != null || todo.phase === 'closed' ? '已归档' : '已完成';
       if (pr?.state === 'merged')
         return {
           ...base,

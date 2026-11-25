@@ -18,12 +18,19 @@ function keyboard(key: string, modifiers: Partial<KeyboardEvent<HTMLTextAreaElem
   return { key, shiftKey: false, metaKey: false, ctrlKey: false, altKey: false, repeat: false, nativeEvent: { isComposing: false }, preventDefault: vi.fn(), stopPropagation: vi.fn(), ...modifiers } as unknown as KeyboardEvent<HTMLTextAreaElement>;
 }
 
-function composer() {
+function composer(withEscapeStop = false) {
   const onSend = vi.fn();
   const onQueue = vi.fn();
   const onStop = vi.fn();
   const onDraftChange = vi.fn();
-  const wire = useComposerWire({ editable: true, draft: 'Next message', onDraftChange, onSend, onQueue, onStopAndSend: onQueue, stop: { available: true, onStop } });
+  const wire = useComposerWire({
+    editable: true,
+    draft: 'Next message',
+    onDraftChange,
+    onSend,
+    onQueue,
+    ...(withEscapeStop ? { stop: { available: true, onStop } } : {}),
+  });
   return { ...wire, onSend, onQueue, onStop, onDraftChange };
 }
 
@@ -44,22 +51,27 @@ test('plain Enter steers and Shift Enter retains the draft', () => {
   expect(wire.onSend).toHaveBeenCalledExactlyOnceWith('Next message');
 });
 
-test('Escape stops without clearing; a second Escape sends the draft without a second stop', () => {
-  const wire = composer();
+test('single and double Escape never silently stop a task or submit an unfinished draft', () => {
+  const wire = composer(false);
   const first = keyboard('Escape');
   wire.handleKeyDown(first);
-  expect(wire.onStop).toHaveBeenCalledOnce();
-  expect(wire.onDraftChange).not.toHaveBeenCalled();
-  expect(first.preventDefault).toHaveBeenCalled();
-  expect(first.stopPropagation).toHaveBeenCalled();
   wire.handleKeyDown(keyboard('Escape'));
-  expect(wire.onQueue).toHaveBeenCalledExactlyOnceWith('Next message');
-  expect(wire.onDraftChange).toHaveBeenCalledWith('');
-  expect(wire.onStop).toHaveBeenCalledOnce();
+  expect(wire.onStop).not.toHaveBeenCalled();
+  expect(wire.onQueue).not.toHaveBeenCalled();
+  expect(wire.onSend).not.toHaveBeenCalled();
+  expect(wire.onDraftChange).not.toHaveBeenCalled();
+  expect(first.preventDefault).not.toHaveBeenCalled();
+
+  const coordinatorWire = composer(true);
+  coordinatorWire.handleKeyDown(keyboard('Escape'));
+  coordinatorWire.handleKeyDown(keyboard('Escape'));
+  expect(coordinatorWire.onQueue).not.toHaveBeenCalled();
+  expect(coordinatorWire.onSend).not.toHaveBeenCalled();
+  expect(coordinatorWire.onDraftChange).not.toHaveBeenCalled();
 });
 
 test('IME composition and repeated Escape never stop or send', () => {
-  const wire = composer();
+  const wire = composer(true);
   wire.handleKeyDown(keyboard('Escape', { nativeEvent: { isComposing: true } as KeyboardEvent<HTMLTextAreaElement>['nativeEvent'] }));
   wire.handleKeyDown(keyboard('Escape', { repeat: true }));
   expect(wire.onStop).not.toHaveBeenCalled();

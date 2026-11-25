@@ -47,6 +47,10 @@ export class TeamStreamHub {
     this.publish(teamId, () => ({ type: 'todo', v: doc.v, doc }));
   }
 
+  publishTodoDeleted(teamId: string, todoId: string, projectId: string): void {
+    this.publish(teamId, () => ({ type: 'todo_deleted', todoId, projectId }));
+  }
+
   publishBuildDoc(teamId: string, doc: BuildRecord): void {
     this.publish(teamId, () => {
       const projectId = this.projectOfBuildTodo?.(teamId, doc.todoId);

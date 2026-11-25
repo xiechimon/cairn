@@ -1,7 +1,18 @@
-import { Archive, ArrowUpRight, Check, Ellipsis, Pencil, RotateCw, Trash2 } from 'lucide-react';
+import { IN_PROGRESS_PHASES } from '@cairn/shared';
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowUpRight,
+  Check,
+  Ellipsis,
+  Pencil,
+  RotateCw,
+  Trash2,
+} from 'lucide-react';
 import { type FormEvent, useState } from 'react';
-import { useApiMutations } from '../api/hooks.js';
+import { useApiMutations, useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { notifyTodoDeleted } from '../api/team-stream-cache.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -15,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { TodoRecord } from '../fixtures/records.js';
@@ -27,6 +38,19 @@ import { MoveToProjectSub } from './task-move-menu.js';
 import { canMarkDone } from './use-mark-done.js';
 
 const RENAME_FORM = 'task-rename-form';
+
+export function deleteTaskDetailKey(
+  todo: Pick<TodoRecord, 'phase'>,
+  hasSchedules: boolean,
+): string | null {
+  const running = (IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase);
+  if (running && hasSchedules) {
+    return '此任务正在运行中，删除会停止当前执行并一并移除关联的定时任务。';
+  }
+  if (running) return '此任务正在运行中，删除会立即停止当前执行。';
+  if (hasSchedules) return '关联的定时任务也会一并删除。';
+  return null;
+}
 
 export function RenameDialog({
   todo,
@@ -103,6 +127,9 @@ export function TaskRowMenu({
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
+  const schedulesQ = useSchedules(live && dialog === 'delete');
+  const hasSchedules = (schedulesQ.data ?? []).some((s) => s.todoId === todo.id);
+  const deleteDetailKey = deleteTaskDetailKey(todo, hasSchedules);
   const archive = () => {
     if (!live) {
       blockDemoWrite();
@@ -119,6 +146,19 @@ export function TaskRowMenu({
       },
     );
   };
+  const unarchive = () => {
+    if (!live) {
+      blockDemoWrite();
+      return;
+    }
+    mutations.setTodoArchived.mutate(
+      { id: todo.id, archived: false },
+      {
+        onSuccess: () => toastSuccess(t('已取消归档')),
+        onError: (error) => toastError(t('无法取消归档任务。'), error),
+      },
+    );
+  };
   const remove = () => {
     setDialog(null);
     if (!live) {
@@ -126,6 +166,7 @@ export function TaskRowMenu({
       return;
     }
     mutations.deleteTodo.mutate(todo.id, {
+      onSuccess: () => notifyTodoDeleted(todo.id),
       onError: (error) => toastError(t('删除任务失败，请重试。'), error),
     });
   };
@@ -193,10 +234,15 @@ export function TaskRowMenu({
             {t('重命名')}
           </KeyedMenuItem>
           <DropdownMenuSeparator />
-          {todo.archivedAt == null && (
+          {todo.archivedAt == null ? (
             <KeyedMenuItem shortcut="A" data-action="archive" onClick={archive}>
               <Archive />
               {t('归档')}
+            </KeyedMenuItem>
+          ) : (
+            <KeyedMenuItem shortcut="A" data-action="unarchive" onClick={unarchive}>
+              <ArchiveRestore />
+              {t('取消归档')}
             </KeyedMenuItem>
           )}
           <KeyedMenuItem
@@ -216,6 +262,7 @@ export function TaskRowMenu({
         open={dialog === 'delete'}
         title={t('确定删除该任务？此操作不可撤销。')}
         summary={todo.title}
+        {...(deleteDetailKey !== null ? { detail: t(deleteDetailKey) } : {})}
         ariaLabel={t('删除任务')}
         onClose={() => setDialog(null)}
         onConfirm={remove}
