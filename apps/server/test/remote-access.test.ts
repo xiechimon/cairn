@@ -582,7 +582,7 @@ describe('F-P2 pairing authority stays with the owner token', () => {
   });
 });
 
-describe('paired devices can approve Runner enrollment', () => {
+describe('paired devices cannot approve Runner enrollment', () => {
   test.each(['bearer', 'cookie'] as const)(
     '%s approval cannot replace an existing local Runner credential',
     async (kind) => {
@@ -613,10 +613,11 @@ describe('paired devices can approve Runner enrollment', () => {
         body: { name: hostname() },
         peer: '127.0.0.1',
       });
-      const body = (await started.json()) as { enrollId: string };
-      expect((await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body })).status).toBe(
-        403,
-      );
+      const { enrollId, code } = (await started.json()) as { enrollId: string; code: string };
+      expect(
+        (await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body: { enrollId } }))
+          .status,
+      ).toBe(403);
       expect(
         (
           await call(s, 'GET', '/api/machine/me', {
@@ -624,15 +625,18 @@ describe('paired devices can approve Runner enrollment', () => {
           })
         ).status,
       ).toBe(200);
-      expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
+      expect(
+        await (await call(s, 'POST', '/api/machine/enroll/poll', { body: { enrollId } })).json(),
+      ).toEqual({
         status: 'pending',
         name: hostname(),
+        code,
       });
     },
   );
 
   test.each(['bearer', 'cookie'] as const)(
-    '%s approval is single-use and stops after revocation',
+    '%s approval of a remote Runner is refused with 403 while owner approval succeeds',
     async (kind) => {
       const s = bootServer({ authToken: OWNER });
       const pairedResponse = await call(s, 'POST', '/api/remote/pair', {
@@ -650,32 +654,39 @@ describe('paired devices can approve Runner enrollment', () => {
         body: { name: 'phone-approved', teamId: s.team.id },
       });
       expect(started.status).toBe(200);
-      const body = (await started.json()) as { enrollId: string };
-      if (kind === 'cookie') {
-        const deniedRequests: Record<string, string>[] = [
-          { cookie: cookie ?? '' },
-          { cookie: cookie ?? '', 'sec-fetch-site': 'cross-site' },
-          { cookie: cookie ?? '', origin: 'https://evil.example' },
-        ];
-        for (const deniedHeaders of deniedRequests) {
-          const denied = await call(s, 'POST', '/api/machine/enroll/confirm', {
-            headers: deniedHeaders,
-            body,
-          });
-          expect(denied.status).toBe(403);
-        }
-        expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
-          status: 'pending',
-          name: 'phone-approved',
-        });
-      }
-      const confirmed = await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body });
+      const { enrollId, code, pollSecret } = (await started.json()) as {
+        enrollId: string;
+        code: string;
+        pollSecret: string;
+      };
+      const refused = await call(s, 'POST', '/api/machine/enroll/confirm', {
+        headers,
+        body: { enrollId },
+      });
+      expect(refused.status).toBe(403);
+      expect(
+        await (await call(s, 'POST', '/api/machine/enroll/poll', { body: { enrollId } })).json(),
+      ).toEqual({
+        status: 'pending',
+        name: 'phone-approved',
+        code,
+      });
+      const confirmed = await call(s, 'POST', '/api/machine/enroll/confirm', {
+        headers: ownerHeaders,
+        body: { enrollId },
+      });
       expect(confirmed.status).toBe(200);
       const { machine } = (await confirmed.json()) as {
         machine: { token: string; teamId: string };
       };
       expect(machine.teamId).toBe(s.team.id);
-      expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
+      expect(
+        await (
+          await call(s, 'POST', '/api/machine/enroll/poll', {
+            body: { enrollId, pollSecret },
+          })
+        ).json(),
+      ).toEqual({
         status: 'authorized',
         machine,
       });
@@ -686,26 +697,14 @@ describe('paired devices can approve Runner enrollment', () => {
           })
         ).status,
       ).toBe(200);
-      expect((await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body })).status).toBe(
-        409,
-      );
-      const next = await call(s, 'POST', '/api/machine/enroll/start', {
-        body: { name: 'after-revoke' },
-      });
-      const pending = (await next.json()) as { enrollId: string };
       expect(
         (
-          await call(s, 'DELETE', `/api/remote/devices/${paired.deviceId}`, {
+          await call(s, 'POST', '/api/machine/enroll/confirm', {
             headers: ownerHeaders,
+            body: { enrollId },
           })
         ).status,
-      ).toBe(204);
-      expect(
-        (await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body: pending })).status,
-      ).toBe(401);
-      expect(
-        await (await call(s, 'POST', '/api/machine/enroll/poll', { body: pending })).json(),
-      ).toEqual({ status: 'pending', name: 'after-revoke' });
+      ).toBe(409);
     },
   );
 });
@@ -1053,17 +1052,20 @@ describe('F-R3 a request that outlives its device cannot create state', () => {
     expect(res.status).toBe(401);
   });
 
-  test('a Runner is not approved if the device is revoked while its request body arrives', async () => {
+  test('a Runner is refused before reading the body when called by a paired device', async () => {
     const s = bootServer({ authToken: OWNER });
     const started = await call(s, 'POST', '/api/machine/enroll/start', {
       body: { name: 'late Runner' },
     });
-    const body = (await started.json()) as { enrollId: string };
-    const res = await revokedBetweenAuthAndBody(s, '/api/machine/enroll/confirm', body);
-    expect(res.status).toBe(401);
-    expect(await (await call(s, 'POST', '/api/machine/enroll/poll', { body })).json()).toEqual({
+    const { enrollId, code } = (await started.json()) as { enrollId: string; code: string };
+    const res = await revokedBetweenAuthAndBody(s, '/api/machine/enroll/confirm', { enrollId });
+    expect(res.status).toBe(403);
+    expect(
+      await (await call(s, 'POST', '/api/machine/enroll/poll', { body: { enrollId } })).json(),
+    ).toEqual({
       status: 'pending',
       name: 'late Runner',
+      code,
     });
   });
 });

@@ -60,5 +60,5 @@ export function ownerChannelAdmits(
   if (channel.key === null) return c.json({ error: 'owner channel is not established' }, 503);
   const provided = c.req.header(OWNER_CHANNEL_HEADER);
   if (provided !== undefined && matchesChannelKey(channel.key, provided)) return null;
-  return c.json({ error: 'owner channel required' }, 403);
+  return c.json({ error: 'owner channel required', code: 'owner-channel-required' }, 403);
 }

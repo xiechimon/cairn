@@ -138,7 +138,10 @@ describe('owner channel gate', () => {
     ]) {
       const res = await answer(s, proposalId, headers);
       expect(res.status).toBe(403);
-      expect(await res.json()).toEqual({ error: 'owner channel required' });
+      expect(await res.json()).toEqual({
+        error: 'owner channel required',
+        code: 'owner-channel-required',
+      });
     }
     expect(proposalById(s.db, proposalId)?.status).toBe('pending');
     s.dispose();
@@ -219,7 +222,10 @@ describe('owner channel gate', () => {
       body: JSON.stringify({ models: [] }),
     });
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: 'owner channel required' });
+    expect(await res.json()).toEqual({
+      error: 'owner channel required',
+      code: 'owner-channel-required',
+    });
     s.dispose();
   });
 
@@ -318,7 +324,10 @@ describe('owner channel gate', () => {
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       expect(res.status, `${method} ${path} admitted a bearer-only same-uid caller`).toBe(403);
-      expect(await res.json()).toEqual({ error: 'owner channel required' });
+      expect(await res.json()).toEqual({
+        error: 'owner channel required',
+        code: 'owner-channel-required',
+      });
     }
     s.dispose();
   });
@@ -399,7 +408,10 @@ describe('owner channel gate', () => {
       },
     });
     expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({ error: 'owner channel required' });
+    expect(await res.json()).toEqual({
+      error: 'owner channel required',
+      code: 'owner-channel-required',
+    });
     s.dispose();
   });
 
@@ -423,6 +435,24 @@ describe('owner channel gate', () => {
       body: JSON.stringify({ models: [] }),
     });
     expect(res.status).toBe(200);
+    s.dispose();
+  });
+
+  test('POST /api/auth/session without owner channel returns structured owner-channel-required code', async () => {
+    const s = world({ key: KEY });
+    const res = await s.app.request('/api/auth/session', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        'x-cairn-browser-auth': '1',
+        'sec-fetch-site': 'same-origin',
+      },
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      error: 'owner channel required',
+      code: 'owner-channel-required',
+    });
     s.dispose();
   });
 

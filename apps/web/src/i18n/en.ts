@@ -3100,4 +3100,8 @@ export const EN: Record<string, string> = {
   二维码: 'qr code',
   机器人: 'bot',
   远程: 'remote',
+  确认码: 'Confirmation code',
+  '这台主机仅接受其他设备使用配对码登录，请返回使用配对码。':
+    'This host accepts only pairing-code sign-in from other devices. Return and use the pairing code.',
+  仅限主机设备查看: 'Visible on host device only',
 };

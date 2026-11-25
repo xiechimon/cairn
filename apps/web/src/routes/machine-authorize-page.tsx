@@ -30,6 +30,7 @@ export function MachineAuthorizePage() {
   const [phase, setPhase] = useState<Phase>(enrollId !== null ? 'pending' : 'idle');
   const [failed, setFailed] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(null);
   const [polled, setPolled] = useState(false);
   const [pollFailed, setPollFailed] = useState(false);
   const { access } = useRunnerServerAccess(phase === 'idle');
@@ -53,9 +54,12 @@ export function MachineAuthorizePage() {
         if (res.status === 'pending') {
           setPolled(true);
           if (res.name) setName(res.name);
+          if (res.code) setCode(res.code);
         }
-        if (res.status === 'authorized') setPhase('authorized');
-        else if (res.status === 'expired') setPhase('expired');
+        if (res.status === 'authorized') {
+          if (res.name) setName(res.name);
+          setPhase('authorized');
+        } else if (res.status === 'expired') setPhase('expired');
       } catch {
         if (!stopped.current) setPollFailed(true);
       }
@@ -110,6 +114,12 @@ export function MachineAuthorizePage() {
           {waiting && (
             <>
               <p className={DESC_CLASS}>{t('有一台执行机请求加入你的团队。')}</p>
+              {code !== null && (
+                <div className="flex items-baseline justify-between gap-3 rounded-md border border-border px-3 py-2 text-meta">
+                  <span className="text-content-secondary">{t('确认码')}</span>
+                  <span className="font-mono text-foreground tabular-nums">{code}</span>
+                </div>
+              )}
               {name !== null && (
                 <>
                   <div className="flex items-baseline justify-between gap-3 rounded-md border border-border px-3 py-2 text-meta">

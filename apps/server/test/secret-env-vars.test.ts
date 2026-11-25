@@ -254,9 +254,20 @@ describe('who sees env values', () => {
     for (const [label, headers, sees] of callers) {
       const res = await s.app.request(path(), { headers });
       expect(res.status, label).toBe(200);
-      const body = JSON.stringify(await res.json());
+      const entries = (await res.json()) as Array<{
+        kind?: string;
+        value?: string;
+        redacted?: boolean;
+      }>;
+      const body = JSON.stringify(entries);
       expect(body.includes(SENTINEL), label).toBe(sees);
       expect(body, label).toContain('"kind":"env"');
+      if (sees) {
+        expect(entries[0]?.redacted, label).toBeUndefined();
+      } else {
+        expect(entries[0]?.value, label).toBeUndefined();
+        expect(entries[0]?.redacted, label).toBe(true);
+      }
     }
   });
 });

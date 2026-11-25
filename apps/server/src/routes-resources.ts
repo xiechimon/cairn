@@ -197,7 +197,7 @@ import { answerSecretRequest } from './services/secret-requests.js';
 import {
   createSecret,
   deleteSecret,
-  listSecrets,
+  listRedactedSecrets,
   listSecretsWithEnvValues,
   updateSecret,
 } from './services/secrets.js';
@@ -1463,7 +1463,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       (ctx.authToken === null || c.get('ownerIdentity') !== undefined);
     c.header('Cache-Control', 'no-store');
     return c.json(
-      ownerCaller ? listSecretsWithEnvValues(keysvc, teamId) : listSecrets(keysvc, teamId),
+      ownerCaller ? listSecretsWithEnvValues(keysvc, teamId) : listRedactedSecrets(keysvc, teamId),
     );
   });
 

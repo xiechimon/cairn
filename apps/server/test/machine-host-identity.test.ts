@@ -1179,16 +1179,8 @@ describe('one computer keeps one identity across runner homes and X.local / X na
         },
         body: JSON.stringify({ enrollId, retireToken: victim.token }),
       });
-      expect(deviceConfirm.status).toBe(200);
-      const pairedMachine = ((await deviceConfirm.json()) as { machine: Enrolled }).machine;
-      expect(pairedMachine.machineId).toBe(browserPrimary.machineId);
-      expect(machineRow(s, victim.machineId)).toBeDefined();
-
-      const pairedPresence = await call(s.app, 'POST', '/api/machine/presence', {
-        cred: pairedMachine.token,
-        body: { hostKey: HOST_KEY_A, legacyHostKeys: [HOST_KEY_A, HOST_KEY_B] },
-      });
-      expect(pairedPresence.status).toBe(200);
+      expect(deviceConfirm.status).toBe(403);
+      expect(machineRow(s, browserPrimary.machineId)).toBeDefined();
       expect(machineRow(s, victim.machineId)).toBeDefined();
     } finally {
       s.dispose();

@@ -198,7 +198,9 @@ export function TokenGate() {
   const [tokenMode, setTokenMode] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [tokenSubmitting, setTokenSubmitting] = useState(false);
-  const [tokenError, setTokenError] = useState<'invalid' | 'unavailable' | null>(null);
+  const [tokenError, setTokenError] = useState<
+    'invalid' | 'owner-channel-required' | 'unavailable' | null
+  >(null);
   const pending = auth.pair?.phase === 'pending';
 
   const submitOwnerToken = async (event: FormEvent) => {
@@ -354,7 +356,9 @@ export function TokenGate() {
                 >
                   {tokenError === 'invalid'
                     ? t('访问令牌无效，请检查后重试。')
-                    : t('连接失败，请重试。')}
+                    : tokenError === 'owner-channel-required'
+                      ? t('这台主机仅接受其他设备使用配对码登录，请返回使用配对码。')
+                      : t('连接失败，请重试。')}
                 </p>
               )}
               <div className="flex items-center justify-end gap-2">

@@ -139,7 +139,10 @@ export const secretRecordSchema = z.object({
 });
 export type SecretRecord = z.infer<typeof secretRecordSchema>;
 
-export const secretListEntrySchema = secretRecordSchema.extend({ value: z.string().optional() });
+export const secretListEntrySchema = secretRecordSchema.extend({
+  value: z.string().optional(),
+  redacted: z.literal(true).optional(),
+});
 export type SecretListEntry = z.infer<typeof secretListEntrySchema>;
 
 export const setSecretBodySchema = z.object({

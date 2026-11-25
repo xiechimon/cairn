@@ -209,12 +209,12 @@ test('A7: another uid cannot adopt the socket', async () => {
 });
 
 test.each([
-  ['/api/machine/enroll/confirm', 200],
-  ['/api/machine/enroll/%63onfirm', 200],
-  ['/%61pi/machine/enroll/confirm', 401],
-  ['/api/machine/%65nroll/confirm', 401],
+  ['/api/machine/enroll/confirm', 403],
+  ['/api/machine/enroll/%63onfirm', 403],
+  ['/%61pi/machine/enroll/confirm', 403],
+  ['/api/machine/%65nroll/confirm', 403],
 ] as const)(
-  'A8: paired approval at %s returns %i without granting pairing administration',
+  'A8: paired device at %s returns %i without granting runner or pairing administration',
   async (confirmPath, expectedStatus) => {
     const s = await setup();
     const started = await call(
@@ -244,7 +244,7 @@ test.each([
           { enrollId: started.body.enrollId },
         )
       ).status,
-    ).toBe(expectedStatus === 200 ? 409 : 200);
+    ).toBe(200);
   },
 );
 

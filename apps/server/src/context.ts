@@ -69,10 +69,12 @@ export interface AppContext {
       teamId: string;
       name?: string;
       code: string;
+      pollSecretHash: string;
       createdAt: number;
       hostKey?: string;
       legacyHostKeys?: string[];
       fromLocalHost?: boolean;
+      authorized?: boolean;
       machine?: { machineId: string; token: string; teamId: string; serverUrl: string };
     }
   >;

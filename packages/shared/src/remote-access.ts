@@ -29,7 +29,7 @@ export function isBrowserAuthExempt(pathname: string): boolean {
   if (pathname.includes('%')) return false;
   return (
     !pathname.startsWith('/api/') ||
-    (pathname !== '/api/machine/enroll/confirm' && pathname.startsWith('/api/machine/')) ||
+    (!pathname.startsWith('/api/machine/enroll/confirm') && pathname.startsWith('/api/machine/')) ||
     pathname === '/api/machine' ||
     pathname.startsWith('/api/webhook/') ||
     pathname === '/api/mcp' ||

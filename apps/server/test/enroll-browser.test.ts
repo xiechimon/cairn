@@ -27,13 +27,22 @@ describe('browser authorization flow (W4 #285)', () => {
       name: 'mbp-14',
     });
     expect(started.status).toBe(200);
-    const startBody = (await started.json()) as { enrollId: string; url: string };
+    const startBody = (await started.json()) as {
+      enrollId: string;
+      url: string;
+      code: string;
+      pollSecret: string;
+    };
     expect(startBody.url).toContain(`/app/machines/authorize?enroll=${startBody.enrollId}`);
 
     const pending = await req(s.app, 'POST', '/api/machine/enroll/poll', {
       enrollId: startBody.enrollId,
     });
-    expect(await pending.json()).toEqual({ status: 'pending', name: 'mbp-14' });
+    expect(await pending.json()).toEqual({
+      status: 'pending',
+      name: 'mbp-14',
+      code: startBody.code,
+    });
     for (const [name, shown] of [
       [undefined, false],
       ['', false],
@@ -48,10 +57,10 @@ describe('browser authorization flow (W4 #285)', () => {
         '/api/machine/enroll/start',
         name === undefined ? {} : { name },
       );
-      const { enrollId } = (await other.json()) as { enrollId: string };
+      const { enrollId, code } = (await other.json()) as { enrollId: string; code: string };
       const polled = await req(s.app, 'POST', '/api/machine/enroll/poll', { enrollId });
       expect(await polled.json()).toEqual(
-        shown ? { status: 'pending', name } : { status: 'pending' },
+        shown ? { status: 'pending', name, code } : { status: 'pending', code },
       );
     }
     const unknown = await req(s.app, 'POST', '/api/machine/enroll/poll', {
@@ -87,6 +96,7 @@ describe('browser authorization flow (W4 #285)', () => {
 
     const after = await req(s.app, 'POST', '/api/machine/enroll/poll', {
       enrollId: startBody.enrollId,
+      pollSecret: startBody.pollSecret,
     });
     expect(await after.json()).toEqual({ status: 'authorized', machine });
 
@@ -94,5 +104,90 @@ describe('browser authorization flow (W4 #285)', () => {
       enrollId: startBody.enrollId,
     });
     expect(again.status).toBe(409);
+  });
+
+  test('enroll poll requires pollSecret for machine credentials, burns token on first delivery, and rate-limits start per IP', async () => {
+    const s = bootServer();
+    try {
+      const started = await req(s.app, 'POST', '/api/machine/enroll/start', {
+        name: 'secure-runner',
+      });
+      expect(started.status).toBe(200);
+      const startBody = (await started.json()) as {
+        enrollId: string;
+        url: string;
+        code?: string;
+        pollSecret?: string;
+      };
+      expect(typeof startBody.pollSecret).toBe('string');
+      expect(startBody.pollSecret?.length).toBeGreaterThanOrEqual(32);
+      expect(startBody.url).not.toContain(startBody.pollSecret ?? '');
+
+      const confirmed = await req(s.app, 'POST', '/api/machine/enroll/confirm', {
+        enrollId: startBody.enrollId,
+      });
+      expect(confirmed.status).toBe(200);
+      const { machine } = (await confirmed.json()) as {
+        machine: { machineId: string; token: string; teamId: string; serverUrl: string };
+      };
+
+      const browserPoll = await req(s.app, 'POST', '/api/machine/enroll/poll', {
+        enrollId: startBody.enrollId,
+      });
+      expect(browserPoll.status).toBe(200);
+      expect(await browserPoll.json()).toEqual({
+        status: 'authorized',
+        name: 'secure-runner',
+      });
+
+      const wrongSecret = await req(s.app, 'POST', '/api/machine/enroll/poll', {
+        enrollId: startBody.enrollId,
+        pollSecret: 'wrong-secret',
+      });
+      expect(wrongSecret.status).toBe(403);
+
+      const cliPoll = await req(s.app, 'POST', '/api/machine/enroll/poll', {
+        enrollId: startBody.enrollId,
+        pollSecret: startBody.pollSecret,
+      });
+      expect(cliPoll.status).toBe(200);
+      expect(await cliPoll.json()).toEqual({ status: 'authorized', machine });
+
+      const replay = await req(s.app, 'POST', '/api/machine/enroll/poll', {
+        enrollId: startBody.enrollId,
+        pollSecret: startBody.pollSecret,
+      });
+      expect(replay.status).toBe(200);
+      expect(await replay.json()).toEqual({
+        status: 'authorized',
+        name: 'secure-runner',
+      });
+
+      const peerEnv = { incoming: { socket: { remoteAddress: '203.0.113.10' } } };
+      for (let i = 0; i < 20; i += 1) {
+        const res = await s.app.request(
+          '/api/machine/enroll/start',
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: `rate-${i}` }),
+          },
+          peerEnv,
+        );
+        expect(res.status, `request ${i}`).toBe(200);
+      }
+      const throttled = await s.app.request(
+        '/api/machine/enroll/start',
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: 'rate-overflow' }),
+        },
+        peerEnv,
+      );
+      expect(throttled.status).toBe(429);
+    } finally {
+      s.dispose();
+    }
   });
 });

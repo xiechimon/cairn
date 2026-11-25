@@ -177,9 +177,9 @@ export async function signOutSession(): Promise<void> {
   clearLegacyBrowserToken();
 }
 
-export async function signInWithOwnerToken(
-  rawToken: string,
-): Promise<'ok' | 'invalid' | 'unavailable'> {
+export type OwnerTokenSignInOutcome = 'ok' | 'invalid' | 'owner-channel-required' | 'unavailable';
+
+export async function signInWithOwnerToken(rawToken: string): Promise<OwnerTokenSignInOutcome> {
   const token = rawToken.trim();
   if (token === '') return 'invalid';
   try {
@@ -198,7 +198,12 @@ export async function signInWithOwnerToken(
       applyVerdict('authenticated', 'waiting', true);
       return 'ok';
     }
-    if (response.status === 401 || response.status === 403) return 'invalid';
+    if (response.status === 403) {
+      const body = (await response.json().catch(() => null)) as { code?: unknown } | null;
+      if (body?.code === 'owner-channel-required') return 'owner-channel-required';
+      return 'invalid';
+    }
+    if (response.status === 401) return 'invalid';
     return 'unavailable';
   } catch {
     return 'unavailable';

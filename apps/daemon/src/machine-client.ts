@@ -289,6 +289,7 @@ export class MachineClient implements MachineApi {
     enrollId: string;
     url: string;
     code?: string;
+    pollSecret?: string;
   }> {
     return this.request('POST', '/api/machine/enroll/start', {
       body,
@@ -298,13 +299,14 @@ export class MachineClient implements MachineApi {
 
   async enrollPoll(
     enrollId: string,
+    pollSecret?: string,
   ): Promise<
-    | { status: 'pending' }
-    | { status: 'authorized'; machine: MachineEnrollResponse }
+    | { status: 'pending'; name?: string; code?: string }
+    | { status: 'authorized'; machine?: MachineEnrollResponse; name?: string }
     | { status: 'expired' }
   > {
     return this.request('POST', '/api/machine/enroll/poll', {
-      body: { enrollId },
+      body: { enrollId, ...(pollSecret !== undefined ? { pollSecret } : {}) },
       parse: (raw) => machineEnrollPollResponseSchema.parse(raw) as never,
     });
   }

@@ -34,7 +34,7 @@ function clientOf(polls: (enrollId: string) => Poll, starts: string[] = []) {
   return {
     enrollStart: async (body: { name?: string }) => {
       starts.push(body.name ?? '');
-      return { enrollId: 'e1', url: AUTHORIZE };
+      return { enrollId: 'e1', url: AUTHORIZE, pollSecret: 'sec-default' };
     },
     enrollPoll: async (enrollId: string) => polls(enrollId),
   };
@@ -70,7 +70,12 @@ test('browser enrollment writes machine.json with mode 0600 and points at the se
 test('the approval code from the server is printed, again when a later start resumes', async () => {
   const { home, paths } = world();
   const client = {
-    enrollStart: async () => ({ enrollId: 'e1', url: AUTHORIZE, code: 'K7F3-Q9XM' }),
+    enrollStart: async () => ({
+      enrollId: 'e1',
+      url: AUTHORIZE,
+      code: 'K7F3-Q9XM',
+      pollSecret: 'sec-code',
+    }),
     enrollPoll: async (): Promise<Poll> => ({ status: 'pending' }),
   };
   const first: string[] = [];
@@ -137,7 +142,12 @@ test('a restart reuses the pending enrollment instead of starting a second one',
   mkdirSync(home, { recursive: true });
   writeFileSync(
     join(home, 'enroll.json'),
-    JSON.stringify({ enrollId: 'e-pending', url: AUTHORIZE, expiresAt: 900_000 }),
+    JSON.stringify({
+      enrollId: 'e-pending',
+      url: AUTHORIZE,
+      pollSecret: 'sec-pending',
+      expiresAt: 900_000,
+    }),
   );
   const starts: string[] = [];
   let polled: string | null = null;
@@ -153,6 +163,30 @@ test('a restart reuses the pending enrollment instead of starting a second one',
   );
   expect(starts).toEqual([]);
   expect(polled).toBe('e-pending');
+  releaseTestTempDir(home);
+});
+
+test('a legacy pending enrollment without pollSecret is discarded and restarted', async () => {
+  const { home, paths } = world();
+  mkdirSync(home, { recursive: true });
+  writeFileSync(
+    join(home, 'enroll.json'),
+    JSON.stringify({ enrollId: 'e-legacy', url: AUTHORIZE, expiresAt: 900_000 }),
+  );
+  const starts: string[] = [];
+  let polled: string | null = null;
+  await enrollThroughBrowser(
+    clientOf((enrollId) => {
+      polled = enrollId;
+      return { status: 'authorized', machine: machine() as never };
+    }, starts),
+    paths,
+    SERVER,
+    'omarchy',
+    { now: () => 1_000, sleep: async () => {}, log: () => {} },
+  );
+  expect(starts).toEqual(['omarchy']);
+  expect(polled).toBe('e1');
   releaseTestTempDir(home);
 });
 
@@ -353,4 +387,55 @@ test('browser enrollment forwards legacyHostKeys distinct from hostKey', async (
   );
   expect(bodies).toEqual([{ name: 'omarchy', hostKey: keyV2, legacyHostKeys: [keyV1] }]);
   releaseTestTempDir(home);
+});
+
+test('browser enrollment stores pollSecret privately, sends it on poll, and fails cleanly when credentials were already claimed', async () => {
+  const { home, paths } = world();
+  const pollArgs: Array<[string, string | undefined]> = [];
+  const client = {
+    enrollStart: async () => ({
+      enrollId: 'e-sec',
+      url: AUTHORIZE,
+      code: 'ABCD-2345',
+      pollSecret: 'secret-token-xyz',
+    }),
+    enrollPoll: async (enrollId: string, pollSecret?: string) => {
+      pollArgs.push([enrollId, pollSecret]);
+      if (pollArgs.length === 1) {
+        const stored = JSON.parse(readFileSync(join(home, 'enroll.json'), 'utf8')) as {
+          pollSecret?: string;
+        };
+        expect(stored.pollSecret).toBe('secret-token-xyz');
+        expect(statSync(join(home, 'enroll.json')).mode & 0o777).toBe(0o600);
+        return { status: 'pending' as const };
+      }
+      return { status: 'authorized' as const, machine: machine() };
+    },
+  };
+  await enrollThroughBrowser(client, paths, SERVER, 'omarchy', {
+    now: () => 1_000,
+    sleep: async () => {},
+    log: () => {},
+  });
+  expect(pollArgs).toEqual([
+    ['e-sec', 'secret-token-xyz'],
+    ['e-sec', 'secret-token-xyz'],
+  ]);
+  releaseTestTempDir(home);
+
+  const second = world();
+  await expect(
+    enrollThroughBrowser(
+      {
+        enrollStart: async () => ({ enrollId: 'e-burned', url: AUTHORIZE, pollSecret: 'sec' }),
+        enrollPoll: async () => ({ status: 'authorized' as const }),
+      },
+      second.paths,
+      SERVER,
+      'omarchy',
+      { now: () => 1_000, sleep: async () => {}, log: () => {} },
+    ),
+  ).rejects.toThrow(/already claimed/);
+  expect(existsSync(join(second.home, 'enroll.json'))).toBe(false);
+  releaseTestTempDir(second.home);
 });

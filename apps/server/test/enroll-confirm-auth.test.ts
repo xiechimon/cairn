@@ -37,13 +37,13 @@ describe('enroll confirm owner auth (#2053)', () => {
       { name: 'audit-machine' },
     );
     expect(start.status).toBe(200);
-    const { enrollId } = (await start.json()) as { enrollId: string };
+    const { enrollId, code } = (await start.json()) as { enrollId: string; code: string };
 
     const confirm = await reqWith(s, 'POST', '/api/machine/enroll/confirm', {}, { enrollId });
     expect(confirm.status).toBe(401);
 
     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await poll.json()).toEqual({ status: 'pending', name: 'audit-machine' });
+    expect(await poll.json()).toEqual({ status: 'pending', name: 'audit-machine', code });
   });
 
   test('wrong bearer and api-key bearer cannot confirm', async () => {
@@ -55,7 +55,7 @@ describe('enroll confirm owner auth (#2053)', () => {
       {},
       { name: 'wrong-bearer' },
     );
-    const { enrollId } = (await start.json()) as { enrollId: string };
+    const { enrollId, code } = (await start.json()) as { enrollId: string; code: string };
     const apiKey = createApiKey(s, {
       teamId: s.team.id,
       gitAccess: false,
@@ -82,7 +82,7 @@ describe('enroll confirm owner auth (#2053)', () => {
     expect(withKey.status).toBe(401);
 
     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await poll.json()).toEqual({ status: 'pending', name: 'wrong-bearer' });
+    expect(await poll.json()).toEqual({ status: 'pending', name: 'wrong-bearer', code });
   });
 
   test('owner confirmation authorizes; CLI poll stays anonymous; confirm is single-use', async () => {
@@ -95,10 +95,14 @@ describe('enroll confirm owner auth (#2053)', () => {
       { name: 'owner-approved', teamId: s.team.id },
     );
     expect(start.status).toBe(200);
-    const { enrollId } = (await start.json()) as { enrollId: string };
+    const { enrollId, code, pollSecret } = (await start.json()) as {
+      enrollId: string;
+      code: string;
+      pollSecret: string;
+    };
 
     const pending = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await pending.json()).toEqual({ status: 'pending', name: 'owner-approved' });
+    expect(await pending.json()).toEqual({ status: 'pending', name: 'owner-approved', code });
 
     const confirmed = await reqWith(
       s,
@@ -113,7 +117,13 @@ describe('enroll confirm owner auth (#2053)', () => {
     };
     expect(machine.teamId).toBe(s.team.id);
 
-    const after = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
+    const after = await reqWith(
+      s,
+      'POST',
+      '/api/machine/enroll/poll',
+      {},
+      { enrollId, pollSecret },
+    );
     expect(await after.json()).toEqual({ status: 'authorized', machine });
 
     const me = await reqWith(s, 'GET', '/api/machine/me', {
@@ -149,7 +159,7 @@ describe('enroll confirm owner auth (#2053)', () => {
       { name: 'foreign-team', teamId: foreignTeamId },
     );
     expect(start.status).toBe(200);
-    const { enrollId } = (await start.json()) as { enrollId: string };
+    const { enrollId, code } = (await start.json()) as { enrollId: string; code: string };
 
     const confirm = await reqWith(
       s,
@@ -161,7 +171,7 @@ describe('enroll confirm owner auth (#2053)', () => {
     expect(confirm.status).toBe(403);
 
     const poll = await reqWith(s, 'POST', '/api/machine/enroll/poll', {}, { enrollId });
-    expect(await poll.json()).toEqual({ status: 'pending', name: 'foreign-team' });
+    expect(await poll.json()).toEqual({ status: 'pending', name: 'foreign-team', code });
   });
 
   test('auth off still allows confirm without bearer (local/dev)', async () => {
@@ -184,7 +194,10 @@ describe('enroll confirm owner auth (#2053)', () => {
     const { enrollId, code } = (await start.json()) as { enrollId: string; code: string };
     expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     const decoy = await reqWith(s, 'POST', '/api/machine/enroll/start', {}, { name: 'studio-mac' });
-    const decoyId = ((await decoy.json()) as { enrollId: string }).enrollId;
+    const { enrollId: decoyId, code: decoyCode } = (await decoy.json()) as {
+      enrollId: string;
+      code: string;
+    };
 
     expect((await reqWith(s, 'POST', '/api/machine/enroll/confirm', {}, { code })).status).toBe(
       401,
@@ -216,7 +229,11 @@ describe('enroll confirm owner auth (#2053)', () => {
       {},
       { enrollId: decoyId },
     );
-    expect(await decoyPoll.json()).toEqual({ status: 'pending', name: 'studio-mac' });
+    expect(await decoyPoll.json()).toEqual({
+      status: 'pending',
+      name: 'studio-mac',
+      code: decoyCode,
+    });
 
     const again = await reqWith(
       s,

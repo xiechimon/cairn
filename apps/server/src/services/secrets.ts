@@ -140,6 +140,11 @@ export function listSecrets(deps: SecretDeps, teamId: string): SecretRecord[] {
   return teamRows(deps, teamId).map((row) => toSecretRecord(row, linked));
 }
 
+export function listRedactedSecrets(deps: SecretDeps, teamId: string): SecretListEntry[] {
+  const linked = linkedMailSecretIds(deps.db, teamId);
+  return teamRows(deps, teamId).map((row) => ({ ...toSecretRecord(row, linked), redacted: true }));
+}
+
 export function listSecretsWithEnvValues(deps: SecretDeps, teamId: string): SecretListEntry[] {
   const linked = linkedMailSecretIds(deps.db, teamId);
   return teamRows(deps, teamId).map((row) => {

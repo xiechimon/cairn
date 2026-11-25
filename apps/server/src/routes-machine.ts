@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { ToolCallRecord } from '@cairn/shared';
 import {
   claudeRateLimitReportSchema,
@@ -42,10 +42,11 @@ import { eq } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { type machine as machineTable, step } from './db/schema.js';
+import { sha256Hex } from './lib/crypto.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
-import { isDirectLoopbackPeer, isLoopbackPeer } from './lib/request-origin.js';
+import { isDirectLoopbackPeer, isLoopbackPeer, pairRequestPeerOf } from './lib/request-origin.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -336,7 +337,39 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   });
 
   const ENROLL_CAP = 100;
+  const ENROLL_START_RATE_CAP = 20;
+  const ENROLL_START_RATE_WINDOW_MS = 600_000;
+  const ENROLL_START_PEER_CAP = 1_000;
+  const enrollStartRates = new Map<string, number[]>();
+
+  const matchesPollSecret = (expectedHash: string, provided: string): boolean => {
+    const left = Buffer.from(expectedHash, 'hex');
+    const right = Buffer.from(sha256Hex(provided), 'hex');
+    return left.byteLength === right.byteLength && timingSafeEqual(left, right);
+  };
+
   app.post('/api/machine/enroll/start', async (c) => {
+    const now = Date.now();
+    const { peer } = pairRequestPeerOf(c);
+    const cutoff = now - ENROLL_START_RATE_WINDOW_MS;
+    if (enrollStartRates.size >= ENROLL_START_PEER_CAP && !enrollStartRates.has(peer)) {
+      for (const [trackedPeer, timestamps] of enrollStartRates) {
+        const fresh = timestamps.filter((t) => t > cutoff);
+        if (fresh.length === 0) enrollStartRates.delete(trackedPeer);
+        else enrollStartRates.set(trackedPeer, fresh);
+      }
+      if (enrollStartRates.size >= ENROLL_START_PEER_CAP) {
+        throw new HttpError(429, 'too many enrollment requests; wait and retry');
+      }
+    }
+    const recent = (enrollStartRates.get(peer) ?? []).filter((t) => t > cutoff);
+    if (recent.length >= ENROLL_START_RATE_CAP) {
+      throw new HttpError(429, 'too many enrollment requests; wait and retry');
+    }
+    recent.push(now);
+    enrollStartRates.delete(peer);
+    enrollStartRates.set(peer, recent);
+
     const body = parseWith(machineEnrollStartBodySchema, await jsonBody(c), 'body');
     const fromLocalHost = isDirectLoopbackPeer(c);
     const refusal = localEnrollmentRefusal(ctx.db, {
@@ -347,45 +380,66 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       fromLocalHost,
     });
     if (refusal !== null) throw new HttpError(409, refusal);
-    const now = Date.now();
     for (const [id, e] of ctx.enrollments) {
       if (now - e.createdAt > MACHINE_ENROLL_TTL_MS) ctx.enrollments.delete(id);
     }
-    while (ctx.enrollments.size >= ENROLL_CAP) {
-      const oldest = ctx.enrollments.keys().next().value;
-      if (oldest === undefined) break;
-      ctx.enrollments.delete(oldest);
+    if (ctx.enrollments.size >= ENROLL_CAP) {
+      throw new HttpError(429, 'too many pending enrollments; wait and retry');
     }
     const enrollId = newRecordId();
     const code = newEnrollCode(new Set([...ctx.enrollments.values()].map((e) => e.code)));
+    const pollSecret = randomBytes(32).toString('base64url');
     ctx.enrollments.set(enrollId, {
       teamId: body.teamId ?? ctx.team.id,
       name: body.name,
       code,
+      pollSecretHash: sha256Hex(pollSecret),
       createdAt: now,
       fromLocalHost,
       ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
       ...(body.legacyHostKeys !== undefined ? { legacyHostKeys: body.legacyHostKeys } : {}),
     });
+    c.header('cache-control', 'no-store');
     return c.json({
       enrollId,
       url: `${enrollOrigin(c)}/app/machines/authorize?enroll=${enrollId}`,
       code: `${code.slice(0, 4)}-${code.slice(4)}`,
+      pollSecret,
     });
   });
 
   app.post('/api/machine/enroll/poll', async (c) => {
+    c.header('cache-control', 'no-store');
     const body = parseWith(machineEnrollPollBodySchema, await jsonBody(c), 'body');
     const pending = ctx.enrollments.get(body.enrollId);
     if (!pending || Date.now() - pending.createdAt > MACHINE_ENROLL_TTL_MS) {
+      if (pending) ctx.enrollments.delete(body.enrollId);
       return c.json({ status: 'expired' });
     }
-    if (pending.machine) return c.json({ status: 'authorized', machine: pending.machine });
+    if (
+      body.pollSecret !== undefined &&
+      !matchesPollSecret(pending.pollSecretHash, body.pollSecret)
+    ) {
+      throw new HttpError(403, 'invalid poll secret');
+    }
     const name = enrollDisplayName(pending.name);
-    return c.json({ status: 'pending', ...(name !== undefined ? { name } : {}) });
+    if (pending.authorized === true) {
+      if (body.pollSecret !== undefined && pending.machine !== undefined) {
+        const machine = pending.machine;
+        delete pending.machine;
+        return c.json({ status: 'authorized', machine });
+      }
+      return c.json({ status: 'authorized', ...(name !== undefined ? { name } : {}) });
+    }
+    return c.json({
+      status: 'pending',
+      ...(name !== undefined ? { name } : {}),
+      code: `${pending.code.slice(0, 4)}-${pending.code.slice(4)}`,
+    });
   });
 
   app.post('/api/machine/enroll/confirm', async (c) => {
+    c.header('cache-control', 'no-store');
     const body = parseWith(machineEnrollConfirmBodySchema, await jsonBody(c), 'body');
     const entry =
       'enrollId' in body
@@ -394,7 +448,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     if (!entry || Date.now() - entry.createdAt > MACHINE_ENROLL_TTL_MS) {
       throw new HttpError(404, 'enrollment unknown or expired');
     }
-    if (entry.machine) throw new HttpError(409, 'enrollment already authorized');
+    if (entry.authorized === true || entry.machine !== undefined) {
+      throw new HttpError(409, 'enrollment already authorized');
+    }
     if (entry.teamId !== ctx.team.id) {
       throw new HttpError(403, 'enrollment team mismatch');
     }
@@ -408,6 +464,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       ...(entry.legacyHostKeys !== undefined ? { legacyHostKeys: entry.legacyHostKeys } : {}),
       ...(body.retireToken !== undefined ? { retireToken: body.retireToken } : {}),
     });
+    entry.authorized = true;
     entry.machine = machineJson;
     return c.json({ machine: machineJson });
   });

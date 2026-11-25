@@ -81,38 +81,79 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
     expect(res.status).toBe(200);
   });
 
-  test('a paired device can edit a skill named import without access to import or refresh', async () => {
+  test('a paired device is refused on owner-only escalation routes while reads stay open', async () => {
     const s = bootServer({ authToken: TOKEN });
-    const issued = await reqWith(s, 'POST', '/api/remote/pairing', authHeaders);
-    expect(issued.status).toBe(201);
-    const { code } = (await issued.json()) as { code: string };
-    const paired = await redeemTestPairing(s.app, code, 'phone');
-    expect(paired.status).toBe(201);
-    const { token } = (await paired.json()) as { token: string };
-    const deviceHeaders = { authorization: `Bearer ${token}` };
-    const created = await reqWith(s, 'POST', '/api/skills', authHeaders, {
-      name: 'import',
-      description: 'Original description',
-      files: [
-        {
-          path: 'SKILL.md',
-          content: '---\nname: import\ndescription: Original description\n---\n',
-        },
-      ],
-    });
-    expect(created.status).toBe(201);
-    const path = `/api/teams/${s.team.id}/skills/import`;
-    const edited = await reqWith(s, 'PUT', path, deviceHeaders, {
-      name: 'import',
-      description: 'Updated description',
-      files: [
-        { path: 'SKILL.md', content: '---\nname: import\ndescription: Updated description\n---\n' },
-      ],
-    });
-    expect(edited.status).toBe(200);
-    expect(await edited.json()).toMatchObject({ id: 'import', description: 'Updated description' });
-    expect((await reqWith(s, 'POST', path, deviceHeaders)).status).toBe(403);
-    expect((await reqWith(s, 'POST', `${path}/refresh`, deviceHeaders)).status).toBe(403);
+    try {
+      const issued = await reqWith(s, 'POST', '/api/remote/pairing', authHeaders);
+      expect(issued.status).toBe(201);
+      const { code } = (await issued.json()) as { code: string };
+      const paired = await redeemTestPairing(s.app, code, 'phone');
+      expect(paired.status).toBe(201);
+      const { token } = (await paired.json()) as { token: string };
+      const deviceHeaders = { authorization: `Bearer ${token}` };
+
+      const projectRes = await reqWith(s, 'POST', '/api/projects', authHeaders, { name: 'owned' });
+      expect(projectRes.status).toBe(201);
+      const { id: projectId } = (await projectRes.json()) as { id: string };
+
+      const created = await reqWith(s, 'POST', '/api/skills', authHeaders, {
+        name: 'import',
+        description: 'Original description',
+        files: [
+          {
+            path: 'SKILL.md',
+            content: '---\nname: import\ndescription: Original description\n---\n',
+          },
+        ],
+      });
+      expect(created.status).toBe(201);
+
+      const started = await reqWith(s, 'POST', '/api/machine/enroll/start', {}, { name: 'runner' });
+      expect(started.status).toBe(200);
+      const { enrollId } = (await started.json()) as { enrollId: string };
+
+      const forbidden: Array<[string, string, unknown?]> = [
+        ['POST', '/api/machine/enroll/confirm', { enrollId }],
+        ['PATCH', `/api/teams/${s.team.id}/routing-rules/session`, { provider: 'openai' }],
+        ['PATCH', `/api/teams/${s.team.id}/work-policies/session`, { tools: [] }],
+        ['POST', `/api/teams/${s.team.id}/im/telegram`, { botToken: 'x' }],
+        ['GET', `/api/teams/${s.team.id}/im/wechat/login/wx_test`],
+        ['DELETE', `/api/teams/${s.team.id}/im/connections/c1`],
+        ['POST', '/api/im/test', {}],
+        ['POST', '/api/skills', { name: 'evil', description: 'd', files: [] }],
+        [
+          'PUT',
+          `/api/teams/${s.team.id}/skills/import`,
+          { name: 'import', description: 'x', files: [] },
+        ],
+        ['POST', `/api/teams/${s.team.id}/skills/import`, { localPath: '/tmp' }],
+        ['POST', `/api/teams/${s.team.id}/skills/import/refresh`, {}],
+        ['POST', '/api/schedules', { name: 'x' }],
+        ['PATCH', '/api/schedules/s1', { enabled: false }],
+        ['DELETE', '/api/schedules/s1'],
+        ['PATCH', `/api/teams/${s.team.id}`, { maxAutonomousMergesPerDay: 5 }],
+        ['DELETE', `/api/projects/${projectId}`],
+        ['POST', '/api/todos/t1/design/index.html/share'],
+        ['DELETE', '/api/todos/t1/design/index.html/share'],
+        ['POST', '/api/design-shares', {}],
+      ];
+
+      for (const [method, path, body] of forbidden) {
+        const res = await reqWith(s, method, path, deviceHeaders, body);
+        expect(res.status, `${method} ${path}`).toBe(403);
+      }
+
+      expect(
+        (await reqWith(s, 'GET', `/api/skills?teamId=${s.team.id}`, deviceHeaders)).status,
+      ).toBe(200);
+      expect(
+        (await reqWith(s, 'GET', `/api/teams/${s.team.id}/routing-settings`, deviceHeaders)).status,
+      ).toBe(200);
+      expect((await reqWith(s, 'GET', '/api/schedules', deviceHeaders)).status).toBe(200);
+      expect((await reqWith(s, 'GET', '/api/projects', deviceHeaders)).status).toBe(200);
+    } finally {
+      s.dispose();
+    }
   });
 
   test('on + a non-stream endpoint with ?token= (correct value) -> 401 -- the query surface is only for the two streams', async () => {

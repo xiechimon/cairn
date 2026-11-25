@@ -68,12 +68,24 @@ export const machineEnrollStartResponseSchema = z.object({
   enrollId: z.string(),
   url: z.string(),
   code: z.string().optional(),
+  pollSecret: z.string().optional(),
 });
 
-export const machineEnrollPollBodySchema = z.object({ enrollId: z.string() });
+export const machineEnrollPollBodySchema = z.object({
+  enrollId: z.string(),
+  pollSecret: z.string().min(1).max(256).optional(),
+});
 export const machineEnrollPollResponseSchema = z.union([
-  z.object({ status: z.literal('pending'), name: z.string().optional() }),
-  z.object({ status: z.literal('authorized'), machine: machineEnrollResponseSchema }),
+  z.object({
+    status: z.literal('pending'),
+    name: z.string().optional(),
+    code: z.string().optional(),
+  }),
+  z.object({
+    status: z.literal('authorized'),
+    machine: machineEnrollResponseSchema.optional(),
+    name: z.string().optional(),
+  }),
   z.object({ status: z.literal('expired') }),
 ]);
 export type MachineEnrollPollResponse = z.infer<typeof machineEnrollPollResponseSchema>;

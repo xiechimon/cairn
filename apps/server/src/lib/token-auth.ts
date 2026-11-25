@@ -19,13 +19,21 @@ const PAIRED_DIAGNOSTIC_PATTERNS = [
   /^\/api\/teams\/[^/]+\/devin-subscriptions\/[^/]+\/(?:upstream-models|verify)$/,
   /^\/api\/teams\/[^/]+\/antigravity-subscriptions\/[^/]+\/(?:upstream-models|verify)$/,
 ];
-const OWNER_ONLY_SKILL_POST_PATTERN = /^\/api\/teams\/[^/]+\/skills\/(?:import|[^/]+\/refresh)$/;
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/computers(?:\/[^/]+)?$/,
-  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|devin-subscriptions|antigravity-subscriptions|mcp-connectors)(?:\/|$)/,
+  /^\/api\/machine\/enroll\/confirm$/,
+  /^\/api\/teams\/[^/]+$/,
+  /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|provider-order|claude-subscriptions|devin-subscriptions|antigravity-subscriptions|mcp-connectors|routing-rules|work-policies|im|skills|schedules)(?:\/|$)/,
+  /^\/api\/im(?:\/|$)/,
+  /^\/api\/skills(?:\/|$)/,
+  /^\/api\/schedules(?:\/|$)/,
+  /^\/api\/design-shares(?:\/|$)/,
+  /^\/api\/todos\/[^/]+\/design\/[^/]+\/share$/,
   /^\/api\/teams\/[^/]+\/github\/(?:oauth|connection|webhook)(?:\/|$)/,
   /^\/api\/machines\/[^/]+(?:\/|$)/,
 ];
+
+const OWNER_ONLY_READ_PATTERNS = [/^\/api\/teams\/[^/]+\/im\/wechat\/login\/[^/]+$/];
 
 export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   const verb = method.toUpperCase();
@@ -37,13 +45,14 @@ export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
     pathname.startsWith('/api/remote/pairing-requests/') ||
     pathname === '/api/remote/tailnet' ||
     (pathname === '/api/remote/tailscale' && !read) ||
-    (pathname.startsWith('/api/remote/devices') && !read)
+    (pathname.startsWith('/api/remote/devices') && !read) ||
+    OWNER_ONLY_READ_PATTERNS.some((pattern) => pattern.test(pathname))
   )
     return true;
   if (read) return false;
-  if (verb === 'POST') {
-    if (OWNER_ONLY_SKILL_POST_PATTERN.test(pathname)) return true;
-    if (PAIRED_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(pathname))) return false;
+  if (verb === 'DELETE' && /^\/api\/projects\/[^/]+$/.test(pathname)) return true;
+  if (verb === 'POST' && PAIRED_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(pathname))) {
+    return false;
   }
   return OWNER_ONLY_PATTERNS.some((pattern) => pattern.test(pathname));
 }

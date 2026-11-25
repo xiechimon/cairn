@@ -14,6 +14,7 @@ const pendingSchema = z.object({
   enrollId: z.string().min(1),
   url: z.string().min(1),
   code: z.string().optional(),
+  pollSecret: z.string().min(1).optional(),
   expiresAt: z.number(),
   serverUrl: z.string().optional(),
   name: z.string().optional(),
@@ -76,6 +77,7 @@ export async function enrollThroughBrowser(
   if (
     pending !== null &&
     (pending.expiresAt <= io.now() ||
+      pending.pollSecret === undefined ||
       (pending.serverUrl !== undefined && pending.serverUrl !== serverUrl) ||
       (pending.name !== undefined && pending.name !== name) ||
       (hostKey !== undefined && pending.hostKey !== hostKey))
@@ -93,6 +95,7 @@ export async function enrollThroughBrowser(
       enrollId: started.enrollId,
       url: started.url,
       ...(started.code !== undefined ? { code: started.code } : {}),
+      ...(started.pollSecret !== undefined ? { pollSecret: started.pollSecret } : {}),
       expiresAt: io.now() + ENROLL_TTL_MS,
       serverUrl,
       name,
@@ -113,8 +116,14 @@ export async function enrollThroughBrowser(
   }
   for (;;) {
     if (io.stop?.aborted === true) throw new Error('enrollment stopped before approval');
-    const polled = await api.enrollPoll(pending.enrollId);
+    const polled = await api.enrollPoll(pending.enrollId, pending.pollSecret);
     if (polled.status === 'authorized') {
+      if (polled.machine === undefined) {
+        rmSync(path, { force: true });
+        throw new Error(
+          'enrollment credentials were already claimed or missing poll secret; run start again',
+        );
+      }
       if (existsSync(paths.machineJson))
         throw new Error('machine.json appeared during enrollment: refusing to overwrite it');
       const machine: EnrolledMachine = {
