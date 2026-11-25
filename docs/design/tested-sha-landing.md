@@ -11,9 +11,11 @@ and are diagnosed later. Prior art and mechanics are in
 push is rejected, so a second lane rebases onto the current queue head and its
 candidate stacks behind the first — order is the ref itself.
 
-Since 2026-11-19 (pilot, mon X) the queue holds one candidate at a time; see
-"One candidate at a time" below. Where this document describes lanes stacking
-behind each other, that behavior is retired.
+Since 2026-11-25 the live queue (`scripts/ops/speculative-queue.mjs`) runs a
+speculative batching window (`MAX_SPECULATIVE_DEPTH = 4`, `15s` client poll
+cadence in `scripts/ops/push-queue.mjs`) over `refs/heads/enqueue/*` and
+`refs/heads/queue/try/*`, replacing the older single-candidate `queue/main`
+loop below.
 
 A candidate moves QUEUED (pushed, no run) → TESTING (ci running on its SHA) →
 GREEN → PROMOTED, or → REJECTED at any point (red run, stale base, replaced
