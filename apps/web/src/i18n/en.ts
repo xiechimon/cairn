@@ -378,16 +378,17 @@ export const EN: Record<string, string> = {
   接入模型来源后就能发消息: 'Connect a model source to send messages',
   '添加一个 Coordinator 可用的服务商，或添加 Claude 订阅和已安装 Claude Code 的执行机':
     'Add a provider the Coordinator can use, or a Claude subscription and a Runner with Claude Code',
-  'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
   已保存: 'Saved',
   暂无可用的模型: 'No usable model',
   换一个: 'Change',
-  'Claude 订阅、API key 或本地模型': 'A Claude subscription, an API key or a local model',
-  '已添加，Coordinator 能用': 'Added; the Coordinator can use it',
   '订阅已保存，这台电脑安装 Claude\u00a0Code 后会自动使用。现在先添加一个服务商，Coordinator 即可开始工作。':
     'Subscription saved. It will be used once Claude Code is installed on this computer. Add a provider now so the Coordinator can start.',
   '欢迎使用 Cairn': 'Welcome to Cairn',
   确认并开始对话: 'Confirm and start chatting',
+  返回接入其他模型: 'Back to connect another model',
+  继续确认设置: 'Continue to confirm settings',
+  '已接入模型来源，可继续添加或返回确认':
+    'Model source connected. Add another or continue to confirm',
   '任务默认用 Coordinator 的模型。以后可以在设置里添加常用模型，让 Coordinator 按任务挑。':
     'Tasks use the Coordinator model by default. Later you can add frequently used models in Settings and let the Coordinator pick one per task.',
   '要在 Cairn 里登录': 'Sign in within Cairn',
@@ -3074,8 +3075,6 @@ export const EN: Record<string, string> = {
   '退出失败，请重试。': 'Could not sign out. Try again.',
   '撤销后，这台已配对设备需要重新扫码配对才能访问':
     'This paired device will need a new QR code scan to reconnect',
-  返回确认设置: 'Back to confirmation',
-  更换或添加服务商: 'Switch or add provider',
   '完成请求未送出，请重试。': 'Could not mark task complete. Try again.',
   '任务开始后不能改，换平台请新开任务':
     'Locked once the task starts. Start a new task to change the platform.',

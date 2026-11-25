@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useChief } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { coordinatorCanAnswer } from '../board/first-run-checklist-model.js';
 import { useNarrow } from '../board/use-narrow.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
@@ -48,6 +49,17 @@ export const HOME_COMPOSER_CLS =
 export const MENU_CONTENT_CLS = 'w-auto max-w-80 min-w-56';
 export const COMPOSER_FIELD_CLS =
   'shadow-(--shadow-composer) focus-within:shadow-(--shadow-composer-focus)';
+
+export function composerPlusVisible(input: {
+  editable: boolean;
+  hasAttachment: boolean;
+  narrow: boolean;
+  showMeter: boolean;
+  noModel?: boolean;
+}): boolean {
+  const canAttach = input.editable && input.hasAttachment && input.noModel !== true;
+  return canAttach || (input.narrow && input.showMeter);
+}
 
 export interface ComposerSurfaceHandle {
   focus: (options?: FocusOptions) => void;
@@ -187,6 +199,14 @@ export function ComposerSurface({
         pendingAttachments.some((entry) => !entry.failed);
   const showMeter =
     !live || contextPercent != null || shownUsage != null || contextLoading || running;
+  const noModel = live && coordinatorCanAnswer(chiefQ.data) === false;
+  const showPlus = composerPlusVisible({
+    editable,
+    hasAttachment: onAttachment != null,
+    narrow,
+    showMeter,
+    noModel,
+  });
   const plusMenu = (
     <DropdownMenu>
       <Tooltip>
@@ -228,7 +248,7 @@ export function ComposerSurface({
       >
         <KeyedMenuItem
           shortcut="A"
-          disabled={attaching || onAttachment == null}
+          disabled={attaching || onAttachment == null || !editable || noModel}
           onClick={openFilePicker}
         >
           <Paperclip className="size-5" />
@@ -278,7 +298,7 @@ export function ComposerSurface({
           onDismissSeeded={(index) => setSeeded((current) => current.filter((_, i) => i !== index))}
         />
         <div className={cn('flex gap-2', narrow ? 'items-center' : 'items-end')}>
-          {narrow && plusMenu}
+          {narrow && showPlus && plusMenu}
           <div className="relative min-w-0 flex-1">
             <Textarea
               ref={attachComposer}
@@ -417,9 +437,9 @@ export function ComposerSurface({
           />
         )}
       </div>
-      {!narrow && (
+      {!narrow && (showPlus || showMeter) && (
         <div className="mt-1.5 flex items-center gap-0 px-1.5">
-          {plusMenu}
+          {showPlus && plusMenu}
           {showMeter && (
             <span className="ml-auto flex">
               <ContextMeterRing

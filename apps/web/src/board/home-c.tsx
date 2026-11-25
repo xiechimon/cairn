@@ -72,6 +72,12 @@ export function greetingFor(hour: number): string {
 
 const STARTERS = ['做个计划', '接一个仓库', '接着最近的活'] as const;
 
+export function homeStarters(input: { activeProjects: number; todos: number }): readonly string[] {
+  return input.activeProjects === 0 && input.todos === 0
+    ? STARTERS.filter((label) => label !== '接着最近的活')
+    : STARTERS;
+}
+
 export function channelStream(
   stream: readonly ChiefStreamItem[],
   fallback: string,
@@ -209,6 +215,7 @@ export function HomeC({
   const modelsMissing = setupStep?.next === 'models';
   usePrs(teamId, undefined, live);
   const activeProjects = splitProjectsByArchive(projectsQuery.data ?? []).active;
+  const shownProjects = fixtureProjects ?? activeProjects;
   const saveProjectId =
     projectId ?? (activeProjects.length === 1 ? (activeProjects[0]?.id ?? null) : null);
   const showPane = (next: WorkPane | null, state: unknown = location.state) => {
@@ -306,7 +313,9 @@ export function HomeC({
   const quickReplies = setupEmpty
     ? []
     : fallbackOnly
-      ? STARTERS.map((label) => t(label))
+      ? homeStarters({ activeProjects: shownProjects.length, todos: todos.length }).map((label) =>
+          t(label),
+        )
       : quickOwner !== undefined && stream.includes(quickOwner)
         ? chiefData.quickReplies
         : undefined;
@@ -574,9 +583,7 @@ export function HomeC({
               hiddenWhenIdle={(homeSpiral && !shortViewport) || setupEmpty}
             />
           )}
-          {homeSpiral && (
-            <HomeSpiral projects={fixtureProjects ?? activeProjects} waiting={waitingIds} />
-          )}
+          {homeSpiral && <HomeSpiral projects={shownProjects} waiting={waitingIds} />}
           {banner != null && (
             <div
               data-home-banner=""

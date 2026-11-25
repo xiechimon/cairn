@@ -1,7 +1,7 @@
 import type { ProviderRecord, RoutingRuleRecord } from '@cairn/shared';
 import { cn } from 'cn';
-import { Check, KeyRound } from 'lucide-react';
-import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import {
   useApiMutations,
   useChief,
@@ -28,13 +28,16 @@ import { AddProviderFlow, type AddProviderView } from '../resources/add-provider
 import { ModelPicker } from '../resources/routing-settings-page.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import {
+  canSelectSetupStep,
   coordinatorCanAnswer,
+  hasAddedModelSource,
   modelSides,
   modelSourceCount,
+  modelSourceKeys,
   modelsConfirmed,
+  resolvedSetupStep,
   type SetupProgress,
   type SetupStepId,
-  setupOpenStep,
 } from './first-run-checklist-model.js';
 import { failureCopy, ProviderCheckList } from './first-run-provider-check.js';
 import { LocalProviderImportCard } from './local-provider-import.js';
@@ -74,7 +77,7 @@ export function FirstRunFrame() {
 }
 
 export function useFirstRunSetup() {
-  const { live, teamId } = useLiveData();
+  const { live, teamId, teamsQuery } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const providersQ = useProviders(teamId, live);
   const routingQ = useModelRouting(teamId, live);
@@ -92,11 +95,17 @@ export function useFirstRunSetup() {
     models === undefined || settings === undefined
       ? undefined
       : { models, confirmed: modelsConfirmed({ ...settings, rules: settings.rules ?? [] }) };
+  const failed =
+    teamsQuery?.isError === true ||
+    projectsQ.isError ||
+    (projectsQ.data?.length === 0 &&
+      (chiefQ.isError || providersQ.isError || routingQ.isError || settingsQ.isError));
   return {
     live,
     teamId,
     projects: live ? projectsQ.data?.length : undefined,
     progress,
+    failed,
     connections: connections ?? [],
     providers: providersQ.data?.providers ?? [],
     machines: machinesQ.data ?? [],
@@ -146,53 +155,20 @@ function StepMark({ n, state, className }: { n: number; state: StepState; classN
 
 type StepState = 'done' | 'now' | 'open';
 
-function SourceRow({
-  icon,
-  title,
-  status,
-  usedBy,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  status: ReactNode;
-  usedBy: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="p-5">
-      <div className="flex items-start gap-4">
-        <span className="grid size-10 flex-none place-items-center rounded-(--radius-tile) bg-background text-content-secondary ring-1 ring-border">
-          {icon}
-        </span>
-        <div className="min-w-0 flex-1 text-pretty">
-          <div className="break-keep text-foreground">
-            <span className="font-title">{title}</span>
-            <span className="mx-1 text-meta text-content-tertiary">·</span>
-            <span className="text-meta text-content-tertiary">{usedBy}</span>
-          </div>
-          <div className="break-keep text-meta text-content-secondary">{status}</div>
-        </div>
-      </div>
-      {action}
-    </div>
-  );
-}
-
 function ModelsBody({
   setup,
   progress,
-  allowManage = false,
+  removing,
   onRemoveProvider,
-  onBackToConfirm,
   onImported,
+  onContinue,
 }: {
   setup: Setup;
   progress: SetupProgress;
-  allowManage?: boolean;
-  onRemoveProvider?: (record: ProviderRecord) => void;
-  onBackToConfirm?: () => void;
+  removing: boolean;
+  onRemoveProvider?: ((record: ProviderRecord) => void) | undefined;
   onImported: (recordIds: string[]) => void;
+  onContinue?: (() => void) | undefined;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -202,27 +178,24 @@ function ModelsBody({
   const subscriptionSaved = setup.connections.some(
     (connection) => connection.kind === 'subscription' && connection.available !== false,
   );
-  const status = hasProvider
-    ? t('已添加，Coordinator 能用')
-    : subscriptionSaved && !setup.claudeCodeFound
-      ? t(
-          '订阅已保存，这台电脑安装 Claude\u00a0Code 后会自动使用。现在先添加一个服务商，Coordinator 即可开始工作。',
-        )
-      : t('Claude 订阅、API key 或本地模型');
-  if (hasProvider && !allowManage) {
-    return (
-      <SettingsCard>
-        <SourceRow
-          icon={<KeyRound className="size-5" />}
-          title={t('服务商')}
-          status={status}
-          usedBy={t('Coordinator 和任务都能用')}
-        />
-      </SettingsCard>
-    );
-  }
   return (
     <>
+      {onContinue !== undefined && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+          <span className="text-meta text-content-secondary">
+            {t('已接入模型来源，可继续添加或返回确认')}
+          </span>
+          <Button
+            data-testid="first-run-continue-confirm"
+            variant="outline"
+            size="sm"
+            className="px-3 pointer-coarse:h-11"
+            onClick={onContinue}
+          >
+            {t('继续确认设置')}
+          </Button>
+        </div>
+      )}
       {hasProvider && setup.providers.length > 0 && (
         <SettingsCard className="mb-4 divide-y divide-border">
           {setup.providers.map((record) => (
@@ -236,6 +209,7 @@ function ModelsBody({
                   variant="ghost"
                   size="sm"
                   data-testid={`first-run-remove-provider-${record.providerId}`}
+                  disabled={removing}
                   onClick={() => onRemoveProvider(record)}
                 >
                   {t('移除')}
@@ -245,8 +219,12 @@ function ModelsBody({
           ))}
         </SettingsCard>
       )}
-      {subscriptionSaved && !setup.claudeCodeFound && (
-        <p className="m-0 mb-4 text-pretty break-keep text-meta text-content-secondary">{status}</p>
+      {!hasProvider && subscriptionSaved && !setup.claudeCodeFound && (
+        <p className="m-0 mb-4 text-pretty break-keep text-meta text-content-secondary">
+          {t(
+            '订阅已保存，这台电脑安装 Claude\u00a0Code 后会自动使用。现在先添加一个服务商，Coordinator 即可开始工作。',
+          )}
+        </p>
       )}
       <AddProviderFlow
         inline
@@ -259,18 +237,6 @@ function ModelsBody({
         onConnectError={setConnectError}
         lead={<LocalProviderImportCard teamId={setup.teamId} live={live} onImported={onImported} />}
       />
-      {hasProvider && onBackToConfirm !== undefined && (
-        <div className="mt-4">
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="first-run-back-to-confirm"
-            onClick={onBackToConfirm}
-          >
-            {t('返回确认设置')}
-          </Button>
-        </div>
-      )}
     </>
   );
 }
@@ -451,14 +417,14 @@ function ConfirmBody({
           {checking ? t('正在试模型…') : patchRule.isPending ? t('保存中…') : t('确认并开始对话')}
         </Button>
         <Button
-          variant="ghost"
+          data-testid="first-run-back-models"
+          variant="outline"
           size="lg"
-          data-testid="first-run-back-to-models"
-          className="px-3 text-content-secondary pointer-coarse:h-11 max-lg:h-11 max-lg:w-full"
+          className="px-4 pointer-coarse:h-11 max-lg:h-11 max-lg:w-full"
           disabled={checking || patchRule.isPending}
           onClick={onBackToModels}
         >
-          {t('更换或添加服务商')}
+          {t('返回接入其他模型')}
         </Button>
       </div>
     </>
@@ -489,10 +455,12 @@ function stateOf(step: SetupStepId, open: SetupStepId): StepState {
 
 function Rail({
   open,
+  canOpenStep,
   onSelectStep,
 }: {
   open: SetupStepId;
-  onSelectStep?: (step: SetupStepId) => void;
+  canOpenStep: (step: SetupStepId) => boolean;
+  onSelectStep: (step: SetupStepId) => void;
 }) {
   const { t } = useI18n();
   const steps = [
@@ -503,36 +471,38 @@ function Rail({
     <ol className="m-0 mt-10 list-none p-0 max-lg:hidden">
       {steps.map(({ n, id, title }) => {
         const state = stateOf(id, open);
-        const clickable = id === 'models' && open === 'confirm' && onSelectStep !== undefined;
+        const clickable = canOpenStep(id);
+        const content = (
+          <>
+            <StepMark n={n} state={state} />
+            <span
+              className={cn(
+                'text-card-title font-title',
+                state === 'open' ? 'text-content-secondary' : 'text-foreground',
+              )}
+            >
+              {title}
+            </span>
+          </>
+        );
         return (
           <li
             key={id}
             data-testid={`first-run-step-${n}`}
             data-state={state}
             aria-current={state === 'now' ? 'step' : undefined}
-            className="flex items-center gap-4 py-2"
+            className={clickable ? 'flex items-center py-1' : 'flex items-center gap-4 py-2'}
           >
             {clickable ? (
               <Button
                 variant="ghost"
-                className="h-auto justify-start gap-4 p-0 text-left font-normal hover:bg-transparent hover:opacity-80"
-                onClick={() => onSelectStep('models')}
+                className="-mx-2 h-auto min-h-8 justify-start gap-4 rounded-md px-2 py-1 text-left font-normal"
+                onClick={() => onSelectStep(id)}
               >
-                <StepMark n={n} state={state} />
-                <span className="text-card-title font-title text-foreground">{title}</span>
+                {content}
               </Button>
             ) : (
-              <>
-                <StepMark n={n} state={state} />
-                <span
-                  className={cn(
-                    'text-card-title font-title',
-                    state === 'open' ? 'text-content-secondary' : 'text-foreground',
-                  )}
-                >
-                  {title}
-                </span>
-              </>
+              content
             )}
           </li>
         );
@@ -541,26 +511,50 @@ function Rail({
   );
 }
 
-function Segments({ open }: { open: SetupStepId }) {
+function Segments({
+  open,
+  canOpenStep,
+  onSelectStep,
+}: {
+  open: SetupStepId;
+  canOpenStep: (step: SetupStepId) => boolean;
+  onSelectStep: (step: SetupStepId) => void;
+}) {
   const { t } = useI18n();
   return (
     <ol className="m-0 mt-6 grid list-none grid-cols-2 gap-2 p-0 lg:hidden">
       {(['models', 'confirm'] as const).map((id) => {
         const state = stateOf(id, open);
+        const label = id === 'models' ? t('接入模型') : t('确认设置');
+        const clickable = canOpenStep(id);
+        const bar = cn(
+          'block h-1 w-full rounded-full',
+          state === 'done'
+            ? 'bg-content-tertiary'
+            : state === 'now'
+              ? 'bg-(--card-button)'
+              : 'bg-content-dim',
+        );
         return (
           <li
             key={id}
             aria-current={state === 'now' ? 'step' : undefined}
-            className={cn(
-              'h-1 rounded-full',
-              state === 'done'
-                ? 'bg-content-tertiary'
-                : state === 'now'
-                  ? 'bg-(--card-button)'
-                  : 'bg-content-dim',
-            )}
+            className="flex items-center"
           >
-            <span className="sr-only">{id === 'models' ? t('接入模型') : t('确认设置')}</span>
+            {clickable ? (
+              <Button
+                variant="ghost"
+                aria-label={label}
+                className="-my-2.5 h-6 w-full rounded-sm p-0 hover:bg-transparent pointer-coarse:-my-5 pointer-coarse:h-11"
+                onClick={() => onSelectStep(id)}
+              >
+                <span className={bar} />
+              </Button>
+            ) : (
+              <span className={bar}>
+                <span className="sr-only">{label}</span>
+              </span>
+            )}
           </li>
         );
       })}
@@ -573,7 +567,13 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
   const checks = useModelChecks(setup.teamId);
   const { deleteProvider } = useApiMutations(setup.teamId);
   const [imported, setImported] = useState<readonly string[]>([]);
-  const [reopenedStep1, setReopenedStep1] = useState(false);
+  const [returnBaseline, setReturnBaseline] = useState<readonly string[] | null>(null);
+  const sourceKeys = modelSourceKeys(setup.providers, setup.connections);
+  const addedAfterReturn =
+    returnBaseline !== null && hasAddedModelSource(returnBaseline, sourceKeys);
+  useEffect(() => {
+    if (addedAfterReturn) setReturnBaseline(null);
+  }, [addedAfterReturn]);
   const reviewed = setup.providers.filter((record) => imported.includes(record.id));
   const { checkProvider } = checks;
   useEffect(() => {
@@ -593,8 +593,14 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
   const progress = setup.progress;
   if (progress === undefined) return null;
   const reviewing = reviewed.length > 0;
-  const open = reviewing ? 'models' : reopenedStep1 ? 'models' : setupOpenStep(progress);
+  const returnToModels = returnBaseline !== null && !addedAfterReturn;
+  const open = resolvedSetupStep(progress, { reviewing, returnToModels });
   if (open === null) return null;
+  const canOpenStep = (step: SetupStepId) => canSelectSetupStep(step, open, progress, reviewing);
+  const selectStep = (step: SetupStepId) => {
+    if (step === 'models') setReturnBaseline(sourceKeys);
+    else setReturnBaseline(null);
+  };
   return (
     <main
       data-testid="first-run-setup"
@@ -622,15 +628,10 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
             {t('欢迎使用 Cairn')}
           </h1>
           <div className="first-run-enter" style={{ '--enter-delay': '100ms' } as CSSProperties}>
-            <Rail
-              open={open}
-              onSelectStep={(step) => {
-                if (step === 'models') setReopenedStep1(true);
-              }}
-            />
+            <Rail open={open} canOpenStep={canOpenStep} onSelectStep={selectStep} />
           </div>
           <div className="first-run-enter" style={{ '--enter-delay': '200ms' } as CSSProperties}>
-            <Segments open={open} />
+            <Segments open={open} canOpenStep={canOpenStep} onSelectStep={selectStep} />
           </div>
           <div
             className="mt-6 self-end first-run-enter max-lg:hidden [@media(max-height:700px)]:hidden"
@@ -664,7 +665,7 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
                 }
                 onNext={() => {
                   setImported([]);
-                  setReopenedStep1(false);
+                  setReturnBaseline(null);
                 }}
               />
             </div>
@@ -673,17 +674,20 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
               <ModelsBody
                 setup={setup}
                 progress={progress}
-                allowManage={reopenedStep1}
+                removing={deleteProvider.isPending}
                 onRemoveProvider={(record) => void remove([record])}
-                onBackToConfirm={() => setReopenedStep1(false)}
-                onImported={setImported}
+                onImported={(recordIds) => {
+                  setReturnBaseline(null);
+                  setImported(recordIds);
+                }}
+                onContinue={canOpenStep('confirm') ? () => selectStep('confirm') : undefined}
               />
             </div>
           ) : (
             <ConfirmBody
               setup={setup}
               checks={checks}
-              onBackToModels={() => setReopenedStep1(true)}
+              onBackToModels={() => selectStep('models')}
             />
           )}
         </section>

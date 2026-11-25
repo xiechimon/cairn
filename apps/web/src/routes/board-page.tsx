@@ -23,7 +23,7 @@ import { artifactTargetOf } from '../board/artifact/artifact-route.js';
 import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { DevinLoginBanner, useDevinLoginWarnings } from '../board/devin-login-banner.js';
-import { setupShown } from '../board/first-run-checklist-model.js';
+import { holdFirstRunFrame, setupShown } from '../board/first-run-checklist-model.js';
 import {
   FirstRunFrame,
   FirstRunSetup,
@@ -256,7 +256,15 @@ export function BoardPage() {
         />
       </TodoGlanceContext.Provider>
     );
-  if (setupHome && setupDecision === undefined && firstRunRemembered()) {
+  if (
+    holdFirstRunFrame({
+      setupHome,
+      decision: setupDecision,
+      projects: setup.projects,
+      remembered: firstRunRemembered(),
+      failed: setup.failed,
+    })
+  ) {
     return <FirstRunFrame />;
   }
   if (showSetup) {

@@ -79,6 +79,59 @@ export function setupOpenStep(progress: SetupProgress): SetupStepId | null {
   return progress.confirmed ? null : 'confirm';
 }
 
+export function resolvedSetupStep(
+  progress: SetupProgress,
+  options?: { reviewing?: boolean; returnToModels?: boolean },
+): SetupStepId | null {
+  const natural = setupOpenStep(progress);
+  if (natural === null) return null;
+  if (options?.reviewing === true) return 'models';
+  if (options?.returnToModels === true && natural === 'confirm') return 'models';
+  return natural;
+}
+
+export function canSelectSetupStep(
+  target: SetupStepId,
+  open: SetupStepId,
+  progress: SetupProgress,
+  reviewing: boolean,
+): boolean {
+  if (target === open) return false;
+  if (target === 'models') return open === 'confirm';
+  return !reviewing && setupOpenStep(progress) === 'confirm';
+}
+
+export function modelSourceKeys(
+  providers: readonly { id: string }[],
+  connections: readonly { id: string; available?: boolean | undefined }[],
+): readonly string[] {
+  return [
+    ...providers.map((provider) => `provider:${provider.id}`),
+    ...connections
+      .filter((connection) => connection.available !== false)
+      .map((connection) => `connection:${connection.id}`),
+  ];
+}
+
+export function hasAddedModelSource(
+  baseline: readonly string[],
+  current: readonly string[],
+): boolean {
+  const known = new Set(baseline);
+  return current.some((key) => !known.has(key));
+}
+
+export function holdFirstRunFrame(input: {
+  setupHome: boolean;
+  decision: boolean | undefined;
+  projects: number | undefined;
+  remembered: boolean;
+  failed: boolean;
+}): boolean {
+  if (!input.setupHome || input.decision !== undefined || input.failed) return false;
+  return input.remembered || input.projects === 0;
+}
+
 export function setupShown(input: {
   projects: number | undefined;
   progress: SetupProgress | undefined;
