@@ -2073,9 +2073,10 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       assert.ok(manifestHits >= 1, 'remote mode never checked the update feed');
       assert.equal(zipHits, 0, 'blocked version downloaded before user clicked update');
 
+      const t0 = Date.now();
       const observedStates = [];
       await remoteWindow.exposeFunction('__cairnSmokeRecordUpdateState', (status) => {
-        observedStates.push(status);
+        observedStates.push(`${Date.now() - t0}:${status}`);
       });
       await remoteWindow.evaluate(() => {
         const w = window;
@@ -2085,7 +2086,7 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
           (event) => {
             const target = event.target instanceof Element ? event.target.closest('button') : null;
             w.__clickTrace.push(
-              `doc-click:${target?.getAttribute('data-testid') ?? event.target?.tagName ?? 'unknown'}`,
+              `doc-click:${target?.getAttribute('data-testid') ?? event.target?.tagName ?? 'unknown'}:${target?.getAttribute('data-status') ?? ''}`,
             );
           },
           true,
@@ -2107,13 +2108,18 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
               { x: box.x + box.width / 2, y: box.y + box.height / 2 },
             );
 
+      const clickAt = Date.now() - t0;
       await updateButton.click();
+      const clickDoneAt = Date.now() - t0;
 
       const deadline = Date.now() + OPEN_TIMEOUT_MS * 4;
       let lastStatus = null;
       while (Date.now() < deadline) {
         lastStatus = await updateButton.getAttribute('data-status');
-        if (zipHits >= 1 && (lastStatus === 'error' || observedStates.includes('installing'))) {
+        if (
+          zipHits >= 1 &&
+          (lastStatus === 'error' || observedStates.some((s) => s.endsWith(':installing')))
+        ) {
           break;
         }
         await remoteWindow.waitForTimeout(100);
@@ -2121,6 +2127,19 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       const clickTrace = await remoteWindow
         .evaluate(() => window.__clickTrace ?? [])
         .catch(() => []);
+      const directProbe =
+        zipHits >= 1
+          ? 'skipped'
+          : await Promise.race([
+              remoteWindow
+                .evaluate(async () => ({
+                  stateBefore: await window.cairnDesktop.update.state(),
+                  installResult: await window.cairnDesktop.update.install(),
+                  stateAfter: await window.cairnDesktop.update.state(),
+                }))
+                .catch((error) => `probe-err:${error.message}`),
+              new Promise((resolve) => setTimeout(() => resolve('probe-timeout-3s'), 3000)),
+            ]);
       const mainLogTail = (() => {
         const path = join(remoteUserData, 'logs', 'main.log');
         if (!existsSync(path)) return '';
@@ -2129,10 +2148,11 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
 
       assert.ok(
         zipHits >= 1,
-        `clicking update button in remote mode never downloaded the update (status=${lastStatus} states=${JSON.stringify(observedStates)} clicks=${JSON.stringify(clickTrace)} hit=${hitTarget} console=${JSON.stringify(consoleErrors.slice(-6))} mainLog=${mainLogTail})`,
+        `clicking update button in remote mode never downloaded the update (click=${clickAt}..${clickDoneAt}ms status=${lastStatus} states=${JSON.stringify(observedStates)} clicks=${JSON.stringify(clickTrace)} probe=${JSON.stringify(directProbe)} zipAfterProbe=${zipHits} hit=${hitTarget} console=${JSON.stringify(consoleErrors.slice(-6))} mainLog=${mainLogTail})`,
       );
       assert.ok(
-        observedStates.includes('downloading') && observedStates.includes('installing'),
+        observedStates.some((s) => s.endsWith(':downloading')) &&
+          observedStates.some((s) => s.endsWith(':installing')),
         `clicking update button in remote mode did not start installing: ${JSON.stringify(observedStates)}`,
       );
       await updateButton
