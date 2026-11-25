@@ -20,9 +20,10 @@ import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_TEXT_CLS } from '../detail/chat-markdown.js';
 import { Segments as DocSegments, TodoGlanceContext } from '../detail/segments.js';
-import type { ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
+import type { ChiefSegment, ChiefStreamItem, ChiefSubagentInfo } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
@@ -322,6 +323,7 @@ interface ChiefStreamRowProps {
   index: number;
   onCopy: (text: string) => void;
   onRewindRequest: (index: number, id: string | null) => void;
+  rewindDisabled?: boolean;
   onWithdraw?: ((messageId: string, text: string) => void) | undefined;
   entering?: boolean;
   joinsPrev?: boolean;
@@ -485,6 +487,62 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
   );
 }
 
+function subagentStatusLabel(sub: ChiefSubagentInfo, t: TFunc): string {
+  switch (sub.status) {
+    case 'queued':
+      return t('排队中');
+    case 'running':
+      return t('进行中');
+    case 'completed':
+      return sub.partial === true ? t('已完成（部分结果）') : t('已完成');
+    case 'timed_out':
+      return t('已超时');
+    case 'failed':
+      return t('已失败');
+    case 'aborted':
+      return t('已停止');
+  }
+}
+
+function SubagentProgressList({ items }: { items: readonly ChiefSubagentInfo[] }) {
+  const { t } = useI18n();
+  return (
+    <ul
+      data-testid="chief-subagent-progress"
+      className="mt-1.5 mb-1 flex list-none flex-col gap-1 p-0 font-sans text-meta text-content-tertiary tabular-nums"
+    >
+      {items.map((sub, index) => {
+        const statusText = subagentStatusLabel(sub, t);
+        const toolText =
+          sub.toolCalls > 0
+            ? sub.lastTool !== undefined && (sub.status === 'running' || sub.status === 'queued')
+              ? t('{n} 次工具 · {tool}', { n: sub.toolCalls, tool: sub.lastTool })
+              : t('{n} 次工具', { n: sub.toolCalls })
+            : null;
+        return (
+          <li
+            key={`${index}-${sub.label}`}
+            data-testid="chief-subagent-row"
+            data-status={sub.status}
+            className="flex min-w-0 items-center gap-2"
+          >
+            <span className="min-w-0 truncate text-content-secondary">{sub.label}</span>
+            <span
+              className={
+                sub.status === 'failed' || sub.status === 'timed_out'
+                  ? 'flex-none text-destructive'
+                  : 'flex-none'
+              }
+            >
+              {toolText !== null ? `${statusText} · ${toolText}` : statusText}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function ChiefMessageTools({
   side,
   touch = false,
@@ -495,6 +553,7 @@ function ChiefMessageTools({
   copyText,
   onCopy,
   onRewind,
+  rewindDisabled = false,
   onWithdraw,
 }: {
   side: 'user' | 'assistant';
@@ -506,6 +565,7 @@ function ChiefMessageTools({
   copyText: string;
   onCopy: (text: string) => void;
   onRewind?: (() => void) | undefined;
+  rewindDisabled?: boolean;
   onWithdraw?: (() => void) | undefined;
 }) {
   const placement =
@@ -524,6 +584,7 @@ function ChiefMessageTools({
       note={touch ? undefined : note}
       onCopy={() => onCopy(copyText)}
       onRewind={onRewind}
+      rewindDisabled={rewindDisabled}
       onWithdraw={onWithdraw}
     />
   );
@@ -534,6 +595,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   index: i,
   onCopy,
   onRewindRequest,
+  rewindDisabled = false,
   onWithdraw,
   entering = false,
   joinsPrev = false,
@@ -607,6 +669,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       copyText: item.text,
       onCopy,
       onRewind: () => onRewindRequest(i, item.id ?? null),
+      rewindDisabled,
       onWithdraw:
         steering && onWithdraw !== undefined && item.id != null
           ? () => onWithdraw(item.id ?? '', item.text)
@@ -689,7 +752,10 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
-  if (item.kind === 'streaming')
+  if (item.kind === 'streaming') {
+    const subagents = (item.tools ?? []).flatMap((tool) =>
+      tool.subagent !== undefined ? [tool.subagent] : [],
+    );
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
@@ -702,11 +768,16 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               blocked={item.blocked === true}
               blockedActions={<CoordinatorFixLinks kind={item.blockedKind} />}
             />
+            {subagents.length > 0 && <SubagentProgressList items={subagents} />}
           </MessageContent>
         </Message>
       </MessageScrollerItem>
     );
+  }
   const settled = item.typing !== true;
+  const subagents = (item.tools ?? []).flatMap((tool) =>
+    tool.subagent !== undefined ? [tool.subagent] : [],
+  );
   const markdown = item.plain !== undefined ? t(item.plain.key, item.plain.vars) : item.markdown;
   const whole = markdown ?? robotText(item);
   const fallbackNote =
@@ -732,6 +803,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         data-run={runAttr(joinsPrev, joinsNext)}
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+          {subagents.length > 0 && <SubagentProgressList items={subagents} />}
           <div
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"

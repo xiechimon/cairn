@@ -1,3 +1,4 @@
+import { COORDINATOR_NOT_READY } from '@cairn/shared';
 import { ApiError } from '../api/client.js';
 import { EN } from '../i18n/en.js';
 import { activeLocale } from '../i18n/locale.js';
@@ -15,6 +16,7 @@ const REASON_COPY: Record<string, string> = {
   not_found: '目标已不存在，请刷新后重试。',
   conflict: '当前状态已变化，请刷新后重试。',
   rate_limited: '请求过于频繁，请稍后重试。',
+  [COORDINATOR_NOT_READY]: 'Coordinator 暂无可用模型，请先在设置里配置模型来源。',
   timeout: '请求超时，请检查网络后重试。',
 };
 

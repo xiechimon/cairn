@@ -16,6 +16,7 @@ import {
   type PendingAttachment,
   preparePastedFiles,
   splitDraft,
+  takeAttachmentErrorReason,
 } from './attachment-paste.js';
 import {
   type CompletionRange,
@@ -266,7 +267,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         return [] as string[];
       });
       if (tokens.length === 0) {
-        failPending(uid);
+        failPending(uid, takeAttachmentErrorReason(file));
         return;
       }
       const base =

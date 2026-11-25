@@ -13,6 +13,7 @@ import {
   useCurrentMemoryEdit,
   useMemories,
   useMemoryImportCandidates,
+  useProjects,
 } from '../api/hooks.js';
 import { ProjectInstructionsField } from '../board/project-instructions-field.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
@@ -113,6 +114,7 @@ export function MemoryPanel({
   const { t } = useI18n();
   const connected = useConnected();
   const memoriesQ = useMemories(teamId, live);
+  const projectsQ = useProjects(teamId, live);
   const usageQ = useChiefMemoryUsage(teamId, live && project === null);
   const editQ = useCurrentMemoryEdit(teamId, live && teamId !== undefined);
   const importQ = useMemoryImportCandidates(teamId, live && connected);
@@ -134,10 +136,23 @@ export function MemoryPanel({
       : memory.source?.startsWith('import:')
         ? t('未验证导入')
         : t('更新于 {date}', { date: updatedOn(memory.updatedAt, t) });
-  const open = [...injected, ...lookup].find((memory) => memory.id === openId) ?? null;
+  const open = memories.find((memory) => memory.id === openId) ?? null;
   const deleting = mutations.deleteMemory;
   const updating = mutations.updateMemory;
-  const scopeLabel = project?.name ?? t('团队');
+  const openProjectName =
+    open === null
+      ? (project?.name ?? null)
+      : open.projectId === null
+        ? null
+        : project?.id === open.projectId
+          ? project.name
+          : (projectsQ.data?.find((item) => item.id === open.projectId)?.name ?? null);
+  const scopeLabel =
+    open === null
+      ? (project?.name ?? t('团队'))
+      : open.projectId === null
+        ? t('团队')
+        : (openProjectName ?? t('项目'));
   const layerLabel = (memory: MemoryRecord) =>
     isAutoInjected(memory.layer) ? t('核心') : t('可检索 · 不自动注入');
 
@@ -440,7 +455,7 @@ export function MemoryPanel({
               embedded
               teamId={teamId}
               projectId={open.projectId}
-              projectName={project?.name ?? null}
+              projectName={openProjectName}
               file={isAutoInjected(open.layer) ? 'MEMORY.md' : open.title}
             />
           ) : undefined
@@ -564,6 +579,7 @@ export function MemoryPanel({
             onCancel={() => setDiscardConfirm(false)}
             onConfirm={() => {
               setDiscardConfirm(false);
+              updating.reset();
               setEditing(null);
               setOpenId(null);
             }}

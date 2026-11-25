@@ -5,7 +5,13 @@ export { isValidFileName };
 
 const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
-export type AttachmentRejectReason = 'invalid-name' | 'size' | 'mime' | 'grant' | 'upload';
+export type AttachmentRejectReason =
+  | 'invalid-name'
+  | 'size'
+  | 'mime'
+  | 'quota'
+  | 'grant'
+  | 'upload';
 
 export class AttachmentError extends Error {
   readonly reason: AttachmentRejectReason;
@@ -61,7 +67,11 @@ export async function attachFile(input: AttachFileInput): Promise<AttachResult> 
     }),
   });
   if (!grantRes.ok) {
-    throw new AttachmentError('grant', `grant failed: ${grantRes.status} ${await grantRes.text()}`);
+    const body = await grantRes.text();
+    if (/quota exceeded/i.test(body)) {
+      throw new AttachmentError('quota', `grant failed: ${grantRes.status} ${body}`);
+    }
+    throw new AttachmentError('grant', `grant failed: ${grantRes.status} ${body}`);
   }
   const grantBody = (await grantRes.json()) as GrantResponse;
   const form = new FormData();
@@ -72,7 +82,11 @@ export async function attachFile(input: AttachFileInput): Promise<AttachResult> 
     body: form,
   });
   if (!upRes.ok) {
-    throw new AttachmentError('upload', `upload failed: ${upRes.status} ${await upRes.text()}`);
+    const body = await upRes.text();
+    if (/quota exceeded/i.test(body)) {
+      throw new AttachmentError('quota', `upload failed: ${upRes.status} ${body}`);
+    }
+    throw new AttachmentError('upload', `upload failed: ${upRes.status} ${body}`);
   }
   return {
     token: `![${file.name}](attachment:${grantBody.key})`,

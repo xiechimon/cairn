@@ -12,6 +12,7 @@ import {
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
+import { ApiError } from '../api/client.js';
 import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordinator-not-ready.js';
 import {
   keepNewestMessagesPage,
@@ -40,6 +41,7 @@ import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ensureGestureKeys } from '../overlay/gesture-machine.js';
 import { settingsHref } from '../settings/settings-href.js';
+import { isApprovalRequest } from './approval-card-model.js';
 import {
   type CoordinatorLoad,
   coordinatorLoad,
@@ -48,6 +50,7 @@ import {
 import { needsMachineName } from './needs-machine-name.js';
 import {
   chiefOutbox,
+  failedOutboxForChannel,
   keepSentKeys,
   type OutboxEntry,
   type UnsentSends,
@@ -89,6 +92,61 @@ export interface ChiefSurface {
 export interface ChiefDeepLink {
   threadId: string | null;
   onConsumed: () => void;
+}
+
+export type ChiefActionErrorKind = 'answer' | 'cancel' | 'rewind' | 'retry-greeting';
+
+export type ChiefActionErrorResolution =
+  | { kind: 'not-ready'; title: string; hint: string; inline: string }
+  | { kind: 'specific'; title: string; inline: string };
+
+export function chiefActionErrorCopy(
+  error: unknown,
+  action: ChiefActionErrorKind,
+  requestId?: string,
+): ChiefActionErrorResolution | null {
+  if (isCoordinatorNotReady(error)) {
+    return {
+      kind: 'not-ready',
+      title: 'Coordinator 暂无可用模型',
+      hint: '请先在设置里配置模型来源后再重试。',
+      inline: 'Coordinator 暂无可用模型，请先在设置里配置模型来源。',
+    };
+  }
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const message = error.message;
+  if (action === 'answer' || action === 'cancel') {
+    const approval = requestId !== undefined && isApprovalRequest(requestId);
+    if (approval && /expired|已过期/i.test(message)) {
+      return {
+        kind: 'specific',
+        title: '这条审批已过期，未能执行。',
+        inline: '这条审批已过期，未能执行。',
+      };
+    }
+    if (approval && /not pending|already /i.test(message)) {
+      return {
+        kind: 'specific',
+        title: '这条审批已处理或已过期。',
+        inline: '这条审批已处理或已过期。',
+      };
+    }
+    if (/already (?:answered|cancelled)/i.test(message)) {
+      return {
+        kind: 'specific',
+        title: '这条提问已结束，无需重复提交。',
+        inline: '这条提问已结束，无需重复提交。',
+      };
+    }
+  }
+  if (action === 'rewind' && /in flight|回合中/i.test(message)) {
+    return {
+      kind: 'specific',
+      title: 'Coordinator 正在运行，请停止后再恢复。',
+      inline: 'Coordinator 正在运行，请停止后再恢复。',
+    };
+  }
+  return null;
 }
 
 function placeOf(pathname: string, search: string): string {
@@ -243,12 +301,12 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   }, [live, outbox, activeThreadId, knownChiefIds]);
   const liveChiefWithUnsent = useMemo(() => {
     if (liveChief === null) return null;
-    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds, globalThreadId);
+    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds, globalThreadId, channel);
     return {
       ...liveChief,
       stream: [...keepSentKeys(liveChief.stream ?? [], chiefOutbox), ...unlanded],
     };
-  }, [liveChief, outbox, activeThreadId, knownChiefIds, globalThreadId]);
+  }, [liveChief, outbox, activeThreadId, knownChiefIds, globalThreadId, channel]);
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
   const loadEarlier = useCallback(() => {
     void fetchNextPage();
@@ -291,6 +349,24 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     activeThread === null ||
     (activeThread.activeRun == null && activeThread.lastTurnAt == null);
 
+  const reportChiefActionError = (
+    error: unknown,
+    action: ChiefActionErrorKind,
+    fallbackTitle: string,
+    requestId?: string,
+  ): string => {
+    const resolved = chiefActionErrorCopy(error, action, requestId);
+    if (resolved?.kind === 'not-ready') {
+      toastCoordinatorNotReady(t(resolved.title), t(resolved.hint));
+      return t(resolved.inline);
+    }
+    if (resolved?.kind === 'specific') {
+      toast.error(t(resolved.title));
+      return t(resolved.inline);
+    }
+    toastError(t(fallbackTitle), error);
+    return t(fallbackTitle);
+  };
   const retryGreetingStepId = activeThread?.retryGreetingStepId;
   const onRetryGreeting =
     live && activeThread !== null && retryGreetingStepId != null
@@ -298,7 +374,10 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           if (mutations.chiefRetryGreeting.isPending) return;
           mutations.chiefRetryGreeting.mutate(
             { threadId: activeThread.id, stepId: retryGreetingStepId },
-            { onError: (e) => toastError(t('恢复失败，请重试。'), e) },
+            {
+              onError: (e) =>
+                void reportChiefActionError(e, 'retry-greeting', '恢复失败，请重试。'),
+            },
           );
         }
       : undefined;
@@ -307,7 +386,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         if (activeThread === null) return;
         mutations.chiefRewind.mutate(
           { threadId: activeThread.id, messageId },
-          { onError: (e) => toastError(t('恢复失败，请重试。'), e) },
+          { onError: (e) => void reportChiefActionError(e, 'rewind', '恢复失败，请重试。') },
         );
       }
     : undefined;
@@ -329,6 +408,17 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
               questionSubmitStore.clear(key);
             },
             onError: (e) => {
+              const resolved = chiefActionErrorCopy(e, 'answer', input.requestId);
+              if (resolved?.kind === 'not-ready') {
+                questionSubmitStore.patch(key, { submitting: false, error: t(resolved.inline) });
+                toastCoordinatorNotReady(t(resolved.title), t(resolved.hint));
+                return;
+              }
+              if (resolved?.kind === 'specific') {
+                questionSubmitStore.patch(key, { submitting: false, error: t(resolved.inline) });
+                toast.error(t(resolved.title));
+                return;
+              }
               questionSubmitStore.patch(key, {
                 submitting: false,
                 error: t('提交回答失败，草稿已保留，请重试。'),
@@ -347,7 +437,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           .mutateAsync({ threadId: id, requestId })
           .then(() => undefined)
           .catch((e) => {
-            toastError(t('取消提问失败，请重试。'), e);
+            reportChiefActionError(e, 'cancel', '取消提问失败，请重试。', requestId);
             throw e;
           });
       }
@@ -409,12 +499,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     () =>
       live
         ? {
-            failed: outbox.filter(
-              (entry) =>
-                entry.state === 'failed' &&
-                (entry.threadId === activeThreadId ||
-                  (entry.threadId === null && entry.projectId === channel)),
-            ),
+            failed: failedOutboxForChannel(outbox, activeThreadId, channel),
             discard: (outboxKey) => chiefOutbox.discard(outboxKey)?.text ?? null,
           }
         : undefined,

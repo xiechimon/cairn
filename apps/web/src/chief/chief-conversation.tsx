@@ -316,9 +316,13 @@ export function ChiefConversation({
     (text: string) => copyTextWithFeedback(text, () => toastSuccess(t('已复制'))),
     [t],
   );
+  const rewindDisabled = chief.running === true || questionPending;
   const requestRewind = useCallback(
-    (index: number, id: string | null) => setRewindConfirm({ index, id }),
-    [],
+    (index: number, id: string | null) => {
+      if (rewindDisabled) return;
+      setRewindConfirm({ index, id });
+    },
+    [rewindDisabled],
   );
   const [typing, setTyping] = useState(false);
   const [liveDraft, setLiveDraft] = useServerDraft({
@@ -438,12 +442,19 @@ export function ChiefConversation({
   };
   const restoreSentRef = useRef(restoreSent);
   restoreSentRef.current = restoreSent;
+  const activeThreadId = chief.threadId ?? null;
+  const scopeProjectId = draftScope.startsWith('chief:') ? draftScope.slice('chief:'.length) : null;
   useEffect(() => {
     for (const entry of unsent?.failed ?? []) {
+      if (entry.threadId !== null) {
+        if (activeThreadId === null || entry.threadId !== activeThreadId) continue;
+      } else if (entry.projectId !== scopeProjectId) {
+        continue;
+      }
       const text = unsent?.discard(entry.key) ?? null;
       if (text !== null) restoreSentRef.current(text);
     }
-  }, [unsent]);
+  }, [unsent, activeThreadId, scopeProjectId]);
   const withdraw =
     onWithdraw == null
       ? undefined
@@ -621,6 +632,7 @@ export function ChiefConversation({
       index={i}
       onCopy={copyText}
       onRewindRequest={requestRewind}
+      rewindDisabled={rewindDisabled}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
       onWithdraw={onWithdraw != null ? withdrawSteer : undefined}
       joinsPrev={run?.joinsPrev === true}
@@ -896,10 +908,11 @@ export function ChiefConversation({
             </Button>
             <Button
               variant="destructive"
+              disabled={rewindDisabled}
               onClick={() => {
                 const anchor = rewindConfirm;
                 setRewindConfirm(null);
-                if (anchor?.id != null) onRewind?.(anchor.id);
+                if (!rewindDisabled && anchor?.id != null) onRewind?.(anchor.id);
               }}
             >
               {t('恢复到此处')}
@@ -907,7 +920,7 @@ export function ChiefConversation({
           </>
         }
       >
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
           <p className="m-0 text-ui text-foreground">
             {t('恢复到此处？该条之后的 {n} 条消息会移除，Coordinator 从这条重发开新回合。', {
               n:
@@ -917,6 +930,9 @@ export function ChiefConversation({
                       (entry) => entry.i > rewindConfirm.index && chiefRowRenders(entry.item.kind),
                     ).length,
             })}
+          </p>
+          <p className="m-0 text-meta text-content-secondary">
+            {t('已创建的任务、代码改动和记忆会保留。')}
           </p>
         </div>
       </DialogShell>

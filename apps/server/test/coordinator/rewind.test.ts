@@ -111,7 +111,7 @@ describe('Coordinator rewind', () => {
     expect(last).not.toContain('third question');
   });
 
-  it('keeps the recorded reason of a failed turn through the rewind', async () => {
+  it('deletes subsequent chief-err-* rows on rewind so old failures do not stay orphaned', async () => {
     const w = await world('first question');
     const { faux } = stub('unused');
     faux.setResponses(
@@ -137,7 +137,7 @@ describe('Coordinator rewind', () => {
     expect(reasonOf()).toContain('Request timed out.');
 
     await rewindTo(w, 'first question');
-    expect(reasonOf()).toContain('Request timed out.');
+    expect(reasonOf()).toBeUndefined();
   });
 
   it('reseeds from the thread rows when the anchor opens the conversation', async () => {

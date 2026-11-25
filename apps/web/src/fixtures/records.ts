@@ -716,11 +716,21 @@ export type ChiefStreamItem =
       queueWait?: QueueWait;
     };
 
+export interface ChiefSubagentInfo {
+  label: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'timed_out' | 'aborted';
+  toolCalls: number;
+  lastTool?: string;
+  partial?: boolean;
+  durationMs?: number;
+}
+
 export interface ChiefToolRow {
   label: string;
   seconds?: number;
   error?: boolean;
   running?: boolean;
+  subagent?: ChiefSubagentInfo;
 }
 
 export interface ChiefThreadRef {
@@ -777,4 +787,5 @@ export interface ChiefContent {
 export interface ComposerFileSeed {
   name: string;
   state: 'ready' | 'uploading' | 'error';
+  errorReason?: string;
 }

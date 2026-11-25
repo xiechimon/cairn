@@ -43,6 +43,7 @@ export function ComposerAttachments({
           {...(entry.state === 'ready' ? {} : { testId: 'attachment-pending' })}
           name={entry.name}
           state={entry.state}
+          {...(entry.errorReason !== undefined ? { errorReason: entry.errorReason } : {})}
           {...(entry.state !== 'uploading' && onDismissSeeded !== undefined
             ? { onRemove: thenFocusInput(() => onDismissSeeded(index)) }
             : {})}
@@ -54,6 +55,7 @@ export function ComposerAttachments({
           testId="attachment-pending"
           name={entry.name}
           state={entry.failed ? 'error' : 'uploading'}
+          {...(entry.errorReason !== undefined ? { errorReason: entry.errorReason } : {})}
           {...(entry.url !== null ? { imageSrc: entry.url } : {})}
           {...(entry.failed && onDismissPending !== undefined
             ? { onRemove: thenFocusInput(() => onDismissPending(entry.uid)) }

@@ -144,6 +144,7 @@ export function MessageToolbar({
   note,
   onCopy,
   onRewind,
+  rewindDisabled = false,
   onWithdraw,
   testId,
 }: {
@@ -152,6 +153,7 @@ export function MessageToolbar({
   note?: ReactNode;
   onCopy: () => void;
   onRewind?: (() => void) | undefined;
+  rewindDisabled?: boolean;
   onWithdraw?: (() => void) | undefined;
   testId: string;
 }) {
@@ -267,7 +269,12 @@ export function MessageToolbar({
               </KeyedMenuItem>
             )}
             {onRewind !== undefined && (
-              <KeyedMenuItem shortcut="R" data-action="rewind" onClick={onRewind}>
+              <KeyedMenuItem
+                shortcut="R"
+                data-action="rewind"
+                disabled={rewindDisabled}
+                onClick={onRewind}
+              >
                 <Restore width={20} height={20} />
                 {t('恢复到此处')}
               </KeyedMenuItem>
