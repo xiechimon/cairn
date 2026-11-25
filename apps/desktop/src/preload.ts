@@ -14,6 +14,7 @@ import type {
   DesktopSubscriptionInput,
   DesktopTrayOpen,
   DesktopTrayState,
+  DesktopUpdateInstallResult,
   DesktopUpdateState,
   DevinLocalStatus,
   DevinLoginOutcome,
@@ -329,7 +330,8 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     check: (): Promise<void> => ipcRenderer.invoke('desktop-update:check'),
     rollbackNotice: (): Promise<DesktopRollbackNotice | null> =>
       ipcRenderer.invoke('desktop-update:rollback-notice'),
-    install: (): Promise<void> => ipcRenderer.invoke('desktop-update:install'),
+    install: (): Promise<DesktopUpdateInstallResult> =>
+      ipcRenderer.invoke('desktop-update:install'),
     subscribe: (listener: (state: DesktopUpdateState) => void): (() => void) => {
       const relay = (_event: unknown, state: DesktopUpdateState) => listener(state);
       ipcRenderer.on('desktop-update:state', relay);

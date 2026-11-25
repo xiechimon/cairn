@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { desktopUpdateView } from '../src/board/desktop-update.js';
+import { desktopUpdateView, updateInstallRefusalCopy } from '../src/board/desktop-update.js';
 import { EN } from '../src/i18n/en.js';
 import { translate, type TFunc } from '../src/i18n/translate.js';
 
@@ -35,6 +35,18 @@ describe('desktop update button presentation', () => {
     expect(viewZh.label).toBe('离开时自动更新到 0.43.0');
     expect(desktopUpdateView({ status: 'ready', version: '0.43.0' }, en).label).toBe(
       'Updates to 0.43.0 when you step away',
+    );
+  });
+
+  it('maps update install refusals to localized action-oriented copy without raw error noise', () => {
+    expect(
+      updateInstallRefusalCopy('the staged update is not signed by the Cairn certificate', zh),
+    ).toBe('更新包签名验证未通过，无法安装');
+    expect(updateInstallRefusalCopy('the staged update is missing', en)).toBe(
+      'The downloaded update is no longer available. Check for updates again',
+    );
+    expect(updateInstallRefusalCopy('Error: EACCES: permission denied', zh)).toBe(
+      '未能安装更新，点击重试',
     );
   });
 });

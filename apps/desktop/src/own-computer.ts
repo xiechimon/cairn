@@ -62,14 +62,14 @@ export interface IpcHandle<E> {
 export function registerOwnComputerIpc<E>(
   ipc: IpcHandle<E>,
   fromOwnPage: (event: E) => boolean,
-  actions: OwnComputerActions,
+  actions: OwnComputerActions | null,
 ): void {
   ipc.handle('own-computer:guide', async (event) => {
-    if (!fromOwnPage(event)) return null;
+    if (actions === null || !fromOwnPage(event)) return null;
     await actions.guide();
     return true;
   });
   ipc.handle('own-computer:permissions', (event) =>
-    fromOwnPage(event) ? actions.permissions() : null,
+    actions !== null && fromOwnPage(event) ? actions.permissions() : null,
   );
 }

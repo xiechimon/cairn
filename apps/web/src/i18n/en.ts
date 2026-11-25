@@ -2477,6 +2477,15 @@ export const EN: Record<string, string> = {
   '正在重启…': 'Restarting…',
   '离开时自动更新到 {version}': 'Updates to {version} when you step away',
   '无法连接网络，未能检查更新': 'Cannot connect to the network to check for updates',
+  '更新包签名验证未通过，无法安装':
+    'The update signature could not be verified, so it cannot be installed',
+  '安装包已失效，请重新检查更新':
+    'The downloaded update is no longer available. Check for updates again',
+  '另一个更新正在安装中，请稍候': 'Another Cairn update is already installing',
+  '当前没有可安装的更新，请先检查更新':
+    'No update is ready to install yet. Check for updates first',
+  '请在 Cairn 主窗口里安装更新': 'Install updates from the main Cairn window',
+  '未能安装更新，点击重试': 'Could not install the update. Click to retry',
   'Cairn 回滚了更新': 'Cairn rolled back an update',
   '{failed} 未能启动，Cairn 已恢复到 {restored}。':
     '{failed} did not start. Cairn restored {restored}.',

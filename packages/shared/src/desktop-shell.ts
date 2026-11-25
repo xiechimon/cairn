@@ -225,6 +225,8 @@ export function desktopNotificationOptions(
 
 export type DesktopUpdateBlocker = 'development' | 'not-in-applications' | 'read-only';
 
+export type DesktopUpdateInstallResult = { ok: true } | { ok: false; reason: string };
+
 export type DesktopUpdateState =
   | { status: 'unsupported'; blocker: DesktopUpdateBlocker }
   | { status: 'idle' }

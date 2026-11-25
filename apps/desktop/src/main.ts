@@ -83,7 +83,7 @@ import {
 } from './connections.js';
 import { installContextMenu } from './context-menu.js';
 import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
-import { canInvokeHostIpc, probeRemoteReachable } from './host-lifecycle.js';
+import { canInvokeHostIpc, canSwitchHost, probeRemoteReachable } from './host-lifecycle.js';
 import {
   desktopStateToHostStatus,
   initialHandledHostRequestId,
@@ -214,6 +214,7 @@ import {
 } from './updater.js';
 import { ensureUpdaterAgent, UPDATER_ENTRY, updaterPlistPath } from './updater-agent.js';
 import { createWakeAhead, earliestScheduleNextRunAt } from './wake-ahead.js';
+import { installDesktopUpdate } from './update-ipc.js';
 import {
   clampBounds,
   createWindowStateStore,
@@ -400,14 +401,15 @@ function agentDesktopBinary(): string | null {
 }
 
 function serveOwnComputer(origin: string, binary: string | null): void {
-  if (binary === null) return;
   registerOwnComputerIpc(
     ipcMain,
     (event: IpcMainInvokeEvent) => event.senderFrame?.origin === origin,
-    {
-      guide: () => openPermissionGuide(binary),
-      permissions: () => readPermissions(binary),
-    },
+    binary === null
+      ? null
+      : {
+          guide: () => openPermissionGuide(binary),
+          permissions: () => readPermissions(binary),
+        },
   );
 }
 
@@ -1429,12 +1431,26 @@ function serveUpdates(
     lastCheckedAt = Date.now();
     return created.check();
   };
+  const runShellInstall = async (fromMain: boolean): Promise<DesktopUpdateInstallResult> => {
+    const locale = await windowLocale();
+    return installDesktopUpdate({
+      fromMainPage: fromMain,
+      updater: created,
+      errorMessage: messageOf,
+      messages: {
+        notMainWindow: 'Update installation can only be started from the main Cairn window.',
+        noPendingUpdate: 'no update is pending to install',
+        offline: updateOfflineCopy(locale).detail,
+        current: (version) => upToDateCopy(locale, version).detail,
+        unsupported: (blocker) => unsupportedUpdateCopy(locale, blocker).detail,
+      },
+    });
+  };
   const channels = createUpdateChannelHandlers({
     localUpdater: {
       state: () => created.state(),
       check,
-      install: () =>
-        created.state().status === 'ready' ? created.apply('foreground') : created.install(),
+      install: () => runShellInstall(true),
     },
     remote: () => remoteVersion,
   });
@@ -1523,10 +1539,10 @@ function serveUpdates(
     fromOwnPage(event) ? channels.shellState() : null,
   );
   ipcMain.handle('desktop-update:check', (event) =>
-    fromOwnPage(event) ? channels.shellCheck() : undefined,
+    fromMainPage(event) ? channels.shellCheck() : undefined,
   );
   ipcMain.handle('desktop-update:install', (event) =>
-    fromOwnPage(event) ? channels.shellInstall() : undefined,
+    fromMainPage(event) ? channels.shellInstall() : runShellInstall(false),
   );
   ipcMain.handle('desktop-update:remote-state', (event) =>
     fromOwnPage(event) ? channels.remoteState() : null,
@@ -2175,8 +2191,7 @@ async function boot(): Promise<void> {
       const offline = fromOfflinePage(event);
       if (!fromHostMainPage(event) && !offline) return null;
       if (typeof id !== 'string' || id === '') throw new Error('Invalid connection id');
-      if (!offline && !canInvokeHostIpc(activeConn.kind, 'switch', id)) return null;
-      if (offline && id !== LOCAL_CONNECTION_ID) return null;
+      if (!canSwitchHost(activeConn.kind, offline, id)) return null;
       switchDesktopHost(userData, id);
       return hostStatus();
     });
@@ -2274,7 +2289,7 @@ async function boot(): Promise<void> {
     }
     serveNotifications(origin);
     servePageActivity(origin);
-    if (activeConn.kind === 'local') serveOwnComputer(origin, agentDesktopBinary());
+    serveOwnComputer(origin, activeConn.kind === 'local' ? agentDesktopBinary() : null);
     watchIdleUpdate(activeRunnerHome);
     const restore = takeRelaunchWindow();
     if (restore !== null || !BACKGROUND_LAUNCH) openWindow(origin, restore);

@@ -104,6 +104,37 @@ test.describe('desktop shell', () => {
     await update.click();
     expect(await calls(page)).toEqual({ install: 2, check: 2 });
   });
+
+  test('an install refusal answers immediately with error state and reason', async ({ page }) => {
+    await page.addInitScript(() => {
+      const listeners = new Set<(state: unknown) => void>();
+      const w = window as unknown as Record<string, unknown>;
+      w.cairnDesktop = {
+        update: {
+          state: async () => ({ status: 'ready', version: '0.43.0' }),
+          check: async () => {},
+          install: async () => ({
+            ok: false,
+            reason: 'the staged update is not signed by the Cairn certificate',
+          }),
+          subscribe: (listener: (state: unknown) => void) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+        },
+      };
+    });
+    await page.goto('/app?scenario=providers-fleet');
+    const update = page.getByTestId('desktop-update');
+    await expect(update).toHaveAttribute('data-status', 'ready');
+    await update.click();
+    await expect(update).toHaveAttribute('data-status', 'error');
+    await expect(update).toHaveAttribute(
+      'title',
+      'the staged update is not signed by the Cairn certificate',
+    );
+    await expect(page.getByText('更新包签名验证未通过，无法安装')).toBeVisible();
+  });
 });
 
 test('in the browser the footer has no brand and no update button', async ({ page }) => {
