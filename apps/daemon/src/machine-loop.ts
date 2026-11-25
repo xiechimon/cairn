@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
@@ -190,6 +191,37 @@ export const PORT_BASE_STRIDE = 100;
 
 export function portBaseForSlot(slot: number): number {
   return PORT_BASE_FLOOR + (slot - 1) * PORT_BASE_STRIDE;
+}
+
+async function waitForReenrollment(
+  machineJsonPath: string,
+  ctx: {
+    log: (line: string) => void;
+    sleep: (ms: number) => Promise<void>;
+    pollMs: number;
+    enrolledServer: string;
+    machineId: string;
+    server: string;
+  },
+): Promise<never> {
+  const seen = readFileOrNull(machineJsonPath);
+  ctx.log(
+    `credentials in ${machineJsonPath} belong to ${ctx.enrolledServer} (machine ${ctx.machineId}) and ${ctx.server} rejected them (401). Re-enroll this runner: cairn logout, then cairn start. Waiting for machine.json to change.`,
+  );
+  for (;;) {
+    await ctx.sleep(ctx.pollMs);
+    if (readFileOrNull(machineJsonPath) !== seen) {
+      throw new Error('machine.json changed; restarting with the new credentials');
+    }
+  }
+}
+
+function readFileOrNull(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
 }
 
 export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> {
@@ -788,6 +820,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
+  const enrolledServer = machineJson.serverUrl;
   enrolledIdentity.machineId = machineId;
   const screens = new OutboundComputerScreens({
     serverUrl: config.serverUrl,
@@ -892,6 +925,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         await presenceReporter.send();
         break;
       } catch (error) {
+        if (error instanceof MachineApiError && error.status === 401 && loadedFromDisk) {
+          await waitForReenrollment(paths.machineJson, {
+            log: (line) => logger.machine(line),
+            sleep,
+            pollMs: opts.claimBackoffBaseMs ?? 1_000,
+            enrolledServer,
+            machineId,
+            server: config.serverUrl,
+          });
+        }
         if (error instanceof MachineApiError && error.status < 500) throw error;
         logger.machine(
           `server not reachable at startup, retrying: ${error instanceof Error ? error.message : String(error)}`,

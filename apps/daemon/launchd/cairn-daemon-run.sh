@@ -1,8 +1,11 @@
 #!/bin/sh
 # Guarded cairn daemon launcher for launchd (user domain).
 #
-# Exit 0 means "already running": with KeepAlive {SuccessfulExit: false}
-# launchd does not relaunch a clean exit, while a crash still is relaunched.
+# A daemon that is still running gets CAIRN_RUN_TWIN_WAIT_S seconds to exit,
+# since `launchctl kickstart -k` starts this launcher while the old daemon is
+# still shutting down. If it outlives the wait the launcher exits 75: with
+# KeepAlive {SuccessfulExit: false} launchd relaunches it after the throttle,
+# so the job comes back once the other daemon is gone.
 # pgrep -f takes an ERE: the pattern is end-anchored (verify-stack daemons
 # carry extra args and must not match), `[.]` keeps the pattern from matching
 # this script's own command line, and the server URL is dot-escaped.
@@ -17,26 +20,41 @@ DAEMON_JSON="$CAIRN_HOME_DIR/daemon.json"
 
 note() { printf '%s [cairn-daemon-run] %s\n' "$(date '+%F %T')" "$*"; }
 
-if [ -f "$DAEMON_JSON" ]; then
-  twin_pid="$(sed -n 's/.*"pid"[ :]*\([0-9][0-9]*\).*/\1/p' "$DAEMON_JSON" | head -n 1)"
-  if [ -n "${twin_pid:-}" ] && kill -0 "$twin_pid" 2>/dev/null; then
-    note "already running as supervisor (pid $twin_pid from $DAEMON_JSON); exiting 0"
-    exit 0
-  fi
-fi
+TWIN_WAIT_S="${CAIRN_RUN_TWIN_WAIT_S:-20}"
 
-if command -v pgrep >/dev/null 2>&1 && command -v lsof >/dev/null 2>&1; then
+supervisor_twin() {
+  [ -f "$DAEMON_JSON" ] || return 1
+  twin_pid="$(sed -n 's/.*"pid"[ :]*\([0-9][0-9]*\).*/\1/p' "$DAEMON_JSON" | head -n 1)"
+  [ -n "${twin_pid:-}" ] && kill -0 "$twin_pid" 2>/dev/null
+}
+
+foreground_twin() {
+  command -v pgrep >/dev/null 2>&1 && command -v lsof >/dev/null 2>&1 || return 1
   server_re="$(printf '%s' "$SERVER_URL" | sed 's/\./[.]/g')"
   for pid in $(pgrep -f "src/cli[.]ts start -f(\$| .*--server $server_re)" 2>/dev/null); do
     [ "$pid" = "$$" ] && continue
     if lsof -nP -a -p "$pid" -d cwd 2>/dev/null | grep -q "$REPO"; then
-      note "already running in foreground (pid $pid, cwd under $REPO); exiting 0"
-      exit 0
+      twin_pid="$pid"
+      return 0
     fi
   done
-else
+  return 1
+}
+
+if ! command -v pgrep >/dev/null 2>&1 || ! command -v lsof >/dev/null 2>&1; then
   note "WARNING: pgrep/lsof unavailable, G2 foreground check skipped (G1 still guards supervisor twins)"
 fi
+
+waited=0
+while supervisor_twin || foreground_twin; do
+  if [ "$waited" -ge "$TWIN_WAIT_S" ]; then
+    note "another daemon is still running (pid $twin_pid) after ${TWIN_WAIT_S}s; exiting 75 so launchd retries"
+    exit 75
+  fi
+  [ "$waited" -eq 0 ] && note "waiting up to ${TWIN_WAIT_S}s for daemon pid $twin_pid to exit"
+  sleep 1
+  waited=$((waited + 1))
+done
 
 if [ ! -d "$REPO" ]; then
   note "ERROR: checkout missing: $REPO (plist WorkingDirectory points at a removed worktree?)" >&2

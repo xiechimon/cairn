@@ -29,10 +29,12 @@ re-renders in place; kickstart as printed to apply).
   (`pnpm dev` in the main checkout) after a reboot; the daemon needs no kick.
 - Enrollment is reused from `~/.cairn` (machine.json). First-ever enroll
   still goes through the browser flow, not this job.
-- Exactly one daemon per checkout: if a manual `pnpm dev:daemon` (or a
-  supervisor-mode `start`) is already on this checkout, the wrapper logs
-  "already running" and exits 0 — launchd does NOT relaunch clean exits
-  (`KeepAlive {SuccessfulExit: false}`), so the check costs one log line.
+- Exactly one daemon per checkout: if another daemon (a manual `pnpm dev:daemon`,
+  a supervisor-mode `start`, or the previous instance still shutting down after
+  `launchctl kickstart -k`) is running on this checkout, the wrapper waits up to
+  20 s (`CAIRN_RUN_TWIN_WAIT_S`) for it to exit and then starts. If it is still
+  there, the wrapper exits 75, so launchd tries again after the 30 s throttle
+  and takes over once the other daemon stops.
   Crash kills restart; restart storms are capped at one per 30s.
 
 ## Operate

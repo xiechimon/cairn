@@ -157,7 +157,7 @@ import {
   startLocalRunner,
 } from './runner.js';
 import { runnerStepsInFlight } from './runner-activity.js';
-import { migrateRunnerHome, runnerHomeFor } from './runner-home.js';
+import { localRunnerHome, migrateRunnerHome, runnerHomeFor } from './runner-home.js';
 import { createServerExitHandler } from './server-exit.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
 import { addLiquidGlass } from './tray-glass.js';
@@ -373,6 +373,8 @@ function reloadMainWindowPreserveDrafts(): void {
   ipcMain.on('desktop-update:prepare-reload-done', done);
   window.webContents.send('desktop-update:prepare-reload', token);
 }
+
+let currentRunnerHome: string | null = null;
 
 function runnerHome(): string {
   return runnerHomeFor({
@@ -1547,7 +1549,7 @@ function serveUpdates(
     if (!fromMainPage(event)) return { installed: false, loggedIn: false, canLogin: false };
     const status = await antigravityLocalStatus();
     if (!allowLocalCredentials) return { ...status, loggedIn: false };
-    const runnerId = readRunnerRegistration(runnerHome())?.machineId;
+    const runnerId = readRunnerRegistration(currentRunnerHome ?? runnerHome())?.machineId;
     return runnerId === undefined ? status : { ...status, runnerId };
   });
   ipcMain.handle('antigravity:import', (event, input: unknown) =>
@@ -1971,7 +1973,15 @@ async function boot(): Promise<void> {
     }
     appOrigin = origin;
 
-    const activeRunnerHome = runnerHomeForConnection(runnerHome(), userData, activeConn.id);
+    const baseRunnerHome = runnerHome();
+    const activeRunnerHome = runnerHomeForConnection(
+      activeConn.id === LOCAL_CONNECTION_ID
+        ? localRunnerHome(baseRunnerHome, join(userData, 'runner-home'), origin)
+        : baseRunnerHome,
+      userData,
+      activeConn.id,
+    );
+    currentRunnerHome = activeRunnerHome;
     let runnerWanted = true;
     const bringRunnerUp = (): Promise<void> => {
       if (runner !== null) {

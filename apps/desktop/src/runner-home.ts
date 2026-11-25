@@ -3,6 +3,7 @@ import {
   lstatSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   renameSync,
   rmdirSync,
   symlinkSync,
@@ -26,6 +27,18 @@ export function runnerHomeFor(opts: {
     throw new Error(`runner home for a non-installed instance resolved inside ${shared}`);
   }
   return isolated;
+}
+
+export function localRunnerHome(shared: string, isolated: string, origin: string): string {
+  let serverUrl: unknown;
+  try {
+    serverUrl = (
+      JSON.parse(readFileSync(join(shared, 'machine.json'), 'utf8')) as { serverUrl?: unknown }
+    ).serverUrl;
+  } catch {
+    return shared;
+  }
+  return typeof serverUrl === 'string' && serverUrl !== origin ? isolated : shared;
 }
 
 export function migrateRunnerHome(legacy: string, target: string): void {

@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test } from 'vitest';
+import { releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
 import { MachineApiError } from '../src/machine-client.js';
-import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
+import { boot, FakeMachineApi, startMachine, waitFor } from './machine-loop-harness.js';
 import { testTempDir } from './test-temp-dir.js';
 
 describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
@@ -64,12 +65,40 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     expect(lines).toContain('Online (machineId=m1); polling http://server');
   });
 
-  test('startup still stops when the server rejects the machine', async () => {
+  test('rejected credentials name their server and wait for a re-enroll instead of crash-looping', async () => {
     const api = new FakeMachineApi();
     api.me = async () => {
       throw new MachineApiError(401, 'unauthorized');
     };
-    await expect(boot({ api })).rejects.toThrow('machine api 401');
+    const started = startMachine({ api, preEnrolled: { serverUrl: 'http://other-host:60805' } });
+    onTestFinished(() => {
+      releaseTestTempDir(started.home);
+    });
+    let settled = false;
+    const outcome = started.handlePromise.then(
+      () => 'online',
+      (error: unknown) => {
+        settled = true;
+        return error instanceof Error ? error.message : String(error);
+      },
+    );
+    await waitFor(() => started.lines.some((l) => l.includes('rejected them')));
+    const notice = started.lines.find((l) => l.includes('rejected them'));
+    expect(notice).toContain('http://other-host:60805');
+    expect(notice).toContain('http://server');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(settled).toBe(false);
+    expect(started.lines.filter((l) => l.includes('rejected them'))).toHaveLength(1);
+    writeFileSync(
+      started.paths.machineJson,
+      JSON.stringify({
+        machineId: 'm-new',
+        token: 'c'.repeat(64),
+        teamId: 'team-1',
+        serverUrl: 'http://server',
+      }),
+    );
+    expect(await outcome).toContain('machine.json changed');
   });
 
   test('#1251 capability manifest uploaded with enroll and every presence beat (injected stub pins content)', async () => {
