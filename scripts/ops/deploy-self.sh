@@ -2,92 +2,12 @@
 set -euo pipefail
 umask 077
 
-unset GH_TOKEN GITHUB_TOKEN
-for credential_variable in ${!GIT_CONFIG_@}; do
-  case "$credential_variable" in
-    GIT_CONFIG_COUNT | GIT_CONFIG_KEY_* | GIT_CONFIG_VALUE_* | GIT_CONFIG_PARAMETERS) unset "$credential_variable" ;;
-  esac
-done
-GITHUB_COMMAND_WRAPPER="${CAIRN_GH_WRAPPER:-$HOME/.cairn/tools/app-token/as-bot.sh}"
-
-gh() {
-  "$GITHUB_COMMAND_WRAPPER" gh "$@"
-}
-
 usage() {
-  cat >&2 <<'EOF'
+  cat >&2 <<'USAGE'
 usage: deploy-self.sh <40-hex sha on origin/main> | --recover
-
-Deploys one green main commit to this host's cairn checkout and user units, with rollback.
-  1. refuses a SHA not on origin/main, without every required check green, or whose
-     pnpm-workspace.yaml allows a new install script (exit 2)
-  2. respects $CAIRN_DEPLOY_STATE/hold
-  3. rehearses the target's migrations on an online copy of the live DB in a scratch worktree
-  4. checks out the target, installs with --frozen-lockfile, builds the daemon and web assets
-  5. restarts the daemon only when the daemon bundle, its package.json or pnpm-lock.yaml differs
-     from the build it replaced; then claims pause with a durable lease and drain within
-     CAIRN_DEPLOY_STEP_WAIT_SECONDS (exit 75 on timeout), always resuming. Otherwise only the
-     server restarts: claims pause the same way and claimed steps get up to
-     CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS before the server restarts anyway. Every deploy also
-     waits that long for open Coordinator computer calls other than request_takeover, which
-     resumes across a restart
-  6. stops daemon and server, snapshots the DB, starts server then daemon, health-checks both
-  7. on a failed health check restores the snapshot and the previous checkout (exit 1;
-     exit 3 when the rollback itself is unhealthy)
-An interrupted deploy leaves $CAIRN_DEPLOY_STATE/in-progress; the next run (or --recover) health-checks
-the target and finishes it or rolls it back before doing anything else.
-Writes the result to $CAIRN_DEPLOY_STATE/deployed.json and $CAIRN_DATA_DIR/deploy.json.
-After each record, if $CAIRN_DEPLOY_NOTIFY (default $CAIRN_DEPLOY_STATE/notify.sh) is
-executable, feeds that JSON on stdin. A missing, non-executable, failing or timed-out
-notify never changes the deploy exit status.
-
-Environment (defaults in brackets):
-  CAIRN_CHECKOUT [~/Code/AgentProjects/cairn-exec]  CAIRN_DATA_DIR [~/.cairn/server]
-  CAIRN_DEPLOY_STATE [~/.local/state/cairn-deploy]  CAIRN_DEPLOY_BACKUPS [~/backups/cairn-server/predeploy]
-  CAIRN_DEPLOY_SCRATCH [$CAIRN_DEPLOY_STATE/scratch]  CAIRN_REPO [xiechimon/cairn]
-  CAIRN_REQUIRED_CHECKS [check pack-smoke e2e-gate]  CAIRN_HEALTH_URL [http://127.0.0.1:8787]
-  CAIRN_HEALTH_TRIES [60]  CAIRN_HEALTH_INTERVAL [2]  CAIRN_MACHINE_NAME [hostname -s]
-  CAIRN_DEPLOY_KEEP_SNAPSHOTS [10]  CAIRN_DEPLOY_STEP_WAIT_SECONDS [1800]
-  CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS [600]
-  CAIRN_DEPLOY_NOTIFY [$CAIRN_DEPLOY_STATE/notify.sh]
-  CAIRN_DEPLOY_NOTIFY_TIMEOUT [5]
-  CAIRN_GH_WRAPPER [~/.cairn/tools/app-token/as-bot.sh]
-  CAIRN_DEPLOY_TOKEN_FILE [~/.cairn/token]
-EOF
+USAGE
   exit 2
 }
-
-CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
-DATA_DIR="${CAIRN_DATA_DIR:-$HOME/.cairn/server}"
-STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
-BACKUPS="${CAIRN_DEPLOY_BACKUPS:-$HOME/backups/cairn-server/predeploy}"
-SCRATCH="${CAIRN_DEPLOY_SCRATCH:-$STATE/scratch}"
-REPO="${CAIRN_REPO:-xiechimon/cairn}"
-REQUIRED_CHECKS="${CAIRN_REQUIRED_CHECKS:-check pack-smoke e2e-gate}"
-HEALTH_URL="${CAIRN_HEALTH_URL:-http://127.0.0.1:8787}"
-HEALTH_TRIES="${CAIRN_HEALTH_TRIES:-60}"
-HEALTH_INTERVAL="${CAIRN_HEALTH_INTERVAL:-2}"
-MACHINE_NAME="${CAIRN_MACHINE_NAME:-$(hostname -s)}"
-KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
-NOTIFY_HOOK="${CAIRN_DEPLOY_NOTIFY:-$STATE/notify.sh}"
-NOTIFY_TIMEOUT="${CAIRN_DEPLOY_NOTIFY_TIMEOUT:-5}"
-STEP_WAIT_SECONDS="${CAIRN_DEPLOY_STEP_WAIT_SECONDS:-1800}"
-SERVER_STEP_WAIT_SECONDS="${CAIRN_DEPLOY_SERVER_STEP_WAIT_SECONDS:-600}"
-TOKEN_FILE="${CAIRN_DEPLOY_TOKEN_FILE:-$HOME/.cairn/token}"
-HOST_TOOLS_ROOT="${CAIRN_HOST_TOOLS_ROOT:-$HOME/.cairn/tools}"
-HOST_LANES_ROOT="${CAIRN_HOST_LANES_ROOT:-$HOME/lanes}"
-HOST_BIN_ROOT="${CAIRN_HOST_BIN_ROOT:-$HOME/.local/bin}"
-HOST_UNITS_ROOT="${CAIRN_HOST_UNITS_ROOT:-$HOME/.config/systemd/user}"
-HOST_TOOLS_ALARM_TITLE="Host tools differ from main"
-SERVER_UNIT=cairn-server.service
-DAEMON_UNIT=cairn-daemon.service
-ORB_UNIT=cairn-daemon-orb.service
-ORB_ALARM_TITLE="Orb daemon needs attention"
-DB="$DATA_DIR/server.db"
-
-EXIT_REFUSED=2
-EXIT_BUSY=75
-EXIT_ROLLBACK_UNHEALTHY=3
 
 [ $# -eq 1 ] || usage
 RECOVER_ONLY=0
@@ -96,37 +16,63 @@ if [ "$TARGET" = --recover ]; then
   RECOVER_ONLY=1
   TARGET=""
 else
-  [[ "$TARGET" =~ ^[0-9a-f]{40}$ ]] || { echo "refused: '$TARGET' is not a full 40-hex SHA" >&2; exit "$EXIT_REFUSED"; }
+  [[ "$TARGET" =~ ^[0-9a-f]{40}$ ]] || { echo "refused: '$TARGET' is not a full 40-hex SHA" >&2; exit 2; }
 fi
 
-mkdir -p "$STATE"
+BUILD_CHECKOUT="${CAIRN_DEPLOY_BUILD_CHECKOUT:-${CAIRN_CHECKOUT:-$HOME/deploy-build}}"
+APP_ROOT="${CAIRN_DEPLOY_APP_ROOT:-$HOME/cairn-server}"
+DATA_DIR="${CAIRN_DATA_DIR:-$HOME/.cairn/server}"
+STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
+BACKUPS="${CAIRN_DEPLOY_BACKUPS:-$STATE/backups}"
+SCRATCH="${CAIRN_DEPLOY_SCRATCH:-$STATE/scratch}"
+RELEASES="${CAIRN_DEPLOY_RELEASES:-$STATE/releases}"
+REPO="${CAIRN_REPO:-xiechimon/cairn}"
+REQUIRED_CHECKS="${CAIRN_REQUIRED_CHECKS:-check pack-smoke e2e-gate}"
+HEALTH_URL="${CAIRN_HEALTH_URL:-http://127.0.0.1:8787}"
+HEALTH_TRIES="${CAIRN_HEALTH_TRIES:-60}"
+HEALTH_INTERVAL="${CAIRN_HEALTH_INTERVAL:-2}"
+MACHINE_NAME="${CAIRN_DEPLOY_MACHINE_NAME:-$(hostname -s)}"
+KEEP_SNAPSHOTS="${CAIRN_DEPLOY_KEEP_SNAPSHOTS:-10}"
+KEEP_RELEASES="${CAIRN_DEPLOY_KEEP_RELEASES:-5}"
+TOKEN_FILE="${CAIRN_DEPLOY_TOKEN_FILE:-$HOME/.cairn/token}"
+SERVICE_MANAGER="${CAIRN_DEPLOY_SERVICE_MANAGER:-systemd}"
+SYSTEMD_UNIT="${CAIRN_DEPLOY_SYSTEMD_UNIT:-cairn-server.service}"
+LAUNCHD_LABEL="${CAIRN_DEPLOY_LAUNCHD_LABEL:-com.cairn.server}"
+LAUNCHD_PLIST="${CAIRN_DEPLOY_LAUNCHD_PLIST:-$HOME/Library/LaunchAgents/$LAUNCHD_LABEL.plist}"
+COORDINATOR_WAIT_SECONDS="${CAIRN_DEPLOY_COORDINATOR_WAIT_SECONDS:-600}"
+DB="$DATA_DIR/server.db"
+IN_PROGRESS="$STATE/in-progress"
+EXIT_REFUSED=2
+EXIT_BUSY=75
+EXIT_ROLLBACK_UNHEALTHY=3
+
+mkdir -p "$STATE" "$RELEASES" "$BACKUPS"
 if [ "${CAIRN_DEPLOY_RUNNING_COPY:-}" != 1 ]; then
-  running_copy="$(mktemp "$STATE/deploy-self.running.XXXXXX")"
-  cp "$0" "$running_copy"
-  CAIRN_DEPLOY_RUNNING_COPY=1 exec bash "$running_copy" "$@"
+  ops_dir="$(cd "$(dirname "$0")" && pwd)"
+  running_dir="$(mktemp -d "$STATE/deploy-self.running.XXXXXX")"
+  cp "$0" "$running_dir/deploy-self.sh"
+  cp "$ops_dir/github-ci-evidence.mjs" "$ops_dir/stage-server-artifact.mjs" "$running_dir/"
+  CAIRN_DEPLOY_RUNNING_COPY=1 CAIRN_DEPLOY_COPY_DIR="$running_dir" exec bash "$running_dir/deploy-self.sh" "$@"
 fi
-RUNNING_COPY="$0"
+OPS_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUNNING_DIR="$(dirname "$0")"
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
 refuse() { echo "refused: $*" >&2; exit "$EXIT_REFUSED"; }
 busy() { printf '%s\n' "$*" >"$STATE/last-reason"; echo "busy: $*" >&2; exit "$EXIT_BUSY"; }
 
 LOCK="$STATE/lock"
-trap 'rm -f "$RUNNING_COPY"' EXIT
 if ! mkdir "$LOCK" 2>/dev/null; then
   holder="$(cat "$LOCK/pid" 2>/dev/null || true)"
-  if [ -n "$holder" ]; then
-    ! kill -0 "$holder" 2>/dev/null || busy "deploy already running (pid $holder)"
-  elif [ -z "$(find "$LOCK" -maxdepth 0 -mmin +10)" ]; then
-    busy "deploy lock is being taken"
-  fi
-  mv "$LOCK" "$LOCK.stale.$$" 2>/dev/null || busy "deploy lock reclaimed concurrently"
-  rm -rf "$LOCK.stale.$$"
+  if [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null; then busy "deploy already running (pid $holder)"; fi
+  rm -rf "$LOCK"
   mkdir "$LOCK" 2>/dev/null || busy "deploy lock taken concurrently"
 fi
 echo $$ >"$LOCK/pid"
-RUNTIME=daemon
 LEASE_OWNER=""
+if [ -s "$STATE/lease-owner" ]; then
+  LEASE_OWNER="$(cat "$STATE/lease-owner")"
+fi
 
 health_url_is_loopback() {
   [[ "$HEALTH_URL" =~ ^http://(127\.0\.0\.1|localhost|\[::1\])(:[0-9]+)?$ ]]
@@ -148,421 +94,70 @@ lease_request() {
       -H "Origin: $HEALTH_URL" -H 'Content-Type: application/json' "$@" "$HEALTH_URL/api/server/deploy/lease"
 }
 
-refuse_lease_status() {
-  local status="$1" cause
-  case "$status" in
-    404) refuse "server lacks the deployment lease endpoint (HTTP 404); bootstrap server-only first" ;;
-    401 | 403)
-      if ! health_url_is_loopback; then
-        cause="it is sent only to a loopback CAIRN_HEALTH_URL, not $HEALTH_URL"
-      elif [ ! -r "$TOKEN_FILE" ]; then
-        cause="that file is missing or unreadable"
-      elif [ -z "$(owner_token)" ]; then
-        cause="that file has no CAIRN_TOKEN value"
-      else
-        cause="the server did not accept it"
-      fi
-      refuse "server rejected the deployment lease request (HTTP $status); the owner token is read from $TOKEN_FILE and $cause" ;;
-    000 | '') refuse "no response to the deployment lease request at $HEALTH_URL within 10s" ;;
-    *) refuse "deployment lease request answered HTTP $status" ;;
-  esac
-}
-
-resume_claims() {
+release_lease() {
   [ -n "$LEASE_OWNER" ] || return 0
   [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || return 1
   lease_request -X DELETE --data-binary "{\"owner\":\"$LEASE_OWNER\"}" >/dev/null 2>&1 || true
   local tables
-  tables="$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'")" || return 1
+  tables="$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'" 2>/dev/null || echo 0)"
   if [ "$tables" = 1 ]; then
     sqlite3 -cmd '.timeout 10000' "$DB" "update deploy_lease set status='accepting', expiresAt=0 where id='server' and owner='$LEASE_OWNER';" || return 1
-    [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 0 ] || return 1
   fi
-  log "claims resumed: owned deployment lease released and read back"
   rm -f "$STATE/lease-owner"
   LEASE_OWNER=""
 }
 
 cleanup() {
   local status=$?
-  if [ "$status" != 0 ] && [ -f "$STATE/in-progress" ] && grep -qx 'phase=building' "$STATE/in-progress"; then
-    switch_code "$PREVIOUS" || log "CRITICAL: restoring the previous checkout failed"
-    clear_in_progress
-  fi
-  if ! resume_claims; then
-    echo "CRITICAL: claims resume failed; recover $STATE/lease-owner" >&2
-    status=3
+  if ! release_lease; then
+    echo "CRITICAL: deployment lease resume failed" >&2
+    status=$EXIT_ROLLBACK_UNHEALTHY
   fi
   rm -rf "$LOCK"
-  rm -f "$RUNNING_COPY"
+  if [ "${CAIRN_DEPLOY_COPY_DIR:-}" = "$RUNNING_DIR" ]; then rm -rf "$RUNNING_DIR"; fi
   exit "$status"
 }
 trap cleanup EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
-if [ -s "$STATE/lease-owner" ]; then
-  LEASE_OWNER="$(cat "$STATE/lease-owner")"
-  [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || refuse "invalid recovery lease owner"
-  if [ ! -e "$STATE/in-progress" ]; then resume_claims || exit 3; fi
-fi
-rm -f "$STATE/last-reason"
 
-run_notify() {
-  local record="$1" status=0
-  [ -e "$NOTIFY_HOOK" ] || return 0
-  if [ ! -x "$NOTIFY_HOOK" ]; then
-    log "deploy notify skipped: $NOTIFY_HOOK is not executable"
-    return 0
-  fi
-  log "deploy notify $NOTIFY_HOOK"
-  if command -v timeout >/dev/null 2>&1; then
-    printf '%s' "$record" | timeout "$NOTIFY_TIMEOUT" "$NOTIFY_HOOK" || status=$?
-  else
-    printf '%s' "$record" | "$NOTIFY_HOOK" || status=$?
-  fi
-  [ "$status" -eq 0 ] || log "deploy notify exited $status (ignored)"
-  return 0
+service_stop() {
+  case "$SERVICE_MANAGER" in
+    systemd) systemctl --user stop "$SYSTEMD_UNIT" ;;
+    launchd)
+      local target="gui/$(id -u)/$LAUNCHD_LABEL" i
+      if launchctl print "$target" >/dev/null 2>&1; then
+        launchctl bootout "$target" || ! launchctl print "$target" >/dev/null 2>&1 || return 1
+        for i in $(seq 1 30); do
+          launchctl print "$target" >/dev/null 2>&1 || return 0
+          sleep 0.5
+        done
+        return 1
+      fi
+      ;;
+    *) echo "unknown service manager $SERVICE_MANAGER" >&2; return 2 ;;
+  esac
 }
 
-write_record() {
-  local sha="$1" previous="$2" result="$3" failed="${4:-}" snapshot="${5:-}"
-  local record
-  if [ "$result" = deployed ]; then
-    resume_claims || return 1
-    install_host_tools "$sha" "$previous"
-  fi
-  record="$(printf '{"sha":"%s","previous":"%s","result":"%s","failed":"%s","snapshot":"%s","at":"%s","host":"%s"}\n' \
-    "$sha" "$previous" "$result" "$failed" "$snapshot" "$(date -u +%FT%TZ)" "$MACHINE_NAME")"
-  printf '%s' "$record" >"$STATE/deployed.json.tmp" && mv "$STATE/deployed.json.tmp" "$STATE/deployed.json"
-  printf '%s' "$record" >"$DATA_DIR/deploy.json.tmp" && mv "$DATA_DIR/deploy.json.tmp" "$DATA_DIR/deploy.json"
-  run_notify "$record"
-}
-
-mark_failed() {
-  mkdir -p "$STATE/failed"
-  echo "$2" >"$STATE/failed/$1"
-}
-
-install_host_tools() {
-  local target="$1" previous="${2:-}" rel dest source kept="" units_changed="" new_timers="" was_missing timer
-  mkdir -p "$HOST_TOOLS_ROOT" "$HOST_LANES_ROOT" "$HOST_BIN_ROOT" "$HOST_UNITS_ROOT" || { log "host tools: cannot create the host roots"; return 0; }
-  while IFS= read -r rel; do
-    [ -n "$rel" ] || continue
-    case "$rel" in
-      scripts/ops/host/tools/*) dest="$HOST_TOOLS_ROOT/${rel#scripts/ops/host/tools/}" ;;
-      scripts/ops/host/lanes/*) dest="$HOST_LANES_ROOT/${rel#scripts/ops/host/lanes/}" ;;
-      scripts/ops/host/bin/*) dest="$HOST_BIN_ROOT/${rel#scripts/ops/host/bin/}" ;;
-      scripts/ops/host/units/*) dest="$HOST_UNITS_ROOT/${rel#scripts/ops/host/units/}" ;;
-      packages/shared/commit-identity.json) dest="$HOST_TOOLS_ROOT/app-token/${rel##*/}" ;;
-      *) continue ;;
-    esac
-    source="$CHECKOUT/$rel"
-    if [ -f "$dest" ] && cmp -s "$source" "$dest"; then
-      continue
-    fi
-    if [ -f "$dest" ] && [ -n "$previous" ] && git -C "$CHECKOUT" cat-file -e "$previous:$rel" 2>/dev/null &&
-      [ "$(git -C "$CHECKOUT" rev-parse "$previous:$rel" 2>/dev/null)" = "$(git hash-object "$dest")" ]; then
-      :
-    elif [ -f "$dest" ]; then
-      kept="$kept $dest"
-      continue
-    fi
-    mkdir -p "$(dirname "$dest")" || continue
-    was_missing=0
-    [ -e "$dest" ] || was_missing=1
-    if cp "$source" "$dest.tmp.$$" && mv "$dest.tmp.$$" "$dest"; then
-      case "$rel" in
-        scripts/ops/host/bin/* | *.sh) chmod 755 "$dest" ;;
-        *) if [ -x "$source" ]; then chmod 755 "$dest"; else chmod 644 "$dest"; fi ;;
-      esac
-    else
-      rm -f "$dest.tmp.$$"
-      log "host tools: cannot write $dest"
-      continue
-    fi
-    case "$rel" in
-      scripts/ops/host/units/*.timer)
-        units_changed=1
-        [ "$was_missing" = 0 ] || new_timers="$new_timers $(basename "$rel")" ;;
-      scripts/ops/host/units/*) units_changed=1 ;;
-    esac
-  done < <(git -C "$CHECKOUT" ls-tree -r --name-only "$target" -- scripts/ops/host/tools scripts/ops/host/lanes scripts/ops/host/bin scripts/ops/host/units packages/shared/commit-identity.json)
-  if [ -n "$units_changed" ]; then
-    systemctl --user daemon-reload || log "host tools: daemon-reload failed"
-    for timer in $new_timers; do
-      systemctl --user enable --now "$timer" || log "host tools: cannot enable $timer"
-    done
-  fi
-  printf '%s\n' "$target" >"$HOST_TOOLS_ROOT/.installed-sha" 2>/dev/null || true
-  printf '%s\n' "$target" >"$STATE/host-tools-sha" 2>/dev/null || true
-  if [ -n "$kept" ]; then
-    log "host tools: kept hand-edited files:$kept"
-    host_tools_alarm "$kept"
-  else
-    rm -f "$STATE/alarms/host-tools-edited"
-  fi
-}
-
-host_tools_alarm() {
-  local kept="$1" reason="host-tools-edited" open_issue body
-  mkdir -p "$STATE/alarms" || return 0
-  [ ! -e "$STATE/alarms/$reason" ] || return 0
-  body="$reason: on $MACHINE_NAME these host files differ from both the previous and the new main:$(printf ' %s' $kept). They were kept; move the change upstream or delete them by hand."
-  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$HOST_TOOLS_ALARM_TITLE\" in:title" --json number --jq '.[0].number // empty')" || return 0
-  if [ -n "$open_issue" ]; then
-    gh issue comment "$open_issue" -R "$REPO" -b "$body" >/dev/null || return 0
-  else
-    gh issue create -R "$REPO" -t "$HOST_TOOLS_ALARM_TITLE" -b "$body" -a xiechimon >/dev/null || return 0
-  fi
-  touch "$STATE/alarms/$reason" || true
-}
-
-assert_hold() {
-  [ ! -e "$STATE/hold" ] || busy "hold: $(head -n1 "$STATE/hold")"
-}
-
-daemon_artifact() {
-  local rel
-  for rel in apps/daemon/dist/cli.mjs apps/daemon/package.json pnpm-lock.yaml; do
-    if [ -f "$CHECKOUT/$rel" ]; then
-      printf '%s %s\n' "$rel" "$(sha256sum <"$CHECKOUT/$rel" | cut -d' ' -f1)"
-    else
-      printf '%s missing\n' "$rel"
-    fi
-  done | sha256sum | cut -d' ' -f1
-}
-
-
-assert_lease() {
-  python3 - "$STATE/lease-response" "$LEASE_OWNER" <<'PYLEASE'
-import json, sys, time
-with open(sys.argv[1]) as response:
-    lease = json.load(response)
-assert lease['owner'] == sys.argv[2] and lease['status'] == 'draining'
-assert lease['expiresAt'] > time.time() * 1000
-PYLEASE
-}
-
-wait_for_steps() {
-  local wait_seconds="${1:-$STEP_WAIT_SECONDS}" on_deadline="${2:-starve}" deadline running
-  deadline=$(( $(date +%s) + wait_seconds ))
-  while :; do
-    [ "$(sqlite3 -readonly "$DB" "select count(*) from deploy_lease where id='server' and owner='$LEASE_OWNER' and status='draining' and expiresAt > $(($(date +%s) * 1000))")" = 1 ] || refuse "deployment lease lost during drain"
-    running="$(sqlite3 -readonly "$DB" "select count(*) from step where status='claimed' and machineId is not null")" || refuse "cannot read running steps"
-    [[ "$running" =~ ^[0-9]+$ ]] || refuse "invalid running step count"
-    [ "$running" != 0 ] || return 0
-    if [ "$(date +%s)" -ge "$deadline" ]; then
-      [ "$on_deadline" = restart ] || busy "starved: steps never idle ($running still running after ${wait_seconds}s drain)"
-      log "drain deadline passed after ${wait_seconds}s; restarting the server with $running claimed steps still running"
-      return 0
-    fi
-    sleep 1
-  done
-}
-
-wait_for_computer_calls() {
-  local deadline=$(( $(date +%s) + STEP_WAIT_SECONDS )) open
-  [ "$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='computer_call'")" = 1 ] || return 0
-  while :; do
-    open="$(sqlite3 -readonly "$DB" "select count(*) from computer_call where state in ('dispatched','running') and tool <> 'request_takeover'")" || refuse "cannot read open computer calls"
-    [[ "$open" =~ ^[0-9]+$ ]] || refuse "invalid open computer call count"
-    [ "$open" != 0 ] || return 0
-    [ "$(date +%s)" -lt "$deadline" ] || busy "starved: computer calls never idle ($open still open after ${STEP_WAIT_SECONDS}s drain)"
-    sleep 1
-  done
-}
-
-drain_steps() {
-  if [ "$RUNTIME" = server ]; then
-    local probe
-    probe="$(lease_request)" || true
-    case "$probe" in
-      200) ;;
-      000 | '' | 404)
-        log "restarting the server without a drain: the deployment lease request answered ${probe:-nothing}"
-        return 0
-        ;;
-      *) refuse_lease_status "$probe" ;;
-    esac
-  fi
-  [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
-  printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
-  local status
-  status="$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" || true
-  [ "$status" = 200 ] || refuse_lease_status "$status"
-  assert_lease || refuse "cannot acquire deployment lease: the server returned another owner or an expired lease"
-  if [ "$RUNTIME" = daemon ]; then
-    wait_for_steps
-  else
-    wait_for_steps "$SERVER_STEP_WAIT_SECONDS" restart
-  fi
-}
-
-WORKSPACE_BUILD_GUARD='
-import { createRequire } from "node:module";
-const { parseDocument } = createRequire(process.argv[1])("yaml");
-const reasons = [];
-const read = (text, label) => {
-  const document = parseDocument(text, { uniqueKeys: true });
-  const problems = [...document.errors, ...document.warnings];
-  if (problems.length > 0) {
-    reasons.push(`${label} pnpm-workspace.yaml does not parse cleanly: ${String(problems[0].message).split("\n")[0]}`);
-    return {};
-  }
-  return document.toJS() ?? {};
-};
-const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-const hasMergeKey = (value) =>
-  Array.isArray(value)
-    ? value.some(hasMergeKey)
-    : plain(value) && Object.entries(value).some(([key, child]) => key === "<<" || hasMergeKey(child));
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const booleans = (map) => plain(map) && Object.values(map).every((value) => typeof value === "boolean");
-const previous = read(process.argv[2], "previous");
-const target = read(process.argv[3], "target");
-if (!plain(previous) || !plain(target)) {
-  reasons.push("pnpm-workspace.yaml is not a mapping");
-} else {
-  if (hasMergeKey(target)) reasons.push("target pnpm-workspace.yaml uses a merge key");
-  for (const key of new Set([...Object.keys(previous), ...Object.keys(target)])) {
-    if (key !== "allowBuilds" && /build|script|pnpmfile|hook|config.?dependenc/i.test(key) && !same(previous[key], target[key])) {
-      reasons.push(`${key} changed`);
-    }
-  }
-  const before = previous.allowBuilds ?? {};
-  const after = target.allowBuilds ?? {};
-  if (!booleans(before) || !booleans(after)) {
-    if (!same(before, after)) reasons.push("allowBuilds changed and is not a map of booleans");
-  } else {
-    for (const [name, allowed] of Object.entries(after)) {
-      if (allowed && before[name] !== true) reasons.push(`allowBuilds permits ${name}`);
-    }
-    for (const [name, allowed] of Object.entries(before)) {
-      if (!allowed && after[name] !== false) reasons.push(`allowBuilds stops denying ${name}`);
-    }
-  }
-}
-if (reasons.length > 0) {
-  console.log(reasons.join("; "));
-  process.exit(1);
-}
-'
-
-MANIFEST_HOOK_GUARD='
-import { execFileSync } from "node:child_process";
-const [checkout, previous, target, ...manifests] = process.argv.slice(1);
-const installHook = /install|prepare|prepublish|^pnpm:/i;
-const reasons = [];
-const plain = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const read = (sha, path) => {
-  const listed = execFileSync("git", ["-C", checkout, "ls-tree", "-z", sha, "--", path], { encoding: "utf8" });
-  if (listed === "") return {};
-  if (!/^100(644|755) blob /.test(listed)) {
-    reasons.push(`${path} is not a regular file at ${sha.slice(0, 12)}`);
-    return {};
-  }
-  const text = execFileSync("git", ["-C", checkout, "show", `${sha}:${path}`], { encoding: "utf8" });
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    reasons.push(`${path} does not parse at ${sha.slice(0, 12)}: ${error.message}`);
-    return {};
-  }
-};
-for (const path of manifests) {
-  const before = read(previous, path);
-  const after = read(target, path);
-  if (!plain(before) || !plain(after)) {
-    reasons.push(`${path} is not a JSON object`);
-    continue;
-  }
-  if (!same(before.pnpm, after.pnpm)) reasons.push(`${path}: pnpm settings changed`);
-  const beforeScripts = before.scripts ?? {};
-  const afterScripts = after.scripts ?? {};
-  if (!plain(beforeScripts) || !plain(afterScripts)) {
-    if (!same(beforeScripts, afterScripts)) reasons.push(`${path}: scripts changed and is not an object`);
-    continue;
-  }
-  for (const [name, command] of Object.entries(afterScripts)) {
-    if (installHook.test(name) && (!Object.hasOwn(beforeScripts, name) || !same(beforeScripts[name], command))) {
-      reasons.push(`${path}: ${name}`);
-    }
-  }
-}
-if (reasons.length > 0) {
-  console.log(reasons.join("; "));
-  process.exit(1);
-}
-'
-
-assert_deployable() {
-  git -C "$CHECKOUT" fetch -q origin main
-  git -C "$CHECKOUT" cat-file -e "$TARGET^{commit}" 2>/dev/null || refuse "$TARGET is not on origin/main"
-  git -C "$CHECKOUT" merge-base --is-ancestor "$TARGET" origin/main || refuse "$TARGET is not on origin/main"
-
-  local ci checks name
-  ci="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$TARGET&per_page=1" \
-    --jq '.workflow_runs[0] | [.head_sha, .head_branch, .event, .status, .conclusion] | @tsv')" ||
-    refuse "cannot read main push CI for $TARGET"
-  [ "$ci" = "$TARGET"$'\tmain\tpush\tcompleted\tsuccess' ] || refuse "main push CI is not successful on $TARGET"
-  checks="$(gh api --paginate "repos/$REPO/commits/$TARGET/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')"
-  for name in $REQUIRED_CHECKS; do
-    grep -qxF "$name"$'\t'success <<<"$checks" || refuse "required check $name is not green on $TARGET"
-  done
-
-  local previous_workspace target_workspace build_changes
-  previous_workspace="$(git -C "$CHECKOUT" show "$PREVIOUS:pnpm-workspace.yaml")" ||
-    refuse "cannot read pnpm-workspace.yaml at $PREVIOUS"
-  target_workspace="$(git -C "$CHECKOUT" show "$TARGET:pnpm-workspace.yaml")" ||
-    refuse "cannot read pnpm-workspace.yaml at $TARGET"
-  build_changes="$(node --input-type=module -e "$WORKSPACE_BUILD_GUARD" "$CHECKOUT/package.json" \
-    "$previous_workspace" "$target_workspace" 2>&1)" ||
-    refuse "pnpm-workspace.yaml may permit new install scripts; deploy by hand after review: ${build_changes:-the build settings guard failed}"
-  local manifest_list hooks
-  local -a manifests=()
-  manifest_list="$(mktemp "$STATE/manifests.XXXXXX")"
-  git -C "$CHECKOUT" diff -z --name-only --no-renames "$PREVIOUS" "$TARGET" -- package.json ':(glob)**/package.json' >"$manifest_list" || {
-    rm -f "$manifest_list"
-    refuse "cannot list package.json changes between $PREVIOUS and $TARGET"
-  }
-  mapfile -d '' -t manifests <"$manifest_list"
-  rm -f "$manifest_list"
-  if [ "${#manifests[@]}" -gt 0 ]; then
-    hooks="$(node --input-type=module -e "$MANIFEST_HOOK_GUARD" "$CHECKOUT" "$PREVIOUS" "$TARGET" "${manifests[@]}" 2>&1)" ||
-      refuse "install hooks in package.json may be added or changed; deploy by hand after review: ${hooks:-the install hook guard failed}"
-  fi
-  hooks="$(git -C "$CHECKOUT" diff --name-only "$PREVIOUS" "$TARGET" -- .pnpmfile.cjs .pnpmfile.mjs .npmrc '*/.npmrc' \
-    package.yaml package.json5 ':(glob)**/package.yaml' ':(glob)**/package.json5' binding.gyp ':(glob)**/binding.gyp')" ||
-    refuse "cannot list pnpm config changes between $PREVIOUS and $TARGET"
-  [ -z "$hooks" ] || refuse "install hooks or pnpm config changed; deploy by hand after review: $hooks"
-}
-
-rehearse_migrations() {
-  local tree="$SCRATCH/tree" copy="$SCRATCH/server.db"
-  rm -rf "$SCRATCH"
-  mkdir -p "$SCRATCH" || return 1
-  git -C "$CHECKOUT" worktree prune
-  git -C "$CHECKOUT" worktree add -q --detach "$tree" "$TARGET" || return 1
-  local result=0
-  sqlite3 "$DB" ".backup '$copy'" &&
-    [ "$(sqlite3 "$copy" 'select count(*) from __drizzle_migrations')" -gt 0 ] &&
-    (cd "$tree" && pnpm install --frozen-lockfile --reporter=silent) &&
-    (cd "$tree/apps/server" && node --import tsx --input-type=module \
-      -e 'const { openDbWithHandle } = await import(process.argv[1]); openDbWithHandle(process.argv[2]).close();' \
-      "$tree/apps/server/src/db/client.ts" "$copy") &&
-    [ "$(sqlite3 "$copy" 'pragma integrity_check')" = ok ] &&
-    [ -z "$(sqlite3 "$copy" 'pragma foreign_key_check')" ] || result=1
-  git -C "$CHECKOUT" worktree remove --force "$tree" || true
-  rm -rf "$SCRATCH"
-  return "$result"
-}
-
-switch_code() {
-  git -C "$CHECKOUT" checkout -q --detach "$1" &&
-    (cd "$CHECKOUT" && pnpm install --frozen-lockfile --reporter=silent) &&
-    (cd "$CHECKOUT" && pnpm -C apps/daemon build) &&
-    (cd "$CHECKOUT" && pnpm -C apps/web build)
+service_start() {
+  case "$SERVICE_MANAGER" in
+    systemd) systemctl --user start "$SYSTEMD_UNIT" ;;
+    launchd)
+      local domain="gui/$(id -u)" target="gui/$(id -u)/$LAUNCHD_LABEL" i
+      if launchctl print "$target" >/dev/null 2>&1; then
+        launchctl kickstart -k "$target"
+        return $?
+      fi
+      for i in 1 2 3; do
+        if launchctl bootstrap "$domain" "$LAUNCHD_PLIST"; then
+          return 0
+        fi
+        [ "$i" -lt 3 ] && sleep 1
+      done
+      return 1
+      ;;
+    *) echo "unknown service manager $SERVICE_MANAGER" >&2; return 2 ;;
+  esac
 }
 
 probe() {
@@ -583,133 +178,156 @@ server_healthy() {
   return 1
 }
 
-daemon_healthy() {
-  local since_ms="$1" i seen
-  for ((i = 0; i < HEALTH_TRIES; i++)); do
-    seen="$(sqlite3 -readonly "$DB" "select coalesce(max(lastSeenAt), 0) from machine where name = '$MACHINE_NAME'")"
-    [ "${seen:-0}" -ge "$since_ms" ] && return 0
-    sleep "$HEALTH_INTERVAL"
-  done
-  return 1
+real_path() {
+  node -e 'process.stdout.write(require("node:fs").realpathSync(process.argv[1]))' "$1"
 }
 
-unit_alarm() {
-  local unit="$1" slug="$2" action="$3" title="$4" reason open_issue
-  reason="$slug-unit-$action-failed"
-  echo "$reason: $unit; continuing the deploy" >&2
-  mkdir -p "$STATE/alarms" || return 0
-  [ ! -e "$STATE/alarms/$reason" ] || return 0
-  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$title\" in:title" --json number --jq '.[0].number // empty')" || return 0
-  if [ -n "$open_issue" ]; then
-    gh issue comment "$open_issue" -R "$REPO" -b "$reason: $unit on $MACHINE_NAME. Core deployment continues; inspect the unit logs." >/dev/null || return 0
-  else
-    gh issue create -R "$REPO" -t "$title" -b "$reason: $unit on $MACHINE_NAME. Core deployment continues; inspect the unit logs." -a xiechimon >/dev/null || return 0
-  fi
-  touch "$STATE/alarms/$reason" || true
+atomic_link() {
+  local target="$1" tmp="$APP_ROOT.next.$$"
+  rm -f "$tmp"
+  ln -s "$target" "$tmp" || return 1
+  node -e 'require("node:fs").renameSync(process.argv[1], process.argv[2])' "$tmp" "$APP_ROOT" || {
+    rm -f "$tmp"
+    return 1
+  }
 }
 
-unit_recovered() {
-  local slug="$1" action
-  shift
-  for action in "$@"; do rm -f "$STATE/alarms/$slug-unit-$action-failed"; done
+set_in_progress() {
+  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\nrelease=%s\nprevious_release=%s\n' \
+    "$1" "$TARGET" "$PREVIOUS" "${2:-}" "${3:-}" "${4:-}" >"$IN_PROGRESS.tmp"
+  mv "$IN_PROGRESS.tmp" "$IN_PROGRESS"
 }
 
-optional_unit_healthy() {
-  local unit="$1" previous="" current streak=0 i
-  for ((i = 0; i < HEALTH_TRIES; i++)); do
-    current="$(systemctl --user show "$unit" -p ActiveState -p SubState -p MainPID -p NRestarts)" || current=""
-    if grep -qxF 'ActiveState=active' <<<"$current" &&
-      grep -qxF 'SubState=running' <<<"$current" &&
-      grep -qE '^MainPID=[1-9][0-9]*$' <<<"$current" &&
-      grep -qE '^NRestarts=[0-9]+$' <<<"$current"; then
-      if [ "$current" = "$previous" ]; then streak=$((streak + 1)); else streak=1; fi
-      previous="$current"
-      [ "$streak" -ge 3 ] && return 0
-    else
-      streak=0
-      previous=""
+clear_in_progress() { rm -f "$IN_PROGRESS"; }
+
+mark_failed() {
+  mkdir -p "$STATE/failed"
+  echo "$2" >"$STATE/failed/$1"
+}
+
+recorded() {
+  sed -nE "s/.*\"$1\":\"([^\"]*)\".*/\1/p" "$STATE/deployed.json" 2>/dev/null
+}
+
+write_record() {
+  local sha="$1" previous="$2" result="$3" failed="${4:-}" snapshot="${5:-}" record
+  if [ "$result" = deployed ]; then release_lease || return 1; fi
+  record="$(printf '{"sha":"%s","previous":"%s","result":"%s","failed":"%s","snapshot":"%s","at":"%s","host":"%s"}\n' \
+    "$sha" "$previous" "$result" "$failed" "$snapshot" "$(date -u +%FT%TZ)" "$MACHINE_NAME")"
+  printf '%s' "$record" >"$STATE/deployed.json.tmp" && mv "$STATE/deployed.json.tmp" "$STATE/deployed.json"
+  printf '%s' "$record" >"$DATA_DIR/deploy.json.tmp" && mv "$DATA_DIR/deploy.json.tmp" "$DATA_DIR/deploy.json"
+}
+
+active_coordinator_count() {
+  local chief=0 computer=0 kind_column
+  if [ -s "$DB" ]; then
+    kind_column="$(sqlite3 -readonly "$DB" "select count(*) from pragma_table_info('step') where name='kind'" 2>/dev/null || echo 0)"
+    if [ "$kind_column" = 1 ]; then
+      chief="$(sqlite3 -readonly "$DB" "select count(*) from step where kind='chief' and status='claimed' and machineId is null" 2>/dev/null || echo 0)"
     fi
-    sleep "$HEALTH_INTERVAL"
-  done
-  return 1
-}
-
-STOP_FAILED=""
-
-stop_optional_unit() {
-  local unit="$1" slug="$2" title="$3"
-  systemctl --user is-enabled --quiet "$unit" || return 0
-  if systemctl --user stop "$unit"; then
-    STOP_FAILED="${STOP_FAILED/ $slug/}"
-    unit_recovered "$slug" stop
-  else
-    STOP_FAILED="$STOP_FAILED $slug"
-    unit_alarm "$unit" "$slug" stop "$title"
+    computer="$(sqlite3 -readonly "$DB" "select count(*) from computer_call where state in ('dispatched','running') and tool <> 'request_takeover'" 2>/dev/null || echo 0)"
   fi
+  echo $((chief + computer))
 }
 
-start_optional_unit() {
-  local unit="$1" slug="$2" title="$3"
-  systemctl --user is-enabled --quiet "$unit" || return 0
-  if [[ "$STOP_FAILED" == *" $slug"* ]]; then
-    if systemctl --user restart "$unit" && optional_unit_healthy "$unit"; then
-      unit_recovered "$slug" stop start
-    else
-      unit_alarm "$unit" "$slug" start "$title"
+acquire_lease() {
+  [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(node -e 'process.stdout.write(crypto.randomUUID())')"
+  printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
+  local status
+  status="$(lease_request -X PUT --data-binary "{\"owner\":\"$LEASE_OWNER\",\"ttlMs\":3600000}")" || true
+  case "$status" in
+    200) ;;
+    404) refuse "server lacks the deployment lease endpoint" ;;
+    000 | '') refuse "no response to the deployment lease request" ;;
+    *) refuse "deployment lease request answered HTTP $status" ;;
+  esac
+}
+
+wait_for_coordinator() {
+  local deadline=$(( $(date +%s) + COORDINATOR_WAIT_SECONDS )) open
+  while :; do
+    open="$(active_coordinator_count)"
+    [[ "$open" =~ ^[0-9]+$ ]] || refuse "invalid active Coordinator count"
+    [ "$open" = 0 ] && return 0
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      busy "active Coordinator turn or computer call still open ($open after ${COORDINATOR_WAIT_SECONDS}s)"
     fi
-  elif systemctl --user start "$unit" && optional_unit_healthy "$unit"; then
-    unit_recovered "$slug" start
-  else
-    unit_alarm "$unit" "$slug" start "$title"
+    sleep 1
+  done
+}
+
+package_manager() {
+  node -e 'const p=JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")); process.stdout.write(p.packageManager)' \
+    "$BUILD_CHECKOUT/package.json"
+}
+
+check_out_target() {
+  git -C "$BUILD_CHECKOUT" fetch -q origin main
+  git -C "$BUILD_CHECKOUT" checkout -q --detach "$TARGET"
+}
+
+install_dependencies() {
+  local pkg
+  pkg="$(package_manager)"
+  (cd "$BUILD_CHECKOUT" && npx -y "$pkg" install --frozen-lockfile --ignore-scripts --reporter=silent)
+}
+
+build_target() {
+  local pkg
+  pkg="$(package_manager)"
+  (cd "$BUILD_CHECKOUT" && node apps/server/build.mjs)
+  (cd "$BUILD_CHECKOUT" && npx -y "$pkg" --filter @cairn/web build)
+}
+
+rehearse_migrations() {
+  local copy="$SCRATCH/server.db"
+  rm -rf "$SCRATCH"
+  mkdir -p "$SCRATCH" || return 1
+  sqlite3 "$DB" ".backup '$copy'" || return 1
+  [ "$(sqlite3 "$copy" 'select count(*) from __drizzle_migrations')" -gt 0 ] || return 1
+  (cd "$BUILD_CHECKOUT" && node --import tsx --input-type=module \
+    -e 'const { openDbWithHandle } = await import(process.argv[1]); openDbWithHandle(process.argv[2]).close();' \
+    "$BUILD_CHECKOUT/apps/server/src/db/client.ts" "$copy") || return 1
+  [ "$(sqlite3 "$copy" 'pragma integrity_check')" = ok ] || return 1
+  [ -z "$(sqlite3 "$copy" 'pragma foreign_key_check')" ] || return 1
+  rm -rf "$SCRATCH"
+}
+
+stage_release() {
+  RELEASE_DIR="$RELEASES/$(date -u +%Y%m%dT%H%M%SZ)-${TARGET:0:12}"
+  node "$OPS_DIR/stage-server-artifact.mjs" "$BUILD_CHECKOUT" "$RELEASE_DIR" "$TARGET" || return 1
+  local sidecar
+  for sidecar in "$PREVIOUS_RELEASE"/tsnet-sidecar*; do
+    [ ! -f "$sidecar" ] || cp -p "$sidecar" "$RELEASE_DIR/" || return 1
+  done
+}
+
+deployed_sha() {
+  local raw=""
+  [ -f "$APP_ROOT/DEPLOYED_SHA" ] && raw="$(head -n1 "$APP_ROOT/DEPLOYED_SHA" | tr -d '[:space:]')"
+  [ -n "$raw" ] || return 1
+  git -C "$BUILD_CHECKOUT" rev-parse --verify "$raw^{commit}" 2>/dev/null
+}
+
+prepare_previous_release() {
+  PREVIOUS_RELEASE=""
+  if [ -L "$APP_ROOT" ] || [ ! -d "$APP_ROOT" ]; then
+    [ -e "$APP_ROOT" ] || refuse "application path $APP_ROOT does not exist"
+    PREVIOUS_RELEASE="$(real_path "$APP_ROOT")"
+    [ -f "$PREVIOUS_RELEASE/DEPLOYED_SHA" ] || refuse "active release has no DEPLOYED_SHA"
+    return 0
   fi
+  PREVIOUS_RELEASE="$RELEASES/legacy-$(date -u +%Y%m%dT%H%M%SZ)-${PREVIOUS:0:12}"
+  [ ! -e "$PREVIOUS_RELEASE" ] || refuse "legacy release path already exists"
+  mkdir -p "$PREVIOUS_RELEASE" || refuse "cannot create legacy release"
+  rsync -a "$APP_ROOT/" "$PREVIOUS_RELEASE/" || refuse "cannot copy the legacy application directory"
+  printf '%s\n' "$PREVIOUS" >"$PREVIOUS_RELEASE/DEPLOYED_SHA"
 }
 
-stop_services() {
-  if [ "$RUNTIME" = daemon ]; then
-    stop_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-    systemctl --user stop "$DAEMON_UNIT" || return 1
-  fi
-  systemctl --user stop "$SERVER_UNIT"
-}
-
-start_and_check() {
-  local started_ms
-  [ -s "$DB" ] || { echo "refusing to start services: $DB is missing" >&2; return 1; }
-  systemctl --user start "$SERVER_UNIT"
-  server_healthy || return 1
-  started_ms="$(($(date +%s) * 1000))"
-  if [ "$RUNTIME" = daemon ]; then
-    systemctl --user start "$DAEMON_UNIT" || return 1
-    start_optional_unit "$ORB_UNIT" orb "$ORB_ALARM_TITLE"
-  fi
-  daemon_healthy "$started_ms" || return 1
-  return 0
-}
-
-PREVIOUS_BUILT=0
-
-build_previous() {
-  [ "$PREVIOUS_BUILT" = 1 ] && return 0
-  switch_code "$PREVIOUS" || return 1
-  PREVIOUS_BUILT=1
-}
-
-restart_previous() {
-  log "restarting $PREVIOUS: $1"
-  build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
-  if start_and_check; then
-    clear_in_progress
-    echo "$1; restarted $PREVIOUS with its DB untouched" >&2
-    exit 1
-  fi
-  write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" ""
-  clear_in_progress
-  echo "CRITICAL: $1, and $PREVIOUS did not come back healthy" >&2
-  exit "$EXIT_ROLLBACK_UNHEALTHY"
-}
-
-prune_snapshots() {
-  find "$BACKUPS" -maxdepth 1 -name 'stopped-*.db' -print | sort -r | tail -n +"$((KEEP_SNAPSHOTS + 1))" | xargs -r rm -f
+snapshot_db() {
+  SNAPSHOT="$BACKUPS/predeploy-$(date -u +%Y%m%dT%H%M%SZ)-${PREVIOUS:0:12}.db"
+  sqlite3 "$DB" ".backup '$SNAPSHOT'" || return 1
+  [ "$(sqlite3 -readonly "$SNAPSHOT" 'pragma integrity_check')" = ok ] || return 1
 }
 
 UNTRACKED_TABLES=" __drizzle_migrations deploy_lease "
@@ -760,235 +378,180 @@ writes_after_snapshot() {
   return 1
 }
 
-stop_or_give_up() {
-  stop_services && return 0
-  write_record "$TARGET" "$PREVIOUS" rollback-unhealthy "$TARGET" "$1"
+restore_snapshot() {
+  local snapshot="$1" failed_dir="$2" file
+  [ -s "$snapshot" ] || return 1
+  mkdir -p "$failed_dir" || return 1
+  for file in server.db server.db-wal server.db-shm; do
+    [ ! -e "$DATA_DIR/$file" ] || mv "$DATA_DIR/$file" "$failed_dir/$file.$(date -u +%Y%m%dT%H%M%SZ).$$" || return 1
+  done
+  cp "$snapshot" "$DB.restoring" && mv "$DB.restoring" "$DB"
+}
+
+critical() {
+  write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "${SNAPSHOT:-}" || true
   clear_in_progress
-  echo "CRITICAL: could not stop services to roll back $TARGET; DB left in place, snapshot $1" >&2
+  echo "CRITICAL: $*" >&2
   exit "$EXIT_ROLLBACK_UNHEALTHY"
 }
 
+restart_previous() {
+  log "restarting $PREVIOUS: $1"
+  if [ -n "${PREVIOUS_RELEASE:-}" ]; then atomic_link "$PREVIOUS_RELEASE" || true; fi
+  if service_start && server_healthy; then
+    clear_in_progress
+    echo "$1; restarted $PREVIOUS with its DB untouched" >&2
+    exit 1
+  fi
+  critical "$1, and $PREVIOUS did not come back healthy"
+}
+
 roll_back() {
-  local snapshot="$1" reason="$2" failed_dir
+  local reason="$1" failed_dir
   log "rolling back to $PREVIOUS: $reason"
   mark_failed "$TARGET" "$reason"
-  stop_or_give_up "$snapshot"
-  if writes_after_snapshot "$snapshot"; then
+  service_stop || critical "could not stop services to roll back $TARGET"
+  atomic_link "$PREVIOUS_RELEASE" || critical "could not point the application path at $PREVIOUS_RELEASE"
+  if writes_after_snapshot "$SNAPSHOT"; then
     log "data changed after the snapshot; keeping the DB and rolling back code only"
-    if build_previous && start_and_check; then
-      write_record "$PREVIOUS" "$PREVIOUS" rolled-back-code "$TARGET" "$snapshot"
+    if service_start && server_healthy; then
+      write_record "$PREVIOUS" "$PREVIOUS" rolled-back-code "$TARGET" "$SNAPSHOT"
       clear_in_progress
       echo "deploy of $TARGET failed ($reason); rolled code back to $PREVIOUS and kept the DB, which changed after the snapshot" >&2
       exit 1
     fi
-    write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
-    clear_in_progress
-    echo "CRITICAL: $PREVIOUS is unhealthy on the DB that changed after the snapshot; kept that DB, snapshot $snapshot" >&2
-    exit "$EXIT_ROLLBACK_UNHEALTHY"
+    critical "$PREVIOUS is unhealthy on the DB that changed after the snapshot"
   fi
   failed_dir="$BACKUPS/failed-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET:0:12}"
-  set_in_progress restoring "$snapshot" "$failed_dir"
-  restore_snapshot "$snapshot" "$failed_dir" || {
-    write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
-    echo "CRITICAL: restoring $snapshot failed; failed DB in $failed_dir, deploy marker kept for --recover" >&2
-    exit "$EXIT_ROLLBACK_UNHEALTHY"
-  }
-  set_in_progress restored "$snapshot" "$failed_dir"
-  build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
-  if start_and_check; then
-    write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"
+  set_in_progress restoring "$SNAPSHOT" "$RELEASE_DIR" "$PREVIOUS_RELEASE"
+  restore_snapshot "$SNAPSHOT" "$failed_dir" || critical "restoring $SNAPSHOT failed; failed DB in $failed_dir"
+  set_in_progress restored "$SNAPSHOT" "$RELEASE_DIR" "$PREVIOUS_RELEASE"
+  if service_start && server_healthy; then
+    write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$SNAPSHOT"
     clear_in_progress
     echo "deploy of $TARGET failed ($reason); rolled back to $PREVIOUS, failed DB kept in $failed_dir" >&2
     exit 1
   fi
-  write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
-  clear_in_progress
-  echo "CRITICAL: rollback to $PREVIOUS is unhealthy; snapshot $snapshot, failed DB in $failed_dir" >&2
-  exit "$EXIT_ROLLBACK_UNHEALTHY"
+  critical "rollback to $PREVIOUS is unhealthy"
 }
 
-IN_PROGRESS="$STATE/in-progress"
-
-set_in_progress() {
-  printf 'phase=%s\ntarget=%s\nprevious=%s\nsnapshot=%s\nfailed=%s\nruntime=%s\n' "$1" "$TARGET" "$PREVIOUS" "${2:-}" "${3:-}" "$RUNTIME" >"$IN_PROGRESS.tmp"
-  mv "$IN_PROGRESS.tmp" "$IN_PROGRESS"
-}
-
-restore_snapshot() {
-  local snapshot="$1" failed_dir="$2" file lease_tables
-  [ -s "$snapshot" ] || return 1
-  mkdir -p "$failed_dir" || return 1
-  if [ -e "$DB" ] && ! cmp -s "$DB" "$snapshot"; then
-    for file in server.db server.db-wal server.db-shm; do
-      [ ! -e "$DATA_DIR/$file" ] || mv "$DATA_DIR/$file" "$failed_dir/$file.$(date -u +%Y%m%dT%H%M%SZ).$$" || return 1
-    done
-  fi
-  rm -f "$DB-wal" "$DB-shm"
-  if [ ! -e "$DB" ]; then
-    cp "$snapshot" "$DB.restoring" && mv "$DB.restoring" "$DB" || return 1
-  fi
-  if [ -n "$LEASE_OWNER" ]; then
-    lease_tables="$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'")" || return 1
-    if [ "$lease_tables" = 1 ]; then
-      sqlite3 -cmd '.timeout 10000' "$DB" "insert into deploy_lease(id,owner,status,expiresAt) values ('server','$LEASE_OWNER','draining',$(($(date +%s) * 1000 + 3600000)))
-        on conflict(id) do update set owner=excluded.owner,status=excluded.status,expiresAt=excluded.expiresAt;" || return 1
-    fi
-  fi
-}
-
-clear_in_progress() {
-  rm -f "$IN_PROGRESS"
-}
-
-recorded() {
-  sed -nE "s/.*\"$1\":\"([^\"]*)\".*/\1/p" "$STATE/deployed.json" 2>/dev/null
+prune_old() {
+  ls -1 "$BACKUPS"/predeploy-*.db 2>/dev/null | sort -r | tail -n +"$((KEEP_SNAPSHOTS + 1))" | while read -r file; do rm -f "$file"; done
+  ls -1d "$RELEASES"/* 2>/dev/null | sort -r | tail -n +"$((KEEP_RELEASES + 1))" | while read -r dir; do
+    [ "$dir" = "$PREVIOUS_RELEASE" ] || rm -rf "$dir"
+  done
 }
 
 recover_interrupted() {
   [ -e "$IN_PROGRESS" ] || return 0
-  local phase="" key value snapshot="" failed_dir=""
+  local phase="" snapshot="" release="" previous_release="" key value
   while IFS='=' read -r key value; do
     case "$key" in
-      runtime) RUNTIME="$value" ;;
       phase) phase="$value" ;;
       target) TARGET="$value" ;;
       previous) PREVIOUS="$value" ;;
       snapshot) snapshot="$value" ;;
-      failed) failed_dir="$value" ;;
+      release) release="$value" ;;
+      previous_release) previous_release="$value" ;;
     esac
   done <"$IN_PROGRESS"
-  log "recovering an interrupted deploy of $TARGET (phase $phase, previous $PREVIOUS)"
+  SNAPSHOT="$snapshot"
+  RELEASE_DIR="$release"
+  PREVIOUS_RELEASE="$previous_release"
+  log "recovering an interrupted deploy of $TARGET (phase $phase)"
   if [ "$phase" = building ]; then
-    build_previous || echo "CRITICAL: could not rebuild $PREVIOUS after an interrupted build" >&2
     clear_in_progress
-    log "restored the $PREVIOUS checkout; running services were not touched"
     return 0
   fi
-  if [ -s "$DB" ] && { [ "$RUNTIME" = daemon ] || { [ "$(probe /app)" = 200 ] &&
-    [ "$(sqlite3 -readonly "$DB" "select count(*) from sqlite_master where name='deploy_lease'")" = 1 ]; }; }; then
-    local lease_now
-    [ -n "$LEASE_OWNER" ] || LEASE_OWNER="$(python3 -c 'import uuid; print(uuid.uuid4())')"
-    [[ "$LEASE_OWNER" =~ ^[0-9a-f-]{36}$ ]] || refuse "invalid recovery lease owner"
-    printf '%s\n' "$LEASE_OWNER" >"$STATE/lease-owner"
-    lease_now="$(($(date +%s) * 1000))"
-    sqlite3 -cmd '.timeout 10000' "$DB" "begin immediate;
-      insert into deploy_lease(id,owner,status,expiresAt) values ('server','$LEASE_OWNER','draining',$((lease_now + 3600000)))
-      on conflict(id) do update set owner=excluded.owner, status=excluded.status, expiresAt=excluded.expiresAt
-      where deploy_lease.owner=excluded.owner or deploy_lease.status='accepting' or deploy_lease.expiresAt <= $lease_now;
-      commit;" || refuse "cannot recover deployment lease"
-    if [ "$RUNTIME" = daemon ]; then
-      wait_for_steps
-    else
-      wait_for_steps "$SERVER_STEP_WAIT_SECONDS" restart
-    fi
-  fi
+  acquire_lease
   if [ "$phase" = restoring ] || [ "$phase" = restored ]; then
-    stop_or_give_up "$snapshot"
+    service_stop || critical "could not stop services during recovery"
+    atomic_link "$PREVIOUS_RELEASE" || critical "could not restore the previous application path"
     if [ "$phase" = restoring ]; then
-      restore_snapshot "$snapshot" "$failed_dir" || {
-        echo "CRITICAL: could not restore $snapshot during recovery; marker kept" >&2
-        exit "$EXIT_ROLLBACK_UNHEALTHY"
-      }
-      set_in_progress restored "$snapshot" "$failed_dir"
+      restore_snapshot "$SNAPSHOT" "$BACKUPS/failed-recovery-${TARGET:0:12}" || critical "could not restore $SNAPSHOT during recovery"
     fi
-    build_previous || log "rebuilding $PREVIOUS failed; starting with the checkout as it is"
-    if start_and_check; then
-      write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$snapshot"
+    if service_start && server_healthy; then
+      write_record "$PREVIOUS" "$PREVIOUS" rolled-back "$TARGET" "$SNAPSHOT"
       clear_in_progress
-      echo "finished the interrupted rollback of $TARGET to $PREVIOUS; failed DB in $failed_dir" >&2
       exit 1
     fi
-    write_record "$PREVIOUS" "$PREVIOUS" rollback-unhealthy "$TARGET" "$snapshot"
-    clear_in_progress
-    echo "CRITICAL: interrupted rollback to $PREVIOUS is unhealthy after restoring $snapshot" >&2
-    exit "$EXIT_ROLLBACK_UNHEALTHY"
+    critical "interrupted rollback is unhealthy"
   fi
-  if [ ! -s "$DB" ]; then
-    stop_or_give_up "$snapshot"
-    restore_snapshot "$snapshot" "${failed_dir:-$BACKUPS/failed-recovery-${TARGET:0:12}}" || {
-      echo "CRITICAL: $DB is missing and $snapshot cannot be restored; marker kept" >&2
-      exit "$EXIT_ROLLBACK_UNHEALTHY"
-    }
+  if [ -n "$RELEASE_DIR" ] && [ "$(real_path "$APP_ROOT" 2>/dev/null || echo missing)" = "$(real_path "$RELEASE_DIR" 2>/dev/null || echo none)" ]; then
+    if service_start && server_healthy; then
+      write_record "$TARGET" "$PREVIOUS" deployed "" "$SNAPSHOT"
+      clear_in_progress
+      return 0
+    fi
+    [ -s "$SNAPSHOT" ] && roll_back "interrupted deploy was unhealthy"
   fi
-  if [ -s "$snapshot" ] && [ "$(git -C "$CHECKOUT" rev-parse HEAD)" = "$TARGET" ] && start_and_check; then
-    write_record "$TARGET" "$PREVIOUS" deployed "" "$snapshot"
-    clear_in_progress
-    log "finished the interrupted deploy of $TARGET"
-    return 0
-  fi
-  if [ -s "$snapshot" ]; then
-    roll_back "$snapshot" "interrupted deploy was unhealthy"
-  fi
+  [ -s "$SNAPSHOT" ] && roll_back "interrupted deploy had no healthy target"
   restart_previous "interrupted deploy had no snapshot"
 }
 
-[[ "$STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$STEP_WAIT_SECONDS" -le 1800 ] || refuse "drain deadline must be between 0 and 1800 seconds"
-[[ "$SERVER_STEP_WAIT_SECONDS" =~ ^[0-9]+$ ]] && [ "$SERVER_STEP_WAIT_SECONDS" -le 1800 ] || refuse "server drain deadline must be between 0 and 1800 seconds"
+[[ "$COORDINATOR_WAIT_SECONDS" =~ ^[0-9]+$ ]] || refuse "coordinator wait must be a nonnegative integer"
 recover_interrupted
 [ "$RECOVER_ONLY" = 0 ] || exit 0
 
-PREVIOUS="$(git -C "$CHECKOUT" rev-parse HEAD)"
-if [ "$PREVIOUS" = "$TARGET" ] && [ "$(recorded sha)" = "$TARGET" ] && [ "$(recorded result)" = deployed ]; then
-  log "already deployed: $TARGET"
-  exit 0
-fi
+git -C "$BUILD_CHECKOUT" fetch -q origin main || refuse "cannot fetch origin/main"
+git -C "$BUILD_CHECKOUT" merge-base --is-ancestor "$TARGET" origin/main || refuse "$TARGET is not on origin/main"
+[ ! -e "$STATE/hold" ] || busy "hold: $(head -n1 "$STATE/hold")"
+[ ! -e "$STATE/failed/$TARGET" ] || refuse "$TARGET already failed: $(head -n1 "$STATE/failed/$TARGET")"
+PREVIOUS="$(deployed_sha)" || refuse "cannot resolve the currently deployed SHA"
 if [ "$PREVIOUS" = "$TARGET" ]; then
   if server_healthy; then
     write_record "$TARGET" "$(recorded previous)" deployed "" ""
-    log "already deployed: $TARGET (record written after a health check)"
+    log "already deployed: $TARGET"
     exit 0
   fi
-  echo "checkout is at $TARGET without a deploy record and the server is unhealthy; deploy the previous SHA by hand" >&2
-  exit 1
-fi
-assert_deployable
-assert_hold
-RUNNING_DAEMON="$(daemon_artifact)"
-
-log "rehearsing migrations of $TARGET"
-if ! rehearse_migrations; then
-  mark_failed "$TARGET" "migration rehearsal failed"
-  echo "migration rehearsal failed for $TARGET; nothing changed" >&2
+  echo "already at $TARGET but unhealthy; recover by hand" >&2
   exit 1
 fi
 
-log "building $TARGET in $CHECKOUT"
+required_csv="${REQUIRED_CHECKS// /,}"
+evidence_error="$(node "$OPS_DIR/github-ci-evidence.mjs" --repo "$REPO" --sha "$TARGET" --required "$required_csv" --state "$STATE" 2>&1)" ||
+  refuse "$evidence_error"
+
+prepare_previous_release
+log "building $TARGET"
 set_in_progress building
-if ! switch_code "$TARGET"; then
-  mark_failed "$TARGET" "install or build failed"
-  switch_code "$PREVIOUS" || echo "CRITICAL: could not rebuild $PREVIOUS after a failed build" >&2
+if ! check_out_target || ! install_dependencies || ! rehearse_migrations || ! build_target || ! stage_release; then
+  mark_failed "$TARGET" "install, build or migration rehearsal failed"
   clear_in_progress
-  echo "install or build failed for $TARGET; running services untouched" >&2
+  echo "install, build or migration rehearsal failed for $TARGET; running services untouched" >&2
   exit 1
 fi
-RUNTIME=server
-if [ "$(daemon_artifact)" != "$RUNNING_DAEMON" ]; then
-  RUNTIME=daemon
-  LEASE_PROBE_STATUS="$(lease_request)" || true
-  [ "$LEASE_PROBE_STATUS" = 200 ] || refuse_lease_status "$LEASE_PROBE_STATUS"
-fi
-if [ "$RUNTIME" = daemon ]; then log "daemon build changed; the daemon and the server will restart"; else log "daemon build unchanged; only the server will restart"; fi
 
-assert_hold
-drain_steps
-wait_for_computer_calls
+log "pausing claims and waiting for in-server work"
+acquire_lease
+wait_for_coordinator
 
-mkdir -p "$BACKUPS" || restart_previous "creating $BACKUPS failed"
-SNAPSHOT="$BACKUPS/stopped-$(date -u +%Y%m%dT%H%M%SZ)-${PREVIOUS:0:12}.db"
-log "stopping services and snapshotting the DB to $SNAPSHOT"
-set_in_progress switching
-stop_services || restart_previous "stopping the services failed"
-if ! sqlite3 "$DB" ".backup '$SNAPSHOT'" || [ "$(sqlite3 -readonly "$SNAPSHOT" 'pragma integrity_check')" != ok ]; then
-  rm -f "$SNAPSHOT"
+log "snapshotting the live database"
+if ! snapshot_db; then
   restart_previous "the DB snapshot failed"
 fi
-set_in_progress switching "$SNAPSHOT"
 
-if ! start_and_check; then
-  roll_back "$SNAPSHOT" "health check failed after starting $TARGET"
+log "switching $APP_ROOT to $RELEASE_DIR"
+set_in_progress switching "$SNAPSHOT" "$RELEASE_DIR" "$PREVIOUS_RELEASE"
+service_stop || restart_previous "stopping the server failed"
+if [ -d "$APP_ROOT" ] && [ ! -L "$APP_ROOT" ]; then
+  legacy_moved="$STATE/legacy-root"
+  [ ! -e "$legacy_moved" ] || critical "legacy root backup already exists"
+  mv "$APP_ROOT" "$legacy_moved" || restart_previous "moving the legacy application directory failed"
+  atomic_link "$RELEASE_DIR" || {
+    mv "$legacy_moved" "$APP_ROOT" || true
+    restart_previous "pointing the application path at the target failed"
+  }
+else
+  atomic_link "$RELEASE_DIR" || restart_previous "pointing the application path at the target failed"
+fi
+set_in_progress switched "$SNAPSHOT" "$RELEASE_DIR" "$PREVIOUS_RELEASE"
+service_start || roll_back "starting the server failed"
+if ! server_healthy; then
+  roll_back "health check failed after starting $TARGET"
 fi
 
 write_record "$TARGET" "$PREVIOUS" deployed "" "$SNAPSHOT"
 clear_in_progress
-prune_snapshots
+prune_old
 log "deployed $TARGET (previous $PREVIOUS)"

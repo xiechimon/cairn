@@ -86,15 +86,16 @@ test('the deployed server fetch uses its configured HTTP proxy', { timeout: 1000
   assert.equal(output.trim(), 'proxied');
 });
 
-test('every ExecStart runs the Node major in .nvmrc', () => {
-  for (const name of UNIT_NAMES) {
-    const [exec] = units[name].entries.get('ExecStart');
-    const binary = exec.split(' ')[0];
-    assert.equal(binary, NODE_24, name);
-    assert.match(binary, new RegExp(`/node/${NODE_MAJOR}/bin/node$`), name);
-    assert.ok(units[name].env.PATH.startsWith('%h/.local/share/mise/installs/node/24/bin:'), name);
-  }
-  assert.ok(selfDeploy.env.PATH.startsWith('%h/.local/share/mise/installs/node/24/bin:'));
+test('long-running units use the pinned Node major while the artifact server uses the host PATH', () => {
+  const [daemonExec] = units['cairn-daemon'].entries.get('ExecStart');
+  const binary = daemonExec.split(' ')[0];
+  assert.equal(binary, NODE_24);
+  assert.match(binary, new RegExp(`/node/${NODE_MAJOR}/bin/node$`));
+  assert.ok(
+    units['cairn-daemon'].env.PATH.startsWith('%h/.local/share/mise/installs/node/24/bin:'),
+  );
+  assert.match(units['cairn-server'].entries.get('ExecStart')[0], /^\/usr\/bin\/env node /);
+  assert.equal(selfDeploy.entries.get('EnvironmentFile')[0], '%h/.config/cairn/deploy.env');
 });
 
 test('the server caps its heap and memory', () => {
@@ -137,28 +138,22 @@ test('no unit pins a removed mount or a tailnet address', () => {
   }
 });
 
-test('self-deploy authenticates gh with a GitHub App token', () => {
+test('self-deploy takes host-specific values from the host env file', () => {
   const [exec] = selfDeploy.entries.get('ExecStart');
-  assert.equal(selfDeploy.env.CAIRN_GH_WRAPPER, '%h/.cairn/tools/app-token/as-bot.sh');
-  assert.doesNotMatch(exec, /GH_TOKEN|token\.mjs/);
-  assert.match(exec, /deploy-watch\.sh/);
+  assert.match(exec, /\$\{CAIRN_DEPLOY_BUILD_CHECKOUT\}\/scripts\/ops\/deploy-watch\.sh/);
+  assert.doesNotMatch(exec, /GH_TOKEN|token\.mjs|CAIRN_GH_WRAPPER/);
+  assert.doesNotMatch(selfDeploy.text, /Code\/AgentProjects|cairn-exec|omarchy/);
 });
 
-test('every unit runs from the dedicated deploy clone, not the lanes checkout', () => {
-  for (const [name, unit] of Object.entries(units)) {
-    assert.match(
-      unit.entries.get('WorkingDirectory')[0],
-      /^%h\/Code\/AgentProjects\/cairn-exec\/apps\//,
-      name,
-    );
-  }
-  assert.equal(selfDeploy.env.CAIRN_CHECKOUT, '%h/Code/AgentProjects/cairn-exec');
+test('the server runs the stable artifact path and only the daemon runs from its source checkout', () => {
+  assert.equal(units['cairn-server'].entries.get('WorkingDirectory')[0], '%h/cairn-server');
+  assert.match(
+    units['cairn-daemon'].entries.get('WorkingDirectory')[0],
+    /^%h\/Code\/AgentProjects\/cairn-exec\/apps\//,
+  );
   for (const script of ['deploy-self.sh', 'deploy-watch.sh']) {
     const text = readFileSync(new URL(`./${script}`, import.meta.url), 'utf8');
-    assert.match(
-      text,
-      /CHECKOUT="\$\{CAIRN_CHECKOUT:-\$HOME\/Code\/AgentProjects\/cairn-exec\}"/,
-      script,
-    );
+    assert.match(text, /CAIRN_DEPLOY_BUILD_CHECKOUT/, script);
+    assert.doesNotMatch(text, /Code\/AgentProjects\/cairn-exec|omarchy/, script);
   }
 });

@@ -1,155 +1,119 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 umask 077
 
-unset GH_TOKEN GITHUB_TOKEN
-for credential_variable in ${!GIT_CONFIG_@}; do
-  case "$credential_variable" in
-    GIT_CONFIG_COUNT | GIT_CONFIG_KEY_* | GIT_CONFIG_VALUE_* | GIT_CONFIG_PARAMETERS) unset "$credential_variable" ;;
-  esac
-done
-GITHUB_COMMAND_WRAPPER="${CAIRN_GH_WRAPPER:-$HOME/.cairn/tools/app-token/as-bot.sh}"
-
-gh() {
-  "$GITHUB_COMMAND_WRAPPER" gh "$@"
-}
-
-CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
+BUILD_CHECKOUT="${CAIRN_DEPLOY_BUILD_CHECKOUT:-${CAIRN_CHECKOUT:-$HOME/deploy-build}}"
+APP_ROOT="${CAIRN_DEPLOY_APP_ROOT:-$HOME/cairn-server}"
 STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
 REPO="${CAIRN_REPO:-xiechimon/cairn}"
 REQUIRED_CHECKS="${CAIRN_REQUIRED_CHECKS:-check pack-smoke e2e-gate}"
+SCAN_COMMITS="${CAIRN_DEPLOY_SCAN_COMMITS:-50}"
 LAG_LIMIT_SECONDS="${CAIRN_DEPLOY_LAG_LIMIT_SECONDS:-7200}"
-SCAN_DEPTH="${CAIRN_DEPLOY_SCAN_DEPTH:-20}"
-QUIET_SECONDS="${CAIRN_DEPLOY_QUIET_SECONDS:-240}"
-MAX_WAIT_SECONDS="${CAIRN_DEPLOY_MAX_WAIT_SECONDS:-1800}"
-DEPLOY_SCRIPT="${CAIRN_DEPLOY_SCRIPT:-$CHECKOUT/scripts/ops/deploy-self.sh}"
-LAG_TITLE="deploy lag: omarchy is behind main"
+MACHINE_NAME="${CAIRN_DEPLOY_MACHINE_NAME:-$(hostname -s)}"
+LAG_ISSUES="${CAIRN_DEPLOY_LAG_ISSUES:-0}"
+GH_WRAPPER="${CAIRN_GH_WRAPPER:-}"
 
-mkdir -p "$STATE/alarms"
-if [ "${CAIRN_DEPLOY_WATCH_RUNNING_COPY:-}" != 1 ]; then
-  running_copy="$(mktemp "$STATE/deploy-watch.running.XXXXXX")"
-  cp "$0" "$running_copy"
-  CAIRN_DEPLOY_WATCH_RUNNING_COPY=1 exec bash "$running_copy" "$@"
+mkdir -p "$STATE"
+if [ "${CAIRN_DEPLOY_WATCH_COPY:-}" != 1 ]; then
+  ops_dir="$(cd "$(dirname "$0")" && pwd)"
+  running_dir="$(mktemp -d "$STATE/deploy-watch.running.XXXXXX")"
+  cp "$0" "$running_dir/deploy-watch.sh"
+  cp "$ops_dir/deploy-self.sh" "$ops_dir/github-ci-evidence.mjs" "$ops_dir/stage-server-artifact.mjs" "$running_dir/"
+  CAIRN_DEPLOY_WATCH_COPY=1 CAIRN_DEPLOY_WATCH_COPY_DIR="$running_dir" exec bash "$running_dir/deploy-watch.sh" "$@"
 fi
-trap 'rm -f "$0"' EXIT
+OPS_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUNNING_DIR="$(dirname "$0")"
+trap 'if [ "${CAIRN_DEPLOY_WATCH_COPY_DIR:-}" = "$RUNNING_DIR" ]; then rm -rf "$RUNNING_DIR"; fi' EXIT
 
 log() { echo "$(date -u +%FT%TZ) $*"; }
-
-green() {
-  local ci checks name
-  ci="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$1&per_page=1" \
-    --jq '.workflow_runs[0] | [.head_sha, .head_branch, .event, .status, .conclusion] | @tsv')" || return 1
-  [ "$ci" = "$1"$'\tmain\tpush\tcompleted\tsuccess' ] || return 1
-  checks="$(gh api --paginate "repos/$REPO/commits/$1/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')" || return 1
-  for name in $REQUIRED_CHECKS; do
-    grep -qxF "$name"$'\t'success <<<"$checks" || return 1
-  done
-}
-
-newest_green_after() {
-  local deployed="$1" sha
-  for sha in $(git -C "$CHECKOUT" rev-list --first-parent --max-count="$SCAN_DEPTH" "$deployed..origin/main"); do
-    if [ -e "$STATE/failed/$sha" ]; then
-      log "skip $sha: already failed ($(head -n1 "$STATE/failed/$sha"))" >&2
-    elif ! git -C "$CHECKOUT" merge-base --is-ancestor "$deployed" "$sha"; then
-      log "skip $sha: it does not contain the deployed $deployed" >&2
-    elif green "$sha"; then
-      echo "$sha"
-      return 0
-    fi
-  done
-}
-
-main_settled() {
-  local deployed="$1" head now seen_head="" seen_at="" behind_at=""
-  head="$(git -C "$CHECKOUT" rev-parse origin/main)"
-  if [ "$head" = "$deployed" ]; then
-    rm -f "$STATE/main-seen"
-    return 0
-  fi
-  now="$(date +%s)"
-  [ ! -s "$STATE/main-seen" ] || read -r seen_head seen_at behind_at <"$STATE/main-seen" || true
-  if ! [[ "$seen_at" =~ ^[1-9][0-9]{0,11}$ && "$behind_at" =~ ^[1-9][0-9]{0,11}$ ]] ||
-    [ "$behind_at" -gt "$seen_at" ] || [ "$seen_at" -gt "$now" ]; then
-    seen_head=""
-    behind_at="$now"
-  fi
-  if [ "$seen_head" != "$head" ]; then
-    seen_at="$now"
-    printf '%s %s %s\n' "$head" "$seen_at" "$behind_at" >"$STATE/main-seen"
-  fi
-  [ $((now - seen_at)) -ge "$QUIET_SECONDS" ] && return 0
-  [ $((now - behind_at)) -ge "$MAX_WAIT_SECONDS" ] && return 0
-  log "waiting for main to settle: $head first seen $((now - seen_at))s ago (quiet ${QUIET_SECONDS}s, behind for $((now - behind_at))s of at most ${MAX_WAIT_SECONDS}s)"
-  return 1
-}
-
-deploy_newest_green() {
-  local deployed target
-  if [ -e "$STATE/in-progress" ]; then
-    log "recovering an interrupted deploy"
-    CAIRN_DEPLOY_RUNNING_COPY= bash "$DEPLOY_SCRIPT" --recover >>"$STATE/last-attempt.log" 2>&1 ||
-      echo "$(date -u +%FT%TZ) recovery exit $?" >"$STATE/last-attempt"
-    [ ! -e "$STATE/in-progress" ] || return 0
-  fi
-  deployed="$(git -C "$CHECKOUT" rev-parse HEAD)"
-  main_settled "$deployed" || return 0
-  target="$(newest_green_after "$deployed")"
-  [ -n "$target" ] || return 0
-  log "deploying $target"
-  local status=0
-  CAIRN_DEPLOY_RUNNING_COPY= bash "$DEPLOY_SCRIPT" "$target" >>"$STATE/last-attempt.log" 2>&1 || status=$?
-  [ "$status" != 0 ] || rm -f "$STATE/main-seen"
-  echo "$(date -u +%FT%TZ) $target exit $status" >"$STATE/last-attempt"
-  log "deploy of $target exited $status"
-}
 
 lag_reason() {
   if [ -e "$STATE/hold" ]; then
     echo "a deploy hold is set: $(head -n1 "$STATE/hold")"
-  elif [ -s "$STATE/last-attempt" ] && [[ "$(cat "$STATE/last-attempt")" == *"exit 75" ]] &&
-    [ -s "$STATE/last-reason" ]; then
-    cat "$STATE/last-reason"
+  elif [ -s "$STATE/last-attempt" ] && [ -s "$STATE/last-reason" ]; then
+    echo "last attempt: $(cat "$STATE/last-attempt"); $(cat "$STATE/last-reason")"
   elif [ -s "$STATE/last-attempt" ]; then
-    echo "last attempt: $(cat "$STATE/last-attempt"); see $STATE/last-attempt.log on the host"
+    echo "last attempt: $(cat "$STATE/last-attempt")"
   else
     echo "no green main commit newer than the deployed one, or no attempt yet"
   fi
 }
 
+gh_command() {
+  if [ -n "$GH_WRAPPER" ]; then "$GH_WRAPPER" gh "$@"; else command gh "$@"; fi
+}
+
 check_lag() {
-  local deployed head oldest committed age open_issue
-  deployed="$(git -C "$CHECKOUT" rev-parse HEAD)"
-  head="$(git -C "$CHECKOUT" rev-parse origin/main)"
-  open_issue="$(gh issue list -R "$REPO" --state open --author "@me" --search "\"$LAG_TITLE\" in:title" --json number --jq '.[0].number // empty')"
+  [ "$LAG_ISSUES" = 1 ] || return 0
+  command -v gh >/dev/null 2>&1 || [ -n "$GH_WRAPPER" ] || return 0
+  local head oldest committed age open_issue title body
+  head="$(git -C "$BUILD_CHECKOUT" rev-parse origin/main)"
+  title="deploy lag: $MACHINE_NAME is behind main"
+  open_issue="$(gh_command issue list -R "$REPO" --state open --author "@me" --search "\"$title\" in:title" --json number --jq '.[0].number // empty' 2>/dev/null)" || return 0
   if [ "$deployed" = "$head" ]; then
     if [ -n "$open_issue" ]; then
-      if ! gh issue close "$open_issue" -R "$REPO" -c "Caught up: omarchy runs $head." >/dev/null; then
-        log "failed to close lag issue #$open_issue"
-        return 1
-      fi
-      log "closed lag issue #$open_issue"
+      gh_command issue close "$open_issue" -R "$REPO" -c "Caught up: $MACHINE_NAME runs $head." >/dev/null 2>&1 || true
     fi
     return 0
   fi
-  oldest="$(git -C "$CHECKOUT" rev-list --reverse --first-parent "$deployed..origin/main" | head -n1)"
-  committed="$(git -C "$CHECKOUT" show -s --format=%ct "$oldest")"
+  oldest="$(git -C "$BUILD_CHECKOUT" rev-list --reverse --first-parent "$deployed..origin/main" 2>/dev/null | head -n1)"
+  [ -n "$oldest" ] || return 0
+  committed="$(git -C "$BUILD_CHECKOUT" show -s --format=%ct "$oldest")"
   age=$(($(date +%s) - committed))
   [ "$age" -gt "$LAG_LIMIT_SECONDS" ] || return 0
+  mkdir -p "$STATE/alarms"
   [ ! -e "$STATE/alarms/$head" ] || return 0
-  local body
-  body="$(printf 'omarchy runs `%s`; origin/main is `%s`. The oldest undeployed main commit `%s` landed %s minutes ago (limit %s).\n\nReason: %s\n\nOpened by deploy-watch on omarchy; closed automatically once the deployed SHA equals main.' \
-    "$deployed" "$head" "$oldest" "$((age / 60))" "$((LAG_LIMIT_SECONDS / 60)) minutes" "$(lag_reason)")"
+  body="$(printf '%s runs `%s`; origin/main is `%s`. The oldest undeployed main commit `%s` landed %s minutes ago (limit %s).\n\nReason: %s\n\nOpened by deploy-watch; closed automatically once the deployed SHA equals main.' \
+    "$MACHINE_NAME" "$deployed" "$head" "$oldest" "$((age / 60))" "$((LAG_LIMIT_SECONDS / 60)) minutes" "$(lag_reason)")"
   if [ -n "$open_issue" ]; then
-    gh issue comment "$open_issue" -R "$REPO" -b "$body" >/dev/null || return 0
-    log "commented lag issue #$open_issue"
+    gh_command issue comment "$open_issue" -R "$REPO" -b "$body" >/dev/null 2>&1 || return 0
   else
-    gh issue create -R "$REPO" -t "$LAG_TITLE" -b "$body" -a xiechimon >/dev/null || return 0
-    log "opened lag issue"
+    gh_command issue create -R "$REPO" -t "$title" -b "$body" >/dev/null 2>&1 || return 0
   fi
   touch "$STATE/alarms/$head"
 }
 
-git -C "$CHECKOUT" fetch -q origin main || { log "fetch failed"; exit 1; }
-deploy_newest_green
-check_lag
+git -C "$BUILD_CHECKOUT" fetch -q origin main
+raw=""
+[ -f "$APP_ROOT/DEPLOYED_SHA" ] && raw="$(head -n1 "$APP_ROOT/DEPLOYED_SHA" | tr -d '[:space:]')"
+[ -n "$raw" ] || { echo "cannot read $APP_ROOT/DEPLOYED_SHA" >&2; exit 1; }
+deployed="$(git -C "$BUILD_CHECKOUT" rev-parse --verify "$raw^{commit}" 2>/dev/null)" || {
+  echo "cannot resolve deployed SHA $raw" >&2
+  exit 1
+}
+check_lag || true
+if [ "$deployed" = "$(git -C "$BUILD_CHECKOUT" rev-parse origin/main)" ]; then
+  exit 0
+fi
+if [ -e "$STATE/in-progress" ]; then
+  log "recovering an interrupted deploy"
+  CAIRN_DEPLOY_RUNNING_COPY= bash "$OPS_DIR/deploy-self.sh" --recover
+  exit $?
+fi
+if [ -e "$STATE/hold" ]; then
+  log "holding: $(head -n1 "$STATE/hold")"
+  exit 0
+fi
+
+range="$deployed..origin/main"
+if ! git -C "$BUILD_CHECKOUT" merge-base --is-ancestor "$deployed" origin/main; then
+  range="origin/main"
+fi
+required_csv="${REQUIRED_CHECKS// /,}"
+target=""
+while read -r sha; do
+  [ ! -e "$STATE/failed/$sha" ] || continue
+  if node "$OPS_DIR/github-ci-evidence.mjs" --repo "$REPO" --sha "$sha" --required "$required_csv" --state "$STATE" >/dev/null 2>&1; then
+    target="$sha"
+    break
+  fi
+done < <(git -C "$BUILD_CHECKOUT" rev-list --first-parent --max-count "$SCAN_COMMITS" "$range")
+
+[ -n "$target" ] || exit 0
+log "deploying $target (currently $deployed)"
+set +e
+CAIRN_DEPLOY_RUNNING_COPY= bash "$OPS_DIR/deploy-self.sh" "$target"
+status=$?
+set -e
+printf 'target=%s\nstatus=%s\nat=%s\n' "$target" "$status" "$(date -u +%FT%TZ)" >"$STATE/last-attempt"
+exit "$status"

@@ -38,6 +38,27 @@ describe('in-server Coordinator runner', () => {
     expect(entries.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('does not claim a new turn while the deployment lease is draining', async () => {
+    const w = await world('status?');
+    const lease = { owner: '00000000-0000-4000-8000-0000000000aa', ttlMs: 60_000 };
+    expect((await req(w.s.app, 'PUT', '/api/server/deploy/lease', lease)).status).toBe(200);
+    const { faux, seen } = stub('after deploy');
+    const coordinator = boot(w, faux);
+
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+
+    expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('pending');
+    expect(seen).toHaveLength(0);
+    expect(
+      (await req(w.s.app, 'DELETE', '/api/server/deploy/lease', { owner: lease.owner })).status,
+    ).toBe(200);
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+    expect(w.s.db.select().from(step).where(eq(step.id, w.stepId)).get()?.status).toBe('done');
+    expect(seen).toHaveLength(1);
+  });
+
   it('leaves the turn to daemons when the flag is off', async () => {
     const w = await world();
     setCoordinatorInServer(false);

@@ -7,7 +7,7 @@ if [ "$#" != 1 ] || ! [[ "$1" =~ ^[0-9a-f]{40}$ ]]; then
   exit 2
 fi
 
-CHECKOUT="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
+CHECKOUT="${CAIRN_DEPLOY_BUILD_CHECKOUT:-${CAIRN_CHECKOUT:-$HOME/deploy-build}}"
 STATE="${CAIRN_DEPLOY_STATE:-$HOME/.local/state/cairn-deploy}"
 TARGET="$1"
 git -C "$CHECKOUT" fetch -q origin main
@@ -17,7 +17,9 @@ if ! git -C "$CHECKOUT" merge-base --is-ancestor "$TARGET" origin/main; then
 fi
 
 mkdir -p "$STATE"
-runner="$(mktemp "$STATE/deploy-bootstrap.XXXXXX")"
-trap 'rm -f "$runner"' EXIT
-git -C "$CHECKOUT" show "$TARGET:scripts/ops/deploy-self.sh" >"$runner"
-CAIRN_DEPLOY_RUNNING_COPY=1 exec bash "$runner" "$TARGET"
+runner="$(mktemp -d "$STATE/deploy-bootstrap.XXXXXX")"
+trap 'rm -rf "$runner"' EXIT
+for script in deploy-self.sh github-ci-evidence.mjs stage-server-artifact.mjs; do
+  git -C "$CHECKOUT" show "$TARGET:scripts/ops/$script" >"$runner/$script"
+done
+CAIRN_DEPLOY_RUNNING_COPY=1 CAIRN_DEPLOY_OPS_DIR="$runner" exec bash "$runner/deploy-self.sh" "$TARGET"

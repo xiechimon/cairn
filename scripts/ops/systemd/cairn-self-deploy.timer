@@ -1,10 +1,11 @@
 [Unit]
-Description=Run Cairn self-deploy every 5 minutes
+Description=Check for deployable Cairn main commits
 
 [Timer]
-OnBootSec=3min
-OnUnitActiveSec=5min
-Unit=cairn-self-deploy.service
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+Persistent=true
 
 [Install]
 WantedBy=timers.target

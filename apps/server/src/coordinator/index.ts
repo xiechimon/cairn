@@ -33,6 +33,7 @@ import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
 import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
 import { coordinatorToolDefs } from '../services/coordinator-tool-defs.js';
 import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
+import { readDeployLease } from '../services/deploy-lease.js';
 import { serverTurnModel } from '../services/machine-claim.js';
 import { stageTurnAttachments, teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
@@ -390,6 +391,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   };
 
   const claimHead = (threadId: string): StepRow | null => {
+    if (readDeployLease(db).status === 'draining') return null;
     const head = liveSteps(threadId)[0];
     if (head === undefined) return null;
     if (head.status === 'claimed') return head.machineId === null ? head : null;
