@@ -2046,6 +2046,15 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
     );
 
     const remoteWindow = await mainWindow(remoteApp, LAUNCH_TIMEOUT_MS);
+    const consoleErrors = [];
+    remoteWindow.on('console', (msg) => {
+      if (msg.type() === 'error' || msg.type() === 'warning') {
+        consoleErrors.push(`${msg.type()}:${msg.text()}`);
+      }
+    });
+    remoteWindow.on('pageerror', (err) => {
+      consoleErrors.push(`pageerror:${err.message}`);
+    });
     await remoteWindow.waitForLoadState('load');
     assert.equal(
       new URL(remoteWindow.url()).origin,
@@ -2069,10 +2078,34 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
         observedStates.push(status);
       });
       await remoteWindow.evaluate(() => {
+        const w = window;
+        w.__clickTrace = [];
+        document.addEventListener(
+          'click',
+          (event) => {
+            const target = event.target instanceof Element ? event.target.closest('button') : null;
+            w.__clickTrace.push(
+              `doc-click:${target?.getAttribute('data-testid') ?? event.target?.tagName ?? 'unknown'}`,
+            );
+          },
+          true,
+        );
         window.cairnDesktop.update.subscribe((state) => {
           void window.__cairnSmokeRecordUpdateState(state.status);
         });
       });
+
+      const box = await updateButton.boundingBox();
+      const hitTarget =
+        box === null
+          ? 'no-box'
+          : await remoteWindow.evaluate(
+              ({ x, y }) => {
+                const el = document.elementFromPoint(x, y);
+                return el?.outerHTML.slice(0, 120) ?? 'null';
+              },
+              { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+            );
 
       await updateButton.click();
 
@@ -2085,6 +2118,9 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
         }
         await remoteWindow.waitForTimeout(100);
       }
+      const clickTrace = await remoteWindow
+        .evaluate(() => window.__clickTrace ?? [])
+        .catch(() => []);
       const mainLogTail = (() => {
         const path = join(remoteUserData, 'logs', 'main.log');
         if (!existsSync(path)) return '';
@@ -2093,7 +2129,7 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
 
       assert.ok(
         zipHits >= 1,
-        `clicking update button in remote mode never downloaded the update (status=${lastStatus} states=${JSON.stringify(observedStates)} mainLog=${mainLogTail})`,
+        `clicking update button in remote mode never downloaded the update (status=${lastStatus} states=${JSON.stringify(observedStates)} clicks=${JSON.stringify(clickTrace)} hit=${hitTarget} console=${JSON.stringify(consoleErrors.slice(-6))} mainLog=${mainLogTail})`,
       );
       assert.ok(
         observedStates.includes('downloading') && observedStates.includes('installing'),
