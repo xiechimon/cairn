@@ -8,9 +8,11 @@ import { useLiveData } from '../api/provider.js';
 import { BANNER_CLS } from '../chief/chief-outage-banner.js';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
+import { localRunnerBridge } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { settingsHref } from '../settings/settings-href.js';
+import { UpdateCairnButton } from './desktop-update.js';
 import {
   coordinatorCanAnswer,
   type FirstRunStepId,
@@ -67,20 +69,9 @@ function withCode(text: string): ReactNode {
   });
 }
 
-interface LocalRunnerBridge {
-  reconnect: () => Promise<void>;
-}
-
-function localRunnerBridge(): LocalRunnerBridge | null {
-  const desktop = (window as Window & { cairnDesktop?: { localRunner?: LocalRunnerBridge } })
-    .cairnDesktop;
-  return desktop?.localRunner ?? null;
-}
-
 export function runnerStep(
   machines: readonly { name: string; online?: boolean; kind?: 'local' | 'remote' }[] | undefined,
   command: string,
-  appRunsLocal: boolean,
   t: TFunc,
 ): { label: string; hint: ReactNode; reconnect: boolean } {
   const offline = (machines ?? []).filter((machine) => machine.online === false);
@@ -92,7 +83,7 @@ export function runnerStep(
       reconnect: false,
     };
   }
-  if (offline.length === 1 && only.kind === 'local' && appRunsLocal) {
+  if (offline.length === 1 && only.kind === 'local') {
     return {
       label: t('{name} 离线', { name: only.name }),
       hint: t('Cairn 会在这台电脑唤醒后自动重连'),
@@ -177,7 +168,6 @@ function MachinePrompt() {
   const { label, hint, reconnect } = runnerStep(
     machinesQ.data,
     `${PUBLISHED_PACKAGES.cli.command} start`,
-    bridge !== null,
     t,
   );
   return (
@@ -197,23 +187,27 @@ function MachinePrompt() {
           {hint}
         </span>
       </span>
-      {reconnect && bridge !== null ? (
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="setup-prompt-reconnect"
-          className="flex-none px-3"
-          disabled={reconnecting}
-          onClick={() => {
-            setReconnecting(true);
-            void bridge
-              .reconnect()
-              .catch((error) => toastError(t('未能重新连接，请重试。'), error))
-              .finally(() => setReconnecting(false));
-          }}
-        >
-          {t(reconnecting ? '正在重新连接…' : '重新连接')}
-        </Button>
+      {reconnect ? (
+        bridge !== null ? (
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="setup-prompt-reconnect"
+            className="flex-none px-3"
+            disabled={reconnecting}
+            onClick={() => {
+              setReconnecting(true);
+              void bridge
+                .reconnect()
+                .catch((error) => toastError(t('未能重新连接，请重试。'), error))
+                .finally(() => setReconnecting(false));
+            }}
+          >
+            {t(reconnecting ? '正在重新连接…' : '重新连接')}
+          </Button>
+        ) : (
+          <UpdateCairnButton testId="setup-prompt-update-cairn" className="px-3" />
+        )
       ) : (
         <Button
           variant="outline"

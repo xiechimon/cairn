@@ -1,22 +1,13 @@
-import type { HostPermissions } from '@cairn/shared';
 import { cn } from 'cn';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useLiveData } from '../api/provider.js';
+import { UpdateCairnNotice } from '../board/desktop-update.js';
 import { Button } from '../components/ui/button.js';
+import { ownComputerBridge } from '../desktop-shell.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-
-interface OwnComputerBridge {
-  guide: () => Promise<boolean | null>;
-  permissions: () => Promise<HostPermissions | null>;
-}
-
-function ownComputerBridge(): OwnComputerBridge | undefined {
-  return (window as Window & { cairnDesktop?: { ownComputer?: OwnComputerBridge } }).cairnDesktop
-    ?.ownComputer;
-}
 
 export type OwnComputerPanelState =
   | 'not-in-app'
@@ -155,12 +146,10 @@ export function useOwnComputerRow(machine: MachineRow): {
       </p>
       {NEEDS_ACTION.has(state) &&
         (live && bridge === undefined ? (
-          <p
-            data-testid="own-computer-browser-hint"
-            className="m-0 text-meta text-content-tertiary"
-          >
-            {t('请在这台 Mac 的 Cairn 桌面应用里完成权限授权与检查。')}
-          </p>
+          <UpdateCairnNotice
+            message={t('更新 Cairn 后即可在这里授权并检查。')}
+            buttonTestId="own-computer-update-cairn"
+          />
         ) : (
           <div className="flex flex-wrap gap-2">
             <Button

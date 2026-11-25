@@ -311,10 +311,11 @@ test('timed-out login falls back to pasting GEMINI_API_KEY', async ({ page }) =>
   await expect(page.locator('body')).not.toContainText(API_KEY);
 });
 
-test('web-only mode saves host-keyring subscription directly with null token', async ({
+test('when the antigravity desktop bridge is absent it offers Update Cairn and still allows saving', async ({
   page,
 }) => {
   const { dialog, calls } = await openDialog(page, { status: null });
+  await expect(dialog.getByTestId('desktop-skew-update')).toHaveText('更新 Cairn');
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   expect(calls.created).toEqual([{ token: null }]);

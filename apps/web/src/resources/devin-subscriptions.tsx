@@ -1,6 +1,5 @@
 import {
   DEVIN_TOKEN_LIFETIME_MS,
-  type DesktopSubscriptionInput,
   type DesktopSubscriptionMetadata,
   type DevinLocalStatus,
   type DevinLoginOutcome,
@@ -8,6 +7,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import type { CreateDevinSubscription } from '../api/devin-subscriptions.js';
 import { extractDevinToken } from '../api/devin-subscriptions.js';
+import { UpdateCairnNotice } from '../board/desktop-update.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { InfoTip } from '../components/info-tip.js';
 import { withCodeSpans } from '../components/notice-banner.js';
@@ -15,20 +15,9 @@ import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
+import { devinBridge } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-
-interface DevinBridge {
-  status: () => Promise<DevinLocalStatus>;
-  import: (input: DesktopSubscriptionInput) => Promise<DevinLoginOutcome>;
-  login: (input: DesktopSubscriptionInput) => Promise<DevinLoginOutcome>;
-  cancelLogin: () => Promise<void>;
-}
-
-function devinBridge(): DevinBridge | null {
-  const desktop = (window as Window & { cairnDesktop?: { devin?: DevinBridge } }).cairnDesktop;
-  return desktop?.devin ?? null;
-}
 
 function loginFailCopy(reason: string, t: TFunc): string {
   return reason === 'timeout'
@@ -164,7 +153,9 @@ export function AddDevinSubscriptionDialog({
   }, [reloginTarget, bridge, local]);
 
   const localAction =
-    local !== null && (local.loggedIn || local.canLogin) ? (
+    bridge === null ? (
+      <UpdateCairnNotice message={t('更新 Cairn 后即可在这里直接登录。')} />
+    ) : local !== null && (local.loggedIn || local.canLogin) ? (
       phase === 'waiting' ? (
         <p className="m-0 flex items-center gap-2">
           <RingSpinner className="size-4" />

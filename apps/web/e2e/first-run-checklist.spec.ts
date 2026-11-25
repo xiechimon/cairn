@@ -227,7 +227,7 @@ test('in the desktop app its own offline machine reconnects instead of asking fo
     .toEqual(['reconnect']);
 });
 
-test('outside the desktop app an offline local machine still shows the start command', async ({
+test('when the localRunner desktop bridge is absent an offline local machine offers Update Cairn', async ({
   page,
 }) => {
   await open(page, {
@@ -236,7 +236,8 @@ test('outside the desktop app an offline local machine still shows the start com
     bound: true,
     machines: [{ id: 'm1', name: 'xmonsMac', online: false, kind: 'local', lastSeenAt: 1 }],
   });
-  await expect(hint(page)).toHaveText(/^在 xmonsMac 上运行 .+ start 让它重新上线$/);
+  await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
+  await expect(page.getByTestId('setup-prompt-update-cairn')).toHaveText('更新 Cairn');
   await expect(page.getByTestId('setup-prompt-reconnect')).toHaveCount(0);
 });
 

@@ -120,10 +120,10 @@ export const EN: Record<string, string> = {
     'Google sign-in finished, but the server did not save it. Try again.',
   '会在浏览器中打开 Google 登录，完成后自动更新「{label}」。':
     'Google sign-in opens in your browser; “{label}” updates when it finishes.',
-  '在 Cairn 桌面 App 中打开这一页，即可重新登录 Antigravity。':
-    'Open this page in the Cairn desktop app to sign in to Antigravity again.',
-  '这台电脑无法安装 Antigravity。请在 Mac 上的 Cairn 桌面 App 中重新登录。':
-    'Antigravity cannot be installed on this computer. Sign in again from the Cairn desktop app on a Mac.',
+  '这台电脑无法安装 Antigravity。': 'Antigravity cannot be installed on this computer.',
+  '更新 Cairn 后即可重新登录 Antigravity。': 'Update Cairn to sign in to Antigravity again.',
+  '更新 Cairn 后即可在这里直接登录。': 'Update Cairn to sign in directly from here.',
+  '更新 Cairn 后即可在这里授权并检查。': 'Update Cairn to grant permissions and recheck here.',
   '已在浏览器中打开 Antigravity 登录页，完成后会自动继续。':
     'The Antigravity sign-in page is open in your browser; this continues automatically when it finishes.',
   '这台 Mac 已登录 Antigravity。': 'This Mac is signed in to Antigravity.',
@@ -3206,8 +3206,6 @@ export const EN: Record<string, string> = {
     'Use Bearer auth header (off uses provider default auth)',
   不限: 'Unlimited',
   自定义服务器和端口: 'Custom server and port',
-  '请在这台 Mac 的 Cairn 桌面应用里完成权限授权与检查。':
-    'Open the Cairn desktop app on this Mac to grant permissions and recheck.',
   '本地路径或 GitHub 地址': 'Local path or GitHub URL',
   '填入服务器本机目录路径（需包含 SKILL.md），或以 https:// 开头的 GitHub 公共仓库地址；导入后可刷新。':
     'Enter a local directory containing SKILL.md or a public https:// GitHub repository URL; imported skills can be refreshed.',

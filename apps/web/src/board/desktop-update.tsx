@@ -22,6 +22,96 @@ export async function updateDesktopNow(): Promise<void> {
   if (installable(await bridge.state())) await bridge.install();
 }
 
+export interface DesktopUpdateSkewView {
+  label: string;
+  busy: boolean;
+  error: string | null;
+}
+
+export function desktopUpdateSkewView(state: DesktopUpdateState, t: TFunc): DesktopUpdateSkewView {
+  if (state.status === 'idle' || state.status === 'current' || state.status === 'offline') {
+    return { label: t('更新 Cairn'), busy: false, error: null };
+  }
+  const view = desktopUpdateView(state, t);
+  return {
+    label: view.label,
+    busy: view.busy,
+    error: state.status === 'error' ? state.message : null,
+  };
+}
+
+export function useDesktopUpdateState(): DesktopUpdateState {
+  const [bridge] = useState(desktopUpdates);
+  const [state, setState] = useState<DesktopUpdateState>({ status: 'idle' });
+
+  useEffect(() => {
+    if (bridge === null) return;
+    void bridge.state().then((initial) => {
+      if (initial !== null) setState(initial);
+    });
+    return bridge.subscribe(setState);
+  }, [bridge]);
+
+  return state;
+}
+
+export function UpdateCairnButton({
+  size = 'sm',
+  variant = 'outline',
+  className,
+  testId = 'desktop-skew-update',
+}: {
+  size?: 'xs' | 'sm' | 'default';
+  variant?: 'outline' | 'default' | 'ghost';
+  className?: string;
+  testId?: string;
+}) {
+  const { t } = useI18n();
+  const state = useDesktopUpdateState();
+  const [starting, setStarting] = useState(false);
+  const view = desktopUpdateSkewView(state, t);
+  const busy = starting || view.busy;
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      data-testid={testId}
+      className={cn('flex-none', className)}
+      disabled={busy}
+      title={view.error ?? undefined}
+      onClick={() => {
+        if (busy) return;
+        setStarting(true);
+        void updateDesktopNow().finally(() => setStarting(false));
+      }}
+    >
+      {view.label}
+    </Button>
+  );
+}
+
+export function UpdateCairnNotice({
+  message,
+  className,
+  testId = 'desktop-skew-notice',
+  buttonTestId = 'desktop-skew-update',
+}: {
+  message: string;
+  className?: string;
+  testId?: string;
+  buttonTestId?: string;
+}) {
+  return (
+    <div
+      data-testid={testId}
+      className={cn('flex min-w-0 flex-wrap items-center justify-between gap-2', className)}
+    >
+      <p className="m-0 min-w-0 flex-1 text-meta text-content-secondary">{message}</p>
+      <UpdateCairnButton testId={buttonTestId} />
+    </div>
+  );
+}
+
 const BLOCKER_HINTS: Record<DesktopUpdateBlocker, string> = {
   development: '开发版不检查更新',
   'not-in-applications': '把 Cairn 移到「应用程序」后才能自动更新',
@@ -172,15 +262,7 @@ export function DesktopUpdateButton({
 }) {
   const { t } = useI18n();
   const [bridge] = useState(desktopUpdates);
-  const [state, setState] = useState<DesktopUpdateState>({ status: 'idle' });
-
-  useEffect(() => {
-    if (bridge === null) return;
-    void bridge.state().then((initial) => {
-      if (initial !== null) setState(initial);
-    });
-    return bridge.subscribe(setState);
-  }, [bridge]);
+  const state = useDesktopUpdateState();
 
   if (bridge === null) return null;
 

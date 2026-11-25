@@ -196,9 +196,10 @@ test('Antigravity re-sign-in without a desktop sign-in bridge explains where to 
   await page.goto('/app/settings/routing?item=subscription:ag-exp-1');
   await page.getByTestId('subscription-sign-in-again').click();
   const dialog = page.getByRole('dialog', { name: '重新登录 Antigravity' });
-  await expect(dialog.getByTestId('antigravity-relogin-state')).toHaveText(
-    '在 Cairn 桌面 App 中打开这一页，即可重新登录 Antigravity。',
+  await expect(dialog.getByTestId('antigravity-relogin-state')).toContainText(
+    '更新 Cairn 后即可重新登录 Antigravity。',
   );
+  await expect(dialog.getByTestId('desktop-skew-update')).toHaveText('更新 Cairn');
   await expect(dialog.getByRole('textbox')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
   await expect(dialog.getByTestId('antigravity-relogin-start')).toHaveCount(0);

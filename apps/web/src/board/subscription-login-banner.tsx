@@ -60,7 +60,6 @@ export function SubscriptionLoginBanner<Kind extends string>({
         data-testid={`${testIdPrefix}-login-banner`}
         tone="warning"
         icon={KeyRound}
-        className="mt-4"
         title={singleTitle}
         body={
           <span data-testid={`${testIdPrefix}-login-warning`} data-login={only.kind}>
@@ -77,7 +76,6 @@ export function SubscriptionLoginBanner<Kind extends string>({
       data-testid={`${testIdPrefix}-login-banner`}
       tone="warning"
       icon={KeyRound}
-      className="mt-4"
       title={title}
       body={<span data-testid={`${testIdPrefix}-login-summary`}>{body}</span>}
       actions={action}

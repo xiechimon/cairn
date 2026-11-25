@@ -1,8 +1,4 @@
-import type {
-  DesktopLocalProvider,
-  DesktopProviderImportInput,
-  DesktopProviderImportResult,
-} from '@cairn/shared';
+import type { DesktopLocalProvider } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
@@ -12,19 +8,9 @@ import { Card } from '../components/ui/card.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError } from '../components/ui/toaster.js';
+import { localProviderBridge } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-
-interface LocalProviderBridge {
-  scan: () => Promise<DesktopLocalProvider[]>;
-  import: (input: DesktopProviderImportInput) => Promise<DesktopProviderImportResult[]>;
-}
-
-function localProviderBridge(): LocalProviderBridge | null {
-  const desktop = (window as Window & { cairnDesktop?: { localProviders?: LocalProviderBridge } })
-    .cairnDesktop;
-  return desktop?.localProviders ?? null;
-}
 
 type Row = Omit<DesktopLocalProvider, 'state'> & {
   state: DesktopLocalProvider['state'] | 'exists';

@@ -587,9 +587,9 @@ export function HomeC({
           {banner != null && (
             <div
               data-home-banner=""
-              className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-chat flex-none overflow-y-auto pt-3 pb-px"
+              className="max-h-[40dvh] w-full flex-none overflow-y-auto px-4 pt-3 pb-1"
             >
-              {banner}
+              <div className="mx-auto w-full max-w-chat">{banner}</div>
             </div>
           )}
           <ConversationBoundary key={channelKey} resetKey={conversationResetKey}>

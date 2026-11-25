@@ -1,13 +1,24 @@
 import {
+  type AntigravityLocalStatus,
+  type AntigravityLoginOutcome,
+  type AntigravityLoginPhase,
+  type AntigravitySignInOutcome,
   DESKTOP_SHELL_USER_AGENT,
   DESKTOP_TRAY_PATH,
   type DesktopActivity,
+  type DesktopLocalProvider,
   type DesktopMenuCommand,
   type DesktopNotifyPayload,
+  type DesktopProviderImportInput,
+  type DesktopProviderImportResult,
   type DesktopRollbackNotice,
+  type DesktopSubscriptionInput,
   type DesktopTrayOpen,
   type DesktopTrayState,
   type DesktopUpdateState,
+  type DevinLocalStatus,
+  type DevinLoginOutcome,
+  type HostPermissions,
   type NativeTrayMenu,
   type RemoteVersionState,
 } from '@cairn/shared';
@@ -184,6 +195,66 @@ export function desktopUpdates(): DesktopUpdateBridge | null {
     (window as Window & { cairnDesktop?: { update?: DesktopUpdateBridge } }).cairnDesktop?.update ??
     null
   );
+}
+
+export interface AntigravityBridge {
+  status: () => Promise<AntigravityLocalStatus>;
+  import: (input: DesktopSubscriptionInput) => Promise<AntigravityLoginOutcome>;
+  signIn: () => Promise<AntigravitySignInOutcome>;
+  cancelLogin: () => Promise<void>;
+  onLoginProgress?: (listener: (phase: AntigravityLoginPhase) => void) => () => void;
+}
+
+export function antigravityBridge(): AntigravityBridge | null {
+  const bridge = (window as Window & { cairnDesktop?: { antigravity?: AntigravityBridge } })
+    .cairnDesktop?.antigravity;
+  return typeof bridge?.signIn === 'function' ? bridge : null;
+}
+
+export interface DevinBridge {
+  status: () => Promise<DevinLocalStatus>;
+  import: (input: DesktopSubscriptionInput) => Promise<DevinLoginOutcome>;
+  login: (input: DesktopSubscriptionInput) => Promise<DevinLoginOutcome>;
+  cancelLogin: () => Promise<void>;
+}
+
+export function devinBridge(): DevinBridge | null {
+  return (
+    (window as Window & { cairnDesktop?: { devin?: DevinBridge } }).cairnDesktop?.devin ?? null
+  );
+}
+
+export interface LocalProviderBridge {
+  scan: () => Promise<DesktopLocalProvider[]>;
+  import: (input: DesktopProviderImportInput) => Promise<DesktopProviderImportResult[]>;
+}
+
+export function localProviderBridge(): LocalProviderBridge | null {
+  return (
+    (window as Window & { cairnDesktop?: { localProviders?: LocalProviderBridge } }).cairnDesktop
+      ?.localProviders ?? null
+  );
+}
+
+export interface LocalRunnerBridge {
+  reconnect: () => Promise<void>;
+}
+
+export function localRunnerBridge(): LocalRunnerBridge | null {
+  return (
+    (window as Window & { cairnDesktop?: { localRunner?: LocalRunnerBridge } }).cairnDesktop
+      ?.localRunner ?? null
+  );
+}
+
+export interface OwnComputerBridge {
+  guide: () => Promise<boolean | null>;
+  permissions: () => Promise<HostPermissions | null>;
+}
+
+export function ownComputerBridge(): OwnComputerBridge | undefined {
+  return (window as Window & { cairnDesktop?: { ownComputer?: OwnComputerBridge } }).cairnDesktop
+    ?.ownComputer;
 }
 
 export async function showPendingRollbackNotice(): Promise<void> {
