@@ -11,7 +11,7 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 macOS 从[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 DMG：Apple 芯片用 arm64，Intel 用 x64。拖进“应用程序”再打开。应用还没有公证；被拦时到“系统设置 → 隐私与安全性”点“仍要打开”（macOS 14 及更早：右键应用选“打开”）。它会启动服务端和 pi Runner，并以 owner 身份登录。不需要 Node.js、单独安装 pi 或 Codex CLI。接着看[接入模型](/zh-cn/docs/models/)。
 
-Linux x64 桌面端目前是 **本地源码构建**，没有公开下载包或自动更新。按[桌面构建和解压步骤](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive)操作，需要图形会话、Git、bubblewrap 0.11+ 和可用的 systemd 用户会话，解压到 `/tmp` 之外。应用自带服务端和 Runner，退出会停止两者。无图形界面的 Linux 服务端用下面的 npm 路线。
+Linux x64 桌面端目前是 **本地源码构建**，没有公开下载包或自动更新。按[桌面构建和解压步骤](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive)操作，需要图形会话和 Git。应用自带服务端和 Runner，退出会停止两者。无图形界面的 Linux 服务端用下面的 npm 路线。
 
 ## 需要什么
 
@@ -52,7 +52,7 @@ Linux x64 桌面端目前是 **本地源码构建**，没有公开下载包或�
 
 </Steps>
 
-界面跟随浏览器语言。首次向导依次显示 **接入模型** 和 **确认设置**，后者分别核对 Coordinator 和任务模型。按[接入模型](/zh-cn/docs/models/)操作后确认选择。独立的 npm 安装还要[连接 Runner](/zh-cn/docs/runner/)。Linux 上请检查任务沙箱已就绪，不要只看 Online。
+界面跟随浏览器语言。首次向导依次显示 **接入模型** 和 **确认设置**（核对 Coordinator 模型，任务默认复用该模型）。按[接入模型](/zh-cn/docs/models/)操作后确认选择。独立的 npm 安装还要[连接 Runner](/zh-cn/docs/runner/) 并确认其在线。
 
 macOS 和 Windows 的 npm 浏览器配对不是 owner 会话，目前不能添加模型连接或批准 Runner。按[上手指南](https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#run-the-server)用 owner-token API，或改用自带 owner 登录的 Mac 桌面应用。浏览器配对成功不等于模型设置完成。
 

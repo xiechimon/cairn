@@ -5,7 +5,7 @@ description: 建一个项目，说一件事，一路看到任务完成。
 
 import { Aside } from '@astrojs/starlight/components';
 
-开始之前，先[接入模型](/zh-cn/docs/models/)，在 **确认设置** 核对 Coordinator 和任务模型，再点 **确认并开始聊天**。全新且只有 Codex 的设置，两项都是 GPT-6.1 Sol，任务通过 pi 执行。还需要[一台 Runner](/zh-cn/docs/runner/) 在线且任务沙箱就绪；桌面应用会自带 Runner，npm 服务端不会。
+开始之前，先[接入模型](/zh-cn/docs/models/)，在 **确认设置** 核对 Coordinator 模型（任务默认复用它），再点 **确认并开始对话**。全新且只连接 ChatGPT 订阅时，模型为 GPT-6.1 Sol，任务通过 pi 执行。还需要[一台 Runner](/zh-cn/docs/runner/) 在线；桌面应用会自带 Runner，npm 服务端不会。
 
 下面用一个本地仓库，从提需求一路走到任务完成，大约几分钟。
 
@@ -56,7 +56,7 @@ thread 跑的过程中可能会停下来问你：
 - 报告最后的“需要你定的”：最多三条，每条带选项和推荐。
 
 <Aside type="caution" title="一直在“排队中”">
-任务停在 `排队中`，后面写着“任务沙箱没就绪”，说明那台 Linux Runner 不是独立的 systemd 用户单元，或者没装 bubblewrap（`bwrap`）。装好之后在那台机器上运行 `cairn restart`，见[在 Linux 上保持常驻](/zh-cn/docs/runner/#在-linux-上保持常驻)。
+如果任务停在 `排队中`，看它旁边显示的原因，并到 **设置 → 执行机** 确认有符合条件的执行机在线。本地文件夹项目要求绑定的那台执行机在线；使用可选运行时（如 Claude Code）时，确认对应执行机已安装该运行时，并用 `cairn logs -f` 查看日志。
 </Aside>
 
 ## 4. 做完之后

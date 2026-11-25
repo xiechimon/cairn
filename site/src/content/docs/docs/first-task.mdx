@@ -5,7 +5,7 @@ description: Create a project, say one thing, and follow it until the task is do
 
 import { Aside } from '@astrojs/starlight/components';
 
-Before you start, [connect a model](/docs/models/), review Coordinator and Tasks in **Confirm settings**, then click **Confirm and start chatting**. A fresh Codex-only setup uses GPT-6.1 Sol for both roles, with pi running tasks. You also need [a Runner](/docs/runner/) online with its task sandbox ready. Desktop starts that Runner for you; npm does not.
+Before you start, [connect a model](/docs/models/), review the Coordinator model in **Confirm settings** (tasks default to it), then click **Confirm and start chatting**. A fresh ChatGPT-only setup uses GPT-6.1 Sol, with pi running tasks. You also need [a Runner](/docs/runner/) online. Desktop starts that Runner for you; npm does not.
 
 This walk uses a local repository and goes from a request to a finished task, in a few minutes.
 
@@ -56,7 +56,7 @@ While it runs, the thread may stop to ask you something:
 - *Needs your decision* at the end of a report: at most three items, each with options and a recommendation.
 
 <Aside type="caution" title="Stuck in Queued">
-If the task stays `Queued` with a note that the task sandbox is not ready, that Linux Runner is not its own systemd user unit, or bubblewrap (`bwrap`) is not installed. Fix that, then run `cairn restart` on the machine; see [Keep it running on Linux](/docs/runner/#keep-it-running-on-linux).
+If the task stays `Queued`, check the reason shown next to it and inspect **Settings → Runners** to confirm an eligible Runner is online. For a local-folder project, the bound Runner must be online; for an optional runtime such as Claude Code, confirm that runtime is installed on the Runner and check `cairn logs -f`.
 </Aside>
 
 ## 4. When it is done

@@ -5,9 +5,9 @@ description: 让 agent 在你的一台机器上干活。
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Runner 就是装在要让 agent 干活的机器上的 `cairn` 守护进程。它从你的服务端领活，每个 thread 在这台机器上自己的 git worktree 里跑，代码和凭证都留在这台机器上。Runner 可以就是服务端所在的那台机器，以后再加别的。
+Runner 就是装在要让 agent 干活的机器上的 `cairn` 守护进程。它从你的服务端领活，每个 thread 直接在这台主机上自己的 git worktree 里跑，代码和凭证都留在这台机器上。Runner 可以就是服务端所在的那台机器，以后再加别的。
 
-桌面应用已经启动并批准内置 pi Runner，不用再为它安装第二份 CLI。下面的命令用于 npm 或其他机器。Runner 自带 pi，不依赖 Codex CLI 登录；请[在 Cairn 内连接模型](/zh-cn/docs/models/)。除了 Online，还要确认任务沙箱已就绪。
+桌面应用已经启动并批准内置 pi Runner，不用再为它安装第二份 CLI。下面的命令用于 npm 或其他机器。Runner 自带 pi，不依赖 Codex CLI 登录；请[在 Cairn 内连接模型](/zh-cn/docs/models/)。在 **设置 → 执行机** 确认这台执行机显示在线。
 
 <Aside type="tip">
 优先用一台常开的机器：台式机、家里的服务器或 VPS。笔记本会休眠、断网，活就得等它回来。
@@ -61,13 +61,9 @@ cairn logs -f        # 跟踪 daemon.log
 
 ## 在 Linux 上保持常驻
 
-在 Linux 上，任务跑在沙箱里。沙箱需要装好 [bubblewrap](https://github.com/containers/bubblewrap)（`bwrap`，多数发行版的包名是 `bubblewrap`），并且守护进程是一个独立的 systemd 用户单元。`cairn start` 和 `cairn restart` 会把它作为一个随会话存在的单元 `cairn-daemon-<id>.service` 运行，并打印单元名。
+任务直接在这台执行机主机的独立 git worktree 里运行，不需要容器运行时或 bubblewrap 沙箱。在 Linux 上，`cairn start` 和 `cairn restart` 会优先以随会话存在的 systemd 用户单元 `cairn-daemon-<id>.service` 启动并打印单元名；如果 `systemd-run --user` 不可用，会打印警告并退回普通后台进程，同样可以正常领取和运行任务。
 
-<Aside type="caution" title="显示在线，但任务一直排队">
-如果 `systemd-run --user` 失败，`cairn start` 会打一条警告，退回成普通后台进程。这样的 Runner 显示在线，却起不了沙箱，任务只会一直排队，`Runner` 设置页里它那一行会写“任务沙箱没就绪”。看一眼启动输出，装好 `bwrap`，再用下面的单元。
-</Aside>
-
-这种单元在你注销或重启后就没了。要让 Runner 一直在：先按上面注册一次，用 `cairn stop` 停掉，再建 `~/.config/systemd/user/cairn-daemon.service`。两个路径用 `command -v cairn` 和 `command -v node` 查：
+随会话存在的单元或普通后台进程在你注销或重启后会停止。要让 Runner 跨注销和重启一直运行：先按上面注册一次，用 `cairn stop` 停掉，再建 `~/.config/systemd/user/cairn-daemon.service`。两个路径用 `command -v cairn` 和 `command -v node` 查：
 
 ```ini title="~/.config/systemd/user/cairn-daemon.service"
 [Unit]

@@ -32,7 +32,7 @@ Tell one Coordinator what you want, from code to your own affairs. It opens a th
 - **Research, then build.** A thread reads how strong open-source projects solved the problem before it changes anything, and decides the details itself.
 - **Only what needs you.** The home page pins the decisions waiting on you, and a push goes out only when you must act.
 - **Results you can trust.** Before an agent merges, the gate counts only review verdicts bound to the current patch. Anything that cannot be undone waits for your yes.
-- **Your machines, your data.** A daemon on each machine runs threads in their own git worktree, or in a throwaway container where the host supports it. Code and credentials stay with you.
+- **Your machines, your data.** A daemon on each machine runs threads directly on that host in their own git worktree. Code and credentials stay on your machines.
 - **Your own affairs (planned).** Mail, calendar and job search as a project with no repository: agents read, sort and draft; sending and submitting wait for you.
 
 <table>
@@ -79,7 +79,7 @@ You decide what you want and the architecture. The thread does the rest:
 
 The bundled Runner includes **pi**, which can run tasks with your Codex subscription or a provider API key. You do not need to install pi or the Codex CLI. Claude Code is an optional separate runtime, not a prerequisite.
 
-**On Linux**, use the npm server and Runner below, or [build the Linux x64 desktop archive](./apps/desktop/README.md#linux-x64-archive) from source. There is no published Linux desktop download or Linux automatic update. The archive needs a graphical session, systemd user services and bubblewrap 0.11+; extract it outside `/tmp`. Like the Mac app, it starts its own server and Runner and signs you in locally.
+**On Linux**, use the npm server and Runner below, or [build the Linux x64 desktop archive](./apps/desktop/README.md#linux-x64-archive) from source. There is no published Linux desktop download or Linux automatic update. The archive needs a graphical Linux session and Git. Like the Mac app, it starts its own server and Runner and signs you in locally.
 
 **For the npm server or an extra Runner**, use Node.js 22.19+ on the 22 or 24 LTS line, and Git:
 
@@ -94,16 +94,16 @@ npm i -g @xiechimon/cairn-cli
 cairn start --server http://127.0.0.1:8787
 ```
 
-It prints a link; open it in the browser where Cairn is open and approve the machine. Use your server's address instead when the Runner is on another machine. A Linux Runner also needs bubblewrap for its task sandbox; see [getting started](./docs/getting-started.md#keep-the-daemon-running-on-linux). On macOS and Windows, the npm server's browser cannot yet approve that machine or add providers; those need the owner token, as [getting started](./docs/getting-started.md#run-the-server) shows.
+It prints a link; open it in the browser where Cairn is open and approve the machine. Use your server's address instead when the Runner is on another machine. On Linux, see [getting started](./docs/getting-started.md#keep-the-daemon-running-on-linux) to keep the Runner running across logouts and reboots. On macOS and Windows, the npm server's browser cannot yet approve that machine or add providers; those need the owner token, as [getting started](./docs/getting-started.md#run-the-server) shows.
 
 ### Connect a model and get your first result
 
-1. In **Connect models**, choose **OpenAI Codex**. Open the displayed device-login link in your browser, sign in to your own OpenAI account, and enter the code. Keep Cairn open until authorization completes. This connects your subscription inside Cairn; `codex login` is not required. Alternatively add your own provider API key or custom endpoint. Later connections live under **Settings → Model services**.
-2. Review **Confirm settings** and the models for **Coordinator** and **Tasks**, then click **Confirm and start chatting**. On a fresh installation with only Codex connected, both show **GPT-6.1 Sol**, with tasks using **pi**. Other connections or saved rules can change the selection; use the actual confirmation screen, not a presumed universal default.
-3. Check that a Runner is online and its **task sandbox is ready**. On Linux, Online alone is not enough: [check systemd and bubblewrap](./docs/getting-started.md#keep-the-daemon-running-on-linux).
+1. In **Connect models**, choose **ChatGPT subscription**. Open the displayed device-login link in your browser, sign in to your own OpenAI account, and enter the code. Keep Cairn open until authorization completes. This connects your subscription inside Cairn; `codex login` is not required. Alternatively add your own provider API key or custom endpoint. Later connections live under **Settings → Model** (in the **Providers** section).
+2. Review **Confirm settings** and the model for **Coordinator** (tasks default to the Coordinator model), then click **Confirm and start chatting**. On a fresh installation with only a ChatGPT subscription connected, **Coordinator** selects **GPT-6.1 Sol**, with tasks using **pi**. Other connections or saved rules can change the selection; use the actual confirmation screen, not a presumed universal default.
+3. Check that a Runner is online under **Settings → Runners** (the desktop app starts and approves its bundled Runner automatically).
 4. Choose **New project → Select repo → Local folder** and select a small, initialized Git repository on that Runner. This needs no GitHub connection. Ask, for example, “Change the README title to Hello; do not push or merge.” Open **Tasks** to inspect the change and test results. Completed work stays on its task branch until you ask to merge. [First-task walkthrough and a throwaway repository](./site/src/content/docs/docs/first-task.mdx).
 
-For optional Claude Code tasks, install `claude` on each Runner and connect a subscription token from `claude setup-token` in Model services; a local CLI login alone does not supply Cairn's task subscription. Devin downloads only after a Devin subscription is connected and enabled. See [model connection details](./site/src/content/docs/docs/models.mdx). To follow along from your phone, see [private access over Tailscale](./docs/deploy/tailscale-mobile.md). Docker and building from source are in [getting started](./docs/getting-started.md).
+For optional Claude Code tasks, install `claude` on each Runner and connect a subscription token from `claude setup-token` under **Settings → Model**; a local CLI login alone does not supply Cairn's task subscription. Devin downloads only after a Devin subscription is connected and enabled. See [model connection details](./site/src/content/docs/docs/models.mdx). To follow along from your phone, see [private access over Tailscale](./docs/deploy/tailscale-mobile.md). Running the server in Docker and building from source are in [getting started](./docs/getting-started.md).
 
 ## "Wait, what are you selling?"
 
@@ -157,7 +157,7 @@ It is not the right fit if you want:
 
 Questions, setup help and "how do I do X with cairn" go to [GitHub Discussions](https://github.com/xiechimon/cairn/discussions): the **Q&A** category for questions and **Show and tell** for what you built. Bugs and feature work go to the [issue tracker](https://github.com/xiechimon/cairn/issues), where a maintainer labels them before an agent picks them up. Security reports go to neither place; see [SECURITY.md](./SECURITY.md). Cairn is built with Cairn: agents inside it take its own tickets and open the pull requests.
 
-After your first pull request merges, Cairn can show a dismissible card linking to a prefilled discussion post. The card is off by default, Cairn opens nothing on its own, and nothing is sent anywhere: you choose whether to submit the post. [docs/privacy.md](./docs/privacy.md) lists the exact fields the prefilled text carries.
+For details on what Cairn stores locally and what configured integrations or optional services send, see [docs/privacy.md](./docs/privacy.md).
 
 ## Acknowledgments
 

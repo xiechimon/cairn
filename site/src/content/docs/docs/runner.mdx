@@ -5,9 +5,9 @@ description: Let agents work on one of your machines.
 
 import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-A Runner is the `cairn` daemon on a machine where agents should work. It claims work from your server and runs each thread in its own git worktree on that machine, so code and credentials stay there. One Runner can be the same machine as the server; you can add more later.
+A Runner is the `cairn` daemon on a machine where agents should work. It claims work from your server and runs each thread directly on that host in its own git worktree, so code and credentials stay there. One Runner can be the same machine as the server; you can add more later.
 
-The desktop app already starts and approves its bundled pi Runner; do not install a second CLI for it. The commands below are for npm or extra machines. pi is included in the Runner and does not require a Codex CLI login. [Connect your model in Cairn](/docs/models/). Check that the task sandbox is ready as well as Online.
+The desktop app already starts and approves its bundled pi Runner; do not install a second CLI for it. The commands below are for npm or extra machines. pi is included in the Runner and does not require a Codex CLI login. [Connect your model in Cairn](/docs/models/). Check that the Runner shows as online under **Settings → Runners**.
 
 <Aside type="tip">
 Prefer a machine that stays on, such as a desktop, a home server or a VPS. A laptop sleeps or drops off the network, and work waits until it is back.
@@ -61,13 +61,9 @@ cairn logs -f        # follow daemon.log
 
 ## Keep it running on Linux
 
-On Linux, tasks run in a sandbox that needs [bubblewrap](https://github.com/containers/bubblewrap) (`bwrap`, in most distributions' `bubblewrap` package) and the daemon running as its own systemd user unit. `cairn start` and `cairn restart` run it as a transient unit, `cairn-daemon-<id>.service`, and print its name.
+Tasks run directly on the Runner host in isolated git worktrees; no container runtime or bubblewrap sandbox is required. On Linux, `cairn start` and `cairn restart` try to run the daemon as a transient systemd user unit (`cairn-daemon-<id>.service`) and print its name. When `systemd-run --user` is unavailable, they print a warning and fall back to a plain background process, which still runs tasks normally.
 
-<Aside type="caution" title="Online but nothing runs">
-When `systemd-run --user` fails, `cairn start` prints a warning and falls back to a plain background process. That Runner shows online but cannot start the sandbox, so tasks wait in the queue, and its row under `Runners` says the task sandbox is not ready. Read the start output, install `bwrap`, and use the unit below.
-</Aside>
-
-A transient unit ends when you log out or reboot. To keep the Runner up, enroll it once as above, stop it with `cairn stop`, and create `~/.config/systemd/user/cairn-daemon.service`. Use `command -v cairn` and `command -v node` for the two paths:
+A transient unit or plain background process ends when you log out or reboot. To keep the Runner up across logouts and reboots, enroll it once as above, stop it with `cairn stop`, and create `~/.config/systemd/user/cairn-daemon.service`. Use `command -v cairn` and `command -v node` for the two paths:
 
 ```ini title="~/.config/systemd/user/cairn-daemon.service"
 [Unit]

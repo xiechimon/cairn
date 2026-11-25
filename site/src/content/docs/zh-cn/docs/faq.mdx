@@ -17,7 +17,7 @@ description: 常见问题，以及事情不动时该查什么。
 
 ## 我的代码和凭证会去哪？
 
-都留在你自己的机器上。thread 跑在你的 Runner 上，每个在 `~/.cairn/workspaces` 下自己的 git worktree 里。你添加的服务商 key 加密存在你的服务端。模型调用从你的机器直接发给你选的服务商。
+默认都留在你自己的机器上。thread 直接跑在你的 Runner 上，每个在 `~/.cairn/workspaces` 下自己的 git worktree 里。你添加的服务商 key 和密钥加密存在你的服务端。模型调用从你的机器发给你选的服务商。关于本地存储以及已配置集成或可选服务会发送哪些数据的完整说明，见 [privacy.md](https://github.com/xiechimon/cairn/blob/main/docs/privacy.md)。
 
 ## 能帮我处理邮件、日程、求职吗？
 
@@ -27,13 +27,13 @@ description: 常见问题，以及事情不动时该查什么。
 
 首页会显示还缺哪一步设置。按顺序过一遍：
 
-1. 在 `接入模型` 完成 Cairn 内的 Codex 设备登录，或添加自己的 API key。本机 Claude CLI 登录不能代替 Cairn 的订阅设置。见[接入模型](/zh-cn/docs/models/)。
-2. 在 `确认设置` 核对 Coordinator 和任务，再确认。全新且只有 Codex 的设置是 GPT-6.1 Sol、任务用 pi；已有规则可能不同，到 `设置 → 模型` 查看。
-3. 确认 Runner 在线且任务沙箱已就绪。桌面应用自带一台，npm 服务端还要单独接入。见[连接 Runner](/zh-cn/docs/runner/)。
+1. 在 `接入模型` 完成 Cairn 内的 ChatGPT 订阅设备登录，或添加自己的 API key。本机 Claude CLI 登录不能代替 Cairn 的订阅设置。见[接入模型](/zh-cn/docs/models/)。
+2. 在 `确认设置` 核对 Coordinator 模型（任务默认复用它），再确认。全新且只连接 ChatGPT 订阅的设置是 GPT-6.1 Sol、任务用 pi；已有规则可能不同，到 `设置 → 模型` 查看。
+3. 到 `设置 → 执行机` 确认 Runner 在线。桌面应用自带一台，npm 服务端还要单独接入。见[连接 Runner](/zh-cn/docs/runner/)。
 
 ## Runner 显示在线，任务却一直排队
 
-在 Linux 上，这是任务沙箱没就绪：没装 bubblewrap（`bwrap`），或者守护进程不是独立的 systemd 用户单元。任务的 `排队中` 后面会写明。装好 `bwrap`，看 `cairn start` 的输出里有没有关于 `systemd-run --user` 的警告，然后把守护进程跑成用户服务：见[在 Linux 上保持常驻](/zh-cn/docs/runner/#在-linux-上保持常驻)。`cairn logs -f` 能看到守护进程在干什么。
+看任务 `排队中` 旁边写的原因。常见情况包括：本地文件夹项目绑定到了另一台离线执行机；在线执行机未安装该任务需要的可选运行时（如 Claude Code）；或 `设置 → 模型` 里所选模型缺少可用连接/订阅已过期。在执行机运行 `cairn logs -f` 可以看到守护进程的详细日志。
 
 ## Runner 掉线了
 

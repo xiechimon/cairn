@@ -32,7 +32,7 @@
 - **先研究，再动手。** thread 改东西之前，先看几个强的开源项目是怎么解决的，细节自己定。
 - **只在需要你时打扰。** 首页只置顶等你拍板的事，推送也只发需要你动手的事。
 - **结果可信。** agent 合并前，合并闸只认绑定当前补丁的审核结论。撤不回的动作都等你点头。
-- **你的机器，你的数据。** 每台机器跑一个 daemon，thread 在独立的 git worktree 里干活，主机支持时也可以放进用完即弃的容器。代码和凭据不出你的机器。
+- **你的机器，你的数据。** 每台机器跑一个 daemon，thread 直接在这台主机上各自的 git worktree 里干活。代码和凭据留在你自己的机器上。
 - **你自己的事（计划中）。** 邮件、日程、求职作为一个不挂仓库的项目：agent 负责读、分类、起草；发出去、投出去都等你。
 
 <table>
@@ -79,7 +79,7 @@
 
 内置 Runner 自带 **pi**，可以用你的 Codex 订阅或服务商 API key 跑任务，不需要另装 pi 或 Codex CLI。Claude Code 是可选的独立运行时，不是安装前提。
 
-**Linux 上**可以用下面的 npm 服务端和 Runner，也可以[从源码构建 Linux x64 桌面归档](./apps/desktop/README.md#linux-x64-archive)。目前没有公开提供的 Linux 桌面安装包或自动更新。归档需要图形会话、systemd 用户服务和 bubblewrap 0.11+，必须解压到 `/tmp` 之外；它和 Mac 应用一样会自带服务端、Runner 并自动登录本机。
+**Linux 上**可以用下面的 npm 服务端和 Runner，也可以[从源码构建 Linux x64 桌面归档](./apps/desktop/README.md#linux-x64-archive)。目前没有公开提供的 Linux 桌面安装包或自动更新。归档需要图形会话和 Git；它和 Mac 应用一样会自带服务端、Runner 并自动登录本机。
 
 **用 npm 跑服务端或增加 Runner**，需要 Node.js 22.19+（22 或 24 LTS）和 Git：
 
@@ -94,16 +94,16 @@ npm i -g @xiechimon/cairn-cli
 cairn start --server http://127.0.0.1:8787
 ```
 
-它会打印一个链接；在打开着 Cairn 的浏览器里打开它，批准这台机器。执行机在别的机器上时，换成你 server 的地址。Linux 执行机的任务沙箱还需要 bubblewrap，见[上手指南](./docs/getting-started.md#keep-the-daemon-running-on-linux)。在 macOS 和 Windows 上用 npm 跑 server 时，浏览器暂时不能批准这台机器、也不能添加服务商，这些要用 owner token 来做，见[上手指南](./docs/getting-started.md#run-the-server)。
+它会打印一个链接；在打开着 Cairn 的浏览器里打开它，批准这台机器。执行机在别的机器上时，换成你 server 的地址。Linux 上如果想在注销或重启后保持常驻，见[上手指南](./docs/getting-started.md#keep-the-daemon-running-on-linux)。在 macOS 和 Windows 上用 npm 跑 server 时，浏览器暂时不能批准这台机器、也不能添加服务商，这些要用 owner token 来做，见[上手指南](./docs/getting-started.md#run-the-server)。
 
 ### 接上模型，拿到第一个结果
 
-1. 在 **接入模型（Connect models）** 里选 **OpenAI Codex**。在浏览器打开页面给出的设备登录链接，登录你自己的 OpenAI 账户并输入设备码；保持 Cairn 打开，等授权完成。这是在 Cairn 内接入订阅，不用先执行 `codex login`。也可以添加自己的服务商 API key 或自定义端点。以后在 **设置 → 模型服务** 管理连接。
-2. 到 **确认设置（Confirm settings）**，核对 **Coordinator** 和 **任务（Tasks）** 的模型，再点 **确认并开始聊天**。全新安装且只连接 Codex 时，两项都显示 **GPT-6.1 Sol**，任务用 **pi** 执行。其他连接或已保存规则可能改变选择，以确认页为准，不存在所有安装都相同的默认模型。
-3. 确认 Runner 在线，而且 **任务沙箱已就绪**。Linux 上仅显示 Online 不够，见 [systemd 和 bubblewrap 检查](./docs/getting-started.md#keep-the-daemon-running-on-linux)。
+1. 在 **接入模型（Connect models）** 里选 **ChatGPT 订阅**。在浏览器打开页面给出的设备登录链接，登录你自己的 OpenAI 账户并输入设备码；保持 Cairn 打开，等授权完成。这是在 Cairn 内接入订阅，不用先执行 `codex login`。也可以添加自己的服务商 API key 或自定义端点。以后在 **设置 → 模型**（**服务商** 区域）管理连接。
+2. 到 **确认设置（Confirm settings）**，核对 **Coordinator** 的模型（任务默认使用 Coordinator 的模型），再点 **确认并开始对话**。全新安装且只连接 ChatGPT 订阅时，显示 **GPT-6.1 Sol**，任务用 **pi** 执行。其他连接或已保存规则可能改变选择，以确认页为准，不存在所有安装都相同的默认模型。
+3. 在 **设置 → 执行机** 确认有一台执行机在线（桌面应用会自动启动并批准内置执行机）。
 4. 点 **新建项目 → 选择仓库 → 本地文件夹**，选 Runner 上一个已初始化的小 Git 仓库，无需连接 GitHub。比如说「把 README 标题改成 Hello，不推送、不合并」。打开 **任务** 查看改动和测试结果；完成后保留在任务分支，等你要求才合并。[首个任务步骤与一次性测试仓库](./site/src/content/docs/zh-cn/docs/first-task.mdx)。
 
-如果要用可选的 Claude Code 任务，在各 Runner 安装 `claude`，并把 `claude setup-token` 得到的订阅令牌接入模型服务；只在 CLI 登录并不等于给 Cairn 提供任务订阅。只有接入并启用 Devin 订阅后，Runner 才下载 Devin。更多见[模型连接说明](./site/src/content/docs/zh-cn/docs/models.mdx)。手机跟进见[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。Docker 和从源码构建见[上手指南](./docs/getting-started.md)。
+如果要用可选的 Claude Code 任务，在各 Runner 安装 `claude`，并把 `claude setup-token` 得到的订阅令牌添加到 **设置 → 模型**；只在 CLI 登录并不等于给 Cairn 提供任务订阅。只有接入并启用 Devin 订阅后，Runner 才下载 Devin。更多见[模型连接说明](./site/src/content/docs/zh-cn/docs/models.mdx)。手机跟进见[用 Tailscale 私网访问](./docs/deploy/tailscale-mobile.md)。用 Docker 跑服务端以及从源码构建见[上手指南](./docs/getting-started.md)。
 
 ## 「等等，你们卖什么？」
 
@@ -157,7 +157,7 @@ Cairn 是给一个人用的，不是给团队用的：你装一份自己用，�
 
 提问、部署求助、"cairn 里怎么做 X" 请走 [GitHub Discussions](https://github.com/xiechimon/cairn/discussions)：**Q&A** 分类问问题，**Show and tell** 分类晒你搭出来的东西。缺陷和功能需求走 [issue 追踪](https://github.com/xiechimon/cairn/issues)，维护者打上标签后才有 agent 接手。安全报告两边都不走，见 [SECURITY.md](./SECURITY.md)。Cairn 正在用它自己开发它自己：里面的 agent 领 Cairn 自己的票、开 PR。
 
-你的第一支 PR 合并后，cairn 可以显示一张可关闭的卡片，指向一条预填好的讨论帖。卡片默认关闭，cairn 自己不会打开任何页面，也不会向任何地方发送内容：是否发帖由你决定。预填内容包含哪些字段写在 [docs/privacy.md](./docs/privacy.md)。
+关于 Cairn 本地保存哪些数据，以及你配置的集成或可选服务会发送什么内容，见 [docs/privacy.md](./docs/privacy.md)。
 
 ## 致谢
 

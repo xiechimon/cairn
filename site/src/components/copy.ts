@@ -59,7 +59,7 @@ export const copy = {
         },
         {
           title: '你的机器，你的数据',
-          body: '每台机器跑一个 Runner。thread 在自己的 git worktree 里干活，主机支持时放进一次性容器。代码和凭证都留在你手里。',
+          body: '每台机器跑一个 Runner，thread 直接在这台主机上各自的 git worktree 里干活。代码和凭证留在你自己的机器上。',
         },
         {
           title: '只把要你的事交给你',
@@ -118,7 +118,7 @@ export const copy = {
         },
         {
           title: '接入模型，说第一件事',
-          body: '在接入模型里选 OpenAI Codex，按设备码在浏览器登录；不用另装 Codex CLI。确认 Coordinator 和任务模型（全新 Codex-only 设置是 GPT-6.1 Sol、任务用 pi），再建本地项目，说第一件事。也可用自己的 API key。',
+          body: '在接入模型里选 ChatGPT 订阅，按设备码在浏览器登录；不用另装 Codex CLI。在确认设置里核对 Coordinator 模型（全新仅连接 ChatGPT 订阅时为 GPT-6.1 Sol，任务默认复用该模型并用 pi 执行），再建本地项目，说第一件事。也可用自己的 API key。',
           code: null,
         },
       ],
@@ -182,7 +182,7 @@ export const copy = {
         },
         {
           title: 'Your machines, your data',
-          body: 'Each machine runs a Runner. Threads work in their own git worktree, or in a throwaway container where the host supports it. Code and credentials stay with you.',
+          body: 'Each machine runs a Runner. Threads work directly on that host in their own git worktree. Code and credentials stay on your machines.',
         },
         {
           title: 'Only what needs you',
@@ -241,7 +241,7 @@ export const copy = {
         },
         {
           title: 'Connect a model, say the first thing',
-          body: 'Choose OpenAI Codex in Connect models and sign in with its device code; no Codex CLI is needed. Confirm Coordinator and Tasks (GPT-6.1 Sol with pi tasks for a fresh Codex-only setup), then create a local project and ask for your first change. Your own API key works too.',
+          body: 'Choose ChatGPT subscription in Connect models and sign in with its device code; no Codex CLI is needed. Confirm the Coordinator model (GPT-6.1 Sol for a fresh ChatGPT-only setup; tasks use it by default through pi), then create a local project and ask for your first change. Your own API key works too.',
           code: null,
         },
       ],

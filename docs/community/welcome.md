@@ -24,7 +24,7 @@ Cairn runs an agent on your own machine and delivers gated pull requests: the ag
 
 ## Your first gated pull request
 
-If Cairn is the reason a pull request merged, the **Show and tell** category is a useful place to say what it changed and how long the first one took. Nothing is posted on your behalf: if Cairn offered you a prefilled post, you choose whether to submit it, and [docs/privacy.md](../privacy.md) lists exactly what the prefilled text contains.
+If Cairn helped land a pull request, the **Show and tell** category is a good place to share what it changed and what worked well. Cairn never posts to Discussions on your behalf; see [docs/privacy.md](../privacy.md) for what stays local and what configured integrations send.
 
 ## Conduct
 

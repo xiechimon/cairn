@@ -3,43 +3,43 @@ title: Connect a model
 description: Connect Codex inside Cairn, or use your own subscription token or API key.
 ---
 
-Cairn includes the pi execution engine, not a model subscription. Use your own account or API key. A fresh installation opens **Connect models**; later, open **Settings → Model services** to manage connections.
+Cairn includes the pi execution engine, not a model subscription. Use your own account or API key. A fresh installation opens **Connect models**; later, open **Settings → Model** (in the **Providers** section) to manage connections.
 
-## Codex subscription: no separate CLI required
+## ChatGPT / Codex subscription: no separate CLI required
 
-1. Choose **OpenAI Codex** in Connect models (or add a connection in Model services).
+1. Choose **ChatGPT subscription** in Connect models (or click **Add provider** under **Settings → Model**).
 2. Open the device-login link Cairn displays in your browser, sign in to your own OpenAI account, and enter the displayed code. Keep Cairn open until authorization finishes. If the code expires, start the login again.
-3. Return to **Confirm settings**. With only Codex connected on a fresh installation, **Coordinator** and **Tasks** both select **GPT-6.1 Sol**. Tasks use the bundled **pi** engine, not an external Codex process.
-4. Review the two model selections and click **Confirm and start chatting**.
+3. Return to **Confirm settings**. With only a ChatGPT subscription connected on a fresh installation, **Coordinator** selects **GPT-6.1 Sol** (tasks default to the Coordinator model and run through the bundled **pi** engine, not an external Codex process).
+4. Review the selection and click **Confirm and start chatting**.
 
 You do not need to install pi, install the Codex CLI, or run `codex login`. The Codex CLI's own login on a Runner is not the setup procedure for this connection.
 
 ## Provider API key or custom endpoint
 
-In Connect models or Model services, choose your provider and enter your own API key. For a relay or self-hosted service, choose **Custom endpoint** and supply its name, provider ID, base URL, API protocol and model IDs. Supported protocols include OpenAI Completions, OpenAI Responses and Anthropic Messages. A keyless endpoint can leave the key empty and disable the authorization header.
+In Connect models or **Settings → Model**, choose your provider and enter your own API key. For a relay or self-hosted service, choose **Custom endpoint** and supply its name, provider ID, base URL, API protocol and model IDs. Supported protocols include OpenAI Completions, OpenAI Responses and Anthropic Messages. A keyless endpoint can leave the key empty and disable the authorization header.
 
-Keys are encrypted on your server. Use **Test connection** to check the connection; it sends a model request and may incur provider charges. Review the actual Coordinator and Tasks selections before confirming setup rather than assuming every provider uses the Codex defaults.
+Keys are encrypted on your server. Use **Test connection** to check the connection; it sends a model request and may incur provider charges. Review the actual Coordinator selection before confirming setup rather than assuming every provider uses the ChatGPT defaults.
 
 ## Optional Claude Code subscription
 
 Claude Code is a separate runtime. Install `claude` on each Runner that should execute it. The Runner detects it on PATH or in the usual installation folders. Cairn tasks require a subscription token connected to the team; merely running `claude` to sign in locally does not replace this token.
 
 1. On a machine signed in to your Claude subscription, run `claude setup-token`.
-2. In Model services add **Claude**, tagged **Subscription**, give the connection a name and paste the token. Set its expiry if known.
-3. Use **Verify**. The server host also needs the Claude CLI for this check.
-4. Review Coordinator and Tasks in Confirm settings or **Settings → Model**. A usable Claude Code runtime and subscription offer `claude-sonnet-5-5` as the task default when no saved rule overrides it. The Coordinator has its own selection.
+2. Under **Settings → Model**, click **Add provider**, pick **Claude** (tagged **Subscription**), give the connection a name and paste the token. Set its expiry if known.
+3. Use **Verify** to check the token against the Anthropic account API.
+4. Review Coordinator in Confirm settings, or adjust Coordinator and task model rules under **Settings → Model**. A usable Claude Code runtime and subscription offer `claude-sonnet-5-5` as the task default when no saved rule overrides it. The Coordinator has its own selection.
 
 An Anthropic API key is a different connection and can run through pi; it does not require the Claude Code CLI.
 
 ## Optional Devin subscription
 
-Connect and enable a Devin subscription in Model services only if you want to use Devin. Runners download its managed runtime after the server reports an enabled, unexpired subscription; a pi-only installation does not download Devin. Installation and capability reporting may take a presence cycle (normally 30 seconds) before the runtime is available. Disabling a subscription prevents new installation attempts but does not remove an installed runtime or cancel a download already in progress.
+Connect and enable a Devin subscription under **Settings → Model** only if you want to use Devin. Runners download its managed runtime after the server reports an enabled, unexpired subscription; a pi-only installation does not download Devin. Installation and capability reporting may take a presence cycle (normally 30 seconds) before the runtime is available. Disabling a subscription prevents new installation attempts but does not remove an installed runtime or cancel a download already in progress.
 
 ## Defaults and saved rules
 
-There is no universal default independent of your connections. On a fresh Codex-only installation the confirmation screen shows GPT-6.1 Sol for both roles. With other connections, the defaults can differ: a usable Claude Code subscription/runtime is preferred for tasks; the Coordinator prefers an Anthropic API connection, then an eligible provider, then usable Claude Code. Saved Coordinator and Tasks rules take precedence. Inspect **Settings → Model** to see or change those selections.
+There is no universal default independent of your connections. On a fresh ChatGPT-only installation the confirmation screen shows GPT-6.1 Sol for Coordinator, and tasks use that model by default. With other connections, the defaults can differ: a usable Claude Code subscription/runtime is preferred for tasks; the Coordinator prefers an Anthropic API connection, then an eligible provider, then usable Claude Code. Saved Coordinator and task rules take precedence. Inspect **Settings → Model** to see or change those selections.
 
-You need both a model and an online Runner with a ready sandbox to finish [your first task](/docs/first-task/). On Linux, Online alone does not establish sandbox readiness; see [Runner setup](/docs/runner/#keep-it-running-on-linux).
+You need both a model and an online Runner to finish [your first task](/docs/first-task/).
 
 ## Where credentials live
 

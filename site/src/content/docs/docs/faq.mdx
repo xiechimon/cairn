@@ -17,7 +17,7 @@ No. Cairn runs on your machines. If you want nothing to install or keep running,
 
 ## Where do my code and credentials go?
 
-They stay on your machines. Threads run on your Runners, each in its own git worktree under `~/.cairn/workspaces`. Provider keys you add are encrypted on your server. Model calls go from your machines straight to the provider you chose.
+They stay on your machines by default. Threads run directly on your Runners, each in its own git worktree under `~/.cairn/workspaces`. Provider keys and secrets you add are encrypted on your server. Model calls go from your machines to the providers you chose. For the full breakdown of local storage and what configured integrations or optional services send, see [privacy.md](https://github.com/xiechimon/cairn/blob/main/docs/privacy.md).
 
 ## Can it handle mail, calendar and job search?
 
@@ -27,13 +27,13 @@ Not yet. That is planned as a project with no repository, where agents read, sor
 
 The home page shows the next setup step that is missing. Work through them in order:
 
-1. In `Connect models`, complete the in-app Codex device login or add your own API key. A local Claude CLI login alone is not Cairn's subscription setup. See [Connect a model](/docs/models/).
-2. In `Confirm settings`, check both Coordinator and Tasks, then confirm. A fresh Codex-only setup selects GPT-6.1 Sol with pi tasks. Existing rules can differ; inspect `Settings → Model`.
-3. Check the Runner is online and its task sandbox is ready. Desktop starts one for you; an npm server needs a separate Runner. See [Connect a Runner](/docs/runner/).
+1. In `Connect models`, complete the in-app ChatGPT subscription device login or add your own API key. A local Claude CLI login alone is not Cairn's subscription setup. See [Connect a model](/docs/models/).
+2. In `Confirm settings`, check the Coordinator model (tasks default to it), then confirm. A fresh ChatGPT-only setup selects GPT-6.1 Sol with pi tasks. Existing rules can differ; inspect `Settings → Model`.
+3. Check the Runner is online under `Settings → Runners`. Desktop starts one for you; an npm server needs a separate Runner. See [Connect a Runner](/docs/runner/).
 
 ## My Runner is online but tasks stay queued
 
-On Linux this means the task sandbox is not ready: bubblewrap (`bwrap`) is missing, or the daemon is not its own systemd user unit. The task says so after `Queued`. Install `bwrap`, look at the output of `cairn start` for a warning about `systemd-run --user`, and run the daemon as a user service: see [Keep it running on Linux](/docs/runner/#keep-it-running-on-linux). `cairn logs -f` shows what the daemon is doing.
+Read the reason shown next to `Queued`. Common causes are a local-folder project bound to a different offline Runner, an optional runtime (such as Claude Code) not installed on the online Runner, or a missing/expired model connection for the selected model under `Settings → Model`. Run `cairn logs -f` on the Runner to see what the daemon is doing.
 
 ## My Runner went offline
 
