@@ -96,7 +96,7 @@ test('a sent message scrolls into view even when the reader was scrolled up', as
   await evidenceShot(page, 'chief-follow-send.png');
 });
 
-test('every message, the newest included, shows its actions only on hover', async ({
+test('older messages show their actions on hover; the newest reply keeps its row shown', async ({
   page,
 }) => {
   await mockSlowSend(page, 6);
@@ -111,7 +111,7 @@ test('every message, the newest included, shows its actions only on hover', asyn
   const olderFoot = messageOf(page, 'answer 3').getByTestId('chief-msg-foot');
   const olderUserTools = messageOf(page, 'question 4').getByTestId('chief-msg-tools');
 
-  await expect.poll(() => opacityOf(newestFoot)).toBe(0);
+  await expect.poll(() => opacityOf(newestFoot)).toBe(1);
   await expect.poll(() => opacityOf(olderFoot)).toBe(0);
   await expect.poll(() => opacityOf(olderUserTools)).toBe(0);
 

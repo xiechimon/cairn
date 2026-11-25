@@ -487,8 +487,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
 
 export const REPLY_TEXT_CLS =
   'w-fit max-w-[min(100%,var(--container-reply))] rounded-sm font-reply text-reply font-normal text-pretty [&_ol]:leading-6 [&_ul]:leading-6 [overflow-wrap:anywhere] data-reply-highlight:bg-(--reply-bubble-highlight) data-reply-highlight:outline-8 data-reply-highlight:outline-solid data-reply-highlight:outline-(--reply-bubble-highlight)';
-export const REPLY_BLOCK_CLS =
-  'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply))]';
+export const REPLY_BLOCK_CLS = 'relative w-fit max-w-[min(100%,var(--container-reply))]';
 
 const isDiffFence = (group: ChatBubbleGroup) =>
   group.blocks.length === 1 &&
@@ -497,12 +496,10 @@ const isDiffFence = (group: ChatBubbleGroup) =>
 
 function ReplyGroup({
   group,
-  tools,
   highlighted,
   footer,
 }: {
   group: ChatBubbleGroup;
-  tools: ReactNode;
   highlighted: boolean;
   footer: ReactNode;
 }) {
@@ -511,7 +508,7 @@ function ReplyGroup({
       className={
         group.bubble
           ? REPLY_BLOCK_CLS
-          : cn('group/reply-block relative max-w-full', isDiffFence(group) ? 'w-full' : 'w-fit')
+          : cn('relative max-w-full', isDiffFence(group) ? 'w-full' : 'w-fit')
       }
       data-slot="reply-block"
       data-bubble={group.bubble ? 'true' : 'false'}
@@ -532,7 +529,6 @@ function ReplyGroup({
           {footer}
         </>
       )}
-      {tools}
     </div>
   );
 }
@@ -540,7 +536,6 @@ function ReplyGroup({
 export function ChatMarkdown({
   text,
   bubbles = false,
-  bubbleTools,
   bubbleFooter,
   highlight,
   streaming = false,
@@ -548,7 +543,6 @@ export function ChatMarkdown({
   text: string;
   streaming?: boolean;
   bubbles?: boolean;
-  bubbleTools?: (group: ChatBubbleGroup, index: number) => ReactNode;
   bubbleFooter?: ReactNode;
   highlight?: (group: ChatBubbleGroup) => boolean;
 }) {
@@ -561,7 +555,6 @@ export function ChatMarkdown({
           <ReplyGroup
             key={i}
             group={group}
-            tools={bubbleTools?.(group, i)}
             highlighted={highlight?.(group) === true}
             footer={i === groups.length - 1 ? bubbleFooter : null}
           />

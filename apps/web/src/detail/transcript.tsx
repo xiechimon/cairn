@@ -79,7 +79,7 @@ function RowTools({
   copy,
   stamp,
 }: {
-  placement: 'right' | 'left' | 'below-start' | 'below-end';
+  placement: 'left' | 'below-start' | 'below-start-hover' | 'below-end';
   copy: string;
   stamp?: string | undefined;
 }) {
@@ -87,7 +87,9 @@ function RowTools({
   return (
     <MessageToolbar
       placement={placement}
-      testId={placement === 'right' || placement === 'left' ? 'msg-tools' : 'msg-tools-touch'}
+      testId={
+        placement === 'left' || placement === 'below-start-hover' ? 'msg-tools' : 'msg-tools-touch'
+      }
       stamp={
         stamp == null ? null : (
           <span className="text-caption whitespace-nowrap tabular-nums" data-testid="msg-stamp">
@@ -296,7 +298,7 @@ function Row({
                 ))
               )}
             </div>
-            <RowTools placement="right" copy={copy} />
+            <RowTools placement="below-start-hover" copy={copy} />
           </div>
           <RowTools placement="below-start" copy={copy} />
         </div>
@@ -443,7 +445,7 @@ function Row({
                 </div>
               ))}
             </div>
-            <RowTools placement="right" copy={reviewCopyText(item)} />
+            <RowTools placement="below-start-hover" copy={reviewCopyText(item)} />
           </div>
           <RowTools placement="below-start" copy={reviewCopyText(item)} />
         </div>
@@ -492,7 +494,7 @@ function Row({
                 </p>
               ))}
             </div>
-            <RowTools placement="right" copy={verifyCopyText(item)} />
+            <RowTools placement="below-start-hover" copy={verifyCopyText(item)} />
           </div>
           <RowTools placement="below-start" copy={verifyCopyText(item)} />
         </div>

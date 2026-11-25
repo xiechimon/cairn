@@ -12,7 +12,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 |---|---|---|
 | C1 | One fact, one wording: a status comes from one selector and is not restated differently elsewhere on the page. | M text of one entity is identical across header, list and footer |
 | C2 | No capability, no placeholder: never render a block for a feature that is not available; one line says what is off and the action to enable it. | M no element text matching `^[\s—·-]+$`; no empty fixed-ratio block |
-| C3 | Hidden means no space: an element shown on hover or focus takes no layout when hidden. | M gap between consecutive short chat messages is 16 to 24px |
+| C3 | Hidden means no space: an element shown on hover or focus takes no layout when hidden, except a reply's toolbar line, which is reserved under the reply so it never covers text. | M gap between consecutive short chat messages is 16 to 24px |
 | C4 | Every icon-only control has a visible tooltip and an accessible name. | M hover 600ms shows a tooltip; axe `button-name` |
 | C5 | No raw error text reaches the user: map it to a plain sentence saying what to do next; raw text lives in a tooltip or details. | M toast and banner text does not match `\(.*\)$`, `Error:`, `\b[45]\d\d\b` |
 | C6 | Developer switches (feature flags, release buttons) never sit on a user page; they live behind the dev route or dev mode. | H |

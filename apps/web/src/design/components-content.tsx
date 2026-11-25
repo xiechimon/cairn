@@ -289,7 +289,7 @@ export function ConversationSection() {
       <Specimen
         id="turns"
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><ChatMarkdown bubbles bubbleTools={…} /></MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>\n<FailureMarker label="This step ended abnormally" detail={{ lines, raw }} />`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><ChatMarkdown bubbles /><MessageToolbar placement="below-start-hover" … /></MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>\n<FailureMarker label="This step ended abnormally" detail={{ lines, raw }} />`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -304,20 +304,18 @@ export function ConversationSection() {
           </Message>
           <Message>
             <MessageContent className="gap-0">
-              <div className="text-ui leading-5">
+              <div className="group/reply-block relative text-ui leading-5">
                 <ChatMarkdown
                   bubbles
                   text={
-                    'The last commit bumped a version in package.json without updating the lockfile.\n\n- the frozen install fails\n- I will commit the lockfile\n\n> Hover a bubble to copy it.'
+                    'The last commit bumped a version in package.json without updating the lockfile.\n\n- the frozen install fails\n- I will commit the lockfile\n\n> Hover the reply to copy it.'
                   }
-                  bubbleTools={() => (
-                    <MessageToolbar
-                      placement="right"
-                      testId="turn-reply-tools"
-                      stamp="10:43"
-                      onCopy={() => {}}
-                    />
-                  )}
+                />
+                <MessageToolbar
+                  placement="below-start-hover"
+                  testId="turn-reply-tools"
+                  stamp="10:43"
+                  onCopy={() => {}}
                 />
               </div>
             </MessageContent>

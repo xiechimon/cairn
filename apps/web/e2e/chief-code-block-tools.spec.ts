@@ -29,9 +29,9 @@ for (const scheme of ['light', 'dark'] as const) {
       for (const [n, name] of ['ends-with-code', 'code-in-middle'].entries()) {
         const code = codeBlocks.nth(n);
         await code.scrollIntoViewIfNeeded();
-        const block = code.locator('xpath=ancestor::*[@data-slot="reply-block"][1]');
+        const block = code.locator('xpath=ancestor::*[@data-testid="chief-reply"][1]');
         await code.getByTestId('md-code').hover();
-        const tools = block.locator('[data-placement="below-start-hover"]');
+        const tools = block.getByTestId('chief-msg-foot');
         await expect(tools).toHaveCSS('opacity', '1');
         await evidencePanelShot(page, `code-block-tools-${name}-${scheme}-${width}.png`, block, 48);
         const ownButtons = [code.getByTestId('md-code-expand'), code.getByTestId('md-code-copy')];

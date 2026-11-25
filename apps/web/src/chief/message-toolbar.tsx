@@ -17,7 +17,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { useI18n } from '../i18n/provider.js';
 import { Copy, Restore } from '../icons/index.js';
 
-export type ToolbarPlacement = 'right' | 'left' | 'below-start' | 'below-start-hover' | 'below-end';
+export type ToolbarPlacement =
+  | 'left'
+  | 'below-start'
+  | 'below-start-hover'
+  | 'below-start-shown'
+  | 'below-end';
 
 const TOOL_BTN_CLS =
   "size-8 cursor-pointer pointer-coarse:size-11 rounded-(--radius-control) border-none bg-transparent text-(--text-tertiary) transition-none hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) aria-expanded:text-foreground [&_svg:not([class*='size-'])]:size-auto group-data-clamped/toolbar:size-6 group-data-clamped/toolbar:[&_svg]:size-4!";
@@ -33,10 +38,10 @@ const CLAMPED_BASE =
   'data-clamped:translate-y-0 data-clamped:gap-2 data-[clamped=below]:top-full data-[clamped=above]:top-auto data-[clamped=above]:bottom-full';
 
 const PLACEMENT_CLS: Record<ToolbarPlacement, string> = {
-  right: `absolute top-1/2 left-full z-10 -translate-y-1/2 pl-3 data-clamped:left-0 data-clamped:pl-0 ${CLAMPED_BASE} ${HOVER_REVEAL}`,
   left: `absolute top-1/2 right-full z-10 -translate-y-1/2 pr-3 data-clamped:right-0 data-clamped:pr-0 ${CLAMPED_BASE} ${HOVER_REVEAL}`,
   'below-start': `mt-1 hidden ${TOUCH_REVEAL}`,
-  'below-start-hover': `absolute top-full left-0 z-10 pt-1 ${HOVER_REVEAL}`,
+  'below-start-hover': `mt-1 ${HOVER_REVEAL}`,
+  'below-start-shown': 'mt-1 pointer-coarse:hidden',
   'below-end': `mt-1 hidden justify-end self-end ${TOUCH_REVEAL}`,
 };
 
@@ -105,16 +110,12 @@ function useKeepInside(ref: RefObject<HTMLDivElement | null>, placement: Toolbar
   useLayoutEffect(() => {
     const node = ref.current;
     const block = node?.parentElement;
-    if (node == null || block == null || (placement !== 'right' && placement !== 'left')) return;
+    if (node == null || block == null || placement !== 'left') return;
     const fit = () => {
       node.style.transform = '';
       delete node.dataset.clamped;
       const edges = clipEdges(node);
-      const shiftFor = (box: DOMRect) =>
-        placement === 'right'
-          ? Math.min(0, edges.right - box.right)
-          : Math.max(0, edges.left - box.left);
-      if (shiftFor(node.getBoundingClientRect()) === 0) return;
+      if (node.getBoundingClientRect().left >= edges.left) return;
       node.dataset.clamped = 'below';
       let box = node.getBoundingClientRect();
       if (

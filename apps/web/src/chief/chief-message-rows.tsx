@@ -102,10 +102,11 @@ const USER_ROW_CLS = 'mt-6';
 const RUN_ROW_CLS = 'mt-1';
 const EVENT_ROW_CLS = 'mt-5';
 const REPLY_ROW_CLS = 'mt-6';
+const REPLY_RUN_ROW_CLS = 'mt-4';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
-const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
+const BUBBLE_WRAP_CLS = `group/reply-block relative w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
 const SAID_CLS = `${REPLY_TEXT_CLS} min-w-0 text-(--foreground)`;
 
 function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
@@ -328,6 +329,7 @@ interface ChiefStreamRowProps {
   entering?: boolean;
   joinsPrev?: boolean;
   joinsNext?: boolean;
+  latest?: boolean;
   unmentioned?: readonly string[];
   reports?: readonly string[];
 }
@@ -546,6 +548,7 @@ function SubagentProgressList({ items }: { items: readonly ChiefSubagentInfo[] }
 function ChiefMessageTools({
   side,
   touch = false,
+  latest = false,
   testId,
   createdAt,
   fallbackAt,
@@ -558,6 +561,7 @@ function ChiefMessageTools({
 }: {
   side: 'user' | 'assistant';
   touch?: boolean;
+  latest?: boolean;
   testId: string;
   createdAt: number | undefined;
   fallbackAt?: string | undefined;
@@ -572,7 +576,9 @@ function ChiefMessageTools({
     side === 'assistant'
       ? touch
         ? 'below-start'
-        : 'below-start-hover'
+        : latest
+          ? 'below-start-shown'
+          : 'below-start-hover'
       : touch
         ? 'below-end'
         : 'left';
@@ -600,6 +606,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   entering = false,
   joinsPrev = false,
   joinsNext = false,
+  latest = false,
   unmentioned = NO_TASKS,
   reports = NO_REPORTS,
 }: ChiefStreamRowProps) {
@@ -788,6 +795,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     ) : undefined;
   const assistantToolProps = {
     side: 'assistant' as const,
+    latest,
     createdAt: item.createdAt,
     note: fallbackNote,
     onCopy,
@@ -798,7 +806,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
       <Message
-        className={joinsPrev ? RUN_ROW_CLS : REPLY_ROW_CLS}
+        className={joinsPrev ? REPLY_RUN_ROW_CLS : REPLY_ROW_CLS}
         data-testid="chief-msg"
         data-run={runAttr(joinsPrev, joinsNext)}
       >
@@ -816,15 +824,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 streaming={!settled}
                 bubbles
                 bubbleFooter={<BubbleReports todoIds={reports} />}
-                bubbleTools={(group, n) =>
-                  settled ? (
-                    <ChiefMessageTools
-                      {...assistantToolProps}
-                      copyText={group.source}
-                      testId={n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools'}
-                    />
-                  ) : null
-                }
                 highlight={(group) =>
                   sourceHighlighted &&
                   (group.source.includes(quoted) || quoted.includes(group.source))
@@ -854,14 +853,10 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   )}
                   <BubbleReports todoIds={reports} />
                 </div>
-                {settled && (
-                  <ChiefMessageTools
-                    {...assistantToolProps}
-                    copyText={whole}
-                    testId="chief-msg-foot"
-                  />
-                )}
               </div>
+            )}
+            {settled && (
+              <ChiefMessageTools {...assistantToolProps} copyText={whole} testId="chief-msg-foot" />
             )}
           </div>
           {item.typing === true && <TypingDots className="mt-1" />}

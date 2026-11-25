@@ -76,8 +76,14 @@ test('shows the latest reply suggestions under the reply as outlined, keyboard-r
     .getByTestId('chief-reply-bubble')
     .filter({ hasText: '要不要先只看 README？' })
     .boundingBox();
-  expect(group!.y - (reply!.y + reply!.height)).toBeGreaterThanOrEqual(12);
-  expect(group!.y - (reply!.y + reply!.height)).toBeLessThanOrEqual(32);
+  const replyTools = await page
+    .getByTestId('home-c')
+    .getByTestId('chief-msg')
+    .filter({ hasText: '要不要先只看 README？' })
+    .getByTestId('chief-msg-foot')
+    .boundingBox();
+  expect(group!.y - (replyTools!.y + replyTools!.height)).toBeGreaterThanOrEqual(12);
+  expect(group!.y - (replyTools!.y + replyTools!.height)).toBeLessThanOrEqual(32);
   expect(Math.abs(group!.x - reply!.x)).toBeLessThanOrEqual(2);
   const composer = await page.getByTestId('home-c').locator('.chief-composer').boundingBox();
   expect(group!.y + group!.height).toBeLessThanOrEqual(composer!.y);

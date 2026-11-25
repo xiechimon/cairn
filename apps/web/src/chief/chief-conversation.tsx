@@ -620,6 +620,10 @@ export function ChiefConversation({
         current.trim() === '' ? text : `${current.trimEnd()}\n${text}`,
       );
   };
+  const lastRobotIndex = rows.findLastIndex(
+    ({ item }) => item.kind === 'robot' && item.typing !== true,
+  );
+  const latestReply = rows[lastRobotIndex]?.item;
   const row = (
     item: GroupedRow['item'],
     i: number,
@@ -637,12 +641,10 @@ export function ChiefConversation({
       onWithdraw={onWithdraw != null ? withdrawSteer : undefined}
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}
+      latest={item === latestReply}
       {...(unmentioned !== undefined ? { unmentioned } : {})}
       {...(reports !== undefined ? { reports } : {})}
     />
-  );
-  const lastRobotIndex = rows.findLastIndex(
-    ({ item }) => item.kind === 'robot' && item.typing !== true,
   );
   const quickAfter =
     lastRobotIndex >= 0 && !rows.slice(lastRobotIndex).some(({ item }) => item.kind === 'user')
