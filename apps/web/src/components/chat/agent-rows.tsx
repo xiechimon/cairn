@@ -25,18 +25,40 @@ export function thinkingPreview(text: string, fallback: string): string {
 }
 
 const AGENT_LINE_CLS =
-  'text-meta leading-5 text-content-tertiary data-[status=error]:text-content-tertiary';
+  'text-meta leading-5 tabular-nums text-content-tertiary data-[status=error]:text-content-tertiary';
+
+function latestThinkingPreview(steps: readonly string[]): string {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const preview = thinkingPreview(steps[i] ?? '', '');
+    if (preview !== '') return preview;
+  }
+  return '';
+}
 
 export function ThinkingRow({
   text,
   defaultOpen = false,
 }: {
-  text: string;
+  text: string | readonly string[];
   defaultOpen?: boolean;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
-  const preview = thinkingPreview(text, t('思考'));
+  const steps = typeof text === 'string' ? [text] : text;
+  const single = steps.length <= 1 ? (steps[0] ?? '') : null;
+  const title =
+    single !== null
+      ? open
+        ? t('思考')
+        : thinkingPreview(single, t('思考'))
+      : open
+        ? t('思考 {n} 步', { n: steps.length })
+        : (() => {
+            const preview = latestThinkingPreview(steps);
+            return preview === ''
+              ? t('思考 {n} 步', { n: steps.length })
+              : t('思考 {n} 步 · {preview}', { n: steps.length, preview });
+          })();
   return (
     <Trace>
       <TraceCollapsible open={open} onOpenChange={setOpen}>
@@ -45,13 +67,28 @@ export function ThinkingRow({
           aria-label={t(open ? '收起思考' : '展开思考')}
         >
           <TraceLine className={AGENT_LINE_CLS}>
-            <TraceTitle>{open ? t('思考') : preview}</TraceTitle>
+            <TraceTitle>{title}</TraceTitle>
           </TraceLine>
         </TraceCollapsibleTrigger>
         <TraceCollapsibleContent>
-          <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-meta leading-5 text-(--text-secondary)">
-            {text}
-          </pre>
+          {single !== null ? (
+            <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-meta leading-5 text-(--text-secondary)">
+              {single}
+            </pre>
+          ) : (
+            <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+              {steps.map((step, index) => (
+                <li key={index} className="min-w-0">
+                  <div className="text-caption font-medium text-content-tertiary tabular-nums">
+                    {t('第 {n} 步', { n: index + 1 })}
+                  </div>
+                  <pre className="m-0 mt-0.5 whitespace-pre-wrap break-words font-[inherit] text-meta leading-5 text-(--text-secondary)">
+                    {step}
+                  </pre>
+                </li>
+              ))}
+            </ol>
+          )}
         </TraceCollapsibleContent>
       </TraceCollapsible>
     </Trace>

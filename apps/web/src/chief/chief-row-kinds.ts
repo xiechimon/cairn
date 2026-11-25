@@ -1,9 +1,9 @@
 import type { ChiefStreamItem } from '../fixtures/records.js';
-import type { ChannelMirror } from './thread-activity.js';
+import type { ChannelMirror, ThinkingGroup } from './thread-activity.js';
 
 export type ChiefRowClass = 'message' | 'card' | 'exception-alert' | 'status';
 
-type ChiefRowKind = (ChiefStreamItem | ChannelMirror)['kind'];
+type ChiefRowKind = (ChiefStreamItem | ChannelMirror | ThinkingGroup)['kind'];
 
 export const CHIEF_ROW_CLASS: Readonly<Record<ChiefRowKind, ChiefRowClass | 'hidden'>> = {
   user: 'message',
@@ -12,7 +12,7 @@ export const CHIEF_ROW_CLASS: Readonly<Record<ChiefRowKind, ChiefRowClass | 'hid
   'chat-block': 'message',
   'channel-mirror': 'message',
   handoff: 'message',
-  stopped: 'message',
+  stopped: 'status',
   question: 'card',
   takeover: 'card',
   'secret-request': 'card',
@@ -21,6 +21,7 @@ export const CHIEF_ROW_CLASS: Readonly<Record<ChiefRowKind, ChiefRowClass | 'hid
   'runner-offline': 'exception-alert',
   note: 'status',
   thinking: 'status',
+  'thinking-group': 'status',
   streaming: 'status',
   'thread-report': 'hidden',
   'thread-message': 'hidden',

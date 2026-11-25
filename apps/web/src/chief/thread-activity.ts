@@ -15,8 +15,14 @@ export interface ChannelMirror {
   fromThreadId: string;
 }
 
+export interface ThinkingGroup {
+  kind: 'thinking-group';
+  id?: string;
+  texts: readonly string[];
+}
+
 export interface GroupedRow {
-  item: ChiefStreamItem | ChannelMirror;
+  item: ChiefStreamItem | ChannelMirror | ThinkingGroup;
   i: number;
 }
 
@@ -33,4 +39,35 @@ export function groupThreadEvents(rows: readonly StreamRow[]): GroupedRow[] {
     }
     return [row];
   });
+}
+
+export function collapseThinkingRuns(rows: readonly GroupedRow[]): GroupedRow[] {
+  const collapsed: GroupedRow[] = [];
+  let run: GroupedRow[] = [];
+  const flush = () => {
+    if (run.length === 0) return;
+    const first = run[0];
+    if (first === undefined) return;
+    if (run.length === 1) {
+      collapsed.push(first);
+    } else {
+      const texts = run.flatMap(({ item }) => (item.kind === 'thinking' ? [item.text] : []));
+      const id = first.item.kind === 'thinking' ? first.item.id : undefined;
+      collapsed.push({
+        item: { kind: 'thinking-group', ...(id !== undefined ? { id } : {}), texts },
+        i: first.i,
+      });
+    }
+    run = [];
+  };
+  for (const row of rows) {
+    if (row.item.kind === 'thinking') {
+      run.push(row);
+    } else {
+      flush();
+      collapsed.push(row);
+    }
+  }
+  flush();
+  return collapsed;
 }

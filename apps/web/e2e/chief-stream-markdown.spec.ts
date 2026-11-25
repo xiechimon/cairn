@@ -633,6 +633,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
           createdAt: 2,
         },
         {
+          id: 'msg-tr-mid',
+          role: 'assistant',
+          content: '收到。',
+          createdAt: 2.5,
+        },
+        {
           id: 'msg-tr-2',
           role: 'assistant',
           content: [{ type: 'thinking', thinking: LONG_LATIN }],

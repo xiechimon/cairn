@@ -1,3 +1,5 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
 import {
@@ -6,9 +8,11 @@ import {
   placeUnmentionedTasks,
   todoGlanceOf,
 } from '../src/chief/chief-task-refs.js';
-import { groupThreadEvents } from '../src/chief/thread-activity.js';
+import { collapseThinkingRuns, groupThreadEvents } from '../src/chief/thread-activity.js';
+import { ThinkingRow } from '../src/components/chat/agent-rows.js';
 import type { TodoGlance } from '../src/detail/segments.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
+import { I18nProvider } from '../src/i18n/provider.js';
 
 let counter = 0;
 const nextId = () => `row-${counter++}`;
@@ -189,5 +193,84 @@ describe('a research report the Coordinator delivered shows once, inside its not
     );
     expect(placed.get(conclusion!)).toEqual(['asked']);
     expect(placed.has(dispatch!)).toBe(false);
+  });
+});
+
+describe('consecutive thinking collapse in a Coordinator turn', () => {
+  const thinkRow = (id: string, thinking: string, createdAt: number): MessageRow => ({
+    id,
+    role: 'assistant',
+    content: [{ type: 'thinking', thinking }],
+    createdAt,
+  });
+  const toolRow = (id: string, name: string, createdAt: number): MessageRow => ({
+    id,
+    role: 'assistant',
+    content: {
+      kind: 'toolcall',
+      call: { id: `call-${id}`, name, arguments: {}, startedAt: createdAt, endedAt: createdAt + 100 },
+    },
+    createdAt,
+  });
+
+  test('collapses consecutive thinking traces from repeated tool errors into one thinking-group while preserving non-consecutive thinking', () => {
+    const stream = mapChiefStream([
+      { id: 'u-1', role: 'user', content: '查一下 MCP 工具', createdAt: 10 },
+      thinkRow('th-1', '先列出可用 MCP 工具', 11),
+      toolRow('tc-1', 'mcp_list_tools', 12),
+      thinkRow('th-2', '工具报错，用 grep 查定义', 13),
+      toolRow('tc-2', 'grep', 14),
+      thinkRow('th-3', '换个关键词再 grep 一次', 15),
+      toolRow('tc-3', 'grep', 16),
+      { id: 'r-1', role: 'assistant', content: [{ type: 'text', text: '已找到问题。' }], createdAt: 17 },
+      thinkRow('th-4', '单独一条后续思考', 18),
+    ]);
+    const folded = foldTaskCards(
+      groupThreadEvents(stream.map((item, i) => ({ item, i }))),
+      glances,
+    ).rows;
+    const collapsed = collapseThinkingRuns(folded);
+
+    expect(collapsed.map(({ item }) => item.kind)).toEqual([
+      'user',
+      'thinking-group',
+      'robot',
+      'thinking',
+    ]);
+    expect(collapsed[1]).toEqual({
+      item: {
+        kind: 'thinking-group',
+        id: 'th-1',
+        texts: ['先列出可用 MCP 工具', '工具报错，用 grep 查定义', '换个关键词再 grep 一次'],
+      },
+      i: 1,
+    });
+    expect(collapsed[3]?.item).toEqual({ kind: 'thinking', text: '单独一条后续思考', id: 'th-4' });
+  });
+
+  test('ThinkingRow renders count + latest preview when collapsed and numbered steps when expanded', () => {
+    const traces = ['先列出 MCP 工具', '第一次 grep 报错', '改用精确路径再查'];
+    const collapsedHtml = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(ThinkingRow, { text: traces }),
+      }),
+    );
+    expect(collapsedHtml).toContain('思考 3 步 · 改用精确路径再查');
+    expect(collapsedHtml).not.toContain('先列出 MCP 工具');
+
+    const expandedHtml = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(ThinkingRow, { text: traces, defaultOpen: true }),
+      }),
+    );
+    expect(expandedHtml).toContain('思考 3 步');
+    expect(expandedHtml).toContain('第 1 步');
+    expect(expandedHtml).toContain('先列出 MCP 工具');
+    expect(expandedHtml).toContain('第 2 步');
+    expect(expandedHtml).toContain('第一次 grep 报错');
+    expect(expandedHtml).toContain('第 3 步');
+    expect(expandedHtml).toContain('改用精确路径再查');
   });
 });

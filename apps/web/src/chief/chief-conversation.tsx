@@ -94,7 +94,12 @@ import { ReaderFollowContext, useReaderFollow } from './reader-follow.js';
 import { ReplyingToBar } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
 import { SelectionReply } from './selection-reply.js';
-import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
+import {
+  collapseThinkingRuns,
+  type GroupedRow,
+  groupThreadEvents,
+  type StreamRow,
+} from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 import { CardFailureContext, QueueWaitCard, TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
@@ -122,7 +127,8 @@ function layoutStream(
   previousAt: number | null,
   reportSeen: Set<string>,
 ): StreamLayout {
-  const { rows: grouped, startedBy } = foldTaskCards(groupThreadEvents(list), glances);
+  const { rows: folded, startedBy } = foldTaskCards(groupThreadEvents(list), glances);
+  const grouped = collapseThinkingRuns(folded);
   let lastAt = previousAt;
   const dividers = grouped.map(({ item }) => {
     const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;

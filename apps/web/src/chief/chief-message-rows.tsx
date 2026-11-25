@@ -1,4 +1,5 @@
 import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
+import { CircleStop } from 'lucide-react';
 import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
@@ -14,13 +15,13 @@ import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-messag
 import { useArrivals } from '../components/growth.js';
 import { MachineName } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
-import { Marker } from '../components/ui/marker.js';
+import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_TEXT_CLS } from '../detail/chat-markdown.js';
 import { Segments as DocSegments, TodoGlanceContext } from '../detail/segments.js';
-import type { ChiefSegment, ChiefStreamItem, ChiefSubagentInfo } from '../fixtures/records.js';
+import type { ChiefSegment, ChiefSubagentInfo } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
@@ -47,7 +48,7 @@ import { ResearchReportLine, ResearchReportRow } from './research-report.js';
 import { SecretRequestCard } from './secret-request-card.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
-import type { ChannelMirror } from './thread-activity.js';
+import type { ChannelMirror, GroupedRow } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
 import { CardFailureContext } from './turn-failure.js';
 
@@ -273,7 +274,7 @@ function HandoffRow({ todoId }: { todoId: string }) {
 const LIVE_TURN_KEY = 'live-turn';
 
 export function chiefStreamRowKeys(
-  rows: readonly { item: ChiefStreamItem | ChannelMirror; i: number }[],
+  rows: readonly { item: GroupedRow['item']; i: number }[],
 ): (string | number)[] {
   let turn: string | number | null = null;
   let slot = 0;
@@ -289,10 +290,7 @@ export function chiefStreamRowKeys(
   });
 }
 
-export function chiefStreamRowKey(
-  item: ChiefStreamItem | ChannelMirror,
-  index: number,
-): string | number {
+export function chiefStreamRowKey(item: GroupedRow['item'], index: number): string | number {
   switch (item.kind) {
     case 'user':
       return item.outboxKey != null ? `outbox-${item.outboxKey}` : (item.id ?? index);
@@ -301,6 +299,7 @@ export function chiefStreamRowKey(
     case 'robot':
       return item.id ?? (item.typing === true ? LIVE_TURN_KEY : index);
     case 'thinking':
+    case 'thinking-group':
     case 'chat-block':
     case 'question':
     case 'handoff':
@@ -320,7 +319,7 @@ export function chiefStreamRowKey(
 }
 
 interface ChiefStreamRowProps {
-  item: ChiefStreamItem | ChannelMirror;
+  item: GroupedRow['item'];
   index: number;
   onCopy: (text: string) => void;
   onRewindRequest: (index: number, id: string | null) => void;
@@ -341,12 +340,29 @@ const NO_REPORTS: readonly string[] = [];
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
   const { t } = useI18n();
+  const stoppedLabel = t('已停止，没有建任务。');
+  if (todos.length === 0) {
+    return (
+      <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
+        <FailureMarker label={stoppedLabel} testId="chief-stopped" />
+      </MessageScrollerItem>
+    );
+  }
   return (
-    <CoordinatorSaid testId="chief-stopped">
-      {todos.length === 0 ? (
-        t('已停止，没有建任务。')
-      ) : (
-        <>
+    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
+      <Marker
+        variant="separator"
+        role="note"
+        data-testid="chief-stopped"
+        className="gap-1.5 text-meta text-content-tertiary"
+      >
+        <MarkerIcon>
+          <CircleStop />
+        </MarkerIcon>
+        <MarkerContent
+          data-testid="failure-marker-label"
+          className="text-pretty tabular-nums group-data-[variant=separator]/marker:flex-initial"
+        >
           {t('已停止。停之前已经建了任务')}
           {todos.map((todo, n) => (
             <span key={todo.id}>
@@ -354,9 +370,9 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
               <TaskChip todoId={todo.id} label={todo.title} />
             </span>
           ))}
-        </>
-      )}
-    </CoordinatorSaid>
+        </MarkerContent>
+      </Marker>
+    </MessageScrollerItem>
   );
 }
 
@@ -735,12 +751,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   }
-  if (item.kind === 'thinking')
+  if (item.kind === 'thinking' || item.kind === 'thinking-group')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <ThinkingRow text={item.text} />
+            <ThinkingRow text={item.kind === 'thinking' ? item.text : item.texts} />
           </MessageContent>
         </Message>
       </MessageScrollerItem>

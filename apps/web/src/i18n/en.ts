@@ -202,6 +202,9 @@ export const EN: Record<string, string> = {
   Agent: 'Agent',
 
   '思考 {n} 次': 'Thought {n#once|# times}',
+  '思考 {n} 步': '{n} thinking steps',
+  '思考 {n} 步 · {preview}': '{n} thinking steps · {preview}',
+  '第 {n} 步': 'Step {n}',
   '读了 {n} 个文件': 'Read {n#1 file|# files}',
   '{n} 行未改动': '{n#1 unmodified line|# unmodified lines}',
   '搜索 {n} 次': 'Searched {n#once|# times}',

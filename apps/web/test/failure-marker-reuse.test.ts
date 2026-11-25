@@ -3,8 +3,10 @@ import { join, relative, resolve } from 'node:path';
 import type { BuildRecord, StepJournalRow, TodoRetryState } from '@cairn/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router';
 import { expect, test } from 'vitest';
 import { mapTranscript } from '../src/api/mappers.js';
+import { ChiefStreamRow } from '../src/chief/chief-message-rows.js';
 import { MessageScroller, MessageScrollerProvider } from '../src/components/ui/message-scroller.js';
 import { Transcript } from '../src/detail/transcript.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
@@ -159,3 +161,45 @@ test.each(STATUS_ROWS)(
     expect(markup, 'C32: no own alert block beside the marker').not.toContain('role="alert"');
   },
 );
+
+test('Stopped. No task was created. and stopped-with-task render with the same separator marker as Not finished', () => {
+  const renderRow = (item: Parameters<typeof ChiefStreamRow>[0]['item']) =>
+    renderToStaticMarkup(
+      createElement(MemoryRouter, {
+        children: createElement(I18nProvider, {
+          initialLocale: 'en',
+          children: createElement(MessageScrollerProvider, {
+            children: createElement(MessageScroller, {
+              children: createElement(ChiefStreamRow, {
+                item,
+                index: 0,
+                onCopy: () => {},
+                onRewindRequest: () => {},
+              }),
+            }),
+          }),
+        }),
+      }),
+    );
+
+  const errorHtml = renderRow({ kind: 'error', text: 'Request failed', id: 'e1' });
+  const stoppedEmptyHtml = renderRow({ kind: 'stopped', todos: [], id: 's1' });
+  const stoppedTaskHtml = renderRow({
+    kind: 'stopped',
+    todos: [{ id: 'todo-1', seq: 1, title: 'Audit notices' }],
+    id: 's2',
+  });
+
+  expect(errorHtml).toContain('data-slot="marker"');
+  expect(errorHtml).toContain('data-variant="separator"');
+
+  for (const html of [stoppedEmptyHtml, stoppedTaskHtml]) {
+    expect(html).toContain('data-testid="chief-stopped"');
+    expect(html).toContain('data-slot="marker"');
+    expect(html).toContain('data-variant="separator"');
+    expect(html).toContain('data-testid="failure-marker-label"');
+    expect(html).not.toContain('font-reply');
+  }
+  expect(stoppedEmptyHtml).toContain('Stopped. No task was created.');
+  expect(stoppedTaskHtml).toContain('Stopped. A task was already created before the stop:');
+});
