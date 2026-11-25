@@ -10,18 +10,24 @@ export type QuestionPrimary = {
 };
 
 const DISMISS_UNDO_MS = 5000;
+const DEFAULT_SCOPE = '';
 
 const dismissing = new Map<string, ReturnType<typeof setTimeout>>();
 const committing = new Set<string>();
 const listeners = new Set<Listener>();
 let version = 0;
 let primary: QuestionPrimary | null = null;
-let focusIndex = 0;
+let activeScope = DEFAULT_SCOPE;
+const focusByScope = new Map<string, number>();
+const minimizedByScope = new Map<string, boolean>();
 let uploads = 0;
 let reveals = 0;
-let minimized = false;
 const answers = new Map<string, string>();
 const closed = new Set<string>();
+
+function resolveScope(scope?: string): string {
+  return scope ?? activeScope;
+}
 
 export function answerKeyOf(draftKey: string, step: number): string {
   return `${draftKey}#${step}`;
@@ -58,12 +64,20 @@ export const questionDockState = {
     uploads -= 1;
     if (uploads === 0) emit();
   },
-  focus(): number {
-    return focusIndex;
+  scope(): string {
+    return activeScope;
   },
-  setFocus(next: number): void {
-    if (next === focusIndex || uploads > 0) return;
-    focusIndex = next;
+  setScope(scope: string): void {
+    activeScope = scope;
+  },
+  focus(scope?: string): number {
+    return focusByScope.get(resolveScope(scope)) ?? 0;
+  },
+  setFocus(next: number, scope?: string): void {
+    const target = resolveScope(scope);
+    if (next === (focusByScope.get(target) ?? 0) || uploads > 0) return;
+    if (next === 0) focusByScope.delete(target);
+    else focusByScope.set(target, next);
     emit();
   },
   answerText(key: string): string {
@@ -107,17 +121,25 @@ export const questionDockState = {
   reveals(): number {
     return reveals;
   },
-  reveal(): void {
+  reveal(scope?: string): void {
+    const target = resolveScope(scope);
     reveals += 1;
-    minimized = false;
+    minimizedByScope.delete(target);
     emit();
   },
-  minimized(): boolean {
-    return minimized;
+  minimized(scope?: string): boolean {
+    return minimizedByScope.get(resolveScope(scope)) === true;
   },
-  minimize(): void {
-    if (minimized) return;
-    minimized = true;
+  minimize(scope?: string): void {
+    const target = resolveScope(scope);
+    if (minimizedByScope.get(target) === true) return;
+    minimizedByScope.set(target, true);
+    emit();
+  },
+  resetScopes(): void {
+    activeScope = DEFAULT_SCOPE;
+    focusByScope.clear();
+    minimizedByScope.clear();
     emit();
   },
   isDismissing(requestId: string): boolean {

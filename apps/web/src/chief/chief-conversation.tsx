@@ -68,7 +68,13 @@ import {
   ChiefFallbackBanner,
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
-import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-question.js';
+import {
+  ChiefQuestion,
+  QuestionRestoreButton,
+  useAnswerKey,
+  useMinimizedQuestion,
+  useQuestionPending,
+} from './chief-question.js';
 import { chiefRowRenders } from './chief-row-kinds.js';
 import {
   foldTaskCards,
@@ -257,6 +263,7 @@ export function ChiefConversation({
   pendingComments,
 }: ChiefConversationProps) {
   const questionPending = useQuestionPending();
+  const minimizedQuestion = useMinimizedQuestion();
   const { t, locale } = useI18n();
   const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
   const [highlightedSource, setHighlightedSource] = useState<ReplyQuoteDraft | null>(null);
@@ -267,13 +274,15 @@ export function ChiefConversation({
     previewReply ??
     (replyQuote !== null
       ? t('回复这条消息')
-      : chief.outage != null
-        ? t('可以继续说，恢复后按顺序处理')
-        : chief.waitingTurn !== undefined
-          ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
-          : chief.running === true
-            ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-            : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+      : minimizedQuestion?.placeholder != null
+        ? minimizedQuestion.placeholder
+        : chief.outage != null
+          ? t('可以继续说，恢复后按顺序处理')
+          : chief.waitingTurn !== undefined
+            ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
+            : chief.running === true
+              ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+              : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
   const answerKey = useAnswerKey();
   const [threadOverride, setThreadOverride] = useState(false);
@@ -827,6 +836,11 @@ export function ChiefConversation({
               onFocusLeave={leaveComposer}
               onCancelReply={replyQuote === null ? undefined : () => setReplyQuote(null)}
               placeholder={composerPlaceholder}
+              trailing={
+                minimizedQuestion === null ? undefined : (
+                  <QuestionRestoreButton onClick={minimizedQuestion.restore} />
+                )
+              }
               composerRef={answerActive ? undefined : composerRef}
               tab={answerActive ? null : queueTab}
               above={

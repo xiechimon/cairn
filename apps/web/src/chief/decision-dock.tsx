@@ -257,6 +257,7 @@ export function DecisionDock({
   const listRef = useRef<HTMLFieldSetElement | null>(null);
   useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
 
+  const approvalRequest = isApprovalRequest(item.requestId);
   const typedAt = (index: number): string =>
     draftKey === undefined ? '' : questionDockState.answerText(answerKeyOf(draftKey, index));
   const withTyped = (
@@ -264,7 +265,7 @@ export function DecisionDock({
     prompt: ChiefQuestionPrompt | undefined,
     text: string,
   ) => {
-    if (!bound || prompt === undefined || text.trim() === '') return stored;
+    if (!bound || approvalRequest || prompt === undefined || text.trim() === '') return stored;
     if (stored.kind === 'text') return { kind: 'text' as const, value: text };
     if (prompt.multiSelect === true) return { ...stored, other: true, otherText: text };
     return { kind: 'choices' as const, picked: [], other: true, otherText: text };
@@ -298,10 +299,10 @@ export function DecisionDock({
     });
   };
 
-  const blockedByUpload = bound && questionDockState.uploading();
+  const blockedByUpload = bound && !approvalRequest && questionDockState.uploading();
   const canAdvance = pending && stepComplete && !blockedByUpload;
   const advance = () => {
-    if (!canAdvance || (bound && questionDockState.uploading())) return;
+    if (!canAdvance || (bound && !approvalRequest && questionDockState.uploading())) return;
     if (last) {
       submitWith(effectiveDrafts);
       return;
@@ -363,7 +364,7 @@ export function DecisionDock({
   }, [draftKey, item.status]);
 
   useEffect(() => {
-    if (!pending || !bound) {
+    if (!pending || !bound || approvalRequest) {
       questionDockState.clearPrimary(item.requestId);
       return;
     }
@@ -373,7 +374,7 @@ export function DecisionDock({
       enabled: canAdvance,
       advance: () => advanceRef.current(),
     });
-  }, [pending, bound, item.requestId, last, canAdvance]);
+  }, [pending, bound, approvalRequest, item.requestId, last, canAdvance]);
   useEffect(() => () => questionDockState.clearPrimary(item.requestId), [item.requestId]);
 
   if (question === undefined || item.status !== 'pending') return null;
@@ -386,6 +387,7 @@ export function DecisionDock({
       return;
     }
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      if (approvalRequest) return;
       event.preventDefault();
       advanceRef.current();
       return;
@@ -410,7 +412,7 @@ export function DecisionDock({
     }
   };
 
-  const approval = isApprovalRequest(item.requestId) ? approvalCardOf(question, t) : null;
+  const approval = approvalRequest ? approvalCardOf(question, t) : null;
   if (approval !== null) {
     const submittedIndex =
       submitting && draft?.kind === 'choices'

@@ -275,7 +275,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-question`, `chief-question-count`, `chief-question-dock`, `chief-question-error`, `chief-question-minimize`, `chief-question-next`, `chief-question-option-*`, `chief-question-option-description`, `chief-question-other-*`, `chief-question-pager`, `chief-question-prev`, `chief-question-recommended`, `chief-question-skip`, `chief-question-text`
+- Test ids in its code: `chief-question`, `chief-question-count`, `chief-question-dock`, `chief-question-error`, `chief-question-minimize`, `chief-question-next`, `chief-question-option-*`, `chief-question-option-description`, `chief-question-other-*`, `chief-question-pager`, `chief-question-prev`, `chief-question-recommended`, `chief-question-restore`, `chief-question-skip`, `chief-question-text`
 - Research: **gap**: the Codex CLI and t3code question patterns were never written up
 - Frontend design: [docs/design/qcard-variants/README.md](../../../docs/design/qcard-variants/README.md) (not on main), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
 - Backend design: **gap**: no design for the question lifecycle: parking, late answers, cancel and resume
