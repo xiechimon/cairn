@@ -332,8 +332,88 @@ jobs:
           retention-days: 1
           overwrite: true
 
+  package-linux:
+    needs: [decide, live-verify]
+    if: needs.decide.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    environment: desktop-release
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ needs.decide.outputs.sha }}
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: apps/tsnet-sidecar/go.mod
+          cache-dependency-path: apps/tsnet-sidecar/go.sum
+
+      - name: Build the tsnet sidecar for linux-amd64
+        working-directory: apps/tsnet-sidecar
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags '-s -w' -o dist/tsnet-sidecar-linux-amd64 .
+
+      - name: Build the web UI, the server and the Runner
+        env:
+          CAIRN_DESKTOP_ARCH: x64
+          ARCH: x64
+        run: |
+          pnpm --filter @cairn/web build
+          pnpm --filter @xiechimon/cairn build
+          pnpm --filter @xiechimon/cairn-cli build
+          node apps/server/scripts/stage-web.mjs
+          pnpm --filter @cairn/desktop stage-server
+          pnpm --filter @cairn/desktop stage-runner
+          test -f apps/desktop/server/tsnet-sidecar-linux-amd64
+
+      - name: Package the Linux x64 archive
+        working-directory: apps/desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          node build.mjs
+          pnpm exec electron-builder --linux tar.gz --x64 -c.extraMetadata.version="$VERSION" --publish never
+
+      - name: Check that the Linux archive holds the Runner and sidecar
+        working-directory: apps/desktop
+        run: |
+          mkdir -p "$RUNNER_TEMP/extracted"
+          tar -xzf "release/Cairn-$VERSION-linux-x64.tar.gz" -C "$RUNNER_TEMP/extracted" --strip-components=1
+          test -x "$RUNNER_TEMP/extracted/cairn"
+          test -f "$RUNNER_TEMP/extracted/resources/server/tsnet-sidecar-linux-amd64"
+          node scripts/check-runner-claude.mjs "$RUNNER_TEMP/extracted/resources/runner" linux x64
+          node scripts/check-virtual-store.mjs \
+            "$RUNNER_TEMP/extracted/resources/runner" \
+            "$RUNNER_TEMP/extracted/resources/server"
+
+      - name: Keep the packaged Linux archive for the publish job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-linux-x64
+          path: apps/desktop/release/Cairn-${{ env.VERSION }}-linux-x64.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
   publish:
-    needs: [decide, package, package-win, live-verify]
+    needs: [decide, package, package-win, package-linux, live-verify]
     runs-on: ubuntu-latest
     environment: desktop-release
     permissions:
@@ -370,8 +450,9 @@ jobs:
           arm64=$(ls Cairn-*-arm64.zip | sed -n 's/^Cairn-\(.*\)-arm64\.zip$/\1/p')
           x64=$(ls Cairn-*-x64.zip | grep -v -- '-win-x64\.zip$' | sed -n 's/^Cairn-\(.*\)-x64\.zip$/\1/p')
           win=$(ls Cairn-*-win-x64.zip | sed -n 's/^Cairn-\(.*\)-win-x64\.zip$/\1/p')
-          if [ "$arm64" != "$VERSION" ] || [ "$x64" != "$VERSION" ] || [ "$win" != "$VERSION" ]; then
-            echo "the packaged archives carry arm64=${arm64:-none} x64=${x64:-none} win-x64=${win:-none}, not the decided $VERSION" >&2
+          linux=$(ls Cairn-*-linux-x64.tar.gz | sed -n 's/^Cairn-\(.*\)-linux-x64\.tar\.gz$/\1/p')
+          if [ "$arm64" != "$VERSION" ] || [ "$x64" != "$VERSION" ] || [ "$win" != "$VERSION" ] || [ "$linux" != "$VERSION" ]; then
+            echo "the packaged archives carry arm64=${arm64:-none} x64=${x64:-none} win-x64=${win:-none} linux-x64=${linux:-none}, not the decided $VERSION" >&2
             exit 1
           fi
 
@@ -415,12 +496,12 @@ jobs:
               bail "the tag $tag could not be read: $probe"
           }
           require_free_tag
-          body="Built from $RELEASE_SHA. Signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open."
+          body="Built from $RELEASE_SHA. Desktop builds for macOS (arm64, x64), Windows (x64), and Linux (x64). macOS builds are signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open."
           release_id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
             -F draft=true \
             -f tag_name="$tag" \
             -f target_commitish="$RELEASE_SHA" \
-            -f name="Cairn for Mac $VERSION" \
+            -f name="Cairn $VERSION" \
             -f body="$body" \
             --jq .id) || bail "the draft release $tag could not be created"
           case "$release_id" in
@@ -430,6 +511,7 @@ jobs:
             Cairn-"$VERSION"-arm64.dmg Cairn-"$VERSION"-x64.dmg \
             Cairn-"$VERSION"-arm64.zip Cairn-"$VERSION"-x64.zip \
             Cairn-"$VERSION"-win-x64.exe Cairn-"$VERSION"-win-x64.zip \
+            Cairn-"$VERSION"-linux-x64.tar.gz \
             desktop-latest.json
           do
             gh api -X POST \

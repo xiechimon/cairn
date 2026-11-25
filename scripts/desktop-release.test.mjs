@@ -756,6 +756,7 @@ const ASSETS = [
   'Cairn-0.1.2-x64.zip',
   'Cairn-0.1.2-win-x64.exe',
   'Cairn-0.1.2-win-x64.zip',
+  'Cairn-0.1.2-linux-x64.tar.gz',
   'desktop-latest.json',
 ];
 
@@ -1231,10 +1232,29 @@ test('both architectures are packaged in parallel and published only after both 
     'decide',
     'package',
     'package-win',
+    'package-linux',
     'live-verify',
   ]);
   assert.equal(workflow.jobs.publish.permissions.contents, 'write');
   assert.equal(workflow.jobs.package.permissions, undefined);
+  assert.equal(workflow.jobs['package-linux']['runs-on'], 'ubuntu-latest');
+  assert.equal(workflow.jobs['package-linux'].permissions, undefined);
+  const linuxPackageStep = workflow.jobs['package-linux'].steps.find(
+    (step) => step.name === 'Package the Linux x64 archive',
+  );
+  assert.match(linuxPackageStep.run, /extraMetadata\.version="\$VERSION"/);
+  const linuxUpload = workflow.jobs['package-linux'].steps.find(
+    (step) => step.name === 'Keep the packaged Linux archive for the publish job',
+  );
+  assert.ok(linuxUpload);
+  assert.equal(linuxUpload.with.name, 'desktop-linux-x64');
+  assert.equal(linuxUpload.with.overwrite, true);
+  assert.match(publishScript, /-f name="Cairn \$VERSION"/);
+  assert.doesNotMatch(publishScript, /Cairn for Mac/);
+  const versionCheck = workflow.jobs.publish.steps.find(
+    (step) => step.name === 'Check the packaged builds carry the decided version',
+  );
+  assert.match(versionCheck.run, /Cairn-\*-linux-x64\.tar\.gz/);
 });
 
 test('the package upload overwrites so a rerun replaces only its own architecture', () => {
