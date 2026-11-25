@@ -79,6 +79,7 @@ export interface ComposerWire {
   handleCaretMoved: () => void;
   handleCompositionStart: () => void;
   handleCompositionEnd: () => void;
+  handleCompositionCancel: () => void;
   suppressedListLines: ReadonlySet<number> | null;
   handleBlur: () => void;
   textareaRef: MutableRefObject<HTMLTextAreaElement | null>;
@@ -231,6 +232,10 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const escapeAt = useRef<number | null>(null);
   const composingRef = useRef(false);
   const [suppressedListLines, setSuppressedListLines] = useState<ReadonlySet<number> | null>(null);
+  const resetComposition = useCallback(() => {
+    composingRef.current = false;
+    setSuppressedListLines(null);
+  }, []);
   const sending = useRef(false);
   const sendAfterUploadRef = useRef<typeof onSend>(undefined);
   const uploadFailedRef = useRef(false);
@@ -445,6 +450,9 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     insertFileAt(path, inlineOpen ? inlineRangeRef.current : null);
   };
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    if ((event.nativeEvent as InputEvent | undefined)?.isComposing === false) {
+      resetComposition();
+    }
     const next = event.target.value;
     setDraft(next);
     if (!editable) return;
@@ -561,11 +569,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [inlineOpen, closeInline]);
 
-  const resetComposition = useCallback(() => {
-    composingRef.current = false;
-    setSuppressedListLines(null);
-  }, []);
-
   const handleCompositionStart = useCallback(() => {
     composingRef.current = true;
     const ta = textareaRef.current;
@@ -575,7 +578,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     if (!hasMarker) setSuppressedListLines(new Set([start]));
   }, []);
 
-  const handleCompositionEnd = useCallback(() => {
+  const endComposition = useCallback(() => {
     resetComposition();
     reevaluate();
   }, [resetComposition, reevaluate]);
@@ -586,13 +589,20 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   }, [closeInline, resetComposition]);
 
   useEffect(() => {
+    const onCompositionCancel = (event: Event) => {
+      if (event.target === textareaRef.current) {
+        endComposition();
+      }
+    };
     window.addEventListener('blur', resetComposition);
     document.addEventListener('visibilitychange', resetComposition);
+    document.addEventListener('compositioncancel', onCompositionCancel, true);
     return () => {
       window.removeEventListener('blur', resetComposition);
       document.removeEventListener('visibilitychange', resetComposition);
+      document.removeEventListener('compositioncancel', onCompositionCancel, true);
     };
-  }, [resetComposition]);
+  }, [resetComposition, endComposition]);
 
   return {
     draft,
@@ -605,7 +615,8 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     handleKeyDown,
     handleCaretMoved: reevaluate,
     handleCompositionStart,
-    handleCompositionEnd,
+    handleCompositionEnd: endComposition,
+    handleCompositionCancel: endComposition,
     suppressedListLines,
     handleBlur,
     textareaRef,

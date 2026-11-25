@@ -347,3 +347,80 @@ test('detail face: blur during IME composition without compositionend lets subse
   await expect.poll(() => posts).toBe(1);
   await expect(input).toHaveValue('');
 });
+
+test('chief face: compositioncancel and non-composing input reset stuck composing state', async ({
+  page,
+}) => {
+  const input = await openChiefHome(page);
+  let posts = 0;
+  await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
+    if (request.method() !== 'POST') return route.fallback();
+    posts += 1;
+    return route.fulfill({
+      status: 200,
+      json: { thread: { id: `chief-ime-hardening-${posts}`, teamId: TEAM_ID, title: CHIEF_DRAFT, createdAt: 0 } },
+    });
+  });
+
+  await input.click();
+  await input.fill(CHIEF_DRAFT);
+  await input.evaluate((el) => {
+    el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+    el.dispatchEvent(new CompositionEvent('compositioncancel', { bubbles: false, data: '' }));
+  });
+  await input.press('Enter');
+  await expect.poll(() => posts).toBe(1);
+  await expect(input).toHaveValue('');
+
+  await input.click();
+  await input.fill(CHIEF_DRAFT);
+  await input.evaluate((el, draft) => {
+    const ta = el as HTMLTextAreaElement;
+    ta.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+    setter.call(ta, `${draft}a`);
+    ta.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true, data: 'a' }));
+  }, CHIEF_DRAFT);
+  await input.press('Enter');
+  expect(posts).toBe(1);
+
+  await input.evaluate((el, draft) => {
+    const ta = el as HTMLTextAreaElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+    setter.call(ta, `${draft}b`);
+    ta.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: false, data: 'b' }));
+  }, CHIEF_DRAFT);
+  await input.press('Enter');
+  await expect.poll(() => posts).toBe(2);
+  await expect(input).toHaveValue('');
+});
+
+test('detail face: compositioncancel during IME composition lets subsequent Enter send', async ({
+  page,
+}) => {
+  await stubBoot(page);
+  await stubDetailSurface(page);
+  let posts = 0;
+  await page.route(
+    new RegExp(`/api/(conversations/${BUILD_ID}|todos/[^/?]+)/messages(\\?|$)`),
+    (route, request) => {
+      if (request.method() !== 'POST') return route.fallback();
+      posts += 1;
+      return route.fulfill({ status: 201, json: { message: { id: 'msg-ime-cancel' } } });
+    },
+  );
+
+  await page.goto(`/app/todo/${CARD_ID}`);
+  const input = page.locator('[data-testid="composer-card"] textarea');
+  await expect(input).toBeVisible();
+  await input.click();
+  await input.fill(DETAIL_DRAFT);
+  await input.evaluate((el) => {
+    el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+    el.dispatchEvent(new CompositionEvent('compositioncancel', { bubbles: true, data: '' }));
+  });
+  await input.press('Enter');
+
+  await expect.poll(() => posts).toBe(1);
+  await expect(input).toHaveValue('');
+});

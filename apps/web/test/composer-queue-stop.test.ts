@@ -152,3 +152,38 @@ test('blur during IME composition without compositionend resets composing so sub
   wire.handleKeyDown(keyboard('Enter'));
   expect(wire.onSend).toHaveBeenCalledExactlyOnceWith('Next message');
 });
+
+test('compositioncancel resets composing so subsequent Enter sends', () => {
+  const wire = composer();
+  wire.handleCompositionStart();
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).not.toHaveBeenCalled();
+  wire.handleCompositionCancel();
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).toHaveBeenCalledExactlyOnceWith('Next message');
+});
+
+test('non-composing handleChange resets stuck composing while composing or unspecified handleChange preserves it', () => {
+  const wire = composer();
+  wire.handleCompositionStart();
+  wire.handleChange({
+    target: { value: 'Next message' },
+    nativeEvent: { isComposing: true },
+  } as unknown as Parameters<typeof wire.handleChange>[0]);
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).not.toHaveBeenCalled();
+
+  wire.handleChange({
+    target: { value: 'Next message' },
+    nativeEvent: {},
+  } as unknown as Parameters<typeof wire.handleChange>[0]);
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).not.toHaveBeenCalled();
+
+  wire.handleChange({
+    target: { value: 'Next message' },
+    nativeEvent: { isComposing: false },
+  } as unknown as Parameters<typeof wire.handleChange>[0]);
+  wire.handleKeyDown(keyboard('Enter'));
+  expect(wire.onSend).toHaveBeenCalledExactlyOnceWith('Next message');
+});
