@@ -131,17 +131,17 @@ import type { ApiKeyRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
   'runtime-disabled': '排队中：{machine} 上未检测到 {runtime}，安装后重启执行机',
-  'model-unavailable': '排队中：{machine} 无法使用这一步的模型——在工作路由里更换模型',
+  'model-unavailable': '排队中：{machine} 无法使用这一步的模型——在「设置 → 模型」中更换模型',
   'local-path': '排队中：本地项目只在它所在的执行机上运行，{machine} 无法运行',
   'machine-retired':
-    '排队中：{machine} 已删除或注销，这一步不会改派——重新注册这台执行机，或在工作路由里改派',
+    '排队中：{machine} 已删除或注销，这一步不会改派——重新注册这台执行机，或在「设置 → 模型」中重新配置',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
-    '排队中：团队暂无可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
+    '排队中：团队暂无可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到「设置 → 模型」',
   'devin-subscription':
-    '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到模型路由',
+    '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到「设置 → 模型」',
   'antigravity-subscription':
-    '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅',
+    '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在「设置 → 模型」中添加 Antigravity 订阅',
   'account-switched':
     '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始',
   'coordinator-provider-missing': 'Coordinator 规则使用的服务商「{name}」尚未添加',
@@ -151,17 +151,17 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
   'runtime-disabled': '排队中：执行机上未检测到 {runtime}，安装后重启执行机',
-  'model-unavailable': '排队中：执行机无法使用这一步的模型——在工作路由里更换模型',
+  'model-unavailable': '排队中：执行机无法使用这一步的模型——在「设置 → 模型」中更换模型',
   'local-path': '排队中：本地项目只在它所在的执行机上运行，这台执行机无法运行',
   'machine-retired':
-    '排队中：这一步绑定的执行机已删除或注销，不会改派到其他执行机——重新注册那台执行机，或在工作路由里改派',
+    '排队中：这一步绑定的执行机已删除或注销，不会改派到其他执行机——重新注册那台执行机，或在「设置 → 模型」中重新配置',
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
-    '排队中：团队暂无可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
+    '排队中：团队暂无可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到「设置 → 模型」',
   'devin-subscription':
-    '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到模型路由',
+    '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到「设置 → 模型」',
   'antigravity-subscription':
-    '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅',
+    '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在「设置 → 模型」中添加 Antigravity 订阅',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {

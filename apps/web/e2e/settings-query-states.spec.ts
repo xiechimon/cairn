@@ -13,7 +13,7 @@ const PANES = [
   {
     section: 'routing',
     endpoint: 'model-routing',
-    errText: '模型路由未能加载',
+    errText: '路由图未能加载',
     empty: '[data-testid="routing-section"]',
     ok: { edges: [], connections: [], quota: [] },
   },

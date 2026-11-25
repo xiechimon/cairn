@@ -40,14 +40,17 @@ function mailItem(
   };
 }
 
-function inI18n(child: ReturnType<typeof createElement>): string {
+function inI18n(
+  child: ReturnType<typeof createElement>,
+  initialLocale: 'zh' | 'en' = 'zh',
+): string {
   return renderToStaticMarkup(
-    createElement(I18nProvider, { initialLocale: 'zh', children: child }),
+    createElement(I18nProvider, { initialLocale, children: child }),
   );
 }
 
-const render = (item: ChiefQuestionItem) =>
-  inI18n(createElement(DecisionDock, { item, onAnswer: () => {}, onCancel: () => {} }));
+const render = (item: ChiefQuestionItem, locale: 'zh' | 'en' = 'zh') =>
+  inI18n(createElement(DecisionDock, { item, onAnswer: () => {}, onCancel: () => {} }), locale);
 
 const textOf = (html: string) =>
   html
@@ -194,5 +197,89 @@ describe('an unsandboxed host shell escalation approval card', () => {
     expect(texts(doc, 'approval-history-text')).toEqual([
       '已过期 · 在 Owner Mac 上不经沙箱运行一条命令',
     ]);
+  });
+});
+
+describe('English approval card localization', () => {
+  const CJK = /[\u4e00-\u9fff]/;
+
+  test('localizes outbound mail note and cc/bcc fields in English', () => {
+    const card = [
+      '对外发送：cairn-mail send',
+      '收件人：lena.hoffmann@example.com',
+      '抄送：team@example.com',
+      '主题：Re: Quote',
+      '正文：',
+      '> Hello',
+      '',
+      '只会按上面的内容发出，发出后无法收回。',
+    ].join('\n');
+    const doc = render(mailItem(card), 'en');
+    expect(texts(doc, 'approval-card-title')).toEqual(['Send email to lena.hoffmann@example.com']);
+    expect(texts(doc, 'approval-card-context')).toEqual(['CC: team@example.com · Subject “Re: Quote”']);
+    expect(texts(doc, 'approval-card-note')).toEqual([
+      'Only the content above will be sent, and it cannot be recalled.',
+    ]);
+    expect(texts(doc, 'chief-question-option-0-0')).toEqual(['Send']);
+    expect(texts(doc, 'chief-question-option-0-1')).toEqual(['Do not send']);
+    expect(textOf(doc)).not.toMatch(CJK);
+  });
+
+  test('localizes todo delete, project delete, external submit, and website secret cards in English', () => {
+    const cases: Array<{
+      header: string;
+      question: string;
+      title: string;
+      note: string;
+    }> = [
+      {
+        header: '审批',
+        question:
+          '删除 2 个任务：「Alpha」（项目 Demo，done）；「Beta」（项目 Demo，todo）。它们的构建、对话和定时会一起删除，无法恢复。',
+        title: 'Delete 2 tasks',
+        note: 'Their builds, conversations, and schedules will be deleted too and cannot be recovered.',
+      },
+      {
+        header: '审批',
+        question:
+          '删除项目「Acme」：它的任务、构建、对话和定时会一起删除，正在运行的工作会被移除，删除后无法恢复。',
+        title: 'Delete project “Acme”',
+        note: 'Its tasks, builds, conversations, and schedules will be deleted too, active work will be removed, and this cannot be undone.',
+      },
+      {
+        header: '审批',
+        question: '对外提交到「billing-portal」，发出后无法收回。',
+        title: 'Submit to “billing-portal”',
+        note: 'Once sent, this cannot be recalled.',
+      },
+      {
+        header: '网站授权',
+        question:
+          '允许在 https://github.com 代填机密 GITHUB_PASS？仅限电脑 m-1；之后在这台电脑的同一网站自动可用，密码不会交给模型。换网站、电脑或密码后会重新询问。',
+        title: 'Allow autofilling GITHUB_PASS on https://github.com',
+        note: 'Future logins to this site on this computer will autofill automatically without sharing the password with the model. Changing the site, computer, or password will ask again.',
+      },
+    ];
+    for (const entry of cases) {
+      const item: ChiefQuestionItem = {
+        kind: 'question',
+        id: 'approval-en-1',
+        requestId: 'approval-en-1',
+        status: 'pending',
+        questions: [
+          {
+            header: entry.header,
+            question: entry.question,
+            options: [{ label: '批准执行' }, { label: '不执行' }],
+          },
+        ],
+        answers: null,
+      };
+      const doc = render(item, 'en');
+      expect(texts(doc, 'approval-card-title')).toEqual([entry.title]);
+      expect(texts(doc, 'approval-card-note')).toEqual([entry.note]);
+      expect(texts(doc, 'chief-question-option-0-0')).toEqual(['Approve']);
+      expect(texts(doc, 'chief-question-option-0-1')).toEqual(['Decline']);
+    }
   });
 });

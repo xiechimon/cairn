@@ -37,6 +37,14 @@ export function approvalChoiceLabel(label: string, t: Translate): string {
 }
 const GENERIC_HEADER = '审批';
 const OUTBOUND_OPEN = '对外发送：';
+const OUTBOUND_NOTE = '只会按上面的内容发出，发出后无法收回。';
+const OUTBOUND_FIELD_TEMPLATES: Record<string, string> = {
+  抄送: '抄送：{value}',
+  密送: '密送：{value}',
+  标题: '标题：{value}',
+  网址: '网址：{value}',
+  命令: '命令：{value}',
+};
 const PARAMETER_LABEL = '参数';
 const RECIPIENT_LABEL = '收件人';
 const SUBJECT_LABEL = '主题';
@@ -49,6 +57,14 @@ const UNSANDBOXED_SHELL_WITH_CWD_SENTENCE =
 const UNSANDBOXED_SHELL_SENTENCE =
   /^Coordinator 想在 ([^\n：]+) 上不经沙箱运行这条命令：([\s\S]+)$/;
 const APP_SENTENCE = /^Coordinator 想在 (.+?) 上读取和操作 ([\s\S]+?)。$/;
+const DELETE_TODO_SENTENCE =
+  /^删除 (\d+) 个任务：([\s\S]+?)。它们的构建、对话和定时会一起删除，无法恢复。$/;
+const DELETE_PROJECT_SENTENCE =
+  /^删除项目「([\s\S]+?)」：它的任务、构建、对话和定时会一起删除，正在运行的工作会被移除，删除后无法恢复。$/;
+const EXTERNAL_SEND_SENTENCE = /^对外发送到「([\s\S]+?)」，发出后无法收回。$/;
+const EXTERNAL_SUBMIT_SENTENCE = /^对外提交到「([\s\S]+?)」，发出后无法收回。$/;
+const WEBSITE_SECRET_SENTENCE =
+  /^允许在 (\S+) 代填机密 ([\s\S]+?)？仅限电脑 ([^；]+)；之后在这台电脑的同一网站自动可用，密码不会交给模型。换网站、电脑或密码后会重新询问。$/;
 const LEAD_CLAUSE = /^([^：。\n]{1,40})：([\s\S]+)$/;
 const CONTEXT_JOIN = ' · ';
 
@@ -63,7 +79,8 @@ function unquote(line: string): string {
 function outboundCard(text: string, t: Translate): ApprovalCardModel {
   const noteAt = text.lastIndexOf('\n\n');
   const head = noteAt < 0 ? text : text.slice(0, noteAt);
-  const note = noteAt < 0 ? null : text.slice(noteAt + 2).trim() || null;
+  const rawNote = noteAt < 0 ? null : text.slice(noteAt + 2).trim() || null;
+  const note = rawNote === OUTBOUND_NOTE ? t('只会按上面的内容发出，发出后无法收回。') : rawNote;
   const [first = '', ...lines] = head.split('\n');
   const tool = first.slice(OUTBOUND_OPEN.length).trim();
   const fields: ApprovalField[] = [];
@@ -106,13 +123,14 @@ function outboundCard(text: string, t: Translate): ApprovalCardModel {
     ...(sender === null ? [] : [t('从 {from} 发出', { from: sender })]),
     ...fields
       .filter((field) => field.label !== RECIPIENT_LABEL && field !== body)
-      .map((field) =>
-        field.label === SUBJECT_LABEL
-          ? t('主题「{subject}」', { subject: field.value })
-          : field.label === ''
-            ? field.value
-            : `${field.label} ${field.value}`,
-      ),
+      .map((field) => {
+        if (field.label === SUBJECT_LABEL) return t('主题「{subject}」', { subject: field.value });
+        if (field.label === '') return field.value;
+        const template = OUTBOUND_FIELD_TEMPLATES[field.label];
+        return template === undefined
+          ? `${field.label} ${field.value}`
+          : t(template, { value: field.value });
+      }),
   ];
   return {
     kind: mail ? 'mail' : 'send',
@@ -180,6 +198,66 @@ export function approvalCardOf(question: ApprovalQuestion, t: Translate): Approv
       preview: null,
       mono: false,
       note: t('以你的身份操作这个应用'),
+      details: [],
+    };
+  const deleteTodos = DELETE_TODO_SENTENCE.exec(text);
+  if (deleteTodos !== null)
+    return {
+      kind: 'other',
+      title: t('删除 {count} 个任务', { count: Number(deleteTodos[1]) }),
+      context: deleteTodos[2] ?? null,
+      preview: null,
+      mono: false,
+      note: t('它们的构建、对话和定时会一起删除，无法恢复。'),
+      details: [],
+    };
+  const deleteProject = DELETE_PROJECT_SENTENCE.exec(text);
+  if (deleteProject !== null)
+    return {
+      kind: 'other',
+      title: t('删除项目「{name}」', { name: deleteProject[1] ?? '' }),
+      context: null,
+      preview: null,
+      mono: false,
+      note: t('它的任务、构建、对话和定时会一起删除，正在运行的工作会被移除，删除后无法恢复。'),
+      details: [],
+    };
+  const externalSend = EXTERNAL_SEND_SENTENCE.exec(text);
+  if (externalSend !== null)
+    return {
+      kind: 'send',
+      title: t('对外发送到「{target}」', { target: externalSend[1] ?? '' }),
+      context: null,
+      preview: null,
+      mono: false,
+      note: t('发出后无法收回。'),
+      details: [],
+    };
+  const externalSubmit = EXTERNAL_SUBMIT_SENTENCE.exec(text);
+  if (externalSubmit !== null)
+    return {
+      kind: 'send',
+      title: t('对外提交到「{target}」', { target: externalSubmit[1] ?? '' }),
+      context: null,
+      preview: null,
+      mono: false,
+      note: t('发出后无法收回。'),
+      details: [],
+    };
+  const websiteSecret = WEBSITE_SECRET_SENTENCE.exec(text);
+  if (websiteSecret !== null)
+    return {
+      kind: 'secret',
+      title: t('允许在 {origin} 代填 {name}', {
+        origin: websiteSecret[1] ?? '',
+        name: websiteSecret[2] ?? '',
+      }),
+      context: t('仅限电脑 {computer}', { computer: websiteSecret[3] ?? '' }),
+      preview: null,
+      mono: false,
+      note: t(
+        '之后在这台电脑的同一网站自动可用，密码不会交给模型。换网站、电脑或密码后会重新询问。',
+      ),
       details: [],
     };
   const lead = LEAD_CLAUSE.exec(text);

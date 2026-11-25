@@ -62,10 +62,10 @@ export const EN: Record<string, string> = {
     'The Coordinator and tasks both use this subscription. It cannot be viewed after saving.',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
-  '{name}：已过期，Coordinator 和任务暂时无法使用。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。':
-    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `claude setup-token` in a terminal and add the new token under Settings → Model routing.',
-  '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。':
-    '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model routing.',
+  '{name}：已过期，Coordinator 和任务暂时无法使用。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型」。':
+    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `claude setup-token` in a terminal and add the new token under Settings → Model.',
+  '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型」。':
+    '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model.',
   'Devin 订阅': 'Devin subscription',
   '添加 Devin 订阅': 'Add Devin subscription',
   '在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴。保存后无法再查看。':
@@ -84,10 +84,10 @@ export const EN: Record<string, string> = {
   '没有读到这台 Mac 上的 Devin 登录，请改用下方粘贴。':
     'Could not read a Devin sign-in on this Mac. Paste below instead.',
   '服务器上找不到 devin 命令': 'The devin command was not found on the server.',
-  '{name}：已过期，Coordinator 和任务暂时无法使用。在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型路由」。':
-    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `cat ~/.local/share/devin/credentials.toml` on a computer signed in to Devin and add the whole output under Settings → Model routing.',
-  '{name}：将在 {days} 天后过期。到期前在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型路由」。':
-    '{name}: expires in {days## day|# days}. Before then, run `cat ~/.local/share/devin/credentials.toml` on a computer signed in to Devin and add the whole output under Settings → Model routing.',
+  '{name}：已过期，Coordinator 和任务暂时无法使用。在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型」。':
+    '{name}: expired, so the Coordinator and tasks cannot run for now. Run `cat ~/.local/share/devin/credentials.toml` on a computer signed in to Devin and add the whole output under Settings → Model.',
+  '{name}：将在 {days} 天后过期。到期前在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型」。':
+    '{name}: expires in {days## day|# days}. Before then, run `cat ~/.local/share/devin/credentials.toml` on a computer signed in to Devin and add the whole output under Settings → Model.',
   'Antigravity 订阅': 'Antigravity subscription',
   'ChatGPT 订阅': 'ChatGPT subscription',
   'GitHub Copilot 订阅': 'GitHub Copilot subscription',
@@ -171,8 +171,8 @@ export const EN: Record<string, string> = {
   '更新登录或 API key 之前，这些订阅不会接收新任务。':
     'These subscriptions will not take new tasks until you refresh the sign-in or API key.',
   '所有 Antigravity 模型': 'All Antigravity models',
-  '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅':
-    'Queued: the team has no usable Antigravity subscription. Run agy acp --login on your Runner and add an Antigravity subscription under Model routing',
+  '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在「设置 → 模型」中添加 Antigravity 订阅':
+    'Queued: the team has no usable Antigravity subscription. Run agy acp --login on your Runner and add an Antigravity subscription under Settings → Model',
   Archived: 'Archived',
   Agent: 'Agent',
 
@@ -325,6 +325,26 @@ export const EN: Record<string, string> = {
   '对外发送给 {to}': 'Send to {to}',
   '从 {from} 发出': 'From {from}',
   '主题「{subject}」': 'Subject “{subject}”',
+  '抄送：{value}': 'CC: {value}',
+  '密送：{value}': 'BCC: {value}',
+  '标题：{value}': 'Title: {value}',
+  '网址：{value}': 'URL: {value}',
+  '命令：{value}': 'Command: {value}',
+  '只会按上面的内容发出，发出后无法收回。':
+    'Only the content above will be sent, and it cannot be recalled.',
+  '删除 {count} 个任务': 'Delete {count#1 task|# tasks}',
+  '它们的构建、对话和定时会一起删除，无法恢复。':
+    'Their builds, conversations, and schedules will be deleted too and cannot be recovered.',
+  '删除项目「{name}」': 'Delete project “{name}”',
+  '它的任务、构建、对话和定时会一起删除，正在运行的工作会被移除，删除后无法恢复。':
+    'Its tasks, builds, conversations, and schedules will be deleted too, active work will be removed, and this cannot be undone.',
+  '对外发送到「{target}」': 'Send to “{target}”',
+  '对外提交到「{target}」': 'Submit to “{target}”',
+  '发出后无法收回。': 'Once sent, this cannot be recalled.',
+  '允许在 {origin} 代填 {name}': 'Allow autofilling {name} on {origin}',
+  '仅限电脑 {computer}': 'Only on computer {computer}',
+  '之后在这台电脑的同一网站自动可用，密码不会交给模型。换网站、电脑或密码后会重新询问。':
+    'Future logins to this site on this computer will autofill automatically without sharing the password with the model. Changing the site, computer, or password will ask again.',
   '在 {computer} 上以你的身份运行一条命令': 'Run a command as you on {computer}',
   '以你的身份运行，能读写你的文件': 'Runs as you and can read and write your files',
   '在 {computer} 上不经沙箱运行一条命令': 'Run a command without the sandbox on {computer}',
@@ -984,7 +1004,8 @@ export const EN: Record<string, string> = {
 
   主题: 'Thread',
   新主题: 'New thread',
-  '请先在工作路由里配置 Coordinator。': 'Configure the Coordinator in work routing first.',
+  '请先在「设置 → 模型」中配置 Coordinator。':
+    'Configure the Coordinator under Settings → Model first.',
   '有什么可以帮你的？': 'How can I help?',
   记忆: 'Memory',
   记忆已更新: 'Memory updated',
@@ -1016,26 +1037,26 @@ export const EN: Record<string, string> = {
     'Queued: no {platform} Runner · needs {platform}',
   '排队中：执行机上未检测到 {runtime}，安装后重启执行机':
     'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner',
-  '排队中：执行机无法使用这一步的模型——在工作路由里更换模型':
-    'Queued: the Runner cannot use the model for this step. Pick another model in work routing',
+  '排队中：执行机无法使用这一步的模型——在「设置 → 模型」中更换模型':
+    'Queued: the Runner cannot use the model for this step. Pick another model under Settings → Model',
   '排队中：本地项目只在它所在的执行机上运行，这台执行机无法运行':
     'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it',
   '排队中：执行机上的 Claude 被限流，恢复后自动继续':
     'Queued: Claude is rate limited on the Runner; this continues once the limit lifts',
-  '排队中：团队暂无可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由':
-    'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model routing',
-  '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到模型路由':
-    'Queued: the team has no usable Devin subscription. Run cat ~/.local/share/devin/credentials.toml on a computer signed in to Devin and add the whole output under Model routing',
+  '排队中：团队暂无可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到「设置 → 模型」':
+    'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Settings → Model',
+  '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到「设置 → 模型」':
+    'Queued: the team has no usable Devin subscription. Run cat ~/.local/share/devin/credentials.toml on a computer signed in to Devin and add the whole output under Settings → Model',
   '排队中：{machine} 上未检测到 {runtime}，安装后重启执行机':
     'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner',
-  '排队中：{machine} 无法使用这一步的模型——在工作路由里更换模型':
-    'Queued: {machine} cannot use the model for this step. Pick another model in work routing',
+  '排队中：{machine} 无法使用这一步的模型——在「设置 → 模型」中更换模型':
+    'Queued: {machine} cannot use the model for this step. Pick another model under Settings → Model',
   '排队中：本地项目只在它所在的执行机上运行，{machine} 无法运行':
     'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it',
-  '排队中：{machine} 已删除或注销，这一步不会改派——重新注册这台执行机，或在工作路由里改派':
-    'Queued: {machine} is deleted or revoked and this step is not moved to another Runner. Register that Runner again, or reassign this step in work routing',
-  '排队中：这一步绑定的执行机已删除或注销，不会改派到其他执行机——重新注册那台执行机，或在工作路由里改派':
-    'Queued: the Runner this step is bound to was deleted or revoked and the step is not moved to another Runner. Register that Runner again, or reassign this step in work routing',
+  '排队中：{machine} 已删除或注销，这一步不会改派——重新注册这台执行机，或在「设置 → 模型」中重新配置':
+    'Queued: {machine} is deleted or revoked and this step is not moved to another Runner. Register that Runner again, or update the configuration under Settings → Model',
+  '排队中：这一步绑定的执行机已删除或注销，不会改派到其他执行机——重新注册那台执行机，或在「设置 → 模型」中重新配置':
+    'Queued: the Runner this step is bound to was deleted or revoked and the step is not moved to another Runner. Register that Runner again, or update the configuration under Settings → Model',
   '排队中：{machine} 的 Claude 被限流，恢复后自动继续':
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts',
   '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始':
@@ -1481,7 +1502,8 @@ export const EN: Record<string, string> = {
   打开模型设置: 'Open model settings',
   复制原始错误: 'Copy original error',
   '更新 Cairn': 'Update Cairn',
-  '需要更新 Cairn': 'Needs a Cairn update',
+  '{model}（已下架）': '{model} (delisted)',
+  '{model}（需要更新 Cairn）': '{model} (needs a Cairn update)',
   '{n} 个模型需要新版 Cairn': '{n#1 model needs|# models need} a Cairn update',
   '更新 Cairn 后再重试。': 'Update Cairn, then try again.',
   '更新 Cairn 后重新运行这个任务。': 'Update Cairn, then run this task again.',
@@ -1765,8 +1787,8 @@ export const EN: Record<string, string> = {
   用途: 'Uses',
   连接: 'Connections',
   模型路由: 'Model routing',
-  正在加载模型路由: 'Loading model routing',
-  模型路由未能加载: 'Model routing did not load',
+  正在加载路由图: 'Loading routing graph',
+  路由图未能加载: 'Routing graph did not load',
   '{count} 个项目单独设置了模型': '{count#1 project sets|# projects set} their own models',
   项目单独设置: 'Set per project',
   常用模型: 'Frequently used models',
@@ -1839,7 +1861,7 @@ export const EN: Record<string, string> = {
   '{use}：{problem}': '{use}: {problem}',
   '没有执行机启用 {runtime}': 'No Runner has {runtime} on',
   没有执行机满足它的要求: 'No Runner meets its requirements',
-  '固定的执行机 {machine} 不可用': 'Its pinned Runner {machine} is unavailable',
+  '固定的执行机 {machine} 不可用': 'Its assigned Runner {machine} is unavailable',
   '服务商 {provider} 已不存在': 'Provider {provider} no longer exists',
   '服务商 {provider} 没有 API key': 'Provider {provider} has no API key',
   '修复后改用 {target}。': 'Fix switches it to {target}.',
@@ -1857,8 +1879,8 @@ export const EN: Record<string, string> = {
   首选执行机: 'Preferred Runner',
   不固定: 'Any Runner',
   '当前默认：{model} · {provider}': 'Current default: {model} · {provider}',
-  '当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则':
-    'No default yet: add a provider with an API key, or create the rule here',
+  '暂无默认模型：在下方添加服务商后，可在此选择模型':
+    'No default yet: add a provider below, then pick a model here',
   设为默认执行机: 'Make default Runner',
   已是默认执行机: 'Default Runner',
   '设为默认执行机失败，请重试。': 'Could not change the default Runner. Try again.',
@@ -2506,8 +2528,8 @@ export const EN: Record<string, string> = {
     'Cannot connect to the upstream, so the model list is unavailable. Check the network and retry.',
   '该订阅未启用或登录凭据不可用。请启用订阅，或重新添加账号并登录。':
     'This subscription is disabled or its sign-in credential is unavailable. Enable it, or add the account again and sign in.',
-  '没有获准查询该订阅的在线执行机。请检查执行机连接与模型路由。':
-    'No online Runner is authorized to query this subscription. Check the Runner connection and model routing.',
+  '没有获准查询该订阅的在线执行机。请检查执行机连接与模型设置。':
+    'No online Runner is authorized to query this subscription. Check the Runner connection and model settings.',
   '筛选{noun}': 'Filter {noun}',
   '没有匹配「{query}」的{noun}': 'Nothing matches “{query}”',
   输入可筛选: 'Type to filter',
@@ -2897,8 +2919,8 @@ export const EN: Record<string, string> = {
   '请检查任务或服务商配置后重试。': 'Check the task or provider configuration, then retry.',
   '模型 {model} 不可用，已停止自动重试': 'Model {model} is unavailable; automatic retries stopped',
   '所选模型不可用，已停止自动重试': 'Selected model is unavailable; automatic retries stopped',
-  '请在模型路由中更换可用模型后重试。':
-    'Switch to an available model in model routing, then retry.',
+  '请在「设置 → 模型」中更换可用模型后重试。':
+    'Switch to an available model under Settings → Model, then retry.',
   '内置运行环境版本过旧（需 {need}），已停止自动重试':
     'Built-in runtime is outdated (needs {need}); automatic retries stopped',
   '内置运行环境版本过旧，已停止自动重试': 'Built-in runtime is outdated; automatic retries stopped',

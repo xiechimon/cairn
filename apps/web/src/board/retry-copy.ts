@@ -97,7 +97,7 @@ export function parkedRetryCopy(retry: Extract<TodoRetryState, { state: 'parked'
           retry.detail !== null && retry.detail !== ''
             ? { key: '模型 {model} 不可用，已停止自动重试', params: { model: retry.detail } }
             : { key: '所选模型不可用，已停止自动重试' },
-        fix: { key: '请在模型路由中更换可用模型后重试。' },
+        fix: { key: '请在「设置 → 模型」中更换可用模型后重试。' },
       };
     case 'runtime_outdated':
       return {

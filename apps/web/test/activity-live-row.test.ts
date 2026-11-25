@@ -398,10 +398,10 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     expect(row.blocked).toBe(true);
     expect(row.blockedKind).toBe('machine-retired');
     expect(translate('zh', EN, row.label, row.labelVars)).toBe(
-      '排队中：xmonsMac 已删除或注销，这一步不会改派——重新注册这台执行机，或在工作路由里改派',
+      '排队中：xmonsMac 已删除或注销，这一步不会改派——重新注册这台执行机，或在「设置 → 模型」中重新配置',
     );
     expect(translate('en', EN, row.label, row.labelVars)).toBe(
-      'Queued: xmonsMac is deleted or revoked and this step is not moved to another Runner. Register that Runner again, or reassign this step in work routing',
+      'Queued: xmonsMac is deleted or revoked and this step is not moved to another Runner. Register that Runner again, or update the configuration under Settings → Model',
     );
   });
 

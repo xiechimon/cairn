@@ -11,12 +11,12 @@ export function subscriptionLoginWarning(
   return subscriptionExpiryWarning(connection, now, {
     expired: (name) =>
       t(
-        '{name}：已过期，Coordinator 和任务暂时无法使用。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。',
+        '{name}：已过期，Coordinator 和任务暂时无法使用。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型」。',
         { name },
       ),
     expiring: (name, days) =>
       t(
-        '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。',
+        '{name}：将在 {days} 天后过期。到期前在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型」。',
         { name, days },
       ),
   });

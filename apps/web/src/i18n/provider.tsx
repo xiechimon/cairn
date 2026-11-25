@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { safeLocalStorage } from '../safe-storage.js';
 import { EN } from './en.js';
 import {
@@ -8,6 +8,7 @@ import {
   persistLocale,
   readStoredLocale,
   setActiveLocale,
+  subscribeLocaleStorage,
 } from './locale.js';
 import { type TFunc, type TVars, translate } from './translate.js';
 
@@ -36,6 +37,18 @@ export function I18nProvider({
     setActiveLocale(next);
     setLocaleState(next);
   }, []);
+  useEffect(() => {
+    if (initialLocale !== undefined || typeof window === 'undefined') return;
+    return subscribeLocaleStorage(
+      (next) => {
+        applyLocaleLang(next);
+        setActiveLocale(next);
+        setLocaleState(next);
+      },
+      window,
+      safeLocalStorage(),
+    );
+  }, [initialLocale]);
   const t = useMemo<TFunc>(
     () => (source: string, vars?: TVars) => translate(locale, EN, source, vars),
     [locale],

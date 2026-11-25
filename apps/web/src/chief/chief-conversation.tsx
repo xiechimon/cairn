@@ -702,7 +702,7 @@ export function ChiefConversation({
       data-testid="chief-gate"
       className="mx-auto mt-4 flex h-14 w-[calc(100%-2rem)] max-w-chat flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
     >
-      <span>{t('请先在工作路由里配置 Coordinator。')}</span>
+      <span>{t('请先在「设置 → 模型」中配置 Coordinator。')}</span>
       <Button className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`} onClick={onSettings}>
         {t('设置')}
       </Button>

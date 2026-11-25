@@ -61,7 +61,7 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     const waitedFor = `步骤已等 ${minutes} 分钟`;
     const snippet = {
       'capability-missing': `没有在线执行机满足要求（缺 ${queue.blocked.missing.join('、')}），${waitedFor}`,
-      'machine-retired': `${runnerName ?? '这一步绑定的执行机'} 已删除或注销，这一步不会改派：重新注册这台执行机，或在工作路由里改派，${waitedFor}`,
+      'machine-retired': `${runnerName ?? '这一步绑定的执行机'} 已删除或注销，这一步不会改派：重新注册这台执行机，或在「设置 → 模型」中重新配置，${waitedFor}`,
       'runner-cannot-run': `${preferredName} 无法运行这一步，不会改派到其他执行机，${waitedFor}`,
       'no-runner': `没有可运行这一步的在线执行机，${waitedFor}`,
     }[reason];

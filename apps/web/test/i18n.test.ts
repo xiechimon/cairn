@@ -5,6 +5,7 @@ import {
   htmlLangFor,
   persistLocale,
   readStoredLocale,
+  subscribeLocaleStorage,
 } from '../src/i18n/locale.js';
 import { translate } from '../src/i18n/translate.js';
 
@@ -42,8 +43,6 @@ describe('readStoredLocale', () => {
     expect(
       readStoredLocale(fakeStorage({ 'cairn.locale': 'en', 'cairn-locale': 'en' }), 'zh-CN'),
     ).toBe('en');
-    // either key alone is enough — the official app writes both, but a
-    // partially-migrated profile must still resolve
     expect(readStoredLocale(fakeStorage({ 'cairn-locale': 'en' }), 'zh-CN')).toBe('en');
   });
 
@@ -72,7 +71,6 @@ describe('htmlLangFor', () => {
 describe('translate', () => {
   it('zh is identity — the canonical source string renders untouched', () => {
     expect(translate('zh', DICT, '工作台')).toBe('工作台');
-    // an entry missing from the dict still renders (zh never needs the dict)
     expect(translate('zh', DICT, '尚无描述')).toBe('尚无描述');
   });
 
@@ -130,5 +128,59 @@ describe('English count rendering', () => {
     expect(translate('en', dict, 'count')).toBe(dict.count);
     expect(translate('en', dict, '{n} missing', { n: 'one' })).toBe('one missing');
     expect(translate('zh', EN, '{n} 次运行', { n: 1 })).toBe('1 次运行');
+  });
+});
+
+describe('subscribeLocaleStorage', () => {
+  it('syncs locale across windows on storage events and ignores unrelated keys', () => {
+    const listeners = new Set<(event: { key: string | null; newValue: string | null }) => void>();
+    const target = {
+      addEventListener: (_type: 'storage', fn: (event: { key: string | null; newValue: string | null }) => void) => {
+        listeners.add(fn);
+      },
+      removeEventListener: (_type: 'storage', fn: (event: { key: string | null; newValue: string | null }) => void) => {
+        listeners.delete(fn);
+      },
+    };
+    const storage = fakeStorage({ 'cairn.locale': 'zh' });
+    const seen: string[] = [];
+    const unsubscribe = subscribeLocaleStorage((next) => seen.push(next), target, storage, 'en-US');
+
+    for (const fn of listeners) fn({ key: 'cairn.theme', newValue: 'dark' });
+    expect(seen).toEqual([]);
+
+    for (const fn of listeners) fn({ key: 'cairn.locale', newValue: 'en' });
+    for (const fn of listeners) fn({ key: 'cairn-locale', newValue: 'zh' });
+    for (const fn of listeners) fn({ key: null, newValue: null });
+    expect(seen).toEqual(['en', 'zh', 'zh']);
+
+    unsubscribe();
+    expect(listeners.size).toBe(0);
+  });
+});
+
+describe('EN dictionary hygiene', () => {
+  const CHINESE_PUNCTUATION = /[。，：「」！？；、（）【】《》]/;
+
+  it('contains no stray Chinese punctuation in English values', () => {
+    const offenders = Object.entries(EN)
+      .filter(([, value]) => CHINESE_PUNCTUATION.test(value))
+      .map(([key, value]) => `${key} => ${value}`);
+    expect(offenders).toEqual([]);
+    expect(CHINESE_PUNCTUATION.test('Model unavailable。')).toBe(true);
+  });
+
+  it('contains no obsolete routing or pinned Runner wording in English guidance', () => {
+    const obsolete = Object.entries(EN)
+      .filter(
+        ([key, value]) =>
+          key.includes('或在这里创建规则') ||
+          key.includes('工作路由') ||
+          (key !== '模型路由' && key.includes('模型路由')) ||
+          /\bwork routing\b/i.test(value) ||
+          /\bpinned Runner\b/i.test(value),
+      )
+      .map(([key, value]) => `${key} => ${value}`);
+    expect(obsolete).toEqual([]);
   });
 });

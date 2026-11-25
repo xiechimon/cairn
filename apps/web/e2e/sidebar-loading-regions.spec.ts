@@ -4,7 +4,7 @@ import { mockLive, THREAD } from './chief-home-mock';
 const DELAY_MS = 5000;
 
 const CONCLUSIONS = [
-  '请先在工作路由里配置 Coordinator',
+  '请先在「设置 → 模型」中配置 Coordinator',
   '没有在进行的任务',
   '暂无已完成的文档',
   '尚无执行机',

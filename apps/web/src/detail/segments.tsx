@@ -49,7 +49,7 @@ export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> |
 export const ThreadUnreadContext = createContext<ReadonlySet<string> | null>(null);
 
 const TASK_NUMBER_LABEL = /^#\d+$/;
-const TASK_NUMBER = /(任务\s*)?#(\d+)/g;
+const TASK_NUMBER = /((?:任务|\btask)\s*)?#(\d+)/gi;
 const NOT_A_TASK_NUMBER = /(?:[\w/]|\b(?:PR|issue|pull)\s*)$/i;
 const TITLE_QUOTES: Record<string, string> = { '「': '」', '“': '”', '"': '"', '《': '》' };
 const PAREN_CLOSE: Record<string, string> = { '（': '）', '(': ')' };
@@ -78,7 +78,11 @@ export function linkTaskNumbers(
     const known = bySeq.get(Number(match[2]));
     const prefix = match[1] ?? '';
     const at = match.index + prefix.length;
-    if (known === undefined || at < cursor || NOT_A_TASK_NUMBER.test(text.slice(cursor, at)))
+    if (
+      known === undefined ||
+      at < cursor ||
+      NOT_A_TASK_NUMBER.test(text.slice(cursor, prefix === '' ? at : match.index))
+    )
       continue;
     const [todoId, glance] = known;
     const end = at + 1 + (match[2] ?? '').length;

@@ -70,7 +70,7 @@ function CoordinatorDefaultHint({
     <span data-testid="routing-coordinator-default">
       {known
         ? t('当前默认：{model} · {provider}', vars)
-        : t('当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则')}
+        : t('暂无默认模型：在下方添加服务商后，可在此选择模型')}
       {known && coordinatorDefault.reason === 'anthropic-key' && (
         <InfoTip className="ml-1.5" info={t('因为团队有 Anthropic API key')} />
       )}
@@ -129,9 +129,9 @@ export function ModelPicker({
           value: modelKey(o),
           label:
             o.liveness === 'dead'
-              ? `${o.modelName}（${t('已下架')}）`
+              ? t('{model}（已下架）', { model: o.modelName })
               : o.updateRequired !== undefined
-                ? `${o.modelName}（${t('需要更新 Cairn')}）`
+                ? t('{model}（需要更新 Cairn）', { model: o.modelName })
                 : o.modelName,
           detail: modelGroupName(o),
           group: modelGroupKey(o),

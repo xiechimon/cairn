@@ -3,7 +3,7 @@ import { Ban, CircleCheck } from 'lucide-react';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalHistoryLine } from './approval-card.js';
-import { approvalCardOf } from './approval-card-model.js';
+import { approvalCardOf, approvalChoiceLabel } from './approval-card-model.js';
 import type { ChiefQuestionItem } from './question-item.js';
 import { answerLineOf } from './question-lifecycle.js';
 
@@ -67,7 +67,7 @@ export function ApprovalAnswered({ item }: { item: ChiefQuestionItem }) {
       : declined
         ? t('已拒绝')
         : choice !== null && index > 0
-          ? t(choice)
+          ? approvalChoiceLabel(choice, t)
           : t('已回答');
   const Icon = declined ? Ban : CircleCheck;
   return (

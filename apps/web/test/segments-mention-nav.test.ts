@@ -136,13 +136,29 @@ describe('a Markdown task link names the task by its title (C15)', () => {
     expect(markup.match(/data-slot="task-mention"/g)).toHaveLength(2);
   });
 
+  test('English task #n and Task #n references become task mention links', () => {
+    const markup = page(
+      createElement(ChatMarkdown, { text: 'Check task #7 after Task #6 finishes.' }),
+      ESSAY,
+    );
+    expect(plain(markup)).toBe(
+      'Check task Export the report as CSV after Task 写一篇 100 字的作文 finishes.',
+    );
+    expect(markup.match(/data-slot="task-mention"/g)).toHaveLength(2);
+    expect(markup).toMatch(/<a [^>]*href="\/app\?thread=t7"/);
+    expect(markup).toMatch(/<a [^>]*href="\/app\?thread=e6"/);
+  });
+
   test('numbers that are not task references stay literal', () => {
     for (const text of [
       'PR #6 写一篇 100 字的作文',
       'xiechimon/cairn#6 写一篇 100 字的作文',
+      'org/task#7 is a repo issue',
+      'subtask #7 stays plain',
       '#6 是另一件事',
       '`#6 写一篇 100 字的作文`',
       '任务 #9 不存在',
+      'task #99 does not exist',
     ]) {
       const markup = page(createElement(ChatMarkdown, { text }), ESSAY);
       expect(markup, text).not.toContain('task-mention');

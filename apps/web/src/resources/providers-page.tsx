@@ -113,7 +113,7 @@ import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 const ANTIGRAVITY_FALLBACK_REASONS = {
   auth: '该订阅未启用或登录凭据不可用。请启用订阅，或重新添加账号并登录。',
-  'not-found': '没有获准查询该订阅的在线执行机。请检查执行机连接与模型路由。',
+  'not-found': '没有获准查询该订阅的在线执行机。请检查执行机连接与模型设置。',
 } as const;
 
 interface Entry {

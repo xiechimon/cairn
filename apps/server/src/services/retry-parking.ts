@@ -120,7 +120,7 @@ function formatChiefParkNotice(input: {
   const { reasonCode, runtimeUpdate, rejectedModel, retryAttempt, failures } = input;
   if (runtimeUpdate !== null) return runtimeUpdateReason(runtimeUpdate);
   if (reasonCode === 'model_unavailable') {
-    return `${RETRY_PARKED_MARK}: model unavailable (${sanitizeDetail(rejectedModel) ?? 'unknown'}). Update model routing before retrying.`;
+    return `${RETRY_PARKED_MARK}: model unavailable (${sanitizeDetail(rejectedModel) ?? 'unknown'}). Update Settings → Model before retrying.`;
   }
   if (reasonCode === 'setup_hook') {
     return `${RETRY_PARKED_MARK}: setup hook failed. Fix the workspace setup hook or environment, then retry. Open the task to see the error.`;
@@ -170,7 +170,7 @@ function formatParkedMessage(input: {
   if (error.startsWith(RETRY_PARKED_MARK)) return error;
   if (runtimeUpdate !== null) return `${runtimeUpdateReason(runtimeUpdate)}\n${error}`;
   if (reasonCode === 'model_unavailable') {
-    return `${RETRY_PARKED_MARK}: model unavailable (${rejectedModel ?? 'unknown'}). Update model routing before retrying.`;
+    return `${RETRY_PARKED_MARK}: model unavailable (${rejectedModel ?? 'unknown'}). Update Settings → Model before retrying.`;
   }
   if (reasonCode === 'setup_hook') {
     return `${RETRY_PARKED_MARK}: setup hook failed. Fix the workspace setup hook or environment, then retry. Last error: ${error}`;

@@ -169,7 +169,7 @@ describe('needs you (#1800)', () => {
     expect(buildCount(w)).toBe(1);
     expect(
       w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.errorMessage,
-    ).toBe('Task parked: model unavailable (glm-5.3). Update model routing before retrying.');
+    ).toBe('Task parked: model unavailable (glm-5.3). Update Settings → Model before retrying.');
     expect(getTodo(w.deps, w.todoId)?.owner).toBe('coordinator');
     expect(
       w.s.db
