@@ -14,6 +14,7 @@ import {
   type DesktopMenuCommand,
   type DesktopRunnerState,
   type DesktopTrayState,
+  type DesktopUpdateInstallResult,
   type DesktopUpdateState,
   desktopNotificationOptions,
   ENV_VARS,
@@ -102,7 +103,7 @@ import {
   resolveLocalHostOwner,
 } from './local-host-owner.js';
 import { scanLocalProviders } from './local-providers.js';
-import { type DesktopLocale, desktopLocale } from './locale.js';
+import { type DesktopLocale, desktopLocale, resolveWindowLocale } from './locale.js';
 import {
   type NativeTray,
   nativeTrayAction,
@@ -954,13 +955,25 @@ function systemAccent(): string | null {
 }
 
 async function windowLocale(): Promise<DesktopLocale> {
-  for (const window of BrowserWindow.getAllWindows()) {
-    const lang = await window.webContents
-      .executeJavaScript('document.documentElement.lang')
-      .catch(() => null);
-    if (typeof lang === 'string' && lang !== '') return desktopLocale(lang);
+  const seen = new Set<BrowserWindow>();
+  const ordered: BrowserWindow[] = [];
+  for (const window of [mainWindow, ...BrowserWindow.getAllWindows()]) {
+    if (window === null || seen.has(window)) continue;
+    seen.add(window);
+    ordered.push(window);
   }
-  return desktopLocale(app.getLocale());
+  return resolveWindowLocale(
+    ordered.map((window) => {
+      const destroyed = window.isDestroyed() || window.webContents.isDestroyed();
+      return {
+        destroyed,
+        loading: !destroyed && window.webContents.isLoadingMainFrame(),
+        url: destroyed ? '' : window.webContents.getURL(),
+        readLang: () => window.webContents.executeJavaScript('document.documentElement.lang'),
+      };
+    }),
+    app.getLocale(),
+  );
 }
 
 function nativeTrayHelper(): string | null {
