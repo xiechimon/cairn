@@ -24,6 +24,13 @@ A lane verifies on GitHub before it occupies `queue/main`:
   `refs/heads/enqueue/*` and builds `refs/heads/queue/try/*` only after a head
   is preflight-green — a `preflight/*` run can never be promoted or counted as a
   live queue candidate.
+- `scripts/ops/preflight.mjs` runs `scripts/ops/preflight-fast-gate.mjs` on
+  the exact committed `HEAD` tree before pushing `refs/heads/preflight/<lane>`
+  (`pnpm lint`, touched-package `typecheck`, and `pnpm test:changed`), and
+  refuses to push if it fails. Setting `CAIRN_PREFLIGHT_GATE_WRAPPER`
+  (whitespace-split command prefix) combines that plan into a single
+  `<wrapper...> sh -c "..."` call so hosts can offload the gate to a dedicated
+  test runner without hardcoding host-specific paths in the repository.
 - `scripts/ops/push-queue.mjs` refuses to land a head with no green
   pre-flight evidence; local `pnpm prepush` / `pnpm test:changed` stay
   recommended but are no longer the gate. When the queue is empty and HEAD

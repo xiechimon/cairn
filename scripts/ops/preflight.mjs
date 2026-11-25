@@ -15,6 +15,21 @@ export function preflightRun(runs, sha, ref) {
   );
 }
 
+export function fastGateInvocation({ env = process.env } = {}) {
+  const runner = env.CAIRN_PREFLIGHT_GATE_WRAPPER?.trim()
+    ? 'CAIRN_PREFLIGHT_GATE_WRAPPER'
+    : 'local exact tree';
+  return { command: process.execPath, args: ['scripts/ops/preflight-fast-gate.mjs'], runner };
+}
+
+export function runFastGateBeforePush({
+  root,
+  spawn = spawnSync,
+  invocation = fastGateInvocation(),
+}) {
+  return spawn(invocation.command, invocation.args, { cwd: root, stdio: 'inherit' });
+}
+
 export function watchVerdict(status, conclusion, watchStatus) {
   if (status === 'completed')
     return { verdict: conclusion === 'success' ? 'green' : 'red', conclusion };
@@ -35,6 +50,16 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     process.exit(1);
   }
   const sha = stamped.sha;
+  const root = git(['rev-parse', '--show-toplevel']);
+  const invocation = fastGateInvocation();
+  console.log(
+    `[preflight] running the fast gate through ${invocation.runner}; nothing is pushed unless it passes`,
+  );
+  const gate = runFastGateBeforePush({ root, invocation });
+  if (gate.status !== 0) {
+    console.error('[preflight] fast gate failed on the exact HEAD tree; nothing was pushed.');
+    process.exit(gate.status ?? 1);
+  }
   const push = spawnSync(
     'git',
     ['push', `--force-with-lease=${preflightRef(lane)}`, 'origin', `HEAD:${preflightRef(lane)}`],
