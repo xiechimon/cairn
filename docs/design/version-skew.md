@@ -206,6 +206,7 @@ One consistent rule across every surface (sidebar update control, top status bar
 > **Edge-case matrix (`part = remote-version`):** [`docs/design/version-skew-edge-cases/remote-version.md`](version-skew-edge-cases/remote-version.md).
 > **Edge-case matrix (`part = server-self-deploy`):** [`docs/design/version-skew-edge-cases/server-self-deploy.md`](version-skew-edge-cases/server-self-deploy.md).
 > **Edge-case matrix (`part = page-shell-capability`):** [`docs/design/version-skew-edge-cases/page-shell-capability.md`](version-skew-edge-cases/page-shell-capability.md).
+> **Edge-case matrix (`part = remote-update`):** [`docs/design/version-skew-edge-cases/remote-update.md`](version-skew-edge-cases/remote-update.md).
 
 ## In-Flight Lanes Mapped to This Contract
 

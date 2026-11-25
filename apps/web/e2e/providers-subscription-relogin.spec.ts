@@ -366,3 +366,61 @@ test('other expired or unauthenticated subscription cards (Claude, Devin, Codex)
   await expect(page.getByTestId('codex-device-login')).toContainText('ABCD-1234');
   expect(codexDeviceStarted).toBe(1);
 });
+
+test.describe('old desktop shell bridge skew', () => {
+  test.use({ userAgent: 'Mozilla/5.0 CairnDesktop/mac' });
+
+  test('Antigravity re-sign-in inside an older desktop shell prompts to update Cairn instead of claiming browser mode', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const w = window as Window & { cairnDesktop?: unknown; __updateInstallCalls?: number };
+      w.__updateInstallCalls = 0;
+      w.cairnDesktop = {
+        antigravity: {
+          status: async () => ({ installed: false, loggedIn: false, canLogin: false }),
+          import: async () => ({ ok: false, reason: 'cancelled' }),
+          login: async () => ({ ok: false, reason: 'cancelled' }),
+          cancelLogin: async () => {},
+        },
+        update: {
+          state: async () => ({ status: 'available', version: '0.43.0' }),
+          check: async () => {},
+          install: async () => {
+            w.__updateInstallCalls = (w.__updateInstallCalls ?? 0) + 1;
+            return { ok: true };
+          },
+          subscribe: () => () => {},
+        },
+      };
+    });
+    await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+      if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+      if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+      if (path === '/api/teams/t1/antigravity-subscriptions') {
+        return json([expiredAntigravity(false)]);
+      }
+      if (path === '/api/teams/t1/antigravity-subscriptions/ag-exp-1/steps') {
+        return json({ steps: [], hasEarlier: false });
+      }
+      return undefined;
+    });
+    await page.goto('/app/settings/routing?item=subscription:ag-exp-1');
+    await page.getByTestId('subscription-sign-in-again').click();
+    const dialog = page.getByRole('dialog', { name: '重新登录 Antigravity' });
+    await expect(dialog.getByTestId('antigravity-relogin-state')).not.toContainText(
+      '在 Cairn 桌面 App 中打开这一页',
+    );
+    await expect(dialog.getByTestId('antigravity-relogin-state')).toContainText(
+      '当前 Cairn 桌面应用版本较旧，请先更新后再重新登录 Antigravity。',
+    );
+    const updateBtn = dialog.getByTestId('antigravity-relogin-update-desktop');
+    await expect(updateBtn).toBeVisible();
+    await updateBtn.click();
+    expect(
+      await page.evaluate(
+        () => (window as Window & { __updateInstallCalls?: number }).__updateInstallCalls,
+      ),
+    ).toBe(1);
+  });
+});

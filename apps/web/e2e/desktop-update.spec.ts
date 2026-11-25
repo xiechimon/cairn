@@ -135,6 +135,35 @@ test.describe('desktop shell', () => {
     );
     await expect(page.getByText('更新包签名验证未通过，无法安装')).toBeVisible();
   });
+
+  test('an unsupported desktop update still answers with the blocker hint on click', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const calls = { install: 0, check: 0 };
+      const w = window as unknown as Record<string, unknown>;
+      w.__updateCalls = calls;
+      w.cairnDesktop = {
+        update: {
+          state: async () => ({ status: 'unsupported', blocker: 'not-in-applications' }),
+          check: async () => {
+            calls.check += 1;
+          },
+          install: async () => {
+            calls.install += 1;
+          },
+          subscribe: () => () => {},
+        },
+      };
+    });
+    await page.goto('/app?scenario=providers-fleet');
+    const update = page.getByTestId('desktop-update');
+    await expect(update).toHaveAttribute('data-status', 'unsupported');
+    await expect(update).toHaveAttribute('aria-disabled', 'true');
+    await update.click({ force: true });
+    await expect(page.getByText('把 Cairn 移到「应用程序」后才能自动更新')).toBeVisible();
+    expect(await calls(page)).toEqual({ install: 0, check: 0 });
+  });
 });
 
 test('in the browser the footer has no brand and no update button', async ({ page }) => {
