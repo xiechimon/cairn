@@ -12,6 +12,8 @@ If that new version cannot start — its bundled server crashes on a database mi
 
 What you need to know: your data lives in the Cairn home directory, not in the app bundle, so a rollback never touches your tasks. A rolled-back version is not offered to you again automatically; the next release is. Nothing asks you for an account, a password or a payment — the update downloads from Cairn's public GitHub releases, the same place you installed it from.
 
+When Cairn is closed, a small background job (`app.cairn.updater`, registered the first time a Cairn with this change opens) checks every half hour and when the Mac wakes. If a new version is out and Cairn is not running, it downloads, verifies and swaps it in, so the next time you open Cairn it is already the newest version. macOS shows one "Background Items Added" notice for it and lists Cairn under Login Items & Extensions; switching it off there just returns you to updating while Cairn is open. On Windows nothing changes: Cairn downloads while open and installs when you quit.
+
 Where you can still get stuck: if the new version's *own launcher* (not the server it starts) cannot run at all, no Cairn code is running to roll it back. That case is covered by publishing a fixed build, and is listed under "not covered" below.
 
 ## Why
@@ -34,7 +36,18 @@ Where you can still get stuck: if the new version's *own launcher* (not the serv
 | You ask to install the version that failed | A dialog naming it as the one that failed | Installs it only because you asked explicitly | — |
 | The previous version is missing or the swap fails | The existing "Cairn could not start" dialog, plus the log line | Gives up loudly rather than looping | Manual download |
 | Notifications are switched off for Cairn | One line in a dialog, after Cairn has started | Falls back to a dialog, because a silent rollback the user cannot see is worse than an interruption; it is raised after boot so its modal loop cannot stall the server starting | One dialog to dismiss |
-| Cairn is not in Applications, or the folder is read-only | Unchanged from today | Reports `unsupported` and never stages an update | — |
+| Cairn is not in Applications, or the folder is read-only | Unchanged from today | Reports `unsupported` and never stages an update; the background updater exits quietly | — |
+| A release is published while Cairn is closed, and the Mac is awake for half an hour or wakes from sleep before you open Cairn | You open the new version | The background updater downloads, verifies and swaps it, writes `installed`, so the first open is guarded exactly like an in-app update | 0 s at open; the download happens while Cairn is closed |
+| You open Cairn before the background updater has run | The old version, as before; it updates when you step away or quit | The background updater sees Cairn running and does nothing; the app checks and downloads itself | — |
+| You open Cairn while the background updater is downloading | The old version opens at once | Before swapping, the updater sees Cairn running, gives up and removes its download | — |
+| You open Cairn in the second the background updater swaps it | The Dock icon bounces a moment longer, then the whole new version opens | The app takes the same update lock at launch and waits for the swap; it then compares the version on disk with its own and relaunches if they differ, so a half-swapped bundle never runs. Both renames are in the same folder, so `Cairn.app` is always either the whole old or the whole new version | Up to a few seconds |
+| A downloaded update is still waiting when you open Cairn (force quit, or the background updater was held) | The Dock icon bounces about four seconds longer, then the new version opens | Before any window or server, the launch verifies the staged bundle, swaps it in and relaunches; no network | About 4 s, rare |
+| You quit Cairn while it talks to a remote server or a resident one | Nothing | Quit stops the Runner and installs the staged update, same as with Cairn's own server | Under a second |
+| The resident server is writing a Coordinator reply when the background updater is ready | Nothing | The updater keeps the download and tries again in half an hour; after a swap it restarts the resident server so it runs the new code | — |
+| The laptop runs on battery below 20% | Nothing | The background updater skips this run | — |
+| Someone copies a Cairn.app over the installed one by hand | Nothing; it keeps updating | The next launch or background run writes "found X installed outside the updater" to `update.log`; the hand-installed copy passes the same signature check as any release | — |
+| Cairn is moved to the Trash | Nothing | The job's launcher finds no Cairn executable, deletes its plist and boots itself out | At most one more half hour |
+| Windows | Unchanged | No background updater | — |
 
 ## State
 
@@ -57,8 +70,11 @@ interface UpdateState {
   } | null;
   blocked: { version: string; at: number; reason: string } | null;
   notice: { failedVersion: string; restoredVersion: string; reason: string; logPath: string; at: number } | null;
+  knownVersion: string | null; // the version the updater last saw or installed
 }
 ```
+
+`<userData>/update.lock` (`apps/desktop/src/update-lock.ts`) serialises every swap: `{pid, holder, at}` created with an atomic `link`, removed by its holder; a lock whose process is gone or which is older than ten minutes is taken over. The background updater holds it only around the two renames, and refuses to wait; the app holds it around its own swap and around the launch check, and waits up to a minute.
 
 Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications`). `<bundle dir>/.cairn-previous/Cairn.app` is the kept previous version. Staging lives in `<bundle dir>/.cairn-update-<random>/` so every rename stays on one filesystem; the desktop's existing "delete leftover staging folders on boot" cleanup skips the folder named by `staged.app`.
 
@@ -77,7 +93,7 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 - `healthy` deletes `previousApp`, clears `installed`, writes the file.
 - When the app talks to a remote server or attaches to a resident one, there is no server of its own to probe; finishing `boot` counts as a health answer and staying up 30 more seconds confirms, so the guard never stays `armed` and the away apply is not held forever.
 - `rollback` writes `notice` and `blocked`, renames `bundle → .cairn-previous/Cairn.app.failed`, renames `previousApp → bundle`, relaunches with `--cairn-background-launch`, exits. The failed bundle is deleted after the process exits by the existing `removeFolderAfterExit`.
-- Any launch takes `notice` before anything else (clear it, append the line to `<userData>/logs/update.log`), and shows one line once the server, tray and window are up: a Notification, or a dialog when the Notification cannot be delivered. It is deliberately not shown during boot — a macOS modal dialog runs a modal event loop that blocks the main thread, which would stop the bundled server from ever starting.
+- Any launch takes `notice` before anything else (clear it, append the line to `<userData>/logs/update.log`), and shows one line once the server, tray and window are up: a Notification, or a dialog when the Notification cannot be delivered. Only the main window's page may take the notice over IPC; the hidden `/tray` page gets nothing, so it cannot swallow the line before the window shows it. It is deliberately not shown during boot — a macOS modal dialog runs a modal event loop that blocks the main thread, which would stop the bundled server from ever starting.
 
 ### Every path that reads or writes the file
 
@@ -92,6 +108,9 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 | boot, guard rollback | `installed` | `notice`, `blocked`, clears `installed` |
 | boot, version mismatch | `installed` | clears `installed` |
 | boot, notice | `notice` | clears `notice` |
+| launch check (`apps/desktop/src/launch-update.ts`), under the lock | `staged`, `installed`, `knownVersion` | on a staged swap `installed`, clears `staged`; `knownVersion` |
+| background updater (`apps/desktop/src/background-update.ts`) | everything | `staged` after a download; under the lock `installed`, clears `staged`, `knownVersion`; clears `staged` on a refused signature |
+| guard rollback | — | also sets `knownVersion` to the restored version |
 
 ### Failure paths
 
@@ -102,15 +121,22 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 | Extracted bundle missing or wrong version | staging folder removed, `error` |
 | Rename across filesystems | cannot happen by construction (staging is beside the bundle) |
 | `staged.app` points anywhere but a staging folder beside the bundle | refused, record and folder discarded, `error` published |
+| The staged bundle disappeared from disk, or its version is not the recorded one | `apply()` clears the staged record and publishes `error`; the next `check()` sees no usable staged bundle, discards the record and downloads again, so `ready` never points at a bundle that cannot install |
+| The menu's install fails | a warning dialog names the failure; the menu stays usable |
 | Staged signature is valid but does not meet Cairn's requirement (exit 3) | refused, `error` published, staged record cleared only if it still names the same app, all folders untouched. Automatic checks and manual installs skip that version for the rest of the process; newer releases are still eligible. Refusals are not persisted, so restarting allows one download of that version per launch before it is refused again. |
 | Staged signature verification fails for any other reason (including exit 1, a signal or a spawn error) | refused, `error` published, staged record and all folders untouched |
 | The bundle is missing at launch but a kept previous copy is there | the previous copy is renamed back before anything else runs |
 | Second rename fails after the first | first rename undone, `error`, app keeps running on the old bundle |
 | Process dies between the two renames | boot sees `installed.version` ≠ running version, clears the record; the moved-aside bundle is restored by name if it is the only one there |
 | New version's server exits before ready | rollback |
+| New version's `boot()` throws (server start timeout, migration error) while the guard is armed | rollback at once, like a server exit; one failure is enough |
 | New version's server answers, then dies inside 60 s | rollback |
 | New version boots but never finishes its first window load | still `armed`; the health window closes on wall-clock, not on the window, so it either confirms by serving or rolls back |
-| New version cannot start at all (its `main.mjs` throws before `boot`) | **not covered**; needs a fixed release. A launchd/ShipIt-style helper is the prior-art answer and is out of scope here |
+| New version cannot start at all (its `main.mjs` throws before `boot`) | **not covered**; needs a fixed release. The background updater does not roll back: it only installs, and skips while `installed` is unconfirmed |
+| Background updater: no network, manifest error, bad hash | logged to `update.log`, staging removed, retried in half an hour |
+| Background updater: Cairn starts during the download or before the swap | download removed, no swap; the lock and the on-disk version check cover the swap itself |
+| Background updater: the resident server cannot be asked about replies | logged; treated as idle so updates are not held forever |
+| Launch check: lock still held after a minute | the launch goes on; the on-disk version check still relaunches into a finished swap |
 | Previous bundle missing at rollback | error dialog, exit; `notice` and `blocked` still written so the next launch of anything explains it |
 | Update applied at quit, then the app is launched again quickly and the new version is fine | confirms after 30 healthy seconds |
 | The same bad version is the newest release | never auto-staged again on that Mac; explicit install still possible |

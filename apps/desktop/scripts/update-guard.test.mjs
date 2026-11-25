@@ -17,6 +17,11 @@ test('a server that exits before it is ready rolls the update back', () => {
   assert.equal(step.state.rollbacks, 1);
 });
 
+test('a launch that fails once while the update is on probation rolls it back', () => {
+  const step = guardStep(armed(), { event: 'boot-failed', at: 2_000 });
+  assert.equal(step.action, 'rollback');
+});
+
 test('one failed health probe is noise, three in a row roll the update back', () => {
   const first = guardStep(armed(), { event: 'health-failed', at: 2_000 });
   const second = guardStep(first.state, { event: 'health-failed', at: 3_000 });

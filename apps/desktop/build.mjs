@@ -15,7 +15,7 @@ const shared = {
 
 await build({
   ...shared,
-  entryPoints: ['src/main.ts', 'src/antigravity-login-worker.ts'],
+  entryPoints: ['src/main.ts', 'src/antigravity-login-worker.ts', 'src/background-updater.ts'],
   outdir: 'dist',
   outExtension: { '.js': '.mjs' },
   format: 'esm',

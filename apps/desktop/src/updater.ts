@@ -1,28 +1,25 @@
-import { execFile, spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { constants, createWriteStream, existsSync } from 'node:fs';
-import { access, mkdir, mkdtemp } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { promisify } from 'node:util';
-import {
-  DESKTOP_MANIFEST_URL,
-  type DesktopUpdate,
-  type DesktopUpdateBlocker,
-  type DesktopUpdateState,
-  desktopReleaseManifestSchema,
-  desktopUpdateFrom,
-} from '@cairn/shared';
+import type { DesktopUpdate, DesktopUpdateBlocker, DesktopUpdateState } from '@cairn/shared';
 import { app } from 'electron';
-import { verifyCairnSignature } from './signature.js';
-import { messageOf, updateFailureState } from './update-error.js';
+import { LAUNCH_SETTLED_FLAG } from './launch-update.js';
 import {
-  canonicalPath,
-  isStagedBundleFor,
-  removeFolder,
-  removeFolderAfterExit,
-  removeStagingFolders,
-  STAGING_PREFIX,
-} from './update-staging.js';
+  afterSwap,
+  download,
+  fetchOfferedUpdate,
+  folderWritable,
+  SIGNATURE_REFUSAL,
+  SignatureRefused,
+  StagedUnusable,
+  stageBundle,
+  swapInStaged,
+  verifyStaged,
+} from './update-core.js';
+import { messageOf, updateFailureState } from './update-error.js';
+import { acquireUpdateLock, updateLockPath } from './update-lock.js';
+import { canonicalPath, removeFolderAfterExit, removeStagingFolders } from './update-staging.js';
 import {
   readUpdateState,
   shouldStage,
@@ -30,19 +27,10 @@ import {
   updateStatePath,
   writeUpdateState,
 } from './update-state.js';
-import {
-  APP_BUNDLE_NAME,
-  APP_EXECUTABLE,
-  applyStagedUpdate,
-  previousAppPath,
-  readBundleVersion,
-} from './update-swap.js';
+import { APP_EXECUTABLE } from './update-swap.js';
 
-const run = promisify(execFile);
-const REQUEST_HEADERS = { 'User-Agent': 'Cairn-Desktop' };
-const NO_MANIFEST = 404;
-const SIGNATURE_REFUSAL = 'the staged update is not signed by the Cairn certificate';
 const QUIT_FALLBACK_MS = 30_000;
+const APPLY_LOCK_WAIT_MS = 15_000;
 export const BACKGROUND_LAUNCH_FLAG = '--cairn-background-launch';
 
 export type ApplyWhen = 'none' | 'background' | 'foreground';
@@ -58,7 +46,7 @@ export function runningBundle(): string {
   return canonicalPath(resolve(process.execPath, '..', '..', '..'));
 }
 
-async function updateBlocker(bundle: string): Promise<DesktopUpdateBlocker | null> {
+export async function updateBlocker(bundle: string): Promise<DesktopUpdateBlocker | null> {
   if (process.platform === 'win32') {
     return app.isPackaged ? null : 'development';
   }
@@ -66,10 +54,7 @@ async function updateBlocker(bundle: string): Promise<DesktopUpdateBlocker | nul
   if (bundle.includes('/AppTranslocation/') || bundle.startsWith('/Volumes/')) {
     return 'not-in-applications';
   }
-  return access(dirname(bundle), constants.W_OK).then(
-    () => null,
-    () => 'read-only' as const,
-  );
+  return (await folderWritable(bundle)) ? null : 'read-only';
 }
 
 export async function removeLeftoverUpdates(): Promise<void> {
@@ -81,38 +66,10 @@ export async function removeLeftoverUpdates(): Promise<void> {
 
 export { messageOf } from './update-error.js';
 
-async function download(
-  update: DesktopUpdate,
-  target: string,
-  onPercent: (percent: number) => void,
-): Promise<void> {
-  const response = await fetch(update.url, { headers: REQUEST_HEADERS });
-  if (!response.ok || response.body === null) {
-    throw new Error(`download failed with HTTP ${response.status}`);
-  }
-  const hash = createHash('sha256');
-  const file = createWriteStream(target);
-  let received = 0;
-  let reported = -1;
-  for await (const chunk of response.body) {
-    hash.update(chunk);
-    received += chunk.byteLength;
-    if (!file.write(chunk)) await new Promise((drained) => file.once('drain', drained));
-    const percent = Math.min(99, Math.floor((received / update.size) * 100));
-    if (percent !== reported) {
-      reported = percent;
-      onPercent(percent);
-    }
-  }
-  await new Promise<void>((closed, failed) =>
-    file.end((error?: Error | null) => (error ? failed(error) : closed())),
-  );
-  if (hash.digest('hex') !== update.sha256)
-    throw new Error('the download does not match its SHA-256 digest');
-}
-
 export function relaunchArgs(background: boolean): string[] {
-  const args = process.argv.slice(1).filter((arg) => arg !== BACKGROUND_LAUNCH_FLAG);
+  const args = process.argv
+    .slice(1)
+    .filter((arg) => arg !== BACKGROUND_LAUNCH_FLAG && arg !== LAUNCH_SETTLED_FLAG);
   return background ? [...args, BACKGROUND_LAUNCH_FLAG] : args;
 }
 
@@ -186,37 +143,14 @@ export function createUpdater(
       }
       return;
     }
-    const bundle = runningBundle();
-    const staging = await mkdtemp(join(dirname(bundle), STAGING_PREFIX));
     try {
-      set({ status: 'downloading', version: update.version, percent: 0 });
-      const zip = join(staging, `Cairn-${update.version}.zip`);
-      await download(update, zip, (percent) =>
-        set({ status: 'downloading', version: update.version, percent }),
-      );
-      set({ status: 'installing', version: update.version });
-      await run('/usr/bin/ditto', ['-x', '-k', zip, staging]);
-      const stagedApp = join(staging, APP_BUNDLE_NAME);
-      const version = await readBundleVersion(stagedApp);
-      if (version !== update.version) {
-        throw new Error(
-          `the downloaded app is version ${version ?? 'unknown'}, not ${update.version}`,
-        );
-      }
-      const previous = readUpdateState(statePath());
-      writeUpdateState(statePath(), {
-        ...previous,
-        staged: {
-          version: update.version,
-          zip,
-          app: stagedApp,
-          previousVersion: app.getVersion(),
-          at: Date.now(),
-        },
+      const staged = await stageBundle(runningBundle(), update, app.getVersion(), {
+        downloading: (percent) => set({ status: 'downloading', version: update.version, percent }),
+        extracting: () => set({ status: 'installing', version: update.version }),
       });
+      writeUpdateState(statePath(), { ...readUpdateState(statePath()), staged });
       set({ status: 'ready', version: update.version });
     } catch (error) {
-      await removeFolder(staging).catch(() => {});
       set(updateFailureState(error, readyVersion()));
     }
   }
@@ -230,23 +164,16 @@ export function createUpdater(
     }
     set({ status: 'checking' });
     try {
-      const response = await fetch(DESKTOP_MANIFEST_URL, { headers: REQUEST_HEADERS });
-      if (!response.ok && response.status !== NO_MANIFEST) {
-        throw new Error(`GitHub answered HTTP ${response.status}`);
-      }
-      pending = response.ok
-        ? desktopUpdateFrom(
-            desktopReleaseManifestSchema.parse(await response.json()),
-            app.getVersion(),
-            process.arch,
-            process.platform,
-          )
-        : null;
+      pending = await fetchOfferedUpdate(app.getVersion());
       if (pending === null) {
         set({ status: 'current', version: app.getVersion() });
         return;
       }
-      const record = readUpdateState(statePath());
+      let record = readUpdateState(statePath());
+      if (record.staged !== null && readyVersion() === null) {
+        await discardStaged(record);
+        record = readUpdateState(statePath());
+      }
       if (record.staged === null && signatureRefusedVersions.has(pending.version)) {
         set({ status: 'error', message: SIGNATURE_REFUSAL });
         return;
@@ -314,42 +241,32 @@ export function createUpdater(
     }
     const bundle = runningBundle();
     try {
-      if (!isStagedBundleFor(bundle, staged.app)) {
-        throw new Error('the staged update is not where Cairn put it');
-      }
       set({ status: 'installing', version: staged.version });
-      const signature = await verifyCairnSignature(staged.app);
-      if (signature !== 'accepted') {
-        if (signature === 'requirement-mismatch') {
-          signatureRefusedVersions.add(staged.version);
-          const path = statePath();
-          const latest = readUpdateState(path);
+      try {
+        await verifyStaged(bundle, staged);
+      } catch (error) {
+        const mismatch = error instanceof SignatureRefused && error.mismatch;
+        if (mismatch) signatureRefusedVersions.add(staged.version);
+        if (mismatch || error instanceof StagedUnusable) {
+          const latest = readUpdateState(statePath());
           if (latest.staged?.app === staged.app) {
-            writeUpdateState(path, { ...latest, staged: null });
+            writeUpdateState(statePath(), { ...latest, staged: null });
           }
         }
-        throw new Error(SIGNATURE_REFUSAL);
+        throw error;
       }
-      const version = await readBundleVersion(staged.app);
-      if (version !== staged.version) {
-        throw new Error(`the staged app is version ${version ?? 'unknown'}, not ${staged.version}`);
+      const release = await acquireUpdateLock(
+        updateLockPath(app.getPath('userData')),
+        'app',
+        APPLY_LOCK_WAIT_MS,
+      );
+      if (release === null) throw new Error('another Cairn update is being installed');
+      try {
+        const installed = await swapInStaged(bundle, staged, app.getVersion());
+        writeUpdateState(statePath(), afterSwap(readUpdateState(statePath()), installed));
+      } finally {
+        release();
       }
-      await removeFolder(previousAppPath(bundle));
-      await applyStagedUpdate({
-        bundle,
-        previousApp: previousAppPath(bundle),
-        stagedApp: staged.app,
-      });
-      writeUpdateState(statePath(), {
-        ...state,
-        staged: null,
-        installed: {
-          version: staged.version,
-          previousVersion: app.getVersion(),
-          previousApp: previousAppPath(bundle),
-          at: Date.now(),
-        },
-      });
       removeFolderAfterExit(dirname(staged.app), process.pid);
       if (when === 'none') return;
       set({ status: 'restarting', version: staged.version });

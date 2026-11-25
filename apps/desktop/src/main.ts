@@ -79,6 +79,7 @@ import { installContextMenu } from './context-menu.js';
 import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
 import { createIdleWatch } from './idle-update.js';
 import { createKeepAwake } from './keep-awake.js';
+import { LAUNCH_SETTLED_FLAG, type LaunchVerdict, settleBundleAtLaunch } from './launch-update.js';
 import { desktopCredentialActions } from './local-credential-actions.js';
 import { scanLocalProviders } from './local-providers.js';
 import { type DesktopLocale, desktopLocale } from './locale.js';
@@ -93,6 +94,7 @@ import { desktopOtelEnv, withOtelFileEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
 import { type CapturePage, createPageCapture } from './page-capture.js';
 import { offscreenCaptureSurfaces, pageCaptureRequestOf } from './page-capture-window.js';
+import { finishQuit } from './quit-steps.js';
 import {
   parseRelaunchWindow,
   RELAUNCH_WINDOW_FILE_NAME,
@@ -128,6 +130,7 @@ import {
   serverStoppedCopy,
   unsupportedUpdateCopy,
   updateCheckFailedCopy,
+  updateInstallFailedCopy,
   updateOfflineCopy,
   upToDateCopy,
 } from './update-copy.js';
@@ -139,6 +142,7 @@ import {
   type GuardState,
   guardStep,
 } from './update-guard.js';
+import { acquireUpdateLock, updateLockPath } from './update-lock.js';
 import { appendUpdateLog, updateLogPath } from './update-log.js';
 import { removeFolder, removeFolderAfterExit } from './update-staging.js';
 import {
@@ -151,7 +155,6 @@ import {
   failedAppPath,
   previousAppPath,
   readBundleVersion,
-  restoreIfBundleMissing,
   restorePrevious,
 } from './update-swap.js';
 import {
@@ -162,7 +165,9 @@ import {
   removeLeftoverUpdates,
   runningBundle,
   type Updater,
+  updateBlocker,
 } from './updater.js';
+import { ensureUpdaterAgent, UPDATER_ENTRY, updaterPlistPath } from './updater-agent.js';
 import { createWakeAhead, earliestScheduleNextRunAt } from './wake-ahead.js';
 import {
   clampBounds,
@@ -185,6 +190,7 @@ const UPDATE_CHECK_ON_FOCUS_AFTER_MS = 10 * 60 * 1000;
 const HEALTH_PROBE_MS = 5_000;
 const HEALTH_PROBE_TIMEOUT_MS = 5_000;
 const IDLE_TICK_MS = 60_000;
+const BOOT_LOCK_WAIT_MS = 60_000;
 const NEW_TASK_SHORTCUT = 'Control+Alt+N';
 const TRAY_FIRST_HEIGHT = 440;
 const TRAY_MAX_HEIGHT = 900;
@@ -1134,6 +1140,14 @@ function serveUpdates(
     return created.check();
   };
   const installFromMenu = async (): Promise<void> => {
+    try {
+      await installChosenUpdate();
+    } catch (error) {
+      const copy = updateInstallFailedCopy(await windowLocale(), messageOf(error));
+      await messageBox({ type: 'warning', message: copy.title, detail: copy.detail });
+    }
+  };
+  const installChosenUpdate = async (): Promise<void> => {
     const state = created.state();
     if (state.status === 'ready') {
       await created.apply('foreground');
@@ -1178,8 +1192,13 @@ function serveUpdates(
   let pendingNotice = notice;
   const fromOwnPage = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
     event.senderFrame?.origin === origin;
+  const fromMainPage = (event: IpcMainInvokeEvent): boolean =>
+    !quitting &&
+    mainWindow?.webContents === event.sender &&
+    event.senderFrame === event.sender.mainFrame &&
+    fromOwnPage(event);
   ipcMain.handle('desktop-update:rollback-notice', (event) => {
-    if (!fromOwnPage(event)) return null;
+    if (!fromMainPage(event)) return null;
     const pending = pendingNotice;
     pendingNotice = null;
     return pending === null
@@ -1200,11 +1219,6 @@ function serveUpdates(
     if (!fromOwnPage(event)) return undefined;
     return created.state().status === 'ready' ? created.apply('foreground') : created.install();
   });
-  const fromMainPage = (event: IpcMainInvokeEvent): boolean =>
-    !quitting &&
-    mainWindow?.webContents === event.sender &&
-    event.senderFrame === event.sender.mainFrame &&
-    fromOwnPage(event);
   const workerPath = join(
     app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'dist'),
     'antigravity-login-worker.mjs',
@@ -1346,6 +1360,7 @@ function armVersionGuard(userData: string): VersionGuard | null {
       writeUpdateState(statePath, {
         ...readUpdateState(statePath),
         installed: null,
+        knownVersion: installed.previousVersion,
         blocked: { version: installed.version, at, reason, attempts: attempts + 1 },
         notice: {
           failedVersion: installed.version,
@@ -1453,6 +1468,47 @@ function watchIdleUpdate(runnerHome: string): void {
   powerMonitor.on('resume', tick);
 }
 
+async function settleLaunch(userData: string): Promise<LaunchVerdict> {
+  if (!IS_MAC || !app.isPackaged) return 'continue';
+  const release = await acquireUpdateLock(updateLockPath(userData), 'app', BOOT_LOCK_WAIT_MS);
+  let verdict: LaunchVerdict;
+  try {
+    verdict = await settleBundleAtLaunch({
+      bundle: runningBundle(),
+      userData,
+      runningVersion: app.getVersion(),
+      settled: process.argv.includes(LAUNCH_SETTLED_FLAG),
+      log: (line) => appendUpdateLog(userData, line),
+    });
+  } finally {
+    release?.();
+  }
+  if (verdict === 'relaunch') {
+    quitting = true;
+    app.relaunch({ args: [...relaunchArgs(BACKGROUND_LAUNCH), LAUNCH_SETTLED_FLAG] });
+    app.exit(0);
+  }
+  return verdict;
+}
+
+function keepUpdaterAgent(userData: string): void {
+  if (!IS_MAC || !app.isPackaged) return;
+  void updateBlocker(runningBundle())
+    .then(async (blocker) => {
+      if (blocker !== null) return;
+      const result = await ensureUpdaterAgent({
+        executablePath: process.execPath,
+        entry: join(process.resourcesPath, UPDATER_ENTRY),
+        userData,
+        plistPath: updaterPlistPath(homedir()),
+      });
+      if (result === 'installed') appendUpdateLog(userData, 'registered the background updater');
+    })
+    .catch((error: unknown) =>
+      console.error('registering the background updater failed:', messageOf(error)),
+    );
+}
+
 function captureMainConsole(): void {
   const log = createServerLog(join(app.getPath('userData'), 'logs', 'main.log'), logSecrets);
   for (const level of ['log', 'info', 'warn', 'error'] as const) {
@@ -1486,9 +1542,7 @@ async function boot(): Promise<void> {
     desktopShellEnv = discoveredShell.patch;
     applyShellEnvironment(process.env, discoveredShell.patch, process.platform);
     process.env[SHELL_ENV_RESOLVED_VAR] = '1';
-    if (await restoreIfBundleMissing(runningBundle())) {
-      console.warn('restored the previous Cairn after an install was interrupted');
-    }
+    if ((await settleLaunch(userData)) === 'relaunch') return;
     const notice = takeRollbackNotice(userData);
     guard = armVersionGuard(userData);
     activeGuard = guard;
@@ -1676,10 +1730,11 @@ async function boot(): Promise<void> {
     const restore = takeRelaunchWindow();
     if (restore !== null || !BACKGROUND_LAUNCH) openWindow(origin, restore);
     if (server === null) confirmAfterBoot(guard);
+    keepUpdaterAgent(userData);
   } catch (error) {
     const reason = messageOf(error);
     if (guard !== null) {
-      await guard.step('health-failed', reason);
+      await guard.step('boot-failed', reason);
       if (guard.rollingBack()) return;
     }
     quitting = true;
@@ -1720,14 +1775,17 @@ if (!app.requestSingleInstanceLock()) {
     globalShortcut.unregisterAll();
     event.preventDefault();
     const running = server;
-    void Promise.all([
-      stopAntigravityLogin(),
-      stopDevinLogin(),
-      runner?.stop(),
-      running === null ? undefined : stopServer(running),
-    ])
-      .then(() => (running === null ? undefined : clearServerOwner(cairnHome(), process.pid)))
-      .then(() => (activeGuard?.rollingBack() === true ? undefined : updater?.apply('none')))
+    void finishQuit({
+      stopHelpers: () => Promise.all([stopAntigravityLogin(), stopDevinLogin(), runner?.stop()]),
+      stopOwnServer:
+        running === null
+          ? null
+          : () => stopServer(running).then(() => clearServerOwner(cairnHome(), process.pid)),
+      rollingBack: () => activeGuard?.rollingBack() === true,
+      applyUpdate: async () => {
+        await updater?.apply('none');
+      },
+    })
       .catch((error: unknown) =>
         console.error('finishing the pending update on quit failed:', messageOf(error)),
       )

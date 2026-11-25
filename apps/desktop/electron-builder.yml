@@ -42,6 +42,8 @@ mac:
       to: liquid-glass/LICENSE
     - from: tray-helper/${arch}
       to: tray
+    - from: dist/background-updater.mjs
+      to: background-updater.mjs
   identity: '-'
   sign: scripts/sign-mac.cjs
   timestamp: none

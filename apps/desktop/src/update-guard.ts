@@ -13,7 +13,7 @@ export interface GuardState {
   failures: number;
 }
 
-export type GuardEvent = 'health-ok' | 'health-failed' | 'server-exit' | 'tick';
+export type GuardEvent = 'health-ok' | 'health-failed' | 'server-exit' | 'boot-failed' | 'tick';
 
 export type GuardAction = 'none' | 'rollback' | 'confirm';
 
@@ -45,6 +45,7 @@ export function guardStep(state: GuardState, event: { event: GuardEvent; at: num
         : { state: { ...state, failures }, action: 'none' };
     }
     case 'server-exit':
+    case 'boot-failed':
       return heldLongEnough
         ? { state: { ...state, phase: 'healthy' }, action: 'confirm' }
         : rollbackOrGiveUp(state);

@@ -209,3 +209,50 @@ export async function uninstallResidentHost(opts: {
   } catch {}
   return { ok: true };
 }
+
+interface ThreadActivity {
+  turnQueue?: unknown;
+  activeRun?: unknown;
+}
+
+export async function residentWritingReply(
+  cairnHome: string,
+  token: string,
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<boolean> {
+  const record = await probeResidentServer(cairnHome, fetchImpl);
+  if (record === null) return false;
+  const get = async (path: string): Promise<unknown> => {
+    const res = await fetchImpl(`${record.origin}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!res.ok) throw new Error(`the resident server answered HTTP ${res.status} for ${path}`);
+    return res.json();
+  };
+  const teams = (await get('/api/teams')) as { id: string }[];
+  for (const team of teams) {
+    const threads = (await get(
+      `/api/teams/${encodeURIComponent(team.id)}/chief/threads`,
+    )) as ThreadActivity[];
+    if (threads.some((thread) => thread.turnQueue != null || thread.activeRun != null)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export async function restartResidentHost(opts: {
+  homeDir: string;
+  uid?: number;
+  runLaunchctl?: (args: string[]) => Promise<void>;
+}): Promise<boolean> {
+  if (!isResidentInstalled(opts.homeDir)) return false;
+  const run =
+    opts.runLaunchctl ??
+    (async (args: string[]) => {
+      await execFileAsync('launchctl', args);
+    });
+  await run(['kickstart', '-k', `gui/${opts.uid ?? process.getuid?.() ?? 501}/${RESIDENT_LABEL}`]);
+  return true;
+}

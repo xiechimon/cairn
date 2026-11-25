@@ -38,6 +38,7 @@ export interface UpdateState {
   installed: InstalledUpdate | null;
   blocked: BlockedUpdate | null;
   notice: UpdateNotice | null;
+  knownVersion: string | null;
 }
 
 export function updateStatePath(userData: string): string {
@@ -45,7 +46,7 @@ export function updateStatePath(userData: string): string {
 }
 
 export function emptyUpdateState(): UpdateState {
-  return { staged: null, installed: null, blocked: null, notice: null };
+  return { staged: null, installed: null, blocked: null, notice: null, knownVersion: null };
 }
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value !== '';
@@ -116,7 +117,8 @@ export function parseUpdateState(text: string): UpdateState {
         }
       : null,
   );
-  return { staged, installed, blocked, notice };
+  const knownVersion = isText(rows.knownVersion) ? rows.knownVersion : null;
+  return { staged, installed, blocked, notice, knownVersion };
 }
 
 export function readUpdateState(path: string): UpdateState {

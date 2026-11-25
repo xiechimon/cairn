@@ -40,6 +40,7 @@ test('every field of a written state comes back, and the file is private', () =>
     installed: null,
     blocked: null,
     notice: null,
+    knownVersion: '0.1.535',
   };
   writeUpdateState(path, state);
   assert.deepEqual(readUpdateState(path), state);

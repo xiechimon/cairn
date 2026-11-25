@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readdirSync,
   realpathSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { registerHooks, syncBuiltinESMExports } from 'node:module';
@@ -168,8 +169,45 @@ test('an ad-hoc installed copy passes the gate for a staged app the Cairn certif
     status: 'error',
     message: 'the staged app is version 9.9.9, not 1.1.0',
   });
-  assert.notEqual(readUpdateState(statePath).staged, null);
+  assert.equal(readUpdateState(statePath).staged, null);
   assert.equal(electron.relaunched, 0);
+});
+
+test('a staged update removed from disk is dropped instead of retried forever', async (t) => {
+  const { staging, statePath } = fixture(t, '1.1.0');
+  const updater = createUpdater(() => {}, { beforeRelaunch: () => {} });
+  rmSync(staging, { recursive: true });
+  await assert.rejects(updater.apply('none'), { message: 'the staged update is missing' });
+  assert.deepEqual(calls, []);
+  assert.equal(readUpdateState(statePath).staged, null);
+});
+
+test('a check downloads again when the staged update vanished from disk', async (t) => {
+  const { staging, statePath, initial } = fixture(t, '1.1.0');
+  const zip = 'fake zip content';
+  const offered = initial.staged.version;
+  const file = `Cairn-${offered}.zip`;
+  t.mock.method(globalThis, 'fetch', async (url) =>
+    url === DESKTOP_MANIFEST_URL
+      ? Response.json({
+          version: offered,
+          files: {
+            [process.arch]: {
+              name: file,
+              size: Buffer.byteLength(zip),
+              sha256: createHash('sha256').update(zip).digest('hex'),
+            },
+          },
+        })
+      : new Response(zip),
+  );
+  const updater = createUpdater(() => {}, { beforeRelaunch: () => {} });
+  rmSync(staging, { recursive: true });
+  await updater.check();
+  const staged = readUpdateState(statePath).staged;
+  assert.deepEqual(updater.state(), { status: 'ready', version: offered });
+  assert.notEqual(staged?.app, initial.staged.app);
+  assert.equal(await readBundleVersion(staged.app), offered);
 });
 
 test('exit 3 clears only staging and skips the refused version until a newer offer', async (t) => {
@@ -326,6 +364,7 @@ test('exit 0 applies the staged build and keeps the previous bundle for rollback
       previousApp,
       at: installed.installed.at,
     },
+    knownVersion: initial.staged.version,
   });
   assert.deepEqual(calls, [
     codesignCall(stagedApp),
