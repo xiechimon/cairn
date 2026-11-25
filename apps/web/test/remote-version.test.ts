@@ -23,6 +23,8 @@ describe('formatServerVersion', () => {
   it('formats build version and short commit consistently in zh and en', () => {
     expect(formatServerVersion('0.1.721', '460fe83e2', zh)).toBe('0.1.721 · 460fe83');
     expect(formatServerVersion('0.1.721', null, zh)).toBe('0.1.721');
+    expect(formatServerVersion(null, '606d9c2ef', zh)).toBe('开发版 · 606d9c2');
+    expect(formatServerVersion(null, '606d9c2ef', en)).toBe('Dev · 606d9c2');
     expect(formatServerVersion(null, null, zh)).toBe('未知版本');
     expect(formatServerVersion(null, null, en)).toBe('Unknown version');
   });

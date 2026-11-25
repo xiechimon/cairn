@@ -11,8 +11,10 @@ export function formatServerVersion(
   commit: string | null,
   t: TFunc,
 ): string {
-  if (version === null) return t('未知版本');
   const shortCommit = commit === null ? null : commit.slice(0, 7);
+  if (version === null) {
+    return shortCommit === null ? t('未知版本') : t('开发版 · {commit}', { commit: shortCommit });
+  }
   return shortCommit === null ? version : `${version} · ${shortCommit}`;
 }
 

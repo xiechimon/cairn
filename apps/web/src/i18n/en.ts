@@ -2427,6 +2427,7 @@ export const EN: Record<string, string> = {
   '新建细粒度令牌，选好仓库，给 Contents、Issues、Pull\u00a0requests 读写权限。':
     'Create a fine-grained token, pick the repositories, and give Contents, Issues and Pull requests read and write access.',
   未知版本: 'Unknown version',
+  '开发版 · {commit}': 'Dev · {commit}',
   当前版本: 'Version',
   关于: 'About',
   当前主机版本: 'Current host version',
