@@ -39,7 +39,7 @@ test('neither user nor Coordinator hover toolbar shows a reply button; select-to
   const { sent, stream } = await openChat(page);
   const source = page.locator('[data-reply-source="m6"]');
   await source.locator('[data-slot="reply-bubble"]').first().hover();
-  const tools = source.locator('[data-placement="right"]').first();
+  const tools = source.locator('[data-placement="below-start-hover"]').first();
   await expect(tools.getByTestId('chief-msg-copy')).toBeVisible();
   await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
   await expect(tools.getByTestId('chief-msg-more')).toHaveCount(0);

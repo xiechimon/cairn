@@ -160,6 +160,7 @@ export const feedbackSubmitBodySchema = z
     message: z.string().trim().min(1).max(4000),
     route: z.string().trim().max(200).optional(),
     errorSummary: z.string().trim().max(400).optional(),
+    includeLogs: z.boolean().optional(),
   })
   .strict();
 export type FeedbackSubmitBody = z.infer<typeof feedbackSubmitBodySchema>;
@@ -167,6 +168,7 @@ export type FeedbackSubmitBody = z.infer<typeof feedbackSubmitBodySchema>;
 export const feedbackSubmitResponseSchema = z.object({
   ok: z.literal(true),
   id: z.string().min(1),
+  issueUrl: z.string().url().nullable().optional(),
 });
 export type FeedbackSubmitResponse = z.infer<typeof feedbackSubmitResponseSchema>;
 

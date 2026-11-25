@@ -99,7 +99,9 @@ export function TokenGate() {
               : pair.phase === 'expired'
                 ? t('5 分钟内没有人批准，这个码已过期。')
                 : t('配对请求发送失败，请重试。')
-            : t('在已经能用 Cairn 的电脑上打开「远程访问」，看到这个码就点「批准」。')}
+            : t(
+                '在已经登录 Cairn 的电脑上，直接点弹出的批准提醒，或打开左下角「设置 → 远程访问」核对下方配对码后点「批准」。',
+              )}
         </p>
         {pair?.code != null && (
           <div
@@ -152,6 +154,9 @@ export function TokenGate() {
               data-testid="owner-token-input"
               disabled={tokenSubmitting}
             />
+            <p className="m-0 text-caption leading-normal text-content-tertiary">
+              {t('在主机终端运行 cairn token，或查看主机 ~/.cairn-server/token 获取令牌。')}
+            </p>
             {tokenError !== null && (
               <p
                 className="m-0 text-xs text-destructive"

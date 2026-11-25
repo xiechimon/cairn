@@ -257,7 +257,7 @@ for (const scheme of ['light', 'dark'] as const) {
     }
   });
 
-  test(`1440px assistant toolbar stays beside the bubble on the right with unchanged geometry (${scheme})`, async ({
+  test(`1440px assistant toolbar sits below the reply at bottom-left without shifting layout (${scheme})`, async ({
     page,
   }) => {
     const { stream } = await openConversation(page, 1440, scheme);
@@ -271,8 +271,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await expect(tools).toHaveCSS('opacity', '1');
     await captureRowShot(page, `${PHASE}-assistant-1440-${scheme}.png`, stream, row);
 
-    await expect(tools).toHaveAttribute('data-placement', 'right');
-    await expect(tools).not.toHaveAttribute('data-clamped');
+    await expect(tools).toHaveAttribute('data-placement', 'below-start-hover');
     await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
 
     const bubbleBox = await boxOf(bubble, 'assistant bubble');
@@ -285,17 +284,13 @@ for (const scheme of ['light', 'dark'] as const) {
 
     expect(Math.round(bubbleBox.y), 'hover does not shift bubble').toBe(Math.round(bubbleBefore.y));
     expect(overlaps(toolsBox, bubbleBox), 'toolbar does not intersect assistant bubble').toBe(false);
-    expect(Math.round(toolsBox.x), 'toolbar meets bubble right edge').toBe(
-      Math.round(bubbleBox.x + bubbleBox.width),
+    expect(Math.round(toolsBox.x), 'toolbar aligns with bubble left edge').toBe(
+      Math.round(bubbleBox.x),
     );
-    expect(Math.round(copyBox.x - (bubbleBox.x + bubbleBox.width)), '12px gap beside bubble').toBe(
-      12,
+    expect(toolsBox.y, 'toolbar sits below the assistant reply').toBeGreaterThanOrEqual(
+      bubbleBox.y + bubbleBox.height - 1,
     );
-    expect(
-      Math.abs(toolsBox.y + toolsBox.height / 2 - (bubbleBox.y + bubbleBox.height / 2)),
-      'toolbar vertically centred on bubble',
-    ).toBeLessThanOrEqual(1);
-    expect(Math.round(copyBox.height), 'desktop side button stays 32px').toBe(32);
+    expect(Math.round(copyBox.height), 'desktop button stays 32px').toBe(32);
     expect(await toolOrder(tools)).toEqual(['copy']);
     expect(copyBox.x + copyBox.width, 'copy button sits left of time').toBeLessThan(metaBox.x);
     await assertPlainMeta(tools, `1440 assistant ${scheme}`);

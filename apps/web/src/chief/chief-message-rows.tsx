@@ -508,13 +508,14 @@ function ChiefMessageTools({
   onRewind?: (() => void) | undefined;
   onWithdraw?: (() => void) | undefined;
 }) {
-  const placement = touch
-    ? side === 'user'
-      ? 'below-end'
-      : 'below-start'
-    : side === 'user'
-      ? 'left'
-      : 'right';
+  const placement =
+    side === 'assistant'
+      ? touch
+        ? 'below-start'
+        : 'below-start-hover'
+      : touch
+        ? 'below-end'
+        : 'left';
   return (
     <MessageToolbar
       placement={placement}

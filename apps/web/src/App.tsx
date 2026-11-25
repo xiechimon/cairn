@@ -15,6 +15,7 @@ import { SubtreeErrorBoundary } from './components/subtree-error-boundary.js';
 import { Toaster } from './components/ui/toaster.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
 import { I18nProvider } from './i18n/provider.js';
+import { PairingRequestBanner } from './overlay/pairing-request-banner.js';
 import { TokenGate } from './overlay/token-gate.js';
 import { ProjectHomeRedirect } from './pages/project-redirect.js';
 import { PwaBridge } from './pwa/register.js';
@@ -138,6 +139,7 @@ export function App() {
       <I18nProvider>
         <TooltipProvider>
           <RouterProvider router={router} />
+          <PairingRequestBanner />
           <TokenGate />
         </TooltipProvider>
         <PanelAwareToaster />

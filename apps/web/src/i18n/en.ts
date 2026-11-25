@@ -1239,8 +1239,6 @@ export const EN: Record<string, string> = {
   '获取 API key →': 'Get an API key →',
   配对这台电脑: 'Pair this computer',
   '正在配对…': 'Pairing…',
-  '在已经能用 Cairn 的电脑上打开「远程访问」，看到这个码就点「批准」。':
-    'On a computer already signed in to Cairn, open Remote access and approve the request with this code.',
   '等待批准 · {remaining} 后失效': 'Waiting for approval · expires in {remaining}',
   '正在发送配对请求…': 'Sending the pairing request…',
   '那台电脑拒绝了这次配对。': 'The other computer denied this pairing.',
@@ -3008,4 +3006,12 @@ export const EN: Record<string, string> = {
   查看表格: 'Show table',
   '复制 CSV': 'Copy CSV',
   正在生成图表: 'Preparing the chart',
+  '在已经登录 Cairn 的电脑上，直接点弹出的批准提醒，或打开左下角「设置 → 远程访问」核对下方配对码后点「批准」。':
+    'On a signed-in Cairn computer, click Approve in the popup notice, or open Settings → Remote access and approve this code.',
+  '在主机终端运行 cairn token，或查看主机 ~/.cairn-server/token 获取令牌。':
+    'Run cairn token on the host, or read ~/.cairn-server/token on the host.',
+  有新设备请求配对: 'New device pairing request',
+  已批准配对: 'Device pairing approved',
+  已拒绝配对: 'Device pairing denied',
+  '处理配对请求失败，请重试。': 'Could not update pairing request. Try again.',
 };

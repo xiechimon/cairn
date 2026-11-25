@@ -20,6 +20,7 @@ import { pairRequestPeerOf, requestOrigin } from './lib/request-origin.js';
 import { matchesAuthToken } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
 import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
+import { submitFeedbackReport } from './services/feedback.js';
 import {
   issuePairingGrant,
   listPairedDevices,
@@ -190,9 +191,15 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/feedback', async (c) => {
     c.header('cache-control', 'no-store');
-    if (remote.tunnel === undefined) throw new HttpError(404, 'feedback unavailable');
     const body = parseWith(feedbackSubmitBodySchema, await jsonBody(c), 'body');
-    return c.json(await remote.tunnel.submitFeedback(body), 201);
+    const isOwner = !ctx.authToken || c.get('ownerIdentity') !== undefined;
+    const result = await submitFeedbackReport({
+      body: isOwner ? body : { ...body, includeLogs: false },
+      homeDir: ctx.homeDir,
+      dataDir: ctx.dataDir ?? ctx.homeDir,
+      extraSecrets: typeof ctx.authToken === 'string' ? [ctx.authToken] : [],
+    });
+    return c.json(result, 201);
   });
 
   const requireTokenAuth = (): void => {

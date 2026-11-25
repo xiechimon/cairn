@@ -2118,6 +2118,9 @@ function collectChiefStream(
       if (notice.success) {
         pendingTools = [];
         const update = notice.data.runtimeUpdate;
+        if (update === undefined && notice.data.provenance.startsWith('retry-parking:')) {
+          continue;
+        }
         items.push({
           kind: 'robot',
           markdown: notice.data.message,

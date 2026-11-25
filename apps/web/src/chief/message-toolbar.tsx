@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { useI18n } from '../i18n/provider.js';
 import { Copy, Restore } from '../icons/index.js';
 
-export type ToolbarPlacement = 'right' | 'left' | 'below-start' | 'below-end';
+export type ToolbarPlacement = 'right' | 'left' | 'below-start' | 'below-start-hover' | 'below-end';
 
 const TOOL_BTN_CLS =
   "size-8 cursor-pointer pointer-coarse:size-11 rounded-(--radius-control) border-none bg-transparent text-(--text-tertiary) transition-none hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) aria-expanded:text-foreground [&_svg:not([class*='size-'])]:size-auto group-data-clamped/toolbar:size-6 group-data-clamped/toolbar:[&_svg]:size-4!";
@@ -25,7 +25,7 @@ const TOOL_BTN_CLS =
 const TOOLS_CLS = 'flex flex-none items-center';
 
 const HOVER_REVEAL =
-  'pointer-events-none opacity-0 transition-opacity duration-(--dur-fast) ease-(--ease-standard) group-hover/reply-block:pointer-events-auto group-hover/reply-block:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-[[aria-expanded=true]]:pointer-events-auto has-[[aria-expanded=true]]:opacity-100 motion-reduce:transition-none pointer-coarse:hidden';
+  'pointer-events-none opacity-0 transition-opacity duration-(--dur-fast) ease-(--ease-standard) group-hover/reply-block:pointer-events-auto group-hover/reply-block:opacity-100 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 has-[[aria-expanded=true]]:pointer-events-auto has-[[aria-expanded=true]]:opacity-100 motion-reduce:transition-none pointer-coarse:hidden';
 
 const TOUCH_REVEAL = 'pointer-coarse:group-data-[tools-open]/message:flex';
 
@@ -36,6 +36,7 @@ const PLACEMENT_CLS: Record<ToolbarPlacement, string> = {
   right: `absolute top-1/2 left-full z-10 -translate-y-1/2 pl-3 data-clamped:left-0 data-clamped:pl-0 ${CLAMPED_BASE} ${HOVER_REVEAL}`,
   left: `absolute top-1/2 right-full z-10 -translate-y-1/2 pr-3 data-clamped:right-0 data-clamped:pr-0 ${CLAMPED_BASE} ${HOVER_REVEAL}`,
   'below-start': `mt-1 hidden ${TOUCH_REVEAL}`,
+  'below-start-hover': `absolute top-full left-0 z-10 pt-1 ${HOVER_REVEAL}`,
   'below-end': `mt-1 hidden justify-end self-end ${TOUCH_REVEAL}`,
 };
 
