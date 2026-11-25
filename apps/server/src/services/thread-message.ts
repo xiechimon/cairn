@@ -12,7 +12,13 @@ import { build, chiefMessage, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
-import { applyBuildStepAction, type BuildDeps, sendBuildSteer, startBuilds } from './builds.js';
+import {
+  applyBuildStepAction,
+  type BuildDeps,
+  endDeadBuildTurn,
+  sendBuildSteer,
+  startBuilds,
+} from './builds.js';
 import { coordinatorThreadRow, ensureChief } from './chief.js';
 import {
   claimClientMessage,
@@ -101,6 +107,7 @@ async function deliver(
   beforeCommit?: () => void,
 ): Promise<{ conversationId: string; delivered: ThreadMessageDelivery }> {
   const nestedId = nestedLedgerId(row.id, body.clientMessageId);
+  const sseClientMessageId = origin.origin === 'user' ? body.clientMessageId : undefined;
   const pending = pendingWorkerQuestionIds(deps.db, buildId);
   if (origin.origin === 'coordinator' && pending.length > 0) {
     throw new HttpError(
@@ -108,23 +115,31 @@ async function deliver(
       `thread #${row.seqNum} has a pending question (requestId ${pending.join(', ')}); answer it with answer_question`,
     );
   }
+  const deadTurnEnded = origin.origin === 'user' ? endDeadBuildTurn(deps, buildId) : false;
   const running = hasClaimedStep(deps, buildId);
   if (!running && (pending.length > 0 || row.phase === 'needs_input')) {
     const sent = await sendBuildSteer(
       deps,
       buildId,
       { content: body.content, clientMessageId: nestedId },
-      { human: true, afterTurn: true, beforeCommit },
+      { human: true, afterTurn: true, beforeCommit, sseClientMessageId },
     );
     return { conversationId: sent.conversationId, delivered: sent.delivered };
   }
-  if (running || row.phase === 'building' || row.phase === 'done') {
+  if (
+    running ||
+    row.phase === 'building' ||
+    row.phase === 'done' ||
+    (deadTurnEnded && row.phase === 'planning')
+  ) {
     const sent = await sendBuildSteer(
       deps,
       buildId,
       { content: body.content, clientMessageId: nestedId },
       {
         ...(origin.origin === 'user' ? { human: true } : { human: false, actor: origin.actor }),
+        ...(deadTurnEnded ? { afterTurn: true } : {}),
+        ...(sseClientMessageId !== undefined ? { sseClientMessageId } : {}),
         beforeCommit,
       },
     );
@@ -142,6 +157,7 @@ async function deliver(
       },
       ...stepActionAttribution(origin),
       beforeCommit,
+      sseClientMessageId,
     );
     const revised = storedDelivery(findClientMessage(deps.db, buildId, nestedId));
     if (revised === undefined) throw new Error('revision receipt missing');
@@ -154,6 +170,7 @@ async function deliver(
       { action: 'restart', feedback: body.content, clientMessageId: nestedId },
       ...stepActionAttribution(origin),
       beforeCommit,
+      sseClientMessageId,
     );
     const restarted = storedDelivery(findClientMessage(deps.db, buildId, nestedId));
     if (restarted === undefined) throw new Error('restart receipt missing');

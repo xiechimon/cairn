@@ -25,6 +25,7 @@ import {
   BuildContinuationPhaseError,
   type BuildDeps,
   type BuildSteerOptions,
+  endDeadBuildTurn,
   enqueueStep,
   githubPrOf,
   publishBuild,
@@ -110,15 +111,18 @@ export async function sendBuildSteer(
   body: { content: string; queuedMessageId?: string; clientMessageId?: string },
   options: BuildSteerOptions | boolean = {},
 ): Promise<BuildSteerResult> {
-  const continuationOptions = typeof options === 'boolean' ? { afterTurn: options } : options;
+  const rawOptions = typeof options === 'boolean' ? { afterTurn: options } : options;
   const { db } = deps;
   const replay = findClientMessage<BuildSteerResult>(db, conversationId, body.clientMessageId);
   if (replay !== undefined) return replay;
   let buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
-  const automatic = (continuationOptions.human ?? deps.steerOptions?.human) !== true;
+  const automatic = (rawOptions.human ?? deps.steerOptions?.human) !== true;
   if (automatic) assertAutomaticRetryAllowed(deps, buildRow.todoId);
   else assertParkedBuildIdle(deps, buildRow);
+  const deadTurnEnded =
+    !automatic && !rawOptions.schedule ? endDeadBuildTurn(deps, conversationId) : false;
+  const continuationOptions = deadTurnEnded ? { ...rawOptions, afterTurn: true } : rawOptions;
   const running = db
     .select()
     .from(step)
@@ -278,6 +282,7 @@ export async function sendBuildSteer(
           body.queuedMessageId === undefined
             ? undefined
             : { conversationId, messageId: body.queuedMessageId },
+          continuationOptions.sseClientMessageId ?? body.clientMessageId,
         );
       if (running && !answered) {
         const prior = db

@@ -6,16 +6,25 @@ import {
   type StopAttribution,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { runAfterCommit } from '../db/commit-effects.js';
-import { build, message, queuedMessage, step, stopPending, todo } from '../db/schema.js';
+import {
+  build,
+  message,
+  queuedMessage,
+  steerPending,
+  step,
+  stopPending,
+  todo,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { settleAutonomousMerge } from './autonomous-merge.js';
 import { settleRetiredGateStep } from './build-gate-steps.js';
 import { type BuildDeps, NotFoundError, publishBuild, settleParkedStep } from './builds.js';
+import { isClaimedStepDead } from './dispatch-timeouts.js';
 import { announceMergeStepOutcome } from './merge-announcement.js';
 import { canStopTransitionPhase, stopReturnPhase } from './phase.js';
 import { publishStepRow } from './quota-wait.js';
@@ -283,6 +292,36 @@ export function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
   const cancelledRow = db.select().from(build).where(eq(build.id, buildRow.id)).get();
   if (cancelledRow) publishBuild(deps, cancelledRow);
+}
+
+export function endDeadBuildTurn(deps: BuildDeps, buildId: string, now: number = nowMs()): boolean {
+  const head = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, buildId), eq(step.status, 'claimed')))
+    .orderBy(asc(step.createdAt), sql`rowid`)
+    .all()
+    .at(-1);
+  if (head === undefined || !isClaimedStepDead(deps.db, deps.machineHub, head, now)) return false;
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (!buildRow) return false;
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (
+    !todoRow ||
+    todoRow.archivedAt !== null ||
+    todoRow.latestBuildId !== buildId ||
+    todoRow.phase === 'closed'
+  ) {
+    return false;
+  }
+  stopStepKeepPhase(deps, head.id);
+  deps.db
+    .delete(steerPending)
+    .where(and(eq(steerPending.conversationId, buildId), eq(steerPending.stepId, head.id)))
+    .run();
+  deps.machineHub?.stopSignal(todoRow.teamId, head.id);
+  deps.machineHub?.wake(todoRow.teamId);
+  return true;
 }
 
 export function stopUnclaimedGateSteps(

@@ -1,7 +1,7 @@
 import { ATTACHMENT_ACCEPT } from '@cairn/shared';
 import { cn } from 'cn';
 import { ArrowUp, CornerDownLeft, Lock, Paperclip, Plus } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, type Ref, useImperativeHandle } from 'react';
 import { useNarrow } from '../board/use-narrow.js';
 import {
   COMPOSER_FIELD_CLS,
@@ -62,6 +62,7 @@ interface ComposerProps {
   onEditQueued?: ((id: string, content: string) => Promise<unknown>) | undefined;
   meter?: ReactNode;
   menuMeter?: ReactNode;
+  handleRef?: Ref<{ focus: (options?: FocusOptions) => void }>;
 }
 
 export function Composer({
@@ -85,6 +86,7 @@ export function Composer({
   onEditQueued,
   meter,
   menuMeter,
+  handleRef,
 }: ComposerProps) {
   const { t } = useI18n();
   const narrow = useNarrow();
@@ -134,6 +136,11 @@ export function Composer({
     },
     growCap: 384,
   });
+  useImperativeHandle(
+    handleRef,
+    () => ({ focus: (options) => textareaRef.current?.focus(options) }),
+    [textareaRef],
+  );
 
   const hasContent =
     draft.trim() !== '' || tokens.length > 0 || pendingAttachments.some((entry) => !entry.failed);

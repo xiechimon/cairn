@@ -16,6 +16,7 @@ export function insertMessageRow(
     origin?: TranscriptUserOrigin | null;
   },
   deliveredQueue?: ConversationMessageEvent['deliveredQueue'],
+  clientMessageId?: string,
 ): void {
   deps.db
     .insert(message)
@@ -28,8 +29,7 @@ export function insertMessageRow(
     .run();
   const published = { ...row, actor: row.actor ?? null, origin: row.origin ?? null };
   const publish = () => {
-    if (deliveredQueue === undefined) deps.convHub?.publishMessage(conversationId, published);
-    else deps.convHub?.publishMessage(conversationId, published, deliveredQueue);
+    deps.convHub?.publishMessage(conversationId, published, deliveredQueue, clientMessageId);
   };
   if (deps.afterCommit === undefined) publish();
   else deps.afterCommit.push(publish);

@@ -52,6 +52,7 @@ export async function restartFailedBuild(
   actorName: string,
   origin: StepActionOrigin,
   beforeCommit: (() => void) | undefined,
+  sseClientMessageId?: string,
 ): Promise<void> {
   const buildId = row.id;
   let todoRecord = initialTodo;
@@ -138,13 +139,19 @@ export async function restartFailedBuild(
       const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
       recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
       if (feedbackText !== null) {
-        insertMessageRow(transcriptDeps, reworkTarget.id, {
-          id: newRecordId(),
-          role: 'user',
-          content: feedbackText,
-          createdAt: now,
-          origin: 'user',
-        });
+        insertMessageRow(
+          transcriptDeps,
+          reworkTarget.id,
+          {
+            id: newRecordId(),
+            role: 'user',
+            content: feedbackText,
+            createdAt: now,
+            origin: 'user',
+          },
+          undefined,
+          sseClientMessageId,
+        );
       }
       if (
         reworkTarget.errorMessage !== null &&
@@ -247,13 +254,19 @@ export async function restartFailedBuild(
       })
       .run();
     if (feedbackText !== null) {
-      insertMessageRow(transcriptDeps, newId, {
-        id: newRecordId(),
-        role: 'user',
-        content: feedbackText,
-        createdAt,
-        origin: 'user',
-      });
+      insertMessageRow(
+        transcriptDeps,
+        newId,
+        {
+          id: newRecordId(),
+          role: 'user',
+          content: feedbackText,
+          createdAt,
+          origin: 'user',
+        },
+        undefined,
+        sseClientMessageId,
+      );
     }
     if (prClosed !== null && reworkTarget !== null) {
       insertMessageRow(transcriptDeps, newId, {

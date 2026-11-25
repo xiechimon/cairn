@@ -63,11 +63,13 @@ export interface Outbox {
       designCommentIds?: readonly string[];
     },
     deliver: Deliver,
+    options?: { awaitRefetch?: boolean },
   ): string;
   discard(key: string): OutboxEntry | null;
   land(key: string, messageId: string): void;
+  markRefetched(key: string): void;
   sentKey(messageId: string): string | null;
-  settle(threadId: string | null, known: ReadonlySet<string>): void;
+  settle(threadId: string | null, known: ReadonlySet<string>, scope?: string): void;
   resume(scope: string, deliver: Deliver): Promise<void>;
 }
 
@@ -174,6 +176,7 @@ export function createOutbox({
   let tail: Promise<void> = Promise.resolve();
   const resumed = new Map<string, Promise<void>>();
   const sentKeys = new Map<string, string>();
+  const pendingRefetchKeys = new Set<string>();
   const listeners = new Set<() => void>();
   const rowOf = (entry: OutboxEntry, state: StoredOutboxEntry['state']) =>
     entry.scope === null
@@ -260,7 +263,7 @@ export function createOutbox({
       return () => listeners.delete(listener);
     },
     entries: () => list,
-    enqueue({ globalThreadId, ...input }, deliver) {
+    enqueue({ globalThreadId, ...input }, deliver, options) {
       const replaced = returned.filter(
         (entry) =>
           entry.scope === input.scope &&
@@ -272,6 +275,7 @@ export function createOutbox({
         replaced.find((entry) => entry.text === input.text && entry.projectId === input.projectId)
           ?.key ?? mintKey();
       for (const retired of replaced) if (retired.key !== key) forget(retired.key);
+      if (options?.awaitRefetch === true) pendingRefetchKeys.add(key);
       const entry: OutboxEntry = {
         ...input,
         key,
@@ -290,12 +294,14 @@ export function createOutbox({
     discard(key) {
       const entry = list.find((candidate) => candidate.key === key);
       if (entry?.state !== 'failed') return null;
+      pendingRefetchKeys.delete(key);
       returned = [...returned, entry];
       replace(list.filter((candidate) => candidate.key !== key));
       void amend(entry, 'returned');
       return entry;
     },
     land(key, messageId) {
+      pendingRefetchKeys.delete(key);
       const entry = sendingEntry(key);
       if (entry === null) return;
       sentKeys.set(messageId, key);
@@ -304,12 +310,19 @@ export function createOutbox({
       );
       forget(key);
     },
+    markRefetched(key) {
+      if (!pendingRefetchKeys.delete(key)) return;
+      for (const listener of listeners) listener();
+    },
     sentKey: (messageId) => sentKeys.get(messageId) ?? null,
-    settle(threadId, known) {
+    settle(threadId, known, scope) {
       const kept = list.filter(
         (entry) =>
+          (scope !== undefined && entry.scope !== scope) ||
           entry.state !== 'sent' ||
-          (entry.threadId === threadId && entry.messageId !== null && !known.has(entry.messageId)),
+          (entry.threadId === threadId &&
+            ((entry.messageId !== null && !known.has(entry.messageId)) ||
+              pendingRefetchKeys.has(entry.key))),
       );
       if (kept.length !== list.length) replace(kept);
     },

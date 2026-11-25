@@ -632,6 +632,14 @@ export interface TranscriptInput {
   agentTodo?: AgentTodo | null;
   pageTodo?: AgentTodoItem[] | null;
   hasEarlier?: boolean;
+  optimisticUsers?: readonly {
+    id: string;
+    outboxKey: string;
+    text: string;
+    createdAt: number;
+    delivery?: 'sending';
+  }[];
+  sentKey?: (id: string) => string | null;
 }
 
 function transcriptHead(
@@ -674,6 +682,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     agentTodo = null,
     pageTodo = null,
     hasEarlier = false,
+    optimisticUsers = [],
+    sentKey,
   } = input;
   const head = hasEarlier ? [] : transcriptHead(messages, steps, build, machineName);
 
@@ -802,9 +812,17 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (m.origin === 'task-prompt' || m.origin === 'synthetic') continue;
+      const outboxKey = sentKey?.(m.id) ?? null;
       entries.push({
         at: m.createdAt,
-        item: { kind: 'user', text, markdown: text, id: m.id, createdAt: m.createdAt },
+        item: {
+          kind: 'user',
+          text,
+          markdown: text,
+          id: m.id,
+          ...(outboxKey !== null ? { outboxKey } : {}),
+          createdAt: m.createdAt,
+        },
       });
       continue;
     }
@@ -896,6 +914,24 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         at: m.createdAt,
         item: { kind: '__work__', step: { kind: 'think', text: thinking, id: m.id, seconds } },
       });
+  }
+
+  if (optimisticUsers.length > 0) {
+    const tailMessageAt = messages.at(-1)?.createdAt ?? 0;
+    optimisticUsers.forEach((opt, index) => {
+      entries.push({
+        at: Math.max(opt.createdAt, tailMessageAt + 1 + index),
+        item: {
+          kind: 'user',
+          text: opt.text,
+          markdown: opt.text,
+          id: opt.id,
+          outboxKey: opt.outboxKey,
+          ...(opt.delivery !== undefined ? { delivery: opt.delivery } : {}),
+          createdAt: opt.createdAt,
+        },
+      });
+    });
   }
 
   if (build?.withPlan === true) {

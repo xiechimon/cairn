@@ -427,6 +427,8 @@ export type TranscriptItem =
       title?: string;
       markdown?: string;
       id?: string;
+      outboxKey?: string;
+      delivery?: 'sending';
       at?: string;
       createdAt?: number;
     }

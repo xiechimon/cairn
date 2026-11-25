@@ -32,6 +32,7 @@ export async function applyBuildStepAction(
   actor?: string,
   origin: StepActionOrigin = 'person',
   beforeCommit?: () => void,
+  sseClientMessageId?: string,
 ): Promise<void> {
   if (
     (body.action === 'revision' || body.action === 'restart') &&
@@ -53,7 +54,16 @@ export async function applyBuildStepAction(
   }
 
   if (body.action === 'restart') {
-    await restartFailedBuild(deps, row, todoRecord, body, actorName, origin, beforeCommit);
+    await restartFailedBuild(
+      deps,
+      row,
+      todoRecord,
+      body,
+      actorName,
+      origin,
+      beforeCommit,
+      sseClientMessageId,
+    );
     return;
   }
 
@@ -85,13 +95,19 @@ export async function applyBuildStepAction(
       body.feedback,
       actorName,
     );
-    insertMessageRow(transcriptDeps, buildId, {
-      id: newRecordId(),
-      role: 'user',
-      content: body.feedback,
-      createdAt: nowMs(),
-      origin: 'user',
-    });
+    insertMessageRow(
+      transcriptDeps,
+      buildId,
+      {
+        id: newRecordId(),
+        role: 'user',
+        content: body.feedback,
+        createdAt: nowMs(),
+        origin: 'user',
+      },
+      undefined,
+      sseClientMessageId,
+    );
     beforeCommit?.();
     if (revising.phase === 'review' && buildRunsSession(deps, buildId)) {
       deps.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();

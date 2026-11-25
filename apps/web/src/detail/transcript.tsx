@@ -254,10 +254,12 @@ function Row({
         </div>
       );
     case 'user': {
+      const sending = item.delivery === 'sending';
       const copy = item.markdown ?? item.text;
+      const keyId = item.outboxKey ?? item.id;
       return (
         <div
-          className={`${USER_ROW} ${TOOLS_ROW} ${margin} ${item.id != null && item.id === enteringUser ? 'message-enter' : ''}`}
+          className={`${USER_ROW} ${TOOLS_ROW} ${margin} ${keyId != null && keyId === enteringUser ? 'message-enter' : ''}`}
           data-tools-root=""
         >
           <div
@@ -269,15 +271,22 @@ function Row({
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
-              }`}
+              } ${sending ? 'opacity-55' : ''}`}
               data-testid="user-bubble"
+              {...(sending ? { 'data-delivery': 'sending' } : {})}
               {...(item.markdown != null ? { 'data-md': 'true' } : {})}
             >
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </UserMessageBubble>
-            <RowTools placement="left" copy={copy} stamp={item.at} />
+            {!sending && <RowTools placement="left" copy={copy} stamp={item.at} />}
           </div>
-          <RowTools placement="below-end" copy={copy} stamp={item.at} />
+          {sending ? (
+            <span role="status" className="sr-only" data-testid="user-msg-sending">
+              {t('发送中')}
+            </span>
+          ) : (
+            <RowTools placement="below-end" copy={copy} stamp={item.at} />
+          )}
         </div>
       );
     }
@@ -657,7 +666,10 @@ export function Transcript({ transcript, result }: TranscriptProps) {
     }
   }
   const rowIds = new Set(
-    transcript.flatMap((item) => ('id' in item && item.id != null ? [item.id] : [])),
+    transcript.flatMap((item) => {
+      const id = item.kind === 'user' ? (item.outboxKey ?? item.id) : 'id' in item ? item.id : null;
+      return id != null ? [id] : [];
+    }),
   );
   const seenRows = useRef<Set<string> | null>(null);
   const enteringRows = new Set(
@@ -669,7 +681,11 @@ export function Transcript({ transcript, result }: TranscriptProps) {
   });
   const lastUserId =
     transcript
-      .flatMap((item) => (item.kind === 'user' && item.id != null ? [item.id] : []))
+      .flatMap((item) => {
+        if (item.kind !== 'user') return [];
+        const id = item.outboxKey ?? item.id;
+        return id != null ? [id] : [];
+      })
       .at(-1) ?? null;
   const shownBefore = useRef({ lastUserId, rows: transcript.length });
   const [enteringUser, setEnteringUser] = useState<string | null>(null);
@@ -683,13 +699,15 @@ export function Transcript({ transcript, result }: TranscriptProps) {
     tailItem?.kind === 'streaming' || (tailItem?.kind === 'work' && tailItem.running === true);
   const resultAt = hasLiveTail ? transcript.length - 1 : transcript.length;
   const rows = transcript.map((item, index) => {
-    const id =
-      ('id' in item ? item.id : undefined) ?? (item.kind === 'user' ? `user-${index}` : undefined);
+    const stableId =
+      item.kind === 'user' ? (item.outboxKey ?? item.id) : 'id' in item ? item.id : undefined;
+    const key = stableId ?? (item.kind === 'user' ? `user-${index}` : undefined);
+    const messageId = ('id' in item ? item.id : undefined) ?? key;
     return (
       <EnteringItem
-        key={id ?? index}
-        messageId={id}
-        enter={id !== undefined && enteringRows.has(id)}
+        key={key ?? index}
+        messageId={messageId}
+        enter={stableId !== undefined && enteringRows.has(stableId)}
       >
         <Row
           item={item}

@@ -50,6 +50,7 @@ export {
 } from './build-start.js';
 export {
   cancelBuild,
+  endDeadBuildTurn,
   prepareStopForDone,
   requestBackgroundTaskStop,
   requestStop,
@@ -162,6 +163,7 @@ export interface BuildSteerOptions {
   };
   answer?: QuestionAnswer;
   beforeCommit?: () => void;
+  sseClientMessageId?: string;
 }
 
 export async function messageTodo(

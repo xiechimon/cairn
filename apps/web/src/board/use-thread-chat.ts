@@ -5,6 +5,7 @@ import {
   resolvedBuildPrNumber,
   STOP_MESSAGE,
   type StepKind,
+  type TranscriptRow,
   type TodoRecord as WireTodo,
 } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
@@ -36,9 +37,9 @@ import {
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
-import { useSendKey } from '../api/use-send-key.js';
 import { globalCoordinatorThread } from '../chief/coordinator-load.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
+import type { UnsentSends } from '../chief/outbox.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import type { NamedMachine } from '../components/machine-label.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
@@ -53,6 +54,16 @@ import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
 import type { EngineRun, EngineRunStage } from './engine-run.js';
 import { liveEngineRun } from './live-engine-run.js';
+import {
+  consumeTaskRollover,
+  discardTaskFailed,
+  enqueueTaskSend,
+  failedTaskOutbox,
+  markTaskRollover,
+  taskOutbox,
+  taskOutboxErrors,
+  unlandedTaskBubbles,
+} from './task-outbox.js';
 import { deriveThreadChanges, type ThreadChanges } from './thread-changes.js';
 import { useMarkThreadRead } from './use-mark-thread-read.js';
 
@@ -83,9 +94,10 @@ export interface ThreadChat {
   platformWait: { machine: string | null; platform: RunnerOs } | null;
   stopped: boolean;
   sendError: string | null;
+  unsent?: UnsentSends;
   queuedMessages: QueuedCapsule[] | undefined;
   retry: () => void;
-  send?: (text: string) => Promise<void>;
+  send?: (text: string) => void | Promise<void>;
   queue?: (text: string) => Promise<void>;
   stopAndSend?: (text: string) => Promise<void>;
   stop?: () => void;
@@ -119,7 +131,6 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const mutations = useApiMutations(teamId);
-  const sendKey = useSendKey();
   const [stopping, setStopping] = useState(false);
   const stopRequested = useRef(false);
 
@@ -154,7 +165,39 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const agentTodo = useSyncExternalStore(agentTodoStore.subscribe, () =>
     buildId != null ? agentTodoStore.get(buildId) : null,
   );
-  useConversationStream(buildId ?? undefined, live, { todoId });
+  const outbox = useSyncExternalStore(taskOutbox.subscribe, taskOutbox.entries);
+  const outboxError = useSyncExternalStore(taskOutboxErrors.subscribe, () =>
+    taskOutboxErrors.get(todoId),
+  );
+  const streamHandlers = useMemo(
+    () => ({
+      todoId,
+      onMessage: (row: TranscriptRow, clientMessageId?: string) => {
+        if (row.role === 'user' && clientMessageId !== undefined) {
+          taskOutbox.land(clientMessageId, row.id);
+        }
+      },
+    }),
+    [todoId],
+  );
+  useConversationStream(buildId ?? undefined, live, streamHandlers);
+  useEffect(() => {
+    if (!live || buildId == null) return;
+    for (const entry of outbox) {
+      if (
+        entry.scope === todoId &&
+        entry.state === 'sent' &&
+        entry.threadId === buildId &&
+        entry.messageId === null &&
+        !messagesQ.isPending &&
+        !messagesQ.isFetching &&
+        consumeTaskRollover(entry.key)
+      ) {
+        taskOutbox.markRefetched(entry.key);
+      }
+    }
+    taskOutbox.settle(buildId, known, todoId);
+  }, [live, outbox, todoId, buildId, known, messagesQ.isPending, messagesQ.isFetching]);
 
   const steps = stepsQ.data ?? [];
   const running = live
@@ -195,6 +238,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const plans = plansQ.data ?? [];
   const latestPlan = plans.length > 0 ? plans[plans.length - 1] : undefined;
 
+  const optimisticUsers = useMemo(
+    () => (live ? unlandedTaskBubbles(outbox, todoId, known) : []),
+    [live, outbox, todoId, known],
+  );
+
   const transcript = useMemo<TranscriptItem[]>(() => {
     if (!live) return fixtureTranscript ?? [];
     if (wire == null || buildId == null) return [];
@@ -212,6 +260,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       activity,
       agentTodo,
       pageTodo: newest?.agentTodo ?? null,
+      optimisticUsers,
+      sentKey: taskOutbox.sentKey,
     });
   }, [
     live,
@@ -231,6 +281,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     activity,
     agentTodo,
     newest?.agentTodo,
+    optimisticUsers,
   ]);
 
   const awaitingStart =
@@ -306,30 +357,58 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const queueSteer =
     postQueued !== undefined
       ? async (text: string, deliverAfterStop: boolean) => {
-          const { key } = sendKey.attempt([todoId, deliverAfterStop, text].join('\n'), 'queue');
-          await postQueued(text, deliverAfterStop, key);
-          sendKey.settle();
+          await postQueued(text, deliverAfterStop, crypto.randomUUID());
         }
       : undefined;
-  const send = writable
-    ? async (text: string) => {
-        const { key, route } = sendKey.attempt(
-          [todoId, false, text].join('\n'),
-          queueReply && postQueued !== undefined ? 'queue' : 'thread',
-        );
-        if (route === 'queue' && postQueued !== undefined) await postQueued(text, false, key);
-        else
-          await mutations.messageThread.mutateAsync({
+  const send =
+    writable && buildId != null
+      ? (text: string) => {
+          if (mutations.sendSteer.isError) mutations.sendSteer.reset();
+          const route = queueReply && postQueued !== undefined ? 'queue' : 'thread';
+          enqueueTaskSend({
             todoId,
-            conversationId: buildId,
-            content: text,
-            clientMessageId: key,
+            buildId,
+            text,
+            queueOnly: route === 'queue',
+            deliver: async (entry) => {
+              if (route === 'queue' && postQueued !== undefined) {
+                await postQueued(entry.text, false, entry.key);
+                return { threadId: buildId, messageId: null };
+              }
+              const result = await mutations.messageThread.mutateAsync({
+                todoId,
+                conversationId: buildId,
+                content: entry.text,
+                clientMessageId: entry.key,
+              });
+              const targetId = result?.conversationId ?? buildId;
+              if (targetId === buildId) {
+                void qc
+                  .refetchQueries({ queryKey: ['messages', targetId, 'pages'], type: 'active' })
+                  .finally(() => taskOutbox.markRefetched(entry.key));
+              } else {
+                markTaskRollover(entry.key);
+              }
+              return { threadId: targetId, messageId: null };
+            },
+            onError: (error) => {
+              taskOutboxErrors.set(todoId, describeError(error, t) ?? t('发送失败，请重试。'));
+            },
           });
-        sendKey.settle();
-      }
-    : !live && open
-      ? fixtureSend
-      : undefined;
+        }
+      : !live && open
+        ? fixtureSend
+        : undefined;
+  const unsent = useMemo<UnsentSends | undefined>(
+    () =>
+      live
+        ? {
+            failed: failedTaskOutbox(outbox, todoId),
+            discard: discardTaskFailed,
+          }
+        : undefined,
+    [live, outbox, todoId],
+  );
   const stop =
     writable && buildId != null && running
       ? () => {
@@ -419,13 +498,14 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     machine,
     platformWait,
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
-    sendError: mutations.messageThread.isError
-      ? (describeError(mutations.messageThread.error, t) ?? t('发送失败，请重试。'))
-      : mutations.sendSteer.isError &&
-          mutations.sendSteer.variables?.cancelQueued !== true &&
-          mutations.sendSteer.variables?.editQueued !== true
+    sendError:
+      outboxError ??
+      (mutations.sendSteer.isError &&
+      mutations.sendSteer.variables?.cancelQueued !== true &&
+      mutations.sendSteer.variables?.editQueued !== true
         ? (describeError(mutations.sendSteer.error, t) ?? t('发送失败，请重试。'))
-        : null,
+        : null),
+    ...(unsent !== undefined ? { unsent } : {}),
     queuedMessages: live ? newest?.queuedMessages : undefined,
     retry: () => {
       void todoQ.refetch();

@@ -9,7 +9,7 @@ import {
   UnfoldVertical,
   X,
 } from 'lucide-react';
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -452,6 +452,16 @@ function ThreadBody({
     localKey: `cairn.draft.todo:${todo.id}`,
     enabled: live,
   });
+  const composerRef = useRef<{ focus: (options?: FocusOptions) => void } | null>(null);
+  useEffect(() => {
+    for (const entry of chat.unsent?.failed ?? []) {
+      const text = chat.unsent?.discard(entry.key) ?? null;
+      if (text !== null) {
+        setDraft((current) => (current === '' ? text : `${current}\n${text}`));
+        composerRef.current?.focus({ preventScroll: true });
+      }
+    }
+  }, [chat.unsent, setDraft]);
   const reportThread = { title: todo.title, final: isFinalReportPhase(todo.phase) };
   return (
     <>
@@ -534,6 +544,7 @@ function ThreadBody({
       )}
       {!archived && (
         <Composer
+          handleRef={composerRef}
           placeholder={chat.started ? t('回复这个任务') : t('开始后才能回复')}
           streaming={chat.running}
           stopping={chat.stopping}

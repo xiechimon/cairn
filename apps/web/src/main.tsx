@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { toast } from 'sonner';
 import { App, router } from './App.js';
+import { taskOutbox } from './board/task-outbox.js';
 import { chiefOutbox } from './chief/outbox.js';
 import {
   followDesktopNavigation,
@@ -45,7 +46,11 @@ if (currentEntry !== null) {
     },
     visible: () => document.visibilityState === 'visible',
     busy: () => {
-      if (chiefOutbox.entries().some((entry) => entry.state === 'sending')) return true;
+      if (
+        chiefOutbox.entries().some((entry) => entry.state === 'sending') ||
+        taskOutbox.entries().some((entry) => entry.state === 'sending')
+      )
+        return true;
       const field = document.activeElement;
       if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
         return field.value !== '';
