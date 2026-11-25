@@ -105,6 +105,15 @@ function runnerProcesses() {
 const serverProcesses = () =>
   matchingPids(`${appRoot}/${SERVER_ENTRY}`).filter((pid) => isServerHelper(commandOf(pid)));
 
+await runAntigravityRemoteAndSkewSmoke({
+  appPath,
+  appRoot,
+  screenshotDir: dirname(resolve(screenshotPath)),
+  launchTimeoutMs: LAUNCH_TIMEOUT_MS,
+  quitTimeoutMs: QUIT_TIMEOUT_MS,
+  withDeadline,
+});
+
 const app = await electron.launch({
   executablePath: join(resolve(appPath), 'Contents', 'MacOS', 'Cairn'),
   timeout: LAUNCH_TIMEOUT_MS,
@@ -1698,15 +1707,6 @@ try {
       } catch {}
     }
   }
-
-  await runAntigravityRemoteAndSkewSmoke({
-    appPath,
-    appRoot,
-    screenshotDir: dirname(resolve(screenshotPath)),
-    launchTimeoutMs: LAUNCH_TIMEOUT_MS,
-    quitTimeoutMs: QUIT_TIMEOUT_MS,
-    withDeadline,
-  });
 
   console.log(
     `desktop smoke passed: ${origin} signed in, no pairing gate, Runner online, the tray opened in ${verified.length} verified cases, not covered: ${skipped.map((outcome) => outcome.name).join(', ') || 'none'}, quit stops the server and Runner`,
