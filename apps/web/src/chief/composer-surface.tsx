@@ -383,6 +383,35 @@ export function ComposerSurface({
             />
           </div>
           {trailing}
+          {stop?.available && (
+            <IconTooltip
+              label={t('停止')}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid="chief-composer-stop"
+                  className={
+                    narrow
+                      ? ROUND_HIT_CLS
+                      : cn(
+                          'composer-stop size-7 flex-none cursor-pointer rounded-(--radius-control) border-0 bg-transparent pointer-coarse:h-11 pointer-coarse:w-11',
+                          STOP_CLS,
+                        )
+                  }
+                  onClick={stop.onStop}
+                />
+              }
+            >
+              {narrow ? (
+                <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
+                  <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                </span>
+              ) : (
+                <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+              )}
+            </IconTooltip>
+          )}
           <IconTooltip
             label={send?.label ?? t('发送')}
             trigger={

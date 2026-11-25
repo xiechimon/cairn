@@ -68,11 +68,15 @@ import {
   SECRET_REQUEST_SAVED_PREFIX,
   SHOW_CHART_TOOL,
   SHOW_DIFF_TOOL,
+  SUBAGENT_TOOL_NAME,
   SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
   stripAnsiEscapes,
   stripSkillRouteSection,
   stripTurnContext,
+  subagentLabelOf,
+  subagentLiveProgressSchema,
+  subagentToolResultSchema,
   systemRowOf,
   TAKEOVER_HANDED_BACK,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -100,6 +104,7 @@ import type {
   ChiefContent,
   ChiefContextUsage,
   ChiefStreamItem,
+  ChiefSubagentInfo,
   ChiefToolRow,
   DiffFile,
   DiffLine,
@@ -1962,6 +1967,111 @@ function archivedTodoIdsOf(call: ToolCallRecord): string[] {
     : [];
 }
 
+function isSubagentToolName(name: string): boolean {
+  return name === SUBAGENT_TOOL_NAME || name === 'mcp__cairn__subagent';
+}
+
+function subagentToolRowOf(call: ToolCallRecord): ChiefToolRow {
+  const args = (call.arguments ?? {}) as { task?: unknown; label?: unknown };
+  const argsLabel = subagentLabelOf(args);
+  const rawResult = toolResultText(call.result)?.trim() ?? '';
+  let parsedJson: unknown = null;
+  if (rawResult.startsWith('{')) {
+    try {
+      parsedJson = JSON.parse(rawResult);
+    } catch {
+      parsedJson = null;
+    }
+  }
+  const finished = subagentToolResultSchema.safeParse(parsedJson);
+  if (finished.success) {
+    const label =
+      finished.data.label !== undefined && finished.data.label.trim() !== ''
+        ? finished.data.label.trim()
+        : argsLabel || SUBAGENT_TOOL_NAME;
+    const subagent: ChiefSubagentInfo = {
+      label,
+      status: finished.data.status,
+      toolCalls: finished.data.toolCalls,
+      ...(finished.data.partial === true ? { partial: true } : {}),
+      durationMs: finished.data.durationMs,
+    };
+    return {
+      label,
+      seconds: Math.max(0, Math.round(finished.data.durationMs / 1000)),
+      ...(finished.data.status === 'failed' || call.isError === true ? { error: true } : {}),
+      subagent,
+    };
+  }
+  const live = subagentLiveProgressSchema.safeParse(parsedJson);
+  if (live.success) {
+    const label =
+      live.data.label !== undefined && live.data.label.trim() !== ''
+        ? live.data.label.trim()
+        : argsLabel || SUBAGENT_TOOL_NAME;
+    const ended = call.endedAt !== undefined || call.isError === true;
+    const status: ChiefSubagentInfo['status'] = ended
+      ? call.isError === true
+        ? /abort/i.test(rawResult)
+          ? 'aborted'
+          : 'failed'
+        : 'completed'
+      : live.data.status;
+    const subagent: ChiefSubagentInfo = {
+      label,
+      status,
+      toolCalls: live.data.toolCalls,
+      ...(live.data.lastTool !== undefined ? { lastTool: live.data.lastTool } : {}),
+      durationMs: live.data.elapsedMs,
+    };
+    return {
+      label,
+      ...(call.startedAt !== undefined && call.endedAt !== undefined
+        ? { seconds: Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000)) }
+        : {}),
+      ...(call.isError === true ? { error: true } : {}),
+      ...(!ended ? { running: true } : {}),
+      subagent,
+    };
+  }
+  const label = argsLabel || SUBAGENT_TOOL_NAME;
+  const isRunning =
+    call.result === undefined && call.endedAt === undefined && call.isError !== true;
+  const status: ChiefSubagentInfo['status'] = isRunning
+    ? 'running'
+    : /abort/i.test(rawResult)
+      ? 'aborted'
+      : call.isError === true
+        ? 'failed'
+        : 'completed';
+  return {
+    label,
+    ...(call.startedAt !== undefined && call.endedAt !== undefined
+      ? { seconds: Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000)) }
+      : {}),
+    ...(call.isError === true ? { error: true } : {}),
+    ...(isRunning ? { running: true } : {}),
+    subagent: { label, status, toolCalls: 0 },
+  };
+}
+
+function settleToolRow(tool: ChiefToolRow): ChiefToolRow {
+  const { running: _settled, ...rest } = tool;
+  if (
+    rest.subagent !== undefined &&
+    (rest.subagent.status === 'running' || rest.subagent.status === 'queued')
+  ) {
+    return {
+      ...rest,
+      subagent: {
+        ...rest.subagent,
+        status: rest.error === true ? 'failed' : 'completed',
+      },
+    };
+  }
+  return rest;
+}
+
 const RAW_API_ERROR_RE = /^API Error: /;
 
 export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
@@ -2195,16 +2305,20 @@ function collectChiefStream(
           (card) => card.kind !== 'task-card' || !undone.has(card.todoId),
         );
       if (eventTurn) continue;
-      pendingTools.push({
-        label: pillOf(call),
-        ...(call.startedAt !== undefined && call.endedAt !== undefined
-          ? { seconds: Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000)) }
-          : {}),
-        ...(call.isError === true ? { error: true } : {}),
-        ...(call.result === undefined && call.endedAt === undefined && call.isError !== true
-          ? { running: true }
-          : {}),
-      });
+      pendingTools.push(
+        isSubagentToolName(call.name)
+          ? subagentToolRowOf(call)
+          : {
+              label: pillOf(call),
+              ...(call.startedAt !== undefined && call.endedAt !== undefined
+                ? { seconds: Math.max(0, Math.round((call.endedAt - call.startedAt) / 1000)) }
+                : {}),
+              ...(call.isError === true ? { error: true } : {}),
+              ...(call.result === undefined && call.endedAt === undefined && call.isError !== true
+                ? { running: true }
+                : {}),
+            },
+      );
       const handoffTodoId = handoffTodoOf(call);
       if (handoffTodoId !== null)
         items.push({ kind: 'handoff', todoId: handoffTodoId, id: `${m.id}:handoff` });
@@ -2271,9 +2385,7 @@ function collectChiefStream(
       seconds: '',
       id: m.id,
       createdAt: m.createdAt,
-      ...(pendingTools.length > 0
-        ? { tools: pendingTools.map(({ running: _settled, ...tool }) => tool) }
-        : {}),
+      ...(pendingTools.length > 0 ? { tools: pendingTools.map(settleToolRow) } : {}),
       ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
       ...rowProject(m),
     });

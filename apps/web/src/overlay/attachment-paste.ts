@@ -87,6 +87,7 @@ export interface PendingAttachment {
   size: number;
   url: string | null;
   failed: boolean;
+  errorReason?: string;
 }
 
 export function isGenericClipboardName(name: string): boolean {
@@ -160,10 +161,19 @@ export function preparePastedFiles(files: readonly File[], counter: PastedNameCo
   });
 }
 
+const failureReasonByFile = new WeakMap<File, string>();
+
+export function takeAttachmentErrorReason(file: File): string | undefined {
+  const reason = failureReasonByFile.get(file);
+  if (reason !== undefined) failureReasonByFile.delete(file);
+  return reason;
+}
+
 export function attachmentFailureTitle(err: unknown): string {
   if (err instanceof AttachmentError) {
     if (err.reason === 'size') return '附件超过 10MB 上限';
     if (err.reason === 'mime') return '不支持该文件类型';
+    if (err.reason === 'quota') return '团队附件空间已满';
   }
   return '附件上传失败';
 }
@@ -179,7 +189,9 @@ export async function uploadMessageAttachments(
       tokens.push(r.token);
     } catch (err) {
       console.error('attachment failed', file.name, err);
-      toast.error(t(attachmentFailureTitle(err)), {
+      const title = t(attachmentFailureTitle(err));
+      failureReasonByFile.set(file, title);
+      toast.error(title, {
         description: file.name,
       });
     }

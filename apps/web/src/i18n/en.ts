@@ -3104,4 +3104,20 @@ export const EN: Record<string, string> = {
   '这台主机仅接受其他设备使用配对码登录，请返回使用配对码。':
     'This host accepts only pairing-code sign-in from other devices. Return and use the pairing code.',
   仅限主机设备查看: 'Visible on host device only',
+  '已完成（部分结果）': 'Done (partial)',
+  已超时: 'Timed out',
+  已失败: 'Failed',
+  '{n} 次工具 · {tool}': '{n#1 tool call|# tool calls} · {tool}',
+  '{n} 次工具': '{n#1 tool call|# tool calls}',
+  '已创建的任务、代码改动和记忆会保留。': 'Created tasks, code changes, and memory are preserved.',
+  团队附件空间已满: 'Team attachment storage is full',
+  'Coordinator 暂无可用模型': 'Coordinator has no available model',
+  'Coordinator 暂无可用模型，请先在设置里配置模型来源。':
+    'Coordinator has no available model. Configure a model provider in Settings first.',
+  '请先在设置里配置模型来源后再重试。': 'Configure a model provider in Settings, then try again.',
+  '这条审批已过期，未能执行。': 'This approval has expired and was not executed.',
+  '这条审批已处理或已过期。': 'This approval has already been handled or has expired.',
+  '这条提问已结束，无需重复提交。': 'This question has already ended.',
+  'Coordinator 正在运行，请停止后再恢复。': 'Coordinator is running. Stop it before restoring.',
+  '其他范围有一条记忆修改正在进行。': 'A memory edit is running in another scope.',
 };

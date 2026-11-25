@@ -1095,6 +1095,7 @@ export function enqueueChiefStep(
     id?: string;
     scopeProjectId?: string | null;
     ownerMessageIds: string[];
+    deferWake?: boolean;
   } & ChiefStepTrigger,
 ): string {
   const threadRow = getChiefThread(deps, threadId);
@@ -1130,8 +1131,10 @@ export function enqueueChiefStep(
     .set({ activeRun, updatedAt: nowMs() })
     .where(eq(chiefThread.id, threadId))
     .run();
-  deps.machineHub?.wake(threadRow.teamId);
-  wakeCoordinator(threadId);
+  if (opts.deferWake !== true) {
+    deps.machineHub?.wake(threadRow.teamId);
+    wakeCoordinator(threadId);
+  }
   return id;
 }
 
@@ -1157,88 +1160,72 @@ function markStoreRewind(db: Db, threadId: string, anchorId: string, doomedIds: 
     .run();
 }
 
-const STEP_OUTCOME_ROW_PREFIXES = ['chief-err-', 'chief-fallback-'] as const;
-
-function isStepOutcomeRow(messageId: string): boolean {
-  return STEP_OUTCOME_ROW_PREFIXES.some((prefix) => messageId.startsWith(prefix));
-}
-
 export function rewindChiefThread(
   deps: ChiefDeps,
   teamId: string,
   threadId: string,
   body: { messageId: string },
 ): { deletedCount: number; thread: ChiefThread } {
-  const threadRow = getChiefThread(deps, threadId);
-  if (!threadRow || threadRow.teamId !== teamId || isChiefSideThreadId(threadRow.id)) {
-    throw new HttpError(404, `chief thread ${threadId}`);
-  }
-  requireWritableThread(threadRow);
-  const anchor = deps.db
-    .select()
-    .from(chiefMessage)
-    .where(and(eq(chiefMessage.id, body.messageId), eq(chiefMessage.threadId, threadId)))
-    .get();
-  if (!anchor) throw new HttpError(404, `chief message ${body.messageId}`);
-  if (anchor.role !== 'user' || anchor.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
-    throw new HttpError(400, 'rewind anchor must be a user message');
-  }
-  if (anchor.projectId !== null) requireUnarchivedProject(deps.db, anchor.projectId);
-  if (threadRow.activeRun !== null) {
-    throw new HttpError(409, 'chief thread turn in flight (回合中不 rewind)');
-  }
-  const ordered = deps.db
-    .select({ id: chiefMessage.id })
-    .from(chiefMessage)
-    .where(eq(chiefMessage.threadId, threadId))
-    .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
-    .all();
-  const doomed = ordered.slice(ordered.findIndex((row) => row.id === anchor.id) + 1);
-  requireNoWaitingQuestion(
-    deps.db,
-    doomed.map((row) => row.id),
-  );
-  requireRewindStaysInProject(
-    deps.db,
-    anchor,
-    doomed.map((row) => row.id),
-  );
-  markStoreRewind(
-    deps.db,
-    threadId,
-    anchor.id,
-    doomed.map((row) => row.id),
-  );
-  let deletedCount = 0;
-  for (const row of doomed) {
-    if (isStepOutcomeRow(row.id)) continue;
-    deps.db.delete(chiefMessage).where(eq(chiefMessage.id, row.id)).run();
-    deletedCount += 1;
-  }
-  const now = nowMs();
-  deps.db
-    .update(chiefThread)
-    .set({ sessionId: '', updatedAt: now })
-    .where(eq(chiefThread.id, threadId))
-    .run();
-  deps.convHub?.clearConversationBuffer(threadId);
-  const content =
-    typeof anchor.content === 'string' ? anchor.content : (extractText(anchor.content) ?? '');
-  enqueueChiefStep(deps, threadId, {
-    prompt: promptWithPickedProject(pickedProjectOf(deps.db, teamId, anchor.projectId), content),
-    trigger: 'user',
-    ownerMessageIds: [anchor.id],
-    scopeProjectId: anchor.projectId,
+  const result = deps.db.transaction((tx) => {
+    const txDeps: ChiefDeps = { ...deps, db: tx, machineHub: undefined };
+    const threadRow = getChiefThread(txDeps, threadId);
+    if (!threadRow || threadRow.teamId !== teamId || isChiefSideThreadId(threadRow.id)) {
+      throw new HttpError(404, `chief thread ${threadId}`);
+    }
+    requireWritableThread(threadRow);
+    const anchor = tx
+      .select()
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.id, body.messageId), eq(chiefMessage.threadId, threadId)))
+      .get();
+    if (!anchor) throw new HttpError(404, `chief message ${body.messageId}`);
+    if (anchor.role !== 'user' || anchor.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
+      throw new HttpError(400, 'rewind anchor must be a user message');
+    }
+    if (anchor.projectId !== null) requireUnarchivedProject(tx, anchor.projectId);
+    if (threadRow.activeRun !== null) {
+      throw new HttpError(409, 'chief thread turn in flight (回合中不 rewind)');
+    }
+    const ordered = tx
+      .select({ id: chiefMessage.id })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, threadId))
+      .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
+      .all();
+    const doomedIds = ordered
+      .slice(ordered.findIndex((row) => row.id === anchor.id) + 1)
+      .map((row) => row.id);
+    requireNoWaitingQuestion(tx, doomedIds);
+    requireRewindStaysInProject(tx, anchor, doomedIds);
+    markStoreRewind(tx, threadId, anchor.id, doomedIds);
+    if (doomedIds.length > 0) {
+      tx.delete(chiefMessage).where(inArray(chiefMessage.id, doomedIds)).run();
+    }
+    const now = nowMs();
+    tx.update(chiefThread)
+      .set({ sessionId: '', updatedAt: now })
+      .where(eq(chiefThread.id, threadId))
+      .run();
+    const content =
+      typeof anchor.content === 'string' ? anchor.content : (extractText(anchor.content) ?? '');
+    enqueueChiefStep(txDeps, threadId, {
+      prompt: promptWithPickedProject(pickedProjectOf(tx, teamId, anchor.projectId), content),
+      trigger: 'user',
+      ownerMessageIds: [anchor.id],
+      scopeProjectId: anchor.projectId,
+      deferWake: true,
+    });
+    const fresh = getChiefThread(txDeps, threadId);
+    if (!fresh) throw new Error('chief thread missing after rewind');
+    return {
+      deletedCount: doomedIds.length,
+      thread: toChiefThreadRecord(fresh, stepQueueProjector(tx, teamId).chiefTurnQueueOf(threadId)),
+    };
   });
-  const fresh = getChiefThread(deps, threadId);
-  if (!fresh) throw new Error('chief thread missing after rewind');
-  return {
-    deletedCount,
-    thread: toChiefThreadRecord(
-      fresh,
-      stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(threadId),
-    ),
-  };
+  deps.convHub?.clearConversationBuffer(threadId);
+  deps.machineHub?.wake(teamId);
+  wakeCoordinator(threadId);
+  return result;
 }
 
 export function addChiefWatch(

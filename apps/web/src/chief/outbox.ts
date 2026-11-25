@@ -233,6 +233,7 @@ export function createOutbox({
             : other.state !== 'sent' &&
                 other.threadId === null &&
                 entry.threadId === null &&
+                other.projectId === entry.projectId &&
                 other.scope === entry.scope
               ? { ...other, threadId: delivered.threadId }
               : other,
@@ -355,15 +356,35 @@ export function createOutbox({
   };
 }
 
+export function failedOutboxForChannel(
+  entries: readonly OutboxEntry[],
+  activeThreadId: string | null,
+  channel: string | null,
+): OutboxEntry[] {
+  return entries.filter((entry) => {
+    if (entry.state !== 'failed') return false;
+    if (entry.threadId !== null) {
+      return activeThreadId !== null && entry.threadId === activeThreadId;
+    }
+    return entry.projectId === channel;
+  });
+}
+
 export function unlandedItems(
   entries: readonly OutboxEntry[],
   threadId: string | null,
   known: ReadonlySet<string>,
   globalThreadId: string | null = null,
+  channel: string | null = null,
 ): ChiefStreamItem[] {
   return entries.flatMap((entry) =>
     entry.state === 'failed' ||
-    (entry.threadId !== threadId && !(entry.threadId === null && threadId === globalThreadId)) ||
+    (entry.threadId !== null
+      ? entry.threadId !== threadId
+      : !(
+          (threadId === null && entry.projectId === channel) ||
+          (threadId !== null && threadId === globalThreadId && entry.projectId === null)
+        )) ||
     (entry.messageId !== null && known.has(entry.messageId))
       ? []
       : [

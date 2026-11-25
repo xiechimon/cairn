@@ -5,7 +5,7 @@ export interface PendingTracker {
   pending: PendingAttachment[];
   track: (files: File[]) => string[];
   untrack: (uids: string[]) => void;
-  fail: (uid: string) => void;
+  fail: (uid: string, errorReason?: string) => void;
   clearFailed: () => void;
 }
 
@@ -46,9 +46,17 @@ export function usePendingAttachments(): PendingTracker {
     });
   }, []);
 
-  const fail = useCallback((uid: string): void => {
+  const fail = useCallback((uid: string, errorReason?: string): void => {
     setPending((current) =>
-      current.map((entry) => (entry.uid === uid ? { ...entry, failed: true } : entry)),
+      current.map((entry) =>
+        entry.uid === uid
+          ? {
+              ...entry,
+              failed: true,
+              ...(errorReason !== undefined ? { errorReason } : {}),
+            }
+          : entry,
+      ),
     );
   }, []);
 

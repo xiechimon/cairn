@@ -35,7 +35,9 @@ function receiptDiffLines(receipt: MemoryEditReceiptRecord): DiffLine[] {
 }
 
 function scopeTag(receipt: MemoryEditReceiptRecord, projectName: string | null, t: TFunc) {
-  return receipt.scope === 'team' || receipt.scope === null ? t('团队') : projectName;
+  return receipt.scope === 'team' || receipt.scope === null
+    ? t('团队')
+    : (projectName ?? t('项目'));
 }
 
 function ReceiptDiff({
@@ -135,8 +137,23 @@ export function MemoryEditComposer({
   const qc = useQueryClient();
   const editQ = useCurrentMemoryEdit(teamId, teamId !== undefined);
   const mutations = useApiMutations(teamId);
-  const edit = editQ.data ?? null;
-  const [draft, setDraft] = useState('');
+  const scopeKey = `${projectId ?? 'team'}:${file ?? ''}`;
+  const rawEdit = editQ.data ?? null;
+  const matchesScope =
+    rawEdit !== null &&
+    (rawEdit.projectId ?? null) === projectId &&
+    (file === null || rawEdit.file === null || rawEdit.file === file);
+  const edit = matchesScope ? rawEdit : null;
+  const otherScopeWorking = rawEdit !== null && !matchesScope && rawEdit.status === 'working';
+  const [draftsByScope, setDraftsByScope] = useState<Record<string, string>>({});
+  const draft = draftsByScope[scopeKey] ?? '';
+  const setDraft = (next: string | ((current: string) => string)) => {
+    setDraftsByScope((current) => {
+      const prev = current[scopeKey] ?? '';
+      const value = typeof next === 'function' ? next(prev) : next;
+      return value === prev ? current : { ...current, [scopeKey]: value };
+    });
+  };
   const restoredFor = useRef<string | null>(null);
   const working = edit?.status === 'working';
   const now = useIntervalNow(working);
@@ -154,15 +171,15 @@ export function MemoryEditComposer({
   useEffect(() => {
     if (edit !== null && edit.status === 'failed' && restoredFor.current !== edit.id) {
       restoredFor.current = edit.id;
-      if (draft === '') setDraft(edit.instruction);
+      setDraft((current) => (current === '' ? edit.instruction : current));
     }
-  }, [draft, edit]);
+  }, [edit, scopeKey]);
 
   const continuable =
     edit !== null && (edit.status === 'awaiting_input' || edit.status === 'partial');
   const sending = mutations.submitMemoryEdit.isPending;
   const stopping = mutations.stopMemoryEdit.isPending;
-  const canSend = connected && !sending && draft.trim() !== '';
+  const canSend = connected && !sending && !otherScopeWorking && draft.trim() !== '';
   const showCard = edit !== null;
   const line = edit !== null ? statusLine(edit, elapsed, t) : null;
 
@@ -179,7 +196,7 @@ export function MemoryEditComposer({
           },
       {
         onSuccess: () => setDraft(''),
-        onError: () => setDraft(text),
+        onError: () => setDraft((current) => (current === '' ? text : current)),
       },
     );
   };
@@ -228,6 +245,11 @@ export function MemoryEditComposer({
         {!connected && (
           <p className="mb-1.5 text-meta text-content-secondary">
             {t('离线中。重新连接后才能让 Coordinator 修改。')}
+          </p>
+        )}
+        {connected && otherScopeWorking && (
+          <p className="mb-1.5 text-meta text-content-secondary">
+            {t('其他范围有一条记忆修改正在进行。')}
           </p>
         )}
         <div className="flex items-end gap-2">

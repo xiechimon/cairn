@@ -13,6 +13,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ChiefDeps } from './chief.js';
 import { enqueueChiefStep, ensureChief } from './chief.js';
 import { wakeCoordinator } from './coordinator-context.js';
+import { signalCoordinator } from './coordinator-signal.js';
 import { executeMemoryDocumentTool, type MemoryDocumentOwner } from './memory-documents.js';
 import {
   MEMORY_EDIT_CLARIFY_PREFIX,
@@ -235,7 +236,11 @@ export function submitMemoryEdit(
         .get();
       if (latest?.status === 'working')
         throw new HttpError(409, 'a memory edit is already running');
-      if (latest !== undefined && CONTINUABLE_STATUSES.has(latest.status)) {
+      if (
+        latest !== undefined &&
+        CONTINUABLE_STATUSES.has(latest.status) &&
+        (latest.projectId ?? null) === projectId
+      ) {
         row = continuing(latest);
       } else {
         const id = newRecordId();
@@ -285,6 +290,7 @@ export function stopMemoryEdit(
   attempt?: number,
 ): MemoryEditRecord {
   let signal: string | null = null;
+  let threadId: string | null = null;
   const record = deps.db.transaction((tx) => {
     const row = requireEditRow(tx, teamId, editId);
     if (attempt !== undefined && attempt !== row.attempt)
@@ -322,11 +328,15 @@ export function stopMemoryEdit(
           })
           .run();
         signal = running.id;
+        threadId = row.threadId;
       }
     }
     return toMemoryEditRecord(tx, { ...row, status });
   });
-  if (signal !== null) deps.machineHub?.stopSignal(teamId, signal);
+  if (signal !== null) {
+    deps.machineHub?.stopSignal(teamId, signal);
+    if (threadId !== null) signalCoordinator(threadId, 'stop');
+  }
   return record;
 }
 
@@ -346,7 +356,6 @@ export function executeMemoryEditTool(
   return db.transaction((tx) => {
     const edit = tx.select().from(memoryEdit).where(eq(memoryEdit.id, editId)).get();
     if (edit === undefined) throw new HttpError(409, `memory edit ${editId} is gone`);
-    const scopedOwner = edit.projectId === null ? owner : { ...owner, projectId: edit.projectId };
     const prior = tx
       .select()
       .from(memoryEditReceipt)
@@ -356,10 +365,24 @@ export function executeMemoryEditTool(
       const stored = JSON.parse(prior.result) as { toolResult: unknown };
       return { replayed: true, output: stored.toolResult };
     }
+    if (edit.status !== 'working') {
+      throw new HttpError(409, `memory edit ${editId} is ${edit.status}`);
+    }
+    const mutating = name !== 'memories';
+    if (mutating) {
+      const stopping = tx
+        .select({ conversationId: stopPending.conversationId })
+        .from(stopPending)
+        .where(eq(stopPending.conversationId, edit.threadId))
+        .get();
+      if (stopping !== undefined) {
+        throw new HttpError(409, `memory edit ${editId} is stopping`);
+      }
+    }
+    const scopedOwner = edit.projectId === null ? owner : { ...owner, projectId: edit.projectId };
     const scope =
       typeof params.scope === 'string' ? params.scope : (scopedOwner.projectId ?? 'team');
     const file = typeof params.file === 'string' ? params.file : null;
-    const mutating = name !== 'memories';
     const before = mutating && file !== null ? readDocument(tx, scopedOwner, scope, file) : null;
     const output = executeMemoryDocumentTool(tx, scopedOwner, name, params);
     if (!mutating) return { replayed: false, output };
