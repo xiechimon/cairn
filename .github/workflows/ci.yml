@@ -21,6 +21,7 @@ jobs:
       contents: read
       issues: read
       pull-requests: read
+      actions: read
     outputs:
       has-code: ${{ steps.classify.outputs.has-code }}
       has-sidecar: ${{ steps.classify.outputs.has-sidecar }}
@@ -30,6 +31,8 @@ jobs:
       eval-needed: ${{ steps.classify.outputs.eval-needed }}
       base-sha: ${{ steps.classify.outputs.base-sha }}
       e2e-tier: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft) && 'none' || steps.classify.outputs.e2e-tier }}
+      reused-sha: ${{ steps.reuse.outputs.reused-sha }}
+      reused-run-id: ${{ steps.reuse.outputs.reused-run-id }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -94,6 +97,14 @@ jobs:
           echo "base-sha=$base_ref" >> "$GITHUB_OUTPUT"
           echo "e2e-tier=$e2e_tier" >> "$GITHUB_OUTPUT"
 
+      - name: Reuse verified main CI
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAS_SIDECAR: ${{ steps.classify.outputs.has-sidecar }}
+          EVAL_REQUIRED: ${{ steps.classify.outputs.eval-needed == 'true' && vars.EVAL_ENABLED == 'true' && 'true' || 'false' }}
+        run: node scripts/ops/ci-reuse-verified.mjs >> "$GITHUB_OUTPUT"
+
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
   check:
     needs: [changes, check-core, vitest-light, vitest-integration, tsnet-sidecar, eval]
@@ -103,6 +114,12 @@ jobs:
       - name: Aggregate check parts
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
+          if [ "${{ needs.changes.outputs.reused-sha }}" = "true" ]; then
+            [ "$GITHUB_REF" = "refs/heads/main" ]
+            [ "${{ github.event_name }}" = "push" ]
+            [ -n "${{ needs.changes.outputs.reused-run-id }}" ]
+            exit 0
+          fi
           ev_result="${{ needs.eval.result }}"
           if [ "$ev_result" != "success" ]; then
             if [ "$ev_result" = "skipped" ]; then
@@ -140,6 +157,7 @@ jobs:
 
   check-core:
     needs: changes
+    if: needs.changes.outputs.reused-sha != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -199,7 +217,7 @@ jobs:
 
   vitest-light:
     needs: changes
-    if: needs.changes.outputs.has-code != 'false'
+    if: needs.changes.outputs.has-code != 'false' && needs.changes.outputs.reused-sha != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -225,12 +243,12 @@ jobs:
 
   vitest-integration:
     needs: changes
-    if: needs.changes.outputs.has-code != 'false' && needs.changes.outputs.needs-integration != 'false'
+    if: needs.changes.outputs.has-code != 'false' && needs.changes.outputs.needs-integration != 'false' && needs.changes.outputs.reused-sha != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -255,7 +273,7 @@ jobs:
 
   e2e:
     needs: changes
-    if: needs.changes.outputs.e2e-tier == 'full' && needs.changes.outputs.has-code != 'false'
+    if: needs.changes.outputs.e2e-tier == 'full' && needs.changes.outputs.has-code != 'false' && needs.changes.outputs.reused-sha != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -288,7 +306,7 @@ jobs:
 
   e2e-affected:
     needs: changes
-    if: needs.changes.outputs.e2e-tier == 'affected' && needs.changes.outputs.has-code != 'false'
+    if: needs.changes.outputs.e2e-tier == 'affected' && needs.changes.outputs.has-code != 'false' && needs.changes.outputs.reused-sha != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -335,6 +353,9 @@ jobs:
       - name: Aggregate the e2e tier
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
+          if [ "${{ needs.changes.outputs.reused-sha }}" = "true" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            exit 0
+          fi
           case "${{ needs.changes.outputs.e2e-tier }}" in
             full) ran="${{ needs.e2e.result }}" idle="${{ needs.e2e-affected.result }}" ;;
             affected) ran="${{ needs.e2e-affected.result }}" idle="${{ needs.e2e.result }}" ;;
@@ -402,7 +423,7 @@ jobs:
 
   pack-smoke:
     needs: changes
-    if: needs.changes.outputs.has-code != 'false'
+    if: needs.changes.outputs.has-code != 'false' && needs.changes.outputs.reused-sha != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -422,7 +443,7 @@ jobs:
 
   gates:
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.gates-needed != 'false' }}
+    if: ${{ !cancelled() && needs.changes.outputs.gates-needed != 'false' && needs.changes.outputs.reused-sha != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -473,7 +494,7 @@ jobs:
 
       - name: Workflow concurrency, scalars and queue promotion
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/speculative-queue.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
+        run: node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/speculative-queue.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/ci-reuse-verified.test.mjs scripts/ops/merge-queue-invariants.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
 
       - name: Commit identity allowlist and hooks (#2289)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}

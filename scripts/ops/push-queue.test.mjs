@@ -8,15 +8,18 @@ import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import { preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
 import {
   classifyWaitStatus,
+  commitCommentsApiArgs,
   DEFAULT_POLL_SECONDS,
   failedGreenContexts,
   fetchCheckRuns,
+  isTransientGitNetworkError,
   landingTarget,
   laneName,
   missingGreenContexts,
   nextWaitAction,
   planEnqueueOrLand,
   planPush,
+  pollWaitStep,
   preflightEvidence,
   stampCommand,
   unownedCommits,
@@ -439,7 +442,19 @@ test('classifyWaitStatus distinguishes landed (including rebased cherry), queued
       onMain: false,
       cherryHasUnapplied: true,
       ejectedByComment: false,
-      mainMoved: true,
+      matchedOnMainBySignature: false,
+    }),
+    {
+      state: 'ejected',
+    },
+  );
+  assert.deepEqual(
+    classifyWaitStatus({
+      stillQueued: false,
+      onMain: false,
+      cherryHasUnapplied: true,
+      ejectedByComment: false,
+      matchedOnMainBySignature: true,
     }),
     {
       state: 'landed',
@@ -451,10 +466,59 @@ test('classifyWaitStatus distinguishes landed (including rebased cherry), queued
       onMain: false,
       cherryHasUnapplied: true,
       ejectedByComment: true,
-      mainMoved: true,
+      matchedOnMainBySignature: true,
     }),
     {
       state: 'ejected',
     },
+  );
+});
+
+test('commitCommentsApiArgs includes gh api subcommand so --wait reads ejection comments', () => {
+  assert.deepEqual(commitCommentsApiArgs('xiechimon/cairn', X), [
+    'api',
+    `repos/xiechimon/cairn/commits/${X}/comments?per_page=20`,
+  ]);
+});
+
+test('isTransientGitNetworkError and pollWaitStep retry transient TLS or network failures instead of aborting --wait', () => {
+  assert.equal(
+    isTransientGitNetworkError(
+      new Error(
+        'fatal: unable to access https://github.com: LibreSSL SSL_connect: SSL_ERROR_SYSCALL',
+      ),
+    ),
+    true,
+  );
+  assert.equal(isTransientGitNetworkError(new Error('gh: HTTP 403 (secondary throttle)')), true);
+  assert.equal(isTransientGitNetworkError(new Error('fatal: bad revision HEAD')), false);
+
+  const transient = pollWaitStep({
+    fetchMain: () => {
+      throw new Error(
+        "fatal: unable to access 'https://github.com/xiechimon/cairn.git/': LibreSSL SSL_connect: SSL_ERROR_SYSCALL",
+      );
+    },
+    listQueue: () => ({ entries: [], mainSha: null }),
+    isOnMain: () => false,
+    hasUnappliedCherry: () => true,
+    readRemovalNote: () => null,
+    sleep: () => {},
+  });
+  assert.equal(transient.state, 'retry');
+  assert.match(transient.reason, /SSL_ERROR_SYSCALL/);
+
+  assert.throws(() =>
+    pollWaitStep({
+      fetchMain: () => {
+        throw new Error('fatal: repository is corrupt');
+      },
+      listQueue: () => ({ entries: [], mainSha: null }),
+      isOnMain: () => false,
+      hasUnappliedCherry: () => true,
+      readRemovalNote: () => null,
+      sleep: () => {},
+      initialMainSha: X,
+    }),
   );
 });

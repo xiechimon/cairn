@@ -235,11 +235,15 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   for (const name of ['vitest-light', 'pack-smoke']) {
     const job = jobs.get(name);
     assert.match(job ?? '', /^ {4}needs: changes$/m, name);
-    assert.match(job, /^ {4}if: needs.changes.outputs.has-code != 'false'$/m, name);
+    assert.match(
+      job,
+      /^ {4}if: needs\.changes\.outputs\.has-code != 'false' && needs\.changes\.outputs\.reused-sha != 'true'$/m,
+      name,
+    );
   }
   assert.match(
     jobs.get('vitest-integration') ?? '',
-    /^ {4}if: needs\.changes\.outputs\.has-code != 'false' && needs\.changes\.outputs\.needs-integration != 'false'$/m,
+    /^ {4}if: needs\.changes\.outputs\.has-code != 'false' && needs\.changes\.outputs\.needs-integration != 'false' && needs\.changes\.outputs\.reused-sha != 'true'$/m,
   );
   for (const name of sidecarJobs) {
     const job = jobs.get(name);
@@ -271,7 +275,7 @@ test('CI classifies before heavy work and skips it only for a classified reason'
   assert.ok(!check.includes('playwright install'));
   const core = jobs.get('check-core');
   assert.match(core ?? '', /^ {4}needs: changes$/m);
-  assert.doesNotMatch(core, /^ {4}if:/m);
+  assert.match(core ?? '', /^ {4}if: needs\.changes\.outputs\.reused-sha != 'true'$/m);
   const verify = core
     .split(/\n(?= {6}- )/)
     .find((step) => step.includes('name: verify-cairn CLI self-test'));
@@ -359,6 +363,9 @@ test('required aggregates only accept skipped work its classification excused', 
             if (expression === 'needs.changes.outputs.has-sidecar') return sidecar;
             if (expression === 'needs.changes.outputs.needs-integration') return needsIntegration;
             if (expression === 'needs.changes.outputs.eval-needed') return vars.evalNeeded;
+            if (expression === 'needs.changes.outputs.reused-sha') return 'false';
+            if (expression === 'needs.changes.outputs.reused-run-id') return '';
+            if (expression === 'github.event_name') return 'push';
             if (expression === 'vars.EVAL_ENABLED') return vars.evalEnabled;
             const match = /^needs\.([\w-]+)\.result$/.exec(expression);
             assert.ok(match, expression);

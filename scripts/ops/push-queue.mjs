@@ -27,18 +27,74 @@ export function planEnqueueOrLand({
   return { action: 'enqueue', sha: pushedSha };
 }
 
+export function commitCommentsApiArgs(repo, sha) {
+  return ['api', `repos/${repo}/commits/${sha}/comments?per_page=20`];
+}
+
 export function classifyWaitStatus({
   stillQueued,
   onMain,
   cherryHasUnapplied,
   ejectedByComment = false,
-  mainMoved = false,
+  matchedOnMainBySignature = false,
 }) {
-  if (onMain || cherryHasUnapplied === false) return { state: 'landed' };
-  if (stillQueued) return { state: 'queued' };
   if (ejectedByComment) return { state: 'ejected' };
-  if (mainMoved) return { state: 'landed' };
+  if (onMain || cherryHasUnapplied === false || matchedOnMainBySignature)
+    return { state: 'landed' };
+  if (stillQueued) return { state: 'queued' };
   return { state: 'ejected' };
+}
+
+const TRANSIENT_NET_ERROR_RE =
+  /SSL_ERROR_SYSCALL|LibreSSL|Could not resolve host|Connection reset|unexpected EOF|ETIMEDOUT|ECONNRESET|EAI_AGAIN|HTTP (?:403|429|500|502|503|504)|Failed to connect to github\.com/i;
+
+export function isTransientGitNetworkError(error) {
+  const message = `${error?.stderr ?? ''}\n${error?.message ?? error ?? ''}`;
+  return TRANSIENT_NET_ERROR_RE.test(message);
+}
+
+export function pollWaitStep({
+  fetchMain,
+  listQueue,
+  isOnMain,
+  hasUnappliedCherry,
+  matchedOnMainBySignature = () => false,
+  readRemovalNote,
+  sleep,
+  enqueueRef,
+}) {
+  try {
+    fetchMain();
+    let latest = listQueue();
+    let stillQueued = latest.entries.some((item) => item.ref === enqueueRef);
+    let onMain = isOnMain();
+    let cherryHasUnapplied = hasUnappliedCherry();
+    let removalNote = null;
+    let matched = false;
+    if (!stillQueued && !onMain && cherryHasUnapplied) {
+      sleep(2);
+      fetchMain();
+      latest = listQueue();
+      stillQueued = latest.entries.some((item) => item.ref === enqueueRef);
+      onMain = isOnMain();
+      cherryHasUnapplied = hasUnappliedCherry();
+      removalNote = readRemovalNote();
+      if (!stillQueued && !onMain && cherryHasUnapplied && removalNote === null) {
+        matched = matchedOnMainBySignature(latest.mainSha);
+      }
+    }
+    const status = classifyWaitStatus({
+      stillQueued,
+      onMain,
+      cherryHasUnapplied,
+      ejectedByComment: removalNote !== null,
+      matchedOnMainBySignature: matched,
+    });
+    return { ...status, mainSha: latest.mainSha, removalNote };
+  } catch (error) {
+    if (!isTransientGitNetworkError(error)) throw error;
+    return { state: 'retry', reason: String(error.message ?? error).split('\n')[0] };
+  }
 }
 
 export function laneName(host, worktree) {
@@ -368,7 +424,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
 
   const readRemovalComment = () => {
     try {
-      const comments = ghJson([`repos/${repo}/commits/${pushedSha}/comments?per_page=20`]);
+      const comments = ghJson(commitCommentsApiArgs(repo, pushedSha));
       const match = comments.findLast(
         (comment) =>
           comment.body.startsWith('Removed from merge queue:') ||
@@ -380,6 +436,31 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     }
   };
 
+  const fetchMain = () => {
+    const fetch = spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { encoding: 'utf8' });
+    if (fetch.stderr) process.stderr.write(fetch.stderr);
+    if (fetch.status !== 0) {
+      throw new Error(fetch.stderr || `git fetch origin main failed with status ${fetch.status}`);
+    }
+  };
+
+  const matchedOnMainBySignature = (latestMainSha) => {
+    if (!initialMainSha || !latestMainSha || latestMainSha === initialMainSha) return false;
+    const unapplied = git(['cherry', 'origin/main', pushedSha])
+      .split('\n')
+      .filter((line) => line.startsWith('+ '))
+      .map((line) => line.slice(2).trim().split(/\s+/)[0]);
+    if (unapplied.length === 0) return true;
+    const landedSigs = new Set(
+      git(['log', '--format=%s%x00%an%x00%ae', `${initialMainSha}..origin/main`])
+        .split('\n')
+        .filter(Boolean),
+    );
+    return unapplied.every((sha) =>
+      landedSigs.has(git(['show', '-s', '--format=%s%x00%an%x00%ae', sha])),
+    );
+  };
+
   for (;;) {
     if (Date.now() > deadline) {
       console.error(
@@ -387,39 +468,35 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       );
       process.exit(2);
     }
-    spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { stdio: 'inherit' });
-    let latest = listRemoteQueue();
-    let stillQueued = latest.entries.some((item) => item.ref === enqueueRef);
-    let onMain = ancestor(pushedSha, 'origin/main');
-    let cherryOut = git(['cherry', 'origin/main', pushedSha]);
-    let cherryHasUnapplied = cherryOut.split('\n').some((line) => line.startsWith('+ '));
-    let removalNote = null;
-    if (!stillQueued && !onMain && cherryHasUnapplied) {
-      sleep(2);
-      spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { stdio: 'inherit' });
-      latest = listRemoteQueue();
-      stillQueued = latest.entries.some((item) => item.ref === enqueueRef);
-      onMain = ancestor(pushedSha, 'origin/main');
-      cherryOut = git(['cherry', 'origin/main', pushedSha]);
-      cherryHasUnapplied = cherryOut.split('\n').some((line) => line.startsWith('+ '));
-      removalNote = readRemovalComment();
-    }
-    const status = classifyWaitStatus({
-      stillQueued,
-      onMain,
-      cherryHasUnapplied,
-      ejectedByComment: removalNote !== null,
-      mainMoved: Boolean(initialMainSha && latest.mainSha && latest.mainSha !== initialMainSha),
+    const status = pollWaitStep({
+      fetchMain,
+      listQueue: listRemoteQueue,
+      isOnMain: () => ancestor(pushedSha, 'origin/main'),
+      hasUnappliedCherry: () =>
+        git(['cherry', 'origin/main', pushedSha])
+          .split('\n')
+          .some((line) => line.startsWith('+ ')),
+      matchedOnMainBySignature,
+      readRemovalNote: readRemovalComment,
+      sleep,
+      enqueueRef,
     });
+    if (status.state === 'retry') {
+      console.log(
+        `[push-queue] transient network error while polling (${status.reason}); retrying in ${POLL_SECONDS}s`,
+      );
+      sleep(POLL_SECONDS);
+      continue;
+    }
     if (status.state === 'landed') {
       console.log(
-        `[push-queue] landed ${pushedSha.slice(0, 9)} on origin/main (${latest.mainSha?.slice(0, 9)})`,
+        `[push-queue] landed ${pushedSha.slice(0, 9)} on origin/main (${status.mainSha?.slice(0, 9)})`,
       );
       process.exit(0);
     }
     if (status.state === 'ejected') {
       console.error(
-        `[push-queue] ${pushedSha.slice(0, 9)} was ejected from the merge queue.\n${removalNote || 'Check the promote workflow run for details.'}`,
+        `[push-queue] ${pushedSha.slice(0, 9)} was ejected from the merge queue.\n${status.removalNote || 'Check the promote workflow run for details.'}`,
       );
       process.exit(1);
     }

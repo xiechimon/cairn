@@ -55,12 +55,13 @@ function evaluate(expression, context) {
 const condition = (name) => job(name).match(/^ {4}if: (.*)$/m)?.[1];
 const tierExpression = job('changes').match(/^ {6}e2e-tier: (.*)$/m)?.[1];
 
-function githubContext({ event, draft = null, login = null, head = '' }) {
+function githubContext({ event, draft = null, login = null, head = '', reusedSha = 'false' }) {
   return {
     'github.event_name': event,
     'github.event.pull_request.draft': draft,
     'github.event.pull_request.user.login': login,
     'github.head_ref': head,
+    'needs.changes.outputs.reused-sha': reusedSha,
   };
 }
 
@@ -101,6 +102,7 @@ function gateShell({ results, outputs }) {
   return command.replace(/\$\{\{ (.*?) \}\}/g, (_, expression) => {
     const output = /^needs\.changes\.outputs\.([\w-]+)$/.exec(expression);
     if (output) {
+      if (output[1] === 'reused-sha' && !(output[1] in outputs)) return 'false';
       assert.ok(output[1] in outputs, expression);
       return outputs[output[1]];
     }
@@ -112,7 +114,10 @@ function gateShell({ results, outputs }) {
 
 function gatePasses(scenarios) {
   const script = scenarios
-    .map((scenario) => `(\nset -e -o pipefail\n${gateShell(scenario)}\n) >/dev/null 2>&1; echo $?`)
+    .map(
+      (scenario) =>
+        `(\nset -e -o pipefail\nGITHUB_REF=${JSON.stringify(scenario.githubRef ?? 'refs/heads/main')}\n${gateShell(scenario)}\n) >/dev/null 2>&1; echo $?`,
+    )
     .join('\n');
   const run = spawnSync('bash', ['-s'], {
     input: script,
@@ -264,6 +269,48 @@ test('eval waits for check-core so a red typecheck or lint stops before the 30-m
   assert.match(job('eval'), /^ {4}needs: \[changes, check-core\]$/m);
 });
 
+test('reused-sha on main push skips heavy jobs and satisfies e2e-gate only on refs/heads/main', () => {
+  const mainCtx = githubContext({ event: 'push', reusedSha: 'true' });
+  assert.equal(
+    evaluate(condition('e2e'), {
+      ...mainCtx,
+      'needs.changes.outputs.has-code': 'true',
+      'needs.changes.outputs.e2e-tier': 'full',
+    }),
+    false,
+  );
+  assert.equal(
+    evaluate(condition('e2e-affected'), {
+      ...mainCtx,
+      'needs.changes.outputs.has-code': 'true',
+      'needs.changes.outputs.e2e-tier': 'affected',
+    }),
+    false,
+  );
+  assert.equal(
+    evaluate(condition('gates'), {
+      ...mainCtx,
+      'job.cancelled': false,
+      'needs.changes.outputs.gates-needed': 'true',
+    }),
+    false,
+  );
+  const [okMain, okFeature] = gatePasses(
+    [
+      {
+        results: { changes: 'success', e2e: 'skipped', 'e2e-affected': 'skipped' },
+        outputs: { 'has-code': 'true', 'e2e-tier': 'full', 'reused-sha': 'true' },
+      },
+      {
+        results: { changes: 'success', e2e: 'skipped', 'e2e-affected': 'skipped' },
+        outputs: { 'has-code': 'true', 'e2e-tier': 'full', 'reused-sha': 'true' },
+      },
+    ].map((s, idx) => ({ ...s, githubRef: idx === 0 ? 'refs/heads/main' : 'refs/heads/feature' })),
+  );
+  assert.equal(okMain, true);
+  assert.equal(okFeature, false);
+});
+
 test('every classify step output is re-exported as a changes job output', () => {
   const block = job('changes');
   const exposed = new Set(
@@ -281,7 +328,7 @@ test('every classify step output is re-exported as a changes job output', () => 
 
 test('changes classify script sets outputs across push and pull_request diffs in a real git repo', () => {
   const classifyScript = job('changes')
-    .match(/run: \|\n([\s\S]*)/)[1]
+    .match(/id: classify[\s\S]*?run: \|\n([\s\S]*?)(?=\n {6}- name:|$)/)[1]
     .replace(/^ {10}/gm, '');
   const outer = makeTestTempDir('ci-tiers-classify-');
   const repo = join(outer, 'repo');

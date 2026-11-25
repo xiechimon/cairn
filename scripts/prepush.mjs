@@ -38,6 +38,8 @@ export const ciOnlyTestSteps = {
 export const selfTests = [
   'scripts/ops/push-test.test.mjs',
   'scripts/ops/push-worker.test.mjs',
+  'scripts/ops/ci-reuse-verified.test.mjs',
+  'scripts/ops/merge-queue-invariants.test.mjs',
   'scripts/prepush.test.mjs',
   'scripts/heavy-slots.test.mjs',
   'scripts/test-admission.test.mjs',

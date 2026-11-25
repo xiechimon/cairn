@@ -5,8 +5,10 @@ import {
   judgeChange,
   PROMOTER,
   RELEASE_MARKER,
+  RETIRED_QUEUE_MAIN_NOTICE,
   refusalNotice,
   restoreNotice,
+  retireQueueMainAction,
 } from './guard-queue.mjs';
 
 const X = 'a'.repeat(40);
@@ -138,4 +140,26 @@ test('the busy message says what the push is waiting on and who owns it', () => 
     /Owner: lane mac\/wt\./,
   );
   assert.match(busyMessage({ sha: X, subject: 's', body: '' }), /ci not started/);
+});
+
+test('retireQueueMainAction guides stale pushers and deletes queue/main only when sha is already on main', () => {
+  assert.match(RETIRED_QUEUE_MAIN_NOTICE, /enqueue\/\*/);
+  assert.deepEqual(
+    retireQueueMainAction({ event: 'delete', actor: lane, sha: X, shaOnMain: true }),
+    { action: 'noop' },
+  );
+  assert.deepEqual(
+    retireQueueMainAction({ event: 'push', actor: PROMOTER, sha: X, shaOnMain: true }),
+    { action: 'noop' },
+  );
+  assert.deepEqual(
+    retireQueueMainAction({ event: 'push', actor: lane, sha: Y, shaOnMain: false }),
+    { action: 'retire', deleteQueueRef: false, cancelRuns: true, commentSha: Y },
+  );
+  assert.deepEqual(retireQueueMainAction({ event: 'push', actor: lane, sha: X, shaOnMain: true }), {
+    action: 'retire',
+    deleteQueueRef: true,
+    cancelRuns: true,
+    commentSha: X,
+  });
 });
