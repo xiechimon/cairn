@@ -97,3 +97,5 @@ requestAnimationFrame(() => {
     window.setTimeout(() => boot.remove(), 240);
   });
 });
+
+export const ciThroughputProbe = true;
