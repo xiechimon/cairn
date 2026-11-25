@@ -1445,6 +1445,12 @@ function serveUpdates(
     return created.check();
   };
   const runShellInstall = async (fromMain: boolean): Promise<DesktopUpdateInstallResult> => {
+    if (!fromMain) {
+      return {
+        ok: false,
+        reason: 'Update installation can only be started from the main Cairn window.',
+      };
+    }
     const locale = await windowLocale();
     return installDesktopUpdate({
       fromMainPage: fromMain,
