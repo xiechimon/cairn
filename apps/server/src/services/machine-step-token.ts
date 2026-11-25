@@ -142,13 +142,13 @@ async function workerStepToken(
         'claim-pin-unresolved',
       );
     }
+    const socketPath = deps.githubAppTokenSocket === undefined ? null : deps.githubAppTokenSocket;
     const ref = { ...pinnedRepo, repositoryId: pinnedRepoId };
     const mintFailure: { reason: AppTokenReason } = { reason: 'app-token-unavailable' };
     const appToken = await appTokenOrNull(
       {
         config: {
-          githubAppTokenSocket:
-            deps.githubAppTokenSocket === undefined ? null : deps.githubAppTokenSocket,
+          githubAppTokenSocket: socketPath,
         },
         ...(deps.githubFetch ? { fetchImpl: deps.githubFetch } : {}),
         onReason: (failure) => {
@@ -162,22 +162,27 @@ async function workerStepToken(
     );
     if (appToken === null) {
       const { reason } = mintFailure;
-      throw new HttpError(
-        503,
-        reason === GITHUB_REPOSITORY_RENAMED.reason
-          ? GITHUB_REPOSITORY_RENAMED.message
-          : 'github app credential unavailable for the claimed step',
-        reason,
-      );
+      if (reason === 'app-token-unconfigured' && !socketPath) {
+        console.info('github step credential', { stepId, kind: 'none' });
+      } else {
+        throw new HttpError(
+          503,
+          reason === GITHUB_REPOSITORY_RENAMED.reason
+            ? GITHUB_REPOSITORY_RENAMED.message
+            : 'github app credential unavailable for the claimed step',
+          reason,
+        );
+      }
+    } else {
+      console.info('github step credential', { stepId, kind: 'app' });
+      const expiresAt = githubAppTokenExpiry(appToken);
+      git = {
+        username: GITHUB_ACCESS_TOKEN_USERNAME,
+        password: appToken,
+        kind: 'app',
+        ...(expiresAt !== undefined ? { expiresAt } : {}),
+      };
     }
-    console.info('github step credential', { stepId, kind: 'app' });
-    const expiresAt = githubAppTokenExpiry(appToken);
-    git = {
-      username: GITHUB_ACCESS_TOKEN_USERNAME,
-      password: appToken,
-      kind: 'app',
-      ...(expiresAt !== undefined ? { expiresAt } : {}),
-    };
   }
   const provider = await dispatchProvider(
     deps,

@@ -912,53 +912,7 @@ test('GitHub step credential uses the minted App identity', async () => {
   }
 });
 
-test.each(['app-token-unconfigured', 'repo-not-installed'] as const)(
-  'a runner whose App credential is %s gets a clear refusal, never the team OAuth token',
-  async (reason) => {
-    const w = await setupGitWorld({
-      githubFetch: async () => Response.json({ id: 4242, full_name: 'owner/repo' }),
-    });
-    w.s.db
-      .update(projectTable)
-      .set({ repoKind: 'github', githubRepo: 'owner/repo' })
-      .where(eq(projectTable.id, w.projectId))
-      .run();
-    upsertGithubConnection(
-      { db: w.s.db, box: w.s.secretBox },
-      {
-        teamId: w.s.team.id,
-        login: 'human',
-        githubUserId: 12,
-        githubName: 'Human',
-        accessToken: 'identity-test-user',
-        scope: 'repo',
-      },
-    );
-    w.startBuild();
-    const claimed = await w.claim();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    stubGithubApp(reason);
-    try {
-      const response = await call(
-        w.s.app,
-        'GET',
-        `/api/machine/token/${claimed.step.id}?generation=${claimed.step.generation}`,
-        {
-          cred: w.token,
-        },
-      );
-      expect(response.status).toBe(503);
-      const body = await response.text();
-      expect(body.includes('identity-test-user')).toBe(false);
-      expect(body.includes(reason)).toBe(true);
-      expect(warn).not.toHaveBeenCalled();
-    } finally {
-      vi.restoreAllMocks();
-    }
-  },
-);
-
-test('a runner with no App socket configured gets a clear refusal, never the team OAuth token', async () => {
+test('a runner whose App credential is repo-not-installed gets a clear refusal, never the team OAuth token', async () => {
   const w = await setupGitWorld({
     githubFetch: async () => Response.json({ id: 4242, full_name: 'owner/repo' }),
   });
@@ -981,6 +935,98 @@ test('a runner with no App socket configured gets a clear refusal, never the tea
   w.startBuild();
   const claimed = await w.claim();
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  stubGithubApp('repo-not-installed');
+  try {
+    const response = await call(
+      w.s.app,
+      'GET',
+      `/api/machine/token/${claimed.step.id}?generation=${claimed.step.generation}`,
+      {
+        cred: w.token,
+      },
+    );
+    expect(response.status).toBe(503);
+    const body = await response.text();
+    expect(body.includes('identity-test-user')).toBe(false);
+    expect(body.includes('repo-not-installed')).toBe(true);
+    expect(warn).not.toHaveBeenCalled();
+  } finally {
+    vi.restoreAllMocks();
+  }
+});
+
+test('a runner with no App socket configured receives git null, never the team OAuth token', async () => {
+  const w = await setupGitWorld({
+    githubFetch: async () => Response.json({ id: 4242, full_name: 'owner/repo' }),
+  });
+  w.s.db
+    .update(projectTable)
+    .set({ repoKind: 'github', githubRepo: 'owner/repo' })
+    .where(eq(projectTable.id, w.projectId))
+    .run();
+  upsertGithubConnection(
+    { db: w.s.db, box: w.s.secretBox },
+    {
+      teamId: w.s.team.id,
+      login: 'human',
+      githubUserId: 12,
+      githubName: 'Human',
+      accessToken: 'identity-test-user',
+      scope: 'repo',
+    },
+  );
+  w.startBuild();
+  const claimed = await w.claim();
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+  try {
+    const response = await call(
+      w.s.app,
+      'GET',
+      `/api/machine/token/${claimed.step.id}?generation=${claimed.step.generation}`,
+      {
+        cred: w.token,
+      },
+    );
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body.includes('identity-test-user')).toBe(false);
+    const result = machineTokenResponseSchema.parse(JSON.parse(body));
+    expect(result.git).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(
+      'github step credential',
+      expect.objectContaining({ kind: 'none' }),
+    );
+  } finally {
+    vi.restoreAllMocks();
+  }
+});
+
+test('a runner with an App socket configured still fails closed if mint reports app-token-unconfigured', async () => {
+  const w = await setupGitWorld({
+    githubAppTokenSocket: '/tmp/configured-mint.sock',
+    githubFetch: async () => Response.json({ id: 4242, full_name: 'owner/repo' }),
+  });
+  w.s.db
+    .update(projectTable)
+    .set({ repoKind: 'github', githubRepo: 'owner/repo' })
+    .where(eq(projectTable.id, w.projectId))
+    .run();
+  upsertGithubConnection(
+    { db: w.s.db, box: w.s.secretBox },
+    {
+      teamId: w.s.team.id,
+      login: 'human',
+      githubUserId: 12,
+      githubName: 'Human',
+      accessToken: 'identity-test-user',
+      scope: 'repo',
+    },
+  );
+  w.startBuild();
+  const claimed = await w.claim();
+  stubGithubApp('app-token-unconfigured');
   try {
     const response = await call(
       w.s.app,
@@ -994,7 +1040,6 @@ test('a runner with no App socket configured gets a clear refusal, never the tea
     const body = await response.text();
     expect(body.includes('identity-test-user')).toBe(false);
     expect(body.includes('app-token-unconfigured')).toBe(true);
-    expect(warn).not.toHaveBeenCalled();
   } finally {
     vi.restoreAllMocks();
   }

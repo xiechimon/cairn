@@ -149,7 +149,7 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
     expect(git).toBeNull();
   });
 
-  test('failure mode 2: github project + connection row without an App socket -> 503; the OAuth token never reaches the runner', async () => {
+  test('failure mode 2: github project + connection row without an App socket -> 200 with git null; the OAuth token never reaches the runner', async () => {
     const w = await setupWorld(
       { name: 'g2t2-gh', kind: 'github', githubRepo: 'octo/alpha' },
       {
@@ -165,9 +165,9 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
       kind: 'github',
       cloneUrl: 'https://github.com/octo/alpha.git',
     });
-    const res = await w.tokenRaw(claimed.step.id);
-    expect(res.status).toBe(503);
-    expect(await res.text()).not.toContain(GH_TOKEN);
+    const { raw, git } = await w.tokenOf(claimed.step.id);
+    expect(git).toBeNull();
+    expect(raw).not.toContain(GH_TOKEN);
     const gitKeys = w.s.db.select().from(apiKeyTable).where(eq(apiKeyTable.gitAccess, true)).all();
     expect(gitKeys).toHaveLength(0);
   });
@@ -198,13 +198,13 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
       { teamId: w.s.team.id, login: 'octo', accessToken: GH_TOKEN, scope: 'repo' },
     );
     const claimed = await w.claim();
-    const res = await w.tokenRaw(claimed.step.id);
-    expect(res.status).toBe(503);
-    expect(await res.text()).not.toContain(GH_TOKEN);
+    const { raw, git } = await w.tokenOf(claimed.step.id);
+    expect(git).toBeNull();
+    expect(raw).not.toContain(GH_TOKEN);
     expect(JSON.stringify(claimed)).not.toContain(GH_TOKEN);
   });
 
-  test('github project with an expired access token -> the runner path fails closed without touching the OAuth refresh', async () => {
+  test('github project with an expired access token -> the runner path returns git null without touching the OAuth refresh', async () => {
     const refreshBodies: string[] = [];
     const w = await setupWorld(
       { name: 'g2t2-gh-expired', kind: 'github', githubRepo: 'octo/delta' },
@@ -242,11 +242,10 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
     );
     const claimed = await w.claim();
     const refreshesAtClaim = refreshBodies.length;
-    const res = await w.tokenRaw(claimed.step.id);
-    expect(res.status).toBe(503);
-    const body = await res.text();
-    expect(body).not.toContain(GH_TOKEN);
-    expect(body).not.toContain('ghu_refreshed_for_machine');
+    const { raw, git } = await w.tokenOf(claimed.step.id);
+    expect(git).toBeNull();
+    expect(raw).not.toContain(GH_TOKEN);
+    expect(raw).not.toContain('ghu_refreshed_for_machine');
     expect(refreshBodies).toHaveLength(refreshesAtClaim);
   });
 });
