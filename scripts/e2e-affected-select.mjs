@@ -43,6 +43,7 @@ const BOARD = [
   'route-override-capabilities',
   'task-send-dead-turn',
   'card-corner-clipping',
+  'usage-popover-icons',
 ];
 const SIDEBAR = [
   'usage-page',
@@ -120,6 +121,7 @@ const DETAIL = [
   'route-override-capabilities',
   'task-send-dead-turn',
   'card-corner-clipping',
+  'usage-popover-icons',
 ];
 const CHIEF = [
   'composer-tool-tips',
@@ -136,6 +138,7 @@ const CHIEF = [
   'mobile-narrow',
   'task-panel',
   'card-corner-clipping',
+  'usage-popover-icons',
 ];
 const AGENT = [
   'menu-keys',
@@ -265,7 +268,7 @@ export const FILE_RULES = new Map([
   ['apps/web/src/overlay/search-panel.tsx', OVERLAYS],
   ['apps/web/src/board/sidebar.tsx', SIDEBAR],
   ['apps/web/src/board/desktop-update.tsx', SIDEBAR],
-  ['apps/web/src/routes/usage-page.tsx', ['usage-page']],
+  ['apps/web/src/routes/usage-page.tsx', ['usage-page', 'usage-popover-icons']],
   ['apps/web/src/board/app-sidebar.tsx', SIDEBAR],
   ['apps/web/src/routes/board-page.tsx', BOARD],
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
@@ -302,7 +305,22 @@ export const FILE_RULES = new Map([
     ['paper-', 'dead-buttons', 'title-band-clicks', 'user-menu-', ...RESOURCES, ...PAGES],
   ],
   ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
-  ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
+  [
+    'apps/web/src/components/brand-marks.tsx',
+    ['machines-', 'title-', 'brand-', 'usage-popover-icons'],
+  ],
+  [
+    'apps/web/src/components/model-identity.tsx',
+    ['usage-popover-icons', 'chief-home-thread-usage', 'settings-routing', 'usage-page'],
+  ],
+  [
+    'apps/web/src/components/usage-breakdown.tsx',
+    ['usage-popover-icons', 'chief-home-thread-usage', 'chief-home-engine-run'],
+  ],
+  [
+    'apps/web/src/components/use-dismiss-on-overlay.ts',
+    ['usage-popover-icons', 'chief-home-thread-usage'],
+  ],
   [
     'apps/web/src/components/queued-capsules.tsx',
     ['detail-composer-queue-stop', 'chief-home-busy'],

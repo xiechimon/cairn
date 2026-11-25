@@ -16,6 +16,7 @@ import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { InkSpiral, type SpiralHang } from '../components/ink-spiral.js';
+import { ModelLabel } from '../components/model-identity.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -377,9 +378,12 @@ function ConfirmBody({
           {pick == null ? (
             <span className="text-meta text-destructive">{t('暂无可用的模型')}</span>
           ) : (
-            <span className="min-w-0 truncate text-foreground">
-              {modelName(pick, setup.options)}
-            </span>
+            <ModelLabel
+              modelId={pick.modelId}
+              modelName={modelName(pick, setup.options)}
+              provider={pick.provider}
+              className="text-foreground"
+            />
           )}
           <span className="ml-auto">
             <ModelPicker

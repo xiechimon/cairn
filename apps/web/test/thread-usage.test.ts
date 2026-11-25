@@ -192,4 +192,40 @@ describe('thread run window and engines from the step journal', () => {
     ];
     expect(threadEngines(steps)).toEqual(['Claude Code', 'Cairn']);
   });
+
+  test('separates current vs historical engine, formatted model, and runner', () => {
+    const steps: StepJournalRow[] = [
+      row({
+        id: 's1',
+        machineId: 'm1',
+        createdAt: 1000,
+        startedAt: 1000,
+        finishedAt: 2000,
+        route: { harness: 'claude-code', modelId: 'claude-haiku-5-5' },
+      }),
+      row({
+        id: 's2',
+        machineId: 'm2',
+        createdAt: 3000,
+        startedAt: 3000,
+        finishedAt: 5000,
+        route: { harness: 'devin', modelId: 'swe-2-1-medium' },
+      }),
+    ];
+    const summary = threadUsageSummary(
+      [
+        usage({ buildId: 'b1', model: 'claude-code/claude-haiku-5-5' }),
+        usage({ buildId: 'b2', model: 'swe-2-1-medium' }),
+      ],
+      ['xmonsMac-3574.local', 'Ians-Mac-mini'],
+      steps,
+      6000,
+    );
+    expect(summary.latestEngine).toEqual({ label: 'Devin', runtime: 'devin' });
+    expect(summary.historyEngines).toEqual([{ label: 'Claude Code', runtime: 'claude-code' }]);
+    expect(summary.latestModel).toMatchObject({ modelId: 'swe-2-1-medium', modelName: 'SWE-2.1' });
+    expect(summary.historyModels?.map((m) => m.modelName)).toEqual(['Claude Haiku 5.5']);
+    expect(summary.latestMachine).toMatchObject({ name: 'Ians-Mac-mini' });
+    expect(summary.historyMachines?.map((m) => m.name)).toEqual(['xmonsMac-3574.local']);
+  });
 });

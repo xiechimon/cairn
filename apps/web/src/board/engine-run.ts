@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
+import { engineRuntimeOf } from '../components/model-identity.js';
 import { isNarrationPreamble } from '../detail/narration-preamble.js';
 import { formatWorkDuration } from '../detail/work-trace.js';
 import type { DiffFile, TodoRecord, TranscriptItem, WorkStep } from '../fixtures/records.js';
@@ -63,9 +64,14 @@ export function engineUsageSummary(
   summary: ThreadUsageSummary,
   run: EngineRun,
 ): ThreadUsageSummary {
+  const engines = [...new Set([run.engine, ...summary.engines])];
   return {
     ...summary,
-    engines: [...new Set([run.engine, ...summary.engines])],
+    engines,
+    latestEngine: { label: run.engine, runtime: engineRuntimeOf(run.engine) },
+    historyEngines: engines
+      .filter((label) => label !== run.engine)
+      .map((label) => ({ label, runtime: engineRuntimeOf(label) })),
     duration:
       run.elapsedSeconds === null ? summary.duration : formatWorkDuration(run.elapsedSeconds),
     cost: engineCost(run.costUsd) ?? summary.cost,

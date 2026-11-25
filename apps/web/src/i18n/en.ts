@@ -3275,4 +3275,5 @@ export const EN: Record<string, string> = {
     'On a fresh launch, click Connect existing Cairn host, paste this URL, and restart; an existing setup can connect under Host connection and resident service at the bottom of the Runners page. After sign-in, that computer automatically joins team {team}, ready as a Runner.',
   '连接并登录后，这台电脑会自动注册为该主机的执行机。':
     'After connecting and signing in, this computer registers as a Runner on that host automatically.',
+  之前还用过: 'Earlier',
 };

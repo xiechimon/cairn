@@ -80,7 +80,7 @@ export function MachineIcon({
   machine,
   className,
 }: {
-  machine: Pick<NamedMachine, 'id' | 'capabilities'>;
+  machine: Pick<NamedMachine, 'id' | 'capabilities'> & { name?: string | null };
   className?: string;
 }) {
   const machines = useContext(MachineIdentityContext);

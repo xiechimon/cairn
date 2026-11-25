@@ -2,7 +2,8 @@ import type { StepJournalRow, TokenUsage } from '@cairn/shared';
 import { useQueries } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { api } from '../api/client.js';
-import { useMachines, useTeams } from '../api/hooks.js';
+import { useMachines, useModelSources, useTeams } from '../api/hooks.js';
+import { toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -34,6 +35,7 @@ export function useThreadUsage(todo: TodoRecord) {
   const hasRuns = buildIds.length > 0;
   const teamsQuery = useTeams(live && hasRuns && teamId === undefined);
   const machinesQuery = useMachines(teamId, live && hasRuns);
+  const sourcesQuery = useModelSources(teamId, live && hasRuns);
   const teamUnavailable = teamId === undefined && (teamsQuery.isError || teamsQuery.isSuccess);
   const queries = [...usageQueries, ...stepQueries];
   const usageComplete =
@@ -54,11 +56,18 @@ export function useThreadUsage(todo: TodoRecord) {
     (id) => machinesQuery.data?.find((machine) => machine.id === id)?.name ?? t('未知执行机'),
   );
   const stepsComplete = live && stepQueries.every((query) => query.isSuccess);
+  const modelOptions = toModelOptions(
+    Array.isArray(sourcesQuery.data?.sources) ? sourcesQuery.data.sources : [],
+  );
   const summary = threadUsageSummary(
     usageComplete ? usageQueries.flatMap((query) => query.data ?? []) : (seeded?.rows ?? null),
     seeded?.machines ?? machineNames,
     stepsComplete ? stepQueries.flatMap((query) => query.data ?? []) : null,
     Date.now(),
+    {
+      machineDetails: machinesQuery.data,
+      modelOptions,
+    },
   );
   const state: 'ready' | 'loading' | 'error' =
     !live || !hasRuns

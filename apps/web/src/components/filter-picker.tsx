@@ -7,6 +7,7 @@ import { useI18n } from '../i18n/provider.js';
 export interface PickOption {
   value: string;
   label: string;
+  icon?: ReactNode;
   detail?: string;
   group?: string;
   groupLabel?: string;
@@ -192,6 +193,11 @@ export function FilterPicker({
             >
               {triggerContent ?? (
                 <>
+                  {picked?.icon !== undefined && (
+                    <span className="flex size-4 flex-none items-center justify-center">
+                      {picked.icon}
+                    </span>
+                  )}
                   <span className="max-w-full flex-none truncate">{picked?.label ?? ''}</span>
                   {picked?.detail !== undefined && (
                     <span className="min-w-0 truncate text-meta text-content-tertiary">
@@ -285,6 +291,11 @@ export function FilterPicker({
                           rowClassName,
                         )}
                       >
+                        {option.icon !== undefined && (
+                          <span className="flex size-4 flex-none items-center justify-center">
+                            {option.icon}
+                          </span>
+                        )}
                         <span className="min-w-0 flex-1 truncate">
                           <Marked text={option.label} query={typed} />
                         </span>

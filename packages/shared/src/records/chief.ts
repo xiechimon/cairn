@@ -103,12 +103,41 @@ export type ChiefPendingMessage = z.infer<typeof chiefPendingMessageSchema>;
 export const chiefMessageDeliverySchema = z.enum(['steer', 'queue', 'steer_missed']);
 export type ChiefMessageDelivery = z.infer<typeof chiefMessageDeliverySchema>;
 
+export const chiefUsageModelEntrySchema = z.object({
+  raw: z.string(),
+  provider: z.string().nullable(),
+  providerLabel: z.string().nullable(),
+  modelId: z.string(),
+  modelName: z.string(),
+  runtime: z.string().nullable().optional(),
+});
+export type ChiefUsageModelEntry = z.infer<typeof chiefUsageModelEntrySchema>;
+
+export const chiefUsageMachineEntrySchema = z.object({
+  id: recordId.nullable(),
+  name: z.string(),
+  osPlatform: z.string().nullable().optional(),
+  osDistribution: z.string().nullable().optional(),
+});
+export type ChiefUsageMachineEntry = z.infer<typeof chiefUsageMachineEntrySchema>;
+
+export const chiefUsageLatestSchema = z.object({
+  engine: z.string().nullable(),
+  engineRuntime: z.string().nullable().optional(),
+  model: chiefUsageModelEntrySchema.nullable(),
+  machine: chiefUsageMachineEntrySchema.nullable(),
+});
+export type ChiefUsageLatest = z.infer<typeof chiefUsageLatestSchema>;
+
 export const chiefChannelUsageSchema = z.object({
   rows: z.array(tokenUsageSchema),
   durationSeconds: z.number().nonnegative().nullable(),
   engines: z.array(z.string()),
   machines: z.array(z.string()),
   turns: z.number().int().nonnegative(),
+  latest: chiefUsageLatestSchema.optional(),
+  models: z.array(chiefUsageModelEntrySchema).optional(),
+  machineDetails: z.array(chiefUsageMachineEntrySchema).optional(),
 });
 export type ChiefChannelUsage = z.infer<typeof chiefChannelUsageSchema>;
 

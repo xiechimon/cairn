@@ -46,6 +46,7 @@ export * from './mcp-server.js';
 export * from './memory.js';
 export * from './merge-gate.js';
 export * from './message.js';
+export * from './model-display.js';
 export * from './model-source.js';
 export * from './needs-you.js';
 export * from './notification.js';

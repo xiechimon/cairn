@@ -1,9 +1,19 @@
 import type { ChiefChannelUsage } from '@cairn/shared';
 import { cn } from 'cn';
+import { useState } from 'react';
 import { cacheHitShare, formatUsd, mapTokenUsage } from '../api/mappers.js';
+import { engineRuntimeOf, resolveModelClientEntry } from '../components/model-identity.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import {
+  type UsageBreakdownData,
+  UsageBreakdownSection,
+  type UsageEngineItem,
+  type UsageModelItem,
+  type UsageRunnerItem,
+} from '../components/usage-breakdown.js';
+import { PopoverDismissEffect } from '../components/use-dismiss-on-overlay.js';
 import { formatWorkDuration } from '../detail/work-trace.js';
 import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useIntervalNow } from '../hooks/use-interval-now.js';
@@ -279,27 +289,132 @@ export function ContextMeterPanel({
   );
 }
 
-function channelUsageRows(t: TFunc, usage: ChiefChannelUsage): { label: string; value: string }[] {
+function sameUsageModel(a: UsageModelItem, b: UsageModelItem): boolean {
+  if (a.modelId !== b.modelId) return false;
+  if (a.provider === b.provider) return true;
+  return a.provider === null || b.provider === null;
+}
+
+function sameUsageRunner(a: UsageRunnerItem, b: UsageRunnerItem): boolean {
+  if (a.id !== null && b.id !== null) return a.id === b.id;
+  return a.name === b.name;
+}
+
+function channelUsageData(usage: ChiefChannelUsage): UsageBreakdownData | null {
   const knownUsage = usage.rows.length > 0 ? usage.rows : null;
   const tokenUsage = knownUsage === null ? null : mapTokenUsage(knownUsage);
   const price = knownUsage?.every((row) => row.costTotal !== null)
     ? knownUsage.reduce((sum, row) => sum + (row.costTotal ?? 0), 0)
     : null;
-  const models = [...new Set(knownUsage?.map((row) => row.model) ?? [])];
   const duration = usage.durationSeconds === null ? '' : formatWorkDuration(usage.durationSeconds);
-  return [
-    { label: t('轮次'), value: usage.turns > 0 ? String(usage.turns) : '' },
-    { label: t('引擎'), value: usage.engines.join(' · ') },
-    { label: t('时长'), value: duration },
-    { label: t('花费'), value: price === null ? '' : formatUsd(price) },
-    { label: t('Token 数'), value: tokenUsage?.total ?? '' },
-    {
-      label: t('缓存命中'),
-      value: tokenUsage !== null && tokenUsage.cacheHitRate !== '—' ? tokenUsage.cacheHitRate : '',
-    },
-    { label: t('模型列表'), value: models.join(' · ') },
-    { label: t('执行机'), value: usage.machines.join(' · ') },
-  ].filter((row) => row.value !== '');
+
+  const latestEngineLabel = usage.latest?.engine ?? usage.engines.at(-1) ?? null;
+  const latestEngine: UsageEngineItem | null =
+    latestEngineLabel !== null
+      ? {
+          label: latestEngineLabel,
+          runtime: usage.latest?.engineRuntime ?? engineRuntimeOf(latestEngineLabel),
+        }
+      : null;
+  const historyEngines: UsageEngineItem[] = [];
+  const seenEngines = new Set<string>(latestEngine !== null ? [latestEngine.label] : []);
+  for (const label of [...usage.engines].reverse()) {
+    if (seenEngines.has(label)) continue;
+    seenEngines.add(label);
+    historyEngines.push({ label, runtime: engineRuntimeOf(label) });
+  }
+
+  const resolvedFromRows: UsageModelItem[] = [];
+  const seenRowModels = new Set<string>();
+  for (const row of [...(knownUsage ?? [])].reverse()) {
+    const entry = resolveModelClientEntry(row.model);
+    const key = `${entry.provider ?? ''}:${entry.modelId}`;
+    if (seenRowModels.has(key)) continue;
+    seenRowModels.add(key);
+    resolvedFromRows.push(entry);
+  }
+  const serverModels: UsageModelItem[] = (usage.models ?? []).map((m) => ({
+    raw: m.raw,
+    provider: m.provider,
+    providerLabel: m.providerLabel,
+    modelId: m.modelId,
+    modelName: m.modelName,
+    runtime: m.runtime ?? null,
+  }));
+  const allModels = serverModels.length > 0 ? serverModels : resolvedFromRows;
+  const serverLatestModel: UsageModelItem | null = usage.latest?.model
+    ? {
+        raw: usage.latest.model.raw,
+        provider: usage.latest.model.provider,
+        providerLabel: usage.latest.model.providerLabel,
+        modelId: usage.latest.model.modelId,
+        modelName: usage.latest.model.modelName,
+        runtime: usage.latest.model.runtime ?? null,
+      }
+    : null;
+  const latestModel = serverLatestModel ?? allModels[0] ?? null;
+  const historyModels: UsageModelItem[] = [];
+  for (const model of allModels) {
+    if (latestModel !== null && sameUsageModel(model, latestModel)) continue;
+    if (historyModels.some((seen) => sameUsageModel(seen, model))) continue;
+    historyModels.push(model);
+  }
+
+  const serverRunners: UsageRunnerItem[] = (usage.machineDetails ?? []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    osPlatform: m.osPlatform ?? null,
+    osDistribution: m.osDistribution ?? null,
+  }));
+  const fallbackRunners: UsageRunnerItem[] = usage.machines
+    .filter((name) => name.trim() !== '')
+    .reverse()
+    .map((name) => ({ id: null, name }));
+  const allRunners = serverRunners.length > 0 ? serverRunners : fallbackRunners;
+  const serverLatestRunner = usage.latest?.machine
+    ? {
+        id: usage.latest.machine.id,
+        name: usage.latest.machine.name,
+        osPlatform: usage.latest.machine.osPlatform ?? null,
+        osDistribution: usage.latest.machine.osDistribution ?? null,
+      }
+    : null;
+  const latestRunner = serverLatestRunner ?? allRunners[0] ?? null;
+  const historyRunners: UsageRunnerItem[] = [];
+  for (const runner of allRunners) {
+    if (latestRunner !== null && sameUsageRunner(runner, latestRunner)) continue;
+    if (historyRunners.some((seen) => sameUsageRunner(seen, runner))) continue;
+    historyRunners.push(runner);
+  }
+
+  const cost = price === null ? '' : formatUsd(price);
+  const tokens = tokenUsage?.total ?? '';
+  const cached =
+    tokenUsage !== null && tokenUsage.cacheHitRate !== '—' ? tokenUsage.cacheHitRate : '';
+  const hasAny =
+    usage.turns > 0 ||
+    latestEngine !== null ||
+    duration !== '' ||
+    cost !== '' ||
+    tokens !== '' ||
+    cached !== '' ||
+    latestModel !== null ||
+    latestRunner !== null;
+  if (!hasAny) return null;
+
+  return {
+    turns: usage.turns,
+    duration,
+    cost,
+    tokens,
+    cached,
+    latestEngine,
+    historyEngines,
+    latestModel,
+    historyModels,
+    latestRunner,
+    historyRunners,
+  };
 }
 
 function ChannelUsageSection({
@@ -309,28 +424,15 @@ function ChannelUsageSection({
   usage: ChiefChannelUsage;
   className?: string;
 }) {
-  const { t } = useI18n();
-  const rows = channelUsageRows(t, usage);
-  if (rows.length === 0) return null;
+  const data = channelUsageData(usage);
+  if (data === null) return null;
   return (
-    <section
-      data-testid="channel-usage"
-      aria-label={t('对话用量')}
-      className={cn('flex min-w-0 flex-col gap-2 text-ui', className)}
-    >
-      <h3 className="m-0 text-ui font-medium text-foreground">{t('用量')}</h3>
-      <dl
-        data-testid="channel-usage-stats"
-        className="m-0 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-ui"
-      >
-        {rows.map((row) => (
-          <div key={row.label} className="contents">
-            <dt className="text-content-secondary">{row.label}</dt>
-            <dd className="m-0 text-right break-words text-foreground tabular-nums">{row.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
+    <UsageBreakdownSection
+      data={data}
+      testId="channel-usage"
+      statsTestId="channel-usage-stats"
+      className={className}
+    />
   );
 }
 
@@ -348,8 +450,9 @@ export function ContextMeterRing({
   loading = false,
 }: ContextMeterRingProps) {
   const { t } = useI18n();
+  const [open, setOpen] = useState(false);
   const now = useContextClock(context);
-  const hasUsage = usage != null && channelUsageRows(t, usage).length > 0;
+  const hasUsage = usage != null && channelUsageData(usage) !== null;
   const filled = contextPercentOf(context) ?? (hasUsage ? 0 : MOCK_CONTEXT_PERCENT);
   const lines = loading
     ? [t('正在加载用量…')]
@@ -396,12 +499,14 @@ export function ContextMeterRing({
     );
   }
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverDismissEffect open={open} onClose={() => setOpen(false)} />
       <Tooltip>
         <TooltipTrigger render={<PopoverTrigger render={trigger} />}>{glyph}</TooltipTrigger>
         {tip}
       </Tooltip>
       <PopoverContent
+        data-usage-popover="true"
         side="top"
         align="end"
         sideOffset={8}
@@ -427,7 +532,7 @@ export function ContextMeterLine({
 }: ContextMeterRingProps) {
   const { t } = useI18n();
   const now = useContextClock(context);
-  const hasUsage = usage != null && channelUsageRows(t, usage).length > 0;
+  const hasUsage = usage != null && channelUsageData(usage) !== null;
   const filled = contextPercentOf(context) ?? (hasUsage ? 0 : MOCK_CONTEXT_PERCENT);
   if (!loading && (context != null || hasUsage)) {
     return (

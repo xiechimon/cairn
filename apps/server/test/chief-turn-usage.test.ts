@@ -780,4 +780,93 @@ describe('the context meter under the in-server Coordinator', () => {
       resume: 'cold',
     });
   });
+
+  test('separates current engine/model/runner from historical turns and formats model names cleanly', async () => {
+    const oldMachineId = insertMachine(H.s, {
+      name: 'xmonsMac-3574.local',
+      capabilities: { osPlatform: 'darwin', executor: 'host', mcpServers: [], skills: [] },
+    });
+    const newMachineId = insertMachine(H.s, {
+      name: 'Ians-Mac-mini',
+      capabilities: { osPlatform: 'darwin', executor: 'host', mcpServers: [], skills: [] },
+    });
+    H.s.db
+      .insert(providerTable)
+      .values({
+        id: 'prov-anthropic-ultra',
+        teamId: H.teamId,
+        providerId: 'anthropic-ultra',
+        label: 'Anthropic Ultra',
+        baseUrl: 'https://example.invalid/v1',
+        api: 'anthropic-messages',
+        compat: {},
+        models: [
+          { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
+          { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+        ],
+        createdBy: H.userId,
+        createdAt: 1,
+        updatedAt: 1,
+      } as typeof providerTable.$inferInsert)
+      .run();
+    const baseAt = Date.now() - 60_000;
+    claimedStep(oldMachineId, 'turn-old-claude', {
+      claimedAt: baseAt,
+      createdAt: baseAt,
+      ranModel: { provider: 'claude-code', modelId: 'claude-opus-5-5', thinkingLevel: null },
+    });
+    await finishStepForClaim(deps(), oldMachineId, 'turn-old-claude', {
+      status: 'success',
+      usage: [
+        usage('claude-code/claude-opus-5-5', 100, 400, { output: 20 }),
+        usage('anthropic-ultra/claude-haiku-5-5', 80, 200, { output: 15 }),
+        usage('domestic-proxy/MiniMax-M3', 50, 0, { output: 10 }),
+      ],
+    });
+    claimedStep(newMachineId, 'turn-new-devin', {
+      claimedAt: baseAt + 10_000,
+      createdAt: baseAt + 10_000,
+      ranModel: { provider: 'devin', modelId: 'swe-2-1-medium', thinkingLevel: null },
+    });
+    await finishStepForClaim(deps(), newMachineId, 'turn-new-devin', {
+      status: 'success',
+      usage: [usage('swe-2-1-medium', 200, 600, { output: 40, contextTokens: 1_500 })],
+    });
+    const envelope = getChiefEnvelope(H.s.svc, H.teamId, H.threadId);
+    expect(envelope.usage).toMatchObject({
+      turns: 2,
+      engines: ['Claude Code', 'Devin'],
+      machines: ['xmonsMac-3574.local', 'Ians-Mac-mini'],
+      latest: {
+        engine: 'Devin',
+        engineRuntime: 'devin',
+        model: {
+          provider: 'devin',
+          providerLabel: 'Devin',
+          modelId: 'swe-2-1-medium',
+          modelName: 'SWE-2.1',
+          runtime: 'devin',
+        },
+        machine: {
+          id: newMachineId,
+          name: 'Ians-Mac-mini',
+          osPlatform: 'darwin',
+        },
+      },
+    });
+    expect(envelope.usage?.models?.map((m) => m.modelName)).toEqual([
+      'SWE-2.1',
+      'MiniMax-M3',
+      'Claude Haiku 5.5',
+      'Claude Opus 5.5',
+    ]);
+    expect(envelope.usage?.machineDetails).toEqual([
+      expect.objectContaining({ id: newMachineId, name: 'Ians-Mac-mini', osPlatform: 'darwin' }),
+      expect.objectContaining({
+        id: oldMachineId,
+        name: 'xmonsMac-3574.local',
+        osPlatform: 'darwin',
+      }),
+    ]);
+  });
 });

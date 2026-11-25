@@ -1,15 +1,9 @@
-import {
-  type DailyUsage,
-  type DailyUsageDay,
-  type DailyUsageModel,
-  localDay,
-  MODEL_SOURCE_RUNTIME_LABELS,
-  type ModelSourceRuntime,
-} from '@cairn/shared';
+import { type DailyUsage, type DailyUsageDay, type DailyUsageModel, localDay } from '@cairn/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { project, provider } from '../db/schema.js';
+import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
+import { loadTeamModelCatalog, resolveTeamModelEntry } from './model-catalog.js';
 import { costFromRates, ratesForModel, type TokenCounts } from './token-usage-cost.js';
 
 const SLOT_MS = 15 * 60_000;
@@ -113,23 +107,13 @@ function addTo(acc: TokenCounts, row: TokenCounts) {
 }
 
 function modelLabels(db: Db, teamId: string, keys: readonly string[]): DailyUsageModel[] {
-  const providers = new Map(
-    db
-      .select({ providerId: provider.providerId, label: provider.label, models: provider.models })
-      .from(provider)
-      .where(eq(provider.teamId, teamId))
-      .all()
-      .map((row) => [row.providerId, row]),
-  );
+  const catalog = loadTeamModelCatalog(db, teamId, { includeBuiltins: false });
   return keys.map((key) => {
-    const slash = key.indexOf('/');
-    const prefix = slash > 0 ? key.slice(0, slash) : '';
-    const id = slash > 0 ? key.slice(slash + 1) : key;
-    const known = providers.get(prefix);
+    const resolved = resolveTeamModelEntry(catalog, key, null, { formatFallback: false });
     return {
       key,
-      name: known?.models.find((model) => model.id === id)?.name ?? id,
-      provider: known?.label ?? MODEL_SOURCE_RUNTIME_LABELS[prefix as ModelSourceRuntime] ?? prefix,
+      name: resolved.modelName,
+      provider: resolved.providerLabel ?? '',
     };
   });
 }

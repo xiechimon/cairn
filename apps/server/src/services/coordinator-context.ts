@@ -1,5 +1,15 @@
-import type { ChiefChannelUsage, ContextCache } from '@cairn/shared';
-import { COORDINATOR_COMPACT_AT, isBackendRuntimeId, tokenUsageSchema } from '@cairn/shared';
+import type {
+  ChiefChannelUsage,
+  ChiefUsageMachineEntry,
+  ChiefUsageModelEntry,
+  ContextCache,
+} from '@cairn/shared';
+import {
+  COORDINATOR_COMPACT_AT,
+  isBackendRuntimeId,
+  parseModelKey,
+  tokenUsageSchema,
+} from '@cairn/shared';
 import { and, asc, desc, eq, gt, inArray, type SQL } from 'drizzle-orm';
 import {
   type ContextResume,
@@ -14,6 +24,7 @@ import type { Db } from '../db/client.js';
 import { chiefThread, chiefTurnUsage, machine, provider, step, tokenUsage } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { stepRuntimeFor } from './dispatch-eligibility.js';
+import { loadTeamModelCatalog, resolveTeamModelEntry } from './model-catalog.js';
 import { coordinatorProfile } from './routing-rules.js';
 
 export { DEFAULT_CONTEXT_WINDOW };
@@ -269,10 +280,18 @@ const HARNESS_LABELS: Record<string, string> = {
   gemini: 'Gemini',
 };
 
-function engineLabelForProvider(providerId: string | null | undefined): string | null {
+function engineRuntimeForProvider(providerId: string | null | undefined): string | null {
   if (providerId == null || providerId === '') return null;
-  const runtime = stepRuntimeFor(providerId);
+  return stepRuntimeFor(providerId);
+}
+
+function engineLabelForRuntime(runtime: string | null | undefined): string | null {
+  if (runtime == null || runtime === '') return null;
   return HARNESS_LABELS[runtime] ?? null;
+}
+
+function modelDedupKey(entry: ChiefUsageModelEntry): string {
+  return `${entry.provider ?? ''}:${entry.modelId}`;
 }
 
 export function channelUsageSummary(
@@ -313,15 +332,20 @@ export function channelUsageSummary(
     .map((row) => tokenUsageSchema.parse(row));
   const steps = db
     .select({
+      id: step.id,
       status: step.status,
       claimedAt: step.claimedAt,
+      createdAt: step.createdAt,
       finishedAt: step.finishedAt,
       ranModel: step.ranModel,
+      machineId: step.machineId,
       machineName: machine.name,
+      machineCapabilities: machine.capabilities,
     })
     .from(step)
     .leftJoin(machine, and(eq(machine.id, step.machineId), eq(machine.teamId, chiefRow.teamId)))
     .where(and(inArray(step.buildId, threadIds), eq(step.kind, 'chief')))
+    .orderBy(asc(step.claimedAt), asc(step.createdAt))
     .all();
   const started = steps.filter((row) => row.claimedAt !== null);
   const turns = started.length;
@@ -336,16 +360,15 @@ export function channelUsageSummary(
           0,
         ) / 1000;
   const stepEngines = started
-    .map((row) => engineLabelForProvider(row.ranModel?.provider))
+    .map((row) => engineLabelForRuntime(engineRuntimeForProvider(row.ranModel?.provider)))
     .filter((label): label is string => label !== null);
   const rowEngines =
     stepEngines.length > 0
       ? stepEngines
       : rows
-          .map((row) => {
-            const slash = row.model.indexOf('/');
-            return engineLabelForProvider(slash > 0 ? row.model.slice(0, slash) : null);
-          })
+          .map((row) =>
+            engineLabelForRuntime(engineRuntimeForProvider(parseModelKey(row.model).provider)),
+          )
           .filter((label): label is string => label !== null);
   const machines = [
     ...new Set(
@@ -354,11 +377,115 @@ export function channelUsageSummary(
         .filter((name): name is string => name !== null && name.trim() !== ''),
     ),
   ];
+
+  const catalog = loadTeamModelCatalog(db, chiefRow.teamId);
+  const stepProviderByModelId = new Map<string, string>();
+  for (const row of started) {
+    if (row.ranModel?.modelId != null && row.ranModel.provider != null) {
+      stepProviderByModelId.set(row.ranModel.modelId, row.ranModel.provider);
+    }
+  }
+  const turnModels = db
+    .select({ stepId: chiefTurnUsage.stepId, model: chiefTurnUsage.model })
+    .from(chiefTurnUsage)
+    .where(inArray(chiefTurnUsage.threadId, threadIds))
+    .orderBy(asc(chiefTurnUsage.createdAt))
+    .all();
+
+  const latestStep = started.at(-1) ?? null;
+  const latestTurn = turnModels.at(-1) ?? null;
+  const latestEngineRuntime =
+    engineRuntimeForProvider(latestStep?.ranModel?.provider) ??
+    (latestTurn !== null
+      ? engineRuntimeForProvider(parseModelKey(latestTurn.model).provider)
+      : null) ??
+    (rows.at(-1) !== undefined
+      ? engineRuntimeForProvider(parseModelKey(rows.at(-1)?.model ?? '').provider)
+      : null);
+  const latestEngine = engineLabelForRuntime(latestEngineRuntime);
+
+  const latestModelEntry = (() => {
+    const ran = latestStep?.ranModel;
+    if (ran?.modelId != null) {
+      const matchingRow = rows.find(
+        (r) => r.model === `${ran.provider}/${ran.modelId}` || r.model === ran.modelId,
+      );
+      return resolveTeamModelEntry(
+        catalog,
+        matchingRow?.model ??
+          (ran.provider != null ? `${ran.provider}/${ran.modelId}` : ran.modelId),
+        ran.provider ?? null,
+      );
+    }
+    const raw = latestTurn?.model ?? rows.at(-1)?.model ?? null;
+    if (raw === null) return null;
+    return resolveTeamModelEntry(
+      catalog,
+      raw,
+      stepProviderByModelId.get(parseModelKey(raw).modelId) ?? null,
+    );
+  })();
+
+  const machineDetails: ChiefUsageMachineEntry[] = [];
+  const seenMachines = new Set<string>();
+  for (const row of [...started].reverse()) {
+    if (row.machineName === null || row.machineName.trim() === '') continue;
+    const key = row.machineId ?? row.machineName;
+    if (seenMachines.has(key)) continue;
+    seenMachines.add(key);
+    machineDetails.push({
+      id: row.machineId ?? null,
+      name: row.machineName,
+      osPlatform: row.machineCapabilities?.osPlatform ?? null,
+      osDistribution: row.machineCapabilities?.osDistribution ?? null,
+    });
+  }
+  const latestMachine: ChiefUsageMachineEntry | null =
+    latestStep?.machineName != null && latestStep.machineName.trim() !== ''
+      ? {
+          id: latestStep.machineId ?? null,
+          name: latestStep.machineName,
+          osPlatform: latestStep.machineCapabilities?.osPlatform ?? null,
+          osDistribution: latestStep.machineCapabilities?.osDistribution ?? null,
+        }
+      : null;
+
+  const models: ChiefUsageModelEntry[] = [];
+  const seenModelKeys = new Set<string>();
+  const pushModel = (entry: ChiefUsageModelEntry | null) => {
+    if (entry === null) return;
+    const key = modelDedupKey(entry);
+    if (seenModelKeys.has(key)) return;
+    seenModelKeys.add(key);
+    models.push(entry);
+  };
+  pushModel(latestModelEntry);
+  for (const turn of [...turnModels].reverse()) {
+    const parsed = parseModelKey(turn.model);
+    pushModel(
+      resolveTeamModelEntry(catalog, turn.model, stepProviderByModelId.get(parsed.modelId) ?? null),
+    );
+  }
+  for (const row of rows) {
+    const parsed = parseModelKey(row.model);
+    pushModel(
+      resolveTeamModelEntry(catalog, row.model, stepProviderByModelId.get(parsed.modelId) ?? null),
+    );
+  }
+
   return {
     rows,
     durationSeconds,
     engines: [...new Set(rowEngines)],
     machines,
     turns,
+    latest: {
+      engine: latestEngine,
+      engineRuntime: latestEngineRuntime,
+      model: latestModelEntry,
+      machine: latestMachine,
+    },
+    models,
+    machineDetails,
   };
 }

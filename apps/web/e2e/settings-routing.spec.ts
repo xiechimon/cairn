@@ -397,13 +397,12 @@ test('frequently used models support mouse drag and keyboard reordering with per
   await expect.poll(rowIds).toEqual(moved);
 
   const moveDownOnce = async () => {
-    await expect
-      .poll(async () => {
-        await page.keyboard.press('ArrowDown');
-        await card.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-        return rows.nth(1).getAttribute('style');
-      })
-      .toMatch(/translate3d\(0px, -/);
+    await expect(card.locator('[data-dragging="true"]')).toHaveCount(1);
+    await card.evaluate(
+      () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+    );
+    await page.keyboard.press('ArrowDown');
+    await expect(rows.nth(1)).toHaveAttribute('style', /translate3d\(0px, -/);
   };
 
   await rows.nth(0).getByTestId('frequent-model-drag-grip').focus();

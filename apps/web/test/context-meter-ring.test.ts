@@ -215,4 +215,89 @@ describe('ContextMeterLine channel usage stats', () => {
     );
     expect(en).toContain('Last turn hit rate');
   });
+
+  test('separates current engine/model/runner with icons and tucks history behind a toggle without raw-slug walls', () => {
+    const html = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'en',
+        children: createElement(ContextMeterLine, {
+          context: { tokens: 24_000, contextWindow: 200_000 },
+          usage: {
+            rows: [
+              {
+                buildId: 'chief-offer',
+                model: 'anthropic-ultra/claude-haiku-5-5',
+                input: 100,
+                output: 50,
+                cacheRead: 400,
+                cacheWrite: 0,
+                costInput: null,
+                costOutput: null,
+                costCacheRead: null,
+                costCacheWrite: null,
+                costTotal: 0.05,
+              },
+              {
+                buildId: 'chief-offer',
+                model: 'domestic-proxy/MiniMax-M3',
+                input: 50,
+                output: 25,
+                cacheRead: 0,
+                cacheWrite: 0,
+                costInput: null,
+                costOutput: null,
+                costCacheRead: null,
+                costCacheWrite: null,
+                costTotal: 0.02,
+              },
+              {
+                buildId: 'chief-offer',
+                model: 'swe-2-1-medium',
+                input: 200,
+                output: 100,
+                cacheRead: 800,
+                cacheWrite: 0,
+                costInput: null,
+                costOutput: null,
+                costCacheRead: null,
+                costCacheWrite: null,
+                costTotal: 0.1,
+              },
+            ],
+            durationSeconds: 32,
+            engines: ['Claude Code', 'Devin'],
+            machines: ['xmonsMac-3574.local', 'Ians-Mac-mini'],
+            turns: 3,
+            latest: {
+              engine: 'Devin',
+              engineRuntime: 'devin',
+              model: {
+                raw: 'swe-2-1-medium',
+                provider: 'devin',
+                providerLabel: 'Devin',
+                modelId: 'swe-2-1-medium',
+                modelName: 'SWE-2.1',
+                runtime: 'devin',
+              },
+              machine: {
+                id: 'm-mini',
+                name: 'Ians-Mac-mini',
+                osPlatform: 'darwin',
+              },
+            },
+          },
+        }),
+      }),
+    );
+    expect(html).toContain('SWE-2.1');
+    expect(html).not.toContain('swe-2-1-medium');
+    expect(html).not.toContain('Claude Code · Devin');
+    expect(html).not.toContain('xmonsMac-3574.local · Ians-Mac-mini');
+    expect(html).toContain('data-testid="usage-current-engine"');
+    expect(html).toContain('data-testid="usage-current-model"');
+    expect(html).toContain('data-testid="usage-current-runner"');
+    expect(html).toContain('data-testid="usage-history-toggle"');
+    expect(html).toContain('+4');
+    expect(html).toContain('<svg');
+  });
 });

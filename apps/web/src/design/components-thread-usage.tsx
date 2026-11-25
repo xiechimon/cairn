@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ThreadUsageSummary } from '../board/thread-usage-model.js';
 import { ThreadUsageDetails, ThreadUsageRing } from '../board/thread-usage-ring.js';
+import { UsageBreakdownSection } from '../components/usage-breakdown.js';
 import { Section, Specimen } from './specimen.js';
 
 const SUMMARY: ThreadUsageSummary = {
@@ -68,6 +69,43 @@ export function ThreadUsageSection() {
             summary={SUMMARY}
             state={retryState}
             onRetry={() => setRetryState('ready')}
+          />
+        </div>
+      </Specimen>
+      <Specimen id="usage-breakdown" title="Usage breakdown" stage="canvas">
+        <div className="w-full max-w-72">
+          <UsageBreakdownSection
+            testId="specimen-usage-breakdown"
+            statsTestId="specimen-usage-stats"
+            data={{
+              turns: 4,
+              duration: '1m 34s',
+              cost: '$0.30',
+              tokens: '59.6k',
+              cached: '88.6%',
+              latestEngine: { label: 'Devin', runtime: 'devin' },
+              historyEngines: [{ label: 'Claude Code', runtime: 'claude-code' }],
+              latestModel: {
+                raw: 'swe-2-1-medium',
+                provider: 'devin',
+                providerLabel: 'Devin',
+                modelId: 'swe-2-1-medium',
+                modelName: 'SWE-2.1',
+                runtime: 'devin',
+              },
+              historyModels: [
+                {
+                  raw: 'anthropic-ultra/claude-opus-5-5',
+                  provider: 'anthropic-ultra',
+                  providerLabel: 'Anthropic Ultra',
+                  modelId: 'claude-opus-5-5',
+                  modelName: 'Claude Opus 5.5',
+                  runtime: 'pi',
+                },
+              ],
+              latestRunner: { id: 'm-mini', name: 'Ians-Mac-mini', osPlatform: 'darwin' },
+              historyRunners: [{ id: 'm-mac', name: 'xmonsMac-3574.local', osPlatform: 'darwin' }],
+            }}
           />
         </div>
       </Specimen>

@@ -15,6 +15,7 @@ import { relativeTime } from '../board/rel-time.js';
 import { AnthropicMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { ModelMark } from '../components/model-identity.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import {
   ProviderEditorHead,
@@ -547,6 +548,7 @@ export function ModelChip({
       }
       className="inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-md bg-secondary py-0.5 pr-0.5 pl-2.5 text-ui text-foreground ring-1 ring-border pointer-coarse:min-h-9"
     >
+      <ModelMark modelId={id} />
       <span
         className={cn(
           'min-w-0 [overflow-wrap:anywhere]',

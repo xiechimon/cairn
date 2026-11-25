@@ -9,6 +9,7 @@ import { FailureMarker, RawTextDialog } from '../components/chat/failure-marker.
 import { liveTokensLabel, TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { MachineIcon } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
 import {
   Collapsible,
@@ -157,14 +158,19 @@ function Row({
       return (
         <div
           data-testid="transcript-time-divider"
-          className="mt-5 w-full text-meta text-(--text-tertiary)"
+          className="mt-5 inline-flex w-full flex-wrap items-center gap-1.5 text-meta tabular-nums text-(--text-tertiary)"
         >
-          {[item.at, item.machine != null ? t('运行在 {m} 上', { m: item.machine }) : null]
-            .filter((part) => part != null)
-            .join(' · ')}
+          {item.at != null && <span>{item.at}</span>}
+          {item.at != null && item.machine != null && <span aria-hidden="true">·</span>}
+          {item.machine != null && (
+            <span className="inline-flex items-center gap-1">
+              <MachineIcon machine={{ id: null, name: item.machine }} className="size-4" />
+              <span>{t('运行在 {m} 上', { m: item.machine })}</span>
+            </span>
+          )}
           {item.cancelled === true && (
             <span className="chat-stamp-cancelled text-(--fail-fg)">
-              {item.at != null || item.machine != null ? ' · ' : ''}
+              {item.at != null || item.machine != null ? '· ' : ''}
               {t('已取消')}
             </span>
           )}

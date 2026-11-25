@@ -4,6 +4,7 @@ import { ChartColumn, TriangleAlert } from 'lucide-react';
 import {
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
   type RefObject,
   useLayoutEffect,
   useRef,
@@ -15,6 +16,7 @@ import { useLiveData } from '../api/provider.js';
 import { useDailyUsage } from '../api/usage-daily.js';
 import { useNarrow } from '../board/use-narrow.js';
 import { EmptyState } from '../components/empty-state.js';
+import { ModelMark, resolveModelClientEntry } from '../components/model-identity.js';
 import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -507,7 +509,7 @@ function Ranking({
 }: {
   testId: string;
   title: string;
-  rows: { id: string; name: string; note?: string; tokens: number }[];
+  rows: { id: string; name: string; lead?: ReactNode; note?: string; tokens: number }[];
   total: number;
 }) {
   const top = rows[0]?.tokens ?? 1;
@@ -517,13 +519,16 @@ function Ranking({
       {rows.map((row) => (
         <div
           key={row.id}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1.5 border-t border-border py-2.5"
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 border-t border-border py-2.5"
         >
-          <span className="truncate text-ui text-foreground">
-            {row.name}
-            {row.note !== undefined && (
-              <span className="ml-1.5 text-meta text-content-tertiary">{row.note}</span>
-            )}
+          <span className="inline-flex min-w-0 items-center gap-2 text-ui text-foreground">
+            {row.lead}
+            <span className="min-w-0 truncate">
+              {row.name}
+              {row.note !== undefined && (
+                <span className="ml-1.5 text-meta text-content-tertiary">{row.note}</span>
+              )}
+            </span>
           </span>
           <span className="font-mono text-meta tabular-nums text-foreground">
             {formatTokens(row.tokens)}
@@ -554,7 +559,6 @@ function UsageBody({ usage, today }: { usage: DailyUsage; today: string }) {
   const scoped = picked === null ? yearSummary : usageSummary(picked);
   const models = new Map(usage.models.map((model) => [model.key, model]));
   const projects = new Map(usage.projects.map((project) => [project.id, project.name]));
-  const modelName = (key: string) => models.get(key)?.name ?? key;
   const usedDates = yearDays.filter((day) => day.coordinator + day.tasks > 0);
   return (
     <div className="flex flex-col gap-6 px-7 pt-7 pb-8 max-sm:gap-5 max-sm:px-4 max-sm:pt-5">
@@ -587,12 +591,24 @@ function UsageBody({ usage, today }: { usage: DailyUsage; today: string }) {
           testId="usage-models"
           title={t('模型')}
           total={scoped.total}
-          rows={scoped.models.map(([key, tokens]) => ({
-            id: key,
-            name: modelName(key),
-            note: models.get(key)?.provider,
-            tokens,
-          }))}
+          rows={scoped.models.map(([key, tokens]) => {
+            const entry = models.get(key);
+            const resolved = resolveModelClientEntry(key, {
+              providerHint: entry?.provider ?? null,
+            });
+            return {
+              id: key,
+              name: entry?.name ?? resolved.modelName,
+              lead: (
+                <ModelMark
+                  modelId={resolved.modelId}
+                  provider={entry?.provider ?? resolved.provider}
+                />
+              ),
+              note: entry?.provider,
+              tokens,
+            };
+          })}
         />
         {scoped.projects.length > 0 && (
           <Ranking

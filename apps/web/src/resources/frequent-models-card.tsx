@@ -1,17 +1,10 @@
 import type { ThinkingLevel, TopModel } from '@cairn/shared';
 import { cn } from 'cn';
-import { Box, Plus, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
-import {
-  AntigravityMark,
-  ClaudeMark,
-  DevinMark,
-  GeminiMark,
-  GrokMark,
-  OpenAIMark,
-} from '../components/brand-marks.js';
 import { FilterPicker } from '../components/filter-picker.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { modelMarkFor } from '../components/model-identity.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import {
   SortableGripButton,
@@ -27,19 +20,13 @@ import { ThinkingLevelSelect } from './thinking-level-select.js';
 export function vendorMark({
   runtime,
   modelId,
+  provider,
 }: {
   runtime: string;
   modelId: string;
+  provider?: string;
 }): ComponentType<SVGProps<SVGSVGElement>> {
-  if (runtime === 'devin') return DevinMark;
-  if (runtime === 'antigravity') return AntigravityMark;
-  if (modelId.startsWith('claude')) return ClaudeMark;
-  if (modelId.startsWith('devin')) return DevinMark;
-  if (modelId.startsWith('antigravity')) return AntigravityMark;
-  if (/^(gpt|o\d|codex)/.test(modelId)) return OpenAIMark;
-  if (modelId.startsWith('gemini')) return GeminiMark;
-  if (modelId.startsWith('grok')) return GrokMark;
-  return Box;
+  return modelMarkFor({ runtime, modelId, provider });
 }
 
 const frequentKey = (model: Pick<TopModel, 'provider' | 'modelId'>) =>
@@ -177,14 +164,18 @@ export function FrequentModelsCard({
         : {})}
       action={
         <FilterPicker
-          options={addable.map((o) => ({
-            value: frequentKey(o),
-            label: o.modelName,
-            detail: modelGroupName(o),
-            group: modelGroupKey(o),
-            groupLabel: modelGroupName(o),
-            keywords: `${o.modelId} ${o.runtime}`,
-          }))}
+          options={addable.map((o) => {
+            const OptionVendor = vendorMark(o);
+            return {
+              value: frequentKey(o),
+              label: o.modelName,
+              icon: <OptionVendor aria-hidden="true" className="size-4" />,
+              detail: modelGroupName(o),
+              group: modelGroupKey(o),
+              groupLabel: modelGroupName(o),
+              keywords: `${o.modelId} ${o.runtime}`,
+            };
+          })}
           value={null}
           onPick={(key) => {
             const o = addable.find((row) => frequentKey(row) === key);

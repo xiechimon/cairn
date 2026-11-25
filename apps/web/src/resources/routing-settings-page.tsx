@@ -19,6 +19,7 @@ import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings, useRoutingSettingsMutations } from '../api/routing-settings.js';
 import { FilterPicker } from '../components/filter-picker.js';
 import { InfoTip } from '../components/info-tip.js';
+import { ModelMark, modelMarkFor } from '../components/model-identity.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { RouteUseGlyph } from '../components/route-use-glyph.js';
@@ -67,7 +68,17 @@ function CoordinatorDefaultHint({
   };
   const known = coordinatorDefault.reason !== 'none' && vars.model !== '';
   return (
-    <span data-testid="routing-coordinator-default">
+    <span
+      data-testid="routing-coordinator-default"
+      className="inline-flex flex-wrap items-center gap-1.5"
+    >
+      {known && (
+        <ModelMark
+          modelId={coordinatorDefault.modelId}
+          provider={coordinatorDefault.provider}
+          runtime={row?.runtime}
+        />
+      )}
       {known
         ? t('当前默认：{model} · {provider}', vars)
         : t('暂无默认模型：在下方添加服务商后，可在此选择模型')}
@@ -125,20 +136,24 @@ export function ModelPicker({
                 groupLabel: '',
               },
             ]),
-        ...rows.map((o) => ({
-          value: modelKey(o),
-          label:
-            o.liveness === 'dead'
-              ? t('{model}（已下架）', { model: o.modelName })
-              : o.updateRequired !== undefined
-                ? t('{model}（需要更新 Cairn）', { model: o.modelName })
-                : o.modelName,
-          detail: modelGroupName(o),
-          group: modelGroupKey(o),
-          groupLabel: modelGroupName(o),
-          disabled: o.liveness === 'dead' || o.updateRequired !== undefined,
-          keywords: `${o.modelId} ${o.runtime}`,
-        })),
+        ...rows.map((o) => {
+          const OptionMark = modelMarkFor(o);
+          return {
+            value: modelKey(o),
+            label:
+              o.liveness === 'dead'
+                ? t('{model}（已下架）', { model: o.modelName })
+                : o.updateRequired !== undefined
+                  ? t('{model}（需要更新 Cairn）', { model: o.modelName })
+                  : o.modelName,
+            icon: <OptionMark aria-hidden="true" className="size-4" />,
+            detail: modelGroupName(o),
+            group: modelGroupKey(o),
+            groupLabel: modelGroupName(o),
+            disabled: o.liveness === 'dead' || o.updateRequired !== undefined,
+            keywords: `${o.modelId} ${o.runtime}`,
+          };
+        }),
       ]}
       value={
         picked !== undefined
@@ -315,7 +330,13 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
               <SettingsRow
                 key={p.id}
                 label={p.name}
-                hint={`Coordinator · ${nameOf(choice)}`}
+                hint={
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <span>{`${t('Coordinator')} ·`}</span>
+                    <ModelMark modelId={choice.modelId} provider={choice.provider} />
+                    <span className="truncate">{nameOf(choice)}</span>
+                  </span>
+                }
                 icon={<ProjectGlyph icon={p.icon} name={p.name} />}
               >
                 <Link

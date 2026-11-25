@@ -2,6 +2,7 @@ import type { ProviderModel } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
+import { ModelMark } from '../components/model-identity.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -33,7 +34,8 @@ function matches(model: ProviderModel, query: string): boolean {
 
 function ModelLabel({ model }: { model: ProviderModel }) {
   return (
-    <span className="flex min-w-0 items-baseline gap-2">
+    <span className="flex min-w-0 items-center gap-2">
+      <ModelMark modelId={model.id} />
       <span className="flex-none truncate text-ui text-foreground">{model.name}</span>
       {model.name !== model.id && <code className={MUTED_ID_CLS}>{model.id}</code>}
     </span>
@@ -72,6 +74,7 @@ export function ProviderModelChips({
             data-model-chip={id}
             className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-md bg-secondary pr-1 pl-2.5 text-ui text-foreground ring-1 ring-border"
           >
+            <ModelMark modelId={id} />
             <span className="truncate">{model?.name ?? id}</span>
             {model !== undefined && (
               <span className={CONTEXT_CLS}>{contextWindowLabel(model.contextWindow)}</span>

@@ -14,6 +14,7 @@ import { StatusLine } from '../components/chat/status-line.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { useArrivals } from '../components/growth.js';
 import { MachineName } from '../components/machine-label.js';
+import { ModelMark, resolveModelClientEntry } from '../components/model-identity.js';
 import { Button } from '../components/ui/button.js';
 import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
@@ -804,10 +805,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   );
   const markdown = item.plain !== undefined ? t(item.plain.key, item.plain.vars) : item.markdown;
   const whole = markdown ?? robotText(item);
+  const fallbackResolved =
+    item.fallbackModel != null ? resolveModelClientEntry(item.fallbackModel) : null;
   const fallbackNote =
-    item.fallbackModel != null ? (
-      <span data-testid="chief-fallback-note">
-        {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
+    item.fallbackModel != null && fallbackResolved !== null ? (
+      <span data-testid="chief-fallback-note" className="inline-flex items-center gap-1">
+        <ModelMark modelId={fallbackResolved.modelId} provider={fallbackResolved.provider} />
+        <span>{t('由备用模型 {model} 回答', { model: item.fallbackModel })}</span>
       </span>
     ) : undefined;
   const assistantToolProps = {
