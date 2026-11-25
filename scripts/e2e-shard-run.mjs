@@ -22,6 +22,6 @@ export async function runPlaywright(specs, { full = false, port = '8398' } = {})
   const args = ['exec', 'playwright', 'test'];
   const env = { ...process.env, E2E_PORT: port };
   args.push('--reporter=list', ...specs.map((spec) => `e2e/${spec}`));
-  if (!full) args.push('--workers', process.env.E2E_AFFECTED_WORKERS ?? '2');
+  args.push('--workers', process.env.E2E_AFFECTED_WORKERS ?? (process.env.GITHUB_ACTIONS ? '4' : '2'));
   process.exit(await runOwned('pnpm', args, { cwd: WEB_DIR, env, name: 'e2e' }));
 }

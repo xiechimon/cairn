@@ -3,7 +3,7 @@ import { slotPortReport, slotResources, slotWorkerBudget } from '../../scripts/h
 import { admitTestRun } from '../../scripts/test-admission.mjs';
 
 const lease = await admitTestRun();
-const workers = slotWorkerBudget(lease) ?? undefined;
+const workers = slotWorkerBudget(lease) ?? (process.env.GITHUB_ACTIONS ? 4 : undefined);
 const resources = lease === null ? null : slotResources(lease.slot, { ...process.env, E2E_PORT: process.env.E2E_PORT ?? '8399' });
 const PORT = resources?.port ?? Number(process.env.E2E_PORT ?? 8399);
 const buildFlags = resources ? `--outDir ${JSON.stringify(resources.distDir)}` : '';
