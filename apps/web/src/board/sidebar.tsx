@@ -24,7 +24,6 @@ import {
   useState,
 } from 'react';
 import { Link, type NavigateFunction, type To, useLocation, useNavigate } from 'react-router';
-import { useRemoteRoutes } from '../api/hooks.js';
 import { CoordinatorGlyph } from '../chief/chief-status-mark.js';
 import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
@@ -373,8 +372,6 @@ export function BoardSidebar({
   const groupNames = useMemo(() => activeLayout.groups.map((group) => group.name), [activeLayout]);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const routesQ = useRemoteRoutes(false);
-  const relayAccount = routesQ.data?.tunnel?.account ?? null;
   const archivedPage = filter === 'archived';
   const archivedRows = useMemo(
     () => (archivedPage ? [...layout.ungrouped, ...layout.groups.flatMap((g) => g.projects)] : []),
@@ -655,34 +652,13 @@ export function BoardSidebar({
         className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
         <div className="flex min-w-0 flex-1 items-center">
-          {relayAccount !== null ? (
-            <Link
-              to={{ pathname: `${SETTINGS_HREF}/remote-access`, search: plain }}
-              data-testid="sidebar-footer-account"
-              className="flex min-w-0 items-center gap-2 rounded-md py-1 pr-2 pl-2 text-foreground no-underline hover:bg-sidebar-hover"
-            >
-              {relayAccount.avatarUrl ? (
-                <img
-                  src={relayAccount.avatarUrl}
-                  alt={relayAccount.displayName}
-                  className="size-5.5 flex-none rounded-full object-cover"
-                />
-              ) : (
-                <span className="flex size-5.5 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
-                  {relayAccount.displayName.slice(0, 1).toUpperCase()}
-                </span>
-              )}
-              <span className="truncate text-ui font-medium">{relayAccount.displayName}</span>
-            </Link>
-          ) : (
-            <span
-              data-testid="sidebar-footer-brand"
-              className="sidebar-footer-brand hidden min-w-0 items-center gap-2 pl-2 text-foreground"
-            >
-              <BrandGlyph className={ICON} />
-              <span className="truncate voice-title text-brand">{BRAND.manifestName}</span>
-            </span>
-          )}
+          <span
+            data-testid="sidebar-footer-brand"
+            className="sidebar-footer-brand hidden min-w-0 items-center gap-2 pl-2 text-foreground"
+          >
+            <BrandGlyph className={ICON} />
+            <span className="truncate voice-title text-brand">{BRAND.manifestName}</span>
+          </span>
         </div>
         <div className="flex flex-none items-center gap-0.5">
           <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />

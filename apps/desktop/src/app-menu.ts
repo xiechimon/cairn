@@ -16,6 +16,7 @@ const LABELS = {
       `正在下载更新 ${version} (${percent}%)`,
     installingUpdate: (version: string) => `正在安装更新 ${version}…`,
     checkUpdates: '检查更新…',
+    switchHost: '切换主机',
     settings: '设置…',
     file: '文件',
     newTask: '新建任务',
@@ -34,6 +35,7 @@ const LABELS = {
       `Downloading Update ${version} (${percent}%)`,
     installingUpdate: (version: string) => `Installing Update ${version}…`,
     checkUpdates: 'Check for Updates…',
+    switchHost: 'Switch Host',
     settings: 'Settings…',
     file: 'File',
     newTask: 'New Task',
@@ -75,13 +77,40 @@ export interface PageMenuActions {
   forward: () => void;
 }
 
+export interface HostMenuEntry {
+  id: string;
+  label: string;
+  active: boolean;
+}
+
+export interface HostMenuActions {
+  entries: readonly HostMenuEntry[];
+  switchHost: (id: string) => void;
+}
+
 export function appMenuTemplate(
   state: DesktopUpdateState,
   actions: UpdateMenuActions,
   page: PageMenuActions,
   locale: DesktopLocale = 'en',
+  hosts?: HostMenuActions,
 ): MenuItemConstructorOptions[] {
   const copy = LABELS[locale];
+  const hostSubmenu: MenuItemConstructorOptions[] =
+    hosts !== undefined && hosts.entries.length > 1
+      ? [
+          {
+            label: copy.switchHost,
+            submenu: hosts.entries.map((entry) => ({
+              label: entry.label,
+              type: 'radio' as const,
+              checked: entry.active,
+              click: () => hosts.switchHost(entry.id),
+            })),
+          },
+          { type: 'separator' },
+        ]
+      : [];
   return [
     {
       role: 'appMenu',
@@ -89,6 +118,7 @@ export function appMenuTemplate(
         { role: 'about' },
         updateItem(state, actions, locale),
         { type: 'separator' },
+        ...hostSubmenu,
         {
           label: copy.settings,
           accelerator: 'CommandOrControl+,',

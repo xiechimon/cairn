@@ -3,30 +3,25 @@ import { Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { signOutSession } from '../api/auth.js';
 import {
+  useClerkAuthConfig,
   usePairingGrants,
   usePairingRequests,
   useRemoteDevices,
-  useRemoteDirectory,
   useRemoteMutations,
   useRemoteRoutes,
   useSetTailnetAccess,
-  useSetTunnelAccess,
-  useShareRelayDevice,
-  useSignOutRelayAccount,
-  useStartRelayOAuth,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { joinMeta, relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
-import { FeedbackDialog } from '../components/feedback-dialog.js';
 import { QrCode } from '../components/qr-code.js';
 import { SettingsCard, SettingsRow } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
-import { Input } from '../components/ui/input.js';
 import {
   Select,
   SelectContent,
@@ -47,7 +42,6 @@ export const REMOTE_ACCESS_ROUTE = 'remote-access';
 
 function sourceName(source: PairingCandidate['source'], t: (key: string) => string): string {
   if (source === 'page') return t('当前页面地址');
-  if (source === 'tunnel') return t('公网隧道');
   return source === 'tailnet' ? t('Tailscale') : t('局域网');
 }
 
@@ -157,62 +151,21 @@ export function RemoteAccessPage() {
   const fixture = resolveScenario(searchParams);
   const { live } = useLiveData();
   const routesQ = useRemoteRoutes(live);
+  const clerkConfigQ = useClerkAuthConfig(live);
   const devicesQ = useRemoteDevices(live);
   const grantsQ = usePairingGrants(live);
   const requestsQ = usePairingRequests(live);
   const mutations = useRemoteMutations();
   const setTailnet = useSetTailnetAccess();
-  const setTunnel = useSetTunnelAccess();
-  const startOAuth = useStartRelayOAuth();
-  const signOutAccount = useSignOutRelayAccount();
-  const shareDevice = useShareRelayDevice();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const [toggleFailed, setToggleFailed] = useState(false);
-  const [tunnelToggleFailed, setTunnelToggleFailed] = useState(false);
-  const [relayDraft, setRelayDraft] = useState<string | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [shareEmail, setShareEmail] = useState('');
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [tunnelCopied, setTunnelCopied] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [loginCopied, setLoginCopied] = useState(false);
   const routes = routesQ.data?.routes ?? [];
   const candidates =
     routesQ.data === undefined ? [] : pairingCandidates(routes, window.location.origin);
   const pairingBlocked = live && routesQ.data !== undefined && candidates.length === 0;
   const tailnet = routesQ.data?.tailnet;
-  const tunnel = routesQ.data?.tunnel;
-  const relayAccount = tunnel?.account ?? null;
-  const directoryQ = useRemoteDirectory(live && relayAccount !== null);
-  const ownDevices = directoryQ.data?.ownDevices ?? [];
-  const sharedDevices = directoryQ.data?.sharedDevices ?? [];
-  const selfSubdomain = directoryQ.data?.selfSubdomain ?? null;
-  const tunnelOn = tunnel?.enabled === true;
-  const tunnelState = tunnelOn ? tunnel.state : 'off';
-  const tunnelFailed = tunnelOn && (tunnelState === 'failed' || tunnelToggleFailed);
-  const tunnelUrl = tunnelOn && tunnelState === 'ready' ? tunnel.url : null;
-  const relayInputValue = relayDraft ?? tunnel?.relayUrl ?? '';
-  const tunnelHint: ReactNode = (() => {
-    if (!tunnelOn)
-      return tunnelToggleFailed
-        ? t('公网隧道未能打开，请检查中继地址后重试')
-        : t('打开后，无需 Tailscale，手机和其他电脑也能通过加密中继隧道访问这台电脑');
-    if (tunnelFailed) {
-      const kind = tunnel?.error;
-      if (kind === 'auth-off') return t('公网隧道需要开启访问认证');
-      if (kind === 'invalid-relay') return t('中继地址无效，请填写完整的 https:// 地址');
-      if (kind === 'rejected') return t('中继服务器拒绝了连接，请稍后重试');
-      return t('无法连接到中继服务器，请检查网络或中继地址');
-    }
-    if (tunnelUrl !== null)
-      return (
-        <>
-          {t('公网隧道已开启')}
-          <br />
-          <span className="font-mono">{tunnelUrl}</span>
-        </>
-      );
-    return t('正在连接公网隧道…');
-  })();
   const tailnetOn = tailnet?.enabled === true;
   const tailnetState = tailnetOn ? tailnet.state : 'off';
   const tailnetFailed = tailnetOn && (tailnetState === 'failed' || toggleFailed);
@@ -258,6 +211,16 @@ export function RemoteAccessPage() {
       { id, decision },
       { onError: (error) => toastError(t('操作失败，请重试。'), error) },
     );
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await window.Clerk?.signOut();
+    } catch {}
+    await signOutSession();
+    window.location.reload();
+  };
+
   return (
     <PageShell
       route={REMOTE_ACCESS_ROUTE}
@@ -317,396 +280,157 @@ export function RemoteAccessPage() {
           </p>
         </Card>
       ))}
-      {(live || routesQ.data !== undefined) && tunnel !== undefined && (
-        <div className="mt-3 flex flex-col gap-3" data-testid="remote-account-connect">
-          {tunnelFailed && (
-            <Card className="gap-2 p-4" data-testid="remote-tunnel-error-banner">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="m-0 text-ui font-medium text-destructive">{t('公网隧道连接异常')}</p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={setTunnel.isPending}
-                    onClick={() =>
-                      setTunnel.mutate(
-                        { enabled: true },
-                        { onError: (error) => toastError(t('开启公网隧道失败，请重试。'), error) },
-                      )
-                    }
-                  >
-                    {t('重试')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    className={DIALOG_PRIMARY_BUTTON}
-                    onClick={() => setFeedbackOpen(true)}
-                    data-testid="remote-error-feedback"
-                  >
-                    {t('一键反馈此问题')}
-                  </Button>
-                </div>
-              </div>
-              <p className="m-0 text-meta text-content-tertiary">{tunnelHint}</p>
-            </Card>
-          )}
-          {relayAccount === null ? (
-            <Card className="gap-3 p-4" data-testid="remote-account-signin-card">
-              <div>
-                <p className="m-0 text-ui font-medium">{t('登录账号，多台电脑一键直连')}</p>
-                <p className="m-0 mt-1 text-meta text-content-tertiary">
-                  {t('在两台 Windows 或 Mac 上登录同一账号，自动发现彼此并直连，无需每次扫码。')}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {!tunnel.relayUrl && (
-                  <Input
-                    value={relayInputValue}
-                    onChange={(event) => setRelayDraft(event.target.value)}
-                    placeholder={t('例如：https://relay.example.com')}
-                    aria-label={t('中继地址')}
-                    data-testid="remote-tunnel-relay-input"
-                    className="max-w-60 font-mono text-meta"
-                  />
-                )}
+      {live && clerkConfigQ.data?.enabled === true && (
+        <SettingsCard className="mt-3" data-testid="clerk-account-card">
+          <SettingsRow label={t('账号登录')} hint={t('已通过 Clerk 验证登录此实例')}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="pointer-coarse:h-11"
+              disabled={signingOut}
+              data-testid="clerk-signout-btn"
+              onClick={() => void handleSignOut()}
+            >
+              {signingOut ? t('正在退出…') : t('退出登录')}
+            </Button>
+          </SettingsRow>
+        </SettingsCard>
+      )}
+      {(live || routesQ.data !== undefined) && (
+        <SettingsCard className="mt-3">
+          <SettingsRow
+            label={t('远程访问')}
+            hint={tailnetHint}
+            hintClassName={tailnetFailed ? 'text-destructive' : undefined}
+          >
+            <ToggleSwitch
+              checked={tailnetOn}
+              disabled={!live || setTailnet.isPending}
+              aria-label={t('远程访问')}
+              data-testid="remote-access-switch"
+              onCheckedChange={(checked) => {
+                setToggleFailed(false);
+                setTailnet.reset();
+                setTailnet.mutate(checked, { onError: () => setToggleFailed(true) });
+              }}
+            />
+          </SettingsRow>
+          {loginUrl !== null && (
+            <div className="flex flex-col items-center gap-3 px-4 py-4" data-testid="tailnet-login">
+              <QrCode text={loginUrl} label={t('Tailscale 登录二维码')} />
+              <div className="flex items-center gap-2">
                 <Button
-                  size="sm"
+                  variant="outline"
                   className={DIALOG_PRIMARY_BUTTON}
-                  disabled={startOAuth.isPending || relayInputValue.trim() === ''}
-                  data-testid="remote-account-signin-btn"
+                  render={<a href={loginUrl} target="_blank" rel="noreferrer" />}
+                >
+                  {t('打开 Tailscale 登录')}
+                </Button>
+                <Button
+                  variant="outline"
+                  className={DIALOG_PRIMARY_BUTTON}
                   onClick={() => {
-                    const trimmedRelay = relayInputValue.trim();
-                    startOAuth.mutate(trimmedRelay !== '' ? { relayUrl: trimmedRelay } : {}, {
-                      onSuccess: ({ loginUrl: oauthUrl }) => {
-                        window.location.href = oauthUrl;
-                      },
-                      onError: (err) => toastError(t('无法发起登录，请检查中继地址后重试'), err),
+                    copyTextWithFeedback(loginUrl, () => {
+                      setLoginCopied(true);
+                      setTimeout(() => setLoginCopied(false), 2_000);
                     });
                   }}
                 >
-                  {startOAuth.isPending ? t('正在跳转登录…') : t('登录账号（Google / GitHub）')}
+                  {loginCopied ? t('已复制') : t('复制链接')}
                 </Button>
               </div>
-            </Card>
-          ) : (
-            <>
-              <SettingsCard>
-                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    {relayAccount.avatarUrl ? (
-                      <img
-                        src={relayAccount.avatarUrl}
-                        alt={relayAccount.displayName}
-                        className="size-8 flex-none rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
-                        {relayAccount.displayName.slice(0, 1).toUpperCase()}
-                      </span>
-                    )}
-                    <div className="min-w-0">
-                      <p className="m-0 truncate text-ui font-medium text-foreground">
-                        {relayAccount.displayName}
-                      </p>
-                      <p className="m-0 truncate text-meta text-content-tertiary">
-                        {relayAccount.email}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      data-testid="remote-share-open"
-                      onClick={() => setShareOpen(true)}
-                    >
-                      {t('授权给其他账号')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={signOutAccount.isPending}
-                      onClick={() =>
-                        signOutAccount.mutate(undefined, {
-                          onError: (error) => toastError(t('退出失败，请重试。'), error),
-                        })
-                      }
-                    >
-                      {t('退出')}
-                    </Button>
-                  </div>
-                </div>
-                {ownDevices.map((dev) => (
-                  <SettingsRow
-                    key={dev.subdomain}
-                    label={dev.name}
-                    hint={`${dev.os} · ${dev.online ? t('在线') : t('离线')}`}
-                  >
-                    {dev.subdomain === selfSubdomain ? (
-                      <span className="text-meta text-content-tertiary">{t('本机已在线')}</span>
-                    ) : dev.online ? (
-                      <Button
-                        size="sm"
-                        className={DIALOG_PRIMARY_BUTTON}
-                        render={<a href={`${dev.url}/app`} target="_blank" rel="noreferrer" />}
-                      >
-                        {t('点击连接')}
-                      </Button>
-                    ) : (
-                      <span className="text-meta text-content-tertiary">{t('未开机')}</span>
-                    )}
-                  </SettingsRow>
-                ))}
-              </SettingsCard>
-              {sharedDevices.length > 0 && (
-                <SettingsCard>
-                  {sharedDevices.map((dev) => (
-                    <SettingsRow
-                      key={dev.subdomain}
-                      label={dev.name}
-                      hint={`${dev.ownerEmail} · ${dev.online ? t('在线') : t('离线')}`}
-                    >
-                      {dev.online ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          render={<a href={`${dev.url}/app`} target="_blank" rel="noreferrer" />}
-                        >
-                          {t('点击连接')}
-                        </Button>
-                      ) : (
-                        <span className="text-meta text-content-tertiary">{t('未开机')}</span>
-                      )}
-                    </SettingsRow>
-                  ))}
-                </SettingsCard>
-              )}
-              <div className="flex items-center justify-end">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setFeedbackOpen(true)}
-                  data-testid="remote-footer-feedback"
-                >
-                  {t('遇到连接问题？反馈 Bug')}
-                </Button>
-              </div>
-            </>
+            </div>
           )}
-        </div>
+        </SettingsCard>
       )}
-      <details
-        className="mt-4"
-        open={pairingBlocked || awaitingTailnetLogin || undefined}
-        data-testid="remote-advanced-details"
-      >
-        <summary className="cursor-pointer select-none text-meta text-content-tertiary hover:text-foreground">
-          {t('高级：本地 Tailscale 与手动配对')}
-        </summary>
-        {(live || routesQ.data !== undefined) && (
-          <SettingsCard className="mt-3">
-            <SettingsRow
-              label={t('Tailscale 远程访问')}
-              hint={tailnetHint}
-              hintClassName={tailnetFailed ? 'text-destructive' : undefined}
-            >
-              <ToggleSwitch
-                checked={tailnetOn}
-                disabled={!live || setTailnet.isPending}
-                aria-label={t('Tailscale 远程访问')}
-                data-testid="remote-access-switch"
-                onCheckedChange={(checked) => {
-                  setToggleFailed(false);
-                  setTailnet.reset();
-                  setTailnet.mutate(checked, { onError: () => setToggleFailed(true) });
-                }}
-              />
-            </SettingsRow>
-            {loginUrl !== null && (
-              <div
-                className="flex flex-col items-center gap-3 px-4 py-4"
-                data-testid="tailnet-login"
-              >
-                <QrCode text={loginUrl} label={t('Tailscale 登录二维码')} />
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    className={DIALOG_PRIMARY_BUTTON}
-                    render={<a href={loginUrl} target="_blank" rel="noreferrer" />}
-                  >
-                    {t('打开 Tailscale 登录')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={DIALOG_PRIMARY_BUTTON}
-                    onClick={() => {
-                      copyTextWithFeedback(loginUrl, () => {
-                        setLoginCopied(true);
-                        setTimeout(() => setLoginCopied(false), 2_000);
-                      });
-                    }}
-                  >
-                    {loginCopied ? t('已复制') : t('复制链接')}
-                  </Button>
-                </div>
-              </div>
-            )}
-            {tunnel !== undefined && (
-              <>
-                <SettingsRow
-                  label={t('公网隧道')}
-                  hint={tunnelHint}
-                  hintClassName={tunnelFailed ? 'text-destructive' : undefined}
-                >
-                  <div className="flex items-center gap-2">
-                    {tunnelUrl !== null && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          copyTextWithFeedback(tunnelUrl, () => {
-                            setTunnelCopied(true);
-                            setTimeout(() => setTunnelCopied(false), 2_000);
-                          });
-                        }}
-                      >
-                        {tunnelCopied ? t('已复制') : t('复制链接')}
-                      </Button>
-                    )}
-                    <ToggleSwitch
-                      checked={tunnelOn}
-                      disabled={!live || setTunnel.isPending}
-                      aria-label={t('公网隧道')}
-                      data-testid="remote-tunnel-switch"
-                      onCheckedChange={(checked) => {
-                        setTunnelToggleFailed(false);
-                        setTunnel.reset();
-                        const trimmed = relayInputValue.trim();
-                        setTunnel.mutate(
-                          {
-                            enabled: checked,
-                            ...(checked && trimmed !== '' ? { relayUrl: trimmed } : {}),
-                          },
-                          { onError: () => setTunnelToggleFailed(true) },
-                        );
-                      }}
-                    />
-                  </div>
-                </SettingsRow>
-                {(!tunnelOn || tunnelFailed) && (
-                  <div className="flex items-center gap-2 px-4 pb-3">
-                    <Input
-                      value={relayInputValue}
-                      onChange={(event) => setRelayDraft(event.target.value)}
-                      placeholder={t('例如：https://relay.example.com')}
-                      aria-label={t('中继地址')}
-                      data-testid="remote-tunnel-relay-input"
-                      className="font-mono text-meta"
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </SettingsCard>
-        )}
-        {pairingBlocked && requestsQ.data !== undefined && requests.length === 0 && (
-          <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
-            {t(
-              '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。',
-            )}
+      {pairingBlocked && requestsQ.data !== undefined && requests.length === 0 && (
+        <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
+          {t(
+            '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。',
+          )}
+        </p>
+      )}
+      {live && routesQ.data === undefined ? null : pairingBlocked && !awaitingTailnetLogin ? (
+        devices.length === 0 && (
+          <p className="m-0 mt-3 text-meta text-content-tertiary" data-testid="remote-routes-empty">
+            {t('暂无已配对的设备')}
           </p>
-        )}
-        {live && routesQ.data === undefined ? null : pairingBlocked && !awaitingTailnetLogin ? (
-          devices.length === 0 && (
-            <p
-              className="m-0 mt-3 text-meta text-content-tertiary"
-              data-testid="remote-routes-empty"
-            >
-              {t('暂无已配对的设备')}
-            </p>
-          )
-        ) : routes.length === 0 ? (
-          <EmptyState
-            testId="remote-routes-empty"
-            className="mt-6"
-            icon={Smartphone}
-            title={t('手机尚无法连接这台电脑')}
-            description={
-              awaitingTailnetLogin
-                ? t('请先登录 Tailscale。')
-                : t('打开上方的开关，手机在外部网络也能连接这台电脑。')
-            }
-          />
-        ) : (
-          <ResourceList>
-            {routes.map((route) => (
-              <ResourceRow key={route.url}>
-                <RowText>
-                  <RowTitle className="font-mono">{route.url}</RowTitle>
-                  <RowDesc>
-                    {route.kind === 'tunnel'
-                      ? t('公网隧道')
-                      : route.kind === 'tailnet'
-                        ? t('Tailscale')
-                        : t('局域网')}
-                  </RowDesc>
-                </RowText>
-              </ResourceRow>
-            ))}
-          </ResourceList>
-        )}
-        {grants.length > 0 && (
-          <ResourceList>
-            {grants.map((grant) => (
-              <ResourceRow key={grant.id}>
-                <RowText>
-                  <RowTitle>{t('未使用的配对码')}</RowTitle>
-                  <RowDesc>
-                    {t('有效期至 {time}', {
-                      time: new Date(grant.expiresAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }),
-                    })}
-                  </RowDesc>
-                </RowText>
-                <Button
-                  variant="ghost"
-                  className={DIALOG_PRIMARY_BUTTON}
-                  disabled={mutations.revokePairingCode.isPending}
-                  onClick={() =>
-                    mutations.revokePairingCode.mutate(grant.id, {
-                      onError: (error) => toastError(t('作废配对码失败，请重试。'), error),
-                    })
-                  }
-                >
-                  {t('作废配对码')}
-                </Button>
-              </ResourceRow>
-            ))}
-          </ResourceList>
-        )}
-        {devices.length > 0 && (
-          <ResourceList>
-            {devices.map((device) => (
-              <ResourceRow key={device.id}>
-                <RowText>
-                  <RowTitle>{device.name}</RowTitle>
-                  <RowDesc>{device.masked}</RowDesc>
-                </RowText>
-                <Button
-                  variant="ghost"
-                  className={DIALOG_PRIMARY_BUTTON}
-                  disabled={mutations.revokeDevice.isPending}
-                  onClick={() => setRevokingDevice({ id: device.id, name: device.name })}
-                >
-                  {t('撤销设备')}
-                </Button>
-              </ResourceRow>
-            ))}
-          </ResourceList>
-        )}
-      </details>
+        )
+      ) : routes.length === 0 ? (
+        <EmptyState
+          testId="remote-routes-empty"
+          className="mt-6"
+          icon={Smartphone}
+          title={t('手机尚无法连接这台电脑')}
+          description={
+            awaitingTailnetLogin
+              ? t('请先登录 Tailscale。')
+              : t('打开上方的开关，手机在外部网络也能连接这台电脑。')
+          }
+        />
+      ) : (
+        <ResourceList>
+          {routes.map((route) => (
+            <ResourceRow key={route.url}>
+              <RowText>
+                <RowTitle className="font-mono">{route.url}</RowTitle>
+                <RowDesc>{route.kind === 'tailnet' ? t('Tailscale') : t('局域网')}</RowDesc>
+              </RowText>
+            </ResourceRow>
+          ))}
+        </ResourceList>
+      )}
+      {grants.length > 0 && (
+        <ResourceList>
+          {grants.map((grant) => (
+            <ResourceRow key={grant.id}>
+              <RowText>
+                <RowTitle>{t('未使用的配对码')}</RowTitle>
+                <RowDesc>
+                  {t('有效期至 {time}', {
+                    time: new Date(grant.expiresAt).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }),
+                  })}
+                </RowDesc>
+              </RowText>
+              <Button
+                variant="ghost"
+                className={DIALOG_PRIMARY_BUTTON}
+                disabled={mutations.revokePairingCode.isPending}
+                onClick={() =>
+                  mutations.revokePairingCode.mutate(grant.id, {
+                    onError: (error) => toastError(t('作废配对码失败，请重试。'), error),
+                  })
+                }
+              >
+                {t('作废配对码')}
+              </Button>
+            </ResourceRow>
+          ))}
+        </ResourceList>
+      )}
+      {devices.length > 0 && (
+        <ResourceList>
+          {devices.map((device) => (
+            <ResourceRow key={device.id}>
+              <RowText>
+                <RowTitle>{device.name}</RowTitle>
+                <RowDesc>{device.masked}</RowDesc>
+              </RowText>
+              <Button
+                variant="ghost"
+                className={DIALOG_PRIMARY_BUTTON}
+                disabled={mutations.revokeDevice.isPending}
+                onClick={() => setRevokingDevice({ id: device.id, name: device.name })}
+              >
+                {t('撤销设备')}
+              </Button>
+            </ResourceRow>
+          ))}
+        </ResourceList>
+      )}
       {pairing !== null && routesQ.data !== undefined && candidates.length > 0 && (
         <PairingDialog
           pairing={pairing}
@@ -715,52 +439,6 @@ export function RemoteAccessPage() {
           onClose={() => setPairing(null)}
         />
       )}
-      {shareOpen && (
-        <DialogShell
-          title={t('授权给其他账号')}
-          subtitle={t('对方使用自己的账号登录后，即可在远程访问列表里直接点击连接这台电脑。')}
-          onClose={() => setShareOpen(false)}
-          footer={
-            <>
-              <Button variant="ghost" onClick={() => setShareOpen(false)}>
-                {t('取消')}
-              </Button>
-              <Button
-                className={DIALOG_PRIMARY_BUTTON}
-                disabled={shareDevice.isPending || !shareEmail.includes('@')}
-                onClick={() => {
-                  shareDevice.mutate(
-                    { targetEmail: shareEmail.trim(), role: 'collaborator' },
-                    {
-                      onSuccess: () => {
-                        toastSuccess(t('已授权给 {email}', { email: shareEmail.trim() }));
-                        setShareEmail('');
-                        setShareOpen(false);
-                      },
-                      onError: (err) => toastError(t('授权失败，请确认本机隧道已在线'), err),
-                    },
-                  );
-                }}
-              >
-                {t('发送授权')}
-              </Button>
-            </>
-          }
-        >
-          <Input
-            value={shareEmail}
-            onChange={(event) => setShareEmail(event.target.value)}
-            placeholder={t('例如：friend@example.com')}
-            aria-label={t('对方邮箱')}
-          />
-        </DialogShell>
-      )}
-      <FeedbackDialog
-        open={feedbackOpen}
-        onClose={() => setFeedbackOpen(false)}
-        route="/app/settings/remote-access"
-        errorSummary={tunnelFailed ? `tunnel:${tunnel?.error ?? 'failed'}` : undefined}
-      />
       <DeleteConfirm
         open={revokingDevice !== null}
         title={t('撤销后，这台已配对设备需要重新扫码配对才能访问')}

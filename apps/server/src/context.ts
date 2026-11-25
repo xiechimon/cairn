@@ -1,13 +1,8 @@
 import type { NetworkInterfaceInfo } from 'node:os';
-import type {
-  GitIdentity,
-  TailnetAccess,
-  TeamRecord,
-  TunnelAccess,
-  UserRecord,
-} from '@cairn/shared';
+import type { GitIdentity, TailnetAccess, TeamRecord, UserRecord } from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
+import type { ClerkVerifier } from './lib/clerk-auth.js';
 import type { AccessVerifier } from './lib/cloudflare-access.js';
 import type { FetchLike } from './lib/github.js';
 import type { OwnerChannel } from './lib/owner-channel.js';
@@ -29,8 +24,13 @@ import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 import type { TailscaleServe } from './services/tailscale-serve.js';
 import type { TailnetRemote } from './services/tsnet-remote.js';
-import type { TunnelRemote } from './services/tunnel-remote.js';
 import type { XaiDeviceState } from './services/xai-device-login.js';
+
+export interface ClerkAuthContext {
+  publishableKey: string;
+  issuer: string;
+  verify: ClerkVerifier;
+}
 
 export interface RemoteAccessContext {
   environmentId: string;
@@ -38,8 +38,6 @@ export interface RemoteAccessContext {
   listenPort: number;
   tailnetStatus: () => TailnetAccess | null;
   tailnet?: TailnetRemote;
-  tunnelStatus?: () => TunnelAccess | null;
-  tunnel?: TunnelRemote;
   tailscale?: TailscaleServe;
   networkInterfaces?: () => NodeJS.Dict<NetworkInterfaceInfo[]>;
 }
@@ -105,6 +103,7 @@ export interface AppContext {
   authToken: string | null;
   ownerChannel?: OwnerChannel;
   accessVerifier?: AccessVerifier | null;
+  clerkAuth?: ClerkAuthContext | null;
   mcpConfigPath: string;
   mcpFetch?: typeof fetch;
   composioFetch?: typeof fetch;

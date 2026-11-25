@@ -6,7 +6,7 @@ const DOCKER_DEFAULT_BRIDGE = /^172\.17(?:\.\d{1,3}){2}$/;
 
 export interface PairingCandidate {
   origin: string;
-  source: 'page' | 'tunnel' | 'tailnet' | 'lan';
+  source: 'page' | 'tailnet' | 'lan';
 }
 
 function hostnameOf(origin: string): string | null {
@@ -40,7 +40,6 @@ export function pairingCandidates(routes: RemoteRoute[], pageOrigin: string): Pa
     candidates.push({ origin, source });
   };
   add(pageOrigin, 'page');
-  for (const route of routes.filter((item) => item.kind === 'tunnel')) add(route.url, 'tunnel');
   for (const route of routes.filter((item) => item.kind === 'tailnet')) add(route.url, 'tailnet');
   const lan = routes.filter((item) => item.kind === 'lan');
   for (const route of lan.filter((item) => !isDockerBridgeOrigin(item.url))) add(route.url, 'lan');

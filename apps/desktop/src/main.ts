@@ -90,6 +90,7 @@ import {
   startNativeTray,
   withHostState,
 } from './native-tray.js';
+import { offlinePageHtml } from './offline-page.js';
 import { desktopOtelEnv, withOtelFileEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
 import { type CapturePage, createPageCapture } from './page-capture.js';
@@ -102,6 +103,7 @@ import {
   relaunchWindowOf,
   restoredUrl,
 } from './relaunch-window.js';
+import { isAllowedRemoteAuthUrl } from './remote-auth.js';
 import {
   clearServerOwner,
   installResidentHost,
@@ -111,7 +113,12 @@ import {
   writeServerOwner,
 } from './resident-host.js';
 import { createRestartBudget } from './restart-budget.js';
-import { type LocalRunner, readRunnerRegistration, startLocalRunner } from './runner.js';
+import {
+  type LocalRunner,
+  RunnerAuthPendingError,
+  readRunnerRegistration,
+  startLocalRunner,
+} from './runner.js';
 import { runnerStepsInFlight } from './runner-activity.js';
 import { migrateRunnerHome, runnerHomeFor } from './runner-home.js';
 import { createServerExitHandler } from './server-exit.js';
@@ -243,6 +250,9 @@ const serverExited = createServerExitHandler<RunningServer>({
 });
 let mainWindow: BrowserWindow | null = null;
 let appOrigin: string | null = null;
+let remoteClerkIssuer: string | null = null;
+let showingOfflinePage = false;
+let activeRemoteHostName: string | null = null;
 let mainWindowShown = false;
 let windowState: WindowStateStore | null = null;
 let tray: { destroy: () => void } | null = null;
@@ -565,6 +575,47 @@ function showRestored(window: BrowserWindow, restore: RelaunchWindow | null): vo
   else window.once('focus', () => window.setFullScreen(true));
 }
 
+function switchDesktopHost(userData: string, id: string): void {
+  setActiveConnection(userData, id);
+  app.relaunch({ args: relaunchArgs(false) });
+  setTimeout(() => app.exit(0), STOP_TIMEOUT_MS + 3_000).unref();
+  app.quit();
+}
+
+function hostMenuEntries(userData: string) {
+  const catalog = readConnectionCatalog(userData);
+  return [
+    {
+      id: LOCAL_CONNECTION_ID,
+      label: 'This computer',
+      active: catalog.activeId === LOCAL_CONNECTION_ID,
+    },
+    ...catalog.items.map((item) => ({
+      id: item.id,
+      label: item.name,
+      active: catalog.activeId === item.id,
+    })),
+  ];
+}
+
+function showOfflineFallback(window: BrowserWindow, origin: string): void {
+  const userData = app.getPath('userData');
+  const catalog = readConnectionCatalog(userData);
+  const html = offlinePageHtml({
+    locale: desktopLocale(app.getLocale()),
+    hostName: activeRemoteHostName ?? new URL(origin).host,
+    hostUrl: origin,
+    connections: [
+      { id: LOCAL_CONNECTION_ID, kind: 'local', name: 'This computer' },
+      ...catalog.items.map((item) => ({ id: item.id, kind: 'remote' as const, name: item.name })),
+    ],
+    activeId: catalog.activeId,
+  });
+  showingOfflinePage = true;
+  void window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  if (!window.isVisible() && !BACKGROUND_LAUNCH) window.show();
+}
+
 function openWindow(origin: string, restore: RelaunchWindow | null = null): BrowserWindow {
   const store = windowStateStore();
   const window = new BrowserWindow({
@@ -618,14 +669,50 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
     window.hide();
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
+    if (activeRemoteHostName !== null && isAllowedRemoteAuthUrl(url, origin, remoteClerkIssuer)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          parent: window,
+          width: 480,
+          height: 680,
+          webPreferences: {
+            contextIsolation: true,
+            sandbox: true,
+            nodeIntegration: false,
+          },
+        },
+      };
+    }
     if (isWebUrl(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
   window.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('data:text/html')) return;
     if (new URL(url).origin === origin) return;
+    if (activeRemoteHostName !== null && isAllowedRemoteAuthUrl(url, origin, remoteClerkIssuer)) {
+      return;
+    }
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
   });
+  window.webContents.on('did-navigate', (_event, url) => {
+    if (!url.startsWith('data:text/html')) showingOfflinePage = false;
+  });
+  window.webContents.on(
+    'did-fail-load',
+    (_event, code, _description, validatedUrl, isMainFrame) => {
+      if (
+        !isMainFrame ||
+        code === ERR_ABORTED ||
+        activeRemoteHostName === null ||
+        validatedUrl.startsWith('data:text/html')
+      ) {
+        return;
+      }
+      showOfflineFallback(window, origin);
+    },
+  );
   rememberWindow(window, store);
   void window.loadURL(restore === null ? origin : restoredUrl(origin, restore.path));
   mainWindow = window;
@@ -779,6 +866,8 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
         {
           open: focusWindow,
           setKeepAwake,
+          hosts: hostMenuEntries(app.getPath('userData')),
+          switchHost: (id) => switchDesktopHost(app.getPath('userData'), id),
           quit: () => app.quit(),
         },
         desktopLocale(app.getLocale()),
@@ -1121,6 +1210,10 @@ function serveUpdates(
               BrowserWindow.getFocusedWindow()?.webContents.navigationHistory.goForward(),
           },
           desktopLocale(app.getLocale()),
+          {
+            entries: hostMenuEntries(app.getPath('userData')),
+            switchHost: (id) => switchDesktopHost(app.getPath('userData'), id),
+          },
         ),
       ),
     );
@@ -1560,7 +1653,20 @@ async function boot(): Promise<void> {
 
     if (activeConn.kind === 'remote') {
       origin = activeConn.url;
+      activeRemoteHostName = activeConn.name;
+      void session.defaultSession
+        .fetch(`${origin}/api/auth/clerk/config`, { signal: AbortSignal.timeout(5_000) })
+        .then(async (response) => {
+          if (!response.ok) return;
+          const body = (await response.json()) as { enabled?: boolean; issuer?: unknown };
+          if (body.enabled === true && typeof body.issuer === 'string') {
+            remoteClerkIssuer = body.issuer;
+          }
+        })
+        .catch(() => {});
     } else {
+      activeRemoteHostName = null;
+      remoteClerkIssuer = null;
       const resident = await probeResidentServer(cairnHome());
       if (resident !== null) {
         origin = resident.origin;
@@ -1608,6 +1714,13 @@ async function boot(): Promise<void> {
         origin,
         ownerToken,
         ownerChannelKey: activeConn.kind === 'local' ? ownerChannelKey : '',
+        authMode: activeConn.kind === 'remote' ? 'session' : 'token',
+        ...(activeConn.kind === 'remote'
+          ? {
+              fetchImpl: ((input, init) =>
+                session.defaultSession.fetch(input as string, init as RequestInit)) as typeof fetch,
+            }
+          : {}),
         otelFile,
         agentDesktop: agentDesktopBinary(),
         shellEnv: () => desktopShellEnv,
@@ -1617,13 +1730,37 @@ async function boot(): Promise<void> {
           (started) => {
             runner = started;
           },
-          (error: unknown) => console.error('Cairn Runner did not start:', error),
+          (error: unknown) => {
+            if (error instanceof RunnerAuthPendingError) {
+              console.info(error.message);
+              return;
+            }
+            console.error('Cairn Runner did not start:', error);
+          },
         )
         .finally(() => {
           runnerStarting = null;
         });
       return runnerStarting;
     };
+    if (activeConn.kind === 'remote') {
+      const originHost = new URL(origin).hostname;
+      session.defaultSession.cookies.on('changed', (_event, cookie, _cause, removed) => {
+        if (
+          removed ||
+          !runnerWanted ||
+          runner !== null ||
+          runnerStarting !== null ||
+          cookie.name !== 'cairn_auth'
+        ) {
+          return;
+        }
+        const domain = cookie.domain?.replace(/^\./, '') ?? '';
+        if (domain === originHost || originHost.endsWith(`.${domain}`)) {
+          void bringRunnerUp();
+        }
+      });
+    }
     void bringRunnerUp();
     tray = showTray(origin, {
       connectionLabel: activeConn.kind === 'local' ? null : activeConn.name || new URL(origin).host,
@@ -1647,6 +1784,12 @@ async function boot(): Promise<void> {
       runnerWanted = true;
       return bringRunnerUp();
     });
+    const fromOfflinePage = (event: IpcMainInvokeEvent): boolean =>
+      !quitting &&
+      showingOfflinePage &&
+      mainWindow?.webContents === event.sender &&
+      event.senderFrame === event.sender.mainFrame &&
+      (event.senderFrame?.url.startsWith('data:text/html') ?? false);
     const fromHostMainPage = (event: IpcMainInvokeEvent): boolean =>
       !quitting &&
       mainWindow?.webContents === event.sender &&
@@ -1697,13 +1840,15 @@ async function boot(): Promise<void> {
       return hostStatus();
     });
     ipcMain.handle('desktop-host:switch', (event, id: unknown) => {
-      if (!fromHostMainPage(event)) return null;
+      if (!fromHostMainPage(event) && !fromOfflinePage(event)) return null;
       if (typeof id !== 'string' || id === '') throw new Error('Invalid connection id');
-      setActiveConnection(userData, id);
-      app.relaunch({ args: relaunchArgs(false) });
-      setTimeout(() => app.exit(0), STOP_TIMEOUT_MS + 3_000).unref();
-      app.quit();
+      switchDesktopHost(userData, id);
       return hostStatus();
+    });
+    ipcMain.handle('desktop-host:retry', (event) => {
+      if (!fromHostMainPage(event) && !fromOfflinePage(event)) return;
+      showingOfflinePage = false;
+      void mainWindow?.loadURL(origin);
     });
     ipcMain.handle('desktop-host:set-resident', async (event, enabled: unknown) => {
       if (!fromHostMainPage(event) || activeConn.kind !== 'local') return null;

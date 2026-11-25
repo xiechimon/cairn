@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
+  BROWSER_AUTH_HEADER,
+  type ClerkAuthConfigResponse,
   dailyUsageQuerySchema,
   patchRoutingRuleBodySchema,
   patchTeamBodySchema,
@@ -19,6 +21,7 @@ import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
+import { requestOrigin } from './lib/request-origin.js';
 import { openSseStream } from './lib/sse-headers.js';
 import {
   isOpenRemotePath,
@@ -28,7 +31,14 @@ import {
 } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
-import { issueBrowserSession, requestIsSecure, setAuthCookie } from './services/browser-session.js';
+import {
+  AUTH_COOKIE,
+  clearAuthCookie,
+  issueBrowserSession,
+  requestIsSecure,
+  revokeBrowserSession,
+  setAuthCookie,
+} from './services/browser-session.js';
 import { coordinatorRunsOnPi } from './services/coordinator-context.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection, StreamSessionRegistry } from './services/events.js';
@@ -61,6 +71,12 @@ const ACCESS_REFUSALS = {
   invalid: { status: 401, error: 'Unauthorized' },
   'not-allowed': { status: 403, error: 'this account is not allowed' },
   unavailable: { status: 503, error: 'Cloudflare Access keys are unavailable' },
+} as const;
+
+const CLERK_REFUSALS = {
+  invalid: { status: 401, error: 'Unauthorized' },
+  'not-allowed': { status: 403, error: 'this account is not allowed' },
+  unavailable: { status: 503, error: 'Clerk keys are unavailable' },
 } as const;
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
@@ -103,6 +119,61 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const session = issueBrowserSession(ctx.db, 'external', null, undefined, verdict.expiresAt);
     setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
     return c.json({ ok: true });
+  });
+
+  app.get('/api/auth/clerk/config', (c) => {
+    c.header('cache-control', 'no-store');
+    const body: ClerkAuthConfigResponse =
+      ctx.clerkAuth == null
+        ? { enabled: false, publishableKey: null, issuer: null }
+        : {
+            enabled: true,
+            publishableKey: ctx.clerkAuth.publishableKey,
+            issuer: ctx.clerkAuth.issuer,
+          };
+    return c.json(body);
+  });
+
+  app.post('/api/auth/clerk', async (c) => {
+    c.header('cache-control', 'no-store');
+    if (ctx.clerkAuth == null) return c.json({ error: 'Not found' }, 404);
+    const site = c.req.header('sec-fetch-site');
+    if (
+      c.req.header(BROWSER_AUTH_HEADER) !== '1' ||
+      (site !== undefined && site !== 'same-origin' && site !== 'none')
+    ) {
+      return c.json({ error: 'same-origin proof required' }, 403);
+    }
+    const origin = c.req.header('origin');
+    if (origin !== undefined && origin !== requestOrigin(c)) {
+      return c.json({ error: 'same-origin proof required' }, 403);
+    }
+    const match = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
+    const verdict = await ctx.clerkAuth.verify(match?.[1]);
+    if (verdict.kind !== 'owner') {
+      const refusal = CLERK_REFUSALS[verdict.kind];
+      ctx.logger?.info({ outcome: verdict.kind, status: refusal.status }, 'clerk auth exchange');
+      return c.json({ error: refusal.error }, refusal.status);
+    }
+    ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'clerk auth exchange');
+    const session = issueBrowserSession(ctx.db, 'external', null);
+    setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/auth/signout', (c) => {
+    c.header('cache-control', 'no-store');
+    const site = c.req.header('sec-fetch-site');
+    if (
+      c.req.header(BROWSER_AUTH_HEADER) !== '1' ||
+      (site !== undefined && site !== 'same-origin' && site !== 'none')
+    ) {
+      return c.json({ error: 'same-origin proof required' }, 403);
+    }
+    const token = getCookie(c, AUTH_COOKIE);
+    if (token !== undefined && token !== '') revokeBrowserSession(ctx.db, token);
+    clearAuthCookie(c, requestIsSecure(c));
+    return c.body(null, 204);
   });
 
   app.post('/api/auth/stream-ticket', (c) => {

@@ -45,10 +45,19 @@ export interface RunnerOptions {
   origin: string;
   ownerToken: string;
   ownerChannelKey: string;
+  authMode?: 'token' | 'session';
+  fetchImpl?: typeof fetch;
   otelFile: string | null;
   agentDesktop: string | null;
   shellEnv?: () => ShellEnvironmentPatch;
   isQuitting: () => boolean;
+}
+
+export class RunnerAuthPendingError extends Error {
+  constructor(status: number) {
+    super(`Remote runner enrollment waiting for sign-in (HTTP ${status})`);
+    this.name = 'RunnerAuthPendingError';
+  }
 }
 
 export interface LocalRunner {
@@ -61,14 +70,34 @@ async function postJson(
   url: string,
   body: unknown,
   headers: Record<string, string> = {},
+  fetchImpl: typeof fetch = fetch,
 ): Promise<unknown> {
-  const response = await fetch(url, {
+  const response = await fetchImpl(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
+  if (response.status === 401 || response.status === 403) {
+    throw new RunnerAuthPendingError(response.status);
+  }
   if (!response.ok) throw new Error(`${new URL(url).pathname} answered HTTP ${response.status}`);
   return response.json();
+}
+
+async function verifyStoredMachine(
+  origin: string,
+  token: string,
+  fetchImpl: typeof fetch,
+): Promise<boolean> {
+  try {
+    const response = await fetchImpl(`${origin}/api/machine/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5_000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 async function enrollLocalMachine(
@@ -78,14 +107,28 @@ async function enrollLocalMachine(
   hostKey: string | undefined,
   legacyHostKeys: readonly string[],
   retireToken: string | undefined,
+  authMode: 'token' | 'session',
+  fetchImpl: typeof fetch,
 ): Promise<MachineJson> {
   const started = machineEnrollStartResponseSchema.parse(
-    await postJson(`${origin}/api/machine/enroll/start`, {
-      name: hostname(),
-      ...(hostKey !== undefined ? { hostKey } : {}),
-      ...(legacyHostKeys.length > 0 ? { legacyHostKeys } : {}),
-    }),
+    await postJson(
+      `${origin}/api/machine/enroll/start`,
+      {
+        name: hostname(),
+        ...(hostKey !== undefined ? { hostKey } : {}),
+        ...(legacyHostKeys.length > 0 ? { legacyHostKeys } : {}),
+      },
+      {},
+      fetchImpl,
+    ),
   );
+  const confirmHeaders: Record<string, string> =
+    authMode === 'session'
+      ? { Origin: origin, 'Sec-Fetch-Site': 'same-origin' }
+      : {
+          Authorization: `Bearer ${ownerToken}`,
+          [OWNER_CHANNEL_HEADER]: ownerChannelKey,
+        };
   for (let attempt = 0; ; attempt++) {
     try {
       const confirmed = (await postJson(
@@ -94,10 +137,8 @@ async function enrollLocalMachine(
           enrollId: started.enrollId,
           ...(retireToken !== undefined ? { retireToken } : {}),
         },
-        {
-          Authorization: `Bearer ${ownerToken}`,
-          [OWNER_CHANNEL_HEADER]: ownerChannelKey,
-        },
+        confirmHeaders,
+        fetchImpl,
       )) as { machine?: unknown };
       return machineEnrollResponseSchema.parse(confirmed.machine);
     } catch (error) {
@@ -173,6 +214,8 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
 }
 
 export async function startLocalRunner(options: RunnerOptions): Promise<LocalRunner> {
+  const authMode = options.authMode ?? 'token';
+  const fetchImpl = options.fetchImpl ?? fetch;
   const previous = readStoredMachine(options.home);
   const previousForOrigin =
     previous !== undefined && previous.serverUrl === options.origin ? previous : undefined;
@@ -189,18 +232,26 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
     previousForOrigin?.hostKey,
     ...siblingStored.map((entry) => entry.hostKey),
   ]);
-  const retireToken = previousForOrigin?.token ?? siblingStored[0]?.token;
-  writeMachineJson(options.home, {
-    ...(await enrollLocalMachine(
-      options.origin,
-      options.ownerToken,
-      options.ownerChannelKey,
-      hostKey,
-      legacyHostKeys,
-      retireToken,
-    )),
-    ...(hostKey !== undefined ? { hostKey } : {}),
-  });
+  const reuseExisting =
+    authMode === 'session' &&
+    previousForOrigin !== undefined &&
+    (await verifyStoredMachine(options.origin, previousForOrigin.token, fetchImpl));
+  if (!reuseExisting) {
+    const retireToken = previousForOrigin?.token ?? siblingStored[0]?.token;
+    writeMachineJson(options.home, {
+      ...(await enrollLocalMachine(
+        options.origin,
+        options.ownerToken,
+        options.ownerChannelKey,
+        hostKey,
+        legacyHostKeys,
+        retireToken,
+        authMode,
+        fetchImpl,
+      )),
+      ...(hostKey !== undefined ? { hostKey } : {}),
+    });
+  }
   let child: ChildProcess | null = null;
   let unit: string | null = null;
   let pending: NodeJS.Timeout | null = null;

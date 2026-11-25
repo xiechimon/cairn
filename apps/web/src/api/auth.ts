@@ -1,6 +1,7 @@
 import {
   BROWSER_AUTH_HEADER,
   BROWSER_SESSION_PATH,
+  type ClerkAuthConfigResponse,
   isBrowserAuthExempt,
   type PairClaimResponse,
   parsePairFragment,
@@ -99,6 +100,81 @@ function publish(confirmedReplacement = false): void {
   }
   snapshot = { gateOpen, rejected, pairing: busy, retrying, pair, generation };
   for (const listener of listeners) listener();
+}
+
+export async function fetchClerkAuthConfig(): Promise<ClerkAuthConfigResponse> {
+  if (DEMO_MODE) return { enabled: false, publishableKey: null, issuer: null };
+  try {
+    const response = await fetch('/api/auth/clerk/config', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      mode: 'same-origin',
+      redirect: 'error',
+    });
+    if (!response.ok || response.redirected) {
+      return { enabled: false, publishableKey: null, issuer: null };
+    }
+    const body = (await response.json()) as Partial<ClerkAuthConfigResponse>;
+    return {
+      enabled:
+        body.enabled === true &&
+        typeof body.publishableKey === 'string' &&
+        typeof body.issuer === 'string',
+      publishableKey: typeof body.publishableKey === 'string' ? body.publishableKey : null,
+      issuer: typeof body.issuer === 'string' ? body.issuer : null,
+    };
+  } catch {
+    return { enabled: false, publishableKey: null, issuer: null };
+  }
+}
+
+export async function signInWithClerkToken(
+  rawToken: string,
+): Promise<'ok' | 'invalid' | 'not-allowed' | 'unavailable'> {
+  const token = rawToken.trim();
+  if (token === '') return 'invalid';
+  try {
+    const response = await fetch('/api/auth/clerk', {
+      method: 'POST',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      mode: 'same-origin',
+      redirect: 'error',
+      headers: {
+        [BROWSER_AUTH_HEADER]: '1',
+        authorization: `Bearer ${token}`,
+      },
+    });
+    if (response.status === 200) {
+      applyVerdict('authenticated', 'waiting', true);
+      const desktop = (
+        globalThis.window as
+          | (Window & { cairnDesktop?: { localRunner?: { reconnect?: () => Promise<void> } } })
+          | undefined
+      )?.cairnDesktop;
+      void desktop?.localRunner?.reconnect?.().catch(() => {});
+      return 'ok';
+    }
+    if (response.status === 403) return 'not-allowed';
+    if (response.status === 401) return 'invalid';
+    return 'unavailable';
+  } catch {
+    return 'unavailable';
+  }
+}
+
+export async function signOutSession(): Promise<void> {
+  try {
+    await fetch('/api/auth/signout', {
+      method: 'POST',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      mode: 'same-origin',
+      redirect: 'error',
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+    });
+  } catch {}
+  clearLegacyBrowserToken();
 }
 
 export async function signInWithOwnerToken(

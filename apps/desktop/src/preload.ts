@@ -86,6 +86,7 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     removeRemote: (id: string): Promise<unknown> =>
       ipcRenderer.invoke('desktop-host:remove-remote', id),
     switch: (id: string): Promise<unknown> => ipcRenderer.invoke('desktop-host:switch', id),
+    retry: (): Promise<void> => ipcRenderer.invoke('desktop-host:retry'),
     setResident: (enabled: boolean): Promise<unknown> =>
       ipcRenderer.invoke('desktop-host:set-resident', enabled),
   },

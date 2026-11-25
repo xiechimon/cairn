@@ -34,11 +34,19 @@ export function isBrowserAuthExempt(pathname: string): boolean {
     pathname.startsWith('/api/webhook/') ||
     pathname === '/api/mcp' ||
     pathname === '/api/oauth/callback' ||
-    pathname === '/api/remote/account/callback' ||
     pathname === '/api/auth/access' ||
+    pathname === '/api/auth/clerk/config' ||
+    pathname === '/api/auth/clerk' ||
     isOpenRemotePath(pathname)
   );
 }
+
+export const clerkAuthConfigResponseSchema = z.object({
+  enabled: z.boolean(),
+  publishableKey: z.string().min(1).nullable(),
+  issuer: z.string().url().nullable(),
+});
+export type ClerkAuthConfigResponse = z.infer<typeof clerkAuthConfigResponseSchema>;
 
 export const remoteDescriptorSchema = z
   .object({
@@ -48,7 +56,7 @@ export const remoteDescriptorSchema = z
   .strict();
 export type RemoteDescriptor = z.infer<typeof remoteDescriptorSchema>;
 
-export const remoteRouteKindSchema = z.enum(['lan', 'tailnet', 'tunnel']);
+export const remoteRouteKindSchema = z.enum(['lan', 'tailnet']);
 export type RemoteRouteKind = z.infer<typeof remoteRouteKindSchema>;
 
 export const remoteRouteSchema = z.object({
@@ -82,79 +90,6 @@ export const tailnetSetBodySchema = z
   .strict();
 export type TailnetSetBody = z.infer<typeof tailnetSetBodySchema>;
 
-export const tunnelErrorKindSchema = z.enum([
-  'auth-off',
-  'invalid-relay',
-  'unreachable',
-  'rejected',
-]);
-export type TunnelErrorKind = z.infer<typeof tunnelErrorKindSchema>;
-
-export const relayAccountSchema = z.object({
-  email: z.string().email(),
-  displayName: z.string().min(1).max(80),
-  avatarUrl: z.string().url().nullable().optional(),
-});
-export type RelayAccount = z.infer<typeof relayAccountSchema>;
-
-export const tunnelAccessSchema = z.object({
-  enabled: z.boolean(),
-  state: z.enum(['off', 'connecting', 'ready', 'reconnecting', 'failed', 'stopped']),
-  url: z.string().nullable(),
-  relayUrl: z.string().nullable(),
-  error: tunnelErrorKindSchema.nullable(),
-  account: relayAccountSchema.nullable().optional(),
-});
-export type TunnelAccess = z.infer<typeof tunnelAccessSchema>;
-
-export const tunnelSetBodySchema = z
-  .object({
-    enabled: z.boolean(),
-    relayUrl: z.string().trim().min(1).max(200).optional(),
-  })
-  .strict();
-export type TunnelSetBody = z.infer<typeof tunnelSetBodySchema>;
-
-export const relayOAuthStartBodySchema = z
-  .object({
-    relayUrl: z.string().trim().min(1).max(200).optional(),
-  })
-  .strict();
-export type RelayOAuthStartBody = z.infer<typeof relayOAuthStartBodySchema>;
-
-export const relayOAuthStartResponseSchema = z.object({
-  loginUrl: z.string().url(),
-});
-export type RelayOAuthStartResponse = z.infer<typeof relayOAuthStartResponseSchema>;
-
-export const relayDirectoryDeviceSchema = z.object({
-  subdomain: z.string().min(1),
-  name: z.string().min(1),
-  os: z.string().min(1),
-  ownerEmail: z.string().email(),
-  online: z.boolean(),
-  url: z.string().url(),
-  lastSeenAt: epochMs,
-  role: z.enum(['owner', 'collaborator']),
-});
-export type RelayDirectoryDevice = z.infer<typeof relayDirectoryDeviceSchema>;
-
-export const relayDirectoryResponseSchema = z.object({
-  account: relayAccountSchema.nullable(),
-  selfSubdomain: z.string().nullable(),
-  ownDevices: z.array(relayDirectoryDeviceSchema),
-  sharedDevices: z.array(relayDirectoryDeviceSchema),
-});
-export type RelayDirectoryResponse = z.infer<typeof relayDirectoryResponseSchema>;
-
-export const relayShareBodySchema = z
-  .object({
-    targetEmail: z.string().trim().email().max(120),
-    role: z.enum(['owner', 'collaborator']).optional(),
-  })
-  .strict();
-export type RelayShareBody = z.infer<typeof relayShareBodySchema>;
-
 export const feedbackSubmitBodySchema = z
   .object({
     message: z.string().trim().min(1).max(4000),
@@ -176,7 +111,6 @@ export const remoteRoutesResponseSchema = z.object({
   environmentId: z.string().min(1),
   routes: z.array(remoteRouteSchema),
   tailnet: tailnetAccessSchema,
-  tunnel: tunnelAccessSchema.optional(),
 });
 export type RemoteRoutesResponse = z.infer<typeof remoteRoutesResponseSchema>;
 

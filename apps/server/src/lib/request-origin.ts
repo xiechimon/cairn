@@ -11,8 +11,6 @@ import {
   tailnetOriginOf,
 } from './tailnet-listener.js';
 
-export const TUNNEL_ORIGIN_ENV_KEY = Symbol.for('cairn.tunnelOrigin');
-
 type NodeBindings = HttpBindings | Http2Bindings;
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -69,8 +67,6 @@ export function pairRequestPeerOf(c: Context): { source: PairRequestSource; peer
 export function requestOrigin(c: Context): string {
   const tailnet = tailnetOriginOf(c);
   if (tailnet !== null) return new URL(tailnet).origin;
-  const tunnelOrigin = (c.env as Record<symbol, unknown> | undefined)?.[TUNNEL_ORIGIN_ENV_KEY];
-  if (typeof tunnelOrigin === 'string') return new URL(tunnelOrigin).origin;
 
   const requestUrl = new URL(c.req.url);
   const env = c.env as (Partial<NodeBindings> & { server?: NodeBindings }) | undefined;

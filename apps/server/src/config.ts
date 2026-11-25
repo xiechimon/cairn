@@ -82,6 +82,24 @@ export const serverConfigSchema = z.object({
     })
     .nullable()
     .default(null),
+  clerkAuth: z
+    .object({
+      publishableKey: z.string().min(1),
+      issuer: z
+        .string()
+        .url()
+        .refine((value) => new URL(value).protocol === 'https:'),
+      jwksUrl: z
+        .string()
+        .url()
+        .refine((value) => new URL(value).protocol === 'https:'),
+      ownerSubs: z.array(z.string().min(1)),
+      ownerEmails: z.array(z.string().email()),
+    })
+    .refine((value) => value.ownerSubs.length > 0 || value.ownerEmails.length > 0)
+    .nullable()
+    .default(null),
+  disableExternalConnectors: z.boolean().default(false),
   githubAppIdentity: z.object({ name: z.string(), email: z.string() }).nullable().default(null),
   githubOauth: z.object({ clientId: z.string(), clientSecret: z.string() }).nullable(),
   authToken: z.string().nullable(),
@@ -128,6 +146,57 @@ function envCloudflareAccess(): { teamDomain: string; aud: string; ownerEmails: 
       .split(',')
       .map((email) => email.trim())
       .filter((email) => email !== ''),
+  };
+}
+
+function splitCsv(raw: string | null): string[] {
+  if (raw === null) return [];
+  return raw
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+}
+
+function envClerkAuth(): {
+  publishableKey: string;
+  issuer: string;
+  jwksUrl: string;
+  ownerSubs: string[];
+  ownerEmails: string[];
+} | null {
+  const publishableKey = envStr('CAIRN_CLERK_PUBLISHABLE_KEY');
+  const rawIssuer = envStr('CAIRN_CLERK_ISSUER');
+  const rawJwksUrl = envStr('CAIRN_CLERK_JWKS_URL');
+  const rawSubs = envStr('CAIRN_CLERK_OWNER_SUBS');
+  const rawEmails = envStr('CAIRN_CLERK_OWNER_EMAILS');
+  if (
+    publishableKey === null &&
+    rawIssuer === null &&
+    rawJwksUrl === null &&
+    rawSubs === null &&
+    rawEmails === null
+  ) {
+    return null;
+  }
+  const ownerSubs = splitCsv(rawSubs);
+  const ownerEmails = splitCsv(rawEmails);
+  const missing: string[] = [];
+  if (publishableKey === null) missing.push('CAIRN_CLERK_PUBLISHABLE_KEY');
+  if (rawIssuer === null) missing.push('CAIRN_CLERK_ISSUER');
+  if (ownerSubs.length === 0 && ownerEmails.length === 0) {
+    missing.push('CAIRN_CLERK_OWNER_SUBS or CAIRN_CLERK_OWNER_EMAILS');
+  }
+  if (missing.length > 0 || publishableKey === null || rawIssuer === null) {
+    throw new Error(`Clerk auth needs ${missing.join(', ')}`);
+  }
+  const issuer = rawIssuer.trim().replace(/\/+$/, '');
+  const jwksUrl = rawJwksUrl === null ? `${issuer}/.well-known/jwks.json` : rawJwksUrl.trim();
+  return {
+    publishableKey: publishableKey.trim(),
+    issuer,
+    jwksUrl,
+    ownerSubs,
+    ownerEmails,
   };
 }
 
@@ -269,6 +338,8 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     webDir: webDirEnv !== undefined && webDirEnv !== '' ? resolve(webDirEnv) : defaultWebDir(),
     githubAppTokenSocket,
     cloudflareAccess: envCloudflareAccess(),
+    clerkAuth: envClerkAuth(),
+    disableExternalConnectors: envFlag('CAIRN_DISABLE_EXTERNAL_CONNECTORS'),
     githubAppIdentity: envGithubAppIdentity(githubAppTokenSocket),
     githubOauth:
       oauthId !== undefined && oauthSecret !== undefined

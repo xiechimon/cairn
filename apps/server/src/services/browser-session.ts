@@ -58,6 +58,22 @@ export function resolveBrowserSession(
   return { kind: row.kind, deviceId: row.deviceId };
 }
 
+export function revokeBrowserSession(db: Db, token: string): void {
+  db.delete(browserSession)
+    .where(eq(browserSession.tokenHash, hashCredential(token)))
+    .run();
+}
+
+export function clearAuthCookie(c: Context, secure: boolean): void {
+  setCookie(c, AUTH_COOKIE, '', {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'Lax',
+    secure,
+    maxAge: 0,
+  });
+}
+
 export function setAuthCookie(
   c: Context,
   token: string,

@@ -1388,6 +1388,7 @@
         ],
         "server": [
           "apps/server/src/routes-remote.ts",
+          "apps/server/src/lib/clerk-auth.ts",
           "apps/server/src/services/tsnet-remote.ts",
           "apps/server/src/services/paired-devices.ts"
         ],
@@ -1403,6 +1404,9 @@
           "/api/remote/**",
           "/api/feedback",
           "/api/auth/access",
+          "/api/auth/clerk/config",
+          "/api/auth/clerk",
+          "/api/auth/signout",
           "/api/auth/stream-ticket"
         ]
       },

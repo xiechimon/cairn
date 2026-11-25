@@ -101,6 +101,7 @@ export function bootServer(
     authToken?: string | null;
     ownerChannel?: AppContext['ownerChannel'];
     accessVerifier?: AppContext['accessVerifier'];
+    clerkAuth?: AppContext['clerkAuth'];
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
     pushEndpointHosts?: ReadonlySet<string>;
@@ -240,6 +241,7 @@ export function bootServer(
       authToken: opts.authToken ?? null,
       ownerChannel: opts.ownerChannel,
       accessVerifier: opts.accessVerifier ?? null,
+      clerkAuth: opts.clerkAuth ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
       ...(opts.mcpFetch !== undefined ? { mcpFetch: opts.mcpFetch } : {}),
       ...(opts.composioFetch !== undefined ? { composioFetch: opts.composioFetch } : {}),

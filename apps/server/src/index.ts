@@ -28,6 +28,7 @@ import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
 import { todo } from './db/schema.js';
 import { seed } from './db/seed.js';
+import { createClerkVerifier } from './lib/clerk-auth.js';
 import { createAccessVerifier } from './lib/cloudflare-access.js';
 import { installEnvProxy } from './lib/env-proxy.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
@@ -77,7 +78,6 @@ import { createTailscaleServe } from './services/tailscale-serve.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { backfillTranscriptOrigins } from './services/transcript-origin-backfill.js';
 import { createTsnetRemote } from './services/tsnet-remote.js';
-import { createTunnelRemote } from './services/tunnel-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
 
@@ -242,13 +242,6 @@ const tailnet = createTsnetRemote({
   authToken: config.authToken,
   logger,
 });
-const tunnel = createTunnelRemote({
-  environmentId,
-  recordPath: join(config.dataDir, 'tunnel-remote.json'),
-  defaultRelayUrl: envStr('CAIRN_TUNNEL_RELAY'),
-  authToken: config.authToken,
-  app: () => app,
-});
 const ownerChannel = ownerChannelFromEnv(process.env);
 listenOwnerChannel(ownerChannel);
 const desktopPort = parentPortOf(process);
@@ -265,8 +258,6 @@ const app = createApp(
       listenPort: config.port,
       tailnetStatus: () => tailnet.status(),
       tailnet,
-      tunnelStatus: () => tunnel.status(),
-      tunnel,
       tailscale,
     },
     db,
@@ -312,6 +303,14 @@ const app = createApp(
     ownerChannel,
     accessVerifier:
       config.cloudflareAccess === null ? null : createAccessVerifier(config.cloudflareAccess),
+    clerkAuth:
+      config.clerkAuth === null
+        ? null
+        : {
+            publishableKey: config.clerkAuth.publishableKey,
+            issuer: config.clerkAuth.issuer,
+            verify: createClerkVerifier(config.clerkAuth),
+          },
     mcpConfigPath: config.mcpConfigPath,
     logger,
   },
@@ -399,11 +398,17 @@ if (coordinator !== null) {
     kind === 'steer' ? coordinator.signalSteer(threadId) : coordinator.signalStop(threadId),
   );
 }
-scheduler.start();
-mail.resume();
-void im.resume().catch((error: unknown) => {
-  logger.warn({ err: error }, 'im connections could not be resumed');
-});
+if (config.disableExternalConnectors) {
+  logger.warn(
+    'CAIRN_DISABLE_EXTERNAL_CONNECTORS is set (migration staging only): IM polling, mail polling, and scheduled runs are paused so this instance does not conflict with the source server; remove it before cutover',
+  );
+} else {
+  scheduler.start();
+  mail.resume();
+  void im.resume().catch((error: unknown) => {
+    logger.warn({ err: error }, 'im connections could not be resumed');
+  });
+}
 
 if (config.authToken === null) {
   await tailscale.withdraw().catch((error: unknown) => {
@@ -445,9 +450,6 @@ if (config.authToken !== null) {
 const tailnetReady = tailnet.resume().catch((error: unknown) => {
   logger.warn({ err: error }, 'tsnet remote access could not be resumed');
 });
-const tunnelReady = tunnel.resume().catch((error: unknown) => {
-  logger.warn({ err: error }, 'tunnel remote access could not be resumed');
-});
 
 const COORDINATOR_CLOSE_MS = 5_000;
 const TAILSCALE_WITHDRAW_MS = 3_000;
@@ -469,8 +471,6 @@ async function shutdown(): Promise<void> {
   await drainHttp();
   await tailnetReady;
   await tailnet.stop();
-  await tunnelReady;
-  await tunnel.stop();
   await im.shutdown().catch(() => {});
   await mail.shutdown().catch(() => {});
   setImRuntime(null);
