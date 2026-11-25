@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button.js';
 import { DialogClose, DialogTitle } from '../components/ui/dialog.js';
 import { DialogShell, dialogWidth } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
-import { isEditableTarget } from './hotkeys.js';
+import { cancelDialogEscape, isDraggingSortable, isEditableTarget } from './hotkeys.js';
 
 const RouteDialogClose = createContext<() => void>(() => undefined);
 
@@ -37,8 +37,13 @@ export function RouteDialog({
       bare
       title={title}
       onClose={(details) => {
-        if (details?.reason === 'escape-key' && isEditableTarget(details.event?.target ?? null))
+        if (
+          details?.reason === 'escape-key' &&
+          (isEditableTarget(details.event?.target ?? null) || isDraggingSortable())
+        ) {
+          cancelDialogEscape(details as { cancel?: () => void; allowPropagation?: () => void });
           return;
+        }
         onClose();
       }}
       zIndex="calc(var(--z-narrow-chrome) + 2)"

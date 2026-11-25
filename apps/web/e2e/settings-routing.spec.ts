@@ -330,3 +330,107 @@ test('the Model page renders no thinking selector without a real choice and no c
     await expect(page.getByRole('option')).toHaveCount(0);
   }
 });
+
+test('frequently used models support mouse drag and keyboard reordering with persistence and rollback', async ({
+  page,
+}) => {
+  let models = [
+    { provider: 'relay', modelId: 'glm-5.3', thinkingLevel: null },
+    { provider: 'relay', modelId: 'claude-opus-5', thinkingLevel: null },
+    { provider: 'relay', modelId: 'qwen-3', thinkingLevel: null },
+  ];
+  const saved: unknown[][] = [];
+  let failPut = false;
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    const method = route.request().method();
+    if (path === '/api/teams/t1/top-models' && method === 'GET') return json({ models });
+    if (path === '/api/teams/t1/top-models' && method === 'PUT') {
+      const body = route.request().postDataJSON() as { models: typeof models };
+      saved.push(body.models);
+      if (failPut) return route.fulfill({ status: 500, body: '{"error":"boom"}' });
+      models = body.models;
+      return json({ models });
+    }
+    if (path === '/api/teams/t1/machines') return json([]);
+    if (path === '/api/teams/t1/model-sources')
+      return json({
+        sources: [
+          {
+            runtime: 'pi',
+            provider: 'relay',
+            providerLabel: 'domestic-proxy',
+            installed: true,
+            models: [
+              { id: 'glm-5.3', name: 'GLM-5.3' },
+              { id: 'claude-opus-5', name: 'Claude Opus 5' },
+              { id: 'qwen-3', name: 'Qwen 3' },
+            ],
+          },
+        ],
+      });
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  const card = page.getByRole('dialog', { name: '设置' }).getByTestId('frequent-models');
+  const rows = card.getByTestId('frequent-model-row');
+  const rowIds = () =>
+    rows.evaluateAll((els) => els.map((el) => el.getAttribute('data-model-key')));
+  await expect.poll(rowIds).toEqual(['relay/glm-5.3', 'relay/claude-opus-5', 'relay/qwen-3']);
+
+  const first = await rows.nth(0).boundingBox();
+  const last = await rows.nth(2).boundingBox();
+  if (first === null || last === null) throw new Error('frequent model rows not laid out');
+  await page.mouse.move(last.x + 20, last.y + last.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(last.x + 200, first.y - 100, { steps: 12 });
+  const held = await rows.nth(2).boundingBox();
+  expect(held?.x ?? 0).toBeCloseTo(last.x, 0);
+  expect(held?.y ?? 0).toBeCloseTo(first.y, 0);
+  await page.mouse.up();
+
+  const moved = ['relay/qwen-3', 'relay/glm-5.3', 'relay/claude-opus-5'];
+  await expect.poll(rowIds).toEqual(moved);
+  await expect.poll(() => saved.length).toBe(1);
+
+  await page.reload();
+  await expect.poll(rowIds).toEqual(moved);
+
+  const moveDownOnce = async () => {
+    await expect
+      .poll(async () => {
+        await page.keyboard.press('ArrowDown');
+        await card.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        return rows.nth(1).getAttribute('style');
+      })
+      .toMatch(/translate3d\(0px, -/);
+  };
+
+  await rows.nth(0).getByTestId('frequent-model-drag-grip').focus();
+  await page.keyboard.press('Space');
+  await expect(card.locator('[data-dragging="true"]')).toHaveCount(1);
+  await moveDownOnce();
+  await page.keyboard.press('Space');
+  const kbMoved = ['relay/glm-5.3', 'relay/qwen-3', 'relay/claude-opus-5'];
+  await expect.poll(rowIds).toEqual(kbMoved);
+  await expect.poll(() => saved.length).toBe(2);
+
+  await rows.nth(0).getByTestId('frequent-model-drag-grip').focus();
+  await page.keyboard.press('Space');
+  await expect(card.locator('[data-dragging="true"]')).toHaveCount(1);
+  await moveDownOnce();
+  await page.keyboard.press('Escape');
+  await expect(card).toBeVisible();
+  await expect(card.locator('[data-dragging="true"]')).toHaveCount(0);
+  await expect.poll(rowIds).toEqual(kbMoved);
+  expect(saved).toHaveLength(2);
+
+  failPut = true;
+  await rows.nth(0).getByTestId('frequent-model-drag-grip').focus();
+  await page.keyboard.press('Space');
+  await expect(card.locator('[data-dragging="true"]')).toHaveCount(1);
+  await moveDownOnce();
+  await page.keyboard.press('Space');
+  await expect(page.getByText('顺序未能保存，已恢复原来的顺序。')).toBeVisible();
+  await expect.poll(rowIds).toEqual(kbMoved);
+});

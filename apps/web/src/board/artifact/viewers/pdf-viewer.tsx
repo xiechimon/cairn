@@ -9,7 +9,7 @@ import { Skeleton } from '../../../components/ui/skeleton.js';
 import { useI18n } from '../../../i18n/provider.js';
 import { RegionSurface, useCommentLayer } from '../file-comments.js';
 import { useFileBytes } from './use-file-bytes.js';
-import type { Zoom } from './zoom.js';
+import { MIN_ZOOM, usePinchZoom, type Zoom } from './zoom.js';
 
 type PdfJs = typeof import('pdfjs-dist');
 
@@ -273,20 +273,25 @@ export function PdfViewer({
   src,
   zoom,
   onFitScale,
+  onChange,
   onPages,
 }: {
   src: string;
   zoom: Zoom;
   onFitScale: (scale: number) => void;
+  onChange: (next: Zoom) => void;
   onPages?: (count: number) => void;
 }) {
   const { t } = useI18n();
   const bytesQ = useFileBytes(src);
   const { opened, failed } = useOpenedPdf(bytesQ.data);
-  const { ref, width } = useBox();
+  const { element, ref, width } = useBox();
+  const [content, setContent] = useState<HTMLDivElement | null>(null);
   const deck = opened !== null && isDeck(opened.sizes);
   const fit = opened === null || width === 0 || deck ? 1 : pdfFitScale(opened.sizes, width);
-  useEffect(() => onFitScale(fit), [fit, onFitScale]);
+  useEffect(() => {
+    if (!deck) onFitScale(fit);
+  }, [deck, fit, onFitScale]);
   const report = useCommentLayer()?.report;
   useEffect(() => {
     if (opened === null) return;
@@ -308,6 +313,7 @@ export function PdfViewer({
     };
   }, [opened, onPages, report]);
   const scale = zoom === 'fit' ? fit : zoom;
+  usePinchZoom({ stage: deck ? null : element, content, scale, onChange });
   if (bytesQ.isError || failed)
     return (
       <EmptyState
@@ -317,7 +323,8 @@ export function PdfViewer({
         className="mt-[12vh]"
       />
     );
-  if (opened !== null && deck) return <PdfDeck opened={opened} />;
+  if (opened !== null && deck)
+    return <PdfDeck opened={opened} zoom={zoom} onFitScale={onFitScale} onChange={onChange} />;
   return (
     <div
       ref={ref}
@@ -331,7 +338,7 @@ export function PdfViewer({
           className="mx-auto my-4 aspect-[1/1.414] w-full max-w-2xl rounded-none"
         />
       ) : (
-        <div className="flex w-max min-w-full flex-col items-center gap-4 p-4">
+        <div ref={setContent} className="flex w-max min-w-full flex-col items-center gap-4 p-4">
           {opened.sizes.map((size, index) => (
             <PdfPage
               key={index}
@@ -432,14 +439,29 @@ function PdfPage({
   );
 }
 
-function PdfDeck({ opened }: { opened: Opened }) {
+function PdfDeck({
+  opened,
+  zoom,
+  onFitScale,
+  onChange,
+}: {
+  opened: Opened;
+  zoom: Zoom;
+  onFitScale: (scale: number) => void;
+  onChange: (next: Zoom) => void;
+}) {
   const { t } = useI18n();
   const count = opened.sizes.length;
   const [current, setCurrent] = useState(0);
   const stage = useBox();
-  const presenting = useFullscreen(stage.element);
+  const [deckShell, setDeckShell] = useState<HTMLDivElement | null>(null);
+  const [content, setContent] = useState<HTMLDivElement | null>(null);
+  const presenting = useFullscreen(deckShell);
   const size = opened.sizes[current] ?? opened.sizes[0] ?? { width: 4, height: 3 };
-  const scale = stage.width === 0 ? 0.1 : deckFitScale(size, stage);
+  const fit = stage.width === 0 ? MIN_ZOOM : deckFitScale(size, stage);
+  useEffect(() => onFitScale(fit), [fit, onFitScale]);
+  const scale = zoom === 'fit' ? fit : zoom;
+  usePinchZoom({ stage: stage.element, content, scale, onChange });
   const go = (next: number) => setCurrent(Math.min(count - 1, Math.max(0, next)));
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -488,19 +510,26 @@ function PdfDeck({ opened }: { opened: Opened }) {
         ))}
       </nav>
       <div
-        ref={stage.ref}
-        data-testid="artifact-deck-stage"
-        data-current={current + 1}
-        className={`relative flex min-h-0 min-w-0 flex-1 items-center justify-center ${presenting ? 'bg-(--lightbox-scrim)' : ''}`}
+        ref={setDeckShell}
+        className={`relative flex min-h-0 min-w-0 flex-1 ${presenting ? 'bg-(--lightbox-scrim)' : ''}`}
       >
-        <PdfPage
-          key={current}
-          pdfjs={opened.pdfjs}
-          doc={opened.doc}
-          number={current + 1}
-          size={size}
-          scale={scale}
-        />
+        <div
+          ref={stage.ref}
+          data-testid="artifact-deck-stage"
+          data-current={current + 1}
+          className="flex min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain p-4"
+        >
+          <div ref={setContent} className="m-auto flex-none">
+            <PdfPage
+              key={current}
+              pdfjs={opened.pdfjs}
+              doc={opened.doc}
+              number={current + 1}
+              size={size}
+              scale={scale}
+            />
+          </div>
+        </div>
         <div className="absolute right-3 bottom-3 flex items-center gap-0.5 rounded-(--radius-control) bg-popover p-0.5 shadow-(--e1)">
           <IconTooltip
             label={t('上一页')}
@@ -549,7 +578,7 @@ function PdfDeck({ opened }: { opened: Opened }) {
                   data-testid="artifact-deck-present"
                   onClick={() => {
                     root?.querySelector<HTMLElement>('[data-testid="artifact-deck-next"]')?.focus();
-                    void stage.element?.requestFullscreen();
+                    void deckShell?.requestFullscreen();
                   }}
                 />
               }

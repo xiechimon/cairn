@@ -69,6 +69,25 @@ describe('frequently used model rows', () => {
     expect(antigravity).toContain(markOf(AntigravityMark));
   });
 
+  test('renders sortable drag grips only when at least two models exist', () => {
+    const three = rows();
+    for (const row of three) {
+      expect(row).toContain('data-testid="frequent-model-drag-grip"');
+      expect(row).toContain('aria-roledescription="sortable"');
+    }
+    const singleHtml = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'en',
+        children: createElement(FrequentModelsCard, {
+          models: [models[0]!],
+          options: toModelOptions(sources),
+          onChange: () => {},
+        }),
+      }),
+    );
+    expect(singleHtml).not.toContain('data-testid="frequent-model-drag-grip"');
+  });
+
   test('a selector whose only level is the default it resolves to is not rendered', () => {
     const html = renderToStaticMarkup(
       createElement(I18nProvider, {

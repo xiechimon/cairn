@@ -6,6 +6,8 @@ export const COMMENT_BRIDGE_MESSAGES = {
   locate: 'od:comment-locate',
   located: 'od:comment-located',
   scroll: 'od:preview-scroll',
+  wheel: 'od:preview-wheel',
+  keydown: 'od:preview-keydown',
   ready: 'od:comment-ready',
 } as const;
 
@@ -130,6 +132,27 @@ export function buildCommentBridgeScript(): string {
     ev.stopPropagation();
     window.parent.postMessage({ type: 'od:comment-target', target: target }, '*');
   }, true);
+  function isEditable(el){
+    return !!(el && el.nodeType === 1 && (el.isContentEditable || (el.closest && el.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))));
+  }
+  window.addEventListener('wheel', function(ev){
+    if (!ev.ctrlKey) return;
+    ev.preventDefault();
+    window.parent.postMessage({ type: 'od:preview-wheel', deltaY: ev.deltaY, deltaMode: ev.deltaMode, clientX: ev.clientX, clientY: ev.clientY }, '*');
+  }, { passive: false });
+  document.addEventListener('keydown', function(ev){
+    if (ev.defaultPrevented || ev.isComposing || ev.keyCode === 229) return;
+    if (ev.key === 'Escape') {
+      if (!isEditable(ev.target)) {
+        window.parent.postMessage({ type: 'od:preview-keydown', key: ev.key, code: ev.code, metaKey: ev.metaKey, ctrlKey: ev.ctrlKey, altKey: ev.altKey }, '*');
+      }
+      return;
+    }
+    if ((ev.metaKey || ev.ctrlKey) && !ev.altKey && (ev.key === '=' || ev.key === '+' || ev.key === '-' || ev.key === '_' || ev.key === '0')) {
+      ev.preventDefault();
+      window.parent.postMessage({ type: 'od:preview-keydown', key: ev.key, code: ev.code, metaKey: ev.metaKey, ctrlKey: ev.ctrlKey, altKey: ev.altKey }, '*');
+    }
+  });
   document.addEventListener('scroll', postScroll, true);
   window.addEventListener('resize', postScroll);
   window.parent.postMessage({ type: 'od:comment-ready' }, '*');

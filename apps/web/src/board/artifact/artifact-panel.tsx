@@ -1,6 +1,6 @@
 import { cn } from 'cn';
 import { Maximize2, Minimize2, X } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { useArtifactOf, useTodo } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
 import { FileGlyph } from '../../components/file-glyph.js';
@@ -10,11 +10,35 @@ import { Button } from '../../components/ui/button.js';
 import { Skeleton } from '../../components/ui/skeleton.js';
 import { attachmentIdFromKey } from '../../detail/attachment-chip.js';
 import { useI18n } from '../../i18n/provider.js';
+import { isEditableTarget } from '../../overlay/hotkeys.js';
 import type { FileTarget } from '../file-pane.js';
 import { usePanelDocked } from '../use-narrow.js';
 import { type ArtifactPanelState, useArtifactPanel } from './artifact-route.js';
 import { FileArtifact } from './file-artifact.js';
 import { PageArtifact, type SendDesignComments } from './page-artifact.js';
+import { hasBlockingLayer } from './viewers/zoom.js';
+
+const ARTIFACT_ESCAPE_BLOCKERS = [
+  '[data-testid="artifact-comment-strip"]',
+  '[data-testid="design-mark-bar"]',
+  '[data-testid="artifact-whiteboard"][data-editing="true"]',
+].join(', ');
+
+function hasArtifactEscapeBlocker(): boolean {
+  if (document.fullscreenElement !== null || hasBlockingLayer()) return true;
+  return [...document.querySelectorAll(ARTIFACT_ESCAPE_BLOCKERS)].some((el) =>
+    el.checkVisibility(),
+  );
+}
+
+const ArtifactPanelControlContext = createContext<{
+  active: boolean;
+  closePanel: () => void;
+}>({ active: true, closePanel: () => {} });
+
+export function useArtifactPanelControl() {
+  return useContext(ArtifactPanelControlContext);
+}
 
 type Focus = 'chat' | 'artifact';
 
@@ -114,71 +138,100 @@ function ArtifactPanel({
   sendComments: SendDesignComments | undefined;
 }) {
   const { t } = useI18n();
+  const closeIfUnblocked = useCallback(() => {
+    if (!hasArtifactEscapeBlocker()) panel.closePanel();
+  }, [panel]);
+
+  useEffect(() => {
+    if (hidden) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.keyCode === 229
+      )
+        return;
+      if (isEditableTarget(event.target) || hasArtifactEscapeBlocker()) return;
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest('[data-testid="decision-dock"], [role="status"][data-kind]') !== null
+      )
+        return;
+      event.preventDefault();
+      panel.closePanel();
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [hidden, panel]);
+
   return (
-    <aside
-      data-testid="artifact-panel"
-      aria-label={t('文件')}
-      hidden={hidden}
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col border-l border-border bg-background max-[1100px]:border-l-0"
-    >
-      <div className="flex h-12 flex-none items-center gap-1 pr-2 pl-3">
-        {switcher}
-        <nav
-          aria-label={t('打开的文件')}
-          className="-m-px flex min-w-0 flex-1 gap-0.5 overflow-hidden p-px"
-        >
-          {panel.tabs.map((tab) => (
-            <ArtifactTabButton
-              key={tab.key}
-              tab={tab}
-              active={tab.key === target.key}
-              onSelect={() => panel.select(tab)}
-              onClose={() => panel.closeTab(tab.key)}
-            />
-          ))}
-        </nav>
-        {full !== null && (
+    <ArtifactPanelControlContext.Provider value={{ active: !hidden, closePanel: closeIfUnblocked }}>
+      <aside
+        data-testid="artifact-panel"
+        aria-label={t('文件')}
+        hidden={hidden}
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col border-l border-border bg-background max-[1100px]:border-l-0"
+      >
+        <div className="flex h-12 flex-none items-center gap-1 pr-2 pl-3">
+          {switcher}
+          <nav
+            aria-label={t('打开的文件')}
+            className="-m-px flex min-w-0 flex-1 gap-0.5 overflow-hidden p-px"
+          >
+            {panel.tabs.map((tab) => (
+              <ArtifactTabButton
+                key={tab.key}
+                tab={tab}
+                active={tab.key === target.key}
+                onSelect={() => panel.select(tab)}
+                onClose={() => panel.closeTab(tab.key)}
+              />
+            ))}
+          </nav>
+          {full !== null && (
+            <IconTooltip
+              label={full.on ? t('退出全屏') : t('全屏')}
+              side="bottom"
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  data-testid="artifact-full"
+                  aria-pressed={full.on}
+                  onClick={full.toggle}
+                  className={HEAD_ICON}
+                />
+              }
+            >
+              {full.on ? (
+                <Minimize2 aria-hidden className="size-4" />
+              ) : (
+                <Maximize2 aria-hidden className="size-4" />
+              )}
+            </IconTooltip>
+          )}
           <IconTooltip
-            label={full.on ? t('退出全屏') : t('全屏')}
+            label={t('关闭文件面板')}
             side="bottom"
             trigger={
               <Button
                 variant="ghost"
                 size="icon-sm"
-                data-testid="artifact-full"
-                aria-pressed={full.on}
-                onClick={full.toggle}
-                className={HEAD_ICON}
+                data-testid="artifact-close"
+                onClick={panel.closePanel}
+                className={`${HEAD_ICON} pointer-coarse:size-11`}
               />
             }
           >
-            {full.on ? (
-              <Minimize2 aria-hidden className="size-4" />
-            ) : (
-              <Maximize2 aria-hidden className="size-4" />
-            )}
+            <X aria-hidden className="size-5" />
           </IconTooltip>
-        )}
-        <IconTooltip
-          label={t('关闭文件面板')}
-          side="bottom"
-          trigger={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              data-testid="artifact-close"
-              onClick={panel.closePanel}
-              className={`${HEAD_ICON} pointer-coarse:size-11`}
-            />
-          }
-        >
-          <X aria-hidden className="size-5" />
-        </IconTooltip>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col border-t border-border">
-        <ArtifactTab key={target.key} target={target} sendComments={sendComments} />
-      </div>
-    </aside>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col border-t border-border">
+          <ArtifactTab key={target.key} target={target} sendComments={sendComments} />
+        </div>
+      </aside>
+    </ArtifactPanelControlContext.Provider>
   );
 }
 

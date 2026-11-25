@@ -68,6 +68,15 @@ const SCENE = JSON.stringify({
   files: {},
 });
 
+const MOD = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+const PNG_1200_1200_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200"><rect width="1200" height="1200" fill="#ecebe6"/><circle cx="600" cy="600" r="400" fill="#9a6500"/></svg>`;
+
+const PNG_1X1 = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
 const FILES: Record<string, { type: string; body: string | Buffer }> = {
   'att-sheet': { type: 'text/csv', body: '姓名,城市,分数\nAda,London,98\nGrace,"New York, NY",95\n' },
   'att-resume': { type: 'application/pdf', body: pdf(['Ada Lovelace, analyst'], [612, 792]) },
@@ -77,6 +86,14 @@ const FILES: Record<string, { type: string; body: string | Buffer }> = {
   },
   'att-flow': { type: 'text/plain', body: 'flowchart LR\n  A[需求] --> B[设计] --> C[上线]\n' },
   'att-board': { type: 'application/json', body: SCENE },
+  'att-photo': { type: 'image/svg+xml', body: PNG_1200_1200_SVG },
+  'att-pic': { type: 'image/png', body: PNG_1X1 },
+  'att-icon': { type: 'image/svg+xml', body: PNG_1200_1200_SVG },
+  'att-page': {
+    type: 'text/html',
+    body: '<!doctype html><html><body><main style="height:1400px"><h1>Design Spec</h1><input aria-label="frame-input" /></main></body></html>',
+  },
+  'att-code': { type: 'text/plain', body: 'const x = 1;\nconst y = 2;\n' },
 };
 
 async function openArtifact(page: Page, key: string, name: string, messages: unknown[] = []) {
@@ -93,6 +110,17 @@ async function openArtifact(page: Page, key: string, name: string, messages: unk
     restoredFromSeq: null,
     createdAt: Date.now() - 60_000,
   };
+  const pageCurrent = {
+    id: 'ver-p1',
+    todoId: BOARD_TASK.id,
+    fileName: 'page.html',
+    seq: 1,
+    attachmentId: 'att-page',
+    sizeBytes: 120,
+    source: 'agent',
+    restoredFromSeq: null,
+    createdAt: Date.now() - 60_000,
+  };
   await mockLive(page, { threads: [THREAD], messages, todos: [BOARD_TASK] } as Parameters<typeof mockLive>[1], (path, route, json) => {
     const method = route.request().method();
     if (path === '/api/attachments/att-board/artifact')
@@ -105,10 +133,23 @@ async function openArtifact(page: Page, key: string, name: string, messages: unk
         versionCount: 1,
         openComments: 0,
       });
+    if (path === '/api/attachments/att-page/artifact')
+      return json({
+        todoId: BOARD_TASK.id,
+        fileName: 'page.html',
+        kind: 'page',
+        versionId: 'ver-p1',
+        versionSeq: 1,
+        versionCount: 1,
+        openComments: 0,
+      });
     if (path === `/api/todos/${BOARD_TASK.id}`) return json(BOARD_TASK);
     if (path === base)
       return json({
-        pages: [{ fileName: 'flow.excalidraw', current, versionCount: 1, openComments: 0, shareToken: null }],
+        pages: [
+          { fileName: 'flow.excalidraw', current, versionCount: 1, openComments: 0, shareToken: null },
+          { fileName: 'page.html', current: pageCurrent, versionCount: 1, openComments: 0, shareToken: null },
+        ],
         shareOrigin: null,
       });
     if (path === `${base}/flow.excalidraw/versions` && method === 'POST') {
@@ -117,6 +158,11 @@ async function openArtifact(page: Page, key: string, name: string, messages: unk
     }
     if (path === `${base}/flow.excalidraw/versions`) return json([current]);
     if (path === `${base}/flow.excalidraw/comments`) return json([]);
+    if (path === `${base}/page.html/versions`) return json([pageCurrent]);
+    if (path === `${base}/page.html/comments`) return json([]);
+    if (path === '/api/design/versions/ver-p1/page') {
+      return route.fulfill({ status: 200, contentType: 'text/html', body: FILES['att-page']!.body });
+    }
     const id = /^\/api\/attachments\/([^/]+)$/.exec(path)?.[1];
     const file = id === undefined ? undefined : FILES[id];
     if (file !== undefined) return route.fulfill({ status: 200, contentType: file.type, body: file.body });
@@ -212,4 +258,128 @@ test('a landscape PDF opens as a deck with a slide rail, paging and arrow keys',
   await panel.getByTestId('artifact-deck-thumb').first().click();
   await expect(stage).toHaveAttribute('data-current', '1');
   await expect(panel.getByTestId('artifact-deck-thumb').first()).toHaveAttribute('aria-current', 'true');
+});
+
+test('image preview supports ctrl+wheel cursor-centered pinch zoom, Cmd +/-/0 shortcuts, and Esc close', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { panel } = await openArtifact(page, 'att-photo.png', 'diagram.png');
+  const stage = panel.getByTestId('artifact-image-stage');
+  const img = panel.getByTestId('file-preview-image');
+  await expect(img).toBeVisible();
+  const fitBtn = panel.getByTestId('artifact-zoom-fit');
+  await expect(fitBtn).toHaveText('适应');
+
+  const stageBox = await stage.boundingBox();
+  const imgBox = await img.boundingBox();
+  if (stageBox === null || imgBox === null) throw new Error('image not laid out');
+  const cursorX = imgBox.x + imgBox.width * 0.75;
+  const cursorY = imgBox.y + imgBox.height * 0.25;
+
+  await page.mouse.move(cursorX, cursorY);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -100);
+  await page.keyboard.up('Control');
+
+  await expect(fitBtn).toHaveText(/^\d+%$/);
+  const zoomedBox = await img.boundingBox();
+  expect(zoomedBox?.width ?? 0).toBeGreaterThan(imgBox.width * 1.4);
+  const scroll = await stage.evaluate((el) => ({ left: el.scrollLeft, top: el.scrollTop }));
+  expect(scroll.left).toBeGreaterThan(0);
+
+  await page.keyboard.press(`${MOD}+0`);
+  await expect(fitBtn).toHaveText('适应');
+
+  await page.keyboard.press(`${MOD}+Equal`);
+  await expect(fitBtn).not.toHaveText('适应');
+  const pctAfterIn = Number((await fitBtn.innerText()).replace('%', ''));
+
+  await page.keyboard.press(`${MOD}+Minus`);
+  const pctAfterOut = Number((await fitBtn.innerText()).replace('%', ''));
+  expect(pctAfterOut).toBeLessThan(pctAfterIn);
+
+  await page.keyboard.press(`${MOD}+0`);
+  await expect(fitBtn).toHaveText('适应');
+
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+  await expect(page).not.toHaveURL(/artifact=/);
+});
+
+test('SVG, PDF, PDF deck, and HTML design viewers support zoom shortcuts and ctrl+wheel', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  const svg = await openArtifact(page, 'att-icon.svg', 'icon.svg');
+  await expect(svg.panel.getByTestId('artifact-zoom-fit')).toHaveText('适应');
+  await page.keyboard.press(`${MOD}+Equal`);
+  await expect(svg.panel.getByTestId('artifact-zoom-fit')).toHaveText(/^\d+%$/);
+  await page.keyboard.press(`${MOD}+0`);
+  await expect(svg.panel.getByTestId('artifact-zoom-fit')).toHaveText('适应');
+  await page.keyboard.press('Escape');
+  await expect(svg.panel).toHaveCount(0);
+
+  const pdfDoc = await openArtifact(page, 'att-resume.pdf', 'resume.pdf');
+  const pdfBox = await pdfDoc.panel.getByTestId('artifact-pdf').boundingBox();
+  if (pdfBox === null) throw new Error('pdf not laid out');
+  await page.mouse.move(pdfBox.x + pdfBox.width / 2, pdfBox.y + pdfBox.height / 2);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -60);
+  await page.keyboard.up('Control');
+  await expect(pdfDoc.panel.getByTestId('artifact-zoom-fit')).toHaveText(/^\d+%$/);
+  await page.keyboard.press(`${MOD}+0`);
+  await expect(pdfDoc.panel.getByTestId('artifact-zoom-fit')).toHaveText('适应');
+  await page.keyboard.press('Escape');
+  await expect(pdfDoc.panel).toHaveCount(0);
+
+  const deckDoc = await openArtifact(page, 'att-deck.pdf', 'q3-review.pdf');
+  await expect(deckDoc.panel.getByTestId('artifact-deck-stage')).toBeVisible();
+  await expect(deckDoc.panel.getByTestId('artifact-zoom-fit')).toHaveText('适应');
+  await page.keyboard.press(`${MOD}+Equal`);
+  await expect(deckDoc.panel.getByTestId('artifact-zoom-fit')).toHaveText(/^\d+%$/);
+  await page.keyboard.press(`${MOD}+0`);
+  await expect(deckDoc.panel.getByTestId('artifact-zoom-fit')).toHaveText('适应');
+  await page.keyboard.press('Escape');
+  await expect(deckDoc.panel).toHaveCount(0);
+
+  const design = await openArtifact(page, 'att-page.html', 'page.html');
+  await expect(design.panel.getByTestId('design-frame')).toBeVisible();
+  await expect(design.panel.getByTestId('artifact-zoom-fit')).toHaveText('适应');
+  await page.keyboard.press(`${MOD}+Equal`);
+  await expect(design.panel.getByTestId('artifact-zoom-fit')).toHaveText('125%');
+  await page.keyboard.press(`${MOD}+0`);
+  await expect(design.panel.getByTestId('artifact-zoom-fit')).toHaveText('适应');
+  await page.keyboard.press('Escape');
+  await expect(design.panel).toHaveCount(0);
+});
+
+test('Esc respects open menus, dialogs, and text inputs before closing the artifact panel', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { panel } = await openArtifact(page, 'att-code.py', 'main.py');
+  await expect(panel.getByTestId('file-preview-text')).toBeVisible();
+
+  await panel.getByTestId('artifact-name').click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(panel).toBeVisible();
+
+  const composer = page.getByTestId('chief-composer-input');
+  await composer.fill('keep panel open');
+  await composer.focus();
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeVisible();
+
+  await page.getByTestId('sidebar-settings').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(panel).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
 });

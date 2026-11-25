@@ -21,6 +21,7 @@ import { TextViewer } from '../../vendor-open-design/viewers/text-viewer.js';
 import { VideoViewer } from '../../vendor-open-design/viewers/video-viewer.js';
 import { DocumentPreviewUnavailable, useAttachmentFiles } from '../file-data.js';
 import { downloadFile, type FileTarget } from '../file-pane.js';
+import { useArtifactPanelControl } from './artifact-panel.js';
 import { artifactKey } from './artifact-route.js';
 import { ArtifactToolbar, OldVersionBar, TOOL_BUTTON, VersionHistory } from './artifact-toolbar.js';
 import {
@@ -38,7 +39,7 @@ import { PdfViewer } from './viewers/pdf-viewer.js';
 import { SheetViewer } from './viewers/sheet-viewer.js';
 import type { SceneReader } from './viewers/whiteboard-canvas.js';
 import { WhiteboardViewer } from './viewers/whiteboard-viewer.js';
-import { type Zoom, ZoomControl } from './viewers/zoom.js';
+import { useZoomShortcuts, type Zoom, ZoomControl } from './viewers/zoom.js';
 import { ZoomImage } from './viewers/zoom-image.js';
 
 const INLINE_KINDS = new Set(['image', 'svg', 'video', 'audio', 'pdf']);
@@ -200,9 +201,20 @@ function FileView({
   const documentQ = files.document;
   const download = () => downloadFile(downloadHref, name);
   const artifactKind = artifactKindOf(name);
+  const { active: panelActive } = useArtifactPanelControl();
   const [mode, setMode] = useState<Mode>('preview');
   const [zoom, setZoom] = useState<Zoom>('fit');
   const [fitScale, setFitScale] = useState(1);
+  const zoomSupported =
+    kind === 'image' ||
+    kind === 'pdf' ||
+    (kind === 'svg' && mode === 'preview') ||
+    (artifactKind === 'diagram' && mode === 'preview');
+  useZoomShortcuts({
+    active: panelActive && zoomSupported,
+    scale: zoom === 'fit' ? fitScale : zoom,
+    onChange: setZoom,
+  });
   const [editing, setEditing] = useState(false);
   const sceneReader = useRef<SceneReader | null>(null);
   const keepReader = useCallback((read: SceneReader | null) => {
@@ -254,7 +266,13 @@ function FileView({
       withText((value) => <SheetViewer name={name} text={value} />)
     ) : artifactKind === 'diagram' ? (
       withText((value) => (
-        <DiagramView text={value} source={<TextViewer name={fileKey} text={value} />} />
+        <DiagramView
+          text={value}
+          source={<TextViewer name={fileKey} text={value} />}
+          zoom={zoom}
+          onFitScale={setFitScale}
+          onZoomChange={setZoom}
+        />
       ))
     ) : artifactKind === 'whiteboard' ? (
       withText((value) => <WhiteboardViewer text={value} editing={editing} onReader={keepReader} />)
@@ -263,7 +281,7 @@ function FileView({
     ) : kind === 'markdown' && mode === 'preview' ? (
       withText((value) => <MarkdownComments text={value} />)
     ) : kind === 'pdf' ? (
-      <PdfViewer src={src} zoom={zoom} onFitScale={setFitScale} />
+      <PdfViewer src={src} zoom={zoom} onFitScale={setFitScale} onChange={setZoom} />
     ) : artifactKind === 'docx' ? (
       <DocxViewer src={src} fallback={extracted} />
     ) : kind === 'markdown' ? (
@@ -276,10 +294,24 @@ function FileView({
           <SvgViewer name={name} src={src} mode="source" source={value} onDownload={download} />
         ))
       ) : (
-        <SvgViewer name={name} src={src} mode="preview" source="" onDownload={download} />
+        <ZoomImage
+          name={name}
+          src={src}
+          zoom={zoom}
+          onFitScale={setFitScale}
+          onChange={setZoom}
+          onDownload={download}
+        />
       )
     ) : kind === 'image' ? (
-      <ZoomImage name={name} src={src} zoom={zoom} onFitScale={setFitScale} onDownload={download} />
+      <ZoomImage
+        name={name}
+        src={src}
+        zoom={zoom}
+        onFitScale={setFitScale}
+        onChange={setZoom}
+        onDownload={download}
+      />
     ) : kind === 'video' ? (
       <VideoViewer name={name} src={src} onDownload={download} />
     ) : kind === 'audio' ? (
@@ -323,9 +355,7 @@ function FileView({
       : undefined;
   const controls = (
     <>
-      {(kind === 'image' || kind === 'pdf') && (
-        <ZoomControl zoom={zoom} fitScale={fitScale} onChange={setZoom} />
-      )}
+      {zoomSupported && <ZoomControl zoom={zoom} fitScale={fitScale} onChange={setZoom} />}
       {artifactKind === 'whiteboard' && save !== null && mode === 'preview' && (
         <Button
           variant="ghost"

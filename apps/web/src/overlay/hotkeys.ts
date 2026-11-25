@@ -5,6 +5,18 @@ const EDITABLE = 'input, textarea, select, [contenteditable]:not([contenteditabl
 export const isEditableTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && target.closest(EDITABLE) !== null;
 
+export function isDraggingSortable(): boolean {
+  return document.querySelector('[data-dragging="true"]') !== null;
+}
+
+export function cancelDialogEscape(details: {
+  cancel?: () => void;
+  allowPropagation?: () => void;
+}): void {
+  details.cancel?.();
+  details.allowPropagation?.();
+}
+
 const COMPOSE_TARGET_ATTR = 'data-compose-target';
 
 const BLOCKING_LAYER =

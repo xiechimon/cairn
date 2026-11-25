@@ -13,6 +13,11 @@ import {
 import { FilterPicker } from '../components/filter-picker.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
+import {
+  SortableGripButton,
+  type SortableItemBind,
+  SortableList,
+} from '../components/providers/provider-panel.js';
 import { SETTINGS_ROW_CLS, SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import type { ModelOption } from '../fixtures/records.js';
@@ -54,11 +59,13 @@ function optionOf(model: TopModel, options: readonly ModelOption[]): ModelOption
 function FrequentModelRow({
   model,
   option,
+  bind,
   onLevel,
   onRemove,
 }: {
   model: TopModel;
   option: ModelOption | undefined;
+  bind?: SortableItemBind;
   onLevel: (level: ThinkingLevel | null) => void;
   onRemove: () => void;
 }) {
@@ -67,12 +74,33 @@ function FrequentModelRow({
   const Vendor = vendorMark({ runtime: option?.runtime ?? model.provider, modelId: model.modelId });
   return (
     <div
+      ref={bind?.rowRef}
+      style={bind?.style}
+      {...bind?.rowListeners}
       data-testid="frequent-model-row"
+      data-model-key={`${model.provider}/${model.modelId}`}
       data-unavailable={option === undefined ? '' : undefined}
-      className={cn(SETTINGS_ROW_CLS, 'flex-wrap gap-y-1 py-2 max-sm:gap-x-2')}
+      data-dragging={bind?.dragging ? 'true' : undefined}
+      className={cn(
+        SETTINGS_ROW_CLS,
+        'group/row relative flex-wrap gap-y-1 py-2 max-sm:gap-x-2',
+        bind !== undefined && 'pl-2.5',
+        bind?.dragging && 'z-10 cursor-grabbing bg-popover shadow-(--e2)',
+      )}
     >
       <span className="flex min-w-0 flex-auto items-center gap-3">
-        <Vendor aria-hidden className="size-4 flex-none text-foreground" />
+        {bind !== undefined && (
+          <SortableGripButton
+            testId="frequent-model-drag-grip"
+            label={t('拖动调整 {model} 优先级', { model: name })}
+            dragging={bind.dragging}
+            buttonRef={bind.activatorRef}
+            activatorProps={bind.activatorProps}
+          />
+        )}
+        <span data-testid="frequent-model-mark" className="flex flex-none items-center">
+          <Vendor aria-hidden className="size-4 flex-none text-foreground" />
+        </span>
         <span className="flex min-w-0 flex-col">
           <span
             className={cn(
@@ -123,7 +151,7 @@ export function FrequentModelsCard({
 }: {
   models: TopModel[];
   options: ModelOption[];
-  onChange: (next: TopModel[]) => void;
+  onChange: (next: TopModel[], reason?: 'reorder') => void;
 }) {
   const { t } = useI18n();
   const listed = new Set(models.map(frequentKey));
@@ -137,6 +165,7 @@ export function FrequentModelsCard({
         .map((o) => [frequentKey(o), o]),
     ).values(),
   ];
+  const byKey = new Map(models.map((m) => [frequentKey(m), m]));
   return (
     <SettingsSection
       testId="frequent-models"
@@ -193,7 +222,7 @@ export function FrequentModelsCard({
               ? t('暂无常用模型。先接入服务商，再返回添加。')
               : t('暂无常用模型，所有任务都使用 Coordinator 的模型。')}
           </p>
-        ) : (
+        ) : models.length === 1 ? (
           models.map((model, index) => (
             <FrequentModelRow
               key={frequentKey(model)}
@@ -205,6 +234,37 @@ export function FrequentModelsCard({
               onRemove={() => onChange(models.filter((_, i) => i !== index))}
             />
           ))
+        ) : (
+          <SortableList
+            items={models}
+            getId={frequentKey}
+            getName={(model) => optionOf(model, options)?.modelName ?? model.modelId}
+            onReorder={(keys) => {
+              const reordered = keys.flatMap((key) => {
+                const hit = byKey.get(key);
+                return hit === undefined ? [] : [hit];
+              });
+              onChange(reordered, 'reorder');
+            }}
+            className="flex flex-col divide-y divide-border"
+            renderItem={(model, bind) => (
+              <FrequentModelRow
+                model={model}
+                option={optionOf(model, options)}
+                bind={bind}
+                onLevel={(thinkingLevel) =>
+                  onChange(
+                    models.map((m) =>
+                      frequentKey(m) === frequentKey(model) ? { ...m, thinkingLevel } : m,
+                    ),
+                  )
+                }
+                onRemove={() =>
+                  onChange(models.filter((m) => frequentKey(m) !== frequentKey(model)))
+                }
+              />
+            )}
+          />
         )}
       </SettingsCard>
     </SettingsSection>

@@ -1815,6 +1815,7 @@ export const EN: Record<string, string> = {
   '暂无常用模型，所有任务都使用 Coordinator 的模型。':
     'No frequently used models, so every task uses the Coordinator model.',
   '{model} 的思考强度': '{model} thinking level',
+  '拖动调整 {model} 优先级': 'Drag to change {model} priority',
   '删除 {model}': 'Remove {model}',
   确认设置: 'Confirm settings',
   正在加载模型: 'Loading models',

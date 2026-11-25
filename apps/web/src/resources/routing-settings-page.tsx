@@ -346,13 +346,17 @@ export function ModelRulesSection() {
   const frequentMutations = useFrequentModelsMutations(teamId);
   const [fixtureFrequent, setFixtureFrequent] = useState(fixture.resources?.topModels ?? []);
   const frequent = live ? (frequentQ.data?.models ?? []) : fixtureFrequent;
-  const saveFrequent = (next: TopModel[]) => {
+  const saveFrequent = (next: TopModel[], reason?: 'reorder') => {
     if (!live) {
       setFixtureFrequent(next);
       return;
     }
     frequentMutations.put.mutate(next, {
-      onError: (error) => toastError(t('保存失败，请重试。'), error),
+      onError: (error) =>
+        toastError(
+          reason === 'reorder' ? t('顺序未能保存，已恢复原来的顺序。') : t('保存失败，请重试。'),
+          error,
+        ),
     });
   };
   const settings = live

@@ -193,15 +193,37 @@ export function ProviderInstanceRow({
   );
 }
 
-function RowGrip({ dragging }: { dragging: boolean }) {
+const keepInList: Modifier = ({ transform, draggingNodeRect, containerNodeRect }) => {
+  if (draggingNodeRect === null || containerNodeRect === null) return { ...transform, x: 0 };
+  const top = containerNodeRect.top - draggingNodeRect.top;
+  const bottom = containerNodeRect.bottom - draggingNodeRect.bottom;
+  return { ...transform, x: 0, y: Math.min(Math.max(transform.y, top), bottom) };
+};
+
+const KEYBOARD_CODES = {
+  start: ['Space'],
+  cancel: ['Escape'],
+  end: ['Space', 'Enter'],
+};
+
+export interface SortableItemBind {
+  rowRef: (node: HTMLElement | null) => void;
+  rowListeners: DOMAttributes<HTMLDivElement> | undefined;
+  activatorRef: (node: HTMLElement | null) => void;
+  activatorProps: Record<string, unknown>;
+  dragging: boolean;
+  style: CSSProperties;
+}
+
+export function SortableGrip({ dragging, testId }: { dragging: boolean; testId: string }) {
   const { t } = useI18n();
   return (
-    <Tooltip>
+    <Tooltip open={dragging ? false : undefined}>
       <TooltipTrigger
         render={
           <span
             aria-hidden
-            data-testid="provider-drag-grip"
+            data-testid={testId}
             className={cn(
               '-mr-2 flex h-5 w-4 flex-none items-center justify-center rounded-(--cds-radius-xs) text-content-dim group-hover/row:text-content-secondary',
               dragging ? 'cursor-grabbing text-content-secondary' : 'cursor-grab',
@@ -218,27 +240,55 @@ function RowGrip({ dragging }: { dragging: boolean }) {
   );
 }
 
-const keepInList: Modifier = ({ transform, draggingNodeRect, containerNodeRect }) => {
-  if (draggingNodeRect === null || containerNodeRect === null) return { ...transform, x: 0 };
-  const top = containerNodeRect.top - draggingNodeRect.top;
-  const bottom = containerNodeRect.bottom - draggingNodeRect.bottom;
-  return { ...transform, x: 0, y: Math.min(Math.max(transform.y, top), bottom) };
-};
-
-const KEYBOARD_CODES = {
-  start: ['Space'],
-  cancel: ['Escape'],
-  end: ['Space', 'Enter'],
-};
-
-function SortableRow({
-  item,
-  selected,
-  onSelect,
+export function SortableGripButton({
+  label,
+  testId,
+  dragging,
+  buttonRef,
+  activatorProps,
 }: {
-  item: ProviderItem;
-  selected: boolean;
-  onSelect: () => void;
+  label: string;
+  testId: string;
+  dragging: boolean;
+  buttonRef: Ref<HTMLButtonElement>;
+  activatorProps: Record<string, unknown>;
+}) {
+  const { t } = useI18n();
+  return (
+    <Tooltip open={dragging ? false : undefined}>
+      <TooltipTrigger
+        render={
+          <Button
+            ref={buttonRef}
+            variant="ghost"
+            size="icon-xs"
+            data-testid={testId}
+            aria-label={label}
+            {...activatorProps}
+            className={cn(
+              '-ml-1 flex-none text-content-dim group-hover/row:text-content-secondary hover:bg-transparent focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:bg-transparent pointer-coarse:size-11',
+              dragging ? 'cursor-grabbing text-content-secondary' : 'cursor-grab',
+            )}
+          />
+        }
+      >
+        <GripVertical aria-hidden className="size-4" />
+      </TooltipTrigger>
+      <TooltipContent side="left" sideOffset={6}>
+        {t('拖动调整优先级')}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SortableEntry<T>({
+  id,
+  item,
+  renderItem,
+}: {
+  id: string;
+  item: T;
+  renderItem: (item: T, bind: SortableItemBind) => ReactNode;
 }) {
   const { t } = useI18n();
   const {
@@ -249,43 +299,42 @@ function SortableRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id });
-  return (
-    <ProviderInstanceRow
-      item={item}
-      selected={selected}
-      onSelect={onSelect}
-      grip={<RowGrip dragging={isDragging} />}
-      rowRef={setNodeRef}
-      rowListeners={listeners}
-      selectRef={setActivatorNodeRef}
-      selectProps={{
-        ...attributes,
-        role: undefined,
-        tabIndex: undefined,
-        'aria-pressed': undefined,
-        'aria-roledescription': t('可拖动排序'),
-      }}
-      dragging={isDragging}
-      style={{
-        transform:
-          transform === null ? undefined : `translate3d(0, ${Math.round(transform.y)}px, 0)`,
-        transition,
-      }}
-    />
-  );
+  } = useSortable({ id });
+  return renderItem(item, {
+    rowRef: setNodeRef,
+    rowListeners: listeners as DOMAttributes<HTMLDivElement> | undefined,
+    activatorRef: setActivatorNodeRef,
+    activatorProps: {
+      ...attributes,
+      role: undefined,
+      tabIndex: undefined,
+      'aria-pressed': undefined,
+      'aria-roledescription': t('可拖动排序'),
+    },
+    dragging: isDragging,
+    style: {
+      transform: transform === null ? undefined : `translate3d(0, ${Math.round(transform.y)}px, 0)`,
+      transition,
+    },
+  });
 }
 
-function SortableRows({
+export function SortableList<T>({
   items,
-  selectedId,
-  onSelect,
+  getId,
+  getName,
   onReorder,
+  onDragStartId,
+  className,
+  renderItem,
 }: {
-  items: ProviderItem[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  items: readonly T[];
+  getId: (item: T) => string;
+  getName: (item: T) => string;
   onReorder: (ids: string[]) => void;
+  onDragStartId?: (id: string) => void;
+  className?: string;
+  renderItem: (item: T, bind: SortableItemBind) => ReactNode;
 }) {
   const { t } = useI18n();
   const sensors = useSensors(
@@ -296,8 +345,11 @@ function SortableRows({
       keyboardCodes: KEYBOARD_CODES,
     }),
   );
-  const ids = items.map((item) => item.id);
-  const nameOf = (id: string | number) => items.find((item) => item.id === id)?.name ?? String(id);
+  const ids = items.map(getId);
+  const nameOf = (id: string | number) => {
+    const match = items.find((item) => getId(item) === id);
+    return match === undefined ? String(id) : getName(match);
+  };
   const positionOf = (id: string | number) => ids.indexOf(String(id)) + 1;
   const announcements: Announcements = {
     onDragStart: ({ active }) =>
@@ -312,7 +364,7 @@ function SortableRows({
         : t('{name} 放在第 {n} 位', { name: nameOf(active.id), n: positionOf(over.id) }),
     onDragCancel: ({ active }) => t('{name} 放回原位', { name: nameOf(active.id) }),
   };
-  const onDragStart = ({ active }: DragStartEvent) => onSelect(String(active.id));
+  const onDragStart = ({ active }: DragStartEvent) => onDragStartId?.(String(active.id));
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (over === null || active.id === over.id) return;
     onReorder(arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id))));
@@ -333,18 +385,51 @@ function SortableRows({
       }}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <div className="flex flex-col divide-y divide-border">
-          {items.map((item) => (
-            <SortableRow
-              key={item.id}
-              item={item}
-              selected={item.id === selectedId}
-              onSelect={() => onSelect(item.id)}
-            />
-          ))}
+        <div className={className}>
+          {items.map((item) => {
+            const id = getId(item);
+            return <SortableEntry key={id} id={id} item={item} renderItem={renderItem} />;
+          })}
         </div>
       </SortableContext>
     </DndContext>
+  );
+}
+
+function SortableRows({
+  items,
+  selectedId,
+  onSelect,
+  onReorder,
+}: {
+  items: ProviderItem[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onReorder: (ids: string[]) => void;
+}) {
+  return (
+    <SortableList
+      items={items}
+      getId={(item) => item.id}
+      getName={(item) => item.name}
+      onReorder={onReorder}
+      onDragStartId={onSelect}
+      className="flex flex-col divide-y divide-border"
+      renderItem={(item, bind) => (
+        <ProviderInstanceRow
+          item={item}
+          selected={item.id === selectedId}
+          onSelect={() => onSelect(item.id)}
+          grip={<SortableGrip dragging={bind.dragging} testId="provider-drag-grip" />}
+          rowRef={bind.rowRef}
+          rowListeners={bind.rowListeners}
+          selectRef={bind.activatorRef}
+          selectProps={bind.activatorProps}
+          dragging={bind.dragging}
+          style={bind.style}
+        />
+      )}
+    />
   );
 }
 

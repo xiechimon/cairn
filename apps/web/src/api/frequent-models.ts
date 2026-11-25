@@ -20,9 +20,17 @@ export function useFrequentModelsMutations(teamId: string | undefined) {
     put: useMutation({
       mutationFn: (models: TopModel[]) =>
         api.put<TopModelsEnvelope>(`/api/teams/${teamId}/top-models`, { models }),
-      onMutate: (models) => store({ models }),
+      onMutate: async (models) => {
+        await client.cancelQueries({ queryKey: key });
+        const previous = client.getQueryData<TopModelsEnvelope>(key);
+        store({ models });
+        return { previous };
+      },
       onSuccess: store,
-      onError: () => client.invalidateQueries({ queryKey: key }),
+      onError: (_error, _models, context) => {
+        if (context?.previous !== undefined) store(context.previous);
+        void client.invalidateQueries({ queryKey: key });
+      },
     }),
   };
 }

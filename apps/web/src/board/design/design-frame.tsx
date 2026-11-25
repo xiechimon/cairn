@@ -1,5 +1,17 @@
 import type { DesignViewport } from '@cairn/shared';
-import { type CSSProperties, type ReactNode, type Ref, useLayoutEffect, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
+import { usePinchZoom, type Zoom } from '../artifact/viewers/zoom.js';
+import type { PreviewWheelPayload } from './design-bridge.js';
 
 export const VIEWPORT_SIZE: Record<DesignViewport, { width: number; height: number } | null> = {
   desktop: null,
@@ -45,43 +57,96 @@ export function frameTransform(
   return { scale, width: preset.width, height: preset.height };
 }
 
+const noop = () => {};
+
 export function DesignFrame({
   frameRef,
   srcdoc,
   title,
   viewport,
+  zoom = 'fit',
+  onFitScale,
+  onZoomChange,
+  wheelBridgeRef,
   overlay,
 }: {
   frameRef: Ref<HTMLIFrameElement>;
   srcdoc: string;
   title: string;
   viewport: DesignViewport;
+  zoom?: Zoom;
+  onFitScale?: (scale: number) => void;
+  onZoomChange?: (next: Zoom) => void;
+  wheelBridgeRef?: RefObject<((wheel: PreviewWheelPayload) => void) | null>;
   overlay?: (transform: FrameTransform) => ReactNode;
 }) {
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
-  const transform = frameTransform(viewport, useSize(canvas));
+  const [stage, setStage] = useState<HTMLDivElement | null>(null);
+  const localFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const setCombinedFrameRef = useCallback(
+    (node: HTMLIFrameElement | null) => {
+      localFrameRef.current = node;
+      if (typeof frameRef === 'function') frameRef(node);
+      else if (frameRef !== null)
+        (frameRef as { current: HTMLIFrameElement | null }).current = node;
+    },
+    [frameRef],
+  );
+  const base = frameTransform(viewport, useSize(canvas));
+  useEffect(() => {
+    if (base !== null) onFitScale?.(base.scale);
+  }, [base?.scale, onFitScale]);
+  const scale = zoom === 'fit' ? (base?.scale ?? 1) : zoom;
+  const transform = base === null ? null : { width: base.width, height: base.height, scale };
+  const applyWheel = usePinchZoom({
+    stage: canvas,
+    content: stage,
+    scale,
+    onChange: onZoomChange ?? noop,
+  });
+  useEffect(() => {
+    if (wheelBridgeRef === undefined) return;
+    wheelBridgeRef.current = (wheel) => {
+      const frame = localFrameRef.current;
+      if (frame === null) return;
+      const rect = frame.getBoundingClientRect();
+      const ratioX = rect.width / Math.max(1, frame.offsetWidth);
+      const ratioY = rect.height / Math.max(1, frame.offsetHeight);
+      applyWheel(
+        wheel.deltaY,
+        wheel.deltaMode,
+        rect.left + wheel.clientX * ratioX,
+        rect.top + wheel.clientY * ratioY,
+      );
+    };
+    return () => {
+      wheelBridgeRef.current = null;
+    };
+  }, [wheelBridgeRef, applyWheel]);
   const fitted = VIEWPORT_SIZE[viewport] !== null;
+  const scrollable = fitted || zoom !== 'fit';
   return (
     <div
       ref={setCanvas}
       data-testid="design-canvas"
       data-viewport={viewport}
       className={
-        fitted
-          ? 'relative flex min-h-0 flex-1 justify-center overflow-hidden bg-(--surface-1) p-6'
+        scrollable
+          ? `relative flex min-h-0 flex-1 overflow-auto overscroll-contain bg-(--surface-1) ${fitted ? 'p-6' : ''}`
           : 'relative flex min-h-0 flex-1 overflow-hidden bg-background'
       }
     >
       {transform !== null && (
         <div
+          ref={setStage}
           data-testid="design-stage"
           className={
-            fitted
-              ? 'relative flex-none overflow-hidden rounded-(--radius-tile) shadow-(--e1)'
+            scrollable
+              ? 'relative m-auto flex-none overflow-hidden rounded-(--radius-tile) shadow-(--e1)'
               : 'relative size-full'
           }
           style={
-            fitted
+            scrollable
               ? {
                   width: transform.width * transform.scale,
                   height: transform.height * transform.scale,
@@ -90,7 +155,7 @@ export function DesignFrame({
           }
         >
           <iframe
-            ref={frameRef}
+            ref={setCombinedFrameRef}
             data-testid="design-frame"
             title={title}
             sandbox={FRAME_SANDBOX}

@@ -29,7 +29,12 @@ import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { isEditableTarget, useTypeToFocus } from '../overlay/hotkeys.js';
+import {
+  cancelDialogEscape,
+  isDraggingSortable,
+  isEditableTarget,
+  useTypeToFocus,
+} from '../overlay/hotkeys.js';
 import { EmbeddedShell } from '../pages/shell.js';
 import { MachinesPage } from '../resources/machines-page.js';
 import { McpServersPage } from '../resources/mcp-servers-page.js';
@@ -360,7 +365,15 @@ export function SettingsDialog({
               el.getAttribute('data-slot') !== 'dialog-overlay' &&
               el.checkVisibility(),
           );
-          if (nestedOpen || layerAbove() || isEditableTarget(details.event?.target ?? null)) return;
+          if (
+            nestedOpen ||
+            layerAbove() ||
+            isEditableTarget(details.event?.target ?? null) ||
+            isDraggingSortable()
+          ) {
+            cancelDialogEscape(details as { cancel?: () => void; allowPropagation?: () => void });
+            return;
+          }
         }
         onClose();
       }}

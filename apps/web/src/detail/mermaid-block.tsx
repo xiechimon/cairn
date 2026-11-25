@@ -1,5 +1,6 @@
 import type * as PeleLazy from 'pele/lazy';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { MIN_ZOOM, usePinchZoom, type Zoom } from '../board/artifact/viewers/zoom.js';
 import { useI18n } from '../i18n/provider.js';
 
 const DRAWN_TYPES = new Set(['flowchart', 'sequence', 'state']);
@@ -127,13 +128,73 @@ export function MermaidBlock({
   );
 }
 
-export function DiagramView({ text, source }: { text: string; source: ReactNode }) {
+export function DiagramView({
+  text,
+  source,
+  zoom = 'fit',
+  onFitScale,
+  onZoomChange,
+}: {
+  text: string;
+  source: ReactNode;
+  zoom?: Zoom;
+  onFitScale?: (scale: number) => void;
+  onZoomChange?: (next: Zoom) => void;
+}) {
   const { t } = useI18n();
   const { host, outcome } = useDiagram(text, true);
   const failure: Failure | null = outcome !== null && outcome !== 'drawn' ? outcome : null;
   const drawn = outcome === 'drawn';
+  const [stage, setStage] = useState<HTMLDivElement | null>(null);
+  const [content, setContent] = useState<HTMLDivElement | null>(null);
+  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
+  const [fitScale, setFitScale] = useState(1);
+
+  useEffect(() => {
+    if (!drawn || host.current === null) {
+      setNatural(null);
+      return;
+    }
+    const svg = host.current.querySelector('svg');
+    if (svg === null) return;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setNatural({ width: rect.width, height: rect.height });
+    }
+  }, [drawn, host]);
+
+  useEffect(() => {
+    if (stage === null || natural === null) return;
+    const measure = () => {
+      const next = Math.max(
+        MIN_ZOOM,
+        Math.min(
+          1,
+          (stage.clientWidth - 48) / natural.width,
+          (stage.clientHeight - 48) / natural.height,
+        ),
+      );
+      setFitScale(next);
+      onFitScale?.(next);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [stage, natural, onFitScale]);
+
+  const scale = zoom === 'fit' ? fitScale : zoom;
+  usePinchZoom({
+    stage,
+    content,
+    scale,
+    onChange: (next) => onZoomChange?.(next),
+  });
+
+  const scaled = drawn && natural !== null && zoom !== 'fit';
   return (
     <div
+      ref={setStage}
       data-testid="artifact-diagram"
       data-state={failure ?? (drawn ? 'drawn' : 'pending')}
       className="relative flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain"
@@ -148,13 +209,24 @@ export function DiagramView({ text, source }: { text: string; source: ReactNode 
         </p>
       )}
       <div
-        ref={host}
-        role="img"
-        aria-label={t('图表')}
-        hidden={failure !== null}
-        className="chat-md-diagram m-auto max-w-full p-6 data-[pending]:invisible"
-        {...(drawn ? {} : { 'data-pending': '' })}
-      />
+        ref={setContent}
+        className="m-auto flex-none p-6"
+        style={
+          scaled
+            ? { width: natural.width * scale + 48, height: natural.height * scale + 48 }
+            : undefined
+        }
+      >
+        <div
+          ref={host}
+          role="img"
+          aria-label={t('图表')}
+          hidden={failure !== null}
+          className="chat-md-diagram origin-top-left data-[pending]:invisible"
+          style={scaled ? { transform: `scale(${scale})`, width: natural.width } : undefined}
+          {...(drawn ? {} : { 'data-pending': '' })}
+        />
+      </div>
       {failure !== null && source}
     </div>
   );

@@ -4,7 +4,7 @@ import {
   type DesignViewport,
   type DesignTarget as ElementTarget,
 } from '@cairn/shared';
-import { type RefObject, useEffect, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import {
   DrawLayer,
@@ -12,7 +12,12 @@ import {
   type Mark,
   useDrawing,
 } from '../../vendor-open-design/draw-overlay.js';
-import { useCommentBridge } from './design-bridge.js';
+import { stepZoom, type Zoom, zoomShortcutAction } from '../artifact/viewers/zoom.js';
+import {
+  type PreviewKeyPayload,
+  type PreviewWheelPayload,
+  useCommentBridge,
+} from './design-bridge.js';
 import {
   type CommentActions,
   CommentList,
@@ -46,6 +51,11 @@ export function DesignCanvas({
   srcdoc,
   title,
   viewport,
+  zoom = 'fit',
+  fitScale = 1,
+  onFitScale,
+  onZoomChange,
+  onEscape,
   commenting,
   onStopCommenting,
   marking,
@@ -64,6 +74,11 @@ export function DesignCanvas({
   srcdoc: string;
   title: string;
   viewport: DesignViewport;
+  zoom?: Zoom;
+  fitScale?: number;
+  onFitScale?: (scale: number) => void;
+  onZoomChange?: (next: Zoom) => void;
+  onEscape?: () => void;
   commenting: boolean;
   onStopCommenting: () => void;
   marking: boolean;
@@ -79,9 +94,39 @@ export function DesignCanvas({
   retarget?: ((target: ElementTarget) => void) | undefined;
 }) {
   const { t } = useI18n();
-  const bridge = useCommentBridge({ frameRef, commenting, comments });
+  const wheelBridgeRef = useRef<((wheel: PreviewWheelPayload) => void) | null>(null);
+  const scale = zoom === 'fit' ? fitScale : zoom;
+  const onPreviewWheel = useCallback(
+    (wheel: PreviewWheelPayload) => wheelBridgeRef.current?.(wheel),
+    [],
+  );
+  const pickedRef = useRef<ElementTarget | null>(null);
+  const onPreviewKeyDown = useCallback(
+    (event: PreviewKeyPayload) => {
+      if (event.key === 'Escape') {
+        if (commenting && pickedRef.current !== null) return;
+        if (marking) onStopMarking();
+        else if (commenting) onStopCommenting();
+        else onEscape?.();
+        return;
+      }
+      const action = zoomShortcutAction(event);
+      if (action === null || onZoomChange === undefined) return;
+      if (action === 'fit') onZoomChange('fit');
+      else onZoomChange(stepZoom(scale, action === 'in' ? 1 : -1));
+    },
+    [marking, commenting, onStopMarking, onStopCommenting, onEscape, onZoomChange, scale],
+  );
+  const bridge = useCommentBridge({
+    frameRef,
+    commenting,
+    comments,
+    onPreviewWheel,
+    onPreviewKeyDown,
+  });
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const { picked, clearPicked } = bridge;
+  pickedRef.current = picked;
   const drawing = useDrawing();
   const { clear } = drawing;
   useEffect(() => {
@@ -143,6 +188,10 @@ export function DesignCanvas({
             srcdoc={srcdoc}
             title={title}
             viewport={viewport}
+            zoom={zoom}
+            {...(onFitScale !== undefined ? { onFitScale } : {})}
+            {...(onZoomChange !== undefined ? { onZoomChange } : {})}
+            wheelBridgeRef={wheelBridgeRef}
             overlay={(transform) => (
               <div
                 data-testid="design-overlay"

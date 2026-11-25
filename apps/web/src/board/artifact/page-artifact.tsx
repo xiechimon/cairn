@@ -25,6 +25,7 @@ import { bakeMarkPng, MarkError, markTarget } from '../design/design-markup.js';
 import { SharePopover } from '../design/design-share.js';
 import { designSrcdoc } from '../design/srcdoc.js';
 import { deliverableHref } from '../made-files.js';
+import { useArtifactPanelControl } from './artifact-panel.js';
 import {
   ArtifactToolbar,
   OldVersionBar,
@@ -34,6 +35,7 @@ import {
 } from './artifact-toolbar.js';
 import { CommentStrip } from './comment-strip.js';
 import { useArtifactVersions } from './use-artifact-versions.js';
+import { useZoomShortcuts, type Zoom, ZoomControl } from './viewers/zoom.js';
 
 const VIEWPORT_LABEL: Record<DesignViewport, string> = {
   desktop: '桌面',
@@ -60,8 +62,16 @@ export function PageArtifact({
   const { live } = useLiveData();
   const versions = useArtifactVersions(todoId, fileName, openedVersionId);
   const { page, shown, viewingOld } = versions;
+  const { active: panelActive, closePanel } = useArtifactPanelControl();
   const [viewport, setViewport] = useState<DesignViewport>('desktop');
   const [source, setSource] = useState(false);
+  const [zoom, setZoom] = useState<Zoom>('fit');
+  const [fitScale, setFitScale] = useState(1);
+  useZoomShortcuts({
+    active: panelActive && !source && page !== undefined && shown !== undefined,
+    scale: zoom === 'fit' ? fitScale : zoom,
+    onChange: setZoom,
+  });
   const [reloads, setReloads] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const htmlQ = useDesignPageHtml(shown?.id ?? null);
@@ -238,11 +248,15 @@ export function PageArtifact({
         }
         controls={
           <>
+            {!source && <ZoomControl zoom={zoom} fitScale={fitScale} onChange={setZoom} />}
             <SegmentedTabs
               value={viewport}
               label={t('视口')}
               className="max-[640px]:hidden"
-              onChange={setViewport}
+              onChange={(next) => {
+                setViewport(next);
+                setZoom('fit');
+              }}
               options={(['desktop', 'tablet', 'mobile'] as const).map((value) => ({
                 value,
                 label: t(VIEWPORT_LABEL[value]),
@@ -377,6 +391,11 @@ export function PageArtifact({
               srcdoc={srcdoc}
               title={`${fileName} · ${versionLabel(shown, t)}`}
               viewport={viewport}
+              zoom={zoom}
+              fitScale={fitScale}
+              onFitScale={setFitScale}
+              onZoomChange={setZoom}
+              onEscape={closePanel}
               commenting={commenting && canComment}
               onStopCommenting={stopCommenting}
               marking={marking && canComment}

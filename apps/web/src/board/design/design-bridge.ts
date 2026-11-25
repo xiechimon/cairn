@@ -36,6 +36,21 @@ function locatedOf(value: unknown): Map<string, Located> | null {
   return out;
 }
 
+export interface PreviewWheelPayload {
+  deltaY: number;
+  deltaMode: number;
+  clientX: number;
+  clientY: number;
+}
+
+export interface PreviewKeyPayload {
+  key: string;
+  code: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+}
+
 export interface CommentBridge {
   ready: boolean;
   unsupported: boolean;
@@ -49,10 +64,14 @@ export function useCommentBridge({
   frameRef,
   commenting,
   comments,
+  onPreviewWheel,
+  onPreviewKeyDown,
 }: {
   frameRef: RefObject<HTMLIFrameElement | null>;
   commenting: boolean;
   comments: readonly DesignCommentRecord[];
+  onPreviewWheel?: (wheel: PreviewWheelPayload) => void;
+  onPreviewKeyDown?: (key: PreviewKeyPayload) => void;
 }): CommentBridge {
   const [ready, setReady] = useState(false);
   const [waited, setWaited] = useState(false);
@@ -115,6 +134,38 @@ export function useCommentBridge({
             locate();
           });
           return;
+        case COMMENT_BRIDGE_MESSAGES.wheel:
+          if (
+            typeof message.deltaY === 'number' &&
+            typeof message.deltaMode === 'number' &&
+            typeof message.clientX === 'number' &&
+            typeof message.clientY === 'number'
+          ) {
+            onPreviewWheel?.({
+              deltaY: message.deltaY,
+              deltaMode: message.deltaMode,
+              clientX: message.clientX,
+              clientY: message.clientY,
+            });
+          }
+          return;
+        case COMMENT_BRIDGE_MESSAGES.keydown:
+          if (
+            typeof message.key === 'string' &&
+            typeof message.code === 'string' &&
+            typeof message.metaKey === 'boolean' &&
+            typeof message.ctrlKey === 'boolean' &&
+            typeof message.altKey === 'boolean'
+          ) {
+            onPreviewKeyDown?.({
+              key: message.key,
+              code: message.code,
+              metaKey: message.metaKey,
+              ctrlKey: message.ctrlKey,
+              altKey: message.altKey,
+            });
+          }
+          return;
       }
     };
     window.addEventListener('message', onMessage);
@@ -123,7 +174,7 @@ export function useCommentBridge({
       if (frameRequest.current !== null) cancelAnimationFrame(frameRequest.current);
       frameRequest.current = null;
     };
-  }, [frameRef, locate]);
+  }, [frameRef, locate, onPreviewWheel, onPreviewKeyDown]);
 
   useEffect(() => {
     if (!ready) return;

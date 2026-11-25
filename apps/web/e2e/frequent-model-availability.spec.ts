@@ -86,7 +86,7 @@ test('a stored SWE-2 row resolves against the live model sources', async ({ page
   await expect(row).not.toContainText('不可用');
   await expect(row).toContainText('Devin');
 
-  const icon = row.locator('svg').first();
+  const icon = row.getByTestId('frequent-model-mark').locator('svg');
   await expect(icon.locator('path').first()).toHaveAttribute('d', LOBEHUB_MONO.devin.paths[0]!);
 
   await expectThinkingLevels(row, 'SWE-2', ['Default (High)', 'Medium', 'High', 'Max']);
@@ -98,7 +98,7 @@ test('a stored Claude Sonnet 5.5 row resolves against the live model sources', a
   await expect(row).not.toContainText('不可用');
   await expect(row).toContainText('Claude Code');
 
-  const icon = row.locator('svg').first();
+  const icon = row.getByTestId('frequent-model-mark').locator('svg');
   await expect(icon).toHaveAttribute('viewBox', '6.2 6.2 235.6 235.6');
   await expect(icon.locator('path').first()).toHaveAttribute('fill', '#D97757');
 
