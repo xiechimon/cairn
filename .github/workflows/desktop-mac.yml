@@ -63,7 +63,6 @@ jobs:
       - name: Test the updater with real macOS signatures
         env:
           CAIRN_REQUIRE_MAC_SIGNATURE_TESTS: '1'
-          NODE_OPTIONS: --test-reporter=spec
         run: node scripts/ops/ci-failed-only.mjs node-test --key signature-mac -- node --test apps/desktop/scripts/signature-mac.test.mjs
 
       - name: Save failed-only CI state

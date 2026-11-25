@@ -82,6 +82,59 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+export function stripNodeOptionsTestReporters(nodeOptions) {
+  if (typeof nodeOptions !== 'string' || !nodeOptions.trim()) return '';
+  const tokens = [];
+  let index = 0;
+  while (index < nodeOptions.length) {
+    while (index < nodeOptions.length && /\s/.test(nodeOptions[index])) index += 1;
+    if (index >= nodeOptions.length) break;
+    const start = index;
+    let value = '';
+    let quote = null;
+    while (index < nodeOptions.length) {
+      const ch = nodeOptions[index];
+      if (quote) {
+        if (ch === '\\' && quote === '"' && index + 1 < nodeOptions.length) {
+          value += nodeOptions[index + 1];
+          index += 2;
+        } else if (ch === quote) {
+          quote = null;
+          index += 1;
+        } else {
+          value += ch;
+          index += 1;
+        }
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+        index += 1;
+      } else if (ch === '\\' && index + 1 < nodeOptions.length) {
+        value += nodeOptions[index + 1];
+        index += 2;
+      } else if (/\s/.test(ch)) {
+        break;
+      } else {
+        value += ch;
+        index += 1;
+      }
+    }
+    tokens.push({ raw: nodeOptions.slice(start, index), value });
+  }
+  const kept = [];
+  for (let i = 0; i < tokens.length; i += 1) {
+    const { value } = tokens[i];
+    if (value === '--test-reporter' || value === '--test-reporter-destination') {
+      i += 1;
+      continue;
+    }
+    if (value.startsWith('--test-reporter=') || value.startsWith('--test-reporter-destination=')) {
+      continue;
+    }
+    kept.push(tokens[i].raw);
+  }
+  return kept.join(' ');
+}
+
 export function selectNodeTestFiles({
   stepKey,
   declaredFiles,
@@ -115,7 +168,11 @@ function runNodeTest({ stepKey, rest, cwd = process.cwd(), env = process.env }) 
   const declaredFiles = rest.slice(2);
   const ctx = contextFromEnv(env);
   if (!ctx.currDir) {
-    const res = spawnSync('node', ['--test', ...declaredFiles], { cwd, env, stdio: 'inherit' });
+    const res = spawnSync(process.execPath, ['--test', ...declaredFiles], {
+      cwd,
+      env,
+      stdio: 'inherit',
+    });
     return res.status ?? 1;
   }
   const selection = selectNodeTestFiles({ stepKey, declaredFiles, ctx, cwd });
@@ -132,6 +189,12 @@ function runNodeTest({ stepKey, rest, cwd = process.cwd(), env = process.env }) 
   mkdirSync(ctx.currDir, { recursive: true });
   const failLog = join(ctx.currDir, `node-test-${safeName(stepKey)}.jsonl`);
   rmSync(failLog, { force: true });
+  const childEnv = { ...env, CI_NODE_TEST_FAIL_LOG: failLog };
+  if (typeof childEnv.NODE_OPTIONS === 'string') {
+    const cleaned = stripNodeOptionsTestReporters(childEnv.NODE_OPTIONS);
+    if (cleaned) childEnv.NODE_OPTIONS = cleaned;
+    else delete childEnv.NODE_OPTIONS;
+  }
   const child = spawnSync(
     process.execPath,
     [
@@ -144,7 +207,7 @@ function runNodeTest({ stepKey, rest, cwd = process.cwd(), env = process.env }) 
     ],
     {
       cwd,
-      env: { ...env, CI_NODE_TEST_FAIL_LOG: failLog },
+      env: childEnv,
       stdio: 'inherit',
     },
   );

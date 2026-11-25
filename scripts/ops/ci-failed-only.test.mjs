@@ -255,6 +255,75 @@ test('node-test CLI runs all files on attempt 1 and only failed file on attempt 
   }
 });
 
+test('node-test CLI strips inherited --test-reporter flags from NODE_OPTIONS while keeping other flags', () => {
+  const dir = makeTestTempDir('ci-failed-only-node-options-');
+  try {
+    const repo = join(dir, 'repo');
+    mkdirSync(repo, { recursive: true });
+    writeFileSync(
+      join(repo, 'env-check.test.mjs'),
+      [
+        "import test from 'node:test';",
+        "import assert from 'node:assert/strict';",
+        "test('preserves non-reporter NODE_OPTIONS', () => {",
+        "  if (process.env.EXPECT_NO_WARNINGS === '1') {",
+        "    assert.ok(process.execArgv.includes('--no-warnings'), JSON.stringify(process.execArgv));",
+        '  }',
+        '});',
+      ].join('\n'),
+    );
+    const cli = join(process.cwd(), 'scripts/ops/ci-failed-only.mjs');
+    const { NODE_TEST_CONTEXT: _ignored, ...cleanEnv } = process.env;
+    const curr1 = join(dir, 'curr1');
+    mkdirSync(curr1, { recursive: true });
+    const res1 = spawnSync(
+      process.execPath,
+      [cli, 'node-test', '--key', 'sig', '--', 'node', '--test', 'env-check.test.mjs'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...cleanEnv,
+          NODE_OPTIONS: '--test-reporter=spec',
+          CI_FAILED_ONLY_PREV_DIR: join(dir, 'prev1'),
+          CI_FAILED_ONLY_CURR_DIR: curr1,
+          CI_FAILED_ONLY_JOB_KEY: 'desktop-mac-signature',
+          GITHUB_SHA: 'deadbeef',
+          GITHUB_RUN_ID: '888',
+          GITHUB_RUN_ATTEMPT: '1',
+        },
+      },
+    );
+    assert.equal(res1.status, 0, res1.stdout + res1.stderr);
+
+    const curr2 = join(dir, 'curr2');
+    mkdirSync(curr2, { recursive: true });
+    const res2 = spawnSync(
+      process.execPath,
+      [cli, 'node-test', '--key', 'sig', '--', 'node', '--test', 'env-check.test.mjs'],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...cleanEnv,
+          NODE_OPTIONS:
+            '--no-warnings --test-reporter=spec --test-reporter tap --test-reporter-destination stdout',
+          EXPECT_NO_WARNINGS: '1',
+          CI_FAILED_ONLY_PREV_DIR: join(dir, 'prev2'),
+          CI_FAILED_ONLY_CURR_DIR: curr2,
+          CI_FAILED_ONLY_JOB_KEY: 'desktop-mac-signature',
+          GITHUB_SHA: 'deadbeef',
+          GITHUB_RUN_ID: '889',
+          GITHUB_RUN_ATTEMPT: '1',
+        },
+      },
+    );
+    assert.equal(res2.status, 0, res2.stdout + res2.stderr);
+  } finally {
+    releaseTestTempDir(dir);
+  }
+});
+
 test('extractGoTestFailures isolates failed packages and top-level tests while falling back on package build failure', () => {
   const testFail = [
     JSON.stringify({ Action: 'run', Package: 'example.com/a', Test: 'TestOne' }),
