@@ -279,6 +279,16 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
       ipcRenderer.send('window-controls:set-visible', visible === true);
     },
   },
+  shell: {
+    isFullScreen: (): Promise<boolean> => ipcRenderer.invoke('desktop-shell:fullscreen'),
+    onFullScreenChange: (listener: (fullScreen: boolean) => void): (() => void) => {
+      const relay = (_event: unknown, fullScreen: boolean) => listener(fullScreen === true);
+      ipcRenderer.on('desktop-shell:fullscreen', relay);
+      return () => {
+        ipcRenderer.removeListener('desktop-shell:fullscreen', relay);
+      };
+    },
+  },
   update: {
     state: (): Promise<DesktopUpdateState> => ipcRenderer.invoke('desktop-update:state'),
     check: (): Promise<void> => ipcRenderer.invoke('desktop-update:check'),

@@ -93,7 +93,7 @@ export function MachineAuthorizePage() {
   const waiting = phase === 'pending' || phase === 'authorizing';
 
   return (
-    <div className="authorize-backdrop fixed inset-0 flex items-center justify-center overflow-y-auto bg-background p-6">
+    <div className="authorize-backdrop desktop-titlebar-drag fixed inset-0 flex items-center justify-center overflow-y-auto bg-background px-6 pt-[calc(1.5rem+var(--titlebar-safe-top))] pb-6">
       <div className="flex w-[400px] max-w-full flex-col items-center gap-4">
         <Card role="region" aria-label={t('授权执行机')} className="w-full gap-3 p-6">
           <h1 className={DIALOG_TITLE_CLS}>{t('授权执行机')}</h1>

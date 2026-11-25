@@ -52,6 +52,33 @@ interface DesktopWindowControlsBridge {
   setVisible: (visible: boolean) => void;
 }
 
+export interface DesktopShellBridge {
+  isFullScreen?: () => Promise<boolean>;
+  onFullScreenChange?: (listener: (fullScreen: boolean) => void) => () => void;
+}
+
+export function syncDesktopFullScreen(root: HTMLElement): () => void {
+  const apply = (fullScreen: boolean): void => {
+    if (fullScreen) root.dataset.fullscreen = '';
+    else delete root.dataset.fullscreen;
+  };
+  const shell = (window as Window & { cairnDesktop?: { shell?: DesktopShellBridge } }).cairnDesktop
+    ?.shell;
+  if (shell === undefined) {
+    delete root.dataset.fullscreen;
+    return () => {};
+  }
+  let active = true;
+  void shell.isFullScreen?.().then((fullScreen) => {
+    if (active) apply(fullScreen === true);
+  });
+  const unsubscribe = shell.onFullScreenChange?.((fullScreen) => apply(fullScreen === true));
+  return () => {
+    active = false;
+    unsubscribe?.();
+  };
+}
+
 export function setDesktopWindowControlsVisible(visible: boolean): void {
   (
     window as Window & { cairnDesktop?: { windowControls?: DesktopWindowControlsBridge } }

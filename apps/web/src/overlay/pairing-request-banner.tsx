@@ -74,7 +74,7 @@ export function PairingRequestBanner() {
     <div
       data-testid="pairing-request-banner"
       role="status"
-      className="pointer-events-auto fixed top-4 right-4 z-(--z-gate) flex w-80 max-w-[calc(100vw-32px)] flex-col gap-2.5 rounded-(--radius-card) bg-popover p-4 shadow-(--e2) ring-1 ring-border"
+      className="desktop-titlebar-no-drag pointer-events-auto fixed top-[calc(1rem+var(--titlebar-safe-top))] right-4 z-(--z-gate) flex w-80 max-w-[calc(100vw-32px)] flex-col gap-2.5 rounded-(--radius-card) bg-popover p-4 shadow-(--e2) ring-1 ring-border"
     >
       <div className="flex flex-col gap-0.5">
         <p className="m-0 text-ui font-medium text-foreground">{t('有新设备请求配对')}</p>

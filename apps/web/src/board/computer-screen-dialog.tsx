@@ -114,7 +114,7 @@ export function ComputerScreenDialog({
         aria-label={title}
         tabIndex={-1}
         data-testid="machine-screen-enlarged"
-        className="fixed inset-0 z-(--z-modal) bg-(--screen-letterbox) pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] outline-none"
+        className="desktop-titlebar-overlay fixed inset-0 z-(--z-modal) bg-(--screen-letterbox) pb-[env(safe-area-inset-bottom)] outline-none"
         onPointerMove={reveal.onPointerMove}
         onPointerLeave={reveal.onPointerLeave}
         onFocus={reveal.onFocus}
@@ -131,7 +131,7 @@ export function ComputerScreenDialog({
           data-testid="machine-screen-bar"
           data-shown={reveal.shown ? 'true' : 'false'}
           className={cn(
-            'absolute top-[calc(env(safe-area-inset-top)+0.5rem)] left-1/2 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-3 rounded-(--radius-popover) bg-popover py-1 pr-1 pl-4 text-popover-foreground shadow-(--e2) transition-opacity duration-(--dur-overlay) motion-reduce:transition-none',
+            'desktop-titlebar-no-drag absolute top-[calc(var(--titlebar-safe-top)+0.5rem)] left-1/2 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-3 rounded-(--radius-popover) bg-popover py-1 pr-1 pl-4 text-popover-foreground shadow-(--e2) transition-opacity duration-(--dur-overlay) motion-reduce:transition-none',
             reveal.shown ? 'opacity-100' : 'pointer-events-none opacity-0',
           )}
         >

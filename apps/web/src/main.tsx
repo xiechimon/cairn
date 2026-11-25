@@ -9,6 +9,7 @@ import {
   followDesktopNavigation,
   markDesktopShell,
   showPendingRollbackNotice,
+  syncDesktopFullScreen,
 } from './desktop-shell.js';
 import { EN } from './i18n/en.js';
 import { applyLocaleLang, readStoredLocale } from './i18n/locale.js';
@@ -23,7 +24,9 @@ import './styles/app.css';
 
 const bootStorage = safeLocalStorage();
 paintTheme(readStoredTheme(bootStorage));
-markDesktopShell(document.documentElement, navigator.userAgent, window.location.pathname);
+if (markDesktopShell(document.documentElement, navigator.userAgent, window.location.pathname)) {
+  syncDesktopFullScreen(document.documentElement);
+}
 followDesktopNavigation((path) => void router.navigate(path));
 followSystemTheme(bootStorage);
 applyLocaleLang(readStoredLocale(bootStorage));

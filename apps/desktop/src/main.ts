@@ -755,6 +755,13 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
   window.on('hide', () => {
     if (mainWindow === window) mainWindowShown = false;
   });
+  const publishFullScreen = (fullScreen: boolean): void => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('desktop-shell:fullscreen', fullScreen);
+    }
+  };
+  window.on('enter-full-screen', () => publishFullScreen(true));
+  window.on('leave-full-screen', () => publishFullScreen(false));
   window.once('ready-to-show', () => showRestored(window, restore));
   const forgetActivity = (): void => {
     if (mainWindow === window) pageActivity = null;
@@ -1492,6 +1499,10 @@ function serveUpdates(
   ipcMain.on('window-controls:set-visible', (event, visible: unknown) => {
     if (!fromOwnPage(event)) return;
     BrowserWindow.fromWebContents(event.sender)?.setWindowButtonVisibility(visible === true);
+  });
+  ipcMain.handle('desktop-shell:fullscreen', (event) => {
+    if (!fromOwnPage(event)) return false;
+    return BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false;
   });
   ipcMain.handle('desktop-update:state', (event) =>
     fromOwnPage(event) ? channels.shellState() : null,

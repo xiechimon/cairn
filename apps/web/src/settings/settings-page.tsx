@@ -351,7 +351,7 @@ export function SettingsDialog({
       height={tabs ? '100dvh' : 'var(--settings-h)'}
       className={
         tabs
-          ? 'inset-0! top-0! left-0! max-h-none! translate-x-0! translate-y-0! animate-none! rounded-none! pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-foreground shadow-none! duration-0!'
+          ? 'desktop-titlebar-overlay inset-0! top-0! left-0! max-h-none! translate-x-0! translate-y-0! animate-none! rounded-none! pb-[env(safe-area-inset-bottom)] text-foreground shadow-none! duration-0!'
           : 'animate-none! rounded-(--radius-sheet)! text-foreground shadow-(--e3)! duration-0!'
       }
       onBackdropClick={onClose}
@@ -381,7 +381,11 @@ export function SettingsDialog({
       <div ref={setFocusRef} tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
         <header
           data-testid="settings-title"
-          className="flex h-11 flex-none items-center justify-between gap-2 border-b border-border pr-3 pl-4"
+          className={
+            tabs
+              ? 'desktop-titlebar-head flex h-11 flex-none items-center justify-between gap-2 border-b border-border pr-3 pl-4'
+              : 'flex h-11 flex-none items-center justify-between gap-2 border-b border-border pr-3 pl-4'
+          }
         >
           <h1 className="m-0 text-card-title font-semibold text-foreground">{t('设置')}</h1>
           <IconTooltip

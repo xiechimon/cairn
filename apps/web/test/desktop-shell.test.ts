@@ -1,6 +1,11 @@
 import { DESKTOP_SHELL_USER_AGENT, DESKTOP_TRAY_PATH } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
-import { MAC_DESKTOP_SHELL, MAC_TRAY_SHELL, markDesktopShell } from '../src/desktop-shell.js';
+import { afterEach, describe, expect, test } from 'vitest';
+import {
+  MAC_DESKTOP_SHELL,
+  MAC_TRAY_SHELL,
+  markDesktopShell,
+  syncDesktopFullScreen,
+} from '../src/desktop-shell.js';
 
 interface FakeElement {
   className: string;
@@ -60,5 +65,48 @@ describe('markDesktopShell', () => {
     expect(markDesktopShell(element, BROWSER_UA, '/app')).toBe(false);
     expect(root.dataset.shell).toBeUndefined();
     expect(appended).toHaveLength(0);
+  });
+});
+
+describe('syncDesktopFullScreen', () => {
+  afterEach(() => {
+    delete (globalThis as { window?: unknown }).window;
+  });
+
+  test('tracks initial fullscreen state and live transitions from cairnDesktop.shell', async () => {
+    const listeners = new Set<(fullScreen: boolean) => void>();
+    (globalThis as { window?: unknown }).window = {
+      cairnDesktop: {
+        shell: {
+          isFullScreen: async () => true,
+          onFullScreenChange: (listener: (fullScreen: boolean) => void) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+        },
+      },
+    };
+    const { root, element } = fakeRoot();
+    const stop = syncDesktopFullScreen(element);
+    await Promise.resolve();
+    expect(root.dataset.fullscreen).toBe('');
+
+    for (const listener of listeners) listener(false);
+    expect(root.dataset.fullscreen).toBeUndefined();
+
+    for (const listener of listeners) listener(true);
+    expect(root.dataset.fullscreen).toBe('');
+
+    stop();
+    expect(listeners.size).toBe(0);
+  });
+
+  test('clears stale fullscreen marker when shell bridge is unavailable', () => {
+    (globalThis as { window?: unknown }).window = {};
+    const { root, element } = fakeRoot();
+    root.dataset.fullscreen = '';
+    const stop = syncDesktopFullScreen(element);
+    expect(root.dataset.fullscreen).toBeUndefined();
+    stop();
   });
 });

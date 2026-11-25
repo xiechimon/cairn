@@ -297,7 +297,7 @@ export function AppSidebar({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="app-menu-trigger fixed top-1.5 left-1 z-(--z-floating) size-11 text-content-secondary"
+                  className="app-menu-trigger desktop-titlebar-no-drag fixed top-[calc(0.375rem+var(--titlebar-safe-top))] left-1 z-(--z-floating) size-11 text-content-secondary"
                   aria-expanded={drawerOpen}
                   onClick={() => setDrawerOpen(true)}
                 />

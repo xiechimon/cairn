@@ -436,17 +436,31 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   .route-page-dialog {
     --settings-w: 100%;
     --settings-h: 100%;
+    --route-dialog-top: var(--titlebar-safe-top);
     top: 0;
     left: 0;
     translate: none;
     max-height: none;
     border-radius: 0;
+    padding-top: var(--titlebar-safe-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  :root[data-shell="mac-desktop"]:not([data-fullscreen]) .route-page-dialog::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 1;
+    height: var(--titlebar-inset-top);
+    pointer-events: auto;
+    -webkit-app-region: drag;
+  }
+
   html:has([data-slot="demo-banner"]) .route-page-dialog {
+    --route-dialog-top: 0px;
     top: 2.25rem;
     --settings-h: calc(100% - 2.25rem);
+    padding-top: 0;
   }
 }
 
@@ -926,6 +940,22 @@ html:has([data-slot="demo-banner"]) .app-drawer {
     padding-left: 52px;
   }
 
+  .page-shell [data-testid="page-topbar"] {
+    padding-top: var(--titlebar-safe-top);
+    height: calc(3.5rem + var(--titlebar-safe-top));
+  }
+
+  :root[data-shell="mac-desktop"]:not([data-fullscreen]) .page-shell [data-testid="page-topbar"] {
+    -webkit-app-region: drag;
+  }
+
+  :root[data-shell="mac-desktop"]:not([data-fullscreen])
+    .page-shell
+    [data-testid="page-topbar"]
+    :is(button, a, input, select, textarea, [role="button"], [role="tab"]) {
+    -webkit-app-region: no-drag;
+  }
+
   body:has(.side-panel[data-phone-tab]) .app-menu-trigger {
     z-index: calc(var(--z-panel-low) + 1);
   }
@@ -947,7 +977,7 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   }
 
   html[data-narrow-chrome] {
-    --narrow-top: calc(env(safe-area-inset-top) + 5.75rem);
+    --narrow-top: calc(var(--titlebar-safe-top) + 5.75rem);
     --narrow-bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 4.375rem);
   }
 
@@ -959,7 +989,7 @@ html:has([data-slot="demo-banner"]) .app-drawer {
 
   html[data-narrow-chrome] .board-sheet .side-panel[data-testid="side-chat-panel"] {
     z-index: calc(var(--z-narrow-chrome) + 1);
-    padding-top: env(safe-area-inset-top);
+    padding-top: var(--titlebar-safe-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
 
@@ -967,7 +997,7 @@ html:has([data-slot="demo-banner"]) .app-drawer {
     position: fixed;
     inset: 0;
     z-index: calc(var(--z-narrow-chrome) + 1);
-    padding-top: env(safe-area-inset-top);
+    padding-top: var(--titlebar-safe-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
 
@@ -1365,29 +1395,80 @@ body:has([data-testid="chief-body"]),
   background: var(--tray-line);
 }
 
-:root[data-shell="mac-desktop"] .sidebar-team-row {
-  padding-left: 82px;
+:root {
+  --titlebar-inset-top: 0px;
+  --titlebar-inset-left: 0px;
+  --titlebar-safe-top: max(env(safe-area-inset-top), var(--titlebar-inset-top));
+}
+
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) {
+  --titlebar-inset-top: 40px;
+  --titlebar-inset-left: 82px;
+}
+
+.desktop-titlebar-overlay {
+  padding-top: var(--titlebar-safe-top);
+}
+
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .desktop-titlebar-drag::before,
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .desktop-titlebar-overlay::before,
+:root[data-shell="mac-desktop"][data-narrow-chrome]:not([data-fullscreen])
+  :is(
+    .board-sheet .side-panel[data-testid="side-chat-panel"],
+    [data-testid="artifact-panel"]
+  )::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: var(--titlebar-inset-top);
+  pointer-events: auto;
   -webkit-app-region: drag;
 }
 
-:root[data-shell="mac-desktop"] .sidebar-team-name {
-  visibility: hidden;
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .desktop-titlebar-head {
+  -webkit-app-region: drag;
 }
 
-:root[data-shell="mac-desktop"] .sidebar-footer-brand {
-  display: flex;
-}
-
-:root[data-shell="mac-desktop"] .sidebar-team-row :is(button, a) {
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .desktop-titlebar-no-drag,
+:root[data-shell="mac-desktop"]:not([data-fullscreen])
+  .desktop-titlebar-head
+  :is(button, a, input, select, textarea, [role="button"], [role="tab"]) {
   -webkit-app-region: no-drag;
 }
 
-:root[data-shell="mac-desktop"] .first-run-drag {
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .sidebar-team-row {
+  padding-left: var(--titlebar-inset-left);
   -webkit-app-region: drag;
 }
 
-:root[data-shell="mac-desktop"] .sidebar-peek-trigger {
-  left: 90px;
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .sidebar-team-name {
+  visibility: hidden;
+}
+
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .sidebar-footer-brand {
+  display: flex;
+}
+
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .sidebar-team-row :is(button, a) {
+  -webkit-app-region: no-drag;
+}
+
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .first-run-drag {
+  height: var(--titlebar-inset-top);
+  -webkit-app-region: drag;
+}
+
+:root[data-shell="mac-desktop"]:not([data-fullscreen]) .sidebar-peek-trigger {
+  left: calc(var(--titlebar-inset-left) + 0.5rem);
+}
+
+@media (min-width: 641px) {
+  :root[data-shell="mac-desktop"]:not([data-fullscreen])
+    .page-shell:not(:has(> .board-sidebar))
+    [data-testid="page-topbar"] {
+    padding-left: calc(var(--titlebar-inset-left) + 3.25rem);
+  }
 }
 
 .desktop-drag-strip {
@@ -1397,6 +1478,10 @@ body:has([data-testid="chief-body"]),
   height: 8px;
   pointer-events: none;
   -webkit-app-region: drag;
+}
+
+:root[data-fullscreen] .desktop-drag-strip {
+  display: none;
 }
 
 .chat-md-diagram {

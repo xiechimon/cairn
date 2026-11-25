@@ -73,7 +73,7 @@ export function NarrowTopControls({
   return (
     <div
       data-slot="narrow-top"
-      className="pointer-events-none fixed inset-x-0 top-0 z-(--z-narrow-chrome) pt-[env(safe-area-inset-top)]"
+      className="desktop-titlebar-overlay desktop-titlebar-drag pointer-events-none fixed inset-x-0 top-0 z-(--z-narrow-chrome)"
     >
       <div className="relative h-18">
         <IconTooltip
