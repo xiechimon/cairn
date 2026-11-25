@@ -4,7 +4,7 @@
 
 > Canonical status: this volume = the pacman positioning source of truth (thesis / criterion / two axes / what not to do / honesty list),
 > revising volume 06 D1's positioning narrative (**revision does not replace** — D1's other components stay valid).
-> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01). → general-assistant thesis (owner decision, 2026-11-11). → personal-assistant thesis and second-person criterion (owner decision, 2026-11-14; §1, §2). → action-bound approvals and Electron-on-three-OSes form factor (owner decision, 2026-11-17; §0 P7, §3.5, §4).
+> Ruling chain: #515 criterion and two axes → #516 adversarial ruling (thesis final draft) → #520 carrier six items (user 2026-10-02 agree). → D55 three-pillar thesis (#2489, PR #2490; owner accepted 2026-11-01). → general-assistant thesis (owner decision, 2026-11-11). → personal-assistant thesis and second-person criterion (owner decision, 2026-11-14; §1, §2). → action-bound approvals and Electron-on-three-OSes form factor (owner decision, 2026-11-17; §0 P7, §3.5, §4). → official hosted Cairn Cloud with separate private control-plane and billing repo while keeping open-source self-hosting free (owner decision, 2026-11-25; §4).
 > Argument and trade-offs were in ADR 0008 (removed; see the git history at 608eabac0): **the ADR recorded why, this volume records what**.
 
 ## 0. Overview
@@ -109,7 +109,7 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 
 ## 4. What Not to Do (#515 Out of scope fixed)
 
-- Selling anything or gating features (owner plan D96–D105, 2026-11-06): all code is Apache-2.0 open source with DCO sign-off and no CLA, the audience is one person who writes code (§1), and only the private rotating eval holdout stays unpublished. No project-run hosted control plane and no resold compute (built-in models gateway / subscription billing stay out); credentials stay on the user's machine. Threads run on the app's machine, registered runners, or planned E2B/Daytona sandboxes with the user's own key.
+- Gating open-source self-hosting features (revised by owner decision, 2026-11-25; supersedes the 2026-11-06 "no project-run hosted control plane" clause in D96–D105): this public repository remains Apache-2.0 open source with DCO sign-off and no CLA, and free self-hosting with full functionality stays permanently un-gated (only the private rotating eval holdout stays unpublished). An official paid hosted service (**Cairn Cloud** — no cloud free tier; hosting an isolated single-tenant Cairn server/brain per user plus on-demand ephemeral cloud coding VMs when all local machines are offline, while the user's devices act as windows and their machines on Mac, Linux, Windows, or servers run as Runners, with zero-markup BYOK first and optional model credits later) is now in scope; its multi-tenant control plane, orchestration, and billing (Creem as Merchant of Record) will live in a separate private repository rather than this open-source repo. Local execution credentials (Claude Code, Codex CLI, local Git SSH keys) remain on the user's own machines; threads run on the app's machine, registered runners, or ephemeral cloud runners with short-lived single-repo tokens.
 - The Squad object — Chief's subset, and explicitly "does not raise concurrency, does not merge agents"; only copy its wake-rule table, do not introduce the object.
 - Chief autonomous dispatch — first want "shutdown without breaking the chain", not "still deciding on its own when shut down".
 - Team features (owner decision, 2026-11-14): channels shared by several people, team roles and permissions, team billing. Another person uses cairn by running their own copy.
@@ -137,6 +137,7 @@ Construction tickets (2026-10-24; #1625 has since landed through #2050): #1623 (
 
 ## 6. Sources
 
+- Owner decision of 2026-11-25 (prior art: `docs/research/cairn-cloud-2026-11-25.md`): official hosted Cairn Cloud with multi-tenant control plane and Creem billing in a separate private repo later, while keeping this open-source repo Apache-2.0 free self-hosting — §4.
 - Owner decisions of 2026-11-14 (Amp thread T-01a1d814-51d8-754a-b827-249c6ec75676): code and personal affairs in one product, one person and no team features, no fixed order among mail, calendar and job search, and the second-person criterion — §1, §2, §4.
 - #2489 / PR #2490 (hands-on walk of DeepSeek Harness's super-agent and sig, 2026-11-01) and plan decision D55 (owner accepted the three-pillar thesis, 2026-11-01) — §1 thesis, P3, P5, P6, maintenance trigger.
 - #515 (Map: pacman self-positioning) — criterion / two axes / Out of scope ruling.
