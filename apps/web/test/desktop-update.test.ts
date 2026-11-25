@@ -1,10 +1,21 @@
-import { describe, expect, it } from 'vitest';
-import { desktopUpdateView, updateInstallRefusalCopy } from '../src/board/desktop-update.js';
+import { toast } from 'sonner';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  desktopUpdateView,
+  updateDesktopNow,
+  updateInstallRefusalCopy,
+} from '../src/board/desktop-update.js';
 import { EN } from '../src/i18n/en.js';
 import { translate, type TFunc } from '../src/i18n/translate.js';
 
 const zh: TFunc = (key, vars) => translate('zh', EN, key, vars);
 const en: TFunc = (key, vars) => translate('en', EN, key, vars);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  delete (globalThis as { window?: unknown }).window;
+  delete (globalThis as { navigator?: unknown }).navigator;
+});
 
 describe('desktop update button presentation', () => {
   it('treats an offline update check as a network notice with no red failure mark and allows retry', () => {
@@ -48,5 +59,32 @@ describe('desktop update button presentation', () => {
     expect(updateInstallRefusalCopy('Error: EACCES: permission denied', zh)).toBe(
       '未能安装更新，点击重试',
     );
+  });
+
+  it('updateDesktopNow surfaces install refusals and non-installable check states via toastError', async () => {
+    const errorSpy = vi.spyOn(toast, 'error').mockImplementation(() => '');
+    let currentState: { status: string; version?: string } = { status: 'ready', version: '0.43.0' };
+    (globalThis as { navigator?: unknown }).navigator = { language: 'zh-CN' };
+    (globalThis as { window?: unknown }).window = {
+      cairnDesktop: {
+        update: {
+          state: async () => currentState,
+          check: async () => {},
+          install: async () => ({
+            ok: false,
+            reason: 'the staged update is not signed by the Cairn certificate',
+          }),
+          subscribe: () => () => {},
+        },
+      },
+    };
+
+    await updateDesktopNow();
+    expect(errorSpy).toHaveBeenCalledWith('更新包签名验证未通过，无法安装', undefined);
+
+    errorSpy.mockClear();
+    currentState = { status: 'offline' };
+    await updateDesktopNow();
+    expect(errorSpy).toHaveBeenCalledWith('无法连接网络，未能检查更新', undefined);
   });
 });

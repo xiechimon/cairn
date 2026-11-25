@@ -1877,7 +1877,12 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
     }
     if (pathname === '/api/teams/t1/providers') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ providers: [] }));
+      res.end(JSON.stringify({ presets: [], providers: [] }));
+      return;
+    }
+    if (pathname === '/api/teams/t1/notifications') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ unreadThreadIds: [] }));
       return;
     }
     if (pathname === '/api/teams/t1/model-sources') {
@@ -1887,7 +1892,7 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
     }
     if (pathname === '/api/teams/t1/model-routing') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ connections: [], rules: [], policies: [] }));
+      res.end(JSON.stringify({ edges: [], connections: [], quota: [] }));
       return;
     }
     if (pathname === '/api/teams/t1/routing-settings') {
@@ -1899,11 +1904,46 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(
         JSON.stringify({
-          agentActor: { machineId: null, modelId: 'm1' },
-          stream: [],
-          streamAt: [],
+          chief: {
+            id: 'chief-u1-t1',
+            userId: 'u1',
+            teamId: 't1',
+            agent: null,
+            lastTurnAt: null,
+            createdAt: 0,
+            tz: null,
+          },
+          agentActor: null,
+          context: null,
+          watches: [],
+          wakes: [],
         }),
       );
+      return;
+    }
+    if (pathname === '/api/tasks') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ entries: [] }));
+      return;
+    }
+    if (pathname === '/api/computers/steps') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ steps: [] }));
+      return;
+    }
+    if (pathname === '/api/teams/t1/usage/daily') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ days: [], models: [], projects: [] }));
+      return;
+    }
+    if (pathname === '/api/server/backup') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ state: 'none' }));
+      return;
+    }
+    if (/^\/api\/conversations\/[^/]+\/messages$/.test(pathname)) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ messages: [], nextCursor: null }));
       return;
     }
     if (pathname === '/api/user/me') {
@@ -2073,7 +2113,9 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
       remoteChild.kill('SIGKILL');
     }
     for (const client of sseClients) client.end();
+    feedServer.closeAllConnections();
     feedServer.close();
+    remoteServer.closeAllConnections();
     remoteServer.close();
     for (const pid of matchingPids(`^${remoteAppBundle}/`)) {
       try {
