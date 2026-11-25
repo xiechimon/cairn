@@ -78,7 +78,7 @@ export function classifyBranch({
   tipAgeDays,
   changeOnMain,
 }) {
-  if (PROTECTED_REFS.has(name) || name.startsWith('queue/')) {
+  if (PROTECTED_REFS.has(name) || name.startsWith('queue/') || name.startsWith('enqueue/')) {
     return { action: 'keep', reason: 'protected ref' };
   }
   if (openPr !== null && openPr !== undefined) {
@@ -603,7 +603,11 @@ function collectBranches({ mainRef, prs }) {
   const branches = { deleted: [], kept: [], report: [] };
   const preflight = { deleted: [], kept: [], report: [] };
   for (const head of heads) {
-    if (PROTECTED_REFS.has(head.name) || head.name.startsWith('queue/')) {
+    if (
+      PROTECTED_REFS.has(head.name) ||
+      head.name.startsWith('queue/') ||
+      head.name.startsWith('enqueue/')
+    ) {
       branches.kept.push(head.name);
       continue;
     }

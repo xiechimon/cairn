@@ -296,9 +296,28 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
 
 ## Tests
 
+- `speculative-queue.test.mjs`: FIFO ordering of `refs/heads/enqueue/<ts>-<sha9>`, admission check requiring preflight green, direct fast-forward on empty queue, prefix batch fast-forward cancelling superseded runs, partial prefix promotion preserving valid downstream `queue/try/*` refs, mid-queue red wait without false blame, one-time retry + tail rebuild on red #1, rebase conflict ejection naming conflicted files, max speculative depth 4, external `main` advance rebuild, and end-to-end real bare-git rebase/batch-promote harness.
 - `promote-queue.test.mjs`: predicate matrix — green run promotes; running,
   cancelled, failed or missing runs do not; stale base refuses; the three job
   names are required, not any aggregate conclusion.
+
+## Speculative + batching queue (2026-11-25)
+
+Because `xiechimon/cairn` is a User-owned repository without PRs, GitHub's native Merge Queue does not apply, yet serial one-at-a-time queuing forces every concurrent lane to discard its preflight run and re-run full ~6-minute CI sequentially whenever another lane lands. Since `ci.yml` uses per-commit/per-ref concurrency (`ci-push-${ref}-${sha}` with `cancel-in-progress: false`), multiple speculative stacks run concurrently without cancelling one another.
+
+### Refs and states
+
+- `refs/heads/enqueue/<13-digit-ts>-<sha9>`: collision-free per-submission inbox written by `push-queue.mjs`. Not matched by `ci.yml` (`branches: [main, 'queue/**', 'preflight/**']`), so enqueueing triggers no duplicate CI; `repo-hygiene.mjs` preserves `enqueue/*`.
+- `refs/heads/queue/try/<id>`: bot-managed speculative branch holding entry `id` rebased atop `main` plus all preceding active queue entries up to `MAX_SPECULATIVE_DEPTH = 4`. Pushing `queue/try/<id>` triggers `ci.yml`, and completion on `queue/**` wakes `promote.yml` on `main`.
+- States per queued entry `i`: `UNVERIFIED` (missing preflight green evidence on original SHA) -> ejected at admission; `PENDING` (try ref building or CI running); `RETRYABLE` (CI failed on `run_attempt === 1`); `GREEN` (`check`, `pack-smoke`, `e2e-gate` all succeeded/skipped on latest `try_i` or fast-forwardable `entry_i` at index 0); `RED` (`run_attempt >= 2` failure).
+
+### Transitions and failure behavior
+
+- **Admission & 0s fast path**: `push-queue.mjs` still requires preflight green evidence (`check`, `pack-smoke`, `e2e-gate`). If `enqueue/*` is empty, `HEAD` contains `origin/main`, and exact `HEAD` has green preflight, `push-queue.mjs` fast-forwards `main` directly (falling back cleanly to `enqueue/*` if another push wins the race). Otherwise it pushes `HEAD:refs/heads/enqueue/<id>`, dispatches `promote.yml` on `main`, and polls every 15s (configurable via `PUSH_QUEUE_POLL_SECONDS`).
+- **Build speculative window (depth 4)**: for each active entry up to index 3, if `try_i` already sits cleanly on `expectedParent` (`main` for index 0, `try_{i-1}` otherwise) with identical `+` commit signatures (`git cherry`), keep `try_i` untouched so running CI is preserved. Otherwise rebase `entry_i` onto `expectedParent` in an isolated temporary worktree (committer `xiechimon <157263579+xiechimon@users.noreply.github.com>`) and push `refs/heads/queue/try/<id>`. On rebase conflict, delete `enqueue/<id>` + `queue/try/<id>`, comment conflicting file paths on `entry_i.sha`, and continue building the tail on the previous good base.
+- **Prefix batch fast-forward**: scan active entries from the head; find the furthest index `g` whose `verdict === 'green'` and whose every ancestor up to `main` is valid (allowing intermediate entries `0..g-1` to still be pending or even skipped, since `T_g` contains their exact cumulative tree + diffs). Push `T_g:refs/heads/main` with `GH013` retry (`pushToMain`), close `Closes #N` issues across `main_before..T_g`, cancel superseded `T_0..T_{g-1}` CI runs, delete all landed `enqueue/*` + `queue/try/*` refs, and immediately loop to promote the next window.
+- **Exact culprit attribution & one-time retry**: never eject or blame entry `r > 0` while any predecessor `0..r-1` is still `pending`, `retryable`, or `red`, because an upstream change may have caused `T_r` to fail. Retry failed jobs (`rerun-failed-jobs`) or cancelled runs (`rerun`) once (`run_attempt === 1`). Only eject entry `0` once `run_attempt >= 2` is red, commenting the run URL and failed jobs on `entry_0.sha`, cancelling obsolete downstream `try/*` runs, and immediately rebuilding remaining entries onto `main`.
+- **Trust boundary**: `promote.yml` runs on `main` (`workflow_run` on `queue/**`, `push` on `main`, `workflow_dispatch`, and 5-minute `schedule` backstop) with `concurrency: promote-main` (`cancel-in-progress: false`) so `environment: desktop-release`'s `main`-only branch policy holds unchanged.
 - `workflow-concurrency.test.mjs`: queue, main and other refs use per-SHA
   groups that never cancel.
 - `guard-queue.test.mjs`, `push-queue.test.mjs`: refuse a stacked, replacing or

@@ -1,17 +1,21 @@
 name: promote
 
-# Auto-promotes the queue/main head once its ci run (or an existing preflight/*
-# ci run on the same SHA) is green. Preflight-green fast-forward SHAs land
-# directly through push-queue.mjs without pushing queue/main; this workflow
-# handles candidates that do enter queue/main. The workflow_run trigger only fires
-# for workflow files on the default branch, so this file is trusted code; the
-# green-main ruleset still decides what may land on main.
+# Auto-promotes green commits from the speculative batching merge queue
+# (refs/heads/enqueue/* + refs/heads/queue/try/*) onto main. Preflight-green
+# fast-forward SHAs land directly through push-queue.mjs when the queue is
+# idle; concurrent lanes enqueue into enqueue/* and run CI in parallel on
+# queue/try/*. The workflow_run trigger only fires for workflow files on main,
+# so this file is trusted code; the green-main ruleset guards main.
 on:
   workflow_run:
     workflows: [ci]
     types: [completed]
     branches: ['queue/**']
+  push:
+    branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
 
 concurrency:
   group: promote-main
@@ -20,11 +24,7 @@ concurrency:
 jobs:
   promote:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    # Reuses the cairn-release app identity: GITHUB_TOKEN pushes cannot carry
-    # commits that touch .github/workflows and do not re-trigger downstream
-    # workflows (desktop-release), so the app token does the write while the
-    # job token only reads run and check state.
+    timeout-minutes: 20
     environment: desktop-release
     permissions:
       contents: read
@@ -48,17 +48,8 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
-      - name: Promote the queue head if green; rerun a red one once, then drop it
+      - name: Advance speculative batching merge queue
         env:
           GH_TOKEN: ${{ github.token }}
           QUEUE_WRITE_TOKEN: ${{ steps.app-token.outputs.token }}
-          PROMOTE_WAIT_SECONDS: 180
-        run: |
-          set +e
-          node scripts/ops/promote-queue.mjs --wait --enforce
-          code=$?
-          set -e
-          # 2 = verdict wait: an older SHA finished while the head still runs;
-          # the head's own completion event will evaluate it again.
-          if [ "$code" -eq 2 ]; then exit 0; fi
-          exit "$code"
+        run: node scripts/ops/speculative-queue.mjs --enforce

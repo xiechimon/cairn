@@ -277,7 +277,13 @@ test('branch backing an open PR is kept', () => {
 });
 
 test('protected refs and branches with a live ci run are never deleted', () => {
-  for (const name of ['main', 'queue/main', 'queue-state/main']) {
+  for (const name of [
+    'main',
+    'queue/main',
+    'queue-state/main',
+    'queue/try/1732510000000-aaaaaaaaa',
+    'enqueue/1732510000000-aaaaaaaaa',
+  ]) {
     assert.equal(
       classifyBranch({
         name,

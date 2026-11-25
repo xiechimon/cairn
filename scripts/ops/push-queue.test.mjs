@@ -7,12 +7,15 @@ import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import { preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
 import {
+  classifyWaitStatus,
+  DEFAULT_POLL_SECONDS,
   failedGreenContexts,
   fetchCheckRuns,
   landingTarget,
   laneName,
   missingGreenContexts,
   nextWaitAction,
+  planEnqueueOrLand,
   planPush,
   preflightEvidence,
   stampCommand,
@@ -368,5 +371,90 @@ test('stamp-then-preflight produces evidence on pushedSha so landingTarget fast-
   assert.deepEqual(
     landingTarget({ pushedSha: stampedSha, evidenceSha: evidence.sha, containsMain: true }),
     { action: 'fast-forward-main', sha: stampedSha },
+  );
+});
+
+test('planEnqueueOrLand fast-forwards only when queue is empty and HEAD is directly green on main', () => {
+  assert.equal(DEFAULT_POLL_SECONDS, 15);
+  assert.deepEqual(
+    planEnqueueOrLand({
+      activeEnqueueCount: 0,
+      hasLegacyLive: false,
+      pushedSha: X,
+      evidenceSha: X,
+      containsMain: true,
+    }),
+    { action: 'fast-forward-main', sha: X },
+  );
+  assert.deepEqual(
+    planEnqueueOrLand({
+      activeEnqueueCount: 1,
+      hasLegacyLive: false,
+      pushedSha: X,
+      evidenceSha: X,
+      containsMain: true,
+    }),
+    { action: 'enqueue', sha: X },
+  );
+  assert.deepEqual(
+    planEnqueueOrLand({
+      activeEnqueueCount: 0,
+      hasLegacyLive: false,
+      pushedSha: X,
+      evidenceSha: X,
+      containsMain: false,
+    }),
+    { action: 'enqueue', sha: X },
+  );
+});
+
+test('classifyWaitStatus distinguishes landed (including rebased cherry), queued, and ejected', () => {
+  assert.deepEqual(
+    classifyWaitStatus({ stillQueued: false, onMain: true, cherryHasUnapplied: false }),
+    {
+      state: 'landed',
+    },
+  );
+  assert.deepEqual(
+    classifyWaitStatus({ stillQueued: false, onMain: false, cherryHasUnapplied: false }),
+    {
+      state: 'landed',
+    },
+  );
+  assert.deepEqual(
+    classifyWaitStatus({ stillQueued: true, onMain: false, cherryHasUnapplied: true }),
+    {
+      state: 'queued',
+    },
+  );
+  assert.deepEqual(
+    classifyWaitStatus({ stillQueued: false, onMain: false, cherryHasUnapplied: true }),
+    {
+      state: 'ejected',
+    },
+  );
+  assert.deepEqual(
+    classifyWaitStatus({
+      stillQueued: false,
+      onMain: false,
+      cherryHasUnapplied: true,
+      ejectedByComment: false,
+      mainMoved: true,
+    }),
+    {
+      state: 'landed',
+    },
+  );
+  assert.deepEqual(
+    classifyWaitStatus({
+      stillQueued: false,
+      onMain: false,
+      cherryHasUnapplied: true,
+      ejectedByComment: true,
+      mainMoved: true,
+    }),
+    {
+      state: 'ejected',
+    },
   );
 });

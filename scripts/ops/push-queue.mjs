@@ -3,12 +3,42 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename, join } from 'node:path';
-import { busyMessage, RELEASE_MARKER } from './guard-queue.mjs';
+import { RELEASE_MARKER } from './guard-queue.mjs';
 import { closeIssuesAfterLanding, landingState, ownerOf, pushToMain } from './promote-queue.mjs';
+import { ENQUEUE_PREFIX, makeEnqueueId, sortEnqueueEntries } from './speculative-queue.mjs';
+
+export const DEFAULT_POLL_SECONDS = 15;
 
 export function planPush({ live, queueHead }) {
   if (!live) return { action: 'push' };
   return { action: 'wait', sha: live, restoring: queueHead === null };
+}
+
+export function planEnqueueOrLand({
+  activeEnqueueCount,
+  hasLegacyLive = false,
+  pushedSha,
+  evidenceSha,
+  containsMain,
+}) {
+  if (!hasLegacyLive && activeEnqueueCount === 0 && containsMain && evidenceSha === pushedSha) {
+    return { action: 'fast-forward-main', sha: pushedSha };
+  }
+  return { action: 'enqueue', sha: pushedSha };
+}
+
+export function classifyWaitStatus({
+  stillQueued,
+  onMain,
+  cherryHasUnapplied,
+  ejectedByComment = false,
+  mainMoved = false,
+}) {
+  if (onMain || cherryHasUnapplied === false) return { state: 'landed' };
+  if (stillQueued) return { state: 'queued' };
+  if (ejectedByComment) return { state: 'ejected' };
+  if (mainMoved) return { state: 'landed' };
+  return { state: 'ejected' };
 }
 
 export function laneName(host, worktree) {
@@ -127,31 +157,23 @@ export function stampUnownedCommits({
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
-  const remoteSha = (ref) => git(['ls-remote', 'origin', ref]).split(/\s+/)[0] || null;
   const wait = process.argv.includes('--wait');
-  const POLL_SECONDS = Number(process.env.PUSH_QUEUE_POLL_SECONDS ?? 60);
+  const enqueueOnly = process.argv.includes('--enqueue');
+  const POLL_SECONDS = Number(process.env.PUSH_QUEUE_POLL_SECONDS ?? DEFAULT_POLL_SECONDS);
   const waitMinutes = Number(process.env.PUSH_QUEUE_WAIT_MINUTES ?? 120);
   const deadline = Date.now() + waitMinutes * 60_000;
-
-  const released = (sha) => {
-    try {
-      return JSON.parse(
-        execFileSync('gh', ['api', `repos/${repo}/commits/${sha}/comments?per_page=100`], {
-          encoding: 'utf8',
-        }),
-      ).some((entry) => entry.body.startsWith(RELEASE_MARKER));
-    } catch {
-      return false;
-    }
-  };
   const ancestor = (a, b) => spawnSync('git', ['merge-base', '--is-ancestor', a, b]).status === 0;
-  const findLive = () => {
-    const queueHead = remoteSha('refs/heads/queue/main');
-    const stateHead = remoteSha('refs/heads/queue-state/main');
-    const candidates = [...new Set([queueHead, stateHead].filter(Boolean))];
-    spawnSync('git', ['fetch', '--quiet', 'origin', 'main', ...candidates], { stdio: 'inherit' });
-    const live = candidates.find((sha) => !ancestor(sha, 'origin/main') && !released(sha)) ?? null;
-    return { queueHead, live };
+  const listRemoteQueue = () => {
+    const out = git(['ls-remote', 'origin', `${ENQUEUE_PREFIX}*`, 'refs/heads/main']);
+    const enqueueRaw = [];
+    let mainSha = null;
+    for (const line of out.split('\n')) {
+      if (!line) continue;
+      const [sha, ref] = line.split(/\s+/);
+      if (ref === 'refs/heads/main') mainSha = sha;
+      else if (ref.startsWith(ENQUEUE_PREFIX)) enqueueRaw.push({ ref, sha });
+    }
+    return { mainSha, entries: sortEnqueueEntries(enqueueRaw), legacyLive: null };
   };
   const treeOf = (sha) => git(['rev-parse', `${sha}^{tree}`]);
   const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
@@ -159,55 +181,17 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const sleep = (seconds) =>
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
 
-  const { queueHead, live } = findLive();
-  const plan = planPush({ live, queueHead });
-  if (plan.action === 'wait' && !wait) {
-    const [subject, body] = git(['log', '-1', '--format=%s%x1f%B', plan.sha]).split('\x1f');
-    let run;
-    try {
-      const { workflow_runs: runs } = JSON.parse(
-        execFileSync(
-          'gh',
-          ['api', `repos/${repo}/actions/runs?head_sha=${plan.sha}&event=push&per_page=30`],
-          { encoding: 'utf8' },
-        ),
-      );
-      run = runs.find((candidate) => candidate.name === 'ci');
-    } catch {
-      run = undefined;
-    }
-    const restoring = plan.restoring
-      ? '\nqueue/main is missing because someone deleted it; the guard is putting the candidate back.'
-      : '';
-    console.error(
-      `[push-queue] not pushed.\n${busyMessage({ sha: plan.sha, subject, body, run })}${restoring}`,
-    );
-    process.exit(1);
-  }
-
   if (wait) {
     let armedTree = null;
-    let lastBase = null;
     for (;;) {
-      let current;
       if (Date.now() > deadline) {
         console.error(
-          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
+          `[push-queue] still waiting for preflight evidence after ${waitMinutes} minutes; rerun to keep waiting.`,
         );
         process.exit(2);
       }
-      try {
-        ({ live: current } = findLive());
-      } catch {
-        console.error('[push-queue] could not read the queue state; retrying');
-        sleep(POLL_SECONDS);
-        continue;
-      }
       const head = git(['rev-parse', 'HEAD']);
       const headTree = treeOf(head);
-      const headOnLive = current !== null && ancestor(current, 'HEAD');
-      const headOnMain = ancestor('origin/main', head);
-      const deadBase = current === null && lastBase !== null && !ancestor(lastBase, 'origin/main');
       let runs;
       try {
         runs = checkRunsOf(head);
@@ -216,53 +200,27 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         sleep(POLL_SECONDS);
         continue;
       }
-      const runsOrEmpty = runs ?? [];
-      const quietCheckRunsOf = (sha) => {
-        try {
-          return checkRunsOf(sha);
-        } catch {
-          return null;
-        }
-      };
-      const step = nextWaitAction({
-        live: current,
-        headOnLive,
-        headOnMain,
-        deadBase,
-        headTree,
-        armedTree,
-        evidence: preflightEvidence({
-          shas: [head],
-          pushedTree: headTree,
-          treeOf,
-          checkRunsOf: quietCheckRunsOf,
-        }),
-        failed: failedGreenContexts(runsOrEmpty),
-      });
-      if (step.action === 'push') break;
-      if (step.action === 'fail') {
+      const failed = failedGreenContexts(runs ?? []);
+      if (failed.length > 0) {
         console.error(
-          `[push-queue] not pushed: the preflight run for ${head.slice(0, 9)} went red in ${step.contexts.join(', ')}. Rerun its failed jobs or fix and push again.`,
+          `[push-queue] not pushed: the preflight run for ${head.slice(0, 9)} went red in ${failed.join(', ')}. Fix the failures and push again.`,
         );
         process.exit(1);
       }
-      if (step.action === 'rebase') {
-        const upstream = lastBase ?? 'origin/main';
-        console.log(`[push-queue] rebasing ${upstream}..HEAD onto ${step.onto.slice(0, 9)}`);
-        const rebase = spawnSync('git', ['rebase', '--onto', step.onto, upstream], {
-          stdio: 'inherit',
-        });
-        if (rebase.status !== 0) {
-          spawnSync('git', ['rebase', '--abort'], { stdio: 'inherit' });
-          console.error(
-            `[push-queue] not pushed: the rebase onto ${step.onto.slice(0, 9)} hit a conflict; resolve it and run again.`,
-          );
-          process.exit(1);
-        }
-        lastBase = step.onto === 'origin/main' ? null : step.onto;
-        continue;
-      }
-      if (step.action === 'preflight') {
+      const ev = preflightEvidence({
+        shas: [head],
+        pushedTree: headTree,
+        treeOf,
+        checkRunsOf: (sha) => {
+          try {
+            return checkRunsOf(sha);
+          } catch {
+            return null;
+          }
+        },
+      });
+      if (ev.ok) break;
+      if (headTree !== armedTree) {
         const pushed = spawnSync(process.execPath, [join(import.meta.dirname, 'preflight.mjs')], {
           stdio: 'inherit',
         });
@@ -315,54 +273,156 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   if (!evidence.ok) {
     console.error(
       `[push-queue] not pushed: ${pushedSha.slice(0, 9)} has no green ci evidence for ${GREEN_CONTEXTS.join(' + ')}.\n` +
-        'Run node scripts/ops/preflight.mjs --wait — it pushes HEAD to refs/heads/preflight/<lane> and waits for the ci run.\n' +
-        'A green run on a commit with the same tree also counts; local pnpm prepush stays optional.',
+        'Run node scripts/ops/preflight.mjs --wait — it pushes HEAD to refs/heads/preflight/<lane> and waits for the ci run.',
     );
     process.exit(1);
   }
-  const target = landingTarget({
-    pushedSha,
-    evidenceSha: evidence.sha,
-    containsMain: ancestor('origin/main', pushedSha),
-  });
-  if (target.action === 'reject-stale') {
-    console.error(
-      `[push-queue] not pushed: ${pushedSha.slice(0, 9)} does not contain origin/main; rebase onto origin/main and run again.`,
-    );
-    process.exit(1);
-  }
-  if (target.action === 'fast-forward-main') {
+
+  const { entries, legacyLive } = listRemoteQueue();
+  const plan = enqueueOnly
+    ? { action: 'enqueue', sha: pushedSha }
+    : planEnqueueOrLand({
+        activeEnqueueCount: entries.length,
+        hasLegacyLive: legacyLive !== null,
+        pushedSha,
+        evidenceSha: evidence.sha,
+        containsMain: ancestor('origin/main', pushedSha),
+      });
+
+  if (plan.action === 'fast-forward-main') {
     const before = git(['rev-parse', 'origin/main']);
-    try {
+    const ff = spawnSync('git', ['push', 'origin', `${plan.sha}:refs/heads/main`], {
+      encoding: 'utf8',
+    });
+    process.stdout.write(ff.stdout ?? '');
+    process.stderr.write(ff.stderr ?? '');
+    if (ff.status === 0) {
+      console.log(
+        `[push-queue] fast-forwarded main to ${plan.sha.slice(0, 9)} (empty queue, preflight-green)`,
+      );
+      closeIssuesAfterLanding({ repo, before, after: plan.sha, logPrefix: '[push-queue]' });
+      process.exit(0);
+    }
+    const output = `${ff.stdout ?? ''}\n${ff.stderr ?? ''}`;
+    if (/GH013/i.test(output)) {
       pushToMain({
-        sha: target.sha,
+        sha: plan.sha,
         mainTip: before,
         expectedQueueHead: null,
-        push: () => {
-          const result = spawnSync('git', ['push', 'origin', `${target.sha}:refs/heads/main`], {
-            encoding: 'utf8',
-          });
-          process.stdout.write(result.stdout ?? '');
-          process.stderr.write(result.stderr ?? '');
-          return result;
-        },
-        recheck: () => landingState(repo, target.sha),
+        push: () =>
+          spawnSync('git', ['push', 'origin', `${plan.sha}:refs/heads/main`], { encoding: 'utf8' }),
+        recheck: () => landingState(repo, plan.sha),
         sleep,
       });
-    } catch (error) {
-      console.error(
-        `[push-queue] not landed (${error.message}); fetch and rebase onto origin/main, then run again.`,
-      );
-      process.exit(error.status ?? 1);
+      console.log(`[push-queue] fast-forwarded main to ${plan.sha.slice(0, 9)}`);
+      closeIssuesAfterLanding({ repo, before, after: plan.sha, logPrefix: '[push-queue]' });
+      process.exit(0);
     }
-    console.log(
-      `[push-queue] fast-forwarded main to ${target.sha.slice(0, 9)} (already green on preflight; skipped queue/main rerun)`,
-    );
-    closeIssuesAfterLanding({ repo, before, after: target.sha, logPrefix: '[push-queue]' });
-    process.exit(0);
+    console.log('[push-queue] main moved concurrently; enqueueing into speculative queue');
   }
-  const push = spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/queue/main'], {
-    stdio: 'inherit',
-  });
-  process.exit(push.status ?? 1);
+
+  spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { stdio: 'inherit' });
+  if (evidence.sha !== pushedSha) {
+    console.error(
+      `[push-queue] not pushed: ${pushedSha.slice(0, 9)} lacks exact-SHA green evidence (e.g. Lane: trailer stamped a new SHA); run node scripts/ops/preflight.mjs --wait first.`,
+    );
+    process.exit(1);
+  }
+
+  const refreshed = listRemoteQueue();
+  const initialMainSha = refreshed.mainSha;
+  const already = refreshed.entries.find((item) => item.sha === pushedSha);
+  const enqueueRef = already?.ref ?? `${ENQUEUE_PREFIX}${makeEnqueueId(pushedSha)}`;
+  if (!already) {
+    const pushEnq = spawnSync('git', ['push', 'origin', `${pushedSha}:${enqueueRef}`], {
+      stdio: 'inherit',
+    });
+    if (pushEnq.status !== 0) {
+      console.error(`[push-queue] failed to push ${enqueueRef}`);
+      process.exit(pushEnq.status ?? 1);
+    }
+  }
+  console.log(
+    `[push-queue] enqueued ${pushedSha.slice(0, 9)} -> ${enqueueRef} (queue depth ${already ? refreshed.entries.length : refreshed.entries.length + 1})`,
+  );
+
+  const dispatch = spawnSync(
+    'gh',
+    [
+      'api',
+      '--method',
+      'POST',
+      `repos/${repo}/actions/workflows/promote.yml/dispatches`,
+      '-f',
+      'ref=main',
+    ],
+    { encoding: 'utf8' },
+  );
+  if (dispatch.status !== 0) {
+    console.log(
+      '[push-queue] note: promote dispatch skipped (scheduled backstop will advance queue)',
+    );
+  }
+
+  if (!wait) process.exit(0);
+
+  const readRemovalComment = () => {
+    try {
+      const comments = ghJson([`repos/${repo}/commits/${pushedSha}/comments?per_page=20`]);
+      const match = comments.findLast(
+        (comment) =>
+          comment.body.startsWith('Removed from merge queue:') ||
+          comment.body.startsWith(RELEASE_MARKER),
+      );
+      return match?.body ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  for (;;) {
+    if (Date.now() > deadline) {
+      console.error(
+        `[push-queue] still waiting on ${enqueueRef} after ${waitMinutes} minutes; rerun to keep waiting.`,
+      );
+      process.exit(2);
+    }
+    spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { stdio: 'inherit' });
+    let latest = listRemoteQueue();
+    let stillQueued = latest.entries.some((item) => item.ref === enqueueRef);
+    let onMain = ancestor(pushedSha, 'origin/main');
+    let cherryOut = git(['cherry', 'origin/main', pushedSha]);
+    let cherryHasUnapplied = cherryOut.split('\n').some((line) => line.startsWith('+ '));
+    let removalNote = null;
+    if (!stillQueued && !onMain && cherryHasUnapplied) {
+      sleep(2);
+      spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { stdio: 'inherit' });
+      latest = listRemoteQueue();
+      stillQueued = latest.entries.some((item) => item.ref === enqueueRef);
+      onMain = ancestor(pushedSha, 'origin/main');
+      cherryOut = git(['cherry', 'origin/main', pushedSha]);
+      cherryHasUnapplied = cherryOut.split('\n').some((line) => line.startsWith('+ '));
+      removalNote = readRemovalComment();
+    }
+    const status = classifyWaitStatus({
+      stillQueued,
+      onMain,
+      cherryHasUnapplied,
+      ejectedByComment: removalNote !== null,
+      mainMoved: Boolean(initialMainSha && latest.mainSha && latest.mainSha !== initialMainSha),
+    });
+    if (status.state === 'landed') {
+      console.log(
+        `[push-queue] landed ${pushedSha.slice(0, 9)} on origin/main (${latest.mainSha?.slice(0, 9)})`,
+      );
+      process.exit(0);
+    }
+    if (status.state === 'ejected') {
+      console.error(
+        `[push-queue] ${pushedSha.slice(0, 9)} was ejected from the merge queue.\n${removalNote || 'Check the promote workflow run for details.'}`,
+      );
+      process.exit(1);
+    }
+    sleep(POLL_SECONDS);
+  }
 }

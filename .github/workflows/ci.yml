@@ -473,7 +473,7 @@ jobs:
 
       - name: Workflow concurrency, scalars and queue promotion
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
+        run: node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/speculative-queue.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
 
       - name: Commit identity allowlist and hooks (#2289)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}

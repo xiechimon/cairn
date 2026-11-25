@@ -94,12 +94,14 @@ test('queue pushes get per-commit groups so a refused stacked push cannot cancel
   assert.equal(second.cancel, false);
 });
 
-test('promote listens for completed ci runs on queue refs and serializes promotions', () => {
+test('promote listens for completed ci runs on queue refs, main pushes, dispatches, and schedule backstop', () => {
   const text = readFileSync(join(WORKFLOWS, 'promote.yml'), 'utf8');
   assert.match(
     text,
     /workflow_run:\s*\n\s*workflows: \[ci\]\s*\n\s*types: \[completed\]\s*\n\s*branches: \['queue\/\*\*'\]/,
   );
+  assert.match(text, /push:\s*\n\s*branches: \[main\]/);
+  assert.match(text, /schedule:\s*\n\s*- cron: '\*\/5 \* \* \* \*'/);
   const { group, cancel } = concurrencyOf('promote');
   assert.equal(group, 'promote-main');
   assert.equal(cancel, 'false');
