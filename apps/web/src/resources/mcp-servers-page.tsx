@@ -206,7 +206,16 @@ export function McpServersPage() {
   const mailAvailable = mail.cards.filter((card) => !card.connected);
   const connectedCatalog = new Set(connectors.map((c) => c.catalogId));
   const available = MCP_CATALOG.filter((entry) => !connectedCatalog.has(entry.id));
-  const composio = useComposioRows({ live, teamId, data: composioApps });
+  const composio = useComposioRows({
+    live,
+    teamId,
+    data: composioApps,
+    queryError: live && composioQ.isError ? (composioQ.error ?? new Error('composio')) : null,
+    isFetching: live && composioQ.isFetching,
+    onRetry: () => {
+      void composioQ.refetch();
+    },
+  });
   const connectButton = (label: string, onClick: () => void, busy = false) => (
     <Button
       variant="outline"
@@ -405,7 +414,7 @@ export function McpServersPage() {
       fixture={fixture}
     >
       <QueryBoundary
-        query={live ? mergeQueries(connectorsQ, mcpQ, composioQ) : undefined}
+        query={live ? mergeQueries(connectorsQ, mcpQ) : undefined}
         isEmpty={false}
         errorWins
         loadingLabel={t('正在加载应用')}
@@ -439,6 +448,7 @@ export function McpServersPage() {
               }
             />
           )}
+          {composio.errorBanner}
           {connectedItems.length > 0 && (
             <SettingsSection title={t('已接入')} testId="mcp-connected">
               <SettingsCard>

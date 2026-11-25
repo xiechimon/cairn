@@ -1,4 +1,6 @@
-import { COMPOSIO_API_KEY_SECRET, type SecretBox } from '@cairn/shared';
+import { isIP } from 'node:net';
+import { COMPOSIO_API_KEY_SECRET, redactSecrets, type SecretBox } from '@cairn/shared';
+import { isPrivateAddress } from '@cairn/shared/private-address';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { secret } from '../db/schema.js';
@@ -16,6 +18,26 @@ export interface ComposioDeps {
 const COMPOSIO_API_BASE = 'https://backend.composio.dev/api/v3.1';
 const COMPOSIO_TIMEOUT_MS = 15_000;
 const MAX_CATALOG_PAGES = 10;
+
+function isSafeHttpsUrl(value: unknown, rejectPrivateIp = false): value is string {
+  if (typeof value !== 'string' || !URL.canParse(value)) return false;
+  const parsed = new URL(value);
+  if (parsed.protocol !== 'https:' || parsed.username !== '' || parsed.password !== '')
+    return false;
+  if (!rejectPrivateIp) return true;
+  const host = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost')) return false;
+  return isIP(host) === 0 || !isPrivateAddress(host);
+}
+
+function sanitizeUpstreamDetail(raw: string, key: string): string {
+  const redacted = String(redactSecrets(raw, [key]).value)
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1[redacted]@')
+    .replace(/[\p{Cc}\s]+/gu, ' ')
+    .trim();
+  if (redacted.length === 0) return '';
+  return ` (${redacted.slice(0, 200)})`;
+}
 
 export function readComposioKey(
   deps: Pick<ComposioDeps, 'db' | 'box'>,
@@ -89,7 +111,12 @@ async function callComposio(
 ): Promise<unknown> {
   const key = readComposioKey(deps, teamId);
   if (key === null)
-    throw new HttpError(400, 'no Composio API key is saved; add one under MCP servers');
+    throw new HttpError(
+      400,
+      'no Composio API key is saved; add one under MCP servers',
+      'missing_api_key',
+      { code: 'composio_missing_api_key' },
+    );
   const base = deps.apiBase ?? COMPOSIO_API_BASE;
   const url = new URL(`${base}${path}`);
   for (const [name, value] of Object.entries(query ?? {})) url.searchParams.set(name, value);
@@ -106,27 +133,60 @@ async function callComposio(
       signal: AbortSignal.timeout(deps.timeoutMs ?? COMPOSIO_TIMEOUT_MS),
     });
   } catch {
-    throw new HttpError(502, 'Composio is unreachable');
+    throw new HttpError(502, 'Composio is unreachable', 'upstream_unavailable', {
+      code: 'composio_unavailable',
+    });
   }
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403)
+      throw new HttpError(400, 'Composio rejected the saved API key', 'invalid_api_key', {
+        code: 'composio_invalid_api_key',
+      });
     const detail = await response
       .json()
-      .then((body: unknown) => {
-        const message = (body as { error?: { message?: unknown }; message?: unknown })?.error
-          ?.message;
-        const plain = (body as { message?: unknown })?.message;
-        const text = message ?? plain;
-        return typeof text === 'string' && text.length <= 200 ? ` (${text})` : '';
+      .then((parsed: unknown) => {
+        if (typeof parsed !== 'object' || parsed === null) return '';
+        const record = parsed as { error?: unknown; message?: unknown; detail?: unknown };
+        const nested =
+          typeof record.error === 'object' && record.error !== null
+            ? (record.error as { message?: unknown }).message
+            : undefined;
+        const text =
+          typeof record.error === 'string'
+            ? record.error
+            : (nested ?? record.message ?? record.detail);
+        return typeof text === 'string' ? sanitizeUpstreamDetail(text, key) : '';
       })
       .catch(() => '');
-    if (response.status === 401 || response.status === 403)
-      throw new HttpError(400, `Composio rejected the saved API key${detail}`);
-    if (response.status === 404) throw new HttpError(404, `Composio object not found${detail}`);
+    if (response.status === 404)
+      throw new HttpError(404, `Composio object not found${detail}`, 'not_found', {
+        code: 'composio_not_found',
+      });
     if (response.status === 429 || response.status >= 500)
-      throw new HttpError(502, `Composio is unreachable${detail}`);
-    throw new HttpError(502, `Composio answered http_${response.status}${detail}`);
+      throw new HttpError(502, `Composio is unreachable${detail}`, 'upstream_unavailable', {
+        code: 'composio_unavailable',
+      });
+    throw new HttpError(
+      502,
+      `Composio answered http_${response.status}${detail}`,
+      'upstream_error',
+      { code: 'composio_upstream_error' },
+    );
   }
-  return response.json();
+  if (response.status === 204 && method === 'DELETE') return {};
+  let parsed: unknown;
+  try {
+    parsed = await response.json();
+  } catch {
+    throw new HttpError(502, 'Composio returned an invalid response', 'invalid_response', {
+      code: 'composio_invalid_response',
+    });
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+    throw new HttpError(502, 'Composio returned an invalid response', 'invalid_response', {
+      code: 'composio_invalid_response',
+    });
+  return parsed;
 }
 
 export interface ComposioToolkit {
@@ -147,18 +207,20 @@ interface ComposioToolkitItem {
   auth_schemes?: unknown;
 }
 
-function toolkitOf(item: ComposioToolkitItem): ComposioToolkit | null {
-  if (typeof item.slug !== 'string' || typeof item.name !== 'string') return null;
-  const meta = item.meta ?? {};
+function toolkitOf(item: unknown): ComposioToolkit | null {
+  if (typeof item !== 'object' || item === null) return null;
+  const raw = item as ComposioToolkitItem;
+  if (typeof raw.slug !== 'string' || typeof raw.name !== 'string') return null;
+  const meta = raw.meta ?? {};
   return {
-    slug: item.slug,
-    name: item.name,
+    slug: raw.slug,
+    name: raw.name,
     description: typeof meta.description === 'string' ? meta.description : null,
-    logoUrl: typeof meta.logo === 'string' ? meta.logo : null,
+    logoUrl: isSafeHttpsUrl(meta.logo, true) ? meta.logo : null,
     noAuth:
-      item.no_auth === true ||
-      item.is_no_auth === true ||
-      (Array.isArray(item.auth_schemes) && item.auth_schemes.length === 0),
+      raw.no_auth === true ||
+      raw.is_no_auth === true ||
+      (Array.isArray(raw.auth_schemes) && raw.auth_schemes.length === 0),
     toolsCount: typeof meta.tools_count === 'number' ? meta.tools_count : null,
   };
 }
@@ -184,7 +246,7 @@ export async function listComposioToolkits(
       ...(cursor === undefined ? {} : { cursor }),
     })) as ComposioPage;
     for (const item of pageItems(result)) {
-      const toolkit = toolkitOf(item as ComposioToolkitItem);
+      const toolkit = toolkitOf(item);
       if (toolkit !== null) toolkits.push(toolkit);
     }
     cursor = typeof result.next_cursor === 'string' ? result.next_cursor : undefined;
@@ -212,8 +274,10 @@ export async function createComposioSession(
     search: { enable: false },
     execute: { enable_multi_execute: false },
   })) as { session_id?: unknown; mcp?: { url?: unknown } };
-  if (typeof result.session_id !== 'string' || typeof result.mcp?.url !== 'string')
-    throw new HttpError(502, 'Composio answered without a session url');
+  if (typeof result.session_id !== 'string' || !isSafeHttpsUrl(result.mcp?.url, true))
+    throw new HttpError(502, 'Composio answered without a valid session url', 'invalid_response', {
+      code: 'composio_invalid_response',
+    });
   return { sessionId: result.session_id, mcpUrl: result.mcp.url };
 }
 
@@ -235,8 +299,10 @@ export async function createComposioLink(
     `/tool_router/session/${encodeURIComponent(sessionId)}/link`,
     { toolkit },
   )) as { redirect_url?: unknown; connected_account_id?: unknown };
-  if (typeof result.redirect_url !== 'string' || typeof result.connected_account_id !== 'string')
-    throw new HttpError(502, 'Composio answered without a redirect url');
+  if (!isSafeHttpsUrl(result.redirect_url) || typeof result.connected_account_id !== 'string')
+    throw new HttpError(502, 'Composio answered without a valid redirect url', 'invalid_response', {
+      code: 'composio_invalid_response',
+    });
   return { redirectUrl: result.redirect_url, connectedAccountId: result.connected_account_id };
 }
 
@@ -257,6 +323,7 @@ export interface ComposioAccount {
 }
 
 function accountOf(item: unknown): ComposioAccount | null {
+  if (typeof item !== 'object' || item === null) return null;
   const raw = item as {
     id?: unknown;
     nanoid?: unknown;
@@ -306,7 +373,7 @@ export async function findActiveComposioAccount(
   })) as ComposioPage;
   const account = pageItems(result)
     .map(accountOf)
-    .find((item) => item !== null);
+    .find((item) => item !== null && !item.isDisabled && item.status === 'ACTIVE');
   return account?.id ?? null;
 }
 

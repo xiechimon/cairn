@@ -3043,6 +3043,15 @@ export const EN: Record<string, string> = {
   '断开 {name}': 'Disconnect {name}',
   '移除后，经 Composio 接入的所有应用都会断开连接':
     'Removing this disconnects every app connected through Composio',
+  'Composio API key 无效': 'Composio API key is invalid',
+  'Composio 应用未能加载': 'Composio apps did not load',
+  '已保存的 API key 未被 Composio 接受，其他应用不受影响。请更换或移除 API key。':
+    'Composio rejected the saved API key. Other apps are unaffected. Replace or remove the API key.',
+  '当前无法连接 Composio，其他应用不受影响。请稍后重试，或更换 API key。':
+    'Cannot connect to Composio right now. Other apps are unaffected. Try again later or replace the API key.',
+  '更换或移除 API key': 'Replace or remove API key',
+  打开授权链接: 'Open authorization link',
+  取消授权: 'Cancel authorization',
   '切换到 {name}？': 'Switch to {name}?',
   切换主机: 'Switch host',
   切换并重启: 'Switch and restart',

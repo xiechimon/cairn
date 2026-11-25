@@ -358,4 +358,145 @@ describe('composio connector routes', () => {
       toolsJson: null,
     });
   });
+
+  test('invalid saved API key returns structured 400 error without crashing', async () => {
+    const { s, base } = boot({ key: 'ck-valid' });
+    await putKey(s, 'ck-wrong');
+    const res = await req(s.app, 'GET', `${base}/composio`);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; reason?: string; code?: string };
+    expect(body.error).toContain('Composio rejected the saved API key');
+    expect(body.reason).toBe('invalid_api_key');
+    expect(body.code).toBe('composio_invalid_api_key');
+  });
+
+  test('non-JSON upstream response returns structured 502 error instead of 500 crash', async () => {
+    const badFetch = (async () =>
+      new Response('<html>gateway</html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      })) as typeof globalThis.fetch;
+    const s = bootServer({ composioFetch: badFetch, mcpFetch: fakeMcp().fetch });
+    onTestFinished(() => s.dispose());
+    await putKey(s, 'ck-test');
+    const res = await req(s.app, 'GET', `/api/teams/${s.team.id}/mcp-connectors/composio`);
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string; reason?: string; code?: string };
+    expect(body.reason).toBe('invalid_response');
+    expect(body.code).toBe('composio_invalid_response');
+  });
+
+  test('204 empty response on account delete succeeds when disconnecting a connector', async () => {
+    const composio = fakeComposio({
+      account: { id: 'ca-204', status: 'ACTIVE', status_reason: null, is_disabled: false },
+    });
+    const fetch204 = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      if (
+        request.method === 'DELETE' &&
+        new URL(request.url).pathname.includes('/connected_accounts/')
+      )
+        return new Response(null, { status: 204 });
+      return composio.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const s = bootServer({ composioFetch: fetch204, mcpFetch: fakeMcp().fetch });
+    onTestFinished(() => s.dispose());
+    const base = `/api/teams/${s.team.id}/mcp-connectors`;
+    await putKey(s);
+    const created = (await (
+      await req(s.app, 'POST', `${base}/composio/toolkits`, { slug: 'gmail' })
+    ).json()) as { id: string };
+    const del = await req(s.app, 'DELETE', `${base}/${created.id}`);
+    expect(del.status).toBe(204);
+  });
+
+  test('re-authorizing an initiated or revoked app issues a fresh redirectUrl', async () => {
+    const { s, base } = boot();
+    await putKey(s);
+    const created = (await (
+      await req(s.app, 'POST', `${base}/composio/toolkits`, { slug: 'gmail' })
+    ).json()) as { id: string };
+
+    const first = (await (
+      await req(s.app, 'POST', `${base}/composio/${created.id}/authorize`)
+    ).json()) as { redirectUrl: string | null };
+    expect(first.redirectUrl).toBe('https://connect.composio.dev/link/abc');
+
+    const second = (await (
+      await req(s.app, 'POST', `${base}/composio/${created.id}/authorize`)
+    ).json()) as { redirectUrl: string | null; connector: { status: string } };
+    expect(second.redirectUrl).toBe('https://connect.composio.dev/link/abc');
+    expect(second.connector.status).toBe('needs_auth');
+
+    await req(s.app, 'POST', `${base}/composio/${created.id}/revoke`);
+    const reconnected = (await (
+      await req(s.app, 'POST', `${base}/composio/${created.id}/reconnect`)
+    ).json()) as { redirectUrl: string | null; connector: { status: string } };
+    expect(reconnected.redirectUrl).toBe('https://connect.composio.dev/link/abc');
+    expect(reconnected.connector.status).toBe('needs_auth');
+  });
+
+  test('disabled ACTIVE account is not reused and upstream key echo is never leaked', async () => {
+    const composio = fakeComposio({
+      key: 'ak_secret_value_12345',
+      account: { id: 'ca-disabled', status: 'ACTIVE', status_reason: null, is_disabled: true },
+    });
+    const echoFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      if (request.headers.get('x-api-key') === 'ak_wrong_echo_999')
+        return json({ error: { message: 'rejected key ak_wrong_echo_999' } }, 401);
+      return composio.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const s = bootServer({ composioFetch: echoFetch, mcpFetch: fakeMcp().fetch });
+    onTestFinished(() => s.dispose());
+    const base = `/api/teams/${s.team.id}/mcp-connectors`;
+
+    await putKey(s, 'ak_wrong_echo_999');
+    const badRes = await req(s.app, 'GET', `${base}/composio`);
+    expect(badRes.status).toBe(400);
+    expect(await badRes.text()).not.toContain('ak_wrong_echo_999');
+
+    await putKey(s, 'ak_secret_value_12345');
+    const created = (await (
+      await req(s.app, 'POST', `${base}/composio/toolkits`, { slug: 'gmail' })
+    ).json()) as { id: string; status: string };
+    expect(created.status).toBe('needs_auth');
+    const auth = (await (
+      await req(s.app, 'POST', `${base}/composio/${created.id}/authorize`)
+    ).json()) as { redirectUrl: string | null };
+    expect(auth.redirectUrl).toBe('https://connect.composio.dev/link/abc');
+  });
+
+  test('rejects unsafe redirect_url, private mcp.url, and JSON array responses', async () => {
+    const composio = fakeComposio();
+    let mode: 'array' | 'bad-session' | 'bad-link' = 'array';
+    const hostileFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (mode === 'array' && url.pathname === `${BASE_COMPOSIO}/toolkits`) return json([]);
+      if (mode === 'bad-session' && url.pathname === `${BASE_COMPOSIO}/tool_router/session`)
+        return json({ session_id: 's-1', mcp: { url: 'https://127.0.0.1/mcp' } });
+      if (mode === 'bad-link' && url.pathname.endsWith('/link'))
+        return json({ redirect_url: 'javascript:alert(1)', connected_account_id: 'ca-bad' });
+      return composio.fetch(input, init);
+    }) as typeof globalThis.fetch;
+    const s = bootServer({ composioFetch: hostileFetch, mcpFetch: fakeMcp().fetch });
+    onTestFinished(() => s.dispose());
+    const base = `/api/teams/${s.team.id}/mcp-connectors`;
+    await putKey(s);
+
+    const arrRes = await req(s.app, 'GET', `${base}/composio`);
+    expect(arrRes.status).toBe(502);
+
+    mode = 'bad-session';
+    const sessRes = await req(s.app, 'POST', `${base}/composio/toolkits`, { slug: 'gmail' });
+    expect(sessRes.status).toBe(502);
+
+    mode = 'bad-link';
+    const created = (await (
+      await req(s.app, 'POST', `${base}/composio/toolkits`, { slug: 'gmail' })
+    ).json()) as { id: string };
+    const linkRes = await req(s.app, 'POST', `${base}/composio/${created.id}/authorize`);
+    expect(linkRes.status).toBe(502);
+  });
 });

@@ -160,10 +160,10 @@ export function IntegrationRow({
     <div
       data-connector-card={name}
       data-testid={testId}
-      className={cn(SETTINGS_ROW_CLS, 'justify-start gap-3 py-2.5')}
+      className={cn(SETTINGS_ROW_CLS, 'flex-wrap justify-start gap-3 py-2.5 sm:flex-nowrap')}
     >
       <span className="flex size-5 flex-none items-center justify-center">{icon}</span>
-      <RowText className="flex-1">
+      <RowText className="min-w-40 flex-1">
         <RowLine>
           <RowTitle className="font-medium">{name}</RowTitle>
           {kind !== undefined && <RowMeta>{kind}</RowMeta>}
@@ -172,7 +172,11 @@ export function IntegrationRow({
         <span className="line-clamp-2 text-meta text-content-tertiary">{description}</span>
       </RowText>
       {status}
-      {action !== undefined && <span className="flex flex-none items-center gap-2">{action}</span>}
+      {action !== undefined && (
+        <span className="ms-auto flex flex-none flex-wrap items-center justify-end gap-2">
+          {action}
+        </span>
+      )}
     </div>
   );
 }

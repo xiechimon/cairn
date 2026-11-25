@@ -152,10 +152,15 @@ export async function authorizeComposioApp(
 ): Promise<ComposioAuthorizeResponse> {
   requireKey(deps, teamId);
   const row = composioRow(deps, teamId, id);
-  const active =
-    row.composioAccount ?? (await findActiveComposioAccount(deps.composio, teamId, row.slug));
+  let active: string | null = null;
+  if (row.composioAccount !== null) {
+    const existing = await getComposioAccount(deps.composio, teamId, row.composioAccount);
+    if (existing !== null && !existing.isDisabled && existing.status === 'ACTIVE')
+      active = existing.id;
+  }
+  if (active === null) active = await findActiveComposioAccount(deps.composio, teamId, row.slug);
   if (active !== null) {
-    if (row.composioAccount === null)
+    if (row.composioAccount !== active || row.status !== 'connected')
       setStatus(deps, row, {
         composioAccount: active,
         status: 'unchecked',

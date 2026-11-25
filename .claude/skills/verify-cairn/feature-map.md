@@ -869,7 +869,7 @@ Reach:
 - Web routes: `/app/resources/mcp-servers`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `应用` (Apps)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composio-authorize-*`, `composio-connect-*`, `composio-key-change`, `composio-key-input`, `composio-key-remove`, `composio-key-save`, `composio-reconnect-*`, `composio-remove-*`, `composio-setup-open`, `mcp-add-server`, `mcp-catalog`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
+- Test ids in its code: `composio-authorize-*`, `composio-cancel-auth-*`, `composio-connect-*`, `composio-error-banner`, `composio-error-manage-key`, `composio-error-retry`, `composio-key-change`, `composio-key-input`, `composio-key-remove`, `composio-key-save`, `composio-open-auth-*`, `composio-reconnect-*`, `composio-remove-*`, `composio-setup-open`, `mcp-add-server`, `mcp-catalog`, `mcp-connected`, `mcp-local`, `mcp-oauth-error`
 - Verify recipes: [.claude/skills/verify-cairn/features/mcp-servers.md](features/mcp-servers.md)
 - Research: [docs/research/mcp-connectors-2026-11-15.md](../../../docs/research/mcp-connectors-2026-11-15.md)
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md), [docs/design/mcp-connectors.md](../../../docs/design/mcp-connectors.md), [docs/design/connector-fabric.md](../../../docs/design/connector-fabric.md)
