@@ -1,7 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
 import { appMenuTemplate } from '../src/app-menu.js';
 import { offlinePageHtml } from '../src/offline-page.js';
-import { isAllowedRemoteAuthUrl } from '../src/remote-auth.js';
+import {
+  isAllowedRemoteAuthUrl,
+  isOfflineHttpStatus,
+  isSameOriginUrl,
+} from '../src/remote-auth.js';
 import { trayMenuTemplate } from '../src/tray-menu.js';
 
 describe('offlinePageHtml', () => {
@@ -83,6 +87,24 @@ describe('isAllowedRemoteAuthUrl', () => {
     expect(isAllowedRemoteAuthUrl('https://evil.example.net/phish', origin, issuer)).toBe(false);
     expect(isAllowedRemoteAuthUrl('javascript:alert(1)', origin, issuer)).toBe(false);
     expect(isAllowedRemoteAuthUrl('file:///etc/passwd', origin, issuer)).toBe(false);
+  });
+});
+
+describe('isOfflineHttpStatus and isSameOriginUrl', () => {
+  test('treats gateway error codes (502/503/504) on the configured origin as offline', () => {
+    expect(isOfflineHttpStatus(502)).toBe(true);
+    expect(isOfflineHttpStatus(503)).toBe(true);
+    expect(isOfflineHttpStatus(504)).toBe(true);
+    expect(isOfflineHttpStatus(200)).toBe(false);
+    expect(isOfflineHttpStatus(401)).toBe(false);
+    expect(isOfflineHttpStatus(500)).toBe(false);
+    expect(isSameOriginUrl('https://cloud.example.com/app', 'https://cloud.example.com')).toBe(
+      true,
+    );
+    expect(isSameOriginUrl('https://other.example.com/app', 'https://cloud.example.com')).toBe(
+      false,
+    );
+    expect(isSameOriginUrl('data:text/html,hi', 'https://cloud.example.com')).toBe(false);
   });
 });
 

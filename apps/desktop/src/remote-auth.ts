@@ -28,6 +28,18 @@ function parseAppOrigin(raw: string): string | null {
   }
 }
 
+export function isOfflineHttpStatus(httpResponseCode: number): boolean {
+  return httpResponseCode >= 502 && httpResponseCode <= 504;
+}
+
+export function isSameOriginUrl(rawUrl: string, origin: string): boolean {
+  try {
+    return new URL(rawUrl).origin === new URL(origin).origin;
+  } catch {
+    return false;
+  }
+}
+
 export function isAllowedRemoteAuthUrl(
   rawUrl: string,
   appOrigin: string,

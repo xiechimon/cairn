@@ -103,7 +103,12 @@ import {
   relaunchWindowOf,
   restoredUrl,
 } from './relaunch-window.js';
-import { isAllowedRemoteAuthUrl, parseHttpsOrigin } from './remote-auth.js';
+import {
+  isAllowedRemoteAuthUrl,
+  isOfflineHttpStatus,
+  isSameOriginUrl,
+  parseHttpsOrigin,
+} from './remote-auth.js';
 import {
   clearServerOwner,
   handoffFromResidentHost,
@@ -719,7 +724,15 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
   });
-  window.webContents.on('did-navigate', (_event, url) => {
+  window.webContents.on('did-navigate', (_event, url, httpResponseCode) => {
+    if (
+      activeRemoteHostName !== null &&
+      isOfflineHttpStatus(httpResponseCode) &&
+      isSameOriginUrl(url, origin)
+    ) {
+      showOfflineFallback(window, origin);
+      return;
+    }
     if (expectedOfflineUrl === null || url !== expectedOfflineUrl) {
       showingOfflinePage = false;
       expectedOfflineUrl = null;
@@ -1682,22 +1695,27 @@ async function boot(): Promise<void> {
     let ownerToken = '';
     let attachedToResident = false;
 
+    const refreshRemoteClerkIssuer = async (remoteOrigin: string): Promise<void> => {
+      try {
+        const response = await session.defaultSession.fetch(
+          `${remoteOrigin}/api/auth/clerk/config`,
+          {
+            redirect: 'error',
+            signal: AbortSignal.timeout(2_500),
+          },
+        );
+        if (response.ok) {
+          const body = (await response.json()) as { enabled?: boolean; issuer?: unknown };
+          remoteClerkIssuer = body.enabled === true ? parseHttpsOrigin(body.issuer) : null;
+        }
+      } catch {}
+    };
+
     if (activeConn.kind === 'remote') {
       origin = activeConn.url;
       activeRemoteHostName = activeConn.name;
       remoteClerkIssuer = null;
-      try {
-        const response = await session.defaultSession.fetch(`${origin}/api/auth/clerk/config`, {
-          redirect: 'error',
-          signal: AbortSignal.timeout(2_500),
-        });
-        if (response.ok) {
-          const body = (await response.json()) as { enabled?: boolean; issuer?: unknown };
-          if (body.enabled === true) {
-            remoteClerkIssuer = parseHttpsOrigin(body.issuer);
-          }
-        }
-      } catch {}
+      await refreshRemoteClerkIssuer(origin);
     } else {
       activeRemoteHostName = null;
       remoteClerkIssuer = null;
@@ -1909,10 +1927,13 @@ async function boot(): Promise<void> {
       switchDesktopHost(userData, id);
       return hostStatus();
     });
-    ipcMain.handle('desktop-host:retry', (event) => {
+    ipcMain.handle('desktop-host:retry', async (event) => {
       if (!fromHostMainPage(event) && !fromOfflinePage(event)) return;
       showingOfflinePage = false;
       expectedOfflineUrl = null;
+      if (activeRemoteHostName !== null) {
+        await refreshRemoteClerkIssuer(origin);
+      }
       void mainWindow?.loadURL(origin);
     });
     let residentTransitionInFlight = false;
