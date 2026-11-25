@@ -346,6 +346,17 @@ test('exit 3 keeps a record changed to a different app during verification', asy
   assert.equal(existsSync(newApp), true);
 });
 
+test('a foreground apply with no staged bundle fails with an explicit error instead of returning silently', async (t) => {
+  const { statePath } = fixture(t, '1.1.0');
+  writeUpdateState(statePath, emptyUpdateState());
+  const updater = createUpdater(() => {}, { beforeRelaunch: () => {} });
+  await assert.rejects(updater.apply('foreground'), { message: 'the staged update is missing' });
+  assert.deepEqual(updater.state(), {
+    status: 'error',
+    message: 'the staged update is missing',
+  });
+});
+
 test('exit 0 applies the staged build and keeps the previous bundle for rollback', async (t) => {
   const { root, bundle, staging, stagedApp, statePath, initial } = fixture(t, '1.1.0');
   const previousApp = join(root, '.cairn-previous', 'Cairn.app');
