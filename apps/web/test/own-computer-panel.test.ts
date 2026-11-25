@@ -71,8 +71,9 @@ describe('own-computer panel host boundary', () => {
         children: createElement(OwnComputerHarness, { machine: MAC_NEEDING_ACCESS }),
       }),
     );
-    expect(html).toContain('data-testid="own-computer-browser-hint"');
-    expect(html).toContain('请在这台 Mac 的 Cairn 桌面应用里完成权限授权与检查。');
+    expect(html).toContain('data-testid="own-computer-status"');
+    expect(html).not.toContain('data-testid="own-computer-browser-hint"');
+    expect(html).not.toContain('请在这台 Mac 的 Cairn 桌面应用里完成权限授权与检查。');
     expect(html).not.toContain('data-testid="own-computer-guide"');
     expect(html).not.toContain('data-testid="own-computer-recheck"');
   });
