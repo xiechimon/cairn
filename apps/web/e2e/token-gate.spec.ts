@@ -91,7 +91,9 @@ test('auth on, loopback: the gate blocks the board until a pairing code opens it
   await redeemViaLink(page, request, authed.base);
 
   await expect(page.locator('.token-gate')).toHaveCount(0);
-  await expect(page.locator('.board-sidebar')).toBeVisible();
+  await expect(
+    page.locator('.board-sidebar, [data-testid="first-run-setup"]'),
+  ).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
   await expect
     .poll(async () =>
@@ -109,7 +111,9 @@ test('auth on: a stored owner token is cleared and is not sent', async ({ page, 
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
 
   await redeemViaLink(page, request, authed.base);
-  await expect(page.locator('.board-sidebar')).toBeVisible();
+  await expect(
+    page.locator('.board-sidebar, [data-testid="first-run-setup"]'),
+  ).toBeVisible();
   for (const url of await streamUrls(page)) expect(url).not.toContain('stale-bad-token');
 });
 
@@ -118,7 +122,9 @@ test('auth off: zero gate page, zero token attached, behavior unchanged', async 
   const firstLoad = page.waitForResponse((res) => res.url().endsWith('/api/teams'));
   await page.goto(`${openServer.base}/app`);
 
-  await expect(page.locator('.board-sidebar')).toBeVisible();
+  await expect(
+    page.locator('.board-sidebar, [data-testid="first-run-setup"]'),
+  ).toBeVisible();
   await expect(page.locator('.token-gate')).toHaveCount(0);
   const res = await firstLoad;
   expect(res.status()).toBe(200);

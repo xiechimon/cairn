@@ -1,6 +1,6 @@
 import type { ClerkAuthConfigResponse } from '@cairn/shared';
 import { cn } from 'cn';
-import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
   consumePairFragment,
   ensurePairRequest,
@@ -15,6 +15,7 @@ import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { Separator } from '../components/ui/separator.js';
+import { desktopHost } from '../desktop-shell.js';
 import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
 import { type ClerkBrowserGlobal, loadClerkScript } from '../lib/clerk-loader.js';
@@ -30,9 +31,11 @@ type ClerkPhase = 'loading' | 'ready' | 'exchanging' | 'not-allowed' | 'invalid'
 function ClerkSignInCard({
   config,
   onUseFallback,
+  switchLocalButton,
 }: {
   config: ClerkAuthConfigResponse;
   onUseFallback: () => void;
+  switchLocalButton: ReactNode;
 }) {
   const { t } = useI18n();
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -199,6 +202,7 @@ function ClerkSignInCard({
       >
         {t('改用配对码或访问令牌')}
       </Button>
+      {switchLocalButton}
       <p className="m-0 text-center text-caption leading-normal text-content-tertiary">
         {t('服务器地址 {host}', { host: window.location.host })}
       </p>
@@ -209,6 +213,9 @@ function ClerkSignInCard({
 export function TokenGate() {
   const { t } = useI18n();
   const auth = useAuth();
+  const hostBridge = desktopHost();
+  const [canSwitchToLocal, setCanSwitchToLocal] = useState(false);
+  const [switchingToLocal, setSwitchingToLocal] = useState(false);
   const [clerkConfig, setClerkConfig] = useState<ClerkAuthConfigResponse | null>(null);
   const [useFallback, setUseFallback] = useState(false);
   const [tokenMode, setTokenMode] = useState(false);
@@ -249,6 +256,19 @@ export function TokenGate() {
     };
   }, [auth.gateOpen]);
 
+  useEffect(() => {
+    if (!auth.gateOpen || hostBridge === null) return;
+    let active = true;
+    void hostBridge.status().then((status) => {
+      if (active && status !== null && status.activeId !== 'local') {
+        setCanSwitchToLocal(true);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [auth.gateOpen, hostBridge]);
+
   const showClerk = clerkConfig?.enabled === true && !useFallback;
 
   useEffect(() => {
@@ -268,6 +288,24 @@ export function TokenGate() {
           Math.floor((remainingMs % 60_000) / 1_000),
         ).padStart(2, '0')}`;
 
+  const switchLocalButton =
+    canSwitchToLocal && hostBridge !== null ? (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full text-meta font-normal pointer-coarse:h-11"
+        data-testid="desktop-host-switch-local"
+        disabled={switchingToLocal}
+        onClick={() => {
+          setSwitchingToLocal(true);
+          void hostBridge.switch('local').catch(() => setSwitchingToLocal(false));
+        }}
+      >
+        {switchingToLocal ? t('正在切回本机…') : t('切回本机')}
+      </Button>
+    ) : null;
+
   return (
     <DialogShell
       bare
@@ -282,7 +320,11 @@ export function TokenGate() {
       className="inset-0! top-0! left-0! max-h-none! translate-x-0! translate-y-0! animate-none! items-center justify-center rounded-none! bg-background! shadow-none! duration-0!"
     >
       {showClerk && clerkConfig !== null ? (
-        <ClerkSignInCard config={clerkConfig} onUseFallback={() => setUseFallback(true)} />
+        <ClerkSignInCard
+          config={clerkConfig}
+          onUseFallback={() => setUseFallback(true)}
+          switchLocalButton={switchLocalButton}
+        />
       ) : (
         <div className="token-gate flex w-90 max-w-[calc(100vw-48px)] flex-col gap-3 rounded-(--radius-sheet) bg-card p-6 shadow-(--e2) ring-1 ring-border">
           <h1 className="token-gate-title m-0 text-heading font-semibold text-foreground">
@@ -424,6 +466,7 @@ export function TokenGate() {
               {t('返回账号登录')}
             </Button>
           )}
+          {switchLocalButton}
           <p className="m-0 text-center text-caption leading-normal text-content-tertiary">
             <span className="block" role="status">
               {auth.retrying ? t('正在连接…') : null}

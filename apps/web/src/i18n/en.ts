@@ -3028,6 +3028,17 @@ export const EN: Record<string, string> = {
   主机名称: 'Host name',
   '主机地址，例如 http://mac-mini.ts.net:8787': 'Host URL, e.g. http://mac-mini.ts.net:8787',
   主机地址: 'Host URL',
+  '切换到「{name}」？': 'Switch to {name}?',
+  '每台主机的项目、对话和任务彼此独立。切换后应用会重启并连接到「{name}」，原主机的数据均保留。':
+    'Projects, chats, and tasks are stored separately on each host. Cairn will restart to connect to {name}, and data on the previous host stays intact.',
+  '移除「{name}」并切回本机？': 'Remove {name} and switch back to this computer?',
+  '「{name}」是当前连接的主机。移除后应用会重启并切回本机服务器，远程主机上的数据均保留。':
+    '{name} is the active host. Removing it restarts Cairn on this computer, and data on the remote host stays intact.',
+  移除并切回本机: 'Remove and switch back',
+  '移除后仅删除这条连接记录，远程主机上的数据均保留。':
+    'Removing this entry only deletes the saved connection; data on the remote host stays intact.',
+  切回本机: 'Switch back to this computer',
+  '正在切回本机…': 'Switching back to this computer…',
   '排队中：信息卡要在执行机上运行，团队暂无在线的执行机':
     'Queued: info cards run on a Runner, and the team has no online Runner',
   正在生成改动: 'Preparing the change',
@@ -3116,13 +3127,8 @@ export const EN: Record<string, string> = {
   '更换或移除 API key': 'Replace or remove API key',
   打开授权链接: 'Open authorization link',
   取消授权: 'Cancel authorization',
-  '切换到 {name}？': 'Switch to {name}?',
   切换主机: 'Switch host',
   切换并重启: 'Switch and restart',
-  '切换后应用会立即重启并连接到选定主机。':
-    'The app will restart immediately and connect to the selected host.',
-  '移除这台远程主机配置？此操作不会关闭远端服务。':
-    'Remove this remote host? The remote server itself will stay running.',
   '删除后，该邮箱的凭据与唤醒规则都会移除，此操作无法撤销':
     'Credentials and wake rules for this mailbox will be removed and cannot be undone',
   '接入失败，请重试。': 'Could not connect. Try again.',
