@@ -68,5 +68,5 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          lane=$(node -e "import('./scripts/ops/push-queue.mjs').then((m) => console.log(m.laneName(require('node:os').hostname(), require('node:path').basename(process.cwd()))))")
+          lane=$(node -e "import('./scripts/ops/push-queue.mjs').then((m) => console.log(m.localLane(process.cwd())))")
           git push origin --delete "preflight/$lane"

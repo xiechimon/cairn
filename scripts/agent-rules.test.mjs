@@ -26,7 +26,7 @@ test('AGENTS.md uses the speculative batching queue, retries once, and never let
   assert.match(agents, /speculative `refs\/heads\/queue\/try\/<id>` branches up to depth 4/);
   assert.match(agents, /rerun once/);
   assert.match(agents, /cancelled jobs alone count/);
-  assert.match(agents, /`Lane: <host>\/<worktree>` trailer/);
+  assert.match(agents, /`Lane: <machine id>\/<worktree>` trailer/);
   assert.match(agents, /never write a loop that deletes or recreates `queue\/main`/);
   assert.match(agents, /you never remove one, not even one you think is yours or dead/);
   assert.match(agents, /whatever tool made the commits \(Amp, Claude Code, a Cairn task/);

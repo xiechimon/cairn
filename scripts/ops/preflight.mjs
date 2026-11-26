@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { hostname } from 'node:os';
-import { basename } from 'node:path';
 import { MAX_CONCURRENT_PREFLIGHT_RUNS } from './ci-capacity-gate.mjs';
-import { laneName, stampUnownedCommits } from './push-queue.mjs';
+import { localLane, stampUnownedCommits } from './push-queue.mjs';
 import { ENQUEUE_PREFIX, TRY_PREFIX } from './speculative-queue.mjs';
 
 export function preflightRef(lane) {
@@ -160,7 +158,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const wait = process.argv.includes('--wait');
   const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
-  const lane = laneName(hostname(), basename(git(['rev-parse', '--show-toplevel'])));
+  const lane = localLane(git(['rev-parse', '--show-toplevel']));
   const ref = `preflight/${lane}`;
   const stamped = stampUnownedCommits({ lane, prefix: '[preflight]' });
   if (!stamped.ok) {

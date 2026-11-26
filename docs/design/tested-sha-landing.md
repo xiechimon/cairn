@@ -31,7 +31,7 @@ accepted and pushing an untested one is rejected.
 
 ## Submitting (`scripts/ops/push-queue.mjs`)
 
-- It stamps `Lane: <host>/<worktree>` on commits in `origin/main..HEAD` that have
+- It stamps `Lane: <machine id>/<worktree>` on commits in `origin/main..HEAD` that have
   no `Amp-Thread-ID` or `Lane` trailer, runs the English-only gate, and requires
   green `check` + `pack-smoke` + `e2e-gate` on the exact SHA of `HEAD`.
   `preflight.mjs` stamps before it pushes, so the SHA it tested is the one

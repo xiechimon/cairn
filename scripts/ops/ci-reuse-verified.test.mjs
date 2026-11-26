@@ -36,7 +36,7 @@ function makeRun(overrides = {}) {
 test('selectVerifiedPriorRun reuses exact-SHA queue/try or preflight green run on main push', () => {
   for (const headBranch of [
     'queue/try/1795588850188-774b4be61',
-    'preflight/xmonsMac.local/my-branch',
+    'preflight/m-0123abcd/my-branch',
   ]) {
     const decision = selectVerifiedPriorRun({
       ref: 'refs/heads/main',

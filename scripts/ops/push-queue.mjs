@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { hostname } from 'node:os';
-import { basename, join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
 import { ownerOf, RELEASE_MARKER } from './promote-queue.mjs';
 import { ENQUEUE_PREFIX, makeEnqueueId, sortEnqueueEntries } from './speculative-queue.mjs';
 
@@ -78,8 +80,33 @@ export function pollWaitStep({
   }
 }
 
-export function laneName(host, worktree) {
-  return `${host}/${worktree}`.replace(/[^A-Za-z0-9._/-]/g, '-');
+export function laneName(machine, worktree) {
+  return `${machine}/${worktree}`.replace(/[^A-Za-z0-9._/-]/g, '-');
+}
+
+export function machineLaneId(home = homedir()) {
+  const path = join(home, '.config', 'cairn-dev', 'lane-machine-id');
+  if (!existsSync(path)) {
+    mkdirSync(dirname(path), { recursive: true });
+    const draft = `${path}.${process.pid}`;
+    writeFileSync(draft, `m-${randomBytes(4).toString('hex')}\n`);
+    try {
+      linkSync(draft, path);
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+    } finally {
+      rmSync(draft, { force: true });
+    }
+  }
+  const id = readFileSync(path, 'utf8').trim();
+  if (!/^m-[0-9a-f]{8}$/.test(id)) {
+    throw new Error(`${path} does not hold a lane machine id; delete it and run again`);
+  }
+  return id;
+}
+
+export function localLane(worktreeRoot, home) {
+  return laneName(machineLaneId(home), basename(worktreeRoot));
 }
 
 export const GREEN_CONTEXTS = ['check', 'pack-smoke', 'e2e-gate'];
@@ -241,7 +268,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   }
 
   const preStampSha = git(['rev-parse', 'HEAD']);
-  const lane = laneName(hostname(), basename(git(['rev-parse', '--show-toplevel'])));
+  const lane = localLane(git(['rev-parse', '--show-toplevel']));
   const stamped = stampUnownedCommits({ lane, prefix: '[push-queue]' });
   if (!stamped.ok) {
     console.error(

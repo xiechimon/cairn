@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +25,7 @@ import {
   fetchCheckRuns,
   isTransientGitNetworkError,
   laneName,
+  machineLaneId,
   missingGreenContexts,
   pollWaitStep,
   preflightEvidence,
@@ -43,13 +45,26 @@ test('commits without an Amp-Thread-ID or Lane trailer are the ones that get sta
   assert.deepEqual(unownedCommits(commits), ['2', '4']);
 });
 
-test('the lane name is host and worktree, safe for a trailer and a shell quote', () => {
+test('the lane name is machine id and worktree, safe for a trailer and a shell quote', () => {
   assert.equal(
-    laneName('xmons-MacBook', 'ecstatic-brahmagupta-aee8fe'),
-    'xmons-MacBook/ecstatic-brahmagupta-aee8fe',
+    laneName('m-0123abcd', 'ecstatic-brahmagupta-aee8fe'),
+    'm-0123abcd/ecstatic-brahmagupta-aee8fe',
   );
-  assert.equal(laneName("my host's", 'wt dir'), 'my-host-s/wt-dir');
+  assert.equal(laneName("my id's", 'wt dir'), 'my-id-s/wt-dir');
   assert.match(stampCommand('mac/wt'), /--trailer 'Lane: mac\/wt'/);
+});
+
+test('a machine keeps one lane id, two machines differ, and a damaged id is refused', () => {
+  const root = makeTestTempDir('lane-id-');
+  try {
+    const id = machineLaneId(join(root, 'a'));
+    assert.equal(machineLaneId(join(root, 'a')), id);
+    assert.notEqual(machineLaneId(join(root, 'b')), id);
+    writeFileSync(join(root, 'a/.config/cairn-dev/lane-machine-id'), 'my-host.local\n');
+    assert.throws(() => machineLaneId(join(root, 'a')), /delete it and run again/);
+  } finally {
+    releaseTestTempDir(root);
+  }
 });
 
 test('the pre-flight gate needs the three green-main contexts on a tree-identical sha', () => {
@@ -251,7 +266,8 @@ test('preflight stamps unowned commits with Lane: before pushing the preflight r
 const args = process.argv.slice(2);
 const apiArg = args.find((a) => a.includes('head_sha=')) || '';
 const sha = (apiArg.match(/head_sha=([0-9a-f]+)/) || [])[1] || '';
-const branch = process.env.EXPECTED_PREFLIGHT_REF || '';
+const id = require('node:fs').readFileSync(process.env.HOME + '/.config/cairn-dev/lane-machine-id', 'utf8').trim();
+const branch = 'preflight/' + id + '/wt';
 console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_branch: branch, html_url: 'https://example/run/1' }] }));
 `,
     );
@@ -259,7 +275,8 @@ console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_b
     const pnpmStub = join(bin, 'pnpm');
     writeFileSync(pnpmStub, '#!/bin/sh\nexit 0\n');
     chmodSync(pnpmStub, 0o755);
-    mkdirSync(join(root, 'home'), { recursive: true });
+    const home = join(root, 'home');
+    mkdirSync(home, { recursive: true });
 
     const preflightScript = join(dirname(fileURLToPath(import.meta.url)), 'preflight.mjs');
     const run = spawnSync(process.execPath, [preflightScript], {
@@ -268,17 +285,37 @@ console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_b
       env: {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
-        EXPECTED_PREFLIGHT_REF: `preflight/${laneName(execFileSync('hostname', { encoding: 'utf8' }).trim(), 'wt')}`,
+        HOME: home,
         CAIRN_PREFLIGHT_GATE_WRAPPER: '',
       },
     });
     assert.equal(run.status, 0, run.stderr);
     const body = git(work, ['log', '-1', '--format=%B', 'HEAD']);
-    assert.match(body, /^Lane:\s+\S+\/wt$/m);
+    const id = readFileSync(join(home, '.config/cairn-dev/lane-machine-id'), 'utf8').trim();
+    const lane = `${id}/wt`;
+    assert.match(id, /^m-[0-9a-f]{8}$/);
+    assert.match(body, new RegExp(`^Lane: ${lane}$`, 'm'));
+    assert.ok(!`${body}\n${run.stdout}`.includes(laneName(hostname(), 'wt')));
     const headSha = git(work, ['rev-parse', 'HEAD']);
-    const lane = laneName(execFileSync('hostname', { encoding: 'utf8' }).trim(), 'wt');
     const remoteSha = git(work, ['ls-remote', 'origin', preflightRef(lane)]).split(/\s+/)[0];
     assert.equal(remoteSha, headSha);
+
+    git(work, ['commit', '--allow-empty', '-m', 'unowned change after preflight']);
+    const queued = spawnSync(
+      process.execPath,
+      [join(dirname(fileURLToPath(import.meta.url)), 'push-queue.mjs')],
+      {
+        cwd: work,
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, HOME: home },
+      },
+    );
+    assert.equal(queued.status, 1, queued.stderr);
+    assert.match(
+      git(work, ['log', '-1', '--format=%B', 'HEAD']),
+      new RegExp(`^Lane: ${lane}$`, 'm'),
+    );
+    assert.equal(git(work, ['ls-remote', 'origin', 'refs/heads/enqueue/*']), '');
   } finally {
     releaseTestTempDir(root);
   }

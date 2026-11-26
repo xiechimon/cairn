@@ -10,8 +10,10 @@ become the fast, optional preview, not the gate.
 A lane verifies on GitHub before it enters the landing queue:
 
 - `refs/heads/preflight/<lane>` is a scratch ref per lane
-  (`<lane>` = `laneName(host, worktree)`, the same name stamped into `Lane:`
-  trailers). `node scripts/ops/preflight.mjs` stamps any unowned commits in
+  (`<lane>` = `localLane(worktreeRoot)`, the same name stamped into `Lane:`
+  trailers: a random per-machine id kept in
+  `~/.config/cairn-dev/lane-machine-id`, then the worktree name; it carries no
+  host name). `node scripts/ops/preflight.mjs` stamps any unowned commits in
   `origin/main..HEAD` with `Lane: <lane>` first, then pushes `HEAD` there with
   `--force-with-lease` and, with `--wait`, follows the `ci` run to a conclusion.
 - `ci.yml` triggers on `preflight/**` pushes and the `changes` job classifies
