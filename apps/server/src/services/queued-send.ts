@@ -2,6 +2,7 @@ import { ACTIVE_STEP_STATUSES, type ThreadMessageDelivery } from '@cairn/shared'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, clientMessage, queuedMessage, step, type todo } from '../db/schema.js';
+import { HttpError } from '../lib/errors.js';
 import { completeClientMessage, findClientMessage, removedFromQueue } from './client-message.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -63,24 +64,6 @@ function isQueuedReceipt(response: unknown): response is QueuedReceipt {
 
 export function nestedLedgerId(todoId: string, clientMessageId: string): string {
   return `nested:${todoId}:${clientMessageId}`;
-}
-
-function anyReceipt(db: Db, todoId: string, clientMessageId: string): boolean {
-  return (
-    db
-      .select({ scopeId: clientMessage.scopeId })
-      .from(clientMessage)
-      .where(
-        and(
-          inArray(clientMessage.scopeId, [todoId, ...buildsOf(db, todoId)]),
-          inArray(clientMessage.clientMessageId, [
-            clientMessageId,
-            nestedLedgerId(todoId, clientMessageId),
-          ]),
-        ),
-      )
-      .get() !== undefined
-  );
 }
 
 export function markAsQueuedSend(
@@ -166,34 +149,16 @@ export function queuedSendUnderKey(
   };
 }
 
-const takenForResend = new WeakMap<Db, Set<string>>();
-
-function takenIn(db: Db): Set<string> {
-  const existing = takenForResend.get(db);
-  if (existing !== undefined) return existing;
-  const created = new Set<string>();
-  takenForResend.set(db, created);
-  return created;
-}
-
-export function forgetCancelledSend(
-  db: Db,
-  todoId: string,
-  messageId: string,
-  removed: boolean,
-): void {
-  const heldByResend = takenIn(db).delete(messageId);
-  if (!removed && !heldByResend) return;
-  const scopes = buildsOf(db, todoId);
+export function forgetCancelledSend(db: Db, todoId: string, messageId: string): void {
   const receipts = db
     .select()
     .from(clientMessage)
-    .where(inArray(clientMessage.scopeId, scopes))
+    .where(inArray(clientMessage.scopeId, buildsOf(db, todoId)))
     .all()
     .filter((entry) => isQueuedReceipt(entry.response) && entry.response.message.id === messageId);
   for (const entry of receipts)
     db.update(clientMessage)
-      .set({ response: asCancelled(entry.response) })
+      .set({ response: { ...(entry.response as QueuedReceipt), cancelled: true } })
       .where(
         and(
           eq(clientMessage.scopeId, entry.scopeId),
@@ -203,58 +168,58 @@ export function forgetCancelledSend(
       .run();
 }
 
-function asCancelled(response: unknown): QueuedReceipt {
-  return { ...(response as QueuedReceipt), cancelled: true };
+export function refuseRemovedSend(db: Db, todoId: string, clientMessageId: string): void {
+  const removed = db
+    .select({ response: clientMessage.response })
+    .from(clientMessage)
+    .where(
+      and(
+        eq(clientMessage.clientMessageId, clientMessageId),
+        inArray(clientMessage.scopeId, buildsOf(db, todoId)),
+      ),
+    )
+    .all()
+    .some((entry) => isQueuedReceipt(entry.response) && entry.response.cancelled === true);
+  if (removed) throw removedFromQueue();
+}
+
+export interface Replacement {
+  messageId: string;
+  commit: () => void;
 }
 
 export async function replacingStrandedSend<T>(
   db: Db,
   task: TodoRow,
   resend: { clientMessageId?: string; content: string; sendNow?: boolean },
-  send: (refuseIfRemoved: () => void) => Promise<T>,
+  send: (replacement?: Replacement) => Promise<T>,
 ): Promise<T> {
   const { clientMessageId, content, sendNow } = resend;
-  const nothingTaken = () => {};
-  if (clientMessageId === undefined) return send(nothingTaken);
+  if (clientMessageId === undefined) return send();
   const found = queuedSendUnderKey(db, task, clientMessageId, sendNow);
   if (found?.kind === 'cancelled') throw removedFromQueue();
-  if (found?.kind !== 'stranded') return send(nothingTaken);
+  if (found?.kind !== 'stranded') return send();
   const queuedRow = eq(queuedMessage.id, found.messageId);
-  const ledger = and(
-    eq(clientMessage.scopeId, found.scopeId),
-    eq(clientMessage.clientMessageId, clientMessageId),
-  );
-  const taken = db.transaction(() => {
-    const unedited = db.select().from(queuedMessage).where(queuedRow).get()?.content === content;
-    return {
-      row: unedited ? db.delete(queuedMessage).where(queuedRow).returning().get() : undefined,
-      receipt: db.delete(clientMessage).where(ledger).returning().get(),
-    };
-  });
-  takenIn(db).add(found.messageId);
-  const removedMeanwhile = () => !takenIn(db).has(found.messageId);
+  const commit = () => {
+    const receipt = findClientMessage<QueuedReceipt>(db, found.scopeId, clientMessageId);
+    const row = db.select().from(queuedMessage).where(queuedRow).get();
+    if (receipt?.message.id !== found.messageId || row === undefined)
+      throw new HttpError(409, 'Queued message was already delivered');
+    if (row.content === content) db.delete(queuedMessage).where(queuedRow).run();
+    db.delete(clientMessage)
+      .where(
+        and(
+          eq(clientMessage.scopeId, found.scopeId),
+          eq(clientMessage.clientMessageId, clientMessageId),
+        ),
+      )
+      .run();
+  };
   try {
-    return await send(() => {
-      if (removedMeanwhile()) throw removedFromQueue();
-    });
+    return await send({ messageId: found.messageId, commit });
   } catch (error) {
-    const cancelledMeanwhile = removedMeanwhile();
-    db.transaction(() => {
-      if (anyReceipt(db, task.id, clientMessageId)) return;
-      if (taken.row && !cancelledMeanwhile)
-        db.insert(queuedMessage).values(taken.row).onConflictDoNothing().run();
-      if (taken.receipt)
-        db.insert(clientMessage)
-          .values(
-            cancelledMeanwhile
-              ? { ...taken.receipt, response: asCancelled(taken.receipt.response) }
-              : taken.receipt,
-          )
-          .onConflictDoNothing()
-          .run();
-    });
+    const now = queuedSendUnderKey(db, task, clientMessageId, sendNow);
+    if (now?.kind === 'received') return now.answer as T;
     throw error;
-  } finally {
-    takenIn(db).delete(found.messageId);
   }
 }

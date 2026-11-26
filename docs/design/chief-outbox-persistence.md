@@ -57,12 +57,12 @@ A queued message has no receipt copy of its own. The queue route marks its ledge
 | Handed to the agent, by either route | success, nothing inserted, also after the task closes |
 | Queued behind an active step of the task's latest build, no delivery error | success, nothing inserted; stop-and-send marks it to run after the stop |
 | Held by a Stop: the latest run's last step is stopped, no delivery error, task open | success, nothing inserted and nothing started; the row stays queued with its send now and remove controls. A stop-and-send resend takes the next row instead, so it is delivered |
-| Queued where no active step will drain it: failed turn, older build, delivery error, archived or closed task | one run removes the queued row and its receipt and sends the resend as a new message through the requested route; a refused or failed send puts both back and returns the error, except a row the user cancelled meanwhile |
+| Queued where no active step will drain it: failed turn, older build, delivery error, archived or closed task | one run sends the resend as a new message through the requested route; the transaction that commits the new copy also removes the old queued row and its receipt. A refused or failed send changes neither and returns the error. If the row was delivered meanwhile (send now, a drain), the resend is answered as delivered |
 | The same, but the queued row was edited since | only the receipt is replaced; the edited row stays queued beside the resent text |
-| Cancelled by the user | the cancel marks the receipt cancelled in the same transaction; every resend under that key, in any send mode, is refused with 409 `queued-message-cancelled` and nothing is inserted. A cancel that arrives while an earlier resend is still in flight wins: that resend is refused at its commit, whether it was about to succeed or fail |
+| Cancelled by the user | the cancel marks the receipt cancelled in the same transaction; every resend under that key, in any send mode, is refused with 409 `queued-message-cancelled` and nothing is inserted. A cancel that arrives while an earlier resend is still in flight wins: that resend is refused first thing in its commit, before anything is settled or published |
 | Never received | normal send. A queue send addressed to an earlier run of the task goes to the task's latest run |
 
-A crash between the removal and the new send leaves neither row; the browser still holds the text and its resend is a new message.
+Nothing is taken out before the commit, so a server that stops during a slow resend keeps the queued row, its receipt and any cancel.
 
 ## Waiting messages follow the task's run
 

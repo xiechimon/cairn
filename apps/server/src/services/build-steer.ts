@@ -38,7 +38,7 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import { projectOfTodo } from './git.js';
-import { moveQueuedMessages } from './queued-send.js';
+import { moveQueuedMessages, refuseRemovedSend } from './queued-send.js';
 import { assertAutomaticRetryAllowed } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -116,9 +116,17 @@ export async function sendBuildSteer(
 ): Promise<BuildSteerResult> {
   const rawOptions = typeof options === 'boolean' ? { afterTurn: options } : options;
   const { db } = deps;
-  const replay = findClientMessage<BuildSteerResult>(db, conversationId, body.clientMessageId);
-  if (replay !== undefined) return replay;
   let buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
+  const todoId = buildRow?.todoId;
+  const settled = () => {
+    if (todoId !== undefined && body.clientMessageId !== undefined)
+      refuseRemovedSend(db, todoId, body.clientMessageId);
+    const stored = findClientMessage<BuildSteerResult>(db, conversationId, body.clientMessageId);
+    const replaced = rawOptions.replacing?.messageId;
+    return replaced !== undefined && stored?.message.id === replaced ? undefined : stored;
+  };
+  const replay = settled();
+  if (replay !== undefined) return replay;
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
   const automatic = (rawOptions.human ?? deps.steerOptions?.human) !== true;
   if (automatic) assertAutomaticRetryAllowed(deps, buildRow.todoId);
@@ -171,11 +179,7 @@ export async function sendBuildSteer(
     }
     if (githubPrOf(deps, todoRow, buildRow.prNumber) !== null) {
       const outcome = await probeReworkTargetPr(deps, buildRow, todoRow, true);
-      const settledMeanwhile = findClientMessage<BuildSteerResult>(
-        db,
-        conversationId,
-        body.clientMessageId,
-      );
+      const settledMeanwhile = settled();
       if (settledMeanwhile !== undefined) return settledMeanwhile;
       todoRow = continuationTodo(deps, buildRow, continuationOptions);
       if (outcome === 'merged') {
@@ -199,6 +203,7 @@ export async function sendBuildSteer(
   let sent: BuildSteerResult;
   try {
     sent = db.transaction((): BuildSteerResult => {
+      continuationOptions.replacing?.commit();
       if (automatic) assertAutomaticRetryAllowed(deps, buildRow.todoId);
       claimClientMessage(db, conversationId, body.clientMessageId);
       if (continuationOptions.schedule) {

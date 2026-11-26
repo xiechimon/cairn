@@ -1,8 +1,17 @@
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
-import { build, message, project, queuedMessage, step, todo } from '../src/db/schema.js';
+import {
+  build,
+  clientMessage,
+  message,
+  project,
+  queuedMessage,
+  step,
+  todo,
+} from '../src/db/schema.js';
 import { sendBuildSteer } from '../src/services/builds.js';
 import { replacingStrandedSend } from '../src/services/queued-send.js';
+import { writeWorkerQuestion } from '../src/services/worker-question-store.js';
 import { req } from './helpers.js';
 import { runningTask, type Task } from './running-task.js';
 
@@ -323,6 +332,7 @@ test.each([
   ['archived', 'reply', { archivedAt: 3 }, 'task-archived'],
   ['archived', 'queue', { archivedAt: 3 }, 'task-archived'],
   ['closed', 'queue', { phase: 'closed' as const }, 'task-closed'],
+  ['closed', 'reply', { phase: 'closed' as const }, 'task-closed'],
 ] as const)(
   'a send to a task that is %s names why through the %s route',
   async (_, route, patch, reason) => {
@@ -420,6 +430,90 @@ test('a steer under the id of a message removed from the queue is refused', asyn
   expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
   await cancelIt(w);
   const steer = await w.send({ content: TEXT, clientMessageId: KEY });
+  expect(steer.status).toBe(409);
+  expect(await steer.json()).toMatchObject({ reason: 'queued-message-cancelled' });
+  expect(copies(w)).toEqual([]);
+});
+
+test.each(['reply', 'queue'] as const)(
+  'a resend in flight through the %s route leaves the queued message on disk until it commits',
+  async (route) => {
+    const { w, rowId, reachesThePrCheck } = await strandedBehindASlowPrCheck();
+    const resend = routes[route](w);
+    await reachesThePrCheck();
+    expect(queuedRows(w).map((row) => row.id)).toEqual([rowId]);
+    await w.send({ content: TEXT, queuedMessageId: rowId, cancelQueued: true });
+    const receipts = w.s.db
+      .select()
+      .from(clientMessage)
+      .where(eq(clientMessage.clientMessageId, KEY))
+      .all();
+    expect(receipts.map((row) => row.response)).toEqual([
+      expect.objectContaining({ cancelled: true }),
+    ]);
+    expect((await resend).status).toBe(409);
+  },
+);
+
+test.each(['reply', 'queue'] as const)(
+  'a removal during a resend through the %s route announces nothing about the removed message',
+  async (route) => {
+    const { w, rowId, reachesThePrCheck } = await strandedBehindASlowPrCheck();
+    w.s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, 'task')).run();
+    writeWorkerQuestion(
+      { db: w.s.db, convHub: w.s.convHub },
+      'build',
+      'q1',
+      {
+        kind: 'ask_user_question',
+        requestId: 'q1',
+        status: 'pending',
+        questions: [{ header: 'Decision', question: 'Which one?', options: [] }],
+        answers: null,
+      },
+      1,
+    );
+    const resend = routes[route](w);
+    await reachesThePrCheck();
+    const announced = vi.spyOn(w.s.convHub, 'publishMessage');
+    const documents = vi.spyOn(w.s.hub, 'publishTodoDoc');
+    await w.send({ content: TEXT, queuedMessageId: rowId, cancelQueued: true });
+    const answer = await resend;
+    expect(await answer.json()).toMatchObject({ reason: 'queued-message-cancelled' });
+    expect(JSON.stringify([announced.mock.calls, documents.mock.calls])).not.toContain(TEXT);
+  },
+);
+
+test('a resend that loses to send now on the same queued message is still acknowledged', async () => {
+  const w = await runningTask();
+  expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
+  const [row] = queuedRows(w);
+  expect((await w.finish('failed')).status).toBe(200);
+  const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
+  const answer = await replacingStrandedSend<object>(
+    w.s.db,
+    task,
+    { clientMessageId: KEY, content: TEXT },
+    async () => {
+      await w.send({ content: TEXT, queuedMessageId: row!.id });
+      throw new Error('the run is busy now');
+    },
+  );
+  expect(answer).toMatchObject({ conversationId: 'build' });
+  expect(copies(w)).toEqual(['build']);
+});
+
+test('a steer to a later run under the id of a removed message is refused', async () => {
+  const w = await runningTask();
+  expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
+  await cancelIt(w);
+  expect((await w.finish('failed')).status).toBe(200);
+  expect((await req(w.s.app, 'POST', '/api/builds/build/retry-now', {})).status).toBe(202);
+  const next = latestBuild(w);
+  const steer = await req(w.s.app, 'POST', `/api/conversations/${next}/messages`, {
+    content: TEXT,
+    clientMessageId: KEY,
+  });
   expect(steer.status).toBe(409);
   expect(await steer.json()).toMatchObject({ reason: 'queued-message-cancelled' });
   expect(copies(w)).toEqual([]);

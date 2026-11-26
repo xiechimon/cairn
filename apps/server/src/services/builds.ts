@@ -31,6 +31,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { planAutoApproveAt, planAwaitsAutoConfirm } from './plan-auto-confirm.js';
 import type { VapidKeys } from './push.js';
+import type { Replacement } from './queued-send.js';
 import { toQuotaWait } from './quota-wait.js';
 import { automaticRestartBlocked } from './retry-parking.js';
 import { profileForStep } from './routing-rules.js';
@@ -163,6 +164,7 @@ export interface BuildSteerOptions {
   };
   answer?: QuestionAnswer;
   beforeCommit?: () => void;
+  replacing?: Replacement;
   sseClientMessageId?: string;
 }
 

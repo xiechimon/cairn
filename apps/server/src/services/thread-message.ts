@@ -1,6 +1,7 @@
 import {
   redactSecrets,
   type StepActionOrigin,
+  TASK_CLOSED,
   THREAD_MESSAGE_EXCERPT_MAX,
   type ThreadMessageBody,
   type ThreadMessageContent,
@@ -29,7 +30,12 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import { assertProjectWritable } from './project-writable.js';
-import { nestedLedgerId, queuedSendUnderKey, replacingStrandedSend } from './queued-send.js';
+import {
+  nestedLedgerId,
+  queuedSendUnderKey,
+  type Replacement,
+  replacingStrandedSend,
+} from './queued-send.js';
 import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
 import { settleQuestionAnswers } from './worker-questions.js';
 
@@ -103,9 +109,14 @@ async function deliver(
   body: ThreadMessageBody,
   origin: ThreadMessageOrigin,
   beforeCommit?: () => void,
+  replacing?: Replacement,
 ): Promise<{ conversationId: string; delivered: ThreadMessageDelivery }> {
   const nestedId = nestedLedgerId(row.id, body.clientMessageId);
   const sseClientMessageId = origin.origin === 'user' ? body.clientMessageId : undefined;
+  const commitStepAction = () => {
+    replacing?.commit();
+    beforeCommit?.();
+  };
   const pending = pendingWorkerQuestionIds(deps.db, buildId);
   if (origin.origin === 'coordinator' && pending.length > 0) {
     throw new HttpError(
@@ -120,7 +131,7 @@ async function deliver(
       deps,
       buildId,
       { content: body.content, clientMessageId: nestedId },
-      { human: true, afterTurn: true, beforeCommit, sseClientMessageId },
+      { human: true, afterTurn: true, replacing, beforeCommit, sseClientMessageId },
     );
     return { conversationId: sent.conversationId, delivered: sent.delivered };
   }
@@ -138,6 +149,7 @@ async function deliver(
         ...(origin.origin === 'user' ? { human: true } : { human: false, actor: origin.actor }),
         ...(deadTurnEnded ? { afterTurn: true } : {}),
         ...(sseClientMessageId !== undefined ? { sseClientMessageId } : {}),
+        replacing,
         beforeCommit,
       },
     );
@@ -154,7 +166,7 @@ async function deliver(
         clientMessageId: nestedId,
       },
       ...stepActionAttribution(origin),
-      beforeCommit,
+      commitStepAction,
       sseClientMessageId,
     );
     const revised = storedDelivery(findClientMessage(deps.db, buildId, nestedId));
@@ -167,7 +179,7 @@ async function deliver(
       buildId,
       { action: 'restart', feedback: body.content, clientMessageId: nestedId },
       ...stepActionAttribution(origin),
-      beforeCommit,
+      commitStepAction,
       sseClientMessageId,
     );
     const restarted = storedDelivery(findClientMessage(deps.db, buildId, nestedId));
@@ -231,6 +243,7 @@ function commitStoppedRestart(
   row: TodoRow,
   body: ThreadMessageBody,
   origin: ThreadMessageOrigin,
+  replacing?: Replacement,
 ): ThreadMessageResult {
   let result: ThreadMessageResult = {
     todoId: row.id,
@@ -238,6 +251,7 @@ function commitStoppedRestart(
     delivered: 'restart',
   };
   const published = deps.db.transaction(() => {
+    replacing?.commit();
     claimClientMessage(deps.db, row.id, body.clientMessageId);
     const conversationId = startThreadBuild(deps, row, origin, body.content);
     result = { todoId: row.id, conversationId, delivered: 'restart' };
@@ -338,15 +352,21 @@ export async function messageThreadAsUser(
   const stored = settleStoredSend(deps, row, body, origin);
   if (stored !== undefined) return stored;
   if (row.archivedAt !== null) throw taskArchived();
+  if (row.phase === 'closed')
+    throw new HttpError(
+      409,
+      `thread #${row.seqNum} cannot take a message while closed`,
+      TASK_CLOSED,
+    );
   assertProjectWritable(deps.db, row.teamId, row.projectId);
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }
   const buildId = row.latestBuildId;
-  const send = async (refuseIfRemoved: () => void): Promise<ThreadMessageResult> => {
+  const send = async (replacing?: Replacement): Promise<ThreadMessageResult> => {
     if (row.phase === 'stopped') {
       try {
-        return commitStoppedRestart(deps, row, body, origin);
+        return commitStoppedRestart(deps, row, body, origin, replacing);
       } catch (error) {
         return replayAfterConflict<ThreadMessageResult>(
           deps.db,
@@ -357,10 +377,7 @@ export async function messageThreadAsUser(
       }
     }
     const bound = bindRouteReceipt(deps, row, body, origin, buildId);
-    const sent = await deliver(deps, row, buildId, body, origin, () => {
-      refuseIfRemoved();
-      bound.write();
-    });
+    const sent = await deliver(deps, row, buildId, body, origin, bound.write, replacing);
     bound.publish();
     const committed = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
     if (committed !== undefined) return committed;
