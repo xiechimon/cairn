@@ -309,11 +309,18 @@ test('preflight stamps unowned commits with Lane: before pushing the preflight r
     git(work, ['commit', '--allow-empty', '-m', 'init']);
     git(work, ['push', '-u', 'origin', 'main']);
     mkdirSync(join(work, 'scripts/ops'), { recursive: true });
-    copyFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), 'preflight-fast-gate.mjs'),
-      join(work, 'scripts/ops/preflight-fast-gate.mjs'),
-    );
-    git(work, ['add', 'scripts/ops/preflight-fast-gate.mjs']);
+    for (const file of [
+      'ops/preflight-fast-gate.mjs',
+      'test-admission.mjs',
+      'heavy-slots.mjs',
+      'owned-process.mjs',
+    ]) {
+      copyFileSync(
+        join(dirname(fileURLToPath(import.meta.url)), '..', file),
+        join(work, 'scripts', file),
+      );
+      git(work, ['add', `scripts/${file}`]);
+    }
     git(work, ['commit', '-m', 'add fast gate']);
     git(work, ['push', 'origin', 'main']);
     git(work, ['checkout', '-b', 'feature']);

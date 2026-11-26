@@ -908,6 +908,7 @@ test('test:changed waits for a slot before it starts Vitest', async () => {
     copyFileSync('scripts/heavy-slots.mjs', join(repo, 'scripts/heavy-slots.mjs'));
     pinSingleSlot(join(repo, 'scripts/heavy-slots.mjs'));
     copyFileSync('scripts/owned-process.mjs', join(repo, 'scripts/owned-process.mjs'));
+    copyFileSync('scripts/test-admission.mjs', join(repo, 'scripts/test-admission.mjs'));
     const git = (...args) =>
       execFileSync(
         'git',

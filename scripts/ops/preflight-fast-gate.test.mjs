@@ -233,3 +233,32 @@ test('fastGatePlan puts previously failed vitest files first and runFastGate cle
     releaseTestTempDir(root);
   }
 });
+
+test('cached failures that this machine refuses to run together do not block the gate', () => {
+  const root = makeTestTempDir('preflight-cached-multi-');
+  try {
+    mkdirSync(join(root, 'apps/web/test'), { recursive: true });
+    const failedTests = ['apps/web/test/one.test.ts', 'apps/web/test/two.test.ts'];
+    for (const file of failedTests) writeFileSync(join(root, file), 'export {};\n');
+    const cachePath = join(root, 'cache.json');
+    writeFileSync(cachePath, JSON.stringify({ failedTests }));
+    const calls = [];
+    const result = runFastGate({
+      cwd: root,
+      wrapper: '',
+      env: {},
+      checkTree: () => null,
+      listPaths: () => ['apps/web/src/App.tsx'],
+      cachePath,
+      spawn: (command, args) => {
+        calls.push([command, ...args].join(' '));
+        return { status: args.includes('vitest') ? 1 : 0 };
+      },
+      log: () => {},
+    });
+    assert.equal(result.ok, true, result.error);
+    assert.ok(calls.includes('pnpm test:changed'));
+  } finally {
+    releaseTestTempDir(root);
+  }
+});

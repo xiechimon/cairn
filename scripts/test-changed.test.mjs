@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 import test from 'node:test';
+import { scrubGitEnv } from './scrub-git-env.mjs';
 import {
   buildReferencing,
   declaredIdentifiers,
   selectTests,
   selectTestsWithReport,
 } from './test-changed.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const tests = [
   'apps/daemon/test/computer-host-desktop.test.ts',
@@ -176,4 +181,62 @@ test('stem matching prioritizes exact filename match and caps broad fan-out', ()
   assert.equal(report.selected.length, 8);
   assert.equal(report.selected.includes('apps/daemon/test/runner.test.ts'), true);
   assert.equal(report.dropped.length, 5);
+});
+
+function runOnMachineWithoutHeavyRuns(testFiles) {
+  const root = makeTestTempDir('test-changed-local-');
+  const env = scrubGitEnv({ ...process.env });
+  for (const name of ['CI', 'CAIRN_MINI_TEST', 'CAIRN_LOCAL_HEAVY']) delete env[name];
+  const git = (...args) =>
+    execFileSync(
+      'git',
+      [
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@example.invalid',
+        '-c',
+        'commit.gpgsign=false',
+        ...args,
+      ],
+      { cwd: root, env },
+    );
+  try {
+    git('init', '-q');
+    writeFileSync(join(root, '.gitignore'), 'bin/\n');
+    mkdirSync(join(root, 'apps/server/test'), { recursive: true });
+    writeFileSync(join(root, 'apps/server/test/migration.test.ts'), 'migrateUpTo(1);\n');
+    git('add', '.gitignore', 'apps/server/test/migration.test.ts');
+    git('commit', '-qm', 'base');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    mkdirSync(join(root, 'apps/web/test'), { recursive: true });
+    for (const name of testFiles) writeFileSync(join(root, 'apps/web/test', name), 'export {};\n');
+    mkdirSync(join(root, 'bin'));
+    writeFileSync(join(root, 'bin/pnpm'), '#!/bin/sh\necho "vitest started: $*"\nexit 1\n');
+    chmodSync(join(root, 'bin/pnpm'), 0o755);
+    return spawnSync(process.execPath, [join(import.meta.dirname, 'test-changed.mjs')], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...env,
+        PATH: `${join(root, 'bin')}${delimiter}${env.PATH}`,
+        CAIRN_HEAVY_GATE_BYPASS: '1',
+      },
+    });
+  } finally {
+    releaseTestTempDir(root);
+  }
+}
+
+test('a machine that refuses multi-file runs defers them to CI instead of failing', () => {
+  const run = runOnMachineWithoutHeavyRuns(['one.test.ts', 'two.test.ts']);
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.doesNotMatch(run.stdout, /vitest started/);
+  assert.match(run.stdout, /none ran here/);
+});
+
+test('a single related test file still runs on that machine', () => {
+  const run = runOnMachineWithoutHeavyRuns(['one.test.ts']);
+  assert.equal(run.status, 1, run.stdout + run.stderr);
+  assert.match(run.stdout, /vitest started: exec vitest run apps\/web\/test\/one\.test\.ts/);
 });

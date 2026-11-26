@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
+import { heavyRunAuthorized } from './test-admission.mjs';
 
 const TEST_FILE = /^(apps|packages)\/[^/]+\/test\/.+\.test\.(ts|tsx|mts|mjs)$/;
 const SOURCE_FILE = /^((apps|packages)\/[^/]+)\/src\/.+\.(ts|tsx|mts)$/;
@@ -239,6 +240,12 @@ async function main() {
     return;
   }
   console.log(`test:changed: ${selected.length} file(s)\n${selected.join('\n')}`);
+  if (selected.length > 1 && !heavyRunAuthorized()) {
+    console.log(
+      'test:changed: this machine runs at most one test file at a time, so none ran here; CI runs the full suite. To run them before pushing, use a test host (CAIRN_PREFLIGHT_GATE_WRAPPER for preflight) or set CAIRN_LOCAL_HEAVY=1.',
+    );
+    return;
+  }
   const env =
     process.platform === 'darwin' && !process.env.CAIRN_TEST_TEMP_ROOT
       ? { ...process.env, CAIRN_TEST_TEMP_ROOT: '/tmp' }

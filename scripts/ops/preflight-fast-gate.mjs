@@ -4,6 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, posix, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { heavyRunAuthorized } from '../test-admission.mjs';
 
 const PACKAGE_ORDER = [
   '@cairn/shared',
@@ -152,6 +153,7 @@ export function exactTreeError(cwd) {
 export function runFastGate({
   cwd,
   wrapper = process.env.CAIRN_PREFLIGHT_GATE_WRAPPER ?? '',
+  env: gateEnv = process.env,
   spawn = spawnSync,
   log = console.log,
   checkTree = exactTreeError,
@@ -161,8 +163,10 @@ export function runFastGate({
 }) {
   const dirty = checkTree(cwd);
   if (dirty !== null) return { ok: false, error: dirty };
-  const resolvedFailed =
+  const cachedFailed =
     lastFailedTests ?? (wrapper.trim() ? [] : readLastFailedTests(cachePath, cwd));
+  const resolvedFailed =
+    cachedFailed.length > 1 && !heavyRunAuthorized(gateEnv) ? [] : cachedFailed;
   const plan = fastGatePlan(listPaths(cwd), resolvedFailed);
   const wrapperTokens = parseGateWrapper(wrapper);
   if (wrapperTokens.length > 0) {

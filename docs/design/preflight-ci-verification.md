@@ -27,7 +27,10 @@ A lane verifies on GitHub before it occupies `queue/main`:
 - `scripts/ops/preflight.mjs` runs `scripts/ops/preflight-fast-gate.mjs` on
   the exact committed `HEAD` tree before pushing `refs/heads/preflight/<lane>`
   (`pnpm lint`, touched-package `typecheck`, and `pnpm test:changed`), and
-  refuses to push if it fails. Setting `CAIRN_PREFLIGHT_GATE_WRAPPER`
+  refuses to push if it fails. On a machine that refuses multi-file test runs
+  (no `CI`, `CAIRN_MINI_TEST` or `CAIRN_LOCAL_HEAVY`), `pnpm test:changed`
+  runs a single related file, and with two or more it lists them, runs none and
+  leaves them to the `ci` run. Setting `CAIRN_PREFLIGHT_GATE_WRAPPER`
   (whitespace-split command prefix) combines that plan into a single
   `<wrapper...> sh -c "..."` call so hosts can offload the gate to a dedicated
   test runner without hardcoding host-specific paths in the repository.
