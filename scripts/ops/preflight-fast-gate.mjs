@@ -22,6 +22,7 @@ const STATIC_REGRESSION_STEP = [
 ];
 const CHECK_SCRIPT = /(?:-gate|-ledger)\.[cm]?[jt]s(?: |$)| --check[\w-]*(?: |$)/;
 const WRAPPER = /(?:ci-failed-only|test-temp-run)\.mjs.*? -- /;
+const RETRY = /\bbash scripts\/ci-retry\.sh +/g;
 const INVOCATION =
   /(?<=^|[\s(;&|'"])(?:(node|pnpm) +|(?=(?:\.\/)?scripts\/\S+\.sh\b))([^;&|)'"]*(?:"[^"]*"[^;&|)'"]*)*)/g;
 
@@ -72,7 +73,10 @@ function invocations(run) {
     .split('\n')
     .filter((line) => !line.trim().startsWith('#'))
     .flatMap((line) => [
-      ...line.replace(new RegExp(`^.*${WRAPPER.source}`), '').matchAll(INVOCATION),
+      ...line
+        .replace(new RegExp(`^.*${WRAPPER.source}`), '')
+        .replace(RETRY, '')
+        .matchAll(INVOCATION),
     ])
     .map(([, tool = 'sh', rest]) => [tool, ...rest.trim().split(/\s+/)]);
 }

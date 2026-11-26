@@ -310,7 +310,15 @@ test('required aggregates only accept skipped work its classification excused', 
   for (const [name, dependencies] of [
     [
       'check',
-      ['changes', 'check-core', 'vitest-light', 'vitest-integration', 'tsnet-sidecar', 'eval'],
+      [
+        'changes',
+        'check-core',
+        'vitest-light',
+        'vitest-integration',
+        'tsnet-sidecar',
+        'gates',
+        'eval',
+      ],
     ],
   ]) {
     const job = jobs.get(name);
@@ -336,10 +344,18 @@ test('required aggregates only accept skipped work its classification excused', 
     );
     const classifications = ['true', 'false', '', 'unknown'].flatMap((hasCode) =>
       ['true', 'false', '', 'unknown'].flatMap((sidecar) =>
-        ['true', 'false'].map((needsIntegration) => ({ hasCode, sidecar, needsIntegration })),
+        ['true', 'false'].flatMap((needsIntegration) =>
+          ['true', 'false', ''].map((gatesNeeded) => ({
+            hasCode,
+            sidecar,
+            needsIntegration,
+            gatesNeeded,
+          })),
+        ),
       ),
     );
-    const skipAllowed = (dependency, { hasCode, sidecar, needsIntegration }, vars) => {
+    const skipAllowed = (dependency, { hasCode, sidecar, needsIntegration, gatesNeeded }, vars) => {
+      if (dependency === 'gates') return gatesNeeded === 'false';
       if (dependency === 'eval')
         return !(vars.evalNeeded === 'true' && vars.evalEnabled === 'true');
       if (dependency === 'vitest-integration')
@@ -347,7 +363,7 @@ test('required aggregates only accept skipped work its classification excused', 
       return (sidecarJobs.includes(dependency) ? sidecar : hasCode) === 'false';
     };
     for (const classification of classifications) {
-      const { hasCode, sidecar, needsIntegration } = classification;
+      const { hasCode, sidecar, needsIntegration, gatesNeeded } = classification;
       for (const results of scenarios) {
         const varSets =
           results.eval === 'skipped'
@@ -363,6 +379,7 @@ test('required aggregates only accept skipped work its classification excused', 
             if (expression === 'needs.changes.outputs.has-sidecar') return sidecar;
             if (expression === 'needs.changes.outputs.needs-integration') return needsIntegration;
             if (expression === 'needs.changes.outputs.eval-needed') return vars.evalNeeded;
+            if (expression === 'needs.changes.outputs.gates-needed') return gatesNeeded;
             if (expression === 'needs.changes.outputs.reused-sha') return 'false';
             if (expression === 'needs.changes.outputs.reused-run-id') return '';
             if (expression === 'github.event_name') return 'push';
@@ -428,14 +445,17 @@ test('folded gates stay visibly red, continue after failures and retain full his
           step.startsWith(`      - name: "${name}"\n`),
       );
     assert.ok(step, name);
-    if (name.startsWith('Comment discipline')) assert.match(step, /continue-on-error: true/, name);
+    if (name.includes('(advisory')) assert.match(step, /continue-on-error: true/, name);
     else assert.doesNotMatch(step, /continue-on-error:/, name);
     assert.equal(step.match(/^ {8}if: \$\{\{ (.*) \}\}$/m)?.[1], expectedCond, name);
     if (variable) assert.ok(step.includes(`${variable}:`), name);
   }
   assert.doesNotMatch(gates, /--depth(?:[=\s]|$)/);
   assert.match(gates, /fetch-depth: 0/);
-  for (const job of jobs.values()) assert.doesNotMatch(job, /^ {4}needs:.*\bgates\b/m);
+  assert.deepEqual(
+    [...jobs].filter(([, job]) => /^ {4}needs:.*\bgates\b/m.test(job)).map(([name]) => name),
+    ['check'],
+  );
   assert.equal(jobs.get('dead-class-gate'), undefined);
   assert.ok(!jobs.get('check').includes('pnpm prepush --advisory'));
 });

@@ -74,6 +74,33 @@ test('safety invariant: reuse never covers a tree without green ci, and main sta
   assert.equal(reuses('refs/heads/preflight/host/lane', 'c'.repeat(40)), false);
 });
 
+test('safety invariant: no ci job can fail while all three required contexts stay green', () => {
+  const jobs = new Map(
+    read('.github/workflows/ci.yml')
+      .split('\njobs:\n')[1]
+      .split(/^(?= {2}[\w-]+:$)/m)
+      .map((block) => [/^ {2}([\w-]+):$/m.exec(block)?.[1], block])
+      .filter(([name]) => name),
+  );
+  const covered = new Set();
+  const cover = (name) => {
+    if (covered.has(name)) return;
+    covered.add(name);
+    const needs = /^ {4}needs: (?:\[([^\]]+)\]|([\w-]+))$/m.exec(jobs.get(name));
+    for (const dependency of (needs?.[1] ?? needs?.[2] ?? '').split(',')) {
+      const trimmed = dependency.trim();
+      if (!trimmed) continue;
+      const aggregated = new RegExp(`needs\\.${trimmed}\\.result`).test(jobs.get(name));
+      if (aggregated) cover(trimmed);
+    }
+  };
+  for (const required of ['check', 'pack-smoke', 'e2e-gate']) cover(required);
+  assert.deepEqual(
+    [...jobs.keys()].filter((name) => !covered.has(name)),
+    [],
+  );
+});
+
 test('safety invariant: speculative queue verifies admission checks and never force-pushes main', () => {
   const spec = read('scripts/ops/speculative-queue.mjs');
   assert.match(spec, /REQUIRED_CHECKS/);

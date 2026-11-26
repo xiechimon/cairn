@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { parse } from 'yaml';
 import { prepushModules } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
@@ -563,6 +564,82 @@ test('changes classify script sets outputs across push and pull_request diffs in
       });
       git('checkout', '-q', '-B', 'case', baseSha);
       git('update-ref', '-d', 'refs/remotes/origin/main');
+    }
+  } finally {
+    releaseTestTempDir(outer);
+  }
+});
+
+test('check fails when the gates job is red, cancelled or skipped while it was needed', () => {
+  const aggregate = job('check')
+    .match(/run: \|\n([\s\S]*)/)[1]
+    .replace(/^ {10}/gm, '');
+  const passes = (gates, needed) => {
+    const script = aggregate
+      .replaceAll('${{ needs.gates.result }}', gates)
+      .replaceAll('${{ needs.changes.outputs.gates-needed }}', needed)
+      .replaceAll('${{ needs.changes.outputs.reused-sha }}', 'false')
+      .replaceAll('${{ needs.changes.outputs.has-code }}', 'true')
+      .replaceAll('${{ needs.changes.outputs.has-sidecar }}', 'true')
+      .replaceAll('${{ needs.changes.outputs.needs-integration }}', 'true')
+      .replace(/\$\{\{ needs\.[\w-]+\.result \}\}/g, 'success')
+      .replace(/\$\{\{[^}]*\}\}/g, 'false');
+    return (
+      spawnSync('bash', ['-c', `set -e\nGITHUB_REF=refs/heads/preflight/host/lane\n${script}`])
+        .status === 0
+    );
+  };
+  assert.equal(passes('success', 'true'), true);
+  assert.equal(passes('skipped', 'false'), true);
+  assert.equal(passes('failure', 'true'), false);
+  assert.equal(passes('cancelled', 'true'), false);
+  assert.equal(passes('skipped', 'true'), false);
+});
+
+test('a download in gates that fails twice and then answers leaves the step green', () => {
+  const root = join(import.meta.dirname, '..');
+  const gates = parse(readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8')).jobs.gates;
+  const outer = makeTestTempDir('ci-retry-');
+  try {
+    const runStep = (name, flaky, failures, broken = 'exit 22') => {
+      const bin = join(outer, `${flaky}-${failures}-${broken.length}`);
+      mkdirSync(bin, { recursive: true });
+      for (const command of ['git', 'curl', 'sudo', 'node', 'sha256sum', 'sleep']) {
+        const fails =
+          command === flaky
+            ? `echo x >> "${bin}/calls"\n[ "$(wc -l < "${bin}/calls")" -gt ${failures} ] || ${broken}\n`
+            : '';
+        writeFileSync(join(bin, command), `#!/bin/sh\n${fails}exit 0\n`, { mode: 0o755 });
+      }
+      writeFileSync(
+        join(bin, 'timeout'),
+        '#!/bin/sh\nshift\nexec perl -e \'alarm 1; exec @ARGV\' "$@"\n',
+        { mode: 0o755 },
+      );
+      const script = gates.steps.find((step) => step.name?.startsWith(name)).run;
+      return spawnSync('/bin/bash', ['--norc', '--noprofile', '-e', '-c', script], {
+        cwd: root,
+        env: { PATH: `${bin}:/usr/bin:/bin`, RUNNER_TEMP: bin, HOME: bin },
+        timeout: 25_000,
+      }).status;
+    };
+    const bare = gates.steps
+      .filter((step) => !step['continue-on-error'])
+      .flatMap((step) => (step.run ?? '').split('\n'))
+      .flatMap((line) => line.split(/&&|\|\||;|\bthen\b|\{/))
+      .filter((part) => /\b(?:git fetch|curl|wget|apt-get) /.test(part))
+      .filter((part) => !part.includes('scripts/ci-retry.sh '));
+    assert.deepEqual(bare, [], 'every download that can fail gates retries');
+    assert.ok(gates['timeout-minutes'] <= 15, 'a hung gates job must not hold check for hours');
+    for (const step of gates.steps.filter((step) => step['continue-on-error']))
+      assert.ok(step['timeout-minutes'] <= 3, `${step.name} can hang into the job cap`);
+    for (const [name, flaky] of [
+      ['Migration additions', 'git'],
+      ['Server backup script', 'curl'],
+    ]) {
+      assert.equal(runStep(name, flaky, 2), 0, `${flaky} flaked twice`);
+      assert.notEqual(runStep(name, flaky, 99), 0, `${flaky} never answered`);
+      assert.equal(runStep(name, flaky, 2, 'exec /bin/sleep 60'), 0, `${flaky} stalled twice`);
     }
   } finally {
     releaseTestTempDir(outer);

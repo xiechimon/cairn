@@ -107,7 +107,7 @@ jobs:
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
   check:
-    needs: [changes, check-core, vitest-light, vitest-integration, tsnet-sidecar, eval]
+    needs: [changes, check-core, vitest-light, vitest-integration, tsnet-sidecar, gates, eval]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -141,6 +141,10 @@ jobs:
             fi
             [ "${{ needs.changes.outputs.has-code }}" = "false" ] && [ "$result" = "skipped" ] || exit 1
           done
+          gates_result="${{ needs.gates.result }}"
+          if [ "$gates_result" != "success" ]; then
+            [ "$gates_result" = "skipped" ] && [ "${{ needs.changes.outputs.gates-needed }}" = "false" ] || exit 1
+          fi
           vi_result="${{ needs.vitest-integration.result }}"
           if [ "$vi_result" != "success" ]; then
             [ "$vi_result" = "skipped" ] &&
@@ -539,6 +543,7 @@ jobs:
         run: scripts/pack-smoke.sh
 
   gates:
+    timeout-minutes: 10
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.gates-needed != 'false' && needs.changes.outputs.reused-sha != 'true' }}
     runs-on: ubuntu-latest
@@ -567,11 +572,12 @@ jobs:
       - name: Migration additions stay ahead of current main (#3692)
         if: ${{ !cancelled() }}
         run: |
-          git fetch origin +refs/heads/main:refs/remotes/origin/main
+          bash scripts/ci-retry.sh git fetch origin +refs/heads/main:refs/remotes/origin/main
           node scripts/ops/ci-failed-only.mjs node-test --key gates-migration-test -- node --test scripts/migration-main-gate.test.mjs
           node scripts/ops/ci-failed-only.mjs step --key gates-migration-check -- node scripts/migration-main-gate.mjs
 
       - name: "Comment discipline gate (advisory, #1520)"
+        timeout-minutes: 2
         continue-on-error: true
         if: ${{ !cancelled() }}
         env:
@@ -582,6 +588,8 @@ jobs:
           node scripts/ops/ci-failed-only.mjs step --key gates-comment-check -- node scripts/comment-discipline-gate.mjs
 
       - name: "Probe reach gate (advisory, #1542)"
+        timeout-minutes: 2
+        continue-on-error: true
         if: ${{ !cancelled() }}
         env:
           VP_REACH_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -627,7 +635,7 @@ jobs:
         env:
           FEATURE_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if [ -n "$FEATURE_REGISTRY_BASE_SHA" ]; then git fetch origin "$FEATURE_REGISTRY_BASE_SHA"; fi
+          if [ -n "$FEATURE_REGISTRY_BASE_SHA" ]; then bash scripts/ci-retry.sh git fetch origin "$FEATURE_REGISTRY_BASE_SHA"; fi
           node scripts/ops/ci-failed-only.mjs step --key gates-feature-map -- node scripts/generate-feature-map.mjs --check
 
       - name: Canon digest stays in step with the marked ruling sentences
@@ -673,8 +681,8 @@ jobs:
       - name: Server backup script against an rrsync receiver (#2163)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: |
-          command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q sqlite3; }
-          curl -fsSL -o "$RUNNER_TEMP/rrsync" https://raw.githubusercontent.com/RsyncProject/rsync/v3.4.1/support/rrsync
+          command -v sqlite3 >/dev/null || { bash scripts/ci-retry.sh sudo apt-get update -q && bash scripts/ci-retry.sh sudo apt-get install -y -q sqlite3; }
+          bash scripts/ci-retry.sh curl -fsSL --connect-timeout 15 --max-time 60 -o "$RUNNER_TEMP/rrsync" https://raw.githubusercontent.com/RsyncProject/rsync/v3.4.1/support/rrsync
           echo "0bb743f8155907ed2a337c12a4672c67269e372803939ec98dac497edc714c9b  $RUNNER_TEMP/rrsync" | sha256sum -c -
           RRSYNC="$RUNNER_TEMP/rrsync" node scripts/ops/ci-failed-only.mjs node-test --key gates-server-backup -- node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
 

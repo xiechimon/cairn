@@ -292,7 +292,6 @@ test('a docs-only head gets every check CI runs for it, including those outside 
     'scripts/generate-feature-map.mjs --check',
     'scripts/generate-canon.mjs --check',
     'scripts/migration-main-gate.mjs',
-    '.claude/skills/verify-cairn/scripts/vp-registry-gate.mjs --check-reach',
     'scripts/ops/ci-capacity-gate.mjs',
     'scripts/ui-registry-gate.mjs',
     'scripts/ui-consumer-shape-gate.mjs',
@@ -300,6 +299,10 @@ test('a docs-only head gets every check CI runs for it, including those outside 
   ])
     assert.ok(docs.includes(check), `${check} is missing`);
   assert.ok(!docs.includes('scripts/ui-debt-gate.mjs'));
+  assert.ok(
+    !docs.some((check) => check.includes('--check-reach')),
+    'an advisory step must not block',
+  );
   const code = selected(['apps/web/src/a.ts']);
   assert.ok(code.includes('scripts/ui-debt-gate.mjs'));
   assert.ok(code.includes('scripts/test-integrity-gate.mjs'));
@@ -437,4 +440,9 @@ test('a long failure reaches a pipe in full, ending with the summary', () => {
   } finally {
     releaseTestTempDir(root);
   }
+});
+
+test('a check run through the retry script still runs in the local fast gate', () => {
+  const wrapped = oneStep('run: bash scripts/ci-retry.sh node scripts/brand-new-gate.mjs');
+  assert.deepEqual(selected(['docs/spec/a.md'], wrapped), ['scripts/brand-new-gate.mjs']);
 });
