@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
+import * as fastGate from './preflight-fast-gate.mjs';
 import {
   committedPaths,
   exactTreeError,
@@ -261,4 +262,69 @@ test('cached failures that this machine refuses to run together do not block the
   } finally {
     releaseTestTempDir(root);
   }
+});
+
+const CI_TEXT = readFileSync(join(import.meta.dirname, '../../.github/workflows/ci.yml'), 'utf8');
+const selected = (paths, workflow = CI_TEXT) =>
+  fastGate.ciChecks(workflow, paths).checks.map((step) => step.slice(1).join(' '));
+const oneStep = (step, jobIf = 'always()') =>
+  `jobs:\n  gates:\n    if: ${jobIf}\n    steps:\n      - name: new step\n        ${step}\n`;
+
+test('every step in the real CI workflow can be classified, and no skip entry is stale', () => {
+  for (const paths of [['apps/server/src/app.ts'], ['docs/spec/a.md']]) {
+    assert.deepEqual(fastGate.ciChecks(CI_TEXT, paths).unclassified, []);
+  }
+  assert.deepEqual(fastGate.staleSkips(CI_TEXT), []);
+});
+
+test('a docs-only head gets every check CI runs for it, including those outside prepush', () => {
+  const docs = selected(['.claude/skills/verify-cairn/feature-map.md']);
+  for (const check of [
+    'scripts/generate-feature-map.mjs --check',
+    'scripts/generate-canon.mjs --check',
+    'scripts/migration-main-gate.mjs',
+    '.claude/skills/verify-cairn/scripts/vp-registry-gate.mjs --check-reach',
+    'scripts/ops/ci-capacity-gate.mjs',
+    'scripts/ui-registry-gate.mjs',
+    'scripts/ui-consumer-shape-gate.mjs',
+    'scripts/public-content-gate.mjs',
+  ])
+    assert.ok(docs.includes(check), `${check} is missing`);
+  assert.ok(!docs.includes('scripts/ui-debt-gate.mjs'));
+  const code = selected(['apps/web/src/a.ts']);
+  assert.ok(code.includes('scripts/ui-debt-gate.mjs'));
+  assert.ok(code.includes('scripts/test-integrity-gate.mjs'));
+  assert.ok(!code.includes('scripts/comment-discipline-gate.mjs'));
+});
+
+test('a new CI check is picked up with the condition CI gives it', () => {
+  for (const run of [
+    'run: node scripts/brand-new-gate.mjs',
+    'run: node --no-warnings ./scripts/brand-new-gate.cjs',
+    'run: node scripts/ops/ci-failed-only.mjs step --key k -- node scripts/brand-new-gate.ts',
+  ])
+    assert.equal(selected(['a.ts'], oneStep(run)).length, 1, run);
+  const gated = oneStep(
+    'run: node scripts/brand-new-gate.mjs',
+    "needs.changes.outputs.has-code != 'false'",
+  );
+  assert.equal(selected(['a.ts'], gated).length, 1);
+  assert.equal(selected(['docs/a.md'], gated).length, 0);
+  const advisory = oneStep('continue-on-error: true\n        run: node scripts/brand-new-gate.mjs');
+  assert.deepEqual(fastGate.ciChecks(advisory, ['a.ts']), { checks: [], unclassified: [] });
+});
+
+test('a CI step that cannot be classified is reported', () => {
+  for (const workflow of [
+    oneStep('run: node scripts/brand-new-thing.mjs'),
+    oneStep('run: pnpm brand:new-gate'),
+    oneStep('run: scripts/brand-new.sh'),
+    oneStep('run: test -z "$(git ls-files secrets)"'),
+    oneStep('run: node scripts/brand-new-gate.mjs', 'matrix.shard == 1'),
+    oneStep(
+      'run: node scripts/brand-new-gate.mjs',
+      "needs.changes.outputs.ops-selftests == 'true'",
+    ),
+  ])
+    assert.equal(fastGate.ciChecks(workflow, ['a.ts']).unclassified.length, 1, workflow);
 });

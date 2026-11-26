@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -247,6 +254,10 @@ test('preflight and push-queue stamp unowned commits with the same machine lane'
       'test-admission.mjs',
       'heavy-slots.mjs',
       'owned-process.mjs',
+      'prepush.mjs',
+      'diff-base.mjs',
+      'ci-failed-only-state.mjs',
+      'scrub-git-env.mjs',
     ]) {
       copyFileSync(
         join(dirname(fileURLToPath(import.meta.url)), '..', file),
@@ -254,6 +265,10 @@ test('preflight and push-queue stamp unowned commits with the same machine lane'
       );
       git(work, ['add', `scripts/${file}`]);
     }
+    symlinkSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../node_modules'),
+      join(root, 'node_modules'),
+    );
     git(work, ['commit', '-m', 'add fast gate']);
     git(work, ['push', 'origin', 'main']);
     git(work, ['checkout', '-b', 'feature']);

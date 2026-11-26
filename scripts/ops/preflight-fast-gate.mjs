@@ -4,7 +4,146 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, posix, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parse } from 'yaml';
+import { hasCode, needsGates, prepushPlan, testsRead } from '../prepush.mjs';
 import { heavyRunAuthorized } from '../test-admission.mjs';
+
+const CHECK_SCRIPT = /(?:-gate|-ledger)\.[cm]?[jt]s(?: |$)| --check[\w-]*(?: |$)/;
+const WRAPPER = /(?:ci-failed-only|test-temp-run)\.mjs.*? -- /;
+const INVOCATION =
+  /(?<=^|[\s(;&|'"])(?:(node|pnpm) +|(?=(?:\.\/)?scripts\/\S+\.sh\b))([^;&|)'"]*(?:"[^"]*"[^;&|)'"]*)*)/g;
+
+const SKIPPED = {
+  'scripts/import-cycle-gate.mjs': '2.0 s in CI',
+  'scripts/dead-runtime-exports-gate.mjs': '1.0 s in CI',
+  'scripts/regression-inversion-gate.mjs': 'runs tests',
+  'scripts/css-mechanism-gate.mjs': 'reads a web build',
+  'scripts/doc-reader-tests.mjs': 'runs vitest',
+  'scripts/prepush.mjs': 'classifies the diff',
+  'scripts/ops/ci-reuse-verified.mjs': 'asks GitHub which run to reuse',
+  '.claude/skills/verify-cairn/scripts/vp-selftest.mjs': 'self-test, 48 s in CI',
+  'eval/install-devin.mjs': 'model eval',
+  'eval/run.ts': 'model eval',
+  'eval/compare.ts': 'model eval',
+  'scripts/pack-smoke.sh': 'builds the package',
+  'pnpm install': 'setup',
+  'pnpm lint': 'its own fast-gate step',
+  'pnpm typecheck': 'its own fast-gate step',
+  'pnpm spec:parse': '13 s in CI',
+  'pnpm prepush --self-test': 'self-tests',
+  'pnpm prepush --e2e-shard': 'browser tests',
+  'pnpm test': 'test suite',
+  'pnpm e2e:affected': 'browser tests',
+  'pnpm exec': 'web build',
+  'pnpm db:check': '2 s in CI',
+  'pnpm db:generate': 'rewrites files',
+};
+const SKIPPED_INLINE = new Set([
+  'Aggregate check parts',
+  'Aggregate the e2e tier',
+  'Conflict markers',
+  'Verify module files are tidy',
+  'Format',
+  'Test',
+  'Vet',
+  'Build all targets',
+  'Restore Devin CLI credentials',
+  'Exam source selection (base checkout wins when it has eval/)',
+  'Baseline arm requires the suite on the merge base',
+  'Comment score diff on the candidate commit',
+  'Gate on the verdict',
+]);
+
+function invocations(run) {
+  return run
+    .replace(/\\\n/g, ' ')
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('#'))
+    .flatMap((line) => [
+      ...line.replace(new RegExp(`^.*${WRAPPER.source}`), '').matchAll(INVOCATION),
+    ])
+    .map(([, tool = 'sh', rest]) => [tool, ...rest.trim().split(/\s+/)]);
+}
+
+function classify([tool, ...args]) {
+  if (tool === 'node') {
+    if (args.includes('--test')) return {};
+    const at = args.findIndex((arg) => /\.[cm]?[jt]s$/.test(arg));
+    if (at < 0) return { unknown: true };
+    const script = args[at].replace(/^\.\//, '');
+    if (SKIPPED[script]) return { skip: script };
+    const flags = args.slice(at + 1).filter((arg) => !/^[<>$\d]/.test(arg));
+    const step = ['node', script, ...flags];
+    return CHECK_SCRIPT.test(step.join(' ')) ? { check: step } : { unknown: true };
+  }
+  if (tool === 'sh') {
+    const script = args[0].replace(/^\.\//, '');
+    return SKIPPED[script] ? { skip: script } : { unknown: true };
+  }
+  const words = args[0] === '--filter' ? args.slice(2) : args;
+  const key = [`pnpm ${words[0]} ${words[1]}`, `pnpm ${words[0]}`].find((name) => SKIPPED[name]);
+  return key ? { skip: key } : { unknown: true };
+}
+
+function holds(condition, outputs) {
+  return String(condition ?? 'always()')
+    .replace(/^\$\{\{|\}\}$/g, '')
+    .split('&&')
+    .map((term) => {
+      if (/^\s*(?:!cancelled|always)\(\)\s*$/.test(term)) return true;
+      const match = /^\s*needs\.changes\.outputs\.([\w-]+) (!=|==) '(\w+)'\s*$/.exec(term);
+      if (!match || !(match[1] in outputs)) throw new Error(`unsupported condition ${term.trim()}`);
+      return (outputs[match[1]] === match[3]) === (match[2] === '==');
+    })
+    .every(Boolean);
+}
+
+function readWorkflow(workflow, paths) {
+  const checks = new Map();
+  const unclassified = [];
+  const skipped = new Set();
+  const outputs = {
+    'reused-sha': '',
+    'has-code': String(hasCode(paths)),
+    'gates-needed': String(needsGates(paths, testsRead)),
+  };
+  for (const job of Object.values(parse(workflow).jobs)) {
+    for (const step of job.steps ?? []) {
+      if (!step.run) continue;
+      const found = invocations(step.run);
+      const fail = (why) => unclassified.push(`${step.name ?? step.run}: ${why}`);
+      if (found.length === 0 && !SKIPPED_INLINE.has(step.name)) fail('inline shell');
+      const visit = (command) => {
+        if (command.join(' ') === 'pnpm prepush --ci') {
+          for (const inner of prepushPlan(paths, 'ci')) visit(inner);
+          return;
+        }
+        const { check, skip, unknown } = classify(command);
+        if (skip) skipped.add(skip);
+        if (unknown) fail(command.join(' '));
+        if (!check || step['continue-on-error'] || job['continue-on-error']) return;
+        try {
+          const applies = [job.if, step.if].map((condition) => holds(condition, outputs));
+          if (applies.every(Boolean)) checks.set(check.join(' '), check);
+        } catch (error) {
+          fail(error.message);
+        }
+      };
+      for (const command of found) visit(command);
+    }
+  }
+  return { checks: [...checks.values()], unclassified, skipped };
+}
+
+export function ciChecks(workflow, paths) {
+  const { checks, unclassified } = readWorkflow(workflow, paths);
+  return { checks, unclassified };
+}
+
+export function staleSkips(workflow) {
+  const { skipped } = readWorkflow(workflow, ['apps/server/src/app.ts', 'docs/spec/a.md']);
+  return Object.keys(SKIPPED).filter((key) => !skipped.has(key));
+}
 
 const PACKAGE_ORDER = [
   '@cairn/shared',
