@@ -42,11 +42,26 @@ const TOOLS_ROW =
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
+function hasAgentTools(item: TranscriptItem | undefined): boolean {
+  return item?.kind === 'robot' || item?.kind === 'review' || item?.kind === 'verify';
+}
+
 function endsWithAgentRow(item: TranscriptItem | undefined): boolean {
   if (item == null) return false;
   if (item.kind === 'streaming') return true;
   return item.kind === 'robot' && item.footer == null;
 }
+
+const ROW_MARGIN_KINDS = new Set<TranscriptItem['kind']>([
+  'robot',
+  'streaming',
+  'review',
+  'verify',
+  'report',
+  'thinking',
+  'chief',
+  'user',
+]);
 
 function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): string {
   if (prev?.kind === 'note') return 'mt-1.5';
@@ -56,11 +71,15 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
     case 'review':
     case 'verify':
     case 'report':
-      return endsWithAgentRow(prev) ? 'mt-1' : 'mt-5';
+      return hasAgentTools(prev)
+        ? 'mt-5 border-t border-border/60 pt-5'
+        : endsWithAgentRow(prev)
+          ? 'mt-1'
+          : 'mt-5';
     case 'chief':
-      return 'mt-1';
+      return hasAgentTools(prev) ? 'mt-9' : 'mt-1';
     case 'user':
-      return prev?.kind === 'user' ? 'mt-1' : 'mt-5';
+      return hasAgentTools(prev) ? 'mt-9' : prev?.kind === 'user' ? 'mt-1' : 'mt-5';
     default:
       return prev?.kind === 'step-prompt' ? 'mt-1.5' : '';
   }
@@ -638,19 +657,22 @@ function verifyCopyText(item: Extract<TranscriptItem, { kind: 'verify' }>): stri
 
 function EnteringItem({
   enter,
+  clearTools,
   messageId,
   children,
 }: {
   enter: boolean;
+  clearTools: boolean;
   messageId: string | undefined;
   children: ReactNode;
 }) {
   const [entered] = useState(enter);
+  const cls = [entered ? 'row-enter' : '', clearTools ? 'mt-9' : ''].filter(Boolean).join(' ');
   return (
     <MessageScrollerItem
       messageId={messageId}
       style={SCROLLER_ITEM_STYLE}
-      className={entered ? 'row-enter' : undefined}
+      className={cls === '' ? undefined : cls}
     >
       {children}
     </MessageScrollerItem>
@@ -716,15 +738,21 @@ export function Transcript({ transcript, result }: TranscriptProps) {
       item.kind === 'user' ? (item.outboxKey ?? item.id) : 'id' in item ? item.id : undefined;
     const key = stableId ?? (item.kind === 'user' ? `user-${index}` : undefined);
     const messageId = ('id' in item ? item.id : undefined) ?? key;
+    const prev = transcript[index - 1];
+    const clearTools =
+      hasAgentTools(prev) &&
+      !ROW_MARGIN_KINDS.has(item.kind) &&
+      !(item.kind === 'streaming' && item.quotaHeld !== true);
     return (
       <EnteringItem
         key={key ?? index}
         messageId={messageId}
         enter={stableId !== undefined && enteringRows.has(stableId)}
+        clearTools={clearTools}
       >
         <Row
           item={item}
-          prev={transcript[index - 1]}
+          prev={prev}
           t={t}
           defaultExpanded={item.kind === 'work' && item.expanded === true}
           entering={entering}

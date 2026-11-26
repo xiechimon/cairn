@@ -265,6 +265,8 @@ for (const scheme of ['light', 'dark'] as const) {
     const bubble = row.getByTestId('chief-reply-bubble');
     const tools = row.getByTestId('chief-msg-foot');
     await bubble.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await expect(tools, 'C3: assistant toolbar is hidden at rest').toHaveCSS('opacity', '0');
     const bubbleBefore = await boxOf(bubble, 'assistant bubble before hover');
 
     await bubble.hover();
@@ -290,7 +292,7 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(toolsBox.y, 'toolbar sits below the assistant reply').toBeGreaterThanOrEqual(
       bubbleBox.y + bubbleBox.height - 1,
     );
-    expect(Math.round(copyBox.height), 'desktop button stays 32px').toBe(32);
+    expect(Math.round(copyBox.height), 'compact assistant button is 28px').toBe(28);
     expect(await toolOrder(tools)).toEqual(['copy']);
     expect(copyBox.x + copyBox.width, 'copy button sits left of time').toBeLessThan(metaBox.x);
     await assertPlainMeta(tools, `1440 assistant ${scheme}`);
@@ -435,10 +437,82 @@ test('wide user bubble never overlaps its toolbar even at 1440px, and unhovered 
   await wideBubble.scrollIntoViewIfNeeded();
   await wideBubble.hover();
   await expect(wideTools).toHaveCSS('opacity', '1');
-  const bubbleBox = await boxOf(wideBubble, 'wide user bubble');
+  const wideBox = await boxOf(wideBubble, 'wide user bubble');
   const toolsBox = await boxOf(wideTools, 'wide user toolbar');
-  expect(overlaps(toolsBox, bubbleBox), 'wide user toolbar must not intersect bubble').toBe(false);
+  expect(overlaps(toolsBox, wideBox), 'wide user toolbar must not intersect bubble').toBe(false);
   for (const btn of await wideTools.locator('button[data-tool]').all()) {
     expect(await isHittable(btn), 'wide user toolbar button is reachable').toBe(true);
   }
+});
+
+test('latest assistant reply uses hover-only zero-height overlay toolbar with left bar and clears composer', async ({
+  page,
+}) => {
+  const { stream } = await openConversation(page, 1440, 'light');
+  const latestRow = stream.getByTestId('chief-msg').filter({ hasText: SHORT_ASSISTANT_MSG });
+  const latestReply = latestRow.getByTestId('chief-reply');
+  const latestBubble = latestRow.getByTestId('chief-reply-bubble');
+  const latestTools = latestRow.getByTestId('chief-msg-foot');
+
+  await page.mouse.move(0, 0);
+  await expect(latestTools, 'latest reply toolbar is hidden at rest').toHaveCSS('opacity', '0');
+  await expect(latestTools).toHaveAttribute('data-placement', 'below-start-hover');
+  const replyHeightBefore = (await boxOf(latestReply, 'latest reply before hover')).height;
+  const bubbleHeightBefore = (await boxOf(latestBubble, 'latest bubble before hover')).height;
+  expect(Math.round(replyHeightBefore), 'toolbar adds 0px in-flow height').toBe(
+    Math.round(bubbleHeightBefore),
+  );
+  const barOpacityAtRest = await latestReply.evaluate((el) => getComputedStyle(el, '::before').opacity);
+  expect(Number(barOpacityAtRest), 'left ownership bar hidden at rest').toBe(0);
+
+  await latestBubble.hover();
+  await expect(latestTools).toHaveCSS('opacity', '1');
+  await expect
+    .poll(() => latestReply.evaluate((el) => Number(getComputedStyle(el, '::before').opacity)))
+    .toBe(1);
+  expect(Math.round((await boxOf(latestReply, 'latest reply hovered')).height)).toBe(
+    Math.round(replyHeightBefore),
+  );
+  const toolsBox = await boxOf(latestTools, 'latest assistant toolbar');
+  const composerBox = await boxOf(page.getByTestId('home-c').locator('.chief-composer'), 'composer');
+  expect(toolsBox.y + toolsBox.height, 'latest toolbar stays above composer').toBeLessThanOrEqual(
+    composerBox.y,
+  );
+  expect(await isHittable(latestTools.getByTestId('chief-msg-copy'))).toBe(true);
+});
+
+test('consecutive assistant messages show a subtle top divider and clear the hovered toolbar above', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const now = Date.now();
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'u-1', role: 'user', content: SHORT_USER_MSG, createdAt: now - 90_000 },
+      { id: 'a-1', role: 'assistant', content: '第一条连续回复。', createdAt: now - 60_000 },
+      { id: 'a-2', role: 'assistant', content: '第二条连续回复。', createdAt: now - 30_000 },
+    ],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await expect(stream).toContainText('第二条连续回复。');
+
+  const first = stream.getByTestId('chief-msg').filter({ hasText: '第一条连续回复。' });
+  const second = stream.getByTestId('chief-msg').filter({ hasText: '第二条连续回复。' });
+  const firstCol = first.getByTestId('chief-msg-col');
+  const secondCol = second.getByTestId('chief-msg-col');
+  await expect(firstCol).toHaveCSS('border-top-width', '0px');
+  await expect(secondCol).toHaveCSS('border-top-width', '1px');
+
+  const firstBubbleBox = await boxOf(first.getByTestId('chief-reply-bubble'), 'first reply');
+  const secondBubbleBox = await boxOf(second.getByTestId('chief-reply-bubble'), 'second reply');
+  expect(Math.round(secondBubbleBox.y - (firstBubbleBox.y + firstBubbleBox.height))).toBe(41);
+
+  await first.getByTestId('chief-reply-bubble').hover();
+  const firstTools = first.getByTestId('chief-msg-foot');
+  await expect(firstTools).toHaveCSS('opacity', '1');
+  const firstToolsBox = await boxOf(firstTools, 'first toolbar');
+  expect(overlaps(firstToolsBox, secondBubbleBox), 'toolbar clears second reply').toBe(false);
+  expect(firstToolsBox.y + firstToolsBox.height).toBeLessThan(secondBubbleBox.y);
 });

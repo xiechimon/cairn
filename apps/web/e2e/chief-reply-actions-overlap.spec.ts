@@ -103,14 +103,21 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.mouse.move(0, 0);
 
       const latestTools = stream.locator('[data-reply-source="a-last"]').getByTestId('chief-msg-foot');
-      await expect(latestTools, 'the latest reply shows its row without hover').toHaveCSS(
+      await expect(latestTools, 'the latest reply hides its row until hovered').toHaveCSS(
         'opacity',
-        '1',
+        '0',
       );
 
       for (const [n, { id }] of RUN.entries()) {
         const reply = stream.locator(`[data-reply-source="${id}"]`);
         await reply.scrollIntoViewIfNeeded();
+        if (n > 0) {
+          const col = reply.locator('xpath=ancestor::*[@data-testid="chief-msg-col"][1]');
+          await expect(col, `${id}: consecutive assistant reply shows top divider`).toHaveCSS(
+            'border-top-width',
+            '1px',
+          );
+        }
         await expect(
           reply.locator('[data-tool="copy"]').filter({ visible: true }),
           `${id}: one copy control per reply`,
@@ -123,10 +130,9 @@ for (const scheme of ['light', 'dark'] as const) {
             await bubbles.nth(b).hover();
             await expect(tools).toHaveCSS('opacity', '1', { timeout: 1_000 });
           }).toPass();
-          const shown = id === 'a-last' ? 1 : 2;
           await expect
-            .poll(() => visibleCopies(page), `${id}: only this reply and the latest show a copy`)
-            .toBe(shown);
+            .poll(() => visibleCopies(page), `${id}: only this reply shows a copy`)
+            .toBe(1);
           expect(await textUnder(tools, stream), `${id}: its row covers no message text`).toEqual(
             [],
           );
