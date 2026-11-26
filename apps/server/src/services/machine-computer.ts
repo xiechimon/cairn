@@ -1327,7 +1327,14 @@ export async function forwardComputerCall(
     throw new HttpError(409, `tool call ${body.toolCallId} was already used for ${existing.tool}`);
   }
   const live = getPendingComputerCall(callId);
-  if (live) return waitForCall(deps, live, stepId, opts.signal);
+  if (live) {
+    const waitingRow =
+      existing ?? db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+    const result = waitForCall(deps, live, stepId, opts.signal);
+    return waitingRow === undefined
+      ? result
+      : result.then((settled) => namingBrowserResult(db, waitingRow, settled));
+  }
 
   if (existing && existing.tool === 'request_takeover' && existing.state === 'running') {
     if (typeof body.params.phone === 'string' && body.params.phone.trim() !== '')
@@ -1348,9 +1355,9 @@ export async function forwardComputerCall(
         .run();
       const interrupted = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
       if (interrupted) publishComputerChanged(db, deps.hub, interrupted);
-      return resultOfRow({ ...existing, state: 'interrupted' });
+      return namingBrowserResult(db, existing, resultOfRow({ ...existing, state: 'interrupted' }));
     }
-    return resultOfRow(existing);
+    return namingBrowserResult(db, existing, resultOfRow(existing));
   }
 
   if (tool === 'request_takeover') {
@@ -1370,7 +1377,7 @@ export async function forwardComputerCall(
     tool,
     nowMs(),
   );
-  if (refusal !== null) return { text: refusal };
+  if (refusal !== null) return { text: noBrowserRun(refusal) };
 
   const secretActions =
     tool === 'browser_act' && Array.isArray(body.params.actions)
@@ -1384,7 +1391,9 @@ export async function forwardComputerCall(
             if (!parsed.success)
               throw new HttpError(
                 400,
-                'fill_secret needs kind, ref, a saved secret name and the current website origin',
+                noBrowserRun(
+                  'fill_secret needs kind, ref, a saved secret name and the current website origin',
+                ),
               );
             return parsed.data;
           })
@@ -1417,7 +1426,7 @@ export async function forwardComputerCall(
     return dispatchComputerCall(deps, request, {
       ...target,
       browserRows: authorized.rows,
-    }).then((sent) => namingBrowser(db, tool, target.machineId, false, sent.result));
+    }).then((sent) => sent.result);
   };
   const pageProducer = isComputerBrowserTool(tool) ? lastBrowserProducer(db, thread) : undefined;
   const followsCurrentPage = tool === 'browser_act' || tool === 'browser_snapshot';
@@ -1487,20 +1496,32 @@ const ownerChromeChains = new Map<
   { tool: ComputerTool; chain: Promise<ComputerRelayResult> }
 >();
 
-function namingBrowser(
+function namingBrowserResult(
   db: Db,
-  tool: ComputerTool,
-  machineId: string,
-  ownerChrome: boolean,
+  row: Pick<CallRow, 'machineId' | 'params' | 'tool'>,
   result: ComputerRelayResult,
 ): ComputerRelayResult {
-  if (tool !== 'browser_navigate') return result;
-  const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
-  const name = host?.capabilities?.computerName ?? host?.name ?? machineId;
+  if (!isComputerBrowserTool(row.tool)) return result;
+  const host = db.select().from(machine).where(eq(machine.id, row.machineId)).get();
+  const name = host?.capabilities?.computerName ?? host?.name ?? row.machineId;
+  const ownerChrome = row.params.browserDriver === 'ownerChrome';
+  const access = ownerChrome
+    ? 'the owner can watch it in Chrome, but there is no coordinated takeover handoff'
+    : host?.capabilities?.screenHandoff === true
+      ? 'the owner can watch and take it over in Cairn'
+      : 'nobody can watch or take it over';
   const browser = ownerChrome
     ? `the owner's own Chrome on ${name}, through Browser MCP`
     : `Cairn's own browser on ${name}, separate from the owner's Chrome and its sign-ins`;
-  return { ...result, text: `[Browser: ${browser}.]\n${result.text}` };
+  const prefix = `[Browser: ${browser}; ${access}.]`;
+  if (result.text.startsWith(prefix)) return result;
+  return { ...result, text: `${prefix}\n${result.text}` };
+}
+
+const NO_BROWSER_RUN_PREFIX = '[Browser: no browser ran; nothing opened or acted.]';
+
+function noBrowserRun(text: string): string {
+  return `${NO_BROWSER_RUN_PREFIX}\n${text}`;
 }
 
 async function throughOwnerChrome(
@@ -1533,10 +1554,7 @@ async function throughOwnerChrome(
       row.errorMessage?.startsWith(OWNER_CHROME_UNAVAILABLE_PREFIX)
         ? row.errorMessage.slice(OWNER_CHROME_UNAVAILABLE_PREFIX.length)
         : null;
-    if (reason === null)
-      return row?.state === 'done'
-        ? namingBrowser(deps.db, request.tool, candidate.id, true, sent.result)
-        : sent.result;
+    if (reason === null) return sent.result;
     if (!mayFallBack) return sent.result;
     unused.push(`${candidate.name}: ${reason}`);
   }
@@ -1566,7 +1584,10 @@ function authorizeSecretFills(
   const { thread } = request;
   const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (secretActions.length > 0 && host?.capabilities?.browserSecretFill !== true)
-    throw new HttpError(409, 'Update this machine before filling saved browser passwords.');
+    throw new HttpError(
+      409,
+      noBrowserRun('Update this machine before filling saved browser passwords.'),
+    );
   const pendingApprovals: string[] = [];
   const browserRows = secretActions.map((action) => {
     const saved = db
@@ -1581,11 +1602,17 @@ function authorizeSecretFills(
       )
       .get();
     if (saved === undefined)
-      throw new HttpError(400, 'Save this workspace secret in Secrets settings first.');
+      throw new HttpError(
+        400,
+        noBrowserRun('Save this workspace secret in Secrets settings first.'),
+      );
     const row = requireBrowserPassword(db, thread.teamId, saved.id);
     const origin = normalizeBrowserSecretOrigin(action.origin);
     if (origin === null)
-      throw new HttpError(400, 'Use an exact HTTPS or loopback website origin, without a path.');
+      throw new HttpError(
+        400,
+        noBrowserRun('Use an exact HTTPS or loopback website origin, without a path.'),
+      );
     const binding = {
       secretId: row.id,
       revision: row.policyRevision,
@@ -1596,7 +1623,7 @@ function authorizeSecretFills(
       if (thread.id === NO_CARD_THREAD)
         throw new HttpError(
           409,
-          'No Coordinator conversation can ask the owner to approve this website.',
+          noBrowserRun('No Coordinator conversation can ask the owner to approve this website.'),
         );
       const proposal = proposeAction(db, {
         teamId: thread.teamId,
@@ -1621,7 +1648,9 @@ function authorizeSecretFills(
   if (pendingApprovals.length > 0)
     return {
       kind: 'pending',
-      text: `尚未代填。网站授权卡已发给用户（${pendingApprovals.join(', ')}），请等用户在卡片上批准。批准后先 browser_snapshot，再用新的 ref 重试；不要索取密码。`,
+      text: noBrowserRun(
+        `尚未代填。网站授权卡已发给用户（${pendingApprovals.join(', ')}），请等用户在卡片上批准。批准后先 browser_snapshot，再用新的 ref 重试；不要索取密码。`,
+      ),
     };
   return { kind: 'ready', rows: browserRows };
 }
@@ -1668,6 +1697,9 @@ async function dispatchComputerCall(
     replaySafe,
     params: {
       ...storedParams(sanitizedParams),
+      ...(browserTool
+        ? { browserDriver: target.ownerChrome === true ? 'ownerChrome' : 'cairn' }
+        : {}),
       ...(browserRows.length > 0
         ? {
             browserPolicies: browserRows.map((row) => ({
@@ -1756,7 +1788,12 @@ async function dispatchComputerCall(
   const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishComputerChanged(db, deps.hub, row);
-  return { callId: dispatchId, result: await waitForCall(deps, pending, stepId, request.signal) };
+  const result = await waitForCall(deps, pending, stepId, request.signal);
+  const finished = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
+  return {
+    callId: dispatchId,
+    result: finished === undefined ? result : namingBrowserResult(db, finished, result),
+  };
 }
 
 const PROMPT_ATTACHMENT_LINK = {

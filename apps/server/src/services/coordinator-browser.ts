@@ -88,7 +88,7 @@ export function ownerChromeCandidates(
   const ownerThread = isOwner(db, audience.userId);
   const able = teamMachines(db, audience.teamId).filter((row) => {
     const drives = row.capabilities?.ownerChrome === true;
-    if (row.kind === 'local') return drives || row.capabilities?.browser === true;
+    if (row.kind === 'local') return drives;
     return ownerThread && drives;
   });
   const remembered = lastOwnerChromeMachine(db, thread);

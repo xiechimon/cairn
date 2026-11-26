@@ -85,6 +85,24 @@ describe('Coordinator computer tool offers', () => {
     }
   });
 
+  test('browser tools require the answer to carry the browser location and takeover facts', () => {
+    for (const def of coordinatorToolDefs().filter((def) => def.name.startsWith('browser_'))) {
+      expect(def.description).toContain('[Browser:');
+      expect(def.description).toContain(
+        'machine, browser and whether the owner can watch or take over',
+      );
+    }
+  });
+
+  test('Browser MCP is described as the first choice, not a guaranteed browser', () => {
+    for (const def of coordinatorToolDefs({ ownerChrome: true }).filter((def) =>
+      def.name.startsWith('browser_'),
+    )) {
+      expect(def.description).toContain("first try the owner's own Chrome");
+      expect(def.description).toContain("fall back to Cairn's own browser");
+    }
+  });
+
   test('with no stealth browser in the team, nothing offers or mentions one', () => {
     const defs = coordinatorToolDefs({ stealth: false, ownerChrome: true }).filter((def) =>
       def.name.startsWith('browser_'),

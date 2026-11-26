@@ -72,10 +72,10 @@ function addMachine(
 }
 
 const inCairnBrowser = (machine: string, text: string) =>
-  `[Browser: Cairn's own browser on ${machine}, separate from the owner's Chrome and its sign-ins.]\n${text}`;
+  `[Browser: Cairn's own browser on ${machine}, separate from the owner's Chrome and its sign-ins; nobody can watch or take it over.]\n${text}`;
 
 const inOwnerChrome = (machine: string, text: string) =>
-  `[Browser: the owner's own Chrome on ${machine}, through Browser MCP.]\n${text}`;
+  `[Browser: the owner's own Chrome on ${machine}, through Browser MCP; the owner can watch it in Chrome, but there is no coordinated takeover handoff.]\n${text}`;
 
 function connect(s: TestServer, machineId: string): ComputerCall[] {
   const calls: ComputerCall[] = [];
@@ -379,7 +379,7 @@ describe('forwardComputerCall target and presence', () => {
       expect(calls).toHaveLength(1);
       receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, 'granted')]);
       expect((await result).text).toBe(
-        name === 'browser_navigate' ? inCairnBrowser('omarchy', 'granted') : 'granted',
+        name.startsWith('browser_') ? inCairnBrowser('omarchy', 'granted') : 'granted',
       );
       markPresence(deps, 'omarchy', { capabilities: { mcpServers: [], skills: [] } });
       expect(
@@ -1128,7 +1128,7 @@ describe('Coordinator tool-name errors', () => {
 describe('the owner’s own Chrome behind browser tools', () => {
   function ownerMachine(
     s: TestServer,
-    capabilities: Record<string, unknown> = { computerKind: 'host' },
+    capabilities: Record<string, unknown> = { computerKind: 'host', ownerChrome: true },
     kind: 'local' | 'remote' = 'local',
   ) {
     s.db
@@ -1176,7 +1176,7 @@ describe('the owner’s own Chrome behind browser tools', () => {
     setup: (s: TestServer) => void,
     params: Record<string, unknown> = { url: 'https://mail.example.com' },
     kind: 'local' | 'remote' = 'local',
-    capabilities: Record<string, unknown> = { computerKind: 'host' },
+    capabilities: Record<string, unknown> = { computerKind: 'host', ownerChrome: true },
   ): Promise<ComputerCall> {
     const { s, deps } = boot();
     ownerMachine(s, capabilities, kind);
@@ -1214,6 +1214,13 @@ describe('the owner’s own Chrome behind browser tools', () => {
         })
       ).ownerChrome,
     ).toBeUndefined();
+  });
+
+  test('a browser-only machine without the owner-Chrome capability cannot be misreported as owner Chrome', async () => {
+    const call = await stampFor(enableBrowserMcp, undefined, 'local', {
+      computerKind: 'host',
+    });
+    expect(call.ownerChrome).toBeUndefined();
   });
 
   test('turning the connector off returns browser calls to Cairn’s own browser', async () => {
@@ -1712,6 +1719,93 @@ describe('browser calls on Macs', () => {
       pending.catch(() => {});
       answer(s, 'mini', await next(calls, 1), 'Example Domain');
       expect((await pending).text).toContain(expected);
+    },
+  );
+
+  test.each([
+    ['browser_navigate', { url: 'https://example.com' }],
+    ['browser_snapshot', {}],
+    ['browser_act', { actions: [{ kind: 'wait', ms: 1 }] }],
+  ] as const)(
+    'the answer to %s names the machine, browser and whether anyone can take over',
+    async (tool, params) => {
+      const { s, deps } = boot();
+      addMac(s, 'mini', { browser: true, computerName: 'Ian’s Mac mini' });
+      const calls = connect(s, 'mini');
+      const pending = forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: tool,
+        toolCallId: `tc-${tool}`,
+        params,
+      });
+      pending.catch(() => {});
+      answer(s, 'mini', await next(calls, 1), 'Example Domain');
+      const text = (await pending).text;
+      expect(text).toContain("Cairn's own browser on Ian’s Mac mini");
+      expect(text).toContain('nobody can watch or take it over');
+    },
+  );
+
+  test('a browser that supports a screen handoff says the owner can watch and take it over', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', {
+      browser: true,
+      screenHandoff: true,
+      computerName: 'Ian’s Mac mini',
+    });
+    const calls = connect(s, 'mini');
+    const pending = navigate(deps, 'visible-browser');
+    pending.catch(() => {});
+    answer(s, 'mini', await next(calls, 1), 'Example Domain');
+    expect((await pending).text).toContain('the owner can watch and take it over in Cairn');
+  });
+
+  test('the owner Chrome answer says where it can be watched and that no handoff coordinates it', async () => {
+    const { s, deps } = boot();
+    addMac(
+      s,
+      'mini',
+      { browser: true, ownerChrome: true, computerName: 'Ian’s Mac mini' },
+      { kind: 'local' },
+    );
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const pending = navigate(deps, 'owner-visible-browser');
+    pending.catch(() => {});
+    answer(s, 'mini', await next(calls, 1), 'Example Domain');
+    const text = (await pending).text;
+    expect(text).toContain('the owner can watch it in Chrome');
+    expect(text).toContain('no coordinated takeover handoff');
+  });
+
+  test.each([
+    ['Cairn’s browser', false, "Cairn's own browser on Ian’s Mac mini"],
+    ['the owner’s Chrome', true, "the owner's own Chrome on Ian’s Mac mini"],
+  ])(
+    'a replayed %s answer still names the browser facts exactly once',
+    async (_name, connector, expected) => {
+      const { s, deps } = boot();
+      addMac(
+        s,
+        'mini',
+        { browser: true, ownerChrome: true, computerName: 'Ian’s Mac mini' },
+        { kind: 'local' },
+      );
+      if (connector) browserMcp(s);
+      const calls = connect(s, 'mini');
+      const body = {
+        computer: true as const,
+        name: 'browser_navigate' as const,
+        toolCallId: 'replayed-browser',
+        params: { url: 'https://example.com' },
+      };
+      const first = forwardComputerCall(deps, 'sidecar', 'step-a', body);
+      first.catch(() => {});
+      answer(s, 'mini', await next(calls, 1), 'Example Domain');
+      await first;
+      const replayed = await forwardComputerCall(deps, 'sidecar', 'step-a', body);
+      expect(replayed.text).toContain(expected);
+      expect(replayed.text.match(/\[Browser:/g)).toHaveLength(1);
     },
   );
 

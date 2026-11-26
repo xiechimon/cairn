@@ -34,6 +34,10 @@ function takeoverAdvice({ takeover }: ComputerBrowserOffer): string {
     : ' Nobody can watch or take over this browser: when a site needs a hand login, a captcha or a code, tell the owner and stop.';
 }
 
+function browserFactsAdvice(): string {
+  return ' When a result includes a [Browser: ...] line, include its machine, browser and whether the owner can watch or take over when you tell the owner what opened or what you did there.';
+}
+
 export function computerRemoteTools(
   offer: ComputerBrowserOffer = { takeover: true, stealth: true },
 ): readonly RemoteToolDef[] {
@@ -41,12 +45,12 @@ export function computerRemoteTools(
   return [
     {
       name: 'browser_navigate',
-      description: `Open a URL in the browser Cairn drives for you. The page stays open for later browser_snapshot and browser_act calls. Use the browser yourself when the owner asks you to open, click or fill something on the web, and for work that needs this browser's logins.${blockedPageAdvice(offer)}${takeoverAdvice(offer)}`,
+      description: `Open a URL in the browser Cairn drives for you. The page stays open for later browser_snapshot and browser_act calls. Use the browser yourself when the owner asks you to open, click or fill something on the web, and for work that needs this browser's logins.${blockedPageAdvice(offer)}${takeoverAdvice(offer)}${browserFactsAdvice()}`,
       parameters: obj({ url: str('Absolute http(s) URL to open.'), ...stealthParam }, ['url']),
     },
     {
       name: 'browser_snapshot',
-      description: `Read the current page as an accessibility tree with interactive refs (@e1, @e2, …), followed by the page text, which is cut at 12000 characters. Prefer this before browser_act; it lists interactive refs, then the page text ([page text]) to read articles and descriptions from. On long pages, for example a result list beside a detail pane, pass selector to read one element in full instead: a CSS selector for the section (such as the job description pane) or an @ref.${takeoverAdvice(offer)}`,
+      description: `Read the current page as an accessibility tree with interactive refs (@e1, @e2, …), followed by the page text, which is cut at 12000 characters. Prefer this before browser_act; it lists interactive refs, then the page text ([page text]) to read articles and descriptions from. On long pages, for example a result list beside a detail pane, pass selector to read one element in full instead: a CSS selector for the section (such as the job description pane) or an @ref.${takeoverAdvice(offer)}${browserFactsAdvice()}`,
       parameters: obj({
         selector: str(
           'CSS selector or @ref of one element whose full text to return instead of the page snapshot.',
@@ -57,7 +61,7 @@ export function computerRemoteTools(
     },
     {
       name: 'browser_act',
-      description: `Act on the current page using fresh snapshot refs. For passwords use fill_secret with the saved secret name and current website origin. First use asks the owner to approve that website in chat; wait for approval, then take a fresh snapshot and retry. Never send a plaintext password or one-time code. ${offer.takeover ? 'CAPTCHA and second factors use request_takeover.' : 'A CAPTCHA or second factor cannot be passed here.'} Find saved credentials with secrets; when none fits, ask the owner to save one on the Secrets settings page. When a step fails (the action did not run, the ref is not in the latest snapshot, the element is covered, or the page is not the target), take a fresh snapshot and try another element, scroll first, or browser_navigate to the link's URL; at most 3 retries in a turn, then report what you tried, where it stuck and which page is open. Ask the owner first with ask_user before sending messages or mail, paying, ordering, changing account settings or deleting.${takeoverAdvice(offer)}`,
+      description: `Act on the current page using fresh snapshot refs. For passwords use fill_secret with the saved secret name and current website origin. First use asks the owner to approve that website in chat; wait for approval, then take a fresh snapshot and retry. Never send a plaintext password or one-time code. ${offer.takeover ? 'CAPTCHA and second factors use request_takeover.' : 'A CAPTCHA or second factor cannot be passed here.'} Find saved credentials with secrets; when none fits, ask the owner to save one on the Secrets settings page. When a step fails (the action did not run, the ref is not in the latest snapshot, the element is covered, or the page is not the target), take a fresh snapshot and try another element, scroll first, or browser_navigate to the link's URL; at most 3 retries in a turn, then report what you tried, where it stuck and which page is open. Ask the owner first with ask_user before sending messages or mail, paying, ordering, changing account settings or deleting.${takeoverAdvice(offer)}${browserFactsAdvice()}`,
       parameters: obj(
         {
           actions: arr(

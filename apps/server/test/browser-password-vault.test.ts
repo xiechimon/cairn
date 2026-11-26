@@ -191,6 +191,7 @@ describe('username+password pair secrets', () => {
       LOGIN: JSON.stringify({ username: 'synthetic-user', password: 'synthetic-password' }),
     });
     const first = await forwardComputerCall(deps, 'sidecar', 'step-a', fill());
+    expect(first.text).toContain('[Browser: no browser ran; nothing opened or acted.]');
     expect(first.text).toContain('尚未代填');
     await answer(s, pendingApproval(s).id);
     await grantFill(s, deps, calls, 'pair-fill');
