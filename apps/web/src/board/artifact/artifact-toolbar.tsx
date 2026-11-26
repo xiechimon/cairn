@@ -58,7 +58,7 @@ export function ArtifactToolbar({
               variant="ghost"
               size="sm"
               data-testid="artifact-name"
-              className="-ml-1.5 h-7 min-w-0 gap-1 px-1.5 font-medium text-foreground aria-expanded:bg-(--hover-1)"
+              className="-ml-1.5 h-7 min-w-0 shrink gap-1 px-1.5 font-medium text-foreground aria-expanded:bg-(--hover-1)"
             />
           }
         >

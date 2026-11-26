@@ -460,3 +460,31 @@ test('a versioned markdown document opens without crashing, lists versions, and 
   await expect(md.locator('[data-testid="design-pin"][data-pin="2"]')).toHaveCount(1);
   await expect(panel.getByTestId('artifact-comment-count')).toHaveText('2');
 });
+
+test('a long artifact name truncates cleanly inside the 1280px split panel without clipping controls', async ({
+  page,
+}) => {
+  const longReport: FileSpec = {
+    ...(FILES.report as FileSpec),
+    fileName: '核实并重写简历 Cairn 与 szsq 条目完整核对分析报告.md',
+  };
+  const { panel } = await openFile(page, longReport);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const toolbar = panel.getByTestId('artifact-toolbar');
+  await expect(panel.getByTestId('artifact-markdown')).toContainText('第一段用于核实简历条目。');
+  const fit = await toolbar.evaluate((bar) => {
+    const barBox = bar.getBoundingClientRect();
+    const exportBox = bar.querySelector('[data-testid="artifact-export"]')?.getBoundingClientRect();
+    const historyBox = bar
+      .querySelector('[data-testid="artifact-history-toggle"]')
+      ?.getBoundingClientRect();
+    return {
+      overflow: bar.scrollWidth - bar.clientWidth,
+      exportFits: exportBox !== undefined && exportBox.right <= barBox.right + 1,
+      historyFits: historyBox !== undefined && historyBox.right <= barBox.right + 1,
+    };
+  });
+  expect(fit.overflow).toBeLessThanOrEqual(1);
+  expect(fit.exportFits).toBe(true);
+  expect(fit.historyFits).toBe(true);
+});
