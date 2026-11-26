@@ -97,7 +97,7 @@ jobs:
           echo "base-sha=$base_ref" >> "$GITHUB_OUTPUT"
           echo "e2e-tier=$e2e_tier" >> "$GITHUB_OUTPUT"
 
-      - name: Reuse verified main CI
+      - name: Reuse verified CI
         id: reuse
         env:
           GH_TOKEN: ${{ github.token }}
@@ -115,7 +115,7 @@ jobs:
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
           if [ "${{ needs.changes.outputs.reused-sha }}" = "true" ]; then
-            [ "$GITHUB_REF" = "refs/heads/main" ]
+            [ "$GITHUB_REF" = "refs/heads/main" ] || [ "${GITHUB_REF#refs/heads/queue/try/}" != "$GITHUB_REF" ]
             [ "${{ github.event_name }}" = "push" ]
             [ -n "${{ needs.changes.outputs.reused-run-id }}" ]
             exit 0
@@ -437,8 +437,10 @@ jobs:
       - name: Aggregate the e2e tier
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
-          if [ "${{ needs.changes.outputs.reused-sha }}" = "true" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            exit 0
+          if [ "${{ needs.changes.outputs.reused-sha }}" = "true" ]; then
+            if [ "$GITHUB_REF" = "refs/heads/main" ] || [ "${GITHUB_REF#refs/heads/queue/try/}" != "$GITHUB_REF" ]; then
+              exit 0
+            fi
           fi
           case "${{ needs.changes.outputs.e2e-tier }}" in
             full) ran="${{ needs.e2e.result }}" idle="${{ needs.e2e-affected.result }}" ;;

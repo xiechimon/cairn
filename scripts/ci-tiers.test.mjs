@@ -311,6 +311,34 @@ test('reused-sha on main push skips heavy jobs and satisfies e2e-gate only on re
   assert.equal(okFeature, false);
 });
 
+test('a queue/try run that reused a same-tree verdict satisfies both required aggregates', () => {
+  const reused = {
+    outputs: { 'has-code': 'true', 'e2e-tier': 'full', 'reused-sha': 'true' },
+    results: { changes: 'success', e2e: 'skipped', 'e2e-affected': 'skipped' },
+  };
+  const verdicts = gatePasses(
+    ['refs/heads/queue/try/1-a', 'refs/heads/preflight/host/lane', 'refs/heads/queue/main'].map(
+      (githubRef) => ({ ...reused, githubRef }),
+    ),
+  );
+  assert.deepEqual(verdicts, [true, false, false]);
+
+  const aggregate = job('check').match(/run: \|\n([\s\S]*)/)[1];
+  const script = (ref) =>
+    aggregate
+      .replace(/^ {10}/gm, '')
+      .replaceAll('${{ needs.changes.result }}', 'success')
+      .replaceAll('${{ needs.changes.outputs.reused-sha }}', 'true')
+      .replaceAll('${{ needs.changes.outputs.reused-run-id }}', '42')
+      .replaceAll('${{ github.event_name }}', 'push')
+      .replace(/\$\{\{[^}]*\}\}/g, 'skipped')
+      .replace(/^/, `set -e\nGITHUB_REF=${ref}\n`);
+  const passes = (ref) => spawnSync('bash', ['-c', script(ref)]).status === 0;
+  assert.equal(passes('refs/heads/queue/try/1-a'), true);
+  assert.equal(passes('refs/heads/main'), true);
+  assert.equal(passes('refs/heads/preflight/host/lane'), false);
+});
+
 test('every classify step output is re-exported as a changes job output', () => {
   const block = job('changes');
   const exposed = new Set(

@@ -52,6 +52,7 @@ accepted and pushing an untested one is rejected.
   the window. An entry without the three green checks on its SHA is ejected.
 - **Window.** The first four entries are active. The first one, when it contains
   the `main` tip and has no `try` ref, is already tested and counts as green.
+  Later entries can count without a ref of their own too (*Verdict reuse*).
   Otherwise a `try` ref is kept, with its running CI, while it sits on the
   expected parent and carries the same commits; if not, it and everything after
   it are rebuilt in a temporary worktree.
@@ -73,6 +74,27 @@ owner learns from that comment and from `push-queue.mjs --wait`.
 
 An operator who must remove a queued candidate first comments
 `queue/main release: <reason>` on its commit. Nobody else removes a queue ref.
+
+## Verdict reuse (2026-11-26)
+
+Invariant: a tree reaches `main` only if a `ci` run on that exact tree ended green. `green-main` still reads check runs on the exact SHA; a new SHA always gets its own `ci` run, which is short when the tree is already verified.
+
+- **Entry unchanged on its tested base**: at any window position, not only the head, when `entry_i` contains `expectedParent` its preflight-green SHA is the speculative candidate. No `queue/try` ref is pushed and a stale `try_i` run still in flight is cancelled.
+- **Entry that adds nothing**: when every patch of `entry_i` is already in `try_{i-1}` (two submissions of one change), it shares that candidate and its verdict, including red: the first of the two is ejected, and the second is then evaluated again on its own base.
+- **Rebuild that does not change the tree** (the entry ahead landed under another SHA): while `try_i`'s run is in flight and the rebuilt tree equals its tree, the ref and run stay. Later entries are built on, or kept on, the held `try_i`; a conflict against a held base that does not contain current `main` is not evidence against the entry, so it waits for the held run instead of being ejected. When the run ends, the next pass pushes the rebuilt SHA, which reuses the green run. Only runs whose entry gets another tree are cancelled.
+- **Tree reuse in `ci`** (`scripts/ops/ci-reuse-verified.mjs`, the same mechanism `main` uses): a `queue/try/*` push reuses a completed green `ci` run from `preflight/*` or `queue/*` whose `head_commit.tree_id` equals its own tree, among the newest 300 successful push runs. `check` and `e2e-gate` pass without the test matrix; `pack-smoke` is skipped. `main` still requires the exact SHA.
+
+| Situation | Behaviour |
+|---|---|
+| Red entry ejected mid-stack | Later entries get different trees; stale runs are cancelled and the new trees run the full matrix |
+| Rebase conflict | Ejected with the conflicting files; no verdict is reused for it |
+| Source run failed, cancelled or still running | Never a source |
+| Held run fails or is cancelled | The next pass pushes the rebuilt SHA, which finds no green source and runs in full |
+| Tree carries the sidecar | No tree reuse; `main` must build the sidecar artifact itself |
+| Two entries with the same tree | An entry that adds nothing shares the candidate ahead; unrelated concurrent runs of one tree both run |
+| Eval required | The source run needs a green `eval` job |
+| Lookup or jobs API error, missing tree | Fails closed to the full matrix |
+| Source classified against an older `main` | Its diff covers the later one, because the identical tree already contains the newer `main` |
 
 ## Failure behaviour
 
@@ -214,7 +236,11 @@ original revision, so such a rerun publishes without the current gate.
 - `speculative-queue.test.mjs`: FIFO order of `enqueue/*`, admission, batch and
   partial-prefix promotion, mid-queue red without false blame, one retry then
   ejection and tail rebuild, conflict ejection, depth 4, external `main` advance,
-  and a real bare-git rebase and promote run.
+  a real bare-git rebase and promote run, and `runQueuePass` against a bare
+  remote with a stub `gh` for the verdict-reuse rules.
+- `ci-reuse-verified.test.mjs`, `ci-tiers.test.mjs`,
+  `merge-queue-invariants.test.mjs`: which runs may be a reuse source, and which
+  refs the `check` and `e2e-gate` aggregates accept it on.
 - `push-queue.test.mjs`, `merge-queue-invariants.test.mjs`: submission, owner
   stamping, waiting, and the invariants a scheduling change must keep.
 - `workflow-concurrency.test.mjs`: queue, `main` and other refs use per-SHA

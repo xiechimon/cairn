@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
@@ -14,6 +14,7 @@ import {
   parseEnqueueRef,
   planQueueStep,
   rebaseOntoTry,
+  runQueuePass,
   sortEnqueueEntries,
   TRY_PREFIX,
 } from './speculative-queue.mjs';
@@ -427,4 +428,265 @@ test('latestCompletedCheckMap picks latest completed run per check chronological
     },
   ]);
   assert.equal(map.get('check'), 'success');
+});
+
+const IDENTITY = {
+  GIT_AUTHOR_NAME: 'xiechimon',
+  GIT_AUTHOR_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+  GIT_COMMITTER_NAME: 'xiechimon',
+  GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+};
+
+const FAKE_GH = `#!/usr/bin/env node
+const { readFileSync, appendFileSync } = require('node:fs');
+const state = JSON.parse(readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
+const args = process.argv.slice(2);
+const path = args.find((arg) => arg.startsWith('repos/'));
+if (args.includes('POST')) {
+  appendFileSync(process.env.FAKE_GH_LOG, path + '\\n');
+  console.log('{}');
+} else {
+  const checks = /commits\\/([0-9a-f]+)\\/check-runs/.exec(path);
+  const runs = /head_sha=([0-9a-f]+)/.exec(path);
+  let body = [];
+  if (checks) {
+    body = { check_runs: state.green.includes(checks[1]) ? ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({ name, status: 'completed', conclusion: 'success' })) : [] };
+  } else if (runs) {
+    body = { workflow_runs: state.runs.filter((run) => run.head_sha === runs[1]) };
+  } else if (path.includes('/jobs')) {
+    body = { jobs: [] };
+  }
+  console.log(JSON.stringify(args.includes('--slurp') ? [body] : body));
+}
+`;
+
+function queueHarness(prefix, scenario) {
+  const root = makeTestTempDir(prefix);
+  const bare = join(root, 'origin.git');
+  const work = join(root, 'work');
+  const bin = join(root, 'bin');
+  const stateFile = join(root, 'state.json');
+  const logFile = join(root, 'posts.log');
+  mkdirSync(bare, { recursive: true });
+  mkdirSync(bin, { recursive: true });
+  const git = (cwd, args) =>
+    execFileSync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...IDENTITY },
+    }).trim();
+  git(bare, ['init', '--bare', '-b', 'main']);
+  git(root, ['clone', bare, work]);
+  const commit = (parent, file, content, message = `feat: ${file}`) => {
+    git(work, ['checkout', '--quiet', '--detach', parent]);
+    writeFileSync(join(work, file), content);
+    git(work, ['add', file]);
+    git(work, ['commit', '--quiet', '-m', message]);
+    return git(work, ['rev-parse', 'HEAD']);
+  };
+  const push = (sha, ref) => git(work, ['push', '--quiet', '--force', 'origin', `${sha}:${ref}`]);
+  writeFileSync(join(work, 'base.txt'), 'base\n');
+  git(work, ['add', 'base.txt']);
+  git(work, ['commit', '--quiet', '-m', 'base']);
+  git(work, ['push', '--quiet', '-u', 'origin', 'main']);
+  const base = git(work, ['rev-parse', 'HEAD']);
+
+  writeFileSync(join(bin, 'gh'), FAKE_GH);
+  chmodSync(join(bin, 'gh'), 0o755);
+  writeFileSync(logFile, '');
+  const state = { green: [], runs: [] };
+  const run = (sha, id, branch, patch) => {
+    state.runs = state.runs.filter((item) => item.head_sha !== sha);
+    state.runs.push({
+      id,
+      name: 'ci',
+      head_sha: sha,
+      head_branch: branch,
+      status: 'in_progress',
+      conclusion: null,
+      run_attempt: 1,
+      ...patch,
+    });
+  };
+  const pass = () => {
+    writeFileSync(stateFile, JSON.stringify(state));
+    const saved = { ...process.env };
+    Object.assign(process.env, {
+      PATH: `${bin}:${saved.PATH}`,
+      FAKE_GH_STATE: stateFile,
+      FAKE_GH_LOG: logFile,
+      ...IDENTITY,
+    });
+    try {
+      return runQueuePass({ repo: 'xiechimon/cairn', cwd: work });
+    } finally {
+      for (const key of ['PATH', 'FAKE_GH_STATE', 'FAKE_GH_LOG', ...Object.keys(IDENTITY)]) {
+        if (saved[key] === undefined) delete process.env[key];
+        else process.env[key] = saved[key];
+      }
+    }
+  };
+  const remote = (ref) => git(work, ['ls-remote', 'origin', ref]).split(/\s+/)[0] || null;
+  try {
+    scenario({
+      base,
+      commit,
+      push,
+      state,
+      run,
+      pass,
+      remote,
+      git: (args) => git(work, args),
+      cancelled: () =>
+        [...readFileSync(logFile, 'utf8').matchAll(/runs\/(\d+)\/cancel/g)].map((m) =>
+          Number(m[1]),
+        ),
+    });
+  } finally {
+    releaseTestTempDir(root);
+  }
+}
+
+const idAt = (n, sha) => makeEnqueueId(sha, 1_795_000_000_000 + n);
+
+test('an entry stacked unchanged on the tested commit ahead of it lands without a second ci run', () => {
+  queueHarness('queue-unchanged-', (q) => {
+    const main1 = q.commit(q.base, 'x.txt', 'x\n');
+    q.push(main1, 'refs/heads/main');
+    const a = q.commit(q.base, 'a.txt', 'a\n');
+    const aTry = q.commit(main1, 'a.txt', 'a\n');
+    const b = q.commit(aTry, 'b.txt', 'b\n');
+    const [idA, idB] = [idAt(1, a), idAt(2, b)];
+    q.push(a, `${ENQUEUE_PREFIX}${idA}`);
+    q.push(aTry, `${TRY_PREFIX}${idA}`);
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.state.green = [a, b];
+    q.run(aTry, 1, `queue/try/${idA}`, {});
+    q.pass();
+    assert.equal(q.remote(`${TRY_PREFIX}${idB}`), null);
+    assert.equal(q.remote('refs/heads/main'), b);
+    assert.deepEqual(q.cancelled(), [1]);
+  });
+});
+
+test('a second entry carrying the same change as the one ahead shares its run', () => {
+  queueHarness('queue-same-tree-', (q) => {
+    const main1 = q.commit(q.base, 'x.txt', 'x\n');
+    q.push(main1, 'refs/heads/main');
+    const a = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const twin = q.commit(q.base, 'a.txt', 'a\n', 'feat: a again');
+    const aTry = q.commit(main1, 'a.txt', 'a\n', 'feat: a');
+    const [idA, idTwin] = [idAt(1, a), idAt(2, twin)];
+    q.push(a, `${ENQUEUE_PREFIX}${idA}`);
+    q.push(aTry, `${TRY_PREFIX}${idA}`);
+    q.push(twin, `${ENQUEUE_PREFIX}${idTwin}`);
+    q.state.green = [a, twin];
+    q.run(aTry, 1, `queue/try/${idA}`, {});
+    assert.equal(q.pass().action, 'wait');
+    assert.equal(q.remote(`${TRY_PREFIX}${idTwin}`), null);
+    assert.equal(q.remote('refs/heads/main'), main1);
+    q.run(aTry, 1, `queue/try/${idA}`, { status: 'completed', conclusion: 'success' });
+    q.state.green.push(aTry);
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), aTry);
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idTwin}`), null);
+  });
+});
+
+test('a landing that leaves the tree unchanged neither cancels nor restarts the run testing that tree', () => {
+  queueHarness('queue-hold-', (q) => {
+    const a = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const b = q.commit(q.base, 'b.txt', 'b\n', 'feat: b');
+    const aTry = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const bTry = q.commit(aTry, 'b.txt', 'b\n', 'feat: b');
+    const landedA = q.commit(q.base, 'a.txt', 'a\n', 'feat: a (landed under another sha)');
+    const idB = idAt(2, b);
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.push(landedA, 'refs/heads/main');
+    q.state.green = [a, b];
+    q.run(bTry, 2, `queue/try/${idB}`, {});
+    assert.equal(q.pass().action, 'wait');
+    assert.equal(q.remote(`${TRY_PREFIX}${idB}`), bTry);
+    assert.deepEqual(q.cancelled(), []);
+
+    q.run(bTry, 2, `queue/try/${idB}`, { status: 'completed', conclusion: 'success' });
+    q.state.green.push(bTry);
+    q.pass();
+    const rebuilt = q.remote(`${TRY_PREFIX}${idB}`);
+    assert.notEqual(rebuilt, bTry);
+    assert.equal(q.git(['rev-parse', `${rebuilt}^{tree}`]), q.git(['rev-parse', `${bTry}^{tree}`]));
+    assert.equal(q.remote('refs/heads/main'), landedA, 'a new sha waits for its own checks');
+  });
+});
+
+test('a rebuild that changes the tree still cancels the stale run and tests the new tree', () => {
+  queueHarness('queue-changed-', (q) => {
+    const b = q.commit(q.base, 'b.txt', 'b\n', 'feat: b');
+    const aTry = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const bTry = q.commit(aTry, 'b.txt', 'b\n', 'feat: b');
+    const main1 = q.commit(q.base, 'x.txt', 'x\n');
+    const idB = idAt(2, b);
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.push(main1, 'refs/heads/main');
+    q.state.green = [b];
+    q.run(bTry, 2, `queue/try/${idB}`, {});
+    assert.equal(q.pass().action, 'rebuilt');
+    assert.notEqual(q.remote(`${TRY_PREFIX}${idB}`), bTry);
+    assert.deepEqual(q.cancelled(), [2]);
+    assert.equal(q.remote('refs/heads/main'), main1);
+  });
+});
+
+test('entries behind a held one still start or keep their speculative runs', () => {
+  queueHarness('queue-hold-tail-', (q) => {
+    const [a, b, c] = ['a', 'b', 'c'].map((name) =>
+      q.commit(q.base, `${name}.txt`, `${name}\n`, `feat: ${name}`),
+    );
+    const aTry = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const bTry = q.commit(aTry, 'b.txt', 'b\n', 'feat: b');
+    const landedA = q.commit(q.base, 'a.txt', 'a\n', 'feat: a (landed under another sha)');
+    const [idB, idC] = [idAt(2, b), idAt(3, c)];
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.push(c, `${ENQUEUE_PREFIX}${idC}`);
+    q.push(landedA, 'refs/heads/main');
+    q.state.green = [b, c];
+    q.run(bTry, 2, `queue/try/${idB}`, {});
+
+    assert.equal(q.pass().action, 'rebuilt');
+    assert.equal(q.remote(`${TRY_PREFIX}${idB}`), bTry);
+    const cTry = q.remote(`${TRY_PREFIX}${idC}`);
+    assert.equal(q.git(['rev-parse', `${cTry}^`]), bTry);
+
+    q.run(cTry, 3, `queue/try/${idC}`, {});
+    assert.equal(q.pass().action, 'wait');
+    assert.equal(q.remote(`${TRY_PREFIX}${idC}`), cTry);
+    assert.deepEqual(q.cancelled(), []);
+  });
+});
+
+test('a conflict against a held base that lacks current main waits instead of ejecting', () => {
+  queueHarness('queue-hold-conflict-', (q) => {
+    const start = q.commit(q.base, 'x.txt', '1\n', 'feat: x one');
+    const squashed = q.commit(start, 'x.txt', '3\n', 'feat: x to three');
+    const b = q.commit(start, 'b.txt', 'b\n', 'feat: b');
+    const bTry = q.commit(squashed, 'b.txt', 'b\n', 'feat: b');
+    const step = q.commit(start, 'x.txt', '2\n', 'feat: x two');
+    const main = q.commit(step, 'x.txt', '3\n', 'feat: x three');
+    const c = q.commit(main, 'c.txt', 'c\n', 'feat: c');
+    const [idB, idC] = [idAt(2, b), idAt(3, c)];
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.push(c, `${ENQUEUE_PREFIX}${idC}`);
+    q.push(main, 'refs/heads/main');
+    q.state.green = [b, c];
+    q.run(bTry, 2, `queue/try/${idB}`, {});
+    assert.equal(q.pass().action, 'wait');
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idC}`), c);
+    assert.equal(q.remote(`${TRY_PREFIX}${idB}`), bTry);
+    assert.deepEqual(q.cancelled(), []);
+  });
 });

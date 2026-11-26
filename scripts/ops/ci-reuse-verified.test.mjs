@@ -190,3 +190,58 @@ test('selectVerifiedPriorRun checks required job conclusions, eval requirement, 
     false,
   );
 });
+
+const TREE = 'c'.repeat(40);
+
+function tryDecision(patch = {}, input = {}) {
+  return selectVerifiedPriorRun({
+    ref: 'refs/heads/queue/try/1795588850188-774b4be61',
+    eventName: 'push',
+    repo: 'xiechimon/cairn',
+    sha: SHA,
+    tree: TREE,
+    hasSidecar: false,
+    evalRequired: false,
+    runs: [
+      makeRun({
+        head_sha: 'b'.repeat(40),
+        head_branch: 'preflight/host/lane',
+        head_commit: { tree_id: TREE },
+        ...patch,
+      }),
+    ],
+    jobsOf: () => makeJobs(),
+    ...input,
+  });
+}
+
+test('a queue/try commit reuses the green verdict of an identical tree from preflight or queue/try', () => {
+  for (const head_branch of ['preflight/host/lane', 'queue/try/1795588850000-aaaaaaaaa']) {
+    assert.deepEqual(tryDecision({ head_branch }), { reuse: true, runId: 1001 });
+  }
+});
+
+test('tree reuse refuses every tree that never had a complete green ci', () => {
+  for (const patch of [
+    { head_commit: { tree_id: 'd'.repeat(40) } },
+    { head_commit: undefined },
+    { status: 'in_progress', conclusion: null },
+    { conclusion: 'failure' },
+    { conclusion: 'cancelled' },
+    { head_branch: 'main' },
+    { head_branch: 'feature/x' },
+    { event: 'pull_request' },
+    { repository: { full_name: 'fork/cairn' } },
+  ]) {
+    assert.equal(tryDecision(patch).reuse, false, JSON.stringify(patch));
+  }
+  assert.equal(tryDecision({}, { tree: '' }).reuse, false);
+  assert.equal(tryDecision({}, { hasSidecar: true }).reuse, false);
+  assert.equal(tryDecision({}, { evalRequired: true }).reuse, false);
+  assert.equal(tryDecision({}, { jobsOf: () => makeJobs({ check: 'failure' }) }).reuse, false);
+  assert.equal(tryDecision({}, { ref: 'refs/heads/preflight/host/lane' }).reuse, false);
+});
+
+test('main still requires the exact sha, never only the same tree', () => {
+  assert.equal(tryDecision({}, { ref: 'refs/heads/main' }).reuse, false);
+});

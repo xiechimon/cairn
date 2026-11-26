@@ -5,25 +5,35 @@ import { realpathSync } from 'node:fs';
 
 const VERIFIED_PREFIX = /^(queue|preflight)\//;
 const PACK_SMOKE_VALID = new Set(['success', 'skipped']);
+const TRY_REF_PREFIX = 'refs/heads/queue/try/';
+const GREEN_RUN_PAGES = 3;
+
+const mayReuse = (ref, eventName) =>
+  eventName === 'push' && (ref === 'refs/heads/main' || ref?.startsWith(TRY_REF_PREFIX));
 
 export function selectVerifiedPriorRun({
   ref,
   eventName,
   repo,
   sha,
+  tree,
   hasSidecar,
   evalRequired,
   runs,
   jobsOf,
 }) {
-  if (ref !== 'refs/heads/main' || eventName !== 'push') {
-    return { reuse: false, reason: 'only push to refs/heads/main may reuse prior CI' };
+  if (!mayReuse(ref, eventName)) {
+    return { reuse: false, reason: 'only a push to main or queue/try/* may reuse prior CI' };
   }
   if (hasSidecar) {
     return { reuse: false, reason: 'sidecar changes must build tsnet-sidecar-binaries on main' };
   }
-  if (!sha || !repo) {
-    return { reuse: false, reason: 'missing commit sha or repository' };
+  const sameCode =
+    ref === 'refs/heads/main'
+      ? (run) => run.head_sha === sha
+      : (run) => run.head_commit?.tree_id === tree;
+  if (!sha || !repo || (ref !== 'refs/heads/main' && !tree)) {
+    return { reuse: false, reason: 'missing commit sha, tree or repository' };
   }
 
   const candidates = [...(runs ?? [])]
@@ -32,7 +42,7 @@ export function selectVerifiedPriorRun({
         run &&
         run.name === 'ci' &&
         run.event === 'push' &&
-        run.head_sha === sha &&
+        sameCode(run) &&
         run.status === 'completed' &&
         run.conclusion === 'success' &&
         (!run.repository?.full_name || run.repository.full_name === repo) &&
@@ -55,7 +65,8 @@ export function selectVerifiedPriorRun({
     if (evalRequired && byName.get('eval') !== 'success') continue;
     return { reuse: true, runId: run.id };
   }
-  return { reuse: false, reason: `no verified green queue/preflight ci run covers ${sha}` };
+  const covered = ref === 'refs/heads/main' ? sha : `tree ${tree}`;
+  return { reuse: false, reason: `no verified green queue/preflight ci run covers ${covered}` };
 }
 
 function ghJson(path) {
@@ -77,6 +88,20 @@ function listAllJobs(repo, runId, attempt) {
   return jobs;
 }
 
+function listCandidateRuns({ repo, ref, sha }) {
+  const base = `repos/${repo}/actions/workflows/ci.yml/runs?event=push`;
+  if (ref === 'refs/heads/main') {
+    return ghJson(`${base}&head_sha=${sha}&per_page=30`).workflow_runs ?? [];
+  }
+  const runs = [];
+  for (let page = 1; page <= GREEN_RUN_PAGES; page += 1) {
+    const batch = ghJson(`${base}&status=success&per_page=100&page=${page}`).workflow_runs ?? [];
+    runs.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return runs;
+}
+
 if (process.argv[1] && import.meta.filename === realpathSync(process.argv[1])) {
   const ref = process.env.GITHUB_REF ?? '';
   const eventName = process.env.GITHUB_EVENT_NAME ?? '';
@@ -87,32 +112,21 @@ if (process.argv[1] && import.meta.filename === realpathSync(process.argv[1])) {
 
   let result = { reuse: false, reason: 'uninitialized' };
   try {
-    if (ref === 'refs/heads/main' && eventName === 'push' && !hasSidecar && repo && sha) {
-      const data = ghJson(
-        `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&event=push&per_page=30`,
-      );
-      result = selectVerifiedPriorRun({
-        ref,
-        eventName,
-        repo,
-        sha,
-        hasSidecar,
-        evalRequired,
-        runs: data.workflow_runs ?? [],
-        jobsOf: (runId, attempt) => listAllJobs(repo, runId, attempt),
-      });
-    } else {
-      result = selectVerifiedPriorRun({
-        ref,
-        eventName,
-        repo,
-        sha,
-        hasSidecar,
-        evalRequired,
-        runs: [],
-        jobsOf: () => [],
-      });
-    }
+    const lookUp = mayReuse(ref, eventName) && !hasSidecar && repo && sha;
+    const tree = lookUp
+      ? execFileSync('git', ['rev-parse', `${sha}^{tree}`], { encoding: 'utf8' }).trim()
+      : '';
+    result = selectVerifiedPriorRun({
+      ref,
+      eventName,
+      repo,
+      sha,
+      tree,
+      hasSidecar,
+      evalRequired,
+      runs: lookUp ? listCandidateRuns({ repo, ref, sha }) : [],
+      jobsOf: (runId, attempt) => listAllJobs(repo, runId, attempt),
+    });
   } catch (error) {
     result = {
       reuse: false,
@@ -122,7 +136,7 @@ if (process.argv[1] && import.meta.filename === realpathSync(process.argv[1])) {
 
   console.error(
     result.reuse
-      ? `[ci-reuse] verified exact SHA ${sha.slice(0, 9)} from prior ci run ${result.runId}; skipping redundant main test matrix`
+      ? `[ci-reuse] ${sha.slice(0, 9)} on ${ref} is verified by prior ci run ${result.runId}; skipping the redundant test matrix`
       : `[ci-reuse] running full CI on ${ref || 'unknown'}: ${result.reason}`,
   );
   console.log(`reused-sha=${result.reuse}`);

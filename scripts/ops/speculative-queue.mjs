@@ -74,7 +74,7 @@ export function evaluateSpeculativeCandidate({ sha, ciRuns, checkRuns, jobs = []
     matchingRuns.find((item) => item.status === 'completed' && item.conclusion === 'success') ??
     matchingRuns[0];
   if (run?.status !== 'completed') {
-    return { state: 'pending', runId: run?.id ?? null };
+    return { state: 'pending', runId: run?.id ?? null, inFlight: Boolean(run) };
   }
   if (run.conclusion !== 'success') {
     const failedJobs = jobs
@@ -308,6 +308,10 @@ export function isTryValid({ cwd, expectedParent, trySha, entrySha }) {
   return trySigs.every((sig, index) => sig === entrySigs[index]);
 }
 
+function treeOf(cwd, sha) {
+  return runGit(cwd, ['rev-parse', `${sha}^{tree}`]);
+}
+
 export function rebaseOntoTry({ cwd, expectedParent, entrySha }) {
   if (isAncestor(cwd, expectedParent, entrySha)) {
     return { ok: true, sha: entrySha, rebased: false };
@@ -519,29 +523,38 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
 
     let prevSha = mainTip;
     let chainBroken = false;
+    const supersededRunIds = [];
     for (let i = 0; i < window.length; i += 1) {
       const item = window[i];
       const existingTrySha = tryRaw.get(item.id) ?? null;
-      if (
-        i === 0 &&
-        existingTrySha === null &&
-        item.verified &&
-        isAncestor(cwd, mainTip, item.sha)
-      ) {
-        tryMap.set(item.id, { sha: item.sha, validOnParent: true });
-        verdicts.set(item.sha, { state: 'green', runId: null });
-        prevSha = item.sha;
-        continue;
-      }
-      const validOnParent =
+      const existingValid =
         !chainBroken &&
         existingTrySha !== null &&
         isTryValid({ cwd, expectedParent: prevSha, trySha: existingTrySha, entrySha: item.sha });
+      const stacksUnchanged =
+        !chainBroken &&
+        (!existingValid || existingTrySha === item.sha) &&
+        isAncestor(cwd, prevSha, item.sha);
+      const addsNothing =
+        !chainBroken &&
+        prevSha !== mainTip &&
+        cherrySignatures(cwd, prevSha, item.sha).length === 0;
+      if (stacksUnchanged || addsNothing) {
+        const covering = stacksUnchanged ? item.sha : prevSha;
+        if (existingTrySha && existingTrySha !== covering) {
+          const stale = readTryVerdict(repo, existingTrySha);
+          if (stale.inFlight) supersededRunIds.push(stale.runId);
+        }
+        tryMap.set(item.id, { sha: covering, validOnParent: true });
+        if (stacksUnchanged) verdicts.set(covering, { state: 'green', runId: null });
+        prevSha = covering;
+        continue;
+      }
       if (existingTrySha) {
-        tryMap.set(item.id, { sha: existingTrySha, validOnParent });
+        tryMap.set(item.id, { sha: existingTrySha, validOnParent: existingValid });
         verdicts.set(existingTrySha, readTryVerdict(repo, existingTrySha));
       }
-      if (!validOnParent) chainBroken = true;
+      if (!existingValid) chainBroken = true;
       else prevSha = existingTrySha;
     }
     for (const [id, trySha] of tryRaw.entries()) {
@@ -579,6 +592,8 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
         );
       }
     }
+
+    if (enforce) cancelRuns(repo, supersededRunIds);
 
     if (plan.promote) {
       const { targetSha, entries: promotedEntries, cancelRunIds } = plan.promote;
@@ -686,15 +701,44 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
     }
 
     if (enforce && plan.rebuild.length > 0) {
-      cancelRuns(repo, plan.cancelObsoleteRunIds);
       let currentParent = plan.rebuild[0].parentSha;
       let hitConflict = false;
+      let pushedAny = false;
+      let keptAny = false;
       for (const step of plan.rebuild) {
         const res = rebaseOntoTry({
           cwd,
           expectedParent: currentParent,
           entrySha: step.entry.sha,
         });
+        const existingTrySha = tryRaw.get(step.entry.id);
+        const existingVerdict = verdicts.get(existingTrySha);
+        const obsoleteRunIds = plan.cancelObsoleteRunIds.filter(
+          (runId) => runId === existingVerdict?.runId,
+        );
+        const alreadyBuilt =
+          res.ok &&
+          existingTrySha !== undefined &&
+          isTryValid({
+            cwd,
+            expectedParent: currentParent,
+            trySha: existingTrySha,
+            entrySha: step.entry.sha,
+          });
+        const runCoversRebuild =
+          res.ok &&
+          Boolean(existingVerdict?.inFlight) &&
+          treeOf(cwd, res.sha) === treeOf(cwd, existingTrySha);
+        if (alreadyBuilt || runCoversRebuild) {
+          console.log(
+            `[speculative-queue] holding ${TRY_PREFIX}${step.entry.id} at ${existingTrySha.slice(0, 9)}: its run already covers what a rebuild would test`,
+          );
+          currentParent = existingTrySha;
+          keptAny = true;
+          continue;
+        }
+        cancelRuns(repo, obsoleteRunIds);
+        if (!res.ok && keptAny && !isAncestor(cwd, mainTip, currentParent)) break;
         if (!res.ok) {
           const refs = [
             step.entry.ref,
@@ -729,8 +773,10 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
           `[speculative-queue] built ${TRY_PREFIX}${step.entry.id} -> ${pushSha.slice(0, 9)} atop ${currentParent.slice(0, 9)}${res.empty ? ' (empty delta preserved)' : ''}`,
         );
         currentParent = pushSha;
+        pushedAny = true;
       }
       if (hitConflict) continue;
+      if (keptAny && !pushedAny) return { action: 'wait' };
       return { action: 'rebuilt' };
     }
 

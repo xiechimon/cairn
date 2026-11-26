@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { selectVerifiedPriorRun } from './ci-reuse-verified.mjs';
 import {
   commitCommentsApiArgs,
   DEFAULT_POLL_SECONDS,
@@ -29,7 +30,7 @@ test('safety invariant: promote workflow keeps main-only environment, serialized
   assert.match(promote, /run:\s*node scripts\/ops\/speculative-queue\.mjs --enforce/);
 });
 
-test('safety invariant: ci workflow keeps green-main contexts, non-cancelling queue groups, and main-only SHA reuse', () => {
+test('safety invariant: ci workflow keeps green-main contexts, non-cancelling queue groups, and verified-only reuse', () => {
   const ci = read('.github/workflows/ci.yml');
   assert.match(ci, /cancel-in-progress:\s*\$\{\{\s*github\.event_name == 'pull_request'\s*\}\}/);
   assert.match(ci, /reused-sha:\s*\$\{\{\s*steps\.reuse\.outputs\.reused-sha\s*\}\}/);
@@ -37,6 +38,40 @@ test('safety invariant: ci workflow keeps green-main contexts, non-cancelling qu
   assert.match(ci, /scripts\/ops\/ci-reuse-verified\.mjs/);
   assert.match(ci, /scripts\/ops\/merge-queue-invariants\.test\.mjs/);
   assert.match(ci, /node scripts\/ops\/ci-capacity-gate\.mjs/);
+});
+
+test('safety invariant: reuse never covers a tree without green ci, and main stays bound to the exact sha', () => {
+  const green = {
+    id: 1,
+    name: 'ci',
+    event: 'push',
+    status: 'completed',
+    conclusion: 'success',
+    head_sha: 'b'.repeat(40),
+    head_branch: 'preflight/host/lane',
+    head_commit: { tree_id: 'c'.repeat(40) },
+  };
+  const reuses = (ref, tree, run = green) =>
+    selectVerifiedPriorRun({
+      ref,
+      eventName: 'push',
+      repo: 'xiechimon/cairn',
+      sha: 'a'.repeat(40),
+      tree,
+      hasSidecar: false,
+      evalRequired: false,
+      runs: [run],
+      jobsOf: () =>
+        ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({ name, conclusion: 'success' })),
+    }).reuse;
+  assert.equal(reuses('refs/heads/queue/try/1-a', 'c'.repeat(40)), true);
+  assert.equal(reuses('refs/heads/queue/try/1-a', 'd'.repeat(40)), false);
+  assert.equal(
+    reuses('refs/heads/queue/try/1-a', 'c'.repeat(40), { ...green, conclusion: 'failure' }),
+    false,
+  );
+  assert.equal(reuses('refs/heads/main', 'c'.repeat(40)), false);
+  assert.equal(reuses('refs/heads/preflight/host/lane', 'c'.repeat(40)), false);
 });
 
 test('safety invariant: speculative queue verifies admission checks and never force-pushes main', () => {
