@@ -315,7 +315,12 @@ export function ChiefConversation({
     null,
   );
   const copyText = useCallback(
-    (text: string) => copyTextWithFeedback(text, () => toastSuccess(t('已复制'))),
+    (text: string) =>
+      copyTextWithFeedback(
+        text,
+        () => toastSuccess(t('已复制')),
+        (error) => toastError(t('复制失败，请重试。'), error),
+      ),
     [t],
   );
   const rewindDisabled = chief.running === true || questionPending;

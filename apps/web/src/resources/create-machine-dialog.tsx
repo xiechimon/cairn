@@ -14,7 +14,7 @@ import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shel
 import { Input } from '../components/ui/input.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
-import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { PhonePairDialog } from './phones-panel.js';
 
 const CMD_CLS =
@@ -45,16 +45,20 @@ export function CopyCommand({ command }: { command: string }) {
   return (
     <div className={CMD_CLS}>
       <code className={CMD_CODE_CLS}>{command}</code>
-      {hasClipboard() && (
-        <Button
-          variant="outline"
-          size="xs"
-          className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
-          onClick={() => copyTextWithFeedback(command, () => toastSuccess(t('已复制')))}
-        >
-          {t('复制')}
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        size="xs"
+        className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
+        onClick={() =>
+          copyTextWithFeedback(
+            command,
+            () => toastSuccess(t('已复制')),
+            (error) => toastError(t('复制失败，请重试。'), error),
+          )
+        }
+      >
+        {t('复制')}
+      </Button>
     </div>
   );
 }

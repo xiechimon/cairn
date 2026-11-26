@@ -1,10 +1,26 @@
-export function hasClipboard(): boolean {
-  return typeof navigator !== 'undefined' && navigator.clipboard !== undefined;
+function asyncClipboard(): Clipboard | undefined {
+  return typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+}
+
+function copyThroughCopyEvent(text: string): boolean {
+  if (typeof document === 'undefined') return false;
+  let filled = false;
+  const fill = (event: ClipboardEvent) => {
+    if (event.clipboardData === null) return;
+    event.clipboardData.setData('text/plain', text);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    filled = true;
+  };
+  document.addEventListener('copy', fill, true);
+  const accepted = document.execCommand('copy');
+  document.removeEventListener('copy', fill, true);
+  return accepted && filled;
 }
 
 export function writeClipboard(text: string): Promise<boolean> {
-  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
-  if (clipboard === undefined) return Promise.resolve(false);
+  const clipboard = asyncClipboard();
+  if (clipboard === undefined) return Promise.resolve(copyThroughCopyEvent(text));
   return clipboard.writeText(text).then(
     () => true,
     () => false,
@@ -14,14 +30,13 @@ export function writeClipboard(text: string): Promise<boolean> {
 export function copyTextWithFeedback(
   text: string,
   onCopied: () => void,
-  onError?: (error: unknown) => void,
+  onError: (error: unknown) => void,
 ): void {
-  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+  const clipboard = asyncClipboard();
   if (clipboard === undefined) {
-    onError?.(null);
+    if (copyThroughCopyEvent(text)) onCopied();
+    else onError(null);
     return;
   }
-  void clipboard.writeText(text).then(onCopied, (error: unknown) => {
-    onError?.(error);
-  });
+  void clipboard.writeText(text).then(onCopied, onError);
 }

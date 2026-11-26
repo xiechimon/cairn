@@ -1,0 +1,6 @@
+or {
+  `navigator.clipboard`,
+  `navigator?.clipboard`
+} as $access where {
+  register_diagnostic(span=$access, message="navigator.clipboard is missing on plain-http origins, which a remote Cairn client uses: copy through lib/clipboard", severity="error")
+}

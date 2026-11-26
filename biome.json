@@ -360,6 +360,10 @@
     {
       "path": "scripts/biome-plugins/no-random-uuid.grit",
       "includes": ["**/apps/web/src/**"]
+    },
+    {
+      "path": "scripts/biome-plugins/no-direct-clipboard.grit",
+      "includes": ["**/apps/web/src/**", "!**/apps/web/src/lib/clipboard.ts"]
     }
   ],
   "javascript": {

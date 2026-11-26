@@ -8,9 +8,10 @@ import {
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import {
   githubDeviceEndedCopy,
   openGithubWindow,
@@ -58,7 +59,6 @@ export function GithubConnectionDeviceDialog({
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const primaryRef = useRef<HTMLButtonElement>(null);
-  const canCopy = hasClipboard();
 
   useEffect(() => () => clearTimeout(copyTimer.current), []);
   useEffect(() => {
@@ -111,11 +111,15 @@ export function GithubConnectionDeviceDialog({
   };
   const copyCode = () => {
     if (step.kind !== 'code') return;
-    copyTextWithFeedback(step.userCode, () => {
-      setCopied(true);
-      clearTimeout(copyTimer.current);
-      copyTimer.current = setTimeout(() => setCopied(false), 1600);
-    });
+    copyTextWithFeedback(
+      step.userCode,
+      () => {
+        setCopied(true);
+        clearTimeout(copyTimer.current);
+        copyTimer.current = setTimeout(() => setCopied(false), 1600);
+      },
+      (error) => toastError(t('复制失败，请重试。'), error),
+    );
   };
 
   let title = t('在 GitHub 上授权 Cairn');
@@ -149,7 +153,7 @@ export function GithubConnectionDeviceDialog({
         </p>
       </>
     );
-    if (canCopy) secondary = { label: copied ? t('已复制') : t('复制验证码'), onClick: copyCode };
+    secondary = { label: copied ? t('已复制') : t('复制验证码'), onClick: copyCode };
     primary = { label: t('打开 GitHub'), onClick: () => openGithubWindow(step.verificationUri) };
   } else if (step.kind === 'ended') {
     title = step.title;

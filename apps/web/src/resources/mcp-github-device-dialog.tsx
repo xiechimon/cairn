@@ -10,11 +10,11 @@ import {
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
-import { toastSuccess } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import {
   githubDeviceEndedCopy,
   openGithubWindow,
@@ -338,16 +338,20 @@ export function DeviceCode({
       >
         {code}
       </code>
-      {hasClipboard() && (
-        <Button
-          variant="outline"
-          size="xs"
-          className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
-          onClick={() => copyTextWithFeedback(code, () => toastSuccess(t('已复制')))}
-        >
-          {t('复制')}
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        size="xs"
+        className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
+        onClick={() =>
+          copyTextWithFeedback(
+            code,
+            () => toastSuccess(t('已复制')),
+            (error) => toastError(t('复制失败，请重试。'), error),
+          )
+        }
+      >
+        {t('复制')}
+      </Button>
     </div>
   );
 }
