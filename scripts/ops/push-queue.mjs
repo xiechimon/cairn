@@ -178,7 +178,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       if (ref === 'refs/heads/main') mainSha = sha;
       else if (ref.startsWith(ENQUEUE_PREFIX)) enqueueRaw.push({ ref, sha });
     }
-    return { mainSha, entries: sortEnqueueEntries(enqueueRaw), legacyLive: null };
+    return { mainSha, entries: sortEnqueueEntries(enqueueRaw) };
   };
   const treeOf = (sha) => git(['rev-parse', `${sha}^{tree}`]);
   const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
