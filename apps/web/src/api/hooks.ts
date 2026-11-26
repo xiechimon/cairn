@@ -1108,6 +1108,15 @@ export const useChiefThreads = (teamId: string | undefined, enabled: boolean) =>
       query.state.data?.some(threadTurnInFlight) ? CHIEF_THREADS_INFLIGHT_POLL_MS : false,
   });
 
+function withThreadUnread(
+  data: NotificationsResponse | undefined,
+  threadId: string,
+  unread: boolean,
+): NotificationsResponse {
+  const ids = (data?.unreadThreadIds ?? []).filter((id) => id !== threadId);
+  return { unreadThreadIds: unread ? [...ids, threadId] : ids };
+}
+
 export const useNotifications = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['notifications', teamId],
@@ -1300,13 +1309,21 @@ export function useApiMutations(teamId: string | undefined) {
             throw error;
           }),
       onMutate: async (input) => {
-        await qc.cancelQueries({ queryKey: ['notifications', teamId] });
-        qc.setQueryData<NotificationsResponse>(['notifications', teamId], (data) => {
-          const ids = (data?.unreadThreadIds ?? []).filter((id) => id !== input.id);
-          return { unreadThreadIds: input.read ? ids : [...ids, input.id] };
-        });
+        const queryKey = ['notifications', teamId];
+        await qc.cancelQueries({ queryKey });
+        const wasUnread =
+          qc.getQueryData<NotificationsResponse>(queryKey)?.unreadThreadIds.includes(input.id) ??
+          false;
+        qc.setQueryData<NotificationsResponse>(queryKey, (data) =>
+          withThreadUnread(data, input.id, !input.read),
+        );
+        return { wasUnread };
       },
-      onSettled: () => {
+      onSettled: (_data, error, input, optimistic) => {
+        if (error && optimistic)
+          qc.setQueryData<NotificationsResponse>(['notifications', teamId], (data) =>
+            withThreadUnread(data, input.id, optimistic.wasUnread),
+          );
         void qc.invalidateQueries({ queryKey: ['notifications', teamId] });
       },
     }),

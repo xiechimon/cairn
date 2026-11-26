@@ -320,7 +320,13 @@ test('archive toast Undo restores the composer immediately', async ({
   expect(unexpected).toEqual([]);
 });
 
-async function openUnreadTask(page: Page, answerMarkRead: (route: Route) => Promise<void>) {
+const unreadList = (route: Route) => route.fulfill({ json: { unreadThreadIds: ['todo-archive'] } });
+
+async function openUnreadTask(
+  page: Page,
+  answerMarkRead: (route: Route) => Promise<void>,
+  { answerUnreadList = unreadList, notifyWhilePending = true } = {},
+) {
   await setup(page, 'done');
   const attempts: string[] = [];
   await page.addInitScript(() => {
@@ -328,27 +334,33 @@ async function openUnreadTask(page: Page, answerMarkRead: (route: Route) => Prom
       readyState = 1;
       onmessage: ((event: MessageEvent<string>) => void) | null = null;
       onerror: (() => void) | null = null;
+      onopen: (() => void) | null = null;
+      heartbeat: ReturnType<typeof setInterval>;
 
       constructor(url: string) {
         const send = (data: unknown) =>
           this.onmessage?.(new MessageEvent('message', { data: JSON.stringify(data) }));
-        if (url.includes('/teams/')) Object.assign(window, { sendTeamEvent: send });
-        queueMicrotask(() =>
-          send({ type: 'hello', connectionId: 'archive-1', followRevision: true }),
-        );
+        if (url.includes('/teams/'))
+          Object.assign(window, { sendTeamEvent: send, dropTeamStream: () => this.onerror?.() });
+        queueMicrotask(() => {
+          this.onopen?.();
+          send({ type: 'hello', connectionId: 'archive-1', followRevision: true });
+        });
+        this.heartbeat = setInterval(() => send({ type: 'ping' }), 5000);
       }
 
       close() {
+        clearInterval(this.heartbeat);
         this.readyState = 2;
       }
     }
     Object.defineProperty(window, 'EventSource', { value: TeamEventSource });
   });
-  await page.route('**/api/teams/team-archive/notifications', (route) =>
-    route.fulfill({ json: { unreadThreadIds: ['todo-archive'] } }),
-  );
+  await page.route('**/api/teams/team-archive/notifications', answerUnreadList);
   await page.route('**/api/teams/team-archive/notifications/todo-archive/read', async (route) => {
     attempts.push(route.request().method());
+    if (!notifyWhilePending) return answerMarkRead(route);
+    await page.waitForFunction(() => 'sendTeamEvent' in window);
     await page.evaluate(() => {
       (window as unknown as { sendTeamEvent: (event: unknown) => void }).sendTeamEvent({
         type: 'notification',
@@ -391,6 +403,89 @@ test('a background mark-read that cannot reach the server stays quiet and gives 
   expect(attempts).toHaveLength(3);
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
 });
+
+function waitForMarkedRead(page: Page) {
+  return page.waitForResponse(
+    (response) => response.url().endsWith('/notifications/todo-archive/read') && response.ok(),
+  );
+}
+
+const returns = {
+  'the user comes back to the window': async (page: Page) => {
+    for (const state of ['hidden', 'visible']) {
+      await page.evaluate((visibility) => {
+        Object.defineProperty(document, 'visibilityState', {
+          configurable: true,
+          get: () => visibility,
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, state);
+      await page.waitForTimeout(200);
+    }
+  },
+  'the live connection comes back': (page: Page) =>
+    page.evaluate(() => (window as unknown as { dropTeamStream: () => void }).dropTeamStream()),
+};
+
+test('a mark-read that failed along with the unread list is sent again when the user comes back', async ({
+  page,
+}) => {
+  let healthy = false;
+  let marking = false;
+  page.on('request', (request) => {
+    if (request.url().endsWith('/notifications/todo-archive/read')) marking = true;
+  });
+  await openUnreadTask(
+    page,
+    (route) => (healthy ? route.fulfill({ json: {} }) : route.abort('connectionrefused')),
+    {
+      answerUnreadList: (route) =>
+        marking && !healthy ? route.abort('connectionrefused') : unreadList(route),
+      notifyWhilePending: false,
+    },
+  );
+
+  healthy = true;
+  const marked = waitForMarkedRead(page);
+  await returns['the user comes back to the window'](page);
+  await marked;
+});
+
+for (const [moment, comeBack] of Object.entries(returns)) {
+  test(`a mark-read that gave up is sent again when ${moment}`, async ({ page }) => {
+    let healthy = false;
+    const attempts = await openUnreadTask(page, (route) =>
+      healthy
+        ? route.fulfill({ json: {} })
+        : route.fulfill({ status: 500, json: { error: 'Internal Server Error' } }),
+    );
+    expect(attempts).toHaveLength(1);
+
+    await comeBack(page);
+    await page.waitForTimeout(3000);
+    expect(attempts).toHaveLength(2);
+
+    healthy = true;
+    const marked = waitForMarkedRead(page);
+    await comeBack(page);
+    await marked;
+  });
+
+  test(`a refusal that was still pending when ${moment} does not cancel the retry`, async ({
+    page,
+  }) => {
+    let replies = 0;
+    const marked = waitForMarkedRead(page);
+    await openUnreadTask(page, async (route) => {
+      replies += 1;
+      if (replies > 1) return route.fulfill({ json: {} });
+      await comeBack(page);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return route.fulfill({ status: 500, json: { error: 'Internal Server Error' } });
+    });
+    await marked;
+  });
+}
 
 test('done tasks offer archive while retaining their done phase', async ({ page }) => {
   const { unexpected } = await setup(page, 'done');
