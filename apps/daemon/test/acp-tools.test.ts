@@ -560,4 +560,21 @@ describe('ACP stdio host tools lifecycle', () => {
       bridge.close();
     }
   });
+
+  test('renders compact typed parameter signatures in systemPromptAppendix instead of raw JSON Schema', async () => {
+    const remoteTools = CHIEF_REMOTE_TOOLS.map((tool) =>
+      CORE_COORDINATOR_TOOLS.has(tool.name) ? tool : { ...tool, deferred: true },
+    );
+    const bridge = await openAcpTools(
+      { ...opts, remoteTools, executeRemoteTool: async () => 'ok' },
+      { maxToolBytes: 950, deferTools: true },
+    );
+    if (!bridge) throw new Error('Missing bridge');
+    const appendix = bridge.systemPromptAppendix ?? '';
+    expect(appendix).toContain('### create_todo');
+    expect(appendix).toContain('title: string (required)');
+    expect(appendix).not.toContain('Parameters: {"type":"object"');
+    expect(Buffer.byteLength(appendix, 'utf8')).toBeLessThan(12_000);
+    bridge.close();
+  });
 });

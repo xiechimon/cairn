@@ -411,4 +411,45 @@ describe('prepareStepEnv', () => {
     for (const cleanup of [...cleanups].reverse()) await cleanup();
     expect(prepared.env.CAIRN_GIT_CRED_PASSWORD).toBeUndefined();
   });
+
+  test('reuses a deterministic refcounted credential profile path per Antigravity OAuth refreshToken and deletes it once all holders clean up', async () => {
+    const root = realpathSync(testTempDir('agy-stable-oauth-'));
+    const appData = join(root, 'daemon');
+    const makeOpts = (refreshToken: string) =>
+      input({
+        runtimeId: 'antigravity',
+        agentConfig: { cairnHome: appData },
+        antigravityToken: JSON.stringify({
+          kind: 'oauth-personal',
+          refreshToken,
+          authMethod: 'consumer',
+        }),
+      });
+
+    const cleanups1: (() => void | Promise<void>)[] = [];
+    const first = prepareStepEnv(makeOpts(`1//0gAccountAlpha_${'a'.repeat(20)}`), cleanups1);
+    if ('error' in first) throw new Error(first.error);
+
+    const cleanups2: (() => void | Promise<void>)[] = [];
+    const second = prepareStepEnv(makeOpts(`1//0gAccountAlpha_${'a'.repeat(20)}`), cleanups2);
+    if ('error' in second) throw new Error(second.error);
+
+    const cleanupsOther: (() => void | Promise<void>)[] = [];
+    const other = prepareStepEnv(makeOpts(`1//0gAccountBeta_${'b'.repeat(20)}`), cleanupsOther);
+    if ('error' in other) throw new Error(other.error);
+
+    const home1 = first.env.HOME!;
+    expect(second.env.HOME).toBe(home1);
+    expect(other.env.HOME).not.toBe(home1);
+    expect(dirname(dirname(home1))).toBe(join(appData, 'credential-profiles'));
+
+    for (const fn of [...cleanups1].reverse()) await fn();
+    expect(existsSync(home1)).toBe(true);
+
+    for (const fn of [...cleanups2].reverse()) await fn();
+    expect(existsSync(home1)).toBe(false);
+
+    for (const fn of [...cleanupsOther].reverse()) await fn();
+    expect(existsSync(other.env.HOME!)).toBe(false);
+  });
 });

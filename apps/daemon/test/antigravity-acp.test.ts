@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -731,6 +732,7 @@ describe('antigravity ACP runtime and credentials', () => {
           '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: {} } });',
           '  } else if (msg.method === "session/new") {',
           '    cairnServer = (msg.params.mcpServers ?? []).find((s) => s.name === "cairn") ?? null;',
+          '    globalThis.__sysAppend = msg.params._meta?.antigravity?.systemPrompt?.append ?? "";',
           '    send({ id: msg.id, result: { sessionId: "ag-compact", modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-carbon", options: [{ value: "gemini-4-carbon", name: "Gemini 4 Carbon" }] }] } });',
           '  } else if (msg.method === "session/set_config_option") {',
           '    send({ id: msg.id, result: { configOptions: [] } });',
@@ -758,6 +760,7 @@ describe('antigravity ACP runtime and credentials', () => {
           '      });',
           '      const summary = {',
           '        promptText,',
+          '        systemPromptAppendix: globalThis.__sysAppend,',
           '        permissions: {',
           '          search: pSearch.outcome.optionId,',
           '          call: pCall.outcome.optionId,',
@@ -813,6 +816,7 @@ describe('antigravity ACP runtime and credentials', () => {
       final?.type === 'message_end' ? String(final.message.content) : '{}',
     ) as {
       promptText: string;
+      systemPromptAppendix: string;
       permissions: Record<string, string>;
       mcpReport: {
         listedNames: string[];
@@ -833,11 +837,11 @@ describe('antigravity ACP runtime and credentials', () => {
     expect(summary.mcpReport.searchText).toContain('## machines');
     expect(summary.mcpReport.callText).toBe('executed:machines');
     expect(executed).toEqual([{ name: 'machines', params: {} }]);
-    expect(summary.promptText).toContain('Base system instructions.');
-    expect(summary.promptText).toContain('## Cairn Tool Reference');
-    expect(summary.promptText).toContain('### create_todo');
-    expect(summary.promptText).toContain((createTodoDef as RemoteToolDef).description);
-    expect(summary.promptText).toContain('Inspect machines and create a todo.');
+    expect(summary.systemPromptAppendix).toContain('Base system instructions.');
+    expect(summary.systemPromptAppendix).toContain('## Cairn Tool Reference');
+    expect(summary.systemPromptAppendix).toContain('### create_todo');
+    expect(summary.systemPromptAppendix).toContain((createTodoDef as RemoteToolDef).description);
+    expect(summary.promptText).toBe('Inspect machines and create a todo.');
   });
 
   test('relay-only writes toolPermission strict into isolated antigravity settings and normal mode clears it', async () => {
@@ -895,5 +899,273 @@ describe('antigravity ACP runtime and credentials', () => {
       auth: { type: 'oauth-personal' },
       gcp: { project: 'demo-proj' },
     });
+  });
+
+  test('installs PreToolUse hook in cwd/.agents/hooks.json for locked Antigravity turns, restores prior file on finish, and allows mcp_cairn_* while denying built-ins', async () => {
+    const dir = tempDir('ag-hooks-guard-');
+    const agentsDir = join(dir, '.agents');
+    const hooksPath = join(agentsDir, 'hooks.json');
+    mkdirSync(agentsDir, { recursive: true });
+    writeFileSync(hooksPath, JSON.stringify({ userHook: { PostToolUse: [] } }));
+
+    let seenHooksDuringSession: Record<string, unknown> | null = null;
+    const agent = join(dir, 'agy-hook-check.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { createInterface } from 'node:readline';",
+          "import { existsSync, readFileSync } from 'node:fs';",
+          `import { join } from 'node:path';`,
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: {} } });',
+          '  } else if (msg.method === "session/new") {',
+          `    const raw = existsSync(${JSON.stringify(hooksPath)}) ? readFileSync(${JSON.stringify(hooksPath)}, "utf8") : "{}";`,
+          '    send({ id: msg.id, result: { sessionId: "ag-hook", modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          `    const content = readFileSync(${JSON.stringify(hooksPath)}, "utf8");`,
+          '    send({ method: "session/update", params: { sessionId: "ag-hook", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: content } } } });',
+          '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+    });
+    const session = await backend.createSession({
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      prompt: 'test',
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      remoteToolsOnly: true,
+      lockedDown: true,
+      executeRemoteTool: async () => '[]',
+    });
+    const events = await collect(session.events);
+    const final = events.find((e) => e.type === 'message_end');
+    seenHooksDuringSession =
+      final?.type === 'message_end'
+        ? (JSON.parse(String(final.message.content)) as Record<string, unknown>)
+        : null;
+
+    expect(seenHooksDuringSession).toMatchObject({
+      userHook: { PostToolUse: [] },
+      'cairn-relay-guard': {
+        PreToolUse: [
+          {
+            matcher: '.*',
+            hooks: [{ type: 'command', command: expect.any(String) }],
+          },
+        ],
+      },
+    });
+    if (!seenHooksDuringSession) throw new Error('Missing hooks snapshot');
+    const guardCommand = (
+      seenHooksDuringSession['cairn-relay-guard'] as {
+        PreToolUse: Array<{ hooks: Array<{ command: string }> }>;
+      }
+    ).PreToolUse[0]!.hooks[0]!.command;
+
+    const runHook = (toolName: string, args: Record<string, unknown> = {}) =>
+      JSON.parse(
+        execFileSync('/bin/sh', ['-c', guardCommand], {
+          input: JSON.stringify({
+            hookEventName: 'PreToolUse',
+            toolCall: { name: toolName, args },
+          }),
+          encoding: 'utf8',
+        }),
+      ) as { decision: string; reason?: string };
+
+    expect(runHook('mcp_cairn_todos')).toEqual({ decision: 'allow' });
+    expect(runHook('call_mcp_tool', { ServerName: 'cairn', ToolName: 'machines' })).toEqual({
+      decision: 'allow',
+    });
+    expect(runHook('call_mcp_tool', { ServerName: 'other', ToolName: 'x' }).decision).toBe('deny');
+    expect(runHook('read_file').decision).toBe('deny');
+    expect(runHook('run_command').decision).toBe('deny');
+    expect(JSON.parse(readFileSync(hooksPath, 'utf8'))).toEqual({ userHook: { PostToolUse: [] } });
+  });
+
+  test('recovers once when Antigravity returns empty end_turn after an ACP permission rejection', async () => {
+    const dir = tempDir('ag-reject-recover-');
+    const agent = join(dir, 'agy-recover.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'const gateWaiters = new Map();',
+          'let promptCount = 0;',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === undefined && gateWaiters.has(msg.id)) {',
+          '    gateWaiters.get(msg.id)(msg.result);',
+          '    gateWaiters.delete(msg.id);',
+          '    continue;',
+          '  }',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: {} } });',
+          '  } else if (msg.method === "session/new") {',
+          '    send({ id: msg.id, result: { sessionId: "ag-rec", modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    promptCount += 1;',
+          '    if (promptCount === 1) {',
+          '      void (async () => {',
+          '        await new Promise((resolve) => {',
+          '          gateWaiters.set("p-cmd", resolve);',
+          '          send({ id: "p-cmd", method: "session/request_permission", params: { sessionId: "ag-rec", toolCall: { toolCallId: "t1", title: "run_command", kind: "execute" }, options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }, { optionId: "deny", name: "Deny", kind: "reject_once" }] } });',
+          '        });',
+          '        send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '      })();',
+          '    } else {',
+          '      send({ method: "session/update", params: { sessionId: "ag-rec", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Recovered reply without blocked tool." } } } });',
+          '      send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '    }',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+    });
+    const session = await backend.createSession({
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      prompt: 'Check hostname',
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      remoteToolsOnly: true,
+      lockedDown: true,
+      executeRemoteTool: async () => '[]',
+    });
+    const events = await collect(session.events);
+    expect(events).toContainEqual({
+      type: 'message_end',
+      message: { role: 'assistant', content: 'Recovered reply without blocked tool.' },
+    });
+    expect(events.at(-1)).toEqual({ type: 'done', usage: [] });
+  });
+
+  test('passes --include-default-customizations=false, uses _meta.systemPrompt on new only, defaults Coordinator thought_level to medium, and records result.usage', async () => {
+    const dir = tempDir('ag-meta-cache-');
+    const agent = join(dir, 'agy-meta.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'const spawnArgs = process.argv.slice(2);',
+          'let metaPrompt = null;',
+          'let selectedThought = null;',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } } });',
+          '  } else if (msg.method === "session/new") {',
+          '    metaPrompt = msg.params._meta?.antigravity?.systemPrompt?.append ?? null;',
+          '    send({ id: msg.id, result: { sessionId: "ag-meta-1", modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }] }, { id: "thought_level", name: "Thinking Level", category: "thought_level", type: "select", currentValue: "high", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
+          '  } else if (msg.method === "session/resume") {',
+          '    metaPrompt = msg.params._meta?.antigravity?.systemPrompt?.append ?? null;',
+          '    send({ id: msg.id, result: { sessionId: msg.params.sessionId, modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }] }, { id: "thought_level", name: "Thinking Level", category: "thought_level", type: "select", currentValue: "high", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    if (msg.params.configId === "thought_level") selectedThought = msg.params.value;',
+          '    send({ id: msg.id, result: { configOptions: [{ id: "thought_level", name: "Thinking Level", category: "thought_level", type: "select", currentValue: selectedThought ?? "high", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    const promptText = msg.params.prompt.find((b) => b.type === "text")?.text ?? "";',
+          '    send({ method: "session/update", params: { sessionId: msg.params.sessionId, update: { sessionUpdate: "usage_update", used: 11200, size: 1048576 } } });',
+          '    send({ method: "session/update", params: { sessionId: msg.params.sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ spawnArgs, metaPrompt, selectedThought, promptText }) } } } });',
+          '    send({ id: msg.id, result: { stopReason: "end_turn", usage: { inputTokens: 2500, outputTokens: 120, cachedReadTokens: 8700, cachedWriteTokens: 0, thoughtTokens: 40, totalTokens: 11320 } } });',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      args: [...ANTIGRAVITY_ACP_ARGS],
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      usageEvents: true,
+    });
+    const s1 = await backend.createSession({
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      systemPrompt: 'COORDINATOR_SYS_PROMPT',
+      prompt: 'Turn 1 question',
+      compactAt: 150_000,
+    });
+    const ev1 = await collect(s1.events);
+    const msg1 = ev1.find((e) => e.type === 'message_end');
+    const p1 = JSON.parse(msg1?.type === 'message_end' ? String(msg1.message.content) : '{}') as {
+      spawnArgs: string[];
+      metaPrompt: string | null;
+      selectedThought: string | null;
+      promptText: string;
+    };
+    expect(p1.spawnArgs).toContain('--include-default-customizations=false');
+    expect(p1.metaPrompt).toContain('COORDINATOR_SYS_PROMPT');
+    expect(p1.promptText).toBe('Turn 1 question');
+    expect(p1.selectedThought).toBe('medium');
+    expect(ev1.at(-1)).toEqual({
+      type: 'done',
+      usage: [
+        {
+          model: 'gemini-4-hydrogen',
+          input: 2500,
+          output: 120,
+          cacheRead: 8700,
+          cacheWrite: 0,
+          contextTokens: 11200,
+          contextWindow: 1048576,
+          compactAt: 150_000,
+        },
+      ],
+    });
+
+    const s2 = await backend.continueSession('ag-meta-1', {
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      systemPrompt: 'COORDINATOR_SYS_PROMPT',
+      prompt: 'Turn 2 follow-up',
+      compactAt: 150_000,
+    });
+    const ev2 = await collect(s2.events);
+    const msg2 = ev2.find((e) => e.type === 'message_end');
+    const p2 = JSON.parse(msg2?.type === 'message_end' ? String(msg2.message.content) : '{}') as {
+      metaPrompt: string | null;
+      promptText: string;
+    };
+    expect(p2.metaPrompt).toBeNull();
+    expect(p2.promptText).toBe('Turn 2 follow-up');
   });
 });

@@ -130,6 +130,48 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
     expect(existsSync(join(directory, 'SKILL.md'))).toBe(true);
   });
 
+  test('machines omits verbose devin and antigravity model arrays while preserving runner status fields', async () => {
+    seedMachineReport('models-trim', { installed: false, hostname: 'models-trim', models: [] });
+    H.s.db
+      .update(machine)
+      .set({
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          computer: true,
+          devin: {
+            installed: true,
+            version: '1.0.0',
+            models: [{ id: 'devin-m1', name: 'Devin Model 1' }],
+          },
+          antigravity: {
+            installed: true,
+            authenticated: true,
+            version: '1.5.18',
+            models: [{ id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' }],
+          },
+        },
+      })
+      .where(eq(machine.id, 'machine-models-trim'))
+      .run();
+    const rows = (await relay('machines', {})) as Array<{
+      id: string;
+      capabilities: {
+        computer?: boolean;
+        devin?: { installed: boolean; version?: string; models?: unknown[] };
+        antigravity?: { installed: boolean; authenticated?: boolean; models?: unknown[] };
+      } | null;
+    }>;
+    const entry = rows.find((r) => r.id === 'machine-models-trim');
+    expect(entry?.capabilities?.computer).toBe(true);
+    expect(entry?.capabilities?.devin).toEqual({ installed: true, version: '1.0.0' });
+    expect(entry?.capabilities?.antigravity).toEqual({
+      installed: true,
+      authenticated: true,
+      version: '1.5.18',
+    });
+  });
+
   describe('conversation tool team scope', () => {
     const OTHER_TEAM = 'other-team';
 

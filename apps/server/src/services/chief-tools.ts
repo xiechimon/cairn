@@ -298,6 +298,23 @@ function requireTeamConversation(db: Db, conversationId: string, teamId: string)
     .get();
   if (!thread) throw new HttpError(404, `conversation ${conversationId}`);
 }
+
+function trimCapabilitiesForCoordinator(
+  capabilities: NonNullable<ReturnType<typeof parseStoredCapabilities>>,
+) {
+  const trimmedDevin = capabilities.devin
+    ? (({ models: _models, ...rest }) => rest)(capabilities.devin)
+    : undefined;
+  const trimmedAntigravity = capabilities.antigravity
+    ? (({ models: _models, ...rest }) => rest)(capabilities.antigravity)
+    : undefined;
+  return {
+    ...capabilities,
+    ...(trimmedDevin !== undefined ? { devin: trimmedDevin } : {}),
+    ...(trimmedAntigravity !== undefined ? { antigravity: trimmedAntigravity } : {}),
+  };
+}
+
 export async function executeChiefTool(
   deps: ChiefToolDeps,
   ctx: ChiefToolCtx,
@@ -474,13 +491,16 @@ export async function executeChiefTool(
         .all()
         .filter(isRegisteredMachine);
       return json(
-        rows.map((m) => ({
-          id: m.id,
-          name: m.name,
-          online: m.online,
-          latestCliVersion: m.latestCliVersion,
-          capabilities: parseStoredCapabilities(m.capabilities) ?? null,
-        })),
+        rows.map((m) => {
+          const parsed = parseStoredCapabilities(m.capabilities);
+          return {
+            id: m.id,
+            name: m.name,
+            online: m.online,
+            latestCliVersion: m.latestCliVersion,
+            capabilities: parsed ? trimCapabilitiesForCoordinator(parsed) : null,
+          };
+        }),
       );
     }
     case 'skills': {

@@ -56,6 +56,7 @@ import {
   restrictiveAcpMode,
 } from './acp-permission-gate.js';
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
+import { installAntigravityTurnHooks } from './antigravity-hooks.js';
 
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -266,6 +267,20 @@ function syncAntigravityToolPermission(home: string | undefined, policy: AcpTurn
   }
 }
 
+interface AcpPromptUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedReadTokens?: number;
+  cachedWriteTokens?: number;
+  thoughtTokens?: number;
+  totalTokens?: number;
+}
+
+interface AcpPromptResponse {
+  stopReason?: string;
+  usage?: AcpPromptUsage;
+}
+
 class AcpSession implements AgentSessionHandle {
   readonly sessionId: string;
   readonly events: AsyncIterable<StepEvent>;
@@ -276,11 +291,12 @@ class AcpSession implements AgentSessionHandle {
   private promptStarted = false;
   private cancelled = false;
   private text = '';
+  private rejectedCount = 0;
   private readonly calls = new Map<string, ToolCallRecord>();
   private readonly toolOutputs = new Map<string, unknown>();
   private readonly rawCalls = new Map<string, AcpToolCall>();
   private cancelTimer: ReturnType<typeof setTimeout> | undefined;
-  private midTurnPrompt: Promise<{ stopReason?: string }> | null = null;
+  private midTurnPrompt: Promise<AcpPromptResponse> | null = null;
   private readonly normalizer?: (update: SessionUpdate) => AcpUpdateNormalization;
 
   constructor(
@@ -320,13 +336,54 @@ class AcpSession implements AgentSessionHandle {
     else this.queue.push(event);
   }
 
+  private recordPromptUsage(usage: AcpPromptUsage | undefined): void {
+    if (usage === undefined) return;
+    const finite = (value: unknown): number | undefined =>
+      typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : undefined;
+    const inputTokens = finite(usage.inputTokens);
+    const outputTokens = finite(usage.outputTokens);
+    const cachedReadTokens = finite(usage.cachedReadTokens);
+    const cachedWriteTokens = finite(usage.cachedWriteTokens);
+    if (
+      inputTokens === undefined &&
+      outputTokens === undefined &&
+      cachedReadTokens === undefined &&
+      cachedWriteTokens === undefined
+    ) {
+      return;
+    }
+    const existing = this.usageRows[0];
+    const input = inputTokens ?? existing?.input ?? 0;
+    const cacheRead = cachedReadTokens ?? existing?.cacheRead ?? 0;
+    const output = outputTokens ?? existing?.output ?? 0;
+    const cacheWrite = cachedWriteTokens ?? existing?.cacheWrite ?? 0;
+    const contextTokens =
+      existing?.contextTokens !== undefined && existing.contextTokens > 0
+        ? existing.contextTokens
+        : input + cacheRead;
+    this.usageRows.splice(0, this.usageRows.length, {
+      model: this.modelId,
+      input,
+      output,
+      cacheRead,
+      cacheWrite,
+      contextTokens,
+      ...(existing?.contextWindow !== undefined ? { contextWindow: existing.contextWindow } : {}),
+      ...(this.compactAt !== undefined ? { compactAt: this.compactAt } : {}),
+    });
+    if (this.adapter?.usageEvents === true) {
+      this.push({ type: 'usage', usage: [...this.usageRows] });
+    }
+  }
+
   private async runPrompt(): Promise<void> {
     if (this.prompt === undefined) {
       this.finish();
       return;
     }
     try {
-      let wait: Promise<{ stopReason?: string }> = this.connection.agent.request(
+      let recoveryAttempted = false;
+      let wait: Promise<AcpPromptResponse> = this.connection.agent.request(
         methods.agent.session.prompt,
         {
           sessionId: this.sessionId,
@@ -347,6 +404,25 @@ class AcpSession implements AgentSessionHandle {
           this.midTurnPrompt = null;
           continue;
         }
+        if (
+          this.adapter?.harness === 'antigravity' &&
+          result.stopReason === 'end_turn' &&
+          this.text.trim() === '' &&
+          this.rejectedCount > 0 &&
+          !recoveryAttempted
+        ) {
+          recoveryAttempted = true;
+          wait = this.connection.agent.request(methods.agent.session.prompt, {
+            sessionId: this.sessionId,
+            prompt: [
+              {
+                type: 'text',
+                text: 'Your previous built-in tool call was blocked by Cairn policy. Continue without retrying blocked built-in tools, use only allowed Cairn tools, and provide a complete response to the user.',
+              },
+            ],
+          });
+          continue;
+        }
         if (this.text)
           this.push({ type: 'message_end', message: { role: 'assistant', content: this.text } });
         if (this.adapter && result.stopReason === 'cancelled' && !this.cancelled) {
@@ -358,6 +434,7 @@ class AcpSession implements AgentSessionHandle {
           if (this.adapter && [...this.calls.values()].some((call) => call.result === undefined)) {
             throw new Error('ACP prompt completed with unfinished tool calls');
           }
+          this.recordPromptUsage(result.usage);
           this.push({ type: 'done', usage: this.usageRows });
         } else
           this.push({
@@ -401,6 +478,7 @@ class AcpSession implements AgentSessionHandle {
 
   recordRejection(toolCall: AcpToolCall, reason: string): void {
     if (this.stopped) return;
+    this.rejectedCount += 1;
     const previous = this.calls.get(toolCall.toolCallId);
     const call: ToolCallRecord = {
       id: toolCall.toolCallId,
@@ -721,14 +799,21 @@ class AcpBackend implements AgentBackend {
       );
     }
     const releaseRuntime = adapter?.acquireRuntime?.();
+    let cleanupHooks: (() => void) | undefined;
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {
-      const args =
+      const rawArgs =
         resolvedLaunch !== null
           ? [...resolvedLaunch.args]
           : adapter
-            ? (adapter.args ?? [])
+            ? [...(adapter.args ?? [])]
             : [...(this.options.executableArgs ?? ['--acp'])];
+      const args =
+        adapter?.harness === 'antigravity' &&
+        rawArgs.includes('acp') &&
+        !rawArgs.some((arg) => arg.startsWith('--include-default-customizations'))
+          ? [...rawArgs, '--include-default-customizations=false']
+          : rawArgs;
       const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
       const geminiHome = sessionEnv.GEMINI_CLI_HOME;
       if (!adapter && opts.compactAt !== undefined && geminiHome !== undefined) {
@@ -746,6 +831,7 @@ class AcpBackend implements AgentBackend {
       if (adapter?.harness === 'antigravity') {
         sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
         syncAntigravityToolPermission(sessionEnv.HOME, policy);
+        cleanupHooks = installAntigravityTurnHooks(opts.cwd, policy);
       }
       const env = runtimeChildEnv(sessionEnv);
       child = spawnProcess(command, args, {
@@ -755,6 +841,7 @@ class AcpBackend implements AgentBackend {
         env,
       });
     } catch (error) {
+      cleanupHooks?.();
       releaseRuntime?.();
       releaseLaunch?.();
       hostTools?.close();
@@ -857,6 +944,7 @@ class AcpBackend implements AgentBackend {
     const cleanup = () => {
       if (cleanedUp) return;
       cleanedUp = true;
+      cleanupHooks?.();
       releaseRuntime?.();
       hostTools?.close();
       for (const bridge of mcpBridges) bridge.close();
@@ -940,8 +1028,16 @@ class AcpBackend implements AgentBackend {
           }
         }
       }
+      const combinedSystemPrompt =
+        opts.systemPrompt && hostTools?.systemPromptAppendix
+          ? `${opts.systemPrompt}\n\n${hostTools.systemPromptAppendix}`
+          : (opts.systemPrompt ?? hostTools?.systemPromptAppendix);
       const sessionMeta =
-        adapter?.harness === 'claude-code' ? claudeAcpSessionMeta(policy) : undefined;
+        adapter?.harness === 'claude-code'
+          ? claudeAcpSessionMeta(policy)
+          : adapter?.harness === 'antigravity' && !resumeId && combinedSystemPrompt
+            ? { antigravity: { systemPrompt: { append: combinedSystemPrompt } } }
+            : undefined;
       const request = {
         cwd: opts.cwd,
         ...(sessionMeta !== undefined ? { _meta: sessionMeta } : {}),
@@ -1020,10 +1116,20 @@ class AcpBackend implements AgentBackend {
         );
       }
       const thinkingOption = configOptions.find(isThoughtOption);
+      const thinkingValues =
+        thinkingOption === undefined ? undefined : selectOptionValues(thinkingOption);
       const thinkingValue =
-        opts.thinkingLevel === undefined || thinkingOption === undefined
+        thinkingOption === undefined || thinkingValues === undefined
           ? undefined
-          : acpThoughtValue(opts.thinkingLevel, selectOptionValues(thinkingOption));
+          : opts.thinkingLevel !== undefined
+            ? acpThoughtValue(opts.thinkingLevel, thinkingValues)
+            : adapter?.harness === 'antigravity' &&
+                opts.compactAt !== undefined &&
+                (currentValueOf(thinkingOption) === 'high' ||
+                  currentValueOf(thinkingOption) === 'xhigh') &&
+                thinkingValues.has('medium')
+              ? 'medium'
+              : undefined;
       if (thinkingOption !== undefined && thinkingValue !== undefined) {
         await connection.agent.request(methods.agent.session.setConfigOption, {
           sessionId,
@@ -1071,16 +1177,16 @@ class AcpBackend implements AgentBackend {
           }
         }
       }
-      const combinedSystemPrompt =
-        opts.systemPrompt && hostTools?.systemPromptAppendix
-          ? `${opts.systemPrompt}\n\n${hostTools.systemPromptAppendix}`
-          : (opts.systemPrompt ?? hostTools?.systemPromptAppendix);
+      const sessionPrompt =
+        adapter?.harness === 'antigravity'
+          ? validated.prompt
+          : combinedSystemPrompt && validated.prompt !== undefined
+            ? `${combinedSystemPrompt}\n\n${validated.prompt}`
+            : validated.prompt;
       session = new AcpSession(
         sessionId,
         connection,
-        combinedSystemPrompt && validated.prompt !== undefined
-          ? `${combinedSystemPrompt}\n\n${validated.prompt}`
-          : validated.prompt,
+        sessionPrompt,
         (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
         caps?.promptCapabilities?.image === true,
         cleanup,

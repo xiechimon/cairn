@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { antigravityOAuthStepCredentialSchema, type BoundGitCredentials } from '@cairn/shared';
-import { createCredentialProfile } from '@cairn/shared/credential-profile';
+import { acquireDeterministicCredentialProfile } from '@cairn/shared/credential-profile';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import {
   antigravityFileStorageEnv,
@@ -108,7 +108,9 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
       (credential.expiresAt === undefined || credential.expiresAt <= Date.now())
     )
       throw new Error('Antigravity OAuth access token expired');
-    const profile = createCredentialProfile(input.agentConfig.cairnHome);
+    const profileKey =
+      credential.refreshToken ?? credential.token ?? input.antigravityToken ?? 'default';
+    const profile = acquireDeterministicCredentialProfile(input.agentConfig.cairnHome, profileKey);
     try {
       writeAntigravityOAuthCredential(profile.home, credential, input.agentConfig.cairnHome);
       Object.assign(env, profile.env, antigravityFileStorageEnv(profile.home));

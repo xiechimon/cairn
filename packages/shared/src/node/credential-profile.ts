@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   closeSync,
   constants,
@@ -18,10 +19,12 @@ import { processLiveness, processStartTime } from './parent-watch.js';
 
 const ROOT = 'credential-profiles';
 const PROFILE = /^profile-([1-9]\d*)-[a-zA-Z0-9]{6}$/;
+const DETERMINISTIC_PROFILE = /^antigravity-oauth-[a-f0-9]{12}$/;
 const OWNER = 'owner.json';
 const START_TIME_VERSION = 1;
 const MAX_LEGACY_LOCAL_OFFSET_MS = 26 * 60 * 60 * 1000;
 const PS_START_TIME = /^[A-Z][a-z]{2} [A-Z][a-z]{2} +\d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/;
+const activeDeterministicProfiles = new Map<string, number>();
 
 type Owner = { pid: number; startTime: string; startTimeVersion: number | null | undefined };
 
@@ -91,10 +94,17 @@ function ownerIsGone(owner: Owner | null, directoryPid: number): boolean {
 export function reapCredentialProfiles(appData: string): void {
   const root = profileRoot(appData);
   for (const entry of readdirSync(root, { withFileTypes: true })) {
-    const match = PROFILE.exec(entry.name);
-    if (!entry.isDirectory() || match === null) continue;
+    if (!entry.isDirectory()) continue;
     const dir = join(root, entry.name);
-    if (ownerIsGone(readOwner(dir), Number(match[1]))) removeProfile(dir);
+    const match = PROFILE.exec(entry.name);
+    if (match !== null) {
+      if (ownerIsGone(readOwner(dir), Number(match[1]))) removeProfile(dir);
+      continue;
+    }
+    if (DETERMINISTIC_PROFILE.test(entry.name) && !activeDeterministicProfiles.has(dir)) {
+      const owner = readOwner(dir);
+      if (owner === null || ownerIsGone(owner, owner.pid)) removeProfile(dir);
+    }
   }
 }
 
@@ -102,17 +112,7 @@ function removeProfile(dir: string): void {
   rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
 }
 
-export function createCredentialProfile(appData: string) {
-  const owner = currentOwner();
-  const dir = mkdtempSync(join(profileRoot(appData), `profile-${owner.pid}-`));
-  const home = join(dir, 'home');
-  try {
-    writeFileSync(join(dir, OWNER), JSON.stringify(owner), { mode: 0o600, flag: 'wx' });
-    mkdirSync(home, { mode: 0o700 });
-  } catch (error) {
-    removeProfile(dir);
-    throw error;
-  }
+function profileHandle(home: string, cleanup: () => void) {
   return {
     home,
     env: {
@@ -134,8 +134,72 @@ export function createCredentialProfile(appData: string) {
         return null;
       }
     },
-    cleanup: () => removeProfile(dir),
+    cleanup,
   };
+}
+
+export function createCredentialProfile(appData: string) {
+  const owner = currentOwner();
+  const dir = mkdtempSync(join(profileRoot(appData), `profile-${owner.pid}-`));
+  const home = join(dir, 'home');
+  try {
+    writeFileSync(join(dir, OWNER), JSON.stringify(owner), { mode: 0o600, flag: 'wx' });
+    mkdirSync(home, { mode: 0o700 });
+  } catch (error) {
+    removeProfile(dir);
+    throw error;
+  }
+  return profileHandle(home, () => removeProfile(dir));
+}
+
+export function acquireDeterministicCredentialProfile(appData: string, key: string) {
+  const owner = currentOwner();
+  const hash = createHash('sha256').update(key).digest('hex').slice(0, 12);
+  const dir = join(profileRoot(appData), `antigravity-oauth-${hash}`);
+  const home = join(dir, 'home');
+  const activeCount = activeDeterministicProfiles.get(dir) ?? 0;
+  if (activeCount === 0) {
+    const existingStat = (() => {
+      try {
+        return lstatSync(dir);
+      } catch {
+        return null;
+      }
+    })();
+    if (existingStat !== null) {
+      if (!existingStat.isDirectory() || existingStat.uid !== process.getuid?.()) {
+        removeProfile(dir);
+      } else {
+        const previous = readOwner(dir);
+        if (previous === null || ownerIsGone(previous, previous.pid)) removeProfile(dir);
+      }
+    }
+    try {
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      assertPrivateDirectory(dir);
+      const ownerStaging = join(dir, `${OWNER}.tmp`);
+      writeFileSync(ownerStaging, JSON.stringify(owner), { mode: 0o600 });
+      renameSync(ownerStaging, join(dir, OWNER));
+      mkdirSync(home, { recursive: true, mode: 0o700 });
+      assertPrivateDirectory(home);
+    } catch (error) {
+      removeProfile(dir);
+      throw error;
+    }
+  }
+  activeDeterministicProfiles.set(dir, activeCount + 1);
+  let released = false;
+  return profileHandle(home, () => {
+    if (released) return;
+    released = true;
+    const next = (activeDeterministicProfiles.get(dir) ?? 1) - 1;
+    if (next > 0) {
+      activeDeterministicProfiles.set(dir, next);
+      return;
+    }
+    activeDeterministicProfiles.delete(dir);
+    removeProfile(dir);
+  });
 }
 
 export function adoptCredentialProfile(home: string, parentPid: number): () => void {

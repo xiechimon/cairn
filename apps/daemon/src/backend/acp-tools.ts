@@ -197,6 +197,57 @@ interface CompactedToolDoc {
   parameters: Record<string, unknown>;
 }
 
+function compactSchemaType(schema: unknown): string {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return 'unknown';
+  const rec = schema as Record<string, unknown>;
+  if (Array.isArray(rec.enum) && rec.enum.length > 0) {
+    return `enum[${rec.enum
+      .slice(0, 8)
+      .map((v) => JSON.stringify(v))
+      .join('|')}]`;
+  }
+  const baseType = typeof rec.type === 'string' ? rec.type : 'any';
+  if (baseType === 'array') {
+    const itemType = rec.items !== undefined ? compactSchemaType(rec.items) : 'any';
+    return `array<${itemType}>`;
+  }
+  if (baseType === 'object' && typeof rec.properties === 'object' && rec.properties !== null) {
+    const keys = Object.keys(rec.properties as Record<string, unknown>);
+    return keys.length > 0
+      ? `object{${keys.slice(0, 6).join(',')}${keys.length > 6 ? ',…' : ''}}`
+      : 'object';
+  }
+  return baseType;
+}
+
+function formatCompactToolParameters(parameters: Record<string, unknown>): string {
+  const rawProps = parameters.properties;
+  if (typeof rawProps !== 'object' || rawProps === null || Array.isArray(rawProps)) {
+    return 'Parameters: none';
+  }
+  const entries = Object.entries(rawProps as Record<string, unknown>);
+  if (entries.length === 0) return 'Parameters: none';
+  const required = new Set(
+    Array.isArray(parameters.required)
+      ? parameters.required.filter((item): item is string => typeof item === 'string')
+      : [],
+  );
+  const lines = entries.map(([paramName, schema]) => {
+    const rec =
+      typeof schema === 'object' && schema !== null && !Array.isArray(schema)
+        ? (schema as Record<string, unknown>)
+        : {};
+    const typeLabel = compactSchemaType(rec);
+    const reqTag = required.has(paramName) ? ' (required)' : '';
+    const desc =
+      typeof rec.description === 'string' && rec.description.trim() !== ''
+        ? ` — ${firstSentence(rec.description).slice(0, 90)}`
+        : '';
+    return `- ${paramName}: ${typeLabel}${reqTag}${desc}`;
+  });
+  return `Parameters:\n${lines.join('\n')}`;
+}
+
 function toolByteLength(
   name: string,
   description: string,
@@ -467,7 +518,7 @@ export async function openAcpTools(
       ? `## Cairn Tool Reference\n\n${compactedDocs
           .map(
             (doc) =>
-              `### ${doc.name}\n${doc.description}\nParameters: ${JSON.stringify(doc.parameters ?? EMPTY_INPUT_SCHEMA)}`,
+              `### ${doc.name}\n${doc.description}\n${formatCompactToolParameters(doc.parameters ?? EMPTY_INPUT_SCHEMA)}`,
           )
           .join('\n\n')}`
       : undefined;
