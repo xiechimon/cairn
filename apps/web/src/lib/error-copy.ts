@@ -75,6 +75,13 @@ function isNetworkFailure(error: unknown): boolean {
   return error instanceof Error && NETWORK_ERROR_RE.test(error.message);
 }
 
+const UNREACHABLE_GATEWAY_STATUSES = new Set([502, 503, 504]);
+
+export function isServerUnreachable(error: unknown): boolean {
+  if (error instanceof ApiError) return UNREACHABLE_GATEWAY_STATUSES.has(error.status);
+  return isNetworkFailure(error);
+}
+
 export function describeError(error: unknown, t: TFunc): string | null {
   if (error == null) return null;
   if (error instanceof SendTimeoutError) return t('不确定是否送达，重发前请先看对话里有没有这条。');

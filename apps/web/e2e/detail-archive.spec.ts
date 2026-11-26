@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Page, type Route, test } from '@playwright/test';
 
 async function setup(page: Page, phase = 'building', archivedAt: number | null = null) {
   let todo = {
@@ -318,6 +318,78 @@ test('archive toast Undo restores the composer immediately', async ({
   await page.reload();
   await continueFromComposer(page, revisions);
   expect(unexpected).toEqual([]);
+});
+
+async function openUnreadTask(page: Page, answerMarkRead: (route: Route) => Promise<void>) {
+  await setup(page, 'done');
+  const attempts: string[] = [];
+  await page.addInitScript(() => {
+    class TeamEventSource {
+      readyState = 1;
+      onmessage: ((event: MessageEvent<string>) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor(url: string) {
+        const send = (data: unknown) =>
+          this.onmessage?.(new MessageEvent('message', { data: JSON.stringify(data) }));
+        if (url.includes('/teams/')) Object.assign(window, { sendTeamEvent: send });
+        queueMicrotask(() =>
+          send({ type: 'hello', connectionId: 'archive-1', followRevision: true }),
+        );
+      }
+
+      close() {
+        this.readyState = 2;
+      }
+    }
+    Object.defineProperty(window, 'EventSource', { value: TeamEventSource });
+  });
+  await page.route('**/api/teams/team-archive/notifications', (route) =>
+    route.fulfill({ json: { unreadThreadIds: ['todo-archive'] } }),
+  );
+  await page.route('**/api/teams/team-archive/notifications/todo-archive/read', async (route) => {
+    attempts.push(route.request().method());
+    await page.evaluate(() => {
+      (window as unknown as { sendTeamEvent: (event: unknown) => void }).sendTeamEvent({
+        type: 'notification',
+        notification: {
+          id: 'notice-archive',
+          teamId: 'team-archive',
+          userId: 'user-archive',
+          type: 'build_review',
+          entityId: 'todo-archive',
+          entityRef: { title: 'Archive probe', projectId: 'project-archive', seqNum: 1 },
+          agent: { name: 'Agent', avatarUrl: null },
+          snippet: null,
+          readAt: null,
+          createdAt: 1,
+          channels: ['in_app'],
+        },
+      });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await answerMarkRead(route);
+  });
+  await page.goto('/app/todo/todo-archive');
+  await expect.poll(() => attempts.length).toBeGreaterThan(0);
+  await page.waitForTimeout(3000);
+  return attempts;
+}
+
+test('a rejected background mark-read says so once and stops asking', async ({ page }) => {
+  const attempts = await openUnreadTask(page, (route) =>
+    route.fulfill({ status: 500, json: { error: 'Internal Server Error' } }),
+  );
+  expect(attempts).toHaveLength(1);
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(1);
+});
+
+test('a background mark-read that cannot reach the server stays quiet and gives up', async ({
+  page,
+}) => {
+  const attempts = await openUnreadTask(page, (route) => route.abort('connectionrefused'));
+  expect(attempts).toHaveLength(3);
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
 });
 
 test('done tasks offer archive while retaining their done phase', async ({ page }) => {

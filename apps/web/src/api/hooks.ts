@@ -137,6 +137,8 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
+import { isServerUnreachable } from '../lib/error-copy.js';
+import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import { randomId } from '../lib/random-id.js';
 import { fetchWithSession, useAuth } from './auth.js';
 import { ApiError, api } from './client.js';
@@ -1289,9 +1291,14 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     setThreadRead: useMutation({
       mutationFn: (input: { id: string; read: boolean }) =>
-        api.post<NotificationRecord>(
-          `/api/teams/${encodeURIComponent(teamId ?? '')}/notifications/${encodeURIComponent(input.id)}/${input.read ? 'read' : 'unread'}`,
-        ),
+        api
+          .post<NotificationRecord>(
+            `/api/teams/${encodeURIComponent(teamId ?? '')}/notifications/${encodeURIComponent(input.id)}/${input.read ? 'read' : 'unread'}`,
+          )
+          .catch((error: unknown) => {
+            if (isServerUnreachable(error)) markErrorSurfaced(error);
+            throw error;
+          }),
       onMutate: async (input) => {
         await qc.cancelQueries({ queryKey: ['notifications', teamId] });
         qc.setQueryData<NotificationsResponse>(['notifications', teamId], (data) => {
