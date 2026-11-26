@@ -91,6 +91,7 @@ export { projectFixture } from './projects.js';
 export {
   agentTodoLive,
   boardFailed,
+  codeHighlight,
   detailFailed12,
   detailFailed15Set,
   detailV3Collapsed,
