@@ -302,6 +302,22 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
     });
   });
 
+  test('zsh files an earlier step left behind cannot move the launchers off PATH', async () => {
+    const host = fakeHost();
+    const isolated = join(host.root, 'cairn', 'homes', 'antigravity');
+    mkdirSync(isolated, { recursive: true });
+    writeFileSync(join(isolated, '.zlogin'), 'export PATH=/usr/bin:/bin\n');
+    writeFileSync(join(isolated, '.zshrc'), 'export PATH=/usr/bin:/bin\n');
+    await withStep(host, { runtimeId: 'antigravity' }, (env) => {
+      for (const flags of ['-lc', '-ilc']) {
+        const query = [flags, 'git credential fill'];
+        expect(tool(env, installedShell('zsh'), query, QUERY), flags).toContain(
+          'password=host-secret',
+        );
+      }
+    });
+  });
+
   test.each([
     ['antigravity', '.gemini/antigravity-cli/antigravity-oauth-token'],
     ['gemini', '.gemini/oauth_creds.json'],
