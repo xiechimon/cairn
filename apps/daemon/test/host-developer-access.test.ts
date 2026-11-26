@@ -56,7 +56,7 @@ async function withStep(
   const hostEnv = { PATH: process.env.PATH, HOME: host.home, ...extraHostEnv };
   const step = prepareStepEnv(
     {
-      inherited: undefined,
+      inherited: extraHostEnv,
       git: null,
       readonlyGit: false,
       runtimeId: null,
@@ -212,6 +212,27 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
           expect(env.COREPACK_ENABLE_DOWNLOAD_PROMPT).toBe('0');
         });
       });
+    },
+  );
+
+  test.each(ISOLATED)(
+    '%s: login shells find the host sign-in when the host sets XDG_CONFIG_HOME and ZDOTDIR',
+    async (_name, patch) => {
+      const host = fakeHost();
+      const zdotdir = join(host.home, '.config', 'zsh');
+      mkdirSync(zdotdir);
+      writeFileSync(join(zdotdir, '.zprofile'), '');
+      await withStep(
+        host,
+        patch,
+        (env) => {
+          expect(ghToken(env)).toBe('fake-host-token');
+          for (const shell of LOGIN_SHELLS) {
+            expect(loginShellPassword(env, shell), shell).toContain('password=host-secret');
+          }
+        },
+        { XDG_CONFIG_HOME: join(host.home, '.config'), ZDOTDIR: zdotdir },
+      );
     },
   );
 

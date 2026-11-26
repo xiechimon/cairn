@@ -55,6 +55,13 @@ function replaceFile(path: string, content: string, mode: number): void {
   renameSync(staging, path);
 }
 
+function startupFilesUnder(isolatedHome: string, env: NodeJS.ProcessEnv): Record<string, string> {
+  return {
+    ...(env.XDG_CONFIG_HOME ? { XDG_CONFIG_HOME: join(isolatedHome, '.config') } : {}),
+    ...(env.ZDOTDIR ? { ZDOTDIR: isolatedHome } : {}),
+  };
+}
+
 function writeLoginProfile(home: string, relative: string, content: string): void {
   const path = join(realDirectory(home, dirname(relative)), basename(relative));
   if (lstatSync(path, { throwIfNoEntry: false })?.isDirectory()) {
@@ -99,7 +106,9 @@ export function developerAccessEnv(input: {
     return corepack;
   }
   mkdirSync(toolsDir, { recursive: true, mode: 0o700 });
-  const stepValues = { ...hostEnv, ...input.stepEnv, HOME: input.isolatedHome };
+  const inherited = { ...hostEnv, ...input.stepEnv };
+  const startupFiles = startupFilesUnder(input.isolatedHome, inherited);
+  const stepValues = { ...inherited, ...startupFiles, HOME: input.isolatedHome };
   const hostValues = { ...hostEnv, HOME: realHome };
   for (const name of HOST_SIGN_IN_TOOLS) {
     const executable = executableOnPath(name, searchPath);
@@ -112,6 +121,7 @@ export function developerAccessEnv(input: {
   }
   return {
     ...corepack,
+    ...startupFiles,
     [HOST_TOOLS_DIR_VAR]: toolsDir,
     PATH: `${toolsDir}${delimiter}${searchPath}`,
   };
