@@ -360,12 +360,7 @@ export function ensurePairRequest(): void {
   ) {
     return;
   }
-  if (
-    pairAttempt !== null &&
-    (pairAttempt.phase === 'requesting' || pairAttempt.phase === 'pending')
-  ) {
-    return;
-  }
+  if (pairAttempt !== null) return;
   pairAbort?.abort();
   const controller = new AbortController();
   pairAbort = controller;

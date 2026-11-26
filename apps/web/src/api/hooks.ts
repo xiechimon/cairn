@@ -701,6 +701,7 @@ export const useRemoteRoutes = (enabled: boolean) =>
     queryKey: ['remoteRoutes'],
     queryFn: () => api.get<RemoteRoutesResponse>('/api/remote/routes'),
     enabled,
+    retry: false,
     refetchInterval: (query) => {
       const state = query.state.data?.tailnet?.state;
       const transient = state === 'starting' || state === 'restarting' || state === 'needs-login';

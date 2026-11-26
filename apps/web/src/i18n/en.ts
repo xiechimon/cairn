@@ -2126,6 +2126,7 @@ export const EN: Record<string, string> = {
   '打开后，手机和其他电脑能通过你的 Tailscale 网络连到这台电脑':
     'Turn it on and phones and other computers can reach this computer over your Tailscale network.',
   '远程访问未能打开，请重试': 'Remote access did not turn on. Try again',
+  '远程访问状态加载失败，请重试': 'Could not load remote access status. Try again',
   这个安装没有附带远程访问组件: 'This install does not include the remote access component.',
   远程访问需要开启访问认证: 'Remote access needs access auth turned on.',
   '远程访问启动失败，请关闭后重新打开': 'Remote access failed to start. Turn it off and on again.',

@@ -1,8 +1,11 @@
 import type { RemoteRoute } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { isLoopbackOrigin, pairingCandidates } from '../src/lib/pairing-origin.js';
+import * as pairingOrigin from '../src/lib/pairing-origin.js';
+
+const { isLoopbackOrigin, pairingCandidates } = pairingOrigin;
 
 const lan: RemoteRoute = { kind: 'lan', url: 'http://192.168.1.20:8787' };
+const lanAlt: RemoteRoute = { kind: 'lan', url: 'http://10.0.0.5:8787' };
 const docker: RemoteRoute = { kind: 'lan', url: 'http://172.17.0.2:8787' };
 const tailnet: RemoteRoute = { kind: 'tailnet', url: 'https://box.tail1234.ts.net' };
 const origins = (routes: RemoteRoute[], page: string) =>
@@ -51,5 +54,21 @@ describe('pairing candidates', () => {
 
   test('tailnet page: no duplicate of the same origin', () => {
     expect(origins([tailnet], tailnet.url)).toEqual([tailnet.url]);
+  });
+
+  test('disambiguates duplicate route sources with their host while keeping unique sources concise', () => {
+    const t = (key: string) => key;
+    const single = pairingCandidates([tailnet, lan], 'http://127.0.0.1:8787');
+    expect(single.map((c) => pairingOrigin.pairingCandidateLabel(single, c, t))).toEqual([
+      'Tailscale',
+      '局域网',
+    ]);
+
+    const multiLan = pairingCandidates([tailnet, lan, lanAlt], 'http://127.0.0.1:8787');
+    expect(multiLan.map((c) => pairingOrigin.pairingCandidateLabel(multiLan, c, t))).toEqual([
+      'Tailscale',
+      '局域网 · 192.168.1.20:8787',
+      '局域网 · 10.0.0.5:8787',
+    ]);
   });
 });

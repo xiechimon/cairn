@@ -32,6 +32,26 @@ function isDockerBridgeOrigin(origin: string): boolean {
   return hostname !== null && DOCKER_DEFAULT_BRIDGE.test(hostname);
 }
 
+export function pairingCandidateLabel(
+  candidates: readonly PairingCandidate[],
+  candidate: PairingCandidate,
+  t: (key: string) => string,
+): string {
+  const base =
+    candidate.source === 'page'
+      ? t('当前页面地址')
+      : candidate.source === 'tailnet'
+        ? t('Tailscale')
+        : t('局域网');
+  const duplicateSource = candidates.filter((item) => item.source === candidate.source).length > 1;
+  if (!duplicateSource) return base;
+  try {
+    return `${base} · ${new URL(candidate.origin).host}`;
+  } catch {
+    return `${base} · ${candidate.origin}`;
+  }
+}
+
 export function pairingCandidates(routes: RemoteRoute[], pageOrigin: string): PairingCandidate[] {
   const candidates: PairingCandidate[] = [];
   const add = (origin: string, source: PairingCandidate['source']) => {

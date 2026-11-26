@@ -686,4 +686,49 @@ describe('the sign-in gate', () => {
     probe.resolve(unauthorized());
     await expect(pending).resolves.toMatchObject({ status: 401 });
   });
+
+  it('does not overwrite a denied pairing request when ensurePairRequest reruns until explicit retry', async () => {
+    vi.useFakeTimers();
+    let requestCount = 0;
+    const { calls } = transport({
+      [PROJECTS]: unauthorized,
+      [SESSION]: unauthorized,
+      '/api/remote/pair/request': () => {
+        requestCount += 1;
+        return Response.json(
+          {
+            id: `req-${requestCount}`,
+            secret: `sec-${requestCount}`,
+            code: requestCount === 1 ? 'ABCD2345' : 'WXYZ6789',
+            expiresAt: Date.now() + 60_000,
+          },
+          { status: 201 },
+        );
+      },
+      '/api/remote/pair/claim': () => Response.json({ status: 'denied' }),
+    });
+
+    const pending = request(PROJECTS);
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(pending).resolves.toMatchObject({ status: 401 });
+    expect(auth.authSnapshot().gateOpen).toBe(true);
+
+    auth.ensurePairRequest();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(auth.authSnapshot().pair).toMatchObject({ phase: 'pending', code: 'ABCD2345' });
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(auth.authSnapshot().pair).toMatchObject({ phase: 'denied', code: 'ABCD2345' });
+
+    auth.ensurePairRequest();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(requestCount).toBe(1);
+    expect(auth.authSnapshot().pair).toMatchObject({ phase: 'denied', code: 'ABCD2345' });
+
+    auth.requestNewPairAttempt();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(requestCount).toBe(2);
+    expect(calls().filter((path) => path === '/api/remote/pair/request')).toHaveLength(2);
+    expect(auth.authSnapshot().pair).toMatchObject({ phase: 'pending', code: 'WXYZ6789' });
+  });
 });

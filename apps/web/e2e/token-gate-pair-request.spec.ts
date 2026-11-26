@@ -182,3 +182,127 @@ test('the pairing-off note explains the grant fallback only when no request wait
     await owner.close();
   }
 });
+
+test('remote access: awaiting tailnet login suppresses pairing-blocked notice, surfaces clipboard failure, and disambiguates duplicate LAN routes', async ({
+  browser,
+}) => {
+  const owner = await browser.newContext({
+    extraHTTPHeaders: { authorization: `Bearer ${GATE_TOKEN}` },
+  });
+  const page = await owner.newPage();
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: () => Promise.reject(new Error('clipboard blocked')),
+      },
+    });
+  });
+  let phase: 'needs-login' | 'multi-lan' = 'needs-login';
+  await page.route('**/api/remote/routes', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        phase === 'needs-login'
+          ? {
+              environmentId: 'e2e-env',
+              routes: [],
+              tailnet: {
+                enabled: true,
+                state: 'needs-login',
+                dnsName: null,
+                ips: [],
+                authUrl: 'https://login.tailscale.com/a/e2e-test',
+                error: null,
+              },
+            }
+          : {
+              environmentId: 'e2e-env',
+              routes: [
+                { kind: 'lan', url: 'http://192.168.1.20:8787' },
+                { kind: 'lan', url: 'http://10.0.0.5:8787' },
+              ],
+              tailnet: {
+                enabled: false,
+                state: 'off',
+                dnsName: null,
+                ips: [],
+                authUrl: null,
+                error: null,
+              },
+            },
+      ),
+    }),
+  );
+  await page.route('**/api/remote/pairing-requests', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  );
+  try {
+    await page.goto(`${server.base}/app/settings/remote`);
+    await expect(page.getByTestId('tailnet-login')).toBeVisible();
+    await expect(page.getByTestId('pairing-blocked')).toHaveCount(0);
+
+    await page.getByTestId('tailnet-login').getByRole('button', { name: '复制链接' }).click();
+    await expect(page.getByText('复制失败，请重试。')).toBeVisible();
+
+    phase = 'multi-lan';
+    await page.reload();
+    await page.getByTestId('pair-new-device').click();
+    await page.getByTestId('pairing-route-select').click();
+    await expect(page.getByRole('option', { name: /192\.168\.1\.20:8787/ })).toBeVisible();
+    await expect(page.getByRole('option', { name: /10\.0\.0\.5:8787/ })).toBeVisible();
+  } finally {
+    await owner.close();
+  }
+});
+
+test('remote access: routes load failure disables the switch and offers retry', async ({
+  browser,
+}) => {
+  const owner = await browser.newContext({
+    extraHTTPHeaders: { authorization: `Bearer ${GATE_TOKEN}` },
+  });
+  const page = await owner.newPage();
+  let failRoutes = true;
+  await page.route('**/api/remote/routes', (route) => {
+    if (failRoutes) {
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'boom' }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        environmentId: 'e2e-env',
+        routes: [{ kind: 'lan', url: 'http://192.168.1.20:8787' }],
+        tailnet: {
+          enabled: false,
+          state: 'off',
+          dnsName: null,
+          ips: [],
+          authUrl: null,
+          error: null,
+        },
+      }),
+    });
+  });
+  await page.route('**/api/remote/pairing-requests', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  );
+  try {
+    await page.goto(`${server.base}/app/settings/remote`);
+    await expect(page.getByTestId('remote-routes-error')).toBeVisible();
+    await expect(page.getByTestId('remote-access-switch')).toBeDisabled();
+
+    failRoutes = false;
+    await page.getByTestId('remote-routes-retry').click();
+    await expect(page.getByText('http://192.168.1.20:8787')).toBeVisible();
+    await expect(page.getByTestId('remote-access-switch')).toBeEnabled();
+  } finally {
+    await owner.close();
+  }
+});

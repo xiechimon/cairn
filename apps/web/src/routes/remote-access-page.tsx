@@ -1,7 +1,7 @@
 import { type PairingCodeResponse, pairingLink } from '@cairn/shared';
 import { Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { signOutSession } from '../api/auth.js';
 import {
@@ -34,7 +34,11 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { loadClerkScript } from '../lib/clerk-loader.js';
 import { copyTextWithFeedback } from '../lib/clipboard.js';
-import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
+import {
+  type PairingCandidate,
+  pairingCandidateLabel,
+  pairingCandidates,
+} from '../lib/pairing-origin.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { pairRequestSourceLabel } from '../overlay/pairing-request-banner.js';
 import { PageShell } from '../pages/shell.js';
@@ -42,22 +46,17 @@ import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resour
 
 export const REMOTE_ACCESS_ROUTE = 'remote-access';
 
-function sourceName(source: PairingCandidate['source'], t: (key: string) => string): string {
-  if (source === 'page') return t('当前页面地址');
-  return source === 'tailnet' ? t('Tailscale') : t('局域网');
-}
-
 function displayPairCode(code: string): string {
   return code.length > 4 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
 }
 
-function sourceLabel(
+function selectedCandidateLabel(
   candidates: PairingCandidate[],
   origin: string,
   t: (key: string) => string,
 ): string {
   const found = candidates.find((candidate) => candidate.origin === origin);
-  return found === undefined ? origin : sourceName(found.source, t);
+  return found === undefined ? origin : pairingCandidateLabel(candidates, found, t);
 }
 
 function PairingDialog({
@@ -113,12 +112,12 @@ function PairingDialog({
             }}
           >
             <SelectTrigger className="w-full max-w-72" data-testid="pairing-route-select">
-              <SelectValue>{sourceLabel(candidates, origin, t)}</SelectValue>
+              <SelectValue>{selectedCandidateLabel(candidates, origin, t)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {candidates.map((candidate) => (
                 <SelectItem key={candidate.origin} value={candidate.origin}>
-                  {sourceName(candidate.source, t)}
+                  {pairingCandidateLabel(candidates, candidate, t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -148,6 +147,14 @@ export function RemoteAccessPage() {
   const [toggleFailed, setToggleFailed] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [loginCopied, setLoginCopied] = useState(false);
+  const loginCopyTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (loginCopyTimerRef.current !== null) window.clearTimeout(loginCopyTimerRef.current);
+    },
+    [],
+  );
+  const routesFailed = live && routesQ.isError && routesQ.data === undefined;
   const routes = routesQ.data?.routes ?? [];
   const candidates =
     routesQ.data === undefined ? [] : pairingCandidates(routes, window.location.origin);
@@ -162,6 +169,9 @@ export function RemoteAccessPage() {
       ? `https://${tailnet.dnsName}`
       : null;
   const tailnetHint: ReactNode = (() => {
+    if (routesFailed) {
+      return <span data-testid="remote-routes-error">{t('远程访问状态加载失败，请重试')}</span>;
+    }
     if (!tailnetOn)
       return toggleFailed
         ? t('远程访问未能打开，请重试')
@@ -307,11 +317,23 @@ export function RemoteAccessPage() {
           <SettingsRow
             label={t('远程访问')}
             hint={tailnetHint}
-            hintClassName={tailnetFailed ? 'text-destructive' : undefined}
+            hintClassName={tailnetFailed || routesFailed ? 'text-destructive' : undefined}
           >
+            {routesFailed && (
+              <Button
+                size="sm"
+                variant="outline"
+                className={DIALOG_PRIMARY_BUTTON}
+                data-testid="remote-routes-retry"
+                disabled={routesQ.isFetching}
+                onClick={() => void routesQ.refetch()}
+              >
+                {t('重试')}
+              </Button>
+            )}
             <ToggleSwitch
               checked={tailnetOn}
-              disabled={!live || setTailnet.isPending}
+              disabled={!live || routesQ.data === undefined || setTailnet.isPending}
               aria-label={t('远程访问')}
               data-testid="remote-access-switch"
               onCheckedChange={(checked) => {
@@ -336,10 +358,21 @@ export function RemoteAccessPage() {
                   variant="outline"
                   className={DIALOG_PRIMARY_BUTTON}
                   onClick={() => {
-                    copyTextWithFeedback(loginUrl, () => {
-                      setLoginCopied(true);
-                      setTimeout(() => setLoginCopied(false), 2_000);
-                    });
+                    copyTextWithFeedback(
+                      loginUrl,
+                      () => {
+                        setLoginCopied(true);
+                        toastSuccess(t('已复制链接'));
+                        if (loginCopyTimerRef.current !== null) {
+                          window.clearTimeout(loginCopyTimerRef.current);
+                        }
+                        loginCopyTimerRef.current = window.setTimeout(() => {
+                          loginCopyTimerRef.current = null;
+                          setLoginCopied(false);
+                        }, 2_000);
+                      },
+                      (error) => toastError(t('复制失败，请重试。'), error),
+                    );
                   }}
                 >
                   {loginCopied ? t('已复制') : t('复制链接')}
@@ -349,13 +382,16 @@ export function RemoteAccessPage() {
           )}
         </SettingsCard>
       )}
-      {pairingBlocked && requestsQ.data !== undefined && requests.length === 0 && (
-        <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
-          {t(
-            '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。',
-          )}
-        </p>
-      )}
+      {pairingBlocked &&
+        !awaitingTailnetLogin &&
+        requestsQ.data !== undefined &&
+        requests.length === 0 && (
+          <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
+            {t(
+              '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。',
+            )}
+          </p>
+        )}
       {live && routesQ.data === undefined ? null : pairingBlocked && !awaitingTailnetLogin ? (
         devices.length === 0 && (
           <p className="m-0 mt-3 text-meta text-content-tertiary" data-testid="remote-routes-empty">

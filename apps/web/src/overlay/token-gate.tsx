@@ -246,7 +246,10 @@ export function TokenGate() {
   }, []);
 
   useEffect(() => {
-    if (!auth.gateOpen) return;
+    if (!auth.gateOpen) {
+      setClerkConfig(null);
+      return;
+    }
     let active = true;
     void fetchClerkAuthConfig().then((cfg) => {
       if (active) setClerkConfig(cfg);
@@ -374,7 +377,7 @@ export function TokenGate() {
             </Button>
           ) : (
             <p
-              className="m-0 flex items-center justify-center gap-2 text-center text-meta text-content-tertiary"
+              className="m-0 flex items-center justify-center gap-2 text-center text-meta text-content-tertiary tabular-nums"
               role="status"
             >
               <RingSpinner aria-hidden="true" className="size-4" />
