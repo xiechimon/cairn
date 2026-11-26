@@ -35,6 +35,12 @@
       "pattern": "chief-turn-waiting-to-retry|CHIEF_TURN_WAITING_TO_RETRY",
       "canary": "chief-turn-waiting-to-retry",
       "reason": "Stop ends a turn that waits to run again; docs/design/chief-stop-visibility.md describes it"
+    },
+    {
+      "id": "spec22-retirement-table",
+      "pattern": "\\bspec[/ ]22 §\\s?5",
+      "canary": "spec/22 §5",
+      "reason": "section 5 of spec 22 was deleted; the component under apps/web/src/components/ui is the canon"
     }
   ],
   "baseline": {
@@ -74,6 +80,7 @@
     },
     "design-rules-file": {},
     "doc-drift-sweep": {},
-    "chief-stop-waiting-to-retry": {}
+    "chief-stop-waiting-to-retry": {},
+    "spec22-retirement-table": {}
   }
 }

@@ -64,7 +64,7 @@ The rows below are the process rules; the rows for a surface live in the `## Rul
 |---|---|---|
 | Button / icon button | `components/ui/button.tsx` | Do not write a new `<button>` + homemade classes |
 | Input (with button/icon: `components/ui/input-group.tsx`) / multi-line input | `components/ui/input.tsx` / `components/ui/textarea.tsx` | Do not place a bare `<input>` / `<textarea>` (except deliberate-native markings); do not stuff a bare `Input` into a homemade composition box |
-| Task-status chip (five states) | `components/ui/status-chip.tsx` (retirement canonical table = spec/22 §5, #942) | Do not write a new `.chip--*` class family (pinned by ui-drift-gate G3) |
+| Task-status chip (five states) | `components/ui/status-chip.tsx` | Do not write a new `.chip--*` class family (pinned by ui-drift-gate G3) |
 | Switch / tabs | `components/ui/switch.tsx` / `components/ui/tabs.tsx` | — |
 | Count / label pill | `components/ui/badge.tsx` (the status color family) | The five task states go through `status-chip.tsx`; do not mix the two vehicles |
 | Empty state | `components/ui/empty.tsx` | Do not hand-write an empty-state copy block per site |

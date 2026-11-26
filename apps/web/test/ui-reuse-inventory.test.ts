@@ -55,7 +55,7 @@ describe('component inventory in sync with source (src/components/ui/INVENTORY.m
   it('old track fully retired: src/ui/ must not resurrect (#952 final state, new pieces all land on the new track)', () => {
     expect(
       existsSync(OLD_TRACK_DIR),
-      'src/ui/ 已随 #952 整目录删除（chip/input/dialog 消费点清零，spec/22 §5 退役正典表执行完毕）。' +
+      'src/ui/ 已随 #952 整目录删除（chip/input/dialog 消费点清零）。' +
         '目录不得复活——新件一律落 src/components/ui/（shadcn + Base UI 基）。',
     ).toBe(false);
     const added = onDiskOld.filter((f) => !listedFrozen.includes(f));

@@ -9,7 +9,7 @@
 | Track | Location | State |
 |---|---|---|
 | **The only track** | `src/components/ui/` | **All new code lands here.** shadcn pieces + Base UI base (#410 ruling), with in-repo deviation records |
-| ~~Old track~~ | ~~`src/ui/`~~ | **Deleted as a whole directory (#952, the spec/22 §5 retirement canonical table fully executed)**: `chip`→`status-chip.tsx` (#942), `input`→`components/ui/input.tsx` (#944), the `dialog.css` form family → equivalent utility-class migration + the `dialog-shell.tsx` mechanism inlined (#952). Machine gates pin the directory against resurrecting |
+| ~~Old track~~ | ~~`src/ui/`~~ | **Deleted as a whole directory (#952)**: `chip`→`status-chip.tsx` (#942), `input`→`components/ui/input.tsx` (#944), the `dialog.css` form family → equivalent utility-class migration + the `dialog-shell.tsx` mechanism inlined (#952). Machine gates pin the directory against resurrecting |
 | Overlay family | `src/overlay/` | Mounts on the shared shell (see section three); **never hand-roll OverlayMount + useEscClose** |
 
 <!-- inventory:old-track-frozen -->
@@ -34,7 +34,7 @@ card.tsx
 checkbox.tsx             # checkbox (registry-same-source + a one-piece zero-skin semantic mapping: indeterminate renders a dash, #952/#982); the row box = the consumer's label wrap; **do not place a bare `<input type="checkbox">`** — the browser's built-in box is a different family from the in-repo checkbox row
 collapsible.tsx          # Base UI Collapsible (Root/Trigger/Content, registry-same-source): the registryDependency of trace.tsx; reach for Trace first when the disclosure is an activity line
 context-menu.tsx         # Base UI ContextMenu in the dropdown-menu skin (MENU_SURFACE_CLS / MENU_ITEM_CLS): opens on right click or a 500ms touch long press at the press point; the Coordinator reply's press menu (copy / select text) on touch and narrow windows
-dialog-shell.tsx         # shared dialog base (e2e vehicle = role=dialog accessible name + dialog-head/-body/-foot testids, spec/22 §5.5)
+dialog-shell.tsx         # shared dialog base (e2e vehicle = role=dialog accessible name + dialog-head/-body/-foot testids)
 dialog.tsx
 dropdown-menu.tsx        # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733), Content exposes anchor (#454); open motion retimed to --ease-out-expo at 100ms (owner motion pick), close stays instant via motion.css [data-closed]
 empty.tsx
@@ -53,10 +53,10 @@ select.tsx               # single-select dropdown (registry-same-source compound
 separator.tsx            # semantic divider (registryDependency of field.tsx): replaces <hr> and border-t divs
 skeleton.tsx             # first-load placeholder drawn in the card shape while data has not arrived; use it instead of a spinner or empty copy (no existing primitive covers this)
 spinner.tsx              # upstream registry spinner (pristine, not used in product code — busy indicators use ring-spinner.tsx)
-status-chip.tsx          # the five-state task-status chip (idle/plan/confirm/done/failed, skin = --chip-* token pairs); lands on badge.tsx, the state vehicle is data-tone; replaces the old-track ui/chip.tsx (canonical table spec/22 §5.2, #942)
+status-chip.tsx          # the five-state task-status chip (idle/plan/confirm/done/failed, skin = --chip-* token pairs); lands on badge.tsx, the state vehicle is data-tone; replaces the old-track ui/chip.tsx (#942)
 switch.tsx
 tabs.tsx                 # default/line tiers ride the upstream native data-[variant] mechanism + zero-chrome TabsIndicator pass-through (#644, keep-or-go belongs to #1009); the segmented/bare hand-written tiers are retired (#991), the segmented control skin = the SEG_* recipes in pages/parts.ts
-textarea.tsx             # multi-line input (registry-same-source); **do not place a bare `<textarea>`** — the old .dlg-form-textarea family is retired (spec/22 §5.3)
+textarea.tsx             # multi-line input (registry-same-source); **do not place a bare `<textarea>`** — the old .dlg-form-textarea family is retired
 toaster.tsx              # toast primitive (sonner, the official shadcn recipe; #631): mount <Toaster /> once at the App root, then imperative `toast.*` anywhere; **do not build another silent catch for failure feedback** — exceptions/toasts always go through it
 tooltip.tsx              # hover/focus info bubble (official-site form; z goes through the single --z-dialog ladder); the shortcut hint chip = the Tooltip+Kbd composition (#983 ruling, landed in #1008, kbd-hint.tsx retired); the App root already mounts a site-wide TooltipProvider (delay=0)
 trace.tsx                # shadcn Trace family (Trace/Line/Icon/Title/Description/Collapsible/Trigger/Content): agent activity lines (tool calls, thinking, waiting) with status running/error/pending and a collapsible detail; do not hand-write tool-call rows in chat files
@@ -72,7 +72,7 @@ trace.tsx                # shadcn Trace family (Trace/Line/Icon/Title/Descriptio
 | Button / icon button | `components/ui/button.tsx` | Do not write a new `<button>` + homemade classes |
 | Input | `components/ui/input.tsx` | Do not place a bare `<input>` (except deliberate-native markings) |
 | Multi-line input | `components/ui/textarea.tsx` | Do not place a bare `<textarea>` / do not keep using the old `.dlg-form-textarea` classes |
-| Task-status chip (five states) | `components/ui/status-chip.tsx` (retirement canonical table = spec/22 §5, #942) | Do not write a new `.chip--*` class family (pinned by ui-drift-gate G3) |
+| Task-status chip (five states) | `components/ui/status-chip.tsx` | Do not write a new `.chip--*` class family (pinned by ui-drift-gate G3) |
 | Switch | `components/ui/switch.tsx` | — |
 | Tabs | `components/ui/tabs.tsx` | — |
 | Count / label pill | `components/ui/badge.tsx` (the status color family) | The five task states go through `status-chip.tsx`; do not mix the two vehicles |
