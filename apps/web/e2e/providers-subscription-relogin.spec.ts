@@ -353,6 +353,7 @@ test('other expired or unauthenticated subscription cards (Claude, Devin, Codex)
 
   await page.locator('[data-instance-id="subscription:devin-exp"]').click();
   await expect(page).toHaveURL(/item=subscription(%3A|:)devin-exp/);
+  await expect(page.getByTestId('subscription-detail')).toHaveAttribute('data-account-id', 'devin-exp');
   await page.getByTestId('subscription-sign-in-again').click();
   const devinDialog = page.getByRole('dialog', { name: '重新登录 Devin' });
   await expect(devinDialog).toBeVisible();
