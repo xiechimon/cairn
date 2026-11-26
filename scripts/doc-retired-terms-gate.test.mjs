@@ -179,6 +179,22 @@ test('writing the baseline shrinks counts and refuses growth', () => {
   assert.throws(() => nextBaseline({ terms: [term], baseline: clean }, counts(1)), /refuses/);
 });
 
+test('without a base commit the committed count is still the limit', (t) => {
+  const r = repo(t, base, registry);
+  assert.deepEqual(checkRepo(r.root, null).failures, []);
+  r.write({ 'docs/ops/a.md': 'Never push queue/main. Or queue/main.\n' });
+  assert.match(checkRepo(r.root, null).failures.join('\n'), /a\.md has 2 .* 1 allowed/);
+});
+
+test('scanning no living document at all is red', (t) => {
+  const r = repo(
+    t,
+    { 'docs/research/r.md': 'x\n' },
+    { terms: [term], baseline: { 'manual-queue': {} } },
+  );
+  assert.match(r.check(), /no living document found/);
+});
+
 test('the command CI runs fails on a mention the base commit does not have', (t) => {
   const r = repo(t, base, registry);
   mkdirSync(join(r.root, 'scripts'), { recursive: true });
