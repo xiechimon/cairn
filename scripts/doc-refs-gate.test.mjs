@@ -157,7 +157,7 @@ function repo(t) {
   });
   git('commit', '-q', '-m', 'base');
   assert.equal(run().status, 0, run().stderr);
-  return { root, git, write, baseline, rows, run };
+  return { root, env, git, write, baseline, rows, run };
 }
 
 test('a record may carry a broken reference, and --report still lists it', (t) => {
@@ -320,6 +320,26 @@ test('moving a living doc into docs/ops/archive does not hide a reference it bre
   const result = r.run();
   assert.equal(result.status, 1);
   assert.match(result.stderr, /docs\/ops\/archive\/a\.md:4 path does not resolve/);
+});
+
+test('moving a judged document outside the living list does not hide a reference it breaks', (t) => {
+  const r = repo(t);
+  r.write({ 'packages/x/README.md': SPEC.replace('`scripts/old.mjs`', 'the package') });
+  r.git('commit', '-q', '-m', 'package readme');
+  mkdirSync(join(r.root, 'docs/research'), { recursive: true });
+  r.git('mv', 'packages/x/README.md', 'docs/research/x.md');
+  r.write({
+    'docs/research/x.md': `${SPEC.replace('`scripts/old.mjs`', 'the package')}${BROKEN}`,
+  });
+  assert.equal(r.run().status, 1);
+});
+
+test('without a base commit a reference missing from the baseline is still red', (t) => {
+  const r = repo(t);
+  r.env.PREPUSH_BASE_SHA = '0'.repeat(40);
+  assert.equal(r.run().status, 0, r.run().stderr);
+  r.write({ 'docs/spec/b.md': BROKEN });
+  assert.equal(r.run().status, 1);
 });
 
 test('--report marks which broken references sit in records', (t) => {

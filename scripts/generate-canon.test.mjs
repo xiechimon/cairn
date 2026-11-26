@@ -140,6 +140,20 @@ for (const [name, change, message] of [
     { rulings: [{ ...row, spec: 'docs/research/x.md' }], research: goodSpec, spec: '# 18\n' },
     /must be under docs\/spec\//,
   ],
+  [
+    'a row climbs out of the spec folder',
+    {
+      rulings: [{ ...row, spec: 'docs/spec/../research/x.md' }],
+      research: goodSpec,
+      spec: '# 18\n',
+    },
+    /must be under docs\/spec\//,
+  ],
+  [
+    'a row points at a folder that only shares the prefix',
+    { rulings: [{ ...row, spec: 'docs/spec-old/x.md' }] },
+    /must be under docs\/spec\//,
+  ],
   ['the mark moved to another spec', { spec: '# 18\n', other: goodSpec }, /belongs in/],
 ]) {
   test(`--check is red when ${name}`, (t) => {
