@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { devNull, tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const FOUND = 1;
@@ -60,6 +67,8 @@ function withBareCopy(source, use) {
   try {
     git(copy, ['init', '--quiet', '--bare', '--template=', '.'], isolatedEnv());
     writeFileSync(join(copy, 'objects', 'info', 'alternates'), `${join(source, 'objects')}\n`);
+    const shallow = join(source, 'shallow');
+    if (existsSync(shallow)) copyFileSync(shallow, join(copy, 'shallow'));
     return use(copy, (...args) => git(copy, args, isolatedEnv()));
   } finally {
     rmSync(copy, { recursive: true, force: true });
@@ -70,14 +79,15 @@ function scanRange(copy, run, base, head) {
   const committed = run('ls-tree', '--name-only', head, '--', IGNORE_FILE)
     ? run('cat-file', 'blob', `${head}:${IGNORE_FILE}`)
     : '';
-  const entries = committed.split('\n').filter((line) => line.trim() && !line.startsWith('#'));
-  const unpinned = entries.find((line) => !PINNED_ENTRY.test(line));
-  if (unpinned)
+  const lines = committed.split('\n');
+  const isEntry = (line) => line.trim() && !line.startsWith('#');
+  const unpinned = lines.findIndex((line) => isEntry(line) && !PINNED_ENTRY.test(line));
+  if (unpinned >= 0)
     return {
       code: COULD_NOT_RUN,
-      message: `every ${IGNORE_FILE} entry must start with the commit it excuses, or it hides later secrets: ${unpinned}`,
+      message: `line ${unpinned + 1} of ${IGNORE_FILE} is not shown: every entry must start with the commit it excuses, or it hides later secrets. If that line holds a secret, treat it as leaked: rotate it first, then remove it from every commit that holds it.`,
     };
-  writeFileSync(join(copy, IGNORE_FILE), `${entries.join('\n')}\n`);
+  writeFileSync(join(copy, IGNORE_FILE), `${lines.filter(isEntry).join('\n')}\n`);
   const range = `${base}..${head}`;
   const label = `${base.slice(0, 9)}..${head.slice(0, 9)}`;
   if (run('rev-list', '--min-parents=3', range))
@@ -103,7 +113,7 @@ export function scanBranch(cwd) {
   return withBareCopy(source, (copy, run) => {
     let base;
     try {
-      const main = git(cwd, ['rev-parse', '--verify', 'origin/main^{commit}']);
+      const main = git(cwd, ['rev-parse', '--verify', 'refs/remotes/origin/main^{commit}']);
       base = run('merge-base', head, main);
     } catch {
       return { code: COULD_NOT_RUN, message: 'no merge-base with origin/main' };
@@ -112,7 +122,7 @@ export function scanBranch(cwd) {
   });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const result = scanBranch(process.cwd());
   if (result.output) process.stdout.write(result.output);
   if (result.code === 0) console.log(`[secret-scan] ${result.message}`);

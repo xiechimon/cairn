@@ -6,6 +6,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -95,6 +96,48 @@ test('no merge-base is red before gitleaks runs', (t) => {
   assert.equal(run.status, 2);
   assert.match(run.stderr, /no merge-base with origin\/main/);
   assert.equal(existsSync(argsFile), false);
+});
+
+test('a local branch or tag named origin/main cannot move the start of the scan', (t) => {
+  for (const shadow of ['branch', 'tag']) {
+    const { base, git, argsFile, addCommit, stubbed } = fixture(t);
+    addCommit('lane.txt', 'lane work\n');
+    git(shadow, 'origin/main');
+    assert.equal(stubbed({ exit: 0 }).status, 0);
+    assert.ok(readFileSync(argsFile, 'utf8').includes(` ${base}..`), shadow);
+  }
+});
+
+test('an ignore entry that may be a pasted secret is named by line number only', (t) => {
+  const { addCommit, stubbed } = fixture(t);
+  const pasted = generatedKey();
+  addCommit('.gitleaksignore', `# reviewed\n\n${pasted}\n`);
+  const run = stubbed({ exit: 0 });
+  assert.equal(run.status, 2);
+  assert.equal(`${run.stdout}${run.stderr}`.includes(pasted), false);
+  assert.match(run.stderr, /line 3 .*must start with the commit.*rotate it first/is);
+});
+
+test('a shallow clone is scanned from its merge-base', (t) => {
+  const { repo, git, addCommit, stubbed } = fixture(t);
+  addCommit('main.txt', 'main\n');
+  git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  const main = git('rev-parse', 'HEAD');
+  const cutOff = git('rev-parse', 'HEAD~1');
+  writeFileSync(join(repo, '.git', 'shallow'), `${main}\n`);
+  rmSync(join(repo, '.git', 'objects', cutOff.replace(/^(..)/, '$1/')));
+  addCommit('lane.txt', 'lane work\n');
+  const run = stubbed({ exit: 0 });
+  assert.equal(run.status, 0, run.stderr);
+});
+
+test('started through a symlinked path it still scans instead of exiting quietly', (t) => {
+  const { repo, bin, git } = fixture(t);
+  git('update-ref', '-d', 'refs/remotes/origin/main');
+  const link = join(bin, 'scan-link.mjs');
+  symlinkSync(SCRIPT, link);
+  const run = spawnSync(process.execPath, [link], { cwd: repo, encoding: 'utf8' });
+  assert.equal(run.status, 2, `${run.stdout}${run.stderr}`);
 });
 
 test('a missing gitleaks is red and says how to install it', (t) => {
