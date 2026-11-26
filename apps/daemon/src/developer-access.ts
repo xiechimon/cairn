@@ -64,6 +64,10 @@ function startupFilesUnder(isolatedHome: string, env: NodeJS.ProcessEnv): Record
   };
 }
 
+function ghConfigUnder(isolatedHome: string, env: NodeJS.ProcessEnv): Record<string, string> {
+  return env.GH_CONFIG_DIR ? { GH_CONFIG_DIR: join(isolatedHome, '.config', 'gh') } : {};
+}
+
 function writeLoginProfile(home: string, relative: string, content: string): void {
   const path = join(realDirectory(home, dirname(relative)), basename(relative));
   if (lstatSync(path, { throwIfNoEntry: false })?.isDirectory()) {
@@ -104,12 +108,13 @@ export function developerAccessEnv(input: {
       hostEnv.COREPACK_HOME ||
       join(hostEnv.XDG_CACHE_HOME || join(realHome, '.cache'), 'node', 'corepack'),
   };
-  if (input.readonlyGit || toolsDir === undefined || !existsSync(input.isolatedHome)) {
-    return corepack;
-  }
-  mkdirSync(toolsDir, { recursive: true, mode: 0o700 });
   const inherited = { ...hostEnv, ...input.stepEnv };
   const startupFiles = startupFilesUnder(input.isolatedHome, inherited);
+  if (input.readonlyGit) {
+    return { ...corepack, ...startupFiles, ...ghConfigUnder(input.isolatedHome, inherited) };
+  }
+  if (toolsDir === undefined || !existsSync(input.isolatedHome)) return corepack;
+  mkdirSync(toolsDir, { recursive: true, mode: 0o700 });
   const stepValues = { ...inherited, ...startupFiles, HOME: input.isolatedHome };
   const hostValues = { ...hostEnv, HOME: realHome };
   for (const name of HOST_SIGN_IN_TOOLS) {

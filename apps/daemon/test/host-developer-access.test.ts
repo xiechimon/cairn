@@ -225,6 +225,30 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
   );
 
   test.each(ISOLATED)(
+    '%s: a read-only step cannot reach the host sign-in through host config variables',
+    async (_name, patch) => {
+      const host = fakeHost();
+      const config = join(host.home, '.config');
+      await withStep(
+        host,
+        { ...patch, readonlyGit: true },
+        (env) => {
+          expect(ghToken(env)).not.toBe('fake-host-token');
+        },
+        { XDG_CONFIG_HOME: config, GH_CONFIG_DIR: join(config, 'gh') },
+      );
+      await withStep(
+        host,
+        { ...patch, readonlyGit: true },
+        (env) => {
+          expect(ghToken(env)).not.toBe('fake-host-token');
+        },
+        { XDG_CONFIG_HOME: config },
+      );
+    },
+  );
+
+  test.each(ISOLATED)(
     '%s: login shells find the host sign-in when the host sets XDG_CONFIG_HOME and ZDOTDIR',
     async (_name, patch) => {
       const host = fakeHost();
