@@ -284,7 +284,8 @@ export function ChiefConversation({
         ? minimizedQuestion.placeholder
         : chief.outage != null
           ? t('可以继续说，恢复后按顺序处理')
-          : chief.waitingTurn !== undefined
+          : chief.waitingTurn !== undefined ||
+              (chief.running === true && chief.noRunningTurn === true)
             ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
             : chief.running === true
               ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)

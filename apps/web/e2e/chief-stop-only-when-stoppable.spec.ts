@@ -45,6 +45,10 @@ for (const [name, thread] of [
     ]);
     await expect(page.getByText('上一轮回复。')).toBeVisible();
     await expect(page.getByTestId('chief-composer-stop')).toHaveCount(0);
+    await expect(page.getByTestId('chief-composer-input')).toHaveAttribute(
+      'placeholder',
+      '尚未开始，新消息会排在后面',
+    );
     await pressEscape(page);
     await page.waitForTimeout(300);
     expect(stops).toEqual([]);
