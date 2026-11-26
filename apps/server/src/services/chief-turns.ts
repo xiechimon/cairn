@@ -66,6 +66,10 @@ function liveChiefSteps(db: Db, threadId: string): StepRow[] {
     .all();
 }
 
+export function hasRunningChiefTurn(db: Db, threadId: string): boolean {
+  return liveChiefSteps(db, threadId).some((row) => row.status === 'claimed');
+}
+
 export function isParkedChiefStep(row: StepRow, now: number): boolean {
   if (row.status === 'waiting_quota') return true;
   return (

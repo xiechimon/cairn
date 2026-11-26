@@ -2594,6 +2594,7 @@ export function mapChief(
         ? { runningTool: active.activeRun.tool.toolName }
         : {}),
     ...(waitingTurn !== undefined ? { waitingTurn } : {}),
+    ...(active?.turnRunning === false ? { noRunningTurn: true } : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
     ...(env.outage != null ? { outage: env.outage } : {}),
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),

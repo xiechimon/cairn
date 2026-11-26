@@ -99,6 +99,7 @@ import {
   chiefPendingMessages,
   chiefThreadFallbackModel,
   endDeadChiefTurn,
+  hasRunningChiefTurn,
   settleChiefActiveRun,
   steerChiefMessage,
   stopAbandonedChiefTurn,
@@ -601,6 +602,13 @@ export function toChiefThreadRecord(
   };
 }
 
+function toLiveChiefThreadRecord(db: Db, teamId: string, row: ThreadRow): ChiefThread {
+  return {
+    ...toChiefThreadRecord(row, stepQueueProjector(db, teamId).chiefTurnQueueOf(row.id)),
+    turnRunning: hasRunningChiefTurn(db, row.id),
+  };
+}
+
 export const COORDINATOR_THREAD_TITLE = 'Coordinator';
 
 function insertCoordinatorThread(
@@ -886,7 +894,7 @@ function dropUnstartedGreeting(db: Db, threadId: string): void {
 
 export function chiefThreadView(deps: ChiefDeps, teamId: string, r: ThreadRow): ChiefThread {
   const record = {
-    ...toChiefThreadRecord(r, stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(r.id)),
+    ...toLiveChiefThreadRecord(deps.db, teamId, r),
     pending: chiefPendingMessages(deps.db, r.id),
     fallbackModel: chiefThreadFallbackModel(deps.db, r.id),
   };
@@ -1153,10 +1161,7 @@ function chiefSendResult(
   message: ChiefSendResult['message'],
 ): ChiefSendResult {
   return {
-    thread: toChiefThreadRecord(
-      threadRow,
-      stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(threadRow.id),
-    ),
+    thread: toLiveChiefThreadRecord(deps.db, teamId, threadRow),
     message,
   };
 }
@@ -1517,7 +1522,7 @@ export function rewindChiefThread(
     if (!fresh) throw new Error('chief thread missing after rewind');
     return {
       deletedCount: doomedIds.length,
-      thread: toChiefThreadRecord(fresh, stepQueueProjector(tx, teamId).chiefTurnQueueOf(threadId)),
+      thread: toLiveChiefThreadRecord(tx, teamId, fresh),
     };
   });
   deps.convHub?.clearConversationBuffer(threadId);

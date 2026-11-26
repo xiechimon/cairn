@@ -779,6 +779,7 @@ export interface ChiefContent {
   running?: boolean;
   runningTool?: string;
   waitingTurn?: { messageId: string; text: string };
+  noRunningTurn?: boolean;
   outage?: ChiefOutage;
   fallbackModel?: string;
   hasEarlier?: boolean;

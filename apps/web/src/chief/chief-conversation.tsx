@@ -436,7 +436,6 @@ export function ChiefConversation({
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const canStop = chief.running === true && onStop != null;
   const connected = useConnected();
   const restoreSent = (text: string) => {
     followSentRef.current = false;
@@ -480,8 +479,11 @@ export function ChiefConversation({
   const stopTurn =
     waitingTurn !== undefined && withdraw !== undefined
       ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
-      : onStop;
+      : chief.noRunningTurn === true
+        ? undefined
+        : onStop;
   stopTurnRef.current = stopTurn;
+  const canStop = chief.running === true && stopTurn !== undefined;
   const allRows = useMemo(
     () =>
       awaitingStream(workingRowLast(chief.stream ?? []), questionPending).map((item, i) => ({

@@ -201,6 +201,7 @@ export const chiefThreadSchema = z.object({
   lastTurnError: z.string().nullable().optional(),
   retryGreetingStepId: recordId.nullable().optional(),
   pending: z.array(chiefPendingMessageSchema).optional(),
+  turnRunning: z.boolean().optional(),
   fallbackModel: z.string().nullable().optional(),
   orchestration: chiefOrchestrationSchema.nullable().optional(),
   turnQueue: z

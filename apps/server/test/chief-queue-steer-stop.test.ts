@@ -65,6 +65,7 @@ interface ThreadView {
   pending?: PendingEntry[];
   fallbackModel?: string | null;
   turnQueue?: unknown;
+  turnRunning?: boolean;
 }
 
 async function setupWorld(fallbackModels: { provider: string; modelId: string }[] | null = null) {
@@ -622,6 +623,33 @@ describe('stop (T5)', () => {
     expect(refused.status).toBe(409);
     expect(await refused.json()).toStrictEqual({ error: expect.any(String) });
     expect(w.stepRow(queued)?.status).toBe('pending');
+  });
+
+  test('the thread says a turn is running only while one is claimed', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    expect((await w.thread()).turnRunning).toBe(false);
+    const running = await w.claim();
+    expect((await w.thread()).turnRunning).toBe(true);
+    await w.done(running!.step.id, { status: 'success' });
+    expect((await w.thread()).turnRunning).toBe(false);
+  });
+
+  test('a system turn waiting on quota is neither running nor named as a queued turn', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    w.s.db
+      .update(stepTable)
+      .set({ status: 'waiting_quota', ownerMessageIds: ['wake-without-a-message'] })
+      .where(eq(stepTable.id, running!.step.id))
+      .run();
+    const view = await w.thread();
+    expect(view.activeRun).not.toBeNull();
+    expect(view.turnQueue ?? null).toBeNull();
+    expect(view.pending).toEqual([]);
+    expect(view.turnRunning).toBe(false);
+    expect((await w.stop()).status).toBe(409);
   });
 
   test('stop after the only turn ended says there is nothing to stop', async () => {
