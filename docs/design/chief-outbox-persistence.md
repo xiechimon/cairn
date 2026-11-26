@@ -64,7 +64,7 @@ A page that missed both the queued event and a cancel made elsewhere still holds
 
 ## Waiting messages follow the task's run
 
-A queued row belongs to the task's latest run. Two transactions that continue the task on another run move the rows with it (`moveQueuedMessages`): a message `sendBuildSteer` delivers to another run, and every restart of a failed run (Retry, a Coordinator restart, an automatic retry; a new run or a reopened PR run). Creation time and insert order are unchanged, so they are handed over one per turn in the order typed. Runs begun through `startBuilds` do not move them: the Start action, and a reply to a stopped task that begins a new run.
+Waiting rows follow the task onto the next run in two transactions, both through `moveQueuedMessages`: a message `sendBuildSteer` delivers to another run, and every restart of a failed run (Retry, a Coordinator restart, an automatic retry; a new run or a reopened PR run). Creation time and insert order are unchanged, so they are handed over one per turn in the order typed. No run begun through `startBuilds` moves them (the Start action, a reply to a stopped task that begins a new run, and its other callers); those rows stay on the old run.
 
 | Case | Result |
 |---|---|
@@ -73,10 +73,11 @@ A queued row belongs to the task's latest run. Two transactions that continue th
 | Retry pressed twice under one key | the second press changes nothing |
 | A row with a delivery error | moves with its error, stays visible, is not sent by itself |
 | A row marked to run after a stop | keeps the mark |
-| The new run fails too | rows wait on it; the next restart moves them again |
+| The new run fails too | rows wait on it; a later restart that continues on another run moves them again |
 | Remove pressed on a page still showing the old run | the row is matched among the task's runs, removed and its receipt released |
 | Edit or send now pressed on such a page | refused as already delivered, until the page shows the new run |
-| The same message resent under its key | success, answered with the run the row is on now |
+| A carried message resent under its key while its row will still run | success, answered with the run the row is on now |
+| The same resend when the row will not run (it has an error, or the new run failed or stopped) | the failed-turn row of the previous section applies; sent through the queue route addressed to the old run, it is refused with 409 |
 
 ## Tests
 
