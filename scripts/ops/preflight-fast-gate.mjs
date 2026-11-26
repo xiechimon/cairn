@@ -14,6 +14,12 @@ import { heavyRunAuthorized } from '../test-admission.mjs';
 const CHEAP_CHECKS_FLAG = '--cheap-checks';
 const CHEAP_CHECKS_STEP = ['node', 'scripts/ops/preflight-fast-gate.mjs', CHEAP_CHECKS_FLAG];
 const COULD_NOT_RUN = 2;
+const STATIC_REGRESSION_STEP = [
+  'node',
+  'scripts/regression-inversion-gate.mjs',
+  '--mode',
+  'static',
+];
 const CHECK_SCRIPT = /(?:-gate|-ledger)\.[cm]?[jt]s(?: |$)| --check[\w-]*(?: |$)/;
 const WRAPPER = /(?:ci-failed-only|test-temp-run)\.mjs.*? -- /;
 const INVOCATION =
@@ -282,7 +288,7 @@ export function fastGatePlan(paths, lastFailedTests = []) {
   if (lastFailedTests.length > 0) {
     plan.unshift(['pnpm', 'exec', 'vitest', 'run', ...lastFailedTests]);
   }
-  return [CHEAP_CHECKS_STEP, ...plan];
+  return [CHEAP_CHECKS_STEP, STATIC_REGRESSION_STEP, ...plan];
 }
 
 export function lastFailedCachePath(cwd, gitExec = git) {

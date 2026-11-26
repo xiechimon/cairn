@@ -49,6 +49,7 @@ test('typecheck package selection follows package blast radius', () => {
 test('fast gate plan is biome, touched package typechecks, then changed tests', () => {
   assert.deepEqual(fastGatePlan(['apps/web/src/App.tsx', 'apps/server/src/index.ts']), [
     CHEAP_STEP,
+    ['node', 'scripts/regression-inversion-gate.mjs', '--mode', 'static'],
     ['pnpm', 'lint'],
     ['pnpm', '--filter', '@xiechimon/cairn', 'typecheck'],
     ['pnpm', '--filter', '@cairn/web', 'typecheck'],
@@ -152,7 +153,7 @@ test('CAIRN_PREFLIGHT_GATE_WRAPPER runs the full fast-gate plan in one sh -c cal
       '--',
       'sh',
       '-c',
-      'node scripts/ops/preflight-fast-gate.mjs --cheap-checks && pnpm lint && pnpm --filter @cairn/web typecheck && pnpm test:changed',
+      'node scripts/ops/preflight-fast-gate.mjs --cheap-checks && node scripts/regression-inversion-gate.mjs --mode static && pnpm lint && pnpm --filter @cairn/web typecheck && pnpm test:changed',
     ],
     options: { cwd: '/wt', stdio: 'inherit' },
   });
@@ -173,6 +174,7 @@ test('CAIRN_PREFLIGHT_GATE_WRAPPER runs the full fast-gate plan in one sh -c cal
 test('fastGatePlan puts previously failed vitest files first and runFastGate clears cache on pass', () => {
   assert.deepEqual(fastGatePlan(['apps/web/src/App.tsx'], ['apps/web/test/remote-host.test.ts']), [
     CHEAP_STEP,
+    ['node', 'scripts/regression-inversion-gate.mjs', '--mode', 'static'],
     ['pnpm', 'exec', 'vitest', 'run', 'apps/web/test/remote-host.test.ts'],
     ['pnpm', 'lint'],
     ['pnpm', '--filter', '@cairn/web', 'typecheck'],
@@ -206,7 +208,11 @@ test('fastGatePlan puts previously failed vitest files first and runFastGate cle
       log: () => {},
     });
     assert.equal(failFirst.ok, false);
-    assert.deepEqual(calls, [CHEAP_STEP.join(' '), `pnpm exec vitest run ${testRel}`]);
+    assert.deepEqual(calls, [
+      CHEAP_STEP.join(' '),
+      'node scripts/regression-inversion-gate.mjs --mode static',
+      `pnpm exec vitest run ${testRel}`,
+    ]);
     assert.equal(existsSync(cachePath), true);
 
     writeFileSync(

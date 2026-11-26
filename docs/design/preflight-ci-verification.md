@@ -37,8 +37,11 @@ A lane verifies on GitHub before it enters the landing queue:
   step, so some ways of writing a step are misread or missed without any
   message, and a local pass does not promise a green run. A step, command or
   condition it does notice it cannot classify, no merge-base with `origin/main`,
-  or a check that cannot run is red. Inline shell is not reproduced. On a
-  machine that refuses multi-file test runs
+  or a check that cannot run is red. Inline shell is not reproduced. The fast
+  gate also runs `regression-inversion-gate.mjs --mode static` on the commits
+  since `origin/main`: a `fix` commit that changes product runtime files and no
+  test file is red, no test is run, and CI still checks that the tests fail on
+  the parent. On a machine that refuses multi-file test runs
   (no `CI`, `CAIRN_MINI_TEST` or `CAIRN_LOCAL_HEAVY`), `pnpm test:changed`
   runs a single related file, and with two or more it lists them, runs none and
   leaves them to the `ci` run. Setting `CAIRN_PREFLIGHT_GATE_WRAPPER`
