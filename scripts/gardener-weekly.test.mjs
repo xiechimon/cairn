@@ -187,3 +187,15 @@ test('the watchlist patterns compile and each has a suggested rule when ungated'
     assert.ok(pattern.gate || pattern.suggestedRule, pattern.id);
   }
 });
+
+for (const args of [['--drift'], ['--ouput', 'x'], ['stray']]) {
+  test(`an argument the gardener does not know fails the run: ${args[0]}`, (t) => {
+    const { cwd, commit, run } = fixture();
+    t.after(() => rmSync(cwd, { recursive: true, force: true }));
+    commit(daysAgo(10), baselineFiles({ controls: 3, comments: 2 }));
+    const result = run(...args);
+    assert.equal(result.status, 2);
+    assert.ok(result.stderr.includes(args[0]), result.stderr);
+    assert.equal(result.stdout, '');
+  });
+}

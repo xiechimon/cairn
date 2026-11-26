@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 import { countMetric, METRICS } from './baseline-ledger.mjs';
 
 const WINDOW_DAYS = 7;
@@ -78,13 +79,9 @@ const signed = (n) => (n > 0 ? `+${n}` : String(n));
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const args = process.argv.slice(2);
-    const option = (name) => {
-      const at = args.indexOf(name);
-      return at === -1 ? undefined : args[at + 1];
-    };
-    const now = new Date(option('--now') ?? Date.now());
-    const outDir = option('--out') ?? '.gardener';
+    const { values } = parseArgs({ options: { now: { type: 'string' }, out: { type: 'string' } } });
+    const now = new Date(values.now ?? Date.now());
+    const outDir = values.out ?? '.gardener';
     const git = (...gitArgs) =>
       execFileSync('git', gitArgs, {
         encoding: 'utf8',
