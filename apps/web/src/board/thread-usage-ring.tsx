@@ -7,7 +7,6 @@ import {
   contextMeterLines,
   contextPercentOf,
   METER_BTN_CLS,
-  useContextClock,
 } from '../chief/context-meter-ring.js';
 import { engineRuntimeOf, resolveModelClientEntry } from '../components/model-identity.js';
 import { Button } from '../components/ui/button.js';
@@ -60,12 +59,10 @@ export function ThreadUsageDetails({
   state,
   onRetry,
   context,
-  running = false,
   className,
 }: ThreadUsageView & { running?: boolean; className?: string }) {
   const { t } = useI18n();
   const reading = context ?? null;
-  const now = useContextClock(reading);
   const fallbackEngine = summary.engines.at(-1);
   const latestEngine: UsageEngineItem | null =
     summary.latestEngine !== undefined
@@ -119,12 +116,7 @@ export function ThreadUsageDetails({
       className={cn('flex min-w-0 flex-col gap-2', className)}
     >
       {reading !== null && contextPercentOf(reading) !== null && (
-        <ContextMeterPanel
-          context={reading}
-          running={running}
-          now={now}
-          className="mb-1 border-b border-border pb-3"
-        />
+        <ContextMeterPanel context={reading} className="mb-1 border-b border-border pb-3" />
       )}
       <UsageBreakdownSection
         as="div"
@@ -166,12 +158,8 @@ export function ThreadUsageRing(view: ThreadUsageView & { running?: boolean }) {
   const [open, setOpen] = useState(false);
   const { summary, state } = view;
   const context = view.context ?? null;
-  const now = useContextClock(context);
   const percent = contextPercentOf(context);
-  const lines =
-    context === null || percent === null
-      ? []
-      : contextMeterLines(t, context, { running: view.running ?? false, now });
+  const lines = context === null || percent === null ? [] : contextMeterLines(t, context);
   const usage = threadUsageShown(summary, state) ? usageStatus(summary, state, t) : null;
   const reading = lines.length === 0 ? null : lines.join(', ');
   return (

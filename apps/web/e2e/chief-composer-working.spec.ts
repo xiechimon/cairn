@@ -27,7 +27,7 @@ test('clicking the ring opens the context panel with only the rows it can read',
   await expect(panel.getByTestId('context-panel-reading')).toHaveText('24K / 200K');
   await expect(panel.getByTestId('context-panel-compact')).toContainText('70K');
   await expect(panel.getByTestId('context-panel-cache')).toHaveCount(0);
-  await expect(panel.getByTestId('context-panel-hit')).toHaveText(/上轮命中率\s*90%/);
+  await expect(panel.getByTestId('context-panel-hit')).toHaveCount(0);
 });
 
 test('an idle coordinator shows the same still ring and no timer', async ({ page }) => {

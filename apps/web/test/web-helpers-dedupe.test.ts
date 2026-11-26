@@ -11,7 +11,7 @@ function readWeb(relPath: string): string {
 describe('web helper deduplication guards', () => {
   test('interval clock hooks reuse hooks/use-interval-now.ts', () => {
     for (const rel of [
-      'chief/context-meter-ring.tsx',
+      'overlay/token-gate.tsx',
       'chief/memory-edit-composer.tsx',
       'chief/takeover-card.tsx',
     ]) {
@@ -19,6 +19,7 @@ describe('web helper deduplication guards', () => {
       expect(source, rel).not.toMatch(/function\s+use(?:Clock|Now)\s*\(/);
       expect(source, rel).toContain("from '../hooks/use-interval-now.js'");
     }
+    expect(readWeb('chief/context-meter-ring.tsx')).not.toMatch(/function\s+use(?:Clock|Now)\s*\(/);
   });
 
   test('baseName and dirName live only in lib/path-name.ts', () => {

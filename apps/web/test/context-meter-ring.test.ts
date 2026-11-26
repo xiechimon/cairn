@@ -8,7 +8,6 @@ import {
   ContextMeterPanel,
   ContextMeterRing,
   type ContextMeterRingProps,
-  contextCacheState,
   contextMeterLines,
   contextPercentOf,
   formatContextTokens,
@@ -95,7 +94,8 @@ describe('ContextMeterRing', () => {
     expect(html).toContain('aria-busy="false"');
     expect(html).not.toContain('animate-spin');
     expect(html).toContain('data-slot="context-arc"');
-    expect(html).toContain('缓存回复中保持有效');
+    expect(html).toContain('aria-label="上下文 24K / 200K"');
+    expect(html).not.toContain('缓存');
   });
 });
 
@@ -109,32 +109,26 @@ describe('formatContextTokens', () => {
   });
 });
 
-describe('contextCacheState and the tooltip cache line', () => {
+describe('contextMeterLines', () => {
   const t = (source: string, vars?: Record<string, string | number>) =>
     source.replace(/\{(\w+)\}/g, (_, name: string) => String(vars?.[name] ?? ''));
   const base = { tokens: 76_000, contextWindow: 200_000, compactAt: 92_000 };
-  const now = 1_000_000;
 
-  test('counts down from the server expiry and flips to expired at it', () => {
-    const at = { ...base, resumeExpiresAt: now + 180_000 };
-    expect(contextCacheState(at, false, now)).toEqual({ kind: 'warm', leftMs: 180_000 });
-    expect(contextMeterLines(t, at, { now })).toContain('缓存 {n} 分钟后失效'.replace('{n}', '3'));
-    expect(contextMeterLines(t, at, { now: now + 179_001 })).toContain('缓存不到 1 分钟后失效');
-    expect(contextCacheState(at, false, now + 180_000)).toEqual({ kind: 'expired' });
-  });
-
-  test('shows no cache line when the provider guarantees no lifetime', () => {
-    expect(contextCacheState(base, false, now)).toBeNull();
-    expect(contextMeterLines(t, base, { now })).toEqual(['上下文 76K / 200K', '92K 时自动压缩']);
-  });
-
-  test('a model switch is a miss whatever the lifetime', () => {
-    expect(contextCacheState({ ...base, resume: 'cold' }, false, now)).toEqual({ kind: 'cold' });
+  test('lists context reading and auto-compact without cache lines even when resume metadata is present', () => {
+    expect(contextMeterLines(t, base)).toEqual(['上下文 76K / 200K', '92K 时自动压缩']);
+    expect(contextMeterLines(t, { ...base, resumeExpiresAt: 1_180_000, resume: 'cold' })).toEqual([
+      '上下文 76K / 200K',
+      '92K 时自动压缩',
+    ]);
+    expect(contextMeterLines(t, { tokens: 76_000, contextWindow: 200_000 })).toEqual([
+      '上下文 76K / 200K',
+    ]);
+    expect(contextMeterLines(t, null)).toEqual(['上下文（示意）']);
   });
 
   test('names the room left once usage is within a tenth of the compaction point', () => {
     const near = { ...base, tokens: 88_400 };
-    expect(contextMeterLines(t, near, { now })[1]).toBe('再用 3.6K 就自动压缩');
+    expect(contextMeterLines(t, near)[1]).toBe('再用 3.6K 就自动压缩');
   });
 });
 
@@ -184,7 +178,7 @@ describe('ContextMeterLine channel usage stats', () => {
     expect(html).not.toContain('—');
   });
 
-  test('ContextMeterPanel labels the prompt cache hit rate as the last turn hit rate', () => {
+  test('ContextMeterPanel omits cache and hit rate rows while keeping context reading and auto-compact', () => {
     const zh = renderToStaticMarkup(
       createElement(I18nProvider, {
         initialLocale: 'zh',
@@ -192,15 +186,20 @@ describe('ContextMeterLine channel usage stats', () => {
           context: {
             tokens: 17_367,
             contextWindow: 183_000,
+            compactAt: 150_000,
+            resume: 'cold',
+            resumeExpiresAt: 1_180_000,
             cache: { read: 44_312, write: 6_545, input: 8 },
           },
-          now: 1_000_000,
         }),
       }),
     );
     expect(zh).toContain('17K / 183K');
-    expect(zh).toContain('上轮命中率');
-    expect(zh).toContain('87%');
+    expect(zh).toContain('自动压缩');
+    expect(zh).toContain('150K');
+    expect(zh).not.toContain('上轮命中率');
+    expect(zh).not.toContain('context-panel-cache');
+    expect(zh).not.toContain('context-panel-hit');
     const en = renderToStaticMarkup(
       createElement(I18nProvider, {
         initialLocale: 'en',
@@ -210,11 +209,13 @@ describe('ContextMeterLine channel usage stats', () => {
             contextWindow: 183_000,
             cache: { read: 44_312, write: 6_545, input: 8 },
           },
-          now: 1_000_000,
         }),
       }),
     );
-    expect(en).toContain('Last turn hit rate');
+    expect(en).toContain('17K / 183K');
+    expect(en).not.toContain('Last turn hit rate');
+    expect(en).not.toContain('context-panel-cache');
+    expect(en).not.toContain('context-panel-hit');
   });
 
   test('shows only current engine/model/runner with icons and omits historical clutter', () => {

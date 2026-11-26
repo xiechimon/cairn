@@ -1,4 +1,4 @@
-import { ENV_VARS, parseAttachmentTokenLines } from '@cairn/shared';
+import { ENV_VARS, parseAttachmentTokenLines, parseModelKey } from '@cairn/shared';
 import type { ImageContent, Message, TextContent, ToolResultMessage } from '@earendil-works/pi-ai';
 
 export const TOOL_RESULT_KEEP_FULL = 3;
@@ -75,7 +75,13 @@ export function isColdResume(args: {
 }): boolean {
   if (args.lastUsage === null) return false;
   const active = args.activeModel?.trim() ?? '';
-  return active !== '' && args.lastUsage.model !== active;
+  if (active === '') return false;
+  const last = args.lastUsage.model.trim();
+  if (last === active) return false;
+  const parsedLast = parseModelKey(last);
+  const parsedActive = parseModelKey(active);
+  if (parsedLast.provider !== null && parsedActive.provider !== null) return true;
+  return parsedLast.modelId !== parsedActive.modelId;
 }
 
 function toolResultText(message: ToolResultMessage): string {

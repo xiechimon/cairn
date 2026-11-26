@@ -49,6 +49,39 @@ describe('isColdResume', () => {
     expect(isColdResume({ lastUsage, activeModel: 'openai/gpt' })).toBe(false);
     expect(isColdResume({ lastUsage, activeModel: '' })).toBe(false);
   });
+
+  it('treats a bare model id matching the active provider/modelId as warm', () => {
+    expect(
+      isColdResume({
+        lastUsage: { ...lastUsage, model: 'gemini-4-hydrogen' },
+        activeModel: 'antigravity/gemini-4-hydrogen',
+      }),
+    ).toBe(false);
+    expect(
+      isColdResume({
+        lastUsage: { ...lastUsage, model: 'antigravity/gemini-4-hydrogen' },
+        activeModel: 'gemini-4-hydrogen',
+      }),
+    ).toBe(false);
+    expect(
+      isColdResume({
+        lastUsage: { ...lastUsage, model: 'gemini-4-hydrogen' },
+        activeModel: 'antigravity/gemini-4-neon',
+      }),
+    ).toBe(true);
+    expect(
+      isColdResume({
+        lastUsage: { ...lastUsage, model: 'gemini-4-hydrogen' },
+        activeModel: 'anthropic/claude-sonnet-5-5',
+      }),
+    ).toBe(true);
+    expect(
+      isColdResume({
+        lastUsage: { ...lastUsage, model: 'openai/gpt-5' },
+        activeModel: 'anthropic/gpt-5',
+      }),
+    ).toBe(true);
+  });
 });
 
 describe('cacheTtlMsFor', () => {

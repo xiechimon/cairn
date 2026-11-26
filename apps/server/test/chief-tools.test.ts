@@ -108,10 +108,21 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
     );
     seedMachineReport('web', { installed: false, hostname: 'web', models: [] });
     const capabilities = { mcpServers: [], skills: [], scrapling: { version: '0.5.1' } };
-    H.s.db.update(machine).set({ capabilities }).where(eq(machine.id, 'machine-web')).run();
-    expect(await relay('machines', {})).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: 'machine-web', capabilities })]),
-    );
+    H.s.db
+      .update(machine)
+      .set({ online: true, capabilities })
+      .where(eq(machine.id, 'machine-web'))
+      .run();
+    const machineRows = (await relay('machines', {})) as Array<{
+      id: string;
+      capabilities: Record<string, unknown> | null;
+    }>;
+    const webEntry = machineRows.find((r) => r.id === 'machine-web');
+    expect(webEntry?.capabilities).toEqual({
+      mcpServers: [],
+      scrapling: { version: '0.5.1' },
+    });
+    expect(webEntry?.capabilities).not.toHaveProperty('skills');
     expect(await relay('skills', {})).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 'agent-reach' })]),
     );
@@ -135,6 +146,7 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
     H.s.db
       .update(machine)
       .set({
+        online: true,
         capabilities: {
           mcpServers: [],
           skills: [],

@@ -1,7 +1,7 @@
 import type { ChiefChannelUsage } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
-import { cacheHitShare, formatUsd, mapTokenUsage } from '../api/mappers.js';
+import { formatUsd, mapTokenUsage } from '../api/mappers.js';
 import { engineRuntimeOf, resolveModelClientEntry } from '../components/model-identity.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -16,7 +16,6 @@ import {
 import { PopoverDismissEffect } from '../components/use-dismiss-on-overlay.js';
 import { formatWorkDuration } from '../detail/work-trace.js';
 import type { ChiefContextUsage } from '../fixtures/records.js';
-import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -66,47 +65,7 @@ export function contextNearCompaction(context: ContextMeterReading | null): bool
   return context?.compactAt !== undefined && context.tokens >= context.compactAt * NEAR_COMPACTION;
 }
 
-export type ContextCacheState =
-  | { kind: 'running' }
-  | { kind: 'cold' }
-  | { kind: 'expired' }
-  | { kind: 'warm'; leftMs: number };
-
-export function contextCacheState(
-  context: ContextMeterReading | null,
-  running: boolean,
-  now: number,
-): ContextCacheState | null {
-  if (context == null) return null;
-  if (context.resume === 'cold') return { kind: 'cold' };
-  if (context.resumeExpiresAt === undefined) return null;
-  if (running) return { kind: 'running' };
-  const leftMs = context.resumeExpiresAt - now;
-  return leftMs > 0 ? { kind: 'warm', leftMs } : { kind: 'expired' };
-}
-
-function cacheTooltip(t: TFunc, state: ContextCacheState): string {
-  if (state.kind === 'running') return t('缓存回复中保持有效');
-  if (state.kind === 'cold') return t('缓存换了模型，下一条不命中');
-  if (state.kind === 'expired') return t('缓存已失效');
-  if (state.leftMs < 60_000) return t('缓存不到 1 分钟后失效');
-  return t('缓存 {n} 分钟后失效', { n: Math.ceil(state.leftMs / 60_000) });
-}
-
-function cachePanelValue(t: TFunc, state: ContextCacheState): string {
-  if (state.kind === 'running') return t('回复中保持有效');
-  if (state.kind === 'cold') return t('下一条不命中');
-  if (state.kind === 'expired') return t('已失效');
-  const seconds = Math.ceil(state.leftMs / 1000);
-  const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  return t('{time} 后失效', { time: clock });
-}
-
-export function contextMeterLines(
-  t: TFunc,
-  context: ContextMeterReading | null,
-  options: { running?: boolean; now?: number } = {},
-): string[] {
+export function contextMeterLines(t: TFunc, context: ContextMeterReading | null): string[] {
   if (context == null) return [t('上下文（示意）')];
   const lines = [
     t('上下文 {used} / {window}', {
@@ -123,15 +82,7 @@ export function contextMeterLines(
         : t('{at} 时自动压缩', { at: formatContextTokens(context.compactAt) }),
     );
   }
-  const cache = contextCacheState(context, options.running ?? false, options.now ?? Date.now());
-  if (cache !== null) lines.push(cacheTooltip(t, cache));
   return lines;
-}
-
-export function useContextClock(context: ContextMeterReading | null): number {
-  return useIntervalNow(
-    context?.resumeExpiresAt !== undefined && context.resumeExpiresAt > Date.now(),
-  );
 }
 
 export function ContextMeterGlyph({
@@ -201,13 +152,9 @@ export function contextGlyphProps(context: ContextMeterReading | null, filled: n
 
 export function ContextMeterPanel({
   context,
-  running = false,
-  now,
   className,
 }: {
   context: ContextMeterReading;
-  running?: boolean;
-  now: number;
   className?: string;
 }) {
   const { t } = useI18n();
@@ -217,15 +164,6 @@ export function ContextMeterPanel({
     context.compactAt === undefined
       ? null
       : Math.min(100, (100 * context.compactAt) / context.contextWindow);
-  const cache = contextCacheState(context, running, now);
-  const hit =
-    context.cache === undefined
-      ? null
-      : cacheHitShare({
-          input: context.cache.input,
-          cacheRead: context.cache.read,
-          cacheWrite: context.cache.write,
-        });
   const rows = [
     context.compactAt === undefined
       ? null
@@ -239,8 +177,6 @@ export function ContextMeterPanel({
               })
             : formatContextTokens(context.compactAt),
         },
-    cache === null ? null : { id: 'cache', label: t('缓存'), value: cachePanelValue(t, cache) },
-    hit === null ? null : { id: 'hit', label: t('上轮命中率'), value: `${Math.round(hit * 100)}%` },
   ].filter((row) => row !== null);
   return (
     <section
@@ -273,18 +209,20 @@ export function ContextMeterPanel({
           />
         )}
       </div>
-      <dl className="m-0 flex flex-col gap-1.5">
-        {rows.map((row) => (
-          <div
-            key={row.id}
-            data-testid={`context-panel-${row.id}`}
-            className="flex items-baseline justify-between gap-4"
-          >
-            <dt className="text-content-secondary">{row.label}</dt>
-            <dd className="m-0 whitespace-nowrap text-foreground tabular-nums">{row.value}</dd>
-          </div>
-        ))}
-      </dl>
+      {rows.length > 0 && (
+        <dl className="m-0 flex flex-col gap-1.5">
+          {rows.map((row) => (
+            <div
+              key={row.id}
+              data-testid={`context-panel-${row.id}`}
+              className="flex items-baseline justify-between gap-4"
+            >
+              <dt className="text-content-secondary">{row.label}</dt>
+              <dd className="m-0 whitespace-nowrap text-foreground tabular-nums">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </section>
   );
 }
@@ -446,21 +384,19 @@ export type ContextMeterRingProps = {
 export function ContextMeterRing({
   context = null,
   usage = null,
-  running = false,
   loading = false,
 }: ContextMeterRingProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const now = useContextClock(context);
   const hasUsage = usage != null && channelUsageData(usage) !== null;
   const filled = contextPercentOf(context) ?? (hasUsage ? 0 : MOCK_CONTEXT_PERCENT);
   const lines = loading
     ? [t('正在加载用量…')]
     : context != null
-      ? contextMeterLines(t, context, { running, now })
+      ? contextMeterLines(t, context)
       : hasUsage
         ? [t('对话用量')]
-        : contextMeterLines(t, context, { running, now });
+        : contextMeterLines(t, context);
   const openable = !loading && (context != null || hasUsage);
   const trigger = (
     <Button
@@ -512,7 +448,7 @@ export function ContextMeterRing({
         sideOffset={8}
         className={cn('p-3.5', hasUsage ? 'w-80' : 'w-65')}
       >
-        {context != null && <ContextMeterPanel context={context} running={running} now={now} />}
+        {context != null && <ContextMeterPanel context={context} />}
         {hasUsage && usage != null && (
           <ChannelUsageSection
             usage={usage}
@@ -527,24 +463,15 @@ export function ContextMeterRing({
 export function ContextMeterLine({
   context = null,
   usage = null,
-  running = false,
   loading = false,
 }: ContextMeterRingProps) {
   const { t } = useI18n();
-  const now = useContextClock(context);
   const hasUsage = usage != null && channelUsageData(usage) !== null;
   const filled = contextPercentOf(context) ?? (hasUsage ? 0 : MOCK_CONTEXT_PERCENT);
   if (!loading && (context != null || hasUsage)) {
     return (
       <div data-testid="composer-context-meter" data-percent={filled} aria-busy={false}>
-        {context != null && (
-          <ContextMeterPanel
-            context={context}
-            running={running}
-            now={now}
-            className="px-2.5 py-2"
-          />
-        )}
+        {context != null && <ContextMeterPanel context={context} className="px-2.5 py-2" />}
         {hasUsage && usage != null && (
           <ChannelUsageSection
             usage={usage}

@@ -300,19 +300,50 @@ function requireTeamConversation(db: Db, conversationId: string, teamId: string)
   if (!thread) throw new HttpError(404, `conversation ${conversationId}`);
 }
 
+function trimProviderSummary<T extends { installed: boolean }>(
+  report: T | undefined,
+  includeAuthenticated = false,
+): { installed: boolean; authenticated?: boolean; version?: string } | undefined {
+  if (report === undefined) return undefined;
+  const version =
+    'version' in report && typeof report.version === 'string' ? report.version : undefined;
+  const authenticated =
+    includeAuthenticated && 'authenticated' in report && typeof report.authenticated === 'boolean'
+      ? report.authenticated
+      : undefined;
+  return {
+    installed: report.installed,
+    ...(authenticated !== undefined ? { authenticated } : {}),
+    ...(version !== undefined ? { version } : {}),
+  };
+}
+
 function trimCapabilitiesForCoordinator(
   capabilities: NonNullable<ReturnType<typeof parseStoredCapabilities>>,
 ) {
-  const trimmedDevin = capabilities.devin
-    ? (({ models: _models, ...rest }) => rest)(capabilities.devin)
-    : undefined;
-  const trimmedAntigravity = capabilities.antigravity
-    ? (({ models: _models, ...rest }) => rest)(capabilities.antigravity)
-    : undefined;
+  const devin = trimProviderSummary(capabilities.devin);
+  const gemini = trimProviderSummary(capabilities.gemini);
+  const antigravity = trimProviderSummary(capabilities.antigravity, true);
   return {
-    ...capabilities,
-    ...(trimmedDevin !== undefined ? { devin: trimmedDevin } : {}),
-    ...(trimmedAntigravity !== undefined ? { antigravity: trimmedAntigravity } : {}),
+    ...(capabilities.osPlatform !== undefined ? { osPlatform: capabilities.osPlatform } : {}),
+    ...(capabilities.computerName !== undefined ? { computerName: capabilities.computerName } : {}),
+    ...(capabilities.hostname !== undefined ? { hostname: capabilities.hostname } : {}),
+    ...(capabilities.executor !== undefined ? { executor: capabilities.executor } : {}),
+    ...(capabilities.computer === true ? { computer: true as const } : {}),
+    ...(capabilities.ownComputer === true ? { ownComputer: true as const } : {}),
+    ...(capabilities.ownComputerShell === true ? { ownComputerShell: true as const } : {}),
+    ...(capabilities.browser === true ? { browser: true as const } : {}),
+    ...(capabilities.browserSecretFill === true ? { browserSecretFill: true as const } : {}),
+    ...(capabilities.stealthBrowser === true ? { stealthBrowser: true as const } : {}),
+    ...(capabilities.screenHandoff === true ? { screenHandoff: true as const } : {}),
+    ...(capabilities.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
+    ...(capabilities.phoneHost === true ? { phoneHost: true as const } : {}),
+    mcpServers: capabilities.mcpServers,
+    ...(capabilities.agentReach !== undefined ? { agentReach: capabilities.agentReach } : {}),
+    ...(capabilities.scrapling !== undefined ? { scrapling: capabilities.scrapling } : {}),
+    ...(devin !== undefined ? { devin } : {}),
+    ...(gemini !== undefined ? { gemini } : {}),
+    ...(antigravity !== undefined ? { antigravity } : {}),
   };
 }
 
@@ -493,7 +524,7 @@ export async function executeChiefTool(
         .filter(isRegisteredMachine);
       return json(
         rows.map((m) => {
-          const parsed = parseStoredCapabilities(m.capabilities);
+          const parsed = m.online ? parseStoredCapabilities(m.capabilities) : null;
           return {
             id: m.id,
             name: m.name,
