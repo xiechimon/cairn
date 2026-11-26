@@ -77,7 +77,7 @@
       "kind": "registry",
       "upstreamItem": "context-menu",
       "status": "deviated",
-      "reason": "Cut down to the four parts the Coordinator reply's press menu uses (Root, Trigger, Content, Item); same deviations as dropdown-menu.tsx: #733 single z ladder (z-(--z-dialog)), the paper menu face from menu.ts (MENU_SURFACE_CLS, MENU_ITEM_CLS with 44px rows under a coarse pointer) and the dropdown's open/close motion.",
+      "reason": "Cut down to the six parts the message press menu uses (Root, Trigger, Content, Group, Label, Item); same deviations as dropdown-menu.tsx: #733 single z ladder (z-(--z-dialog)), the paper menu face from menu.ts (MENU_SURFACE_CLS, MENU_ITEM_CLS with 44px rows under a coarse pointer) and the dropdown's open/close motion.",
       "hash": "be9efd67dfd87b72c16981e32edd016db8f0b8e7c80882999e303230801bf973"
     },
     "dialog-shell.tsx": {
