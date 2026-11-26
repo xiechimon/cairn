@@ -382,6 +382,21 @@ test('a reference the moving commit breaks stays red under later commits', (t) =
   );
 });
 
+test('archiving again after a revert is judged as of the latest move', (t) => {
+  const r = archive(t);
+  r.commit('archive');
+  r.git('mv', 'docs/research/a.md', 'docs/spec/a.md');
+  r.commit('revert the archive');
+  r.git('mv', 'docs/spec/a.md', 'docs/research/a.md');
+  r.commit('archive again and edit', `${SPEC}${BROKEN}`);
+  const result = r.run();
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /docs\/research\/a\.md:4 path does not resolve: `scripts\/gone\.mjs`/,
+  );
+});
+
 test('a reference the moving commit breaks and a later commit repairs is green', (t) => {
   const r = archive(t);
   r.commit('archive and edit', `${SPEC}${BROKEN}`);

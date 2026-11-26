@@ -262,11 +262,10 @@ export const demotedBy = (renames) =>
       .map(([target]) => target),
   );
 
-const movingCommit = (base, path) =>
+const latestMove = (base, path) =>
   git([
     'log',
     '--first-parent',
-    '--reverse',
     '--no-renames',
     '--diff-filter=A',
     '--format=%H',
@@ -275,17 +274,22 @@ const movingCommit = (base, path) =>
     path,
   ]).split('\n')[0];
 
+function brokenWhenMoved(demoted, moves) {
+  const broken = new Set();
+  for (const commit of new Set([...moves.values()].filter(Boolean))) {
+    const snapshot = gather(demoted, commit);
+    const docs = snapshot.docs.filter((doc) => moves.get(doc) === commit);
+    for (const row of filterIgnored(collectViolations({ ...snapshot, docs })))
+      broken.add(rowKey(row));
+  }
+  return broken;
+}
+
 export function brokenByTheMove(rows, demoted, base) {
-  const atMove = new Map();
-  return rows.filter((row) => {
-    if (!demoted.has(row.doc)) return true;
-    if (!atMove.has(row.doc)) {
-      const commit = movingCommit(base, row.doc);
-      const broken = commit ? filterIgnored(collectViolations(gather(demoted, commit))) : null;
-      atMove.set(row.doc, broken && new Set(broken.map(rowKey)));
-    }
-    return atMove.get(row.doc)?.has(rowKey(row)) ?? true;
-  });
+  const moved = new Set(rows.filter((row) => demoted.has(row.doc)).map((row) => row.doc));
+  const moves = new Map([...moved].map((doc) => [doc, latestMove(base, doc)]));
+  const broken = brokenWhenMoved(demoted, moves);
+  return rows.filter((row) => !moves.get(row.doc) || broken.has(rowKey(row)));
 }
 
 const baselineKeys = (text) => new Set(JSON.parse(text).rows);
