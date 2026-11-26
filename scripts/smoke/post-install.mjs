@@ -27,23 +27,66 @@ const POLL_MS = 2_000;
 const STRINGS = {
   zh: {
     settings: '设置',
+    closeSettings: '关闭设置',
     copyImage: '拷贝图像',
     saveImage: '将图像存储为…',
     copyLink: '拷贝链接',
     paste: '粘贴',
     copy: '拷贝',
     lookUp: '查询“',
+    start: '开始',
+    handedToCoordinator: (title) => `已交给 Coordinator：${title}`,
+    handedToastTitle: '已交给 Coordinator 编排',
+    unknownVersion: '未知版本',
+    devVersion: '开发版',
   },
   en: {
     settings: 'Settings',
+    closeSettings: 'Close settings',
     copyImage: 'Copy Image',
     saveImage: 'Save Image As…',
     copyLink: 'Copy Link',
     paste: 'Paste',
     copy: 'Copy',
     lookUp: 'Look Up “',
+    start: 'Start',
+    handedToCoordinator: (title) => `Handed to the Coordinator: ${title}`,
+    handedToastTitle: 'Handed to the Coordinator',
+    unknownVersion: 'Unknown version',
+    devVersion: 'Dev',
   },
 };
+
+const DESKTOP_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/136.0.0.0 Safari/537.36 CairnDesktop/mac';
+
+export const TRAFFIC_LIGHT_ZONE = { x: 0, y: 0, width: 80, height: 32 };
+
+export function overlapsTrafficLights(box) {
+  return (
+    box.x < TRAFFIC_LIGHT_ZONE.x + TRAFFIC_LIGHT_ZONE.width &&
+    box.x + box.width > TRAFFIC_LIGHT_ZONE.x &&
+    box.y < TRAFFIC_LIGHT_ZONE.y + TRAFFIC_LIGHT_ZONE.height &&
+    box.y + box.height > TRAFFIC_LIGHT_ZONE.y
+  );
+}
+
+export function formatExpectedServerVersion(version, commit, lang = 'en') {
+  const shortCommit = commit === null ? null : commit.slice(0, 7);
+  const copy = STRINGS[lang] ?? STRINGS.en;
+  if (version === null) {
+    return shortCommit === null ? copy.unknownVersion : `${copy.devVersion} · ${shortCommit}`;
+  }
+  return shortCommit === null ? version : `${version} · ${shortCommit}`;
+}
+
+export function buildStartTaskSeedPrompt(todo) {
+  return (
+    `开始任务 #${todo.seqNum}\n\n` +
+    `编排请求：[#${todo.seqNum}](todo:${todo.id}) —— 直接规划，并按活的类型派发执行。\n\n` +
+    `任务原文：\n> ${todo.spec}`
+  );
+}
 
 const SWE2 = {
   name: 'SWE-2',
@@ -77,6 +120,7 @@ export function parseArgs(argv) {
     userData: null,
     token: null,
     evidence: null,
+    checks: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -86,7 +130,19 @@ export function parseArgs(argv) {
     else if (arg === '--user-data') args.userData = argv[++i];
     else if (arg === '--token') args.token = argv[++i];
     else if (arg === '--evidence') args.evidence = argv[++i];
-    else if (arg === '--help' || arg === '-h') args.help = true;
+    else if (arg === '--checks') {
+      const raw = argv[++i] ?? '';
+      const ids = raw
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+      if (ids.length === 0) throw new Error('--checks requires at least one check id');
+      const known = new Set(CHECKS.map((check) => check.id));
+      for (const id of ids) {
+        if (!known.has(id)) throw new Error(`unknown check: ${id}`);
+      }
+      args.checks = ids;
+    } else if (arg === '--help' || arg === '-h') args.help = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
   if (args.app === null && args.userData === null) args.userData = DEFAULT_USER_DATA;
@@ -787,6 +843,389 @@ async function checkServeApp(_page, ctx) {
   return `serving /app${ctx.seededTables === undefined ? '' : ` on a migrated ${ctx.seededTables}-table database`}`;
 }
 
+async function checkStartTaskEcho(page, ctx) {
+  const projects = await api(ctx, 'GET', '/api/projects');
+  const project = (projects.projects ?? projects).find((p) => p.archivedAt == null);
+  assert.ok(project, 'expected at least one active project');
+
+  const todo = await windowApi(ctx, 'POST', `/api/projects/${project.id}/todos`, {
+    title: 'Smoke start-task echo guard',
+    spec: 'Verify synthetic start prompt is hidden in Coordinator chat',
+  });
+  const dbPath = join(ctx.userData, 'home', 'server', 'server.db');
+  const now = Math.max(Date.now(), (todo.phaseAt ?? 0) + 10);
+  const prompt = JSON.stringify(buildStartTaskSeedPrompt(todo));
+  const syntheticId = `smoke-orch-${now}`;
+  const echoId = `smoke-orch-echo-${now}`;
+
+  const db = new DatabaseSync(dbPath);
+  try {
+    db.prepare(
+      `INSERT INTO chief_message (id, threadId, role, content, projectId, delivery, origin, createdAt)
+       VALUES (?, ?, 'user', ?, NULL, NULL, 'synthetic', ?)`,
+    ).run(syntheticId, ctx.threadId, prompt, now);
+    db.prepare(
+      `INSERT INTO chief_message (id, threadId, role, content, projectId, delivery, origin, createdAt)
+       VALUES (?, ?, 'user', ?, NULL, NULL, 'task-prompt', ?)`,
+    ).run(echoId, ctx.threadId, prompt, now + 5);
+  } finally {
+    db.close();
+  }
+
+  ctx.cleanup.push(async () => {
+    const cleanupDb = new DatabaseSync(dbPath);
+    try {
+      cleanupDb.prepare('DELETE FROM chief_message WHERE id IN (?, ?)').run(syntheticId, echoId);
+    } finally {
+      cleanupDb.close();
+    }
+    await windowApi(ctx, 'DELETE', `/api/todos/${todo.id}`).catch(() => {});
+  });
+
+  await openCoordinator(page, ctx);
+  const stream = page.getByTestId('chief-stream');
+  await stream.waitFor({ timeout: UI_WAIT_MS });
+  const streamText = await stream.innerText();
+  assert.ok(
+    !streamText.includes('开始任务') && !streamText.includes('编排请求'),
+    `Coordinator stream leaked synthetic start-task prompt: ${streamText}`,
+  );
+
+  await page.goto(`${ctx.base}/app?thread=${todo.id}`, { waitUntil: 'domcontentloaded' });
+  const sideChat = page.getByRole('complementary', { name: todo.title });
+  await sideChat.waitFor({ timeout: UI_WAIT_MS });
+  const expectedNote = STRINGS[ctx.lang].handedToCoordinator(todo.title);
+  await sideChat
+    .getByTestId('transcript-note')
+    .filter({ hasText: expectedNote })
+    .first()
+    .waitFor({ timeout: UI_WAIT_MS });
+  const sideText = await sideChat.innerText();
+  assert.ok(
+    !sideText.includes(`#${todo.seqNum}`),
+    `Task thread leaked #${todo.seqNum}: ${sideText}`,
+  );
+
+  const machines = await api(ctx, 'GET', `/api/teams/${ctx.teamId}/machines`);
+  const onlineMachines = (machines.machines ?? machines).filter((m) => m.online === true);
+  if (onlineMachines.length <= 1) {
+    let orchestrateCalls = 0;
+    const routePattern = `**/api/todos/${todo.id}/orchestrate`;
+    const routeHandler = async (route, request) => {
+      if (request.method() !== 'POST') return route.fallback();
+      orchestrateCalls += 1;
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          thread: {
+            id: ctx.threadId,
+            chiefId: 'chief-smoke',
+            userId: 'u-smoke',
+            teamId: ctx.teamId,
+            title: 'Coordinator',
+            createdAt: now - 60_000,
+            updatedAt: Date.now(),
+            lastTurnAt: null,
+            session: { runtime: 'pi', id: '', openedAt: now - 60_000 },
+            pendingSessionResumeAt: null,
+            toolDefHashes: {},
+            toolResultHashes: {},
+            activeRun: { phase: 'chief' },
+            turnQueue: null,
+            orchestration: { todoId: todo.id, state: 'queued', error: null },
+          },
+          message: {
+            id: 'smoke-orch-click',
+            role: 'user',
+            origin: 'synthetic',
+            content: buildStartTaskSeedPrompt(todo),
+            createdAt: Date.now(),
+          },
+        }),
+      });
+    };
+    await page.route(routePattern, routeHandler);
+    try {
+      const startBtn = sideChat.getByRole('button', { name: STRINGS[ctx.lang].start });
+      await startBtn.waitFor({ timeout: UI_WAIT_MS });
+      await startBtn.click();
+      const deadline = Date.now() + UI_WAIT_MS;
+      while (orchestrateCalls === 0 && Date.now() < deadline) await delay(100);
+      assert.equal(orchestrateCalls, 1, 'expected Start button to trigger mocked orchestrate POST');
+      await delay(200);
+      const toastCount = await page
+        .locator('[data-sonner-toast]')
+        .filter({ hasText: STRINGS[ctx.lang].handedToastTitle })
+        .count();
+      assert.equal(toastCount, 0, 'in-thread Start must not emit redundant orchestration toast');
+    } finally {
+      await page.unroute(routePattern, routeHandler);
+    }
+  }
+
+  return `suppressed "开始任务 #${todo.seqNum}" in Coordinator and rendered "${expectedNote}"`;
+}
+
+async function assertNarrowSettingsTitlebar(page, base, lang) {
+  await page.goto(`${base}/app/settings/account`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('dialog', { name: STRINGS[lang].settings }).waitFor({ timeout: UI_WAIT_MS });
+  const shell = await page.locator('html').getAttribute('data-shell');
+  assert.equal(shell, 'mac-desktop', `expected data-shell="mac-desktop", got ${shell}`);
+
+  const header = page.getByTestId('settings-title');
+  await header.waitFor({ timeout: UI_WAIT_MS });
+  const titleHeading = header.locator('h1');
+  const closeButton = header.getByRole('button', { name: STRINGS[lang].closeSettings });
+  await titleHeading.waitFor({ timeout: UI_WAIT_MS });
+  await closeButton.waitFor({ timeout: UI_WAIT_MS });
+
+  const titleBox = await titleHeading.boundingBox();
+  const closeBox = await closeButton.boundingBox();
+  assert.ok(titleBox !== null, 'Settings title heading must have a bounding box');
+  assert.ok(closeBox !== null, 'Settings close button must have a bounding box');
+  assert.equal(
+    overlapsTrafficLights(titleBox),
+    false,
+    `Settings title (${JSON.stringify(titleBox)}) overlaps traffic lights ${JSON.stringify(TRAFFIC_LIGHT_ZONE)}`,
+  );
+  assert.equal(
+    overlapsTrafficLights(closeBox),
+    false,
+    `Settings close button (${JSON.stringify(closeBox)}) overlaps traffic lights ${JSON.stringify(TRAFFIC_LIGHT_ZONE)}`,
+  );
+
+  const dragCheck = await header.evaluate((el) => {
+    const dialog = el.closest('[role="dialog"]');
+    const beforeStyle = dialog ? getComputedStyle(dialog, '::before') : null;
+    const headerStyle = getComputedStyle(el);
+    const closeBtn = el.querySelector('button');
+    const closeStyle = closeBtn ? getComputedStyle(closeBtn) : null;
+    return {
+      beforeAppRegion: beforeStyle?.webkitAppRegion,
+      headerAppRegion: headerStyle.webkitAppRegion,
+      closeAppRegion: closeStyle?.webkitAppRegion,
+    };
+  });
+  assert.ok(
+    dragCheck.beforeAppRegion === 'drag' || dragCheck.headerAppRegion === 'drag',
+    `expected narrow Settings header or ::before to be draggable, got ${JSON.stringify(dragCheck)}`,
+  );
+  assert.equal(
+    dragCheck.closeAppRegion,
+    'no-drag',
+    `expected Settings close button to be no-drag, got ${dragCheck.closeAppRegion}`,
+  );
+  return { titleBox, closeBox };
+}
+
+async function checkSettingsTitlebar(page, ctx) {
+  if (ctx.mode === 'app') {
+    const savedBounds = await ctx.electronApp.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find(
+        (w) => !w.webContents.getURL().includes('/tray'),
+      );
+      if (!win) throw new Error('main BrowserWindow not found');
+      const bounds = win.getBounds();
+      win.setSize(760, 850);
+      return bounds;
+    });
+    try {
+      const deadline = Date.now() + UI_WAIT_MS;
+      while (Date.now() < deadline) {
+        const w = await page.evaluate(() => window.innerWidth);
+        if (w <= 767) break;
+        await delay(100);
+      }
+      const { titleBox } = await assertNarrowSettingsTitlebar(page, ctx.base, ctx.lang);
+      return `760px Settings titlebar clears traffic lights (h1 y=${Math.round(titleBox.y)}px)`;
+    } finally {
+      await ctx.electronApp
+        .evaluate(({ BrowserWindow }, bounds) => {
+          const win = BrowserWindow.getAllWindows().find(
+            (w) => !w.webContents.getURL().includes('/tray'),
+          );
+          if (win) win.setBounds(bounds);
+        }, savedBounds)
+        .catch(() => {});
+    }
+  }
+
+  const desktopContext = await ctx.browser.newContext({
+    userAgent: DESKTOP_UA,
+    viewport: { width: 760, height: 850 },
+    extraHTTPHeaders: { authorization: `Bearer ${ctx.token}` },
+  });
+  try {
+    const desktopPage = await desktopContext.newPage();
+    await desktopPage.goto(`${ctx.base}/app`, { waitUntil: 'domcontentloaded' });
+    const lang = await desktopPage
+      .evaluate(() => document.documentElement.lang)
+      .then((value) => (value.toLowerCase().startsWith('zh') ? 'zh' : 'en'))
+      .catch(() => ctx.lang);
+    const { titleBox } = await assertNarrowSettingsTitlebar(desktopPage, ctx.base, lang);
+    return `760px Settings titlebar clears traffic lights (h1 y=${Math.round(titleBox.y)}px)`;
+  } finally {
+    await desktopContext.close().catch(() => {});
+  }
+}
+
+async function checkImeComposition(page, ctx) {
+  await openCoordinator(page, ctx);
+  const composer = page.locator('textarea[data-compose-target]').first();
+  await composer.waitFor({ timeout: UI_WAIT_MS });
+
+  let posts = 0;
+  const routeHandler = async (route, request) => {
+    if (request.method() !== 'POST') return route.fallback();
+    const { pathname } = new URL(request.url());
+    if (
+      !/\/api\/conversations\/[^/]+\/messages$/.test(pathname) &&
+      !/\/api\/teams\/[^/]+\/chief\/threads$/.test(pathname)
+    ) {
+      return route.fallback();
+    }
+    posts += 1;
+    return route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        thread: {
+          id: ctx.threadId,
+          chiefId: 'chief-smoke',
+          userId: 'u-smoke',
+          teamId: ctx.teamId,
+          title: 'Coordinator',
+          createdAt: Date.now() - 60_000,
+          updatedAt: Date.now(),
+          lastTurnAt: null,
+          session: { runtime: 'pi', id: '', openedAt: Date.now() - 60_000 },
+          pendingSessionResumeAt: null,
+          toolDefHashes: {},
+          toolResultHashes: {},
+          activeRun: null,
+          turnQueue: null,
+        },
+        message: {
+          id: `smoke-ime-${posts}`,
+          role: 'user',
+          origin: 'user',
+          content: 'smoke ime',
+          createdAt: Date.now(),
+        },
+      }),
+    });
+  };
+
+  await page.route('**/api/**', routeHandler);
+  try {
+    await composer.click({ timeout: UI_WAIT_MS });
+    await composer.fill('smoke ime blur');
+    await composer.evaluate((el) => {
+      el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+    });
+    await composer.press('Enter');
+    assert.equal(posts, 0, 'Enter during active IME composition must not send');
+
+    await composer.evaluate((el) => el.blur());
+    await composer.click({ timeout: UI_WAIT_MS });
+    await composer.press('Enter');
+    const blurDeadline = Date.now() + UI_WAIT_MS;
+    while (posts < 1 && Date.now() < blurDeadline) await delay(100);
+    assert.equal(posts, 1, 'Enter after blur without compositionend must send');
+    const afterBlur = await composer.inputValue();
+    assert.equal(afterBlur, '', `expected composer draft to clear after send, got "${afterBlur}"`);
+
+    await composer.click({ timeout: UI_WAIT_MS });
+    await composer.fill('smoke ime cancel');
+    await composer.evaluate((el) => {
+      el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '' }));
+      el.dispatchEvent(new CompositionEvent('compositioncancel', { bubbles: true, data: '' }));
+    });
+    await composer.press('Enter');
+    const cancelDeadline = Date.now() + UI_WAIT_MS;
+    while (posts < 2 && Date.now() < cancelDeadline) await delay(100);
+    assert.equal(posts, 2, 'Enter after compositioncancel must send');
+    const afterCancel = await composer.inputValue();
+    assert.equal(
+      afterCancel,
+      '',
+      `expected composer draft to clear after compositioncancel send, got "${afterCancel}"`,
+    );
+  } finally {
+    await page.unroute('**/api/**', routeHandler);
+  }
+
+  return 'blur and compositioncancel reset composing state so Enter sends cleanly';
+}
+
+async function checkServerVersion(page, ctx) {
+  const info = await api(ctx, 'GET', '/api/server/version');
+  assert.ok(
+    info.version !== null || info.commit !== null,
+    `GET /api/server/version returned neither version nor commit: ${JSON.stringify(info)}`,
+  );
+  await openSettings(page, ctx, 'account');
+  const badge = page.getByTestId('server-version');
+  await badge.waitFor({ timeout: UI_WAIT_MS });
+  const rendered = (await badge.textContent()).trim();
+  const expected = formatExpectedServerVersion(info.version, info.commit, ctx.lang);
+  assert.equal(
+    rendered,
+    expected,
+    `Settings version badge rendered "${rendered}", expected "${expected}"`,
+  );
+  assert.ok(
+    !/[0-9a-f]{8,}/i.test(rendered),
+    `Settings version badge leaked full/untruncated SHA: "${rendered}"`,
+  );
+
+  const devSha = '606d9c2ef';
+  const expectedDev = formatExpectedServerVersion(null, devSha, ctx.lang);
+  const versionPattern = '**/api/server/version';
+  const versionHandler = async (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        version: null,
+        commit: devSha.slice(0, 7),
+        busy: false,
+        updater: {
+          supported: false,
+          state: 'idle',
+          availableVersion: null,
+          percent: null,
+          error: null,
+          updatedAt: null,
+        },
+      }),
+    });
+  };
+  await page.route(versionPattern, versionHandler);
+  try {
+    await page.goto(`${ctx.base}/app`, { waitUntil: 'domcontentloaded' });
+    await openSettings(page, ctx, 'account');
+    await badge.waitFor({ timeout: UI_WAIT_MS });
+    const deadline = Date.now() + UI_WAIT_MS;
+    let devRendered = (await badge.textContent()).trim();
+    while (devRendered !== expectedDev && Date.now() < deadline) {
+      await delay(200);
+      devRendered = (await badge.textContent()).trim();
+    }
+    assert.equal(
+      devRendered,
+      expectedDev,
+      `Settings dev version badge rendered "${devRendered}", expected "${expectedDev}"`,
+    );
+  } finally {
+    await page.unroute(versionPattern, versionHandler);
+  }
+
+  return `Settings version renders "${rendered}" and untagged dev fallback "${expectedDev}"`;
+}
+
 const CHECKS = [
   { id: 'migration', run: checkServeApp },
   { id: 'models', run: checkModels },
@@ -794,6 +1233,10 @@ const CHECKS = [
   { id: 'menu', run: checkMenu, appOnly: true },
   { id: 'attachment', run: checkAttachment },
   { id: 'remote', run: checkRemote },
+  { id: 'start-task-echo', run: checkStartTaskEcho },
+  { id: 'settings-titlebar', run: checkSettingsTitlebar },
+  { id: 'ime-composition', run: checkImeComposition },
+  { id: 'server-version', run: checkServerVersion },
 ];
 
 async function waitForServerUp(base, timeoutMs) {
@@ -978,7 +1421,7 @@ async function main() {
       'Usage: node scripts/smoke/post-install.mjs [--app <path-to-Cairn.app>]\n' +
         '          [--prev-app <path-to-previous-Cairn.app>]\n' +
         `          [--base ${DEFAULT_BASE}] [--user-data <dir>] [--token <t>]\n` +
-        '          [--evidence <dir>]\n' +
+        '          [--evidence <dir>] [--checks <id,id,...>]\n' +
         'With --prev-app: boot the previous release on the scratch home first,\n' +
         'populate every table, then boot --app so migrations run on real data.\n' +
         'With --app: launches the packaged app in a scratch home and runs all checks.\n' +
@@ -986,6 +1429,8 @@ async function main() {
     );
     return;
   }
+  const selectedChecks =
+    args.checks === null ? CHECKS : CHECKS.filter((check) => args.checks.includes(check.id));
   const evidence = args.evidence ?? mkdtempSync(join(tmpdir(), 'cairn-smoke-evidence-'));
   mkdirSync(evidence, { recursive: true });
   const ctx = args.app ? await connectApp(args.app, args.prevApp) : await connectLocal(args);
@@ -994,7 +1439,9 @@ async function main() {
   try {
     const teams = await api(ctx, 'GET', '/api/teams');
     ctx.teamId = teams[0].id;
-    ctx.runnerPromise = pollLocalRunnerOnline(ctx);
+    if (selectedChecks.some((check) => check.id === 'runner')) {
+      ctx.runnerPromise = pollLocalRunnerOnline(ctx);
+    }
     await ensureProject(ctx);
     if (ctx.mode === 'app') {
       await seedModelSources(ctx);
@@ -1011,7 +1458,7 @@ async function main() {
     await api(ctx, 'GET', `/api/teams/${ctx.teamId}/chief`);
     await waitForChief(ctx);
     ctx.threadId = seedChiefMessage(ctx);
-    for (const check of CHECKS) {
+    for (const check of selectedChecks) {
       if (check.appOnly && ctx.mode !== 'app') {
         results.push({
           id: check.id,

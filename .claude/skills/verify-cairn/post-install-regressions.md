@@ -16,6 +16,10 @@ visible symptom, and the release that shipped the regression.
 | `menu` | Coordinator chat loses native context-menu entries: copy, copy image, save image as, copy link, paste, look up. | — |
 | `attachment` | A finished file attachment tile renders no type icon, or the floating lightbox/pager stops opening. | — |
 | `remote` | Remote access switch fails to render or shows a state that differs from the persisted `tsnet-remote.json`. | — |
+| `start-task-echo` | Starting a task leaks synthetic `开始任务 #N` / `编排请求` prompts into the main Coordinator chat, renders `#N` in the task thread notice instead of the task title, or emits a redundant in-thread orchestration toast (S10, fixed by `40a5af0d0`). | — (fixed in 0.1.736) |
+| `settings-titlebar` | Narrow (`760px`) full-window Settings overlay header (`h1` or close button) overlaps the top-left macOS traffic-light zone or loses its draggable titlebar region (S13, fixed by `1734a565e`). | — (fixed in 0.1.737) |
+| `ime-composition` | Blurring the composer or firing `compositioncancel` during IME input leaves composing state stuck so subsequent `Enter` presses fail to send (S14, fixed by `bcb383cda`, `906d76aeb`). | — (fixed in 0.1.737–0.1.738) |
+| `server-version` | Settings About / Host version badge falls back to `Unknown version` on untagged builds with a commit SHA or leaks an untruncated SHA instead of rendering `<version> · <sha7>` or `Dev · <sha7>` (S5, fixed by `606d9c2ec`, `589f305c0`). | — (fixed in 0.1.733–0.1.734) |
 
 ## Adding a regression
 
