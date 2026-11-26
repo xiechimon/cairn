@@ -10,10 +10,11 @@ import {
 } from '../api/mappers.js';
 import { canUpdateDesktop, updateDesktopNow } from '../board/desktop-update.js';
 import { PANE_PARAM } from '../board/work-panel.js';
-import { NoticeLine } from '../components/chat/notice-line.js';
+import { type NoticeDetail, NoticeLine } from '../components/chat/notice-line.js';
 import { Button } from '../components/ui/button.js';
 import type { QueueWait } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 
@@ -40,12 +41,19 @@ function actionHref(action: TurnFailureAction, error: TurnErrorFacts): string | 
   return null;
 }
 
+function translatedCopy(copy: TurnErrorCopy, t: TFunc) {
+  const vars = { ...copy.vars, provider: copy.vars.provider || t('该服务商') };
+  return { title: t(copy.title, vars), why: t(copy.why, vars), vars };
+}
+
+export function turnErrorDetail(error: TurnErrorFacts, t: TFunc): NoticeDetail {
+  const text = translatedCopy(turnErrorCopy(error, ON_MAC), t);
+  return { lines: [text.title, text.why], raw: error.message };
+}
+
 function useCopyText() {
   const { t } = useI18n();
-  return (copy: TurnErrorCopy) => {
-    const vars = { ...copy.vars, provider: copy.vars.provider || t('该服务商') };
-    return { title: t(copy.title, vars), why: t(copy.why, vars), vars };
-  };
+  return (copy: TurnErrorCopy) => translatedCopy(copy, t);
 }
 
 export const CardFailureContext = createContext<string | null>(null);

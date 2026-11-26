@@ -2666,7 +2666,15 @@ export function mapOrchestrationFeedback(
     const error = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (error !== null) {
       const copy = turnErrorCopy(error, false);
-      items.push({ kind: 'note', text: copy.title, vars: copy.vars, id: m.id });
+      items.push({
+        kind: 'fail',
+        label: copy.title,
+        labelVars: copy.vars,
+        body: copy.why,
+        bodyVars: copy.vars,
+        raw: error.message,
+        id: m.id,
+      });
       return items;
     }
     const text = m.role === 'assistant' ? textOfContent(m.content).trim() : '';

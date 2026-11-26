@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'zh'));
 });
 
-test('the card carries the latest failure alone; older failures are a bare 未完成 marker', async ({
+test('the card carries the latest failure alone; older failures stay expandable in the stream', async ({
   page,
 }) => {
   const sent: string[] = [];
@@ -58,10 +58,16 @@ test('the card carries the latest failure alone; older failures are a bare 未�
   );
   const stream = page.getByTestId('chief-stream');
   const markers = page.getByTestId('chief-turn-error');
-  await expect(markers).toHaveText(['未完成']);
-  await expect(markers.getByRole('button')).toHaveCount(0);
+  await expect(markers).toHaveText(['未完成详情']);
+  const olderDetail = markers.getByRole('button', { name: '详情' });
+  await expect(olderDetail).toHaveCount(1);
   await expect(stream).not.toContainText('Request timed out');
   await expect(stream).not.toContainText('被打断');
+  await olderDetail.click();
+  await expect(page.getByTestId('chief-turn-error-raw')).toContainText('generation, 3 times');
+  await expect(page.getByTestId('chief-turn-error-raw')).toContainText('这一轮被打断了');
+  await olderDetail.click();
+  await expect(page.getByTestId('chief-turn-error-raw')).toHaveCount(0);
   const card = page.getByTestId('chief-turn-error-card');
   await expect(card).toHaveCount(1);
   await expect(card).toContainText('模型响应超时');
@@ -77,7 +83,7 @@ test('the card carries the latest failure alone; older failures are a bare 未�
   expect(sent).toEqual([]);
 });
 
-test('closing the card leaves the bare marker', async ({ page }) => {
+test('closing the card leaves an expandable marker', async ({ page }) => {
   await open(page, [
     { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
     failure('m2', 11, TIMEOUT),
@@ -87,7 +93,10 @@ test('closing the card leaves the bare marker', async ({ page }) => {
   await expect(page.getByTestId('chief-turn-error')).toHaveCount(0);
   await page.getByTestId('chief-turn-error-card-dismiss').click();
   await expect(card).toHaveCount(0);
-  await expect(page.getByTestId('chief-turn-error')).toHaveText('未完成');
+  const marker = page.getByTestId('chief-turn-error');
+  await expect(marker).toHaveText('未完成详情');
+  await marker.getByRole('button', { name: '详情' }).click();
+  await expect(page.getByTestId('chief-turn-error-raw')).toContainText('Request timed out.');
 });
 
 test('a stored raw API error reply renders as the marker, never as a chat bubble', async ({
@@ -104,7 +113,7 @@ test('a stored raw API error reply renders as the marker, never as a chat bubble
   ]);
   const stream = page.getByTestId('chief-stream');
   await expect(page.getByTestId('chief-turn-error-card')).toHaveAttribute('data-kind', 'runtime-update');
-  await expect(page.getByTestId('chief-turn-error')).toHaveText(['未完成']);
+  await expect(page.getByTestId('chief-turn-error')).toHaveText(['未完成详情']);
   await expect(stream).not.toContainText('API Error');
   await expect(stream.getByTestId('chief-reply')).toHaveCount(0);
 });
@@ -134,7 +143,7 @@ test('a turn that failed shows only its marker: no thinking and no second failur
   ]);
   const stream = page.getByTestId('chief-stream');
   await expect(page.getByTestId('chief-turn-error-card')).toHaveCount(1);
-  await expect(page.getByTestId('chief-turn-error')).toHaveText(['未完成']);
+  await expect(page.getByTestId('chief-turn-error')).toHaveText(['未完成详情']);
   await expect(page.getByRole('button', { name: '展开思考' })).toHaveCount(0);
   await expect(stream).not.toContainText('先查 #5393');
   await expect(stream).not.toContainText('逐条核对');

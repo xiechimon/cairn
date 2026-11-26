@@ -55,7 +55,7 @@ import { SecretRequestCard } from './secret-request-card.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
 import type { ChannelMirror, GroupedRow } from './thread-activity.js';
-import { CardFailureContext } from './turn-failure.js';
+import { CardFailureContext, turnErrorDetail } from './turn-failure.js';
 
 function runAttr(joinsPrev: boolean, joinsNext: boolean): BubbleRun | undefined {
   if (joinsPrev && joinsNext) return 'middle';
@@ -539,7 +539,17 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
-        <NoticeLine label={t('未完成')} testId="chief-turn-error" tone="danger" />
+        <NoticeLine
+          label={t('未完成')}
+          testId="chief-turn-error"
+          tone="danger"
+          detail={
+            item.error === undefined
+              ? { lines: [], raw: item.text }
+              : turnErrorDetail(item.error, t)
+          }
+          detailTestId="chief-turn-error-raw"
+        />
       </MessageScrollerItem>
     );
   if (item.kind === 'chat-block')
