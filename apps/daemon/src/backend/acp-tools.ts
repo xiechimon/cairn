@@ -10,6 +10,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { DAEMON_VERSION } from '../version.js';
+import { acpTurnPolicy } from './acp-permission-gate.js';
 import { hostToolContent } from './host-tool-content.js';
 
 const AUTH_TIMEOUT_MS = 5_000;
@@ -174,6 +175,7 @@ export async function openAcpTools(opts: SessionOpts): Promise<AcpStdioBridge | 
   if (remote.length > 0 && !opts.executeRemoteTool) throw new Error('ACP tools require a relay');
   const names = [...remote, ...local].map((tool) => tool.name);
   if (new Set(names).size !== names.length) throw new Error('ACP host tool names must be unique');
+  const locked = acpTurnPolicy(opts) !== 'normal';
   const definitions = [...remote, ...local].map((tool) => ({
     name: tool.name,
     description: tool.description,
@@ -181,6 +183,7 @@ export async function openAcpTools(opts: SessionOpts): Promise<AcpStdioBridge | 
       .object({ type: z.literal('object') })
       .loose()
       .parse(tool.parameters ?? { type: 'object', properties: {} }),
+    ...(locked ? { annotations: { readOnlyHint: true } } : {}),
   }));
 
   return openStdioMcpListener('cairn', names, (server) => {

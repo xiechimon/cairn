@@ -164,6 +164,71 @@ describe('ACP stdio host tools lifecycle', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['lockedDown', { lockedDown: true }],
+    ['readOnly', { readOnly: true }],
+    ['remoteToolsOnly', { remoteToolsOnly: true }],
+  ] as const)(
+    'annotates every host tool with readOnlyHint: true on %s turns',
+    async (_label, policy) => {
+      const bridge = await openAcpTools({
+        ...opts,
+        ...policy,
+        remoteTools: [{ name: 'todos', description: 'Read todos' }],
+        executeRemoteTool: async () => '[]',
+        localTools: [{ name: 'local', description: 'Local', execute: async () => 'ok' }],
+      });
+      if (!bridge) throw new Error('Missing bridge');
+      const rpc = spawnStdioRpc(bridge.declaration);
+      try {
+        await rpc.call('initialize', {
+          protocolVersion: '2025-11-25',
+          capabilities: {},
+          clientInfo: { name: 'test', version: '1' },
+        });
+        const listed = (await rpc.call('tools/list')) as {
+          result: { tools: Array<{ name: string; annotations?: { readOnlyHint?: boolean } }> };
+        };
+        expect(listed.result.tools.map((t) => t.name)).toEqual(['todos', 'local']);
+        for (const tool of listed.result.tools) {
+          expect(tool.annotations).toEqual({ readOnlyHint: true });
+        }
+      } finally {
+        rpc.close();
+        bridge.close();
+      }
+    },
+  );
+
+  test('omits tool annotations on normal turns', async () => {
+    const bridge = await openAcpTools({
+      ...opts,
+      remoteTools: [{ name: 'todos', description: 'Read todos' }],
+      executeRemoteTool: async () => '[]',
+      localTools: [{ name: 'local', description: 'Local', execute: async () => 'ok' }],
+    });
+    if (!bridge) throw new Error('Missing bridge');
+    const rpc = spawnStdioRpc(bridge.declaration);
+    try {
+      await rpc.call('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '1' },
+      });
+      const listed = (await rpc.call('tools/list')) as {
+        result: { tools: Array<{ name: string; annotations?: unknown }> };
+      };
+      expect(listed.result.tools.map((t) => t.name)).toEqual(['todos', 'local']);
+      for (const tool of listed.result.tools) {
+        expect('annotations' in tool).toBe(false);
+        expect(tool.annotations).toBeUndefined();
+      }
+    } finally {
+      rpc.close();
+      bridge.close();
+    }
+  });
+
   test('bridges external HTTP MCP connectors onto stdio and refuses redirects without leaking auth headers', async () => {
     let seenAuth: string | undefined;
     let leakedToRedirectTarget = false;
@@ -218,9 +283,10 @@ describe('ACP stdio host tools lifecycle', () => {
         clientInfo: { name: 'test', version: '1' },
       });
       const listed = (await rpc.call('tools/list')) as {
-        result: { tools: Array<{ name: string }> };
+        result: { tools: Array<{ name: string; annotations?: Record<string, unknown> }> };
       };
       expect(listed.result.tools.map((t) => t.name)).toEqual(['ext_ping']);
+      expect(listed.result.tools[0]?.annotations).toBeUndefined();
       const called = (await rpc.call('tools/call', { name: 'ext_ping', arguments: {} })) as {
         result: { content: Array<{ text: string }> };
       };
