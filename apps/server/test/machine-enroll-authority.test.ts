@@ -6,7 +6,7 @@ import { describe, expect, test } from 'vitest';
 import { machine as machineTable, pairedDevice } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
 import { issueBrowserSession } from '../src/services/browser-session.js';
-import { seedLocalMachine } from '../src/services/machines.js';
+import { demoteMigratedLocalMachines, seedLocalMachine } from '../src/services/machines.js';
 import { bootServer, issueApiKey, type TestServer } from './helpers.js';
 
 const HOST = hostname();
@@ -592,6 +592,197 @@ describe('machine enrollment authority (#2054)', () => {
       expect((await call(s.app, 'GET', '/api/machine/me', { cred: secondBody.token })).status).toBe(
         200,
       );
+    } finally {
+      s.dispose();
+    }
+  });
+});
+
+describe('migrated local machine demotion', () => {
+  test('demotes a migrated local row from a foreign host so both hosts can enroll', async () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    try {
+      const oldLaptopKey = 'c'.repeat(64);
+      const oldLaptopId = 'migrated-old-laptop';
+      s.db
+        .insert(machineTable)
+        .values({
+          id: oldLaptopId,
+          teamId: s.team.id,
+          name: 'old-laptop.local',
+          online: false,
+          tokenHash: 'old-laptop-token-hash',
+          apiKeyId: null,
+          latestCliVersion: null,
+          kind: 'local',
+          hostKey: oldLaptopKey,
+          retiredAt: null,
+        })
+        .run();
+
+      const oldLaptopBlocked = await call(s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: 'old-laptop.local', teamId: s.team.id, hostKey: oldLaptopKey },
+        peer: '203.0.113.10',
+      });
+      expect(oldLaptopBlocked.status).toBe(409);
+      expect(await oldLaptopBlocked.json()).toEqual({ error: HOST_NAME_NEEDS_LOOPBACK_REFUSAL });
+
+      const currentHostBlocked = await call(s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: HOST, teamId: s.team.id, hostKey: HOST_KEY },
+        peer: '127.0.0.1',
+      });
+      expect(currentHostBlocked.status).toBe(409);
+      expect(await currentHostBlocked.json()).toEqual({ error: LOCAL_HOST_PROOF_REFUSAL });
+
+      expect(demoteMigratedLocalMachines(s.db, { name: HOST, hostKey: HOST_KEY })).toBe(1);
+      expect(machineRow(s, oldLaptopId)?.kind).toBe('remote');
+      expect(seedLocalMachine(s.db, s.team.id)).toBe('created');
+
+      const oldLaptopStart = await call(s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: 'old-laptop.local', teamId: s.team.id, hostKey: oldLaptopKey },
+        peer: '203.0.113.10',
+      });
+      expect(oldLaptopStart.status).toBe(200);
+      const { enrollId: oldEnrollId } = (await oldLaptopStart.json()) as { enrollId: string };
+      const oldLaptopConfirm = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
+        cred: OWNER_TOKEN,
+        body: { enrollId: oldEnrollId },
+      });
+      expect(oldLaptopConfirm.status).toBe(200);
+      const { machine: oldEnrolled } = (await oldLaptopConfirm.json()) as {
+        machine: { machineId: string };
+      };
+      expect(oldEnrolled.machineId).toBe(oldLaptopId);
+      expect(machineRow(s, oldLaptopId)?.kind).toBe('remote');
+
+      const currentHostStart = await call(s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: HOST, teamId: s.team.id, hostKey: HOST_KEY },
+        peer: '127.0.0.1',
+      });
+      expect(currentHostStart.status).toBe(200);
+      const { enrollId: hostEnrollId } = (await currentHostStart.json()) as { enrollId: string };
+      const currentHostConfirm = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
+        cred: OWNER_TOKEN,
+        body: { enrollId: hostEnrollId },
+      });
+      expect(currentHostConfirm.status).toBe(200);
+      const { machine: hostEnrolled } = (await currentHostConfirm.json()) as {
+        machine: { machineId: string };
+      };
+      expect(hostEnrolled.machineId).not.toBe(oldLaptopId);
+      expect(machineRow(s, hostEnrolled.machineId)).toMatchObject({
+        kind: 'local',
+        name: HOST,
+        hostKey: HOST_KEY,
+      });
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('demotes a migrated claimed local row with null hostKey but preserves unclaimed placeholders', () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    try {
+      const migratedId = 'migrated-legacy-local';
+      const placeholderId = 'unclaimed-placeholder';
+      s.db
+        .insert(machineTable)
+        .values([
+          {
+            id: migratedId,
+            teamId: s.team.id,
+            name: 'old-laptop.local',
+            online: false,
+            tokenHash: 'legacy-token-hash',
+            apiKeyId: null,
+            latestCliVersion: null,
+            kind: 'local',
+            hostKey: null,
+            retiredAt: null,
+          },
+          {
+            id: placeholderId,
+            teamId: s.team.id,
+            name: 'other-unclaimed.local',
+            online: false,
+            tokenHash: null,
+            apiKeyId: null,
+            latestCliVersion: null,
+            kind: 'local',
+            hostKey: null,
+            retiredAt: null,
+          },
+        ])
+        .run();
+
+      expect(demoteMigratedLocalMachines(s.db, { name: HOST, hostKey: HOST_KEY })).toBe(1);
+      expect(machineRow(s, migratedId)?.kind).toBe('remote');
+      expect(machineRow(s, placeholderId)?.kind).toBe('local');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('preserves kind=local across a same-host rename and same-name hostKey mismatch', async () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    try {
+      const sameHostId = 'same-host-renamed';
+      const foreignKey = 'b'.repeat(64);
+      const sameNameMismatchId = 'same-name-mismatch';
+      s.db
+        .insert(machineTable)
+        .values([
+          {
+            id: sameHostId,
+            teamId: s.team.id,
+            name: 'previous-name.local',
+            online: false,
+            tokenHash: 'same-host-token-hash',
+            apiKeyId: null,
+            latestCliVersion: null,
+            kind: 'local',
+            hostKey: HOST_KEY,
+            retiredAt: null,
+          },
+          {
+            id: sameNameMismatchId,
+            teamId: s.team.id,
+            name: HOST,
+            online: false,
+            tokenHash: 'same-name-token-hash',
+            apiKeyId: null,
+            latestCliVersion: null,
+            kind: 'local',
+            hostKey: foreignKey,
+            retiredAt: null,
+          },
+        ])
+        .run();
+
+      expect(demoteMigratedLocalMachines(s.db, { name: HOST, hostKey: HOST_KEY })).toBe(0);
+      expect(machineRow(s, sameHostId)?.kind).toBe('local');
+      expect(machineRow(s, sameNameMismatchId)?.kind).toBe('local');
+
+      s.db.delete(machineTable).where(eq(machineTable.id, sameNameMismatchId)).run();
+      expect(seedLocalMachine(s.db, s.team.id)).toBe('existing');
+      const start = await call(s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: HOST, teamId: s.team.id, hostKey: HOST_KEY },
+        peer: '127.0.0.1',
+      });
+      expect(start.status).toBe(200);
+      const { enrollId } = (await start.json()) as { enrollId: string };
+      const confirm = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
+        cred: OWNER_TOKEN,
+        body: { enrollId },
+      });
+      expect(confirm.status).toBe(200);
+      const { machine } = (await confirm.json()) as { machine: { machineId: string } };
+      expect(machine.machineId).toBe(sameHostId);
+      expect(machineRow(s, sameHostId)).toMatchObject({
+        kind: 'local',
+        name: HOST,
+        hostKey: HOST_KEY,
+      });
     } finally {
       s.dispose();
     }

@@ -27,6 +27,7 @@ describe('machines.ts facade', () => {
       'authorizeEnrollmentMachine',
       'beginMachineStarting',
       'claimStep',
+      'demoteMigratedLocalMachines',
       'enrollMachine',
       'fetchSteer',
       'fetchStop',

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { ENV_VARS } from '@cairn/shared';
 import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
+import { probeHostKey } from '@cairn/shared/host-identity';
 import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { applyLoginShellEnv } from '@cairn/shared/shell-env';
 import { serve } from '@hono/node-server';
@@ -64,7 +65,7 @@ import { createSlackAdapter } from './services/im/slack.js';
 import { createTelegramAdapter } from './services/im/telegram.js';
 import { createWechatAdapter } from './services/im/wechat.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
-import { seedLocalMachine } from './services/machines.js';
+import { demoteMigratedLocalMachines, seedLocalMachine } from './services/machines.js';
 import { createMailConnector } from './services/mail-connector.js';
 import { adoptGithubConnectorGrants } from './services/mcp-github-connector.js';
 import {
@@ -170,6 +171,16 @@ const vapidKeys = {
 };
 const seeded = seed(db);
 await fillSystemAvatar(seeded.user);
+const demotedLocalMachines = demoteMigratedLocalMachines(db, {
+  name: hostname(),
+  hostKey: probeHostKey(),
+});
+if (demotedLocalMachines > 0) {
+  logger.info(
+    { count: demotedLocalMachines, name: hostname() },
+    'demoted migrated local machine record(s) from another host to remote',
+  );
+}
 if (seedLocalMachine(db, seeded.team.id) === 'blocked') {
   logger.warn(
     { name: hostname() },

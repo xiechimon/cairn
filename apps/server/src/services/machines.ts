@@ -347,6 +347,35 @@ function hostKeyHeldByOther(db: Db, teamId: string, hostKey: string, machineId: 
   );
 }
 
+export function demoteMigratedLocalMachines(
+  db: Db,
+  host: { name: string; hostKey: string | null },
+): number {
+  const rows = db
+    .select({
+      id: machine.id,
+      name: machine.name,
+      hostKey: machine.hostKey,
+      tokenHash: machine.tokenHash,
+    })
+    .from(machine)
+    .where(and(eq(machine.kind, 'local'), isNull(machine.retiredAt)))
+    .all();
+  const demoteIds = rows
+    .filter((row) => {
+      if (row.name === host.name) return false;
+      if (host.hostKey !== null && row.hostKey !== null) return row.hostKey !== host.hostKey;
+      return row.hostKey === null && row.tokenHash !== null;
+    })
+    .map((row) => row.id);
+  if (demoteIds.length === 0) return 0;
+  return db
+    .update(machine)
+    .set({ kind: 'remote' })
+    .where(and(inArray(machine.id, demoteIds), eq(machine.kind, 'local')))
+    .run().changes;
+}
+
 export function seedLocalMachine(
   db: Db,
   teamId: string,
