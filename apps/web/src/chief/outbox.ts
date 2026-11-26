@@ -1,10 +1,12 @@
+import { QUEUED_MESSAGE_CANCELLED } from '@cairn/shared';
+import { ApiError } from '../api/client.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { randomId } from '../lib/random-id.js';
-import { SendStaleError, SendTimeoutError } from '../lib/send-errors.js';
+import { SendCancelledError, SendStaleError, SendTimeoutError } from '../lib/send-errors.js';
 
 export type OutboxState = 'sending' | 'failed' | 'sent';
 
-export type OutboxFailure = 'error' | 'timeout' | 'stale';
+export type OutboxFailure = 'error' | 'timeout' | 'stale' | 'cancelled';
 
 export type TaskSendMode = 'reply' | 'queue' | 'stop-and-send';
 
@@ -199,6 +201,19 @@ export function pageLockOwner(): OutboxOwner {
   };
 }
 
+function failureOf(error: unknown): OutboxFailure {
+  if (error instanceof SendTimeoutError) return 'timeout';
+  return error instanceof ApiError && error.reason === QUEUED_MESSAGE_CANCELLED
+    ? 'cancelled'
+    : 'error';
+}
+
+function restoredError(failure: OutboxFailure | undefined): Error | null {
+  if (failure === 'stale') return new SendStaleError();
+  if (failure === 'timeout') return new SendTimeoutError();
+  return failure === 'cancelled' ? new SendCancelledError() : null;
+}
+
 function conversationOf(
   entry: Pick<OutboxEntry, 'scope' | 'threadId' | 'projectId' | 'task'>,
 ): string {
@@ -355,7 +370,7 @@ export function createOutbox({
       );
       forget(key);
     } catch (error) {
-      await fail(key, error instanceof SendTimeoutError ? 'timeout' : 'error', error, onFailed);
+      await fail(key, failureOf(error), error, onFailed);
     }
   };
   const chain = (lane: string, work: () => Promise<void>) => {
@@ -415,9 +430,13 @@ export function createOutbox({
       const entry = list.find((candidate) => candidate.key === key);
       if (entry?.state !== 'failed') return null;
       pendingRefetchKeys.delete(key);
+      replace(list.filter((candidate) => candidate.key !== key));
+      if (entry.failure === 'cancelled') {
+        forget(key);
+        return entry;
+      }
       const handedBack = { ...entry, createdAt: now() };
       returned = [...returned, handedBack];
-      replace(list.filter((candidate) => candidate.key !== key));
       void amend(handedBack, 'returned');
       return entry;
     },
@@ -512,15 +531,7 @@ export function createOutbox({
         if (unsent.length > 0) replace([...unsent, ...list]);
         for (const entry of unsent)
           if (entry.state === 'failed')
-            options?.onFailed?.(
-              entry,
-              entry.failure === 'stale'
-                ? new SendStaleError()
-                : entry.failure === 'timeout'
-                  ? new SendTimeoutError()
-                  : null,
-              onRecord.has(entry.key),
-            );
+            options?.onFailed?.(entry, restoredError(entry.failure), onRecord.has(entry.key));
       };
       const run = place().catch((error) => {
         console.debug('cairn: recoverable operation failed', error);

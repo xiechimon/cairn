@@ -28,7 +28,12 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import { assertProjectWritable } from './project-writable.js';
-import { nestedLedgerId, queuedSendUnderKey, replacingStrandedSend } from './queued-send.js';
+import {
+  nestedLedgerId,
+  queuedSendUnderKey,
+  removedFromQueue,
+  replacingStrandedSend,
+} from './queued-send.js';
 import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
 import { settleQuestionAnswers } from './worker-questions.js';
 
@@ -283,6 +288,7 @@ function settleStoredSend(
   const nested = nestedSendReceipt(deps, row, body.clientMessageId);
   if (nested === undefined) {
     const queued = queuedSendUnderKey(deps.db, row, body.clientMessageId);
+    if (queued?.kind === 'cancelled') throw removedFromQueue();
     return queued?.kind === 'received'
       ? { todoId: row.id, conversationId: queued.conversationId, delivered: queued.delivered }
       : undefined;

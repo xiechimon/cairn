@@ -1,7 +1,12 @@
-import { ACTIVE_STEP_STATUSES, type ThreadMessageDelivery } from '@cairn/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import {
+  ACTIVE_STEP_STATUSES,
+  QUEUED_MESSAGE_CANCELLED,
+  type ThreadMessageDelivery,
+} from '@cairn/shared';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, clientMessage, queuedMessage, step, type todo } from '../db/schema.js';
+import { HttpError } from '../lib/errors.js';
 import { completeClientMessage, findClientMessage } from './client-message.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -11,6 +16,7 @@ export interface QueuedReceipt {
   conversationId: string;
   delivered?: ThreadMessageDelivery;
   message: { id: string };
+  cancelled?: true;
 }
 
 export type QueuedSend =
@@ -21,7 +27,21 @@ export type QueuedSend =
       answer: object;
       waitingMessageId?: string;
     }
-  | { kind: 'stranded'; scopeId: string; messageId: string };
+  | { kind: 'stranded'; scopeId: string; messageId: string }
+  | { kind: 'cancelled' };
+
+export function removedFromQueue(): HttpError {
+  return new HttpError(409, 'Queued message was removed', QUEUED_MESSAGE_CANCELLED);
+}
+
+export function latestStepStatus(db: Db, conversationId: string) {
+  return db
+    .select({ status: step.status })
+    .from(step)
+    .where(eq(step.buildId, conversationId))
+    .orderBy(desc(step.createdAt), sql`rowid DESC`)
+    .get()?.status;
+}
 
 export function buildsOf(db: Db, todoId: string): string[] {
   return db
@@ -82,24 +102,34 @@ export function markAsQueuedSend(
   completeClientMessage(db, scopeId, clientMessageId, { ...stored, via: 'queue' });
 }
 
-function willRun(db: Db, task: TodoRow, row: typeof queuedMessage.$inferSelect): boolean {
+type QueuedRow = typeof queuedMessage.$inferSelect;
+
+function onTheOpenRun(task: TodoRow, row: QueuedRow): boolean {
   if (task.archivedAt !== null || task.phase === 'closed') return false;
-  if (task.latestBuildId !== row.conversationId || row.error !== null) return false;
+  return task.latestBuildId === row.conversationId && row.error === null;
+}
+
+function hasActiveStep(db: Db, conversationId: string): boolean {
   return (
     db
       .select({ id: step.id })
       .from(step)
-      .where(
-        and(eq(step.buildId, row.conversationId), inArray(step.status, [...ACTIVE_STEP_STATUSES])),
-      )
+      .where(and(eq(step.buildId, conversationId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
       .get() !== undefined
   );
+}
+
+function staysQueued(db: Db, task: TodoRow, row: QueuedRow, sendNow: boolean): boolean {
+  if (!onTheOpenRun(task, row)) return false;
+  if (hasActiveStep(db, row.conversationId)) return true;
+  return !sendNow && latestStepStatus(db, row.conversationId) === 'stopped';
 }
 
 export function queuedSendUnderKey(
   db: Db,
   task: TodoRow,
   clientMessageId: string,
+  sendNow = false,
 ): QueuedSend | undefined {
   const scopes = buildsOf(db, task.id);
   if (scopes.length === 0) return undefined;
@@ -115,7 +145,8 @@ export function queuedSendUnderKey(
     .all()
     .find((entry) => isQueuedReceipt(entry.response));
   if (found === undefined) return undefined;
-  const { via: _via, ...answer } = found.response as QueuedReceipt;
+  const { via: _via, cancelled, ...answer } = found.response as QueuedReceipt;
+  if (cancelled) return { kind: 'cancelled' };
   if (answer.delivered !== undefined)
     return {
       kind: 'received',
@@ -129,7 +160,8 @@ export function queuedSendUnderKey(
     const conversationId = task.latestBuildId ?? answer.conversationId;
     return { kind: 'received', conversationId, delivered: 'steer', answer: { conversationId } };
   }
-  if (!willRun(db, task, row)) return { kind: 'stranded', scopeId: found.scopeId, messageId };
+  if (!staysQueued(db, task, row, sendNow))
+    return { kind: 'stranded', scopeId: found.scopeId, messageId };
   return {
     kind: 'received',
     conversationId: row.conversationId,
@@ -169,7 +201,8 @@ export function forgetCancelledSend(
     .all()
     .filter((entry) => isQueuedReceipt(entry.response) && entry.response.message.id === messageId);
   for (const entry of receipts)
-    db.delete(clientMessage)
+    db.update(clientMessage)
+      .set({ response: asCancelled(entry.response) })
       .where(
         and(
           eq(clientMessage.scopeId, entry.scopeId),
@@ -179,15 +212,20 @@ export function forgetCancelledSend(
       .run();
 }
 
+function asCancelled(response: unknown): QueuedReceipt {
+  return { ...(response as QueuedReceipt), cancelled: true };
+}
+
 export async function replacingStrandedSend<T>(
   db: Db,
   task: TodoRow,
-  resend: { clientMessageId?: string; content: string },
+  resend: { clientMessageId?: string; content: string; sendNow?: boolean },
   send: () => Promise<T>,
 ): Promise<T> {
-  const { clientMessageId, content } = resend;
+  const { clientMessageId, content, sendNow } = resend;
   if (clientMessageId === undefined) return send();
-  const found = queuedSendUnderKey(db, task, clientMessageId);
+  const found = queuedSendUnderKey(db, task, clientMessageId, sendNow);
+  if (found?.kind === 'cancelled') throw removedFromQueue();
   if (found?.kind !== 'stranded') return send();
   const queuedRow = eq(queuedMessage.id, found.messageId);
   const ledger = and(
@@ -206,13 +244,20 @@ export async function replacingStrandedSend<T>(
     return await send();
   } catch (error) {
     const cancelledMeanwhile = taken.row !== undefined && !takenIn(db).has(found.messageId);
-    if (!cancelledMeanwhile)
-      db.transaction(() => {
-        if (anyReceipt(db, task.id, clientMessageId)) return;
-        if (taken.row) db.insert(queuedMessage).values(taken.row).onConflictDoNothing().run();
-        if (taken.receipt)
-          db.insert(clientMessage).values(taken.receipt).onConflictDoNothing().run();
-      });
+    db.transaction(() => {
+      if (anyReceipt(db, task.id, clientMessageId)) return;
+      if (taken.row && !cancelledMeanwhile)
+        db.insert(queuedMessage).values(taken.row).onConflictDoNothing().run();
+      if (taken.receipt)
+        db.insert(clientMessage)
+          .values(
+            cancelledMeanwhile
+              ? { ...taken.receipt, response: asCancelled(taken.receipt.response) }
+              : taken.receipt,
+          )
+          .onConflictDoNothing()
+          .run();
+    });
     throw error;
   } finally {
     takenIn(db).delete(found.messageId);

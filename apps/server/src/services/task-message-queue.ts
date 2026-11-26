@@ -1,8 +1,8 @@
-import { ACTIVE_STEP_STATUSES } from '@cairn/shared';
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { ACTIVE_STEP_STATUSES, TASK_CLOSED } from '@cairn/shared';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, queuedMessage, step, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { addUserMessageAttachmentGrants } from './attachment-authorization.js';
 import { type BuildDeps, type BuildSteerResult, sendBuildSteer } from './builds.js';
@@ -16,8 +16,10 @@ import {
 import {
   buildsOf,
   forgetCancelledSend,
+  latestStepStatus,
   markAsQueuedSend,
   queuedSendUnderKey,
+  removedFromQueue,
   replacingStrandedSend,
 } from './queued-send.js';
 import { threadSendUnderKey } from './thread-message.js';
@@ -68,8 +70,9 @@ export async function queueTaskMessage(
   if (replied !== undefined) return { conversationId: replied.conversationId };
   const earlier =
     task && clientMessageId !== undefined
-      ? queuedSendUnderKey(deps.db, task, clientMessageId)
+      ? queuedSendUnderKey(deps.db, task, clientMessageId, deliverAfterStop)
       : undefined;
+  if (earlier?.kind === 'cancelled') throw removedFromQueue();
   if (earlier?.kind === 'received') {
     if (deliverAfterStop && earlier.waitingMessageId !== undefined)
       deps.db
@@ -88,62 +91,55 @@ export async function queueTaskMessage(
     if (replay !== undefined) return replay;
   }
   if (!row) throw new HttpError(404, `conversation ${conversationId}`);
-  if (
-    !task ||
-    task.archivedAt !== null ||
-    task.latestBuildId !== conversationId ||
-    task.phase === 'closed'
-  )
+  if (task?.archivedAt != null) throw taskArchived();
+  if (task?.phase === 'closed')
+    throw new HttpError(409, 'Task cannot accept a queued message', TASK_CLOSED);
+  const latestRun =
+    task?.latestBuildId == null
+      ? undefined
+      : deps.db.select().from(build).where(eq(build.id, task.latestBuildId)).get();
+  if (!task || latestRun === undefined)
     throw new HttpError(409, 'Task cannot accept a queued message');
+  const runId = latestRun.id;
   const send = async () => {
-    if (!activeStep(deps.db, conversationId))
+    if (!activeStep(deps.db, runId))
       return sendBuildSteer(
         deps,
-        conversationId,
+        runId,
         { content, clientMessageId },
         {
           afterTurn: true,
           origin: 'user',
-          beforeCommit: () => markAsQueuedSend(deps.db, conversationId, clientMessageId),
+          beforeCommit: () => markAsQueuedSend(deps.db, runId, clientMessageId),
         },
       );
     const message = {
       id: newRecordId(),
-      conversationId,
+      conversationId: runId,
       content,
       deliverAfterStop,
       createdAt: nowMs(),
     };
-    const queued = { conversationId, message };
+    const queued = { conversationId: runId, message };
     try {
       deps.db.transaction(() => {
-        claimClientMessage(deps.db, conversationId, clientMessageId);
+        claimClientMessage(deps.db, runId, clientMessageId);
         deps.db.insert(queuedMessage).values(message).run();
         addUserMessageAttachmentGrants(deps.db, task.id, task.teamId, content);
-        completeClientMessage(deps.db, conversationId, clientMessageId, queued);
-        markAsQueuedSend(deps.db, conversationId, clientMessageId);
+        completeClientMessage(deps.db, runId, clientMessageId, queued);
+        markAsQueuedSend(deps.db, runId, clientMessageId);
       });
     } catch (error) {
-      return replayAfterConflict<QueuedTaskMessageResult>(
-        deps.db,
-        conversationId,
-        clientMessageId,
-        error,
-      );
+      return replayAfterConflict<QueuedTaskMessageResult>(deps.db, runId, clientMessageId, error);
     }
-    deps.convHub?.publishMessage(
-      conversationId,
-      { ...message, role: 'user' },
-      undefined,
-      clientMessageId,
-    );
+    deps.convHub?.publishMessage(runId, { ...message, role: 'user' }, undefined, clientMessageId);
     return queued;
   };
   return coalesceClientMessage(deps.db, task.id, clientMessageId, () =>
     replacingStrandedSend<BuildSteerResult | QueuedTaskMessageResult>(
       deps.db,
       task,
-      { clientMessageId, content },
+      { clientMessageId, content, sendNow: deliverAfterStop },
       send,
     ),
   );
@@ -243,15 +239,10 @@ export async function drainTaskMessageQueue(
   conversationId: string,
 ): Promise<void> {
   if (activeStep(deps.db, conversationId)) return;
-  const latest = deps.db
-    .select()
-    .from(step)
-    .where(eq(step.buildId, conversationId))
-    .orderBy(desc(step.createdAt), sql`rowid DESC`)
-    .get();
-  if (latest?.status === 'failed') return;
+  const latest = latestStepStatus(deps.db, conversationId);
+  if (latest === 'failed') return;
   const next = readQueuedMessages(deps.db, conversationId).find(
-    (row) => row.error === null && (latest?.status !== 'stopped' || row.deliverAfterStop),
+    (row) => row.error === null && (latest !== 'stopped' || row.deliverAfterStop),
   );
   if (!next) return;
   try {

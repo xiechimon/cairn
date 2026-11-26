@@ -21,6 +21,7 @@ export const CHIEF_MESSAGE_READ = 'chief-message-read';
 export const CHIEF_MESSAGE_MERGED = 'chief-message-merged';
 export const MEMORY_EDIT_MOVED = 'memory-edit-moved';
 export const TASK_COMPUTER_OFFLINE = 'task-computer-offline';
+export const QUEUED_MESSAGE_CANCELLED = 'queued-message-cancelled';
 export const TASK_ARCHIVED = 'task-archived';
 export const TASK_CLOSED = 'task-closed';
 

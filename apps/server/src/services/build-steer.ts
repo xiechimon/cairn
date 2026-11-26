@@ -5,6 +5,7 @@ import {
   conversationBranch,
   isWaitingPhase,
   prNumberFromUrl,
+  TASK_ARCHIVED,
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import {
@@ -67,6 +68,7 @@ function continuationTodo(
     row?.phase === 'done' ||
     row?.phase === 'building' ||
     (options.allowReviewContinuation === true && row?.phase === 'review') ||
+    (options.afterTurn === true && options.schedule === undefined && row?.phase === 'stopped') ||
     row?.phase === 'needs_input' ||
     (options.afterTurn === true &&
       row !== undefined &&
@@ -134,7 +136,11 @@ export async function sendBuildSteer(
   if (todoRow?.phase === 'closed' && todoRow.archivedAt === null)
     throw new BuildContinuationPhaseError();
   if (!todoRow || todoRow.archivedAt !== null || todoRow.latestBuildId !== conversationId)
-    throw new HttpError(409, 'Task cannot accept a message');
+    throw new HttpError(
+      409,
+      'Task cannot accept a message',
+      todoRow?.archivedAt != null ? TASK_ARCHIVED : undefined,
+    );
   let targetBuildId = conversationId;
   let prClosed: 'closed' | null = null;
   if (running && continuationOptions.schedule) {

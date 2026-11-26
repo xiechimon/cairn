@@ -5,6 +5,13 @@ export class SendTimeoutError extends Error {
   }
 }
 
+export class SendCancelledError extends Error {
+  constructor() {
+    super('The message was removed from the queue');
+    this.name = 'SendCancelledError';
+  }
+}
+
 export class SendStaleError extends Error {
   constructor() {
     super('The send is too old to repeat on its own');

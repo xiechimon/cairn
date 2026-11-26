@@ -4,7 +4,7 @@ Status: approved by the owner on 2026-11-19 (rebuild, not patch; `failed` stays 
 
 ## Who meets it
 
-Every task card. Today a task you stop before it delivers anything goes back to "not started" and looks like a task nobody ever ran; a task restarted from a running state and then stopped can land in "running" with nothing running, and stays there until someone archives it (#155, #167, #169 in the backup). After this change a stop that ends a run before it delivered anything shows the task as **Stopped**. Sending it a message, or pressing Rerun, starts a new run.
+Every task card. Today a task you stop before it delivers anything goes back to "not started" and looks like a task nobody ever ran; a task restarted from a running state and then stopped can land in "running" with nothing running, and stays there until someone archives it (#155, #167, #169 in the backup). After this change a stop that ends a run before it delivered anything shows the task as **Stopped**. A message from the task's own composer, send now on a waiting message included, continues the stopped conversation; pressing Rerun, or a message through the task reply route (the Coordinator's), starts a new run.
 
 ## Target
 
@@ -23,7 +23,7 @@ Four outer states with the reason or result in a field, the shape Letta and GitH
 
 1. Every phase write goes through `setTodoPhase`, which checks `PHASE_TRANSITIONS` (`apps/server/src/services/phase.ts`). A stop passes `cause: 'stop'` and may additionally return the task to the last thing it delivered (`confirm` after a plan, `review` after a build, or the phase the run started from when that phase was `confirm`, `review`, `done` or `failed`), or end it as `stopped`. A stop never writes `todo` or an in-flight phase.
 2. A stop is settled only when the runner reports the step stopped. The runner reports it only after the agent process has exited, background subagents are dropped and background commands are killed and reaped (daemon side, `apps/daemon/src/backend/claude-code.ts`).
-3. Ended tasks hold no session and no background work. `stopped` leaves to `queued` (new run), `done` or `closed`; the new run records `prevPhase = 'stopped'` and does not reuse the old session.
+3. Ended tasks hold no session and no background work. `stopped` leaves to `queued`, `done` or `closed`. A new run records `prevPhase = 'stopped'` and does not reuse the old session. A composer message continues the stopped run in its conversation (`sendBuildSteer` with `afterTurn`); a scheduled wake never does.
 4. After a turn, a running task with live work (a foreground step, a background subagent, a background command) keeps its session open; a waiting task checkpoints and sends no model requests.
 5. Every phase change appends one `todo_transition` row (from, to, cause, at), written in the same transaction as the phase by `setTodoPhase` and `updateTodo`. The cause is `stop`, `manual` (a board move) or empty for the system. `inspect_run` returns the last rows as `phaseHistory`, so the Coordinator and a debugging session can see how a task reached its phase.
 6. The scheduler checks every in-flight phase, not only `queued`. A `planning`, `building` or `needs_input` task whose latest run has no active step, no pending question, no queued message and no pending steer, and whose phase and last step are both older than two minutes, is settled as `failed` with the run's reason (`build-stalled-sweep.ts`).

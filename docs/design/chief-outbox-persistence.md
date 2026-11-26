@@ -14,7 +14,7 @@ The chief composer posts to `POST /api/teams/:id/chief/threads` (no thread yet) 
 
 ## State
 
-IndexedDB databases `cairn-chief-outbox` (Coordinator) and `cairn-task-outbox` (task replies), store `entries` keyed by `key`, through a thin wrapper over the IndexedDB API (no new dependency: four operations, one a conditional write in one transaction; a blocked open rejects). One row per client id: `{ key, scope, owner, threadId, projectId, text, task?, failure?, state, createdAt }`. `task` is `{ todoId, mode }` with `mode` one of `reply`, `queue` and `stop-and-send`; `failure` is `error`, `timeout` or `stale`. `scope` is `userId/teamId` (IndexedDB is per origin, not per user); `owner` is the page that holds the row, and each page holds the Web Lock `cairn-chief-outbox:<owner>` for its lifetime, which the browser releases when the page closes or crashes. `state` is `sending`, `failed` or `returned`. `sent` entries live only in memory. A row is never the proof that the server stored a message; only a 201 or the stream event is.
+IndexedDB databases `cairn-chief-outbox` (Coordinator) and `cairn-task-outbox` (task replies), store `entries` keyed by `key`, through a thin wrapper over the IndexedDB API (no new dependency: four operations, one a conditional write in one transaction; a blocked open rejects). One row per client id: `{ key, scope, owner, threadId, projectId, text, task?, failure?, state, createdAt }`. `task` is `{ todoId, mode }` with `mode` one of `reply`, `queue` and `stop-and-send`; `failure` is `error`, `timeout`, `stale` or `cancelled` (the server refused the send because the queued message was removed). `scope` is `userId/teamId` (IndexedDB is per origin, not per user); `owner` is the page that holds the row, and each page holds the Web Lock `cairn-chief-outbox:<owner>` for its lifetime, which the browser releases when the page closes or crashes. `state` is `sending`, `failed` or `returned`. `sent` entries live only in memory. A row is never the proof that the server stored a message; only a 201 or the stream event is.
 
 | # | Path | Memory | Store |
 |---|---|---|---|
@@ -30,7 +30,7 @@ IndexedDB databases `cairn-chief-outbox` (Coordinator) and `cairn-task-outbox` (
 | 7 | `settle` | drops `sent` entries | nothing |
 | 8 | the app shell mounts with a scope (`resume`; no conversation has to be open) | once per scope per page: rows of this scope, not already in memory, whose owner lock is not held; `returned` rows older than 10 minutes are deleted; the rest, by `createdAt`: `sending` rows at most 10 minutes old are sent under their key before any later send in their conversation, older ones become `failed` with `stale` and are not sent, `failed` appended (row 6 returns them), `returned` join the returned list. Each failure found or hit here raises a toast that opens the conversation; a row already stored as `failed` was reported by the page that failed it, so it raises none. Sends made during the load wait for it, at most 5 s | put each taken row with this page as owner |
 | 9 | reload from PR #4854 (background tab, new deploy), plain reload, closed tab, renderer crash | lost with the page | rows survive; row 8 on the next load |
-| 9a | PR #4854 deploy check | `busy()` is true while an entry is `sending`, or `failed` without a scope (so not stored); it then shows the `有新版本` prompt instead of reloading | — |
+| 9a | PR #4854 deploy check | `busy()` is true while an entry is `sending`, while a task reply is `failed` until it is handed back or lands (its notice must not be reloaded away), or while a Coordinator entry is `failed` without a scope or with a failed store write; it then shows the `有新版本` prompt instead of reloading | — |
 | 10 | render (`unlandedItems`) | a `null`-thread entry shows in the global thread's view | — |
 
 ## Failures
@@ -43,6 +43,7 @@ IndexedDB databases `cairn-chief-outbox` (Coordinator) and `cairn-task-outbox` (
 - IndexedDB unavailable, quota, or an open that blocks: every write is raced against 1 s and errors are swallowed, so sends behave as before. A failed entry whose write did not land holds back the app-update reload, because only this page has its text.
 - Two tabs: a row owned by a live page is left to it. If both still POST one id, the claim returns one stored message to both; a later failure cannot recreate a row the other tab deleted (rows 5 and 6 are conditional).
 - Crash between the draft write and the `returned` put: the row comes back `failed` and its text is appended to the draft a second time. Text duplication only, never a second server message, because the key is kept.
+- A send refused as removed from the queue hands its text back without its key, so sending that text again is a new message.
 - A returned key reused for the same text sends a retransmission that returns the earlier message. Limited to 10 minutes after the text was handed back, with or without a reload; after that the same words are a new message.
 - Two or more handed-back messages joined in one draft and sent as one text are a new message, as are the same words sent after another message or after the 10 minutes. The timeout copy therefore promises nothing about duplicates and asks the user to check the conversation. When one of them turns out to have arrived, it is removed from the draft wherever it stands.
 - A row of another user or team stays stored until that scope is opened in this browser.
@@ -55,12 +56,13 @@ A queued message has no receipt copy of its own. The queue route marks its ledge
 |---|---|
 | Handed to the agent, by either route | success, nothing inserted, also after the task closes |
 | Queued behind an active step of the task's latest build, no delivery error | success, nothing inserted; stop-and-send marks it to run after the stop |
-| Queued where no active step will drain it: failed or stopped turn, older build, delivery error, archived or closed task | one run removes the queued row and its receipt and sends the resend as a new message through the requested route; a refused or failed send puts both back and returns the error, except a row the user cancelled meanwhile |
+| Held by a Stop: the latest run's last step is stopped, no delivery error, task open | success, nothing inserted and nothing started; the row stays queued with its send now and remove controls. A stop-and-send resend takes the next row instead, so it is delivered |
+| Queued where no active step will drain it: failed turn, older build, delivery error, archived or closed task | one run removes the queued row and its receipt and sends the resend as a new message through the requested route; a refused or failed send puts both back and returns the error, except a row the user cancelled meanwhile |
 | The same, but the queued row was edited since | only the receipt is replaced; the edited row stays queued beside the resent text |
-| Cancelled by the user | the cancel removed the receipt in the same transaction, so the resend is a new message |
-| Never received | normal send |
+| Cancelled by the user | the cancel marks the receipt cancelled in the same transaction; every resend under that key is refused with 409 `queued-message-cancelled` and nothing is inserted, also when the cancel arrived while an earlier resend was failing |
+| Never received | normal send. A queue send addressed to an earlier run of the task goes to the task's latest run |
 
-A page that missed both the queued event and a cancel made elsewhere still holds the send as unconfirmed, so its automatic resend inside the 10 minutes sends it again. A crash between the removal and the new send leaves neither row; the browser still holds the text and its resend is a new message.
+A crash between the removal and the new send leaves neither row; the browser still holds the text and its resend is a new message.
 
 ## Waiting messages follow the task's run
 
@@ -77,11 +79,11 @@ Waiting rows follow the task onto the next run in two transactions, both through
 | Remove pressed on a page still showing the old run | the row is matched among the task's runs, removed and its receipt released |
 | Edit or send now pressed on such a page | refused as already delivered, until the page shows the new run |
 | A carried message resent under its key while its row will still run | success, answered with the run the row is on now |
-| The same resend when the row will not run (it has an error, or the new run failed or stopped) | the failed-turn row of the previous section applies; sent through the queue route addressed to the old run, it is refused with 409 |
+| The same resend when the row will not run (it has an error, or the new run failed or stopped) | the failed-turn or held-by-a-Stop row of the previous section applies, whichever run the resend is addressed to |
 
 ## Tests
 
-`apps/server/test/composer-queue-stop.test.ts` covers one key across both task routes, and `apps/server/test/composer-resend-fate.test.ts` covers each state above through both routes. `apps/server/test/retry-carries-queue.test.ts` covers the move on restart. `apps/web/test/outbox-persist-lanes.test.ts` covers per-conversation chains, the 30 s timeout, the 10 minute window, task rows and late arrival. `apps/web/test/chief-outbox.test.ts` with an in-memory store: one test per table row, plus a stuck write, failed-after-stored, the other-page delete, land on a returned key, a live owner, re-ownership, expiry, ordering against a send made during the load. Playwright `apps/web/e2e/chief-send-retry.spec.ts`: renderer crash while the POST is held before the server stores it; crash after the server stored it and before the response; reload while sending. Live acceptance reruns the probe's crash window against a built stack and checks `chief_message` and `client_message`.
+`apps/server/test/composer-queue-stop.test.ts` covers one key across both task routes, and `apps/server/test/composer-resend-fate.test.ts` covers each state above through both routes, and concurrent resends through both routes while a send is slow. `apps/server/test/retry-carries-queue.test.ts` covers the move on restart. `apps/web/test/outbox-send-tails.test.ts` covers the update hold, the key of handed-back text, the refusal copy and the single timeout notice. `apps/web/test/outbox-persist-lanes.test.ts` covers per-conversation chains, the 30 s timeout, the 10 minute window, task rows and late arrival. `apps/web/test/chief-outbox.test.ts` with an in-memory store: one test per table row, plus a stuck write, failed-after-stored, the other-page delete, land on a returned key, a live owner, re-ownership, expiry, ordering against a send made during the load. Playwright `apps/web/e2e/chief-send-retry.spec.ts`: renderer crash while the POST is held before the server stores it; crash after the server stored it and before the response; reload while sending. Live acceptance reruns the probe's crash window against a built stack and checks `chief_message` and `client_message`.
 
 ## Risk
 

@@ -23,7 +23,7 @@ export function taskDelivery(mutations: ApiMutations, qc: QueryClient): Deliver 
     const { task, threadId: buildId } = entry;
     if (task === undefined || buildId === null) throw new Error('Not a task send');
     if (task.mode !== 'reply') {
-      await mutations.sendSteer.mutateAsync({
+      const queued = await mutations.sendSteer.mutateAsync({
         conversationId: buildId,
         content: entry.text,
         mode: 'queue',
@@ -31,7 +31,7 @@ export function taskDelivery(mutations: ApiMutations, qc: QueryClient): Deliver 
         clientMessageId: entry.key,
         signal,
       });
-      return { threadId: buildId, messageId: null };
+      return { threadId: queued.conversationId ?? buildId, messageId: null };
     }
     const result = await mutations.messageThread.mutateAsync({
       todoId: task.todoId,
