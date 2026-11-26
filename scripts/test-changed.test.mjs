@@ -183,7 +183,10 @@ test('stem matching prioritizes exact filename match and caps broad fan-out', ()
   assert.equal(report.dropped.length, 5);
 });
 
-function runOnMachineWithoutHeavyRuns(testFiles) {
+function runOnMachineWithoutHeavyRuns(
+  testFiles,
+  { base = 'refs/remotes/origin/main', args = [] } = {},
+) {
   const root = makeTestTempDir('test-changed-local-');
   const env = scrubGitEnv({ ...process.env });
   for (const name of ['CI', 'CAIRN_MINI_TEST', 'CAIRN_LOCAL_HEAVY']) delete env[name];
@@ -208,13 +211,13 @@ function runOnMachineWithoutHeavyRuns(testFiles) {
     writeFileSync(join(root, 'apps/server/test/migration.test.ts'), 'migrateUpTo(1);\n');
     git('add', '.gitignore', 'apps/server/test/migration.test.ts');
     git('commit', '-qm', 'base');
-    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    git('update-ref', base, 'HEAD');
     mkdirSync(join(root, 'apps/web/test'), { recursive: true });
     for (const name of testFiles) writeFileSync(join(root, 'apps/web/test', name), 'export {};\n');
     mkdirSync(join(root, 'bin'));
     writeFileSync(join(root, 'bin/pnpm'), '#!/bin/sh\necho "vitest started: $*"\nexit 1\n');
     chmodSync(join(root, 'bin/pnpm'), 0o755);
-    return spawnSync(process.execPath, [join(import.meta.dirname, 'test-changed.mjs')], {
+    return spawnSync(process.execPath, [join(import.meta.dirname, 'test-changed.mjs'), ...args], {
       cwd: root,
       encoding: 'utf8',
       env: {
@@ -239,4 +242,13 @@ test('a single related test file still runs on that machine', () => {
   const run = runOnMachineWithoutHeavyRuns(['one.test.ts']);
   assert.equal(run.status, 1, run.stdout + run.stderr);
   assert.match(run.stdout, /vitest started: exec vitest run apps\/web\/test\/one\.test\.ts/);
+});
+
+test('a base ref given as the first argument is the one compared against', () => {
+  const run = runOnMachineWithoutHeavyRuns(['one.test.ts', 'two.test.ts'], {
+    base: 'refs/heads/release-base',
+    args: ['release-base'],
+  });
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  assert.match(run.stdout, /test:changed: 2 file\(s\)/);
 });

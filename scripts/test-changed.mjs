@@ -192,7 +192,8 @@ async function main() {
   const dryRun = args.includes('--dry-run');
   const commitAt = args.indexOf('--commit');
   const commit = commitAt === -1 ? null : args[commitAt + 1];
-  const positional = args.filter((arg, index) => !arg.startsWith('--') && index !== commitAt + 1);
+  const commitValueAt = commitAt === -1 ? -1 : commitAt + 1;
+  const positional = args.filter((arg, index) => !arg.startsWith('--') && index !== commitValueAt);
   let changed;
   let readSource;
   let diffFor;
