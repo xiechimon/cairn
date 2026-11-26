@@ -74,7 +74,12 @@ export function evaluateSpeculativeCandidate({ sha, ciRuns, checkRuns, jobs = []
     matchingRuns.find((item) => item.status === 'completed' && item.conclusion === 'success') ??
     matchingRuns[0];
   if (run?.status !== 'completed') {
-    return { state: 'pending', runId: run?.id ?? null, inFlight: Boolean(run) };
+    return {
+      state: 'pending',
+      runId: run?.id ?? null,
+      inFlight: Boolean(run),
+      retrying: (run?.run_attempt ?? 1) > 1,
+    };
   }
   if (run.conclusion !== 'success') {
     const failedJobs = jobs
@@ -157,10 +162,12 @@ export function planQueueStep({
   }
 
   let furthestGreen = -1;
+  let allGreenSoFar = true;
   for (let i = 0; i <= validPrefixEnd; i += 1) {
-    const info = tryMap.get(window[i].id);
-    const verdict = verdicts.get(info.sha);
-    if (verdict?.state === 'green') furthestGreen = i;
+    const verdict = verdicts.get(tryMap.get(window[i].id).sha);
+    if (verdict?.state === 'retry' || verdict?.state === 'red' || verdict?.retrying) break;
+    if (verdict?.state !== 'green') allGreenSoFar = false;
+    else if (allGreenSoFar || verdict.runId) furthestGreen = i;
   }
 
   if (furthestGreen >= 0) {
@@ -546,7 +553,9 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
           if (stale.inFlight) supersededRunIds.push(stale.runId);
         }
         tryMap.set(item.id, { sha: covering, validOnParent: true });
-        if (stacksUnchanged) verdicts.set(covering, { state: 'green', runId: null });
+        if (stacksUnchanged && !verdicts.has(covering)) {
+          verdicts.set(covering, { state: 'green', runId: null });
+        }
         prevSha = covering;
         continue;
       }

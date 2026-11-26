@@ -106,7 +106,7 @@ test('planQueueStep batch-promotes furthest green prefix T_3 and cancels superse
     ]),
     verdicts: new Map([
       [SHA('1'), { state: 'pending', runId: 101 }],
-      [SHA('2'), { state: 'red', runId: 102, runAttempt: 2, failedJobs: ['e2e (1)'] }],
+      [SHA('2'), { state: 'pending', runId: 102 }],
       [SHA('3'), { state: 'green', runId: 103 }],
       [SHA('4'), { state: 'pending', runId: 104 }],
     ]),
@@ -562,11 +562,12 @@ test('an entry stacked unchanged on the tested commit ahead of it lands without 
     q.push(aTry, `${TRY_PREFIX}${idA}`);
     q.push(b, `${ENQUEUE_PREFIX}${idB}`);
     q.state.green = [a, b];
-    q.run(aTry, 1, `queue/try/${idA}`, {});
+    q.run(aTry, 1, `queue/try/${idA}`, { status: 'completed', conclusion: 'success' });
+    q.state.green.push(aTry);
     q.pass();
     assert.equal(q.remote(`${TRY_PREFIX}${idB}`), null);
     assert.equal(q.remote('refs/heads/main'), b);
-    assert.deepEqual(q.cancelled(), [1]);
+    assert.deepEqual(q.cancelled(), []);
   });
 });
 
@@ -688,5 +689,148 @@ test('a conflict against a held base that lacks current main waits instead of ej
     assert.equal(q.remote(`${ENQUEUE_PREFIX}${idC}`), c);
     assert.equal(q.remote(`${TRY_PREFIX}${idB}`), bTry);
     assert.deepEqual(q.cancelled(), []);
+  });
+});
+
+const RUN_STATES = {
+  green: { state: 'green', runId: 2 },
+  'first attempt running': { state: 'pending', runId: 2 },
+  'waiting for its retry': { state: 'retry', runId: 2, rerun: 'rerun-failed-jobs' },
+  'retry running': { state: 'pending', runId: 2, retrying: true },
+  red: { state: 'red', runId: 2, runAttempt: 2 },
+};
+
+test('what may be passed on the way to main, for every run state ahead', () => {
+  const landsThrough = (ahead, follower) => {
+    const ids = ['1-a', '2-b', '3-c'];
+    const plan = planQueueStep({
+      mainTip: MAIN,
+      entries: ids.map((id, i) => entry(id, 'abc'[i])),
+      tryMap: new Map(ids.map((id, i) => [id, { sha: SHA(`${i + 1}`), validOnParent: true }])),
+      verdicts: new Map([
+        [SHA('1'), { state: 'green', runId: 1 }],
+        [SHA('2'), RUN_STATES[ahead]],
+        [SHA('3'), { state: 'green', runId: follower === 'own queue run' ? 3 : null }],
+      ]),
+    });
+    return plan.promote?.entries.length ?? 0;
+  };
+  const table = Object.fromEntries(
+    Object.keys(RUN_STATES).map((ahead) => [
+      ahead,
+      [landsThrough(ahead, 'own queue run'), landsThrough(ahead, 'pre-flight only')],
+    ]),
+  );
+  assert.deepEqual(table, {
+    green: [3, 3],
+    'first attempt running': [3, 1],
+    'waiting for its retry': [1, 1],
+    'retry running': [1, 1],
+    red: [1, 1],
+  });
+});
+
+test('evaluateSpeculativeCandidate tells a running retry from a running first attempt', () => {
+  const sha = SHA('1');
+  const running = (attempt) =>
+    evaluateSpeculativeCandidate({
+      sha,
+      checkRuns: [],
+      ciRuns: [
+        {
+          id: 9,
+          name: 'ci',
+          head_sha: sha,
+          head_branch: 'queue/try/x',
+          status: 'in_progress',
+          run_attempt: attempt,
+        },
+      ],
+    });
+  assert.equal(Boolean(running(1).retrying), false);
+  assert.equal(running(2).retrying, true);
+});
+
+function failingHead(q, follower) {
+  const main1 = q.commit(q.base, 'x.txt', 'x\n');
+  q.push(main1, 'refs/heads/main');
+  const a = q.commit(q.base, 'a.txt', 'a\n');
+  const b = q.commit(q.base, 'b.txt', 'b\n');
+  const aTry = q.commit(main1, 'a.txt', 'a\n');
+  const stacked = follower === 'pre-flight only';
+  const second = stacked ? q.commit(aTry, 'b.txt', 'b\n') : b;
+  const bTry = stacked ? second : q.commit(aTry, 'b.txt', 'b\n');
+  const [idA, idB] = [idAt(1, a), idAt(2, second)];
+  q.push(a, `${ENQUEUE_PREFIX}${idA}`);
+  q.push(aTry, `${TRY_PREFIX}${idA}`);
+  q.push(second, `${ENQUEUE_PREFIX}${idB}`);
+  if (!stacked) {
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.run(bTry, 2, `queue/try/${idB}`, { status: 'completed', conclusion: 'success' });
+  }
+  q.state.green = [a, second, bTry];
+  const head = (patch) => q.run(aTry, 1, `queue/try/${idA}`, patch);
+  return { main1, aTry, bTry, idA, head };
+}
+
+const FAILED_ONCE = { status: 'completed', conclusion: 'failure', run_attempt: 1 };
+const RETRY_RUNNING = { status: 'in_progress', run_attempt: 2 };
+
+for (const follower of ['own queue run', 'pre-flight only']) {
+  test(`a green follower (${follower}) stays off main while the head has failed or is retrying`, () => {
+    queueHarness('queue-failed-head-', (q) => {
+      const { main1, aTry, bTry, head } = failingHead(q, follower);
+      head(FAILED_ONCE);
+      assert.equal(q.pass().action, 'retry');
+      assert.equal(q.remote('refs/heads/main'), main1, 'landed past a failed run');
+      head(RETRY_RUNNING);
+      assert.equal(q.pass().action, 'wait');
+      assert.equal(q.remote('refs/heads/main'), main1, 'landed past a running retry');
+      assert.deepEqual(q.cancelled(), []);
+      head({ status: 'completed', conclusion: 'success', run_attempt: 2 });
+      q.state.green.push(aTry);
+      q.pass();
+      assert.equal(q.remote('refs/heads/main'), bTry);
+    });
+  });
+}
+
+test('a head that fails twice is ejected and a follower with its own queue run does not land it', () => {
+  queueHarness('queue-twice-red-', (q) => {
+    const { main1, aTry, idA, head } = failingHead(q, 'own queue run');
+    head({ ...FAILED_ONCE, run_attempt: 2 });
+    q.pass();
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idA}`), null);
+    assert.equal(q.remote('refs/heads/main'), main1);
+    assert.throws(() => q.git(['merge-base', '--is-ancestor', aTry, 'origin/main']));
+  });
+});
+
+test('a pre-flight-only entry waits for a running first attempt ahead of it', () => {
+  queueHarness('queue-past-pending-', (q) => {
+    const { main1, aTry, bTry, head } = failingHead(q, 'pre-flight only');
+    head({});
+    assert.equal(q.pass().action, 'wait');
+    assert.equal(q.remote('refs/heads/main'), main1, 'landed past a pending run');
+    head({ status: 'completed', conclusion: 'success' });
+    q.state.green.push(aTry);
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), bTry);
+  });
+});
+
+test('an entry that is the queue commit ahead of it never overrides that run verdict', () => {
+  queueHarness('queue-same-sha-', (q) => {
+    const main1 = q.commit(q.base, 'x.txt', 'x\n');
+    q.push(main1, 'refs/heads/main');
+    const a = q.commit(q.base, 'a.txt', 'a\n');
+    const aTry = q.commit(main1, 'a.txt', 'a\n');
+    q.push(a, `${ENQUEUE_PREFIX}${idAt(1, a)}`);
+    q.push(aTry, `${TRY_PREFIX}${idAt(1, a)}`);
+    q.push(aTry, `${ENQUEUE_PREFIX}${idAt(2, aTry)}`);
+    q.state.green = [a, aTry];
+    q.run(aTry, 1, 'queue/try/a', FAILED_ONCE);
+    assert.equal(q.pass().action, 'retry');
+    assert.equal(q.remote('refs/heads/main'), main1);
   });
 });

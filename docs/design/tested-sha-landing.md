@@ -56,10 +56,21 @@ accepted and pushing an untested one is rejected.
   Otherwise a `try` ref is kept, with its running CI, while it sits on the
   expected parent and carries the same commits; if not, it and everything after
   it are rebuilt in a temporary worktree.
-- **Batch fast-forward.** The furthest green position in the valid prefix is
-  pushed to `main`, even while earlier positions are still running, because its
-  tree contains theirs. Superseded runs are cancelled, `enqueue/*` and `try`
-  refs are deleted, and the next window is planned at once.
+- **Batch fast-forward.** The furthest position in the valid prefix that may be
+  passed to is pushed to `main`, because its tree contains the earlier ones.
+  Superseded runs are cancelled, `enqueue/*` and `try` refs are deleted, and the
+  next window is planned at once. What may be passed depends on the runs ahead:
+
+| Run ahead | Green queue run behind it | Entry behind it with only its pre-flight evidence |
+|---|---|---|
+| Green | lands both | lands both |
+| First attempt pending or running | lands both | waits |
+| Failed once and waiting for its retry, retry pending or running, or failed twice | waits | waits |
+
+  A first attempt that is still running with a job already failed counts as
+  running. The wait lasts while the failed position is in the window: once a
+  twice-failed head is ejected, an entry that was pre-flighted on top of its
+  `try` commit still contains that commit and can land it in the same pass.
 - **One retry.** A first-attempt run that did not succeed has its failed jobs
   rerun; a run with only cancelled jobs is rerun whole.
 - **Attribution.** Only the head entry is ever ejected for red CI, once a second
@@ -79,7 +90,7 @@ An operator who must remove a queued candidate first comments
 
 Invariant: a tree reaches `main` only if a `ci` run on that exact tree ended green. `green-main` still reads check runs on the exact SHA; a new SHA always gets its own `ci` run, which is short when the tree is already verified.
 
-- **Entry unchanged on its tested base**: at any window position, not only the head, when `entry_i` contains `expectedParent` its preflight-green SHA is the speculative candidate. No `queue/try` ref is pushed and a stale `try_i` run still in flight is cancelled.
+- **Entry unchanged on its tested base**: at any window position, not only the head, when `entry_i` contains `expectedParent` its preflight-green SHA is the speculative candidate. No `queue/try` ref is pushed and a stale `try_i` run still in flight is cancelled. This evidence predates the entries ahead, so it lands only once they are all green (*Batch fast-forward*).
 - **Entry that adds nothing**: when every patch of `entry_i` is already in `try_{i-1}` (two submissions of one change), it shares that candidate and its verdict, including red: the first of the two is ejected, and the second is then evaluated again on its own base.
 - **Rebuild that does not change the tree** (the entry ahead landed under another SHA): while `try_i`'s run is in flight and the rebuilt tree equals its tree, the ref and run stay. Later entries are built on, or kept on, the held `try_i`; a conflict against a held base that does not contain current `main` is not evidence against the entry, so it waits for the held run instead of being ejected. When the run ends, the next pass pushes the rebuilt SHA, which reuses the green run. Only runs whose entry gets another tree are cancelled.
 - **Tree reuse in `ci`** (`scripts/ops/ci-reuse-verified.mjs`, the same mechanism `main` uses): a `queue/try/*` push reuses a completed green `ci` run from `preflight/*` or `queue/*` whose `head_commit.tree_id` equals its own tree, among the newest 300 successful push runs. `check` and `e2e-gate` pass without the test matrix; `pack-smoke` is skipped. `main` still requires the exact SHA.
@@ -234,7 +245,7 @@ original revision, so such a rerun publishes without the current gate.
 ## Tests
 
 - `speculative-queue.test.mjs`: FIFO order of `enqueue/*`, admission, batch and
-  partial-prefix promotion, mid-queue red without false blame, one retry then
+  partial-prefix promotion, what each run state ahead lets through, mid-queue red without false blame, one retry then
   ejection and tail rebuild, conflict ejection, depth 4, external `main` advance,
   a real bare-git rebase and promote run, and `runQueuePass` against a bare
   remote with a stub `gh` for the verdict-reuse rules.
