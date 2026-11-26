@@ -6,6 +6,7 @@ import {
   type DesignTarget as ElementTarget,
 } from '@cairn/shared';
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { randomId } from '../../lib/random-id.js';
 import { COMMENT_BRIDGE_MESSAGES } from '../../vendor-open-design/comment-bridge.js';
 
 export type AnchorState = 'anchored' | 'moved' | 'lost';
@@ -97,7 +98,7 @@ export function useCommentBridge({
         text: comment.text,
         label: comment.label,
       }));
-    const requestId = crypto.randomUUID();
+    const requestId = randomId();
     requestRef.current = requestId;
     post({ type: COMMENT_BRIDGE_MESSAGES.locate, requestId, items });
   }, [post, comments]);

@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { api } from '../api/client.js';
+import { randomId } from '../lib/random-id.js';
 
 const browserTabId = (() => {
   try {
-    return globalThis.crypto.randomUUID();
+    return randomId();
   } catch {
     return `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   }

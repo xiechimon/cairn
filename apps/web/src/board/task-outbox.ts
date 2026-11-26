@@ -95,7 +95,7 @@ export function unlandedTaskBubbles(
   return entries.flatMap((entry) =>
     entry.scope !== todoId ||
     entry.state === 'failed' ||
-    queueOnlyKeys.has(entry.key) ||
+    (queueOnlyKeys.has(entry.key) && entry.state !== 'sending') ||
     (entry.messageId !== null && known.has(entry.messageId))
       ? []
       : [

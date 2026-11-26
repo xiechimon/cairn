@@ -356,6 +356,10 @@
     {
       "path": "scripts/biome-plugins/no-silent-promise-catch.grit",
       "includes": ["**/apps/web/src/**", "**/apps/desktop/src/**"]
+    },
+    {
+      "path": "scripts/biome-plugins/no-random-uuid.grit",
+      "includes": ["**/apps/web/src/**"]
     }
   ],
   "javascript": {

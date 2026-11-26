@@ -53,6 +53,8 @@ import type { DocBlock, TodoRecord, TranscriptItem } from '../fixtures/records.j
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { describeError } from '../lib/error-copy.js';
+import { markErrorSurfaced } from '../lib/mutation-error-report.js';
+import { randomId } from '../lib/random-id.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
 import type { EngineRun, EngineRunStage } from './engine-run.js';
@@ -385,7 +387,10 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const queueSteer =
     postQueued !== undefined
       ? async (text: string, deliverAfterStop: boolean) => {
-          await postQueued(text, deliverAfterStop, crypto.randomUUID());
+          await postQueued(text, deliverAfterStop, randomId()).catch((error: unknown) => {
+            markErrorSurfaced(error);
+            throw error;
+          });
         }
       : undefined;
   const send =

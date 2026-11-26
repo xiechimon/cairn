@@ -1,4 +1,5 @@
 import type { ChiefStreamItem } from '../fixtures/records.js';
+import { randomId } from '../lib/random-id.js';
 
 export type OutboxState = 'sending' | 'failed' | 'sent';
 
@@ -145,7 +146,7 @@ const OWNER_LOCK = 'cairn-chief-outbox:';
 export function pageLockOwner(): OutboxOwner {
   const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
   if (locks === undefined) return solitary;
-  const id = crypto.randomUUID();
+  const id = randomId();
   void locks
     .request(`${OWNER_LOCK}${id}`, () => new Promise<never>(() => {}))
     .catch((error) => {
@@ -164,7 +165,7 @@ export function pageLockOwner(): OutboxOwner {
 
 export function createOutbox({
   now = Date.now,
-  mintKey = () => crypto.randomUUID(),
+  mintKey = randomId,
   store = unstored,
   owner = solitary,
   writeTimeoutMs = 1000,

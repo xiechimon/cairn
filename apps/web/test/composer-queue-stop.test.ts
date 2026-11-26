@@ -12,7 +12,7 @@ vi.mock('react', () => ({
   useState: (value: unknown) => [value, vi.fn()],
 }));
 vi.mock('../src/i18n/provider.js', () => ({ useI18n: () => ({ t: (text: string) => text }) }));
-vi.mock('sonner', () => ({ toast: { success: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function keyboard(key: string, modifiers: Partial<KeyboardEvent<HTMLTextAreaElement>> = {}) {
   return { key, shiftKey: false, metaKey: false, ctrlKey: false, altKey: false, repeat: false, nativeEvent: { isComposing: false }, preventDefault: vi.fn(), stopPropagation: vi.fn(), ...modifiers } as unknown as KeyboardEvent<HTMLTextAreaElement>;

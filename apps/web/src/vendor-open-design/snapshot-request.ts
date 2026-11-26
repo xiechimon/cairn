@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/runtime/exports.ts
+import { randomId } from '../lib/random-id.js';
 export interface PreviewSnapshot {
   dataUrl: string;
   w: number;
@@ -15,7 +16,7 @@ export function requestPreviewSnapshot(
 ): Promise<PreviewSnapshotResult> {
   const win = iframe.contentWindow;
   if (!win) return Promise.resolve({ ok: false, reason: 'loading' });
-  const id = `snap-${crypto.randomUUID()}`;
+  const id = `snap-${randomId()}`;
   return new Promise((resolve) => {
     let done = false;
     const finish = (result: PreviewSnapshotResult) => {

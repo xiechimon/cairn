@@ -524,7 +524,9 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
               onClick: () => navigate(settingsHref('routing')),
             },
           });
-          return Promise.reject(new Error('Name a machine first'));
+          const refusal = new Error('Name a machine first');
+          markErrorSurfaced(refusal);
+          return Promise.reject(refusal);
         }
         chiefOutbox.enqueue(
           {

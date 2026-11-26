@@ -1,0 +1,6 @@
+or {
+  `$target.randomUUID`,
+  `$target?.randomUUID`
+} where {
+  register_diagnostic(span=$target, message="crypto.randomUUID is missing on plain-http origins, which a remote Cairn client uses: call randomId() from lib/random-id", severity="error")
+}

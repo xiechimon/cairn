@@ -8,6 +8,7 @@ import type {
   SetStateAction,
 } from 'react';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { reportFailedSend } from '../lib/report-failed-send.js';
 import {
   createPastedNameCounter,
   filesFromClipboardData,
@@ -252,7 +253,13 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       return;
     }
     if (text === '' || callback === undefined) return;
-    const result = callback(text);
+    let result: ReturnType<typeof callback>;
+    try {
+      result = callback(text);
+    } catch (error) {
+      reportFailedSend(error, null);
+      return;
+    }
     if (result instanceof Promise) {
       sending.current = true;
       void result
@@ -261,7 +268,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
           if (fullDraftRef.current === fullDraft) writeFull('');
         })
         .catch((error) => {
-          console.debug('cairn: recoverable operation failed', error);
+          setTimeout(() => reportFailedSend(error, error), 0);
         })
         .finally(() => {
           sending.current = false;

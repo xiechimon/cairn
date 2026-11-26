@@ -137,6 +137,7 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
+import { randomId } from '../lib/random-id.js';
 import { fetchWithSession, useAuth } from './auth.js';
 import { ApiError, api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
@@ -1326,7 +1327,7 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (input: { buildId: string; clientMessageId?: string }) =>
         api.post<{ delegated: true; mode: 'quota_resumed' | 'restarted' }>(
           `/api/builds/${encodeURIComponent(input.buildId)}/retry-now`,
-          { clientMessageId: input.clientMessageId ?? crypto.randomUUID() },
+          { clientMessageId: input.clientMessageId ?? randomId() },
         ),
       onSuccess: invalidateAll,
       onError: invalidateAll,
@@ -1981,7 +1982,7 @@ export function useApiMutations(teamId: string | undefined) {
       }) =>
         api.post<ThreadMessageResult>(`/api/todos/${input.todoId}/messages`, {
           content: input.content,
-          clientMessageId: input.clientMessageId ?? crypto.randomUUID(),
+          clientMessageId: input.clientMessageId ?? randomId(),
         }),
       onSuccess: (result, input) => {
         if (input.conversationId != null && result.conversationId != null)
