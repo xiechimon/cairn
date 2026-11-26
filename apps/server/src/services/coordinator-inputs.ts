@@ -68,11 +68,15 @@ export function stoppedCoordinatorTurns(db: Db, threadId: string): StoppedTurn[]
   return ended
     .filter((row) => row.status === 'stopped' && (row.finishedAt ?? answeredSince) >= answeredSince)
     .map((row) => {
-      const prompt = row.prompt ?? '';
-      const quotes = new Map([[row.id, prompt]]);
+      const started = typedRequest(db, threadId, row.id, row.ownerMessageIds);
+      const quotes = new Map([[row.id, started]]);
       for (const input of inputs.filter((candidate) => candidate.stepId === row.id)) {
+        const quote =
+          input.kind === 'steer'
+            ? typedRequest(db, threadId, input.id, input.ownerMessageIds)
+            : started;
         for (const requestId of inputRequestIds(inputRequestId(input))) {
-          quotes.set(requestId, input.kind === 'steer' ? input.content : prompt);
+          quotes.set(requestId, quote);
         }
       }
       return {
@@ -82,8 +86,35 @@ export function stoppedCoordinatorTurns(db: Db, threadId: string): StoppedTurn[]
     });
 }
 
-export function stoppedTurnRequests(db: Db, stepId: string): string[] {
-  const prompt = db.select().from(step).where(eq(step.id, stepId)).get()?.prompt ?? '';
+function typedRequest(
+  db: Db,
+  threadId: string,
+  requestId: string,
+  ownerMessageIds: readonly string[] | null,
+): string | null {
+  const rows = db
+    .select()
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId),
+        eq(chiefMessage.role, 'user'),
+        inArray(chiefMessage.id, [requestId, ...(ownerMessageIds ?? [])]),
+      ),
+    )
+    .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
+    .all();
+  const own = rows.find((row) => row.id === requestId);
+  const words = (own === undefined ? rows : [own])
+    .map((row) => row.content)
+    .filter((content) => typeof content === 'string')
+    .join('\n');
+  return words === '' ? null : words;
+}
+
+export function stoppedTurnRequests(db: Db, stepId: string): (string | null)[] {
+  const stopped = db.select().from(step).where(eq(step.id, stepId)).get();
+  if (stopped === undefined) return [];
   const steered = db
     .select()
     .from(coordinatorInput)
@@ -96,7 +127,10 @@ export function stoppedTurnRequests(db: Db, stepId: string): string[] {
     )
     .orderBy(asc(coordinatorInput.createdAt), sql`rowid`)
     .all();
-  return [prompt, ...steered.map((input) => input.content)].filter((text) => text !== '');
+  return [
+    typedRequest(db, stopped.buildId, stopped.id, stopped.ownerMessageIds),
+    ...steered.map((input) => typedRequest(db, stopped.buildId, input.id, input.ownerMessageIds)),
+  ];
 }
 
 export function inputForRequestId(

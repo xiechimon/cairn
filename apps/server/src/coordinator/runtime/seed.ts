@@ -14,7 +14,7 @@ export interface SeedRow {
   role: string;
   content: string;
   createdAt: number;
-  stoppedRequests?: readonly string[];
+  stoppedRequests?: readonly (string | null)[];
 }
 
 function blocksText(value: unknown): string {

@@ -1,4 +1,3 @@
-import { isMailWakeText } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage } from '@earendil-works/pi-ai';
 import { defineEntry, type Harness } from '@earendil-works/pi-durable';
@@ -11,13 +10,14 @@ export const StoppedEntry = defineEntry('cairn.stopped');
 
 export interface StoppedTurn {
   stepId: string;
-  requests: { requestId: string; quote: string }[];
+  requests: { requestId: string; quote: string | null }[];
 }
 
-function quoted(request: string): string {
-  const text = (isMailWakeText(request) ? 'a new mail notification' : request)
-    .replaceAll('<', '&lt;')
-    .trim();
+const UNTYPED_REQUEST =
+  '(the last instruction above this note, which is not a message the user typed)';
+
+function quoted(typed: string | null): string {
+  const text = (typed ?? UNTYPED_REQUEST).replaceAll('<', '&lt;').trim();
   const short =
     text.length <= QUOTE_HEAD_CHARS + QUOTE_TAIL_CHARS
       ? text
@@ -25,7 +25,7 @@ function quoted(request: string): string {
   return `<stopped_request>\n${short}\n</stopped_request>`;
 }
 
-export function stoppedNote(requests: readonly string[]): string {
+export function stoppedNote(requests: readonly (string | null)[]): string {
   return [
     '[Stopped] My turn was stopped while it was working on what is quoted below.',
     ...requests.map(quoted),
@@ -60,7 +60,7 @@ export async function cancelStoppedRequests(
   context: Context,
 ): Promise<void> {
   for (const turn of stopped) {
-    const unfinished = new Set<string>();
+    const unfinished = new Set<string | null>();
     for (const { requestId, quote } of turn.requests) {
       const pending = await harness.commit(async (tx) => {
         const record = await tx.submissionByRequest(conversation.id, requestId);

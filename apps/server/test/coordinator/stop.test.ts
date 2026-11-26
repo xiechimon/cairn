@@ -8,7 +8,10 @@ import {
   coordinatorInput,
   step,
 } from '../../src/db/schema.js';
-import { stoppedCoordinatorTurns } from '../../src/services/coordinator-inputs.js';
+import {
+  stoppedCoordinatorTurns,
+  stoppedTurnRequests,
+} from '../../src/services/coordinator-inputs.js';
 import { req } from '../helpers.js';
 import { boot, stub, world } from './runner-world.js';
 
@@ -61,6 +64,11 @@ function expectCancelledBetween(asked: Asked[], stopped: string, next: string): 
 describe('which Coordinator requests a stop cancels', () => {
   it('lists every attempt of the turns stopped since the last turn that succeeded', async () => {
     const w = await world('long job');
+    const typed = (id: string, content: string) =>
+      w.s.db
+        .insert(chiefMessage)
+        .values({ id, threadId: w.threadId, role: 'user', content, createdAt: 1 })
+        .run();
     const turn = (id: string, status: 'stopped' | 'done' | 'failed', finishedAt: number) =>
       w.s.db
         .insert(step)
@@ -69,11 +77,13 @@ describe('which Coordinator requests a stop cancels', () => {
           buildId: w.threadId,
           kind: 'chief',
           status,
-          prompt: `asked in ${id}`,
+          prompt: `DELIVERED-EARLIER: add the export button\n\nasked in ${id}`,
           createdAt: 1,
           finishedAt,
         })
         .run();
+    typed('stopped-on-retry', 'asked in stopped-on-retry');
+    typed('correction', 'and be brief');
     turn('stopped-long-ago', 'stopped', 100);
     turn('answered', 'done', 200);
     turn('failed-alone', 'failed', 300);
@@ -99,7 +109,9 @@ describe('which Coordinator requests a stop cancels', () => {
         stepId: 'stopped-on-retry',
         kind: 'steer',
         ownerMessageIds: [],
-        content: 'and be brief',
+        content: 'and be brief\n\n## Project instructions\nALWAYS-RUN-THE-RELEASE-CHECK',
+        state: 'consumed',
+        entryId: '7',
         attempt: 1,
         createdAt: 2,
       })
@@ -116,6 +128,16 @@ describe('which Coordinator requests a stop cancels', () => {
         ],
       },
     ]);
+    expect(
+      stoppedTurnRequests(w.s.db, 'stopped-on-retry'),
+      'a rebuilt conversation quotes the same words',
+    ).toEqual([asked, 'and be brief']);
+
+    turn('woken', 'stopped', 500);
+    expect(
+      stoppedCoordinatorTurns(w.s.db, w.threadId).at(-1)?.requests,
+      'text the user never typed is not quoted',
+    ).toEqual([{ requestId: 'woken', quote: null }]);
   });
 });
 
