@@ -501,6 +501,12 @@ test('isTransientGitNetworkError and pollWaitStep retry transient TLS or network
   assert.equal(isTransientGitNetworkError(new Error('gh: HTTP 403 (secondary throttle)')), true);
   assert.equal(isTransientGitNetworkError(new Error('fatal: bad revision HEAD')), false);
 
+  const truncatedListing = Object.assign(new Error('Command failed: git ls-remote origin'), {
+    stderr:
+      'error: RPC failed; curl 18 Transferred a partial file\nerror: 5 bytes of body are still expected\nfatal: expected flush after ref listing\n',
+  });
+  assert.equal(isTransientGitNetworkError(truncatedListing), true);
+
   const transient = pollWaitStep({
     fetchMain: () => {
       throw new Error(

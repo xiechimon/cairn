@@ -37,7 +37,7 @@ export function classifyWaitStatus({
 }
 
 const TRANSIENT_NET_ERROR_RE =
-  /SSL_ERROR_SYSCALL|LibreSSL|Could not resolve host|Connection reset|unexpected EOF|ETIMEDOUT|ECONNRESET|EAI_AGAIN|HTTP (?:403|429|500|502|503|504)|Failed to connect to github\.com/i;
+  /SSL_ERROR_SYSCALL|LibreSSL|Could not resolve host|Connection reset|unexpected EOF|ETIMEDOUT|ECONNRESET|EAI_AGAIN|HTTP (?:403|429|500|502|503|504)|Failed to connect to github\.com|Transferred a partial file|expected flush after ref listing/i;
 
 export function isTransientGitNetworkError(error) {
   const message = `${error?.stderr ?? ''}\n${error?.message ?? error ?? ''}`;
