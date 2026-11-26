@@ -97,15 +97,14 @@ test('static mode refuses a fix without a test and never runs one', (t) => {
   assert.equal(refused.ok, false);
   assert.match(refused.reason, /no test file/);
 
-  write('apps/server/src/thing.ts', 'export const thing = "fixed";\n');
-  write('integration/test/thing.test.ts', 'integration regression\n');
-  const tested = addCommit(
-    ['apps/server/src/thing.ts', 'integration/test/thing.test.ts'],
-    'fix(server): repair integration path',
-  );
-  const accepted = evaluateFixCommit(root, tested, 'static', never);
-  assert.equal(accepted.ok, true);
-  assert.match(accepted.skipped, /ci/i);
+  for (const testFile of ['apps/server/test/thing.test.ts', 'integration/test/thing.test.ts']) {
+    write('apps/server/src/thing.ts', `export const thing = "fixed for ${testFile}";\n`);
+    write(testFile, 'regression for the fix\n');
+    const tested = addCommit(['apps/server/src/thing.ts', testFile], 'fix(server): repair thing');
+    const accepted = evaluateFixCommit(root, tested, 'static', never);
+    assert.equal(accepted.ok, true);
+    assert.match(accepted.skipped, /ci/i);
+  }
 });
 
 test('static mode judges the commits since origin/main, and no base is red', (t) => {
