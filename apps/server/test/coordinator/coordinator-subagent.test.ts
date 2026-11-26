@@ -428,7 +428,7 @@ describe('Coordinator sub-agents (paths 1-12)', () => {
     const faux = fauxProvider({
       provider: 'stub',
       models: [{ id: 'm', contextWindow: 200_000 }],
-      tokensPerSecond: 15,
+      tokensPerSecond: 1e9,
     });
     faux.setResponses([
       () =>
@@ -437,7 +437,13 @@ describe('Coordinator sub-agents (paths 1-12)', () => {
           { stopReason: 'toolUse' },
         ),
       () => fauxAssistantMessage([fauxToolCall('todos', {})], { stopReason: 'toolUse' }),
-      () => fauxAssistantMessage([fauxText(`partial ${'working '.repeat(120)}`)]),
+      async (_context, options) => {
+        await new Promise<void>((resolve) => {
+          if (options?.signal?.aborted) resolve();
+          else options?.signal?.addEventListener('abort', () => resolve(), { once: true });
+        });
+        return fauxAssistantMessage([fauxText('partial working')]);
+      },
       () => fauxAssistantMessage([fauxText('Recovered from timeout.')]),
     ]);
 
@@ -451,7 +457,7 @@ describe('Coordinator sub-agents (paths 1-12)', () => {
         gate,
         models,
         api,
-        minTimeoutMs: 120,
+        minTimeoutMs: 3_000,
       }),
     );
     const harness = await openCoordinatorHarness(storagePath(), models.models, ctx, { registry });
