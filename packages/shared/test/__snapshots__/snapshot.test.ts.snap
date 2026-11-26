@@ -9685,6 +9685,19 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
     {
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "const": "chief.updated",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
         "connectionId": {
           "minLength": 1,
           "type": "string",

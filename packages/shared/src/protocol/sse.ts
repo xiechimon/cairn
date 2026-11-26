@@ -67,6 +67,11 @@ export const computerStateEventSchema = z.object({
 });
 export type ComputerStateEvent = z.infer<typeof computerStateEventSchema>;
 
+export const chiefUpdatedEventSchema = z.object({
+  type: z.literal('chief.updated'),
+});
+export type ChiefUpdatedEvent = z.infer<typeof chiefUpdatedEventSchema>;
+
 export const conversationMessageEventSchema = z.object({
   type: z.literal('message'),
   conversationId: recordId.optional(),
@@ -147,6 +152,7 @@ export const teamStreamEventSchema = z.discriminatedUnion('type', [
   buildDocEventSchema,
   notificationEventSchema,
   computerStateEventSchema,
+  chiefUpdatedEventSchema,
   streamHelloEventSchema,
   conversationEnvelopeEventSchema,
 ]);

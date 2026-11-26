@@ -433,3 +433,91 @@ test('frequently used models support mouse drag and keyboard reordering with per
   await expect(page.getByText('顺序未能保存，已恢复原来的顺序。')).toBeVisible();
   await expect.poll(rowIds).toEqual(kbMoved);
 });
+
+test('navigating to #route-coordinator opens flush at top without clipping SettingsCard top ring', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/routing?scenario=model-routing#route-coordinator');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  const coordinator = settings.getByTestId('routing-rule-coordinator');
+  await expect(coordinator).toBeVisible();
+  await expect(coordinator).toHaveClass(/scroll-mt-4/);
+
+  const layout = await settings.getByTestId('settings-body').evaluate((body) => {
+    const scroller = body.querySelector('.overflow-y-auto');
+    const card = body.querySelector('.settings-card');
+    if (scroller === null || card === null) return null;
+    const scrollerRect = scroller.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+    return {
+      scrollTop: scroller.scrollTop,
+      topGap: cardRect.top - scrollerRect.top,
+    };
+  });
+  expect(layout).not.toBeNull();
+  expect(layout?.scrollTop).toBe(0);
+  expect(layout?.topGap ?? 0).toBeGreaterThanOrEqual(3);
+});
+
+test('navigating to #route-compaction scrolls with scroll-mt-4 breathing room', async ({
+  page,
+}) => {
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/routing-settings') {
+      return json({
+        rules: [
+          {
+            id: 'r1',
+            teamId: 't1',
+            use: 'coordinator',
+            provider: 'relay',
+            modelId: 'glm-5.3',
+            thinkingLevel: null,
+            fallbackModels: null,
+            machineId: null,
+            requiredCapabilities: null,
+            seededFromAgentId: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          {
+            id: 'r2',
+            teamId: 't1',
+            use: 'compaction',
+            provider: 'relay',
+            modelId: 'glm-5.3',
+            thinkingLevel: null,
+            fallbackModels: null,
+            machineId: null,
+            requiredCapabilities: null,
+            seededFromAgentId: null,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+        policies: [],
+        ruleIssues: [],
+      });
+    }
+    if (path === '/api/teams/t1/machines') return json([]);
+    if (path === '/api/teams/t1/model-sources') {
+      return json({
+        sources: [
+          {
+            runtime: 'pi',
+            provider: 'relay',
+            providerLabel: 'domestic-proxy',
+            installed: true,
+            models: [{ id: 'glm-5.3', name: 'GLM-5.3' }],
+          },
+        ],
+      });
+    }
+    return undefined;
+  });
+  await page.goto('/app/settings/routing#route-compaction');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  const compaction = settings.getByTestId('routing-rule-compaction');
+  await expect(compaction).toBeVisible();
+  await expect(compaction).toHaveClass(/scroll-mt-4/);
+});

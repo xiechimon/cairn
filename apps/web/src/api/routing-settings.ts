@@ -18,7 +18,7 @@ export function routingRuleInvalidateKeys(
   use: RouteUse,
 ): ReadonlyArray<readonly unknown[]> {
   const keys: Array<readonly unknown[]> = [[ROUTING_SETTINGS_KEY, teamId]];
-  if (use === 'coordinator') keys.push(['chief', teamId]);
+  if (use === 'coordinator') keys.push(['chief', teamId], ['chiefThreads', teamId]);
   return keys;
 }
 

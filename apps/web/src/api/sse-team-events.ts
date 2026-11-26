@@ -19,7 +19,10 @@ export type StreamQueryEvent =
       projectId?: string | undefined;
       parent?: TodoRecord | undefined;
     }
-  | { type: 'notification' | 'machine_presence' | 'computer.state'; teamId: string }
+  | {
+      type: 'notification' | 'machine_presence' | 'computer.state' | 'chief.updated';
+      teamId: string;
+    }
   | {
       type: 'message';
       teamId: string;
@@ -230,6 +233,11 @@ export function streamEventQueryEffect(
         : 'ignore';
     case 'computer.state':
       return kind === 'computers' && id === event.teamId ? 'cancel' : 'ignore';
+    case 'chief.updated':
+      return id === event.teamId &&
+        (kind === 'chief' || kind === 'chiefThreads' || kind === 'routing-settings')
+        ? 'cancel'
+        : 'ignore';
     case 'message':
       return (kind === 'messages' &&
         (id === event.conversationId ||

@@ -43,6 +43,7 @@ import {
   revokeBrowserSession,
   setAuthCookie,
 } from './services/browser-session.js';
+import { releaseParkedCoordinatorSteps } from './services/chief.js';
 import { coordinatorRunsOnPi } from './services/coordinator-context.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection, StreamSessionRegistry } from './services/events.js';
@@ -65,6 +66,7 @@ import {
 } from './services/paired-devices.js';
 import { routingRuleIssues } from './services/routing-rule-issues.js';
 import {
+  coordinatorProfile,
   listRoutingSettings,
   upsertRoutingRule,
   upsertWorkPolicy,
@@ -417,7 +419,28 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, id);
     const use = parseWith(routeUseSchema, c.req.param('use'), 'use');
     const body = parseWith(patchRoutingRuleBodySchema, await jsonBody(c), 'body');
-    return c.json(upsertRoutingRule(ctx.db, id, use, body));
+    const beforeCoordinator = use === 'coordinator' ? coordinatorProfile(ctx.db, id) : null;
+    const saved = upsertRoutingRule(ctx.db, id, use, body);
+    if (use === 'coordinator') {
+      const afterCoordinator = coordinatorProfile(ctx.db, id);
+      const nextProvider = afterCoordinator?.provider ?? saved.provider;
+      const nextModelId = afterCoordinator?.modelId ?? saved.modelId;
+      if (
+        beforeCoordinator?.provider !== nextProvider ||
+        beforeCoordinator?.modelId !== nextModelId
+      ) {
+        releaseParkedCoordinatorSteps(
+          {
+            db: ctx.db,
+            hub: ctx.hub,
+            convHub: ctx.convHub,
+            machineHub: ctx.machineHub,
+          },
+          id,
+        );
+      }
+    }
+    return c.json(saved);
   });
 
   app.patch('/api/teams/:id/work-policies/:use', async (c) => {

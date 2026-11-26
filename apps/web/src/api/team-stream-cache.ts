@@ -184,6 +184,7 @@ export function applyTeamStreamEvent(
     }
     case 'machine_presence':
     case 'computer.state':
+    case 'chief.updated':
       void invalidateEventQueries(qc, { type: ev.type, teamId });
       break;
   }

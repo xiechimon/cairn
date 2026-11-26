@@ -23,6 +23,7 @@ import {
 import { answerProposal } from './services/action-proposals.js';
 import { executeAction, undoJournalEntry } from './services/action-registry.js';
 import { toBuildRecord } from './services/builds.js';
+import { releaseParkedCoordinatorSteps } from './services/chief.js';
 import { listDir } from './services/fs-list.js';
 import { pickFolder } from './services/fs-pick.js';
 import { readBranches, readFiles, toProjectRecord } from './services/git.js';
@@ -30,6 +31,7 @@ import { importGithubIssue } from './services/github-issues.js';
 import { isOwner } from './services/instance-owner.js';
 import { listedProjects } from './services/personal-space.js';
 import { createProject, updateProject } from './services/projects.js';
+import { coordinatorProfile } from './services/routing-rules.js';
 import { listTodos } from './services/todos.js';
 
 export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
@@ -143,6 +145,11 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
   app.patch('/api/projects/:id', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
     const body = parseWith(patchProjectBodySchema, await jsonBody(c), 'body');
+    const beforeOverride = row.modelOverrides?.coordinator ?? null;
+    const beforeCoordinator =
+      body.modelOverrides?.coordinator !== undefined
+        ? coordinatorProfile(ctx.db, row.teamId, row.id)
+        : null;
     const updated = await updateProject(
       {
         ...githubAppOf(ctx),
@@ -159,6 +166,28 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
       pairedDeviceIdOf(c),
     );
     if (updated === null) throw notFound(`project ${row.id}`);
+    if (body.modelOverrides?.coordinator !== undefined) {
+      const afterOverride = updated.modelOverrides?.coordinator ?? null;
+      const afterCoordinator = coordinatorProfile(ctx.db, updated.teamId, updated.id);
+      const modelChanged =
+        beforeCoordinator !== null || afterCoordinator !== null
+          ? beforeCoordinator?.provider !== afterCoordinator?.provider ||
+            beforeCoordinator?.modelId !== afterCoordinator?.modelId
+          : beforeOverride?.provider !== afterOverride?.provider ||
+            beforeOverride?.modelId !== afterOverride?.modelId;
+      if (modelChanged) {
+        releaseParkedCoordinatorSteps(
+          {
+            db: ctx.db,
+            hub: ctx.hub,
+            convHub: ctx.convHub,
+            machineHub: ctx.machineHub,
+          },
+          updated.teamId,
+          updated.id,
+        );
+      }
+    }
     return c.json(
       toProjectRecord(updated, requestOrigin(c), {
         includeLocalPath: isOwnerSession(c),

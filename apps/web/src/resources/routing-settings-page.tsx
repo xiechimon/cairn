@@ -31,6 +31,7 @@ import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { FrequentModelsCard, vendorMark } from './frequent-models-card.js';
+import { COORDINATOR_ROUTE_ANCHOR } from './hrefs.js';
 import { RuleIssueNotices } from './rule-issue-notices.js';
 import { ThinkingLevelSelect } from './thinking-level-select.js';
 
@@ -248,6 +249,7 @@ export function RuleRow({
   return (
     <div
       id={testId === undefined ? `route-${use}` : undefined}
+      className={testId === undefined ? 'scroll-mt-4' : undefined}
       data-testid={testId ?? (rule === null ? `routing-rule-new-${use}` : `routing-rule-${use}`)}
     >
       <SettingsRow
@@ -389,10 +391,23 @@ export function ModelRulesSection() {
   );
   const { hash } = useLocation();
   const loaded = !live || settingsQ.data !== undefined;
+  const issueCount = settings.ruleIssues?.length ?? 0;
   useEffect(() => {
     if (!loaded || hash === '') return;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
-  }, [loaded, hash]);
+    const id = hash.slice(1);
+    const target =
+      document.getElementById(id) ??
+      (id === 'coordinator' ? document.getElementById(COORDINATOR_ROUTE_ANCHOR) : null);
+    if (target === null) return;
+    if ((id === COORDINATOR_ROUTE_ANCHOR || id === 'coordinator') && issueCount === 0) {
+      const scroller = target.closest('.overflow-y-auto');
+      if (scroller !== null) {
+        scroller.scrollTo({ top: 0 });
+        return;
+      }
+    }
+    target.scrollIntoView({ block: 'start' });
+  }, [loaded, hash, issueCount]);
   const ruleOf = (use: RouteUse) => settings.rules.find((rule) => rule.use === use) ?? null;
   const save =
     (use: RouteUse) =>

@@ -180,6 +180,8 @@ const matrix: {
     fire: () => applyTeamStreamEvent(qc, team, { type: 'machine_presence' }) },
   { event: 'computer state → team computers', base: ['computers'],
     fire: () => applyTeamStreamEvent(qc, team, { type: 'computer.state' }) },
+  { event: 'chief updated → team chief and threads', base: ['chiefThreads', 'chief', 'otherChief'],
+    fire: () => applyTeamStreamEvent(qc, team, { type: 'chief.updated' }) },
   ...[true, false].map((checked) => ({ event: `computer control ${checked ? 'acquired' : 'released'} → team computers`, base: ['computers'] as const,
     fire: () => {
       let setHeld: ((held: boolean) => void) | undefined;

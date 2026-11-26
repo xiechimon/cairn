@@ -6,6 +6,7 @@ describe('routingRuleInvalidateKeys', () => {
     expect(routingRuleInvalidateKeys('team-1', 'coordinator')).toEqual([
       ['routing-settings', 'team-1'],
       ['chief', 'team-1'],
+      ['chiefThreads', 'team-1'],
     ]);
   });
 

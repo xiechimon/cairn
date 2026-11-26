@@ -457,6 +457,118 @@ export function getChiefEnvelope(
   };
 }
 
+export function releaseParkedCoordinatorSteps(
+  deps: Pick<ChiefDeps, 'db' | 'hub' | 'convHub' | 'machineHub'>,
+  teamId: string,
+  projectId?: string | null,
+): number {
+  const { releasedIds, wakeThreadIds } = deps.db.transaction((tx) => {
+    const threadIds = (() => {
+      if (projectId !== undefined) {
+        return tx
+          .select({ id: chiefThread.id })
+          .from(chiefThread)
+          .where(
+            and(
+              eq(chiefThread.teamId, teamId),
+              projectId === null
+                ? isNull(chiefThread.projectId)
+                : eq(chiefThread.projectId, projectId),
+            ),
+          )
+          .all()
+          .map((row) => row.id);
+      }
+      const overriddenProjects = new Set(
+        tx
+          .select({ id: project.id, modelOverrides: project.modelOverrides })
+          .from(project)
+          .where(and(eq(project.teamId, teamId), isNotNull(project.modelOverrides)))
+          .all()
+          .filter((row) => row.modelOverrides?.coordinator != null)
+          .map((row) => row.id),
+      );
+      return tx
+        .select({ id: chiefThread.id, projectId: chiefThread.projectId })
+        .from(chiefThread)
+        .where(eq(chiefThread.teamId, teamId))
+        .all()
+        .filter((row) => row.projectId === null || !overriddenProjects.has(row.projectId))
+        .map((row) => row.id);
+    })();
+    if (threadIds.length === 0) {
+      return { releasedIds: [] as string[], wakeThreadIds: [] as string[] };
+    }
+    const parkedCondition = or(
+      eq(step.status, 'waiting_quota'),
+      and(eq(step.status, 'pending'), eq(step.holdReason, 'quota')),
+    );
+    const parked = tx
+      .select({ id: step.id })
+      .from(step)
+      .where(and(inArray(step.buildId, threadIds), eq(step.kind, 'chief'), parkedCondition))
+      .all()
+      .map((row) => row.id);
+    if (parked.length > 0) {
+      tx.update(step)
+        .set({
+          status: 'pending',
+          holdReason: null,
+          holdUntil: null,
+          holdCount: 0,
+          quotaBlock: null,
+          ranModel: null,
+          fallback: null,
+          machineId: null,
+          claudeSubscriptionId: null,
+          devinSubscriptionId: null,
+          antigravitySubscriptionId: null,
+          mcpGrant: null,
+          targetMachineId: null,
+          routedFromMachineId: null,
+          routedReason: null,
+        })
+        .where(and(inArray(step.id, parked), parkedCondition))
+        .run();
+    }
+    const pendingThreadIds = tx
+      .select({ buildId: step.buildId })
+      .from(step)
+      .where(
+        and(inArray(step.buildId, threadIds), eq(step.kind, 'chief'), eq(step.status, 'pending')),
+      )
+      .all()
+      .map((row) => row.buildId);
+    return {
+      releasedIds: parked,
+      wakeThreadIds: [...new Set(pendingThreadIds)],
+    };
+  });
+  for (const id of releasedIds) {
+    const fresh = deps.db.select().from(step).where(eq(step.id, id)).get();
+    if (fresh !== undefined) {
+      deps.convHub?.publishStep(fresh.buildId, {
+        id: fresh.id,
+        buildId: fresh.buildId,
+        kind: fresh.kind,
+        machineId: fresh.machineId,
+        createdAt: fresh.createdAt,
+        status: fresh.status,
+        checkpointCommit: fresh.checkpointCommit,
+        skillInjection: fresh.skillInjection ?? null,
+      });
+    }
+  }
+  for (const threadId of wakeThreadIds) {
+    wakeCoordinator(threadId);
+  }
+  if (releasedIds.length > 0 || wakeThreadIds.length > 0) {
+    deps.machineHub?.wake(teamId);
+  }
+  deps.hub.publish(teamId, () => ({ type: 'chief.updated' }));
+  return releasedIds.length;
+}
+
 export function chiefToolDefHashes(): Record<string, string> {
   const out: Record<string, string> = {};
   for (const def of chiefRemoteTools()) {
