@@ -35,7 +35,6 @@ export function ChatBlockRow({
   joinsPrev: boolean;
   joinsNext: boolean;
 }) {
-  if (item.state === 'failed') return null;
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
       <Message

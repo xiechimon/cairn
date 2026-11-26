@@ -100,7 +100,7 @@ import {
   groupThreadEvents,
   type StreamRow,
 } from './thread-activity.js';
-import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
+import { streamDividers, timeDividerLabel } from './time-dividers.js';
 import { CardFailureContext, QueueWaitCard, TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
 
@@ -126,16 +126,11 @@ function layoutStream(
   glances: ReadonlyMap<string, TodoGlance>,
   previousAt: number | null,
   reportSeen: Set<string>,
+  cardFailure: string | null,
 ): StreamLayout {
   const { rows: folded, startedBy } = foldTaskCards(groupThreadEvents(list), glances);
   const grouped = collapseThinkingRuns(folded);
-  let lastAt = previousAt;
-  const dividers = grouped.map(({ item }) => {
-    const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
-    const divider = at !== null && needsTimeDivider(lastAt, at) ? at : null;
-    if (at !== null) lastAt = at;
-    return divider;
-  });
+  const { dividers, lastAt } = streamDividers(grouped, previousAt, cardFailure);
   return {
     grouped,
     keys: chiefStreamRowKeys(grouped),
@@ -616,12 +611,12 @@ export function ChiefConversation({
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
     const reportSeen = new Set<string>();
-    const before = layoutStream(rows.slice(0, dayEarlier), glances, null, reportSeen);
+    const before = layoutStream(rows.slice(0, dayEarlier), glances, null, reportSeen, cardFailure);
     return [
       before,
-      layoutStream(rows.slice(dayEarlier), glances, before.lastAt, reportSeen),
+      layoutStream(rows.slice(dayEarlier), glances, before.lastAt, reportSeen, cardFailure),
     ] as const;
-  }, [rows, glances, dayEarlier]);
+  }, [rows, glances, dayEarlier, cardFailure]);
   const addQuote = (draft: ReplyQuoteDraft, text: string) => {
     stageReply(draft);
     if (text !== '')

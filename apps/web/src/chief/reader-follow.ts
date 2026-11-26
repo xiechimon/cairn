@@ -65,7 +65,7 @@ export function useReaderFollow() {
               event.deltaMode === 0 ? -event.deltaY : Number.POSITIVE_INFINITY,
             );
         },
-        onTouchStart: (event: React.TouchEvent<HTMLDivElement>) => {
+        onTouchStartCapture: (event: React.TouchEvent<HTMLDivElement>) => {
           touchYRef.current = event.touches[0]?.clientY ?? 0;
         },
         onTouchMove: (event: React.TouchEvent<HTMLDivElement>) => {

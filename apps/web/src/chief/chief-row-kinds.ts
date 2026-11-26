@@ -32,3 +32,31 @@ export function chiefRowRenders(kind: string): boolean {
   const rowClass = (CHIEF_ROW_CLASS as Readonly<Record<string, ChiefRowClass | 'hidden'>>)[kind];
   return rowClass !== undefined && rowClass !== 'hidden';
 }
+
+type ChiefRowItem = ChiefStreamItem | ChannelMirror | ThinkingGroup;
+type NeverShownKind =
+  | 'thinking'
+  | 'thinking-group'
+  | 'thread-report'
+  | 'thread-message'
+  | 'report-ack';
+
+export function chiefRowShows<T extends ChiefRowItem>(
+  item: T,
+  cardFailure: string | null,
+): item is Exclude<T, { kind: NeverShownKind }> {
+  if (!chiefRowRenders(item.kind)) return false;
+  switch (item.kind) {
+    case 'thinking':
+    case 'thinking-group':
+      return false;
+    case 'question':
+      return item.status !== 'pending';
+    case 'error':
+      return item.id === undefined || item.id !== cardFailure;
+    case 'chat-block':
+      return item.state !== 'failed';
+    default:
+      return true;
+  }
+}

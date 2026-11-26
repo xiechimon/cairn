@@ -1,10 +1,37 @@
 import type { TFunc } from '../i18n/translate.js';
 import { dateTimeFormat, formatClockTime } from '../lib/date-format.js';
+import { chiefRowShows } from './chief-row-kinds.js';
+import type { GroupedRow } from './thread-activity.js';
 
 export const TIME_DIVIDER_GAP_MS = 10 * 60 * 1000;
 
 export function needsTimeDivider(previousAt: number | null, at: number): boolean {
   return previousAt !== null && at - previousAt > TIME_DIVIDER_GAP_MS;
+}
+
+type StreamItem = GroupedRow['item'];
+
+const isReply = (item: StreamItem | null) => item?.kind === 'robot';
+
+export function streamDividers(
+  rows: readonly GroupedRow[],
+  previousAt: number | null,
+  cardFailure: string | null,
+  now: number = Date.now(),
+): { dividers: (number | null)[]; lastAt: number | null } {
+  let lastAt = previousAt;
+  let shown: StreamItem | null = null;
+  const dividers = rows.map(({ item }) => {
+    if (!chiefRowShows(item, cardFailure)) return null;
+    const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
+    const splitsReplies = isReply(item) && isReply(shown);
+    shown = item;
+    if (at === null) return splitsReplies ? now : null;
+    const divider = splitsReplies || needsTimeDivider(lastAt, at) ? at : null;
+    lastAt = at;
+    return divider;
+  });
+  return { dividers, lastAt };
 }
 
 function startOfDay(at: number): number {

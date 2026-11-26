@@ -32,10 +32,11 @@ import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
 import { ChatBlockRow } from './chat-block-row.js';
 import { ChiefReportMessage } from './chief-report-row.js';
-import { chiefRowRenders } from './chief-row-kinds.js';
+import { chiefRowShows } from './chief-row-kinds.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
 import { ApprovalAnswered, QuestionReceipt } from './question-answered-line.js';
+import { ReplyPressMenu, useReplyPressMenu } from './reply-press-menu.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
   REPLY_HIGHLIGHT_ATTR,
@@ -106,9 +107,9 @@ const REPLY_ROW_CLS = 'mt-6';
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
-const REPLY_OWNER_BAR_CLS =
-  "before:pointer-events-none before:content-[''] before:absolute before:-left-3 before:inset-y-0.5 before:w-0.5 before:rounded-full before:bg-border before:opacity-0 before:transition-opacity before:duration-(--dur-fast) before:ease-(--ease-standard) hover:before:opacity-100 focus-within:before:opacity-100 has-[[aria-expanded=true]]:before:opacity-100 data-reply-highlight:before:opacity-100 motion-reduce:before:transition-none pointer-coarse:before:hidden";
-const BUBBLE_WRAP_CLS = `group/reply-block relative w-full max-w-full font-sans ${CHAT_BODY_CLS} ${REPLY_OWNER_BAR_CLS}`;
+const BUBBLE_WRAP_CLS = `group/reply-block relative w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
+const REPLY_TOOL_GUTTER_CLS =
+  '[&_[data-slot=reply-blocks]>:first-child]:max-w-[min(100%_-_2.5rem,var(--container-reply))]';
 const SAID_CLS = `${REPLY_TEXT_CLS} min-w-0 text-(--foreground)`;
 
 function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
@@ -568,7 +569,6 @@ function ChiefMessageTools({
   testId,
   createdAt,
   fallbackAt,
-  note,
   copyText,
   onCopy,
   onRewind,
@@ -580,27 +580,20 @@ function ChiefMessageTools({
   testId: string;
   createdAt: number | undefined;
   fallbackAt?: string | undefined;
-  note?: ReactNode;
   copyText: string;
   onCopy: (text: string) => void;
   onRewind?: (() => void) | undefined;
   rewindDisabled?: boolean;
   onWithdraw?: (() => void) | undefined;
 }) {
-  const placement =
-    side === 'assistant'
-      ? touch
-        ? 'below-start'
-        : 'below-start-hover'
-      : touch
-        ? 'below-end'
-        : 'left';
+  const placement = side === 'assistant' ? 'top-end-hover' : touch ? 'below-end' : 'left';
   return (
     <MessageToolbar
       placement={placement}
       testId={testId}
-      stamp={<MessageStamp createdAt={createdAt} fallback={fallbackAt} />}
-      note={touch ? undefined : note}
+      stamp={
+        side === 'assistant' ? null : <MessageStamp createdAt={createdAt} fallback={fallbackAt} />
+      }
       onCopy={() => onCopy(copyText)}
       onRewind={onRewind}
       rewindDisabled={rewindDisabled}
@@ -624,24 +617,21 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
+  const pressMenu = useReplyPressMenu();
   const cardFailure = useContext(CardFailureContext);
   const highlight = (id: string | undefined) =>
     id !== undefined && id === highlightedSource?.sourceMessageId
       ? { [REPLY_HIGHLIGHT_ATTR]: '' }
       : {};
-  if (!chiefRowRenders(item.kind)) return null;
+  if (!chiefRowShows(item, cardFailure)) return null;
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
-  if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
-    return null;
-  if (item.kind === 'error') {
-    if (item.id !== undefined && item.id === cardFailure) return null;
+  if (item.kind === 'error')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
         <NoticeLine label={t('未完成')} testId="chief-turn-error" tone="danger" />
       </MessageScrollerItem>
     );
-  }
   if (item.kind === 'chat-block')
     return <ChatBlockRow item={item} joinsPrev={joinsPrev} joinsNext={joinsNext} />;
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
@@ -747,8 +737,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   }
-  if (item.kind === 'thinking' || item.kind === 'thinking-group') return null;
-  if (item.kind === 'question' && item.status === 'pending') return null;
   if (item.kind === 'question')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
@@ -800,85 +788,81 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         <span>{t('由备用模型 {model} 回答', { model: item.fallbackModel })}</span>
       </span>
     ) : undefined;
-  const assistantToolProps = {
-    side: 'assistant' as const,
-    createdAt: item.createdAt,
-    note: fallbackNote,
-    onCopy,
-  };
   const sourceHighlighted =
     highlightedSource !== null && highlightedSource.sourceMessageId === item.id;
   const quoted = highlightedSource?.quote ?? '';
-  return (
-    <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-      <Message
-        className={joinsPrev ? 'mt-0' : REPLY_ROW_CLS}
-        data-testid="chief-msg"
-        data-run={runAttr(joinsPrev, joinsNext)}
-      >
-        <MessageContent
-          className={cn(MSG_COL_MID_CLS, joinsPrev && 'mt-5 border-t border-border/60 pt-5')}
-          data-testid="chief-msg-col"
-        >
-          {subagents.length > 0 && <SubagentProgressList items={subagents} />}
-          <ChatMessageBody
-            speaker="assistant"
-            className={BUBBLE_WRAP_CLS}
-            data-testid="chief-reply"
-            {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+  const replyBody = (
+    <ChatMessageBody
+      speaker="assistant"
+      className={cn(BUBBLE_WRAP_CLS, !pressMenu && REPLY_TOOL_GUTTER_CLS)}
+      data-testid="chief-reply"
+      {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+      {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
+    >
+      {markdown != null ? (
+        <ChatMarkdown
+          text={markdown}
+          streaming={!settled}
+          bubbles
+          bubbleFooter={<BubbleReports todoIds={reports} />}
+          highlight={(group) =>
+            sourceHighlighted && (group.source.includes(quoted) || quoted.includes(group.source))
+          }
+        />
+      ) : (
+        <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
+          <div
+            className={REPLY_TEXT_CLS}
+            data-slot="reply-bubble"
+            data-testid="chief-reply-bubble"
             {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
           >
-            {markdown != null ? (
-              <ChatMarkdown
-                text={markdown}
-                streaming={!settled}
-                bubbles
-                bubbleFooter={<BubbleReports todoIds={reports} />}
-                highlight={(group) =>
-                  sourceHighlighted &&
-                  (group.source.includes(quoted) || quoted.includes(group.source))
-                }
-              />
-            ) : (
-              <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
-                <div
-                  className={REPLY_TEXT_CLS}
-                  data-slot="reply-bubble"
-                  data-testid="chief-reply-bubble"
-                  {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
-                >
-                  {(item.paragraphs ?? []).map((p, j) => (
-                    <p key={j} className={j > 0 ? 'mt-3' : undefined}>
-                      <Segments segments={p} />
-                    </p>
-                  ))}
-                  {item.bullets != null && item.bullets.length > 0 && (
-                    <ul className="mt-1 list-disc ps-9">
-                      {item.bullets.map((b, j) => (
-                        <li key={`b${j}`}>
-                          <Segments segments={b} />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <BubbleReports todoIds={reports} />
-                </div>
-              </div>
+            {(item.paragraphs ?? []).map((p, j) => (
+              <p key={j} className={j > 0 ? 'mt-3' : undefined}>
+                <Segments segments={p} />
+              </p>
+            ))}
+            {item.bullets != null && item.bullets.length > 0 && (
+              <ul className="mt-1 list-disc ps-9">
+                {item.bullets.map((b, j) => (
+                  <li key={`b${j}`}>
+                    <Segments segments={b} />
+                  </li>
+                ))}
+              </ul>
             )}
-            {settled && (
-              <ChiefMessageTools {...assistantToolProps} copyText={whole} testId="chief-msg-foot" />
-            )}
-          </ChatMessageBody>
+            <BubbleReports todoIds={reports} />
+          </div>
+        </div>
+      )}
+      {settled && !pressMenu && (
+        <ChiefMessageTools
+          side="assistant"
+          createdAt={item.createdAt}
+          copyText={whole}
+          onCopy={onCopy}
+          testId="chief-msg-foot"
+        />
+      )}
+    </ChatMessageBody>
+  );
+  return (
+    <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
+      <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
+        <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+          {subagents.length > 0 && <SubagentProgressList items={subagents} />}
+          {pressMenu ? (
+            <ReplyPressMenu text={whole} onCopy={onCopy} disabled={!settled}>
+              {replyBody}
+            </ReplyPressMenu>
+          ) : (
+            replyBody
+          )}
+          {fallbackNote !== undefined && (
+            <div className="mt-1 text-caption text-(--text-tertiary)">{fallbackNote}</div>
+          )}
           {item.typing === true && <TypingDots className="mt-1" />}
           {unmentioned.length > 0 && <StartedTasksLine todoIds={unmentioned} />}
-          {settled && (
-            <ChiefMessageTools
-              {...assistantToolProps}
-              touch
-              copyText={whole}
-              testId="chief-msg-tools-touch"
-            />
-          )}
         </MessageContent>
       </Message>
     </MessageScrollerItem>

@@ -12,7 +12,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 |---|---|---|
 | C1 | One fact, one wording: a status comes from one selector and is not restated differently elsewhere on the page. | M text of one entity is identical across header, list and footer |
 | C2 | No capability, no placeholder: never render a block for a feature that is not available; one line says what is off and the action to enable it. | M no element text matching `^[\s—·-]+$`; no empty fixed-ratio block |
-| C3 | Hidden means no space: an element shown on hover or focus takes no layout when hidden; a reply's toolbar overlays cleanly below it without shifting layout or covering sibling text. | M `e2e/chief-message-toolbar.spec.ts` (C3) |
+| C3 | Hidden means no space: an element shown on hover or focus takes no layout when hidden. A Coordinator reply's hover toolbar floats at its top-right in a reserved gutter, covering no text and never touching the divider; at 640px or narrower, or on touch, a reply has no toolbar and a press opens `复制` / `选择文字`. | M `e2e/chief-message-toolbar.spec.ts` (C3), `e2e/chief-reply-actions-overlap.spec.ts` |
 | C4 | Every icon-only control has a visible tooltip and an accessible name. | M hover 600ms shows a tooltip; axe `button-name` |
 | C5 | No raw error text reaches the user: map it to a plain sentence saying what to do next; raw text lives in a tooltip or details. | M toast and banner text does not match `\(.*\)$`, `Error:`, `\b[45]\d\d\b` |
 | C6 | Developer switches (feature flags, release buttons) never sit on a user page; they live behind the dev route or dev mode. | H |

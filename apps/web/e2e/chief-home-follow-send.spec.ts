@@ -202,6 +202,39 @@ test('scrolling up stops following, and the jump button resumes it', async ({ pa
   await expect(jump).toHaveAttribute('data-active', 'true');
 });
 
+test.describe('touch', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('a drag back into history that starts on a reply stops following', async ({ page }) => {
+    await sendAtBottom(page);
+    await emit(page, { type: 'text_delta', text: `${paragraph(0)}\n\n` });
+    await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: string, x = 0, y = 0) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+      });
+    const pinned = await row(page, 'stay pinned').boundingBox();
+    if (pinned === null) throw new Error('the sent message is not laid out');
+    await touch('touchStart', pinned.x + 10, pinned.y + pinned.height / 2);
+    await touch('touchEnd');
+    const reply = messageOf(page, 'answer 249').getByTestId('chief-reply-bubble').first();
+    const box = await reply.boundingBox();
+    if (box === null) throw new Error('answer 249 is not laid out');
+    const x = box.x + 40;
+    const y = box.y + 8;
+    await touch('touchStart', x, y);
+    for (let step = 1; step <= 10; step++) await touch('touchMove', x, y + step * 30);
+    await touch('touchEnd');
+    await expect.poll(() => gapToBottom(page)).toBeGreaterThan(100);
+    const parked = await gapToBottom(page);
+    for (let n = 1; n < 4; n++) await emit(page, { type: 'text_delta', text: `${paragraph(n)}\n\n` });
+    await expect.poll(() => gapToBottom(page)).toBeGreaterThan(parked);
+    await expect(home(page).getByTestId('jump-to-latest')).toHaveAttribute('data-active', 'true');
+  });
+});
+
 test('a scroll up that lands after the stream re-renders stays where the reader put it', async ({
   page,
 }) => {

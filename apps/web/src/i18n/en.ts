@@ -758,6 +758,8 @@ export const EN: Record<string, string> = {
     'API keys connect Runners from the command line and let MCP clients reach your workbench.',
   '新建 API 密钥': 'New API key',
   复制: 'Copy',
+  选择文字: 'Select text',
+  回复操作: 'Reply actions',
   展开: 'Expand',
   '回复：{quote}': 'Replying to: {quote}',
   回复这条消息: 'Reply to this message',

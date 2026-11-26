@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Folder,
   SquarePen,
+  TextSelect,
   Trash2,
 } from 'lucide-react';
 import { useId, useState } from 'react';
@@ -20,6 +21,12 @@ import {
 } from '../components/menu-keys.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '../components/ui/context-menu.js';
 import {
   DIALOG_PRIMARY_BUTTON,
   DIALOG_TEXT_BUTTON,
@@ -181,6 +188,33 @@ export function MenuSection() {
             </KeyedMenuItem>
           </KeyedMenuContent>
         </DropdownMenu>
+      </Specimen>
+      <Specimen
+        id="context-menu"
+        title="Press menu"
+        note="Right-click, or long-press on touch. Rows grow to 44px under a coarse pointer"
+        stage="canvas"
+        code={`<ContextMenu>\n  <ContextMenuTrigger render={<div>…</div>} />\n  <ContextMenuContent aria-label="Reply actions">\n    <ContextMenuItem>Copy</ContextMenuItem>\n  </ContextMenuContent>\n</ContextMenu>`}
+      >
+        <ContextMenu>
+          <ContextMenuTrigger
+            render={
+              <div className="rounded-(--radius-control) border border-dashed border-border px-4 py-6 text-ui text-content-secondary" />
+            }
+          >
+            Press here for the reply menu
+          </ContextMenuTrigger>
+          <ContextMenuContent aria-label="Reply actions">
+            <ContextMenuItem onClick={() => setLast('Copy')}>
+              <Copy />
+              Copy
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => setLast('Select text')}>
+              <TextSelect />
+              Select text
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       </Specimen>
       <Specimen
         id="popover"

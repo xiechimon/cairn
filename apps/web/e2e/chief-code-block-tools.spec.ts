@@ -32,6 +32,13 @@ for (const scheme of ['light', 'dark'] as const) {
         const block = code.locator('xpath=ancestor::*[@data-testid="chief-reply"][1]');
         await code.getByTestId('md-code').hover();
         const tools = block.getByTestId('chief-msg-foot');
+        if (width === 390) {
+          await expect(tools, `${name}: no reply toolbar at 390px`).toHaveCount(0);
+          for (const own of [code.getByTestId('md-code-expand'), code.getByTestId('md-code-copy')])
+            expect(await hits(page, own), `${name}: code button is reachable`).toBe(true);
+          await evidencePanelShot(page, `code-block-tools-${name}-${scheme}-${width}.png`, block, 48);
+          continue;
+        }
         await expect(tools).toHaveCSS('opacity', '1');
         await evidencePanelShot(page, `code-block-tools-${name}-${scheme}-${width}.png`, block, 48);
         const ownButtons = [code.getByTestId('md-code-expand'), code.getByTestId('md-code-copy')];
@@ -50,19 +57,16 @@ for (const scheme of ['light', 'dark'] as const) {
           }
           expect(await hits(page, own), `${name}: code button is reachable`).toBe(true);
         }
-        const meta = tools.locator('[data-slot="message-toolbar-meta"]');
-        const metaBox = await meta.boundingBox();
-        for (const own of ownButtons) {
-          const ownBox = await own.boundingBox();
-          if (metaBox === null || ownBox === null) continue;
-          expect(overlaps(ownBox, metaBox), `${name}: time stamp covers a code button`).toBe(false);
-        }
+        await expect(
+          tools.locator('[data-slot="message-toolbar-meta"]'),
+          `${name}: the reply toolbar carries no time`,
+        ).toHaveCount(0);
         for (const tool of await toolButtons.all())
           expect(await hits(page, tool), `${name}: toolbar button is reachable`).toBe(true);
         const codeBox = await code.boundingBox();
         const headerBox = await code.locator('xpath=./div[1]').boundingBox();
         if (codeBox === null || headerBox === null) throw new Error(`${name}: code block not laid out`);
-        for (const part of [...(await toolButtons.all()), meta]) {
+        for (const part of await toolButtons.all()) {
           const box = await part.boundingBox();
           if (box === null || box.x >= codeBox.x + codeBox.width) continue;
           for (const line of [codeBox.y, headerBox.y + headerBox.height])

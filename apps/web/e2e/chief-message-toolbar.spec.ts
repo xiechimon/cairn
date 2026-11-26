@@ -127,15 +127,23 @@ for (const width of [1440, COMPACT_WIDTH, 390] as const) {
     await expect(userTools.getByTestId('chief-msg-reply')).toHaveCount(0);
     const userVisible = await sharedRowTools(userTools);
 
+    expect(userVisible, `${width}px: user visible tools`).toEqual(['copy']);
     const assistantBubble = assistantRow.getByTestId('chief-reply-bubble');
     const assistantTools = assistantRow.getByTestId('chief-msg-foot');
     await assistantBubble.scrollIntoViewIfNeeded();
+    if (width === 390) {
+      await assistantBubble.hover();
+      await expect(
+        assistantRow.locator('[data-tool]'),
+        '390px: a reply has no toolbar; a press opens its menu instead',
+      ).toHaveCount(0);
+      return;
+    }
     await assistantBubble.hover();
     await expect(assistantTools).toHaveCSS('opacity', '1');
     await expect(assistantTools.getByTestId('chief-msg-reply')).toHaveCount(0);
     const assistantVisible = await sharedRowTools(assistantTools);
 
-    expect(userVisible, `${width}px: user visible tools`).toEqual(['copy']);
     expect(
       assistantVisible,
       `${width}px: assistant visible data-tool set and order match user`,
@@ -257,46 +265,11 @@ for (const scheme of ['light', 'dark'] as const) {
     }
   });
 
-  test(`1440px assistant toolbar sits below the reply at bottom-left without shifting layout (${scheme})`, async ({
+  test(`1440px assistant toolbar floats at the reply's top-right in its own gutter without shifting layout (${scheme})`, async ({
     page,
   }) => {
     const { stream } = await openConversation(page, 1440, scheme);
-    const row = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
-    const bubble = row.getByTestId('chief-reply-bubble');
-    const tools = row.getByTestId('chief-msg-foot');
-    await bubble.scrollIntoViewIfNeeded();
-    await page.mouse.move(0, 0);
-    await expect(tools, 'C3: assistant toolbar is hidden at rest').toHaveCSS('opacity', '0');
-    const bubbleBefore = await boxOf(bubble, 'assistant bubble before hover');
-
-    await bubble.hover();
-    await expect(tools).toHaveCSS('opacity', '1');
-    await captureRowShot(page, `${PHASE}-assistant-1440-${scheme}.png`, stream, row);
-
-    await expect(tools).toHaveAttribute('data-placement', 'below-start-hover');
-    await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
-
-    const bubbleBox = await boxOf(bubble, 'assistant bubble');
-    const toolsBox = await boxOf(tools, 'assistant toolbar');
-    const copyBox = await boxOf(tools.getByTestId('chief-msg-copy'), 'assistant copy button');
-    const metaBox = await boxOf(
-      tools.locator('[data-slot="message-toolbar-meta"]'),
-      'assistant meta',
-    );
-
-    expect(Math.round(bubbleBox.y), 'hover does not shift bubble').toBe(Math.round(bubbleBefore.y));
-    expect(overlaps(toolsBox, bubbleBox), 'toolbar does not intersect assistant bubble').toBe(false);
-    expect(Math.round(toolsBox.x), 'toolbar aligns with bubble left edge').toBe(
-      Math.round(bubbleBox.x),
-    );
-    expect(toolsBox.y, 'toolbar sits below the assistant reply').toBeGreaterThanOrEqual(
-      bubbleBox.y + bubbleBox.height - 1,
-    );
-    expect(Math.round(copyBox.height), 'compact assistant button is 28px').toBe(28);
-    expect(await toolOrder(tools)).toEqual(['copy']);
-    expect(copyBox.x + copyBox.width, 'copy button sits left of time').toBeLessThan(metaBox.x);
-    await assertPlainMeta(tools, `1440 assistant ${scheme}`);
-    expect(await isHittable(tools.getByTestId('chief-msg-copy'))).toBe(true);
+    await assertTopEndToolbar(page, stream, `1440 ${scheme}`, `${PHASE}-assistant-1440-${scheme}.png`);
   });
 
   for (const [label, width] of [
@@ -366,55 +339,15 @@ for (const scheme of ['light', 'dark'] as const) {
       page,
     }) => {
       const { stream } = await openConversation(page, width, scheme);
-      const row = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
-      const nextRow = stream.getByTestId('chief-msg').filter({ hasText: SHORT_USER_MSG });
-      const bubble = row.getByTestId('chief-reply-bubble');
-      const nextBubble = nextRow.getByTestId('chief-bubble');
-      const tools = row.getByTestId('chief-msg-foot');
-      await bubble.scrollIntoViewIfNeeded();
-      const bubbleBefore = await boxOf(bubble, 'assistant bubble before hover');
-
-      await bubble.hover();
-      await expect(tools).toHaveCSS('opacity', '1');
-      await captureRowShot(page, `${PHASE}-assistant-${label}-${scheme}.png`, stream, row);
-
-      const streamBox = await boxOf(stream, 'stream');
-      const bubbleBox = await boxOf(bubble, 'assistant bubble');
-      const nextBubbleBox = await boxOf(nextBubble, 'next user bubble');
-      const toolsBox = await boxOf(tools, 'assistant toolbar');
-
-      expect(Math.round(bubbleBox.y), 'hover does not shift bubble').toBe(
-        Math.round(bubbleBefore.y),
-      );
-      expect(
-        overlaps(toolsBox, bubbleBox),
-        `${label} assistant: toolbar must not intersect bubble`,
-      ).toBe(false);
-      expect(
-        overlaps(toolsBox, nextBubbleBox),
-        `${label} assistant: toolbar must not intersect the next bubble`,
-      ).toBe(false);
-      expect(
-        toolsBox.x,
-        `${label} assistant: toolbar stays inside stream left`,
-      ).toBeGreaterThanOrEqual(streamBox.x);
-      expect(
-        toolsBox.x + toolsBox.width,
-        `${label} assistant: toolbar stays inside stream right`,
-      ).toBeLessThanOrEqual(streamBox.x + streamBox.width + 1);
-      expect(await toolOrder(tools)).toEqual(['copy']);
-      await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
-      await assertPlainMeta(tools, `${label} assistant ${scheme}`);
-      for (const btn of await tools.locator('button[data-tool]').all()) {
-        const btnBox = await boxOf(btn, 'assistant tool button');
-        expect(
-          overlaps(btnBox, bubbleBox),
-          `${label} assistant: button must not overlap bubble`,
-        ).toBe(false);
-        expect(btnBox.width, 'A1: desktop hit target >= 24px').toBeGreaterThanOrEqual(24);
-        expect(btnBox.height, 'A1: desktop hit target >= 24px').toBeGreaterThanOrEqual(24);
-        expect(await isHittable(btn), `${label} assistant: button is reachable`).toBe(true);
+      if (width === 390) {
+        const row = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
+        await row.getByTestId('chief-reply-bubble').hover();
+        await expect(row.locator('[data-tool]'), '390px: no reply toolbar').toHaveCount(0);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+        expect(overflow, 'R1: no horizontal scroll at 390px').toBeLessThanOrEqual(0);
+        return;
       }
+      await assertTopEndToolbar(page, stream, `${label} ${scheme}`, `${PHASE}-assistant-${label}-${scheme}.png`);
     });
   }
 }
@@ -445,7 +378,7 @@ test('wide user bubble never overlaps its toolbar even at 1440px, and unhovered 
   }
 });
 
-test('latest assistant reply uses hover-only zero-height overlay toolbar with left bar and clears composer', async ({
+test('latest assistant reply uses a hover-only overlay toolbar with no left bar and clears composer', async ({
   page,
 }) => {
   const { stream } = await openConversation(page, 1440, 'light');
@@ -456,20 +389,19 @@ test('latest assistant reply uses hover-only zero-height overlay toolbar with le
 
   await page.mouse.move(0, 0);
   await expect(latestTools, 'latest reply toolbar is hidden at rest').toHaveCSS('opacity', '0');
-  await expect(latestTools).toHaveAttribute('data-placement', 'below-start-hover');
+  await expect(latestTools).toHaveAttribute('data-placement', 'top-end-hover');
   const replyHeightBefore = (await boxOf(latestReply, 'latest reply before hover')).height;
   const bubbleHeightBefore = (await boxOf(latestBubble, 'latest bubble before hover')).height;
   expect(Math.round(replyHeightBefore), 'toolbar adds 0px in-flow height').toBe(
     Math.round(bubbleHeightBefore),
   );
-  const barOpacityAtRest = await latestReply.evaluate((el) => getComputedStyle(el, '::before').opacity);
-  expect(Number(barOpacityAtRest), 'left ownership bar hidden at rest').toBe(0);
 
   await latestBubble.hover();
   await expect(latestTools).toHaveCSS('opacity', '1');
-  await expect
-    .poll(() => latestReply.evaluate((el) => Number(getComputedStyle(el, '::before').opacity)))
-    .toBe(1);
+  expect(
+    await latestReply.evaluate((el) => getComputedStyle(el, '::before').content),
+    'no left ownership bar on hover',
+  ).toMatch(/^(none|normal)$/);
   expect(Math.round((await boxOf(latestReply, 'latest reply hovered')).height)).toBe(
     Math.round(replyHeightBefore),
   );
@@ -481,7 +413,7 @@ test('latest assistant reply uses hover-only zero-height overlay toolbar with le
   expect(await isHittable(latestTools.getByTestId('chief-msg-copy'))).toBe(true);
 });
 
-test('consecutive assistant messages show a subtle top divider and clear the hovered toolbar above', async ({
+test('consecutive assistant messages are split by a centred time line and the hovered toolbar never reaches it', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -489,8 +421,8 @@ test('consecutive assistant messages show a subtle top divider and clear the hov
   await mockLive(page, {
     threads: [THREAD],
     messages: [
-      { id: 'u-1', role: 'user', content: SHORT_USER_MSG, createdAt: now - 90_000 },
-      { id: 'a-1', role: 'assistant', content: '第一条连续回复。', createdAt: now - 60_000 },
+      { id: 'u-1', role: 'user', content: SHORT_USER_MSG, createdAt: now - 330_000 },
+      { id: 'a-1', role: 'assistant', content: '第一条连续回复。', createdAt: now - 300_000 },
       { id: 'a-2', role: 'assistant', content: '第二条连续回复。', createdAt: now - 30_000 },
     ],
   });
@@ -500,19 +432,66 @@ test('consecutive assistant messages show a subtle top divider and clear the hov
 
   const first = stream.getByTestId('chief-msg').filter({ hasText: '第一条连续回复。' });
   const second = stream.getByTestId('chief-msg').filter({ hasText: '第二条连续回复。' });
-  const firstCol = first.getByTestId('chief-msg-col');
-  const secondCol = second.getByTestId('chief-msg-col');
-  await expect(firstCol).toHaveCSS('border-top-width', '0px');
-  await expect(secondCol).toHaveCSS('border-top-width', '1px');
+  await expect(first.getByTestId('chief-msg-col')).toHaveCSS('border-top-width', '0px');
+  await expect(second.getByTestId('chief-msg-col')).toHaveCSS('border-top-width', '0px');
+  const divider = stream.getByTestId('chief-time-divider');
+  await expect(divider, 'one time line between the two replies').toHaveCount(1);
+  await expect(divider).toHaveCSS('text-align', 'center');
 
   const firstBubbleBox = await boxOf(first.getByTestId('chief-reply-bubble'), 'first reply');
   const secondBubbleBox = await boxOf(second.getByTestId('chief-reply-bubble'), 'second reply');
-  expect(Math.round(secondBubbleBox.y - (firstBubbleBox.y + firstBubbleBox.height))).toBe(41);
+  const dividerBox = await boxOf(divider, 'time line');
+  expect(dividerBox.y).toBeGreaterThan(firstBubbleBox.y + firstBubbleBox.height);
+  expect(dividerBox.y + dividerBox.height).toBeLessThan(secondBubbleBox.y);
 
-  await first.getByTestId('chief-reply-bubble').hover();
-  const firstTools = first.getByTestId('chief-msg-foot');
-  await expect(firstTools).toHaveCSS('opacity', '1');
-  const firstToolsBox = await boxOf(firstTools, 'first toolbar');
-  expect(overlaps(firstToolsBox, secondBubbleBox), 'toolbar clears second reply').toBe(false);
-  expect(firstToolsBox.y + firstToolsBox.height).toBeLessThan(secondBubbleBox.y);
+  for (const [row, label] of [
+    [first, 'first'],
+    [second, 'second'],
+  ] as const) {
+    await row.getByTestId('chief-reply-bubble').hover();
+    const tools = row.getByTestId('chief-msg-foot');
+    await expect(tools).toHaveCSS('opacity', '1');
+    const toolsBox = await boxOf(tools, `${label} toolbar`);
+    expect(overlaps(toolsBox, dividerBox), `${label} toolbar clears the time line`).toBe(false);
+    expect(overlaps(toolsBox, label === 'first' ? secondBubbleBox : firstBubbleBox)).toBe(false);
+  }
 });
+
+async function assertTopEndToolbar(page: Page, stream: Locator, label: string, shot: string) {
+  const row = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
+  const prevRow = stream.getByTestId('chief-msg').filter({ hasText: USER_MSG });
+  const reply = row.getByTestId('chief-reply');
+  const bubble = row.getByTestId('chief-reply-bubble');
+  const tools = row.getByTestId('chief-msg-foot');
+  await bubble.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  await expect(tools, `C3 ${label}: assistant toolbar is hidden at rest`).toHaveCSS('opacity', '0');
+  const bubbleBefore = await boxOf(bubble, 'assistant bubble before hover');
+
+  await bubble.hover();
+  await expect(tools).toHaveCSS('opacity', '1');
+  await captureRowShot(page, shot, stream, row);
+  await expect(tools).toHaveAttribute('data-placement', 'top-end-hover');
+  await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
+  await expect(tools.locator('[data-slot="message-toolbar-meta"]'), `${label}: no time in the toolbar`).toHaveCount(0);
+
+  const replyBox = await boxOf(reply, 'assistant reply');
+  const bubbleBox = await boxOf(bubble, 'assistant bubble');
+  const toolsBox = await boxOf(tools, 'assistant toolbar');
+  const prevBox = await boxOf(prevRow.getByTestId('chief-bubble'), 'previous user bubble');
+  const copyBox = await boxOf(tools.getByTestId('chief-msg-copy'), 'assistant copy button');
+
+  expect(Math.round(bubbleBox.y), `${label}: hover does not shift bubble`).toBe(Math.round(bubbleBefore.y));
+  expect(overlaps(toolsBox, bubbleBox), `${label}: toolbar sits in the gutter beside the text`).toBe(false);
+  expect(overlaps(toolsBox, prevBox), `${label}: toolbar clears the bubble above`).toBe(false);
+  expect(Math.abs(toolsBox.x + toolsBox.width - (replyBox.x + replyBox.width)), `${label}: pinned to the right edge`).toBeLessThanOrEqual(1);
+  expect(Math.abs(toolsBox.y - replyBox.y), `${label}: level with the first line`).toBeLessThanOrEqual(2);
+  expect(Math.round(copyBox.height), `${label}: compact assistant button is 28px`).toBe(28);
+  expect(await toolOrder(tools)).toEqual(['copy']);
+  const look = await tools.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    return { border: cs.borderTopWidth, shadow: cs.boxShadow };
+  });
+  expect(look, `${label}: a bordered pill, no shadow (V21)`).toEqual({ border: '1px', shadow: 'none' });
+  expect(await isHittable(tools.getByTestId('chief-msg-copy'))).toBe(true);
+}

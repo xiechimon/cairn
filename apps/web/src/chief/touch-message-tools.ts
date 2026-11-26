@@ -3,6 +3,12 @@ import { useEffect } from 'react';
 export const TOOLS_OPEN_ATTR = 'data-tools-open';
 
 const MESSAGE_SELECTOR = '[data-testid="chief-msg"], [data-tools-root]';
+const PRESS_MENU_REPLY = '[data-press-menu]';
+
+function toolsOwner(target: Element): Element | null {
+  const message = target.closest(MESSAGE_SELECTOR);
+  return message?.querySelector(PRESS_MENU_REPLY) == null ? message : null;
+}
 const INTERACTIVE_SELECTOR =
   'a, button, input, textarea, select, summary, label, [role="button"], [role="menuitem"], [contenteditable="true"]';
 const COARSE_QUERY = '(pointer: coarse)';
@@ -19,7 +25,7 @@ export function useTouchMessageTools(root: HTMLElement | null): void {
     const coarse = window.matchMedia(COARSE_QUERY);
     const onClick = (event: MouseEvent) => {
       if (!coarse.matches || !(event.target instanceof Element)) return;
-      const message = event.target.closest(MESSAGE_SELECTOR);
+      const message = toolsOwner(event.target);
       if (event.target.closest(INTERACTIVE_SELECTOR) !== null) {
         if (message === null) closeAll(root, null);
         return;
@@ -32,7 +38,7 @@ export function useTouchMessageTools(root: HTMLElement | null): void {
     };
     const onContextMenu = (event: MouseEvent) => {
       if (!coarse.matches || !(event.target instanceof Element)) return;
-      const message = event.target.closest(MESSAGE_SELECTOR);
+      const message = toolsOwner(event.target);
       if (message === null) return;
       closeAll(root, message);
       message.setAttribute(TOOLS_OPEN_ATTR, '');

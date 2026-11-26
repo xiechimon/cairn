@@ -33,6 +33,7 @@ button.tsx               # registry-same-source + in-repo semantic mapping (type
 card.tsx
 checkbox.tsx             # checkbox (registry-same-source + a one-piece zero-skin semantic mapping: indeterminate renders a dash, #952/#982); the row box = the consumer's label wrap; **do not place a bare `<input type="checkbox">`** — the browser's built-in box is a different family from the in-repo checkbox row
 collapsible.tsx          # Base UI Collapsible (Root/Trigger/Content, registry-same-source): the registryDependency of trace.tsx; reach for Trace first when the disclosure is an activity line
+context-menu.tsx         # Base UI ContextMenu in the dropdown-menu skin (MENU_SURFACE_CLS / MENU_ITEM_CLS): opens on right click or a 500ms touch long press at the press point; the Coordinator reply's press menu (copy / select text) on touch and narrow windows
 dialog-shell.tsx         # shared dialog base (e2e vehicle = role=dialog accessible name + dialog-head/-body/-foot testids, spec/22 §5.5)
 dialog.tsx
 dropdown-menu.tsx        # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733), Content exposes anchor (#454); open motion retimed to --ease-out-expo at 100ms (owner motion pick), close stays instant via motion.css [data-closed]
