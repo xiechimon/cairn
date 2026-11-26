@@ -93,6 +93,24 @@ for (const [name, body] of [
     'an earlier paragraph left an inline tag open',
     `Press <s> now.\n\n${marked('a.team', SENTENCE)}\n`,
   ],
+  [
+    'the sanitizer drops a hidden attribute',
+    `<div hidden>\n\n${marked('a.team', SENTENCE)}\n\n</div>\n`,
+  ],
+  [
+    'the sanitizer drops a hiding style',
+    `<div style="display:none">\n\n${marked('a.team', SENTENCE)}\n\n</div>\n`,
+  ],
+  [
+    'a title only quotes a hiding style',
+    `<div title="display:none">\n\n${marked('a.team', SENTENCE)}\n\n</div>\n`,
+  ],
+  ['a textarea tag shows as text', `<textarea>\n${marked('a.team', SENTENCE)}\n</textarea>\n`],
+  [
+    'a template tag is stripped and its text shows',
+    `<template>\n${marked('a.team', SENTENCE)}\n</template>\n`,
+  ],
+  ['a referenced footnote holds it', `Body.[^x]\n\n[^x]: ${marked('a.team', SENTENCE)}\n`],
 ]) {
   test(`--check stays green when ${name}`, (t) => {
     const { run, put } = sandbox(t);
@@ -124,9 +142,14 @@ for (const [name, body, why] of [
     /inside a <pre> element/,
   ],
   [
-    'a hidden element holds it',
-    `<div hidden>\n\n${marked('a.team', SENTENCE)}\n\n</div>\n`,
-    /inside a <div> element opened at line 1/,
+    'only a footnote nothing refers to holds it',
+    `Body.\n\n[^x]: ${marked('a.team', SENTENCE)}\n`,
+    /a\.team mark does not render: it is in a footnote nothing refers to/,
+  ],
+  [
+    'a link title holds it',
+    `See [this](a.md "${marked('a.team', SENTENCE)}").\n`,
+    /docs\/spec\/18-a\.md:1: the a\.team mark does not render: it is not in visible text/,
   ],
   ['single tildes strike it', `~${marked('a.team', SENTENCE)}~\n`, /struck through/],
   [

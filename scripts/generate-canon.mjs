@@ -18,21 +18,8 @@ const CLOSING_MARK = /^<!--\s*\/ruling\s*-->$/;
 const MENTIONED_MARK = /<!--\s*ruling:([\w.-]+)\s*-->/g;
 const HTML_TOKEN =
   /<!--[\s\S]*?(?:-->|$)|<(\/?)([A-Za-z][\w:-]*)((?:[^<>"']|"[^"]*"|'[^']*')*?)(\/?)>/g;
-const HIDING_ELEMENTS = new Set([
-  'code',
-  'del',
-  'noscript',
-  'pre',
-  's',
-  'script',
-  'strike',
-  'style',
-  'template',
-  'textarea',
-]);
+const HIDING_ELEMENTS = new Set(['code', 'del', 'pre', 's', 'strike']);
 const VOID_ELEMENTS = new Set(['br', 'hr', 'img', 'input', 'link', 'meta', 'source', 'wbr']);
-const HIDDEN_ATTRIBUTE = /(?:^|\s)hidden(?=\s|=|$)/i;
-const HIDDEN_STYLE = /display\s*:\s*none/i;
 const PHRASING_PARENTS = new Set([
   'delete',
   'emphasis',
@@ -55,14 +42,6 @@ function fail(lines) {
 
 const newlines = (text) => text.split('\n').length - 1;
 
-function hidingElement(name, attributes) {
-  return (
-    HIDING_ELEMENTS.has(name) ||
-    HIDDEN_ATTRIBUTE.test(attributes.replace(/"[^"]*"|'[^']*'/g, '')) ||
-    HIDDEN_STYLE.test(attributes)
-  );
-}
-
 function readHtml(node, source, inline, context) {
   const text = inline
     ? source.slice(node.position.start.offset, node.position.end.offset)
@@ -72,14 +51,14 @@ function readHtml(node, source, inline, context) {
   const elements = inline ? context.inlineElements : context.blockElements;
   for (const token of text.matchAll(HTML_TOKEN)) {
     const line = node.position.start.line + newlines(text.slice(0, token.index));
-    const [whole, closing, rawName, attributes, selfClosing] = token;
+    const [whole, closing, rawName, , selfClosing] = token;
     if (rawName) {
       const name = rawName.toLowerCase();
       if (closing) {
         const at = elements.findLastIndex((element) => element.name === name);
         if (at !== -1) elements.splice(at, 1);
       } else if (!selfClosing && !VOID_ELEMENTS.has(name))
-        elements.push({ name, line, hides: hidingElement(name, attributes) });
+        elements.push({ name, line, hides: HIDING_ELEMENTS.has(name) });
       continue;
     }
     const opening = OPENING_MARK.exec(whole);
@@ -95,9 +74,9 @@ function readHtml(node, source, inline, context) {
     const hider = [...context.blockElements, ...context.inlineElements].find(
       (element) => element.hides,
     );
-    const why = context.struck
-      ? 'struck through'
-      : hider && `inside a <${hider.name}> element opened at line ${hider.line}`;
+    const why =
+      context.concealed ??
+      (hider && `inside a <${hider.name}> element opened at line ${hider.line}`);
     if (why) {
       if (opening) context.unrendered(opening[1], line, why);
       continue;
@@ -112,6 +91,12 @@ function readHtml(node, source, inline, context) {
   }
 }
 
+function footnoteReferences(node, found = new Set()) {
+  if (node.type === 'footnoteReference') found.add(node.identifier);
+  for (const child of node.children ?? []) footnoteReferences(child, found);
+  return found;
+}
+
 function renderedMarks(source) {
   const tree = fromMarkdown(source, {
     extensions: [gfm()],
@@ -123,9 +108,10 @@ function renderedMarks(source) {
     headings: [],
     blockElements: [],
     inlineElements: [],
-    struck: false,
+    concealed: null,
     unrendered: (id, line, why) => hidden.push({ id, line, why }),
   };
+  const referenced = footnoteReferences(tree);
   const walk = (node, parent) => {
     if (node.type === 'html') {
       readHtml(node, source, PHRASING_PARENTS.has(parent?.type), context);
@@ -142,10 +128,12 @@ function renderedMarks(source) {
       return;
     }
     if (node.type === 'heading') context.headings.push(node.position.start.line);
-    const wasStruck = context.struck;
-    if (node.type === 'delete') context.struck = true;
+    const outer = context.concealed;
+    if (node.type === 'delete') context.concealed = 'struck through';
+    if (node.type === 'footnoteDefinition' && !referenced.has(node.identifier))
+      context.concealed = 'in a footnote nothing refers to';
     for (const child of node.children ?? []) walk(child, node);
-    context.struck = wasStruck;
+    context.concealed = outer;
     if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'tableCell')
       context.inlineElements.length = 0;
   };
@@ -158,6 +146,11 @@ function readMarks(spec, problems, unrendered) {
   const lines = source.split('\n');
   const { shown, headings, hidden } = renderedMarks(source);
   unrendered.push(...hidden.map((mark) => ({ ...mark, spec })));
+  const explained = new Set([...hidden, ...shown].map((mark) => mark.id));
+  for (const [at, text] of lines.entries())
+    for (const [, id] of text.matchAll(MENTIONED_MARK))
+      if (!explained.has(id))
+        unrendered.push({ id, spec, line: at + 1, why: 'not in visible text' });
   const sectionAt = (line) =>
     headings
       .filter((at) => at <= line)
