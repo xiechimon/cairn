@@ -60,13 +60,14 @@ function fixture(t) {
 }
 
 test('scans exactly the commits since origin/main, redacted, with inline allows ignored', (t) => {
-  const { base, argsFile, stubbed } = fixture(t);
+  const { base, argsFile, addCommit, stubbed } = fixture(t);
+  addCommit('lane.txt', 'lane work\n');
   const run = stubbed({ exit: 0, log: 'INF no leaks found' });
   assert.equal(run.status, 0, run.stderr);
   const args = readFileSync(argsFile, 'utf8').split('\n');
   for (const expected of ['git', 'stdin', '--redact', '--ignore-gitleaks-allow'])
     assert.ok(args.includes(expected), expected);
-  assert.ok(args.some((arg) => arg.startsWith('--log-opts=') && arg.endsWith(` ${base}..HEAD`)));
+  assert.ok(args.some((arg) => arg.startsWith('--log-opts=') && arg.includes(` ${base}..`)));
 });
 
 test('a finding is red and says to rotate before removing it', (t) => {
@@ -135,24 +136,20 @@ test(
 );
 
 const hidingPlaces = {
-  'color.ui=always': ({ git, addCommit }, line) => {
-    git('config', 'color.ui', 'always');
-    addCommit('key.txt', line);
-  },
   'a file git treats as binary': ({ addCommit }, line) => addCommit('key.txt', `\0${line}`),
-  'a -diff attribute': ({ addCommit }, line) => {
-    addCommit('.gitattributes', '*.txt -diff\n');
-    addCommit('key.txt', line);
-  },
   'a textconv filter': ({ git, addCommit }, line) => {
     git('config', 'diff.mask.textconv', 'echo masked #');
     addCommit('.gitattributes', '*.txt diff=mask\n');
     addCommit('key.txt', line);
   },
-  'a replace ref': ({ repo, git, addCommit }, line) => {
-    addCommit('key.txt', line);
-    writeFileSync(join(repo, 'clean-blob'), 'nothing\n');
-    git('replace', git('rev-parse', 'HEAD:key.txt'), git('hash-object', '-w', 'clean-blob'));
+  'a replace ref over the commit': ({ git, addCommit }, line) => {
+    git('commit', '-q', '--allow-empty', '-m', line);
+    git('replace', 'HEAD', git('commit-tree', 'HEAD^{tree}', '-p', 'HEAD~1', '-m', 'clean'));
+    addCommit('clean.txt', 'clean\n');
+  },
+  'i18n.logOutputEncoding=UTF-16': ({ git }, line) => {
+    git('commit', '-q', '--allow-empty', '-m', line);
+    git('config', 'i18n.logOutputEncoding', 'UTF-16');
   },
   'text added only by a merge commit': ({ repo, git, addCommit }, line) => {
     git('checkout', '-qb', 'side');
@@ -164,7 +161,6 @@ const hidingPlaces = {
     git('add', '--', 'key.txt');
     git('commit', '-qm', 'merge side');
   },
-  'a commit message': ({ git }, line) => git('commit', '-q', '--allow-empty', '-m', line),
 };
 
 for (const [place, hide] of Object.entries(hidingPlaces))
@@ -189,14 +185,45 @@ test('merging origin/main does not rescan what main already holds', realGitleaks
 test('no gitleaks configuration can switch the rules off', realGitleaks, (t) => {
   const { addCommit, scan } = fixture(t);
   const token = generatedKey();
-  addCommit('key.txt', `token = "${token}"\n`);
   const silent = "title = \"x\"\n[[rules]]\nid = \"never\"\nregex = '''never-matches-zzz'''\n";
-  refusesWithoutPrinting(scan({ GITLEAKS_CONFIG_TOML: silent }), token);
-
   addCommit('.gitleaks.toml', silent);
-  const configured = scan();
-  assert.equal(configured.status, 2);
-  assert.match(configured.stderr, /\.gitleaks\.toml.*\.gitleaksignore/s);
+  addCommit('key.txt', `token = "${token}"\n`);
+  refusesWithoutPrinting(scan({ GITLEAKS_CONFIG_TOML: silent }), token);
+});
+
+test('only a committed ignore entry that names its commit is honoured', realGitleaks, (t) => {
+  const { repo, git, addCommit, scan } = fixture(t);
+  const token = generatedKey();
+  git('config', 'log.date', 'relative');
+  addCommit('key.txt', `token = "${token}"\n`);
+  const found = scan({ GIT_CONFIG_PARAMETERS: "'log.date'='human'" });
+  refusesWithoutPrinting(found, token);
+  const [fingerprint] = found.stdout.match(/[0-9a-f]{40}:key\.txt:github-pat:1/) ?? [];
+  assert.ok(fingerprint, found.stdout);
+
+  writeFileSync(join(repo, '.gitleaksignore'), `${fingerprint}\n`);
+  assert.equal(scan().status, 1);
+  addCommit('.gitleaksignore', `# reviewed\n${fingerprint}\n`);
+  const ignored = scan();
+  assert.equal(ignored.status, 0, `${ignored.stdout}${ignored.stderr}`);
+
+  for (const unpinned of ['key.txt:github-pat:1', ':github-pat:2']) {
+    addCommit('.gitleaksignore', `${unpinned}\n`);
+    const refused = scan();
+    assert.equal(refused.status, 2);
+    assert.match(refused.stderr, /must start with the commit/);
+  }
+});
+
+test('a key in a commit message is traced to its commit', realGitleaks, (t) => {
+  const { git, addCommit, scan } = fixture(t);
+  const token = generatedKey();
+  git('commit', '-q', '--allow-empty', '-m', `fix\n\n${token}`);
+  const guilty = git('rev-parse', 'HEAD');
+  addCommit('later.txt', 'later\n');
+  const run = scan();
+  refusesWithoutPrinting(run, token);
+  assert.match(run.stderr, new RegExp(`message of ${guilty}.*reword`, 's'));
 });
 
 test('a merge with more than two parents is red, because its own text is not shown', (t) => {

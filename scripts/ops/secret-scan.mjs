@@ -1,43 +1,51 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { devNull, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { mergeBase } from '../diff-base.mjs';
 
 const FOUND = 1;
 const COULD_NOT_RUN = 2;
 const BUFFER = 64 * 1024 * 1024;
-const EVERY_ADDED_LINE =
-  '--no-color --no-textconv --no-ext-diff --text --pretty=medium --src-prefix=a/ --dst-prefix=b/ --diff-merges=remerge';
+const IGNORE_FILE = '.gitleaksignore';
+const PINNED_ENTRY = /^[0-9a-f]{40}:.+:[\w-]+:\d+$/;
 const LOGGED_ERROR = /(?:^|\s)ERR\s/m;
 const INSTALL =
   'brew install gitleaks (other systems: https://github.com/gitleaks/gitleaks/releases)';
-const REMEDY =
-  'If a finding is real, treat it as leaked: rotate it first, then remove it from every commit that holds it. A false positive goes into .gitleaksignore as its Fingerprint line.';
+const LEAKED =
+  'If a finding is real, treat it as leaked: rotate it first, then remove it from every commit that holds it.';
+const FILE_REMEDY = `${LEAKED} For a false positive, commit its Fingerprint line to ${IGNORE_FILE}.`;
+const messageRemedy = (commit) =>
+  `The finding is in the message of ${commit}. ${LEAKED} For a false positive, reword the message.`;
 
-function git(cwd, args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: BUFFER }).trim();
+function isolatedEnv() {
+  const inherited = Object.entries(process.env).filter(([key]) => !/^(GIT|GITLEAKS)_/.test(key));
+  return {
+    ...Object.fromEntries(inherited),
+    GIT_CONFIG_GLOBAL: devNull,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_ATTR_NOSYSTEM: '1',
+  };
 }
 
-function gitleaks(cwd, args, input) {
-  const env = { ...process.env, GIT_NO_REPLACE_OBJECTS: '1' };
-  delete env.GITLEAKS_CONFIG;
-  delete env.GITLEAKS_CONFIG_TOML;
-  return spawnSync(
+function git(cwd, args, env = process.env) {
+  const options = { cwd, env, encoding: 'utf8', maxBuffer: BUFFER, stdio: 'pipe' };
+  return execFileSync('git', args, options).trim();
+}
+
+function scan(cwd, args, { range, remedy, input }) {
+  const run = spawnSync(
     'gitleaks',
     [...args, '--redact', '--no-banner', '--no-color', '--verbose', '--ignore-gitleaks-allow'],
-    { cwd, env, input, encoding: 'utf8', maxBuffer: BUFFER },
+    { cwd, env: isolatedEnv(), input, encoding: 'utf8', maxBuffer: BUFFER },
   );
-}
-
-function verdict(run, range) {
   if (run.error?.code === 'ENOENT')
     return { code: COULD_NOT_RUN, message: `gitleaks is not installed: ${INSTALL}` };
   const output = `${run.stdout ?? ''}${run.stderr ?? ''}`;
   if (run.status === FOUND)
-    return { code: FOUND, output, message: `gitleaks found a secret or failed. ${REMEDY}` };
+    return { code: FOUND, output, message: `gitleaks found a secret or failed. ${remedy}` };
   if (run.error || run.status !== 0 || LOGGED_ERROR.test(output))
     return {
       code: COULD_NOT_RUN,
@@ -47,30 +55,61 @@ function verdict(run, range) {
   return null;
 }
 
-export function scanBranch(cwd) {
-  const base = mergeBase(cwd, 'origin/main');
-  if (!base) return { code: COULD_NOT_RUN, message: 'no merge-base with origin/main' };
-  const root = git(cwd, ['rev-parse', '--show-toplevel']);
-  if (existsSync(join(root, '.gitleaks.toml')))
+function withBareCopy(source, use) {
+  const copy = mkdtempSync(join(tmpdir(), 'secret-scan-'));
+  try {
+    git(copy, ['init', '--quiet', '--bare', '--template=', '.'], isolatedEnv());
+    writeFileSync(join(copy, 'objects', 'info', 'alternates'), `${join(source, 'objects')}\n`);
+    return use(copy, (...args) => git(copy, args, isolatedEnv()));
+  } finally {
+    rmSync(copy, { recursive: true, force: true });
+  }
+}
+
+function scanRange(copy, run, base, head) {
+  const committed = run('ls-tree', '--name-only', head, '--', IGNORE_FILE)
+    ? run('cat-file', 'blob', `${head}:${IGNORE_FILE}`)
+    : '';
+  const entries = committed.split('\n').filter((line) => line.trim() && !line.startsWith('#'));
+  const unpinned = entries.find((line) => !PINNED_ENTRY.test(line));
+  if (unpinned)
     return {
       code: COULD_NOT_RUN,
-      message: 'remove .gitleaks.toml: a false positive goes only into .gitleaksignore',
+      message: `every ${IGNORE_FILE} entry must start with the commit it excuses, or it hides later secrets: ${unpinned}`,
     };
-  const range = `${base}..HEAD`;
-  if (git(root, ['rev-list', '--min-parents=3', range]))
+  writeFileSync(join(copy, IGNORE_FILE), `${entries.join('\n')}\n`);
+  const range = `${base}..${head}`;
+  const label = `${base.slice(0, 9)}..${head.slice(0, 9)}`;
+  if (run('rev-list', '--min-parents=3', range))
     return {
       code: COULD_NOT_RUN,
       message: 'a merge with more than two parents cannot be scanned; merge one branch at a time',
     };
-  const passes = [
-    () => gitleaks(root, ['git', `--log-opts=${EVERY_ADDED_LINE} ${range}`, '.']),
-    () => gitleaks(root, ['stdin'], git(root, ['log', '--no-color', '--format=%H%n%B', range])),
-  ];
-  for (const pass of passes) {
-    const failed = verdict(pass(), `${base.slice(0, 9)}..HEAD`);
-    if (failed) return failed;
+  const diffs = ['git', `--log-opts=--text --diff-merges=remerge ${range}`, '.'];
+  const inDiffs = scan(copy, diffs, { range: label, remedy: FILE_REMEDY });
+  if (inDiffs) return inDiffs;
+  for (const commit of run('rev-list', range).split('\n').filter(Boolean)) {
+    const input = run('show', '--no-patch', '--format=%B', commit);
+    const options = { range: label, remedy: messageRemedy(commit), input };
+    const inMessage = scan(copy, ['stdin'], options);
+    if (inMessage) return inMessage;
   }
-  return { code: 0, message: `PASS: no secrets in ${base.slice(0, 9)}..HEAD` };
+  return { code: 0, message: `PASS: no secrets in ${label}` };
+}
+
+export function scanBranch(cwd) {
+  const source = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  const head = git(cwd, ['rev-parse', 'HEAD']);
+  return withBareCopy(source, (copy, run) => {
+    let base;
+    try {
+      const main = git(cwd, ['rev-parse', '--verify', 'origin/main^{commit}']);
+      base = run('merge-base', head, main);
+    } catch {
+      return { code: COULD_NOT_RUN, message: 'no merge-base with origin/main' };
+    }
+    return scanRange(copy, run, base, head);
+  });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
