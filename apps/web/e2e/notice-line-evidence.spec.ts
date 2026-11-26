@@ -16,6 +16,9 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app?scenario=chief-md-ref');
     await expect(page.getByTestId('chief-bubble').first()).toBeVisible();
     await expect(page.getByTestId('chief-reply').first()).toBeVisible();
+    const python = page.getByTestId('md-code').filter({ hasText: 'from collections' }).first();
+    await expect(python.locator('span[style]').filter({ hasText: 'from' }).first()).toBeVisible();
+    await expect(python.locator('span[style]').filter({ hasText: 'import' }).first()).toBeVisible();
     await page.screenshot({ path: `${dir}/chief-messages-${theme}.png`, fullPage: true });
 
     await page.goto('/app/todo/home-c-retry-waiting?scenario=home-c-retry');
