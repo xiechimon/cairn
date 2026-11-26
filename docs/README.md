@@ -2,7 +2,7 @@
 
 Every document here is either **living** or a **record**. Decide which before reading.
 
-- **Living** documents must be true today: the root `*.md` files, `docs/*.md`, `docs/spec/`, `docs/ops/`, the project skills under `.claude/skills/` (not their vendored, reference or changelog files), `apps/web/DESIGN.md`, the `## Rules` sections of `docs/design/surfaces/*.md`, and the landing mechanics in `docs/design/tested-sha-landing.md` and `docs/design/preflight-ci-verification.md`.
+- **Living** documents must be true today: the root `*.md` files except `CHANGELOG.md`, `docs/*.md`, `docs/spec/`, `docs/ops/`, the project skills under `.claude/skills/` (not their vendored, reference or changelog files), `apps/web/DESIGN.md`, the `## Rules` sections of `docs/design/surfaces/*.md`, and the landing mechanics in `docs/design/tested-sha-landing.md` and `docs/design/preflight-ci-verification.md`.
 - **Records** were true on their date. They are not maintained and are never current behaviour: `docs/research/`, `docs/lessons/` and everything else under `docs/design/`. A status line in a record describes the day it was written. A rule in a record that still governs behaviour moves into a living document.
 
 The change that retires a mechanism, path or rule updates or deletes every living document that describes it. Records stay as they are.

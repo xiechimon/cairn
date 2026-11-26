@@ -1,0 +1,65 @@
+{
+  "terms": [
+    {
+      "id": "adr-number",
+      "pattern": "\\b[Aa][Dd][Rr][Ss]?[-_ /]?#?\\d{3,4}\\b",
+      "canary": "ADR 0026",
+      "reason": "no ADR file is tracked; cite the spec section or design document that holds the decision"
+    },
+    {
+      "id": "pr-evidence-gate",
+      "pattern": "\\bpr-evidence\\b",
+      "canary": "pr-evidence-gate.py",
+      "reason": "there is no pull request evidence gate; AGENTS.md (Ship) is how work lands"
+    },
+    {
+      "id": "manual-queue-main",
+      "pattern": "\\bqueue/main\\b(?! release:)",
+      "canary": "git push origin HEAD:queue/main",
+      "reason": "nobody lands through queue/main by hand; scripts/ops/push-queue.mjs is the one landing route"
+    },
+    {
+      "id": "design-rules-file",
+      "pattern": "\\bDESIGN-RULES\\.md\\b",
+      "canary": "apps/web/DESIGN-RULES.md",
+      "reason": "the file was removed; rule rows live in the Rules section of docs/design/surfaces/*.md"
+    }
+  ],
+  "baseline": {
+    "adr-number": {
+      ".claude/skills/verify-cairn/features/agent-detail.md": 2,
+      ".claude/skills/verify-cairn/features/attachments.md": 1,
+      ".claude/skills/verify-cairn/features/board-new-task.md": 1,
+      ".claude/skills/verify-cairn/features/chief-dispatch-judgment.md": 3,
+      ".claude/skills/verify-cairn/features/chief-segments.md": 5,
+      ".claude/skills/verify-cairn/features/detail-right-pane.md": 1,
+      ".claude/skills/verify-cairn/features/failed-send.md": 1,
+      ".claude/skills/verify-cairn/features/hotkeys.md": 3,
+      ".claude/skills/verify-cairn/features/local-daemon-executor.md": 2,
+      ".claude/skills/verify-cairn/features/mcp-servers.md": 1,
+      ".claude/skills/verify-cairn/features/persona-verify.md": 3,
+      ".claude/skills/verify-cairn/features/README.md": 3,
+      ".claude/skills/verify-cairn/features/review-700.md": 1,
+      ".claude/skills/verify-cairn/features/review-modal.md": 2,
+      ".claude/skills/verify-cairn/features/review-reject.md": 2,
+      ".claude/skills/verify-cairn/features/skills-injection.md": 7,
+      ".claude/skills/verify-merge-gate/evidence/findings.md": 1,
+      "docs/spec/06-open-source-and-divergence.md": 3,
+      "docs/spec/11-model-service-and-machine-localization.md": 7,
+      "docs/spec/18-positioning-and-differentiation.md": 22,
+      "docs/spec/22-color-and-geometry-token-scale-canonical-table.md": 4,
+      "docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md": 5,
+      "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 28,
+      "docs/spec/29-evaluation-and-data-loop.md": 7,
+      "docs/spec/base-ui-theme.md": 4
+    },
+    "pr-evidence-gate": {
+      ".claude/skills/verify-merge-gate/SKILL.md": 1,
+      "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 5
+    },
+    "manual-queue-main": {
+      "AGENTS.md": 3
+    },
+    "design-rules-file": {}
+  }
+}

@@ -479,6 +479,7 @@ test('documentation skips code checks, unknown paths fail closed', () => {
     ['node', 'scripts/public-content-gate.mjs'],
     ['node', 'scripts/conflict-marker-gate.mjs'],
     ['node', 'scripts/doc-refs-gate.mjs'],
+    ['node', 'scripts/doc-retired-terms-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md', 'AGENTS.md'],
   ]);
   assert.deepEqual(prepushPlan(['docs/lessons.md'], 'ci'), [
@@ -486,6 +487,7 @@ test('documentation skips code checks, unknown paths fail closed', () => {
     ['node', 'scripts/public-content-gate.mjs'],
     ['node', 'scripts/conflict-marker-gate.mjs'],
     ['node', 'scripts/doc-refs-gate.mjs'],
+    ['node', 'scripts/doc-retired-terms-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md'],
   ]);
   assert.deepEqual(
@@ -656,6 +658,7 @@ test('lesson entries use the same document checks as other Markdown', () => {
         ['node', 'scripts/public-content-gate.mjs'],
         ['node', 'scripts/conflict-marker-gate.mjs'],
         ['node', 'scripts/doc-refs-gate.mjs'],
+        ['node', 'scripts/doc-retired-terms-gate.mjs'],
         ['node', 'scripts/doc-reader-tests.mjs', path],
       ]);
 });
@@ -710,6 +713,7 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['node', 'scripts/public-content-gate.mjs'],
         ['node', 'scripts/conflict-marker-gate.mjs'],
         ['node', 'scripts/doc-refs-gate.mjs'],
+        ['node', 'scripts/doc-retired-terms-gate.mjs'],
         ['node', 'scripts/journal-newline-gate.mjs'],
         ['node', 'scripts/ui-debt-gate.mjs'],
         ['node', 'scripts/flake-ledger.mjs'],
@@ -781,6 +785,7 @@ test('a docs-only data change still runs every test that reads the changed file'
     ['node', 'scripts/public-content-gate.mjs'],
     ['node', 'scripts/conflict-marker-gate.mjs'],
     ['node', 'scripts/doc-refs-gate.mjs'],
+    ['node', 'scripts/doc-retired-terms-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons/README.md', data],
   ]);
   assert.ok(
@@ -946,7 +951,7 @@ test('CLI skips real document changes and rejects a missing base', () => {
       env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main' }),
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /PASS \(5 checks\)/);
+    assert.match(result.stdout, /PASS \(6 checks\)/);
     const forced = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
@@ -1024,7 +1029,7 @@ test('a stale local origin/main is refreshed by fetch before computing changes',
     gitIn(work, ['commit', '-m', 'docs']);
     const result = runPrepushCi(work);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /PASS \(5 checks\)/);
+    assert.match(result.stdout, /PASS \(6 checks\)/);
     assert.doesNotMatch(result.stderr, /may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -1047,7 +1052,7 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
     gitIn(work, ['commit', '-m', 'docs']);
     const result = runPrepushCi(work);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /PASS \(5 checks\)/);
+    assert.match(result.stdout, /PASS \(6 checks\)/);
     assert.match(result.stderr, /git fetch origin main failed.*may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -1075,7 +1080,7 @@ test('a dead configured base falls back to origin/main only under a queue ref', 
       env: prepushEnv({ PREPUSH_BASE_SHA: dead, GITHUB_REF: 'refs/heads/queue/main' }),
     });
     assert.equal(queued.status, 0, `${queued.stdout}\n${queued.stderr}`);
-    assert.match(queued.stdout, /PASS \(5 checks\)/);
+    assert.match(queued.stdout, /PASS \(6 checks\)/);
     const ordinary = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: work,
       encoding: 'utf8',

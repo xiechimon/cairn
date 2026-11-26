@@ -50,7 +50,7 @@ Work happens in worktrees, never in the primary checkout: a machine-level pre-co
 - Decide by your own recommendation and say in chat what you chose and why. Ask the owner for payments, credentials, intended-behavior or design changes, and decisions explicitly routed to him.
 - Explain problems, designs, trade-offs and outcomes to the user through concrete scenarios, not internal symbol or protocol dumps. For each point give: a real user scenario ("when you do X..."), why it breaks or blocks in plain words, how the fix works, and what happens in that scenario afterwards; link files for reference instead of reciting field names. Skip this for one-line answers or trivial status updates.
 - Keep each change small and self-contained.
-- The change that retires a mechanism, path or rule updates or deletes every living document that describes it (`docs/README.md` says which are living), replacing the old text instead of adding a note above it.
+- The change that retires a mechanism, path or rule updates or deletes every living document that describes it (`docs/README.md` says which are living), replacing the old text instead of adding a note above it. It also adds the retired name to `scripts/doc-retired-terms.json`, so `scripts/doc-retired-terms-gate.mjs` stops it being copied back.
 - Do not commit verification evidence (logs, screenshots, probe output).
 
 Where to look:

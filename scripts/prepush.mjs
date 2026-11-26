@@ -27,6 +27,9 @@ export const prepushModules = [
   'scripts/conflict-marker-gate.mjs',
   'scripts/drizzle-drift-gate.mjs',
   'scripts/doc-refs-gate.mjs',
+  'scripts/doc-retired-terms-gate.mjs',
+  'scripts/doc-retired-terms.json',
+  'scripts/living-docs.mjs',
 ];
 
 export const ciOnlyScripts = {
@@ -62,6 +65,7 @@ export const selfTests = [
   'scripts/journal-newline-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
   'scripts/doc-refs-gate.test.mjs',
+  'scripts/doc-retired-terms-gate.test.mjs',
   'scripts/import-cycle-gate.test.mjs',
   'scripts/epic-done.test.mjs',
   'scripts/agent-rules.test.mjs',
@@ -164,7 +168,13 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   const codePaths = paths.filter((path) => hasCode([path]));
   const docPaths = paths.filter(isDocument);
   if (codePaths.length === 0 && !forceFull) {
-    const checks = [language, publicContent, conflictMarker, ['node', 'scripts/doc-refs-gate.mjs']];
+    const checks = [
+      language,
+      publicContent,
+      conflictMarker,
+      ['node', 'scripts/doc-refs-gate.mjs'],
+      ['node', 'scripts/doc-retired-terms-gate.mjs'],
+    ];
     checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
     return checks;
   }
@@ -173,6 +183,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     publicContent,
     conflictMarker,
     ['node', 'scripts/doc-refs-gate.mjs'],
+    ['node', 'scripts/doc-retired-terms-gate.mjs'],
     ['node', 'scripts/journal-newline-gate.mjs'],
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/flake-ledger.mjs'],
