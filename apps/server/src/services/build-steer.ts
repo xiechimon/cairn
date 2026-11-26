@@ -37,6 +37,7 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import { projectOfTodo } from './git.js';
+import { moveQueuedMessages } from './queued-send.js';
 import { assertAutomaticRetryAllowed } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -417,11 +418,7 @@ export async function sendBuildSteer(
       }
       if (body.queuedMessageId !== undefined)
         db.delete(queuedMessage).where(eq(queuedMessage.id, body.queuedMessageId)).run();
-      if (targetBuildId !== conversationId)
-        db.update(queuedMessage)
-          .set({ conversationId: targetBuildId })
-          .where(eq(queuedMessage.conversationId, conversationId))
-          .run();
+      moveQueuedMessages(db, conversationId, targetBuildId);
       return {
         conversationId: targetBuildId,
         message: messageRow,

@@ -14,6 +14,7 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import {
+  buildsOf,
   forgetCancelledSend,
   markAsQueuedSend,
   queuedSendUnderKey,
@@ -196,12 +197,18 @@ export async function deliverQueuedMessage(
 
 export function cancelQueuedMessage(deps: BuildDeps, conversationId: string, messageId: string) {
   deps.db.transaction(() => {
+    const row = deps.db.select().from(build).where(eq(build.id, conversationId)).get();
+    if (!row) return;
     const cancelled = deps.db
       .delete(queuedMessage)
-      .where(and(eq(queuedMessage.id, messageId), eq(queuedMessage.conversationId, conversationId)))
+      .where(
+        and(
+          eq(queuedMessage.id, messageId),
+          inArray(queuedMessage.conversationId, buildsOf(deps.db, row.todoId)),
+        ),
+      )
       .run().changes;
-    const row = deps.db.select().from(build).where(eq(build.id, conversationId)).get();
-    if (row) forgetCancelledSend(deps.db, row.todoId, messageId, cancelled > 0);
+    forgetCancelledSend(deps.db, row.todoId, messageId, cancelled > 0);
   });
   return { conversationId };
 }

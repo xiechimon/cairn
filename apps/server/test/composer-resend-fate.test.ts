@@ -56,7 +56,7 @@ const states = {
   'stranded by a failed turn on the same run': async (w: Task) => {
     expect((await w.finish('failed')).status).toBe(200);
   },
-  'stranded on the old run after a retry': async (w: Task) => {
+  'carried to the new run by a retry': async (w: Task) => {
     expect((await w.finish('failed')).status).toBe(200);
     const restarted = await req(w.s.app, 'POST', '/api/builds/build/steps', {
       action: 'restart',

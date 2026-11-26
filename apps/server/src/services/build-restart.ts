@@ -27,6 +27,7 @@ import {
 } from './builds.js';
 import { rewatchCreatingThread } from './chief.js';
 import { claimClientMessage, completeClientMessage } from './client-message.js';
+import { moveQueuedMessages } from './queued-send.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import {
   assertAutomaticRetryAllowed,
@@ -95,7 +96,8 @@ export async function restartFailedBuild(
       : null;
   const afterCommit: (() => void)[] = [];
   const transcriptDeps = { ...deps, afterCommit };
-  const recordRestartConversation = (conversationId: string) => {
+  const continueOn = (conversationId: string) => {
+    moveQueuedMessages(deps.db, buildId, conversationId);
     completeClientMessage(deps.db, buildId, body.clientMessageId, {
       delegated: true,
       delivered: 'restart',
@@ -203,7 +205,7 @@ export async function restartFailedBuild(
         })
         .where(eq(build.id, reworkTarget.id))
         .run();
-      recordRestartConversation(reworkTarget.id);
+      continueOn(reworkTarget.id);
       enqueueStep(
         deps,
         reworkTarget.id,
@@ -290,7 +292,7 @@ export async function restartFailedBuild(
       });
     }
     const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-    recordRestartConversation(newId);
+    continueOn(newId);
     const stepPrompt =
       [isInfoOutput(todoRecord.output) ? null : SESSION_BRIEF, restartPrompt, priorLessons]
         .filter((part) => part != null && part !== '')

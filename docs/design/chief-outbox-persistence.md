@@ -62,9 +62,25 @@ A queued message has no receipt copy of its own. The queue route marks its ledge
 
 A page that missed both the queued event and a cancel made elsewhere still holds the send as unconfirmed, so its automatic resend inside the 10 minutes sends it again. A crash between the removal and the new send leaves neither row; the browser still holds the text and its resend is a new message.
 
+## Waiting messages follow the task's run
+
+A queued row belongs to the task's latest run. A transaction that continues the task on another run moves the rows with it (`moveQueuedMessages`): a reply that continues elsewhere, and every restart of a failed run (Retry, a Coordinator restart, an automatic retry; a new run or a reopened PR run). Creation time and insert order are unchanged, so they are handed over one per turn in the order typed. Starting the task afresh does not move them.
+
+| Case | Result |
+|---|---|
+| Restart on the same run, or a quota wait resumed | rows stay where they are |
+| Restart refused: task changed or archived, a step still active, PR unreadable | rows stay on the failed run |
+| Retry pressed twice under one key | the second press changes nothing |
+| A row with a delivery error | moves with its error, stays visible, is not sent by itself |
+| A row marked to run after a stop | keeps the mark |
+| The new run fails too | rows wait on it; the next restart moves them again |
+| Remove pressed on a page still showing the old run | the row is matched among the task's runs, removed and its receipt released |
+| Edit or send now pressed on such a page | refused as already delivered, until the page shows the new run |
+| The same message resent under its key | success, answered with the run the row is on now |
+
 ## Tests
 
-`apps/server/test/composer-queue-stop.test.ts` covers one key across both task routes, and `apps/server/test/composer-resend-fate.test.ts` covers each state above through both routes. `apps/web/test/outbox-persist-lanes.test.ts` covers per-conversation chains, the 30 s timeout, the 10 minute window, task rows and late arrival. `apps/web/test/chief-outbox.test.ts` with an in-memory store: one test per table row, plus a stuck write, failed-after-stored, the other-page delete, land on a returned key, a live owner, re-ownership, expiry, ordering against a send made during the load. Playwright `apps/web/e2e/chief-send-retry.spec.ts`: renderer crash while the POST is held before the server stores it; crash after the server stored it and before the response; reload while sending. Live acceptance reruns the probe's crash window against a built stack and checks `chief_message` and `client_message`.
+`apps/server/test/composer-queue-stop.test.ts` covers one key across both task routes, and `apps/server/test/composer-resend-fate.test.ts` covers each state above through both routes. `apps/server/test/retry-carries-queue.test.ts` covers the move on restart. `apps/web/test/outbox-persist-lanes.test.ts` covers per-conversation chains, the 30 s timeout, the 10 minute window, task rows and late arrival. `apps/web/test/chief-outbox.test.ts` with an in-memory store: one test per table row, plus a stuck write, failed-after-stored, the other-page delete, land on a returned key, a live owner, re-ownership, expiry, ordering against a send made during the load. Playwright `apps/web/e2e/chief-send-retry.spec.ts`: renderer crash while the POST is held before the server stores it; crash after the server stored it and before the response; reload while sending. Live acceptance reruns the probe's crash window against a built stack and checks `chief_message` and `client_message`.
 
 ## Risk
 

@@ -23,13 +23,25 @@ export type QueuedSend =
     }
   | { kind: 'stranded'; scopeId: string; messageId: string };
 
-function buildsOf(db: Db, todoId: string): string[] {
+export function buildsOf(db: Db, todoId: string): string[] {
   return db
     .select({ id: build.id })
     .from(build)
     .where(eq(build.todoId, todoId))
     .all()
     .map((row) => row.id);
+}
+
+export function moveQueuedMessages(
+  db: Db,
+  fromConversationId: string,
+  toConversationId: string,
+): void {
+  if (fromConversationId === toConversationId) return;
+  db.update(queuedMessage)
+    .set({ conversationId: toConversationId })
+    .where(eq(queuedMessage.conversationId, fromConversationId))
+    .run();
 }
 
 function isQueuedReceipt(response: unknown): response is QueuedReceipt {
@@ -122,7 +134,11 @@ export function queuedSendUnderKey(
     kind: 'received',
     conversationId: row.conversationId,
     delivered: 'steer',
-    answer,
+    answer: {
+      ...answer,
+      conversationId: row.conversationId,
+      message: { ...answer.message, conversationId: row.conversationId },
+    },
     waitingMessageId: messageId,
   };
 }
