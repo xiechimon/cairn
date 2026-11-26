@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { anchorsOf, collectViolations, slugify } from './doc-refs-gate.mjs';
+import { testGitEnv } from './test-git-env.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 function fixture(files, docs) {
   const tracked = new Set(Object.keys(files));
@@ -103,4 +108,224 @@ test('a backtick path#anchor verifies the anchor in the target doc', () => {
     rows.map((r) => `${r.kind}:${r.ref}`),
     ['anchor:`docs/b.md#gone`'],
   );
+});
+
+const GATE_MODULES = [
+  'doc-refs-gate.mjs',
+  'doc-retired-terms-gate.mjs',
+  'living-docs.mjs',
+  'diff-base.mjs',
+  'scrub-git-env.mjs',
+];
+const BASELINE = 'scripts/doc-refs-baseline.json';
+const KNOWN = 'docs/spec/a.md|path|`scripts/old.mjs`';
+const SPEC =
+  'See `scripts/old.mjs`.\nThe volume states one rule here.\nAnd a second rule below it.\n';
+const BROKEN = 'Run `scripts/gone.mjs`.\n';
+
+function repo(t) {
+  const sandbox = makeTestTempDir('doc-refs-');
+  t.after(() => releaseTestTempDir(sandbox));
+  const root = realpathSync(sandbox);
+  const env = { ...testGitEnv(), PREPUSH_BASE_SHA: 'HEAD' };
+  const git = (...args) => execFileSync('git', args, { cwd: root, env, stdio: 'pipe' });
+  const write = (tree) => {
+    for (const [path, text] of Object.entries(tree)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), text);
+    }
+    git('add', '-A');
+  };
+  const baseline = (...rows) => ({ [BASELINE]: JSON.stringify({ rows }) });
+  const rows = () => JSON.parse(readFileSync(join(root, BASELINE), 'utf8')).rows;
+  const run = (...args) =>
+    spawnSync(process.execPath, [join(root, 'scripts/doc-refs-gate.mjs'), ...args], {
+      cwd: root,
+      env,
+      encoding: 'utf8',
+    });
+  git('init', '-q', '-b', 'main');
+  git('config', 'user.email', 'test@example.com');
+  git('config', 'user.name', 'Test');
+  mkdirSync(join(root, 'scripts'));
+  for (const file of GATE_MODULES)
+    copyFileSync(join(import.meta.dirname, file), join(root, 'scripts', file));
+  write({
+    'docs/spec/a.md': SPEC,
+    'docs/design/surfaces/s.md': '## Rules\nA rule.\n',
+    ...baseline(KNOWN),
+  });
+  git('commit', '-q', '-m', 'base');
+  assert.equal(run().status, 0, run().stderr);
+  return { root, git, write, baseline, rows, run };
+}
+
+test('a record may carry a broken reference, and --report still lists it', (t) => {
+  const r = repo(t);
+  r.write({
+    'docs/design/plan.md': BROKEN,
+    '.claude/skills/s/references/x.md': BROKEN,
+  });
+  assert.equal(r.run().status, 0, r.run().stderr);
+  assert.match(r.run('--report').stdout, /docs\/design\/plan\.md:1 path `scripts\/gone\.mjs`/);
+});
+
+for (const [name, path, text] of [
+  ['a spec volume', 'docs/spec/b.md', BROKEN],
+  ['a landing design doc that is living', 'docs/design/tested-sha-landing.md', BROKEN],
+  ['a surface Rules row', 'docs/design/surfaces/s.md', `## Rules\n${BROKEN}`],
+  [
+    'a surface file outside Rules',
+    'docs/design/surfaces/s.md',
+    `## Rules\nA rule.\n## Notes\n${BROKEN}`,
+  ],
+  ['a package readme', 'packages/x/README.md', BROKEN],
+]) {
+  test(`a new broken reference is red in ${name}`, (t) => {
+    const r = repo(t);
+    r.write({ [path]: text });
+    assert.equal(r.run().status, 1);
+  });
+
+  test(`a baseline row cannot admit it in ${name}`, (t) => {
+    const r = repo(t);
+    r.write({ [path]: text, ...r.baseline(KNOWN, `${path}|path|\`scripts/gone.mjs\``) });
+    const result = r.run();
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /baseline grew/);
+  });
+
+  test(`--write-baseline refuses to add it for ${name}`, (t) => {
+    const r = repo(t);
+    r.write({ [path]: text });
+    const result = r.run('--write-baseline');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /refuses to grow/);
+    assert.deepEqual(r.rows(), [KNOWN]);
+  });
+}
+
+test('--write-baseline drops resolved rows and never records a record', (t) => {
+  const r = repo(t);
+  r.write({ 'docs/spec/a.md': 'Fixed.\n', 'docs/design/plan.md': BROKEN });
+  assert.equal(r.run('--write-baseline').status, 0);
+  assert.deepEqual(r.rows(), []);
+});
+
+test('a record row the base commit already holds blocks nobody', (t) => {
+  const r = repo(t);
+  r.write({
+    'docs/design/plan.md': BROKEN,
+    ...r.baseline(KNOWN, 'docs/design/plan.md|path|`scripts/gone.mjs`'),
+  });
+  r.git('commit', '-q', '-m', 'inherited record row');
+  assert.equal(r.run().status, 0, r.run().stderr);
+});
+
+for (const [name, tree, row] of [
+  ['a living doc before its reference breaks', {}, 'docs/spec/a.md|path|`scripts/gone.mjs`'],
+  [
+    'a record that could later be promoted',
+    { 'docs/design/plan.md': BROKEN },
+    'docs/design/plan.md|path|`scripts/gone.mjs`',
+  ],
+]) {
+  test(`a baseline row cannot be planted for ${name}`, (t) => {
+    const r = repo(t);
+    r.write({ ...tree, ...r.baseline(KNOWN, row) });
+    const result = r.run();
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /baseline grew/);
+  });
+}
+
+test('the root changelog is a record', (t) => {
+  const r = repo(t);
+  r.write({ 'CHANGELOG.md': BROKEN });
+  assert.equal(r.run().status, 0, r.run().stderr);
+});
+
+test('a renamed living doc carries its baselined row', (t) => {
+  const r = repo(t);
+  r.git('mv', 'docs/spec/a.md', 'docs/spec/renamed.md');
+  r.write({});
+  assert.equal(r.run('--write-baseline').status, 0, r.run('--write-baseline').stderr);
+  assert.deepEqual(r.rows(), [KNOWN.replace('a.md', 'renamed.md')]);
+  assert.equal(r.run().status, 0, r.run().stderr);
+  assert.equal(r.run('--write-baseline').status, 0);
+});
+
+test('moving a living doc into a record folder does not hide a reference it breaks', (t) => {
+  const r = repo(t);
+  r.git('mv', 'docs/spec/a.md', 'docs/design/a.md');
+  r.write({ 'docs/design/a.md': `${SPEC}${BROKEN}` });
+  const result = r.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /docs\/design\/a\.md:4 path does not resolve/);
+});
+
+test('archiving a living doc as it is stays green, then it is a record', (t) => {
+  const r = repo(t);
+  r.git('mv', 'docs/spec/a.md', 'docs/design/a.md');
+  r.write(r.baseline(KNOWN.replace('docs/spec/', 'docs/design/')));
+  assert.equal(r.run().status, 0, r.run().stderr);
+  r.git('commit', '-q', '-m', 'archive');
+  r.write({ 'docs/design/a.md': `${SPEC}${BROKEN}` });
+  assert.equal(r.run().status, 0, r.run().stderr);
+});
+
+test('a surface file stays judged when a heading added above a rule', (t) => {
+  const r = repo(t);
+  r.write({ 'docs/design/surfaces/s.md': `## Rules\n## Notes\nA rule.\n${BROKEN}` });
+  assert.equal(r.run().status, 1);
+});
+
+test('a surface file stays judged when the Rules heading is renamed', (t) => {
+  const r = repo(t);
+  r.write({ 'docs/design/surfaces/s.md': `## Rules (current)\n${BROKEN}` });
+  assert.equal(r.run().status, 1);
+});
+
+test('a surface file stays judged when the table moves under another heading', (t) => {
+  const r = repo(t);
+  r.write({ 'docs/design/surfaces/s.md': `## Rules\n## Rule table\n${BROKEN}` });
+  assert.equal(r.run().status, 1);
+});
+
+test('moving a living doc into docs/research does not hide a reference it breaks', (t) => {
+  const r = repo(t);
+  mkdirSync(join(r.root, 'docs/research'), { recursive: true });
+  r.git('mv', 'docs/spec/a.md', 'docs/research/a.md');
+  r.write({ 'docs/research/a.md': `${SPEC}${BROKEN}` });
+  const result = r.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /docs\/research\/a\.md:4 path does not resolve/);
+});
+
+test('moving a living doc into docs/lessons does not hide a reference it breaks', (t) => {
+  const r = repo(t);
+  mkdirSync(join(r.root, 'docs/lessons'), { recursive: true });
+  r.git('mv', 'docs/spec/a.md', 'docs/lessons/a.md');
+  r.write({ 'docs/lessons/a.md': `${SPEC}${BROKEN}` });
+  const result = r.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /docs\/lessons\/a\.md:4 path does not resolve/);
+});
+
+test('moving a living doc into docs/ops/archive does not hide a reference it breaks', (t) => {
+  const r = repo(t);
+  mkdirSync(join(r.root, 'docs/ops/archive'), { recursive: true });
+  r.git('mv', 'docs/spec/a.md', 'docs/ops/archive/a.md');
+  r.write({ 'docs/ops/archive/a.md': `${SPEC}${BROKEN}` });
+  const result = r.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /docs\/ops\/archive\/a\.md:4 path does not resolve/);
+});
+
+test('--report marks which broken references sit in records', (t) => {
+  const r = repo(t);
+  r.write({ 'docs/design/plan.md': BROKEN });
+  const out = r.run('--report').stdout;
+  assert.match(out, /docs\/design\/plan\.md:1 path `scripts\/gone\.mjs` \(record, leave it\)/);
+  assert.match(out, /docs\/spec\/a\.md:1 path `scripts\/old\.mjs`\n/);
 });

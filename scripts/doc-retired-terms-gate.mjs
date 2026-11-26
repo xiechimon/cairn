@@ -145,7 +145,7 @@ function renamePairs(root, from, to) {
   return pairs;
 }
 
-export function renamesSince(root, rev, head) {
+export function renamesSince(root, rev, head, carries = isLivingDoc) {
   const commits = git(root, [
     'rev-list',
     '--first-parent',
@@ -170,7 +170,7 @@ export function renamesSince(root, rev, head) {
   const present = new Set(
     nulList(git(root, head ? ['ls-tree', '-r', '-z', '--name-only', head] : ['ls-files', '-z'])),
   );
-  return new Map([...origins].filter(([, origin]) => isLivingDoc(origin) && !present.has(origin)));
+  return new Map([...origins].filter(([, origin]) => carries(origin) && !present.has(origin)));
 }
 
 function registryAt(root, rev) {

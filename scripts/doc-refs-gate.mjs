@@ -3,6 +3,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { mergeBase } from './diff-base.mjs';
+import { renamesSince } from './doc-retired-terms-gate.mjs';
+import { isRecordDoc } from './living-docs.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const BASELINE_REL = 'scripts/doc-refs-baseline.json';
@@ -178,7 +181,7 @@ export function filterIgnored(rows) {
   return rows.filter((r) => !r.missing || !ignored.has(r.missing.replace(/\/$/, '')));
 }
 
-export function gather() {
+export function gather(carried = new Set()) {
   const files = git(['ls-files']).split('\n').filter(Boolean);
   const tracked = new Set(files.map((p) => p.replace(/\/$/, '')));
   for (const p of files) {
@@ -200,7 +203,10 @@ export function gather() {
   const docs = files
     .filter(
       (p) =>
-        p.endsWith('.md') && !SKIP_DIRS.test(p) && !SNAPSHOT_DOC.test(p) && !GENERATED_DOCS.has(p),
+        p.endsWith('.md') &&
+        !SKIP_DIRS.test(p) &&
+        (carried.has(p) || !SNAPSHOT_DOC.test(p)) &&
+        !GENERATED_DOCS.has(p),
     )
     .sort();
   const readFile = (path) => {
@@ -215,31 +221,99 @@ export function gather() {
 
 export const rowKey = (row) => `${row.doc}|${row.kind}|${row.ref}`;
 
+const keyBefore = (key, renames) => {
+  const at = key.indexOf('|');
+  const doc = key.slice(0, at);
+  return `${renames.get(doc) ?? doc}${key.slice(at)}`;
+};
+
+export function judge({ rows, baseline, baseBaseline, renames }) {
+  const known = (key) => !baseBaseline || baseBaseline.has(keyBefore(key, renames));
+  const fresh = rows.filter((row) => !baseline.has(rowKey(row)) || !known(rowKey(row)));
+  const current = new Set(rows.map(rowKey));
+  const grown = [...baseline].filter((key) => !known(key));
+  const stale = [...baseline].filter((key) => !current.has(key)).length;
+  return { fresh, grown, stale };
+}
+
+export function nextBaseline(rows, previous, renames) {
+  const keys = [...new Set(rows.map(rowKey))];
+  const added = previous
+    ? keys.filter((key) => !previous.has(key) && !previous.has(keyBefore(key, renames)))
+    : [];
+  if (added.length > 0)
+    throw new Error(
+      `--write-baseline refuses to grow the baseline; fix these references:\n${added.join('\n')}`,
+    );
+  return keys;
+}
+
+export const judgedRows = (rows, demoted = new Set()) =>
+  rows.filter((row) => demoted.has(row.doc) || !isRecordDoc(row.doc));
+
+const isUnjudged = (path) => SNAPSHOT_DOC.test(path) || isRecordDoc(path);
+
+export const demotedBy = (renames) =>
+  new Set(
+    [...renames]
+      .filter(([target, origin]) => !isUnjudged(origin) && isUnjudged(target))
+      .map(([target]) => target),
+  );
+
+const baselineKeys = (text) => new Set(JSON.parse(text).rows);
+
+function baselineAt(rev) {
+  if (!git(['ls-tree', '--name-only', rev, '--', BASELINE_REL]).trim()) return null;
+  return baselineKeys(git(['show', `${rev}:${BASELINE_REL}`]));
+}
+
+function resolveBase() {
+  const configured = process.env.PREPUSH_BASE_SHA ?? 'origin/main';
+  if (/^0{40}$/.test(configured)) return null;
+  const base = mergeBase(root, configured);
+  if (!base) throw new Error(`no merge-base between HEAD and ${configured}`);
+  return base;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const report = process.argv.includes('--report');
-  const { tracked, docs, readFile } = gather();
+  const base = resolveBase();
+  const renames = base ? renamesSince(root, base, undefined, () => true) : new Map();
+  const demoted = demotedBy(renames);
+  const { tracked, docs, readFile } = gather(demoted);
   const rows = filterIgnored(collectViolations({ tracked, docs, readFile }));
+  const judged = judgedRows(rows, demoted);
   if (report) {
-    for (const row of rows) process.stdout.write(`${row.doc}:${row.line} ${row.kind} ${row.ref}\n`);
+    const blocking = new Set(judged);
+    for (const row of rows)
+      process.stdout.write(
+        `${row.doc}:${row.line} ${row.kind} ${row.ref}${blocking.has(row) ? '' : ' (record, leave it)'}\n`,
+      );
     process.exit(0);
   }
   const baselinePath = join(root, BASELINE_REL);
+  const committed = existsSync(baselinePath)
+    ? baselineKeys(readFileSync(baselinePath, 'utf8'))
+    : null;
   if (process.argv.includes('--write-baseline')) {
+    const keys = nextBaseline(judged, committed, renames);
     writeFileSync(
       baselinePath,
-      `${JSON.stringify({ scope: 'doc|kind|ref keys allowed to stay broken', rows: rows.map(rowKey) }, null, 2)}\n`,
+      `${JSON.stringify({ scope: 'doc|kind|ref keys allowed to stay broken', rows: keys }, null, 2)}\n`,
     );
-    console.log(`[doc-refs-gate] wrote ${rows.length} baseline entries`);
+    console.log(`[doc-refs-gate] wrote ${keys.length} baseline entries`);
     process.exit(0);
   }
-  const baseline = new Set(
-    existsSync(baselinePath) ? JSON.parse(readFileSync(baselinePath, 'utf8')).rows : [],
-  );
-  const fresh = rows.filter((row) => !baseline.has(rowKey(row)));
-  const stale = baseline.size - rows.filter((row) => baseline.has(rowKey(row))).length;
-  if (fresh.length === 0) {
+  const { fresh, grown, stale } = judge({
+    rows: judged,
+    baseline: committed ?? new Set(),
+    baseBaseline: base ? baselineAt(base) : null,
+    renames,
+  });
+  if (fresh.length === 0 && grown.length === 0) {
     console.log(
-      `[doc-refs-gate] ${docs.length} docs: ${rows.length} known stale references, no new broken ones` +
+      `[doc-refs-gate] ${docs.length} docs: ${judged.length} known stale references, no new broken ones; ` +
+        `${rows.length - judged.length} in records (report only)` +
         (stale > 0
           ? `; ${stale} baseline entries resolved — re-run with --write-baseline to shrink`
           : ''),
@@ -248,8 +322,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   }
   for (const row of fresh)
     console.error(`${row.doc}:${row.line} ${row.kind} does not resolve: ${row.ref}`);
+  for (const key of grown) console.error(`${BASELINE_REL}: baseline grew: ${key}`);
   console.error(
-    `[doc-refs-gate] ${fresh.length} new broken doc references (baseline: ${baseline.size})`,
+    `[doc-refs-gate] ${fresh.length} new broken doc references; fix the reference, the baseline only shrinks`,
   );
   process.exit(1);
 }

@@ -16,6 +16,13 @@ export const isLivingDoc = (path) =>
   !CHANGELOG.test(path) &&
   !GENERATED.has(path);
 
+const DESIGN_RECORDS = /^docs\/(?:design|research|lessons)\//;
+
+export const isRecordDoc = (path) =>
+  CHANGELOG.test(path) ||
+  SKILL_RECORDS.test(path) ||
+  (DESIGN_RECORDS.test(path) && !isLivingDoc(path));
+
 export function livingText(path, text) {
   if (!RULES_ONLY.test(path)) return text;
   let inRules = false;
