@@ -401,3 +401,34 @@ test('a really failing check reaches pre-flight as a non-zero exit', async () =>
     releaseTestTempDir(root);
   }
 });
+
+test('a long failure reaches a pipe in full, ending with the summary', () => {
+  const root = makeTestTempDir('cheap-checks-pipe-');
+  try {
+    const git = (...args) => execFileSync('git', args, { cwd: root });
+    mkdirSync(join(root, '.github/workflows'), { recursive: true });
+    mkdirSync(join(root, 'scripts'));
+    writeFileSync(
+      join(root, '.github/workflows/ci.yml'),
+      'jobs:\n  c:\n    steps:\n      - run: node scripts/loud-gate.mjs\n',
+    );
+    writeFileSync(
+      join(root, 'scripts/loud-gate.mjs'),
+      "process.stdout.write('bad line\\n'.repeat(200000)); process.exitCode = 1;\n",
+    );
+    git('init', '-q');
+    git('add', '.');
+    git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-qm', 'fixture');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    const cli = join(import.meta.dirname, 'preflight-fast-gate.mjs');
+    const result = spawnSync(
+      'sh',
+      ['-c', '"$0" "$1" --cheap-checks | cat', process.execPath, cli],
+      { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 },
+    );
+    assert.equal(result.stdout.match(/^bad line$/gm).length, 200000);
+    assert.match(result.stdout, /0\/1 passed in [\d.]+s\n$/);
+  } finally {
+    releaseTestTempDir(root);
+  }
+});

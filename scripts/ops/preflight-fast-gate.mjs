@@ -426,12 +426,13 @@ export function runFastGate({
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   if (process.argv[2] === CHEAP_CHECKS_FLAG) {
-    process.exit(await runCheapChecks({ cwd: process.cwd() }));
+    process.exitCode = await runCheapChecks({ cwd: process.cwd() });
+  } else {
+    const result = runFastGate({ cwd: process.cwd() });
+    if (!result.ok) {
+      console.error(`[preflight-fast-gate] ${result.error}`);
+      process.exit(result.status ?? 1);
+    }
+    console.log('[preflight-fast-gate] PASS');
   }
-  const result = runFastGate({ cwd: process.cwd() });
-  if (!result.ok) {
-    console.error(`[preflight-fast-gate] ${result.error}`);
-    process.exit(result.status ?? 1);
-  }
-  console.log('[preflight-fast-gate] PASS');
 }

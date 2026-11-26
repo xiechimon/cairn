@@ -32,9 +32,13 @@ A lane verifies on GitHub before it enters the landing queue:
   their conditions are read from `.github/workflows/ci.yml` at that `HEAD`,
   with `pnpm prepush --ci` expanded to its own plan: a node script named
   `*-gate` or `*-ledger`, or run with `--check`, is run unless CI marks the step
-  `continue-on-error` or the fast gate names why it skips it. A step, command or
-  condition it cannot classify, no merge-base with `origin/main`, or a check
-  that cannot run is red. Inline shell is not reproduced. On a machine that refuses multi-file test runs
+  `continue-on-error` or the fast gate names why it skips it. This reading is
+  best-effort and the `ci` run has the final word: it matches the text of each
+  step, so some ways of writing a step are misread or missed without any
+  message, and a local pass does not promise a green run. A step, command or
+  condition it does notice it cannot classify, no merge-base with `origin/main`,
+  or a check that cannot run is red. Inline shell is not reproduced. On a
+  machine that refuses multi-file test runs
   (no `CI`, `CAIRN_MINI_TEST` or `CAIRN_LOCAL_HEAVY`), `pnpm test:changed`
   runs a single related file, and with two or more it lists them, runs none and
   leaves them to the `ci` run. Setting `CAIRN_PREFLIGHT_GATE_WRAPPER`
