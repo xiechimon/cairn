@@ -1,6 +1,5 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { join, resolve } from 'node:path';
 import { ACCESS_TOKEN_FILE_NAME, parseAccessTokenFile } from '@cairn/shared';
@@ -44,15 +43,6 @@ async function boot(
   const home = existingHome ?? tempDir();
   const webDir = tempDir();
   writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>cairn</title>');
-  const port = await new Promise<number>((done, fail) => {
-    const probe = createServer();
-    probe.once('error', fail);
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address();
-      const picked = typeof address === 'object' && address !== null ? address.port : 0;
-      probe.close(() => done(picked));
-    });
-  });
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
     cwd: serverDir,
     env: {
@@ -65,7 +55,7 @@ async function boot(
       CAIRN_AUTH: undefined,
       CAIRN_TAILSCALE_USERS: undefined,
       HOST: '127.0.0.1',
-      PORT: String(port),
+      PORT: '0',
       ...env,
     },
   });
@@ -78,7 +68,22 @@ async function boot(
     collected += chunk;
   });
   const exited = new Promise<number | null>((done) => child.on('close', (code) => done(code)));
-  return { child, home, port, output: () => collected, exited };
+  return {
+    child,
+    home,
+    get port() {
+      return listeningPort(collected);
+    },
+    output: () => collected,
+    exited,
+  };
+}
+
+function listeningPort(output: string): number {
+  const online = output.split('\n').find((line) => line.includes('cairn-server online'));
+  const port = online === undefined ? undefined : /"port":(\d+)/.exec(online)?.[1];
+  if (port === undefined) throw new Error(`server reported no listening port:\n${output}`);
+  return Number(port);
 }
 
 async function untilOnline(booted: Booted): Promise<void> {
