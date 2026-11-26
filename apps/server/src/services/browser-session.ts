@@ -1,14 +1,18 @@
 import { randomBytes } from 'node:crypto';
-import { eq, lte } from 'drizzle-orm';
-import type { Context } from 'hono';
-import { setCookie } from 'hono/cookie';
+import { and, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
+import type { Context, MiddlewareHandler } from 'hono';
+import { getCookie, setCookie } from 'hono/cookie';
 import type { Db } from '../db/client.js';
-import { browserSession } from '../db/schema.js';
+import { browserSession, pairingRequest } from '../db/schema.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { requestOrigin } from '../lib/request-origin.js';
 
 export const AUTH_COOKIE = 'cairn_auth';
+const MARK_COOKIE = 'cairn_browser';
+const MARK_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const MARK_BYTES = 32;
+const PAIR_REQUEST_IN_FLIGHT_MS = 30_000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const EXTERNAL_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const TICKET_TTL_MS = 60_000;
@@ -21,27 +25,69 @@ export interface ResolvedBrowserSession {
   deviceId: string | null;
 }
 
+export function forgetBrowserSignIn(db: Db, browserMarkHash: string | null): void {
+  if (browserMarkHash === null) return;
+  db.update(browserSession)
+    .set({ browserMarkHash: null })
+    .where(eq(browserSession.browserMarkHash, browserMarkHash))
+    .run();
+}
+
+function supersedeBrowserPairRequests(db: Db, browserMarkHash: string | null, now = nowMs()): void {
+  if (browserMarkHash === null) return;
+  db.update(pairingRequest)
+    .set({ status: 'superseded', decidedAt: now })
+    .where(
+      and(
+        eq(pairingRequest.browserMarkHash, browserMarkHash),
+        inArray(pairingRequest.status, ['pending', 'approved']),
+        isNull(pairingRequest.deviceId),
+      ),
+    )
+    .run();
+}
+
+export function browserJustSignedIn(db: Db, browserMarkHash: string, now: number): boolean {
+  return (
+    db
+      .select({ id: browserSession.id })
+      .from(browserSession)
+      .where(
+        and(
+          eq(browserSession.browserMarkHash, browserMarkHash),
+          gt(browserSession.createdAt, now - PAIR_REQUEST_IN_FLIGHT_MS),
+        ),
+      )
+      .get() !== undefined
+  );
+}
+
 export function issueBrowserSession(
   db: Db,
   kind: BrowserSessionKind,
-  deviceId: string | null = null,
+  deviceId: string | null,
+  browserMarkHash: string | null,
   now = nowMs(),
   notAfter = Number.POSITIVE_INFINITY,
 ): { token: string; expiresAt: number } {
   const token = randomBytes(TOKEN_BYTES).toString('hex');
   const ttlMs = kind === 'external' ? EXTERNAL_SESSION_TTL_MS : SESSION_TTL_MS;
   const expiresAt = Math.min(now + ttlMs, notAfter);
-  db.delete(browserSession).where(lte(browserSession.expiresAt, now)).run();
-  db.insert(browserSession)
-    .values({
-      id: newRecordId(),
-      tokenHash: hashCredential(token),
-      kind,
-      deviceId,
-      expiresAt,
-      createdAt: now,
-    })
-    .run();
+  db.transaction((tx) => {
+    tx.delete(browserSession).where(lte(browserSession.expiresAt, now)).run();
+    tx.insert(browserSession)
+      .values({
+        id: newRecordId(),
+        tokenHash: hashCredential(token),
+        kind,
+        deviceId,
+        expiresAt,
+        createdAt: now,
+        browserMarkHash,
+      })
+      .run();
+    supersedeBrowserPairRequests(tx, browserMarkHash, now);
+  });
   return { token, expiresAt };
 }
 
@@ -93,6 +139,38 @@ export function setAuthCookie(
     secure,
     maxAge: Math.max(0, Math.floor((expiresAt - nowMs()) / 1000)),
   });
+}
+
+export function browserMarkHashOf(c: Context): string | null {
+  const mark = c.get('browserMark');
+  return mark === undefined ? null : hashCredential(mark);
+}
+
+export function browserMarkMiddleware(secure: (c: Context) => boolean): MiddlewareHandler {
+  return async (c, next) => {
+    const sent = getCookie(c, MARK_COOKIE);
+    const mark =
+      sent !== undefined && MARK_PATTERN.test(sent)
+        ? sent
+        : randomBytes(MARK_BYTES).toString('base64url');
+    c.set('browserMark', mark);
+    await next();
+    const signedOutProbe = c.req.method === 'GET' && c.res.status === 401;
+    if (c.res.status >= 400 && !signedOutProbe) return;
+    setCookie(c, MARK_COOKIE, mark, {
+      httpOnly: true,
+      path: '/api',
+      sameSite: 'Lax',
+      secure: secure(c),
+      maxAge: Math.floor(SESSION_TTL_MS / 1000),
+    });
+  };
+}
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    browserMark: string;
+  }
 }
 
 export function requestIsSecure(

@@ -13,6 +13,7 @@ import {
   tailnetSetBodySchema,
 } from '@cairn/shared';
 import type { Context, Hono } from 'hono';
+import { getCookie } from 'hono/cookie';
 import type { AppContext } from './context.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
@@ -21,7 +22,13 @@ import { hasProxyForwardingHeaders, pairRequestPeerOf } from './lib/request-orig
 import { tailnetListenerOf } from './lib/tailnet-listener.js';
 import { matchesAuthToken, pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
-import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
+import {
+  AUTH_COOKIE,
+  browserMarkHashOf,
+  requestIsSecure,
+  resolveBrowserSession,
+  setAuthCookie,
+} from './services/browser-session.js';
 import { submitFeedbackReport } from './services/feedback.js';
 import {
   issuePairingGrant,
@@ -186,11 +193,14 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     c.header('cache-control', 'no-store');
     const body = parseWith(pairRequestBodySchema, await jsonBody(c), 'body');
     const { source, peer } = pairRequestPeerOf(c, ctx.trustedProxies);
+    const session = getCookie(c, AUTH_COOKIE);
     const issued = createPairRequest(ctx.db, {
       name: body.name,
       detail: body.detail,
       source,
       peer,
+      browserMarkHash: browserMarkHashOf(c),
+      fromSignedInBrowser: session !== undefined && resolveBrowserSession(ctx.db, session) !== null,
     });
     return c.json(issued, 201);
   });
@@ -208,6 +218,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
       id: body.id,
       secret: body.secret,
       teamId: ctx.team.id,
+      browserMarkHash: browserMarkHashOf(c),
     });
     if (outcome.status === 'missing') throw new HttpError(404, 'pairing request not found');
     if (outcome.status !== 'approved') return c.json({ status: outcome.status });
@@ -267,6 +278,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
       code: body.code,
       teamId: ctx.team.id,
       name: body.name,
+      browserMarkHash: browserMarkHashOf(c),
     });
     if (paired === null) {
       throw new HttpError(401, 'pairing code is invalid or expired');

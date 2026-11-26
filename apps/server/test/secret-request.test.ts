@@ -236,7 +236,7 @@ describe('answering a secret request from the chat card', () => {
         kind === 'bearer'
           ? { authorization: `Bearer ${deviceToken}` }
           : {
-              cookie: `cairn_auth=${issueBrowserSession(s.db, 'device', 'paired-phone').token}`,
+              cookie: `cairn_auth=${issueBrowserSession(s.db, 'device', 'paired-phone', null).token}`,
               'sec-fetch-site': 'same-origin',
             };
       const pending = hold(s);

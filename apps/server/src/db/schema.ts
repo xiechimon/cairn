@@ -989,6 +989,7 @@ export const pairingRequest = sqliteTable(
     createdAt: epochMs('createdAt').notNull(),
     decidedAt: epochMs('decidedAt'),
     deviceId: text('deviceId'),
+    browserMarkHash: text('browserMarkHash'),
   },
   (t) => [uniqueIndex('pairing_request_secretHash_unique').on(t.secretHash)],
 );
@@ -1002,6 +1003,7 @@ export const browserSession = sqliteTable(
     deviceId: text('deviceId').references(() => pairedDevice.id, { onDelete: 'cascade' }),
     expiresAt: epochMs('expiresAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),
+    browserMarkHash: text('browserMarkHash'),
   },
   (t) => [uniqueIndex('browser_session_tokenHash_unique').on(t.tokenHash)],
 );

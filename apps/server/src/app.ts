@@ -1,6 +1,7 @@
 import { existsSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname, join, resolve, sep } from 'node:path';
+import { BROWSER_SESSION_PATH } from '@cairn/shared';
 import { Hono } from 'hono';
 import { compress } from 'hono/compress';
 import type { Logger } from 'pino';
@@ -11,7 +12,11 @@ import { registerTokenAuth } from './lib/token-auth.js';
 import { registerRoutes } from './routes.js';
 import { registerMachineAuth, registerMachineRoutes } from './routes-machine.js';
 import { registerRemoteRoutes } from './routes-remote.js';
-import { resolveBrowserSession } from './services/browser-session.js';
+import {
+  browserMarkMiddleware,
+  requestIsSecure,
+  resolveBrowserSession,
+} from './services/browser-session.js';
 import { NotFoundError } from './services/builds.js';
 import {
   deviceStreamsOf,
@@ -88,8 +93,22 @@ function registerStaticSpa(app: Hono, webDir: string): void {
   });
 }
 
+const BROWSER_MARK_PATHS = [
+  BROWSER_SESSION_PATH,
+  '/api/auth/access',
+  '/api/auth/clerk',
+  '/api/auth/signout',
+  '/api/remote/pair',
+  '/api/remote/pair/request',
+  '/api/remote/pair/claim',
+];
+
 export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
+  const markBrowser = browserMarkMiddleware((c) =>
+    requestIsSecure(c, ctx.webOrigin, ctx.trustedProxies),
+  );
+  for (const path of BROWSER_MARK_PATHS) app.use(path, markBrowser);
   registerTokenAuth(app, ctx.authToken, {
     ownerChannel: ctx.ownerChannel,
     accessExchange: ctx.accessVerifier != null || ctx.clerkAuth != null,

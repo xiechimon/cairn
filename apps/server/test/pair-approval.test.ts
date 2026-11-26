@@ -312,7 +312,12 @@ describe('F-P3 pair by approval', () => {
     const req = await requestPair(s);
     await decide(s, req.id, 'approve');
     expect(() =>
-      claimPairRequest(s.db, { id: req.id, secret: req.secret, teamId: 'missing-team' }),
+      claimPairRequest(s.db, {
+        id: req.id,
+        secret: req.secret,
+        teamId: 'missing-team',
+        browserMarkHash: null,
+      }),
     ).toThrow();
     const claimed = await claim(s, req.id, req.secret);
     expect(claimed.status).toBe('approved');

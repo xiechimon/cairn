@@ -242,9 +242,14 @@ describe('who sees env values', () => {
     s = bootServer({ authToken: OWNER });
     createSecret(deps(), { teamId: s.team.id, name: 'E', value: SENTINEL, kind: 'env' });
     const grant = issuePairingGrant(s.db);
-    const paired = pairFromGrant(s.db, { code: grant.code, teamId: s.team.id, name: 'phone' });
+    const paired = pairFromGrant(s.db, {
+      code: grant.code,
+      teamId: s.team.id,
+      name: 'phone',
+      browserMarkHash: null,
+    });
     if (!paired) throw new Error('pairing failed');
-    const ownerSession = issueBrowserSession(s.db, 'owner').token;
+    const ownerSession = issueBrowserSession(s.db, 'owner', null, null).token;
     const callers: [string, Record<string, string>][] = [
       ['owner token', { authorization: `Bearer ${OWNER}` }],
       ['owner session', { cookie: `cairn_auth=${ownerSession}` }],

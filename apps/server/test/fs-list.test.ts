@@ -223,13 +223,13 @@ describe('GET /api/fs/list -- route wire surface (R family)', () => {
           createdAt: 1,
         })
         .run();
-      const device = `cairn_auth=${issueBrowserSession(authed.db, 'device', 'phone').token}`;
+      const device = `cairn_auth=${issueBrowserSession(authed.db, 'device', 'phone', null).token}`;
       const dir = encodeURIComponent(makeRoot());
       const pairedRes = await authed.app.request(`/api/fs/list?dir=${dir}`, {
         headers: { cookie: device },
       });
       expect(pairedRes.status).toBe(200);
-      const owner = `cairn_auth=${issueBrowserSession(authed.db, 'owner').token}`;
+      const owner = `cairn_auth=${issueBrowserSession(authed.db, 'owner', null, null).token}`;
       const allowed = await authed.app.request(`/api/fs/list?dir=${dir}`, {
         headers: { cookie: owner },
       });

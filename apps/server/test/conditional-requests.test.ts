@@ -419,7 +419,12 @@ describe('conditional requests on hot list endpoints', () => {
       '/api/remote/devices',
       () => {
         const { code } = issuePairingGrant(s.db);
-        const paired = pairFromGrant(s.db, { code, teamId: s.team.id, name: 'phone-1' });
+        const paired = pairFromGrant(s.db, {
+          code,
+          teamId: s.team.id,
+          name: 'phone-1',
+          browserMarkHash: null,
+        });
         if (paired === null) throw new Error('pairing failed');
       },
       owner,
@@ -446,7 +451,12 @@ describe('sensitive list endpoints stay uncacheable', () => {
     });
     const owner = { authorization: 'Bearer owner-token' };
     const grant = issuePairingGrant(s.db);
-    const paired = pairFromGrant(s.db, { code: grant.code, teamId: s.team.id, name: 'phone-1' });
+    const paired = pairFromGrant(s.db, {
+      code: grant.code,
+      teamId: s.team.id,
+      name: 'phone-1',
+      browserMarkHash: null,
+    });
     if (paired === null) throw new Error('pairing failed');
     const device = { authorization: `Bearer ${paired.token}` };
 
@@ -492,7 +502,12 @@ describe('sensitive list endpoints stay uncacheable', () => {
     const s = bootServer({ authToken: 'owner-token' });
     const owner = { authorization: 'Bearer owner-token' };
     const grant = issuePairingGrant(s.db);
-    const paired = pairFromGrant(s.db, { code: grant.code, teamId: s.team.id, name: 'phone-1' });
+    const paired = pairFromGrant(s.db, {
+      code: grant.code,
+      teamId: s.team.id,
+      name: 'phone-1',
+      browserMarkHash: null,
+    });
     if (paired === null) throw new Error('pairing failed');
     issuePairingGrant(s.db);
 

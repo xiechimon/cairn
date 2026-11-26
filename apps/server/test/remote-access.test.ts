@@ -100,7 +100,9 @@ test('a mismatched pairing environment does not consume the grant or set a cooki
 test('a failed device insert does not consume the pairing code', async () => {
   const s = bootServer({ authToken: OWNER });
   const code = await issueCode(s);
-  expect(() => pairFromGrant(s.db, { code, teamId: 'missing-team', name: 'phone' })).toThrow();
+  expect(() =>
+    pairFromGrant(s.db, { code, teamId: 'missing-team', name: 'phone', browserMarkHash: null }),
+  ).toThrow();
   const retry = await call(s, 'POST', '/api/remote/pair', { body: { code, name: 'phone' } });
   expect(retry.status).toBe(201);
   expect(s.db.select().from(pairedDevice).all()).toHaveLength(1);

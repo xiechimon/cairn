@@ -15,7 +15,7 @@ import { pairingRequest } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { issueBrowserSession } from './browser-session.js';
+import { browserJustSignedIn, issueBrowserSession } from './browser-session.js';
 import { createPairedDevice, hasRoomForDevice } from './paired-devices.js';
 
 const SECRET_BYTES = 32;
@@ -64,7 +64,14 @@ export interface IssuedPairRequest {
 
 export function createPairRequest(
   db: Db,
-  input: { name: string; detail?: string | undefined; source: PairRequestSource; peer: string },
+  input: {
+    name: string;
+    detail?: string | undefined;
+    source: PairRequestSource;
+    peer: string;
+    browserMarkHash: string | null;
+    fromSignedInBrowser: boolean;
+  },
   now = nowMs(),
 ): IssuedPairRequest {
   return db.transaction((tx) => {
@@ -93,7 +100,10 @@ export function createPairRequest(
     if (live.length >= PAIRING_REQUEST_CAP) {
       throw new HttpError(429, 'too many pending pairing requests; wait and retry');
     }
-    for (const row of live.filter((item) => item.peer === input.peer)) {
+    const bornVoid =
+      input.fromSignedInBrowser ||
+      (input.browserMarkHash !== null && browserJustSignedIn(tx, input.browserMarkHash, now));
+    for (const row of live.filter((item) => !bornVoid && item.peer === input.peer)) {
       tx.update(pairingRequest)
         .set({ status: 'superseded', decidedAt: now })
         .where(eq(pairingRequest.id, row.id))
@@ -112,9 +122,10 @@ export function createPairRequest(
         detail: input.detail ?? null,
         source: input.source,
         peer: input.peer,
-        status: 'pending',
+        status: bornVoid ? 'superseded' : 'pending',
         expiresAt,
         createdAt: now,
+        browserMarkHash: input.browserMarkHash,
       })
       .run();
     return { id, secret, code, expiresAt };
@@ -168,7 +179,7 @@ export type PairClaimOutcome =
 
 export function claimPairRequest(
   db: Db,
-  input: { id: string; secret: string; teamId: string },
+  input: { id: string; secret: string; teamId: string; browserMarkHash: string | null },
   now = nowMs(),
 ): PairClaimOutcome {
   const row = db.select().from(pairingRequest).where(eq(pairingRequest.id, input.id)).get();
@@ -205,7 +216,7 @@ export function claimPairRequest(
       .set({ deviceId: created.device.id })
       .where(eq(pairingRequest.id, row.id))
       .run();
-    const session = issueBrowserSession(tx, 'device', created.device.id);
+    const session = issueBrowserSession(tx, 'device', created.device.id, input.browserMarkHash);
     return {
       status: 'approved',
       device: created.device,

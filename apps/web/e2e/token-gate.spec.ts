@@ -142,3 +142,39 @@ test('a forged Tailscale-User-Login header does not open the board', async ({ pa
   await page.goto(`${authed.base}/app`);
   await expect(page.locator('.token-gate')).toBeVisible();
 });
+
+for (const secondTab of ['is closed', 'stays open'] as const) {
+  test(`signing in leaves no pairing request pending when the tab that asked ${secondTab}`, async ({
+    context,
+    request,
+  }) => {
+    const openSignIn = async (path: string) => {
+      const page = await context.newPage();
+      const issued = page.waitForResponse((res) => res.url().endsWith('/api/remote/pair/request'));
+      await page.goto(`${authed.base}${path}`);
+      return { page, id: ((await (await issued).json()) as { id: string }).id };
+    };
+    const first = await openSignIn('/app');
+    const second = await openSignIn('/tray');
+    const pendingFromThisBrowser = async () => {
+      const res = await request.get(`${authed.base}/api/remote/pairing-requests`, {
+        headers: { authorization: `Bearer ${GATE_TOKEN}` },
+      });
+      const pending = (await res.json()) as { id: string }[];
+      return [first.id, second.id].filter((id) => pending.some((entry) => entry.id === id));
+    };
+    expect(await pendingFromThisBrowser()).toEqual([second.id]);
+    if (secondTab === 'is closed') await second.page.close();
+
+    await first.page.getByTestId('owner-token-toggle').click();
+    await first.page.getByTestId('owner-token-input').fill(GATE_TOKEN);
+    await first.page.getByTestId('owner-token-submit').click();
+    await expect(first.page.locator('.token-gate')).toHaveCount(0);
+
+    await expect.poll(pendingFromThisBrowser).toEqual([]);
+    await expect(first.page.getByTestId('pairing-request-banner')).toHaveCount(0);
+    if (secondTab === 'stays open') {
+      await expect(second.page.locator('.token-gate')).toHaveCount(0);
+    }
+  });
+}

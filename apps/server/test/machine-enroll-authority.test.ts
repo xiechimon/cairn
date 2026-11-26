@@ -538,7 +538,7 @@ describe('machine enrollment authority (#2054)', () => {
         .where(eq(machineTable.id, victim.machineId))
         .run();
 
-      const deviceSession = issueBrowserSession(s.db, 'device', 'paired-enroll');
+      const deviceSession = issueBrowserSession(s.db, 'device', 'paired-enroll', null);
       const deviceConfirm = (enrollId: string) =>
         s.app.request('/api/machine/enroll/confirm', {
           method: 'POST',

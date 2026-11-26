@@ -269,24 +269,29 @@ async function withSessionRequestDeadline<T>(
   }
 }
 
+async function askSession(signal: AbortSignal): Promise<Verdict | null> {
+  const response = await withSessionRequestDeadline(signal, (requestSignal) =>
+    fetch(BROWSER_SESSION_PATH, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+      mode: 'same-origin',
+      redirect: 'error',
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+      signal: requestSignal,
+    }),
+  );
+  if (response === null || response.redirected) return null;
+  if (response.status === 204) return 'authenticated';
+  if (response.status === 401) return 'signed-out';
+  return null;
+}
+
 async function probeSession(signal: AbortSignal): Promise<Verdict | null> {
   let delay = PROBE_RETRY_INITIAL_MS;
   while (!signal.aborted) {
-    const response = await withSessionRequestDeadline(signal, (requestSignal) =>
-      fetch(BROWSER_SESSION_PATH, {
-        cache: 'no-store',
-        credentials: 'same-origin',
-        mode: 'same-origin',
-        redirect: 'error',
-        headers: { [BROWSER_AUTH_HEADER]: '1' },
-        signal: requestSignal,
-      }),
-    );
+    const verdict = await askSession(signal);
     if (signal.aborted) return null;
-    if (response !== null && !response.redirected) {
-      if (response.status === 204) return 'authenticated';
-      if (response.status === 401) return 'signed-out';
-    }
+    if (verdict !== null) return verdict;
     retrying = true;
     publish();
     if (signal.aborted) return null;
@@ -459,6 +464,9 @@ async function runPairAttempt(controller: AbortController): Promise<void> {
       expiresAt: pairAttempt?.expiresAt ?? issued.expiresAt,
     };
     publish();
+    if ((await askSession(signal)) === 'authenticated' && !signal.aborted) {
+      applyVerdict('authenticated', 'waiting');
+    }
     return;
   }
   if (!signal.aborted && pairAttempt?.phase === 'pending') {

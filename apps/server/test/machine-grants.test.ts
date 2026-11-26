@@ -45,7 +45,7 @@ function call(
   if (kind === 'agent')
     headers.authorization = `Bearer ${createApiKey(s, { teamId: s.team.id, gitAccess: false, mcpAccess: true, machineAccess: true, toolGrants: { read: [], write: [] } }).plaintext}`;
   else
-    headers.cookie = `cairn_auth=${issueBrowserSession(s.db, kind, kind === 'device' ? 'paired' : null).token}`;
+    headers.cookie = `cairn_auth=${issueBrowserSession(s.db, kind, kind === 'device' ? 'paired' : null, null).token}`;
   return s.app.request(path, { method, headers, body: JSON.stringify(body) });
 }
 

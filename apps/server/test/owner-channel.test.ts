@@ -159,7 +159,7 @@ describe('owner channel gate', () => {
   test('a stolen owner cookie still cannot answer without the channel', async () => {
     const s = world({ key: KEY });
     const proposalId = pendingProposal(s);
-    const session = issueBrowserSession(s.db, 'owner');
+    const session = issueBrowserSession(s.db, 'owner', null, null);
     const res = await answer(s, proposalId, {
       cookie: `cairn_auth=${session.token}`,
       'sec-fetch-site': 'same-origin',
@@ -199,7 +199,7 @@ describe('owner channel gate', () => {
   test('an access-exchanged owner session answers without the channel', async () => {
     const s = world({ key: KEY }, { accessVerifier: async () => ({ kind: 'invalid' }) });
     const proposalId = pendingProposal(s);
-    const session = issueBrowserSession(s.db, 'external');
+    const session = issueBrowserSession(s.db, 'external', null, null);
     const res = await answer(s, proposalId, {
       cookie: `cairn_auth=${session.token}`,
       'sec-fetch-site': 'same-origin',
@@ -211,7 +211,7 @@ describe('owner channel gate', () => {
 
   test('a forged external session is refused where no access exchange exists', async () => {
     const s = world({ key: KEY });
-    const session = issueBrowserSession(s.db, 'external');
+    const session = issueBrowserSession(s.db, 'external', null, null);
     const res = await s.app.request(`/api/teams/${s.team.id}/top-models`, {
       method: 'PUT',
       headers: {
@@ -380,7 +380,7 @@ describe('owner channel gate', () => {
       },
     );
     expect(devicePairing.status).toBe(201);
-    const access = issueBrowserSession(s.db, 'external');
+    const access = issueBrowserSession(s.db, 'external', null, null);
     const accessWrite = await s.app.request(`/api/teams/${s.team.id}/top-models`, {
       method: 'PUT',
       headers: {
@@ -396,7 +396,7 @@ describe('owner channel gate', () => {
 
   test('a stolen owner cookie cannot mutate ordinary routes either', async () => {
     const s = world({ key: KEY });
-    const session = issueBrowserSession(s.db, 'owner');
+    const session = issueBrowserSession(s.db, 'owner', null, null);
     const res = await s.app.request('/api/todos/todo-x', {
       method: 'DELETE',
       headers: {

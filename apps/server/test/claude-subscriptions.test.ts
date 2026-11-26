@@ -759,7 +759,7 @@ test('a paired device runs subscription checks, and the check bookkeeping is sto
     })
     .run();
   const id = insertClaudeSubscription(s);
-  const cookie = `cairn_auth=${issueBrowserSession(s.db, 'device', 'phone').token}`;
+  const cookie = `cairn_auth=${issueBrowserSession(s.db, 'device', 'phone', null).token}`;
   const team = `/api/teams/${s.team.id}`;
   for (const url of [
     `${team}/claude-subscriptions/${id}/verify`,

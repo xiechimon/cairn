@@ -24,6 +24,7 @@ if (appPath === undefined) {
   console.error('usage: node scripts/packaged-journey.mjs <Cairn.app> [evidence-dir]');
   process.exit(2);
 }
+const PAIRING_SETTLE_TIMEOUT_MS = 10_000;
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const { journeys } = JSON.parse(
   readFileSync(join(REPO_ROOT, '.claude/skills/verify-cairn/packaged-journeys.json'), 'utf8'),
@@ -153,10 +154,30 @@ async function signInToRemote(window, token) {
   await window.getByTestId('owner-token-input').fill(token);
   await window.getByTestId('owner-token-submit').click();
   await window.getByTestId('owner-token-input').waitFor({ state: 'detached', timeout: 30_000 });
-  await window.getByTestId('pairing-banner-deny').click({ timeout: 30_000 });
+  await window
+    .locator('[data-testid="home-c"], [data-testid="first-run-setup"]')
+    .first()
+    .waitFor({ timeout: 30_000 });
+  await assertNoPairingRequestLeft(window);
+}
+
+async function assertNoPairingRequestLeft(window) {
+  const read = () =>
+    window.evaluate(async () => {
+      const response = await fetch('/api/remote/pairing-requests');
+      return { status: response.status, requests: await response.json() };
+    });
+  const deadline = Date.now() + PAIRING_SETTLE_TIMEOUT_MS;
+  let pending = await read();
+  while (pending.requests.length > 0 && Date.now() < deadline) {
+    await window.waitForTimeout(250);
+    pending = await read();
+  }
+  assert.equal(pending.status, 200, 'the signed-in app cannot read pairing requests');
+  assert.deepEqual(pending.requests, [], 'signing in left a pairing request waiting for approval');
   await window
     .getByTestId('pairing-request-banner')
-    .waitFor({ state: 'detached', timeout: 30_000 });
+    .waitFor({ state: 'detached', timeout: PAIRING_SETTLE_TIMEOUT_MS });
 }
 
 function disposableCopy() {

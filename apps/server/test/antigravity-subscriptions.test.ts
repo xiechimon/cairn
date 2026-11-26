@@ -1137,7 +1137,7 @@ describe('antigravity upstream models', () => {
         createdAt: 1,
       })
       .run();
-    const session = issueBrowserSession(s.db, 'device', 'catalog-phone');
+    const session = issueBrowserSession(s.db, 'device', 'catalog-phone', null);
     const open = vi.spyOn(s.secretBox, 'open');
     try {
       const response = await s.app.request(`${path}/${id}/upstream-models`, {

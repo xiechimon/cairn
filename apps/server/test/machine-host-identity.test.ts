@@ -1144,7 +1144,7 @@ describe('one computer keeps one identity across runner homes and X.local / X na
           createdAt: 1,
         })
         .run();
-      const deviceSession = issueBrowserSession(s.db, 'device', 'paired-1');
+      const deviceSession = issueBrowserSession(s.db, 'device', 'paired-1', null);
 
       const adoptApiKeyStart = await call(s.app, 'POST', '/api/machine/enroll/start', {
         body: { name: 'adopt-apikey', hostKey: 'd'.repeat(64) },

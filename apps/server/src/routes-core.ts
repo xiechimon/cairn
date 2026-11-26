@@ -36,7 +36,9 @@ import { BackupInProgressError, BackupNotFoundError } from './services/backup-se
 import { readBackupHealth } from './services/backup-status.js';
 import {
   AUTH_COOKIE,
+  browserMarkHashOf,
   clearAuthCookie,
+  forgetBrowserSignIn,
   issueBrowserSession,
   requestIsSecure,
   revokeAllExternalBrowserSessions,
@@ -103,7 +105,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: 'access token required' }, 403);
     }
     if (matchesAuthToken(ctx.authToken, provided)) {
-      const session = issueBrowserSession(ctx.db, 'owner', null);
+      const session = issueBrowserSession(ctx.db, 'owner', null, browserMarkHashOf(c));
       setAuthCookie(
         c,
         session.token,
@@ -114,7 +116,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     }
     const deviceId = pairedDeviceIdOfToken(ctx.db, provided);
     if (deviceId !== null) {
-      const session = issueBrowserSession(ctx.db, 'device', deviceId);
+      const session = issueBrowserSession(ctx.db, 'device', deviceId, browserMarkHashOf(c));
       setAuthCookie(
         c,
         session.token,
@@ -150,7 +152,14 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: refusal.error }, refusal.status);
     }
     ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'access exchange');
-    const session = issueBrowserSession(ctx.db, 'external', null, undefined, verdict.expiresAt);
+    const session = issueBrowserSession(
+      ctx.db,
+      'external',
+      null,
+      browserMarkHashOf(c),
+      undefined,
+      verdict.expiresAt,
+    );
     setAuthCookie(
       c,
       session.token,
@@ -195,7 +204,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: refusal.error }, refusal.status);
     }
     ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'clerk auth exchange');
-    const session = issueBrowserSession(ctx.db, 'external', null);
+    const session = issueBrowserSession(ctx.db, 'external', null, browserMarkHashOf(c));
     setAuthCookie(
       c,
       session.token,
@@ -216,6 +225,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     }
     const token = getCookie(c, AUTH_COOKIE);
     if (token !== undefined && token !== '') revokeBrowserSession(ctx.db, token);
+    forgetBrowserSignIn(ctx.db, browserMarkHashOf(c));
     if (c.req.query('all') === '1' && c.get('ownerIdentity') !== undefined) {
       revokeAllExternalBrowserSessions(ctx.db);
     }

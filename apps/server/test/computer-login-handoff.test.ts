@@ -344,7 +344,7 @@ describe('login handoff gate', () => {
         kind === 'bearer'
           ? { authorization: `Bearer ${deviceToken}`, 'sec-fetch-site': 'same-origin' }
           : {
-              cookie: `cairn_auth=${issueBrowserSession(s.db, 'device', 'paired-phone').token}`,
+              cookie: `cairn_auth=${issueBrowserSession(s.db, 'device', 'paired-phone', null).token}`,
               'sec-fetch-site': 'same-origin',
             };
       expect((await post(headers)).status).toBe(200);

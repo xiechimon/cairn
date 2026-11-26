@@ -257,7 +257,7 @@ export function revokePairingGrant(db: Db, id: string, now = nowMs()): boolean {
 
 export function pairFromGrant(
   db: Db,
-  input: { code: string; teamId: string; name: string },
+  input: { code: string; teamId: string; name: string; browserMarkHash: string | null },
 ): { device: PairedDevice; token: string; sessionToken: string; sessionExpiresAt: number } | null {
   return db.transaction((tx) => {
     if (!hasRoomForDevice(tx)) {
@@ -265,7 +265,7 @@ export function pairFromGrant(
     }
     if (!redeemPairingGrant(tx, input.code)) return null;
     const created = createPairedDevice(tx, { teamId: input.teamId, name: input.name });
-    const session = issueBrowserSession(tx, 'device', created.device.id);
+    const session = issueBrowserSession(tx, 'device', created.device.id, input.browserMarkHash);
     return {
       device: created.device,
       token: created.token,
