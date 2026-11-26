@@ -221,5 +221,6 @@
   "transcript-history-paging.spec.ts": 2460,
   "transcript-user-words.spec.ts": 6107,
   "usage-page.spec.ts": 3131,
-  "vault.spec.ts": 5281
+  "vault.spec.ts": 5281,
+  "visual-baseline.spec.ts": 47000
 }

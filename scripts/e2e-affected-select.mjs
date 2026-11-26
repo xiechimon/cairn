@@ -534,7 +534,17 @@ export function selectSpecs({ paths, allSpecs, dependencies, workspace, i18n }) 
     for (const s of specs ?? []) picked.add(s);
     if (axe) picked.add('a11y-axe');
   }
-  return { full, selection: full ? [...allSpecs].sort() : expand([...picked], allSpecs), reasons };
+  if (full) return { full, selection: [...allSpecs].sort(), reasons };
+  const selection = expand([...picked], allSpecs);
+  const rendersPixels = paths.some(
+    (path) => path.startsWith('apps/web/src/') && !path.endsWith('.md'),
+  );
+  if (rendersPixels && !selection.includes('visual-baseline.spec.ts')) {
+    selection.push('visual-baseline.spec.ts');
+    selection.sort();
+    reasons.push('  visual pixels → visual-baseline.spec.ts (every rendered web change)');
+  }
+  return { full, selection, reasons };
 }
 
 function scanEnTokens(text) {

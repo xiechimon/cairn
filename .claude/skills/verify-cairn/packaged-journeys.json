@@ -1,0 +1,8 @@
+{
+  "journeys": {
+    "new-task": {
+      "features": ["threads"],
+      "modes": ["local-server", "remote-server"]
+    }
+  }
+}

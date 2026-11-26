@@ -216,6 +216,23 @@ jobs:
           CAIRN_SMOKE_ISOLATED_SESSION: '1'
         run: pnpm smoke
 
+      - name: Walk the packaged feature journeys in local and remote server modes
+        if: matrix.arch == 'arm64' && hashFiles('apps/desktop/scripts/journeys/*.mjs') != ''
+        timeout-minutes: 10
+        working-directory: apps/desktop
+        env:
+          CAIRN_SMOKE_ISOLATED_SESSION: '1'
+        run: node scripts/packaged-journey.mjs "$RUNNER_TEMP/unzipped/Cairn.app" "$RUNNER_TEMP/packaged-journeys"
+
+      - name: Upload packaged journey evidence
+        if: always() && matrix.arch == 'arm64'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: packaged-journeys-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/packaged-journeys
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Download the previous release for the migration smoke
         if: matrix.arch == 'arm64'
         env:

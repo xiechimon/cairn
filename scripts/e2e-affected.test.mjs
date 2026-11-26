@@ -593,7 +593,7 @@ test('additive-only i18n/en.ts edits skip full e2e fallback while edits/deletion
     i18n: () => resAdd,
   });
   assert.equal(selAdd.full, false);
-  assert.deepEqual(selAdd.selection, ['a11y-axe.spec.ts']);
+  assert.deepEqual(selAdd.selection, ['a11y-axe.spec.ts', 'visual-baseline.spec.ts']);
 
   const modified = EN_BASE.replace("hello: 'Hello'", "hello: 'Hi'");
   assert.equal(i18nImpact({ base: EN_BASE, head: modified }).specs, null);

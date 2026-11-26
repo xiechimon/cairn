@@ -359,6 +359,15 @@ jobs:
         with:
           key: e2e-${{ matrix.shard }}
 
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-playwright-evidence-shard-${{ matrix.shard }}
+          path: apps/web/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
   e2e-affected:
     needs: changes
     if: needs.changes.outputs.e2e-tier == 'affected' && needs.changes.outputs.has-code != 'false' && needs.changes.outputs.reused-sha != 'true'
@@ -410,6 +419,15 @@ jobs:
         uses: ./.github/actions/failed-only-save
         with:
           key: e2e-affected-${{ matrix.shard }}
+
+      - name: Upload Playwright failure evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-affected-playwright-evidence-shard-${{ matrix.shard }}
+          path: apps/web/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
 
   e2e-gate:
     needs: [changes, e2e, e2e-affected]
@@ -593,6 +611,10 @@ jobs:
       - name: E2E selection and timed shards
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node scripts/ops/ci-failed-only.mjs node-test --key gates-e2e-affected -- node --test scripts/e2e-affected.test.mjs
+
+      - name: Packaged journey and visual baseline gates stay red on the real misses
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-journey-visual -- node --test scripts/packaged-journey-gate.test.mjs scripts/visual-baseline-gate.test.mjs
 
       - name: Pages keep to tokens
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}

@@ -1,0 +1,165 @@
+{
+  "surfaces": [
+    {
+      "id": "workbench",
+      "url": "/app?scenario=01",
+      "ready": "[data-testid=\"home-c\"]",
+      "sources": [
+        "apps/web/src/board/home-c.tsx",
+        "apps/web/src/routes/board-page.tsx"
+      ]
+    },
+    {
+      "id": "coordinator-chat-markdown-code-highlighting",
+      "url": "/app?scenario=chief-md-ref",
+      "ready": "[data-testid=\"md-code\"] span",
+      "sources": [
+        "apps/web/src/chief/chief-conversation.tsx"
+      ],
+      "highlightedKeywords": [
+        "from",
+        "import"
+      ]
+    },
+    {
+      "id": "providers",
+      "url": "/app/settings/routing?scenario=06",
+      "ready": "[data-testid=\"provider-instance\"]",
+      "sources": [
+        "apps/web/src/resources/providers-page.tsx",
+        "apps/web/src/resources/model-routing-page.tsx",
+        "apps/web/src/settings/settings-page.tsx"
+      ]
+    },
+    {
+      "id": "machines",
+      "url": "/app/resources/machines?scenario=06",
+      "ready": "[data-testid=\"machine-item\"]",
+      "sources": [
+        "apps/web/src/resources/machines-page.tsx"
+      ]
+    },
+    {
+      "id": "skills",
+      "url": "/app/resources/skills?scenario=06",
+      "ready": "[data-testid=\"resource-row\"]",
+      "sources": [
+        "apps/web/src/resources/skills-page.tsx"
+      ]
+    },
+    {
+      "id": "secrets",
+      "url": "/app/resources/secrets?scenario=secrets-list",
+      "ready": "[data-testid=\"secret-value\"]",
+      "sources": [
+        "apps/web/src/resources/secrets-page.tsx"
+      ]
+    },
+    {
+      "id": "mcp-servers",
+      "url": "/app/resources/mcp-servers?scenario=06",
+      "ready": "[data-testid=\"resource-row\"]",
+      "sources": [
+        "apps/web/src/resources/mcp-servers-page.tsx"
+      ]
+    },
+    {
+      "id": "thread",
+      "url": "/app/todo/r8-12?scenario=54",
+      "ready": "[data-testid=\"side-chat-status\"]",
+      "sources": [
+        "apps/web/src/board/side-chat.tsx"
+      ]
+    },
+    {
+      "id": "project-new",
+      "url": "/app/project/new?scenario=01",
+      "ready": "[role=\"dialog\"] input",
+      "sources": [
+        "apps/web/src/pages/project-new-page.tsx"
+      ]
+    },
+    {
+      "id": "project-settings",
+      "url": "/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c",
+      "ready": "[data-testid=\"project-settings-body\"]",
+      "sources": [
+        "apps/web/src/pages/project-settings-page.tsx"
+      ]
+    },
+    {
+      "id": "usage",
+      "url": "/app/usage?scenario=home-c",
+      "ready": "[data-testid=\"usage-heatmap\"]",
+      "sources": [
+        "apps/web/src/routes/usage-page.tsx"
+      ]
+    },
+    {
+      "id": "machine-authorize",
+      "url": "/app/machines/authorize?scenario=06",
+      "ready": "#root button",
+      "sources": [
+        "apps/web/src/routes/machine-authorize-page.tsx"
+      ]
+    },
+    {
+      "id": "account",
+      "url": "/app/settings/account?scenario=13",
+      "ready": "[data-testid=\"account-appearance\"]",
+      "sources": [
+        "apps/web/src/routes/account-page.tsx",
+        "apps/web/src/settings/settings-page.tsx"
+      ]
+    },
+    {
+      "id": "api-keys",
+      "url": "/app/settings/api-keys?scenario=api-keys-created",
+      "ready": "[data-testid=\"api-key-row\"]",
+      "sources": [
+        "apps/web/src/routes/api-keys-page.tsx"
+      ]
+    },
+    {
+      "id": "im",
+      "url": "/app/settings/im?scenario=providers-fleet",
+      "ready": "[data-testid^=\"im-\"]",
+      "sources": [
+        "apps/web/src/routes/im-page.tsx"
+      ]
+    },
+    {
+      "id": "remote-access",
+      "url": "/app/settings/remote?scenario=01",
+      "ready": "[data-testid=\"remote-routes-empty\"], [data-testid=\"pairing-blocked\"], [data-testid=\"remote-access-switch\"]",
+      "sources": [
+        "apps/web/src/routes/remote-access-page.tsx"
+      ]
+    },
+    {
+      "id": "vault",
+      "url": "/app/settings/vault?scenario=vault-list",
+      "ready": "[data-testid=\"vault-new\"]",
+      "sources": [
+        "apps/web/src/resources/vault-page.tsx"
+      ]
+    },
+    {
+      "id": "model-routing",
+      "url": "/app/settings/routing?scenario=model-routing",
+      "ready": "[data-testid=\"routing-section\"]",
+      "sources": [
+        "apps/web/src/resources/model-routing-page.tsx",
+        "apps/web/src/resources/routing-settings-page.tsx"
+      ]
+    },
+    {
+      "id": "tray",
+      "url": "/tray?scenario=home-c",
+      "ready": "[data-testid=\"tray-popover\"]",
+      "sources": [
+        "apps/web/src/tray/tray-page.tsx"
+      ]
+    }
+  ]
+}
