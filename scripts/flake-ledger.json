@@ -6,12 +6,6 @@
       "owner": "xiechimon",
       "expires": "2026-12-09",
       "reason": "Token gate polling has a known timing flake; owner must fix or delete the instability before expiry."
-    },
-    {
-      "path": "integration/test/plan-upload-recovery.test.ts",
-      "owner": "xiechimon",
-      "expires": "2026-12-09",
-      "reason": "plan-upload-recovery waitFor has a known timing flake; owner must fix or delete the instability before expiry."
     }
   ]
 }

@@ -82,6 +82,7 @@ let stub: StubLlm;
 let server: RealServer;
 let home: string;
 const children: ChildProcess[] = [];
+const daemonStderr = new WeakMap<ChildProcess, () => string>();
 let proxyHandle: Awaited<ReturnType<typeof startProxy>> | null = null;
 
 afterAll(async () => {
@@ -124,8 +125,30 @@ function spawnDaemon(serverUrl: string, name: string, apiKey: string): ChildProc
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
+  child.stdout?.resume();
+  let stderrTail = '';
+  child.stderr?.on('data', (chunk: Buffer) => {
+    stderrTail = `${stderrTail}${chunk.toString()}`.slice(-4_000);
+  });
+  daemonStderr.set(child, () => stderrTail);
   children.push(child);
   return child;
+}
+
+async function waitForLiveDaemon(
+  child: ChildProcess,
+  condition: () => boolean,
+  timeoutMs: number,
+): Promise<void> {
+  await waitFor(() => {
+    if (condition()) return true;
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(
+        `daemon exited (${child.exitCode ?? child.signalCode}) while the test was waiting on it\n${daemonStderr.get(child)?.()}`,
+      );
+    }
+    return false;
+  }, timeoutMs);
 }
 
 function logLines(): string[] {
@@ -326,8 +349,13 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
       () => logLines().some((l) => l.includes(`new session ${daemonWorld.buildId}`)),
       90_000,
     );
-    await waitFor(() => logLines().some((l) => l.includes('transcript upload failed')), 30_000);
+    await waitForLiveDaemon(
+      first,
+      () => logLines().some((l) => l.includes('transcript upload failed')),
+      30_000,
+    );
     expect(serverClosed).toBe(true);
+    expect(first.exitCode).toBeNull();
     const daemonStep = server.db
       .select()
       .from(stepTable)
