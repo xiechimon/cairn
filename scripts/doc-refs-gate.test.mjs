@@ -331,7 +331,12 @@ test('moving a judged document outside the living list does not hide a reference
   r.write({
     'docs/research/x.md': `${SPEC.replace('`scripts/old.mjs`', 'the package')}${BROKEN}`,
   });
-  assert.equal(r.run().status, 1);
+  const result = r.run();
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /docs\/research\/x\.md:\d+ path does not resolve: `scripts\/gone\.mjs`/,
+  );
 });
 
 test('without a base commit a reference missing from the baseline is still red', (t) => {
@@ -339,7 +344,49 @@ test('without a base commit a reference missing from the baseline is still red',
   r.env.PREPUSH_BASE_SHA = '0'.repeat(40);
   assert.equal(r.run().status, 0, r.run().stderr);
   r.write({ 'docs/spec/b.md': BROKEN });
-  assert.equal(r.run().status, 1);
+  const result = r.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /docs\/spec\/b\.md:1 path does not resolve: `scripts\/gone\.mjs`/);
+});
+
+function archive(t) {
+  const r = repo(t);
+  r.env.PREPUSH_BASE_SHA = r.git('rev-parse', 'HEAD').toString().trim();
+  const commit = (message, text) => {
+    if (text) r.write({ 'docs/research/a.md': text });
+    r.git('commit', '-q', '-m', message);
+  };
+  mkdirSync(join(r.root, 'docs/research'), { recursive: true });
+  r.git('mv', 'docs/spec/a.md', 'docs/research/a.md');
+  r.write(r.baseline(KNOWN.replace('docs/spec/', 'docs/research/')));
+  return { ...r, commit };
+}
+
+test('a later queued commit may edit a record that an earlier one archived', (t) => {
+  const r = archive(t);
+  r.commit('lane a archives the volume');
+  r.commit('lane b appends to the record', `${SPEC}${BROKEN}`);
+  assert.equal(r.run().status, 0, r.run().stderr);
+});
+
+test('a reference the moving commit breaks stays red under later commits', (t) => {
+  const r = archive(t);
+  r.commit('archive and edit', `${SPEC}${BROKEN}`);
+  r.write({ 'docs/spec/other.md': 'Nothing to see.\n' });
+  r.commit('unrelated');
+  const result = r.run();
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /docs\/research\/a\.md:4 path does not resolve: `scripts\/gone\.mjs`/,
+  );
+});
+
+test('a reference the moving commit breaks and a later commit repairs is green', (t) => {
+  const r = archive(t);
+  r.commit('archive and edit', `${SPEC}${BROKEN}`);
+  r.commit('repair', SPEC);
+  assert.equal(r.run().status, 0, r.run().stderr);
 });
 
 test('--report marks which broken references sit in records', (t) => {

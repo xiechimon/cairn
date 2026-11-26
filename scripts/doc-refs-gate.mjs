@@ -181,8 +181,9 @@ export function filterIgnored(rows) {
   return rows.filter((r) => !r.missing || !ignored.has(r.missing.replace(/\/$/, '')));
 }
 
-export function gather(carried = new Set()) {
-  const files = git(['ls-files']).split('\n').filter(Boolean);
+export function gather(carried = new Set(), rev = null) {
+  const listing = rev ? ['ls-tree', '-r', '--name-only', rev] : ['ls-files'];
+  const files = git(listing).split('\n').filter(Boolean);
   const tracked = new Set(files.map((p) => p.replace(/\/$/, '')));
   for (const p of files) {
     const parts = p.split('/');
@@ -211,6 +212,7 @@ export function gather(carried = new Set()) {
     .sort();
   const readFile = (path) => {
     try {
+      if (rev) return files.includes(path) ? git(['show', `${rev}:${path}`]) : null;
       return readFileSync(join(root, path), 'utf8');
     } catch {
       return null;
@@ -260,6 +262,32 @@ export const demotedBy = (renames) =>
       .map(([target]) => target),
   );
 
+const movingCommit = (base, path) =>
+  git([
+    'log',
+    '--first-parent',
+    '--reverse',
+    '--no-renames',
+    '--diff-filter=A',
+    '--format=%H',
+    `${base}..HEAD`,
+    '--',
+    path,
+  ]).split('\n')[0];
+
+export function brokenByTheMove(rows, demoted, base) {
+  const atMove = new Map();
+  return rows.filter((row) => {
+    if (!demoted.has(row.doc)) return true;
+    if (!atMove.has(row.doc)) {
+      const commit = movingCommit(base, row.doc);
+      const broken = commit ? filterIgnored(collectViolations(gather(demoted, commit))) : null;
+      atMove.set(row.doc, broken && new Set(broken.map(rowKey)));
+    }
+    return atMove.get(row.doc)?.has(rowKey(row)) ?? true;
+  });
+}
+
 const baselineKeys = (text) => new Set(JSON.parse(text).rows);
 
 function baselineAt(rev) {
@@ -282,7 +310,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const demoted = demotedBy(renames);
   const { tracked, docs, readFile } = gather(demoted);
   const rows = filterIgnored(collectViolations({ tracked, docs, readFile }));
-  const judged = judgedRows(rows, demoted);
+  const judged = brokenByTheMove(judgedRows(rows, demoted), demoted, base);
   if (report) {
     const blocking = new Set(judged);
     for (const row of rows)
