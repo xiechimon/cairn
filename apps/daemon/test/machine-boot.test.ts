@@ -102,6 +102,42 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     expect(await outcome).toContain('machine.json changed');
   });
 
+  test('rejected credentials for the configured server name that server once', async () => {
+    const api = new FakeMachineApi();
+    api.me = async () => {
+      throw new MachineApiError(401, 'unauthorized');
+    };
+    const started = startMachine({ api, preEnrolled: { serverUrl: 'http://server' } });
+    onTestFinished(() => {
+      releaseTestTempDir(started.home);
+    });
+    const outcome = started.handlePromise.catch((error: unknown) => error);
+    await waitFor(() => started.lines.some((l) => l.includes('rejected them')));
+    const notice = started.lines.find((l) => l.includes('rejected them')) ?? '';
+    expect(notice.split('http://server')).toHaveLength(2);
+    writeFileSync(started.paths.machineJson, '{}');
+    await outcome;
+  });
+
+  test('a stop sent by the server says why the runner stops', async () => {
+    const { handle, api, lines } = await boot({});
+    await waitFor(() => lines.some((l) => l.includes('[wake] push channel connected')));
+    api.onStreamEvent?.({ type: 'shutdown' });
+    await handle.done;
+    expect(lines).toContain(
+      '[machine] Shutting down… (the server told this Runner to stop: it was removed, revoked or enrolled again, or another process connected with the same credentials)',
+    );
+  });
+
+  test('an API key without a team id says it is not used', async () => {
+    const { handle, lines } = await boot({ apiKeyWithoutTeam: true });
+    expect(lines).toContain(
+      '[machine] the API key is not used without --team <id>; approve this computer in the browser instead',
+    );
+    await handle.stop();
+    await handle.done;
+  });
+
   test('a local-host-proof enrollment refusal backs off, logs one recovery line, and continues after the stale row is gone', async () => {
     const api = new FakeMachineApi();
     let refused = true;
@@ -195,7 +231,9 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     await firstAttempt;
     await vi.advanceTimersByTimeAsync(3_600_000);
     expect(throttled).toBe(0);
-    expect(started.lines.filter((l) => l.includes('enrollment refused'))).toHaveLength(1);
+    const refusalLines = started.lines.filter((l) => l.includes('enrollment refused'));
+    expect(refusalLines).toHaveLength(1);
+    expect(refusalLines[0]).toContain('retrying until it is accepted, at most 60s apart');
     const busiestWindow = Math.max(
       ...admitted.map((at) => admitted.filter((t) => t >= at && t < at + 600_000).length),
     );

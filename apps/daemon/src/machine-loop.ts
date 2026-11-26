@@ -210,8 +210,12 @@ async function waitForReenrollment(
   },
 ): Promise<never> {
   const seen = readFileOrNull(machineJsonPath);
+  const rejection =
+    ctx.enrolledServer === ctx.server
+      ? `${ctx.server} rejected them`
+      : `belong to ${ctx.enrolledServer} and ${ctx.server} rejected them`;
   ctx.log(
-    `credentials in ${machineJsonPath} belong to ${ctx.enrolledServer} (machine ${ctx.machineId}) and ${ctx.server} rejected them (401). Re-enroll this runner: cairn logout, then cairn start. Waiting for machine.json to change.`,
+    `credentials in ${machineJsonPath} (machine ${ctx.machineId}): ${rejection} (401). Re-enroll this runner: cairn logout, then cairn start. Waiting for machine.json to change.`,
   );
   for (;;) {
     await ctx.sleep(ctx.pollMs);
@@ -308,7 +312,7 @@ async function retryEnrollment<T>(
       if (failure === null) throw error;
       if (failure.signature !== lastSignature) {
         ctx.log(
-          `${failure.kind}: ${failure.cause}${failure.advice === '' ? '' : ` — ${failure.advice}`}; retrying in ${backoff}ms`,
+          `${failure.kind}: ${failure.cause}${failure.advice === '' ? '' : ` — ${failure.advice}`}; retrying until it is accepted, at most ${ENROLL_BACKOFF_CAP_MS / 1_000}s apart`,
         );
         lastSignature = failure.signature;
       }
@@ -895,6 +899,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     const enrollmentApiKey = config.apiKey;
     const enrollmentTeamId = config.teamId;
     if (!enrollmentApiKey || !enrollmentTeamId) {
+      if (enrollmentApiKey) {
+        logger.machine(
+          'the API key is not used without --team <id>; approve this computer in the browser instead',
+        );
+      }
       const seenEnrollmentLines = new Set<string>();
       const enrolled = await retryEnrollment(
         () =>
@@ -1546,7 +1555,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           streamCtrl.signal,
           (ev) => {
             if (ev.type === 'hello') connectionId = ev.connectionId;
-            if (ev.type === 'shutdown') void stop();
+            if (ev.type === 'shutdown') {
+              void stop(
+                'the server told this Runner to stop: it was removed, revoked or enrolled again, or another process connected with the same credentials',
+              );
+            }
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
             if (ev.type === 'task.stop') {

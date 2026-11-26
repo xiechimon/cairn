@@ -334,6 +334,7 @@ export interface BootOpts {
   capabilitiesProbe?: () => MachineCapabilities;
   withMachineJson?: boolean;
   browserEnrollment?: boolean;
+  apiKeyWithoutTeam?: boolean;
   claimBackoffBaseMs?: number;
   preEnrolled?: { serverUrl: string };
   seedJournal?: (paths: StatePaths) => void;
@@ -362,6 +363,7 @@ export function startMachine(opts: BootOpts) {
       {
         serverUrl: 'http://server',
         ...(opts.browserEnrollment === true ? {} : { apiKey: 'cairn_k', teamId: 'team-1' }),
+        ...(opts.apiKeyWithoutTeam === true ? { apiKey: 'cairn_k', teamId: undefined } : {}),
         home,
         name: 'test-mbp',
       },
