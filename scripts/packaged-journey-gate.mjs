@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { mergeBase } from './diff-base.mjs';
 
@@ -61,7 +61,7 @@ function checkClaim(id, script, source, feature) {
   return `${REGISTRY}: ${id} claims ${feature.id} but ${script} drives none of its test ids or routes in the UI (${patterns.map(({ anchor }) => anchor).join(', ')})`;
 }
 
-function validateRegistry(registry, features, read) {
+function validateRegistry(registry, features, read, walkFiles) {
   const errors = [];
   const coverage = new Map();
   const byId = new Map(features.map((row) => [row.id, row]));
@@ -103,6 +103,10 @@ function validateRegistry(registry, features, read) {
         new Set([...(coverage.get(featureId) ?? []), ...(journey.modes ?? [])]),
       );
     }
+  }
+  for (const file of walkFiles) {
+    if (file.endsWith('.mjs') && !Object.hasOwn(journeys, file.slice(0, -'.mjs'.length)))
+      errors.push(`${JOURNEY_DIR}/${file} is not registered in ${REGISTRY}, so it never runs`);
   }
   for (const workflow of PACKAGED_APP_WORKFLOWS) {
     const text = read(workflow);
@@ -153,7 +157,7 @@ function ratchetErrors({ features, coverage, baseline, previousBaseline }) {
   return errors;
 }
 
-export function evaluate({ read, previousBaseline = null }) {
+export function evaluate({ read, walkFiles, previousBaseline = null }) {
   const map = read(FEATURE_MAP);
   const baselineText = read(BASELINE);
   if (map === null) return { errors: [`${FEATURE_MAP} is missing`], covered: [], baseline: [] };
@@ -162,7 +166,7 @@ export function evaluate({ read, previousBaseline = null }) {
   const features = JSON.parse(map).features ?? [];
   const baseline = JSON.parse(baselineText).features;
   const registry = JSON.parse(read(REGISTRY) ?? 'null');
-  const { errors, coverage } = validateRegistry(registry, features, read);
+  const { errors, coverage } = validateRegistry(registry, features, read, walkFiles);
   return {
     errors: [...errors, ...ratchetErrors({ features, coverage, baseline, previousBaseline })],
     covered: [...coverage.keys()].sort(),
@@ -185,6 +189,7 @@ function main(argv) {
   const previous = git(['show', `${base}:${BASELINE}`], { cwd, allowFailure: true });
   const result = evaluate({
     read: readWorktree(cwd),
+    walkFiles: readdirSync(join(cwd, JOURNEY_DIR)),
     previousBaseline: previous === null ? null : JSON.parse(previous).features,
   });
   for (const error of result.errors) console.error(`packaged-journey-gate: ${error}`);

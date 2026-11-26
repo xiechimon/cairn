@@ -16,6 +16,14 @@
       ],
       "modes": ["local-server", "remote-server"]
     },
+    "coordinator-chat": {
+      "features": ["coordinator-chat"],
+      "modes": ["local-server"]
+    },
+    "thread-transcript": {
+      "features": ["thread-transcript"],
+      "modes": ["local-server", "remote-server"]
+    },
     "coordinator-turn-failure": {
       "features": ["coordinator-chat"],
       "modes": ["local-server", "remote-server"]

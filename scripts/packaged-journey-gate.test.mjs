@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { evaluate } from './packaged-journey-gate.mjs';
 
@@ -42,6 +42,7 @@ function run({
   previousBaseline = null,
   features = FEATURES,
   desktopMac = RUNNER,
+  strayWalks = [],
 }) {
   const journeys =
     walk === undefined
@@ -55,12 +56,18 @@ function run({
     '.github/workflows/desktop-mac.yml': desktopMac,
     '.github/workflows/desktop-release.yml': RUNNER,
   };
-  return evaluate({ read: (path) => files[path] ?? null, previousBaseline }).errors.join('\n');
+  const walkFiles = [...(walk === undefined ? [] : ['probe.mjs']), ...strayWalks];
+  return evaluate({
+    read: (path) => files[path] ?? null,
+    walkFiles,
+    previousBaseline,
+  }).errors.join('\n');
 }
 
 test('the checked-in registry and baseline pass', () => {
   const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : null);
-  assert.deepEqual(evaluate({ read }).errors, []);
+  const walkFiles = readdirSync('apps/desktop/scripts/journeys');
+  assert.deepEqual(evaluate({ read, walkFiles }).errors, []);
 });
 
 test('features on the baseline do not block, and planned ones need nothing', () => {
@@ -118,4 +125,11 @@ test('walking the built app after the live smoke launched it is red', () => {
     /desktop-mac\.yml walks the built app after pnpm smoke/,
   );
   assert.equal(run({ baseline, desktopMac: `${built}\nrun: pnpm smoke` }), '');
+});
+
+test('a walk file the registry does not name is refused, because the runner never starts it', () => {
+  assert.match(
+    run({ baseline: ['providers', 'step-claim'], strayWalks: ['coordinator-chat.mjs'] }),
+    /journeys\/coordinator-chat\.mjs is not registered .* never runs/,
+  );
 });

@@ -12,6 +12,7 @@
 | A journey lists a feature it never drives | Red: the walk must pass one of the feature's `testid:` reach steps to `getByTestId` or a `data-testid` selector, or navigate to one of its static routes. A feature with neither cannot be claimed until its feature-map row gains one, so a feature name in a string proves nothing | the hollow `step-claim` walk (a constant asserted to be a string) is red |
 | A journey performs no UI action or asserts nothing | Red | unit control |
 | A journey is registered without a walk file, or names an unknown feature or mode | Red | registry validation |
+| A walk file is in `apps/desktop/scripts/journeys/` but not registered | Red: the runner starts only registered walks, so the file would never run | `coordinator-chat.mjs` and `thread-transcript.mjs`, added by `1b5eee7ee` without entries, are red |
 | A packaged-app workflow stops running the journeys | Red: `desktop-mac.yml` and `desktop-release.yml` must call `apps/desktop/scripts/packaged-journey.mjs`; the runner walks every registered journey in each of its modes, so no per-workflow case list can drift | registry validation |
 | The remote walk silently runs against the app's own server | The walk fails unless the window origin is the seeded remote server | packaged run |
 | The remote server asks the app to sign in | The runner gives the scratch server its own access token and enters it in the app's access-token form before the walk, then refuses the pairing request the sign-in screen itself created; without that the walk fails on the sign-in screen | packaged run |
