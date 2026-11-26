@@ -1036,8 +1036,8 @@ class AcpBackend implements AgentBackend {
           const preferred = !isRestricted
             ? (modes.availableModes.find((mode) => mode.id === 'auto') ??
               modes.availableModes.find((mode) => mode.id === 'accept-edits'))
-            : (modes.availableModes.find((mode) => mode.id === 'plan') ??
-              modes.availableModes.find((mode) => mode.id === 'default'));
+            : (modes.availableModes.find((mode) => mode.id === 'default') ??
+              modes.availableModes.find((mode) => mode.id === 'plan'));
           if (preferred !== undefined && modes.currentModeId !== preferred.id) {
             await connection.agent.request(methods.agent.session.setMode, {
               sessionId,

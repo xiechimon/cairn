@@ -112,40 +112,59 @@ function writeResumeMock(
   return agent;
 }
 
+function writeModeMock(
+  dir: string,
+  name: string,
+  modes: {
+    currentModeId: string;
+    availableModes: readonly { id: string; name: string }[];
+  },
+): string {
+  const agent = join(dir, `${name}.sh`);
+  writeFileSync(
+    agent,
+    shellNodeScript(
+      [
+        "import { createInterface } from 'node:readline';",
+        'if (process.argv.includes("--dangerously-skip-permissions")) process.exit(99);',
+        'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+        `let currentMode = ${JSON.stringify(modes.currentModeId)};`,
+        'let selectedThinking = null;',
+        'for await (const line of createInterface({ input: process.stdin })) {',
+        '  const msg = JSON.parse(line);',
+        '  if (msg.method === "initialize") {',
+        '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true } } });',
+        '  } else if (msg.method === "session/new") {',
+        `    send({ id: msg.id, result: { sessionId: "ag-1", modes: ${JSON.stringify(modes)}, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-carbon", options: [{ value: "gemini-4-carbon", name: "Gemini 4 Carbon" }] }, { id: "thought_level", name: "Thought Level", category: "thought_level", type: "select", currentValue: "medium", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });`,
+        '  } else if (msg.method === "session/set_mode") {',
+        '    currentMode = msg.params.modeId;',
+        '    send({ id: msg.id, result: {} });',
+        '  } else if (msg.method === "session/set_config_option") {',
+        '    if (msg.params.configId === "thought_level") selectedThinking = msg.params.value;',
+        '    send({ id: msg.id, result: { configOptions: [{ id: "thought_level", name: "Thought Level", category: "thought_level", type: "select", currentValue: "medium", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
+        '  } else if (msg.method === "session/prompt") {',
+        '    send({ method: "session/update", params: { sessionId: "ag-1", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: currentMode + ":" + selectedThinking } } } });',
+        '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
+        '  }',
+        '}',
+      ].join('\n'),
+    ),
+  );
+  chmodSync(agent, 0o755);
+  return agent;
+}
+
 describe('antigravity ACP runtime and credentials', () => {
-  test('prefers auto mode for worker steps, plan mode when restricted, and never passes dangerously-skip-permissions', async () => {
+  test('prefers auto mode for worker steps, default mode over plan when restricted, and never passes dangerously-skip-permissions', async () => {
     const dir = tempDir('ag-acp-');
-    const agent = join(dir, 'agy-mock.sh');
-    writeFileSync(
-      agent,
-      shellNodeScript(
-        [
-          "import { createInterface } from 'node:readline';",
-          'if (process.argv.includes("--dangerously-skip-permissions")) process.exit(99);',
-          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
-          'let currentMode = "default";',
-          'let selectedThinking = null;',
-          'for await (const line of createInterface({ input: process.stdin })) {',
-          '  const msg = JSON.parse(line);',
-          '  if (msg.method === "initialize") {',
-          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true } } });',
-          '  } else if (msg.method === "session/new") {',
-          '    send({ id: msg.id, result: { sessionId: "ag-1", modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }, { id: "auto", name: "Auto" }, { id: "plan", name: "Plan" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-carbon", options: [{ value: "gemini-4-carbon", name: "Gemini 4 Carbon" }] }, { id: "thought_level", name: "Thought Level", category: "thought_level", type: "select", currentValue: "medium", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
-          '  } else if (msg.method === "session/set_mode") {',
-          '    currentMode = msg.params.modeId;',
-          '    send({ id: msg.id, result: {} });',
-          '  } else if (msg.method === "session/set_config_option") {',
-          '    if (msg.params.configId === "thought_level") selectedThinking = msg.params.value;',
-          '    send({ id: msg.id, result: { configOptions: [{ id: "thought_level", name: "Thought Level", category: "thought_level", type: "select", currentValue: "medium", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
-          '  } else if (msg.method === "session/prompt") {',
-          '    send({ method: "session/update", params: { sessionId: "ag-1", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: currentMode + ":" + selectedThinking } } } });',
-          '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
-          '  }',
-          '}',
-        ].join('\n'),
-      ),
-    );
-    chmodSync(agent, 0o755);
+    const agent = writeModeMock(dir, 'agy-mock', {
+      currentModeId: 'default',
+      availableModes: [
+        { id: 'default', name: 'Default' },
+        { id: 'auto', name: 'Auto' },
+        { id: 'plan', name: 'Plan' },
+      ],
+    });
 
     const baseOpts: SessionOpts = {
       cwd: dir,
@@ -177,6 +196,59 @@ describe('antigravity ACP runtime and credentials', () => {
     });
     const restrictedEvents = await collect(restrictedSession.events);
     expect(restrictedEvents).toContainEqual({
+      type: 'message_end',
+      message: { role: 'assistant', content: 'default:low' },
+    });
+
+    const autoStartAgent = writeModeMock(dir, 'agy-auto-start', {
+      currentModeId: 'auto',
+      availableModes: [
+        { id: 'default', name: 'Default' },
+        { id: 'auto', name: 'Auto' },
+        { id: 'plan', name: 'Plan' },
+      ],
+    });
+    const autoStartBackend = createAcpBackend({
+      harness: 'antigravity',
+      command: autoStartAgent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+    });
+    const autoStartRestricted = await autoStartBackend.createSession({
+      ...baseOpts,
+      remoteToolsOnly: true,
+      lockedDown: true,
+      thinkingLevel: 'low',
+    });
+    const autoStartEvents = await collect(autoStartRestricted.events);
+    expect(autoStartEvents).toContainEqual({
+      type: 'message_end',
+      message: { role: 'assistant', content: 'default:low' },
+    });
+
+    const planFallbackAgent = writeModeMock(dir, 'agy-plan-fallback', {
+      currentModeId: 'auto',
+      availableModes: [
+        { id: 'auto', name: 'Auto' },
+        { id: 'plan', name: 'Plan' },
+      ],
+    });
+    const planFallbackBackend = createAcpBackend({
+      harness: 'antigravity',
+      command: planFallbackAgent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+    });
+    const planFallbackSession = await planFallbackBackend.createSession({
+      ...baseOpts,
+      readOnly: true,
+      lockedDown: true,
+      thinkingLevel: 'low',
+    });
+    const planFallbackEvents = await collect(planFallbackSession.events);
+    expect(planFallbackEvents).toContainEqual({
       type: 'message_end',
       message: { role: 'assistant', content: 'plan:low' },
     });

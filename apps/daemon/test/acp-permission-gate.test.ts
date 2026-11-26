@@ -241,4 +241,151 @@ describe('ACP permission gate on locked turns', () => {
       expect(outcomes.__executed).toEqual([]);
     },
   );
+
+  test('relay-only: allows call_mcp_tool targeting cairn host tools and denies other servers, undeclared tools, missing fields, or non-other kinds', () => {
+    const hostToolNames = ['create_todo', 'mail_reply'];
+    const normal = { mode: 'deny' } as const;
+
+    for (const toolCall of [
+      {
+        toolCallId: 'm1',
+        title: 'call_mcp_tool',
+        kind: 'other' as const,
+        rawInput: { ServerName: 'cairn', ToolName: 'create_todo', Arguments: { title: 'x' } },
+      },
+      {
+        toolCallId: 'm2',
+        title: 'call_mcp_tool',
+        kind: 'other' as const,
+        rawInput: { serverName: 'cairn', toolName: 'create_todo', arguments: { title: 'x' } },
+      },
+      {
+        toolCallId: 'm3',
+        name: 'call_mcp_tool',
+        title: 'Call MCP tool',
+        kind: 'other' as const,
+        rawInput: { server_name: ' Cairn ', tool_name: 'mail_reply' },
+      },
+    ]) {
+      expect(
+        decideAcpPermission({
+          policy: 'relay-only',
+          toolCall,
+          hostToolNames,
+          normal,
+        }),
+      ).toEqual({ allow: true, reason: 'Cairn relay tool' });
+    }
+
+    for (const denied of [
+      {
+        toolCallId: 'd-server',
+        title: 'call_mcp_tool',
+        kind: 'other' as const,
+        rawInput: { ServerName: 'github', ToolName: 'create_todo', Arguments: {} },
+      },
+      {
+        toolCallId: 'd-tool',
+        title: 'call_mcp_tool',
+        kind: 'other' as const,
+        rawInput: { ServerName: 'cairn', ToolName: 'bash', Arguments: {} },
+      },
+      {
+        toolCallId: 'd-missing-server',
+        title: 'call_mcp_tool',
+        kind: 'other' as const,
+        rawInput: { ToolName: 'create_todo', Arguments: {} },
+      },
+      {
+        toolCallId: 'd-missing-tool',
+        title: 'call_mcp_tool',
+        kind: 'other' as const,
+        rawInput: { ServerName: 'cairn', Arguments: {} },
+      },
+      {
+        toolCallId: 'd-array-input',
+        title: 'call_mcp_tool',
+        kind: 'other' as const,
+        rawInput: ['cairn', 'create_todo'],
+      },
+      {
+        toolCallId: 'd-execute',
+        title: 'call_mcp_tool',
+        kind: 'execute' as const,
+        rawInput: { ServerName: 'cairn', ToolName: 'create_todo', Arguments: {} },
+      },
+      {
+        toolCallId: 'd-edit',
+        title: 'call_mcp_tool',
+        kind: 'edit' as const,
+        rawInput: { ServerName: 'cairn', ToolName: 'create_todo', Arguments: {} },
+      },
+    ]) {
+      const decision = decideAcpPermission({
+        policy: 'relay-only',
+        toolCall: denied,
+        hostToolNames,
+        normal,
+      });
+      expect(decision.allow).toBe(false);
+      expect(decision.reason).toContain('Cairn permission gate rejected');
+    }
+
+    expect(
+      decideAcpPermission({
+        policy: 'relay-only',
+        toolCall: {
+          toolCallId: 'd-empty-host',
+          title: 'call_mcp_tool',
+          kind: 'other',
+          rawInput: { ServerName: 'cairn', ToolName: 'create_todo', Arguments: {} },
+        },
+        hostToolNames: [],
+        normal,
+      }).allow,
+    ).toBe(false);
+  });
+
+  test('antigravity (relay-only): allows call_mcp_tool for cairn host tools over ACP while denying other servers, undeclared tools, and non-other kinds', async () => {
+    const calls: Call[] = [
+      {
+        toolCallId: 'mcp-allow',
+        title: 'call_mcp_tool',
+        kind: 'other',
+        rawInput: { ServerName: 'cairn', ToolName: 'mail_reply', Arguments: { title: 'x' } },
+        hostTool: 'mail_reply',
+      },
+      {
+        toolCallId: 'mcp-other-server',
+        title: 'call_mcp_tool',
+        kind: 'other',
+        rawInput: { ServerName: 'github', ToolName: 'mail_reply', Arguments: {} },
+        exec: true,
+      },
+      {
+        toolCallId: 'mcp-undeclared',
+        title: 'call_mcp_tool',
+        kind: 'other',
+        rawInput: { ServerName: 'cairn', ToolName: 'bash', Arguments: {} },
+        exec: true,
+      },
+      {
+        toolCallId: 'mcp-exec-kind',
+        title: 'call_mcp_tool',
+        kind: 'execute',
+        rawInput: { ServerName: 'cairn', ToolName: 'mail_reply', Arguments: {} },
+        exec: true,
+      },
+    ];
+    const { events, outcomes } = await run(backendFor('antigravity'), mailTurn, calls);
+    expect(events.at(-1)).toMatchObject({ type: 'done' });
+    expect(outcomes).toMatchObject({
+      'mcp-allow': 'allow',
+      'mcp-allow:tool': 'mail sent',
+      'mcp-other-server': 'deny',
+      'mcp-undeclared': 'deny',
+      'mcp-exec-kind': 'deny',
+    });
+    expect(outcomes.__executed).toEqual([]);
+  });
 });

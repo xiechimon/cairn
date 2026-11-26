@@ -101,11 +101,27 @@ function nameCandidates(toolCall: AcpToolCall): string[] {
   return found.map((value) => value.trim());
 }
 
+function isCairnLazyMcpCall(
+  toolCall: AcpToolCall,
+  candidates: readonly string[],
+  hostToolNames: readonly string[],
+): boolean {
+  if (!candidates.some((candidate) => /^call_mcp_tool(?:\b|$)/i.test(candidate))) return false;
+  const rawInput = toolCall.rawInput;
+  if (typeof rawInput !== 'object' || rawInput === null || Array.isArray(rawInput)) return false;
+  const record = rawInput as Record<string, unknown>;
+  const serverName = record.ServerName ?? record.serverName ?? record.server_name;
+  if (typeof serverName !== 'string' || serverName.trim().toLowerCase() !== 'cairn') return false;
+  const toolName = record.ToolName ?? record.toolName ?? record.tool_name;
+  return typeof toolName === 'string' && hostToolNames.includes(toolName);
+}
+
 export function isHostToolCall(toolCall: AcpToolCall, hostToolNames: readonly string[]): boolean {
   if (hostToolNames.length === 0) return false;
   const candidates = nameCandidates(toolCall);
   const kind = toolCall.kind ?? 'other';
   if (kind !== 'other') return false;
+  if (isCairnLazyMcpCall(toolCall, candidates, hostToolNames)) return true;
   return hostToolNames.some((name) => {
     const escaped = escapeRegExp(name);
     const qualified = new RegExp(
