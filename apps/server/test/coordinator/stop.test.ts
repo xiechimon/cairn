@@ -64,7 +64,15 @@ describe('which Coordinator requests a stop cancels', () => {
     const turn = (id: string, status: 'stopped' | 'done' | 'failed', finishedAt: number) =>
       w.s.db
         .insert(step)
-        .values({ id, buildId: w.threadId, kind: 'chief', status, createdAt: 1, finishedAt })
+        .values({
+          id,
+          buildId: w.threadId,
+          kind: 'chief',
+          status,
+          prompt: `asked in ${id}`,
+          createdAt: 1,
+          finishedAt,
+        })
         .run();
     turn('stopped-long-ago', 'stopped', 100);
     turn('answered', 'done', 200);
@@ -78,14 +86,35 @@ describe('which Coordinator requests a stop cancels', () => {
         stepId: 'stopped-on-retry',
         kind: 'initial',
         ownerMessageIds: [],
-        content: 'long job',
+        content: 'asked in stopped-on-retry\n\nappended context',
         attempt: 2,
         createdAt: 1,
       })
       .run();
+    w.s.db
+      .insert(coordinatorInput)
+      .values({
+        id: 'correction',
+        threadId: w.threadId,
+        stepId: 'stopped-on-retry',
+        kind: 'steer',
+        ownerMessageIds: [],
+        content: 'and be brief',
+        attempt: 1,
+        createdAt: 2,
+      })
+      .run();
 
+    const asked = 'asked in stopped-on-retry';
     expect(stoppedCoordinatorTurns(w.s.db, w.threadId)).toEqual([
-      { stepId: 'stopped-on-retry', requestIds: ['stopped-on-retry', 'stopped-on-retry#2'] },
+      {
+        stepId: 'stopped-on-retry',
+        requests: [
+          { requestId: 'stopped-on-retry', quote: asked },
+          { requestId: 'stopped-on-retry#2', quote: asked },
+          { requestId: expect.stringContaining('correction'), quote: 'and be brief' },
+        ],
+      },
     ]);
   });
 });

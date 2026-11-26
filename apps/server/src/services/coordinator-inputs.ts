@@ -1,5 +1,6 @@
 import { coordinatorConversationKey, isMailWakeText } from '@cairn/shared';
 import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import type { StoppedTurn } from '../coordinator/runtime/stopped-turn.js';
 import type { Db } from '../db/client.js';
 import {
   chiefMessage,
@@ -44,10 +45,7 @@ export function parseInputRequestId(requestId: string): { id: string; attempt: n
     : { id: requestId, attempt: 1 };
 }
 
-export function stoppedCoordinatorTurns(
-  db: Db,
-  threadId: string,
-): { stepId: string; requestIds: string[] }[] {
+export function stoppedCoordinatorTurns(db: Db, threadId: string): StoppedTurn[] {
   const ended = db
     .select()
     .from(step)
@@ -69,22 +67,23 @@ export function stoppedCoordinatorTurns(
   const inputs = coordinatorInputs(db, threadId);
   return ended
     .filter((row) => row.status === 'stopped' && (row.finishedAt ?? answeredSince) >= answeredSince)
-    .map((row) => ({
-      stepId: row.id,
-      requestIds: [
-        ...new Set([
-          row.id,
-          ...inputs
-            .filter((input) => input.stepId === row.id)
-            .flatMap((input) => inputRequestIds(inputRequestId(input))),
-        ]),
-      ],
-    }));
+    .map((row) => {
+      const prompt = row.prompt ?? '';
+      const quotes = new Map([[row.id, prompt]]);
+      for (const input of inputs.filter((candidate) => candidate.stepId === row.id)) {
+        for (const requestId of inputRequestIds(inputRequestId(input))) {
+          quotes.set(requestId, input.kind === 'steer' ? input.content : prompt);
+        }
+      }
+      return {
+        stepId: row.id,
+        requests: [...quotes].map(([requestId, quote]) => ({ requestId, quote })),
+      };
+    });
 }
 
 export function stoppedTurnRequests(db: Db, stepId: string): string[] {
   const prompt = db.select().from(step).where(eq(step.id, stepId)).get()?.prompt ?? '';
-  if (isMailWakeText(prompt)) return [];
   const steered = db
     .select()
     .from(coordinatorInput)

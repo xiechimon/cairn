@@ -1,6 +1,7 @@
+import { isMailWakeText } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage } from '@earendil-works/pi-ai';
-import { defineEntry, type EntryRecord, type Harness, UserEntry } from '@earendil-works/pi-durable';
+import { defineEntry, type Harness } from '@earendil-works/pi-durable';
 import type { Conversation } from './conversations.js';
 
 const QUOTE_HEAD_CHARS = 150;
@@ -10,11 +11,13 @@ export const StoppedEntry = defineEntry('cairn.stopped');
 
 export interface StoppedTurn {
   stepId: string;
-  requestIds: string[];
+  requests: { requestId: string; quote: string }[];
 }
 
 function quoted(request: string): string {
-  const text = request.replaceAll('</stopped_request>', '').trim();
+  const text = (isMailWakeText(request) ? 'a new mail notification' : request)
+    .replaceAll('<', '&lt;')
+    .trim();
   const short =
     text.length <= QUOTE_HEAD_CHARS + QUOTE_TAIL_CHARS
       ? text
@@ -28,14 +31,6 @@ export function stoppedNote(requests: readonly string[]): string {
     ...requests.map(quoted),
     'Whatever I had not finished for it is cancelled: I will not answer it or act on it, now or in a later reply, unless the user asks for it again. Answers already finished and work already done stay done. This stop covers no other request.',
   ].join('\n');
-}
-
-function requestText(entry: EntryRecord | undefined): string {
-  const message = entry?.model?.[0];
-  if (message?.role !== 'user') return '';
-  return typeof message.content === 'string'
-    ? message.content
-    : message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n');
 }
 
 function stoppedReply(text: string, timestamp: number): AssistantMessage {
@@ -66,14 +61,12 @@ export async function cancelStoppedRequests(
 ): Promise<void> {
   for (const turn of stopped) {
     const unfinished = new Set<string>();
-    for (const requestId of turn.requestIds) {
-      const text = await harness.commit(async (tx) => {
+    for (const { requestId, quote } of turn.requests) {
+      const pending = await harness.commit(async (tx) => {
         const record = await tx.submissionByRequest(conversation.id, requestId);
-        if (record?.type !== 'input' || record.status === 'done' || record.entry === undefined)
-          return undefined;
-        return requestText(await tx.entry(UserEntry, record.entry));
+        return record?.type === 'input' && record.status !== 'done' && record.entry !== undefined;
       }, context);
-      if (text !== undefined) unfinished.add(text);
+      if (pending) unfinished.add(quote);
     }
     if (unfinished.size === 0) continue;
     await conversation.submit(

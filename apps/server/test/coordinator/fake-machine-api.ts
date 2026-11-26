@@ -18,6 +18,7 @@ export interface FakeMachineApi extends MachineApi {
   tools: { stepId: string; name: string; params: Record<string, unknown> }[];
   keys: string[];
   stopRequested: Set<string>;
+  asked: Map<string, string>;
   stopPolls: string[];
   asks: { stepId: string; body: MachineAskBody }[];
   suggestions: { stepId: string; replies: readonly string[] }[];
@@ -34,6 +35,7 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
     tools: [],
     keys: [],
     stopRequested: new Set(),
+    asked: new Map(),
     stopPolls: [],
     asks: [],
     suggestions: [],
@@ -59,7 +61,10 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
       return api.stopRequested.has(stepId) ? false : null;
     },
     stoppedTurns: async () =>
-      [...api.stopRequested].map((id) => ({ stepId: id, requestIds: [id] })),
+      [...api.stopRequested].map((id) => ({
+        stepId: id,
+        requests: [{ requestId: id, quote: api.asked.get(id) ?? id }],
+      })),
     askUser: async (stepId, body) => {
       api.asks.push({ stepId, body });
       return { status: 'cancelled', requestId: body.requestId, answers: null, reason: 'no user' };

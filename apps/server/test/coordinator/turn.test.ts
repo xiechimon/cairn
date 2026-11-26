@@ -577,11 +577,13 @@ describe('runCoordinatorTurn', () => {
     ]);
     const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx);
     const api = fakeMachineApi();
-    const run = (id: string, instruction: string) =>
-      runCoordinatorTurn(
+    const run = (id: string, instruction: string, appended = '') => {
+      api.asked.set(id, instruction);
+      return runCoordinatorTurn(
         { harness, models: coordinatorModels, api, context: ctx, heartbeatMs: 1000, now: () => 1 },
-        chiefStep(id, instruction),
+        chiefStep(id, `${instruction}${appended}`),
       );
+    };
     const notes = () =>
       (sent.at(-1) ?? [])
         .map((m) => JSON.stringify(m.content))
@@ -634,6 +636,18 @@ describe('runCoordinatorTurn', () => {
     expect(notes()).toHaveLength(1);
     expect(notes()[0]).toContain('delete every branch');
     expect(notes()[0]).not.toContain('summarise the repository');
+    await harness.close(ctx);
+  }, 30_000);
+
+  it('quotes the request itself, not the context appended to it', async () => {
+    const { harness, api, run, notes } = await stoppedRun([failure()]);
+    await run('step-stopped', 'delete every branch', '\n\nTEAM-STATE-SECTION '.repeat(40));
+    api.stopRequested.add('step-stopped');
+
+    await run('step-next', 'what time is it');
+
+    expect(notes()[0]).toContain('delete every branch');
+    expect(notes()[0]).not.toContain('TEAM-STATE-SECTION');
     await harness.close(ctx);
   }, 30_000);
 
