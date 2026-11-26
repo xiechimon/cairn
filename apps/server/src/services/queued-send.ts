@@ -1,13 +1,8 @@
-import {
-  ACTIVE_STEP_STATUSES,
-  QUEUED_MESSAGE_CANCELLED,
-  type ThreadMessageDelivery,
-} from '@cairn/shared';
+import { ACTIVE_STEP_STATUSES, type ThreadMessageDelivery } from '@cairn/shared';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, clientMessage, queuedMessage, step, type todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
-import { completeClientMessage, findClientMessage } from './client-message.js';
+import { completeClientMessage, findClientMessage, removedFromQueue } from './client-message.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -29,10 +24,6 @@ export type QueuedSend =
     }
   | { kind: 'stranded'; scopeId: string; messageId: string }
   | { kind: 'cancelled' };
-
-export function removedFromQueue(): HttpError {
-  return new HttpError(409, 'Queued message was removed', QUEUED_MESSAGE_CANCELLED);
-}
 
 export function latestStepStatus(db: Db, conversationId: string) {
   return db
@@ -220,13 +211,14 @@ export async function replacingStrandedSend<T>(
   db: Db,
   task: TodoRow,
   resend: { clientMessageId?: string; content: string; sendNow?: boolean },
-  send: () => Promise<T>,
+  send: (refuseIfRemoved: () => void) => Promise<T>,
 ): Promise<T> {
   const { clientMessageId, content, sendNow } = resend;
-  if (clientMessageId === undefined) return send();
+  const nothingTaken = () => {};
+  if (clientMessageId === undefined) return send(nothingTaken);
   const found = queuedSendUnderKey(db, task, clientMessageId, sendNow);
   if (found?.kind === 'cancelled') throw removedFromQueue();
-  if (found?.kind !== 'stranded') return send();
+  if (found?.kind !== 'stranded') return send(nothingTaken);
   const queuedRow = eq(queuedMessage.id, found.messageId);
   const ledger = and(
     eq(clientMessage.scopeId, found.scopeId),
@@ -239,11 +231,14 @@ export async function replacingStrandedSend<T>(
       receipt: db.delete(clientMessage).where(ledger).returning().get(),
     };
   });
-  if (taken.row) takenIn(db).add(found.messageId);
+  takenIn(db).add(found.messageId);
+  const removedMeanwhile = () => !takenIn(db).has(found.messageId);
   try {
-    return await send();
+    return await send(() => {
+      if (removedMeanwhile()) throw removedFromQueue();
+    });
   } catch (error) {
-    const cancelledMeanwhile = taken.row !== undefined && !takenIn(db).has(found.messageId);
+    const cancelledMeanwhile = removedMeanwhile();
     db.transaction(() => {
       if (anyReceipt(db, task.id, clientMessageId)) return;
       if (taken.row && !cancelledMeanwhile)

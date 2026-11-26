@@ -11,6 +11,7 @@ import {
   coalesceClientMessage,
   completeClientMessage,
   findClientMessage,
+  removedFromQueue,
   replayAfterConflict,
 } from './client-message.js';
 import {
@@ -19,7 +20,6 @@ import {
   latestStepStatus,
   markAsQueuedSend,
   queuedSendUnderKey,
-  removedFromQueue,
   replacingStrandedSend,
 } from './queued-send.js';
 import { threadSendUnderKey } from './thread-message.js';
@@ -101,7 +101,7 @@ export async function queueTaskMessage(
   if (!task || latestRun === undefined)
     throw new HttpError(409, 'Task cannot accept a queued message');
   const runId = latestRun.id;
-  const send = async () => {
+  const send = async (refuseIfRemoved: () => void) => {
     if (!activeStep(deps.db, runId))
       return sendBuildSteer(
         deps,
@@ -110,7 +110,10 @@ export async function queueTaskMessage(
         {
           afterTurn: true,
           origin: 'user',
-          beforeCommit: () => markAsQueuedSend(deps.db, runId, clientMessageId),
+          beforeCommit: () => {
+            refuseIfRemoved();
+            markAsQueuedSend(deps.db, runId, clientMessageId);
+          },
         },
       );
     const message = {
@@ -123,6 +126,7 @@ export async function queueTaskMessage(
     const queued = { conversationId: runId, message };
     try {
       deps.db.transaction(() => {
+        refuseIfRemoved();
         claimClientMessage(deps.db, runId, clientMessageId);
         deps.db.insert(queuedMessage).values(message).run();
         addUserMessageAttachmentGrants(deps.db, task.id, task.teamId, content);

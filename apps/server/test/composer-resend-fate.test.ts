@@ -334,39 +334,93 @@ test.each([
   },
 );
 
+async function strandedBehindASlowPrCheck() {
+  let probes = 0;
+  const w = await runningTask({
+    githubFetch: async () => {
+      probes += 1;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return Response.json({ state: 'open', merged: false });
+    },
+  });
+  const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
+  w.s.db
+    .update(project)
+    .set({ repoKind: 'github', githubRepo: 'demo-owner/demo-repo' })
+    .where(eq(project.id, task.projectId))
+    .run();
+  expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
+  const [row] = queuedRows(w);
+  expect((await w.finish('failed')).status).toBe(200);
+  w.s.db
+    .update(build)
+    .set({ prNumber: 43, prUrl: 'https://github.com/demo-owner/demo-repo/pull/43' })
+    .where(eq(build.id, 'build'))
+    .run();
+  const before = probes;
+  const reachesThePrCheck = () => vi.waitFor(() => expect(probes).toBeGreaterThan(before));
+  return { w, rowId: row!.id, reachesThePrCheck };
+}
+
 test.each([
   ['queue', 'reply'],
   ['reply', 'queue'],
 ] as const)(
   'concurrent resends through the %s and %s routes deliver one copy while the send is slow',
   async (first, second) => {
-    let probes = 0;
-    const w = await runningTask({
-      githubFetch: async () => {
-        probes += 1;
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        return Response.json({ state: 'open', merged: false });
-      },
-    });
-    const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
-    w.s.db
-      .update(project)
-      .set({ repoKind: 'github', githubRepo: 'demo-owner/demo-repo' })
-      .where(eq(project.id, task.projectId))
-      .run();
-    expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
-    expect((await w.finish('failed')).status).toBe(200);
-    w.s.db
-      .update(build)
-      .set({ prNumber: 43, prUrl: 'https://github.com/demo-owner/demo-repo/pull/43' })
-      .where(eq(build.id, 'build'))
-      .run();
-    const before = probes;
+    const { w, reachesThePrCheck } = await strandedBehindASlowPrCheck();
     const leading = routes[first](w);
-    await vi.waitFor(() => expect(probes).toBeGreaterThan(before));
+    await reachesThePrCheck();
     const answers = await Promise.all([leading, routes[second](w)]);
     expect(answers.map((res) => res.status)).toEqual([201, 201]);
     expect(copies(w)).toHaveLength(1);
     expect(w.s.db.select().from(step).where(eq(step.status, 'pending')).all()).toHaveLength(1);
   },
 );
+
+test.each(['reply', 'queue'] as const)(
+  'a message removed while its resend through the %s route is being delivered stays removed',
+  async (route) => {
+    const { w, rowId, reachesThePrCheck } = await strandedBehindASlowPrCheck();
+    const resend = routes[route](w);
+    await reachesThePrCheck();
+    const removal = await w.send({ content: TEXT, queuedMessageId: rowId, cancelQueued: true });
+    expect(removal.status).toBe(201);
+    const answer = await resend;
+    expect(answer.status).toBe(409);
+    expect(await answer.json()).toMatchObject({ reason: 'queued-message-cancelled' });
+    expect(copies(w)).toEqual([]);
+    expect(w.s.db.select().from(step).where(eq(step.status, 'pending')).all()).toHaveLength(0);
+    const later = await routes[route](w);
+    expect(later.status).toBe(409);
+    expect(copies(w)).toEqual([]);
+  },
+);
+
+test('an edited message removed while an earlier resend is failing is never reported as sent', async () => {
+  const w = await runningTask();
+  expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
+  const [row] = queuedRows(w);
+  await w.send({ content: EDITED, queuedMessageId: row!.id, editQueued: true });
+  expect((await w.finish('failed')).status).toBe(200);
+  const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
+  await expect(
+    replacingStrandedSend(w.s.db, task, { clientMessageId: KEY, content: TEXT }, async () => {
+      await w.send({ content: EDITED, queuedMessageId: row!.id, cancelQueued: true });
+      throw new Error('refused');
+    }),
+  ).rejects.toThrow('refused');
+  const later = await routes.queue(w);
+  expect(later.status).toBe(409);
+  expect(await later.json()).toMatchObject({ reason: 'queued-message-cancelled' });
+});
+
+test('a steer under the id of a message removed from the queue is refused', async () => {
+  const w = await runningTask();
+  expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
+  await cancelIt(w);
+  const steer = await w.send({ content: TEXT, clientMessageId: KEY });
+  expect(steer.status).toBe(409);
+  expect(await steer.json()).toMatchObject({ reason: 'queued-message-cancelled' });
+  expect(copies(w)).toEqual([]);
+});

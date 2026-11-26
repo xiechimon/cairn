@@ -59,7 +59,7 @@ A queued message has no receipt copy of its own. The queue route marks its ledge
 | Held by a Stop: the latest run's last step is stopped, no delivery error, task open | success, nothing inserted and nothing started; the row stays queued with its send now and remove controls. A stop-and-send resend takes the next row instead, so it is delivered |
 | Queued where no active step will drain it: failed turn, older build, delivery error, archived or closed task | one run removes the queued row and its receipt and sends the resend as a new message through the requested route; a refused or failed send puts both back and returns the error, except a row the user cancelled meanwhile |
 | The same, but the queued row was edited since | only the receipt is replaced; the edited row stays queued beside the resent text |
-| Cancelled by the user | the cancel marks the receipt cancelled in the same transaction; every resend under that key is refused with 409 `queued-message-cancelled` and nothing is inserted, also when the cancel arrived while an earlier resend was failing |
+| Cancelled by the user | the cancel marks the receipt cancelled in the same transaction; every resend under that key, in any send mode, is refused with 409 `queued-message-cancelled` and nothing is inserted. A cancel that arrives while an earlier resend is still in flight wins: that resend is refused at its commit, whether it was about to succeed or fail |
 | Never received | normal send. A queue send addressed to an earlier run of the task goes to the task's latest run |
 
 A crash between the removal and the new send leaves neither row; the browser still holds the text and its resend is a new message.

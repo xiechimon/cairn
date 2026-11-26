@@ -25,15 +25,11 @@ import {
   coalesceClientMessage,
   completeClientMessage,
   findClientMessage,
+  removedFromQueue,
   replayAfterConflict,
 } from './client-message.js';
 import { assertProjectWritable } from './project-writable.js';
-import {
-  nestedLedgerId,
-  queuedSendUnderKey,
-  removedFromQueue,
-  replacingStrandedSend,
-} from './queued-send.js';
+import { nestedLedgerId, queuedSendUnderKey, replacingStrandedSend } from './queued-send.js';
 import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
 import { settleQuestionAnswers } from './worker-questions.js';
 
@@ -347,7 +343,7 @@ export async function messageThreadAsUser(
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }
   const buildId = row.latestBuildId;
-  const send = async (): Promise<ThreadMessageResult> => {
+  const send = async (refuseIfRemoved: () => void): Promise<ThreadMessageResult> => {
     if (row.phase === 'stopped') {
       try {
         return commitStoppedRestart(deps, row, body, origin);
@@ -361,7 +357,10 @@ export async function messageThreadAsUser(
       }
     }
     const bound = bindRouteReceipt(deps, row, body, origin, buildId);
-    const sent = await deliver(deps, row, buildId, body, origin, bound.write);
+    const sent = await deliver(deps, row, buildId, body, origin, () => {
+      refuseIfRemoved();
+      bound.write();
+    });
     bound.publish();
     const committed = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
     if (committed !== undefined) return committed;

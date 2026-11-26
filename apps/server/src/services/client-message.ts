@@ -1,6 +1,8 @@
+import { QUEUED_MESSAGE_CANCELLED } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { clientMessage } from '../db/schema.js';
+import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 
 export class ClientMessageConflict extends Error {
@@ -8,6 +10,10 @@ export class ClientMessageConflict extends Error {
     super('client message id was already submitted');
     this.name = 'ClientMessageConflict';
   }
+}
+
+export function removedFromQueue(): HttpError {
+  return new HttpError(409, 'Queued message was removed', QUEUED_MESSAGE_CANCELLED);
 }
 
 const inFlightByDb = new WeakMap<Db, Map<string, Promise<unknown>>>();
@@ -30,7 +36,10 @@ export function findClientMessage<T>(
     .from(clientMessage)
     .where(ledgerRow(scopeId, clientMessageId))
     .get();
-  return (row?.response ?? undefined) as T | undefined;
+  const response = row?.response ?? undefined;
+  if ((response as { cancelled?: unknown } | undefined)?.cancelled === true)
+    throw removedFromQueue();
+  return response as T | undefined;
 }
 
 export function claimClientMessage(
