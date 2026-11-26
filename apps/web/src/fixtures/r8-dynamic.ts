@@ -571,6 +571,59 @@ export const skillsRouting: FixtureSet = {
   },
 };
 
+const CODE_SAMPLE = [
+  '统计词频的函数如下：',
+  '',
+  '```python',
+  'from collections import Counter',
+  '',
+  'counts = Counter(text.split())',
+  '```',
+].join('\n');
+
+const CODE_TRANSCRIPT: TranscriptItem[] = [
+  { kind: 'run', at: '13:35', machine: MACHINE_NAME },
+  {
+    kind: 'user',
+    text: CODE_SAMPLE,
+    markdown: CODE_SAMPLE,
+    seq: 9,
+    title: '在 README.md 末尾追加一行「r7 rebaseline probe」',
+  },
+  { kind: 'robot', markdown: CODE_SAMPLE, footer: { seconds: 12 } },
+];
+
+export const codeHighlight: FixtureSet = {
+  todos: [probeTodo('review', r7(13, 37))],
+  now: r7(13, 40),
+  detail: {
+    transcript: CODE_TRANSCRIPT,
+    doc: DOC_V2,
+    changes: probeChanges(true),
+  },
+  chief: {
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: 'Python 代码高亮',
+    stream: [
+      {
+        kind: 'user',
+        id: 'code-highlight-user',
+        text: CODE_SAMPLE,
+        markdown: CODE_SAMPLE,
+        createdAt: r7(13, 36),
+      },
+      {
+        kind: 'robot',
+        id: 'code-highlight-robot',
+        markdown: CODE_SAMPLE,
+        seconds: '8s',
+        createdAt: r7(13, 37),
+      },
+    ],
+  },
+};
+
 export const revisionStreaming: FixtureSet = {
   todos: [failed12, review13, probe15('planning', r8(23, 55))],
   now: r8(23, 55),
