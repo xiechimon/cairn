@@ -2,7 +2,7 @@
 
 > Kept sections only. The header of the full volume said it was superseded in part (ADR 0012 / #980) and that §1.1 and §3 stay in effect. ADR 0012 is not in this tree, so those two sections are kept here as the contract an agent can read. The rest of the volume (the #912-era measurement tables, the geometry canon, the prototype callback list and the §5 retirement ledger) described work that has landed and is deleted; it stays in git history.
 
-<!-- ruling:tokens.canonical -->UI code consumes tokens, not literals; the token table is the frontmatter of `apps/web/DESIGN.md`, and for its entries `apps/web/src/styles/shadcn.css` holds the colour variables, the radius variables, the sidebar and dialog width variables, the `--type-*` size variables and the sans, display and mono families, `apps/web/src/styles/fonts.css` holds the faces behind the serif and reply families, `apps/web/src/styles/app.css` holds the type utility names and line-height variables, and the full radius, the other spacing entries and the response and reply sizes have no `--type-*` variable of their own.<!-- /ruling -->
+<!-- ruling:tokens.canonical -->UI code consumes tokens, not literals; the token table is the frontmatter of `apps/web/DESIGN.md`, and for its entries `apps/web/src/styles/shadcn.css` holds the colour variables, the radius variables (`--edge-radius` for the sheet entry), the sidebar and dialog width variables, the `--type-*` size variables, the title and voice weight variables and the sans, display and mono family stacks, `apps/web/src/styles/fonts.css` holds the serif and reply family stacks and the bundled font faces, including those the sans and mono stacks use, and `apps/web/src/styles/app.css` holds the type utility names and line-height variables; the full radius and the grid, card padding, column gap, board padding, header height, navigation row height and menu row height spacing entries have no CSS variable of their own, and the response and reply type entries have no size variable of their own and share `--type-card-title`.<!-- /ruling -->
 
 ## 1.1 Slots unchanged, only values flip
 
@@ -10,7 +10,7 @@ A name-level diff measured 111 color slots, **0 added, 0 retired** — the final
 
 - **Flips**: dark 107 slots, light 103 slots take new values (incl. the six coalesced alias slots `--surface-inset`/`--card-bg`/`--popover-bg`/`--text-primary`/`--code-bg`/`--danger`, whose values flip together with the canonical slot they directly reference).
 - **Unchanged**: dark 2 slots, light 6 slots — theme-constant values (`--overlay-scrim` `rgb(0 0 0 / 0.6)`, `--text-on-veil` white; the light side also has `--primary-foreground`/`--destructive-foreground`/`--text-on-accent`/`--spot-disabled-fg` exactly equal to the current value). Unchanged ≠ no flip needed, it is the finalized value exactly equal to the current value.
-- **Retirement candidate**: 2 slots (`--toggle-track`/`--toggle-knob`) — invisible to a name-level diff (both files have them), but their only consumer is the per-face CSS handwritten toggle zeroed by D3 (see §1.6). **Retired**: #952 deleted the two slots from shadcn.css (the execution point of the §4-2 ruling).
+- **Retirement candidate**: 2 slots (`--toggle-track`/`--toggle-knob`) — invisible to a name-level diff (both files have them), but their only consumer is the per-face CSS handwritten toggle zeroed by D3. **Retired**: #952 deleted the two slots from shadcn.css.
 
 ## 3. Carrier rule (Tailwind class writing)
 
@@ -23,7 +23,7 @@ A name-level diff measured 111 color slots, **0 added, 0 retired** — the final
 ### 3.2 token notation: hex/rgb, forbid oklch
 
 - Source-of-truth contract (ADR 0010 D5.4, inheriting #910 ruling 4's full inheritance of #411): token held values uniformly in hex/rgb notation, **forbid oklch**. Reason: the e2e value probes (computed-style probe + `apps/web/e2e/png.ts` luma probe) parse by rgb string regex, the `oklch()` function channel is misread by the regex → false red.
-- `color-mix(in srgb, …)` **allowed**: it is resolved to rgb by the browser at render time, computed-style reads back an rgb string, the probes read normally. The six P0 semantic slots' color-mix formulas kept (§1.4).
+- `color-mix(in srgb, …)` **allowed**: it is resolved to rgb by the browser at render time, computed-style reads back an rgb string, the probes read normally. The six P0 semantic slots' color-mix formulas kept.
 - c.css measured all hex/rgb zero oklch, the contract naturally compatible — #915 value-flipping will not introduce oklch.
 
 ### 3.3 oklch old-pit disposition (ticket Q&A)
