@@ -11,7 +11,6 @@ import {
 } from 'node:fs';
 import { devNull, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 const FOUND = 1;
 const COULD_NOT_RUN = 2;
@@ -39,7 +38,7 @@ function isolatedEnv() {
 
 function git(cwd, args, env = process.env) {
   const options = { cwd, env, encoding: 'utf8', maxBuffer: BUFFER, stdio: 'pipe' };
-  return execFileSync('git', args, options).trim();
+  return execFileSync('git', args, options).trimEnd();
 }
 
 function scan(cwd, args, { range, remedy, input }) {
@@ -122,7 +121,7 @@ export function scanBranch(cwd) {
   });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(import.meta.filename)) {
   const result = scanBranch(process.cwd());
   if (result.output) process.stdout.write(result.output);
   if (result.code === 0) console.log(`[secret-scan] ${result.message}`);

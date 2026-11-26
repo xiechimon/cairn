@@ -111,11 +111,11 @@ test('a local branch or tag named origin/main cannot move the start of the scan'
 test('an ignore entry that may be a pasted secret is named by line number only', (t) => {
   const { addCommit, stubbed } = fixture(t);
   const pasted = generatedKey();
-  addCommit('.gitleaksignore', `# reviewed\n\n${pasted}\n`);
+  addCommit('.gitleaksignore', `\n\n${pasted}\n`);
   const run = stubbed({ exit: 0 });
   assert.equal(run.status, 2);
   assert.equal(`${run.stdout}${run.stderr}`.includes(pasted), false);
-  assert.match(run.stderr, /line 3 .*must start with the commit.*rotate it first/is);
+  assert.match(run.stderr, /line 3 of .*must start with the commit.*rotate it first/is);
 });
 
 test('a shallow clone is scanned from its merge-base', (t) => {
@@ -136,8 +136,10 @@ test('started through a symlinked path it still scans instead of exiting quietly
   git('update-ref', '-d', 'refs/remotes/origin/main');
   const link = join(bin, 'scan-link.mjs');
   symlinkSync(SCRIPT, link);
-  const run = spawnSync(process.execPath, [link], { cwd: repo, encoding: 'utf8' });
-  assert.equal(run.status, 2, `${run.stdout}${run.stderr}`);
+  for (const flags of [[], ['--preserve-symlinks-main']]) {
+    const run = spawnSync(process.execPath, [...flags, link], { cwd: repo, encoding: 'utf8' });
+    assert.equal(run.status, 2, `${flags} ${run.stdout}${run.stderr}`);
+  }
 });
 
 test('a missing gitleaks is red and says how to install it', (t) => {
