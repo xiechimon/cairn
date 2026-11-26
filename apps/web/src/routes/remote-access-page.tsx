@@ -387,9 +387,13 @@ export function RemoteAccessPage() {
         requestsQ.data !== undefined &&
         requests.length === 0 && (
           <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
-            {t(
-              '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。',
-            )}
+            {tailnetOn
+              ? t(
+                  '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请用局域网或 Tailscale 地址打开本页。',
+                )
+              : t(
+                  '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。',
+                )}
           </p>
         )}
       {live && routesQ.data === undefined ? null : pairingBlocked && !awaitingTailnetLogin ? (
@@ -407,7 +411,9 @@ export function RemoteAccessPage() {
           description={
             awaitingTailnetLogin
               ? t('请先登录 Tailscale。')
-              : t('打开上方的开关，手机在外部网络也能连接这台电脑。')
+              : routesQ.data !== undefined && !tailnetOn
+                ? t('打开上方的开关，手机在外部网络也能连接这台电脑。')
+                : undefined
           }
         />
       ) : (

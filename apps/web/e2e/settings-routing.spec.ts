@@ -697,3 +697,13 @@ test('project override reset keeps row and shows toast when PATCH fails', async 
   await expect(resetBtn).toBeEnabled();
   await expect(overrides).toContainText('cairn');
 });
+
+test('remote access: the empty state does not point at a switch that is not on the page', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/remote?scenario=01');
+  const empty = page.getByTestId('remote-routes-empty');
+  await expect(empty).toBeVisible();
+  await expect(page.getByTestId('remote-access-switch')).toHaveCount(0);
+  await expect(empty).not.toContainText('开关');
+});

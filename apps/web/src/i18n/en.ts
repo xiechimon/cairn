@@ -2141,6 +2141,8 @@ export const EN: Record<string, string> = {
   局域网: 'Local network',
   '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。':
     'Pairing is off: this page is open on an address that only works on this computer, so a phone would connect to itself. Turn on remote access above, or open this page through its LAN or Tailscale address.',
+  '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请用局域网或 Tailscale 地址打开本页。':
+    'Pairing is off: this page is open on an address that only works on this computer, so a phone would connect to itself. Open this page through its LAN or Tailscale address.',
   当前页面地址: 'This page’s address',
   新设备请求配对: 'A new device is asking to pair',
   '先确认这个码和那台电脑屏幕上的一样，再批准。':

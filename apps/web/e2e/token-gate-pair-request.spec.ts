@@ -183,6 +183,49 @@ test('the pairing-off note explains the grant fallback only when no request wait
   }
 });
 
+test('the pairing-off note asks to turn remote access on only while the switch is off', async ({
+  browser,
+}) => {
+  const owner = await browser.newContext({
+    extraHTTPHeaders: { authorization: `Bearer ${GATE_TOKEN}` },
+  });
+  const page = await owner.newPage();
+  let enabled = false;
+  await page.route('**/api/remote/routes', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        environmentId: 'e2e-env',
+        routes: [],
+        tailnet: {
+          enabled,
+          state: enabled ? 'starting' : 'off',
+          dnsName: null,
+          ips: [],
+          authUrl: null,
+          error: null,
+        },
+      }),
+    }),
+  );
+  await page.route('**/api/remote/pairing-requests', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+  );
+  try {
+    await page.goto(`${server.base}/app/settings/remote`);
+    const note = page.getByTestId('pairing-blocked');
+    await expect(note).toContainText('请打开上面的远程访问开关');
+    enabled = true;
+    await page.reload();
+    await expect(page.getByTestId('remote-access-switch')).toBeChecked();
+    await expect(note).toContainText('请用局域网或 Tailscale 地址打开本页');
+    await expect(note).not.toContainText('开关');
+  } finally {
+    await owner.close();
+  }
+});
+
 test('remote access: awaiting tailnet login suppresses pairing-blocked notice, surfaces clipboard failure, and disambiguates duplicate LAN routes', async ({
   browser,
 }) => {
