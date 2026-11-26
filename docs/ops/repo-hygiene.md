@@ -27,9 +27,9 @@ Read the pinned issue "Repo hygiene report" in xiechimon/cairn and handle every
 judgement item it lists:
 
 - Pull requests marked "still wanted?": read each PR's diff, decide whether its
-  remaining change is still wanted. If a lane should land it, route it through
-  queue/main like any other work (rebase onto origin/main, preflight green,
-  push-queue). If it is dead, close it with a comment saying why. Do not merge
+  remaining change is still wanted. If a lane should land it, land it like any
+  other work (rebase onto origin/main, preflight green,
+  `node scripts/ops/push-queue.mjs`). If it is dead, close it with a comment saying why. Do not merge
   through the PR UI.
 - Branches holding unique commits: judge whether the work is already covered on
   main or is a lane's unlanded progress; either open the work as an issue/PR or

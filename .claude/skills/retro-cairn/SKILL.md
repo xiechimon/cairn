@@ -1,6 +1,6 @@
 ---
 name: retro-cairn
-description: Use when wrapping up a task or after fixing an error: list the mistakes that appeared and got fixed along the way (including ones a user corrected), attribute them, turn them into recurrence-preventing safeguards, and land each safeguard in the code it concerns.
+description: 'Use when wrapping up a task or after fixing an error: list the mistakes that appeared and got fixed along the way (including ones a user corrected), attribute them, turn them into recurrence-preventing safeguards, and land each safeguard in the code it concerns.'
 ---
 
 # retro-cairn: process error -> safeguard
