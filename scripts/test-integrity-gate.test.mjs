@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import {
@@ -104,4 +104,37 @@ test('a strong assertion replaced by visibility in the same file is red', (t) =>
   const result = evaluateTestIntegrityCommit(root, sha);
   assert.equal(result.ok, false);
   assert.equal(result.violations[0].kind, 'assertion-weakened-to-visibility');
+});
+
+test('the gate refuses to pass without a base and judges against origin/main when it has one', (t) => {
+  const { root, git, write, commit } = fixture(t);
+  const scripts = ['test-integrity-gate.mjs', 'regression-inversion-gate.mjs', 'diff-base.mjs'].map(
+    (name) => {
+      mkdirSync(join(root, 'scripts'), { recursive: true });
+      copyFileSync(join(import.meta.dirname, name), join(root, 'scripts', name));
+      return `scripts/${name}`;
+    },
+  );
+  commit(scripts, 'ops: add the gate');
+  const run = (extra = {}) => {
+    const env = { ...process.env, ...extra };
+    if (!('PREPUSH_BASE_SHA' in extra)) delete env.PREPUSH_BASE_SHA;
+    delete env.TEST_INTEGRITY_BASE_SHA;
+    return spawnSync(process.execPath, ['scripts/test-integrity-gate.mjs'], {
+      cwd: root,
+      env,
+      encoding: 'utf8',
+    });
+  };
+  for (const missing of [{}, { PREPUSH_BASE_SHA: '0'.repeat(40) }]) {
+    const result = run(missing);
+    assert.equal(result.status, 2, result.stdout);
+    assert.match(result.stderr, /no merge-base with origin\/main/);
+  }
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  assert.equal(run().status, 0);
+  write('apps/web/test/behavior.test.ts', "test('behavior', () => {\n  value();\n});\n");
+  commit(['apps/web/test/behavior.test.ts'], 'web: drop the assertion');
+  for (const missing of [{}, { PREPUSH_BASE_SHA: '0'.repeat(40) }])
+    assert.equal(run(missing).status, 1);
 });

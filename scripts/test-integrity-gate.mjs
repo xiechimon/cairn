@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { mergeBase } from './diff-base.mjs';
 import { changedFilesForCommit, commitsInRange } from './regression-inversion-gate.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -110,6 +111,13 @@ export function evaluateTestIntegrityRange({ cwd, base, head = 'HEAD' }) {
   return commitsInRange(cwd, base, head).map((commit) => evaluateTestIntegrityCommit(cwd, commit));
 }
 
+function integrityBase(cwd, configured) {
+  if (configured && !/^0{40}$/.test(configured)) return configured;
+  const fallback = mergeBase(cwd, 'origin/main');
+  if (!fallback) throw new Error('no merge-base with origin/main; fetch it or pass --base <sha>');
+  return fallback;
+}
+
 function parseArgs(argv) {
   const opts = { commit: null, base: null, head: 'HEAD' };
   for (let index = 0; index < argv.length; index += 1) {
@@ -145,13 +153,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     if (opts.commit) {
       results = [evaluateTestIntegrityCommit(cwd, opts.commit)];
     } else {
-      const base = opts.base ?? process.env.TEST_INTEGRITY_BASE_SHA ?? process.env.PREPUSH_BASE_SHA;
-      if (!base || /^0{40}$/.test(base)) {
-        console.log('[test-integrity] PASS: no merge-base for this checkout');
-        results = [];
-      } else {
-        results = evaluateTestIntegrityRange({ cwd, base, head: opts.head });
-      }
+      const base = integrityBase(
+        cwd,
+        opts.base ?? process.env.TEST_INTEGRITY_BASE_SHA ?? process.env.PREPUSH_BASE_SHA,
+      );
+      results = evaluateTestIntegrityRange({ cwd, base, head: opts.head });
     }
     for (const result of results) report(result);
     if (results.length === 0) console.log('[test-integrity] PASS: no commits in range');

@@ -127,3 +127,4 @@ One row per item, in landing order: checks that add no CI time first, by value; 
 - Row 5 blocks both empty-catch forms, detected on the syntax tree, with the shrinking baseline.
 - Row 9 commits the 300-line and 5-file limits; they only go down, and the check only warns.
 - Waiting on the owner: the different-model half of row 10, and row 3b. The rest of row 10 is released.
+- Row 1a lands in two slices (2026-11-27): first the test-integrity gate stops passing without a base; then the pre-flight checks, with the check list and each run condition read from the CI workflow so that it cannot drift, and a step that cannot be classified failing the coverage test.
