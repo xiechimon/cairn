@@ -93,14 +93,18 @@ const QUERY = 'protocol=https\nhost=github.com\n\n';
 const gitPassword = (env: Env) => tool(env, 'git', ['credential', 'fill'], QUERY);
 const ghToken = (env: Env) => tool(env, 'gh', ['auth', 'token', '--hostname', 'github.com']);
 
-const LOGIN_SHELLS = [
-  '/bin/sh',
-  '/bin/bash',
-  '/bin/zsh',
-  '/opt/homebrew/bin/fish',
-  '/usr/local/bin/fish',
-  '/usr/bin/fish',
-].filter((shell) => existsSync(shell));
+const SHELL_LOCATIONS = {
+  sh: ['/bin/sh'],
+  bash: ['/bin/bash'],
+  zsh: ['/bin/zsh'],
+  fish: ['/opt/homebrew/bin/fish', '/usr/local/bin/fish', '/usr/bin/fish'],
+};
+const LOGIN_SHELLS = ['sh', 'bash', 'zsh', 'fish'] as const;
+function installedShell(name: (typeof LOGIN_SHELLS)[number]): string {
+  const found = SHELL_LOCATIONS[name].find((path) => existsSync(path));
+  if (found === undefined) throw new Error(`${name} is not installed; this test needs it`);
+  return found;
+}
 const loginShellPassword = (env: Env, shell: string) =>
   tool(env, shell, ['-lc', 'git credential fill'], QUERY);
 
@@ -132,7 +136,9 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
       expect(gitPassword(env)).toContain('password=host-secret');
       expect(ghToken(env)).toBe('fake-host-token');
       for (const shell of LOGIN_SHELLS) {
-        expect(loginShellPassword(env, shell), shell).toContain('password=host-secret');
+        expect(loginShellPassword(env, installedShell(shell)), shell).toContain(
+          'password=host-secret',
+        );
       }
       for (const path of ['.gitconfig', '.netrc', '.git-credentials', '.config/git', 'Library']) {
         expect(() => lstatSync(join(env.HOME ?? '', path))).toThrow();
@@ -208,7 +214,9 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
           expect(gitPassword(env)).not.toContain('host-secret');
           expect(ghToken(env)).not.toBe('fake-host-token');
           for (const shell of LOGIN_SHELLS) {
-            expect(loginShellPassword(env, shell), shell).not.toContain('host-secret');
+            expect(loginShellPassword(env, installedShell(shell)), shell).not.toContain(
+              'host-secret',
+            );
           }
           expect(env.COREPACK_ENABLE_DOWNLOAD_PROMPT).toBe('0');
         });
@@ -229,7 +237,9 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
         (env) => {
           expect(ghToken(env)).toBe('fake-host-token');
           for (const shell of LOGIN_SHELLS) {
-            expect(loginShellPassword(env, shell), shell).toContain('password=host-secret');
+            expect(loginShellPassword(env, installedShell(shell)), shell).toContain(
+              'password=host-secret',
+            );
           }
         },
         { XDG_CONFIG_HOME: join(host.home, '.config'), ZDOTDIR: zdotdir },
@@ -247,7 +257,7 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
       { runtimeId: 'antigravity' },
       (env) => {
         writeFileSync(join(env.HOME as string, '.zshenv'), 'export CAIRN_FROM_ZSHENV=step\n');
-        const alias = "alias.zshenv=!/bin/zsh -c 'echo $CAIRN_FROM_ZSHENV'";
+        const alias = `alias.zshenv=!${installedShell('zsh')} -c 'echo $CAIRN_FROM_ZSHENV'`;
         expect(tool(env, 'git', ['-c', alias, 'zshenv'])).toBe('host-zshenv');
       },
       { ZDOTDIR: zdotdir },
@@ -309,10 +319,6 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
     expect(readFileSync(token, 'utf8')).toBe('{"mine":true}');
     expect(readFileSync(join(host.home, '.profile'), 'utf8')).toBe('export MINE=1\n');
     expect(readFileSync(join(host.home, '.bash_profile'), 'utf8')).toBe('export MINE=2\n');
-  });
-
-  test.runIf(process.env.CI === 'true')('CI has fish, so the fish login path is covered', () => {
-    expect(LOGIN_SHELLS.some((shell) => shell.endsWith('/fish'))).toBe(true);
   });
 
   test('what an earlier step left in the home cannot block or redirect the next one', async () => {

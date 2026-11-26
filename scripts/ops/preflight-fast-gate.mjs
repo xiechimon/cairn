@@ -56,7 +56,7 @@ const SKIPPED_INLINE = new Set([
   'Aggregate check parts',
   'Aggregate the e2e tier',
   'Conflict markers',
-  'Install fish for the login shell tests',
+  'Install fish and zsh for the login shell tests',
   'Verify module files are tidy',
   'Format',
   'Test',

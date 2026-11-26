@@ -272,8 +272,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install fish for the login shell tests
-        run: command -v fish >/dev/null || { bash scripts/ci-retry.sh sudo apt-get update -q && bash scripts/ci-retry.sh sudo apt-get install -y -q --no-install-recommends fish; }
+      - name: Install fish and zsh for the login shell tests
+        run: command -v fish zsh >/dev/null || { bash scripts/ci-retry.sh sudo apt-get update -q && bash scripts/ci-retry.sh sudo apt-get install -y -q --no-install-recommends fish zsh; }
 
       - name: Test (vitest, light project)
         run: VITEST_PROJECT_SET=light node scripts/test-temp-run.mjs -- pnpm test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
