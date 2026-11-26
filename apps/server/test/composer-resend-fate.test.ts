@@ -518,3 +518,25 @@ test('a steer to a later run under the id of a removed message is refused', asyn
   expect(await steer.json()).toMatchObject({ reason: 'queued-message-cancelled' });
   expect(copies(w)).toEqual([]);
 });
+
+test.each(['reply', 'queue'] as const)(
+  'send now pressed while a resend through the %s route is in flight does not report a failure',
+  async (route) => {
+    const { w, rowId, reachesThePrCheck } = await strandedBehindASlowPrCheck();
+    const resend = routes[route](w);
+    await reachesThePrCheck();
+    const sendNow = w.send({ content: TEXT, queuedMessageId: rowId });
+    const answers = await Promise.all([resend, sendNow]);
+    expect(answers.map((res) => res.status)).toEqual([201, 201]);
+    expect(copies(w)).toHaveLength(1);
+  },
+);
+
+test('send now on a queued message removed while it waits is still refused', async () => {
+  const { w, rowId, reachesThePrCheck } = await strandedBehindASlowPrCheck();
+  const sendNow = w.send({ content: TEXT, queuedMessageId: rowId });
+  await reachesThePrCheck();
+  await w.send({ content: TEXT, queuedMessageId: rowId, cancelQueued: true });
+  expect((await sendNow).status).toBe(409);
+  expect(copies(w)).toEqual([]);
+});

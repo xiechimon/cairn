@@ -188,6 +188,29 @@ export interface Replacement {
   commit: () => void;
 }
 
+const replacedByResend = new WeakMap<Db, Set<string>>();
+
+function noteReplaced(db: Db, messageId: string): void {
+  const noted = replacedByResend.get(db) ?? new Set<string>();
+  replacedByResend.set(db, noted.add(messageId));
+}
+
+export function sentByResend(db: Db, todoId: string, messageId: string): boolean {
+  if (!replacedByResend.get(db)?.has(messageId)) return false;
+  if (db.select().from(queuedMessage).where(eq(queuedMessage.id, messageId)).get()) return false;
+  return !db
+    .select({ response: clientMessage.response })
+    .from(clientMessage)
+    .where(inArray(clientMessage.scopeId, buildsOf(db, todoId)))
+    .all()
+    .some(
+      (entry) =>
+        isQueuedReceipt(entry.response) &&
+        entry.response.message.id === messageId &&
+        entry.response.cancelled === true,
+    );
+}
+
 export async function replacingStrandedSend<T>(
   db: Db,
   task: TodoRow,
@@ -205,7 +228,10 @@ export async function replacingStrandedSend<T>(
     const row = db.select().from(queuedMessage).where(queuedRow).get();
     if (receipt?.message.id !== found.messageId || row === undefined)
       throw new HttpError(409, 'Queued message was already delivered');
-    if (row.content === content) db.delete(queuedMessage).where(queuedRow).run();
+    if (row.content === content) {
+      db.delete(queuedMessage).where(queuedRow).run();
+      noteReplaced(db, row.id);
+    }
     db.delete(clientMessage)
       .where(
         and(

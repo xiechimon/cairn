@@ -22,6 +22,7 @@ import {
   queuedSendUnderKey,
   type Replacement,
   replacingStrandedSend,
+  sentByResend,
 } from './queued-send.js';
 import { threadSendUnderKey } from './thread-message.js';
 
@@ -177,6 +178,8 @@ export async function deliverQueuedMessage(
         true,
       );
     } catch (error) {
+      const todoId = deps.db.select().from(build).where(eq(build.id, conversationId)).get()?.todoId;
+      if (todoId !== undefined && sentByResend(deps.db, todoId, row.id)) return { conversationId };
       if (error instanceof HttpError)
         deps.db
           .update(queuedMessage)
