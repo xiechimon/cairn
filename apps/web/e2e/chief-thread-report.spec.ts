@@ -509,7 +509,9 @@ test('an archived task keeps its word in its task row', async ({ page }) => {
   });
   await page.goto('/app');
   const started = page.getByTestId('home-c').getByTestId('chief-task-started');
-  await expect(started.locator('a[data-slot="task-mention"]')).toHaveText('Create HELLO.md');
+  const ref = started.getByTestId('chief-task-ref');
+  await expect(ref).toHaveText(/^Create HELLO\.md/);
+  await expect(ref).toHaveAttribute('data-phase', 'done');
   await expect(started).not.toContainText('已建任务');
   await expect(page.getByTestId('chief-task-created')).toHaveCount(0);
 });
