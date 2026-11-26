@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { AppSidebar } from '../board/app-sidebar.js';
+import { RemoteUpdateBar } from '../board/remote-update-bar.js';
 import type { SidebarSelected } from '../board/sidebar.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import type { FixtureSet } from '../fixtures/records.js';
@@ -78,8 +79,10 @@ export function PageShell({
       data-route={route}
     >
       {!embedded && <AppSidebar fixture={fixture} selected={selected} />}
-      <div className={embedded ? 'relative flex min-w-0 flex-1' : `page-main ${SHEET_PANEL}`}>
-        <div className="page-main-col flex min-w-0 flex-1 flex-col">
+      <div
+        className={embedded ? 'relative flex min-w-0 flex-1' : `page-main flex-col ${SHEET_PANEL}`}
+      >
+        <div className="page-main-col flex min-h-0 min-w-0 flex-1 flex-col">
           {embedded ? (
             shell.toolbarSlot !== null &&
             createPortal(
@@ -114,6 +117,7 @@ export function PageShell({
             )}
           </div>
         </div>
+        {!embedded && <RemoteUpdateBar />}
       </div>
     </div>
   );

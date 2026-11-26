@@ -94,7 +94,10 @@ function startRemoteUpdateFallback(): void {
     bar = null;
   };
   const render = (state: RemoteVersionState): void => {
-    if (document.querySelector('[data-testid="remote-update-bar"]') !== null) {
+    if (
+      document.documentElement.dataset.cairnRemoteBar === 'mounted' ||
+      document.querySelector('[data-testid="remote-update-bar"]') !== null
+    ) {
       remove();
       return;
     }
@@ -103,12 +106,15 @@ function startRemoteUpdateFallback(): void {
       remove();
       return;
     }
+    const sidebarRight =
+      document
+        .querySelector('.board-shell > .board-sidebar, .page-shell > .board-sidebar')
+        ?.getBoundingClientRect().right ?? 0;
     if (bar === null) {
       bar = document.createElement('div');
       bar.dataset.cairnRemoteFallback = 'true';
       bar.setAttribute('role', 'status');
       bar.style.position = 'fixed';
-      bar.style.left = '0';
       bar.style.right = '0';
       bar.style.bottom = '0';
       bar.style.zIndex = '2147483000';
@@ -120,6 +126,7 @@ function startRemoteUpdateFallback(): void {
       bar.style.borderTop = '1px solid rgb(0 0 0 / 0.1)';
       document.body.append(bar);
     }
+    bar.style.left = `${sidebarRight}px`;
     bar.style.background = copy.quiet ? '#ecebe6' : '#f9e8e3';
     bar.textContent = copy.message;
     if (copy.action !== null) {

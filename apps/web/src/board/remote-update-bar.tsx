@@ -1,6 +1,6 @@
 import type { RemoteVersionState } from '@cairn/shared';
 import { cn } from 'cn';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { desktopUpdates } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
@@ -98,15 +98,20 @@ export function RemoteUpdateBar() {
   const { t } = useI18n();
   const [bridge] = useState(desktopUpdates);
   const [state, setState] = useState<RemoteVersionState | null>(null);
+  const barRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.cairnRemoteBar = 'mounted';
     document.querySelector('[data-cairn-remote-fallback]')?.remove();
     if (
       bridge === null ||
       typeof bridge.remoteState !== 'function' ||
       typeof bridge.subscribeRemote !== 'function'
     ) {
-      return;
+      return () => {
+        delete root.dataset.cairnRemoteBar;
+      };
     }
     let active = true;
     void bridge.remoteState().then((initial) => {
@@ -116,34 +121,65 @@ export function RemoteUpdateBar() {
     return () => {
       active = false;
       unsubscribe();
+      delete root.dataset.cairnRemoteBar;
     };
   }, [bridge]);
 
-  if (bridge === null || state === null) return null;
-  const presentation = remoteUpdatePresentation(state, t);
+  const presentation =
+    bridge === null || state === null ? null : remoteUpdatePresentation(state, t);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const node = barRef.current;
+    if (presentation === null || node === null) {
+      root.style.removeProperty('--remote-update-bar-h');
+      return;
+    }
+    document.querySelector('[data-cairn-remote-fallback]')?.remove();
+    const syncHeight = () => {
+      root.style.setProperty(
+        '--remote-update-bar-h',
+        `${Math.ceil(node.getBoundingClientRect().height)}px`,
+      );
+    };
+    syncHeight();
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        root.style.removeProperty('--remote-update-bar-h');
+      };
+    }
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--remote-update-bar-h');
+    };
+  }, [presentation]);
+
   if (presentation === null) return null;
 
   return (
     <div
+      ref={barRef}
       data-testid="remote-update-bar"
       data-tone={presentation.tone}
       role="status"
       className={cn(
-        'fixed inset-x-0 bottom-0 z-40 flex justify-center border-t border-border px-4 py-2 text-meta',
+        'flex flex-none justify-center border-t border-border px-4 py-2 text-meta',
         presentation.tone === 'error'
           ? 'bg-(--tint-fail-soft) text-tint-fail-ink'
           : 'bg-popover text-content-secondary',
       )}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <span className="truncate tabular-nums">{presentation.message}</span>
+        <span className="min-w-0 tabular-nums sm:truncate">{presentation.message}</span>
         {presentation.actionLabel !== null && (
           <Button
             size="sm"
             variant="outline"
             className="h-7 flex-none px-2 text-caption pointer-coarse:h-11 pointer-coarse:px-4"
             data-testid="remote-update-action"
-            onClick={() => void bridge.retryRemote?.()}
+            onClick={() => void bridge?.retryRemote?.()}
           >
             {presentation.actionLabel}
           </Button>

@@ -37,6 +37,7 @@ import { NotificationBanner, useNotificationBanner } from '../board/notify-banne
 import { ProjectNotFound, ProjectsFailed, ProjectsLoading } from '../board/project-not-found.js';
 import { type SuggestableProject, suggestProjects } from '../board/project-suggestions.js';
 import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
+import { RemoteUpdateBar } from '../board/remote-update-bar.js';
 import { SideChat } from '../board/side-chat.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import { useCloseThread } from '../board/thread-link.js';
@@ -265,10 +266,24 @@ export function BoardPage() {
       failed: setup.failed,
     })
   ) {
-    return <FirstRunFrame />;
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="min-h-0 flex-1">
+          <FirstRunFrame />
+        </div>
+        <RemoteUpdateBar />
+      </div>
+    );
   }
   if (showSetup) {
-    return <FirstRunSetup setup={setup} />;
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="min-h-0 flex-1">
+          <FirstRunSetup setup={setup} />
+        </div>
+        <RemoteUpdateBar />
+      </div>
+    );
   }
   return (
     <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
@@ -280,60 +295,63 @@ export function BoardPage() {
         onSearch={() => search.setOpen(true)}
         menuTrigger={!homeShown}
       />
-      <div className={`board-sheet ${SHEET_PANEL}`}>
+      <div className={`board-sheet flex-col ${SHEET_PANEL}`}>
         <div className="relative flex min-h-0 min-w-0 flex-1">
-          {projectLookup === 'loading' ? (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <ProjectsLoading />
-            </div>
-          ) : projectLookup === 'failed' ? (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <ProjectsFailed
-                retrying={teamsQ.isFetching || projectsQ.isFetching}
-                onRetry={() => {
-                  if (teamId === undefined) {
-                    void teamsQ.refetch();
-                    return;
-                  }
-                  void projectsQ.refetch();
-                }}
+          <div className="relative flex min-h-0 min-w-0 flex-1">
+            {projectLookup === 'loading' ? (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <ProjectsLoading />
+              </div>
+            ) : projectLookup === 'failed' ? (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <ProjectsFailed
+                  retrying={teamsQ.isFetching || projectsQ.isFetching}
+                  onRetry={() => {
+                    if (teamId === undefined) {
+                      void teamsQ.refetch();
+                      return;
+                    }
+                    void projectsQ.refetch();
+                  }}
+                />
+              </div>
+            ) : projectLookup === 'unknown' && homeProjectId !== null ? (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <ProjectNotFound
+                  unknownId={homeProjectId}
+                  suggestions={suggestProjects(homeProjectId, knownProjects)}
+                  projectHref={(id) => {
+                    const params = new URLSearchParams(searchParams);
+                    params.set('project', id);
+                    params.set('chat', '1');
+                    params.delete(THREAD_PARAM);
+                    return `/app?${params.toString()}`;
+                  }}
+                />
+              </div>
+            ) : (
+              <HomeC
+                surface={chief}
+                todos={todos}
+                now={now}
+                projectId={homeProjectName === null ? null : homeProjectId}
+                projectName={homeProjectName}
+                banner={homeBanner}
+                machines={machines}
+                coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
+                machinesQuery={live ? machinesQ : undefined}
+                todosQuery={live ? todosQ : undefined}
+                tasks={tasks}
+                tasksQuery={live ? tasksQ : undefined}
+                archived={archivedState}
+                fixtureProjects={live ? undefined : fixtureActive}
+                {...(dockThread ? { thread: sideChat(true) } : {})}
               />
-            </div>
-          ) : projectLookup === 'unknown' && homeProjectId !== null ? (
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <ProjectNotFound
-                unknownId={homeProjectId}
-                suggestions={suggestProjects(homeProjectId, knownProjects)}
-                projectHref={(id) => {
-                  const params = new URLSearchParams(searchParams);
-                  params.set('project', id);
-                  params.set('chat', '1');
-                  params.delete(THREAD_PARAM);
-                  return `/app?${params.toString()}`;
-                }}
-              />
-            </div>
-          ) : (
-            <HomeC
-              surface={chief}
-              todos={todos}
-              now={now}
-              projectId={homeProjectName === null ? null : homeProjectId}
-              projectName={homeProjectName}
-              banner={homeBanner}
-              machines={machines}
-              coordinatorMachineId={live ? (chiefQ.data?.agentActor?.machineId ?? null) : null}
-              machinesQuery={live ? machinesQ : undefined}
-              todosQuery={live ? todosQ : undefined}
-              tasks={tasks}
-              tasksQuery={live ? tasksQ : undefined}
-              archived={archivedState}
-              fixtureProjects={live ? undefined : fixtureActive}
-              {...(dockThread ? { thread: sideChat(true) } : {})}
-            />
-          )}
+            )}
+          </div>
+          {threadId !== null && !artifactOpen && !dockThread && sideChat(false)}
         </div>
-        {threadId !== null && !artifactOpen && !dockThread && sideChat(false)}
+        <RemoteUpdateBar />
       </div>
       <SearchPanel
         open={search.open}

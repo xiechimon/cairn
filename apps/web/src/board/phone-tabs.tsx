@@ -74,7 +74,7 @@ export function PhoneTabs({
   return (
     <div
       data-slot="phone-bar"
-      className="pointer-events-none fixed inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-(--z-narrow-chrome) flex items-center justify-center gap-3 px-3"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+var(--remote-update-bar-h))] z-(--z-narrow-chrome) flex items-center justify-center gap-3 px-3"
     >
       <nav
         data-slot="phone-tabs"

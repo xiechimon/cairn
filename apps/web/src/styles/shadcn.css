@@ -163,6 +163,7 @@
   --chat-max-w: 768px;
   --composer-max-h: 384px;
   --composer-bottom-gap: 16px;
+  --remote-update-bar-h: 0px;
   --scroll-fade-size: 28px;
   --chat-end-space: 24px;
   --type-scale: calc(var(--rem-scale) * 17 / 16);
