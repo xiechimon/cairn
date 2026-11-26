@@ -20,7 +20,7 @@ The change that retires a mechanism, path or rule updates or deletes every livin
 | `feature-map.md` | Feature coverage: every user-facing feature with its research, frontend design and backend design, the gaps grouped into batches, and eval coverage. Generated from `.claude/skills/verify-cairn/feature-map.json` by `scripts/generate-feature-map.mjs`; do not hand-edit |
 | `ops/feature-map-maintain.md` | How the feature registry and the verify-cairn `features/` recipes stay current: the CI check, the daily Actions loop and the live maintain routine |
 | `lessons/` | Frozen archive of past mistake notes. Do not add files; the `retro-cairn` skill records a safeguard in the code it concerns |
-| `agent-dispatch-prompts.md` | Agent dispatch prompt templates (task, scope, and acceptance commands are appended after the matching template), shared by Codex / Grok / pi, all following AGENTS.md |
+| `agent-dispatch-prompts.md` | Rules for dispatched agents, whichever tool runs them: background processes, ticket dispatch, GitHub access, evidence limits, design rule rows and the worker prompt |
 | `ops/langfuse.md` | Self-hosted Langfuse v4 on this machine (compose lives in `ops/langfuse/`, not in the product install path) |
 
 ## Records and per-ticket artifacts

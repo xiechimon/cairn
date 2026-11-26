@@ -350,7 +350,7 @@ test('server changes run the live-server specs; files outside both apps run none
     'token-gate.spec.ts',
   ]);
   assert.deepEqual(
-    select(['docs/ops/lane-workers.md', 'scripts/e2e-shard-weights.json']).selection,
+    select(['docs/ops/langfuse.md', 'scripts/e2e-shard-weights.json']).selection,
     [],
   );
 });

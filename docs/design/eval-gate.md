@@ -54,7 +54,7 @@ The `changes` job in `ci.yml` gains an `eval-needed` output that greps the merge
 | Tool definitions and tool-call repair | `packages/shared/src/protocol/chief-tools.ts`, `apps/server/src/services/{schedules,schedule-run,thread-schedule-tools}.ts` |
 | Model routing and dispatch policy | `apps/server/src/services/{routing-rules,routing-migration,routing-rule-issues,step-route,machine-routing,model-routing,dispatch-eligibility,dispatch-timeouts}.ts` |
 | Memory and skill injection | `apps/server/src/services/{memory*,team-memory}.ts`, `packages/shared/src/skill-{facts,inject,injection-check,route}.ts` |
-| Dispatch prompts and lane policy | `docs/agent-dispatch-prompts.md`, `docs/ops/lane-workers.md`, `scripts/{dispatch-agent,lane-model-policy}.js` |
+| Dispatch prompts | `docs/agent-dispatch-prompts.md`, `scripts/dispatch-agent.mjs` |
 | The exam itself | `eval/**`, `.github/workflows/ci.yml`, `.github/workflows/eval-weekly.yml` |
 
 `apps/daemon/src/backend/**` stays out of scope for v1 — the suite replays Coordinator turns and dispatches the Devin CLI directly; executor internals gate on evidence the suite cannot produce (Derived, honest boundary).

@@ -59,5 +59,4 @@ Where to look:
 - Every user-facing feature has a row in `.claude/skills/verify-cairn/feature-map.json`; run `node scripts/generate-feature-map.mjs` after changing routes, test ids or shortcuts. Acceptance and evidence: `.claude/skills/verify-cairn/SKILL.md`.
 - Test scope: `docs/spec/19-test-layering-and-blast-radius.md`; use real e2e for complex features.
 - Model-side latency, failures and usage: Langfuse first, `docs/ops/langfuse.md#debugging-a-turn-or-task`.
-- Model roles and banned models for dispatched lanes: `docs/ops/lane-workers.md`.
 - Long-running servers and loops: `node scripts/owned-process.mjs -- <command>`, never `nohup`, `setsid`, `disown` or a trailing `&`.

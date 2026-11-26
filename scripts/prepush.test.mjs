@@ -448,7 +448,7 @@ for (const [name, paths, expected] of [
     ['docs/ops/agent-bot-identity.md'],
     true,
   ],
-  ['AGENTS.md, which lane-model-policy reads', ['AGENTS.md'], true],
+  ['AGENTS.md, which agent-rules reads', ['AGENTS.md'], true],
   ['root docs', ['README.md', 'CLAUDE.md'], true],
   ['skill docs the probe reach gate reads', ['.claude/skills/verify-cairn/features/a.md'], true],
   ['an executable check under docs', ['docs/verify/1542/reach.test.mjs'], true],
@@ -808,7 +808,7 @@ test('every node --test step in any workflow runs locally when its tests, source
     );
   assert.equal(steps.length, written.length, 'every node --test step is parsed');
   assert.ok(steps.some(({ workflow }) => workflow === '.github/workflows/ci.yml'));
-  assert.ok(steps.some(({ tests }) => tests.includes('scripts/lane-model-policy.test.mjs')));
+  assert.ok(steps.some(({ tests }) => tests.includes('scripts/dispatch-dedupe.test.mjs')));
   assert.ok(steps.some(({ tests }) => tests.some((test) => test in ciOnlyTestSteps)));
   for (const { workflow, tests } of steps) {
     const step = ['node', '--test', ...tests].join(' ');

@@ -72,7 +72,7 @@ jobs:
             if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/|apps/daemon/|integration/|packages/shared/|scripts/|\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'; then
               needs_integration=false
             fi
-            if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/src/coordinator/|apps/server/src/services/(chief|coordinator-|project-instructions|memory|team-memory|routing-|step-route|machine-routing|model-routing|dispatch-|schedules|schedule-run|thread-schedule)|packages/shared/src/(protocol/chief-tools|skill-)|eval/|\.github/workflows/(ci|eval-weekly)\.yml$|docs/agent-dispatch-prompts\.md|docs/ops/lane-workers\.md|scripts/(dispatch-agent|lane-model-policy)\.m?js)'; then
+            if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/src/coordinator/|apps/server/src/services/(chief|coordinator-|project-instructions|memory|team-memory|routing-|step-route|machine-routing|model-routing|dispatch-|schedules|schedule-run|thread-schedule)|packages/shared/src/(protocol/chief-tools|skill-)|eval/|\.github/workflows/(ci|eval-weekly)\.yml$|docs/agent-dispatch-prompts\.md|scripts/dispatch-agent\.m?js)'; then
               eval_needed=false
             fi
             has_code=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --has-code) || has_code=true
@@ -590,7 +590,7 @@ jobs:
 
       - name: Dispatch agent start/check round trip (#1556)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-dispatch -- node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs scripts/lane-model-policy.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-dispatch -- node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs
 
       - name: Workflow concurrency, scalars and queue promotion
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
