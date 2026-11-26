@@ -2,7 +2,7 @@
 
 > Kept sections only. The header of the full volume said it was superseded in part (ADR 0012 / #980) and that §1.1 and §3 stay in effect. ADR 0012 is not in this tree, so those two sections are kept here as the contract an agent can read. The rest of the volume (the #912-era measurement tables, the geometry canon, the prototype callback list and the §5 retirement ledger) described work that has landed and is deleted; it stays in git history.
 
-<!-- ruling:tokens.canonical -->UI code consumes tokens, not literals; the token table is the frontmatter of `apps/web/DESIGN.md`, and the CSS variables behind it are defined in `apps/web/src/styles/shadcn.css`.<!-- /ruling -->
+<!-- ruling:tokens.canonical -->UI code consumes tokens, not literals; the token table is the frontmatter of `apps/web/DESIGN.md`, and for its entries `apps/web/src/styles/shadcn.css` holds the colour variables, the radius variables, the sidebar and dialog width variables, the `--type-*` size variables and the sans, display and mono families, `apps/web/src/styles/fonts.css` holds the faces behind the serif and reply families, `apps/web/src/styles/app.css` holds the type utility names and line-height variables, and the full radius, the other spacing entries and the response and reply sizes have no `--type-*` variable of their own.<!-- /ruling -->
 
 ## 1.1 Slots unchanged, only values flip
 

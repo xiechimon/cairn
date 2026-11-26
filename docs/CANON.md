@@ -25,7 +25,7 @@ One line per standing ruling; the spec volume stays the full record. To add one,
 - **test.scope** (2026-10-08, volume) — Test layering and blast-radius rules live here; use real e2e for complex features, fixture surfaces for regression.
 ## docs/spec/22-color-and-geometry-token-scale-canonical-table.md
 
-- **tokens.canonical** (2026-10-08, volume) — UI code consumes tokens, not literals; the token table is the frontmatter of `apps/web/DESIGN.md`, and the CSS variables behind it are defined in `apps/web/src/styles/shadcn.css`.
+- **tokens.canonical** (2026-10-08, volume) — UI code consumes tokens, not literals; the token table is the frontmatter of `apps/web/DESIGN.md`, and for its entries `apps/web/src/styles/shadcn.css` holds the colour variables, the radius variables, the sidebar and dialog width variables, the `--type-*` size variables and the sans, display and mono families, `apps/web/src/styles/fonts.css` holds the faces behind the serif and reply families, `apps/web/src/styles/app.css` holds the type utility names and line-height variables, and the full radius, the other spacing entries and the response and reply sizes have no `--type-*` variable of their own.
 ## docs/spec/29-evaluation-and-data-loop.md
 
 - **eval.data-loop** (2026-10-08, volume) — The eval suite's task set, scorers and run configuration (`eval/**`) are protected paths; no change may edit what judges it.
