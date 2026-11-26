@@ -25,14 +25,18 @@ import {
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
-import { queueCoordinatorInput, STEER_WITHDRAW_HOLD } from './coordinator-inputs.js';
+import {
+  queueCoordinatorInput,
+  STEER_WITHDRAW_HOLD,
+  traceDeliveredSteer,
+} from './coordinator-inputs.js';
 import { signalCoordinator } from './coordinator-signal.js';
 import { claimIsDead, isClaimedStepDead } from './dispatch-timeouts.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { settleMemoryEditTurn } from './memory-edit-turns.js';
 import { stepScopeProjectId } from './picked-project.js';
-import { projectTurnContext } from './project-instructions.js';
+import { projectTurnContextTraced } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
 import { coordinatorMemoryOwner } from './routing-rules.js';
 import { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
@@ -277,6 +281,21 @@ export async function withdrawChiefMessage(
   return { ok: true };
 }
 
+function stageSteeredMemory(db: Db, waitingId: string, memoryIds: readonly string[]): void {
+  db.update(step)
+    .set({
+      memoryTrace: {
+        teamMemoryIds: [],
+        teamMemoriesOmitted: 0,
+        projectMemoryIds: [...memoryIds],
+        projectMemoriesOmitted: 0,
+        recalledMemoryIds: [],
+      },
+    })
+    .where(eq(step.id, waitingId))
+    .run();
+}
+
 function steerContent(
   db: Db,
   thread: typeof chiefThread.$inferSelect,
@@ -287,16 +306,17 @@ function steerContent(
   const scope = stepScopeProjectId(waiting);
   const projectSection =
     scope !== null && scope !== stepScopeProjectId(running)
-      ? projectTurnContext(db, {
+      ? projectTurnContextTraced(db, {
           teamId: thread.teamId,
           agentId: coordinatorMemoryOwner(db, thread.teamId) ?? null,
           projectId: scope,
           threadId: thread.id,
         })
       : null;
+  if (projectSection !== null) stageSteeredMemory(db, waiting.id, projectSection.memoryIds);
   return [
     waiting.prompt ?? (typeof message?.content === 'string' ? message.content : ''),
-    projectSection,
+    projectSection?.text,
   ]
     .filter((part) => part)
     .join('\n\n');
@@ -526,6 +546,7 @@ export function ackChiefSteer(
   );
   const now = nowMs();
   for (const row of sent) {
+    traceDeliveredSteer(deps.db, running.id, row);
     deps.db.delete(step).where(eq(step.id, row.id)).run();
     deps.db.update(chiefMessage).set({ createdAt: now }).where(eq(chiefMessage.id, row.id)).run();
     const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, row.id)).get();
@@ -564,7 +585,7 @@ export function releaseUnconsumedSteer(db: Db, finished: StepRow): void {
       .set({ delivery: 'steer_missed' })
       .where(inArray(chiefMessage.id, owners))
       .run();
-  db.update(step).set({ holdReason: null }).where(unread).run();
+  db.update(step).set({ holdReason: null, memoryTrace: null }).where(unread).run();
 }
 
 export function endDeadChiefTurn(

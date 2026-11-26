@@ -10,12 +10,13 @@ import {
   projectRenamedNote,
   type SecretBox,
 } from '@cairn/shared';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build,
   chief,
   chiefThread,
+  memoryCorrection,
   message,
   project,
   schedule,
@@ -349,6 +350,9 @@ export function deleteProject(
       tx.delete(step).where(inArray(step.buildId, buildIds)).run();
       tx.delete(message).where(inArray(message.conversationId, buildIds)).run();
     }
+    tx.delete(memoryCorrection)
+      .where(or(eq(memoryCorrection.projectId, id), inArray(memoryCorrection.buildId, buildIds)))
+      .run();
     retireTodoDeliverables(deps.db, todoIds);
     tx.delete(schedule).where(eq(schedule.projectId, id)).run();
     tx.delete(secret).where(eq(secret.projectId, id)).run();

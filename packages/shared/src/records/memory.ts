@@ -19,6 +19,27 @@ export const MEMORY_WRITE_CRITERION =
 export const MEMORY_VERIFY_NOTE =
   'Memory may be out of date: check what it says is in a repository against the repository before relying on it. For what a repository contains, the repository wins; preferences and decisions the user set still apply even where its files say otherwise.';
 
+export const MEMORY_CORRECTION_WORDS_MAX_CHARS = 1_000;
+
+export const memoryCorrectionRecordSchema = z.object({
+  id: recordId,
+  projectId: recordId.nullable(),
+  pointedFile: z.string().nullable(),
+  pointedRule: z.string().nullable(),
+  inTurnIndex: z.boolean().nullable(),
+  buildId: z.string(),
+  stepId: z.string(),
+  ownerMessageId: z.string(),
+  ownerWords: z.string(),
+  createdAt: epochMs,
+});
+export type MemoryCorrectionRecord = z.infer<typeof memoryCorrectionRecordSchema>;
+
+export const memoryCorrectionsResponseSchema = z.object({
+  corrections: z.array(memoryCorrectionRecordSchema),
+});
+export type MemoryCorrectionsResponse = z.infer<typeof memoryCorrectionsResponseSchema>;
+
 export const memoryRecordSchema = z.object({
   id: recordId,
   agentId: recordId,
@@ -150,11 +171,28 @@ const memoryFileParam = z
   .regex(/^[^\r\n\0]+$/)
   .describe('Exact memory file name; MEMORY.md is the always-loaded index.');
 const memoryDocumentParams = z.object({ scope: memoryScopeParam, file: memoryFileParam }).strict();
+const memoryCorrectionParams = {
+  correction: z
+    .boolean()
+    .optional()
+    .describe('True when this write records the user correcting you in this turn.'),
+  repeats: z
+    .string()
+    .min(1)
+    .max(4096)
+    .optional()
+    .describe(
+      'With correction: the exact saved MEMORY.md line, or file name, that already says it. update_memory accepts correction and repeats without an edit.',
+    ),
+};
 const memoryMutationParams = memoryDocumentParams.extend({
   baseVersion: z.string().min(1).describe('Current document revision.'),
 });
 export const memoryToolParamsSchemas = {
-  save_memory: memoryDocumentParams.extend({ content: z.string().describe('Full file text.') }),
+  save_memory: memoryDocumentParams.extend({
+    content: z.string().describe('Full file text.'),
+    ...memoryCorrectionParams,
+  }),
   update_memory: memoryMutationParams.extend({
     content: z.string().optional().describe('Full text; empty clears the index.'),
     old_str: z.string().min(1).optional().describe('Exact unique text to replace.'),
@@ -162,6 +200,7 @@ export const memoryToolParamsSchemas = {
     moveTo: memoryScopeParam.optional(),
     renameTo: memoryFileParam.optional().describe('New file name; MEMORY.md is reserved.'),
     restoreVersion: z.string().min(1).optional().describe('Retained version id.'),
+    ...memoryCorrectionParams,
   }),
   delete_memory: memoryMutationParams,
   memories: memoryDocumentParams.partial().extend({

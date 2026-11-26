@@ -185,7 +185,12 @@ export function ensureMemoryIndex(
 export function injectMemoryDocuments(
   db: Db,
   scope: InjectScope,
-): { memories: InjectedMemory[]; omitted: number; fileCount: number } {
+): {
+  memories: InjectedMemory[];
+  indexes: { id: string; projectId: string | null; omitted: number }[];
+  omitted: number;
+  fileCount: number;
+} {
   return db.transaction((tx) => {
     const owner = and(
       ownerWhere(scope),
@@ -203,12 +208,14 @@ export function injectMemoryDocuments(
       scope.projectOnly || projectId === null ? [projectId] : [null, projectId]
     ).map((projectId) => ({ ...scope, projectId }));
     const memories: InjectedMemory[] = [];
+    const indexes: { id: string; projectId: string | null; omitted: number }[] = [];
     let omitted = 0;
     for (const namespace of namespaces.values()) {
       const index = ensureMemoryIndex(tx, namespace);
       const rendered = memoryIndexText(index);
       const bounded = boundMemoryIndex(rendered);
       omitted += bounded.omitted;
+      indexes.push({ id: index.id, projectId: namespace.projectId, omitted: bounded.omitted });
       memories.push({
         id: index.id,
         title: MEMORY_INDEX_TITLE,
@@ -243,7 +250,7 @@ export function injectMemoryDocuments(
         .from(agentMemory)
         .where(and(owner, project, stillValid, eq(agentMemory.layer, 'searchable')))
         .get()?.count ?? 0;
-    return { memories, omitted, fileCount };
+    return { memories, indexes, omitted, fileCount };
   });
 }
 

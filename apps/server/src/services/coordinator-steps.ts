@@ -286,7 +286,7 @@ function replyLanguageOf(words: string): string | null {
   return best[1] / letters >= REPLY_LANGUAGE_MIN_SHARE ? best[0] : REPLY_LANGUAGE_GENERIC;
 }
 
-function ownerTextOf(content: unknown): string {
+export function ownerTextOf(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content
@@ -459,6 +459,7 @@ export function latestChiefMemoryUsage(db: Db, teamId: string) {
         eq(step.kind, 'chief'),
         notLike(chiefThread.id, 'chief-memory-%'),
         isNotNull(step.memoryTrace),
+        or(isNull(step.holdReason), notLike(step.holdReason, 'steer%')),
       ),
     )
     .orderBy(desc(step.createdAt))
@@ -734,4 +735,23 @@ export function recordStepUsage(
       }
     }
   });
+}
+
+export function recordReusedInstructions(db: Db, stepId: string, sentBy: string): void {
+  const traceOf = (id: string) =>
+    db.select({ memoryTrace: step.memoryTrace }).from(step).where(eq(step.id, id)).get()
+      ?.memoryTrace;
+  const current = traceOf(stepId);
+  const sent = traceOf(sentBy);
+  if (!current || !sent) return;
+  db.update(step)
+    .set({
+      memoryTrace: {
+        ...current,
+        teamMemoryIds: sent.teamMemoryIds,
+        teamMemoriesOmitted: sent.teamMemoriesOmitted,
+      },
+    })
+    .where(eq(step.id, stepId))
+    .run();
 }

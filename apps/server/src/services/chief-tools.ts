@@ -94,7 +94,7 @@ import { executeGithubReadTool } from './github-reads.js';
 import { inspectRun } from './inspect-run.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
-import { executeMemoryDocumentTool } from './memory-documents.js';
+import { executeMemoryToolForStep } from './memory-corrections.js';
 import { executeMemoryEditTool } from './memory-edit.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { notifyChiefMessage } from './notifications.js';
@@ -170,6 +170,7 @@ export interface ChiefToolCtx {
   chiefAgentId: string | null;
   conversationId: string;
   toolCallId?: string;
+  stepId?: string;
   turnPrompt?: string | null;
   turnMessageIds?: readonly string[];
   turnScopeProjectId?: string | null;
@@ -1363,7 +1364,7 @@ export async function executeChiefTool(
         const receipt = executeMemoryEditTool(db, owner, editId, ctx.toolCallId, name, params);
         return json(receipt.output);
       }
-      return json(executeMemoryDocumentTool(db, owner, name, params));
+      return json(executeMemoryToolForStep(db, owner, ctx.stepId, name, params));
     }
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
@@ -1559,6 +1560,7 @@ export interface WorkerMemoryCtx {
   buildId: string;
   attachmentsDir: string;
   teamScoped?: boolean;
+  stepId?: string;
 }
 
 export async function executeWorkerMemoryTool(
@@ -1573,7 +1575,7 @@ export async function executeWorkerMemoryTool(
     case 'delete_memory':
     case 'memories':
       return json(
-        executeMemoryDocumentTool(
+        executeMemoryToolForStep(
           db,
           {
             agentId: ctx.agentId,
@@ -1585,6 +1587,7 @@ export async function executeWorkerMemoryTool(
             sourceTodoId: ctx.todoId,
             sourceBuildId: ctx.buildId,
           },
+          ctx.stepId,
           name,
           params,
         ),

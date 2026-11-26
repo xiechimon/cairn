@@ -211,12 +211,14 @@ export async function runCoordinatorTurn(
       }
     }
     deps.setupPhase?.('conversation');
+    const reused = deps.volatile?.instructions(rootKey, claimed.chief.systemPrompt, stepId);
+    const instructions = reused?.text ?? claimed.chief.systemPrompt;
+    if (reused !== undefined && instructions !== claimed.chief.systemPrompt)
+      await api.reusedInstructions?.(stepId, reused.sentBy);
     await root.configure(
       {
         model: { provider, modelId },
-        instructions:
-          deps.volatile?.instructions(rootKey, claimed.chief.systemPrompt) ??
-          claimed.chief.systemPrompt,
+        instructions,
         thinkingLevel: (claimed.agent?.thinkingLevel ?? null) as ModelThinkingLevel | null,
       },
       context,

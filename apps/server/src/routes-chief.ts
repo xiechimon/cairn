@@ -47,6 +47,7 @@ import { sendDesignComments } from './services/design-comments.js';
 import { isOwner } from './services/instance-owner.js';
 import { chiefIneligibility } from './services/machine-routing.js';
 import { isChiefConversation } from './services/machines.js';
+import { listMemoryCorrections } from './services/memory-corrections.js';
 import { effectiveModel } from './services/model-fallback.js';
 import { coordinatorProfile } from './services/routing-rules.js';
 import {
@@ -127,6 +128,12 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return c.json({ usage: latestChiefMemoryUsage(ctx.db, teamId) });
+  });
+
+  app.get('/api/teams/:id/chief/memory-corrections', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(listMemoryCorrections(ctx.db, teamId));
   });
 
   app.post('/api/teams/:id/chief/threads', async (c) => {

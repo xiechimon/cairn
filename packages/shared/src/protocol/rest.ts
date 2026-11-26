@@ -129,6 +129,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: '{usage|null}: the newest chief step carrying a memoryTrace, with stepId, threadId, createdAt and the injected/recalled id lists',
   },
   {
+    method: 'GET',
+    path: '/api/teams/{id}/chief/memory-corrections',
+    note: '{corrections}: recorded user corrections, newest first, at most 200, each with the user words, the saved rule the agent pointed at, whether the turn memory index held it, and the turn',
+  },
+  {
     method: 'POST',
     path: '/api/teams/{id}/chief/channels/{projectId}',
     note: 'find or create the project channel thread; 201 with a greeting turn queued when created, 200 when it exists; 404 for a project outside the team, 409 when archived',

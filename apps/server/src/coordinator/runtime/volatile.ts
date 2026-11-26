@@ -8,13 +8,18 @@ import {
   resolveCacheRetentionTier,
 } from './cold-slim.js';
 
+export interface SentInstructions {
+  text: string;
+  sentBy: string;
+}
+
 export interface VolatileContext {
   set(conversationId: string, text: string | null): void;
   get(conversationId: string): string | undefined;
   setStep(conversationId: string, stepId: string | null): void;
   step(conversationId: string): string | undefined;
   sent(conversationId: string, at: number): void;
-  instructions(conversationId: string, next: string): string;
+  instructions(conversationId: string, next: string, stepId: string): SentInstructions;
 }
 
 function defaultReuseMs(): number {
@@ -29,17 +34,18 @@ export function createVolatileContext(
   const sections = new Map<string, string>();
   const steps = new Map<string, string>();
   const sentAt = new Map<string, number>();
-  const epochs = new Map<string, string>();
+  const epochs = new Map<string, SentInstructions>();
   return {
     sent: (conversationId, at) => {
       sentAt.set(conversationId, at);
     },
-    instructions: (conversationId, next) => {
+    instructions: (conversationId, next, stepId) => {
       const last = sentAt.get(conversationId);
       const frozen = epochs.get(conversationId);
       if (frozen !== undefined && last !== undefined && now() - last < reuseMs) return frozen;
-      epochs.set(conversationId, next);
-      return next;
+      const sent = { text: next, sentBy: stepId };
+      epochs.set(conversationId, sent);
+      return sent;
     },
     setStep: (conversationId, stepId) => {
       if (stepId === null) steps.delete(conversationId);

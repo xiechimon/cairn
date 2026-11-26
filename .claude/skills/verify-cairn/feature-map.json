@@ -245,6 +245,7 @@
           "apps/server/src/services/memory-edit.ts",
           "apps/server/src/services/memory-edit-turns.ts",
           "apps/server/src/services/memory-import.ts",
+          "apps/server/src/services/memory-corrections.ts",
           "apps/server/src/routes-memories.ts"
         ]
       },
@@ -256,7 +257,8 @@
           "/api/teams/:id/memories**",
           "/api/teams/:id/memory-edits**",
           "/api/teams/:id/memory-imports**",
-          "/api/teams/:id/chief/memory-usage"
+          "/api/teams/:id/chief/memory-usage",
+          "/api/teams/:id/chief/memory-corrections"
         ]
       },
       "reach": [

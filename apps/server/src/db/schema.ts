@@ -738,6 +738,27 @@ export const teamMemoryEntry = sqliteTable(
   (t) => [uniqueIndex('team_memory_entry_line_idx').on(t.teamId, t.line)],
 );
 
+export const memoryCorrection = sqliteTable(
+  'memory_correction',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId').notNull(),
+    projectId: text('projectId'),
+    pointedFile: text('pointedFile'),
+    pointedRule: text('pointedRule'),
+    inTurnIndex: bool('inTurnIndex'),
+    buildId: text('buildId').notNull(),
+    stepId: text('stepId').notNull(),
+    ownerMessageId: text('ownerMessageId').notNull(),
+    ownerWords: text('ownerWords').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [
+    index('memory_correction_exchange_idx').on(t.teamId, t.ownerMessageId),
+    index('memory_correction_team_created_idx').on(t.teamId, t.createdAt),
+  ],
+);
+
 export const dataMigration = sqliteTable('data_migration', {
   id: text('id').primaryKey(),
   doneAt: epochMs('doneAt').notNull(),

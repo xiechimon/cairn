@@ -103,6 +103,17 @@ function current(db: Db | Tx, owner: MemoryDocumentOwner, file: string) {
   }
   return row;
 }
+export function currentMemoryDocument(
+  db: Db | Tx,
+  owner: MemoryDocumentOwner,
+  scope: string,
+  file: string,
+) {
+  return current(db, namespace(db, owner, scope), file);
+}
+export function memoryDocumentRows(db: Db | Tx, owner: MemoryDocumentOwner, scope: string) {
+  return scopedRows(db, namespace(db, owner, scope)).all();
+}
 function reserve(db: Db | Tx, owner: MemoryDocumentOwner, file: string, except?: string) {
   if (file === MEMORY_INDEX_TITLE) throw new HttpError(400, 'MEMORY.md is reserved for the index');
   const row = scopedRows(db, owner)
@@ -311,8 +322,10 @@ export function executeMemoryDocumentTool(
       [edit.content, edit.old_str, edit.restoreVersion, edit.moveTo, edit.renameTo].every(
         (value) => value === undefined,
       )
-    )
+    ) {
+      if (edit.repeats !== undefined && row.invalidAt === null) return result(row);
       throw new HttpError(400, 'no memory edit provided');
+    }
     let content = edit.content ?? memoryIndexText(row);
     if (edit.old_str !== undefined) {
       const first = content.indexOf(edit.old_str);

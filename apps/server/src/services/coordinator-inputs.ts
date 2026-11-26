@@ -53,6 +53,21 @@ export function inputForRequestId(
   return { batch, stale: batch !== undefined && batch.attempt !== ref.attempt };
 }
 
+export function traceDeliveredSteer(db: Db, runningId: string, waiting: StepRow): void {
+  const delivered = waiting.memoryTrace?.projectMemoryIds ?? [];
+  const trace = db.select().from(step).where(eq(step.id, runningId)).get()?.memoryTrace;
+  if (!trace || delivered.length === 0) return;
+  db.update(step)
+    .set({
+      memoryTrace: {
+        ...trace,
+        projectMemoryIds: [...new Set([...trace.projectMemoryIds, ...delivered])],
+      },
+    })
+    .where(eq(step.id, runningId))
+    .run();
+}
+
 export function queueCoordinatorInput(
   db: Db,
   target: StepRow,
@@ -309,6 +324,12 @@ export function consumeCoordinatorInput(
         .run();
       owners.push(id);
     }
+    const delivered =
+      batch.kind === 'steer'
+        ? db.select().from(step).where(eq(step.id, batch.id)).get()
+        : undefined;
+    if (producer !== undefined && delivered !== undefined)
+      traceDeliveredSteer(db, producer.id, delivered);
     if (producer !== undefined)
       db.update(step)
         .set({ ownerMessageIds: [...new Set([...(producer.ownerMessageIds ?? []), ...owners])] })

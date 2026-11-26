@@ -11553,6 +11553,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "coordinator_lease",
   "coordinator_turn_snapshot",
   "team_memory_entry",
+  "memory_correction",
   "data_migration",
   "task_issue_close",
   "deploy_lease",
@@ -11753,6 +11754,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "{usage|null}: the newest chief step carrying a memoryTrace, with stepId, threadId, createdAt and the injected/recalled id lists",
     "path": "/api/teams/{id}/chief/memory-usage",
+  },
+  {
+    "method": "GET",
+    "note": "{corrections}: recorded user corrections, newest first, at most 200, each with the user words, the saved rule the agent pointed at, whether the turn memory index held it, and the turn",
+    "path": "/api/teams/{id}/chief/memory-corrections",
   },
   {
     "method": "POST",

@@ -17,6 +17,7 @@ export interface MachineApi {
   claim(): Promise<ClaimedStep | null>;
   recover(): Promise<StepRecord[]>;
   token(stepId: string): Promise<MachineTokenResponse>;
+  reusedInstructions?(stepId: string, sentBy: string): Promise<void>;
   heartbeat(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
   steer?(

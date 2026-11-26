@@ -340,6 +340,16 @@ export function deleteDesignComment(
   db.delete(designComment).where(eq(designComment.id, row.id)).run();
 }
 
+const RELAY_NOTICE = '（Cairn 已把这些批注转给任务「';
+
+export function designCommentRelay(note: string, summary: string, taskTitle: string): string {
+  return `${note === '' ? '' : `${note}\n\n`}${summary}\n\n${RELAY_NOTICE}${taskTitle}」。）`;
+}
+
+export function isDesignCommentRelay(text: string): boolean {
+  return text.includes(`\n\n${RELAY_NOTICE}`) && text.endsWith('」。）');
+}
+
 export async function sendDesignComments(
   deps: SendDeps,
   teamId: string,
@@ -397,7 +407,7 @@ export async function sendDesignComments(
   );
   const sent = sendChiefMessageFromComposer(deps, teamId, {
     ...body,
-    content: `${note === '' ? '' : `${note}\n\n`}${summary}\n\n（Cairn 已把这些批注转给任务「${todoRow.title}」。）`,
+    content: designCommentRelay(note, summary, todoRow.title),
   });
   deps.db
     .update(designComment)

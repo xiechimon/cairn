@@ -29,6 +29,7 @@ import {
   WORKER_THREAD_REPORT_TOOL,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import {
   build,
   chief,
@@ -103,7 +104,7 @@ import {
   localBrowserConnector,
   mcpConnectorDepsOf,
 } from './mcp-servers.js';
-import { injectMemories } from './memory.js';
+import { injectMemoryDocuments } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
@@ -1002,7 +1003,7 @@ async function tryClaim(
         provider: model.provider,
         modelId: model.modelId,
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
-        memories: injectMemories(db, {
+        memories: injectWorkerStepMemories(db, cand.stepRow.id, {
           agentId: memoryOwnerOf(db, teamId, cand.stepRow.kind),
           teamId,
           teamScoped: memoryOpsAreTeamScoped(cand.stepRow.kind),
@@ -1032,6 +1033,30 @@ async function tryClaim(
     stillAuthorized,
     signal,
   );
+}
+
+function injectWorkerStepMemories(
+  db: Db,
+  stepId: string,
+  scope: Parameters<typeof injectMemoryDocuments>[1],
+) {
+  const { memories, indexes } = injectMemoryDocuments(db, scope);
+  const teamIndexes = indexes.filter((index) => index.projectId === null);
+  const projectIndexes = indexes.filter((index) => index.projectId !== null);
+  const total = (rows: typeof indexes) => rows.reduce((sum, index) => sum + index.omitted, 0);
+  db.update(step)
+    .set({
+      memoryTrace: {
+        teamMemoryIds: teamIndexes.map((index) => index.id),
+        teamMemoriesOmitted: total(teamIndexes),
+        projectMemoryIds: projectIndexes.map((index) => index.id),
+        projectMemoriesOmitted: total(projectIndexes),
+        recalledMemoryIds: [],
+      },
+    })
+    .where(eq(step.id, stepId))
+    .run();
+  return memories.map(({ title, content }) => ({ title, content }));
 }
 
 export function workerRemoteTools(

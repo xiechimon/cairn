@@ -30,7 +30,11 @@ import { connectorToolDefsForTeam } from '../services/connector-broker.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
-import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator-steps.js';
+import {
+  chiefTurnContext,
+  claimPendingChiefStep,
+  recordReusedInstructions,
+} from '../services/coordinator-steps.js';
 import { coordinatorToolDefs } from '../services/coordinator-tool-defs.js';
 import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { readDeployLease } from '../services/deploy-lease.js';
@@ -141,6 +145,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   };
   const api: MachineApi = {
     ...serverApi,
+    reusedInstructions: async (stepId, sentBy) => recordReusedInstructions(db, stepId, sentBy),
     done: async (stepId, body, observation) => {
       if (!closing) await serverApi.done(stepId, scrubbed(stepId, body), observation);
     },

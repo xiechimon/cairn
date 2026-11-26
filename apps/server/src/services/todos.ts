@@ -51,6 +51,7 @@ import type { Db } from '../db/client.js';
 import {
   build,
   machine,
+  memoryCorrection,
   message,
   schedule,
   step,
@@ -1123,6 +1124,7 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
     if (buildIds.length > 0) {
       db.delete(stopPending).where(inArray(stopPending.conversationId, buildIds)).run();
       db.delete(step).where(inArray(step.buildId, buildIds)).run();
+      db.delete(memoryCorrection).where(inArray(memoryCorrection.buildId, buildIds)).run();
     }
     if (row.sourceKind === 'github-issue-self' && row.sourceRef !== null) {
       queueIssueClose(db, row.teamId, row.sourceRef, DELETED_TASK_ISSUE_COMMENT);
