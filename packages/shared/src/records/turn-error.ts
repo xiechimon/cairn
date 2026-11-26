@@ -1,4 +1,8 @@
-import { RUNTIME_UPDATE_REQUIRED_RE } from '../task-failure.js';
+import {
+  CONNECTION_FAILURE_RE,
+  isUnansweredFetch,
+  RUNTIME_UPDATE_REQUIRED_RE,
+} from '../task-failure.js';
 
 export const TURN_ERROR_KINDS = [
   'no-model',
@@ -17,18 +21,15 @@ export const TURN_ERROR_KINDS = [
 ] as const;
 export type TurnErrorKind = (typeof TURN_ERROR_KINDS)[number];
 
-const RULES: readonly [TurnErrorKind, RegExp][] = [
+const RULES: readonly [TurnErrorKind, Pick<RegExp, 'test'>][] = [
   ['no-model', /\bno_model\b|no keyed provider|has no model or chief context/i],
   [
     'interrupted',
-    /\b(interrupted|restart_limit|faulted|orphaned|reset)\b|journal lost|server restarted|stream disconnected|executor lost/i,
+    /\b(interrupted|restart_limit|faulted|orphaned|(?<!connection[ _])reset)\b|journal lost|server restarted|stream disconnected|executor lost/i,
   ],
   ['turn-limit', /\bturn_limit\b/i],
   ['runtime-update', RUNTIME_UPDATE_REQUIRED_RE],
-  [
-    'connect',
-    /Connection error|NECP|ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH|ECONNRESET|fetch failed/i,
-  ],
+  ['connect', new RegExp(`NECP|${CONNECTION_FAILURE_RE.source}`, 'i')],
   ['key', /\b401\b|(invalid|incorrect).{0,20}api key|unauthorized|authentication_error/i],
   [
     'context',
@@ -38,6 +39,7 @@ const RULES: readonly [TurnErrorKind, RegExp][] = [
   ['quota', /insufficient_quota|insufficient.balance|quota|billing|余额|额度/i],
   ['busy', /\b(429|503|529)\b|overloaded|no available accounts|rate.limit/i],
   ['timeout', /timed out|timeout|ETIMEDOUT/i],
+  ['connect', { test: isUnansweredFetch }],
   ['provider', /\bmodel_error\b|\b[45]\d\d\b/],
 ];
 

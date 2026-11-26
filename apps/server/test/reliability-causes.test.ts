@@ -42,6 +42,16 @@ const liveMessages: Array<{ message: string; cause: BuildCause; why: string }> =
     why: 'a bare connection failure from the provider client',
   },
   {
+    message: 'Failed to fetch team settings',
+    cause: 'provider-network',
+    why: 'the Devin client could not reach its service while loading team settings',
+  },
+  {
+    message: 'getaddrinfo ENOTFOUND api.example.com',
+    cause: 'provider-network',
+    why: 'a name that does not resolve is a connection failure in every classifier',
+  },
+  {
     message:
       '404: {"message":"Model \\"glm-5.3\\" is not supported by any configured account in this group","type":"model_not_found"}\nprovider response: POST https://relay.example/v1/chat/completions -> 404 application/json',
     cause: 'model-config',
@@ -114,6 +124,11 @@ test('every cause has at least one message that reaches it, and no pattern steal
       samples[cause],
     ).toBe(cause);
   }
+});
+
+test('a fetch the server refused is not counted as a network failure', () => {
+  const message = 'Failed to fetch team settings: 401 Unauthorized';
+  expect(classifyBuildCause({ errorMessage: message, prNumber: null, ageMs: 0 })).toBe('other');
 });
 
 test('a worktree failure is git, not provider-network, even though it printed to stderr', () => {

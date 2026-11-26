@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { turnErrorKind } from '../src/index.js';
+import {
+  classifyAgentFailure,
+  classifyRetryFailure,
+  classifyStepFailure,
+  turnErrorKind,
+} from '../src/index.js';
 
 describe('turnErrorKind names the failure from the stored raw text', () => {
   test.each([
@@ -23,6 +28,7 @@ describe('turnErrorKind names the failure from the stored raw text', () => {
     ['executor lost', 'interrupted'],
     ['Coordinator turn ended: turn_limit "40 turns"', 'turn-limit'],
     ['Coordinator turn ended: model_error "Connection error."', 'connect'],
+    ['Failed to fetch team settings', 'connect'],
     ['Coordinator turn ended: model_error "401: {\\"message\\":\\"Invalid API key\\"}"', 'key'],
     ['Coordinator turn ended: model_error "403: model not available in your region"', 'model'],
     [
@@ -38,5 +44,44 @@ describe('turnErrorKind names the failure from the stored raw text', () => {
     ['Coordinator turn has no answer entry', 'unknown'],
   ])('%s', (message, kind) => {
     expect(turnErrorKind(message)).toBe(kind);
+  });
+});
+
+describe('every failure classifier reads the same connection wording as a network failure', () => {
+  test.each([
+    'Failed to fetch team settings',
+    'Coordinator turn ended: model_error "Failed to fetch team settings"',
+    'Failed to fetch team settings: error sending request for url (https://api.example.com:443/v1)',
+    'error sending request for url (https://api.example.com/v1)',
+    'unable to connect to the server',
+    'socket hang up',
+    'read tcp: connection reset by peer',
+    'connect: connection refused',
+    'getaddrinfo ENOTFOUND api.example.com',
+    'getaddrinfo EAI_AGAIN api.example.com',
+    'connect EHOSTUNREACH 192.0.2.1:443',
+    'connect ENETUNREACH 192.0.2.1:443',
+  ])('%s', (message) => {
+    expect(turnErrorKind(message)).toBe('connect');
+    expect(classifyStepFailure(message)).toBe('network');
+    expect(classifyAgentFailure(message)).toBe('provider_network');
+    expect(classifyRetryFailure(message)).toMatchObject({
+      failureClass: 'transient',
+      reasonCode: 'network',
+    });
+  });
+
+  test.each([
+    ['Failed to fetch team settings: 401 Unauthorized', 'key', 'auth'],
+    ['Failed to fetch team settings: Unauthorized', 'key', 'unknown'],
+    ['Failed to fetch team settings: status:403 Forbidden', 'model', 'auth'],
+    ['Failed to fetch team settings: 429 Too Many Requests', 'busy', 'rate_limit'],
+    ['Failed to fetch team settings: 502 Bad Gateway', 'provider', 'server_error'],
+    ['Failed to fetch team settings: 400 Bad Request', 'provider', 'unknown'],
+  ])('a server that answered is not unreachable: %s', (message, kind, reasonCode) => {
+    expect(turnErrorKind(message)).toBe(kind);
+    expect(classifyStepFailure(message)).not.toBe('network');
+    expect(classifyAgentFailure(message)).not.toBe('provider_network');
+    expect(classifyRetryFailure(message).reasonCode).toBe(reasonCode);
   });
 });

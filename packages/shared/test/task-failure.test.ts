@@ -58,6 +58,7 @@ describe('classifyStepFailure (#1257 three-bucket classification)', () => {
     expect(classifyStepFailure('context deadline exceeded')).toBe('network');
     expect(classifyStepFailure('Request timed out.')).toBe('network');
     expect(classifyStepFailure('connectionECONNRESET')).toBe('network');
+    expect(classifyStepFailure('Failed to fetch team settings')).toBe('network');
   });
 
   test('failure mode 4: other bucket (auth / context / 5xx / empty)', () => {
@@ -213,6 +214,7 @@ describe('classifyAgentFailure (#1261 four buckets, F1-F4)', () => {
     expect(classifyAgentFailure('fetch failed: ECONNREFUSED 127.0.0.1:9999')).toBe(
       'provider_network',
     );
+    expect(classifyAgentFailure('Failed to fetch team settings')).toBe('provider_network');
   });
 
   test('other: protocol errors / tool failures / empty string no false positive (F1/F6)', () => {
@@ -386,6 +388,10 @@ describe('classifyRetryFailure & parseRetryDelayMs / parseQuotaResetAt', () => {
       reasonCode: 'server_error',
     });
     expect(classifyRetryFailure('connection reset by peer')).toMatchObject({
+      failureClass: 'transient',
+      reasonCode: 'network',
+    });
+    expect(classifyRetryFailure('Failed to fetch team settings')).toMatchObject({
       failureClass: 'transient',
       reasonCode: 'network',
     });

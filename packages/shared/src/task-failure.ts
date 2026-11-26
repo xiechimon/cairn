@@ -74,6 +74,23 @@ export function failureEndsStepNow(rawError: string): boolean {
   return kind === 'model_unavailable' || kind === 'runtime_outdated';
 }
 
+export const CONNECTION_FAILURE_RE =
+  /connection[\s_]*(?:error|failed|reset|refused|closed)|ECONNREFUSED|ECONNRESET|ENOTFOUND|EHOSTUNREACH|ENETUNREACH|EAI_AGAIN|socket[\s_]+hang[\s_]+up|fetch[\s_]+failed|error[\s_]+sending[\s_]+request|unable[\s_]+to[\s_]+connect|dial[\s_]+tcp|network[\s_]+error/i;
+
+const ADDRESS_RE =
+  /\bhttps?:\/\/\S+|(?:\d{1,3}(?:\.\d{1,3}){3}|[\w-]+(?:\.[\w-]+)+|\]|\blocalhost):\d+/gi;
+
+const SERVER_ANSWER_RE =
+  /\b[45]\d\d\b(?!\s*m?s\b)|\b(?:unauthorized|unauthenticated|forbidden|permission[_ ]denied)\b/i;
+
+export function isUnansweredFetch(text: string): boolean {
+  return /failed to fetch/i.test(text) && !SERVER_ANSWER_RE.test(text.replace(ADDRESS_RE, ''));
+}
+
+export function isConnectionFailure(text: string): boolean {
+  return CONNECTION_FAILURE_RE.test(text) || isUnansweredFetch(text);
+}
+
 export function classifyStepFailure(rawError: string): StepFailureKind {
   const trimmed = scanSlice(rawError).trim();
   if (trimmed === '') return 'other';
@@ -145,21 +162,11 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
   }
 
   if (
+    isConnectionFailure(trimmed) ||
     containsAny(lower, [
       'stream disconnected',
-      'connection closed',
       'mid-response',
-      'connection error',
-      'fetch failed',
-      'connection reset',
-      'econnreset',
       'etimedout',
-      'socket hang up',
-      'error sending request',
-      'unable to connect',
-      'dial tcp',
-      'connection refused',
-      'connectionrefused',
       'dns',
       'i/o timeout',
       'deadline exceeded',
@@ -252,15 +259,14 @@ const QUOTA_PATTERN =
 const CAPACITY_PATTERN =
   /\b(?:429|529)\b|rate[_\s-]?limit|too\s+many\s+requests|overloaded|请求过于频繁|限流|负载(?:已)?饱和/i;
 
-const NETWORK_PATTERN =
-  /connection\s+(?:error|reset|refused|closed)|upstream\s+stream\s+disconnected|ECONNREFUSED|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|network\s+error|temporarily\s+unavailable/i;
+const NETWORK_PATTERN = /upstream\s+stream\s+disconnected|ETIMEDOUT|temporarily\s+unavailable/i;
 
 export function classifyAgentFailure(message: string): AgentFailureKind {
   const text = scanSlice(message);
   if (text === '') return 'other';
   if (QUOTA_PATTERN.test(text)) return 'quota';
   if (CAPACITY_PATTERN.test(text)) return 'capacity';
-  if (NETWORK_PATTERN.test(text)) return 'provider_network';
+  if (isConnectionFailure(text) || NETWORK_PATTERN.test(text)) return 'provider_network';
   return 'other';
 }
 

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { redactSecrets, STOP_MESSAGE } from '@cairn/shared';
+import { isConnectionFailure, redactSecrets, STOP_MESSAGE } from '@cairn/shared';
 import Database from 'better-sqlite3';
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -44,7 +44,7 @@ const NO_STEPS: ReliabilityStepCounts = {
   waitingQuota: 0,
 };
 
-const CAUSE_PATTERNS: readonly { cause: BuildCause; pattern: RegExp }[] = [
+const CAUSE_PATTERNS: readonly { cause: BuildCause; pattern: Pick<RegExp, 'test'> }[] = [
   { cause: 'timeout', pattern: /\bstream timeout \(arm=/ },
   {
     cause: 'git',
@@ -67,10 +67,11 @@ const CAUSE_PATTERNS: readonly { cause: BuildCause; pattern: RegExp }[] = [
     pattern:
       /\b402\b|usage[ _-]?limit|insufficient[ _](?:quota|credit|balance)|(?:quota|credit|balance)[ _]is[ _]insufficient|quota[ _](?:exceed|exhaust|limit)|credit[ _]balance|billing|you['’]ve hit your limit|credits/,
   },
+  { cause: 'provider-network', pattern: { test: isConnectionFailure } },
   {
     cause: 'provider-network',
     pattern:
-      /econnreset|etimedout|econnrefused|connection[ _]reset|connection[ _]refused|connection[ _]closed|\bconnection[ _]?(?:error|failed)\b|socket[ _]hang[ _]up|dial tcp|fetch failed|error sending request|unable to connect|stream disconnected|network error|temporarily unavailable|rate[ _-]?limit|too many requests|overloaded|no capacity available|all available accounts exhausted|\b429\b|\b503\b|\b529\b|\bdns\b|deadline exceeded|request timed out/i,
+      /etimedout|stream disconnected|temporarily unavailable|rate[ _-]?limit|too many requests|overloaded|no capacity available|all available accounts exhausted|\b429\b|\b503\b|\b529\b|\bdns\b|deadline exceeded|request timed out/i,
   },
   {
     cause: 'agent-gave-up',
