@@ -1,9 +1,11 @@
+import { type AddressInfo, createServer } from 'node:net';
 import { describe, expect, test } from 'vitest';
 import { hostShellCommand } from '../src/backend/confine-seatbelt.js';
 import {
   type HostShellConfinement,
   runnerHostShellConfinement,
 } from '../src/backend/host-shell-confinement.js';
+import { MAC_SHELL_DENIED_PORTS } from '../src/backend/loopback-ports.js';
 import { HostComputerProvider } from '../src/computer/host.js';
 import { defaultStagingRoot } from '../src/computer/staging.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -41,6 +43,64 @@ describe('host shell seatbelt profile and trustd (#5412)', () => {
       ]);
     }
   });
+});
+
+describe('host shell seatbelt profile and Cairn’s browser ports', () => {
+  test('every browser debugging, streaming and extension port is closed to the sandboxed shell', () => {
+    const profile = hostShellCommand({ deniedDirectories: [], deniedFiles: [] }, 'true', [])
+      .args[1] as string;
+    expect(MAC_SHELL_DENIED_PORTS).toContain(9009);
+    for (const port of MAC_SHELL_DENIED_PORTS)
+      for (const rule of [
+        'network-outbound (remote',
+        'network-inbound (local',
+        'network-bind (local',
+      ])
+        expect(profile).toContain(`(deny ${rule} tcp "localhost:${port}"))`);
+  });
+
+  test.skipIf(process.platform !== 'darwin')(
+    'a sandboxed shell cannot connect to a listening browser port but can reach other local ports',
+    async () => {
+      const listen = async (port: number) => {
+        const server = createServer((socket) => {
+          socket.on('error', () => {});
+          socket.end('hi');
+        });
+        const bound = await new Promise<boolean>((resolve) => {
+          server.once('error', () => resolve(false));
+          server.listen(port, '127.0.0.1', () => resolve(true));
+        });
+        return bound ? server : null;
+      };
+      let guarded: Awaited<ReturnType<typeof listen>> = null;
+      for (const port of MAC_SHELL_DENIED_PORTS.slice(1).reverse()) {
+        guarded = await listen(port);
+        if (guarded !== null) break;
+      }
+      const open = await listen(0);
+      if (guarded === null || open === null) throw new Error('no port to listen on');
+      const host = new HostComputerProvider({ confinement: productionConfinement() });
+      const connect = async (port: number) => {
+        const events = await host.execute({
+          argv: ['/usr/bin/nc', '-z', '-w', '2', '127.0.0.1', String(port)],
+          timeoutMs: 8_000,
+          signal: new AbortController().signal,
+        });
+        let code = -1;
+        for await (const event of events) if (event.kind === 'exit') code = event.code;
+        return code;
+      };
+      try {
+        expect(await connect((open.address() as AddressInfo).port)).toBe(0);
+        expect(await connect((guarded.address() as AddressInfo).port)).not.toBe(0);
+      } finally {
+        guarded.close();
+        open.close();
+      }
+    },
+    25_000,
+  );
 });
 
 interface Client {

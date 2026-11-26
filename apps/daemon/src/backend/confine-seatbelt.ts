@@ -1,5 +1,6 @@
 import { dirname } from 'node:path';
 import { CONTAINER_SOCKETS } from './confine.js';
+import { MAC_SHELL_DENIED_PORTS } from './loopback-ports.js';
 
 export const SANDBOX_EXEC = '/usr/bin/sandbox-exec';
 
@@ -105,7 +106,7 @@ function unixSocketDenies(directories: string[], files: string[]): string[] {
   ];
 }
 
-function serverPortDenies(lines: string[], port: number): void {
+function portDenies(lines: string[], port: number): void {
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid server port');
   for (const denied of ['localhost', '*']) {
     lines.push(`(deny network-outbound (remote tcp "${denied}:${port}"))`);
@@ -146,7 +147,8 @@ function hostShellProfile(policy: HostShellPolicy): string {
   lines.push(...unixSocketDenies(policy.deniedDirectories, policy.deniedFiles));
   lines.push(...ESCAPE_DENIALS);
   lines.push(...MACH_SERVICE_DENIALS, ...HOST_SHELL_KEYCHAIN_MACH_DENIALS);
-  if (policy.serverPort !== undefined) serverPortDenies(lines, policy.serverPort);
+  for (const port of MAC_SHELL_DENIED_PORTS) portDenies(lines, port);
+  if (policy.serverPort !== undefined) portDenies(lines, policy.serverPort);
   return `${lines.join('\n')}\n`;
 }
 

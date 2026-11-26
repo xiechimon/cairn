@@ -1453,6 +1453,56 @@ describe('browser calls on Macs', () => {
     expect(text).toContain('没有可用的浏览器');
   });
 
+  test('a saved password is never sent toward the owner’s Chrome', async () => {
+    const { s, deps } = boot();
+    addMac(
+      s,
+      'mini',
+      { browser: true, ownerChrome: true, browserSecretFill: true },
+      { kind: 'local' },
+    );
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const outcome = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_act',
+      toolCallId: 'secret',
+      params: {
+        actions: [
+          { kind: 'fill_secret', ref: '@e1', secret: 'SITE', origin: 'https://example.com' },
+        ],
+      },
+    }).catch((error: Error) => error.message);
+    expect(await outcome).toBe('Save this workspace secret in Secrets settings first.');
+    expect(calls).toEqual([]);
+  });
+
+  test('browser_act never moves to another Mac’s Chrome, whose page nobody opened', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    addMac(s, 'air', { ownerChrome: true });
+    browserMcp(s);
+    const mini = connect(s, 'mini');
+    const air = connect(s, 'air');
+    const opened = navigate(deps, 'open');
+    opened.catch(() => {});
+    answer(s, 'mini', await next(mini, 1), 'their page');
+    await opened;
+    const acting = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_act',
+      toolCallId: 'press',
+      params: { actions: [{ kind: 'press', text: 'Enter' }] },
+    });
+    acting.catch(() => {});
+    fail(s, 'mini', await next(mini, 2), NO_EXTENSION);
+    const own = await next(mini, 3);
+    expect(own.ownerChrome).toBeUndefined();
+    answer(s, 'mini', own, 'done');
+    expect((await acting).text).toContain('instead of your own Chrome');
+    expect(air).toEqual([]);
+  });
+
   test('another person’s thread never reaches a remote Mac’s Chrome', async () => {
     const { s, deps } = boot();
     addMac(s, 'air', { ownerChrome: true });

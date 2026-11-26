@@ -1,15 +1,18 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { accessSync, constants, existsSync, statSync } from 'node:fs';
+import { accessSync, constants, existsSync, readFileSync, statSync } from 'node:fs';
 import { open, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { promisify } from 'node:util';
+import { MAC_SHELL_DENIED_PORTS } from '../backend/loopback-ports.js';
 import { createManagedRuntime, type ManagedRuntimeChannel } from '../backend/managed-runtime.js';
 import { ensurePrivateDir } from '../private-fs.js';
 import { AGENT_BROWSER_BINARY, browserProfileKeyOfSession } from './browser.js';
 import { HostComputerProvider } from './host.js';
 import { browserProxyArgs } from './host-desktop.js';
+import { REAL_BROWSER_ENV, writeBrowserLauncher } from './mac-browser-launcher.js';
+import { createBrowserPortSlots } from './mac-browser-ports.js';
 import { type ComputerProvider, ComputerRefusal, type LazyBrowser } from './provider.js';
 
 export const MAC_AGENT_BROWSER_ENV = 'CAIRN_AGENT_BROWSER';
@@ -22,6 +25,7 @@ export const MAC_BROWSER_FIRST_USE_NOTE =
 const BROWSER_RUN_HEADROOM_MS = 10_000;
 const VERSION_TIMEOUT_MS = 20_000;
 const CLOSE_TIMEOUT_MS = 2_000;
+const SOCKET_DIR = '.agent-browser';
 const IDLE_TIMEOUT_MS = 30 * 60_000;
 const SHELL_ID = 'chrome-headless-shell';
 const CHROME_BINARY = 'Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -132,6 +136,7 @@ export function createMacBrowser(options: MacBrowserOptions): LazyBrowser {
   let failure: string | null = null;
   let downloading: Promise<string | null> | null = null;
   const versions = new Map<string, string>();
+  const portsFor = createBrowserPortSlots();
   const providers = new Map<string, HostComputerProvider>();
   const sessions = new Map<string, ComputerProvider>();
 
@@ -212,7 +217,7 @@ export function createMacBrowser(options: MacBrowserOptions): LazyBrowser {
       if (major !== null) return { kind: 'chrome', path: chrome, major };
     }
     const installed = shell.current();
-    if (installed === null) return null;
+    if (installed === null || installed.version !== release?.version) return null;
     const major = await majorOf(installed.binPath);
     return major === null ? null : { kind: 'shell', path: installed.binPath, major };
   }
@@ -222,6 +227,8 @@ export function createMacBrowser(options: MacBrowserOptions): LazyBrowser {
       failure = null;
       progress.received = 0;
       progress.total = 0;
+      if (shell.current() !== null)
+        await rm(join(options.toolsRoot, SHELL_ID, 'versions'), { recursive: true, force: true });
       const installed = await shell.update().catch((error: unknown) => {
         failure = error instanceof Error ? error.message : String(error);
         return null;
@@ -234,11 +241,27 @@ export function createMacBrowser(options: MacBrowserOptions): LazyBrowser {
     return downloading;
   }
 
+  async function closeUnguardedStream(session: string): Promise<void> {
+    let port: number;
+    try {
+      port = Number(readFileSync(join(options.root, SOCKET_DIR, `${session}.stream`), 'utf8'));
+    } catch {
+      return;
+    }
+    if (MAC_SHELL_DENIED_PORTS.includes(port)) return;
+    await run(options.agentBrowser, ['--session', session, 'stream', 'disable'], {
+      cwd: options.root,
+      env: { ...options.env, HOME: options.root, AGENT_BROWSER_SOCKET_DIR: SOCKET_DIR },
+      timeout: CLOSE_TIMEOUT_MS,
+    }).catch(() => {});
+  }
+
   function providerFor(executable: Executable): ComputerProvider {
     const key = `${executable.kind}\u0000${executable.path}\u0000${executable.major}`;
     const known = providers.get(key);
     if (known !== undefined) return known;
     ensurePrivateDir(options.root);
+    const launcher = writeBrowserLauncher(options.root);
     const provider: HostComputerProvider = new HostComputerProvider({
       home: options.root,
       env: { ...options.env, HOME: options.root },
@@ -253,12 +276,20 @@ export function createMacBrowser(options: MacBrowserOptions): LazyBrowser {
           executable.kind,
         );
         ensurePrivateDir(profile);
+        const ports = await portsFor(session);
+        await closeUnguardedStream(session);
         return {
-          AGENT_BROWSER_EXECUTABLE_PATH: executable.path,
+          AGENT_BROWSER_EXECUTABLE_PATH: launcher,
+          [REAL_BROWSER_ENV]: executable.path,
+          AGENT_BROWSER_STREAM_PORT: String(ports.stream),
           AGENT_BROWSER_PROFILE: profile,
           AGENT_BROWSER_USER_AGENT: userAgent(executable.major),
-          AGENT_BROWSER_ARGS: [...CHROME_ARGS, ...browserProxyArgs(options.env)].join(','),
-          AGENT_BROWSER_SOCKET_DIR: '.agent-browser',
+          AGENT_BROWSER_ARGS: [
+            ...CHROME_ARGS,
+            ...browserProxyArgs(options.env),
+            `--remote-debugging-port=${ports.debug}`,
+          ].join(','),
+          AGENT_BROWSER_SOCKET_DIR: SOCKET_DIR,
           AGENT_BROWSER_IDLE_TIMEOUT_MS: String(IDLE_TIMEOUT_MS),
           AGENT_BROWSER_NO_VERSION_CHECK: '1',
         };

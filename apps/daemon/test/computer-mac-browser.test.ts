@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
@@ -8,11 +8,14 @@ import {
   realpathSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import type { ComputerCall, ComputerFrame, MachineCapabilities } from '@cairn/shared';
 import { OWNER_CHROME_UNAVAILABLE_PREFIX } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { MAC_SHELL_DENIED_PORTS } from '../src/backend/loopback-ports.js';
 import { createComputerDispatcher } from '../src/computer/dispatch.js';
 import {
   createMacBrowser,
@@ -32,7 +35,7 @@ function executable(path: string, body: string): string {
 function fakeAgentBrowser(dir: string, log: string): string {
   return executable(
     join(dir, 'agent-browser'),
-    `printf '%s\\n' "ARGV $*" "EXE $AGENT_BROWSER_EXECUTABLE_PATH" "PROFILE $AGENT_BROWSER_PROFILE" "UA $AGENT_BROWSER_USER_AGENT" "ARGS $AGENT_BROWSER_ARGS" >> '${log}'
+    `printf '%s\\n' "ARGV $*" "EXE $AGENT_BROWSER_EXECUTABLE_PATH" "PROFILE $AGENT_BROWSER_PROFILE" "UA $AGENT_BROWSER_USER_AGENT" "ARGS $AGENT_BROWSER_ARGS" "REAL $CAIRN_BROWSER_EXECUTABLE" "STREAM $AGENT_BROWSER_STREAM_PORT" >> '${log}'
 case "$*" in
   *"tab list"*) echo '{"data":{"tabs":[{"active":true,"label":null,"targetId":"t1"}]}}' ;;
   *" open "*) echo '✓ Example Domain' ;;
@@ -46,7 +49,10 @@ esac`,
 function shellZip(dir: string): { path: string; sha256: string } {
   const folder = join(dir, 'zip-source', 'chrome-headless-shell-mac-arm64');
   mkdirSync(folder, { recursive: true });
-  executable(join(folder, 'chrome-headless-shell'), 'echo "Google Chrome for Testing 158.0.1.2"');
+  executable(
+    join(folder, 'chrome-headless-shell'),
+    '[ -e "$(dirname "$0")/broken" ] && exit 1\necho "Google Chrome for Testing 158.0.1.2"',
+  );
   const path = join(dir, 'shell.zip');
   execFileSync('zip', ['-qr', path, 'chrome-headless-shell-mac-arm64'], {
     cwd: join(dir, 'zip-source'),
@@ -168,7 +174,8 @@ describe('a browser call on a Mac', () => {
     const seen = readFileSync(w.log, 'utf8');
     expect(seen).toContain('--headed false');
     expect(seen).not.toContain('--init-script');
-    expect(seen).toContain(`EXE ${w.chrome}`);
+    expect(seen).toContain(`EXE ${join(w.options.root, 'browser-launcher')}`);
+    expect(seen).toContain(`REAL ${w.chrome}`);
     expect(seen).toContain(`PROFILE ${join(w.options.root, 'profiles')}`);
     expect(seen).toMatch(/UA Mozilla\/5\.0 \(Macintosh.* Chrome\/158\.0\.0\.0 Safari/);
     expect(seen).not.toContain('HeadlessChrome');
@@ -183,7 +190,7 @@ describe('a browser call on a Mac', () => {
     expect(result).toMatchObject({ ok: true });
     expect(result.text).toContain('第一次使用浏览器');
     expect(readFileSync(w.log, 'utf8')).toContain(
-      `EXE ${join(w.options.toolsRoot, 'chrome-headless-shell', 'versions', '158.0.1.2')}`,
+      `REAL ${join(w.options.toolsRoot, 'chrome-headless-shell', 'versions', '158.0.1.2')}`,
     );
     const again = await dispatcherFor(browser).run();
     expect(again.text).not.toContain('第一次使用浏览器');
@@ -242,6 +249,124 @@ describe('a browser call on a Mac', () => {
     expect(failed.text).not.toContain('\n');
     expect(existsSync(w.log)).toBe(false);
     expect((await dispatcherFor(browser).run()).ok).toBe(true);
+  });
+});
+
+describe('the browser’s loopback ports', () => {
+  test('every session gets its own ports out of the ones a sandboxed shell cannot reach', async () => {
+    const w = world();
+    const { run } = dispatcherFor(w.browser);
+    await run();
+    await run({ browserScope: 'thread-2' });
+    const seen = readFileSync(w.log, 'utf8');
+    const debug = [...seen.matchAll(/debugging-port=(\d+)/g)].map((m) => Number(m[1]));
+    const stream = [...seen.matchAll(/^STREAM (\d+)$/gm)].map((m) => Number(m[1]));
+    expect(debug.length).toBeGreaterThan(1);
+    expect(stream.length).toBe(debug.length);
+    for (const port of [...debug, ...stream]) expect(MAC_SHELL_DENIED_PORTS).toContain(port);
+    expect(new Set(debug).size).toBe(2);
+    expect(new Set(stream).size).toBe(2);
+  });
+});
+
+describe('the browser launcher', () => {
+  test('a stream that fell back to a port the sandbox leaves open is switched off', async () => {
+    const w = world();
+    const { run } = dispatcherFor(w.browser);
+    await run();
+    mkdirSync(join(w.options.root, '.agent-browser'), { recursive: true });
+    writeFileSync(join(w.options.root, '.agent-browser', 'p_thread-1.stream'), '53108');
+    await run();
+    expect(readFileSync(w.log, 'utf8')).toContain('--session p_thread-1 stream disable');
+  });
+
+  test.skipIf(process.platform !== 'darwin')(
+    'it tells agent-browser where the browser it started is listening',
+    async () => {
+      const w = world();
+      await dispatcherFor(w.browser).run();
+      const profile = join(w.dir, 'launched-profile');
+      mkdirSync(profile);
+      const server = join(w.dir, 'server.cjs');
+      writeFileSync(
+        server,
+        `const flags = process.argv.filter((a) => a.startsWith('--remote-debugging-port='));
+const port = Number(flags.at(-1).split('=')[1]);
+const body = '{\\n   "webSocketDebuggerUrl": "ws://127.0.0.1:' + port + '/devtools/browser/abc"\\n}';
+require('node:http').createServer((_q, r) => r.end(body)).listen(port, '127.0.0.1');
+setTimeout(() => process.exit(0), 8000);
+`,
+      );
+      const real = executable(
+        join(w.dir, 'real-browser'),
+        `exec '${process.execPath}' '${server}' "$@"`,
+      );
+      const probe = createServer();
+      await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
+      const { port } = probe.address() as AddressInfo;
+      await new Promise((resolve) => probe.close(resolve));
+      const child = spawn(
+        join(w.options.root, 'browser-launcher'),
+        [
+          '--remote-debugging-port=0',
+          `--user-data-dir=${profile}`,
+          `--remote-debugging-port=${port}`,
+        ],
+        { env: { PATH: process.env.PATH, CAIRN_BROWSER_EXECUTABLE: real }, stdio: 'ignore' },
+      );
+      try {
+        await vi.waitFor(
+          () =>
+            expect(readFileSync(join(profile, 'DevToolsActivePort'), 'utf8')).toBe(
+              `${port}\n/devtools/browser/abc`,
+            ),
+          { timeout: 10_000, interval: 100 },
+        );
+      } finally {
+        child.kill();
+      }
+    },
+    20_000,
+  );
+});
+
+describe('keeping the headless shell current', () => {
+  async function installedOnce() {
+    const w = world({ chrome: async () => null });
+    const fetchImpl = vi.fn(download(w.zip.path));
+    const options = { ...w.options, fetchImpl: fetchImpl as unknown as typeof fetch };
+    expect((await dispatcherFor(createMacBrowser(options)).run()).ok).toBe(true);
+    return { w, fetchImpl, options };
+  }
+
+  test('a Cairn update that pins another version downloads it', async () => {
+    const { w, fetchImpl, options } = await installedOnce();
+    const updated = createMacBrowser({
+      ...options,
+      shellReleases: {
+        arm64: { version: '159.0.0.0', url: 'https://shell.test/new.zip', sha256: w.zip.sha256 },
+      },
+    });
+    expect((await dispatcherFor(updated).run()).ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(readFileSync(w.log, 'utf8')).toContain(join('versions', '159.0.0.0'));
+  });
+
+  test('an installed shell that no longer starts is downloaded again', async () => {
+    const { w, fetchImpl, options } = await installedOnce();
+    writeFileSync(
+      join(
+        w.options.toolsRoot,
+        'chrome-headless-shell',
+        'versions',
+        '158.0.1.2',
+        'chrome-headless-shell-mac-arm64',
+        'broken',
+      ),
+      '',
+    );
+    expect((await dispatcherFor(createMacBrowser(options)).run()).ok).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
 

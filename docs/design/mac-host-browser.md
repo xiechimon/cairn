@@ -55,6 +55,32 @@ about it.
 A browser session shuts itself down after 30 idle minutes; the daemon closes the rest when it
 stops. The profile stays.
 
+An installed headless shell is used only while its version equals the pinned one and it still
+starts; otherwise the next call removes it and downloads the pinned one.
+
+## Local ports
+
+`agent-browser` controls the browser through a debugging port and serves a second port that
+streams and drives the page. Neither asks for a password, so anything that can connect owns the
+browser: it can read files the sandboxed host shell is denied and reach the Cairn server's port.
+
+- Both ports come from a fixed pool of 16 pairs (`backend/loopback-ports.ts`). The macOS host
+  shell profile denies connecting to, listening on and binding every one of them, and the Browser
+  MCP extension port 9009, for every sandboxed command.
+- A session takes the first pair that nobody holds and that can be bound. With every pair held, it
+  takes over the pair of a session whose browser has stopped. With none left the call answers that
+  too many browsers are open.
+- `agent-browser` only learns a browser's address from `DevToolsActivePort`, which Chrome writes
+  only when it picks the port itself. It is therefore pointed at `browser-launcher`, a script in
+  the Cairn data folder (denied to the sandbox) that writes that file after `lsof` shows that its
+  own process listens on the pinned port, then becomes the browser (`CAIRN_BROWSER_EXECUTABLE`).
+- When the stream port is taken, `agent-browser` silently picks a random one. Before each command
+  the daemon reads the session's `.stream` file and switches a stream outside the pool off. A
+  sandboxed command cannot cause this; another program on the Mac taking the port between the
+  check and the browser start can, and the stream is then open until the next command.
+- An `escalate` command the owner approved runs outside the sandbox and is not limited by this.
+- Linux runners are unchanged by this design: their sandbox does not isolate loopback.
+
 ## Which machine runs a call
 
 1. **Owner's Chrome.** Taken when the tool is a browser tool, `stealth` is unset, there is no
@@ -62,7 +88,9 @@ stops. The profile stays.
    that last answered, the server's own host, then the others by last contact. A candidate is the
    server's own host reporting `browser` or `ownerChrome`, or, for the instance owner's threads
    only, any machine reporting `ownerChrome`. These calls create no `computer` row and take no
-   lease.
+   lease; the daemon runs the calls for one tab one after another. `browser_act` is offered to the
+   first candidate only, because its element references belong to the page that machine showed;
+   when that machine is offline or has no extension, step 4 applies.
 2. A candidate that cannot reach an extension (no `npx`, the server did not start, no browser
    connected) answers with the shared `OWNER_CHROME_UNAVAILABLE` prefix, and the server asks the
    next one under a new attempt id. It answers that way only when none of the call's commands ran.
@@ -109,6 +137,10 @@ close it.
 | `CAIRN_AGENT_BROWSER` | the Mac app, in its runner's environment | `bundledAgentBrowser` | unset or not executable: unsupported |
 | `<Cairn home>/tools/chrome-headless-shell/` | the managed runtime during a download | `mac-browser.ts` before every call that has no Chrome | an incomplete or tampered install is not used; the next call downloads again |
 | `<Cairn home>/mac-browser/profiles/` | the browser | the browser only | a missing folder is created empty, so the site asks for sign-in again; nothing in this change deletes it |
+| port pair held by a session | `mac-browser-ports.ts`, in daemon memory | `mac-browser.ts` before each command | a daemon restart forgets it; a pair still in use cannot be bound, so it is skipped |
+| `<Cairn home>/mac-browser/browser-launcher` | `mac-browser.ts` when it first uses a browser | `agent-browser` | rewritten by the next daemon run |
+| `<Cairn home>/mac-browser/.agent-browser/<session>.stream` | `agent-browser` | `mac-browser.ts` before each command | absent: no stream yet |
+| turn queue per owner's Chrome tab | `owner-chrome.ts`, in daemon memory | the next call for that tab | a failed or stopped call releases its turn |
 
 ## What the Coordinator is offered
 
@@ -135,6 +167,11 @@ Without takeover, the `browser_*` descriptions say that nobody can take over and
 | Extension waiting for Allow or paused | the extension's own words | stop | until they act | server and daemon |
 | Browser MCP on, no extension anywhere | page from Cairn's browser with the note | step 4 | as above | server |
 | Extension drops after a click ran | the error | no replay | none | daemon |
+| `browser_act` after the machine that showed the page lost its extension | Cairn's browser with the note | no other Mac's Chrome | none | server |
+| Two calls for one tab at once | both answer | one after the other | the second waits | daemon |
+| A sandboxed command probes the browser's ports or 9009 | connection refused | profile denies them | none | daemon, real sandbox on macOS |
+| 16 browsers running at once | "too many browsers are open" | no 17th | until one idles out (30 min) | |
+| Cairn update pins a new headless shell, or the installed one no longer starts | the answer, after one download | remove and download again | as first use | daemon |
 | Non-owner thread | never another person's Mac | remote candidates excluded | none | server |
 | `stealth: true` or `fill_secret` | Cairn's browser | step 1 skipped | none | server |
 | Pin left on a Mac that can no longer run it | works on another machine | pin moves | none | server |

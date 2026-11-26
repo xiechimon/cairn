@@ -268,3 +268,49 @@ describe('the owner’s Chrome through browser tools', () => {
     );
   });
 });
+
+describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
+  test('an extension that drops after a click ran is never reported as safe to repeat', async () => {
+    const { call } = recording((commands) =>
+      commands[0] === 'click e2'
+        ? { text: 'No browser is connected', isError: true }
+        : commands[0]?.startsWith('eval') === true
+          ? JSON.stringify({ title: 'Shop', url: 'https://shop.example.com/' })
+          : '✓',
+    );
+    const failure = await runOwnerChromeTool(
+      'browser_act',
+      {
+        actions: [
+          { kind: 'click', ref: '@e1' },
+          { kind: 'click', ref: '@e2' },
+        ],
+      },
+      options(call, ORIGINS),
+    ).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ComputerRefusal);
+    expect(failure).not.toBeInstanceOf(OwnerChromeUnavailable);
+    expect((failure as ComputerRefusal).delivery).toBe('unknown');
+  });
+
+  test('two calls on one tab run one after the other', async () => {
+    const seen: string[] = [];
+    const call: OwnerChromeCaller = async (_session, commands) => {
+      const command = commands[0] ?? '';
+      seen.push(command);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (command.includes('document.title'))
+        return {
+          text: JSON.stringify({ title: 'Page', url: 'https://a.example.com/' }),
+          isError: false,
+        };
+      return { text: command.startsWith('goto') ? '✓' : '[]', isError: false };
+    };
+    await Promise.all(
+      ['https://a.example.com/', 'https://b.example.com/'].map((url) =>
+        runOwnerChromeTool('browser_navigate', { url }, options(call)),
+      ),
+    );
+    expect(seen.indexOf('goto "https://b.example.com/"')).toBe(3);
+  });
+});

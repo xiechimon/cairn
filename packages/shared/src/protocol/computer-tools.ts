@@ -41,7 +41,7 @@ export function computerRemoteTools(
   return [
     {
       name: 'browser_navigate',
-      description: `Open a URL in the Coordinator computer browser. The page stays open for later browser_snapshot and browser_act calls. Use the browser yourself when the owner asks you to open, click or fill something on the web, and for work that needs this browser's logins.${blockedPageAdvice(offer)}${takeoverAdvice(offer)}`,
+      description: `Open a URL in the browser Cairn drives for you. The page stays open for later browser_snapshot and browser_act calls. Use the browser yourself when the owner asks you to open, click or fill something on the web, and for work that needs this browser's logins.${blockedPageAdvice(offer)}${takeoverAdvice(offer)}`,
       parameters: obj({ url: str('Absolute http(s) URL to open.'), ...stealthParam }, ['url']),
     },
     {

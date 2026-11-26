@@ -17,6 +17,12 @@
       "key": "CAIRN_AGENT_BROWSER",
       "scope": "product",
       "userScenario": "A new Mac user never sets it: the app hands its bundled browser driver to its own runner so the Coordinator can open pages."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_BROWSER_EXECUTABLE",
+      "scope": "product",
+      "userScenario": "A new Mac user never sets or sees it: the runner tells its own browser launcher which browser to start for each page the Coordinator opens."
     }
   ]
 }

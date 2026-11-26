@@ -1347,7 +1347,9 @@ export async function forwardComputerCall(
     body.params.stealth !== true &&
     secretActions.length === 0;
   const candidates = mayUseOwnerChrome
-    ? ownerChromeCandidates(db, thread).filter((row) => deps.machineHub.isConnected(row.id))
+    ? ownerChromeCandidates(db, thread)
+        .slice(0, tool === 'browser_act' ? 1 : undefined)
+        .filter((row) => deps.machineHub.isConnected(row.id))
     : [];
   if (candidates.length === 0) return onTarget();
   const chain = throughOwnerChrome(deps, request, candidates, onTarget);

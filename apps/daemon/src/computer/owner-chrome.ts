@@ -350,7 +350,27 @@ export function ownerChromeActionCommands(action: Record<string, unknown>): stri
   }
 }
 
-export async function runOwnerChromeTool(
+const turns = new Map<string, Promise<unknown>>();
+
+export function runOwnerChromeTool(
+  tool: BrowserToolName,
+  params: Record<string, unknown>,
+  options: OwnerChromeRunOptions,
+): Promise<BrowserToolResult> {
+  const next = () => {
+    options.signal.throwIfAborted();
+    return runInOwnerTab(tool, params, options);
+  };
+  const mine = (turns.get(options.session) ?? Promise.resolve()).then(next, next);
+  turns.set(options.session, mine);
+  const leave = () => {
+    if (turns.get(options.session) === mine) turns.delete(options.session);
+  };
+  mine.then(leave, leave);
+  return mine;
+}
+
+async function runInOwnerTab(
   tool: BrowserToolName,
   params: Record<string, unknown>,
   options: OwnerChromeRunOptions,

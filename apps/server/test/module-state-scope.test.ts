@@ -31,6 +31,8 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/computer/owner-chrome.ts:ACT_KINDS': 'constant lookup table',
   'apps/daemon/src/computer/owner-chrome.ts:sessions':
     'MCP tool-client pool for the daemon-owned Chrome session; a process resource',
+  'apps/daemon/src/computer/owner-chrome.ts:turns':
+    'call order for each tab of that process-wide Chrome session pool; entries leave when idle',
   'apps/daemon/src/host-permissions.ts:SETTLED': 'constant lookup table',
   'apps/daemon/src/step-env.ts:AMBIENT_GOOGLE_AUTH':
     'constant environment-variable name lookup; never mutated or populated from an instance',

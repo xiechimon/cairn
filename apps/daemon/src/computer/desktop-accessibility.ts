@@ -16,7 +16,7 @@ import { refuseScreen, ScreenStop } from './screen-stop.js';
 
 export const AGENT_DESKTOP_BINARY = 'agent-desktop';
 export const DESKTOP_NOT_INSTALLED =
-  'agent-desktop is not installed on this computer; update the computer to the latest image';
+  'agent-desktop is not installed on this computer; update Cairn on this computer';
 const COMMAND_NOT_FOUND = 127;
 const COMMAND_TIMEOUT_MS = 30_000;
 const FINAL_FRAME_MARGIN_MS = 5_000;
