@@ -226,7 +226,7 @@ test('fetchCheckRuns returns null when the commit is unknown to GitHub', () => {
   );
 });
 
-test('preflight stamps unowned commits with Lane: before pushing the preflight ref', () => {
+test('preflight and push-queue stamp unowned commits with the same machine lane', () => {
   const root = makeTestTempDir('preflight-stamp-');
   try {
     const bare = join(root, 'origin.git');
@@ -268,7 +268,8 @@ const apiArg = args.find((a) => a.includes('head_sha=')) || '';
 const sha = (apiArg.match(/head_sha=([0-9a-f]+)/) || [])[1] || '';
 const id = require('node:fs').readFileSync(process.env.HOME + '/.config/cairn-dev/lane-machine-id', 'utf8').trim();
 const branch = 'preflight/' + id + '/wt';
-console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_branch: branch, html_url: 'https://example/run/1' }] }));
+const isCheckRuns = args.some((a) => a.includes('/check-runs'));
+console.log(JSON.stringify(isCheckRuns ? [{ check_runs: [] }] : { workflow_runs: [{ name: 'ci', head_sha: sha, head_branch: branch, html_url: 'https://example/run/1' }] }));
 `,
     );
     chmodSync(ghStub, 0o755);
@@ -311,6 +312,7 @@ console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_b
       },
     );
     assert.equal(queued.status, 1, queued.stderr);
+    assert.match(queued.stderr, /no green ci evidence/);
     assert.match(
       git(work, ['log', '-1', '--format=%B', 'HEAD']),
       new RegExp(`^Lane: ${lane}$`, 'm'),
