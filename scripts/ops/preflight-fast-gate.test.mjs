@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -48,6 +48,7 @@ test('typecheck package selection follows package blast radius', () => {
 
 test('fast gate plan is biome, touched package typechecks, then changed tests', () => {
   assert.deepEqual(fastGatePlan(['apps/web/src/App.tsx', 'apps/server/src/index.ts']), [
+    CHEAP_STEP,
     ['pnpm', 'lint'],
     ['pnpm', '--filter', '@xiechimon/cairn', 'typecheck'],
     ['pnpm', '--filter', '@cairn/web', 'typecheck'],
@@ -151,7 +152,7 @@ test('CAIRN_PREFLIGHT_GATE_WRAPPER runs the full fast-gate plan in one sh -c cal
       '--',
       'sh',
       '-c',
-      'pnpm lint && pnpm --filter @cairn/web typecheck && pnpm test:changed',
+      'node scripts/ops/preflight-fast-gate.mjs --cheap-checks && pnpm lint && pnpm --filter @cairn/web typecheck && pnpm test:changed',
     ],
     options: { cwd: '/wt', stdio: 'inherit' },
   });
@@ -171,6 +172,7 @@ test('CAIRN_PREFLIGHT_GATE_WRAPPER runs the full fast-gate plan in one sh -c cal
 
 test('fastGatePlan puts previously failed vitest files first and runFastGate clears cache on pass', () => {
   assert.deepEqual(fastGatePlan(['apps/web/src/App.tsx'], ['apps/web/test/remote-host.test.ts']), [
+    CHEAP_STEP,
     ['pnpm', 'exec', 'vitest', 'run', 'apps/web/test/remote-host.test.ts'],
     ['pnpm', 'lint'],
     ['pnpm', '--filter', '@cairn/web', 'typecheck'],
@@ -204,7 +206,7 @@ test('fastGatePlan puts previously failed vitest files first and runFastGate cle
       log: () => {},
     });
     assert.equal(failFirst.ok, false);
-    assert.deepEqual(calls, [`pnpm exec vitest run ${testRel}`]);
+    assert.deepEqual(calls, [CHEAP_STEP.join(' '), `pnpm exec vitest run ${testRel}`]);
     assert.equal(existsSync(cachePath), true);
 
     writeFileSync(
@@ -264,6 +266,7 @@ test('cached failures that this machine refuses to run together do not block the
   }
 });
 
+const CHEAP_STEP = ['node', 'scripts/ops/preflight-fast-gate.mjs', '--cheap-checks'];
 const CI_TEXT = readFileSync(join(import.meta.dirname, '../../.github/workflows/ci.yml'), 'utf8');
 const selected = (paths, workflow = CI_TEXT) =>
   fastGate.ciChecks(workflow, paths).checks.map((step) => step.slice(1).join(' '));
@@ -327,4 +330,74 @@ test('a CI step that cannot be classified is reported', () => {
     ),
   ])
     assert.equal(fastGate.ciChecks(workflow, ['a.ts']).unclassified.length, 1, workflow);
+});
+
+function runCheap(overrides) {
+  const lines = [];
+  return fastGate
+    .runCheapChecks({
+      cwd: '/wt',
+      resolveBase: () => 'abc123',
+      select: () => ({ checks: [['node', 'a.mjs']], unclassified: [] }),
+      log: (line) => lines.push(line),
+      ...overrides,
+    })
+    .then((status) => ({ status, output: lines.join('\n') }));
+}
+
+test('cheap checks get the pushed base and no inherited override', async () => {
+  const seen = [];
+  const { status } = await runCheap({
+    env: { TEST_INTEGRITY_BASE_SHA: 'stale', ENGLISH_ONLY_BASE_SHA: 'stale' },
+    run: async (_step, { env }) => {
+      seen.push(env);
+      return { status: 0, output: '' };
+    },
+  });
+  assert.equal(status, 0);
+  assert.equal(seen[0].PREPUSH_BASE_SHA, 'abc123');
+  assert.equal(seen[0].TEST_INTEGRITY_BASE_SHA, undefined);
+  assert.equal(seen[0].ENGLISH_ONLY_BASE_SHA, undefined);
+});
+
+test('every failure is reported, and anything that cannot run is red', async () => {
+  const exits = { 'a.mjs': 1, 'b.mjs': null, 'c.mjs': 0 };
+  const failed = await runCheap({
+    select: () => ({
+      checks: Object.keys(exits).map((script) => ['node', script]),
+      unclassified: [],
+    }),
+    run: async ([, script]) => ({ status: exits[script], output: `${script} said no` }),
+  });
+  assert.equal(failed.status, 2);
+  assert.match(
+    failed.output,
+    /a\.mjs said no[\s\S]*b\.mjs said no|b\.mjs said no[\s\S]*a\.mjs said no/,
+  );
+  assert.match(failed.output, /1\/3 passed/);
+  for (const override of [
+    { resolveBase: () => '' },
+    { select: () => ({ checks: [], unclassified: [] }) },
+    { select: () => ({ checks: [['node', 'a.mjs']], unclassified: ['new step: pnpm x'] }) },
+  ])
+    assert.equal((await runCheap(override)).status, 2);
+});
+
+test('a really failing check reaches pre-flight as a non-zero exit', async () => {
+  const real = (code) =>
+    runCheap({
+      cwd: process.cwd(),
+      select: () => ({ checks: [[process.execPath, '-e', code]], unclassified: [] }),
+    }).then((result) => result.status);
+  assert.equal(await real('process.exit(0)'), 0);
+  assert.equal(await real('process.exit(1)'), 1);
+  assert.equal(await real("process.kill(process.pid, 'SIGKILL')"), 2);
+  const root = makeTestTempDir('cheap-checks-cli-');
+  try {
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    const cli = join(import.meta.dirname, 'preflight-fast-gate.mjs');
+    assert.equal(spawnSync(process.execPath, [cli, '--cheap-checks'], { cwd: root }).status, 2);
+  } finally {
+    releaseTestTempDir(root);
+  }
 });

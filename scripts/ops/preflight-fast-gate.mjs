@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn as spawnChild, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { dirname, posix, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parse } from 'yaml';
+import { mergeBase } from '../diff-base.mjs';
 import { hasCode, needsGates, prepushPlan, testsRead } from '../prepush.mjs';
+import { scrubGitEnv } from '../scrub-git-env.mjs';
 import { heavyRunAuthorized } from '../test-admission.mjs';
 
+const CHEAP_CHECKS_FLAG = '--cheap-checks';
+const CHEAP_CHECKS_STEP = ['node', 'scripts/ops/preflight-fast-gate.mjs', CHEAP_CHECKS_FLAG];
+const COULD_NOT_RUN = 2;
 const CHECK_SCRIPT = /(?:-gate|-ledger)\.[cm]?[jt]s(?: |$)| --check[\w-]*(?: |$)/;
 const WRAPPER = /(?:ci-failed-only|test-temp-run)\.mjs.*? -- /;
 const INVOCATION =
@@ -145,6 +151,65 @@ export function staleSkips(workflow) {
   return Object.keys(SKIPPED).filter((key) => !skipped.has(key));
 }
 
+function runStep([command, ...args], { cwd, env }) {
+  return new Promise((done) => {
+    const chunks = [];
+    const options = { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 5 * 60_000 };
+    const child = spawnChild(command, args, options);
+    child.stdout.on('data', (chunk) => chunks.push(chunk));
+    child.stderr.on('data', (chunk) => chunks.push(chunk));
+    const finish = (status, extra = '') =>
+      done({ status, output: `${Buffer.concat(chunks).toString('utf8')}${extra}` });
+    child.on('error', (error) => finish(null, error.message));
+    child.on('close', (status) => finish(status));
+  });
+}
+
+function selectChecks(cwd) {
+  const workflow = readFileSync(resolve(cwd, '.github/workflows/ci.yml'), 'utf8');
+  return ciChecks(workflow, committedPaths(cwd));
+}
+
+export async function runCheapChecks({
+  cwd,
+  env = process.env,
+  resolveBase = () => mergeBase(cwd, 'origin/main'),
+  select = selectChecks,
+  run = runStep,
+  log = console.log,
+}) {
+  const base = resolveBase();
+  const { checks, unclassified } = base ? select(cwd) : { checks: [], unclassified: [] };
+  if (checks.length === 0 || unclassified.length > 0) {
+    const why = base
+      ? unclassified.join('\n') || 'CI selects no check'
+      : 'no merge-base with origin/main';
+    log(`[cheap-checks] could not run: ${why}`);
+    return COULD_NOT_RUN;
+  }
+  const childEnv = scrubGitEnv(
+    Object.fromEntries(Object.entries(env).filter(([key]) => !/_BASE_(?:SHA|REF)$/.test(key))),
+  );
+  childEnv.PREPUSH_BASE_SHA = base;
+  const queue = [...checks];
+  const results = [];
+  const worker = async () => {
+    for (let step = queue.shift(); step; step = queue.shift()) {
+      results.push({ step, ...(await run(step, { cwd, env: childEnv })) });
+    }
+  };
+  const started = Date.now();
+  await Promise.all(Array.from({ length: availableParallelism() }, worker));
+  const failed = results.filter((result) => result.status !== 0);
+  for (const { step, status, output } of failed) {
+    log(`[cheap-checks] FAIL (exit ${status ?? 'none'}) ${step.join(' ')}\n${output.trimEnd()}`);
+  }
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  log(`[cheap-checks] ${results.length - failed.length}/${results.length} passed in ${seconds}s`);
+  if (failed.length === 0) return 0;
+  return failed.every((result) => result.status === 1) ? 1 : COULD_NOT_RUN;
+}
+
 const PACKAGE_ORDER = [
   '@cairn/shared',
   '@xiechimon/cairn',
@@ -217,7 +282,7 @@ export function fastGatePlan(paths, lastFailedTests = []) {
   if (lastFailedTests.length > 0) {
     plan.unshift(['pnpm', 'exec', 'vitest', 'run', ...lastFailedTests]);
   }
-  return plan;
+  return [CHEAP_CHECKS_STEP, ...plan];
 }
 
 export function lastFailedCachePath(cwd, gitExec = git) {
@@ -360,6 +425,9 @@ export function runFastGate({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  if (process.argv[2] === CHEAP_CHECKS_FLAG) {
+    process.exit(await runCheapChecks({ cwd: process.cwd() }));
+  }
   const result = runFastGate({ cwd: process.cwd() });
   if (!result.ok) {
     console.error(`[preflight-fast-gate] ${result.error}`);

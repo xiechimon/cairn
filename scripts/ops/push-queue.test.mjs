@@ -254,8 +254,8 @@ test('preflight and push-queue stamp unowned commits with the same machine lane'
       'test-admission.mjs',
       'heavy-slots.mjs',
       'owned-process.mjs',
-      'prepush.mjs',
       'diff-base.mjs',
+      'prepush.mjs',
       'ci-failed-only-state.mjs',
       'scrub-git-env.mjs',
     ]) {
@@ -269,6 +269,17 @@ test('preflight and push-queue stamp unowned commits with the same machine lane'
       join(dirname(fileURLToPath(import.meta.url)), '../../node_modules'),
       join(root, 'node_modules'),
     );
+    for (const [file, text] of [
+      [
+        '.github/workflows/ci.yml',
+        'jobs:\n  c:\n    steps:\n      - run: node scripts/stub-gate.mjs\n',
+      ],
+      ['scripts/stub-gate.mjs', ''],
+    ]) {
+      mkdirSync(dirname(join(work, file)), { recursive: true });
+      writeFileSync(join(work, file), text);
+      git(work, ['add', file]);
+    }
     git(work, ['commit', '-m', 'add fast gate']);
     git(work, ['push', 'origin', 'main']);
     git(work, ['checkout', '-b', 'feature']);

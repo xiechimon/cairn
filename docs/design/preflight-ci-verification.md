@@ -27,8 +27,14 @@ A lane verifies on GitHub before it enters the landing queue:
   live queue candidate.
 - `scripts/ops/preflight.mjs` runs `scripts/ops/preflight-fast-gate.mjs` on
   the exact committed `HEAD` tree before pushing `refs/heads/preflight/<lane>`
-  (`pnpm lint`, touched-package `typecheck`, and `pnpm test:changed`), and
-  refuses to push if it fails. On a machine that refuses multi-file test runs
+  (CI's cheap checks, `pnpm lint`, touched-package `typecheck`, and
+  `pnpm test:changed`), and refuses to push if it fails. The cheap checks and
+  their conditions are read from `.github/workflows/ci.yml` at that `HEAD`,
+  with `pnpm prepush --ci` expanded to its own plan: a node script named
+  `*-gate` or `*-ledger`, or run with `--check`, is run unless CI marks the step
+  `continue-on-error` or the fast gate names why it skips it. A step, command or
+  condition it cannot classify, no merge-base with `origin/main`, or a check
+  that cannot run is red. Inline shell is not reproduced. On a machine that refuses multi-file test runs
   (no `CI`, `CAIRN_MINI_TEST` or `CAIRN_LOCAL_HEAVY`), `pnpm test:changed`
   runs a single related file, and with two or more it lists them, runs none and
   leaves them to the `ci` run. Setting `CAIRN_PREFLIGHT_GATE_WRAPPER`
