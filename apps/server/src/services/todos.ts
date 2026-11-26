@@ -79,7 +79,11 @@ import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { contextWindowOf } from './coordinator-context.js';
 import { assertCorrectionDone } from './correction.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
-import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
+import {
+  antigravityUsesHostLogin,
+  capabilityGatePasses,
+  runtimeGatePasses,
+} from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import {
   claimEffect,
@@ -563,7 +567,10 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
           sole);
     const provider = s.fallback?.model?.provider ?? agentRow.provider;
     const target = online.find(
-      (m) => m.id === named && runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),
+      (m) =>
+        m.id === named &&
+        runtimeGatePasses(m, provider, antigravityUsesHostLogin(deps.db, row.teamId)) &&
+        capabilityGatePasses(m, agentRow),
     );
     if (target === undefined) return { on: 'machine', retryAt: null };
   }

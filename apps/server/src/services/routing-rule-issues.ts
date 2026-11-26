@@ -7,7 +7,7 @@ import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordin
 import {
   codexProviderKeyed,
   machineRuntimeAvailable,
-  runtimeGatePasses,
+  machineRuntimeClaimable,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import {
@@ -46,7 +46,7 @@ function capabilityRouted(rule: RoutingRuleRow): boolean {
 }
 
 function runsRule(m: MachineRow, rule: RoutingRuleRow, codexProvider: boolean): boolean {
-  if (!capabilityRouted(rule)) return runtimeGatePasses(m, rule.provider);
+  if (!capabilityRouted(rule)) return machineRuntimeClaimable(m, stepRuntimeFor(rule.provider));
   return machineRuntimeAvailable(m, 'claude-code') || codexProvider;
 }
 

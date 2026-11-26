@@ -10,7 +10,7 @@ import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { machine, type routingRule, type StepFallbackRow, type step } from '../db/schema.js';
-import { runtimeGatePasses } from './dispatch-eligibility.js';
+import { antigravityUsesHostLogin, runtimeGatePasses } from './dispatch-eligibility.js';
 import { getModelLiveness } from './model-liveness.js';
 import { providerHealth } from './provider-health.js';
 
@@ -157,10 +157,11 @@ export function planModelFallback(
   const from = stepRow.ranModel ?? stepRow.fallback?.model ?? primary;
   const tried = new Set(stepRow.fallback?.tried ?? [modelKey(primary)]);
   tried.add(modelKey(from));
+  const antigravityHostLogin = antigravityUsesHostLogin(deps.db, agentRow.teamId);
   const to = chain.find(
     (m) =>
       !tried.has(modelKey(m)) &&
-      hosts.some((host) => runtimeGatePasses(host, m.provider)) &&
+      hosts.some((host) => runtimeGatePasses(host, m.provider, antigravityHostLogin)) &&
       getModelLiveness(agentRow.teamId, m.provider, m.modelId) !== 'dead' &&
       providerHealth.canAcquire(`${agentRow.teamId}/${m.provider}`),
   );

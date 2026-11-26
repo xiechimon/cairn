@@ -11,6 +11,7 @@ import {
   type RunnerOs,
   runnerOsOf,
   runnerOutOfWindow,
+  runsLegacyMacSandbox,
   type StepKind,
 } from '@cairn/shared';
 import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm';
@@ -32,7 +33,10 @@ export function stepRuntimeFor(
 
 export interface MachineRuntimeFacts {
   claudeCodeReport: Pick<ClaudeCodeReport, 'installed'> | null;
-  capabilities: Pick<MachineCapabilities, 'executor' | 'devin' | 'antigravity'> | null;
+  capabilities: Pick<
+    MachineCapabilities,
+    'executor' | 'devin' | 'antigravity' | 'osPlatform' | 'confinement'
+  > | null;
 }
 
 export function machineRuntimeAvailable(
@@ -59,11 +63,30 @@ export function availableRuntimes(machineRow: MachineRuntimeFacts): MachineRunti
   return MACHINE_RUNTIMES.filter((runtime) => machineRuntimeAvailable(machineRow, runtime));
 }
 
+export function runnerCannotConnect(
+  capabilities: MachineRuntimeFacts['capabilities'],
+  runtime: ReturnType<typeof stepRuntimeFor>,
+  antigravityHostLogin: boolean,
+): boolean {
+  const sandboxBlocksTls =
+    runtime === 'devin' || (runtime === 'antigravity' && !antigravityHostLogin);
+  return sandboxBlocksTls && runsLegacyMacSandbox(capabilities);
+}
+
+export function antigravityUsesHostLogin(db: Pick<Db, 'select'>, teamId: string): boolean {
+  return activeAntigravitySource(db, teamId).kind === 'host';
+}
+
 export function runtimeGatePasses(
   machineRow: MachineRuntimeFacts,
   agentProvider: string | null | undefined,
+  antigravityHostLogin = false,
 ): boolean {
-  return machineRuntimeClaimable(machineRow, stepRuntimeFor(agentProvider));
+  const runtime = stepRuntimeFor(agentProvider);
+  return (
+    machineRuntimeClaimable(machineRow, runtime) &&
+    !runnerCannotConnect(machineRow.capabilities, runtime, antigravityHostLogin)
+  );
 }
 
 export function claudeCodeUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
@@ -250,6 +273,7 @@ export interface EligibilityInput {
   claudeSubscriptionMissing: boolean;
   devinSubscriptionMissing: boolean;
   antigravitySubscriptionMissing?: boolean;
+  antigravityHostLogin?: boolean;
 }
 
 export type MachineIneligibility =
@@ -269,7 +293,10 @@ export type MachineIneligibility =
 export function machineEligibility(input: EligibilityInput): MachineIneligibility | null {
   const { machine: machineRow, agent: agentRow, model } = input;
   const runtime = stepRuntimeFor(model.provider);
-  if (runnerOutOfWindow(machineRow.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL)) {
+  if (
+    runnerOutOfWindow(machineRow.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL) ||
+    runnerCannotConnect(machineRow.capabilities, runtime, input.antigravityHostLogin === true)
+  ) {
     return { kind: 'runner-outdated' };
   }
   if (!machineRuntimeClaimable(machineRow, runtime)) return { kind: 'runtime' };

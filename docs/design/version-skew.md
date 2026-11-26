@@ -94,11 +94,11 @@ Server rules:
 
 `MIN_SUPPORTED_RUNNER_PROTOCOL` is `0` today: no runner in use is below the floor. It is raised only by a change that removes a server path older runners need, and that change keeps at least 30 days of runner releases inside the window.
 
-Removing a runner feature never removes the server half a runner inside the window still waits on. Runners from before `desktop-v0.1.712` read their `capabilities.confinement` report back before they start, so the server keeps storing and returning it (`legacyConfinementReportSchema`); that field and its schema go when the floor rises above `0`.
+Removing a runner feature never removes the server half a runner inside the window still waits on. Runners from before `desktop-v0.1.712` read their `capabilities.confinement` report back before they start, so the server keeps storing and returning it (`legacyConfinementReportSchema`); that field and its schema go when the floor rises above `0`. The same report marks a macOS runner whose sandbox blocks TLS verification, so Devin and Antigravity token turns wait for it to update instead of failing (`runsLegacyMacSandbox`).
 
 #### Runner ↔ Server edge cases
 
-Every pairing, mode and condition for this part, with the expected result, its test and the red-on-main evidence: [`version-skew-edge-cases/runner-claim.md`](version-skew-edge-cases/runner-claim.md) (R1–R18).
+Every pairing, mode and condition for this part, with the expected result, its test and the red-on-main evidence: [`version-skew-edge-cases/runner-claim.md`](version-skew-edge-cases/runner-claim.md) (R1–R21).
 
 ### 3. Compatibility windows
 

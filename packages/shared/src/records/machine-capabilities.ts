@@ -304,6 +304,13 @@ export function runnerNeedsUpdate(capabilities: MachineCapabilities | null | und
   return capabilities != null && runnerProtocolOf(capabilities) < RUNNER_PROTOCOL_VERSION;
 }
 
+export function runsLegacyMacSandbox(
+  capabilities: Pick<MachineCapabilities, 'osPlatform' | 'confinement'> | null | undefined,
+): boolean {
+  const state = capabilities?.confinement?.state;
+  return capabilities?.osPlatform === 'darwin' && state !== undefined && state !== 'not-applicable';
+}
+
 export function parseStoredCapabilities(raw: unknown): MachineCapabilities | null | undefined {
   if (raw === undefined) return undefined;
   if (raw === null) return null;

@@ -18,11 +18,13 @@ import {
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
+  antigravityUsesHostLogin,
   type MachineIneligibility,
   machineEligibility,
   machineRunningCount,
   machineRuntimeClaimable,
   missingCapabilities,
+  runnerCannotConnect,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import type { RouteProfile } from './routing-rules.js';
@@ -63,6 +65,8 @@ export function workerIneligibility(
         machineRow.id,
         machineRow.capabilities,
       ),
+    antigravityHostLogin:
+      runtime === 'antigravity' && antigravityUsesHostLogin(db, machineRow.teamId),
   });
   return ineligible;
 }
@@ -75,7 +79,14 @@ export function chiefIneligibility(
   now: number,
 ): MachineIneligibility | null {
   const runtime = stepRuntimeFor(provider);
-  if (runnerOutOfWindow(machineRow.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL)) {
+  if (
+    runnerOutOfWindow(machineRow.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL) ||
+    runnerCannotConnect(
+      machineRow.capabilities,
+      runtime,
+      runtime === 'antigravity' && antigravityUsesHostLogin(db, machineRow.teamId),
+    )
+  ) {
     return { kind: 'runner-outdated' };
   }
   if (!machineRuntimeClaimable(machineRow, runtime)) return { kind: 'runtime' };

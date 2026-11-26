@@ -118,7 +118,11 @@ import {
   wakeCoordinator,
 } from './coordinator-context.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
-import { runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
+import {
+  antigravityUsesHostLogin,
+  runtimeGatePasses,
+  stepRuntimeFor,
+} from './dispatch-eligibility.js';
 import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
@@ -261,7 +265,11 @@ function chiefOrchestration(deps: ChiefDeps, teamId: string): ChiefGetResponse['
     if (home === null) continue;
     const machineRow = deps.db.select().from(machine).where(eq(machine.id, home)).get();
     const offline = machineRow === undefined || !machineRow.online;
-    if (!offline && runtimeGatePasses(machineRow, agentRow?.provider)) continue;
+    if (
+      !offline &&
+      runtimeGatePasses(machineRow, agentRow?.provider, antigravityUsesHostLogin(deps.db, teamId))
+    )
+      continue;
     bump(home).waiting += 1;
   }
   return {
