@@ -343,9 +343,10 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
             agentTodo,
             pageTodo: newest?.agentTodo ?? null,
             build: buildQ.data ?? null,
+            liveText,
           })
         : null,
-    [live, messages, steps, agentTodo, newest?.agentTodo, buildQ.data],
+    [live, messages, steps, agentTodo, newest?.agentTodo, buildQ.data, liveText],
   );
 
   const load: ThreadChatLoad = !live

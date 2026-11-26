@@ -468,7 +468,7 @@ function ThreadBody({
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
       {view === 'raw' && engine !== undefined ? (
-        <EngineRawView run={engine.run} />
+        <EngineRawView key={todo.id} run={engine.run} />
       ) : (
         <ReportThreadContext.Provider value={reportThread}>
           <TranscriptColumn
@@ -609,12 +609,18 @@ export function SideChat({
       },
       { replace: true },
     );
-  const [view, setView] = useState<ThreadView>('chat');
+  const [rawFor, setRawFor] = useState<string | null>(null);
+  const view: ThreadView = rawFor === todoId ? 'raw' : 'chat';
+  const setView = (next: ThreadView) => setRawFor(next === 'raw' ? todoId : null);
   const [changesOpenFor, setChangesOpenFor] = useState<string | null>(
     searchParams.get(VIEW_PARAM) === 'changes' ? todoId : null,
   );
-  const showsSubView = view !== 'chat';
   const Stage = chat.engineStage;
+  const showsSubView =
+    view !== 'chat' &&
+    todo != null &&
+    chat.load === 'ready' &&
+    (Stage !== undefined || chat.engineRun !== undefined);
   const thread = (engine: EngineRunView | undefined) =>
     todo == null ? null : (
       <ReadyThread
@@ -760,15 +766,16 @@ function ReadyThread({
       }),
     );
   };
+  const effectiveView: ThreadView = view === 'raw' && engine !== undefined ? 'raw' : 'chat';
   return (
     <>
       <Head
         todoId={todo.id}
         todo={todo}
-        onBack={view !== 'chat' ? () => onView('chat') : onClose}
-        backLabel={view !== 'chat' ? t('返回对话') : t('返回')}
+        onBack={effectiveView !== 'chat' ? () => onView('chat') : onClose}
+        backLabel={effectiveView !== 'chat' ? t('返回对话') : t('返回')}
         onClose={onCloseAll}
-        {...(docked ? { onCollapse: onClose, subView: view !== 'chat' } : {})}
+        {...(docked ? { onCollapse: onClose, subView: effectiveView !== 'chat' } : {})}
         menu={actions.menu}
         titleExtra={<ThreadAutomations key={todo.id} todo={todo} now={now} />}
         tooltip={todo.title}
@@ -785,7 +792,7 @@ function ReadyThread({
         chat={chat}
         todo={todo}
         actions={actions}
-        view={view}
+        view={effectiveView}
         changesOpen={changesOpen}
         onChangesOpen={onChangesOpen}
         origin={origin}

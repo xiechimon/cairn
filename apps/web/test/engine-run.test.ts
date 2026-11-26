@@ -1,5 +1,8 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { engineUsageSummary } from '../src/board/engine-run.js';
+import { engineTranscript, engineUsageSummary } from '../src/board/engine-run.js';
+import { EngineRawView } from '../src/board/engine-run-view.js';
 import { earlierStepCount } from '../src/detail/work-trace.js';
 import {
   ENGINE_SCRIPTS,
@@ -7,6 +10,7 @@ import {
   engineRunAt,
   engineScriptSteps,
 } from '../src/fixtures/engine-runs.js';
+import { I18nProvider } from '../src/i18n/provider.js';
 
 const script = ENGINE_SCRIPTS.running;
 const planOf = (shown: number, answers = {}) =>
@@ -38,6 +42,60 @@ describe('engine run view model', () => {
 
   it('folds earlier steps only when more than one would hide', () => {
     expect([0, 5, 6, 7, 25].map(earlierStepCount)).toEqual([0, 0, 0, 2, 20]);
+  });
+
+  it('keeps a narration preamble between tool calls in one work block', () => {
+    const items = engineTranscript({
+      engine: 'Claude Code',
+      state: 'finished',
+      elapsedSeconds: 12,
+      costUsd: 0.05,
+      plan: [],
+      rawOutput: '',
+      events: [
+        { kind: 'read', id: 'r1', path: 'a.ts', lines: 10, seconds: 0.2 },
+        { kind: 'text', id: 'p1', text: 'Next, update the handler.' },
+        { kind: 'edit', id: 'e1', file: { path: 'a.ts', added: 1, removed: 1, hunks: [] } },
+      ],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      kind: 'work',
+      steps: [
+        { kind: 'call', action: 'read' },
+        { kind: 'say', text: 'Next, update the handler.' },
+        { kind: 'call', action: 'edit' },
+      ],
+    });
+  });
+
+  it('ignores non-finite or negative costUsd in usage summary', () => {
+    const summary = {
+      cost: '—',
+      tokens: '—',
+      cached: '',
+      models: [],
+      machines: [],
+      duration: '',
+      engines: [],
+    };
+    const run = engineRunAt(script, 0);
+    expect(engineUsageSummary(summary, { ...run, costUsd: Number.NaN }).cost).toBe('—');
+    expect(engineUsageSummary(summary, { ...run, costUsd: -1 }).cost).toBe('—');
+  });
+
+  it('renders empty raw output without an inert copy button and uses keyboard focus ring on log', () => {
+    const emptyHtml = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(EngineRawView, {
+          run: { ...engineRunAt(script, 0), rawOutput: '' },
+        }),
+      }),
+    );
+    expect(emptyHtml).toContain('引擎尚无输出');
+    expect(emptyHtml).not.toContain('data-testid="engine-raw-copy"');
+    expect(emptyHtml).toContain('focus-visible:');
   });
 });
 

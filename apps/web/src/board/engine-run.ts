@@ -56,7 +56,7 @@ export type EngineRunStage = ComponentType<{
 }>;
 
 function engineCost(costUsd: number | null): string | null {
-  if (costUsd === null) return null;
+  if (costUsd === null || !Number.isFinite(costUsd) || costUsd < 0) return null;
   return `$${costUsd < 0.01 && costUsd > 0 ? costUsd.toFixed(4) : costUsd.toFixed(2)}`;
 }
 
@@ -172,7 +172,6 @@ export function engineTranscript(run: EngineRun): TranscriptItem[] {
         nextEvent.kind !== 'text' &&
         nextEvent.kind !== 'question'
       ) {
-        flush(event.id);
         steps.push({ kind: 'say', id: event.id, text: event.text });
       } else {
         flush(event.id);

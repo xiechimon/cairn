@@ -4,12 +4,13 @@ import { CopyIconButton } from '../components/copy-icon-button.js';
 import { Button } from '../components/ui/button.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
+import { FOCUS_RING_INSET } from '../lib/focus-ring.js';
 import { type EngineRun, type EngineRunActions, enginePendingQuestion } from './engine-run.js';
 
 const END_SLACK = 24;
 const KEYBOARD_SCROLLABLE = { tabIndex: 0 } as const;
 
-function useStickToEnd<T extends HTMLElement>() {
+function useStickToEnd<T extends HTMLElement>(text: string) {
   const ref = useRef<T>(null);
   const pinned = useRef(true);
   useScrollFade(ref);
@@ -22,9 +23,14 @@ function useStickToEnd<T extends HTMLElement>() {
     };
     stick();
     const observer = new ResizeObserver(stick);
+    observer.observe(el);
     observer.observe(content);
     return () => observer.disconnect();
   }, []);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el != null && pinned.current) el.scrollTop = el.scrollHeight;
+  }, [text]);
   const onScroll = () => {
     const el = ref.current;
     if (el !== null) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < END_SLACK;
@@ -34,8 +40,9 @@ function useStickToEnd<T extends HTMLElement>() {
 
 export function EngineRawView({ run }: { run: EngineRun }) {
   const { t } = useI18n();
-  const scroller = useStickToEnd<HTMLPreElement>();
   const text = run.rawOutput;
+  const scroller = useStickToEnd<HTMLPreElement>(text);
+  const empty = text === '';
   return (
     <div data-testid="engine-raw-view" className="flex min-h-0 flex-1 flex-col px-4 pt-3 pb-4">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-(--radius-code) border border-border bg-background">
@@ -43,16 +50,22 @@ export function EngineRawView({ run }: { run: EngineRun }) {
           <span className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-secondary">
             {t('原始输出')}
           </span>
-          <CopyIconButton text={text} testId="engine-raw-copy" />
+          {!empty && <CopyIconButton text={text} testId="engine-raw-copy" />}
         </div>
         <pre
           {...scroller}
           role="log"
           aria-label={t('原始输出')}
           data-testid="engine-raw"
-          className="scroll-fade m-0 min-h-0 flex-1 overflow-auto px-5 py-3 font-prose-mono text-code whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere] focus:outline-none"
+          className={`scroll-fade m-0 min-h-0 flex-1 overflow-auto px-5 py-3 font-prose-mono text-code whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere] ${FOCUS_RING_INSET}`}
         >
-          <span className="block">{text === '' ? t('引擎尚无输出') : text}</span>
+          {empty ? (
+            <span className="block font-sans text-ui text-content-tertiary">
+              {t('引擎尚无输出')}
+            </span>
+          ) : (
+            <span className="block">{text}</span>
+          )}
         </pre>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
+import { findLowContrast } from './contrast-probe.js';
 import { settleTransitions } from './helpers.js';
 import { remounts, watchRemounts } from './live-stability.js';
 
@@ -266,4 +267,77 @@ test('the plan keeps its card as the run advances and the item just finished dra
     'grow-check-draw',
   );
   expect(await remounts(page)).toEqual([]);
+});
+
+test('an empty engine log shows the empty state without a copy button and keyboard focus reaches the log', async ({
+  page,
+}) => {
+  await open(page, 'empty');
+  await (await menuItem(page, '原始输出')).click();
+  const raw = page.getByTestId('engine-raw');
+  await expect(raw).toHaveText('引擎尚无输出');
+  await expect(page.getByTestId('engine-raw-copy')).toHaveCount(0);
+  await raw.focus();
+  await expect(raw).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(transcript(page)).toBeVisible();
+});
+
+test('switching threads in docked mode leaves raw output behind instead of leaking back button or raw state', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await page.goto('/app?scenario=home-c-engine&pane=tasks&thread=home-c-engine-running');
+  await (await menuItem(page, '原始输出')).click();
+  await expect(page.getByTestId('engine-raw')).toBeVisible();
+  const tasksPanel = page.getByRole('complementary', { name: '任务' });
+  await tasksPanel.getByText('Orb canary round 7').click();
+  await expect(page.getByTestId('side-chat')).toHaveAttribute('data-todo-id', 'home-c-working-c');
+  await expect(page.getByTestId('side-chat-back')).toHaveCount(0);
+  await expect(page.getByTestId('side-chat-collapse')).toBeVisible();
+  await tasksPanel.getByRole('tab', { name: '已完成' }).click();
+  await tasksPanel.getByText('所有下载入口的文件名乱码').click();
+  await expect(page.getByTestId('side-chat')).toHaveAttribute('data-todo-id', 'home-c-engine-long');
+  await expect(transcript(page)).toBeVisible();
+  await expect(page.getByTestId('engine-raw')).toHaveCount(0);
+});
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`axe and contrast pass on raw output and failed states (${theme})`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await open(page, 'failed');
+    await expect(tail(page)).toHaveAttribute('data-state', 'failed');
+    await page.getByTestId('work-summary').last().click();
+    await lastSteps(page).last().click();
+    await expect(page.getByTestId('tool-output')).toBeVisible();
+    await settleTransitions(page);
+    const failedAxe = await new AxeBuilder({ page })
+      .include('.side-panel')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze();
+    expect(failedAxe.violations.map((v) => `${v.id}: ${v.nodes[0]?.target.join(' ')}`)).toEqual([]);
+    expect(await findLowContrast(page, '.side-panel')).toEqual([]);
+
+    await (await menuItem(page, '原始输出')).click();
+    await expect(page.getByTestId('engine-raw')).toBeVisible();
+    await settleTransitions(page);
+    const rawAxe = await new AxeBuilder({ page })
+      .include('.side-panel')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze();
+    expect(rawAxe.violations.map((v) => `${v.id}: ${v.nodes[0]?.target.join(' ')}`)).toEqual([]);
+    expect(await findLowContrast(page, '.side-panel')).toEqual([]);
+  });
+}
+
+test('raw output fits the 390px phone viewport without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, 'long');
+  await (await menuItem(page, '原始输出')).click();
+  await expect(page.getByTestId('engine-raw')).toBeVisible();
+  const fits = await page.evaluate(
+    () => document.documentElement.scrollWidth <= window.innerWidth,
+  );
+  expect(fits).toBe(true);
 });

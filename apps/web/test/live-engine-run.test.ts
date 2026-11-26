@@ -1,4 +1,12 @@
-import type { AgentTodo, StepJournalRow, ToolCallRecord } from '@cairn/shared';
+import {
+  type AgentTodo,
+  buildFailureRowContent,
+  RETRY_PARKED_MARK,
+  STOP_MESSAGE,
+  type StepJournalRow,
+  type ToolCallRecord,
+  workspaceHookRowContent,
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import type { MessageRow } from '../src/api/mappers.js';
 import { liveEngineRun } from '../src/board/live-engine-run.js';
@@ -201,5 +209,123 @@ describe('liveEngineRun', () => {
     const run = liveEngineRun({ messages: [], steps: [step('done')], agentTodo: null });
     expect(run?.elapsedSeconds).toBeNull();
     expect(run?.costUsd).toBeNull();
+  });
+
+  test('appends live streaming text to events and rawOutput', () => {
+    const run = liveEngineRun({
+      messages: [call({ name: 'Read', arguments: { file_path: 'a.ts' }, result: 'ok' })],
+      steps: [step('claimed')],
+      agentTodo: null,
+      liveText: '正在检查剩余文件…',
+    });
+    expect(run?.events.at(-1)).toMatchObject({ kind: 'text', text: '正在检查剩余文件…' });
+    expect(run?.rawOutput).toContain('● 正在检查剩余文件…');
+  });
+
+  test('maps computer and ACP tools cleanly, skips plan/TodoWrite/subagent child calls, and handles failed ACP calls without result', () => {
+    const dir = '/home/agent/tasks/01a20cbc-b485-7ab6-922c-f66596bf2c99';
+    const run = liveEngineRun({
+      messages: [
+        call({ name: 'mcp__cairn__read_file', arguments: { path: `${dir}/report.md` }, result: 'a\nb' }),
+        call({ name: 'mcp__cairn__write_file', arguments: { path: `${dir}/out.md`, content: 'hi\nok' }, result: 'ok' }),
+        call({ name: 'mcp__cairn__shell', arguments: { command: 'pnpm lint' }, result: 'lint ok\n' }),
+        call({ name: 'TodoWrite', arguments: { todos: [] }, result: 'ok' }),
+        call({ name: 'plan', todo: [{ text: 'Step 1', state: 'doing' }], result: '' }),
+        call({ name: 'Bash', parent: 'subagent-1', arguments: { command: 'ls' }, result: 'file' }),
+        call({ name: 'Bash', arguments: { command: 'devin-cmd' }, isError: true }),
+      ],
+      steps: [step('claimed', 'devin')],
+      agentTodo: null,
+    });
+    expect(run?.engine).toBe('Devin');
+    expect(run?.events).toHaveLength(4);
+    expect(run?.events[0]).toMatchObject({ kind: 'read', path: 'report.md', lines: 2 });
+    expect(run?.events[1]).toMatchObject({ kind: 'edit', file: { path: 'out.md', added: 2, removed: 0 } });
+    expect(run?.events[2]).toMatchObject({ kind: 'run', command: 'pnpm lint', exit: 0 });
+    expect(run?.events[3]).toMatchObject({ kind: 'run', command: 'devin-cmd', exit: 1 });
+    expect(run?.rawOutput).toContain('  ⎿ lint ok');
+    expect(run?.rawOutput).not.toContain('TodoWrite');
+    expect(run?.rawOutput).not.toContain('● plan');
+    expect(run?.rawOutput).not.toContain('ls');
+  });
+
+  test('does not treat empty errorMessage as failed and marks a retried build finished when the latest step is done', () => {
+    expect(
+      liveEngineRun({
+        messages: [],
+        steps: [step('done')],
+        agentTodo: null,
+        build: { errorMessage: '' },
+      })?.state,
+    ).toBe('finished');
+    expect(
+      liveEngineRun({
+        messages: [],
+        steps: [step('failed'), step('done')],
+        agentTodo: null,
+        build: { errorMessage: null },
+      })?.state,
+    ).toBe('finished');
+  });
+
+  test('synthesizes provider, timeout, hook, retry-parked, and stopped failure reasons into rawOutput with ANSI stripped', () => {
+    const providerRun = liveEngineRun({
+      messages: [],
+      steps: [step('failed', 'claude-code')],
+      agentTodo: null,
+      build: { errorMessage: '\x1b[31mupstream provider returned 503 service unavailable\x1b[0m' },
+    });
+    expect(providerRun?.state).toBe('failed');
+    expect(providerRun?.rawOutput).toContain('upstream provider returned 503 service unavailable');
+    expect(providerRun?.rawOutput).not.toContain('\x1b[');
+
+    const timeoutRun = liveEngineRun({
+      messages: [
+        {
+          id: 'sys-hook',
+          role: 'system',
+          createdAt: NOW,
+          content: workspaceHookRowContent({
+            name: 'setup',
+            status: 'failed',
+            exitCode: 127,
+            output: '.agents/setup: pnpm: command not found',
+            totalChars: 38,
+            ms: 120,
+          }),
+        },
+        {
+          id: 'sys-fail',
+          role: 'system',
+          createdAt: NOW + 100,
+          content: buildFailureRowContent({
+            reason: 'Devin ACP exited (1): timed out waiting for prompt',
+            commits: [],
+            pr: null,
+          }),
+        },
+        {
+          id: 'sys-park',
+          role: 'system',
+          createdAt: NOW + 200,
+          content: `${RETRY_PARKED_MARK} automatic retries exhausted (3)`,
+        },
+      ],
+      steps: [step('failed', 'devin')],
+      agentTodo: null,
+      build: { errorMessage: 'Devin ACP exited (1): timed out waiting for prompt' },
+    });
+    expect(timeoutRun?.rawOutput).toContain('pnpm: command not found');
+    expect(timeoutRun?.rawOutput).toContain('Devin ACP exited (1): timed out waiting for prompt');
+    expect(timeoutRun?.rawOutput).toContain('automatic retries exhausted (3)');
+
+    const stoppedRun = liveEngineRun({
+      messages: [],
+      steps: [step('stopped')],
+      agentTodo: null,
+      build: { errorMessage: STOP_MESSAGE },
+    });
+    expect(stoppedRun?.state).toBe('stopped');
+    expect(stoppedRun?.rawOutput).toContain(STOP_MESSAGE);
   });
 });

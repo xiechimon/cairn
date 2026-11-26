@@ -276,10 +276,29 @@ export const homeCEngine: FixtureSet = {
     ...ENGINE_THREADS.map((thread, index) =>
       homeTodo(thread.id, 2311 + index, thread.title, thread.phase, PROJECT_ID),
     ),
+    homeTodo(
+      'home-c-engine-empty',
+      2311 + ENGINE_THREADS.length,
+      '检查导出文件名编码',
+      'building',
+      PROJECT_ID,
+    ),
   ],
   details: {
     ...homeC.details,
     ...Object.fromEntries(ENGINE_THREADS.map((thread) => [thread.id, thread.detail])),
+    'home-c-engine-empty': {
+      transcript: [],
+      engineRun: {
+        engine: 'Claude Code',
+        state: 'running',
+        elapsedSeconds: null,
+        costUsd: null,
+        plan: [],
+        events: [],
+        rawOutput: '',
+      },
+    },
   },
 };
 
