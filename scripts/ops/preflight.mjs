@@ -5,6 +5,7 @@ import { hostname } from 'node:os';
 import { basename } from 'node:path';
 import { MAX_CONCURRENT_PREFLIGHT_RUNS } from './ci-capacity-gate.mjs';
 import { laneName, stampUnownedCommits } from './push-queue.mjs';
+import { ENQUEUE_PREFIX, TRY_PREFIX } from './speculative-queue.mjs';
 
 export function preflightRef(lane) {
   return `refs/heads/preflight/${lane}`;
@@ -41,6 +42,44 @@ export function isActivePreflightRun(run) {
     typeof run?.head_branch === 'string' &&
     run.head_branch.startsWith('preflight/')
   );
+}
+
+export function isSupersededRun(run, { ref, sha, keepShas }) {
+  return run.head_branch === ref && run.head_sha !== sha && !keepShas.has(run.head_sha);
+}
+
+export function cancelSupersededRuns({
+  repo,
+  ref,
+  sha,
+  keepShas = new Set(),
+  gh,
+  cancel,
+  log = console.log,
+}) {
+  let runs = [];
+  try {
+    runs =
+      gh([
+        'api',
+        `repos/${repo}/actions/workflows/ci.yml/runs?branch=${encodeURIComponent(ref)}&per_page=30`,
+      ])?.workflow_runs ?? [];
+  } catch (error) {
+    log(`[preflight] could not list superseded runs (${error.message}); leaving them running`);
+  }
+  const superseded = runs.filter(
+    (run) =>
+      run.name === 'ci' &&
+      isSupersededRun(run, { ref, sha, keepShas }) &&
+      isActivePreflightRun(run),
+  );
+  return superseded
+    .map((run) => run.id)
+    .filter((id) => {
+      const accepted = cancel(id);
+      if (accepted) log(`[preflight] cancelled superseded ci run ${id} on ${ref}`);
+      return accepted;
+    });
 }
 
 export function preflightCapacityDecision({
@@ -81,6 +120,7 @@ export function waitForPreflightCapacity({
   sleep,
   log = console.log,
   bypass = false,
+  replaced = () => false,
   pollSeconds = 20,
   waitMinutes = 60,
   now = () => Date.now(),
@@ -94,19 +134,17 @@ export function waitForPreflightCapacity({
       );
       return { ok: true, degraded: true };
     }
-    const decision = preflightCapacityDecision({
-      activeCount: active.runs.length,
-      bypass,
-    });
-    if (decision.action === 'push') return { ok: true, activeCount: active.runs.length };
+    const activeCount = active.runs.filter((run) => !replaced(run)).length;
+    const decision = preflightCapacityDecision({ activeCount, bypass });
+    if (decision.action === 'push') return { ok: true, activeCount };
     if (now() > deadline) {
       return {
         ok: false,
-        error: `${active.runs.length} preflight ci runs are still active after ${waitMinutes} minutes; rerun later or set CAIRN_PREFLIGHT_CONCURRENCY_BYPASS=1`,
+        error: `${activeCount} preflight ci runs are still active after ${waitMinutes} minutes; rerun later or set CAIRN_PREFLIGHT_CONCURRENCY_BYPASS=1`,
       };
     }
     log(
-      `[preflight] ${active.runs.length}/${MAX_CONCURRENT_PREFLIGHT_RUNS} preflight ci runs active; waiting ${pollSeconds}s before pushing`,
+      `[preflight] ${activeCount}/${MAX_CONCURRENT_PREFLIGHT_RUNS} preflight ci runs active; waiting ${pollSeconds}s before pushing`,
     );
     sleep(pollSeconds);
   }
@@ -144,11 +182,25 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   }
   const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
   const sleep = (seconds) => spawnSync('sleep', [String(seconds)]);
+  const readQueuedShas = () =>
+    new Set(
+      git(['ls-remote', 'origin', `${ENQUEUE_PREFIX}*`, `${TRY_PREFIX}*`])
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => line.split(/\s+/)[0]),
+    );
+  let keepShas = null;
+  try {
+    keepShas = readQueuedShas();
+  } catch (error) {
+    console.log(`[preflight] could not list queued shas (${error.message}); cancelling nothing`);
+  }
   const capacity = waitForPreflightCapacity({
     repo,
     gh: ghJson,
     sleep,
     bypass: process.env.CAIRN_PREFLIGHT_CONCURRENCY_BYPASS === '1',
+    replaced: (run) => keepShas !== null && isSupersededRun(run, { ref, sha, keepShas }),
   });
   if (!capacity.ok) {
     console.error(`[preflight] ${capacity.error}`);
@@ -161,6 +213,19 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   );
   if (push.status !== 0) process.exit(push.status ?? 1);
   console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
+  if (keepShas !== null) {
+    cancelSupersededRuns({
+      repo,
+      ref,
+      sha,
+      keepShas,
+      gh: ghJson,
+      cancel: (id) =>
+        spawnSync('gh', ['api', '--method', 'POST', `repos/${repo}/actions/runs/${id}/cancel`], {
+          stdio: 'ignore',
+        }).status === 0,
+    });
+  }
   const readRun = () => {
     const { workflow_runs: runs } = ghJson([
       'api',

@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import {
+  cancelSupersededRuns,
   fastGateInvocation,
   isActivePreflightRun,
   MAX_CONCURRENT_PREFLIGHT_RUNS,
@@ -497,4 +498,86 @@ test('preflight fast gate invokes preflight-fast-gate locally or via CAIRN_PREFL
   assert.equal(result.status, 0);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].options.cwd, '/wt');
+});
+
+test('a new preflight push cancels only the still-active older runs on the same lane ref', () => {
+  const run = (id, patch) => ({
+    id,
+    name: 'ci',
+    status: 'in_progress',
+    head_branch: 'preflight/host/lane',
+    head_sha: 'a'.repeat(40),
+    ...patch,
+  });
+  const calls = [];
+  const cancelled = cancelSupersededRuns({
+    repo: 'xiechimon/cairn',
+    ref: 'preflight/host/lane',
+    sha: 'b'.repeat(40),
+    gh: (args) => {
+      calls.push(args.at(-1));
+      return {
+        workflow_runs: [
+          run(1, {}),
+          run(2, { status: 'queued' }),
+          run(3, { status: 'completed' }),
+          run(4, { head_sha: 'b'.repeat(40) }),
+          run(5, { head_branch: 'preflight/host/other' }),
+          run(6, { name: 'promote' }),
+        ],
+      };
+    },
+    cancel: (id) => id !== 2,
+    log: () => {},
+  });
+  assert.deepEqual(cancelled, [1]);
+  assert.match(calls[0], /branch=preflight%2Fhost%2Flane/);
+});
+
+test('an unreadable run list never blocks a preflight push', () => {
+  const cancelled = cancelSupersededRuns({
+    repo: 'xiechimon/cairn',
+    ref: 'preflight/host/lane',
+    sha: 'b'.repeat(40),
+    gh: () => {
+      throw new Error('HTTP 502');
+    },
+    cancel: () => assert.fail('nothing to cancel'),
+    log: () => {},
+  });
+  assert.deepEqual(cancelled, []);
+});
+
+test('a superseded run whose sha is already queued keeps running', () => {
+  const run = (id, head_sha) => ({
+    id,
+    name: 'ci',
+    status: 'in_progress',
+    head_branch: 'preflight/host/lane',
+    head_sha,
+  });
+  const cancelled = cancelSupersededRuns({
+    repo: 'xiechimon/cairn',
+    ref: 'preflight/host/lane',
+    sha: 'b'.repeat(40),
+    keepShas: new Set(['c'.repeat(40)]),
+    gh: () => ({ workflow_runs: [run(1, 'a'.repeat(40)), run(2, 'c'.repeat(40))] }),
+    cancel: () => true,
+    log: () => {},
+  });
+  assert.deepEqual(cancelled, [1]);
+});
+
+test('runs this push is about to replace do not count against the preflight cap', () => {
+  const run = (id, head_branch) => ({ id, name: 'ci', status: 'in_progress', head_branch });
+  const verdict = waitForPreflightCapacity({
+    repo: 'xiechimon/cairn',
+    gh: () => ({
+      workflow_runs: [run(1, 'preflight/host/lane'), run(2, 'preflight/host/other')],
+    }),
+    sleep: () => assert.fail('must not wait on its own stale run'),
+    replaced: (item) => item.head_branch === 'preflight/host/lane',
+    log: () => {},
+  });
+  assert.deepEqual(verdict, { ok: true, activeCount: 1 });
 });

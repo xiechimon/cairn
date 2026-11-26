@@ -39,6 +39,13 @@ A lane verifies on GitHub before it enters the landing queue:
   wait, never the fast gate. If the GitHub run-count API is unreadable the
   script proceeds after the fast gate because capacity is an efficiency gate,
   while the safety evidence remains the required checks on the exact SHA.
+- Still-active `ci` runs on this lane's own ref that test another SHA are being
+  replaced: they do not count against that cap, and once the new head is pushed
+  they are cancelled. Nothing is cancelled when the wait or the push fails.
+  Other lanes' refs, completed runs, a run on the same SHA and a run whose SHA
+  sits under `enqueue/*` or `queue/try/*` (its verdict is still wanted) are left
+  alone; if those refs cannot be listed, nothing is cancelled. A failed lookup or
+  cancel never blocks the push.
 - `scripts/ops/push-queue.mjs` refuses to land a head with no green
   pre-flight evidence; local `pnpm prepush` / `pnpm test:changed` stay
   recommended but are no longer the gate. It always enqueues `HEAD` into
