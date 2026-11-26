@@ -76,3 +76,18 @@ test('a running turn keeps stop, and Esc stops it', async ({ page }) => {
   await pressEscape(page);
   await expect.poll(() => stops).toEqual(['POST /api/teams/t1/chief/threads/chief-home/stop']);
 });
+
+test('a running turn keeps stop while a later message is held', async ({ page }) => {
+  const stops = await open(
+    page,
+    { turnRunning: true, turnQueue: null, pending: [{ messageId: 'q2', state: 'held' }] },
+    [
+      { id: 'm1', role: 'user', content: '正在跑的一句', createdAt: 10 },
+      { id: 'q2', role: 'user', content: '暂缓的一句', createdAt: 11 },
+    ],
+  );
+  await expect(page.getByText('暂缓的一句')).toBeVisible();
+  await expect(page.getByTestId('chief-composer-stop')).toBeVisible();
+  await pressEscape(page);
+  await expect.poll(() => stops).toEqual(['POST /api/teams/t1/chief/threads/chief-home/stop']);
+});

@@ -11,6 +11,8 @@ The composer's Stop button and its Esc key act only when the press can succeed. 
 | unstarted system turn (greeting, wake), `pending` or `waiting_quota` | false | not offered |
 | none | false | not offered |
 
+A running turn keeps Stop even while a later message is held (`pending[].state` `held`); a held message hides the running state only when `turnRunning` is not true.
+
 A server that does not send the field leaves the web on its earlier behavior. A turn claimed or ended after the last read is corrected by the next thread refetch; a Stop press in that window is answered by the server's refusal as before.
 
 Task threads need no field: `POST .../stop` on a build accepts `pending`, `claimed` and `waiting_quota` steps, which are exactly the states that show Stop there.

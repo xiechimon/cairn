@@ -2474,7 +2474,7 @@ export function mapChief(
       ? (opts.threads.find((t) => t.id === opts.activeThreadId) ?? null)
       : null;
   const pendingIds = new Map((active?.pending ?? []).map((p) => [p.messageId, p.state] as const));
-  const parked = [...pendingIds.values()].includes('held');
+  const parked = active?.turnRunning !== true && [...pendingIds.values()].includes('held');
   const running = active?.activeRun != null && !parked;
   const collected = active === null ? null : collectChiefStream(opts.messages, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
