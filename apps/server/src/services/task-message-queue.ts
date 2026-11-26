@@ -128,7 +128,10 @@ export async function queueTaskMessage(
       deps.db.transaction(() => {
         replacing?.commit();
         claimClientMessage(deps.db, runId, clientMessageId);
-        deps.db.insert(queuedMessage).values(message).run();
+        deps.db
+          .insert(queuedMessage)
+          .values({ ...message, sentByAgent: deps.sentByAgent ?? null })
+          .run();
         addUserMessageAttachmentGrants(deps.db, task.id, task.teamId, content);
         completeClientMessage(deps.db, runId, clientMessageId, queued);
         markAsQueuedSend(deps.db, runId, clientMessageId);

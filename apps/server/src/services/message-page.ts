@@ -114,6 +114,8 @@ function chiefMessagesWithTurnBoundaries(
         projectId: scope,
         delivery: null,
         origin: null,
+        typedAt: null,
+        sentByAgent: null,
       },
     ];
   });

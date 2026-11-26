@@ -698,6 +698,8 @@ export function createImService(deps: ImServiceDeps): ImService {
       provenance: `im:${row.platform}:${connId}:${msg.chat.key}`,
       ownerMessageIds: [],
     });
+    if (msg.text !== '')
+      deps.db.update(step).set({ ownerSaid: msg.text }).where(eq(step.id, stepId)).run();
     deps.db
       .insert(imTurnOrigin)
       .values({

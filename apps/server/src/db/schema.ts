@@ -331,6 +331,7 @@ export const step = sqliteTable(
     promptOrigin: json<StepPromptOrigin>('promptOrigin'),
     scopeProjectId: text('scopeProjectId'),
     ownerMessageIds: json<string[]>('ownerMessageIds'),
+    ownerSaid: text('ownerSaid'),
     byPerson: bool('byPerson').notNull().default(false),
     claudeSubscriptionId: text('claudeSubscriptionId'),
     devinSubscriptionId: text('devinSubscriptionId'),
@@ -369,6 +370,8 @@ export const message = sqliteTable(
     createdAt: epochMs('createdAt').notNull(),
     actor: text('actor'),
     origin: text('origin').$type<TranscriptUserOrigin>(),
+    typedAt: epochMs('typedAt'),
+    sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
   },
   (t) => [
     index('message_createdAt_idx').on(t.createdAt),
@@ -522,6 +525,7 @@ export const queuedMessage = sqliteTable(
     content: text('content').notNull(),
     deliverAfterStop: integer('deliverAfterStop', { mode: 'boolean' }).notNull().default(false),
     error: text('error'),
+    sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [index('queued_message_conversation_idx').on(t.conversationId, t.createdAt)],
@@ -1299,6 +1303,8 @@ export const chiefMessage = sqliteTable('chief_message', {
   projectId: text('projectId'),
   delivery: text('delivery').$type<ChiefMessageDelivery>(),
   origin: text('origin').$type<TranscriptUserOrigin>(),
+  typedAt: epochMs('typedAt'),
+  sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
   createdAt: epochMs('createdAt').notNull(),
 });
 

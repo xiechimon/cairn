@@ -8,6 +8,7 @@ import {
   imConnection,
   imPairingRequest,
   imTurnOrigin,
+  memoryCorrection,
   step,
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
@@ -25,6 +26,7 @@ import type {
   ImOutboundMessage,
 } from '../src/services/im/types.js';
 import { upsertChiefRow } from '../src/services/machine-deps.js';
+import { executeMemoryToolForStep } from '../src/services/memory-corrections.js';
 import { notifyChiefMessage } from '../src/services/notifications.js';
 import { bootServer, seedRoute, type TestServer } from './helpers.js';
 
@@ -598,6 +600,12 @@ describe('cards, actions and attachments', () => {
     return stepRow;
   };
 
+  const claimLatest = () => {
+    const { id } = latestChiefStep();
+    s.db.update(step).set({ status: 'claimed', claimedAt: nowMs() }).where(eq(step.id, id)).run();
+    return stepById(id);
+  };
+
   const tap = (value: string, senderId = '55', messageId = 'cq:1') => {
     sessions[0]?.handlers.onAction?.({
       chat: { key: '777', kind: 'direct', title: null },
@@ -736,6 +744,60 @@ describe('cards, actions and attachments', () => {
     await vi.waitFor(() =>
       expect(sessions[0]?.sent.some((msg) => msg.text === 'went with A')).toBe(true),
     );
+  });
+
+  test('an option tapped in the chat app is kept as what the user chose', async () => {
+    seedRoute(s, 'coordinator');
+    await connectAndPair('55');
+    const stepRow = await claimImStep('pick something');
+    await questionCard(stepRow.buildId, 'q-evidence');
+    const card = s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'q-evidence')).get();
+    const parked = { ...(JSON.parse(card?.content as string) as object), parkedAt: nowMs() };
+    s.db
+      .update(chiefMessage)
+      .set({ content: JSON.stringify(parked) })
+      .where(eq(chiefMessage.id, 'q-evidence'))
+      .run();
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
+
+    tap('imcb:q-evidence:1');
+    correct(claimLatest().id);
+
+    expect(s.db.select().from(memoryCorrection).all()).toMatchObject([{ ownerWords: 'B' }]);
+  });
+
+  test('approving a card in the chat app leaves no words to quote', async () => {
+    await connectAndPair('55');
+    const stepRow = await claimImStep('send the mail');
+    const { proposalId } = proposeAction(s.db, {
+      teamId: s.team.id,
+      actionId: 'connector.gmail.send_message',
+      targetId: 'mailto:ian@example.com',
+      input: { to: 'mailto:ian@example.com', body: 'hi' },
+      threadId: stepRow.buildId,
+      scopeProjectId: null,
+      card: [
+        {
+          header: '发送',
+          question: 'Send this mail?',
+          options: [{ label: '发送' }, { label: '不发' }],
+        },
+      ],
+    });
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
+
+    tap(`imcb:approval-${proposalId}:0`);
+
+    const wakeId = `wake:${proposalId}:${stepRow.buildId}`;
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, wakeId))
+      .run();
+    expect(correct(wakeId)).toMatchObject({
+      correction: expect.stringContaining('not recorded'),
+    });
+    expect(s.db.select().from(memoryCorrection).all()).toEqual([]);
   });
 
   test('tapping approve on an approval card executes the proposal and unblocks the chat', async () => {
@@ -934,4 +996,29 @@ describe('wechat qr login', () => {
     const reconnected = await service.reconnectConnection(s.team.id, connRow()!.id);
     expect(reconnected.lastSendError).toBeNull();
   });
+});
+
+function correct(stepId: string) {
+  return executeMemoryToolForStep(
+    s.db,
+    { agentId: 'agent-im', teamId: s.team.id, projectId: null },
+    stepId,
+    'save_memory',
+    { scope: 'team', file: 'units.md', content: 'Use metric units.', correction: true },
+  );
+}
+
+test('the words of a paired chat app message are kept as evidence of a correction', async () => {
+  await connectAndPair();
+  sessions[0]?.handlers.onMessage(inbound('55', 'IM CORRECTION: use metric units.'));
+  const turnRow = latestChiefStep();
+  s.db
+    .update(step)
+    .set({ status: 'claimed', claimedAt: Date.now() })
+    .where(eq(step.id, turnRow.id))
+    .run();
+  correct(turnRow.id);
+  expect(s.db.select().from(memoryCorrection).all()).toMatchObject([
+    { ownerWords: 'IM CORRECTION: use metric units.', stepId: turnRow.id },
+  ]);
 });

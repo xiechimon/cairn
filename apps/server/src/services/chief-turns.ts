@@ -562,7 +562,14 @@ export function ackChiefSteer(
   for (const row of sent) {
     traceDeliveredSteer(deps.db, running.id, row);
     deps.db.delete(step).where(eq(step.id, row.id)).run();
-    deps.db.update(chiefMessage).set({ createdAt: now }).where(eq(chiefMessage.id, row.id)).run();
+    deps.db
+      .update(chiefMessage)
+      .set({
+        createdAt: now,
+        typedAt: sql`coalesce(${chiefMessage.typedAt}, ${chiefMessage.createdAt})`,
+      })
+      .where(eq(chiefMessage.id, row.id))
+      .run();
     const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, row.id)).get();
     if (message) deps.convHub?.publishMessage(threadId, message);
     publishStepRow(deps, row);

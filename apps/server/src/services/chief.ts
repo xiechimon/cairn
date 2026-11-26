@@ -160,6 +160,7 @@ import { reportProvenance, turnProvenance, WAKE_PROMPT_PREFIX } from './turn-pro
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 export interface ChiefDeps {
+  sentByAgent?: boolean;
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;
@@ -1246,6 +1247,7 @@ export function submitChiefMessage(
           content: body.content,
           projectId: message.projectId,
           origin,
+          sentByAgent: deps.sentByAgent ?? null,
           createdAt: now,
         })
         .run();
@@ -1304,6 +1306,15 @@ export function sendChiefMessageFromComposer(
   return sent;
 }
 
+function markSentByAgent(deps: ChiefDeps, messageId: string): void {
+  if (deps.sentByAgent !== true) return;
+  deps.db
+    .update(chiefMessage)
+    .set({ sentByAgent: true })
+    .where(eq(chiefMessage.id, messageId))
+    .run();
+}
+
 export function answerChiefQuestion(
   deps: ChiefDeps,
   teamId: string,
@@ -1320,6 +1331,7 @@ export function answerChiefQuestion(
     .get();
   if (askQuestionContentOf(waiting?.content)?.parkedAt === undefined) {
     const answered = answerQuestion(deps, input);
+    markSentByAgent(deps, answered.requestId);
     addTurnOwnerMessage(deps.db, input.threadId, answered.requestId);
     return answered;
   }
@@ -1331,6 +1343,7 @@ export function answerChiefQuestion(
   if (projectId !== null) requireUnarchivedProject(deps.db, projectId);
   return deps.db.transaction(() => {
     const answered = answerQuestion(deps, input);
+    markSentByAgent(deps, answered.requestId);
     enqueueResumedTurn(deps, teamId, input.threadId, answered, projectId);
     return answered;
   });
@@ -1523,6 +1536,7 @@ export function rewindChiefThread(
       .set({ sessionId: '', updatedAt: now })
       .where(eq(chiefThread.id, threadId))
       .run();
+    tx.update(chiefMessage).set({ delivery: null }).where(eq(chiefMessage.id, anchor.id)).run();
     const content =
       typeof anchor.content === 'string' ? anchor.content : (extractText(anchor.content) ?? '');
     enqueueChiefStep(txDeps, threadId, {

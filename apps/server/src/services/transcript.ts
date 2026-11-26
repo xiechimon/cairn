@@ -5,7 +5,12 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub } from './events.js';
 
 export function insertMessageRow(
-  deps: { db: Db; convHub?: ConversationStreamHub; afterCommit?: (() => void)[] },
+  deps: {
+    db: Db;
+    convHub?: ConversationStreamHub;
+    afterCommit?: (() => void)[];
+    sentByAgent?: boolean;
+  },
   conversationId: string,
   row: {
     id: string;
@@ -14,20 +19,25 @@ export function insertMessageRow(
     createdAt: number;
     actor?: string | null;
     origin?: TranscriptUserOrigin | null;
+    typedAt?: number | null;
+    sentByAgent?: boolean | null;
   },
   deliveredQueue?: ConversationMessageEvent['deliveredQueue'],
   clientMessageId?: string,
 ): void {
+  const { typedAt, sentByAgent, ...shown } = row;
   deps.db
     .insert(message)
     .values({
       ...row,
+      sentByAgent: sentByAgent ?? (row.origin === 'user' ? (deps.sentByAgent ?? null) : null),
+      typedAt: typedAt ?? null,
       actor: row.actor ?? null,
       origin: row.origin ?? null,
       conversationId,
     })
     .run();
-  const published = { ...row, actor: row.actor ?? null, origin: row.origin ?? null };
+  const published = { ...shown, actor: row.actor ?? null, origin: row.origin ?? null };
   const publish = () => {
     if (clientMessageId !== undefined) {
       deps.convHub?.publishMessage(conversationId, published, deliveredQueue, clientMessageId);

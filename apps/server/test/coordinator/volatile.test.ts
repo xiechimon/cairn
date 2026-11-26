@@ -38,6 +38,22 @@ afterEach(() => {
   for (const d of dirs.splice(0)) releaseTestTempDir(d);
 });
 
+describe('reused instructions', () => {
+  it('are not reused for a second claim of the step that built them', () => {
+    const volatile = createVolatileContext({ now: () => 0, reuseMs: 1000 });
+    volatile.instructions('c', 'first claim', 'step-1');
+    volatile.sent('c', 0);
+    expect(volatile.instructions('c', 'later step', 'step-2')).toEqual({
+      text: 'first claim',
+      sentBy: 'step-1',
+    });
+    expect(volatile.instructions('c', 'second claim', 'step-1')).toEqual({
+      text: 'second claim',
+      sentBy: 'step-1',
+    });
+  });
+});
+
 describe('volatile turn context', () => {
   it('stays on the message it was sent with while the cache is warm and is never stored', async () => {
     const dir = makeTestTempDir('coord-volatile-');

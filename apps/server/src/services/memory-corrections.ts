@@ -1,16 +1,44 @@
 import {
+  type AskUserQuestionContent,
+  askUserQuestionContentSchema,
   MEMORY_CORRECTION_WORDS_MAX_CHARS,
   MEMORY_INDEX_TITLE,
   type MemoryCorrectionsResponse,
   memoryToolParamsSchemas,
+  replyQuoteText,
   stripTurnContext,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gt, inArray, lte, max, ne, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  lt,
+  lte,
+  max,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agentMemory, chiefMessage, memoryCorrection, message, step } from '../db/schema.js';
+import {
+  agentMemory,
+  chiefMessage,
+  coordinatorInput,
+  memoryCorrection,
+  message,
+  steerPending,
+  step,
+} from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { askQuestionContentOf } from './chief-question-store.js';
+import { STEER_HOLDS } from './chief-turns.js';
 import { ownerTextOf } from './coordinator-steps.js';
 import { isDesignCommentRelay } from './design-comments.js';
 import { boundMemoryIndex, memoryIndexText } from './memory.js';
@@ -26,8 +54,7 @@ type Row = typeof agentMemory.$inferSelect;
 type StepRow = typeof step.$inferSelect;
 
 const LISTED_MAX = 200;
-const NOT_RECORDED =
-  'not recorded as a correction: no user message in Cairn chat or the task thread started or steered this turn. The memory write itself was applied.';
+const NOT_RECORDED = 'correction not recorded. The memory write itself was applied.';
 
 interface Entry {
   projectId: string | null;
@@ -65,12 +92,26 @@ function namedEntry(tx: Tx, owner: MemoryDocumentOwner, scope: string, repeats: 
 interface Said {
   messageId: string;
   createdAt: number;
+  insertedAt: number | null;
   content: unknown;
+}
+
+function saidWithoutMessageRow(turn: StepRow): Said[] {
+  return turn.ownerSaid === null
+    ? []
+    : [
+        {
+          messageId: turn.id,
+          createdAt: turn.createdAt,
+          insertedAt: null,
+          content: turn.ownerSaid,
+        },
+      ];
 }
 
 function saidInCoordinatorTurn(tx: Tx, turn: StepRow): Said[] {
   const ids = turn.ownerMessageIds ?? [];
-  if (ids.length === 0) return [];
+  if (ids.length === 0) return saidWithoutMessageRow(turn);
   const rows = new Map(
     tx
       .select()
@@ -79,10 +120,15 @@ function saidInCoordinatorTurn(tx: Tx, turn: StepRow): Said[] {
       .all()
       .map((row) => [row.id, row]),
   );
-  return ids.flatMap((id) => {
+  const sent = ids.flatMap((id) => {
     const row = rows.get(id);
     if (row === undefined) return [];
-    const said = { messageId: row.id, createdAt: row.createdAt };
+    const said = {
+      messageId: row.id,
+      createdAt: row.typedAt ?? row.createdAt,
+      insertedAt: row.createdAt,
+    };
+    if (row.sentByAgent === true) return [];
     if (row.role === 'user')
       return isDesignCommentRelay(ownerTextOf(row.content))
         ? []
@@ -92,34 +138,215 @@ function saidInCoordinatorTurn(tx: Tx, turn: StepRow): Said[] {
     const content = answers.map((each) => each.text ?? each.choices?.join(', ') ?? '').join('\n');
     return [{ ...said, content }];
   });
+  return [...saidWithoutMessageRow(turn), ...sent];
 }
 
-function saidInTask(tx: Tx, turn: StepRow): Said[] {
-  const answered = tx
-    .select({ at: max(step.finishedAt) })
-    .from(step)
-    .where(
-      and(
-        eq(step.buildId, turn.buildId),
-        eq(step.status, 'done'),
-        ne(step.id, turn.id),
-        lte(step.finishedAt, turn.createdAt),
-      ),
-    )
-    .get()?.at;
-  return tx
-    .select({ messageId: message.id, createdAt: message.createdAt, content: message.content })
+function lastDoneWorkerStepAt(tx: Tx, turn: StepRow): number | undefined {
+  return (
+    tx
+      .select({ at: max(step.finishedAt) })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, turn.buildId),
+          eq(step.status, 'done'),
+          ne(step.id, turn.id),
+          lte(step.finishedAt, turn.createdAt),
+        ),
+      )
+      .get()?.at ?? undefined
+  );
+}
+
+function saidInTask(tx: Tx, turn: StepRow, answered: number | undefined): Said[] {
+  const sent = tx
+    .select({
+      messageId: message.id,
+      createdAt: sql<number>`coalesce(${message.typedAt}, ${message.createdAt})`,
+      insertedAt: message.createdAt,
+      content: message.content,
+    })
     .from(message)
     .where(
       and(
         eq(message.conversationId, turn.buildId),
         eq(message.role, 'user'),
         eq(message.origin, 'user'),
+        or(isNull(message.sentByAgent), eq(message.sentByAgent, false)),
         answered == null ? undefined : gt(message.createdAt, answered),
       ),
     )
     .orderBy(asc(message.createdAt), sql`rowid`)
     .all();
+  const starter = answered == null ? threadStarter(tx, turn) : undefined;
+  return [...(starter === undefined ? [] : saidWithoutMessageRow(starter)), ...sent];
+}
+
+function threadStarter(tx: Tx, turn: StepRow): StepRow | undefined {
+  return tx
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, turn.buildId), isNotNull(step.ownerSaid)))
+    .get();
+}
+
+function textOf(content: unknown): string {
+  return replyQuoteText(stripTurnContext(ownerTextOf(content))).trim();
+}
+
+function typedAnswerTexts(question: AskUserQuestionContent): string[] {
+  if (question.status !== 'answered' || question.answeredBy === 'coordinator') return [];
+  return (question.answers ?? []).flatMap((answer, index) => {
+    if (answer.text !== undefined) {
+      const text = answer.text.trim();
+      return text === '' ? [] : [text];
+    }
+    const predefined = new Set(
+      question.questions[index]?.options.map((option) => option.label) ?? [],
+    );
+    return (answer.choices ?? []).filter((choice) => !predefined.has(choice));
+  });
+}
+
+function chiefTurnIsUnclear(tx: Tx, turn: StepRow, said: readonly Said[]): boolean {
+  const ownerIds = [...new Set(turn.ownerMessageIds ?? [])];
+  if (
+    ownerIds.length > 0 &&
+    tx
+      .select({ id: chiefMessage.id })
+      .from(chiefMessage)
+      .where(
+        and(
+          eq(chiefMessage.threadId, turn.buildId),
+          inArray(chiefMessage.id, ownerIds),
+          isNotNull(chiefMessage.delivery),
+        ),
+      )
+      .limit(1)
+      .get() !== undefined
+  ) {
+    return true;
+  }
+  if (
+    tx
+      .select({ id: coordinatorInput.id })
+      .from(coordinatorInput)
+      .where(and(eq(coordinatorInput.stepId, turn.id), eq(coordinatorInput.kind, 'steer')))
+      .limit(1)
+      .get() !== undefined
+  ) {
+    return true;
+  }
+  if (
+    tx
+      .select({ conversationId: steerPending.conversationId })
+      .from(steerPending)
+      .where(and(eq(steerPending.conversationId, turn.buildId), eq(steerPending.stepId, turn.id)))
+      .limit(1)
+      .get() !== undefined
+  ) {
+    return true;
+  }
+  if (
+    turn.status === 'claimed' &&
+    tx
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, turn.buildId),
+          eq(step.status, 'pending'),
+          inArray(step.holdReason, STEER_HOLDS),
+        ),
+      )
+      .limit(1)
+      .get() !== undefined
+  ) {
+    return true;
+  }
+  const started = turn.claimedAt ?? turn.createdAt;
+  const ownerIdSet = new Set(ownerIds);
+  const turns = tx.select().from(step).where(eq(step.buildId, turn.buildId)).all();
+  const rows = tx.select().from(chiefMessage).where(eq(chiefMessage.threadId, turn.buildId)).all();
+  return rows.some((row) => {
+    if (row.sentByAgent === true) return false;
+    const question = askQuestionContentOf(row.content);
+    if (question === null) return false;
+    const typed = typedAnswerTexts(question);
+    if (typed.length === 0) return false;
+    if (ownerIdSet.has(row.id)) return true;
+    const answeredAt = question.answeredAt;
+    if (answeredAt === undefined) return false;
+    const answeredDuringThisTurn =
+      answeredAt >= started &&
+      (turn.finishedAt === null || answeredAt <= turn.finishedAt) &&
+      !turns.some(
+        (other) => other.id !== turn.id && (other.ownerMessageIds ?? []).includes(row.id),
+      );
+    if (answeredDuringThisTurn) return true;
+    return said.some(
+      (each) =>
+        each.insertedAt !== null &&
+        answeredAt >= each.insertedAt &&
+        answeredAt <= started &&
+        typed.includes(textOf(each.content)),
+    );
+  });
+}
+
+function workerQuestionOf(content: unknown): AskUserQuestionContent | null {
+  if (content === null || typeof content !== 'object') return null;
+  const parsed = askUserQuestionContentSchema.safeParse(content);
+  return parsed.success ? parsed.data : null;
+}
+
+function workerTurnIsUnclear(tx: Tx, turn: StepRow, answered: number | undefined): boolean {
+  const midTurnSteer = tx
+    .select({ id: message.id })
+    .from(message)
+    .where(
+      and(
+        eq(message.conversationId, turn.buildId),
+        or(like(message.id, 'human-steer-%'), like(message.id, 'steer-%')),
+        answered === undefined ? undefined : gt(message.createdAt, answered),
+      ),
+    )
+    .limit(1)
+    .get();
+  if (midTurnSteer !== undefined) return true;
+  if (
+    tx
+      .select({ conversationId: steerPending.conversationId })
+      .from(steerPending)
+      .where(and(eq(steerPending.conversationId, turn.buildId), eq(steerPending.stepId, turn.id)))
+      .limit(1)
+      .get() !== undefined
+  ) {
+    return true;
+  }
+  const turnStarted = turn.claimedAt ?? turn.createdAt;
+  return tx
+    .select({ createdAt: message.createdAt, content: message.content })
+    .from(message)
+    .where(eq(message.conversationId, turn.buildId))
+    .all()
+    .some((row) => {
+      const question = workerQuestionOf(row.content);
+      if (question === null || typedAnswerTexts(question).length === 0) return false;
+      if (question.deliveredStepId === turn.id) return true;
+      const answeredAt = question.answeredAt ?? row.createdAt;
+      if (
+        turn.promptOrigin?.kind === 'continue' &&
+        (answered === undefined || answeredAt >= answered)
+      )
+        return true;
+      if (answered === undefined ? true : answeredAt > answered) return true;
+      return (
+        question.answeredAt !== undefined &&
+        question.answeredAt >= turnStarted &&
+        row.createdAt >= turn.createdAt
+      );
+    });
 }
 
 interface UserWords {
@@ -130,16 +357,19 @@ interface UserWords {
 
 function userWords(tx: Tx, turn: StepRow): UserWords | null {
   const chief = turn.kind === 'chief';
-  const said = chief ? saidInCoordinatorTurn(tx, turn) : saidInTask(tx, turn);
+  const answered = chief ? undefined : lastDoneWorkerStepAt(tx, turn);
+  const said = chief ? saidInCoordinatorTurn(tx, turn) : saidInTask(tx, turn, answered);
   const identity = said[0];
   if (identity === undefined) return null;
+  if (chief ? chiefTurnIsUnclear(tx, turn, said) : workerTurnIsUnclear(tx, turn, answered))
+    return null;
   const text = [...said]
     .reverse()
-    .map((each) => stripTurnContext(ownerTextOf(each.content)).trim())
+    .map((each) => textOf(each.content))
     .join('\n');
   return {
     messageId: identity.messageId,
-    savedByThen: Math.min(identity.createdAt, turn.claimedAt ?? turn.createdAt),
+    savedByThen: Math.min(...said.map((each) => each.createdAt), turn.claimedAt ?? turn.createdAt),
     text: text.slice(0, MEMORY_CORRECTION_WORDS_MAX_CHARS),
   };
 }
@@ -175,8 +405,28 @@ function savedBy(time: number, entry: Entry, versions: readonly Row[]): boolean 
   );
 }
 
-function inAttachedIndex(tx: Tx, teamId: string, turn: StepRow, entry: Entry): boolean {
+function promptMayNotBeResent(tx: Tx, turn: StepRow): boolean {
+  if (turn.antigravitySubscriptionId === null) return false;
+  if (turn.sessionId !== null) return true;
+  return (
+    tx
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, turn.buildId),
+          ne(step.id, turn.id),
+          lt(step.claimedAt, turn.claimedAt ?? turn.createdAt),
+        ),
+      )
+      .limit(1)
+      .get() !== undefined
+  );
+}
+
+function inAttachedIndex(tx: Tx, teamId: string, turn: StepRow, entry: Entry): boolean | null {
   if (entry.file !== MEMORY_INDEX_TITLE) return false;
+  if (promptMayNotBeResent(tx, turn)) return null;
   const attached = [
     ...(turn.memoryTrace?.teamMemoryIds ?? []),
     ...(turn.memoryTrace?.projectMemoryIds ?? []),

@@ -219,21 +219,22 @@ export async function sendBuildSteer(
           throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
         }
       }
-      if (
-        body.queuedMessageId !== undefined &&
-        !db
-          .select({ id: queuedMessage.id })
-          .from(queuedMessage)
-          .where(
-            and(
-              eq(queuedMessage.id, body.queuedMessageId),
-              eq(queuedMessage.conversationId, conversationId),
-            ),
-          )
-          .get()
-      )
+      const queued =
+        body.queuedMessageId === undefined
+          ? undefined
+          : db
+              .select()
+              .from(queuedMessage)
+              .where(
+                and(
+                  eq(queuedMessage.id, body.queuedMessageId),
+                  eq(queuedMessage.conversationId, conversationId),
+                ),
+              )
+              .get();
+      if (body.queuedMessageId !== undefined && queued === undefined)
         throw new HttpError(409, 'Queued message was already delivered');
-      const now = nowMs();
+      const now = running ? Math.max(nowMs(), running.createdAt + 1) : nowMs();
       const human =
         continuationOptions.human ?? deps.steerOptions?.human ?? body.queuedMessageId !== undefined;
       if (continuationOptions.answer !== undefined)
@@ -242,7 +243,13 @@ export async function sendBuildSteer(
         continuationOptions.answer !== undefined ||
         (human && settleWorkerReply(deps, conversationId, body.content) > 0);
       const messageRow = {
-        id: human ? `human-${newRecordId()}` : newRecordId(),
+        id: running
+          ? human
+            ? `human-steer-${newRecordId()}`
+            : `steer-${newRecordId()}`
+          : human
+            ? `human-${newRecordId()}`
+            : newRecordId(),
         actor: human ? deps.user.displayName : (continuationOptions.actor ?? null),
         role: 'user' as const,
         content: body.content,
@@ -293,7 +300,12 @@ export async function sendBuildSteer(
         insertMessageRow(
           transcriptDeps,
           targetBuildId,
-          messageRow,
+          {
+            ...messageRow,
+            ...(queued === undefined
+              ? {}
+              : { typedAt: queued.createdAt, sentByAgent: queued.sentByAgent ?? false }),
+          },
           body.queuedMessageId === undefined
             ? undefined
             : { conversationId, messageId: body.queuedMessageId },

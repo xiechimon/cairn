@@ -347,7 +347,13 @@ export function consumeCoordinatorInput(
         .get();
       if (source === undefined) continue;
       if (batch.kind === 'steer' && placedAt !== undefined && placedAt > source.createdAt) {
-        db.update(chiefMessage).set({ createdAt: placedAt }).where(eq(chiefMessage.id, id)).run();
+        db.update(chiefMessage)
+          .set({
+            createdAt: placedAt,
+            typedAt: sql`coalesce(${chiefMessage.typedAt}, ${chiefMessage.createdAt})`,
+          })
+          .where(eq(chiefMessage.id, id))
+          .run();
         placed.push({ ...source, createdAt: placedAt });
       }
       db.insert(coordinatorEntry)

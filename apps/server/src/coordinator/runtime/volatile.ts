@@ -42,7 +42,8 @@ export function createVolatileContext(
     instructions: (conversationId, next, stepId) => {
       const last = sentAt.get(conversationId);
       const frozen = epochs.get(conversationId);
-      if (frozen !== undefined && last !== undefined && now() - last < reuseMs) return frozen;
+      const warm = last !== undefined && now() - last < reuseMs;
+      if (frozen !== undefined && frozen.sentBy !== stepId && warm) return frozen;
       const sent = { text: next, sentBy: stepId };
       epochs.set(conversationId, sent);
       return sent;

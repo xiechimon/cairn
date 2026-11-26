@@ -134,13 +134,15 @@ function strArrOf(args: Args, key: string): string[] {
 }
 
 export async function executeMcpTool(
-  deps: ChiefToolDeps,
+  caller: ChiefToolDeps,
   ctx: McpCallerCtx,
   name: string,
   args: Args,
 ): Promise<string> {
+  const deps = { ...caller, sentByAgent: true };
   const { db } = deps;
   const svc = {
+    sentByAgent: true,
     db,
     hub: deps.hub,
     machineHub: deps.machineHub,

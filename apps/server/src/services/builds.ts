@@ -75,6 +75,7 @@ export interface BuildDeps extends CommitEffects {
   githubAppTokenSocket?: string | null | undefined;
   githubAppIdentity?: GitIdentity | null | undefined;
   steerOptions?: Pick<BuildSteerOptions, 'human'>;
+  sentByAgent?: boolean;
   db: Db;
   hub: TeamStreamHub;
   machineHub?: MachineWakeHub;

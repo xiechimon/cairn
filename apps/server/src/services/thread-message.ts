@@ -254,6 +254,12 @@ function commitStoppedRestart(
     replacing?.commit();
     claimClientMessage(deps.db, row.id, body.clientMessageId);
     const conversationId = startThreadBuild(deps, row, origin, body.content);
+    if (origin.origin === 'user' && deps.sentByAgent !== true)
+      deps.db
+        .update(step)
+        .set({ ownerSaid: body.content })
+        .where(eq(step.buildId, conversationId))
+        .run();
     result = { todoId: row.id, conversationId, delivered: 'restart' };
     completeClientMessage(deps.db, row.id, body.clientMessageId, result);
     return insertCoordinatorMarker(deps, row, body, result, origin);
