@@ -563,10 +563,20 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       createdAt: nowMs(),
     });
   }
+  const isChiefTurn = stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId);
+  const stopAccepted =
+    db
+      .delete(stopPending)
+      .where(eq(stopPending.stepId, stepId))
+      .returning({ stepId: stopPending.stepId })
+      .all().length > 0;
   const outcome: MachineDoneBody =
-    landingError !== null ? { ...body, status: 'failed', errorMessage: landingError } : body;
+    landingError !== null
+      ? { ...body, status: 'failed', errorMessage: landingError }
+      : stopAccepted && body.status === 'failed' && isChiefTurn
+        ? { ...body, status: 'stopped' }
+        : body;
   recordStepUsage(deps, stepRow, outcome.usage ?? []);
-  db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   const worker = workerStepContext(deps, stepRow);
   if (
     db.select({ archiveStop: step.archiveStop }).from(step).where(eq(step.id, stepId)).get()
@@ -686,7 +696,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   if (outcome.skillInjectionFacts !== undefined) {
     recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
   }
-  if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
+  if (isChiefTurn) {
     finishCoordinatorTurn(deps, stepRow, outcome);
     return;
   }

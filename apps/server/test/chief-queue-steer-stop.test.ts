@@ -634,6 +634,22 @@ describe('stop (T5)', () => {
     expect(await refused.json()).toMatchObject({ reason: 'nothing-to-stop' });
   });
 
+  test.each([
+    ['a login error', 'Antigravity login failed: Authentication required'],
+    ['a quota error', QUOTA_ERROR],
+  ])('an accepted stop stays a stop when the turn then ends in %s', async (_name, errorMessage) => {
+    const w = await setupWorld([{ provider: 'relay-b', modelId: 'm' }]);
+    await w.send('第一句');
+    const running = await w.claim();
+    expect((await w.stop()).status).toBe(200);
+    await w.done(running!.step.id, { status: 'failed', errorMessage });
+    expect(w.stepRow(running!.step.id)?.status).toBe('stopped');
+    const ids = w.messages().map((m) => m.id);
+    expect(ids).toContain(`chief-stop-${running!.step.id}`);
+    expect(ids.some((id) => id.startsWith('chief-err-'))).toBe(false);
+    expect((await w.thread()).activeRun).toBeNull();
+  });
+
   test('stop on a turn whose machine went silent ends it right away', async () => {
     const w = await setupWorld();
     await w.send('第一句');
