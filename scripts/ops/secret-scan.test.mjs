@@ -47,7 +47,7 @@ function fixture(t) {
   const stubbed = ({ exit, log = '' }) => {
     writeFileSync(
       join(bin, 'gitleaks'),
-      '#!/bin/sh\nprintf \'%s\\n\' "$@" >> "$STUB_ARGS"\nprintf \'%s\\n\' "$STUB_LOG" >&2\nexit "$STUB_EXIT"\n',
+      '#!/bin/sh\ncat > /dev/null\nprintf \'%s\\n\' "$@" >> "$STUB_ARGS"\nprintf \'%s\\n\' "$STUB_LOG" >&2\nexit "$STUB_EXIT"\n',
     );
     chmodSync(join(bin, 'gitleaks'), 0o755);
     return scan({
@@ -61,8 +61,10 @@ function fixture(t) {
 }
 
 test('scans exactly the commits since origin/main, redacted, with inline allows ignored', (t) => {
-  const { base, argsFile, addCommit, stubbed } = fixture(t);
+  const { repo, base, argsFile, git, addCommit, stubbed } = fixture(t);
   addCommit('lane.txt', 'lane work\n');
+  writeFileSync(join(repo, 'long-message'), 'a line of a long commit message\n'.repeat(20_000));
+  git('commit', '-q', '--allow-empty', '-F', 'long-message');
   const run = stubbed({ exit: 0, log: 'INF no leaks found' });
   assert.equal(run.status, 0, run.stderr);
   const args = readFileSync(argsFile, 'utf8').split('\n');
