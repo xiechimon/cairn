@@ -1,5 +1,5 @@
 import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
-import { CircleStop } from 'lucide-react';
+import { CircleAlert, CircleStop } from 'lucide-react';
 import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
@@ -344,7 +344,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
   if (todos.length === 0) {
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
-        <FailureMarker label={stoppedLabel} testId="chief-stopped" />
+        <NoticeLine label={stoppedLabel} testId="chief-stopped" icon={CircleAlert} />
       </MessageScrollerItem>
     );
   }
