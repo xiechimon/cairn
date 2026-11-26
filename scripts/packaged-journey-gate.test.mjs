@@ -8,14 +8,19 @@ import { scrubGitEnv } from './scrub-git-env.mjs';
 import { cleanupTestTempDirs, makeTestTempDir } from './test-tmpdir.mjs';
 
 const REGISTRY = '.claude/skills/verify-cairn/packaged-journeys.json';
+const INITIAL_REGISTRY_COMMIT = '6f5c86d50';
 const REAL_MISSES = [
   ['the 11-25 Antigravity re-sign-in', 'bbf7d78bd', 'providers'],
   ['the update button that was dead in remote mode', '67299d5d4', 'server-status'],
 ];
 
 for (const [name, commit, feature] of REAL_MISSES) {
-  test(`${name} (${commit}) is red against today's journeys and names ${feature}`, () => {
-    const result = analyze({ base: `${commit}^`, head: commit, coverageFrom: 'HEAD' });
+  test(`${name} (${commit}) is red against the initial registry and names ${feature}`, () => {
+    const result = analyze({
+      base: `${commit}^`,
+      head: commit,
+      coverageFrom: INITIAL_REGISTRY_COMMIT,
+    });
     assert.deepEqual(result.registryErrors, []);
     assert.deepEqual(result.missing.find((row) => row.id === feature)?.modes, [
       'local-server',
@@ -23,6 +28,15 @@ for (const [name, commit, feature] of REAL_MISSES) {
     ]);
   });
 }
+
+test('HEAD registry remains valid against historical feature commits', () => {
+  const result = analyze({ base: '67299d5d4^', head: '67299d5d4', coverageFrom: 'HEAD' });
+  assert.deepEqual(result.registryErrors, []);
+  assert.deepEqual(result.missing.find((row) => row.id === 'server-status')?.modes, [
+    'local-server',
+    'remote-server',
+  ]);
+});
 
 test('a diff outside every feature row is green', () => {
   const commit = 'f9b6c33409949dcaf66ea5cbea5e2e7b4d9a3767';

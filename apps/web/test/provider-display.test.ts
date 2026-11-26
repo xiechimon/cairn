@@ -624,6 +624,26 @@ it.each([false, true])('keeps off row text at full opacity when selected=%s', (s
   expect(classes?.filter((token) => /^opacity-/.test(token))).toEqual([]);
 });
 
+it('renders the right-side status mark and aside inside the selectable button so right-side clicks select the row', () => {
+  const row = renderRow({
+    item: {
+      id: 'right-click',
+      name: 'Right click provider',
+      Mark: () => null,
+      status: 'API key · 1 model',
+      statusLabel: 'Available',
+      tone: 'ok',
+      statusGlyph: 'ok',
+      aside: createElement('span', { 'data-testid': 'aside-chip' }, '90%'),
+    },
+    selected: false,
+    onSelect: () => undefined,
+  });
+  const buttonInner = row.match(/<button\b[^>]*>([\s\S]*?)<\/button>/)?.[1] ?? '';
+  expect(buttonInner).toContain('data-testid="provider-status-mark"');
+  expect(buttonInner).toContain('data-testid="aside-chip"');
+});
+
 it.each([
   { providerId: 'anthropic', authHeader: true, available: false, label: '填写 API key', tone: 'warn' },
   { providerId: 'github-copilot', authHeader: true, available: false, label: '未登录', tone: 'warn' },

@@ -12,6 +12,8 @@ export const devinSubscriptionModelSchema = z.object({
   supportsImages: z.boolean().optional(),
   isNew: z.boolean().optional(),
   isBeta: z.boolean().optional(),
+  thinkingLevels: modelSourceModelSchema.shape.thinkingLevels,
+  thinkingDefault: modelSourceModelSchema.shape.thinkingDefault,
   liveness: modelSourceModelSchema.shape.liveness,
 });
 export type DevinSubscriptionModel = z.infer<typeof devinSubscriptionModelSchema>;

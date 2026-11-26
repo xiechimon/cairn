@@ -3,8 +3,10 @@ import {
   distinctThinkingLevels,
   type ModelCostRates,
   type ProviderConfig,
+  piCatalogFallbackOrder,
   piCatalogProviderId,
   resolveModelInput,
+  strippedCatalogModelId,
   type ThinkingLevel,
 } from '@cairn/shared';
 import type {
@@ -61,6 +63,21 @@ export function catalogContextWindow(providerId: string, modelId: string): numbe
   );
 }
 
+function findBuiltinModel(
+  providers: readonly string[],
+  api: string | undefined,
+  predicate: (model: Model<Api>) => boolean,
+): Model<Api> | undefined {
+  for (const id of providers) {
+    if (!isBuiltinProvider(id)) continue;
+    const hit = getBuiltinModels(id).find(
+      (model) => (api === undefined || model.api === api) && predicate(model),
+    );
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
+}
+
 function catalogModel(
   providerId: string,
   modelId: string,
@@ -68,11 +85,21 @@ function catalogModel(
   api?: string,
 ): Model<Api> | undefined {
   const catalogId = subscription ? CODEX_PROVIDER_ID : piCatalogProviderId(providerId);
-  return isBuiltinProvider(catalogId)
-    ? getBuiltinModels(catalogId).find(
-        (model) => model.id === modelId && (api === undefined || model.api === api),
-      )
-    : undefined;
+  if (isBuiltinProvider(catalogId)) {
+    return getBuiltinModels(catalogId).find(
+      (model) => model.id === modelId && (api === undefined || model.api === api),
+    );
+  }
+  const providers = piCatalogFallbackOrder(getBuiltinProviders(), api);
+  const exact = findBuiltinModel(providers, api, (model) => model.id === modelId);
+  if (exact !== undefined) return exact;
+  const bare = strippedCatalogModelId(modelId);
+  if (bare === undefined) return undefined;
+  return findBuiltinModel(
+    providers,
+    api,
+    (model) => model.id === bare || strippedCatalogModelId(model.id) === bare,
+  );
 }
 
 const CANONICAL_COST_PROVIDERS: readonly string[] = [

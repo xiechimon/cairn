@@ -210,7 +210,15 @@ describe('antigravity subscriptions REST & model sources', () => {
       installed: true,
       hostname: 'agy-mac',
       machineId,
-      models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' }],
+      models: [
+        {
+          id: 'gemini-4-carbon',
+          name: 'Gemini 4 Carbon',
+          slot: 'builtin',
+          thinkingLevels: ['low', 'medium', 'high'],
+          thinkingDefault: 'high',
+        },
+      ],
     });
 
     const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
@@ -1786,8 +1794,20 @@ describe('antigravity upstream models', () => {
       hostname: 'agy-mac',
       machineId: 'machine-agy-mac',
       models: [
-        { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' },
-        { id: 'gemini-4-argon', name: 'Gemini 4 Argon', slot: 'builtin' },
+        {
+          id: 'gemini-4-carbon',
+          name: 'Gemini 4 Carbon',
+          slot: 'builtin',
+          thinkingLevels: ['low', 'medium', 'high'],
+          thinkingDefault: 'high',
+        },
+        {
+          id: 'gemini-4-argon',
+          name: 'Gemini 4 Argon',
+          slot: 'builtin',
+          thinkingLevels: ['low', 'medium', 'high'],
+          thinkingDefault: 'high',
+        },
       ],
     });
   });
@@ -1846,7 +1866,15 @@ describe('antigravity upstream models', () => {
       installed: true,
       hostname: 'agy-asleep',
       machineId,
-      models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' }],
+      models: [
+        {
+          id: 'gemini-4-carbon',
+          name: 'Gemini 4 Carbon',
+          slot: 'builtin',
+          thinkingLevels: ['low', 'medium', 'high'],
+          thinkingDefault: 'high',
+        },
+      ],
     });
   });
 

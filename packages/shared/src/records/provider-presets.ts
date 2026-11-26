@@ -40,6 +40,60 @@ export function piCatalogProviderId(providerId: string): string {
   return PI_PROVIDER_ID[providerId] ?? providerId;
 }
 
+const API_PREFERRED_CATALOG_PROVIDERS: Partial<Record<string, readonly string[]>> = {
+  'anthropic-messages': ['anthropic'],
+  'openai-responses': ['openai'],
+  'openai-codex-responses': ['openai-codex'],
+};
+
+const SECONDARY_CATALOG_PROVIDERS = new Set([
+  'amazon-bedrock',
+  'azure',
+  'baseten',
+  'cerebras',
+  'cloudflare-ai-gateway',
+  'cloudflare-workers-ai',
+  'fireworks',
+  'github-copilot',
+  'google-vertex',
+  'groq',
+  'huggingface',
+  'nvidia',
+  'opencode',
+  'opencode-go',
+  'openrouter',
+  'qwen-token-plan',
+  'qwen-token-plan-cn',
+  'qwen-token-plan-individual',
+  'radius',
+  'together',
+  'typesafe',
+  'vercel-ai-gateway',
+  'xiaomi-token-plan-ams',
+  'xiaomi-token-plan-cn',
+  'xiaomi-token-plan-sgp',
+]);
+
+export function piCatalogFallbackOrder(
+  builtinProviders: readonly string[],
+  api?: string,
+): string[] {
+  const preferred = (api === undefined ? undefined : API_PREFERRED_CATALOG_PROVIDERS[api]) ?? [];
+  const primary = builtinProviders.filter(
+    (id) => !preferred.includes(id) && !SECONDARY_CATALOG_PROVIDERS.has(id),
+  );
+  const secondary = builtinProviders.filter(
+    (id) => !preferred.includes(id) && SECONDARY_CATALOG_PROVIDERS.has(id),
+  );
+  return [...preferred.filter((id) => builtinProviders.includes(id)), ...primary, ...secondary];
+}
+
+export function strippedCatalogModelId(modelId: string): string | undefined {
+  if (!modelId.includes('/')) return undefined;
+  const bare = modelId.split('/').pop()?.trim();
+  return bare && bare !== modelId ? bare : undefined;
+}
+
 export const AGGREGATOR_PRESET_IDS: readonly string[] = [
   'cloudflare-ai-gateway',
   'vercel-ai-gateway',

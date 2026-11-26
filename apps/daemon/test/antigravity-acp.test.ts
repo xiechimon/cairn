@@ -182,6 +182,64 @@ describe('antigravity ACP runtime and credentials', () => {
     });
   });
 
+  test('reports learned Antigravity model thinking levels back through onAntigravityModels', async () => {
+    const dir = tempDir('ag-learned-models-');
+    const agent = join(dir, 'agy-learned.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true } } });',
+          '  } else if (msg.method === "session/new") {',
+          '    send({ id: msg.id, result: { sessionId: "ag-learn", configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-neon", options: [{ value: "gemini-4-neon", name: "Gemini 4 Neon" }, { value: "gpt-oss-120b-medium", name: "GPT-OSS 120B (Medium)" }] }, { id: "thought_level", name: "Thinking Level", category: "thought_level", type: "select", currentValue: "high", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }, { value: "xhigh", name: "Extra" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    const opts = msg.params.value === "gpt-oss-120b-medium" ? [] : [{ id: "thought_level", name: "Thinking Level", category: "thought_level", type: "select", currentValue: "high", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }, { value: "xhigh", name: "Extra" }] }];',
+          '    send({ id: msg.id, result: { configOptions: opts } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const learned: unknown[] = [];
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      onAntigravityModels: (models) => learned.push(models),
+    });
+    const session = await backend.createSession({
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gpt-oss-120b-medium',
+      prompt: 'hi',
+    });
+    await collect(session.events);
+    expect(learned).toEqual([
+      [
+        {
+          id: 'gemini-4-neon',
+          name: 'Gemini 4 Neon',
+          thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+          thinkingDefault: 'high',
+        },
+        {
+          id: 'gpt-oss-120b-medium',
+          name: 'GPT-OSS 120B (Medium)',
+          thinkingLevels: [],
+        },
+      ],
+    ]);
+  });
+
   test('old-pack session resumes under full CLI via session/resume and falls back to session/load when resume asks for load', async () => {
     const dir = tempDir('ag-resume-ok-');
     const baseOpts: SessionOpts = {

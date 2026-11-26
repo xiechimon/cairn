@@ -7,6 +7,7 @@ import {
   antigravityKeyFromText,
   createAntigravitySubscriptionSchema,
   DEFAULT_ANTIGRAVITY_MODELS,
+  DEFAULT_DEVIN_MODELS,
 } from '../src/index.js';
 import {
   unsafeManagedVersion,
@@ -111,17 +112,62 @@ describe('antigravity local helpers and schemas', () => {
     ).toThrow();
   });
 
-  test('DEFAULT_ANTIGRAVITY_MODELS includes all 9 observed models', () => {
-    expect(DEFAULT_ANTIGRAVITY_MODELS.map((m) => m.id)).toEqual([
-      'gemini-4-carbon',
-      'gemini-4-argon',
-      'gemini-4-hydrogen',
-      'gemini-pro-orchestrator',
-      'gemini-pro-orchestrator-argon',
-      'gemini-3.8-flash',
-      'claude-sonnet-4-6',
-      'claude-opus-4-6-thinking',
-      'gpt-oss-120b-medium',
+  test('DEFAULT_ANTIGRAVITY_MODELS includes all 11 agy 1.5.17 models with verified thought_level support', () => {
+    expect(
+      DEFAULT_ANTIGRAVITY_MODELS.map((m) => ({
+        id: m.id,
+        thinkingLevels: m.thinkingLevels,
+        thinkingDefault: m.thinkingDefault,
+      })),
+    ).toEqual([
+      {
+        id: 'gemini-4-neon',
+        thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+        thinkingDefault: 'high',
+      },
+      {
+        id: 'gemini-4-carbon',
+        thinkingLevels: ['low', 'medium', 'high'],
+        thinkingDefault: 'high',
+      },
+      {
+        id: 'gemini-4-argon',
+        thinkingLevels: ['low', 'medium', 'high'],
+        thinkingDefault: 'high',
+      },
+      {
+        id: 'gemini-4-hydrogen',
+        thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+        thinkingDefault: 'high',
+      },
+      { id: 'gemini-pro-orchestrator-neon', thinkingLevels: [], thinkingDefault: undefined },
+      { id: 'gemini-pro-orchestrator', thinkingLevels: [], thinkingDefault: undefined },
+      { id: 'gemini-pro-orchestrator-argon', thinkingLevels: [], thinkingDefault: undefined },
+      {
+        id: 'gemini-3.8-flash',
+        thinkingLevels: ['low', 'medium', 'high'],
+        thinkingDefault: 'medium',
+      },
+      {
+        id: 'claude-opus-5-5',
+        thinkingLevels: ['low', 'medium', 'high'],
+        thinkingDefault: 'medium',
+      },
+      {
+        id: 'claude-sonnet-5-5',
+        thinkingLevels: ['low', 'medium', 'high'],
+        thinkingDefault: 'medium',
+      },
+      { id: 'gpt-oss-120b-medium', thinkingLevels: [], thinkingDefault: undefined },
     ]);
+  });
+
+  test('DEFAULT_DEVIN_MODELS includes verified swe-2-1-medium with full effort range', () => {
+    expect(DEFAULT_DEVIN_MODELS.find((m) => m.id === 'swe-2-1-medium')).toMatchObject({
+      id: 'swe-2-1-medium',
+      name: 'SWE-2.1',
+      thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+      thinkingDefault: 'medium',
+    });
   });
 });

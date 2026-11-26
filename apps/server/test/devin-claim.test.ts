@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { machineTokenResponseSchema } from '@cairn/shared';
+import { DEFAULT_DEVIN_MODELS, machineTokenResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -327,23 +327,7 @@ describe('model sources', () => {
     });
     s.db.update(machineTable).set({ online: false }).where(eq(machineTable.id, offline)).run();
     insertMachine(s, { name: 'no-devin' });
-    const statics = [
-      {
-        id: 'swe-2-high',
-        name: 'SWE-2',
-        slot: 'builtin',
-        thinkingLevels: ['medium', 'high', 'max'],
-        thinkingDefault: 'high',
-      },
-      {
-        id: 'swe-2-flash-medium',
-        name: 'SWE-2 Flash',
-        slot: 'builtin',
-        thinkingLevels: ['medium', 'high', 'max'],
-        thinkingDefault: 'medium',
-      },
-      { id: 'adaptive', name: 'Adaptive', slot: 'builtin', thinkingLevels: [] },
-    ];
+    const statics = [...DEFAULT_DEVIN_MODELS];
     expect(listDevinSources(s.db, s.team.id)).toEqual([
       {
         runtime: 'devin',
@@ -423,7 +407,7 @@ describe('model sources', () => {
     ]);
   });
 
-  test('an empty devin.models falls back to the static three', async () => {
+  test('an empty devin.models falls back to the static defaults', async () => {
     const { s } = await world();
     const machineId = insertMachine(s, {
       name: 'devin-empty',
@@ -435,23 +419,7 @@ describe('model sources', () => {
         installed: true,
         hostname: 'devin-empty',
         machineId,
-        models: [
-          {
-            id: 'swe-2-high',
-            name: 'SWE-2',
-            slot: 'builtin',
-            thinkingLevels: ['medium', 'high', 'max'],
-            thinkingDefault: 'high',
-          },
-          {
-            id: 'swe-2-flash-medium',
-            name: 'SWE-2 Flash',
-            slot: 'builtin',
-            thinkingLevels: ['medium', 'high', 'max'],
-            thinkingDefault: 'medium',
-          },
-          { id: 'adaptive', name: 'Adaptive', slot: 'builtin', thinkingLevels: [] },
-        ],
+        models: [...DEFAULT_DEVIN_MODELS],
       },
     ]);
   });

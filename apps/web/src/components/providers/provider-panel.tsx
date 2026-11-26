@@ -150,45 +150,47 @@ export function ProviderInstanceRow({
           .filter(Boolean)
           .join(' ')}
         onClick={onSelect}
-        className="h-auto min-w-0 flex-1 items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent dark:hover:bg-transparent"
+        className="h-auto min-w-0 flex-1 items-start justify-start gap-3 border-0 p-0 text-left font-normal whitespace-normal hover:bg-transparent dark:hover:bg-transparent"
       >
-        <item.Mark
-          aria-hidden
-          className={cn('mt-0.5 size-4 flex-none text-content-secondary', MONO_MARK_CLS)}
-        />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-2">
-            <span title={item.name} className="truncate text-ui font-medium text-foreground">
-              {item.name}
+        <span className="flex min-w-0 flex-1 items-start gap-2.5 p-px">
+          <item.Mark
+            aria-hidden
+            className={cn('mt-0.5 size-4 flex-none text-content-secondary', MONO_MARK_CLS)}
+          />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex min-w-0 items-center gap-2">
+              <span title={item.name} className="truncate text-ui font-medium text-foreground">
+                {item.name}
+              </span>
+              {item.version != null && (
+                <code className="flex-none text-meta text-content-secondary">v{item.version}</code>
+              )}
             </span>
-            {item.version != null && (
-              <code className="flex-none text-meta text-content-secondary">v{item.version}</code>
-            )}
+            <span className="flex min-w-0 items-center gap-1.5 text-meta tabular-nums">
+              <span
+                data-testid="provider-subtitle"
+                title={item.status}
+                className="truncate text-content-secondary"
+              >
+                {item.status}
+              </span>
+            </span>
           </span>
-          <span className="flex min-w-0 items-center gap-1.5 text-meta tabular-nums">
-            <span
-              data-testid="provider-subtitle"
-              title={item.status}
-              className="truncate text-content-secondary"
-            >
-              {item.status}
-            </span>
+        </span>
+        <span className="flex flex-none flex-col items-end justify-center gap-1 self-stretch">
+          {item.aside}
+          <span
+            data-testid="provider-status-mark"
+            data-status={item.statusGlyph}
+            role="img"
+            aria-label={statusLabel}
+            title={statusLabel}
+            className={cn('flex size-4 items-center justify-center', TONE_INK[tone])}
+          >
+            <StatusIcon aria-hidden className="size-4" />
           </span>
         </span>
       </Button>
-      <span className="flex flex-none flex-col items-end justify-center gap-1 self-stretch">
-        {item.aside}
-        <span
-          data-testid="provider-status-mark"
-          data-status={item.statusGlyph}
-          role="img"
-          aria-label={statusLabel}
-          title={statusLabel}
-          className={cn('flex size-4 items-center justify-center', TONE_INK[tone])}
-        >
-          <StatusIcon aria-hidden className="size-4" />
-        </span>
-      </span>
     </div>
   );
 }
@@ -370,29 +372,31 @@ export function SortableList<T>({
     onReorder(arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id))));
   };
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      modifiers={[keepInList]}
-      autoScroll={false}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      accessibility={{
-        announcements,
-        screenReaderInstructions: {
-          draggable: t('按空格键拿起，用上下方向键移动，再按空格键放下，按 Esc 取消。'),
-        },
-      }}
-    >
-      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <div className={className}>
-          {items.map((item) => {
-            const id = getId(item);
-            return <SortableEntry key={id} id={id} item={item} renderItem={renderItem} />;
-          })}
-        </div>
-      </SortableContext>
-    </DndContext>
+    <div className="min-w-0">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[keepInList]}
+        autoScroll={false}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        accessibility={{
+          announcements,
+          screenReaderInstructions: {
+            draggable: t('按空格键拿起，用上下方向键移动，再按空格键放下，按 Esc 取消。'),
+          },
+        }}
+      >
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+          <div className={className}>
+            {items.map((item) => {
+              const id = getId(item);
+              return <SortableEntry key={id} id={id} item={item} renderItem={renderItem} />;
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
   );
 }
 

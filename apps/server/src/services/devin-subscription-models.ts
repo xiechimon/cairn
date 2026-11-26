@@ -2,7 +2,12 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { DevinSubscriptionModel } from '@cairn/shared';
+import {
+  type DevinSubscriptionModel,
+  devinVariantEffort,
+  THINKING_LEVELS,
+  type ThinkingLevel,
+} from '@cairn/shared';
 import {
   childEnv,
   collectLines,
@@ -32,6 +37,8 @@ interface CatalogVariant {
   contextTokens?: number;
   isNew?: boolean;
   isBeta?: boolean;
+  thinkingLevels?: ThinkingLevel[];
+  thinkingDefault?: ThinkingLevel;
 }
 
 interface AcpModelOption {
@@ -75,6 +82,21 @@ function parseCatalog(stdout: string, token: string): Map<string, CatalogVariant
     const familyLabel = stringOf((family as { family_label?: unknown }).family_label, 256, token);
     const variants = (family as { variants?: unknown }).variants;
     if (!Array.isArray(variants)) continue;
+    const siblingLevels = new Map<string, Set<ThinkingLevel>>();
+    for (const variant of variants) {
+      if (typeof variant !== 'object' || variant === null) continue;
+      const uid = stringOf(
+        (variant as Record<string, unknown>).model_uid,
+        MAX_MODEL_ID_LENGTH,
+        token,
+      );
+      if (uid === undefined) continue;
+      const effort = devinVariantEffort(uid);
+      if (effort === null) continue;
+      const set = siblingLevels.get(effort.baseId) ?? new Set<ThinkingLevel>();
+      set.add(effort.level);
+      siblingLevels.set(effort.baseId, set);
+    }
     for (const variant of variants) {
       if (typeof variant !== 'object' || variant === null) continue;
       const record = variant as Record<string, unknown>;
@@ -95,6 +117,12 @@ function parseCatalog(stdout: string, token: string): Map<string, CatalogVariant
       }
       if (typeof record.is_new === 'boolean') variantMeta.isNew = record.is_new;
       if (typeof record.is_beta === 'boolean') variantMeta.isBeta = record.is_beta;
+      const effort = devinVariantEffort(uid);
+      const levels = effort === null ? undefined : siblingLevels.get(effort.baseId);
+      if (effort !== null && levels !== undefined && levels.size >= 2) {
+        variantMeta.thinkingLevels = THINKING_LEVELS.filter((level) => levels.has(level));
+        variantMeta.thinkingDefault = effort.level;
+      }
       meta.set(uid, variantMeta);
     }
   }

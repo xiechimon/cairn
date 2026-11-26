@@ -41,6 +41,7 @@ import {
   acpThoughtLevels,
   acpThoughtValue,
   CLAUDE_TODO_STATUS_STATES,
+  isInternalAntigravityModelId,
 } from '@cairn/shared';
 import { writeJsonObject } from '../agent-config.js';
 import { DAEMON_VERSION } from '../version.js';
@@ -105,9 +106,10 @@ export function validateGeminiSession(opts: GeminiSessionValidation): {
   return { prompt: opts.prompt, resumeId: opts.resumeId };
 }
 
-function advertisedDevinModels(
+function advertisedAcpModels(
   option: SessionConfigOption,
   thoughtByModel: Record<string, readonly SessionConfigOption[]>,
+  skipId?: (id: string) => boolean,
 ): ModelSourceModel[] {
   if (option.type !== 'select') return [];
   const seen = new Set<string>();
@@ -115,7 +117,13 @@ function advertisedDevinModels(
   for (const entry of option.options) {
     const candidates = 'value' in entry ? [entry] : entry.options;
     for (const candidate of candidates) {
-      if (candidate.value === '' || seen.has(candidate.value)) continue;
+      if (
+        candidate.value === '' ||
+        seen.has(candidate.value) ||
+        skipId?.(candidate.value) === true
+      ) {
+        continue;
+      }
       seen.add(candidate.value);
       const options = thoughtByModel[candidate.value];
       models.push({
@@ -963,11 +971,21 @@ class AcpBackend implements AgentBackend {
         );
         configOptions = selected.configOptions ?? [];
         if (adapter?.harness === 'devin') {
-          const models = advertisedDevinModels(modelOption, {
+          const models = advertisedAcpModels(modelOption, {
             [currentValueOf(modelOption)]: response.configOptions ?? [],
             [opts.modelId]: configOptions,
           });
           if (models.length > 0) adapter.onDevinModels?.(models);
+        } else if (adapter?.harness === 'antigravity') {
+          const models = advertisedAcpModels(
+            modelOption,
+            {
+              [currentValueOf(modelOption)]: response.configOptions ?? [],
+              [opts.modelId]: configOptions,
+            },
+            isInternalAntigravityModelId,
+          );
+          if (models.length > 0) adapter.onAntigravityModels?.(models);
         }
       } else if (adapter) {
         throw new Error('ACP adapter did not advertise model configuration');
@@ -1087,6 +1105,7 @@ export interface AcpBackendOptions {
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
   onDevinModels?: (models: ModelSourceModel[]) => void;
+  onAntigravityModels?: (models: ModelSourceModel[]) => void;
   createUpdateNormalizer?: () => (update: SessionUpdate) => AcpUpdateNormalization;
   initializeTimeoutMs?: number;
   cancelTimeoutMs?: number;

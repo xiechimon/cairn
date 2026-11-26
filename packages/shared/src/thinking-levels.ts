@@ -101,3 +101,65 @@ export function distinctThinkingLevels(
       !supported.some((other) => other !== level && sentValue(other) === sentValue(level)),
   );
 }
+
+const DEVIN_EFFORT_SUFFIX_RE = /^(.*)-(none|off|minimal|low|medium|high|xhigh|max)$/;
+
+export function devinVariantEffort(modelId: string): {
+  baseId: string;
+  level: ThinkingLevel;
+} | null {
+  const match = DEVIN_EFFORT_SUFFIX_RE.exec(modelId.trim().toLowerCase());
+  if (match === null || !match[1] || !match[2]) return null;
+  const level = acpThoughtLevel(match[2] === 'off' ? ACP_OFF : match[2]);
+  if (level === undefined) return null;
+  return { baseId: match[1], level };
+}
+
+export function devinInferredThinking(modelId: string): {
+  thinkingLevels?: ThinkingLevel[];
+  thinkingDefault?: ThinkingLevel;
+} {
+  const id = modelId.trim().toLowerCase();
+  if (id === '' || id === 'adaptive' || id.startsWith('fusion-')) return {};
+  if (/^glm-5(?:-|$)/.test(id)) {
+    const suffix = devinVariantEffort(id);
+    const thinkingDefault: ThinkingLevel = suffix?.level === 'max' ? 'max' : 'high';
+    return { thinkingLevels: ['off', 'high', 'max'], thinkingDefault };
+  }
+  const parsed = devinVariantEffort(id);
+  if (parsed === null) return {};
+  const { baseId, level } = parsed;
+  if (baseId.startsWith('claude-')) {
+    const claudeBase = /^claude-(\d+)-([a-z]+)$/.exec(baseId);
+    const normalized = claudeBase ? `claude-${claudeBase[2]}-${claudeBase[1]}` : baseId;
+    const levels = claudeCodeThinkingLevels(normalized);
+    if (levels.length === 0) return {};
+    return levels.includes(level)
+      ? { thinkingLevels: levels, thinkingDefault: level }
+      : { thinkingLevels: levels };
+  }
+  if (/^gpt-6(?:-|$)/.test(baseId)) {
+    return {
+      thinkingLevels: ['off', 'low', 'medium', 'high', 'xhigh', 'max'],
+      thinkingDefault: level,
+    };
+  }
+  if (/^gemini-/.test(baseId) && (level === 'low' || level === 'medium' || level === 'high')) {
+    return {
+      thinkingLevels: ['low', 'medium', 'high'],
+      thinkingDefault: level,
+    };
+  }
+  if (
+    /^kimi-k3(?:-|$)/.test(baseId) &&
+    level !== 'off' &&
+    level !== 'minimal' &&
+    level !== 'xhigh'
+  ) {
+    return {
+      thinkingLevels: ['low', 'medium', 'high', 'max'],
+      thinkingDefault: level,
+    };
+  }
+  return {};
+}

@@ -53,34 +53,84 @@ export const MODEL_SOURCE_RUNTIME_LABELS: Record<ModelSourceRuntime, string> = {
 };
 
 export const DEFAULT_ANTIGRAVITY_MODELS: readonly ModelSourceModel[] = [
-  { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' },
-  { id: 'gemini-4-argon', name: 'Gemini 4 Argon', slot: 'builtin' },
-  { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', slot: 'builtin' },
-  { id: 'gemini-pro-orchestrator', name: 'Orchestrator (Carbon)', slot: 'builtin' },
-  { id: 'gemini-pro-orchestrator-argon', name: 'Orchestrator (Argon)', slot: 'builtin' },
   {
-    id: 'gemini-3.8-flash',
-    name: 'Gemini 3.8 Flash',
+    id: 'gemini-4-neon',
+    name: 'Gemini 4 Neon',
+    slot: 'builtin',
+    thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+    thinkingDefault: 'high',
+  },
+  {
+    id: 'gemini-4-carbon',
+    name: 'Gemini 4 Carbon',
     slot: 'builtin',
     thinkingLevels: ['low', 'medium', 'high'],
     thinkingDefault: 'high',
   },
   {
-    id: 'claude-sonnet-4-6',
-    name: 'Claude Sonnet 4.6 (Thinking)',
+    id: 'gemini-4-argon',
+    name: 'Gemini 4 Argon',
+    slot: 'builtin',
+    thinkingLevels: ['low', 'medium', 'high'],
+    thinkingDefault: 'high',
+  },
+  {
+    id: 'gemini-4-hydrogen',
+    name: 'Gemini 4 Hydrogen',
+    slot: 'builtin',
+    thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+    thinkingDefault: 'high',
+  },
+  {
+    id: 'gemini-pro-orchestrator-neon',
+    name: 'Orchestrator (Neon)',
     slot: 'builtin',
     thinkingLevels: [],
   },
   {
-    id: 'claude-opus-4-6-thinking',
-    name: 'Claude Opus 4.6 (Thinking)',
+    id: 'gemini-pro-orchestrator',
+    name: 'Orchestrator (Carbon)',
     slot: 'builtin',
     thinkingLevels: [],
+  },
+  {
+    id: 'gemini-pro-orchestrator-argon',
+    name: 'Orchestrator (Argon)',
+    slot: 'builtin',
+    thinkingLevels: [],
+  },
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    slot: 'builtin',
+    thinkingLevels: ['low', 'medium', 'high'],
+    thinkingDefault: 'medium',
+  },
+  {
+    id: 'claude-opus-5-5',
+    name: 'Claude Opus 5.5',
+    slot: 'builtin',
+    thinkingLevels: ['low', 'medium', 'high'],
+    thinkingDefault: 'medium',
+  },
+  {
+    id: 'claude-sonnet-5-5',
+    name: 'Claude Sonnet 5.5',
+    slot: 'builtin',
+    thinkingLevels: ['low', 'medium', 'high'],
+    thinkingDefault: 'medium',
   },
   { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)', slot: 'builtin', thinkingLevels: [] },
 ];
 
 export const DEFAULT_DEVIN_MODELS: readonly ModelSourceModel[] = [
+  {
+    id: 'swe-2-1-medium',
+    name: 'SWE-2.1',
+    slot: 'builtin',
+    thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    thinkingDefault: 'medium',
+  },
   {
     id: 'swe-2-high',
     name: 'SWE-2',

@@ -104,4 +104,21 @@ describe('frequently used model rows', () => {
     );
     expect(html).toBe('');
   });
+
+  test('SortableList wraps DndContext outside divide-y so DndKit live regions do not create a bottom border artifact in SettingsCard', () => {
+    const html = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'en',
+        children: createElement(FrequentModelsCard, {
+          models,
+          options: toModelOptions(sources),
+          onChange: () => {},
+        }),
+      }),
+    );
+    expect(html).toContain('data-slot="card"');
+    expect(html).toMatch(
+      /data-slot="card"[^>]*><div class="min-w-0"><div class="flex flex-col divide-y divide-border">/,
+    );
+  });
 });

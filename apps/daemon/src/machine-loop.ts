@@ -9,6 +9,7 @@ import type {
   ClaimedStep,
   DeliveredImage,
   MachineCapabilities,
+  ModelSourceModel,
 } from '@cairn/shared';
 import {
   appendAnswers,
@@ -539,6 +540,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let devinEnsured = false;
   let devinEnsureRetryAt = 0;
   let devinModels = loadDevinModels(paths);
+  const learnedAntigravityModels = new Map<string, ModelSourceModel>();
   const activeAntigravityVersions = new Map<string, number>();
   const antigravityManaged =
     opts.antigravityManaged ??
@@ -629,15 +631,29 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       })(),
       antigravity: (() => {
         const install = antigravityManaged.current();
-        return install === null
-          ? { installed: false }
-          : {
-              installed: true,
-              version: install.version,
-              authenticated: install.authenticated,
-              source: install.source,
-              models: install.models,
-            };
+        if (install === null) return { installed: false };
+        const merged = install.models.map((model) => {
+          const learned = learnedAntigravityModels.get(model.id);
+          if (learned?.thinkingLevels === undefined) return model;
+          return {
+            id: model.id,
+            name: model.name,
+            thinkingLevels: learned.thinkingLevels,
+            ...(learned.thinkingDefault !== undefined
+              ? { thinkingDefault: learned.thinkingDefault }
+              : {}),
+          };
+        });
+        for (const [id, learned] of learnedAntigravityModels) {
+          if (!merged.some((model) => model.id === id)) merged.push(learned);
+        }
+        return {
+          installed: true,
+          version: install.version,
+          authenticated: install.authenticated,
+          source: install.source,
+          models: merged,
+        };
       })(),
       executor: 'host' as const,
       antigravityOAuthProfile: true,
@@ -692,6 +708,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             usageEvents: true,
             skills: { skillsDir: config.skillsDir, cwd: config.home },
             onSkillsLog: (msg) => logger.skills(msg),
+            onAntigravityModels: (models) => {
+              for (const model of models) {
+                if (model.thinkingLevels !== undefined) {
+                  learnedAntigravityModels.set(model.id, model);
+                } else if (!learnedAntigravityModels.has(model.id)) {
+                  learnedAntigravityModels.set(model.id, model);
+                }
+              }
+            },
             acquireRuntime: () => {
               activeAntigravityVersions.set(
                 runtimeVersion,

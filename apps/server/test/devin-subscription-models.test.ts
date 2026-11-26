@@ -844,4 +844,48 @@ describe('patching devin subscription models', () => {
       0,
     );
   });
+
+  test('infers thinkingLevels and thinkingDefault when a Devin catalog family carries effort siblings', async () => {
+    fakeDevinModels({
+      acp: 'no-update',
+      configOptions: [
+        {
+          id: 'model',
+          name: 'Model',
+          category: 'model',
+          type: 'select',
+          currentValue: 'swe-2-1-medium',
+          options: [{ value: 'swe-2-1-medium', name: 'SWE-2.1' }],
+        },
+      ],
+      catalogData: {
+        families: [
+          {
+            family_label: 'SWE-2.1',
+            variants: [
+              { model_uid: 'swe-2-1-low', cost_tier: 'Med cost' },
+              { model_uid: 'swe-2-1-medium', cost_tier: 'Med cost' },
+              { model_uid: 'swe-2-1-high', cost_tier: 'Med cost' },
+              { model_uid: 'swe-2-1-xhigh', cost_tier: 'High cost' },
+              { model_uid: 'swe-2-1-max', cost_tier: 'High cost' },
+            ],
+          },
+        ],
+      },
+    });
+    const result = await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 150 });
+    expect(result).toEqual({
+      ok: true,
+      models: [
+        {
+          id: 'swe-2-1-medium',
+          name: 'SWE-2.1',
+          family: 'SWE-2.1',
+          costTier: 'Med cost',
+          thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+          thinkingDefault: 'medium',
+        },
+      ],
+    });
+  });
 });

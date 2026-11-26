@@ -2,6 +2,7 @@ import type {
   CreateDevinSubscription,
   DevinSubscription,
   DevinSubscriptionListEntry,
+  DevinSubscriptionModel,
   DevinSubscriptionVerifyResult,
   PatchDevinSubscription,
   ProviderFailure,
@@ -400,10 +401,12 @@ export async function devinSubscriptionUpstreamModels(
 export function enabledDevinSubscriptionModels(
   deps: { db: Pick<Db, 'select'> },
   teamId: string,
-): { id: string; name: string }[] {
+): Pick<DevinSubscriptionModel, 'id' | 'name' | 'thinkingLevels' | 'thinkingDefault'>[] {
   return (activeSubscriptionRow(deps, teamId)?.models ?? []).map((model) => ({
     id: model.id,
     name: model.name,
+    ...(model.thinkingLevels !== undefined ? { thinkingLevels: model.thinkingLevels } : {}),
+    ...(model.thinkingDefault !== undefined ? { thinkingDefault: model.thinkingDefault } : {}),
   }));
 }
 

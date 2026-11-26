@@ -87,4 +87,49 @@ describe('models pi already ships stay pi built-ins', () => {
       expect.objectContaining({ id: 'glm-next-preview', reasoning: false }),
     ]);
   });
+
+  test('a custom anthropic-messages endpoint inherits reasoning, thinkingLevelMap, compat, contextWindow and cost for known models while unknown models stay reasoning: false', () => {
+    const entry = materialized({
+      kind: 'http',
+      providerId: 'anthropic-ultra',
+      baseUrl: 'https://ultra.example.com',
+      api: 'anthropic-messages',
+      models: [
+        { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+        { id: 'anthropic/claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+        { id: 'foo-custom-model', name: 'Custom Model' },
+      ],
+    });
+    expect(entry.models).toEqual([
+      expect.objectContaining({
+        id: 'claude-opus-5-5',
+        reasoning: true,
+        contextWindow: 1_000_000,
+        thinkingLevelMap: expect.objectContaining({
+          off: null,
+          low: 'low',
+          medium: 'medium',
+          high: 'high',
+          xhigh: 'xhigh',
+          max: 'max',
+        }),
+        compat: expect.objectContaining({
+          forceAdaptiveThinking: true,
+          supportsMidConvoEffort: true,
+        }),
+      }),
+      expect.objectContaining({
+        id: 'anthropic/claude-sonnet-5-5',
+        reasoning: true,
+        contextWindow: 1_000_000,
+        thinkingLevelMap: expect.objectContaining({ xhigh: 'xhigh', max: 'max' }),
+      }),
+      expect.objectContaining({
+        id: 'foo-custom-model',
+        reasoning: false,
+      }),
+    ]);
+    const opus = (entry.models as { id: string; cost: { input: number } }[])[0];
+    expect(opus?.cost.input).toBeGreaterThan(0);
+  });
 });

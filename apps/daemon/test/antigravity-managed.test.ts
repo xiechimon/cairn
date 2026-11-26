@@ -523,4 +523,40 @@ describe('antigravity managed binary resolution', () => {
     expect(managed.current()?.authenticated).toBe(true);
     expect(managed.current()?.models.map((m) => m.id)).toEqual(['gemini-4-carbon']);
   });
+
+  test('reads thinking levels when ACP reports option id effort without category thought_level', async () => {
+    const dir = tempDir('ag-effort-id-');
+    const root = join(dir, 'managed');
+    const body = [
+      "import { createInterface } from 'node:readline';",
+      'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+      'for await (const line of createInterface({ input: process.stdin })) {',
+      '  const msg = JSON.parse(line);',
+      '  if (msg.method === "initialize") {',
+      '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentInfo: { name: "Antigravity ACP Server", version: "1.5.17" }, agentCapabilities: { loadSession: true } } });',
+      '  } else if (msg.method === "session/new") {',
+      '    send({ id: msg.id, result: { sessionId: "probe-effort", configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "claude-opus-5-5", options: [{ value: "claude-opus-5-5", name: "Claude Opus 5.5" }] }] } });',
+      '  } else if (msg.method === "session/set_config_option") {',
+      '    send({ id: msg.id, result: { configOptions: [{ id: "effort", name: "Effort", type: "select", currentValue: "medium", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
+      '  }',
+      '}',
+    ].join('\n');
+    const source = `#!/bin/sh\nexec ${shQuote(process.execPath)} --input-type=module -e ${shQuote(body)} -- "$0" "$@"\n`;
+    writeManagedCliInstall(root, '1.5.17', source);
+    const managed = createAntigravityManaged({
+      root,
+      platform: 'darwin',
+      arch: 'arm64',
+      fetchImpl: async () => new Response('{}', { status: 500 }),
+    });
+    const install = await managed.probe();
+    expect(install?.models).toEqual([
+      {
+        id: 'claude-opus-5-5',
+        name: 'Claude Opus 5.5',
+        thinkingLevels: ['low', 'medium', 'high'],
+        thinkingDefault: 'medium',
+      },
+    ]);
+  });
 });

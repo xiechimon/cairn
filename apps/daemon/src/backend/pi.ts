@@ -25,8 +25,10 @@ import {
   failureEndsStepNow,
   LANGFUSE_ATTR,
   observationAttributes,
+  piCatalogFallbackOrder,
   piCatalogProviderId,
   pipeStreamRetriedBeforeContent,
+  strippedCatalogModelId,
   THINKING_LEVELS,
   contextTokensOf as usageContextTokens,
 } from '@cairn/shared';
@@ -1366,13 +1368,39 @@ function builtinModelIds(providerId: string): ReadonlySet<string> {
   return new Set(getAllBuiltinModels(providerId).map((model) => model.id));
 }
 
+function findCatalogEntry(
+  providers: readonly string[],
+  api: string,
+  predicate: (model: Model<Api>) => boolean,
+): Model<Api> | undefined {
+  for (const id of providers) {
+    if (!isBuiltinProvider(id)) continue;
+    const hit = getAllBuiltinModels(id).find(
+      (model): model is Model<Api> => model.api === api && 'reasoning' in model && predicate(model),
+    );
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
+}
+
 function catalogEntry(provider: ProviderConfig, modelId: string): Model<Api> | undefined {
   const catalogId = piCatalogProviderId(provider.providerId);
-  if (!isBuiltinProvider(catalogId)) return undefined;
   const api = provider.api ?? 'openai-completions';
-  return getAllBuiltinModels(catalogId).find(
-    (model): model is Model<Api> =>
-      model.api === api && 'reasoning' in model && model.id === modelId,
+  if (isBuiltinProvider(catalogId)) {
+    return getAllBuiltinModels(catalogId).find(
+      (model): model is Model<Api> =>
+        model.api === api && 'reasoning' in model && model.id === modelId,
+    );
+  }
+  const providers = piCatalogFallbackOrder(getBuiltinProviders(), api);
+  const exact = findCatalogEntry(providers, api, (model) => model.id === modelId);
+  if (exact !== undefined) return exact;
+  const bare = strippedCatalogModelId(modelId);
+  if (bare === undefined) return undefined;
+  return findCatalogEntry(
+    providers,
+    api,
+    (model) => model.id === bare || strippedCatalogModelId(model.id) === bare,
   );
 }
 

@@ -6,6 +6,7 @@ import {
   claudeCodeUpdateRequired,
   DEFAULT_ANTIGRAVITY_MODELS,
   DEFAULT_DEVIN_MODELS,
+  devinInferredThinking,
   type ModelSourceModel,
   type ModelSourcesEnvelope,
   orderByKeys,
@@ -247,7 +248,11 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
   const merged = withKnownThinkingLevels(
     uniqueModels([...enabledDevinSubscriptionModels({ db }, teamId), ...reported]),
     [...reported, ...DEFAULT_DEVIN_MODELS],
-  );
+  ).map((model) => {
+    if (model.thinkingLevels !== undefined) return model;
+    const inferred = devinInferredThinking(model.id);
+    return inferred.thinkingLevels === undefined ? model : { ...model, ...inferred };
+  });
   const models: ModelSourceModel[] = merged.length > 0 ? merged : [...DEFAULT_DEVIN_MODELS];
   return machines.map((row) => ({
     runtime: 'devin' as const,

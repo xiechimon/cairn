@@ -136,7 +136,10 @@ function defaultModels(): AntigravityModel[] {
 function thoughtChoiceOf(
   options: readonly SessionConfigOption[],
 ): Pick<AntigravityModel, 'thinkingLevels' | 'thinkingDefault'> {
-  const option = options.find((entry) => entry.category === 'thought_level');
+  const option = options.find(
+    (entry) =>
+      entry.category === 'thought_level' || entry.id === 'thought_level' || entry.id === 'effort',
+  );
   if (option?.type !== 'select') return { thinkingLevels: [] };
   const thinkingLevels = acpThoughtLevels(
     option.options.flatMap((entry) =>

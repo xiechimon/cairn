@@ -307,7 +307,34 @@ describe('thinking levels offered on Coordinator rows', () => {
     });
   });
 
-  it('offers nothing on a custom endpoint', () => {
+  it('offers nothing for an unknown model on a custom endpoint', () => {
+    expect(
+      inServerThinking(
+        {
+          providerId: 'relay',
+          baseUrl: 'https://relay.example.com/v1',
+          api: 'openai-completions' as const,
+        },
+        'foo-custom-model',
+      ),
+    ).toEqual({ levels: [] });
+  });
+
+  it('borrows catalog thinking levels for known models on custom endpoints matching the api', () => {
+    const anthropicUltra = {
+      providerId: 'anthropic-ultra',
+      baseUrl: 'https://ultra.example.com',
+      api: 'anthropic-messages' as const,
+    };
+    expect(inServerThinking(anthropicUltra, 'claude-opus-5-5')).toEqual({
+      levels: ['low', 'medium', 'high', 'xhigh', 'max'],
+      resolvesTo: 'high',
+    });
+    expect(inServerThinking(anthropicUltra, 'anthropic/claude-sonnet-5-5')).toEqual({
+      levels: ['low', 'medium', 'high', 'xhigh', 'max'],
+      resolvesTo: 'high',
+    });
+    expect(inServerThinking(anthropicUltra, 'foo-custom-model')).toEqual({ levels: [] });
     expect(
       inServerThinking(
         {
@@ -317,7 +344,70 @@ describe('thinking levels offered on Coordinator rows', () => {
         },
         'glm-5.3',
       ),
-    ).toEqual({ levels: [] });
+    ).toEqual({ levels: ['low', 'high', 'max'] });
+  });
+
+  it('registers catalog reasoning, compat, contextWindow and cost on a custom anthropic-messages endpoint and sends effort on the wire', async () => {
+    const models = createCoordinatorModels();
+    const anthropicUltra = {
+      kind: 'http' as const,
+      providerId: 'anthropic-ultra',
+      baseUrl: 'https://ultra.example.com',
+      api: 'anthropic-messages' as const,
+      models: [
+        { id: 'claude-opus-5-5', name: 'Opus 5.5' },
+        { id: 'foo-custom-model', name: 'Custom' },
+      ],
+    };
+    models.useStepProvider(anthropicUltra);
+    const opus = models.models.getModel('anthropic-ultra', 'claude-opus-5-5');
+    expect(opus).toMatchObject({
+      reasoning: true,
+      contextWindow: 1_000_000,
+      thinkingLevelMap: expect.objectContaining({ off: null, xhigh: 'xhigh', max: 'max' }),
+      compat: expect.objectContaining({
+        forceAdaptiveThinking: true,
+        supportsMidConvoEffort: true,
+      }),
+    });
+    expect(opus?.cost.input).toBeGreaterThan(0);
+    expect(models.models.getModel('anthropic-ultra', 'foo-custom-model')).toMatchObject({
+      reasoning: false,
+      thinkingLevelMap: undefined,
+    });
+
+    let requestBody: Record<string, unknown> | undefined;
+    await models.models
+      .streamSimple(
+        opus!,
+        { messages: [{ role: 'user', content: 'Hello', timestamp: 1 }] },
+        {
+          reasoning: 'xhigh',
+          transport: 'sse',
+          maxRetries: 0,
+          fetch: async (url, init) => {
+            const request = new Request(url, init);
+            const bytes = Buffer.from(await request.arrayBuffer());
+            requestBody = JSON.parse(
+              (request.headers.get('content-encoding') === 'zstd'
+                ? zstdDecompressSync(bytes)
+                : bytes
+              ).toString('utf8'),
+            ) as Record<string, unknown>;
+            return Response.json(
+              { error: { message: 'Captured by test transport' } },
+              { status: 400 },
+            );
+          },
+        },
+      )
+      .result();
+    expect(requestBody?.thinking).toMatchObject({ type: 'adaptive' });
+    expect(requestBody?.messages).toContainEqual({
+      role: 'system',
+      content: [],
+      output_config: { effort: 'xhigh' },
+    });
   });
 });
 
@@ -333,5 +423,22 @@ describe('thinking levels offered for Runner rows', () => {
         'glm-5.3',
       ),
     ).toEqual({ levels: ['low', 'high', 'max'], resolvesTo: 'high' });
+  });
+
+  it('resolves known models on custom endpoints like anthropic-ultra while leaving unknown models empty', () => {
+    const anthropicUltra = {
+      providerId: 'anthropic-ultra',
+      baseUrl: 'https://ultra.example.com',
+      api: 'anthropic-messages' as const,
+    };
+    expect(piThinking(anthropicUltra, 'claude-opus-5-5')).toEqual({
+      levels: ['low', 'medium', 'high', 'xhigh', 'max'],
+      resolvesTo: 'medium',
+    });
+    expect(piThinking(anthropicUltra, 'claude-haiku-5-5')).toEqual({
+      levels: ['off', 'low', 'medium', 'high', 'xhigh', 'max'],
+      resolvesTo: 'medium',
+    });
+    expect(piThinking(anthropicUltra, 'foo-custom-model')).toEqual({ levels: [] });
   });
 });

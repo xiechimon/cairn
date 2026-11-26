@@ -481,6 +481,7 @@ describe('thinking levels per model', () => {
               thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
             },
             { id: 'gpt-6-sol-medium', name: 'GPT via Devin' },
+            { id: 'custom-unrun-model', name: 'Custom Unrun' },
           ],
         },
       },
@@ -526,11 +527,21 @@ describe('thinking levels per model', () => {
         inServerDefault: 'off',
       },
     });
-    expect(levelsOf(env, 'pi', 'relay')).toEqual({ 'glm-5.3': { task: [], inServer: [] } });
+    expect(levelsOf(env, 'pi', 'relay')).toEqual({
+      'glm-5.3': {
+        task: ['low', 'high', 'max'],
+        taskDefault: 'high',
+        inServer: ['low', 'high', 'max'],
+      },
+    });
     expect(levelsOf(env, 'devin')).toEqual({
       'swe-2-high': { task: ['medium', 'high', 'max'], taskDefault: 'high' },
       'claude-opus-5-5-medium': { task: claude },
-      'gpt-6-sol-medium': {},
+      'gpt-6-sol-medium': {
+        task: ['off', 'low', 'medium', 'high', 'xhigh', 'max'],
+        taskDefault: 'medium',
+      },
+      'custom-unrun-model': {},
     });
     s.dispose();
   });
