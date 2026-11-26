@@ -1,6 +1,6 @@
 # Contributing to Cairn
 
-Thanks for your interest. Cairn is built mostly by its own agents, with a human gating every merge, so the rules below apply to people and agents alike.
+Thanks for your interest. Cairn is built mostly by its own agents, and `main` only accepts commits whose CI checks are green, so the rules below apply to people and agents alike.
 
 ## Before you start
 
@@ -25,14 +25,14 @@ pnpm dev          # web on :5173, server on :8787, daemon, all with hot reload
 
 1. Branch from `main`. Name the branch `<area>/<issue>-<slug>`, for example `web/1429-spiral-avatar`.
 2. Keep one concern per pull request.
-3. Test what you change. Prefer an end-to-end test (`apps/web/e2e`, `integration/`) over a unit test that only restates the implementation. During development run the tests you touched; run the full suite before opening the pull request.
+3. Test what you change. Prefer an end-to-end test (`apps/web/e2e`, `integration/`) over a unit test that only restates the implementation. Run the tests you touched; CI runs the full suite. A local run of more than one test file is refused unless you set `CAIRN_LOCAL_HEAVY=1`.
 4. Run the local gates:
 
    ```sh
    pnpm lint         # biome ci
    pnpm typecheck    # tsc across all packages
-   pnpm test         # vitest
-   pnpm prepush      # the pre-push gates (English-only, comments, UI drift, affected e2e)
+   pnpm test:changed # tests related to your change
+   pnpm prepush      # the pre-push gates (English-only, comments, UI drift and others)
    ```
 
 ## House rules
@@ -44,7 +44,7 @@ pnpm dev          # web on :5173, server on :8787, daemon, all with hot reload
 
 ## Pull requests
 
-Pull requests are the flow for external contributors. Maintainers and agents working in this repository land directly on `main` through the `queue/main` ref per `AGENTS.md`; they do not open pull requests.
+Pull requests are the flow for external contributors. Maintainers and agents working in this repository do not open pull requests; they land on `main` through `scripts/ops/push-queue.mjs`, as the "Ship" section of [AGENTS.md](./AGENTS.md) describes.
 
 Describe what changed, why, and how you verified it; the [pull request template](./.github/PULL_REQUEST_TEMPLATE.md) is an optional outline. When the change finishes a ticket, put `Closes #N` on its own line, or `Part of #N` for one segment.
 
@@ -56,15 +56,7 @@ A maintainer reviews every pull request, and an AI reviewer may also comment. A 
 
 ## Releases
 
-Releases use [changesets](https://changesets.dev). Add a changeset with `pnpm changeset` for any pull request that changes a publishable package. When the pull request should ship, run `pnpm release:version` in it to bump package versions and write changelogs, then include those changes in the pull request for normal review and merge.
-
-After merge to main, the `release` workflow publishes unpublished versions of `@xiechimon/cairn` and `@xiechimon/cairn-cli` to npm through npm Trusted Publishing (OIDC) with provenance and attempts to push the release tags after publishing, including after a partial publish failure. Versions already on npm are skipped. Pending changesets on main leave a warning naming them and wait for a pull request that runs `pnpm release:version`. Unpublished package versions still publish when changesets are pending.
-
-The release workflow builds and packs the tarballs in a job without npm publishing rights, and a separate job that runs no package scripts publishes them.
-
-Publish only through the `release` workflow: both manifests set `publishConfig.provenance`, and provenance needs the CI's OIDC identity, so a publish from a laptop fails. If a tag push fails after a successful publish, run `pnpm exec changeset git-tag` and `git push origin --tags` from an up-to-date main to recreate the tags.
-
-Publishing requires a Trusted Publisher on npmjs.com for each package, with provider GitHub Actions, repository `xiechimon/cairn`, workflow file `release.yml`, and environment `npm`. The `publish` job deploys to the GitHub environment `npm`, which only `main` may deploy to. Each Trusted Publisher names environment `npm`. A run from another ref that declares the environment is stopped by GitHub before any step runs, and a run that omits it gets an OIDC token npm refuses to exchange. Renaming the workflow file breaks publishing until the Trusted Publishers are updated. Publishing needs no token or repository secret.
+Contributors do nothing to release: there are no changesets and no version bumps in a pull request. The shipped product is the Mac desktop app. The [`desktop-release` workflow](./.github/workflows/desktop-release.yml) publishes it from `main` by itself: it picks the newest unreleased commit with green CI whose app sources changed since the last stable release, allocates the next `desktop-v*` version, and verifies the build before publishing. The rules are in [docs/design/tested-sha-landing.md](./docs/design/tested-sha-landing.md#desktop-release).
 
 ## License
 

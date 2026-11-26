@@ -1,14 +1,13 @@
 # Pre-flight CI verification
 
 Problem: every lane runs `pnpm prepush` and `pnpm test:changed` on its own
-host before pushing, so on a shared Mac the serial `queue/main` pipeline is
-bought with tens of minutes of 8-core load per lane. The same checks already
+host before pushing, so on a shared Mac every landing is bought with tens of minutes of 8-core load per lane. The same checks already
 run on GitHub runners for free (the repo is public); local verification should
 become the fast, optional preview, not the gate.
 
 ## Model
 
-A lane verifies on GitHub before it occupies `queue/main`:
+A lane verifies on GitHub before it enters the landing queue:
 
 - `refs/heads/preflight/<lane>` is a scratch ref per lane
   (`<lane>` = `laneName(host, worktree)`, the same name stamped into `Lane:`
@@ -48,26 +47,22 @@ A lane verifies on GitHub before it occupies `queue/main`:
 
 ## Gate predicate
 
-Because `preflight.mjs` stamps unowned commits before pushing `preflight/<lane>`,
-`push-queue.mjs` finds nothing left to stamp: `S = HEAD` is the exact SHA that
-already passed pre-flight, so the train can admit `S` without a second CI run
-on a queue try branch when it is the first entry on current `main`. If a lane
-still has an unowned commit at push time, `push-queue.mjs` runs the same
-stamping step and requires the three contexts (`check`, `pack-smoke` and
-`e2e-gate`) with `conclusion: success` on `S` (or on the pre-stamp SHA, which
-shares `S`'s tree). A green run on a tree-identical SHA counts as pre-flight
-evidence, while train admission requires the green checks on `S` itself.
+`push-queue.mjs` admits `HEAD` only with `conclusion: success` or `skipped` for
+`check`, `pack-smoke` and `e2e-gate` on its exact SHA. `preflight.mjs` stamps the
+`Lane:` trailer before it pushes, so the SHA it tests is the SHA submitted. A
+green run on another SHA with the same tree does not admit `HEAD`. The first
+entry on current `main` lands without a second CI run.
 
 ## States and failure behaviour
 
 - **No pre-flight run for `S`**: push refused with the `preflight.mjs`
-  command to run. Nothing touches `queue/main`.
-- **Run still in progress**: same refusal; wait for `preflight.mjs --wait`
-  to exit green, or push again later.
-- **Run red**: same refusal; the failed jobs are the ones to fix. The lane
-  fixes, re-pushes its preflight ref and waits again.
-- **Green on `S` (or on its identical tree)**: the queue check proceeds as
-  before — the lane may still wait if another candidate holds `queue/main`.
+  command to run. Nothing is enqueued. With `--wait`, `push-queue.mjs` pushes the
+  pre-flight ref itself.
+- **Run still in progress**: without `--wait`, the same refusal.
+- **Run red**: the failed jobs are the ones to fix. The lane fixes, re-pushes
+  its preflight ref and waits again.
+- **Green on `S`**: `S` is enqueued; the queue is described in
+  `docs/design/tested-sha-landing.md`.
 - **`gh` API unreachable**: the check-runs lookup fails and the push is
   refused with the API error; retry once connectivity is back. Failing closed
   is deliberate: the gate exists to prove the head was tested.
@@ -76,17 +71,15 @@ evidence, while train admission requires the green checks on `S` itself.
   the full candidate diff rather than the delta since the last preflight
   push.
 - **Docs-only heads**: classify reports `has-code=false`, the heavy jobs skip
-  and the three contexts go green in about a minute — the same cheap path a
-  docs push already takes through the queue.
+  and the three contexts go green in about a minute.
 
 ## What it costs
 
 Local verification stays available for fast iteration, but a lane that trusts
 the runners skips ~10–20 minutes of host load per push. GitHub minutes are
 free for this public repo; the marginal cost is one extra `ci` run per lane
-attempt, which is exactly the run the queue would have burned on a red
-candidate — so total runner usage rises only when a lane verifies once and
-lands on the first try.
+attempt; an entry stacked behind another in the queue is tested once more on its
+`queue/try/*` ref.
 
 See `docs/design/tested-sha-landing.md` for the queue and promote mechanics
 this gate sits in front of.

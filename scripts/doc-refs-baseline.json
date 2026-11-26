@@ -146,7 +146,6 @@
     "docs/design/verify-evidence-out-of-tree.md|path|`scripts/run.sh`",
     "docs/ops/incident-2271-integration-pass.md|path|`apps/web/src/detail/use-detail-composer.ts`",
     "docs/ops/incident-2271-integration-pass.md|path|`apps/web/test/detail-confirm-request-changes.test.ts`",
-    "docs/pr-review.md|path|`scripts/pr-evidence-gate.py`",
     "docs/reliability/1996/README.md|path|`docs/verify/1996/`",
     "docs/reliability/effect-paths-audit.md|path|`apps/coordinator`",
     "docs/security/2000-prelaunch-review.md|path|`../sentinel.txt`",

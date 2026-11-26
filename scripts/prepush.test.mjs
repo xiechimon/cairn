@@ -443,7 +443,11 @@ test('folded gates stay visibly red, continue after failures and retain full his
 for (const [name, paths, expected] of [
   ['a research note no test reads', ['docs/research/unread-note.md'], false],
   ['docs evidence and lessons', ['docs/verify/2182/README.md', 'docs/lessons.md'], false],
-  ['a doc a test reads, as identity-compat reads docs/pr-review.md', ['docs/pr-review.md'], true],
+  [
+    'a doc a test reads, as commit-identity reads agent-bot-identity.md',
+    ['docs/ops/agent-bot-identity.md'],
+    true,
+  ],
   ['AGENTS.md, which lane-model-policy reads', ['AGENTS.md'], true],
   ['root docs', ['README.md', 'CLAUDE.md'], true],
   ['skill docs the probe reach gate reads', ['.claude/skills/verify-cairn/features/a.md'], true],
@@ -454,14 +458,14 @@ for (const [name, paths, expected] of [
 ]) {
   test(`needsGates classifies ${name}`, () => {
     assert.equal(
-      needsGates(paths, (path) => path === 'docs/pr-review.md'),
+      needsGates(paths, (path) => path === 'docs/ops/agent-bot-identity.md'),
       expected,
     );
   });
 }
 
 test('testsRead finds a doc a test names in the real tree and not an unread one', () => {
-  assert.equal(testsRead('docs/pr-review.md'), true);
+  assert.equal(testsRead('docs/ops/agent-bot-identity.md'), true);
   assert.equal(testsRead(['docs', 'research', 'xmon48-filter-panel-closure.md'].join('/')), false);
 });
 

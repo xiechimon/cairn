@@ -251,7 +251,6 @@ test('pre-push: merging main into an agent branch does not re-judge commits main
 test('no merge rule keeps a rebase or single-commit route for bot-opened PRs', () => {
   for (const file of [
     'AGENTS.md',
-    'docs/pr-review.md',
     '.claude/skills/pr-cairn/SKILL.md',
     'docs/ops/agent-bot-identity.md',
     'scripts/ops/host/README.md',

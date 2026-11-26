@@ -41,7 +41,7 @@ Jakub Krehel's skills are vendored verbatim at `jakubkrehel/skills@672ae44ace6aa
 
 ## Order of work
 
-The owner's order for UI work (mon X 2026-11-19): 1. the owner says the idea; 2. a prototype the owner opens and judges (a replayable visual; no recording needed at this step); 3. implement; 4. show the real result, as a recording when it moves or a screenshot when it does not; 5. land through `queue/main`. Do not push before step 4 when the owner asked to see it.
+The owner's order for UI work (mon X 2026-11-19): 1. the owner says the idea; 2. a prototype the owner opens and judges (a replayable visual; no recording needed at this step); 3. implement; 4. show the real result, as a recording when it moves or a screenshot when it does not; 5. land through `scripts/ops/push-queue.mjs`. Do not push before step 4 when the owner asked to see it.
 
 ## Draft first
 
@@ -96,7 +96,7 @@ A state nobody has seen is not done. For every cell of the list that the live st
 
 ## After the build
 
-Put the reference-versus-ours rows and the transition recordings in the wrap-up shown to the owner, and capture with `.claude/skills/verify-cairn/SKILL.md` ("UI reference comparison"). There are no pull requests; work lands through `queue/main` (AGENTS.md, Ship).
+Put the reference-versus-ours rows and the transition recordings in the wrap-up shown to the owner, and capture with `.claude/skills/verify-cairn/SKILL.md` ("UI reference comparison"). There are no pull requests; work lands through `scripts/ops/push-queue.mjs` (AGENTS.md, Ship).
 
 When a new reference is needed, operate the product (use the `walk` skill), save real screenshots under `docs/design/references/<surface>/`, remove personal data, and add rows to the references README. Do not send messages or start runs on the owner's accounts without asking.
 

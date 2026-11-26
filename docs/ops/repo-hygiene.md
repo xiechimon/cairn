@@ -15,7 +15,7 @@ Two layers keep every repository surface maintained:
 - **Releases.** Keeps published releases; deletes draft releases older than 24h and their tag only when its commit cannot be reached from any live branch and no other tag points to it. Unreadable tag evidence keeps the draft and its tag. Reports desktop-release runs that failed to publish.
 - **Actions.** Deletes caches for deleted branches and closed PRs when the live branch and open-PR lists can be read; leaves tag caches alone. Flags a scheduled workflow whose last 3 runs all failed or that has never run.
 - **Docs.** `scripts/doc-refs-gate.mjs` checks markdown links, anchors and repo paths named in living docs (archive/changelog/research/verify/lessons snapshots and generated files are excluded by design). It runs in `pnpm prepush`, so a change that breaks a doc reference fails at preflight; `scripts/doc-refs-baseline.json` holds the pre-existing backlog and `--write-baseline` shrinks it as fixes land. The full stale list goes into the report for layer B.
-- **Security.** Reports every open Dependabot, CodeQL and secret-scanning alert, and drifts: alerts disabled, automated security fixes enabled (policy: off — bumps stay owner-gated through queue/main), CodeQL default setup missing, secret scanning off.
+- **Security.** Reports every open Dependabot, CodeQL and secret-scanning alert, and drifts: alerts disabled, automated security fixes enabled (policy: off — bumps stay owner-gated), CodeQL default setup missing, secret scanning off.
 - **Settings drift.** Wiki re-enabled, Discussions templates missing, `green-main` ruleset weakened — all reported.
 
 ## Layer B: the Cairn recurring schedule
