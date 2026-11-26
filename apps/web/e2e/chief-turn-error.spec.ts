@@ -385,3 +385,52 @@ test('an outdated built-in Claude Code says so in English, offers only Update Ca
     .poll(() => page.evaluate(() => (window as unknown as { updateCalls: string[] }).updateCalls))
     .toEqual(['check', 'install']);
 });
+
+for (const width of [1440, 390]) {
+  test(`C32: the docked failure card reads left to right and keeps its actions on one row at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await open(page, [
+      { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
+      failure('m2', 11, TIMEOUT),
+    ]);
+    const card = page.getByTestId('chief-turn-error-card');
+    await expect(card).toBeVisible();
+    const label = card.getByTestId('failure-marker-label');
+    expect(
+      await label.evaluate((el) => getComputedStyle(el).textAlign),
+      'C32: card text is not centred',
+    ).toMatch(/^(left|start)$/);
+    const controls = [
+      card.getByTestId('chief-turn-retry'),
+      card.getByRole('link', { name: '换 Coordinator 模型' }),
+    ];
+    const boxes = await Promise.all(controls.map(async (c) => (await c.boundingBox())!));
+    const middles = boxes.map((box) => box.y + box.height / 2);
+    expect(
+      Math.abs(middles[0]! - middles[1]!),
+      'C32: the two actions share one row',
+    ).toBeLessThanOrEqual(1);
+    const frame = (await card.boundingBox())!;
+    for (const box of boxes) {
+      expect(box.x).toBeGreaterThanOrEqual(frame.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(frame.x + frame.width);
+    }
+    const labelWidth = (await label.boundingBox())!.width;
+    expect(labelWidth, 'C32: the reason keeps a readable width').toBeGreaterThanOrEqual(
+      Math.min(frame.width * 0.6, 240),
+    );
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await card.getByRole('button', { name: '详情' }).click();
+    const raw = card.getByTestId('chief-turn-error-raw');
+    await expect(raw).toBeVisible();
+    await expect
+      .poll(async () => (await raw.boundingBox())!.width, {
+        message: 'C32: raw error spans the card',
+      })
+      .toBeGreaterThanOrEqual(frame.width * 0.8);
+  });
+}

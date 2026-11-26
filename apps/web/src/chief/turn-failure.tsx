@@ -1,3 +1,4 @@
+import { cn } from 'cn';
 import { X } from 'lucide-react';
 import { createContext, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -85,9 +86,12 @@ function NoticeCard({
       data-testid={testId}
       data-kind={kind}
       onKeyDown={onKeyDown}
-      className={className}
+      className={cn(className, 'flex-col items-stretch')}
     >
       <NoticeLine
+        layout="plain"
+        className="flex-wrap"
+        contentClassName="flex-1 basis-72"
         tone={tone === 'fail' ? 'danger' : 'waiting'}
         waiting={tone === 'wait'}
         detail={detail}
@@ -149,7 +153,7 @@ export function TurnFailureCard({
       detail={{ lines: [], raw: error.message }}
       detailTestId="chief-turn-error-raw"
     >
-      <span className="mt-2 flex flex-wrap items-center gap-2">
+      <span className="flex min-w-0 flex-wrap items-center gap-2">
         {actions.map((action, n) => {
           const href = actionHref(action, error);
           const label = t(ACTION_LABELS[action], text.vars);
@@ -224,7 +228,7 @@ export function QueueWaitCard({
       className={className}
       onDismiss={onDismiss}
     >
-      <span className="mt-2 flex flex-wrap items-center gap-2">
+      <span className="flex min-w-0 flex-wrap items-center gap-2">
         {canSwitch && wait.stepId !== undefined && (
           <Button
             size="sm"

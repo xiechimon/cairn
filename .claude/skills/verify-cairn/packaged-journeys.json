@@ -15,6 +15,10 @@
         "providers"
       ],
       "modes": ["local-server", "remote-server"]
+    },
+    "coordinator-turn-failure": {
+      "features": ["coordinator-chat"],
+      "modes": ["local-server", "remote-server"]
     }
   }
 }
