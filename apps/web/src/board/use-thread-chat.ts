@@ -53,8 +53,6 @@ import type { DocBlock, TodoRecord, TranscriptItem } from '../fixtures/records.j
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { describeError } from '../lib/error-copy.js';
-import { markErrorSurfaced } from '../lib/mutation-error-report.js';
-import { randomId } from '../lib/random-id.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
 import type { EngineRun, EngineRunStage } from './engine-run.js';
@@ -104,8 +102,8 @@ export interface ThreadChat {
   queuedMessages: QueuedCapsule[] | undefined;
   retry: () => void;
   send?: (text: string) => void | Promise<void>;
-  queue?: (text: string) => Promise<void>;
-  stopAndSend?: (text: string) => Promise<void>;
+  queue?: (text: string) => void;
+  stopAndSend?: (text: string) => void;
   stop?: () => void;
   attach?: (files: File[]) => Promise<string[]>;
   sendQueuedNow?: (id: string, content: string) => Promise<unknown>;
@@ -384,28 +382,18 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
             clientMessageId,
           })
       : undefined;
-  const queueSteer =
-    postQueued !== undefined
-      ? async (text: string, deliverAfterStop: boolean) => {
-          await postQueued(text, deliverAfterStop, randomId()).catch((error: unknown) => {
-            markErrorSurfaced(error);
-            throw error;
-          });
-        }
-      : undefined;
-  const send =
+  const enqueueReply =
     writable && buildId != null
-      ? (text: string) => {
+      ? (text: string, queued: { deliverAfterStop: boolean } | null) => {
           if (mutations.sendSteer.isError) mutations.sendSteer.reset();
-          const route = queueReply && postQueued !== undefined ? 'queue' : 'thread';
           enqueueTaskSend({
             todoId,
             buildId,
             text,
-            queueOnly: route === 'queue',
+            queueOnly: queued !== null,
             deliver: async (entry) => {
-              if (route === 'queue' && postQueued !== undefined) {
-                await postQueued(entry.text, false, entry.key);
+              if (queued !== null && postQueued !== undefined) {
+                await postQueued(entry.text, queued.deliverAfterStop, entry.key);
                 return { threadId: buildId, messageId: null };
               }
               const result = await mutations.messageThread.mutateAsync({
@@ -429,6 +417,10 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
             },
           });
         }
+      : undefined;
+  const send =
+    enqueueReply !== undefined
+      ? (text: string) => enqueueReply(text, queueReply ? { deliverAfterStop: false } : null)
       : !live && open
         ? fixtureSend
         : undefined;
@@ -551,10 +543,10 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       void todoQ.refetch();
     },
     ...(send !== undefined ? { send } : {}),
-    ...(queueSteer !== undefined && running
+    ...(enqueueReply !== undefined && running
       ? {
-          queue: (text: string) => queueSteer(text, false),
-          stopAndSend: (text: string) => queueSteer(text, true),
+          queue: (text: string) => enqueueReply(text, { deliverAfterStop: false }),
+          stopAndSend: (text: string) => enqueueReply(text, { deliverAfterStop: true }),
         }
       : {}),
     ...(stop !== undefined ? { stop } : {}),

@@ -1,14 +1,7 @@
 import { useEffect } from 'react';
 import { api } from '../api/client.js';
-import { randomId } from '../lib/random-id.js';
 
-const browserTabId = (() => {
-  try {
-    return randomId();
-  } catch {
-    return `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  }
-})();
+const browserTabId = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 const presenceWrites = new Map<string, Promise<unknown>>();
 
 export function startThreadPresence(
