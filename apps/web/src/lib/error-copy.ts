@@ -3,6 +3,8 @@ import {
   CHIEF_MESSAGE_READ,
   COORDINATOR_NOT_READY,
   MEMORY_EDIT_MOVED,
+  TASK_ARCHIVED,
+  TASK_CLOSED,
   TASK_COMPUTER_OFFLINE,
 } from '@cairn/shared';
 import { ApiError } from '../api/client.js';
@@ -13,6 +15,8 @@ import { safeLocalStorage } from '../safe-storage.js';
 import { SendStaleError, SendTimeoutError } from './send-errors.js';
 
 const REASON_COPY: Record<string, string> = {
+  [TASK_ARCHIVED]: '这个任务已归档。取消归档后才能继续。',
+  [TASK_CLOSED]: '这个任务已关闭，消息没有发出。',
   'already-started': '这个任务已经开始过，无法退回待开始。',
   'build-not-delivered': '本轮运行尚未产生交付结果，请重新运行后再合并。',
   'missing-delivery-artifact': '本轮运行没有产生分支或 PR，请重新运行后再合并。',

@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { build, machine, project, schedule, step } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { newUuidv7, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep, NotFoundError, publishBuild } from './builds.js';
 import { teamDefaultMachineId } from './machine-routing.js';
@@ -107,7 +107,7 @@ export function startBuilds(
             .from(build)
             .where(eq(build.id, todoRecord.latestBuildId))
             .get();
-    if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
+    if (todoRecord.archivedAt != null) throw taskArchived();
     if (triggerSource !== 'user') assertAutomaticRetryAllowed(deps, todoId);
     assertSplitProposalExecutable(previous?.errorMessage ?? null);
     namedMachineForStart(deps, todoRecord, input.routeOverride);

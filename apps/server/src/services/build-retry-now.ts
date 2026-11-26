@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { build } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { newRecordId } from '../lib/ids.js';
 import { applyBuildStepAction } from './build-step-action.js';
 import { type BuildDeps, NotFoundError } from './builds.js';
@@ -16,7 +16,7 @@ export async function retryBuildNow(
   if (!row) throw new NotFoundError(`build ${buildId}`);
   const todoRecord = getTodo(deps, row.todoId);
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
-  if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
+  if (todoRecord.archivedAt != null) throw taskArchived();
   if (todoRecord.latestBuildId !== buildId) {
     throw new HttpError(409, 'This run is no longer the latest build');
   }

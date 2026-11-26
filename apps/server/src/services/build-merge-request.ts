@@ -1,7 +1,7 @@
 import { ACTIVE_STEP_STATUSES, isInfoOutput, MERGE_ANNOUNCEMENT } from '@cairn/shared';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { build, step, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
 import { mergeThroughGithub } from './build-github-merge.js';
 import {
@@ -41,7 +41,7 @@ export async function requestMerge(
   if (!row) throw new NotFoundError(`build ${buildId}`);
   let todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
-  if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (todoRow.archivedAt !== null) throw taskArchived();
   if (isInfoOutput(todoRow.output)) throw new HttpError(409, INFO_CARD_MERGE_REFUSAL);
   if (todoRow.latestBuildId !== buildId)
     throw new HttpError(409, 'Only the current delivery can be merged');

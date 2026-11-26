@@ -1647,6 +1647,8 @@ export const EN: Record<string, string> = {
   任务加载失败: 'Failed to load the task',
   任务不存在或已被删除: 'This task does not exist or was deleted',
   开始后才能回复: 'Start the task to reply',
+  '这个任务已归档。取消归档后才能继续。': 'This task is archived. Unarchive it to continue.',
+  '这个任务已关闭，消息没有发出。': 'This task is closed, so the message was not sent.',
   '这个任务已归档。取消归档后才能发消息。': 'This task is archived. Unarchive it to send messages.',
   调整面板宽度: 'Resize panel',
   拖动调宽: 'Drag to resize',

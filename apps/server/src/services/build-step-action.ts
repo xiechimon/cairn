@@ -2,7 +2,7 @@ import type { StepActionOrigin } from '@cairn/shared';
 import { buildReplanPrompt, buildReviewRejectPrompt, SESSION_REWORK_BRIEF } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { recordBuildFeedback } from './build-provenance.js';
 import { restartFailedBuild } from './build-restart.js';
@@ -45,7 +45,7 @@ export async function applyBuildStepAction(
   assertSplitProposalExecutable(row.errorMessage);
   const todoRecord = getTodo(deps, row.todoId);
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
-  if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
+  if (todoRecord.archivedAt != null) throw taskArchived();
   const actorName = actor ?? deps.user.displayName;
   if (origin === 'retry') assertAutomaticRetryAllowed(deps, row.todoId);
   else {

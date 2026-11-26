@@ -1,7 +1,7 @@
 import { CONFIRM_ANNOUNCEMENT } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { type BuildDeps, dispatchSplitChildren, enqueueStep, NotFoundError } from './builds.js';
 import { planAutoConfirmation } from './plan-auto-confirm.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
@@ -19,7 +19,7 @@ export function applyBuildConfirm(
   assertSplitProposalExecutable(row.errorMessage);
   const todoRecord = getTodo(deps, row.todoId);
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
-  if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
+  if (todoRecord.archivedAt != null) throw taskArchived();
   if (todoRecord.phase !== 'confirm') {
     throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
   }

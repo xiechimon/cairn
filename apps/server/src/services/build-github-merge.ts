@@ -2,7 +2,7 @@ import type { GithubRepoRef } from '@cairn/shared';
 import { ACTIVE_STEP_STATUSES, conversationBranch, MERGE_ANNOUNCEMENT } from '@cairn/shared';
 import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import { type build, step, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import {
   type GithubMergeResult,
   githubMergePull,
@@ -41,7 +41,7 @@ type TodoRow = typeof todo.$inferSelect;
 function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; failed: boolean } {
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
-  if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (todoRow.archivedAt !== null) throw taskArchived();
   const failed = todoRow.phase === 'failed';
   if (failed) {
     assertDeliveredBuild(deps, row);

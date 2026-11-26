@@ -16,7 +16,7 @@ import {
 import { and, desc, eq, gte, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment, clientMessage, designComment, designVersion, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-gc.js';
 import { writeAttachmentFile } from './attachments.js';
@@ -36,7 +36,7 @@ function requireWritableTodo(db: Db, teamId: string, todoId: string): typeof tod
     .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
     .get();
   if (!row) throw new HttpError(404, `todo ${todoId}`);
-  if (row.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (row.archivedAt !== null) throw taskArchived();
   return row;
 }
 

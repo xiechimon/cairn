@@ -9,7 +9,7 @@ import {
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { build, chiefMessage, step, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
 import {
@@ -335,7 +335,7 @@ export async function messageThreadAsUser(
   if (!row) throw new HttpError(404, `todo ${todoId}`);
   const stored = settleStoredSend(deps, row, body, origin);
   if (stored !== undefined) return stored;
-  if (row.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (row.archivedAt !== null) throw taskArchived();
   assertProjectWritable(deps.db, row.teamId, row.projectId);
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
@@ -396,7 +396,7 @@ export async function answerTaskQuestion(
     .where(and(eq(todo.id, input.todoId), eq(todo.teamId, teamId)))
     .get();
   if (!row) throw new HttpError(404, `todo ${input.todoId}`);
-  if (row.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (row.archivedAt !== null) throw taskArchived();
   assertProjectWritable(deps.db, row.teamId, row.projectId);
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);

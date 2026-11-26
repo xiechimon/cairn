@@ -15,7 +15,7 @@ import {
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment, designComment, designShare, designVersion } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, taskArchived } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-gc.js';
 import { writeAttachmentFile } from './attachments.js';
@@ -204,7 +204,7 @@ export function restoreDesignVersion(
   input: { teamId: string; todoId: string; versionId: string; userId: string },
 ): DesignVersionRecord {
   const todoRow = requireTeamTodo(db, input.todoId, input.teamId);
-  if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (todoRow.archivedAt !== null) throw taskArchived();
   const from = db
     .select()
     .from(designVersion)
@@ -244,7 +244,7 @@ export function saveUserVersion(
 ): DesignVersionRecord {
   const { db } = deps;
   const todoRow = requireTeamTodo(db, input.todoId, input.teamId);
-  if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (todoRow.archivedAt !== null) throw taskArchived();
   if (artifactKindOf(input.fileName) !== 'whiteboard') {
     throw new HttpError(400, 'only a whiteboard can be saved from the panel');
   }
@@ -391,7 +391,7 @@ export function createDesignShare(
   const origin = relayOrigin();
   if (origin === null) throw new HttpError(409, 'a share link needs a relay', 'relay-missing');
   const todoRow = requireTeamTodo(db, input.todoId, input.teamId);
-  if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (todoRow.archivedAt !== null) throw taskArchived();
   if (
     artifactKindOf(input.fileName) !== 'page' ||
     currentVersion(db, input.todoId, input.fileName) === undefined

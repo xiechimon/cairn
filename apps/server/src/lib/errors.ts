@@ -1,3 +1,4 @@
+import { TASK_ARCHIVED } from '@cairn/shared';
 import type { z } from 'zod';
 
 export class HttpError extends Error {
@@ -22,6 +23,10 @@ export function forbidden(message: string): HttpError {
 
 export function conflict(message: string): HttpError {
   return new HttpError(409, message);
+}
+
+export function taskArchived(): HttpError {
+  return new HttpError(409, 'Unarchive to continue', TASK_ARCHIVED);
 }
 
 export function parseWith<T extends z.ZodType>(

@@ -1,7 +1,7 @@
 import { buildOrchestratePrompt, canOrchestrate } from '@cairn/shared';
 import { inArray } from 'drizzle-orm';
 import { githubLabel } from '../db/schema.js';
-import { conflict, notFound } from '../lib/errors.js';
+import { conflict, notFound, taskArchived } from '../lib/errors.js';
 import { sendChiefMessage } from './chief.js';
 import { isCorrectionTask } from './correction.js';
 import type { ConversationStreamHub } from './events.js';
@@ -16,7 +16,7 @@ export interface OrchestrateDeps extends TodoDeps {
 export function orchestrateTodo(deps: OrchestrateDeps, todoId: string) {
   const record = getTodo(deps, todoId);
   if (!record) throw notFound(`todo ${todoId}`);
-  if (record.archivedAt != null) throw conflict('Unarchive to continue');
+  if (record.archivedAt != null) throw taskArchived();
   assertProjectWritable(deps.db, record.teamId, record.projectId);
   if (!canOrchestrate(record.phase)) {
     throw conflict(`orchestrate 仅适用于 待开始/失败 相位（当前 ${record.phase}）`);
