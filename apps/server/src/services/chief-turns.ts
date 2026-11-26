@@ -4,6 +4,7 @@ import {
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
   isChiefSideThreadId,
+  NOTHING_TO_STOP,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
 import { and, asc, eq, gt, inArray, isNull, lt, lte, notInArray, or, sql } from 'drizzle-orm';
@@ -570,7 +571,11 @@ export function stopChiefTurn(
   const thread = requireThread(deps.db, teamId, threadId);
   const head = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
   if (head === undefined) {
-    throw new HttpError(409, 'no chief turn in flight (Coordinator 当前没有在回复)');
+    throw new HttpError(
+      409,
+      'no chief turn in flight (Coordinator 当前没有在回复)',
+      NOTHING_TO_STOP,
+    );
   }
   return stopClaimedChiefStep(deps, thread, head, nowMs());
 }

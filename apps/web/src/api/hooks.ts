@@ -120,6 +120,7 @@ import {
   backupNotice,
   IN_PROGRESS_PHASES,
   isRegisteredMachine,
+  NOTHING_TO_STOP,
   SKILL_ENTRY_FILE,
   tasksQuerySchema,
 } from '@cairn/shared';
@@ -1139,14 +1140,26 @@ export function useStopBackgroundTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { buildId: string; taskId: string }) =>
-      api.post<{ ok: true }>(
-        `/api/builds/${input.buildId}/tasks/${encodeURIComponent(input.taskId)}/stop`,
-        {},
+      stopIfRunning(
+        api.post<{ ok: true }>(
+          `/api/builds/${input.buildId}/tasks/${encodeURIComponent(input.taskId)}/stop`,
+          {},
+        ),
+        { ok: true as const },
       ),
     onSettled: () => {
       void qc.invalidateQueries();
     },
   });
+}
+
+async function stopIfRunning<T>(request: Promise<T>, alreadyStopped: T): Promise<T> {
+  try {
+    return await request;
+  } catch (error) {
+    if (error instanceof ApiError && error.reason === NOTHING_TO_STOP) return alreadyStopped;
+    throw error;
+  }
 }
 
 export function useApiMutations(teamId: string | undefined) {
@@ -1300,9 +1313,12 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     stopBuild: useMutation({
       mutationFn: (input: { buildId: string; discard: boolean }) =>
-        api.post<{ delegated: boolean }>(`/api/builds/${input.buildId}/stop`, {
-          discard: input.discard,
-        }),
+        stopIfRunning(
+          api.post<{ delegated: boolean }>(`/api/builds/${input.buildId}/stop`, {
+            discard: input.discard,
+          }),
+          { delegated: false },
+        ),
       onSuccess: invalidateAll,
       onError: invalidateAll,
     }),
@@ -1555,12 +1571,16 @@ export function useApiMutations(teamId: string | undefined) {
           `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}`,
         ),
       onSuccess: invalidateAll,
+      onError: invalidateAll,
     }),
     chiefStop: useMutation({
       mutationFn: (input: { threadId: string }) =>
-        api.post<{ delegated: boolean }>(
-          `/api/teams/${teamId}/chief/threads/${input.threadId}/stop`,
-          {},
+        stopIfRunning(
+          api.post<{ delegated: boolean }>(
+            `/api/teams/${teamId}/chief/threads/${input.threadId}/stop`,
+            {},
+          ),
+          { delegated: false },
         ),
       onSuccess: invalidateAll,
     }),
@@ -1885,12 +1905,16 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     stopMemoryEdit: useMutation({
       mutationFn: (input: { editId: string; attempt?: number }) =>
-        api.post<MemoryEditRecord>(
-          `/api/teams/${teamId}/memory-edits/${input.editId}/stop`,
-          input.attempt === undefined ? {} : { attempt: input.attempt },
+        stopIfRunning<MemoryEditRecord | null>(
+          api.post<MemoryEditRecord>(
+            `/api/teams/${teamId}/memory-edits/${input.editId}/stop`,
+            input.attempt === undefined ? {} : { attempt: input.attempt },
+          ),
+          null,
         ),
       onSuccess: (record) => {
-        qc.setQueryData<MemoryEditRecord | null>(['memory-edit', teamId], record);
+        if (record !== null)
+          qc.setQueryData<MemoryEditRecord | null>(['memory-edit', teamId], record);
         invalidateAll();
       },
     }),

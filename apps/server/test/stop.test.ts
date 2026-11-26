@@ -184,7 +184,10 @@ describe('the stop server write surface (M7 #308)', () => {
     await w.done(claimed.step.id, { status: 'success' });
     const late = await w.stop(buildId, true);
     expect(late.status).toBe(409);
-    expect(Object.keys((await late.json()) as object)).toEqual(['error']);
+    expect(await late.json()).toStrictEqual({
+      error: expect.any(String),
+      reason: 'nothing-to-stop',
+    });
   });
 
   test('failure mode 2: a pending step -> canceled by the server at once (step stopped + the task ends as stopped)', async () => {

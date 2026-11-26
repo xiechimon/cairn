@@ -336,4 +336,12 @@ test('REST round-trip: post, get current, stop', async () => {
   );
   expect(stopped.status).toBe(200);
   expect(((await stopped.json()) as { status: string }).status).toBe('stopped');
+  const again = await req(
+    H.s.app,
+    'POST',
+    `/api/teams/${H.teamId}/memory-edits/${body.id}/stop`,
+    {},
+  );
+  expect(again.status).toBe(409);
+  expect(await again.json()).toMatchObject({ reason: 'nothing-to-stop' });
 });

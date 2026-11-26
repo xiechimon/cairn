@@ -618,7 +618,9 @@ describe('stop (T5)', () => {
     const running = await w.claim();
     const queued = w.queue('第二句');
     await w.done(running!.step.id, { status: 'success' });
-    expect((await w.stop()).status).toBe(409);
+    const refused = await w.stop();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ reason: 'nothing-to-stop' });
     expect(w.stepRow(queued)?.status).toBe('pending');
   });
 

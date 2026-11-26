@@ -16,6 +16,8 @@ export const stopAttributionSchema = z.object({
 });
 export type StopAttribution = z.infer<typeof stopAttributionSchema>;
 
+export const NOTHING_TO_STOP = 'nothing-to-stop';
+
 export const buildStopSchema = stopAttributionSchema.extend({ at: epochMs });
 export type BuildStop = z.infer<typeof buildStopSchema>;
 

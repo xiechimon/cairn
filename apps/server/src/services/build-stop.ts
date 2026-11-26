@@ -2,6 +2,7 @@ import type { Phase } from '@cairn/shared';
 import {
   ACTIVE_STEP_STATUSES,
   backgroundTaskMessageId,
+  NOTHING_TO_STOP,
   STOP_MESSAGE,
   type StopAttribution,
   UNSTARTED_STEP_STATUSES,
@@ -81,7 +82,11 @@ export function requestStop(
     .all()
     .at(-1);
   if (!active) {
-    throw new HttpError(409, 'no active step on this build (stop 只对运行中的任务生效)');
+    throw new HttpError(
+      409,
+      'no active step on this build (stop 只对运行中的任务生效)',
+      NOTHING_TO_STOP,
+    );
   }
   recordStop(db, buildId, by);
   if (active.status === 'pending' || active.status === 'waiting_quota') {
@@ -109,14 +114,15 @@ export function requestBackgroundTaskStop(deps: BuildDeps, buildId: string, task
     .orderBy(asc(step.createdAt))
     .all()
     .at(-1);
-  if (active?.machineId == null) throw new HttpError(409, 'no running step on this build');
+  if (active?.machineId == null)
+    throw new HttpError(409, 'no running step on this build', NOTHING_TO_STOP);
   const row = deps.db
     .select({ content: message.content })
     .from(message)
     .where(eq(message.id, backgroundTaskMessageId(active.id, taskId)))
     .get();
   if ((row?.content as { task?: { status?: string } } | undefined)?.task?.status !== 'running')
-    throw new HttpError(409, 'background task is not running');
+    throw new HttpError(409, 'background task is not running', NOTHING_TO_STOP);
   if (deps.machineHub?.pushTaskStop(active.machineId, active.id, taskId) !== true)
     throw new HttpError(409, 'the computer running this task is not connected');
 }

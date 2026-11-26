@@ -662,11 +662,15 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
       });
     const stop = (taskId: string) =>
       call(w.s.app, 'POST', `/api/builds/${buildId}/tasks/${taskId}/stop`);
-    expect((await stop('live')).status).toBe(409);
+    const disconnected = await stop('live');
+    expect(disconnected.status).toBe(409);
+    expect(await disconnected.json()).not.toHaveProperty('reason');
     const push = vi.spyOn(w.s.machineHub, 'pushTaskStop').mockReturnValue(true);
     expect((await stop('live')).status).toBe(202);
     expect(push).toHaveBeenCalledWith(w.machineId, stepId, 'live');
-    expect((await stop('over')).status).toBe(409);
+    const settled = await stop('over');
+    expect(settled.status).toBe(409);
+    expect(await settled.json()).toMatchObject({ reason: 'nothing-to-stop' });
     expect((await stop('missing')).status).toBe(409);
     expect(push).toHaveBeenCalledTimes(1);
   });

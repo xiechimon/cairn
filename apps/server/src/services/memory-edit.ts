@@ -4,6 +4,7 @@ import {
   type MemoryEditReceiptRecord,
   type MemoryEditRecord,
   memoryEditRecordSchema,
+  NOTHING_TO_STOP,
 } from '@cairn/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -296,7 +297,7 @@ export function stopMemoryEdit(
     if (attempt !== undefined && attempt !== row.attempt)
       throw new HttpError(409, `memory edit moved to attempt ${row.attempt}`);
     if (row.status !== 'working' && row.status !== 'awaiting_input')
-      throw new HttpError(409, `memory edit is ${row.status}`);
+      throw new HttpError(409, `memory edit is ${row.status}`, NOTHING_TO_STOP);
     const receipts = memoryEditReceipts(tx, row.id);
     const status = receipts.length > 0 ? 'partial' : 'stopped';
     tx.update(memoryEdit)

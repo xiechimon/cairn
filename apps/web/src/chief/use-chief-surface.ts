@@ -453,7 +453,8 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           .mutateAsync({ threadId: activeThread.id, messageId })
           .then(() => undefined)
           .catch((error: unknown) => {
-            toastError(t('撤回失败，Coordinator 已经读到这条了。'), error);
+            if (!(error instanceof ApiError && error.status === 404))
+              toastError(t('撤回失败，Coordinator 已经读到这条了。'), error);
             throw error;
           });
       }

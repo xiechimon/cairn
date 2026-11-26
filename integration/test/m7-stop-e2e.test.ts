@@ -100,6 +100,6 @@ describe('M7 stop E2E: stop button → pending → signal → pull-confirm → p
 
     const late = await api(server.url, 'POST', `/api/builds/${buildId}/stop`, { discard: true });
     expect(late.status).toBe(409);
-    expect(Object.keys(late.body as object)).toEqual(['error']);
+    expect(late.body).toStrictEqual({ error: expect.any(String), reason: 'nothing-to-stop' });
   }, 240_000);
 });
