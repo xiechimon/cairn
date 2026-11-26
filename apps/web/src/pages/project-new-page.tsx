@@ -58,7 +58,7 @@ const FIELD_NOTE_CLS = 'text-meta';
 type RepoSel = 'none' | 'github' | 'local';
 
 function pathBasename(raw: string): string {
-  const trimmed = raw.trim().replace(/\/+$/, '');
+  const trimmed = raw.trim().replace(/(?<!\/)\/+$/, '');
   if (trimmed === '') return '';
   const segment = trimmed.slice(trimmed.lastIndexOf('/') + 1);
   return segment === '.' || segment === '..' ? '' : segment;

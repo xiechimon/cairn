@@ -1,5 +1,5 @@
 export function baseName(path: string): string {
-  const trimmed = path.replace(/\/+$/, '');
+  const trimmed = path.replace(/(?<!\/)\/+$/, '');
   if (trimmed === '') return path;
   return trimmed.slice(trimmed.lastIndexOf('/') + 1);
 }

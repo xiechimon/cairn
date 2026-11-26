@@ -17,7 +17,7 @@ const USAGE_PROBE_TIMEOUT_MS = 25_000;
 const MAX_STDOUT_BYTES = 1_048_576;
 const MAX_STDERR_BYTES = 16_384;
 const AUTH_ERROR_PATTERN =
-  /unauthorized|authentication|unauthenticated|invalid.*(?:token|credential|grant)|expired|not logged in|login required|forbidden|\b401\b|\b403\b/i;
+  /unauthorized|authentication|unauthenticated|invalid(?:(?!invalid).)*?(?:token|credential|grant)|expired|not logged in|login required|forbidden|\b401\b|\b403\b/i;
 
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;

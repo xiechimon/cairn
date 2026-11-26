@@ -57,7 +57,7 @@ const GENERIC_HTTP_PHRASES = new Set([
   'gateway timeout',
   'request failed',
 ]);
-const STATUS_ONLY_RE = /^http\s*\d+(?:\s*[:-]\s*.*)?$/i;
+const STATUS_ONLY_RE = /^http\s*\d+(?:\s*[:-]\s*(?:\S.*)?)?$/i;
 const MASKED_GATEWAY_STATUSES = new Set([408, 429, 502, 503, 504]);
 
 function isSafeServerMessage(message: string): boolean {

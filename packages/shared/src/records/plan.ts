@@ -35,8 +35,8 @@ export type PlanContractCheck = { ok: true; items: string[] } | { ok: false; pro
 const ANCHOR_PATTERNS: readonly RegExp[] = [
   /`[^`]+`/,
   /https?:\/\/\S+/,
-  /[\w.-]+(?:\/[\w.-]+)+\.\w{1,8}\b/,
-  /\b[\w.-]*\w\.(?:md|ts|tsx|js|mjs|cjs|json|ya?ml|toml|sql|sh|py|go|rs|css|html)\b/i,
+  /[\w.-]\/[\w.-]+\.\w{1,8}\b/,
+  /\w\.(?:md|ts|tsx|js|mjs|cjs|json|ya?ml|toml|sql|sh|py|go|rs|css|html)\b/i,
   /(?:^|\s)\/[\w-]+(?:\/[\w:{}.-]+)+/,
   /\b(?:pnpm|npm|npx|vitest|playwright|pytest|curl|gh|git|bash|cargo|docker)\b/i,
   /^(?:node|make|python3?|go|sh|bun|deno)\b/i,
@@ -44,17 +44,17 @@ const ANCHOR_PATTERNS: readonly RegExp[] = [
 
 const VAGUE_PATTERN = /\b(?:TODO|TBD|FIXME)\b|待定|待补|待确认/;
 
-const LIST_ITEM = /^(\s*)(?:[-*•]|\d+[.)])\s+(.*)$/;
+const LIST_ITEM = /^(\s*)(?:[-*•]|\d+[.)])\s+(\S.*|)$/;
 
 const CHECK_LABEL = /^\s*(?:\*\*\S|#{3,6}\s)/;
-const HEADING = /^(#{1,6})\s+(.*)$/;
-const LABEL = /^(?:\d+[.)、]\s*)?([A-Za-z][A-Za-z ]{0,24}?)\s*[:：]\s*(.*)$/;
+const HEADING = /^(#{1,6})\s+(\S.*|)$/;
+const LABEL = /^(?:\d+[.)、]\s*)?([A-Za-z][A-Za-z ]{0,24}?)\s*[:：]\s*(\S.*|)$/;
 
 function cleanSectionName(text: string): string {
   return text
     .replace(/\*\*|__/g, '')
     .replace(/^\d+(?:\.\d+)*[.)、]?\s*/, '')
-    .replace(/\s*[:：]\s*$/, '')
+    .replace(/(?<!\s)\s*[:：]\s*$/, '')
     .trim()
     .toLowerCase();
 }
@@ -217,7 +217,9 @@ function checkVerificationContract(content: string): PlanContractCheck {
         if (item.fenced) return;
         if (
           VAGUE_PATTERN.test(
-            item.text.replace(/^\s*```[\s\S]*?^\s*```/gm, '').replace(/`[^`]*`/g, ''),
+            item.text
+              .replace(/^[^\S\n\r\u2028\u2029]*```[\s\S]*?^[^\S\n\r\u2028\u2029]*```/gm, '')
+              .replace(/`[^`]*`/g, ''),
           )
         )
           vague.push(i + 1);

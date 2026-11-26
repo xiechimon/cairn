@@ -597,7 +597,7 @@ export function ModelChip({
 }
 
 function modelsEndpoint(record: ProviderRecord): string {
-  const root = record.baseUrl.replace(/\/+$/, '');
+  const root = record.baseUrl.replace(/(?<!\/)\/+$/, '');
   return `GET ${/\/v\d+$/.test(root) ? `${root}/models` : `${root}/v1/models`}`;
 }
 

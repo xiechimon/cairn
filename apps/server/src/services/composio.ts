@@ -32,7 +32,7 @@ function isSafeHttpsUrl(value: unknown, rejectPrivateIp = false): value is strin
 
 function sanitizeUpstreamDetail(raw: string, key: string): string {
   const redacted = String(redactSecrets(raw, [key]).value)
-    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1[redacted]@')
+    .replace(/([a-z0-9+.-]:\/\/)[^\s/@]+@/gi, '$1[redacted]@')
     .replace(/[\p{Cc}\s]+/gu, ' ')
     .trim();
   if (redacted.length === 0) return '';

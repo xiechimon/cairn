@@ -1,3 +1,4 @@
+import { trimEndChars } from '@cairn/shared';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import {
@@ -11,7 +12,7 @@ import {
 
 const PREVIEW_CHARS = 150;
 const GENERIC_THINKING_OPENER =
-  /^(?:i['’]?m |i am |let me )?(?:think(?:ing)?(?:\s+(?:through|about)\b[^.!?]*)?|reason(?:ing)?(?:\s+(?:through|about)\b[^.!?]*)?)[.!?…]*$/i;
+  /^(?:i['’]?m |i am |let me )?(?:think(?:ing)?(?:\s+(?:through|about)\b[^.!?]*)?|reason(?:ing)?(?:\s+(?:through|about)\b[^.!?]*)?)$/i;
 
 export function thinkingPreview(text: string, fallback: string): string {
   const firstLine =
@@ -20,7 +21,8 @@ export function thinkingPreview(text: string, fallback: string): string {
       .split('\n')
       .find((line) => line.trim() !== '')
       ?.trim() ?? '';
-  if (firstLine === '' || GENERIC_THINKING_OPENER.test(firstLine)) return fallback;
+  if (firstLine === '' || GENERIC_THINKING_OPENER.test(trimEndChars(firstLine, '.!?…')))
+    return fallback;
   return firstLine.length > PREVIEW_CHARS ? `${firstLine.slice(0, PREVIEW_CHARS)}…` : firstLine;
 }
 

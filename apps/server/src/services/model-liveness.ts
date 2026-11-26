@@ -51,7 +51,7 @@ export async function refreshRelayCatalog(
   const baseUrl = providerRow?.baseUrl;
   if (!baseUrl) return;
 
-  const root = baseUrl.replace(/\/+$/, '');
+  const root = baseUrl.replace(/(?<!\/)\/+$/, '');
   const url = /\/v\d+$/.test(root) ? `${root}/models` : `${root}/v1/models`;
   try {
     const res = await fetch(url, {

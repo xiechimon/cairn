@@ -1,9 +1,9 @@
+import { findHistoryMarker } from './records/history-marker.js';
 import { thirdPartyFenceAt } from './records/prompts.js';
 
 export const CHIEF_EVENT_SHORT_MAX_CHARS = 400;
 
 const EVENT_HEADER_RE = /^\[wake:(\w+)\](?:[ \t]+provenance=(\S+)[ \t]*\n?|\s*)/;
-const HISTORY_MARKER_RE = /\n*\[history id: ([^\]\s]+)\]\s*$/;
 
 export function withHistoryMarker(prompt: string, rowId: string): string {
   return `${prompt}\n\n[history id: ${rowId}]`;
@@ -12,8 +12,8 @@ export function withHistoryMarker(prompt: string, rowId: string): string {
 export function shortEvent(text: string, rowId?: string): string | null {
   const header = EVENT_HEADER_RE.exec(text);
   if (header === null) return null;
-  const marker = HISTORY_MARKER_RE.exec(text);
-  const id = rowId ?? marker?.[1];
+  const marker = findHistoryMarker(text);
+  const id = rowId ?? marker?.id;
   const raw = text.slice(header[0].length, marker === null ? undefined : marker.index);
   const fence = thirdPartyFenceAt(raw);
   const fenceNote = fence === null ? '' : ` ${fence.open}\u3011 third-party text omitted`;

@@ -79,16 +79,23 @@ function textOf(content: Message['content']): string {
     .trim();
 }
 
+function summaryBlockBody(text: string): string | null {
+  const open = '<summary>\n';
+  const start = text.indexOf(open);
+  const end = text.lastIndexOf('\n</summary>');
+  return start < 0 || end < start + open.length ? null : text.slice(start + open.length, end);
+}
+
 export function splitPreviousSummary(messages: readonly Message[]): {
   previous: string | null;
   rest: readonly Message[];
 } {
   const first = messages[0];
   if (first?.role !== 'user') return { previous: null, rest: messages };
-  const match = /<summary>\n([\s\S]*)\n<\/summary>/.exec(textOf(first.content));
-  return match?.[1] === undefined
+  const previous = summaryBlockBody(textOf(first.content));
+  return previous === null
     ? { previous: null, rest: messages }
-    : { previous: match[1], rest: messages.slice(1) };
+    : { previous, rest: messages.slice(1) };
 }
 
 export function transcriptLines(messages: readonly Message[]): string[] {

@@ -40,7 +40,7 @@ const fail = (reason: string, opts: Omit<Failure, keyof Error> = {}): Failure =>
 
 const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-const withSlash = (value: string) => `${value.replace(/\/+$/, '')}/`;
+const withSlash = (value: string) => `${value.replace(/(?<!\/)\/+$/, '')}/`;
 
 const clientHeaders = () => ({
   'iLink-App-Id': ILINK_APP_ID,

@@ -21,7 +21,7 @@ export function githubOauthBaseUrl(): string {
   ) {
     throw new Error('Invalid CAIRN_GITHUB_OAUTH_BASE_URL');
   }
-  return url.href.replace(/\/+$/, '');
+  return url.href.replace(/(?<!\/)\/+$/, '');
 }
 
 export interface GithubOauthEndpoints {

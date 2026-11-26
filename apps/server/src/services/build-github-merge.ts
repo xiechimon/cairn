@@ -1,5 +1,10 @@
 import type { GithubRepoRef } from '@cairn/shared';
-import { ACTIVE_STEP_STATUSES, conversationBranch, MERGE_ANNOUNCEMENT } from '@cairn/shared';
+import {
+  ACTIVE_STEP_STATUSES,
+  conversationBranch,
+  MERGE_ANNOUNCEMENT,
+  nextIndexFinder,
+} from '@cairn/shared';
 import { and, eq, inArray, notInArray } from 'drizzle-orm';
 import { type build, step, todo } from '../db/schema.js';
 import { HttpError, taskArchived } from '../lib/errors.js';
@@ -77,7 +82,20 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
   return { todoRow, failed };
 }
 
-const CLOSING_SHAPE = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*\S*\d/i;
+const CLOSING_KEYWORD = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)/gi;
+const KEYWORD_SEPARATOR = /\s*(?::\s*)?/y;
+
+export function titleClosesAnIssue(title: string): boolean {
+  const nextSpace = nextIndexFinder(title, /\s|$/g);
+  const nextDigit = nextIndexFinder(title, /\d|$/g);
+  for (const keyword of title.matchAll(CLOSING_KEYWORD)) {
+    KEYWORD_SEPARATOR.lastIndex = keyword.index + keyword[0].length;
+    KEYWORD_SEPARATOR.exec(title);
+    const reference = KEYWORD_SEPARATOR.lastIndex;
+    if (nextDigit(reference) < nextSpace(reference)) return true;
+  }
+  return false;
+}
 
 const PLAIN_MERGE_BODY = 'Merged by cairn.';
 
@@ -229,7 +247,7 @@ export async function mergeThroughGithub(
     claimAutonomousMerge(deps.db, row.id, true);
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
-      commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
+      commitTitle: titleClosesAnIssue(pull.title) ? `Merge pull request #${prNumber}` : titled,
       commitMessage: PLAIN_MERGE_BODY,
     });
     if (result.kind === 'merged' || result.kind === 'refused' || result.kind === 'rate-limited')

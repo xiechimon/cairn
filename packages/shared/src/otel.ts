@@ -115,7 +115,7 @@ export function parseOtlpTarget(env: {
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:')
     throw new OtlpTargetConfigError('CAIRN_OTEL_ENDPOINT must be http or https');
-  const base = url.pathname.replace(/\/+$/, '').replace(/\/v1\/traces$/, '');
+  const base = url.pathname.replace(/(?<!\/)\/+$/, '').replace(/\/v1\/traces$/, '');
   url.pathname = `${base}/v1/traces`;
   const headers: Record<string, string> = {};
   if (url.username !== '') {

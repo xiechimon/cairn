@@ -333,10 +333,10 @@ function parseTabList(output: string): BrowserTab[] | null {
 export function browserSessionName(scopeKey: string | undefined, stealth = false): string {
   const cleaned = (scopeKey ?? '')
     .replace(/[^A-Za-z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
+    .replace(/^_+|(?<!_)_+$/g, '')
     .slice(0, 64)
     .replace(/(?:-stealth)+$/i, '')
-    .replace(/^[-_]+|[-_]+$/g, '');
+    .replace(/^[-_]+|(?<![-_])[-_]+$/g, '');
   const base = cleaned.length > 0 ? cleaned : AGENT_BROWSER_SESSION;
   return stealth ? `${base}${STEALTH_SESSION_SUFFIX}` : base;
 }

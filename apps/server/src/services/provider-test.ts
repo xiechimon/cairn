@@ -1,6 +1,7 @@
 import {
   type ProviderFailure,
   redactSecrets,
+  replaceTags,
   type TeamProviderTestResult,
   teamProviderTestResultSchema,
   type UpstreamModelsResult,
@@ -36,13 +37,13 @@ function upstreamMessage(text: string): string {
       if (typeof picked === 'string') return picked;
     }
   } catch {}
-  return text.replace(/<[^>]*>/g, ' ');
+  return replaceTags(text, ' ');
 }
 
 function errorDetail(text: string, secrets: readonly string[]): string | null {
   const scrubbed = redactSecrets(upstreamMessage(text), secrets).value as string;
   const line = scrubbed
-    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1')
+    .replace(/([a-z0-9+.-]:\/\/)[^\s/@]+@/gi, '$1')
     .replace(/\s+/g, ' ')
     .trim();
   const chars = Array.from(line);

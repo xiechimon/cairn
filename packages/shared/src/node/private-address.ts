@@ -16,7 +16,7 @@ function ipv4Private(a: number, b: number): boolean {
 
 function expandIpv6(address: string): number[] | null {
   let text = address.split('%')[0] ?? address;
-  const tail = text.match(/(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  const tail = text.match(/(?<!\d)(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (tail !== null) {
     const [, a, b, c, d] = tail.map(Number);
     text = `${text.slice(0, text.length - (tail[0]?.length ?? 0))}${(((a ?? 0) << 8) | (b ?? 0)).toString(16)}:${(((c ?? 0) << 8) | (d ?? 0)).toString(16)}`;

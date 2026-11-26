@@ -42,7 +42,7 @@ export function capReason(text: string, limit: number = REASON_CHAR_LIMIT): stri
 }
 
 export function extractCodeFence(text: string): string | null {
-  const matches = [...text.matchAll(/```(?:json)?\s*\n([\s\S]*?)```/gi)];
+  const matches = [...text.matchAll(/```(?:json)?[^\S\n]*\n([\s\S]*?)```/gi)];
   if (matches.length === 0) return null;
   const last = matches[matches.length - 1];
   return last ? (last[1] ?? '').trim() : null;

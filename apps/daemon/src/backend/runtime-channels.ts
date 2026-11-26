@@ -41,7 +41,7 @@ const MAX_REDIRECTS = 5;
 const MAX_METADATA_BYTES = 2 * 1024 * 1024;
 const MAX_DOWNLOAD_BYTES = 512 * 1024 * 1024;
 const MAX_VERSION_LENGTH = 64;
-const VERSION_PATTERN = /\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?/;
+const VERSION_PATTERN = /(?<!\d)\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?/;
 const SAFE_BINARY_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 const CLAUDE_RELEASES_BASE_URL = 'https://downloads.claude.ai/claude-code-releases';
@@ -309,7 +309,10 @@ export function createClaudeManaged(options: ClaudeManagedOptions = {}): Managed
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
   const musl = options.musl ?? (options.platform === undefined ? isMuslLinux() : false);
-  const releaseBaseUrl = (options.releaseBaseUrl ?? CLAUDE_RELEASES_BASE_URL).replace(/\/+$/, '');
+  const releaseBaseUrl = (options.releaseBaseUrl ?? CLAUDE_RELEASES_BASE_URL).replace(
+    /(?<!\/)\/+$/,
+    '',
+  );
   const trustedHost = hostOf(releaseBaseUrl);
 
   const channel: ManagedRuntimeChannel<ClaudeRelease> = {
@@ -603,7 +606,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): Managed
   const root = options.root ?? geminiInstallRoot(join(homedir(), BRAND.homeDirName));
   const nodePath = options.nodePath ?? process.execPath;
   const registryUrl = options.registryUrl ?? ACP_REGISTRY_URL;
-  const npmRegistryUrl = (options.npmRegistryUrl ?? NPM_REGISTRY_URL).replace(/\/+$/, '');
+  const npmRegistryUrl = (options.npmRegistryUrl ?? NPM_REGISTRY_URL).replace(/(?<!\/)\/+$/, '');
   const registryHost = hostOf(registryUrl);
   const npmRegistryHost = hostOf(npmRegistryUrl);
   const tarballHost = options.tarballHost ?? npmRegistryHost;

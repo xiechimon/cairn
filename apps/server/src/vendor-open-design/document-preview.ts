@@ -220,7 +220,7 @@ function readZipTextOrEmpty(zip: Zip, name: string): string {
 
 function parseAttrs(raw: string): XmlAttrs {
   const attrs: XmlAttrs = {};
-  for (const m of raw.matchAll(/([\w:-]+)="([^"]*)"/g)) {
+  for (const m of raw.matchAll(/(?<![\w:-])([\w:-]+)="([^"]*)"/g)) {
     const name = m[1];
     if (name) attrs[name] = decodeXml(m[2] ?? '');
   }
@@ -247,7 +247,7 @@ function assertZipPreviewSize(zip: Zip): void {
 }
 
 function numericPathSort(a: string, b: string): number {
-  const an = Number(a.match(/(\d+)(?=\.xml$)/)?.[1] ?? 0);
-  const bn = Number(b.match(/(\d+)(?=\.xml$)/)?.[1] ?? 0);
+  const an = Number(a.match(/(?<!\d)(\d+)(?=\.xml$)/)?.[1] ?? 0);
+  const bn = Number(b.match(/(?<!\d)(\d+)(?=\.xml$)/)?.[1] ?? 0);
   return an - bn || a.localeCompare(b);
 }

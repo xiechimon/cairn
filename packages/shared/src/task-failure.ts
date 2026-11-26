@@ -1,5 +1,6 @@
 import semver from 'semver';
 import { z } from 'zod';
+import { trimEndChars, trimStartChars } from './linear-text.js';
 
 export const RETRY_PARKED_MARK = 'Task parked';
 
@@ -32,6 +33,18 @@ const FAILURE_TEXT_SCAN_LIMIT = 8_192;
 
 function scanSlice(text: string): string {
   return text.length <= FAILURE_TEXT_SCAN_LIMIT ? text : text.slice(0, FAILURE_TEXT_SCAN_LIMIT);
+}
+
+const MODEL_NOT_FOUND_RE = /\bmodel (?:(?!\bmodel (?!not found\b))[^\n])+? not found\b/;
+const MODEL_THEN_ONLY_SPACE_RE = /\bmodel(\s+)not found\b/g;
+
+function namesModelNotFound(lower: string): boolean {
+  for (const [, gap = ''] of lower.matchAll(MODEL_THEN_ONLY_SPACE_RE)) {
+    if (/[^\n]/.test(gap.slice(1, -1))) return true;
+  }
+  return MODEL_NOT_FOUND_RE.test(
+    lower.replace(/(?<=\S)\s+(?=not found\b)/g, ' ').replace(/(?<=\bmodel)\s+/g, ' '),
+  );
 }
 
 function containsAny(haystack: string, needles: readonly string[]): boolean {
@@ -78,14 +91,51 @@ export function failureEndsStepNow(rawError: string): boolean {
 export const CONNECTION_FAILURE_RE =
   /connection[\s_]*(?:error|failed|reset|refused|closed)|ECONNREFUSED|ECONNRESET|ENOTFOUND|EHOSTUNREACH|ENETUNREACH|EAI_AGAIN|socket[\s_]+hang[\s_]+up|fetch[\s_]+failed|error[\s_]+sending[\s_]+request|unable[\s_]+to[\s_]+connect|dial[\s_]+tcp|network[\s_]+error/i;
 
-const ADDRESS_RE =
-  /\bhttps?:\/\/\S+|(?:\d{1,3}(?:\.\d{1,3}){3}|[\w-]+(?:\.[\w-]+)+|\]|\blocalhost):\d+/gi;
+const URL_OR_HOST_BEFORE_PORT_RE = /\bhttps?:\/\/\S+|(\]|(?<![\w.-])[\w.-]+):(?=\d)/gi;
+const PORT_DIGITS_RE = /\d+/y;
+const WORD_CHAR_RE = /\w/;
+
+function addressLengthEndingHost(host: string, followsWordChar: boolean): number {
+  if (host === ']') return 1;
+  const labels = host.split('.');
+  const dotted = labels.slice(labels.lastIndexOf('') + 1);
+  if (dotted.length >= 2) return dotted.join('.').length;
+  const localhost = /\blocalhost$/i.exec(host);
+  if (localhost === null || (localhost.index === 0 && followsWordChar)) return 0;
+  return localhost[0].length;
+}
+
+function withoutAddresses(text: string): string {
+  let out = '';
+  let copied = 0;
+  for (const match of text.matchAll(URL_OR_HOST_BEFORE_PORT_RE)) {
+    const run = match[1];
+    if (run === undefined) {
+      out += text.slice(copied, match.index);
+      copied = match.index + match[0].length;
+      continue;
+    }
+    const hostEnd = match.index + run.length;
+    const hostStart = Math.max(match.index, copied);
+    if (hostStart >= hostEnd) continue;
+    const length = addressLengthEndingHost(
+      text.slice(hostStart, hostEnd),
+      WORD_CHAR_RE.test(text.charAt(hostStart - 1)),
+    );
+    if (length === 0) continue;
+    out += text.slice(copied, hostEnd - length);
+    PORT_DIGITS_RE.lastIndex = hostEnd + 1;
+    PORT_DIGITS_RE.test(text);
+    copied = PORT_DIGITS_RE.lastIndex;
+  }
+  return out + text.slice(copied);
+}
 
 const SERVER_ANSWER_RE =
   /\b[45]\d\d\b(?!\s*m?s\b)|\b(?:unauthorized|unauthenticated|forbidden|permission[_ ]denied)\b/i;
 
 export function isUnansweredFetch(text: string): boolean {
-  return /failed to fetch/i.test(text) && !SERVER_ANSWER_RE.test(text.replace(ADDRESS_RE, ''));
+  return /failed to fetch/i.test(text) && !SERVER_ANSWER_RE.test(withoutAddresses(text));
 }
 
 export function isConnectionFailure(text: string): boolean {
@@ -100,7 +150,7 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
   if (RUNTIME_UPDATE_REQUIRED_RE.test(trimmed)) return 'runtime_outdated';
 
   if (
-    /\bmodel\s+[^\n]+?\s+not found\b/.test(lower) ||
+    namesModelNotFound(lower) ||
     /unsupported[ _-]model/.test(lower) ||
     /\bmodel(?:\s+["'][^"']+["'])?\s+(?:is\s+)?not supported\b/.test(lower) ||
     containsAny(lower, ['model_not_found', 'model_not_supported'])
@@ -439,7 +489,7 @@ const TRANSIENT_5XX_RE =
   /(?:^|[^\d])(?:500|502|503|504|520|521|522|524)(?:[^\d]|$)|\b(?:internal server error|bad gateway|service unavailable|gateway timeout|temporarily unavailable)\b/i;
 
 const HTTP_401_403_AUTH_RE =
-  /\b401\s+unauthorized\b|\bhttp\s+401\b|\bstatus\s*[:=]?\s*401\b|\b403\s+forbidden\b/i;
+  /\b401\s+unauthorized\b|\bhttp\s+401\b|\bstatus\s*(?:[:=]\s*)?401\b|\b403\s+forbidden\b/i;
 
 const MISSING_COMMAND_PATTERNS: readonly RegExp[] = [
   /missing command[:\s]+['"]?([^\s'"():]+)['"]?/i,
@@ -450,19 +500,50 @@ const MISSING_COMMAND_PATTERNS: readonly RegExp[] = [
   /\benv:\s*['"]?([^\s:'"]+)['"]?:\s*No such file or directory/i,
   /The term\s+['"]([^'"]+)['"]\s+is not recognized/i,
   /['"]([^'"]+)['"]\s+is not recognized as an internal or external command/i,
-  /(?:^|[\n—–-])\s*['"]?([^\s:'"]+)['"]?:\s*(?:command\s+)?not found/i,
 ];
+
+const NOT_FOUND_AFTER_COLON_RE = /:\s*(?:command\s+)?not found/gi;
+const COMMAND_TOKEN_BREAK = /[\s:'"]/;
+const LINE_OR_DASH = /[\n—–-]/;
+
+function isQuote(char: string): boolean {
+  return char === "'" || char === '"';
+}
+
+function bareNotFoundCommand(text: string): string | undefined {
+  for (const suffix of text.matchAll(NOT_FOUND_AFTER_COLON_RE)) {
+    let end = suffix.index;
+    if (isQuote(text.charAt(end - 1))) end--;
+    let start = end;
+    while (start > 0 && !COMMAND_TOKEN_BREAK.test(text.charAt(start - 1))) start--;
+    if (start === end) continue;
+    let before = isQuote(text.charAt(start - 1)) ? start - 1 : start;
+    let startsLine = false;
+    while (before > 0 && /\s/.test(text.charAt(before - 1))) {
+      startsLine ||= text.charAt(before - 1) === '\n';
+      before--;
+    }
+    const token = text.slice(start, end);
+    if (startsLine || before === 0 || LINE_OR_DASH.test(text.charAt(before - 1))) return token;
+    const dash = token.search(LINE_OR_DASH);
+    if (dash >= 0 && dash < token.length - 1) return token.slice(dash + 1);
+  }
+  return undefined;
+}
 
 const PLAUSIBLE_COMMAND_NAME = /^[A-Za-z0-9._@/+:-]{1,100}$/;
 const SHELL_SCRIPT_NAMES = new Set(['sh', 'bash', 'zsh', 'dash', 'fish', 'setup', 'resume']);
 
 export function missingSetupCommand(text: string): string | null {
   if (text.trim() === '') return null;
-  for (const pattern of MISSING_COMMAND_PATTERNS) {
-    const match = pattern.exec(text);
-    const raw = match?.[1]?.trim();
+  const captures = [
+    ...MISSING_COMMAND_PATTERNS.map((pattern) => () => pattern.exec(text)?.[1]),
+    () => bareNotFoundCommand(text),
+  ];
+  for (const capture of captures) {
+    const raw = capture()?.trim();
     if (raw === undefined || raw === '') continue;
-    const cleaned = raw.replace(/^['"`]+|['"`,;.)]+$/g, '');
+    const cleaned = trimEndChars(trimStartChars(raw, '\'"`'), '\'"`,;.)');
     if (!PLAUSIBLE_COMMAND_NAME.test(cleaned)) continue;
     const base = cleaned.includes('/') ? (cleaned.split('/').at(-1) ?? cleaned) : cleaned;
     if (base === '' || SHELL_SCRIPT_NAMES.has(base)) continue;

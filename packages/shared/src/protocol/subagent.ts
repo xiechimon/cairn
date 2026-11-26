@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { replaceDelimitedSpans } from '../linear-text.js';
 import type { RemoteToolDef } from './chief-tools.js';
 
 export const SUBAGENT_TOOL_NAME = 'subagent';
@@ -256,8 +257,8 @@ export function resolveSubagentAllowedTools(
   return result;
 }
 
-const CONTROL_TAG_RE =
-  /<(\/?(?:system-reminder|turn_state|untrusted|preferences|how_you_work|channel|asking|talking|events|delivery|tools|turn_notes|quick_replies))\b[^>]*>/gi;
+const CONTROL_TAG_OPEN_RE =
+  /<(\/?(?:system-reminder|turn_state|untrusted|preferences|how_you_work|channel|asking|talking|events|delivery|tools|turn_notes|quick_replies))\b/i;
 const ROLE_LINE_RE = /^([ \t]*)(Human|Assistant|System):/gm;
 
 export function sanitizeSubagentSummary(
@@ -265,10 +266,14 @@ export function sanitizeSubagentSummary(
   childId: string,
 ): { summary: string; truncated: boolean; flaggedPatterns: string[] } {
   const flagged = new Set<string>();
-  let cleaned = text.replace(CONTROL_TAG_RE, (match, tag: string) => {
-    flagged.add(tag.replace(/^\//, '').toLowerCase());
-    return `&lt;${match.slice(1)}`;
-  });
+  let cleaned = replaceDelimitedSpans(
+    text,
+    { open: CONTROL_TAG_OPEN_RE, close: () => '>' },
+    (span, open) => {
+      flagged.add((open[1] ?? '').replace(/^\//, '').toLowerCase());
+      return `&lt;${span.slice(1)}`;
+    },
+  );
   cleaned = cleaned.replace(ROLE_LINE_RE, (_match, indent: string, role: string) => {
     flagged.add(`${role}:`);
     return `${indent}\\${role}:`;

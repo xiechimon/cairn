@@ -75,7 +75,9 @@ const SAMPLE_USAGE_JSON = JSON.stringify({
   },
 });
 
-function createFakeAgyBinary(mode: 'ok' | 'auth' | 'hang' | 'bad-json'): {
+type FakeAgyMode = 'ok' | 'auth' | 'hang' | 'bad-json' | 'bad-grant' | 'long-output';
+
+function createFakeAgyBinary(mode: FakeAgyMode): {
   binPath: string;
   marker: string;
   dir: string;
@@ -118,6 +120,12 @@ if (${JSON.stringify(mode)} === 'ok') {
 } else if (${JSON.stringify(mode)} === 'auth') {
   process.stderr.write('401 Unauthorized: invalid refresh_token 1//secret-refresh-token\\n');
   process.exit(1);
+} else if (${JSON.stringify(mode)} === 'bad-grant') {
+  process.stderr.write('invalid request, invalid_grant\\n');
+  process.exitCode = 1;
+} else if (${JSON.stringify(mode)} === 'long-output') {
+  process.stdout.write('invalid'.repeat(80_000));
+  process.exitCode = 1;
 } else if (${JSON.stringify(mode)} === 'bad-json') {
   process.stdout.write('not-json');
   process.exit(0);
@@ -246,6 +254,26 @@ test('probeAntigravityUsage uses host home without mutating realHome', async () 
   expect(meta.cliToken.token.refresh_token).toBe('1//host-refresh-token-value');
   expect(existsSync(join(realHome, '.gemini/antigravity-cli/antigravity-oauth-token'))).toBe(false);
 });
+
+test.each([
+  ['bad-grant', 'auth'],
+  ['long-output', 'upstream'],
+] as const)(
+  'a failed probe with %s output is classified without stalling',
+  async (mode, failure) => {
+    const stub = createFakeAgyBinary(mode);
+    const started = performance.now();
+    const result = await probeAntigravityUsage(
+      { binPath: stub.binPath },
+      { mode: 'host' },
+      stub.dir,
+      stub.dir,
+    );
+    expect(result).toEqual({ status: 'failed', failure });
+    expect(performance.now() - started).toBeLessThan(5_000);
+  },
+  120_000,
+);
 
 test('probeAntigravityUsage maps expired oauth, auth errors, abort timeouts, invalid output, and missing binary', async () => {
   const dir = makeTestTempDir('agy-usage-failures-');

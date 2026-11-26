@@ -209,14 +209,16 @@ function envClerkAuth(explicitWebOrigin: string | null): {
   if (missing.length > 0 || publishableKey === null || rawIssuer === null) {
     throw new Error(`Clerk auth needs ${missing.join(', ')}`);
   }
-  const issuer = rawIssuer.trim().replace(/\/+$/, '');
+  const issuer = rawIssuer.trim().replace(/(?<!\/)\/+$/, '');
   const jwksUrl = rawJwksUrl === null ? `${issuer}/.well-known/jwks.json` : rawJwksUrl.trim();
-  const explicitParties = splitCsv(rawAuthorizedParties).map((entry) => entry.replace(/\/+$/, ''));
+  const explicitParties = splitCsv(rawAuthorizedParties).map((entry) =>
+    entry.replace(/(?<!\/)\/+$/, ''),
+  );
   const authorizedParties =
     explicitParties.length > 0
       ? explicitParties
       : explicitWebOrigin !== null
-        ? [explicitWebOrigin.trim().replace(/\/+$/, '')]
+        ? [explicitWebOrigin.trim().replace(/(?<!\/)\/+$/, '')]
         : [];
   return {
     publishableKey: publishableKey.trim(),

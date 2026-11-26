@@ -298,7 +298,7 @@ function domainsOfText(text: string): Map<SkillInjectDomain, string> {
   if (text.trim() === '') return out;
   const withoutUrlsAndPaths = text
     .replace(/https?:\/\/[^\s)>\]]+/gi, ' ')
-    .replace(/(?:[\w.@+-]+\/)+[\w.@+-]+/g, ' ');
+    .replace(/(?<![\w.@+-])(?:[\w.@+-]+\/)+[\w.@+-]+/g, ' ');
   const folded = fold(withoutUrlsAndPaths);
   if (folded.compact === '') return out;
   for (const domain of SKILL_INJECT_DOMAINS) {

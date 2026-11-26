@@ -82,7 +82,7 @@ export function loadBackupS3Config(env: NodeJS.ProcessEnv = process.env): Backup
   const rawPrefix = (env.CAIRN_BACKUP_S3_PREFIX?.trim() ?? 'cairn-backups/').replace(/^\/+/, '');
   const prefix = rawPrefix === '' || rawPrefix.endsWith('/') ? rawPrefix : `${rawPrefix}/`;
   return {
-    endpoint: endpoint.replace(/\/+$/, ''),
+    endpoint: endpoint.replace(/(?<!\/)\/+$/, ''),
     bucket,
     region: env.CAIRN_BACKUP_S3_REGION?.trim() || 'auto',
     prefix,
@@ -187,7 +187,7 @@ export function createS3BackupStore(
   fetchImpl: typeof fetch = globalThis.fetch,
 ): BackupObjectStore {
   const endpointUrl = validateEndpointUrl(config.endpoint);
-  const basePath = endpointUrl.pathname.replace(/\/+$/, '');
+  const basePath = endpointUrl.pathname.replace(/(?<!\/)\/+$/, '');
   const bucketPrefixPath = `${basePath}/${encodeURIComponent(config.bucket)}/`;
   const objectUrl = (key: string): URL => {
     const safeKey = assertSafeObjectKey(key);

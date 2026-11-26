@@ -71,7 +71,7 @@ export function slugifyRepoName(name: string): string {
     .toLowerCase()
     .replaceAll(/[^a-z0-9._-]+/g, '-')
     .replaceAll(/-{2,}/g, '-')
-    .replaceAll(/^[-.]+|[-.]+$/g, '');
+    .replaceAll(/(?<![-.])[-.]+$|^[-.]+/g, '');
   return slug === '' ? 'repo' : slug;
 }
 

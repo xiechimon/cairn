@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { stripAnsiEscapes } from '../ansi.js';
 import type { GitCredentialSource } from '../git-ops.js';
+import { lastLineStart } from '../linear-text.js';
 import type { WorkspaceHookNoteData } from '../protocol/executor.js';
 import { redactSecrets } from '../secret-redaction.js';
 import {
@@ -156,6 +157,15 @@ function legacyFailureField(text: string, label: string): string | null {
   return text.slice(from, ends.length > 0 ? Math.min(...ends) : undefined).trim();
 }
 
+function legacyListedFiles(field: string): string[] | undefined {
+  if (!field.endsWith('）')) return undefined;
+  const body = field.slice(0, -1);
+  const open = body.indexOf('（', lastLineStart(body));
+  if (open < 0) return undefined;
+  const listed = body.slice(open + 1);
+  return (listed.endsWith(' 等') ? listed.slice(0, -2) : listed).split('、');
+}
+
 function legacySystemRow(text: string): SystemRow | null {
   const hook = LEGACY_HOOK.exec(text);
   if (hook !== null) {
@@ -182,7 +192,7 @@ function legacySystemRow(text: string): SystemRow | null {
   }
   if (text.startsWith(LEGACY_FAILURE_HEAD)) {
     const files = legacyFailureField(text, '已知改动：');
-    const fileList = files === null ? null : /（(.*?)( 等)?）$/.exec(files)?.[1]?.split('、');
+    const fileList = files === null ? null : legacyListedFiles(files);
     const unrecorded = files === null || files === '没有改动记录';
     const pr = /^#(\d+)(?: (\S+))?$/.exec(legacyFailureField(text, 'PR：') ?? '');
     return {

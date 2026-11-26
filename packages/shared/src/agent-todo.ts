@@ -24,7 +24,7 @@ export const agentTodoSchema = agentTodoReportSchema.extend({
 });
 export type AgentTodo = z.infer<typeof agentTodoSchema>;
 
-export const AGENT_TODO_LINE_RE = /^\s*[-*]\s+\[([ xX~/])\]\s+(.*)$/;
+export const AGENT_TODO_LINE_RE = /^\s*[-*]\s+\[([ xX~/])\]\s+(\S.*|)$/;
 
 export const AGENT_TODO_MARKER_STATES: Record<string, AgentTodoState> = {
   ' ': 'todo',
@@ -45,7 +45,7 @@ const TODO_ORDINAL = /^\d+[.)、]\s*/;
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
 
 const STANDALONE_TODO_HEADER_RE =
-  /^(?:#{1,6}\s+)?(?:\*{1,2}|_{1,2})?(?:计划|任务清单|清单|待办|待办事项|步骤|Plan|Plans|Todo|Todos|To-Do|Checklist|Task\s+list|Tasks|Steps)(?:\*{1,2}|_{1,2})?\s*[:：]?\s*$/i;
+  /^(?:#{1,6}\s+)?(?:\*{1,2}|_{1,2})?(?:计划|任务清单|清单|待办|待办事项|步骤|Plan|Plans|Todo|Todos|To-Do|Checklist|Task\s+list|Tasks|Steps)(?:\*{1,2}|_{1,2})?\s*(?:[:：]\s*)?$/i;
 
 export function parseAgentTodoText(text: string): AgentTodoItem[] | null {
   let run: AgentTodoItem[] | null = null;

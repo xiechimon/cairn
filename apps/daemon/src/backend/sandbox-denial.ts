@@ -17,14 +17,14 @@ const NESTED_SANDBOX_PATTERNS: readonly RegExp[] = [
   /\b(?:sandbox_init|sandbox_apply)\b/i,
   /\bsandbox-exec:/i,
   /cannot enter sandbox|already sandboxed/i,
-  /\bbwrap:.*(?:operation not permitted|permission denied|cannot|failed|no permissions)/i,
+  /\bbwrap:(?:(?!\bbwrap:).)*(?:operation not permitted|permission denied|cannot|failed|no permissions)/i,
 ];
 
 const EPERM_PATTERNS: readonly RegExp[] = [
   /operation not permitted/i,
   /\bEPERM\b/,
-  /\bdeny\([^)]+\)/i,
-  /sandbox:.*\bdeny\b/i,
+  /\bdeny\((?!\))(?:(?!\bdeny\([^)])[^)])+\)/i,
+  /sandbox:(?:(?!sandbox:).)*\bdeny\b/i,
 ];
 
 const LINUX_SANDBOX_PATTERNS: readonly RegExp[] = [
@@ -54,7 +54,7 @@ function hasDeniedPathError(
     const line = raw.trim();
     if (line === '' || !PERMISSION_DENIED_PATTERN.test(line)) continue;
     for (const match of line.matchAll(ABSOLUTE_PATH_PATTERN)) {
-      const candidate = match[0].replace(/[.,;:]+$/, '');
+      const candidate = match[0].replace(/(?<![.,;:])[.,;:]+$/, '');
       if (candidate.length > 1 && isDeniedPath(candidate)) return true;
     }
   }

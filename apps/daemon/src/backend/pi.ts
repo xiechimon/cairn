@@ -453,10 +453,14 @@ export function protocolCompatFlip(errorMessage: string): Partial<ProviderCompat
   if (/model does not support this protocol/i.test(errorMessage)) {
     return { maxTokensField: 'max_tokens', supportsStore: false };
   }
-  if (/unsupported parameter[^\n]*max_completion_tokens/i.test(errorMessage)) {
+  if (
+    /unsupported parameter(?:(?!unsupported parameter)[^\n])*max_completion_tokens/i.test(
+      errorMessage,
+    )
+  ) {
     return { maxTokensField: 'max_tokens' };
   }
-  if (/unsupported parameter[^\n]*\bstore\b/i.test(errorMessage)) {
+  if (/unsupported parameter(?:(?!unsupported parameter)[^\n])*\bstore\b/i.test(errorMessage)) {
     return { supportsStore: false };
   }
   return null;
@@ -631,11 +635,13 @@ function toMessageRecord(msg: PiMessageLike): {
 
 function isRetryableError(message: string): boolean {
   if (
-    /\b404\b|\bmodel(?:[\s_-]+[^\n]*?)?not[\s_-]+found\b|\bnot[\s_-]+supported\b/i.test(message)
+    /\b404\b|\bmodel(?:[\s_-]+(?![\s_-])(?:(?!\bmodel[\s_-])[^\n])*?)?not[\s_-]+found\b|\bnot[\s_-]+supported\b/i.test(
+      message,
+    )
   ) {
     return false;
   }
-  return /^5\d\d:|rate.?limit|overloaded|timeout|temporarily|\b(?:HTTP(?:\/\d(?:\.\d)?)?|status)\s*:?\s*5\d\d\b|\b5\d\d\s+(?:Internal Server Error|Not Implemented|Bad Gateway|Service Unavailable|Gateway Timeout|HTTP Version Not Supported|Variant Also Negotiates|Insufficient Storage|Loop Detected|Not Extended|Network Authentication Required)\b/i.test(
+  return /^5\d\d:|rate.?limit|overloaded|timeout|temporarily|\b(?:HTTP(?:\/\d(?:\.\d)?)?|status)\s*(?::\s*)?5\d\d\b|\b5\d\d\s+(?:Internal Server Error|Not Implemented|Bad Gateway|Service Unavailable|Gateway Timeout|HTTP Version Not Supported|Variant Also Negotiates|Insufficient Storage|Loop Detected|Not Extended|Network Authentication Required)\b/i.test(
     message,
   );
 }

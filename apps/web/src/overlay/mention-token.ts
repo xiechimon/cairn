@@ -1,4 +1,4 @@
-import type { MachineCapabilities } from '@cairn/shared';
+import { type BracketLinkShape, findBracketLinks, type MachineCapabilities } from '@cairn/shared';
 import { fuzzyFilter } from './completion.js';
 
 export type MentionKind = 'todo' | 'skill' | 'agent' | 'project' | 'machine';
@@ -132,21 +132,29 @@ export type MentionSegment =
   | { kind: 'text'; text: string }
   | { kind: 'mention'; token: MentionToken; start: number; end: number };
 
-const SCHEME_REGEX = /\[([^\]\n]+?)\]\((agent|skill|project|machine|todo):([A-Za-z0-9_-]+)\)/g;
+const SCHEME_LINK: BracketLinkShape = {
+  opener: /\[/,
+  labelEnd: /[\]\n]/,
+  head: '](',
+  targetEnd: /\)/,
+};
+const SCHEME_TARGET = /^(agent|skill|project|machine|todo):([A-Za-z0-9_-]+)$/;
 
 export function parseMentionSegments(text: string): MentionSegment[] {
   const segments: MentionSegment[] = [];
   let cursor = 0;
-  SCHEME_REGEX.lastIndex = 0;
-  for (;;) {
-    const match = SCHEME_REGEX.exec(text) as RegExpExecArray | null;
-    if (match === null) break;
-    const [full, rawLabel, rawKind, id] = match;
-    if (match.index > cursor) {
-      segments.push({ kind: 'text', text: text.slice(cursor, match.index) });
+  const links = findBracketLinks(
+    text,
+    SCHEME_LINK,
+    (label, target) => label !== '' && SCHEME_TARGET.test(target),
+  );
+  for (const link of links) {
+    const [, rawKind, id] = SCHEME_TARGET.exec(link.target) ?? [];
+    if (link.start > cursor) {
+      segments.push({ kind: 'text', text: text.slice(cursor, link.start) });
     }
     const kind = rawKind as MentionKind;
-    const label = unescapeLabel(rawLabel ?? '');
+    const label = unescapeLabel(link.label);
     const seqDigits = kind === 'todo' && label.startsWith('#') ? label.slice(1) : '';
     const seq = /^\d+$/.test(seqDigits) ? Number(seqDigits) : undefined;
     segments.push({
@@ -157,10 +165,10 @@ export function parseMentionSegments(text: string): MentionSegment[] {
         id: id ?? '',
         ...(seq !== undefined ? { seq } : {}),
       },
-      start: match.index,
-      end: match.index + full.length,
+      start: link.start,
+      end: link.end,
     });
-    cursor = match.index + full.length;
+    cursor = link.end;
   }
   if (cursor < text.length) {
     segments.push({ kind: 'text', text: text.slice(cursor) });

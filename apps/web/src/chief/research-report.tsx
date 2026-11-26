@@ -1,4 +1,4 @@
-import { infoReportMessageSchema, type TodoDeliverables } from '@cairn/shared';
+import { infoReportMessageSchema, replaceBracketLinks, type TodoDeliverables } from '@cairn/shared';
 import { cn } from 'cn';
 import { FileText } from 'lucide-react';
 import { type CSSProperties, createContext, useContext, useMemo, useState } from 'react';
@@ -86,8 +86,11 @@ export function reportSummaryOf(content: string): string {
     .split(/\n\s*\n/)
     .map((block) => block.trim())
     .find((block) => block !== '' && !/^(#|!\[|[-*]\s|\d+\.\s|```|\||>)/.test(block));
-  return (para ?? '')
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+  return replaceBracketLinks(
+    para ?? '',
+    { opener: /!?\[/, labelEnd: /\]/, head: '](', targetEnd: /\)/ },
+    (link) => link.label,
+  )
     .replace(/[*_`]/g, '')
     .replace(/\s+/g, ' ');
 }

@@ -23,7 +23,7 @@ const endsHunk = (line: string, next: string | undefined) =>
   (line.startsWith('--- ') && next?.startsWith('+++ ') === true);
 
 function recountHunks(text: string): string {
-  const lines = text.replace(/\n+$/, '').split('\n');
+  const lines = text.replace(/(?<!\n)\n+$/, '').split('\n');
   return lines
     .map((line, at) => {
       const head = HUNK_HEAD.exec(line);

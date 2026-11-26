@@ -105,7 +105,7 @@ export class CloakBrowser {
 
   private async key(): Promise<string> {
     const key = (await readFile(this.licenseFile, 'utf8').catch(() => '')).replace(
-      /^[ \t\n\v\f\r]+|[ \t\n\v\f\r]+$/g,
+      /^[ \t\n\v\f\r]+|(?<![ \t\n\v\f\r])[ \t\n\v\f\r]+$/g,
       '',
     );
     if (!key || /[\0\r\n]/.test(key))

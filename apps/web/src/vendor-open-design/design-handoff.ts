@@ -5,7 +5,7 @@ export const DESIGN_MANIFEST_FILENAME = 'DESIGN-MANIFEST.json';
 export function safeFilename(name: string, fallback: string): string {
   const slug = (name || fallback)
     .replace(/[^\w.-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-+|(?<!-)-+$/g, '')
     .slice(0, 60);
   return slug || fallback;
 }

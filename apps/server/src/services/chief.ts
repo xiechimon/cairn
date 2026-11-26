@@ -40,6 +40,7 @@ import {
   parseOrchestrationSourceRef,
   quoteIssueLines,
   redactSecrets,
+  replaceDelimitedSpans,
   SUGGEST_REPLIES_TOOL_NAME,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
@@ -696,9 +697,10 @@ function escapeXmlAttr(value: string): string {
 function sanitizeUntrustedReadmeText(text: string): string {
   const redacted = String(redactSecrets(text).value);
   const neutralized = neutralizeIssueAttachmentTokens(redacted);
-  return stripUnsafeControlChars(neutralized, true).replace(
-    /<(\/?\s*(?:project_readme|turn_state|quick_replies)\b[^>]*)>/gi,
-    '&lt;$1&gt;',
+  return replaceDelimitedSpans(
+    stripUnsafeControlChars(neutralized, true),
+    { open: /<\/?\s*(?:project_readme|turn_state|quick_replies)\b/i, close: () => '>' },
+    (span) => `&lt;${span.slice(1, -1)}&gt;`,
   );
 }
 

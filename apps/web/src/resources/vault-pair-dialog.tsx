@@ -25,7 +25,7 @@ function deriveName(site: string): string {
   const base = (siteHost(site) ?? site.trim())
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .replace(/^_+|(?<!_)_+$/g, '');
   const name = /^[0-9]/.test(base) ? `LOGIN_${base}` : base;
   return SECRET_NAME_PATTERN.test(name) ? name : 'LOGIN';
 }

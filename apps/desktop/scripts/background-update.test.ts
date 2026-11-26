@@ -183,6 +183,12 @@ describe('a release published while Cairn is closed', () => {
     expect(parseBatteryLow("Now drawing from 'AC Power'\n")).toBe(false);
   });
 
+  test('reads a long digit run in the battery report in linear time', () => {
+    const started = performance.now();
+    expect(parseBatteryLow(`'Battery Power' ${'1'.repeat(160_000)}`)).toBe(false);
+    expect(performance.now() - started).toBeLessThan(1_500);
+  }, 300_000);
+
   test('never replaces a version still on probation, so its kept copy survives', async () => {
     const { bundle, userData } = mac();
     writeUpdateState(updateStatePath(userData), {

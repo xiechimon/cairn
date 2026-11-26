@@ -61,7 +61,13 @@ import {
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
 import { installAntigravityTurnHooks } from './antigravity-hooks.js';
 
-import { SessionNotResumableError, StepFailureError, stepFailureOf } from './errors.js';
+import {
+  FAILED_SPAWN,
+  MISSING_HOST_TOOL,
+  SessionNotResumableError,
+  StepFailureError,
+  stepFailureOf,
+} from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { runtimeChildEnv } from './otel.js';
 
@@ -208,7 +214,7 @@ function isAntigravityAuthError(error: unknown, message: string): boolean {
 }
 
 function antigravityAcpErrorMessage(error: unknown, message: string): string {
-  if (/spawn .*ENOENT|\bagy\b.*not found/i.test(message)) {
+  if (FAILED_SPAWN.test(message) || /\bagy\b(?:(?!\bagy\b).)*not found/i.test(message)) {
     return 'Antigravity executable not found: install Google Antigravity (agy) on the Runner or enable managed install.';
   }
   if (isAntigravityAuthError(error, message)) {
@@ -219,7 +225,7 @@ function antigravityAcpErrorMessage(error: unknown, message: string): string {
 
 export function acpErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/spawn agy .*ENOENT|\bagy\b.*not found/i.test(message)) {
+  if (/spawn agy (?:(?!spawn agy ).)*ENOENT|\bagy\b(?:(?!\bagy\b).)*not found/i.test(message)) {
     return 'Antigravity executable not found: install Google Antigravity (agy) on the Runner or enable managed install.';
   }
   if (
@@ -228,7 +234,7 @@ export function acpErrorMessage(error: unknown): string {
   ) {
     return `Antigravity login failed: sign in to Antigravity on the Runner or enable a subscription with a token. ${message}`;
   }
-  if (/spawn gemini .*ENOENT|gemini.*not found/i.test(message)) {
+  if (/spawn gemini (?:(?!spawn gemini ).)*ENOENT|gemini(?:(?!gemini).)*not found/i.test(message)) {
     return 'Gemini executable not found: the managed Gemini install is missing or still downloading';
   }
   if (
@@ -619,7 +625,7 @@ class AcpSession implements AgentSessionHandle {
     const output = [toolResultText(rawOutput), toolResultText(call.result)]
       .filter((part) => part.length > 0)
       .join('\n');
-    if (/unknown tool|tool .* not found|no such tool/i.test(output)) {
+    if (MISSING_HOST_TOOL.test(output)) {
       this.missingHostToolsError = `Cairn host tools did not attach to this ${this.hostToolsCheck.runtime} ACP session (MCP server did not connect). Start a new session or retry.`;
     }
   }
@@ -1456,7 +1462,7 @@ class AcpBackend implements AgentBackend {
           : `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${agentVersion}): ${message}`;
       const isMissingBinary =
         /^Antigravity executable not found:|^Gemini executable not found:/.test(finalMessage) ||
-        /spawn .*ENOENT/i.test(message);
+        FAILED_SPAWN.test(message);
       const isAuth =
         adapter?.harness === 'antigravity'
           ? isAntigravityAuthError(error, message) || isAntigravityAuthError(error, finalMessage)

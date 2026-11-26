@@ -6,9 +6,9 @@ export function planHasOpenDecisions(content: string): boolean {
   for (let i = 0; i < lines.length; i++) {
     const name = (lines[i] ?? '')
       .replace(/^#{1,6}\s+/, '')
-      .replace(/\s+#+$/, '')
+      .replace(/(?<!\s)\s+#+$/, '')
       .replace(/\*\*|__/g, '')
-      .replace(/\s*[:：]$/, '')
+      .replace(/(?<!\s)\s*[:：]$/, '')
       .trim();
     if (!/^(open questions|decisions needed|decision points)$/i.test(name)) continue;
     const own = /^(#{1,6})\s/.exec(lines[i] ?? '')?.[1]?.length;

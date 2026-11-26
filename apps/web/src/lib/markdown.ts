@@ -73,6 +73,11 @@ export function expandCollapsedTableLine(line: string): string[] | null {
   return expanded;
 }
 
+function endsWithBlankLine(raw: string): boolean {
+  const tail = raw.slice(raw.trimEnd().length);
+  return tail.indexOf('\n') !== tail.lastIndexOf('\n');
+}
+
 function normalizeSource(text: string): string {
   const out: string[] = [];
   let fence: string | null = null;
@@ -410,7 +415,7 @@ function topBlocks(text: string): TopBlock[] {
         source: runSources?.[n] ?? token.raw.trim(),
       });
     });
-    spaced = /\n\s*\n\s*$/.test(token.raw);
+    spaced = endsWithBlankLine(token.raw);
   }
   return out;
 }

@@ -89,7 +89,7 @@ export function otelErrorMessage(reason: string | null | undefined): string | un
       '<redacted>',
     )
     .replace(
-      /(\b[a-z][a-z0-9+.-]*:\/\/(?:[^\s/@]+@)?)(?:\d{1,3}\.){3}\d{1,3}(?=[:/\s?#"'<>),;\]]|$)/gi,
+      /([a-z0-9+.-]:\/\/(?:[^\s/@]+@)?)(?:\d{1,3}\.){3}\d{1,3}(?=[:/\s?#"'<>),;\]]|$)/gi,
       '$1<ip>',
     )
     .replace(/\s+/g, ' ')

@@ -26,7 +26,7 @@ interface ListMarker {
 }
 
 function parseListLine(line: string): ParsedListLine | null {
-  const ordered = /^([ \t]*)(\d+)\. +(.*)$/.exec(line);
+  const ordered = /^([ \t]*)(\d+)\. +([^ \r\u2028\u2029].*|)$/.exec(line);
   if (ordered !== null) {
     const indent = ordered[1] ?? '';
     const digits = ordered[2] ?? '0';
@@ -41,7 +41,7 @@ function parseListLine(line: string): ParsedListLine | null {
       markerLength: ordered[0].length - (ordered[3] ?? '').length,
     };
   }
-  const bullet = /^([ \t]*)- +(.*)$/.exec(line);
+  const bullet = /^([ \t]*)- +([^ \r\u2028\u2029].*|)$/.exec(line);
   if (bullet !== null) {
     return {
       kind: 'bullet',

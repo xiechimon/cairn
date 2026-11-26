@@ -665,7 +665,7 @@ export function localRepoUnreachableMessage(
 
 export function repoLabel(cloneUrl: string): string {
   try {
-    const path = new URL(cloneUrl).pathname.replace(/^\/+|\/+$/g, '');
+    const path = new URL(cloneUrl).pathname.replace(/^\/+|(?<!\/)\/+$/g, '');
     const segments = path.split('/').filter(Boolean);
     if (segments[0] === 'git') segments.shift();
     return segments

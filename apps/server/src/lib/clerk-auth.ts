@@ -41,10 +41,10 @@ export function createClerkVerifier(
   const emails = new Set(config.ownerEmails.map(normalizedEmail).filter((email) => email !== ''));
   const authorizedParties = new Set(
     (config.authorizedParties ?? [])
-      .map((origin) => origin.trim().replace(/\/+$/, ''))
+      .map((origin) => origin.trim().replace(/(?<!\/)\/+$/, ''))
       .filter(Boolean),
   );
-  const issuer = config.issuer.replace(/\/+$/, '');
+  const issuer = config.issuer.replace(/(?<!\/)\/+$/, '');
 
   return async (token) => {
     if (token === undefined || token === '') return { kind: 'invalid' };
@@ -55,7 +55,8 @@ export function createClerkVerifier(
         requiredClaims: ['exp', 'sub'],
       });
       if (payload.aud !== undefined) return { kind: 'invalid' };
-      const azp = typeof payload.azp === 'string' ? payload.azp.trim().replace(/\/+$/, '') : null;
+      const azp =
+        typeof payload.azp === 'string' ? payload.azp.trim().replace(/(?<!\/)\/+$/, '') : null;
       if (authorizedParties.size > 0 && azp !== null && !authorizedParties.has(azp)) {
         return { kind: 'invalid' };
       }

@@ -4,6 +4,8 @@ import { isIP } from 'node:net';
 import { dirname, join } from 'node:path';
 import {
   type LocalToolDef,
+  replaceDelimitedSpans,
+  replaceTags,
   WEB_BRAVE_KEY_SECRET,
   WEB_EXA_KEY_SECRET,
   WEB_FETCH_TOOL_NAME,
@@ -154,12 +156,34 @@ function decodeEntities(text: string): string {
     .replace(/&amp;/g, '&');
 }
 
+function firstTitleText(source: string): string {
+  const opening = /<title/i.exec(source);
+  if (opening === null) return '';
+  const openEnd = source.indexOf('>', opening.index);
+  if (openEnd < 0) return '';
+  const closing = /<\/title>/gi;
+  closing.lastIndex = openEnd + 1;
+  const close = closing.exec(source);
+  return close === null ? '' : source.slice(openEnd + 1, close.index);
+}
+
 function htmlToText(source: string): { title: string; text: string } {
-  const title = source.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '';
-  const text = source
-    .replace(/<(script|style|noscript|template)[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<[^>]*>/g, ' ');
+  const title = firstTitleText(source);
+  const withoutBlocks = replaceDelimitedSpans(
+    source,
+    {
+      open: /<(script|style|noscript|template)/i,
+      close: (open) => `</${open[1]}>`,
+      ignoreCase: true,
+    },
+    () => ' ',
+  );
+  const withoutComments = replaceDelimitedSpans(
+    withoutBlocks,
+    { open: /<!--/, close: () => '-->' },
+    () => ' ',
+  );
+  const text = replaceTags(withoutComments, ' ');
   return {
     title: decodeEntities(title).replace(/\s+/g, ' ').trim(),
     text: decodeEntities(text).replace(/\s+/g, ' ').trim(),
@@ -274,8 +298,8 @@ export function buildWebTools(opts: WebToolsOpts): LocalToolDef[] {
     return {
       results: arrayOf(web.results).map((r) => ({
         url: str(r.url),
-        title: decodeEntities(str(r.title).replace(/<[^>]*>/g, '')),
-        text: decodeEntities(str(r.description).replace(/<[^>]*>/g, '')),
+        title: decodeEntities(replaceTags(str(r.title), '')),
+        text: decodeEntities(replaceTags(str(r.description), '')),
         fetchedAt,
       })),
       cost: BRAVE_SEARCH_ESTIMATE_USD,

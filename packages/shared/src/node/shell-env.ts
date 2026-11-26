@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { homedir, userInfo } from 'node:os';
 import { basename, dirname, posix } from 'node:path';
+import { trimEndChars } from '../linear-text.js';
 
 export const SHELL_ENV_RESOLVED_VAR = 'CAIRN_SHELL_ENV_RESOLVED';
 export const LOGIN_SHELL_TIMEOUT_MS = 5_000;
@@ -609,7 +610,7 @@ function probeBaseEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 function stripAppImagePaths(target: NodeJS.ProcessEnv, platform: NodeJS.Platform): void {
   if (platform !== 'linux' || target.PATH === undefined) return;
   if (target.APPIMAGE === undefined && target.APPDIR === undefined) return;
-  const appDir = target.APPDIR?.replace(/\/+$/u, '');
+  const appDir = target.APPDIR === undefined ? undefined : trimEndChars(target.APPDIR, '/');
   const kept = target.PATH.split(':').filter(
     (entry) =>
       !(appDir && (entry === appDir || entry.startsWith(`${appDir}/`))) &&
@@ -622,7 +623,7 @@ function stripAppImagePaths(target: NodeJS.ProcessEnv, platform: NodeJS.Platform
 function linuxRuntimeDirCandidates(env: NodeJS.ProcessEnv, uid: number | undefined): string[] {
   const candidates: string[] = [];
   const fromEnv = trimNonEmpty(env.XDG_RUNTIME_DIR);
-  if (fromEnv !== undefined) candidates.push(fromEnv.replace(/\/+$/u, ''));
+  if (fromEnv !== undefined) candidates.push(trimEndChars(fromEnv, '/'));
   if (uid !== undefined) candidates.push(`/run/user/${uid}`);
   return candidates.filter((candidate) => candidate.length > 0);
 }

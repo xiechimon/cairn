@@ -55,7 +55,11 @@ type StepRow = typeof step.$inferSelect;
 
 const LISTED_MAX = 200;
 const NOT_RECORDED = 'correction not recorded. The memory write itself was applied.';
-const CHECK_POINTER_RE = /\(todo:[^)]+\)/i;
+export function hasCheckPointerText(text: string): boolean {
+  const lastClose = text.lastIndexOf(')');
+  if (lastClose < 0) return false;
+  return /\(todo:[^)]/i.test(text.slice(0, lastClose));
+}
 const RECURRENCE_NEXT =
   'This rule was repeated. If a repository check (regression test, lint rule, or CI gate) can stop it, call ask_user offering to create a task to add that check (recommended) or keep it as advice — never install a check unasked. On accept, call create_todo citing both the correction message and the answered question card in messageIds, then update_memory on this rule to add one pointer to the task link. On decline, leave the rule unmarked. If no check can enforce it, state so plainly and keep it as advice.';
 
@@ -447,10 +451,10 @@ function inAttachedIndex(tx: Tx, teamId: string, turn: StepRow, entry: Entry): b
 }
 
 function hasCheckPointer(tx: Tx, owner: MemoryDocumentOwner, entry: Entry): boolean {
-  if (entry.file === MEMORY_INDEX_TITLE) return CHECK_POINTER_RE.test(entry.text);
+  if (entry.file === MEMORY_INDEX_TITLE) return hasCheckPointerText(entry.text);
   try {
     const doc = currentMemoryDocument(tx, owner, entry.projectId ?? 'team', entry.file);
-    return CHECK_POINTER_RE.test(memoryIndexText(doc));
+    return hasCheckPointerText(memoryIndexText(doc));
   } catch {
     return false;
   }

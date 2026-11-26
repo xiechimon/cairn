@@ -1,3 +1,4 @@
+import { matchesInOrderWithinSegment, replaceDelimitedSpans } from '../linear-text.js';
 import type { RemoteToolDef } from './chief-tools.js';
 import { toolObjectSchema as obj, toolStringSchema as str } from './tool-parameters.js';
 
@@ -13,36 +14,230 @@ export function isOwnComputerTool(tool: string): tool is OwnComputerTool {
 }
 
 const RM_TARGET = String.raw`(?:\/|\/\*|~|~\/|~\/\*|\$HOME|\$HOME\/|\$HOME\/\*|\$\{HOME\}|\$\{HOME\}\/|\$\{HOME\}\/\*|\/Users|\/Users\/|\/Users\/\*|\/Users\/[^\/\s;&|]+\/?\*?|\/System|\/System\/|\/Library|\/Library\/|\/Applications\/?)`;
-const COMMAND_START = String.raw`(?:^|[;&|({\x60]|\$\()\s*(?:sudo\s+(?:-\S+\s+)*)?(?:\S*\/)?`;
 
 const PHONE_COMMANDS =
   'adb|afcclient|cfgutil|devicectl|fb-idb|gidevice|idb|idevice\\w*|ifuse|instruments|ios-deploy|iproxy|irecovery|mobiledevice|pymobiledevice3|simctl|tidevice|xcodebuild|xcrun|xctrace';
 
-const HARDLINE: readonly { pattern: RegExp; reason: string }[] = [
+const SHELL_SEGMENT_BREAK = /[;&|]/;
+
+type CommandCheck = { test(text: string): boolean };
+
+const NO_SEGMENT_BREAK = /(?!)/;
+
+function inOrder(parts: readonly RegExp[]): CommandCheck {
+  return matchesInOrderWithinSegment(NO_SEGMENT_BREAK, parts);
+}
+
+function inShellSegment(parts: readonly RegExp[]): CommandCheck {
+  return matchesInOrderWithinSegment(SHELL_SEGMENT_BREAK, parts);
+}
+
+function eitherOf(checks: readonly CommandCheck[]): CommandCheck {
+  return { test: (text) => checks.some((check) => check.test(text)) };
+}
+
+function phoneWord(extra?: string): RegExp {
+  const words = extra === undefined ? PHONE_COMMANDS : `${PHONE_COMMANDS}|${extra}`;
+  return new RegExp(String.raw`\b(?:${words})\b`, 'i');
+}
+
+function afterFirst(text: string, pattern: RegExp): string | null {
+  const match = pattern.exec(text);
+  return match === null ? null : text.slice(match.index + match[0].length);
+}
+
+function osascriptReachesOutside(phoneCommands: string): CommandCheck {
+  const scripting =
+    /\b(?:do shell script|doShellScript|doScript|do script|includeStandardAdditions|NSTask)\b|\$\s*(?:\.\s*system\b|\[\s*['"]\s*system\b)/i;
+  const reach = new RegExp(String.raw`\b(?:${phoneCommands})\b|system attribute|getenv`, 'i');
+  return {
+    test: (text) =>
+      text.split(/[;|]/).some((chunk) => {
+        const pieces = chunk.split('&');
+        return pieces.some((piece, at) => {
+          const rest = afterFirst(piece, /\bosascript\b/i);
+          if (rest === null || !scripting.test(rest)) return false;
+          return at < pieces.length - 1 || reach.test(rest);
+        });
+      }),
+  };
+}
+
+function substitutionAfterAssignment(tail: RegExp): CommandCheck {
+  return {
+    test(text) {
+      let assigned = false;
+      let marked = false;
+      for (const [part] of text.matchAll(/\s+|[;&|]|[^\s;&|]+/g)) {
+        if (/^\s/.test(part)) assigned = false;
+        else if (SHELL_SEGMENT_BREAK.test(part)) marked = false;
+        else if (marked && tail.test(part)) return true;
+        else {
+          let rest: string | null = part;
+          if (!assigned) {
+            rest = afterFirst(part, /\b[A-Za-z_]\w*=/);
+            assigned = rest !== null;
+          }
+          const afterMarker = rest === null || marked ? null : afterFirst(rest, /\$\(|\x60/);
+          if (afterMarker === null) continue;
+          marked = true;
+          if (tail.test(afterMarker)) return true;
+        }
+      }
+      return false;
+    },
+  };
+}
+
+function assignedThenExpanded(command: RegExp): CommandCheck {
+  const head = inOrder([/\b\w+=/, command]);
+  return {
+    test: (text) =>
+      text.split(/[&|]/).some((chunk) => {
+        const statements = chunk.split(';');
+        return statements.some(
+          (statement, at) => head.test(statement) && /\$[\w({]/.test(statements[at + 1] ?? ''),
+        );
+      }),
+  };
+}
+
+const COMMAND_OPENER = /[;&|({`]/;
+
+function commandStarts(text: string): number[] {
+  const words = new Set<number>();
+  const sudo = /sudo\s+/iy;
+  const flag = /-\S+\s+/y;
+  for (let at = 0; at <= text.length; at++) {
+    if (at !== 0 && !COMMAND_OPENER.test(text.charAt(at - 1))) continue;
+    let word = at;
+    while (/\s/.test(text.charAt(word))) word++;
+    words.add(word);
+    let next = endOfMatchAt(sudo, text, word);
+    while (next !== null && !words.has(next)) {
+      words.add(next);
+      next = endOfMatchAt(flag, text, next);
+    }
+  }
+  const starts: number[] = [];
+  let inPath = false;
+  for (let at = 0; at <= text.length; at++) {
+    const afterDirectory = inPath && text.charAt(at - 1) === '/';
+    if (words.has(at) || afterDirectory) starts.push(at);
+    if (words.has(at)) inPath = true;
+    if (/\s/.test(text.charAt(at))) inPath = false;
+  }
+  return starts;
+}
+
+function endOfMatchAt(sticky: RegExp, text: string, at: number): number | null {
+  sticky.lastIndex = at;
+  return sticky.test(text) ? sticky.lastIndex : null;
+}
+
+function commandNamed(name: string): CommandCheck {
+  const sticky = new RegExp(name, 'iy');
+  return {
+    test: (text) => commandStarts(text).some((at) => endOfMatchAt(sticky, text, at) !== null),
+  };
+}
+
+function removesProtectedFolder(): CommandCheck {
+  const command = /rm\s+/iy;
+  const target = new RegExp(String.raw`(?<=\s)${RM_TARGET}(?=$|[\s;&|)])`, 'gi');
+  return {
+    test(text) {
+      for (const at of commandStarts(text)) {
+        const operands = endOfMatchAt(command, text, at);
+        if (operands === null) continue;
+        target.lastIndex = operands;
+        return target.test(text);
+      }
+      return false;
+    },
+  };
+}
+
+function drivesAdb(): CommandCheck {
+  const command = /adb\s+/iy;
+  const flag = /-\S+\s+/y;
+  const operand = /(?!devices\b|version\b|mdns\b|help\b|--help\b|start-server\b|kill-server\b)\S/iy;
+  return {
+    test(text) {
+      const seen = new Set<number>();
+      return commandStarts(text).some((at) => {
+        let word = endOfMatchAt(command, text, at);
+        while (word !== null && !seen.has(word)) {
+          seen.add(word);
+          if (endOfMatchAt(operand, text, word) !== null) return true;
+          word = endOfMatchAt(flag, text, word);
+        }
+        return false;
+      });
+    },
+  };
+}
+
+type NameSuffixes = { earliestBody: number; longer: Map<string, NameSuffixes> };
+
+function definesAndForksItself(body: string): boolean {
+  const defined: NameSuffixes = { earliestBody: 0, longer: new Map() };
+  for (const header of body.matchAll(/((?<!\w)\w+|:)\s*\(\s*\)\s*\{/g)) {
+    const name = header[1] ?? '';
+    let node = defined;
+    for (let at = name.length - 1; at >= 0; at--) {
+      let next = node.longer.get(name.charAt(at));
+      if (next === undefined) {
+        next = { earliestBody: header.index + header[0].length, longer: new Map() };
+        node.longer.set(name.charAt(at), next);
+      }
+      node = next;
+    }
+  }
+  for (const fork of body.matchAll(/\|(?=\s*(\w+|:)\s*&)/g)) {
+    const name = fork[1] ?? '';
+    let end = fork.index;
+    while (/\s/.test(body.charAt(end - 1))) end--;
+    const start = end - name.length;
+    if (start < 0 || !body.startsWith(name, start)) continue;
+    let node: NameSuffixes | undefined = defined;
+    for (let at = name.length - 1; at >= 0 && node !== undefined; at--) {
+      node = node.longer.get(name.charAt(at));
+    }
+    if (node !== undefined && node.earliestBody <= start) return true;
+  }
+  return false;
+}
+
+const FORK_BOMB: CommandCheck = {
+  test: (text) => text.split('}').some(definesAndForksItself),
+};
+
+const HARDLINE: readonly { pattern: CommandCheck; reason: string }[] = [
   {
-    pattern: new RegExp(
-      String.raw`${COMMAND_START}rm\s+(?:\S+\s+)*?(?:--\s+)?${RM_TARGET}(?=$|[\s;&|)])`,
-      'i',
-    ),
+    pattern: removesProtectedFolder(),
     reason: 'it deletes the home folder, a system folder or the root of the disk',
   },
   { pattern: /\b(?:mkfs(?:\.\w+)?|newfs_\w+)\b/i, reason: 'it formats a disk' },
   {
     pattern:
-      /\bdiskutil\s+(?:\S+\s+)*?(?:erase\w*|zerodisk|randomdisk|secureerase|reformat|partitiondisk|deletecontainer|deletevolume)\b/i,
+      /\bdiskutil\s(?:(?!\bdiskutil\s)[\s\S])*?(?<=\s)(?:erase\w*|zerodisk|randomdisk|secureerase|reformat|partitiondisk|deletecontainer|deletevolume)\b/i,
     reason: 'it erases or repartitions a disk',
   },
   {
-    pattern: /\bdd\b[^;&|]*\bof=\/dev\/(?!(?:null|zero|stdout|stderr|tty)\b|fd\/)/i,
+    pattern: matchesInOrderWithinSegment(SHELL_SEGMENT_BREAK, [
+      /\bdd\b/i,
+      /\bof=\/dev\/(?!(?:null|zero|stdout|stderr|tty)\b|fd\/)/i,
+    ]),
     reason: 'it writes raw bytes to a disk device',
   },
   { pattern: />\s*\/dev\/r?disk\d/i, reason: 'it writes raw bytes to a disk device' },
   {
-    pattern: /(\w+|:)\s*\(\s*\)\s*\{[^}]*\1\s*\|\s*\1\s*&/,
+    pattern: FORK_BOMB,
     reason: 'it is a fork bomb',
   },
   {
-    pattern: new RegExp(String.raw`${COMMAND_START}(?:shutdown|reboot|halt|poweroff)\b`, 'i'),
+    pattern: commandNamed(String.raw`(?:shutdown|reboot|halt|poweroff)\b`),
     reason: 'it shuts down or restarts the Mac',
   },
   {
@@ -50,103 +245,107 @@ const HARDLINE: readonly { pattern: RegExp; reason: string }[] = [
     reason: 'it shuts down or restarts the Mac',
   },
   {
-    pattern: /\bcsrutil\b[^;&|]*\b(?:disable|clear)\b/i,
+    pattern: matchesInOrderWithinSegment(SHELL_SEGMENT_BREAK, [
+      /\bcsrutil\b/i,
+      /\b(?:disable|clear)\b/i,
+    ]),
     reason: 'it turns off System Integrity Protection',
   },
   {
-    pattern: new RegExp(
-      String.raw`${COMMAND_START}adb\s+(?:-\S+\s+)*(?!devices\b|version\b|mdns\b|help\b|--help\b|start-server\b|kill-server\b)\S`,
-      'i',
-    ),
+    pattern: drivesAdb(),
     reason:
       'it controls a paired phone outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern:
-      /\bxcrun\b[^;&|]*\bdevicectl\b[^;&|]*\b(?:install|uninstall|launch|terminate|pair|unpair|erase|reset|manage|copy)\b/i,
+    pattern: matchesInOrderWithinSegment(SHELL_SEGMENT_BREAK, [
+      /\bxcrun\b/i,
+      /\bdevicectl\b/i,
+      /\b(?:install|uninstall|launch|terminate|pair|unpair|erase|reset|manage|copy)\b/i,
+    ]),
     reason:
       'it controls a paired phone outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern:
-      /\bxcodebuild\b[^;&|]*\b(?:WebDriverAgent|platform=(?:iOS|watchOS|tvOS|visionOS)(?! Simulator)\b)/i,
+    pattern: matchesInOrderWithinSegment(SHELL_SEGMENT_BREAK, [
+      /\bxcodebuild\b/i,
+      /\b(?:WebDriverAgent|platform=(?:iOS|watchOS|tvOS|visionOS)(?! Simulator)\b)/i,
+    ]),
     reason:
       'it drives a phone through WebDriverAgent outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(String.raw`(?:${COMMAND_START}simctl|\bxcrun\b[^;&|]*\bsimctl)\b`, 'i'),
+    pattern: eitherOf([
+      commandNamed(String.raw`simctl\b`),
+      inShellSegment([/\bxcrun\b/i, /\bsimctl\b/i]),
+    ]),
     reason:
       'it controls a phone simulator outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(
-      String.raw`${COMMAND_START}(?:afcclient|cfgutil|devicectl|fb-idb|gidevice|idb|idevice\w*|ifuse|instruments|ios-deploy|iproxy|irecovery|mobiledevice|pymobiledevice3|tidevice|xctrace)\b`,
-      'i',
+    pattern: commandNamed(
+      String.raw`(?:afcclient|cfgutil|devicectl|fb-idb|gidevice|idb|idevice\w*|ifuse|instruments|ios-deploy|iproxy|irecovery|mobiledevice|pymobiledevice3|tidevice|xctrace)\b`,
     ),
     reason:
       'it talks to a phone outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(
-      String.raw`\bosascript\b(?=[^;&|]*(?:\b(?:do shell script|doShellScript|doScript|do script|includeStandardAdditions|NSTask)\b|\$\s*(?:\.\s*system\b|\[\s*['"]\s*system\b)))(?=[^;|]*(?:\b(?:${PHONE_COMMANDS})\b|&|system attribute|getenv))`,
-      'i',
-    ),
+    pattern: osascriptReachesOutside(PHONE_COMMANDS),
     reason:
       'it controls a paired phone outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(
-      String.raw`\b(?:BASH_ENV|BROWSER|CVSEDITOR|CVS_RSH|DIFFPROG|EDITOR|ENV|GIT_ASKPASS|GIT_CONFIG_\w*|GIT_EDITOR|GIT_EXTERNAL_DIFF|GIT_PAGER|GIT_PROXY_COMMAND|GIT_SEQUENCE_EDITOR|GIT_SSH|GIT_SSH_COMMAND|HGEDITOR|LESSCLOSE|LESSOPEN|MANPAGER|MAILER|P4DIFF|P4EDITOR|P4MERGE|PAGER|PROMPT_COMMAND|PS4|RSYNC_RSH|SSH_ASKPASS|SUDO_ASKPASS|SVN_EDITOR|SVN_SSH|SYSTEMD_PAGER|TERMINAL|VISUAL)\+?=\S*\b(?:${PHONE_COMMANDS})\b`,
-      'i',
-    ),
+    pattern: matchesInOrderWithinSegment(/\s/, [
+      /\b(?:BASH_ENV|BROWSER|CVSEDITOR|CVS_RSH|DIFFPROG|EDITOR|ENV|GIT_ASKPASS|GIT_CONFIG_\w*|GIT_EDITOR|GIT_EXTERNAL_DIFF|GIT_PAGER|GIT_PROXY_COMMAND|GIT_SEQUENCE_EDITOR|GIT_SSH|GIT_SSH_COMMAND|HGEDITOR|LESSCLOSE|LESSOPEN|MANPAGER|MAILER|P4DIFF|P4EDITOR|P4MERGE|PAGER|PROMPT_COMMAND|PS4|RSYNC_RSH|SSH_ASKPASS|SUDO_ASKPASS|SVN_EDITOR|SVN_SSH|SYSTEMD_PAGER|TERMINAL|VISUAL)\+?=/i,
+      phoneWord(),
+    ]),
     reason:
       'it hides phone control inside an environment variable a program runs as a command; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(String.raw`\bGIT_CONFIG_\w*\+?=[^;&|]*\b(?:${PHONE_COMMANDS})\b`, 'i'),
+    pattern: inShellSegment([/\bGIT_CONFIG_\w*\+?=/i, phoneWord()]),
     reason:
       'it hides phone control inside git config injected through the environment; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(
-      String.raw`\b[A-Za-z_]\w*=\S*(?:\$\(|\x60)[^;&|]*\b(?:${PHONE_COMMANDS})\b`,
-      'i',
-    ),
+    pattern: substitutionAfterAssignment(phoneWord()),
     reason:
       'it hides phone control inside a command substitution the checker cannot resolve; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(String.raw`\btrap\s+[^;&|]*\b(?:${PHONE_COMMANDS})\b`, 'i'),
+    pattern: inShellSegment([/\btrap\s/i, phoneWord()]),
     reason:
       'it defers phone control to a shell trap outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(
-      String.raw`\b(?:test|\[|declare|let|local|mapfile|printf|read|readonly|typeset|unset|export)\b[^;&|]*(?:\$\(|\x60)[^;&|]*\b(?:${PHONE_COMMANDS})\b`,
-      'i',
-    ),
+    pattern: inShellSegment([
+      /\b(?:test|\[|declare|let|local|mapfile|printf|read|readonly|typeset|unset|export)\b/i,
+      /\$\(|\x60/,
+      phoneWord(),
+    ]),
     reason:
       'it hides phone control inside a shell builtin the checker cannot resolve; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(String.raw`\bhash\b[^;&|]*\b(?:${PHONE_COMMANDS}|osascript)\b`, 'i'),
+    pattern: inShellSegment([/\bhash\b/i, phoneWord('osascript')]),
     reason:
       'it aliases a phone-control binary outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: /\b(?:pythonw?[\d.]*|uvx?|pipx)\b[^;&|]*pymobiledevice3\b/i,
+    pattern: matchesInOrderWithinSegment(SHELL_SEGMENT_BREAK, [
+      /\b(?:pythonw?[\d.]*|uvx?|pipx)\b/i,
+      /pymobiledevice3\b/i,
+    ]),
     reason:
       'it controls a paired phone outside the phone tools; phone control goes through phone_observe and phone_act',
   },
   {
-    pattern: new RegExp(
-      String.raw`\b\w+=["']?[^;&|]*\b(?:${PHONE_COMMANDS}|rm|dd|mkfs|diskutil|newfs_\w+|shutdown|reboot|halt|poweroff|csrutil|launchctl)\b[^;&|]*;[^;&|]*\$[\w({]`,
-      'i',
+    pattern: assignedThenExpanded(
+      phoneWord('rm|dd|mkfs|diskutil|newfs_\\w+|shutdown|reboot|halt|poweroff|csrutil|launchctl'),
     ),
     reason: 'it hides a gated command behind a variable expansion the checker cannot resolve',
   },
   {
-    pattern: new RegExp(String.raw`\balias\s+\w+=["']?[^;&|]*\b(?:${PHONE_COMMANDS})\b`, 'i'),
+    pattern: inShellSegment([/\balias\s+\w+=/i, phoneWord()]),
     reason:
       'it aliases a phone-control binary outside the phone tools; phone control goes through phone_observe and phone_act',
   },
@@ -157,10 +356,11 @@ export function ownComputerHardlineRefusal(command: string): string | null {
     .replace(/["'\\]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  const spliced = folded
-    .replace(/\$\([^()]*\)/g, '')
-    .replace(/`[^`]*`/g, '')
-    .replace(/\$\{[^}]*\}/g, '')
+  const spliced = replaceDelimitedSpans(
+    folded.replace(/\$\([^()]*\)/g, '').replace(/`[^`]*`/g, ''),
+    { open: /\$\{/, close: () => '}' },
+    () => '',
+  )
     .replace(/\$[A-Za-z0-9_]+/g, '')
     .replace(/\$[^\s]/g, '')
     .replace(/\s+/g, ' ')

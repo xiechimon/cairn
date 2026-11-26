@@ -52,7 +52,7 @@ export interface BackgroundDeps {
 
 export function parseBatteryLow(pmset: string): boolean {
   if (!pmset.includes("'Battery Power'")) return false;
-  const percent = /(\d+)%/.exec(pmset);
+  const percent = /(?<!\d)(\d+)%/.exec(pmset);
   return percent !== null && Number(percent[1]) < LOW_BATTERY_PERCENT;
 }
 

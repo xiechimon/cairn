@@ -26,7 +26,7 @@ export interface ClaudeBinProbeOpts {
 
 const DEFAULT_TIMEOUT_MS = 2_000;
 
-const VERSION_PATTERN = /\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?/;
+const VERSION_PATTERN = /(?<!\d)\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?/;
 
 export function parseClaudeVersion(stdout: string): string | null {
   const match = VERSION_PATTERN.exec(stdout);

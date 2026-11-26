@@ -67,7 +67,7 @@ export const RADIUS_EXPRS: Record<string, string> = {
 
 const SECTION_RE = /^([\w-]+):\s*$/;
 const ENTRY_INDENT_RE = /^ {2}\S/;
-const ENTRY_RE = /^\s*([\w-]+):\s*(\[[^\]]*\]|'[^']*'|"[^"]*"|[^#\s][^#]*?)\s*$/;
+const ENTRY_RE = /^\s*([\w-]+):\s*(\[[^\]]*\]|'[^']*'|"[^"]*"|[^#\s][^#]*)$/;
 const QUOTED_RE = /^(['"])(.*)\1$/;
 
 export function parseFrontmatter(markdown: string): Frontmatter {
@@ -81,10 +81,10 @@ export function parseFrontmatter(markdown: string): Frontmatter {
       out[head[1]] = section;
       continue;
     }
-    const body = line.replace(/\s+#.*$/, '');
+    const body = line.replace(/(?<!\s)\s+#[\s\S]*$/, '');
     if (section == null || !ENTRY_INDENT_RE.test(body)) continue;
     for (const segment of body.split(';')) {
-      const entry = ENTRY_RE.exec(segment);
+      const entry = ENTRY_RE.exec(segment.trimEnd());
       if (entry?.[1] == null || entry[2] == null) continue;
       const raw = entry[2];
       section[entry[1]] = raw.startsWith('[')

@@ -31,6 +31,8 @@ describe("the owner's Mac hardline list", () => {
     'bomb(){ bomb|bomb& };bomb',
     'shutdown -h now',
     'sudo shutdown -r +1',
+    'sudo -n shutdown -h now',
+    'sudo -E rm -rf /Users/someone',
     'reboot',
     'sudo halt',
     'launchctl reboot',

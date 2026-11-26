@@ -1,3 +1,4 @@
+import { replaceBracketLinks } from './linear-text.js';
 export const CAIRN_REVIEW_HOLD_LABEL = 'cairn-review-hold';
 
 export const REVIEW_BOT_LOGINS = ['chatgpt-codex-connector'] as const;
@@ -12,9 +13,11 @@ export function reviewFindingBadge(body: string): string | null {
 
 export function reviewFindingTitle(body: string): string {
   for (const line of body.split('\n')) {
-    const text = line
-      .replace(/<\/?sub>/g, '')
-      .replace(/!\[P[0-3] Badge\]\([^)]*\)/g, '')
+    const text = replaceBracketLinks(
+      line.replace(/<\/?sub>/g, ''),
+      { opener: /!\[(?=P[0-3] Badge\])/, labelEnd: /\]/, head: '](', targetEnd: /\)/ },
+      () => '',
+    )
       .replace(/\*\*/g, '')
       .trim();
     if (text) return text;

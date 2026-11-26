@@ -93,7 +93,8 @@ const KEYCODES: Record<string, string> = {
 
 const INPUT_TEXT_SAFE = /^[A-Za-z0-9\-_.:,/@=+!]+$/;
 const CAIRN_PACKAGE = /cairn/i;
-const CAIRN_FOREGROUND = /(?:mCurrentFocus|mFocusedApp)=[^\n]*cairn/i;
+const CAIRN_FOREGROUND =
+  /(?:mCurrentFocus|mFocusedApp)=(?:(?!mCurrentFocus=|mFocusedApp=)[^\n])*cairn/i;
 const PHONE_CAIRN_FOREGROUND =
   'The Cairn app is in the foreground on the phone; it belongs to the owner, so nothing ran.';
 const PHONE_DROPPED = 'This phone was removed from the consented list, so nothing ran.';
@@ -123,7 +124,7 @@ const INTERACTIVE_CLASSES =
 
 export function parseUiAutomator(xml: string): PhoneElement[] {
   const elements: PhoneElement[] = [];
-  const tag = /<node\b([^>]*?)\/?>/g;
+  const tag = /<node\b([^<>]*?)\/?>/g;
   for (;;) {
     const match = tag.exec(xml);
     if (match === null) break;

@@ -5,6 +5,7 @@ import {
   DONE_ANNOUNCEMENT,
   formatSkillRouteSection,
   isInfoOutput,
+  nextIndexFinder,
   stripTurnContext,
   suggestSkillsForMessage,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -267,10 +268,45 @@ const REPLY_LANGUAGE_SCRIPTS: readonly [string, RegExp][] = [
   ['Thai', /[฀-๿]/g],
 ];
 
-const QUOTED_OR_LINKED = /「[^」]*」|『[^』]*』|“[^”]*”|"[^"\n]*"|`[^`\n]*`|https?:\/\/\S+/g;
+const QUOTE_OR_LINK_OPENER = /[「『“"`]|https?:\/\/(?=\S)/g;
+const QUOTE_ENDS: Record<string, readonly [RegExp, string]> = {
+  '「': [/」/g, '」'],
+  '『': [/』/g, '』'],
+  '“': [/”/g, '”'],
+  '"': [/["\n]/g, '"'],
+  '`': [/[`\n]/g, '`'],
+};
+
+function withoutQuotesAndLinks(words: string): string {
+  const closers = new Map(
+    Object.entries(QUOTE_ENDS).map(([open, [stop, close]]) => [
+      open,
+      { endAt: nextIndexFinder(words, new RegExp(stop.source, 'g')), close },
+    ]),
+  );
+  const linkEndAt = nextIndexFinder(words, /\s|$/g);
+  const opener = new RegExp(QUOTE_OR_LINK_OPENER.source, 'g');
+  let out = '';
+  let copied = 0;
+  for (let match = opener.exec(words); match !== null; match = opener.exec(words)) {
+    const quote = closers.get(match[0]);
+    let end: number;
+    if (quote === undefined) {
+      end = linkEndAt(opener.lastIndex);
+    } else {
+      const at = quote.endAt(opener.lastIndex);
+      if (words.charAt(at) !== quote.close) continue;
+      end = at + 1;
+    }
+    out += `${words.slice(copied, match.index)} `;
+    copied = end;
+    opener.lastIndex = end;
+  }
+  return out + words.slice(copied);
+}
 
 function replyLanguageOf(words: string): string | null {
-  const own = words.replace(QUOTED_OR_LINKED, ' ');
+  const own = withoutQuotesAndLinks(words);
   const letters = own.match(LETTER)?.length ?? 0;
   if (letters === 0) return null;
   const counts = new Map(

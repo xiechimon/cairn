@@ -65,7 +65,7 @@ export function startSummaryCall(
       const scrub = (text: string) =>
         otelErrorMessage(
           (scope.threadId === undefined ? text : sink.scrub(scope.threadId, text)).replace(
-            /\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi,
+            /(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s"'<>]+/gi,
             '<url>',
           ),
         );

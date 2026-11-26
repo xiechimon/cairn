@@ -143,7 +143,7 @@ function slugFromLabel(value: string): string {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-+|(?<!-)-+$/g, '');
 }
 
 function MonoMark({ mark }: { mark: { viewBox: string; paths: readonly string[] } }) {

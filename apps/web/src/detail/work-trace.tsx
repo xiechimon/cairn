@@ -1,3 +1,4 @@
+import { cutTailOfLastLine } from '@cairn/shared';
 import { CircleDashed } from 'lucide-react';
 import { useState } from 'react';
 import { thinkingPreview } from '../components/chat/agent-rows.js';
@@ -74,7 +75,7 @@ export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TF
       const cleaned =
         tail
           ?.replace(/^(?:#{1,6}\s+|[-*>]\s+)/, '')
-          .replace(/^\*+|\*+$/g, '')
+          .replace(/(?<!\*)\*+$|^\*+/g, '')
           .trim() ?? '';
       return cleaned === '' ? [] : [cleaned];
     }
@@ -90,12 +91,14 @@ export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TF
   return [...new Set(purposes.filter((purpose) => purpose !== ''))].slice(0, NAMED_PURPOSES);
 }
 
-const FILE_NAME = /([\w.-]+\.[A-Za-z]\w*)/;
+const FILE_NAME = /(?<![\w.-])([\w.-]+\.[A-Za-z]\w*)/;
+
+const withoutLineRange = (target: string) => cutTailOfLastLine(target, / L\d/);
 
 function touchedFiles(steps: readonly WorkStep[], action: 'read' | 'edit'): string[] {
   const paths = steps.flatMap((step) =>
     step.kind === 'call' && step.action === action && !step.running && !step.error
-      ? [(step.target ?? '').replace(/ L\d.*$/, '').trim()]
+      ? [withoutLineRange(step.target ?? '').trim()]
       : [],
   );
   return [...new Set(paths.filter((path) => path !== ''))];
@@ -418,7 +421,7 @@ export function WorkTrace({
       counts.think += 1;
       if (step.running === true) running = true;
     } else {
-      if (step.action === 'read') readPaths.add((step.target ?? '').replace(/ L\d.*$/, ''));
+      if (step.action === 'read') readPaths.add(withoutLineRange(step.target ?? ''));
       else if (step.action === 'edit') editPaths.add(step.target ?? '');
       else if (step.action === 'setup') counts.setup = 1;
       else counts[step.action] += 1;

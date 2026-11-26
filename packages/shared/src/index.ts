@@ -27,6 +27,7 @@ export * from './genai-conventions.js';
 export * from './git-ops.js';
 export * from './im.js';
 export * from './image-caption.js';
+export * from './linear-text.js';
 export * from './local-providers.js';
 export * from './mail.js';
 export * from './model-routing.js';

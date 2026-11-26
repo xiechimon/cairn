@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
-import type { MachinePhoneReport } from '@cairn/shared';
+import { cutTailOfLastLine, type MachinePhoneReport } from '@cairn/shared';
 
 export interface AdbResult {
   code: number;
@@ -111,9 +111,7 @@ export function parseMdnsServices(output: string): MdnsService[] {
     const trimmed = line.trim();
     if (trimmed === '' || trimmed.startsWith('List of discovered')) continue;
     const match =
-      /^(\S+)\s+(\S*adb-tls-\S+)\s+(\S+:\d+)$/.exec(trimmed) ??
-      /^(\S+)\s+(\S+)\s+(\S+:\d+)$/.exec(trimmed) ??
-      /^(\S+)\s+()(\S+:\d+)$/.exec(trimmed);
+      /^(\S+)\s+(\S+)\s+(\S+:\d+)$/.exec(trimmed) ?? /^(\S+)\s+()(\S+:\d+)$/.exec(trimmed);
     if (match === null) continue;
     services.push({ name: match[1]!, serviceType: match[2]!, address: match[3]! });
   }
@@ -135,9 +133,7 @@ function ipOf(address: string): string {
 const MDNS_SERIAL_SUFFIX = /-(?=[0-9A-Za-z]*\d)[0-9A-Za-z]{8,}$/;
 
 function mdnsName(name: string): string {
-  const stripped = name
-    .replace(/^adb-/, '')
-    .replace(/\._adb.*$/, '')
+  const stripped = cutTailOfLastLine(name.replace(/^adb-/, ''), /\._adb/)
     .replace(/\.$/, '')
     .replace(MDNS_SERIAL_SUFFIX, '');
   return stripped.replace(/[-_]/g, ' ');

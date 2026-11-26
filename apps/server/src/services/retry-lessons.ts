@@ -61,7 +61,7 @@ function clipToBytes(text: string, maxBytes: number): string {
   if (buf.length <= maxBytes) return text;
   const clipped = new TextDecoder('utf-8')
     .decode(buf.subarray(0, maxBytes))
-    .replace(/\uFFFD+$/, '');
+    .replace(/(?<!\uFFFD)\uFFFD+$/, '');
   return `${clipped}${RESEARCH_CLIPPED}`;
 }
 

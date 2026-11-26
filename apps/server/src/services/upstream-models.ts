@@ -15,7 +15,7 @@ export function failureForStatus(status: number): ProviderFailure {
 }
 
 function modelsUrl(baseUrl: string, api: ProviderApi): string {
-  const root = baseUrl.replace(/\/+$/, '');
+  const root = baseUrl.replace(/(?<!\/)\/+$/, '');
   const url = /\/v\d+$/.test(root) ? `${root}/models` : `${root}/v1/models`;
   return api === 'anthropic-messages' ? `${url}?limit=1000` : url;
 }

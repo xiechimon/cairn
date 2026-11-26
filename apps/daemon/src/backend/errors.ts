@@ -1,4 +1,16 @@
-import type { StepFailureCode, StepFailureDetail } from '@cairn/shared';
+import {
+  matchesInOrderWithinSegment,
+  type StepFailureCode,
+  type StepFailureDetail,
+} from '@cairn/shared';
+
+export const FAILED_SPAWN = /spawn (?:(?!spawn ).)*ENOENT/i;
+export const MISSING_CLAUDE = /\bclaude\b(?:(?!\bclaude\b).)*not found/i;
+const TOOL_NOT_FOUND = matchesInOrderWithinSegment(/(?!.)[\s\S]/, [/tool /i, / not found/i]);
+export const MISSING_HOST_TOOL = {
+  test: (text: string): boolean =>
+    /unknown tool|no such tool/i.test(text) || TOOL_NOT_FOUND.test(text),
+};
 
 export class SessionNotResumableError extends Error {
   constructor(sessionId: string, detail?: string) {

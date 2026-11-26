@@ -16,7 +16,7 @@ export function githubApiBaseUrl(): string {
   ) {
     throw new Error('Invalid CAIRN_GITHUB_API_BASE_URL');
   }
-  return url.href.replace(/\/+$/, '');
+  return url.href.replace(/(?<!\/)\/+$/, '');
 }
 
 export function isGithubApiUrl(value: string): boolean {

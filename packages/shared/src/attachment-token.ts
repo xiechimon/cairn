@@ -1,3 +1,4 @@
+import { type BracketLinkShape, replaceBracketLinks } from './linear-text.js';
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 export const ATTACHMENT_TOKEN_LINE = /^ {0,3}!\[([^\]\n]*)\]\(attachment:([^)\s]+)\)\s*$/;
@@ -40,10 +41,20 @@ export function formatAttachmentToken(fileName: string, key: string): string {
   return `![${fileName}](attachment:${key})`;
 }
 
-const INLINE_ATTACHMENT_TOKEN = /!\[([^\]\n]*)\]\(attachment:[^)\s]+\)/g;
+const INLINE_ATTACHMENT_TOKEN: BracketLinkShape = {
+  opener: /!\[/,
+  labelEnd: /[\]\n]/,
+  head: '](attachment:',
+  targetEnd: /[)\s]/,
+};
 
 export function renderAttachmentTokensToLabels(text: string): string {
-  return text.replace(INLINE_ATTACHMENT_TOKEN, (_, label: string) => label);
+  return replaceBracketLinks(
+    text,
+    INLINE_ATTACHMENT_TOKEN,
+    (link) => link.label,
+    (_label, target) => target !== '',
+  );
 }
 
 export const INLINE_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp'] as const;

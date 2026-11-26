@@ -50,7 +50,12 @@ import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
 import { BackgroundTaskRows } from './claude-background-tasks.js';
 import { type ClaudeTelemetryCapture, captureClaudeTelemetry } from './claude-telemetry.js';
-import { SessionNotResumableError, StepFailureError } from './errors.js';
+import {
+  FAILED_SPAWN,
+  MISSING_CLAUDE,
+  SessionNotResumableError,
+  StepFailureError,
+} from './errors.js';
 import { hostToolContent } from './host-tool-content.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { CLAUDE_TELEMETRY_PINS, claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
@@ -824,7 +829,8 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         });
       } else if (
         (err as NodeJS.ErrnoException).code === 'ENOENT' ||
-        /spawn .*ENOENT|\bclaude\b.*not found/i.test(message)
+        FAILED_SPAWN.test(message) ||
+        MISSING_CLAUDE.test(message)
       ) {
         this.queue.push({
           type: 'error',

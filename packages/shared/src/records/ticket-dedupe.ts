@@ -1,3 +1,4 @@
+import { trimEndChars } from '../linear-text.js';
 export interface TicketDedupeInput {
   category: string;
   paths: readonly string[];
@@ -12,7 +13,7 @@ export function ticketDedupeKey(input: TicketDedupeInput): string {
   const paths = [
     ...new Set(
       input.paths
-        .map((p) => p.trim().replace(/^\.\//, '').replace(/\/+$/, ''))
+        .map((p) => trimEndChars(p.trim().replace(/^\.\//, ''), '/'))
         .filter((p) => p !== ''),
     ),
   ].sort();

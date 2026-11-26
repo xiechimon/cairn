@@ -12,6 +12,7 @@ import {
   type ComputerFrame,
   type ComputerRelayResult,
   type ComputerTool,
+  findBracketLinks,
   isComputerBrowserTool,
   isOwnComputerTool,
   isPhoneTool,
@@ -1685,8 +1686,13 @@ async function dispatchComputerCall(
   return { callId: dispatchId, result: await waitForCall(deps, pending, stepId, request.signal) };
 }
 
-const PROMPT_ATTACHMENT_REF =
-  /!?\[[^\]]*\]\(attachment:([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)\.([a-z0-9]{1,8})\)/g;
+const PROMPT_ATTACHMENT_LINK = {
+  opener: /!?\[/,
+  labelEnd: /\]/,
+  head: '](attachment:',
+  targetEnd: /\)/,
+};
+const PROMPT_ATTACHMENT_TARGET = /^([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)\.([a-z0-9]{1,8})$/;
 const MAX_STAGED_ATTACHMENTS_PER_TURN = 16;
 
 function sanitizePromptInline(text: string, maxChars: number): string {
@@ -1785,7 +1791,11 @@ export async function stageTurnAttachments(
   if (memoryEditIdOfPrompt(prompt) !== null) return null;
   const seen = new Set<string>();
   const refs: { teamId: string; attachmentId: string }[] = [];
-  for (const match of prompt.matchAll(PROMPT_ATTACHMENT_REF)) {
+  const links = findBracketLinks(prompt, PROMPT_ATTACHMENT_LINK, (_label, target) =>
+    PROMPT_ATTACHMENT_TARGET.test(target),
+  );
+  for (const link of links) {
+    const match = PROMPT_ATTACHMENT_TARGET.exec(link.target) ?? [];
     const teamId = match[1] ?? '';
     const attachmentId = match[2] ?? '';
     if (teamId !== threadRow.teamId || attachmentId === '' || seen.has(attachmentId)) continue;

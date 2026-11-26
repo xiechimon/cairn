@@ -1,5 +1,7 @@
+import { findBracketLinks } from '../linear-text.js';
 import { CAIRN_REVIEW_HOLD_LABEL, type PrReviewFinding } from '../review-findings.js';
 import { chiefThreadTitle } from './chief.js';
+import { findHistoryMarker } from './history-marker.js';
 import { PLAN_FILE_NAME } from './plan.js';
 import type { StepKind } from './step.js';
 import { renderTaskText, type TaskRequest, type TaskTitleAuthor } from './task-request.js';
@@ -126,12 +128,12 @@ export function mailFenceBlock(text: string): string | null {
 
 export function mailSharedTranscript(text: string): string {
   if (!isMailWakeText(text)) return dropMailFence(text);
-  const marker = text.match(/\n*\[history id: [^\]\s]+\]\s*$/);
+  const marker = findHistoryMarker(text);
   const body = marker === null ? text : text.slice(0, marker.index);
   const lines = body.split('\n');
   const ids = lines.find((line) => line.startsWith('邮件事件 ')) ?? '';
   const head = [lines[0] ?? '', ids].filter((line) => line !== '').join('\n');
-  return dropMailFence(marker === null ? head : `${head}\n\n${marker[0].trim()}`);
+  return dropMailFence(marker === null ? head : `${head}\n\n${marker.line}`);
 }
 
 export function thirdPartyFenceAt(text: string): { at: number; open: string } | null {
@@ -578,7 +580,17 @@ export function buildOrchestratePrompt(
 }
 
 export function orchestratedTodoIdOf(prompt: string | null): string | null {
-  return /(?:^|\n)编排请求：\[[^\]]+\]\(todo:([^)\s]+)\)/.exec(prompt ?? '')?.[1] ?? null;
+  const [request] = findBracketLinks(
+    prompt ?? '',
+    {
+      opener: /(?:^|\n)编排请求：\[/,
+      labelEnd: /\]/,
+      head: '](todo:',
+      targetEnd: /[)\s]/,
+    },
+    (label, target) => label !== '' && target !== '',
+  );
+  return request?.target ?? null;
 }
 
 export function orchestrateThreadTitle(title: string): string {

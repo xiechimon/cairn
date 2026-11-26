@@ -22,7 +22,7 @@ export function githubRepoRefOf(cloneUrl: string): { owner: string; repo: string
   }
   const ref = path
     .replace(/^\/+/, '')
-    .replace(/\/+$/, '')
+    .replace(/(?<!\/)\/+$/, '')
     .replace(/\.git$/, '');
   if (!isGithubRepoRef(ref)) return null;
   const slash = ref.indexOf('/');

@@ -85,7 +85,7 @@ const slugOf = (label: string) =>
   label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-+|(?<!-)-+$/g, '')
     .slice(0, 40);
 
 function submitError(t: Translate, error: unknown): string {

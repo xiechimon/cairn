@@ -539,7 +539,7 @@ export function pillOf(call: ToolCallRecord): string {
 }
 
 function planSectionHead(line: string): { label: string; rest: string } | null {
-  const m = /^([A-Za-z][A-Za-z ]{0,24}?)\s*:\s*(.*)$/.exec(line);
+  const m = /^([A-Za-z][A-Za-z ]{0,24}?)\s*:\s*(\S.*|)$/.exec(line);
   if (m == null) return null;
   const label = m[1]?.trim() ?? '';
   if (!PLAN_SECTIONS.some((s) => s.toLowerCase() === label.toLowerCase())) return null;
@@ -1336,7 +1336,7 @@ function failLabel(raw: string): { label: string; labelVars?: Record<string, str
     const retries = /automatic retries exhausted \((\d+)\)/.exec(raw)?.[1];
     if (retries !== undefined)
       return { label: '自动重试 {n} 次后仍失败，已暂停', labelVars: { n: retries } };
-    const hourly = /(\d+) failed builds in one hour/.exec(raw)?.[1];
+    const hourly = /(?<!\d)(\d+) failed builds in one hour/.exec(raw)?.[1];
     if (hourly !== undefined)
       return { label: '一小时内失败 {n} 次，已暂停', labelVars: { n: hourly } };
     if (/model unavailable/i.test(raw)) return { label: '模型不可用，已暂停' };
