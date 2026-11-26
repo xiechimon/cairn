@@ -140,6 +140,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check that the host shell Seatbelt profile still reaches the network over TLS
+        if: matrix.arch == 'arm64'
+        run: pnpm --filter @xiechimon/cairn-cli exec vitest run test/seatbelt-tls.test.ts
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: apps/tsnet-sidecar/go.mod

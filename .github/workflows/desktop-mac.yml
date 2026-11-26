@@ -5,11 +5,19 @@ on:
     paths:
       - apps/desktop/**
       - .github/workflows/desktop-mac.yml
+      - apps/daemon/src/backend/*confine*
+      - apps/daemon/src/computer/host.ts
+      - apps/daemon/src/child-env.ts
+      - apps/daemon/test/seatbelt-tls.test.ts
   push:
     branches: [main]
     paths:
       - apps/desktop/**
       - .github/workflows/desktop-mac.yml
+      - apps/daemon/src/backend/*confine*
+      - apps/daemon/src/computer/host.ts
+      - apps/daemon/src/child-env.ts
+      - apps/daemon/test/seatbelt-tls.test.ts
   workflow_dispatch:
 
 permissions:
@@ -91,6 +99,9 @@ jobs:
         uses: ./.github/actions/failed-only-restore
         with:
           key: desktop-mac-package
+
+      - name: Check that the host shell Seatbelt profile still reaches the network over TLS
+        run: pnpm --filter @xiechimon/cairn-cli exec vitest run test/seatbelt-tls.test.ts
 
       - name: Build the web UI, the server and the Runner
         run: |

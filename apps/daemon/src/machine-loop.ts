@@ -1,8 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { join } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import type {
   AgentBackend,
@@ -43,9 +42,8 @@ import {
 import { probeAntigravitySubscriptionModels } from './backend/antigravity-subscription-models.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
-import { serverPortOf } from './backend/confine.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
-import { createHostShellConfinement } from './backend/host-shell-confinement.js';
+import { runnerHostShellConfinement } from './backend/host-shell-confinement.js';
 import type { ManagedRuntime } from './backend/managed-runtime.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
@@ -452,18 +450,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
     });
-  const extraDeniedRoots = (process.env[ENV_VARS.confineDeniedRoots] ?? '')
-    .split(delimiter)
-    .filter((path) => path !== '');
-  const serverPort = serverPortOf(new URL(config.serverUrl));
   const stagingRoot = defaultStagingRoot();
   const hostConfinement =
     capEnv.CAIRN_OWN_COMPUTER === '1'
-      ? createHostShellConfinement({
-          deniedRoots: [config.home, join(homedir(), '.cairn'), ...extraDeniedRoots],
-          ...(serverPort !== null ? { serverPort } : {}),
-          agentDesktop: capEnv.CAIRN_AGENT_DESKTOP ?? null,
+      ? runnerHostShellConfinement({
+          cairnHome: config.home,
+          serverUrl: config.serverUrl,
           stagingRoot,
+          capabilityEnv: capEnv,
         })
       : undefined;
   const hostComputer =

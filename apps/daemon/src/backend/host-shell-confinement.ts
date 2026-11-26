@@ -11,7 +11,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
+import { ENV_VARS } from '@cairn/shared';
 import { realpathOfNearest } from '@cairn/shared/realpath-nearest';
 import { executableOnPath } from '../computer/contained-spawn.js';
 import { ComputerRefusal } from '../computer/provider.js';
@@ -22,6 +23,7 @@ import {
   contains,
   HOST_SHELL_CREDENTIAL_DIRECTORIES,
   HOST_SHELL_CREDENTIAL_FILES,
+  serverPortOf,
 } from './confine.js';
 import {
   hostShellCommand,
@@ -371,4 +373,22 @@ export function createHostShellConfinement(
   };
 
   return { denied, wrap };
+}
+
+export function runnerHostShellConfinement(runner: {
+  cairnHome: string;
+  serverUrl: string;
+  stagingRoot: string;
+  capabilityEnv: NodeJS.ProcessEnv;
+}): HostShellConfinement {
+  const extraDeniedRoots = (process.env[ENV_VARS.confineDeniedRoots] ?? '')
+    .split(delimiter)
+    .filter((path) => path !== '');
+  const serverPort = serverPortOf(new URL(runner.serverUrl));
+  return createHostShellConfinement({
+    deniedRoots: [runner.cairnHome, join(homedir(), '.cairn'), ...extraDeniedRoots],
+    ...(serverPort !== null ? { serverPort } : {}),
+    agentDesktop: runner.capabilityEnv.CAIRN_AGENT_DESKTOP ?? null,
+    stagingRoot: runner.stagingRoot,
+  });
 }
