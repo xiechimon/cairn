@@ -236,6 +236,23 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
     },
   );
 
+  test('zsh run by git still reads the startup files in the host ZDOTDIR', async () => {
+    const host = fakeHost();
+    const zdotdir = join(host.home, '.config', 'zsh');
+    mkdirSync(zdotdir);
+    writeFileSync(join(zdotdir, '.zshenv'), 'export CAIRN_FROM_ZSHENV=host-zshenv\n');
+    await withStep(
+      host,
+      { runtimeId: 'antigravity' },
+      (env) => {
+        writeFileSync(join(env.HOME as string, '.zshenv'), 'export CAIRN_FROM_ZSHENV=step\n');
+        const alias = "alias.zshenv=!/bin/zsh -c 'echo $CAIRN_FROM_ZSHENV'";
+        expect(tool(env, 'git', ['-c', alias, 'zshenv'])).toBe('host-zshenv');
+      },
+      { ZDOTDIR: zdotdir },
+    );
+  });
+
   test('bash profiles an earlier step left behind do not hide the host sign-in', async () => {
     const host = fakeHost();
     const isolated = join(host.root, 'cairn', 'homes', 'antigravity');

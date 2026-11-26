@@ -21,6 +21,7 @@ const RESTORED_FOR_HOST_TOOLS = [
   'XDG_DATA_HOME',
   'XDG_STATE_HOME',
   'XDG_CACHE_HOME',
+  'ZDOTDIR',
 ] as const;
 const POSIX_PROFILE = `if [ -n "$${HOST_TOOLS_DIR_VAR}" ]; then PATH="$${HOST_TOOLS_DIR_VAR}:$PATH"; export PATH; fi\n`;
 const FISH_PROFILE = `if set -q ${HOST_TOOLS_DIR_VAR}\n    set -gx PATH $${HOST_TOOLS_DIR_VAR} $PATH\nend\n`;
