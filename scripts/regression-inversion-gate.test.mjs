@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -85,6 +85,50 @@ test('a product fix without a changed test file is red, while a docs-only fix is
   write('docs/thing.md', 'docs\n');
   const docs = addCommit(['docs/thing.md'], 'fix(docs): wording');
   assert.equal(evaluateFixCommit(root, docs, 'light').skipped, 'no product runtime change');
+});
+
+test('static mode refuses a fix without a test and never runs one', (t) => {
+  const { root, write, addCommit } = fixture();
+  t.after(() => releaseTestTempDir(root));
+  const never = () => assert.fail('static mode ran a test');
+  write('apps/server/src/thing.ts', 'export const thing = "silent fix";\n');
+  const silent = addCommit(['apps/server/src/thing.ts'], 'fix(server): silent thing');
+  const refused = evaluateFixCommit(root, silent, 'static', never);
+  assert.equal(refused.ok, false);
+  assert.match(refused.reason, /no test file/);
+
+  write('apps/server/src/thing.ts', 'export const thing = "fixed";\n');
+  write('integration/test/thing.test.ts', 'integration regression\n');
+  const tested = addCommit(
+    ['apps/server/src/thing.ts', 'integration/test/thing.test.ts'],
+    'fix(server): repair integration path',
+  );
+  const accepted = evaluateFixCommit(root, tested, 'static', never);
+  assert.equal(accepted.ok, true);
+  assert.match(accepted.skipped, /ci/i);
+});
+
+test('static mode judges the commits since origin/main, and no base is red', (t) => {
+  const { root, git, write, addCommit } = fixture();
+  t.after(() => releaseTestTempDir(root));
+  for (const file of ['regression-inversion-gate.mjs', 'diff-base.mjs'])
+    write(`scripts/${file}`, readFileSync(join(import.meta.dirname, file), 'utf8'));
+  const run = (env = {}) =>
+    spawnSync(process.execPath, ['scripts/regression-inversion-gate.mjs', '--mode', 'static'], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, ...env },
+    });
+  assert.equal(run().status, 2);
+
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  assert.equal(run().status, 0);
+
+  write('apps/server/src/thing.ts', 'export const thing = "silent fix";\n');
+  const silent = addCommit(['apps/server/src/thing.ts'], 'fix(server): silent thing');
+  const refused = run({ REGRESSION_INVERSION_BASE_SHA: silent, PREPUSH_BASE_SHA: silent });
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /silent thing.*no test file/);
 });
 
 test('the parent tree keeps parent source and overlays only the commit test harness', (t) => {

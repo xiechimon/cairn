@@ -13,6 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { mergeBase } from './diff-base.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const VITEST_TEST_FILE = /^(?:apps|packages|integration)\/.*\.test\.(?:ts|tsx|mts)$/;
@@ -189,6 +190,7 @@ export function evaluateFixCommit(cwd, commit, mode = 'light', execute = execute
       plan,
     };
   }
+  if (mode === 'static') return { ok: true, commit, subject, skipped: 'tests run in CI' };
   if (plan.delegated)
     return {
       ok: true,
@@ -246,8 +248,8 @@ function parseArgs(argv) {
     else if (arg === '--head') opts.head = argv[++index];
     else throw new Error(`unknown argument ${arg}`);
   }
-  if (!['light', 'integration'].includes(opts.mode))
-    throw new Error('--mode must be light or integration');
+  if (!['light', 'integration', 'static'].includes(opts.mode))
+    throw new Error('--mode must be light, integration or static');
   return opts;
 }
 
@@ -286,6 +288,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       } else {
         results = [evaluateFixCommit(cwd, opts.commit, opts.mode)];
       }
+    } else if (opts.mode === 'static') {
+      const base = opts.base ?? mergeBase(cwd, 'origin/main');
+      if (!base) throw new Error('no merge-base with origin/main');
+      results = evaluateRange({ cwd, base, head: opts.head, mode: opts.mode });
     } else {
       const base =
         opts.base ?? process.env.REGRESSION_INVERSION_BASE_SHA ?? process.env.PREPUSH_BASE_SHA;
