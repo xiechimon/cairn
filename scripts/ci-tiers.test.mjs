@@ -645,3 +645,33 @@ test('a download in gates that fails twice and then answers leaves the step gree
     releaseTestTempDir(outer);
   }
 });
+
+test('two downloads that stall until their last attempt still finish inside the gates cap', () => {
+  const root = join(import.meta.dirname, '..');
+  const cap = parse(readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8')).jobs.gates[
+    'timeout-minutes'
+  ];
+  const bin = makeTestTempDir('ci-retry-budget-');
+  try {
+    for (const [name, script] of [
+      ['timeout', `echo "$1" >> "${bin}/attempts"\nshift\nexec "$@"\n`],
+      ['sleep', `echo "$1" >> "${bin}/pauses"\n`],
+    ])
+      writeFileSync(join(bin, name), `#!/bin/sh\n${script}`, { mode: 0o755 });
+    spawnSync('/bin/bash', [join(root, 'scripts/ci-retry.sh'), '/usr/bin/false'], {
+      env: { PATH: `${bin}:/usr/bin:/bin`, HOME: bin },
+    });
+    const numbers = (name) => readFileSync(join(bin, name), 'utf8').trim().split('\n').map(Number);
+    const attempts = numbers('attempts');
+    assert.ok(attempts.every((seconds) => seconds >= 30 && seconds <= 90));
+    assert.ok(attempts.length >= 3, 'two failures in a row must still be recoverable');
+    const slowestRecovery = [...attempts, ...numbers('pauses')].reduce((a, b) => a + b);
+    const longestGatesRun = 182;
+    assert.ok(
+      2 * slowestRecovery + longestGatesRun <= cap * 60,
+      `two stalled downloads take ${2 * slowestRecovery + longestGatesRun} s of ${cap * 60}`,
+    );
+  } finally {
+    releaseTestTempDir(bin);
+  }
+});
