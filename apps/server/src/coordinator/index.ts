@@ -31,6 +31,7 @@ import {
   STEER_HOLDS,
 } from '../services/chief-turns.js';
 import { connectorToolDefsForTeam } from '../services/connector-broker.js';
+import { browserOfferFor } from '../services/coordinator-browser.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
@@ -49,7 +50,6 @@ import {
   CONNECTOR_TOOL_HYDRATE_BOUND_MS,
   connectorSlugs,
   hydrateMissingConnectorTools,
-  localBrowserConnector,
   mcpConnectorDepsOf,
 } from '../services/mcp-servers.js';
 import { ownComputerOffered } from '../services/own-computer.js';
@@ -309,6 +309,20 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         return teamId === null ? [] : connectorToolDefsForTeam(db, teamId);
       },
       ownComputer: (threadId) => ownComputerOffered(db, threadId),
+      browserOffer: (threadId) => {
+        const threadRow = db
+          .select({ teamId: chiefThread.teamId, userId: chiefThread.userId })
+          .from(chiefThread)
+          .where(eq(chiefThread.id, threadId))
+          .get();
+        return threadRow === undefined
+          ? undefined
+          : browserOfferFor(
+              db,
+              threadRow,
+              offeredPhoneNames({ db, machineHub: machine.machineHub }, threadId),
+            );
+      },
       phoneComputer: (threadId) =>
         offeredPhoneNames({ db, machineHub: machine.machineHub }, threadId),
       providersFor: (threadId) => {
@@ -605,7 +619,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             routerTools: options.routerTools ?? true,
             desktopTools: teamOffersDesktop(db, threadRow.teamId),
             ownComputer: ownComputerOffered(db, row.buildId),
-            ownerChrome: localBrowserConnector(db, threadRow.teamId) !== null,
+            ...browserOfferFor(
+              db,
+              threadRow,
+              offeredPhoneNames({ db, machineHub: machine.machineHub }, row.buildId),
+            ),
             phoneComputer: offeredPhoneNames({ db, machineHub: machine.machineHub }, row.buildId),
           }),
           ...connectorToolDefsForTeam(db, threadRow.teamId),

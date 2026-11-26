@@ -470,6 +470,9 @@ export function coordinatorToolsExtension(
     desktopTools?: boolean;
     ownComputer?: boolean;
     ownerChrome?: boolean;
+    browser?: boolean;
+    takeover?: boolean;
+    stealth?: boolean;
     phoneComputer?: readonly string[];
     connectorTools?: RemoteToolDef[];
     remoteTools?: readonly RemoteToolDef[];

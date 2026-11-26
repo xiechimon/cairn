@@ -53,6 +53,7 @@ export interface HostComputerOptions {
   streamDrainMs?: number;
   maxFileBytes?: number;
   browserEnvironment?: (argv: readonly string[]) => Promise<Record<string, string>>;
+  agentBrowserBinary?: string;
   confinement?: HostShellConfinement;
 }
 
@@ -250,7 +251,11 @@ export class HostComputerProvider implements ComputerProvider {
     } finally {
       this.running.delete(pending);
     }
-    const [command, ...args] = request.argv;
+    const [requested, ...args] = request.argv;
+    const command =
+      requested === AGENT_BROWSER_BINARY
+        ? (this.options.agentBrowserBinary ?? requested)
+        : requested;
     if (!command) {
       clearTimeout(deadlineTimer);
       throw new ComputerRefusal('empty command');

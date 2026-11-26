@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  type BrowserSecretFillAction,
   browserSecretFillActionSchema,
   CLOAK_LICENSE_SECRET,
   COMPUTER_HANDOFF_TIMEOUT_MS,
@@ -17,6 +18,7 @@ import {
   type MachineComputerFramesResponse,
   type MachineComputerRelayBody,
   normalizeBrowserSecretOrigin,
+  OWNER_CHROME_UNAVAILABLE_PREFIX,
   PHONE_HANDED_BACK,
   PHONE_MANAGE_PANEL_ONLY,
   PHONE_MANAGE_TIMEOUT_MS,
@@ -29,7 +31,7 @@ import {
   STAGE_ATTACHMENT_TIMEOUT_MS,
   TAKEOVER_HANDED_BACK,
 } from '@cairn/shared';
-import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { runAfterCommit } from '../db/commit-effects.js';
 import {
@@ -95,6 +97,7 @@ import {
   ownerHoldsControl,
   pause,
   TAKEOVER_NO_COMPUTER,
+  TAKEOVER_NO_SCREEN,
   TAKEOVER_NOT_DONE,
 } from './computer-handoff.js';
 import {
@@ -103,6 +106,7 @@ import {
   computerThreadOf,
   NO_CARD_THREAD,
 } from './computer-thread.js';
+import { ownerChromeCandidates, teamMachines } from './coordinator-browser.js';
 import type { TeamStreamHub } from './events.js';
 import {
   HOST_SHELL_ESCALATION_ACTION,
@@ -113,7 +117,6 @@ import {
 import { isOwner } from './instance-owner.js';
 import { type MachineDeps, ownedStepRow } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { localBrowserConnector } from './mcp-servers.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { ownComputerTarget } from './own-computer.js';
 import {
@@ -157,7 +160,8 @@ export const COMPUTER_BUSY = 'the computer is busy with another Coordinator turn
 export const COMPUTER_USER_CONTROL =
   'the owner is using this computer right now; wait a few seconds and retry the same call';
 export const COMPUTER_BROWSER_UNAVAILABLE =
-  'this machine no longer reports browser capability; rebuild the computer image';
+  '没有可用的浏览器：请在一台 Mac 上把 Cairn 更新到最新版并保持打开，或在“设置 → 应用”里开启 Browser MCP。';
+const COMPUTER_DESKTOP_UNAVAILABLE = 'Computer tools are unavailable for this machine';
 
 export function hasPendingComputerOutput(callId: string): boolean {
   return pendingOutput.has(callId);
@@ -383,6 +387,7 @@ export function receiveComputerFrames(
       row.computerId !== null &&
       !cancelled &&
       isComputerBrowserTool(row.tool) &&
+      canHandOverScreen(tx, row.machineId) &&
       fresh.some(
         (frame) =>
           frame.kind === 'done' &&
@@ -410,6 +415,13 @@ export function receiveComputerFrames(
     if (row) publishComputerCallChanged(db, publishHub, row);
   }
   return result.response;
+}
+
+function canHandOverScreen(db: Pick<Db, 'select'>, machineId: string): boolean {
+  return (
+    db.select().from(machine).where(eq(machine.id, machineId)).get()?.capabilities
+      ?.screenHandoff === true
+  );
 }
 
 function latestComputerAttempt(
@@ -510,22 +522,38 @@ function machineAcceptsTool(row: typeof machine.$inferSelect, tool: ComputerTool
 }
 
 export function teamOffersDesktop(db: Db, teamId: string): boolean {
-  return db
-    .select()
-    .from(machine)
-    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
-    .all()
-    .some((row) => machineAcceptsTool(row, 'computer_observe'));
+  return teamMachines(db, teamId).some((row) => machineAcceptsTool(row, 'computer_observe'));
 }
 
-function assertMachineGrant(db: Db, machineId: string, tool: ComputerTool): void {
-  const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
-  if (isComputerBrowserTool(tool)) {
-    if (host?.capabilities?.browser !== true)
-      throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
-  } else if (host?.capabilities?.computer !== true) {
-    throw new HttpError(403, 'Computer tools are unavailable for this machine');
-  }
+function unreportedState(row: typeof machine.$inferSelect): 'starting' | 'stopped' {
+  return row?.capabilities?.computer === true ? 'starting' : 'stopped';
+}
+
+function movePin(
+  db: Db,
+  row: typeof computer.$inferSelect,
+  target: typeof machine.$inferSelect,
+): void {
+  const now = nowMs();
+  db.update(computer)
+    .set({
+      machineId: target.id,
+      state: unreportedState(target),
+      runningSince: null,
+      executionStepId: null,
+      executionLeaseExpiresAt: null,
+      executionFence: row.executionFence + 1,
+      controlHolder: 'none',
+      controlLeaseId: null,
+      controlLeaseExpiresAt: null,
+      controlFence: row.controlFence + 1,
+      screenGeneration: row.screenGeneration + 1,
+      ...HANDOFF_CLEARED,
+      updatedAt: now,
+    })
+    .where(eq(computer.id, row.id))
+    .run();
+  db.delete(computerBrowserLease).where(eq(computerBrowserLease.computerId, row.id)).run();
 }
 
 function selectTarget(
@@ -533,40 +561,36 @@ function selectTarget(
   teamId: string,
   chiefId: string,
   tool: ComputerTool,
-): { machineId: string; computerId: string | null; scopeKey?: string } {
+): { machineId: string; computerId: string; scopeKey: string } {
   const { db, machineHub } = deps;
-  const capable = (row: typeof machine.$inferSelect): boolean =>
-    row.capabilities?.computer === true;
-  const fleet = db
-    .select()
-    .from(machine)
-    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
-    .orderBy(desc(machine.lastSeenAt))
-    .all()
-    .filter(capable);
-  const connected = fleet.filter((row) => machineHub.isConnected(row.id));
-  const live = connected.filter((row) => machineAcceptsTool(row, tool));
+  const accepting = teamMachines(db, teamId).filter((row) => machineAcceptsTool(row, tool));
+  const live = accepting.find((row) => machineHub.isConnected(row.id));
 
   const scopeKey = `chief:${chiefId}`;
   const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
-  if (existing) {
-    assertMachineGrant(db, existing.machineId, tool);
+  const pinned = existing && accepting.find((row) => row.id === existing.machineId);
+  if (existing && pinned) {
     if (!machineHub.isConnected(existing.machineId)) {
       throw new HttpError(409, COMPUTER_NOT_CONNECTED);
     }
+    if (unreportedState(pinned) === 'stopped' && existing.state !== 'stopped') {
+      db.update(computer)
+        .set({ state: 'stopped', runningSince: null, updatedAt: nowMs() })
+        .where(eq(computer.id, existing.id))
+        .run();
+    }
     return { machineId: existing.machineId, computerId: existing.id, scopeKey };
   }
-  const chosen = live[0];
-  if (!chosen) {
-    if (connected[0]) assertMachineGrant(db, connected[0].id, tool);
-    throw new HttpError(
-      409,
-      fleet.length === 0
-        ? 'no machine in this team offers a Coordinator computer'
-        : COMPUTER_NOT_CONNECTED,
-    );
+  if (live === undefined) {
+    if (accepting.length > 0) throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+    if (isComputerBrowserTool(tool)) throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
+    if (existing) throw new HttpError(403, COMPUTER_DESKTOP_UNAVAILABLE);
+    throw new HttpError(409, 'no machine in this team offers a Coordinator computer');
   }
-  assertMachineGrant(db, chosen.id, tool);
+  if (existing) {
+    movePin(db, existing, live);
+    return { machineId: live.id, computerId: existing.id, scopeKey };
+  }
   const now = nowMs();
   const id = newRecordId();
   db.insert(computer)
@@ -574,14 +598,14 @@ function selectTarget(
       id,
       teamId,
       scopeKey,
-      machineId: chosen.id,
+      machineId: live.id,
       providerRef: computerMachineName(scopeKey),
-      state: 'starting',
+      state: unreportedState(live),
       createdAt: now,
       updatedAt: now,
     })
     .run();
-  return { machineId: chosen.id, computerId: id, scopeKey };
+  return { machineId: live.id, computerId: id, scopeKey };
 }
 
 function acquireExecutionLease(
@@ -713,6 +737,7 @@ async function holdTakeover(
   const callId = computerCallId(stepId, body.toolCallId);
   const waiting = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
   const resumed = waiting?.state === 'running';
+  if (!resumed && !canHandOverScreen(db, target.machineId)) return { text: TAKEOVER_NO_SCREEN };
   const deadlineAt = resumed ? waiting.deadlineAt : now + timeoutMs;
   const atInsert = db.select().from(computer).where(eq(computer.id, target.id)).get();
   if (!resumed) {
@@ -1123,7 +1148,7 @@ export async function forwardComputerCall(
     ) {
       throw new HttpError(
         400,
-        'the Coordinator VM command channel was removed; use user_computer_shell instead',
+        'the Coordinator has no shell or file tool of this name; use user_computer_shell instead',
       );
     }
   }
@@ -1214,10 +1239,11 @@ export async function forwardComputerCall(
     }
   }
   const safe = COMPUTER_REPLAY_SAFE_TOOLS.has(tool);
-  const latest = latestComputerAttempt(db, stepId, body.toolCallId);
-  const existing = latest?.row;
-  const previousAttempt = latest?.attempt ?? 0;
-  const callId = existing ? existing.id : computerCallId(stepId, body.toolCallId);
+  const baseId = computerCallId(stepId, body.toolCallId);
+  const chained = ownerChromeChains.get(baseId);
+  if (chained !== undefined) return chained;
+  const existing = latestComputerAttempt(db, stepId, body.toolCallId)?.row;
+  const callId = existing ? existing.id : baseId;
   if (existing && existing.tool !== tool) {
     throw new HttpError(409, `tool call ${body.toolCallId} was already used for ${existing.tool}`);
   }
@@ -1253,23 +1279,20 @@ export async function forwardComputerCall(
       return holdPhoneTakeover(deps, thread, stepId, body, opts);
     return holdTakeover(deps, thread, stepId, body, opts);
   }
+  const pinned = db
+    .select()
+    .from(computer)
+    .where(eq(computer.scopeKey, `chief:${thread.chiefId}`))
+    .get();
   const refusal = handoffRefusal(
-    db
-      .select()
-      .from(computer)
-      .where(eq(computer.scopeKey, `chief:${thread.chiefId}`))
-      .get(),
+    pinned && !canHandOverScreen(db, pinned.machineId)
+      ? { ...pinned, handoffReason: null }
+      : pinned,
     tool,
     nowMs(),
   );
   if (refusal !== null) return { text: refusal };
 
-  const target =
-    phoneTarget !== null
-      ? { machineId: phoneTarget.machineId, computerId: null }
-      : own === null
-        ? selectTarget(deps, thread.teamId, thread.chiefId, tool)
-        : { machineId: own.machineId, computerId: null };
   const secretActions =
     tool === 'browser_act' && Array.isArray(body.params.actions)
       ? body.params.actions
@@ -1287,7 +1310,154 @@ export async function forwardComputerCall(
             return parsed.data;
           })
       : [];
-  const host = db.select().from(machine).where(eq(machine.id, target.machineId)).get();
+  const request: DispatchRequest = {
+    thread,
+    stepRow,
+    toolCallId: body.toolCallId,
+    tool,
+    params: body.params,
+    replaySafe: safe,
+    signal: opts.signal,
+  };
+  const onTarget = () => {
+    if (phoneTarget !== null)
+      return dispatchComputerCall(deps, request, {
+        machineId: phoneTarget.machineId,
+        computerId: null,
+        phone: phoneTarget,
+      }).then((sent) => sent.result);
+    if (own !== null)
+      return dispatchComputerCall(deps, request, {
+        machineId: own.machineId,
+        computerId: null,
+        hostTool: true,
+      }).then((sent) => sent.result);
+    const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
+    const authorized = authorizeSecretFills(deps, request, target.machineId, secretActions);
+    if (authorized.kind === 'pending') return Promise.resolve({ text: authorized.text });
+    return dispatchComputerCall(deps, request, {
+      ...target,
+      browserRows: authorized.rows,
+    }).then((sent) => namingBrowser(db, tool, target.machineId, false, sent.result));
+  };
+  const mayUseOwnerChrome =
+    own === null &&
+    phoneTarget === null &&
+    isComputerBrowserTool(tool) &&
+    body.params.stealth !== true &&
+    secretActions.length === 0;
+  const candidates = mayUseOwnerChrome
+    ? ownerChromeCandidates(db, thread).filter((row) => deps.machineHub.isConnected(row.id))
+    : [];
+  if (candidates.length === 0) return onTarget();
+  const chain = throughOwnerChrome(deps, request, candidates, onTarget);
+  ownerChromeChains.set(baseId, chain);
+  try {
+    return await chain;
+  } finally {
+    ownerChromeChains.delete(baseId);
+  }
+}
+
+interface DispatchRequest {
+  thread: ComputerThread;
+  stepRow: typeof step.$inferSelect;
+  toolCallId: string;
+  tool: ComputerTool;
+  params: Record<string, unknown>;
+  replaySafe: boolean;
+  signal: AbortSignal | undefined;
+}
+
+type BrowserSecretRow = ReturnType<typeof requireBrowserPassword> & { browserOrigin: string };
+
+interface DispatchRoute {
+  machineId: string;
+  computerId: string | null;
+  scopeKey?: string;
+  phone?: Extract<PhoneComputerTarget, { kind: 'ready' }>;
+  hostTool?: true;
+  ownerChrome?: true;
+  browserRows?: BrowserSecretRow[];
+}
+
+const ownerChromeChains = new Map<string, Promise<ComputerRelayResult>>();
+
+function namingBrowser(
+  db: Db,
+  tool: ComputerTool,
+  machineId: string,
+  ownerChrome: boolean,
+  result: ComputerRelayResult,
+): ComputerRelayResult {
+  if (tool !== 'browser_navigate') return result;
+  const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  const name = host?.capabilities?.computerName ?? host?.name ?? machineId;
+  const browser = ownerChrome
+    ? `the owner's own Chrome on ${name}, through Browser MCP`
+    : `Cairn's own browser on ${name}, separate from the owner's Chrome and its sign-ins`;
+  return { ...result, text: `[Browser: ${browser}.]\n${result.text}` };
+}
+
+async function throughOwnerChrome(
+  deps: MachineDeps,
+  request: DispatchRequest,
+  candidates: readonly (typeof machine.$inferSelect)[],
+  onTarget: () => Promise<ComputerRelayResult>,
+): Promise<ComputerRelayResult> {
+  const unused: string[] = [];
+  for (const candidate of candidates) {
+    let sent: { callId: string; result: ComputerRelayResult };
+    try {
+      sent = await dispatchComputerCall(deps, request, {
+        machineId: candidate.id,
+        computerId: null,
+        scopeKey: `chief:${request.thread.chiefId}`,
+        ownerChrome: true,
+      });
+    } catch (error) {
+      if (!(error instanceof HttpError) || error.message !== COMPUTER_NOT_CONNECTED) throw error;
+      unused.push(`${candidate.name}: ${COMPUTER_NOT_CONNECTED}`);
+      continue;
+    }
+    const row = deps.db.select().from(computerCall).where(eq(computerCall.id, sent.callId)).get();
+    const reason =
+      row?.state === 'error' &&
+      row.errorDelivery === 'not_delivered' &&
+      row.errorMessage?.startsWith(OWNER_CHROME_UNAVAILABLE_PREFIX)
+        ? row.errorMessage.slice(OWNER_CHROME_UNAVAILABLE_PREFIX.length)
+        : null;
+    if (reason === null)
+      return row?.state === 'done'
+        ? namingBrowser(deps.db, request.tool, candidate.id, true, sent.result)
+        : sent.result;
+    unused.push(`${candidate.name}: ${reason}`);
+  }
+  const reasons = unused.join(' ');
+  try {
+    const result = await onTarget();
+    return {
+      ...result,
+      text: `[Ran in Cairn's browser instead of your own Chrome. ${reasons}]\n${result.text}`,
+    };
+  } catch (error) {
+    if (!(error instanceof HttpError)) throw error;
+    throw new HttpError(
+      error.status,
+      `[Your own Chrome was not used. ${reasons}] ${error.message}`,
+    );
+  }
+}
+
+function authorizeSecretFills(
+  deps: MachineDeps,
+  request: DispatchRequest,
+  machineId: string,
+  secretActions: readonly BrowserSecretFillAction[],
+): { kind: 'ready'; rows: BrowserSecretRow[] } | { kind: 'pending'; text: string } {
+  const { db } = deps;
+  const { thread } = request;
+  const host = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (secretActions.length > 0 && host?.capabilities?.browserSecretFill !== true)
     throw new HttpError(409, 'Update this machine before filling saved browser passwords.');
   const pendingApprovals: string[] = [];
@@ -1313,7 +1483,7 @@ export async function forwardComputerCall(
       secretId: row.id,
       revision: row.policyRevision,
       origin,
-      machineId: target.machineId,
+      machineId,
     };
     if (!hasBrowserPasswordGrant(db, thread.teamId, binding)) {
       if (thread.id === NO_CARD_THREAD)
@@ -1327,11 +1497,11 @@ export async function forwardComputerCall(
         targetId: row.id,
         input: binding,
         threadId: thread.id,
-        scopeProjectId: stepRow.scopeProjectId,
+        scopeProjectId: request.stepRow.scopeProjectId,
         card: [
           {
             header: '网站授权',
-            question: `允许在 ${origin} 代填机密 ${row.name}？仅限电脑 ${target.machineId}；之后在这台电脑的同一网站自动可用，密码不会交给模型。换网站、电脑或密码后会重新询问。`,
+            question: `允许在 ${origin} 代填机密 ${row.name}？仅限电脑 ${machineId}；之后在这台电脑的同一网站自动可用，密码不会交给模型。换网站、电脑或密码后会重新询问。`,
             options: [{ label: APPROVE_CHOICE }, { label: REFUSE_CHOICE }],
           },
         ],
@@ -1343,40 +1513,52 @@ export async function forwardComputerCall(
   });
   if (pendingApprovals.length > 0)
     return {
+      kind: 'pending',
       text: `尚未代填。网站授权卡已发给用户（${pendingApprovals.join(', ')}），请等用户在卡片上批准。批准后先 browser_snapshot，再用新的 ref 重试；不要索取密码。`,
     };
+  return { kind: 'ready', rows: browserRows };
+}
+
+async function dispatchComputerCall(
+  deps: MachineDeps,
+  request: DispatchRequest,
+  target: DispatchRoute,
+): Promise<{ callId: string; result: ComputerRelayResult }> {
+  const { db } = deps;
+  const { thread, stepRow, toolCallId, tool, params, replaySafe } = request;
+  const stepId = stepRow.id;
+  const browserRows = target.browserRows ?? [];
   const now = nowMs();
   const computerStarting =
     target.computerId !== null &&
     db.select().from(computer).where(eq(computer.id, target.computerId)).get()?.state !== 'running';
-  const deadlineAt = now + computerDeadlineMs(tool, body.params, computerStarting);
+  const deadlineAt = now + computerDeadlineMs(tool, params, computerStarting);
   const browserTool = isComputerBrowserTool(tool);
-  const ownerChrome =
-    browserTool &&
-    body.params.stealth !== true &&
-    secretActions.length === 0 &&
-    host?.kind === 'local' &&
-    localBrowserConnector(db, thread.teamId) !== null
-      ? ('browsermcp' as const)
-      : null;
   if (target.computerId !== null) {
     if (browserTool)
-      acquireBrowserLease(db, target.computerId, browserScopeFor(thread), stepId, safe, deadlineAt);
-    else acquireExecutionLease(db, target.computerId, stepId, safe, deadlineAt);
-  } else if (phoneTarget !== null) {
-    acquirePhoneLease(db, phoneTarget.phoneId, stepId, deadlineAt);
+      acquireBrowserLease(
+        db,
+        target.computerId,
+        browserScopeFor(thread),
+        stepId,
+        replaySafe,
+        deadlineAt,
+      );
+    else acquireExecutionLease(db, target.computerId, stepId, replaySafe, deadlineAt);
+  } else if (target.phone !== undefined) {
+    acquirePhoneLease(db, target.phone.phoneId, stepId, deadlineAt);
   }
 
   const sanitizedParams =
     tool === 'user_computer_shell'
-      ? (({ escalate: _escalate, sandboxDeniedReason: _denied, ...rest }) => rest)(body.params)
-      : body.params;
+      ? (({ escalate: _escalate, sandboxDeniedReason: _denied, ...rest }) => rest)(params)
+      : params;
   const fresh = {
     machineId: target.machineId,
     computerId: target.computerId,
-    phoneId: phoneTarget?.phoneId ?? null,
+    phoneId: target.phone?.phoneId ?? null,
     tool,
-    replaySafe: safe,
+    replaySafe,
     params: {
       ...storedParams(sanitizedParams),
       ...(browserRows.length > 0
@@ -1404,11 +1586,11 @@ export async function forwardComputerCall(
     startedAt: null,
     finishedAt: null,
   };
-  const dispatchId = existing
-    ? computerCallId(stepId, body.toolCallId, previousAttempt + 1)
-    : callId;
+  const latest = latestComputerAttempt(db, stepId, toolCallId);
+  const existing = latest?.row;
+  const dispatchId = computerCallId(stepId, toolCallId, (latest?.attempt ?? 0) + 1);
   if (existing) {
-    clearPendingComputerOutput(callId);
+    clearPendingComputerOutput(existing.id);
     if (!isFinalState(existing.state)) {
       db.update(computerCall)
         .set({
@@ -1417,7 +1599,7 @@ export async function forwardComputerCall(
           errorDelivery: 'unknown',
           finishedAt: nowMs(),
         })
-        .where(eq(computerCall.id, callId))
+        .where(eq(computerCall.id, existing.id))
         .run();
     }
   }
@@ -1426,7 +1608,7 @@ export async function forwardComputerCall(
       id: dispatchId,
       teamId: thread.teamId,
       stepId,
-      toolCallId: body.toolCallId,
+      toolCallId,
       ...fresh,
     })
     .run();
@@ -1437,16 +1619,16 @@ export async function forwardComputerCall(
     tool,
     params: sanitizedParams,
     deadlineAt,
-    ...('scopeKey' in target && target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
+    ...(target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
     ...(browserTool
       ? { tabScope: browserTabScope(stepRow), browserScope: browserScopeFor(thread) }
       : {}),
-    ...(ownerChrome === null ? {} : { ownerChrome }),
-    ...(own === null && phoneTarget === null
+    ...(target.ownerChrome === true ? { ownerChrome: 'browsermcp' as const } : {}),
+    ...(target.hostTool !== true && target.phone === undefined
       ? { computerGrant: browserTool ? ('browser' as const) : ('desktop' as const) }
       : {}),
-    ...(phoneTarget !== null
-      ? { phone: { phoneId: phoneTarget.phoneId, deviceId: phoneTarget.deviceId } }
+    ...(target.phone !== undefined
+      ? { phone: { phoneId: target.phone.phoneId, deviceId: target.phone.deviceId } }
       : {}),
   };
   try {
@@ -1467,7 +1649,7 @@ export async function forwardComputerCall(
   const pending = openPending(deps, call);
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishComputerChanged(db, deps.hub, row);
-  return waitForCall(deps, pending, stepId, opts.signal);
+  return { callId: dispatchId, result: await waitForCall(deps, pending, stepId, request.signal) };
 }
 
 const PROMPT_ATTACHMENT_REF =

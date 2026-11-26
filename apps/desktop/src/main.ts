@@ -395,12 +395,10 @@ function bundledRoot(name: string): string {
   return app.isPackaged ? join(process.resourcesPath, name) : join(app.getAppPath(), name);
 }
 
-function agentDesktopBinary(): string | null {
+function bundledMacBinary(name: 'agent-desktop' | 'agent-browser'): string | null {
   if (process.platform !== 'darwin') return null;
-  const folder = app.isPackaged
-    ? bundledRoot('agent-desktop')
-    : join(bundledRoot('agent-desktop'), process.arch);
-  return join(folder, 'agent-desktop');
+  const folder = app.isPackaged ? bundledRoot(name) : join(bundledRoot(name), process.arch);
+  return join(folder, name);
 }
 
 function serveOwnComputer(origin: string, binary: string | null): void {
@@ -2094,7 +2092,8 @@ async function boot(): Promise<void> {
             }
           : {}),
         otelFile,
-        agentDesktop: agentDesktopBinary(),
+        agentDesktop: bundledMacBinary('agent-desktop'),
+        agentBrowser: bundledMacBinary('agent-browser'),
         shellEnv: () => desktopShellEnv,
         isQuitting: () => quitting,
       })
@@ -2325,7 +2324,10 @@ async function boot(): Promise<void> {
     }
     serveNotifications(origin);
     servePageActivity(origin);
-    serveOwnComputer(origin, activeConn.kind === 'local' ? agentDesktopBinary() : null);
+    serveOwnComputer(
+      origin,
+      activeConn.kind === 'local' ? bundledMacBinary('agent-desktop') : null,
+    );
     watchIdleUpdate(activeRunnerHome);
     const restore = takeRelaunchWindow();
     if (restore !== null || !BACKGROUND_LAUNCH) openWindow(origin, restore);

@@ -27,6 +27,13 @@ describe('the Coordinator tool table is the same on the in-server runtime and on
     disposables.push(() => s.dispose());
     const machineId = insertMachine(s, {
       name: 'parity',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        browser: true,
+        screenHandoff: true,
+        stealthBrowser: true,
+      },
       claudeCodeReport: {
         installed: true,
         hostname: 'omarchy',

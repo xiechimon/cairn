@@ -27,4 +27,4 @@ Server environment variables (all optional):
 
 Web Push requires HTTPS and notification permission. On iOS, install the site on the home screen before enabling device push in account settings. Back up `vapid.json` with the database, and keep the APNs `.p8` key outside the repository with `600` permissions. To rotate VAPID keys, stop the server, remove `vapid.json`, restart, and disable then re-enable device push in every subscribed browser; subscriptions are bound to the original public key.
 
-Daemon environment variables (alternatives to the CLI flags above): `CAIRN_SERVER` (default `http://127.0.0.1:8787`), `CAIRN_API_KEY`, `CAIRN_TEAM`, `CAIRN_WORKSPACES_DIR` (default `<CAIRN_HOME>/workspaces`).
+Daemon environment variables (alternatives to the CLI flags above): `CAIRN_SERVER` (default `http://127.0.0.1:8787`), `CAIRN_API_KEY`, `CAIRN_TEAM`, `CAIRN_WORKSPACES_DIR` (default `<CAIRN_HOME>/workspaces`). On a Mac, `CAIRN_AGENT_BROWSER` is the path of the `agent-browser` binary that runs the Coordinator's browser; the desktop app sets it for its own Runner, and a Runner without it reports no browser of its own.

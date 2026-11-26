@@ -12,6 +12,8 @@ export const HANDOFF_OWNER_CONTROL_REFUSED =
 export const TAKEOVER_NOT_DONE =
   'The owner did not finish. This step is not done. Stop and tell the owner.';
 export const TAKEOVER_NO_COMPUTER = 'There is no Coordinator computer to hand over.';
+export const TAKEOVER_NO_SCREEN =
+  'Nobody can watch or take over this browser. Tell the owner what is blocking the page and stop.';
 
 export const HANDOFF_CLEARED = {
   handoffReason: null,

@@ -355,8 +355,31 @@ export async function runOwnerChromeTool(
   params: Record<string, unknown>,
   options: OwnerChromeRunOptions,
 ): Promise<BrowserToolResult> {
-  const call = callerFor(options);
+  const reach = callerFor(options);
+  let ran = 0;
+  const call: OwnerChromeCaller = async (...request) => {
+    const answer = await reach(...request);
+    if (!answer.isError) ran += 1;
+    return answer;
+  };
+  try {
+    return await runOwnerChromeSteps(call, tool, params, options);
+  } catch (error) {
+    if (error instanceof OwnerChromeUnavailable && ran > 0)
+      throw new ComputerRefusal(
+        `The owner’s Chrome stopped answering after part of this call had run, so nothing was repeated elsewhere. ${error.message}`,
+        'unknown',
+      );
+    throw error;
+  }
+}
 
+async function runOwnerChromeSteps(
+  call: OwnerChromeCaller,
+  tool: BrowserToolName,
+  params: Record<string, unknown>,
+  options: OwnerChromeRunOptions,
+): Promise<BrowserToolResult> {
   if (tool === 'browser_navigate') {
     const url = cleanAddress(params.url);
     if (url === null)

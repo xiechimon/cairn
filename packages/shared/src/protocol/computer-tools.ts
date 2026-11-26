@@ -11,68 +11,95 @@ const stealth = {
     'Use the stealth browser (CloakBrowser, its own profile and session) instead of the default Chromium. Use it for sites that block automated browsers and for logging in to them; keep the same value for every call on that page.',
 };
 
-export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = [
-  {
-    name: 'browser_navigate',
-    description:
-      "Open a URL in the Coordinator computer browser. The page stays open for later browser_snapshot and browser_act calls. Use the browser yourself when the owner asks you to open, click or fill something on the web, and for work that needs this browser's logins. The default is Chromium; when a page opens blank, the tool reopens it in the stealth browser and says so, and later calls for that site pass stealth: true. When a site blocks automation (the page closes, goes blank or redirects, or says automated access is forbidden), or to log in to such a site, pass stealth: true. When the stealth browser is blocked too, or its license seats are full, do not retry or work around the block: call request_takeover and name the site.",
-    parameters: obj({ url: str('Absolute http(s) URL to open.'), stealth }, ['url']),
-  },
-  {
-    name: 'browser_snapshot',
-    description:
-      'Read the current page as an accessibility tree with interactive refs (@e1, @e2, …), followed by the page text, which is cut at 12000 characters. Prefer this before browser_act; it lists interactive refs, then the page text ([page text]) to read articles and descriptions from. On long pages, for example a result list beside a detail pane, pass selector to read one element in full instead: a CSS selector for the section (such as the job description pane) or an @ref.',
-    parameters: obj({
-      selector: str(
-        'CSS selector or @ref of one element whose full text to return instead of the page snapshot.',
-      ),
-      stealth,
-    }),
-    replaySafe: true,
-  },
-  {
-    name: 'browser_act',
-    description:
-      "Act on the current page using fresh snapshot refs. For passwords use fill_secret with the saved secret name and current website origin. First use asks the owner to approve that website in chat; wait for approval, then take a fresh snapshot and retry. Never send a plaintext password or one-time code. CAPTCHA and second factors use request_takeover. Find saved credentials with secrets; when none fits, ask the owner to save one on the Secrets settings page. When a step fails (the action did not run, the ref is not in the latest snapshot, the element is covered, or the page is not the target), take a fresh snapshot and try another element, scroll first, or browser_navigate to the link's URL; at most 3 retries in a turn, then report what you tried, where it stuck and which page is open. Ask the owner first with ask_user before sending messages or mail, paying, ordering, changing account settings or deleting.",
-    parameters: obj(
-      {
-        actions: arr(
-          obj(
-            {
-              kind: str(
-                'One of click, fill, fill_secret, type, press, hover, select, check, uncheck, scrollintoview.',
-              ),
-              ref: str('Interactive ref from browser_snapshot, for example @e1.'),
-              text: str('Text for fill, type, press or select.'),
-              secret: str(
-                'Saved workspace secret name for fill_secret; never its value. Use only kind, ref, secret and origin.',
-              ),
-              origin: str(
-                'Exact current website origin for fill_secret, including scheme and port but no path; for example https://example.com.',
-              ),
-              paths: arr({ type: 'string' }, 'File paths for upload actions when supported.'),
-            },
-            ['kind'],
-          ),
-          'Ordered actions to run on the page.',
+export interface ComputerBrowserOffer {
+  takeover: boolean;
+  stealth: boolean;
+}
+
+const BLOCKED_PAGE_SIGNS =
+  'a site blocks automation (the page closes, goes blank or redirects, or says automated access is forbidden)';
+
+function blockedPageAdvice({ takeover, stealth }: ComputerBrowserOffer): string {
+  const giveUp = takeover
+    ? 'call request_takeover and name the site'
+    : 'tell the owner which site blocked it and stop';
+  if (!stealth)
+    return ` When ${BLOCKED_PAGE_SIGNS}, do not retry or work around the block: ${giveUp}.`;
+  return ` The default is Chromium; when a page opens blank, the tool reopens it in the stealth browser and says so, and later calls for that site pass stealth: true. When ${BLOCKED_PAGE_SIGNS}, or to log in to such a site, pass stealth: true. When the stealth browser is blocked too, or its license seats are full, do not retry or work around the block: ${giveUp}.`;
+}
+
+function takeoverAdvice({ takeover }: ComputerBrowserOffer): string {
+  return takeover
+    ? ''
+    : ' Nobody can watch or take over this browser: when a site needs a hand login, a captcha or a code, tell the owner and stop.';
+}
+
+export function computerRemoteTools(
+  offer: ComputerBrowserOffer = { takeover: true, stealth: true },
+): readonly RemoteToolDef[] {
+  const stealthParam = offer.stealth ? { stealth } : {};
+  return [
+    {
+      name: 'browser_navigate',
+      description: `Open a URL in the Coordinator computer browser. The page stays open for later browser_snapshot and browser_act calls. Use the browser yourself when the owner asks you to open, click or fill something on the web, and for work that needs this browser's logins.${blockedPageAdvice(offer)}${takeoverAdvice(offer)}`,
+      parameters: obj({ url: str('Absolute http(s) URL to open.'), ...stealthParam }, ['url']),
+    },
+    {
+      name: 'browser_snapshot',
+      description: `Read the current page as an accessibility tree with interactive refs (@e1, @e2, …), followed by the page text, which is cut at 12000 characters. Prefer this before browser_act; it lists interactive refs, then the page text ([page text]) to read articles and descriptions from. On long pages, for example a result list beside a detail pane, pass selector to read one element in full instead: a CSS selector for the section (such as the job description pane) or an @ref.${takeoverAdvice(offer)}`,
+      parameters: obj({
+        selector: str(
+          'CSS selector or @ref of one element whose full text to return instead of the page snapshot.',
         ),
-        stealth,
-      },
-      ['actions'],
-    ),
-  },
-  {
-    name: 'request_takeover',
-    description:
-      'Ask the owner to take over the Coordinator computer for a login, captcha, slider or code. Waits until the owner gives control back, then continue from a fresh browser_snapshot. Pass phone with the phone name to ask the owner to take over a paired phone instead (unlock it or open the secure screen); the call waits for the owner to hand it back.',
-    parameters: obj({
-      reason: str('Short reason shown to the owner, for example which site needs a login.'),
-      phone: str(
-        'The phone name exactly as Settings, Computers shows it. Set to hand the phone to the owner instead of the computer.',
+        ...stealthParam,
+      }),
+      replaySafe: true,
+    },
+    {
+      name: 'browser_act',
+      description: `Act on the current page using fresh snapshot refs. For passwords use fill_secret with the saved secret name and current website origin. First use asks the owner to approve that website in chat; wait for approval, then take a fresh snapshot and retry. Never send a plaintext password or one-time code. ${offer.takeover ? 'CAPTCHA and second factors use request_takeover.' : 'A CAPTCHA or second factor cannot be passed here.'} Find saved credentials with secrets; when none fits, ask the owner to save one on the Secrets settings page. When a step fails (the action did not run, the ref is not in the latest snapshot, the element is covered, or the page is not the target), take a fresh snapshot and try another element, scroll first, or browser_navigate to the link's URL; at most 3 retries in a turn, then report what you tried, where it stuck and which page is open. Ask the owner first with ask_user before sending messages or mail, paying, ordering, changing account settings or deleting.${takeoverAdvice(offer)}`,
+      parameters: obj(
+        {
+          actions: arr(
+            obj(
+              {
+                kind: str(
+                  'One of click, fill, fill_secret, type, press, hover, select, check, uncheck, scrollintoview.',
+                ),
+                ref: str('Interactive ref from browser_snapshot, for example @e1.'),
+                text: str('Text for fill, type, press or select.'),
+                secret: str(
+                  'Saved workspace secret name for fill_secret; never its value. Use only kind, ref, secret and origin.',
+                ),
+                origin: str(
+                  'Exact current website origin for fill_secret, including scheme and port but no path; for example https://example.com.',
+                ),
+                paths: arr({ type: 'string' }, 'File paths for upload actions when supported.'),
+              },
+              ['kind'],
+            ),
+            'Ordered actions to run on the page.',
+          ),
+          ...stealthParam,
+        },
+        ['actions'],
       ),
-    }),
-  },
-];
+    },
+    {
+      name: 'request_takeover',
+      description:
+        'Ask the owner to take over the Coordinator computer for a login, captcha, slider or code. Waits until the owner gives control back, then continue from a fresh browser_snapshot. Pass phone with the phone name to ask the owner to take over a paired phone instead (unlock it or open the secure screen); the call waits for the owner to hand it back.',
+      parameters: obj({
+        reason: str('Short reason shown to the owner, for example which site needs a login.'),
+        phone: str(
+          'The phone name exactly as Settings, Computers shows it. Set to hand the phone to the owner instead of the computer.',
+        ),
+      }),
+    },
+  ];
+}
+
+export const COMPUTER_REMOTE_TOOLS: readonly RemoteToolDef[] = computerRemoteTools();
 
 export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
   {

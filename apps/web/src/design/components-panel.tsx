@@ -36,7 +36,7 @@ export function PanelSection() {
                 <StoneGroup tone="waiting" label="Waiting on you" count={1}>
                   <ThreadRow
                     title="Pick the build machine"
-                    reason="Question · run on the VM or the Mac?"
+                    reason="Question · run on this Mac or the server?"
                     tone="waiting"
                     age="12m"
                   />

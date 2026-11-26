@@ -74,7 +74,9 @@ function boot(authToken: string | null = null) {
         capabilities: {
           mcpServers: [],
           skills: [],
-          ...(id === 'omarchy' ? { computer: true, browser: true, browserSecretFill: true } : {}),
+          ...(id === 'omarchy'
+            ? { computer: true, browser: true, browserSecretFill: true, screenHandoff: true }
+            : {}),
         },
       })
       .run();
@@ -406,6 +408,7 @@ describe('login handoff gate', () => {
           computer: true,
           browser: true,
           browserSecretFill: true,
+          screenHandoff: true,
           mcpServers: [],
           skills: [],
         },

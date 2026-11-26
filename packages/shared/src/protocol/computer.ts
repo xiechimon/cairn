@@ -66,6 +66,7 @@ export const browserSecretFillActionSchema = z.strictObject({
   secret: z.string().min(1).max(200),
   origin: z.string().min(1).max(2048),
 });
+export type BrowserSecretFillAction = z.infer<typeof browserSecretFillActionSchema>;
 
 export const computerCallSchema = z.object({
   callId: computerCallIdSchema,
@@ -226,6 +227,8 @@ export const computerStepSchema = z.object({
   shotMissing: z.boolean(),
 });
 export type ComputerStep = z.infer<typeof computerStepSchema>;
+
+export const OWNER_CHROME_UNAVAILABLE_PREFIX = "Owner's Chrome unavailable: ";
 
 export const COMPUTER_BROWSER_TOOLS = [
   'browser_navigate',

@@ -35,6 +35,8 @@ mac:
   extraResources:
     - from: agent-desktop/${arch}
       to: agent-desktop
+    - from: agent-browser/${arch}
+      to: agent-browser
     - from: node_modules/electron-liquid-glass/prebuilds
       to: liquid-glass
       filter: ['darwin-*/*.node']

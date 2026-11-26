@@ -190,6 +190,7 @@ export const machineCapabilitiesSchema = z.object({
   browserSecretFill: z.literal(true).optional(),
   stealthBrowser: z.literal(true).optional(),
   screenHandoff: z.literal(true).optional(),
+  ownerChrome: z.literal(true).optional(),
   computerKind: z.preprocess(
     (value) => (value === 'host' ? 'host' : undefined),
     z.literal('host').optional(),
@@ -275,6 +276,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.browserSecretFill === true ? { browserSecretFill: true as const } : {}),
     ...(rec.stealthBrowser === true ? { stealthBrowser: true as const } : {}),
     ...(rec.screenHandoff === true ? { screenHandoff: true as const } : {}),
+    ...(rec.ownerChrome === true ? { ownerChrome: true as const } : {}),
     ...(rec.computerKind === 'host' ? { computerKind: 'host' as const } : {}),
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
     ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),

@@ -65,6 +65,12 @@
       "pattern": "\\bexperience-candidate\\b|\\bexperienceCandidate\\b|\\bexperienceProposalSchema\\b|\\bPROMOTION_MIN_BUILDS\\b",
       "canary": "experience-candidate",
       "reason": "experience-candidate was deleted; repeated corrections go through Coordinator check-task proposals"
+    },
+    {
+      "id": "computer-image-rebuild",
+      "pattern": "\\brebuild the computer image\\b",
+      "canary": "rebuild the computer image",
+      "reason": "the built-in Linux VM and its image are gone; a Mac browser comes from the app itself (docs/design/mac-host-browser.md)"
     }
   ],
   "baseline": {
@@ -109,6 +115,7 @@
     "decision-dock": {},
     "restore-to-here": {},
     "memory-candidate-table": {},
-    "experience-candidate-module": {}
+    "experience-candidate-module": {},
+    "computer-image-rebuild": {}
   }
 }

@@ -11,6 +11,7 @@ Cairn is self-hosted and has no built-in product analytics, advertising trackers
   - Hosted bare Git repositories, task attachments, step session records, and `feedback.jsonl` (if you submit an in-app feedback report).
 - **Runner data directory** (`~/.cairn` for CLI Runners, or the desktop app's bundled runner folder):
   - `machine.json` (Runner enrollment credentials), `daemon.log`, and `workspaces/` (isolated git worktrees where tasks execute directly on the Runner host).
+  - `mac-browser/profiles/` on a Mac Runner: cookies and logins made in the browser Cairn runs for the Coordinator, one profile per thread or task scope. It is separate from your own Chrome profile.
   - Isolated per-agent configuration and history directories (for example `<home>/claude`), separate from your personal `~/.claude` or `~/.gemini`, carrying in only your sign-in ([design](design/agent-config-isolation.md)).
 
 ## Task session records
@@ -40,6 +41,7 @@ Data is sent to external services only when you connect an integration, enable a
 - **Explicit user-initiated actions**:
   - **In-app feedback**: Nothing is sent automatically. If you submit a feedback report in the app, Cairn writes a sanitized copy locally to `feedback.jsonl` and, unless `CAIRN_FEEDBACK_ENDPOINT` is cleared, sends the sanitized message, current route, error summary, OS/architecture/Node version, and (when log inclusion is enabled) redacted tails of recent local log files to the configured endpoint (default `https://feedback.xmon.me/submit`).
   - **macOS desktop updates**: Cairn for Mac checks GitHub Releases for newer desktop versions and downloads update packages from GitHub.
+  - **Coordinator browser on a Mac**: With Google Chrome installed, Cairn runs it without a window. Without it, the first browser call downloads Chrome's headless shell from Google (`storage.googleapis.com`). Pages the Coordinator opens receive ordinary browser requests.
   - **Optional web tools**: Running `cairn web-tools install` or enabling Agent Reach downloads packages from GitHub and PyPI only when you invoke those commands.
 
 ## Where to ask

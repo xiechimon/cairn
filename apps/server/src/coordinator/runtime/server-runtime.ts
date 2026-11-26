@@ -16,6 +16,7 @@ import type {
   ProviderResponse,
 } from '@earendil-works/pi-ai';
 import { createRegistry, type Harness } from '@earendil-works/pi-durable';
+import type { BrowserOffer } from '../../services/coordinator-browser.js';
 import {
   coordinatorCompactionExtension,
   coordinatorCompactionSettings,
@@ -57,6 +58,7 @@ export interface ServerRuntimeConfig {
   desktopTools?(threadId: string): boolean;
   connectorTools?(threadId: string): RemoteToolDef[];
   ownComputer?(threadId: string): boolean;
+  browserOffer?(threadId: string): BrowserOffer | undefined;
   phoneComputer?(threadId: string): readonly string[];
   providersFor?(threadId: string): readonly ProviderBinding[];
   onImagesRejected?(threadId: string, providerId: string, modelId: string): void;
@@ -151,6 +153,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS }
           : { loaded: CORE_COORDINATOR_TOOLS }),
         ownComputer: config.ownComputer?.(threadId) === true,
+        ...config.browserOffer?.(threadId),
         phoneComputer: config.phoneComputer?.(threadId) ?? [],
         shuttingDown: () => shuttingDown,
         onToolRound: (conversationId, active) => {
@@ -178,17 +181,21 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     let connectorDefs = new Map(
       initialConnectorTools.map((def) => [def.name, JSON.stringify(def)]),
     );
+    let offeredBrowser = JSON.stringify(config.browserOffer?.(threadId) ?? null);
     const syncConnectorTools = () => {
       if (memoryThread) return;
       const next = config.connectorTools?.(threadId) ?? [];
       const nextDefs = new Map(next.map((def) => [def.name, JSON.stringify(def)]));
+      const nextBrowser = JSON.stringify(config.browserOffer?.(threadId) ?? null);
       if (
+        nextBrowser === offeredBrowser &&
         nextDefs.size === connectorDefs.size &&
         [...nextDefs].every(([name, raw]) => connectorDefs.get(name) === raw)
       )
         return;
       registry.install(buildToolsExtension(next));
       connectorDefs = nextDefs;
+      offeredBrowser = nextBrowser;
     };
     const extensions = [
       buildToolsExtension(initialConnectorTools),

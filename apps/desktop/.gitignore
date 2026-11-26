@@ -2,4 +2,5 @@ server/
 runner/
 release/
 agent-desktop/
+agent-browser/
 tray-helper/

@@ -3,9 +3,10 @@ import {
   CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   COMPUTER_DESKTOP_TOOLS,
-  COMPUTER_REMOTE_TOOLS,
   COORDINATOR_ATTACH_FILE_TOOL,
   type ComputerTool,
+  computerRemoteTools,
+  isComputerBrowserTool,
   OWN_COMPUTER_TOOLS,
   PHONE_TOOLS,
   REQUEST_SECRET_TOOL_DEF,
@@ -27,11 +28,14 @@ const OWNER_CHROME_TOOLS: ReadonlySet<string> = new Set([
   'browser_act',
 ]);
 
-const OWNER_CHROME_NOTE =
-  " This team turned on Browser MCP, so these calls run in the owner's own Chrome, in background tabs of a tab group Cairn opens, with their own sessions already signed in; pass stealth: true when you want the stealth browser instead. The first call may answer that the extension needs Allow, with a six-digit code: tell the owner to click Allow in its popup and end the turn.";
+function ownerChromeNote(stealth: boolean): string {
+  const instead = stealth ? '; pass stealth: true when you want the stealth browser instead' : '';
+  return ` This team turned on Browser MCP, so these calls run in the owner's own Chrome, in background tabs of a tab group Cairn opens, with their own sessions already signed in${instead}. The first call may answer that the extension needs Allow, with a six-digit code: tell the owner to click Allow in its popup and end the turn.`;
+}
 
 export type CoordinatorComputerToolOffer =
-  | { offered: 'always' }
+  | { offered: 'when_a_machine_can_run_a_browser' }
+  | { offered: 'when_somebody_can_take_over' }
   | { offered: 'when_machine_reports_computer' }
   | { offered: 'when_owner_thread_and_team_has_mac' }
   | { offered: 'when_owner_thread_and_consented_phone' }
@@ -55,11 +59,11 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
     desktop_act: { offered: 'when_machine_reports_computer' },
     open_path: { withheld: 'host app control waits for its approval gate' },
     launch_app: { withheld: 'host app control waits for its approval gate' },
-    browser_navigate: { offered: 'always' },
-    browser_snapshot: { offered: 'always' },
-    browser_act: { offered: 'always' },
+    browser_navigate: { offered: 'when_a_machine_can_run_a_browser' },
+    browser_snapshot: { offered: 'when_a_machine_can_run_a_browser' },
+    browser_act: { offered: 'when_a_machine_can_run_a_browser' },
     browser_close_tab: { withheld: 'the server closes a card tab when its step ends' },
-    request_takeover: { offered: 'always' },
+    request_takeover: { offered: 'when_somebody_can_take_over' },
     user_computer_shell: { offered: 'when_owner_thread_and_team_has_mac' },
     user_computer_observe: { offered: 'when_owner_thread_and_team_has_mac' },
     user_computer_act: { offered: 'when_owner_thread_and_team_has_mac' },
@@ -110,18 +114,22 @@ export function coordinatorToolDefs(
     desktopTools?: boolean;
     ownComputer?: boolean;
     ownerChrome?: boolean;
+    browser?: boolean;
+    takeover?: boolean;
+    stealth?: boolean;
     phoneComputer?: readonly string[];
     includeSubagent?: boolean;
   } = {},
 ): RemoteToolDef[] {
-  const browserTools =
-    options.ownerChrome === true
-      ? COMPUTER_REMOTE_TOOLS.map((def) =>
-          OWNER_CHROME_TOOLS.has(def.name)
-            ? { ...def, description: `${def.description}${OWNER_CHROME_NOTE}` }
-            : def,
-        )
-      : COMPUTER_REMOTE_TOOLS;
+  const takeover = options.takeover !== false;
+  const stealth = options.stealth !== false;
+  const browserTools = computerRemoteTools({ takeover, stealth })
+    .filter((def) => (isComputerBrowserTool(def.name) ? options.browser !== false : takeover))
+    .map((def) =>
+      options.ownerChrome === true && OWNER_CHROME_TOOLS.has(def.name)
+        ? { ...def, description: `${def.description}${ownerChromeNote(stealth)}` }
+        : def,
+    );
   return [
     ...CHIEF_REMOTE_TOOLS,
     ...(options.routerTools === false ? [] : CHIEF_ROUTER_TOOLS),

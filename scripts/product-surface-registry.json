@@ -11,6 +11,12 @@
       "type": "setting",
       "key": "chiefStopBodySchema.messageId",
       "userScenario": "Nothing to set: pressing Stop on your own message that has not started sends its id, so that turn is the one stopped."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_AGENT_BROWSER",
+      "scope": "product",
+      "userScenario": "A new Mac user never sets it: the app hands its bundled browser driver to its own runner so the Coordinator can open pages."
     }
   ]
 }

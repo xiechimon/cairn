@@ -92,7 +92,7 @@ export interface ManagedRuntimeChannelContext {
 export interface ManagedRuntimeChannel<
   TRelease extends ManagedRuntimeRelease = ManagedRuntimeRelease,
 > {
-  readonly id: ManagedUpdateRuntime;
+  readonly id: ManagedUpdateRuntime | 'chrome-headless-shell';
   readonly defaultArgs: readonly string[];
   resolveRelease(
     ctx: ManagedRuntimeChannelContext,

@@ -13668,6 +13668,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "const": true,
               "type": "boolean",
             },
+            "ownerChrome": {
+              "const": true,
+              "type": "boolean",
+            },
             "phoneHost": {
               "const": true,
               "type": "boolean",

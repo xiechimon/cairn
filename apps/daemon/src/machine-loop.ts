@@ -74,6 +74,11 @@ import { HostComputerProvider } from './computer/host.js';
 import { HostDesktops } from './computer/host-desktop.js';
 import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
 import { ComputerInputFence } from './computer/input-fence.js';
+import {
+  bundledAgentBrowser,
+  createMacBrowser,
+  HEADLESS_SHELL_RELEASES,
+} from './computer/mac-browser.js';
 import { closeOwnerChrome } from './computer/owner-chrome.js';
 import { createPhones } from './computer/phones.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
@@ -525,6 +530,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     );
   }
   const orbComputer = opts.orbComputer ?? hostDesktops;
+  const agentBrowser =
+    platform === 'darwin' && opts.orbComputer === undefined ? bundledAgentBrowser(capEnv) : null;
+  const macBrowser =
+    agentBrowser !== null && HEADLESS_SHELL_RELEASES[process.arch]
+      ? createMacBrowser({
+          root: join(paths.home, 'mac-browser'),
+          toolsRoot: join(paths.home, 'tools'),
+          agentBrowser,
+          arch: process.arch,
+          env: capEnv,
+          log: (message) => logger.machine(message),
+        })
+      : undefined;
   const agentReach = new AgentReachProbe(undefined, undefined, () => agentReachEnabled(paths.home));
   const scrapling = new ScraplingProbe(() => readScrapling(paths.home));
   const devinManaged =
@@ -673,9 +691,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       claimGeneration: true,
       runnerProtocolVersion: RUNNER_PROTOCOL_VERSION,
       ...(orbComputer ? { computer: true as const } : {}),
-      ...(hostDesktops?.offersBrowser()
+      ...(hostDesktops?.offersBrowser() || macBrowser
         ? { browser: true as const, browserSecretFill: true as const }
         : {}),
+      ...(platform === 'darwin' ? { ownerChrome: true as const } : {}),
       ...(hostDesktops?.offersStealthBrowser() ? { stealthBrowser: true as const } : {}),
       ...(hostDesktops ? { computerKind: hostDesktops.kind, screenHandoff: true as const } : {}),
       ...(hostComputer ? { ownComputerShell: true as const } : {}),
@@ -1426,6 +1445,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     stagingRoot,
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
+    ...(macBrowser ? { browser: macBrowser } : {}),
     phones,
     cairnOrigins,
     stepTreeMarkers,

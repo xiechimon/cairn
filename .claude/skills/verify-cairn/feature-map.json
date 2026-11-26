@@ -1008,7 +1008,8 @@
         "docs/research/coordinator-computer.md",
         "docs/research/agent-small-computer-2026-11-08.md",
         "docs/research/user-computer-model-2026-11-08.md",
-        "docs/research/resident-cloakbrowser-2026-11-16.md"
+        "docs/research/resident-cloakbrowser-2026-11-16.md",
+        "docs/research/mac-agent-browser-prior-art-2026-11-26.md"
       ],
       "frontendDesign": {
         "gap": "the screen view and control handover have no design"
@@ -1016,7 +1017,8 @@
       "backendDesign": [
         "docs/design/computer-login-handoff.md",
         "docs/design/cloakbrowser-computer.md",
-        "docs/design/own-mac-computer.md"
+        "docs/design/own-mac-computer.md",
+        "docs/design/mac-host-browser.md"
       ],
       "evidence": [
         "apps/web/e2e/machines-computer-card.spec.ts",
@@ -1033,7 +1035,8 @@
         "apps/daemon/test/computer-browser.test.ts",
         "apps/daemon/test/machine-boot.test.ts",
         "apps/daemon/test/computer-host-desktop.test.ts",
-        "apps/daemon/test/computer-cloak-browser.test.ts"
+        "apps/daemon/test/computer-cloak-browser.test.ts",
+        "apps/daemon/test/computer-mac-browser.test.ts"
       ],
       "batch": "B4"
     },

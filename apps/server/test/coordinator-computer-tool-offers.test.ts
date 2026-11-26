@@ -11,7 +11,13 @@ const computerNames = (
   ownComputer = desktopTools,
   phoneComputer: readonly string[] = [],
 ) =>
-  coordinatorToolDefs({ desktopTools, ownComputer, phoneComputer })
+  coordinatorToolDefs({
+    desktopTools,
+    ownComputer,
+    phoneComputer,
+    browser: desktopTools,
+    takeover: desktopTools,
+  })
     .map((def) => def.name)
     .filter((name) => (COMPUTER_TOOLS as readonly string[]).includes(name))
     .sort();
@@ -64,6 +70,33 @@ describe('Coordinator computer tool offers', () => {
     expect(computerNames(true, false)).not.toContain('attach_file');
   });
 
+  test('browser tools are offered only when some machine can run a browser', () => {
+    const names = coordinatorToolDefs({ browser: false, takeover: false }).map((def) => def.name);
+    expect(names.filter((name) => name.startsWith('browser_'))).toEqual([]);
+    expect(names).not.toContain('request_takeover');
+  });
+
+  test('when nobody can take over, the browser tools say so and never name request_takeover', () => {
+    const defs = coordinatorToolDefs({ takeover: false });
+    expect(defs.map((def) => def.name)).not.toContain('request_takeover');
+    for (const def of defs.filter((def) => def.name.startsWith('browser_'))) {
+      expect(def.description).not.toContain('request_takeover');
+      expect(def.description).toContain('Nobody can watch or take over this browser');
+    }
+  });
+
+  test('with no stealth browser in the team, nothing offers or mentions one', () => {
+    const defs = coordinatorToolDefs({ stealth: false, ownerChrome: true }).filter((def) =>
+      def.name.startsWith('browser_'),
+    );
+    expect(defs.map((def) => def.name).sort()).toEqual([
+      'browser_act',
+      'browser_navigate',
+      'browser_snapshot',
+    ]);
+    expect(JSON.stringify(defs)).not.toMatch(/stealth/i);
+  });
+
   test('every offered computer tool is routed to a machine computer', () => {
     const unrouted = COMPUTER_TOOLS.filter(
       (name) =>
@@ -72,13 +105,8 @@ describe('Coordinator computer tool offers', () => {
     expect(unrouted).toEqual([]);
   });
 
-  test('without a computer the desktop tools are not offered', () => {
-    const always = COMPUTER_TOOLS.filter((name) => {
-      const offer = COORDINATOR_COMPUTER_TOOL_OFFERS[name];
-      return 'offered' in offer && offer.offered === 'always';
-    }).sort();
-    expect(computerNames(false)).toEqual(always);
-    expect(always).not.toContain('computer_observe');
+  test('without a computer the desktop and browser tools are not offered', () => {
+    expect(computerNames(false)).toEqual([]);
     expect(COMPUTER_DESKTOP_TOOLS.map((def) => def.name).sort()).toEqual([
       'computer_act',
       'computer_observe',

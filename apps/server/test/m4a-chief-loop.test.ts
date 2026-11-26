@@ -88,6 +88,7 @@ async function setupChiefWorld(opts?: {
       teamId,
       name: 'm4a-mbp',
       cliVersion: '0.1.0',
+      capabilities: { mcpServers: [], skills: [], browser: true, screenHandoff: true },
       ...(opts?.claudeCode !== undefined ? { claudeCode: opts.claudeCode } : {}),
     }),
   });

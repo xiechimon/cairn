@@ -41,7 +41,11 @@ function world(provider = 'claude-code') {
     models: [{ id: 'sonnet', name: 'sonnet' }],
     auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
   } as ClaudeCodeReport;
-  const machineId = insertMachine(s, { name: 'omarchy', claudeCodeReport: report });
+  const machineId = insertMachine(s, {
+    name: 'omarchy',
+    claudeCodeReport: report,
+    capabilities: { mcpServers: [], skills: [], browser: true, screenHandoff: true },
+  });
   seedRoute(s, 'coordinator', {
     provider,
     modelId: 'sonnet',
@@ -130,7 +134,13 @@ describe('Coordinator rule that selects Devin', () => {
     if (withSubscription) insertDevinSubscription(s, { token });
     const machineId = insertMachine(s, {
       name: 'devin-runner',
-      capabilities: { mcpServers: [], skills: [], devin: { installed: true } },
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        devin: { installed: true },
+        browser: true,
+        screenHandoff: true,
+      },
     });
     seedRoute(s, 'coordinator', {
       provider: 'devin',

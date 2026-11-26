@@ -277,6 +277,7 @@ export interface BrowserRunOptions {
   browserScope?: string;
   tabScope?: string;
   binary?: string;
+  headless?: boolean;
   deadlineAt?: number;
   timeoutMs?: number;
   now?: () => number;
@@ -373,8 +374,8 @@ function sessionFlag(session: string): string[] {
   return ['--session', session];
 }
 
-function headedFlags(): string[] {
-  return ['--headed'];
+function windowFlags(headless: boolean): string[] {
+  return headless ? ['--headed', 'false'] : ['--headed'];
 }
 
 function bareRef(ref: string): string {
@@ -536,25 +537,27 @@ export async function runBrowserTool(
   options: BrowserRunOptions,
 ): Promise<BrowserToolResult> {
   const binary = options.binary ?? AGENT_BROWSER_BINARY;
-  const stealth = params.stealth === true;
+  const headless = options.headless === true;
+  const stealth = !headless && params.stealth === true;
   const session = browserSessionFor(options, stealth);
   const deadlineAt = browserDeadlineAt(options);
   const timed = { ...options, deadlineAt };
-  const cursorScriptWritten = stealth
-    ? false
-    : await provider
-        .writeFile(AGENT_CURSOR_INIT_PATH, AGENT_CURSOR_INIT_SCRIPT, {
-          timeoutMs: remainingTimeoutMs(deadlineAt, options.now ?? Date.now),
-          signal: options.signal,
-        })
-        .then(
-          () => true,
-          () => false,
-        );
+  const cursorScriptWritten =
+    stealth || headless
+      ? false
+      : await provider
+          .writeFile(AGENT_CURSOR_INIT_PATH, AGENT_CURSOR_INIT_SCRIPT, {
+            timeoutMs: remainingTimeoutMs(deadlineAt, options.now ?? Date.now),
+            signal: options.signal,
+          })
+          .then(
+            () => true,
+            () => false,
+          );
   const prefix = [
     binary,
     ...sessionFlag(session),
-    ...headedFlags(),
+    ...windowFlags(headless),
     ...(cursorScriptWritten ? ['--init-script', AGENT_CURSOR_INIT_PATH] : []),
   ];
   let started = false;
@@ -820,7 +823,9 @@ export async function runBrowserTool(
     if (await cairnPage(url, cairnOrigins)) {
       refuse(`browser_navigate refused: ${url} ${CAIRN_PAGE_REFUSAL}`, started);
     }
-    const result = (await navigateByAddressBar(url)) ?? (await execute([...prefix, 'open', url]));
+    const result =
+      (headless ? null : await navigateByAddressBar(url)) ??
+      (await execute([...prefix, 'open', url]));
     if (result.code !== 0 && result.code !== null) {
       refuse(result.text || `agent-browser open failed with exit code ${result.code}`, started);
     }
@@ -840,7 +845,7 @@ export async function runBrowserTool(
         started,
       );
     }
-    if (params.stealth !== true && landed !== 'about:blank') {
+    if (!stealth && landed !== 'about:blank') {
       const probe = await read([...prefix, 'snapshot', '-i']);
       if (probe.code === 0 && isAutomationBlankSnapshot(probe.text))
         return { text: result.text || `opened ${url}`, automationBlocked: true };
@@ -951,7 +956,7 @@ export async function runBrowserTool(
         );
       }
     }
-    if (!stealth && action.ref !== undefined) {
+    if (!stealth && !headless && action.ref !== undefined) {
       await showAgentCursor(normalizeRef(action.ref), action.kind === 'click' ? 'click' : 'point');
     }
     let argv: string[];

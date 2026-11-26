@@ -15,6 +15,7 @@ import {
   machine as machineTable,
   mcpConnector as mcpConnectorTable,
   step as stepTable,
+  user as userTable,
 } from '../src/db/schema.js';
 import {
   COMPUTER_BROWSER_UNAVAILABLE,
@@ -77,6 +78,12 @@ function addMachine(
     })
     .run();
 }
+
+const inCairnBrowser = (machine: string, text: string) =>
+  `[Browser: Cairn's own browser on ${machine}, separate from the owner's Chrome and its sign-ins.]\n${text}`;
+
+const inOwnerChrome = (machine: string, text: string) =>
+  `[Browser: the owner's own Chrome on ${machine}, through Browser MCP.]\n${text}`;
 
 function connect(s: TestServer, machineId: string): ComputerCall[] {
   const calls: ComputerCall[] = [];
@@ -379,7 +386,9 @@ describe('forwardComputerCall target and presence', () => {
       const result = forwardComputerCall(deps, 'sidecar', 'step-a', body);
       expect(calls).toHaveLength(1);
       receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, 'granted')]);
-      expect((await result).text).toBe('granted');
+      expect((await result).text).toBe(
+        name === 'browser_navigate' ? inCairnBrowser('omarchy', 'granted') : 'granted',
+      );
       markPresence(deps, 'omarchy', { capabilities: { mcpServers: [], skills: [] } });
       expect(
         s.db.select().from(machineTable).where(eq(machineTable.id, 'omarchy')).get()?.capabilities
@@ -431,7 +440,7 @@ describe('forwardComputerCall target and presence', () => {
     });
     expect(olderCalls).toHaveLength(1);
     receiveComputerFrames(s.db, s.hub, 'older', olderCalls[0]!.callId, [done(1, 'picked')]);
-    expect((await browser).text).toBe('picked');
+    expect((await browser).text).toBe(inCairnBrowser('older', 'picked'));
     expect(s.db.select().from(computerTable).get()?.machineId).toBe('older');
   });
 
@@ -467,6 +476,8 @@ describe('forwardComputerCall target and presence', () => {
         params: { url: 'https://example.com' },
       }),
     ).rejects.toMatchObject({ status: 403, message: COMPUTER_BROWSER_UNAVAILABLE });
+    expect(COMPUTER_BROWSER_UNAVAILABLE).toContain('Browser MCP');
+    expect(COMPUTER_BROWSER_UNAVAILABLE).not.toContain('image');
     expect(s.db.select().from(computerCallTable).all()).toEqual([]);
   });
 
@@ -1252,5 +1263,327 @@ describe('the owner’s own Chrome behind browser tools', () => {
 
   test('turning the connector off returns browser calls to Cairn’s own browser', async () => {
     expect((await stampFor(() => {})).ownerChrome).toBeUndefined();
+  });
+});
+
+describe('browser calls on Macs', () => {
+  function addMac(
+    s: TestServer,
+    id: string,
+    capabilities: Record<string, unknown>,
+    { kind = 'remote', lastSeenAt = 1 }: { kind?: 'local' | 'remote'; lastSeenAt?: number } = {},
+  ) {
+    s.db
+      .insert(machineTable)
+      .values({
+        id,
+        teamId: s.team.id,
+        name: id,
+        online: true,
+        lastSeenAt,
+        kind,
+        capabilities: { mcpServers: [], skills: [], ...capabilities },
+      })
+      .run();
+  }
+
+  function browserMcp(s: TestServer) {
+    s.db
+      .insert(mcpConnectorTable)
+      .values({
+        id: 'conn-browsermcp',
+        teamId: s.team.id,
+        slug: 'browsermcp',
+        label: 'Browser MCP',
+        catalogId: 'browsermcp',
+        transport: 'stdio',
+        url: null,
+        headerNames: [],
+        valuesCipher: null,
+        authKind: 'none',
+        status: 'local',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+  }
+
+  function navigate(deps: MachineDeps, toolCallId: string) {
+    return forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_navigate',
+      toolCallId,
+      params: { url: 'https://example.com' },
+    });
+  }
+
+  async function next(calls: ComputerCall[], count: number): Promise<ComputerCall> {
+    await vi.waitFor(() => expect(calls).toHaveLength(count));
+    return calls[count - 1]!;
+  }
+
+  function answer(s: TestServer, machineId: string, call: ComputerCall, text: string) {
+    receiveComputerFrames(s.db, s.hub, machineId, call.callId, [done(1, text)]);
+  }
+
+  function fail(s: TestServer, machineId: string, call: ComputerCall, message: string) {
+    receiveComputerFrames(s.db, s.hub, machineId, call.callId, [
+      { kind: 'error', seq: 1, message, delivery: 'not_delivered' },
+    ]);
+  }
+
+  const NO_EXTENSION = "Owner's Chrome unavailable: no Chrome is connected to Browser MCP";
+
+  function pin(s: TestServer, chiefId: string, machineId: string) {
+    s.db
+      .insert(computerTable)
+      .values({
+        id: 'pinned',
+        teamId: s.team.id,
+        scopeKey: `chief:${chiefId}`,
+        machineId,
+        providerRef: computerMachineName(`chief:${chiefId}`),
+        state: 'running',
+        controlHolder: 'user',
+        handoffReason: 'login',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+  }
+
+  test('a Mac that reports a browser and no computer gets browser_navigate', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mac', { browser: true });
+    const calls = connect(s, 'mac');
+    const pending = navigate(deps, 'mac-browser');
+    pending.catch(() => {});
+    const call = await next(calls, 1);
+    expect(call).toMatchObject({ tool: 'browser_navigate', computerGrant: 'browser' });
+    expect(call.ownerChrome).toBeUndefined();
+    answer(s, 'mac', call, 'Example Domain');
+    expect((await pending).text).toBe(inCairnBrowser('mac', 'Example Domain'));
+    expect(s.db.select().from(computerTable).get()?.machineId).toBe('mac');
+  });
+
+  test('with Browser MCP on, a local Mac with no Cairn browser drives the owner’s Chrome', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const pending = navigate(deps, 'mcp-local');
+    pending.catch(() => {});
+    const call = await next(calls, 1);
+    expect(call.ownerChrome).toBe('browsermcp');
+    answer(s, 'mini', call, 'their page');
+    expect((await pending).text).toBe(inOwnerChrome('mini', 'their page'));
+    expect(s.db.select().from(computerTable).all()).toEqual([]);
+  });
+
+  test('the next Mac is asked when one has no extension, and is asked first afterwards', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    addMac(s, 'air', { ownerChrome: true });
+    browserMcp(s);
+    const mini = connect(s, 'mini');
+    const air = connect(s, 'air');
+    const first = navigate(deps, 'failover');
+    first.catch(() => {});
+    const onMini = await next(mini, 1);
+    expect(onMini.ownerChrome).toBe('browsermcp');
+    fail(s, 'mini', onMini, NO_EXTENSION);
+    const onAir = await next(air, 1);
+    expect(onAir.ownerChrome).toBe('browsermcp');
+    expect(onAir.callId).not.toBe(onMini.callId);
+    answer(s, 'air', onAir, 'their page');
+    expect((await first).text).toBe(inOwnerChrome('air', 'their page'));
+    const second = navigate(deps, 'remembered');
+    second.catch(() => {});
+    answer(s, 'air', await next(air, 2), 'again');
+    expect((await second).text).toBe(inOwnerChrome('air', 'again'));
+    expect(mini).toHaveLength(1);
+  });
+
+  test('an extension waiting for Allow ends the call on that Mac', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    addMac(s, 'air', { ownerChrome: true });
+    browserMcp(s);
+    const mini = connect(s, 'mini');
+    const air = connect(s, 'air');
+    const pending = navigate(deps, 'pairing');
+    pending.catch(() => {});
+    fail(s, 'mini', await next(mini, 1), 'Click Allow, code 123456');
+    expect((await pending).text).toContain('Click Allow, code 123456');
+    expect(air).toEqual([]);
+    expect(mini).toHaveLength(1);
+  });
+
+  test('with no extension anywhere the page comes from Cairn’s browser and says why', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const pending = navigate(deps, 'fallback');
+    pending.catch(() => {});
+    fail(s, 'mini', await next(calls, 1), NO_EXTENSION);
+    const own = await next(calls, 2);
+    expect(own.ownerChrome).toBeUndefined();
+    answer(s, 'mini', own, 'Example Domain');
+    const { text } = await pending;
+    expect(text).toContain('instead of your own Chrome');
+    expect(text).toContain('no Chrome is connected to Browser MCP');
+    expect(text).toContain('Example Domain');
+  });
+
+  test('with no extension and no Cairn browser the answer says why and what to turn on', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const pending = navigate(deps, 'nothing');
+    const outcome = pending.then(
+      (result) => result.text,
+      (error: Error) => error.message,
+    );
+    fail(s, 'mini', await next(calls, 1), NO_EXTENSION);
+    const text = await outcome;
+    expect(text).toContain('no Chrome is connected to Browser MCP');
+    expect(text).toContain('Browser MCP');
+    expect(text).toContain('没有可用的浏览器');
+  });
+
+  test('another person’s thread never reaches a remote Mac’s Chrome', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'air', { ownerChrome: true });
+    browserMcp(s);
+    s.db.insert(userTable).values({ id: 'guest', displayName: 'Guest' }).run();
+    s.db
+      .update(chiefThreadTable)
+      .set({ userId: 'guest' })
+      .where(eq(chiefThreadTable.id, THREAD))
+      .run();
+    const air = connect(s, 'air');
+    await expect(navigate(deps, 'guest')).rejects.toMatchObject({ status: 403 });
+    expect(air).toEqual([]);
+  });
+
+  test.each([
+    ['Cairn’s browser', false, "Cairn's own browser on Ian’s Mac mini, separate from"],
+    ['the owner’s Chrome', true, "the owner's own Chrome on Ian’s Mac mini"],
+  ])(
+    'the answer to browser_navigate names %s and the machine, so the owner can be told',
+    async (_name, connector, expected) => {
+      const { s, deps } = boot();
+      addMac(
+        s,
+        'mini',
+        { browser: true, ownerChrome: true, computerName: 'Ian’s Mac mini' },
+        { kind: 'local' },
+      );
+      if (connector) browserMcp(s);
+      const calls = connect(s, 'mini');
+      const pending = navigate(deps, 'where');
+      pending.catch(() => {});
+      answer(s, 'mini', await next(calls, 1), 'Example Domain');
+      expect((await pending).text).toContain(expected);
+    },
+  );
+
+  test('a pin on a Mac that can no longer run a browser moves to one that can', async () => {
+    const { s, deps, chiefId } = boot();
+    addMac(s, 'old-mac', {}, { lastSeenAt: 9 });
+    addMac(s, 'new-mac', { browser: true });
+    pin(s, chiefId, 'old-mac');
+    connect(s, 'old-mac');
+    const calls = connect(s, 'new-mac');
+    const pending = navigate(deps, 'moved');
+    pending.catch(() => {});
+    answer(s, 'new-mac', await next(calls, 1), 'moved');
+    expect((await pending).text).toBe(inCairnBrowser('new-mac', 'moved'));
+    expect(s.db.select().from(computerTable).get()).toMatchObject({
+      id: 'pinned',
+      machineId: 'new-mac',
+      controlHolder: 'none',
+      handoffReason: null,
+    });
+  });
+
+  test.each([
+    ['a new pin', false],
+    ['a pin the removed VM left running', true],
+  ])('%s on a machine that reports no computer is never shown as starting', async (_n, left) => {
+    const { s, deps, chiefId } = boot();
+    addMac(s, 'mac', { browser: true });
+    if (left) pin(s, chiefId, 'mac');
+    if (left) s.db.update(computerTable).set({ handoffReason: null, controlHolder: 'none' }).run();
+    const calls = connect(s, 'mac');
+    const pending = navigate(deps, 'resting');
+    pending.catch(() => {});
+    answer(s, 'mac', await next(calls, 1), 'Example Domain');
+    await pending;
+    expect(s.db.select().from(computerTable).get()?.state).toBe('stopped');
+  });
+
+  test('a pin on a sleeping Mac that can run a browser stays', async () => {
+    const { s, deps, chiefId } = boot();
+    addMac(s, 'asleep', { browser: true });
+    addMac(s, 'awake', { browser: true });
+    pin(s, chiefId, 'asleep');
+    s.db.update(computerTable).set({ handoffReason: null, controlHolder: 'none' }).run();
+    const awake = connect(s, 'awake');
+    await expect(navigate(deps, 'asleep')).rejects.toThrow(COMPUTER_NOT_CONNECTED);
+    expect(awake).toEqual([]);
+    expect(s.db.select().from(computerTable).get()?.machineId).toBe('asleep');
+  });
+
+  test.each([
+    ['without a screen to hand over', {}, null],
+    ['with one', { screenHandoff: true }, 'login'],
+  ])(
+    'a captcha on a machine %s opens a handoff only when somebody can close it',
+    async (_n, extra, reason) => {
+      const { s, deps } = boot();
+      addMac(s, 'host', { browser: true, ...extra });
+      const calls = connect(s, 'host');
+      const pending = navigate(deps, 'captcha');
+      pending.catch(() => {});
+      const call = await next(calls, 1);
+      receiveComputerFrames(s.db, s.hub, 'host', call.callId, [
+        {
+          kind: 'done',
+          seq: 1,
+          text: 'verify you are human',
+          exitCode: 0,
+          loginForm: { signals: ['challenge'] },
+        } as ComputerFrame,
+      ]);
+      await pending;
+      expect(s.db.select().from(computerTable).get()?.handoffReason).toBe(reason);
+    },
+  );
+
+  test('asking for takeover on a browser nobody can see answers at once', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mac', { browser: true });
+    const calls = connect(s, 'mac');
+    const pending = navigate(deps, 'before-takeover');
+    pending.catch(() => {});
+    answer(s, 'mac', await next(calls, 1), 'ok');
+    await pending;
+    const result = await forwardComputerCall(
+      deps,
+      'sidecar',
+      'step-a',
+      {
+        computer: true,
+        name: 'request_takeover',
+        toolCallId: 'take',
+        params: { reason: 'captcha' },
+      },
+      { takeover: { timeoutMs: 200, pollMs: 5 } },
+    );
+    expect(result.text).toContain('Nobody can watch or take over');
+    expect(s.db.select().from(computerTable).get()?.handoffReason).toBeNull();
   });
 });

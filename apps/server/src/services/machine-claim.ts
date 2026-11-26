@@ -59,6 +59,7 @@ import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.j
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { connectorToolDefsForTeam } from './connector-broker.js';
+import { browserOfferFor } from './coordinator-browser.js';
 import { coordinatorInServerEnabled, rotatesPastCompaction } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
@@ -101,7 +102,6 @@ import {
   CONNECTOR_TOOL_HYDRATE_BOUND_MS,
   connectorSlugs,
   hydrateMissingConnectorTools,
-  localBrowserConnector,
   mcpConnectorDepsOf,
 } from './mcp-servers.js';
 import { injectMemoryDocuments } from './memory.js';
@@ -453,7 +453,7 @@ function chiefClaimPayload(
               ...coordinatorToolDefs({
                 desktopTools: teamOffersDesktop(deps.db, threadRow.teamId),
                 ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
-                ownerChrome: localBrowserConnector(deps.db, threadRow.teamId) !== null,
+                ...browserOfferFor(deps.db, threadRow, offeredPhoneNames(deps, stepRow.buildId)),
                 phoneComputer: offeredPhoneNames(deps, stepRow.buildId),
               }),
               ...connectorToolDefsForTeam(deps.db, threadRow.teamId),

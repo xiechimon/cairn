@@ -47,3 +47,12 @@ export interface ScopedComputerProviders {
   forScope(scopeKey: string): ComputerProvider;
   killAll(): Promise<void>;
 }
+
+export interface LazyBrowser {
+  open(request: {
+    signal: AbortSignal;
+    deadlineAt: number;
+  }): Promise<{ provider: ComputerProvider; note: string | null }>;
+  installed(): Promise<ComputerProvider | null>;
+  killAll(): Promise<void>;
+}

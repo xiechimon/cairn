@@ -74,6 +74,8 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/im/slack.ts:AUTH_ERRORS': 'constant lookup table',
   'apps/server/src/services/im/slack.ts:LINK_NODE_TYPES': 'constant lookup table',
   'apps/server/src/services/im/slack.ts:PERMANENT_ERRORS': 'constant lookup table',
+  'apps/server/src/services/machine-computer.ts:ownerChromeChains':
+    'in-flight owner-Chrome failover chains keyed on unique callIds; each entry is removed when its chain settles',
   'apps/server/src/services/machine-computer.ts:pendingOutput':
     'in-flight computer-call buffers keyed on unique callIds; dropComputerWaiters is the process-wide test cleanup seam',
   'apps/server/src/services/machine-deps.ts:DEFERRED_SIGNALS': 'constant lookup table',

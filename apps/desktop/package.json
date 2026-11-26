@@ -18,6 +18,7 @@
     "stage-server": "node scripts/stage-server.mjs",
     "stage-runner": "node scripts/stage-runner.mjs",
     "stage-agent-desktop": "node scripts/stage-agent-desktop.mjs",
+    "stage-agent-browser": "node scripts/stage-agent-browser.mjs",
     "build": "node build.mjs",
     "start": "node scripts/pack.mjs --start",
     "dist:mac": "node scripts/pack.mjs --mac",

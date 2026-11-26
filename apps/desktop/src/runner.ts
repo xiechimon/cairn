@@ -50,6 +50,7 @@ export interface RunnerOptions {
   fetchImpl?: typeof fetch;
   otelFile: string | null;
   agentDesktop: string | null;
+  agentBrowser: string | null;
   shellEnv?: () => ShellEnvironmentPatch;
   isQuitting: () => boolean;
 }
@@ -210,6 +211,7 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
       ...(options.agentDesktop === null
         ? {}
         : { CAIRN_AGENT_DESKTOP: options.agentDesktop, CAIRN_OWN_COMPUTER: '1' }),
+      ...(options.agentBrowser === null ? {} : { CAIRN_AGENT_BROWSER: options.agentBrowser }),
     },
     options.otelFile,
   );

@@ -6,6 +6,7 @@ import {
   type ComputerTool,
   isPhoneTool,
   OWN_COMPUTER_TOOL_NAMES,
+  OWNER_CHROME_UNAVAILABLE_PREFIX,
   ownComputerHardlineRefusal,
 } from '@cairn/shared';
 import { z } from 'zod';
@@ -25,6 +26,7 @@ import { DesktopAccessibility } from './desktop-accessibility.js';
 import { DesktopScreen } from './desktop-screen.js';
 import { FramePoster } from './frame-poster.js';
 import type { HostScreen, ScreenCall, ScreenOutcome } from './host-screen.js';
+import { NO_STEALTH_BROWSER_NOTE } from './mac-browser.js';
 import {
   OWNER_CHROME_NO_EXTENSION,
   OwnerChromeUnavailable,
@@ -37,6 +39,7 @@ import {
   type ComputerProcessEvent,
   type ComputerProvider,
   ComputerRefusal,
+  type LazyBrowser,
   type ScopedComputerProviders,
 } from './provider.js';
 import { defaultStagingRoot, readHostFileForAttach, writeStagedUpload } from './staging.js';
@@ -97,6 +100,12 @@ const ORB_TOOLS: ReadonlySet<ComputerTool> = new Set([
 
 const BROWSER_TOOLS: ReadonlySet<ComputerTool> = new Set(COMPUTER_BROWSER_TOOLS);
 
+interface CairnBrowser {
+  provider: ComputerProvider;
+  headless: boolean;
+  note: string | null;
+}
+
 interface Route {
   provider: ComputerProvider;
   refusal?: (command: string) => string | undefined;
@@ -123,6 +132,7 @@ export interface ComputerDispatcherOptions {
   stagingRoot?: string;
   screen?: HostScreen;
   orb?: ScopedComputerProviders;
+  browser?: LazyBrowser;
   logger?: Pick<DaemonLogger, 'machine'>;
   now?: () => number;
   flushMs?: number;
@@ -225,8 +235,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
           }
         : NO_COMPUTER_PROVIDER_MESSAGE;
     }
-    if ((!ORB_TOOLS.has(call.tool) && call.tool !== 'browser_close_tab') || !options.orb)
-      return NO_COMPUTER_PROVIDER_MESSAGE;
+    if (!ORB_TOOLS.has(call.tool) || !options.orb) return NO_COMPUTER_PROVIDER_MESSAGE;
     if (!call.scopeKey) return NO_COMPUTER_SCOPE_MESSAGE;
     return {
       provider: options.orb.forScope(call.scopeKey),
@@ -480,56 +489,89 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     );
   }
 
-  async function handleBrowser(
+  async function openCairnBrowser(
     call: ComputerCall,
-    route: Route,
     controller: AbortController,
-  ): Promise<void> {
-    if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
-      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
-      return;
+  ): Promise<CairnBrowser> {
+    const scopeKey = call.scopeKey ?? '';
+    if (options.browser) {
+      const opened = await options.browser.open({
+        signal: controller.signal,
+        deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+      });
+      return { ...opened, headless: true };
     }
-    const poster = posterFor(call, controller);
-    let result: BrowserToolResult;
-    let ownerChromeNote: string | null = null;
+    if (!options.orb) throw new ComputerRefusal(NO_COMPUTER_PROVIDER_MESSAGE);
+    return { provider: options.orb.forScope(scopeKey), headless: false, note: null };
+  }
+
+  function cairnBrowserRefusal(call: ComputerCall): string | null {
+    if (!options.browser && !options.orb) return NO_COMPUTER_PROVIDER_MESSAGE;
+    return call.scopeKey ? null : NO_COMPUTER_SCOPE_MESSAGE;
+  }
+
+  async function runInCairnBrowser(
+    call: ComputerCall,
+    controller: AbortController,
+  ): Promise<BrowserToolResult> {
+    const opened = await openCairnBrowser(call, controller);
     const run = (params: Record<string, unknown>) =>
-      runBrowserTool(route.provider, call.tool as BrowserToolName, params, {
+      runBrowserTool(opened.provider, call.tool as BrowserToolName, params, {
         deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
         now,
         signal: controller.signal,
+        headless: opened.headless,
         session: call.scopeKey,
         ...(call.browserScope === undefined ? {} : { browserScope: call.browserScope }),
         ...(call.tabScope === undefined ? {} : { tabScope: call.tabScope }),
         cairnOrigins: options.cairnOrigins,
         browserSecrets: call.browserSecrets,
       });
-    const runOwnerChrome = () =>
-      runOwnerChromeTool(call.tool as BrowserToolName, call.params, {
-        deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
-        now,
-        signal: controller.signal,
-        session: call.scopeKey ?? call.stepId,
-        cairnOrigins: options.cairnOrigins,
-      });
+    let result = await run(call.params);
+    const notes = opened.note === null ? [] : [opened.note];
+    if (opened.headless) {
+      if (call.params.stealth === true || result.automationBlocked)
+        notes.push(NO_STEALTH_BROWSER_NOTE);
+    } else if (result.automationBlocked) {
+      result = await run({ ...call.params, stealth: true });
+      notes.push(AUTO_STEALTH_NOTE);
+    }
+    return notes.length === 0 ? result : { ...result, text: [...notes, result.text].join('\n') };
+  }
+
+  async function handleBrowser(call: ComputerCall, controller: AbortController): Promise<void> {
+    const refusal = call.ownerChrome === undefined ? cairnBrowserRefusal(call) : null;
+    if (refusal !== null) {
+      await refuse(call, refusal);
+      return;
+    }
+    if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
+      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    let result: BrowserToolResult;
     try {
-      if (call.ownerChrome !== undefined) {
-        try {
-          result = await runOwnerChrome();
-        } catch (error) {
-          if (!(error instanceof OwnerChromeUnavailable)) throw error;
-          const reason =
-            error.reason === 'no-extension' ? OWNER_CHROME_NO_EXTENSION : error.message;
-          ownerChromeNote = `[Ran in Cairn's browser instead of your own Chrome. ${reason}]`;
-          result = await run(call.params);
-        }
-      } else result = await run(call.params);
-      if (result.automationBlocked) {
-        const stealthy = await run({ ...call.params, stealth: true });
-        result = { ...stealthy, text: `${AUTO_STEALTH_NOTE}\n${stealthy.text}` };
-      }
-      if (ownerChromeNote !== null)
-        result = { ...result, text: `${ownerChromeNote}\n${result.text}` };
+      result =
+        call.ownerChrome === undefined
+          ? await runInCairnBrowser(call, controller)
+          : await runOwnerChromeTool(call.tool as BrowserToolName, call.params, {
+              deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+              now,
+              signal: controller.signal,
+              session: call.scopeKey ?? call.stepId,
+              cairnOrigins: options.cairnOrigins,
+            });
     } catch (error) {
+      if (error instanceof OwnerChromeUnavailable) {
+        const reason = error.reason === 'no-extension' ? OWNER_CHROME_NO_EXTENSION : error.message;
+        await poster.finish({
+          kind: 'error',
+          message: boundBrowserError(`${OWNER_CHROME_UNAVAILABLE_PREFIX}${reason}`),
+          delivery: 'not_delivered',
+        });
+        return;
+      }
       await poster.finish(
         error instanceof ComputerRefusal
           ? {
@@ -553,26 +595,33 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     });
   }
 
-  async function handleCloseTab(
-    call: ComputerCall,
-    route: Route,
-    controller: AbortController,
-  ): Promise<void> {
-    if (call.tabScope === undefined) {
+  async function handleCloseTab(call: ComputerCall, controller: AbortController): Promise<void> {
+    const refusal = cairnBrowserRefusal(call);
+    if (refusal !== null) {
+      await refuse(call, refusal);
+      return;
+    }
+    const { tabScope } = call;
+    if (tabScope === undefined) {
       await refuse(call, 'browser_close_tab needs a tab scope');
       return;
     }
     const poster = posterFor(call, controller);
     try {
-      const text = await closeScopeTab(route.provider, {
-        deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
-        now,
-        signal: controller.signal,
-        session: call.scopeKey,
-        ...(call.browserScope === undefined ? {} : { browserScope: call.browserScope }),
-        tabScope: call.tabScope,
-        cairnOrigins: [],
-      });
+      const provider = options.browser
+        ? await options.browser.installed()
+        : options.orb?.forScope(call.scopeKey ?? '');
+      const text = !provider
+        ? 'no tab to close'
+        : await closeScopeTab(provider, {
+            deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+            now,
+            signal: controller.signal,
+            session: call.scopeKey,
+            ...(call.browserScope === undefined ? {} : { browserScope: call.browserScope }),
+            tabScope,
+            cairnOrigins: [],
+          });
       await poster.finish({ kind: 'done', text });
     } catch (error) {
       await poster.finish({
@@ -773,6 +822,14 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       else await refuse(call, NO_COMPUTER_PROVIDER_MESSAGE);
       return;
     }
+    if (call.tool === 'browser_close_tab') {
+      await handleCloseTab(call, controller);
+      return;
+    }
+    if (BROWSER_TOOLS.has(call.tool)) {
+      await handleBrowser(call, controller);
+      return;
+    }
     const route = routeFor(call);
     if (typeof route === 'string') {
       await refuse(call, route);
@@ -804,10 +861,6 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     if (call.tool === 'shell' || call.tool === 'user_computer_shell') {
       await handleShell(call, route, controller);
-    } else if (call.tool === 'browser_close_tab') {
-      await handleCloseTab(call, route, controller);
-    } else if (BROWSER_TOOLS.has(call.tool)) {
-      await handleBrowser(call, route, controller);
     } else {
       await handleFile(call, route, controller);
     }
@@ -840,6 +893,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
           options.host?.killAll(),
           options.screen?.killAll(),
           options.orb?.killAll(),
+          options.browser?.killAll(),
           options.phones?.killAll(),
         ]);
         await Promise.race([
