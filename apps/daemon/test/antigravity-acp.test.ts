@@ -8,7 +8,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import type { ClaimedStep, SessionOpts, StepEvent } from '@cairn/shared';
+import type { ClaimedStep, RemoteToolDef, SessionOpts, StepEvent } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { ANTIGRAVITY_ACP_ARGS } from '@cairn/shared/antigravity-install';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -677,5 +678,165 @@ describe('antigravity ACP runtime and credentials', () => {
     expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).toContain('Antigravity OAuth login expired or revoked');
     expect((err as Error).message).not.toContain('secret-state');
+  });
+
+  test('restricted antigravity turn compacts oversized tools into the prompt and allows tool_search and call_tool through the gate', async () => {
+    const dir = tempDir('ag-compactor-gate-');
+    const agent = join(dir, 'agy-compactor.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { spawn } from 'node:child_process';",
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'const gateWaiters = new Map();',
+          'let cairnServer = null;',
+          'async function withCairnMcp(fn) {',
+          '  const child = spawn(cairnServer.command, cairnServer.args, { stdio: ["pipe", "pipe", "pipe"] });',
+          '  const waiters = new Map();',
+          '  const responses = new Map();',
+          '  createInterface({ input: child.stdout }).on("line", (line) => {',
+          '    if (!line.trim()) return;',
+          '    const msg = JSON.parse(line);',
+          '    const waiter = waiters.get(msg.id);',
+          '    if (waiter) { waiters.delete(msg.id); waiter(msg); } else { responses.set(msg.id, msg); }',
+          '  });',
+          '  let nextId = 1;',
+          '  const rpc = (method, params = {}) => {',
+          '    const id = nextId++;',
+          '    const wait = new Promise((resolve) => {',
+          '      if (responses.has(id)) { const r = responses.get(id); responses.delete(id); resolve(r); return; }',
+          '      waiters.set(id, resolve);',
+          '    });',
+          '    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\\n");',
+          '    return wait;',
+          '  };',
+          '  try {',
+          '    await rpc("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "mock", version: "1" } });',
+          '    return await fn(rpc);',
+          '  } finally {',
+          '    child.stdin.end();',
+          '    child.kill("SIGTERM");',
+          '  }',
+          '}',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === undefined && gateWaiters.has(msg.id)) {',
+          '    gateWaiters.get(msg.id)(msg.result);',
+          '    gateWaiters.delete(msg.id);',
+          '    continue;',
+          '  }',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: {} } });',
+          '  } else if (msg.method === "session/new") {',
+          '    cairnServer = (msg.params.mcpServers ?? []).find((s) => s.name === "cairn") ?? null;',
+          '    send({ id: msg.id, result: { sessionId: "ag-compact", modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-carbon", options: [{ value: "gemini-4-carbon", name: "Gemini 4 Carbon" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    void (async () => {',
+          '      const promptText = msg.params.prompt.find((b) => b.type === "text")?.text ?? "";',
+          '      const reqPerm = (reqId, toolCall) => new Promise((resolve) => {',
+          '        gateWaiters.set(reqId, resolve);',
+          '        send({ id: reqId, method: "session/request_permission", params: { sessionId: "ag-compact", toolCall, options: [{ optionId: "allow", name: "Allow", kind: "allow_once" }, { optionId: "deny", name: "Deny", kind: "reject_once" }] } });',
+          '      });',
+          '      const pSearch = await reqPerm("p1", { toolCallId: "t1", title: "mcp_cairn_tool_search", kind: "other" });',
+          '      const pCall = await reqPerm("p2", { toolCallId: "t2", title: "mcp_cairn_call_tool", kind: "other" });',
+          '      const pDirectDeferred = await reqPerm("p3", { toolCallId: "t3", title: "mcp_cairn_machines", kind: "other" });',
+          '      const pRead = await reqPerm("p4", { toolCallId: "t4", title: "Read", kind: "read" });',
+          '      const mcpReport = await withCairnMcp(async (rpc) => {',
+          '        const list = await rpc("tools/list");',
+          '        const searchRes = await rpc("tools/call", { name: "tool_search", arguments: { query: "machines" } });',
+          '        const callRes = await rpc("tools/call", { name: "call_tool", arguments: { name: "machines", arguments: {} } });',
+          '        return {',
+          '          listedNames: list.result.tools.map((t) => t.name),',
+          '          maxBytes: Math.max(...list.result.tools.map((t) => Buffer.byteLength(JSON.stringify({ name: t.name, description: t.description, inputSchema: t.inputSchema }), "utf8"))),',
+          '          searchText: searchRes.result?.content?.[0]?.text ?? JSON.stringify(searchRes.error ?? null),',
+          '          callText: callRes.result?.content?.[0]?.text ?? JSON.stringify(callRes.error ?? null),',
+          '        };',
+          '      });',
+          '      const summary = {',
+          '        promptText,',
+          '        permissions: {',
+          '          search: pSearch.outcome.optionId,',
+          '          call: pCall.outcome.optionId,',
+          '          directDeferred: pDirectDeferred.outcome.optionId,',
+          '          read: pRead.outcome.optionId,',
+          '        },',
+          '        mcpReport,',
+          '      };',
+          '      send({ method: "session/update", params: { sessionId: "ag-compact", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify(summary) } } } });',
+          '      send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '    })();',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const createTodoDef = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'create_todo');
+    const machinesDef = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'machines');
+    expect(createTodoDef).toBeDefined();
+    expect(machinesDef).toBeDefined();
+    const remoteTools: RemoteToolDef[] = [
+      createTodoDef as RemoteToolDef,
+      { ...(machinesDef as RemoteToolDef), deferred: true },
+    ];
+    const executed: Array<{ name: string; params: Record<string, unknown> }> = [];
+
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+    });
+    const session = await backend.createSession({
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-carbon',
+      systemPrompt: 'Base system instructions.',
+      prompt: 'Inspect machines and create a todo.',
+      remoteTools,
+      remoteToolsOnly: true,
+      lockedDown: true,
+      executeRemoteTool: async (name, params) => {
+        executed.push({ name, params });
+        return `executed:${name}`;
+      },
+    });
+    const events = await collect(session.events);
+    const final = events.find((event) => event.type === 'message_end');
+    expect(final?.type).toBe('message_end');
+    const summary = JSON.parse(
+      final?.type === 'message_end' ? String(final.message.content) : '{}',
+    ) as {
+      promptText: string;
+      permissions: Record<string, string>;
+      mcpReport: {
+        listedNames: string[];
+        maxBytes: number;
+        searchText: string;
+        callText: string;
+      };
+    };
+
+    expect(summary.permissions).toEqual({
+      search: 'allow',
+      call: 'allow',
+      directDeferred: 'deny',
+      read: 'deny',
+    });
+    expect(summary.mcpReport.listedNames).toEqual(['create_todo', 'tool_search', 'call_tool']);
+    expect(summary.mcpReport.maxBytes).toBeLessThanOrEqual(950);
+    expect(summary.mcpReport.searchText).toContain('## machines');
+    expect(summary.mcpReport.callText).toBe('executed:machines');
+    expect(executed).toEqual([{ name: 'machines', params: {} }]);
+    expect(summary.promptText).toContain('Base system instructions.');
+    expect(summary.promptText).toContain('## Cairn Tool Reference');
+    expect(summary.promptText).toContain('### create_todo');
+    expect(summary.promptText).toContain((createTodoDef as RemoteToolDef).description);
+    expect(summary.promptText).toContain('Inspect machines and create a todo.');
   });
 });

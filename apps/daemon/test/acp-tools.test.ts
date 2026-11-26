@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { createServer as createHttpServer } from 'node:http';
 import { createConnection } from 'node:net';
 import { createInterface } from 'node:readline';
-import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS, CORE_COORDINATOR_TOOLS } from '@cairn/shared';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -320,6 +320,198 @@ describe('ACP stdio host tools lifecycle', () => {
       upstream.closeAllConnections();
       redirectTarget.close();
       redirectTarget.closeAllConnections();
+    }
+  });
+
+  test('compacts oversized eager tools and exposes deferred tools via tool_search and call_tool', async () => {
+    const remoteTools = CHIEF_REMOTE_TOOLS.map((tool) =>
+      CORE_COORDINATOR_TOOLS.has(tool.name) ? tool : { ...tool, deferred: true },
+    );
+    const executeRemoteTool = vi.fn(async (name: string) => `ran:${name}`);
+    const bridge = await openAcpTools(
+      { ...opts, remoteTools, executeRemoteTool },
+      { maxToolBytes: 950, deferTools: true },
+    );
+    expect(bridge).not.toBeNull();
+    if (!bridge) throw new Error('Missing bridge');
+
+    expect(bridge.toolNames).toContain('create_todo');
+    expect(bridge.toolNames).toContain('todos');
+    expect(bridge.toolNames).toContain('tool_search');
+    expect(bridge.toolNames).toContain('call_tool');
+    expect(bridge.toolNames).not.toContain('projects');
+    expect(bridge.toolNames).not.toContain('machines');
+    expect(bridge.toolNames).not.toContain('update_todo');
+
+    const originalCreateTodo = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'create_todo');
+    expect(originalCreateTodo).toBeDefined();
+    expect(bridge.systemPromptAppendix).toContain('## Cairn Tool Reference');
+    expect(bridge.systemPromptAppendix).toContain('### create_todo');
+    expect(bridge.systemPromptAppendix).toContain(originalCreateTodo?.description ?? '');
+
+    const rpc = spawnStdioRpc(bridge.declaration);
+    try {
+      await rpc.call('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '1' },
+      });
+      const listed = (await rpc.call('tools/list')) as {
+        result: {
+          tools: Array<{
+            name: string;
+            description: string;
+            inputSchema: {
+              required?: string[];
+              properties?: Record<string, { type?: string }>;
+            };
+          }>;
+        };
+      };
+      const listedNames = listed.result.tools.map((tool) => tool.name);
+      expect(listedNames).toEqual([...bridge.toolNames]);
+      expect(listedNames).toContain('create_todo');
+      expect(listedNames).toContain('todos');
+      expect(listedNames).toContain('tool_search');
+      expect(listedNames).toContain('call_tool');
+      expect(listedNames).not.toContain('projects');
+      expect(listedNames).not.toContain('machines');
+      expect(listedNames).not.toContain('update_todo');
+
+      for (const tool of listed.result.tools) {
+        const bytes = Buffer.byteLength(
+          JSON.stringify({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema,
+          }),
+          'utf8',
+        );
+        expect(bytes).toBeLessThanOrEqual(950);
+      }
+
+      const listedCreateTodo = listed.result.tools.find((tool) => tool.name === 'create_todo');
+      expect(listedCreateTodo?.inputSchema.required).toEqual(['title']);
+      const originalProps = (
+        originalCreateTodo?.parameters as { properties?: Record<string, { type?: string }> }
+      )?.properties;
+      for (const [key, value] of Object.entries(originalProps ?? {})) {
+        expect(listedCreateTodo?.inputSchema.properties?.[key]?.type).toBe(value.type);
+      }
+
+      const searchMachines = (await rpc.call('tools/call', {
+        name: 'tool_search',
+        arguments: { query: 'machines' },
+      })) as { result: { content: Array<{ text: string }> } };
+      expect(searchMachines.result.content[0]?.text).toContain('## machines');
+      expect(searchMachines.result.content[0]?.text).toContain('call_tool');
+
+      const searchAll = (await rpc.call('tools/call', {
+        name: 'tool_search',
+        arguments: { query: '*' },
+      })) as { result: { content: Array<{ text: string }> } };
+      expect(searchAll.result.content[0]?.text).toContain('machines');
+      expect(searchAll.result.content[0]?.text).toContain('projects');
+      expect(searchAll.result.content[0]?.text).toContain('update_todo');
+
+      const callMachines = (await rpc.call('tools/call', {
+        name: 'call_tool',
+        arguments: { name: 'machines', arguments: {} },
+      })) as { result: { content: Array<{ text: string }>; isError?: boolean } };
+      expect(callMachines.result.isError).toBeUndefined();
+      expect(callMachines.result.content[0]?.text).toBe('ran:machines');
+      expect(executeRemoteTool).toHaveBeenCalledWith('machines', {});
+
+      executeRemoteTool.mockClear();
+      const callEagerViaCallTool = (await rpc.call('tools/call', {
+        name: 'call_tool',
+        arguments: { name: 'create_todo', arguments: { title: 'x' } },
+      })) as { result: { content: Array<{ text: string }>; isError?: boolean } };
+      expect(callEagerViaCallTool.result.isError).toBe(true);
+      expect(executeRemoteTool).not.toHaveBeenCalled();
+
+      const callUnknown = (await rpc.call('tools/call', {
+        name: 'call_tool',
+        arguments: { name: 'unknown_tool', arguments: {} },
+      })) as { result: { content: Array<{ text: string }>; isError?: boolean } };
+      expect(callUnknown.result.isError).toBe(true);
+      expect(executeRemoteTool).not.toHaveBeenCalled();
+
+      const directDeferred = await rpc.call('tools/call', {
+        name: 'machines',
+        arguments: {},
+      });
+      expect(directDeferred.error).toBeDefined();
+      expect(executeRemoteTool).not.toHaveBeenCalled();
+    } finally {
+      rpc.close();
+      bridge.close();
+    }
+  });
+
+  test('compaction preserves a parameter literally named description while stripping schema descriptions', async () => {
+    const oversizedWithDescriptionParam = {
+      name: 'save_note',
+      description: `Save a note. ${'Details. '.repeat(120)}`,
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Title of the note.' },
+          description: { type: 'string', description: 'Body description of the note.' },
+        },
+        required: ['title', 'description'],
+      },
+    };
+    const bridge = await openAcpTools(
+      {
+        ...opts,
+        remoteTools: [oversizedWithDescriptionParam],
+        executeRemoteTool: async () => 'saved',
+      },
+      { maxToolBytes: 400 },
+    );
+    expect(bridge).not.toBeNull();
+    if (!bridge) throw new Error('Missing bridge');
+    expect(bridge.systemPromptAppendix).toContain('### save_note');
+
+    const rpc = spawnStdioRpc(bridge.declaration);
+    try {
+      await rpc.call('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '1' },
+      });
+      const listed = (await rpc.call('tools/list')) as {
+        result: {
+          tools: Array<{
+            name: string;
+            description: string;
+            inputSchema: {
+              properties?: Record<string, { type?: string; description?: string }>;
+              required?: string[];
+            };
+          }>;
+        };
+      };
+      const tool = listed.result.tools[0];
+      expect(tool?.name).toBe('save_note');
+      expect(tool?.inputSchema.required).toEqual(['title', 'description']);
+      expect(tool?.inputSchema.properties?.description?.type).toBe('string');
+      expect(tool?.inputSchema.properties?.description?.description).toBeUndefined();
+      expect(tool?.inputSchema.properties?.title?.description).toBeUndefined();
+      expect(
+        Buffer.byteLength(
+          JSON.stringify({
+            name: tool?.name,
+            description: tool?.description,
+            inputSchema: tool?.inputSchema,
+          }),
+          'utf8',
+        ),
+      ).toBeLessThanOrEqual(400);
+    } finally {
+      rpc.close();
+      bridge.close();
     }
   });
 });

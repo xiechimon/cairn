@@ -667,16 +667,19 @@ class AcpBackend implements AgentBackend {
         'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
       );
     const policy = acpTurnPolicy(opts);
-    const hostToolNames = [...(opts.remoteTools ?? []), ...(opts.localTools ?? [])].map(
-      (tool) => tool.name,
-    );
     const validated = validateGeminiSession({
       cwd: opts.cwd,
       modelId: opts.modelId,
       ...(resumeId !== undefined ? { resumeId } : {}),
       ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
     });
-    const hostTools = await openAcpTools(opts);
+    const hostTools = await openAcpTools(
+      opts,
+      adapter?.harness === 'antigravity' ? { maxToolBytes: 950, deferTools: true } : undefined,
+    );
+    const hostToolNames =
+      hostTools?.toolNames ??
+      [...(opts.remoteTools ?? []), ...(opts.localTools ?? [])].map((tool) => tool.name);
     const mcpBridges: AcpStdioBridge[] = [];
     const spawnProcess = this.options.spawnProcess ?? spawn;
     const resolver = adapter?.resolveLaunch ?? this.options.resolveLaunch;
@@ -1046,11 +1049,15 @@ class AcpBackend implements AgentBackend {
           }
         }
       }
+      const combinedSystemPrompt =
+        opts.systemPrompt && hostTools?.systemPromptAppendix
+          ? `${opts.systemPrompt}\n\n${hostTools.systemPromptAppendix}`
+          : (opts.systemPrompt ?? hostTools?.systemPromptAppendix);
       session = new AcpSession(
         sessionId,
         connection,
-        opts.systemPrompt && validated.prompt !== undefined
-          ? `${opts.systemPrompt}\n\n${validated.prompt}`
+        combinedSystemPrompt && validated.prompt !== undefined
+          ? `${combinedSystemPrompt}\n\n${validated.prompt}`
           : validated.prompt,
         (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
         caps?.promptCapabilities?.image === true,
