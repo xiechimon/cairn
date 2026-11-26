@@ -4,7 +4,6 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { countMetric, METRICS } from './baseline-ledger.mjs';
-import { collectDocDrift, renderDriftSection } from './doc-drift.mjs';
 
 const WINDOW_DAYS = 7;
 const MIN_NEW_SITES = 3;
@@ -86,7 +85,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     };
     const now = new Date(option('--now') ?? Date.now());
     const outDir = option('--out') ?? '.gardener';
-    const withDrift = args.includes('--drift');
     const git = (...gitArgs) =>
       execFileSync('git', gitArgs, {
         encoding: 'utf8',
@@ -164,17 +162,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       '',
     ].join('\n');
 
-    const drift = withDrift ? collectDocDrift() : null;
-    const summary = drift ? report + renderDriftSection(drift) : report;
     mkdirSync(outDir, { recursive: true });
-    writeFileSync(join(outDir, `weekly-${now.toISOString().slice(0, 10)}.md`), summary);
-    if (drift) {
-      writeFileSync(
-        join(outDir, `drift-${now.toISOString().slice(0, 10)}.json`),
-        JSON.stringify(drift.rows, null, 2),
-      );
-    }
-    process.stdout.write(summary);
+    writeFileSync(join(outDir, `weekly-${now.toISOString().slice(0, 10)}.md`), report);
+    process.stdout.write(report);
   } catch (error) {
     console.error(`gardener-weekly: ${error.message}`);
     process.exitCode = 2;

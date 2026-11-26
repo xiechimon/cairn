@@ -23,6 +23,12 @@
       "pattern": "\\bDESIGN-RULES\\.md\\b",
       "canary": "apps/web/DESIGN-RULES.md",
       "reason": "the file was removed; rule rows live in the Rules section of docs/design/surfaces/*.md"
+    },
+    {
+      "id": "doc-drift-sweep",
+      "pattern": "\\bdoc-drift\\b",
+      "canary": "node scripts/doc-drift.mjs",
+      "reason": "the spec drift sweep was removed; living docs are kept true by the change that retires a mechanism and a monthly agent review"
     }
   ],
   "baseline": {
@@ -60,6 +66,7 @@
     "manual-queue-main": {
       "AGENTS.md": 3
     },
-    "design-rules-file": {}
+    "design-rules-file": {},
+    "doc-drift-sweep": {}
   }
 }

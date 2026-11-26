@@ -14,7 +14,6 @@
   "scripts/delivery-metrics.test.mjs": 3,
   "scripts/dispatch-agent.test.mjs": 10,
   "scripts/dispatch-dedupe.test.mjs": 4,
-  "scripts/doc-drift.test.mjs": 1,
   "scripts/english-only-gate.test.mjs": 2,
   "scripts/epic-done.test.mjs": 6,
   "scripts/escape-trace.test.mjs": 3,
