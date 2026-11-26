@@ -553,7 +553,8 @@ export function hasPendingSend(entries: readonly OutboxEntry[]): boolean {
   return entries.some(
     (entry) =>
       entry.state === 'sending' ||
-      (entry.state === 'failed' && (entry.scope === null || entry.unsaved === true)),
+      (entry.state === 'failed' &&
+        (entry.task !== undefined || entry.scope === null || entry.unsaved === true)),
   );
 }
 

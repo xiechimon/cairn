@@ -8,7 +8,6 @@ import type { Deliver, SendFailed } from '../chief/outbox.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { describeError } from '../lib/error-copy.js';
-import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import {
   markTaskReadyToSettle,
   taskIsWatched,
@@ -68,11 +67,7 @@ export function openTaskChat(todoId: string): () => void {
 }
 
 export function liveTaskDelivery(deliver: Deliver): Deliver {
-  return (entry, signal) =>
-    deliver(entry, signal).catch((error: unknown) => {
-      if (entry.task !== undefined && !taskIsWatched(entry.task.todoId)) markErrorSurfaced(error);
-      throw error;
-    });
+  return (entry, signal) => deliver(entry, signal).catch(reportedByOutbox);
 }
 
 export function liveTaskSendFailed(t: TFunc): SendFailed {
@@ -109,10 +104,9 @@ export function useTaskOutboxResume(): void {
     if (!live || account === null) return;
     void taskOutbox.resume(
       account,
-      (entry, signal) =>
-        taskDelivery(latest.current.mutations, latest.current.qc)(entry, signal).catch(
-          reportedByOutbox,
-        ),
+      liveTaskDelivery((entry, signal) =>
+        taskDelivery(latest.current.mutations, latest.current.qc)(entry, signal),
+      ),
       {
         awaitRefetch: (entry) => entry.task?.mode === 'reply',
         onFailed: (entry, error, repeat) =>
