@@ -783,11 +783,11 @@ describe('the context meter under the in-server Coordinator', () => {
 
   test('separates current engine/model/runner from historical turns and formats model names cleanly', async () => {
     const oldMachineId = insertMachine(H.s, {
-      name: 'xmonsMac-3574.local',
+      name: 'studioMac-0001.local',
       capabilities: { osPlatform: 'darwin', executor: 'host', mcpServers: [], skills: [] },
     });
     const newMachineId = insertMachine(H.s, {
-      name: 'Ians-Mac-mini',
+      name: 'Studio-Mac-mini',
       capabilities: { osPlatform: 'darwin', executor: 'host', mcpServers: [], skills: [] },
     });
     H.s.db
@@ -836,7 +836,7 @@ describe('the context meter under the in-server Coordinator', () => {
     expect(envelope.usage).toMatchObject({
       turns: 2,
       engines: ['Claude Code', 'Devin'],
-      machines: ['xmonsMac-3574.local', 'Ians-Mac-mini'],
+      machines: ['studioMac-0001.local', 'Studio-Mac-mini'],
       latest: {
         engine: 'Devin',
         engineRuntime: 'devin',
@@ -849,7 +849,7 @@ describe('the context meter under the in-server Coordinator', () => {
         },
         machine: {
           id: newMachineId,
-          name: 'Ians-Mac-mini',
+          name: 'Studio-Mac-mini',
           osPlatform: 'darwin',
         },
       },
@@ -861,10 +861,10 @@ describe('the context meter under the in-server Coordinator', () => {
       'Claude Opus 5.5',
     ]);
     expect(envelope.usage?.machineDetails).toEqual([
-      expect.objectContaining({ id: newMachineId, name: 'Ians-Mac-mini', osPlatform: 'darwin' }),
+      expect.objectContaining({ id: newMachineId, name: 'Studio-Mac-mini', osPlatform: 'darwin' }),
       expect.objectContaining({
         id: oldMachineId,
-        name: 'xmonsMac-3574.local',
+        name: 'studioMac-0001.local',
         osPlatform: 'darwin',
       }),
     ]);

@@ -64,7 +64,7 @@ async function stubMentionSources(page: Page) {
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await page.route('**/api/skills?*', (route) => route.fulfill({ json: SKILLS }));
   await page.route(`**/api/teams/${TEAM_ID}/machines`, (route) =>
-    route.fulfill({ json: [{ id: 'machine-1', name: 'xmonsMac' }] }),
+    route.fulfill({ json: [{ id: 'machine-1', name: 'studioMac' }] }),
   );
   await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route, request) => {
     if (request.method() !== 'GET') return route.fallback();

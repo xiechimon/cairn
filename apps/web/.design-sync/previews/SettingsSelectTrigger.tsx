@@ -2,7 +2,7 @@ import { Select, SelectContent, SelectItem, SelectValue, SettingsCard, SettingsR
 
 const machines = [
   { value: 'omarchy', label: 'omarchy' },
-  { value: 'xmonsMac', label: 'xmonsMac' },
+  { value: 'studioMac', label: 'studioMac' },
 ];
 
 export const Closed = () => (

@@ -485,7 +485,7 @@ const MD_TOOL_OUTPUTS = [
 ];
 
 const MD_TOOLOUT_TRANSCRIPT: TranscriptItem[] = [
-  { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
+  { kind: 'run', at: '13:35', machine: 'studioMac-0001' },
   {
     kind: 'user',
     text: '列出仓库根目录并打印一句问候',
@@ -546,7 +546,7 @@ export const agentTodoLive: FixtureSet = {
 };
 
 const SKILLS_ROUTING_TRANSCRIPT: TranscriptItem[] = [
-  { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
+  { kind: 'run', at: '13:35', machine: 'studioMac-0001' },
   {
     kind: 'user',
     text: '写一首深夜写代码主题的三行俳句，保存到 haiku.txt',

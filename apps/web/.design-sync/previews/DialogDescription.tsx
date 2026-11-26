@@ -6,7 +6,7 @@ export const Description = () => (
       <DialogHeader>
         <DialogTitle>Evacuate machine omarchy</DialogTitle>
         <DialogDescription>
-          Agents on omarchy move to xmonsMac. Running builds finish first; new steps are dispatched to the target machine.
+          Agents on omarchy move to studioMac. Running builds finish first; new steps are dispatched to the target machine.
         </DialogDescription>
       </DialogHeader>
       <DialogFooter>

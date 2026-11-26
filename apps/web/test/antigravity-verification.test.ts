@@ -60,13 +60,13 @@ describe('antigravity verification and named-runner status', () => {
       await new Promise((resolve) => setTimeout(resolve, 140));
       return {
         ok: true,
-        runnerName: 'xmonsMac',
+        runnerName: 'studioMac',
         check: {
           at: Date.now(),
           ok: true,
           reason: null,
           check: 'sign-in' as const,
-          command: 'agy acp · xmonsMac',
+          command: 'agy acp · studioMac',
           model: null,
           durationMs: 1,
         },
@@ -74,7 +74,7 @@ describe('antigravity verification and named-runner status', () => {
     });
     expect(outcome.phase).toBe('passed');
     if (outcome.phase !== 'passed') return;
-    expect(outcome.runnerName).toBe('xmonsMac');
+    expect(outcome.runnerName).toBe('studioMac');
     expect(outcome.check?.durationMs).toBeGreaterThanOrEqual(120);
   });
 
@@ -82,19 +82,19 @@ describe('antigravity verification and named-runner status', () => {
     const account: SubscriptionAccount = {
       ...BASE_ACCOUNT,
       runnerId: 'm-mini',
-      runnerName: 'Ians-Mac-mini',
+      runnerName: 'Studio-Mac-mini',
       runnerLogin: 'missing_local_login',
       runnerModels: [],
       runnerLogins: [
-        { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
-        { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' },
+        { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'ok' },
       ],
     };
     const view = subscriptionStatusView(account, NOW, t, clock);
     expect(view.tone).toBe('warn');
-    expect(view.label).toBe('Ians-Mac-mini 未登录，已在 xmonsMac 登录');
+    expect(view.label).toBe('Studio-Mac-mini 未登录，已在 studioMac 登录');
     expect(view.reason).toBe(
-      '这个订阅绑定在 Ians-Mac-mini。请在 Ians-Mac-mini 上登录 Antigravity，或改用 API key。',
+      '这个订阅绑定在 Studio-Mac-mini。请在 Studio-Mac-mini 上登录 Antigravity，或改用 API key。',
     );
   });
 
@@ -106,13 +106,13 @@ describe('antigravity verification and named-runner status', () => {
       runnerLogin: 'unavailable',
       runnerModels: [],
       runnerLogins: [
-        { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
-        { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'missing_local_login' },
+        { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'missing_local_login' },
       ],
     };
     const view = subscriptionStatusView(account, NOW, t, clock);
     expect(view.tone).toBe('warn');
-    expect(view.label).toBe('Ians-Mac-mini, xmonsMac 未登录');
+    expect(view.label).toBe('Studio-Mac-mini, studioMac 未登录');
     expect(view.reason).toBe(
       '这个订阅尚未绑定执行机。请先在目标执行机登录 Antigravity，或改用 API key。',
     );
@@ -122,17 +122,17 @@ describe('antigravity verification and named-runner status', () => {
     const account: SubscriptionAccount = {
       ...BASE_ACCOUNT,
       runnerId: 'm-mac',
-      runnerName: 'xmonsMac',
+      runnerName: 'studioMac',
       runnerLogin: 'ok',
       runnerModels: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
       runnerLogins: [
-        { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
-        { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' },
+        { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'ok' },
       ],
     };
     const html = renderDetail(account);
     expect(html).toContain('data-tone="ok"');
-    expect(html).toContain('已在 xmonsMac 登录，Ians-Mac-mini 未登录');
+    expect(html).toContain('已在 studioMac 登录，Studio-Mac-mini 未登录');
     expect(html).not.toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>未登录</);
   });
 
@@ -140,18 +140,18 @@ describe('antigravity verification and named-runner status', () => {
     const account: SubscriptionAccount = {
       ...BASE_ACCOUNT,
       runnerId: 'm-mini',
-      runnerName: 'Ians-Mac-mini',
+      runnerName: 'Studio-Mac-mini',
       runnerLogin: 'unavailable',
       runnerModels: [],
       runnerLogins: [
-        { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'unavailable' },
-        { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' },
+        { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'unavailable' },
+        { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'ok' },
       ],
     };
     const view = subscriptionStatusView(account, NOW, t, clock);
     expect(view.tone).toBe('warn');
-    expect(view.label).toBe('Ians-Mac-mini 无法验证 · 已在 xmonsMac 登录');
-    expect(view.reason).toContain('Ians-Mac-mini');
+    expect(view.label).toBe('Studio-Mac-mini 无法验证 · 已在 studioMac 登录');
+    expect(view.reason).toContain('Studio-Mac-mini');
     expect(view.reason).not.toContain('登录已失效');
   });
 
@@ -239,7 +239,7 @@ describe('antigravity verification and named-runner status', () => {
           ok: true,
           reason: null,
           check: 'sign-in',
-          command: 'agy acp · xmonsMac',
+          command: 'agy acp · studioMac',
           via: 'cli',
           model: null,
           durationMs: 1200,
@@ -251,7 +251,7 @@ describe('antigravity verification and named-runner status', () => {
     );
     expect(cliCheck).toContainEqual({
       label: '验证命令',
-      value: 'agy acp · xmonsMac',
+      value: 'agy acp · studioMac',
       code: true,
     });
 

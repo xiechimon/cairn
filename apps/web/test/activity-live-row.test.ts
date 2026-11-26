@@ -324,13 +324,13 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
   }
 
   test.each([
-    ['a named machine with steps ahead', { position: 2, waitingFor: { machineId: 'm1', name: 'xmonsMac' } }],
+    ['a named machine with steps ahead', { position: 2, waitingFor: { machineId: 'm1', name: 'studioMac' } }],
     ['any free Runner', { position: 1, waitingFor: null }],
     [
       'an offline machine',
       {
         position: 1,
-        waitingFor: { machineId: 'm1', name: 'xmonsMac' },
+        waitingFor: { machineId: 'm1', name: 'studioMac' },
         blocked: { kind: 'machine-offline' as const, missing: [] },
       },
     ],
@@ -338,7 +338,7 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
       'an offline machine of a platform',
       {
         position: 3,
-        waitingFor: { machineId: 'm1', name: 'xmonsMac' },
+        waitingFor: { machineId: 'm1', name: 'studioMac' },
         blocked: { kind: 'machine-offline' as const, missing: [], platform: 'macos' as const },
       },
     ],
@@ -384,7 +384,7 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
       steps: [
         queuedStep({
           position: 1,
-          waitingFor: { machineId: 'm1', name: 'xmonsMac' },
+          waitingFor: { machineId: 'm1', name: 'studioMac' },
           blocked: { kind: 'machine-retired', missing: [] },
         }),
       ],
@@ -398,10 +398,10 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     expect(row.blocked).toBe(true);
     expect(row.blockedKind).toBe('machine-retired');
     expect(translate('zh', EN, row.label, row.labelVars)).toBe(
-      '排队中：xmonsMac 已删除或注销，这一步不会改派——重新注册这台执行机，或在「设置 → 模型」中重新配置',
+      '排队中：studioMac 已删除或注销，这一步不会改派——重新注册这台执行机，或在「设置 → 模型」中重新配置',
     );
     expect(translate('en', EN, row.label, row.labelVars)).toBe(
-      'Queued: xmonsMac is deleted or revoked and this step is not moved to another Runner. Register that Runner again, or update the configuration under Settings → Model',
+      'Queued: studioMac is deleted or revoked and this step is not moved to another Runner. Register that Runner again, or update the configuration under Settings → Model',
     );
   });
 
@@ -538,7 +538,7 @@ describe('mapChief queue projection (#1108 Q6)', () => {
   test('Q6: turnQueue with machine → one connecting verb and no queue detail; when it disappears → `处理中`', () => {
     const queuedTail = chiefOfThread({
       ...THREAD_Q,
-      turnQueue: { position: 3, waitingFor: { machineId: 'm1', name: 'xmonsMac' } },
+      turnQueue: { position: 3, waitingFor: { machineId: 'm1', name: 'studioMac' } },
     }).stream?.at(-1);
     expect(queuedTail).not.toHaveProperty('labelDetail');
     expect(
@@ -546,13 +546,13 @@ describe('mapChief queue projection (#1108 Q6)', () => {
         ...THREAD_Q,
         turnQueue: {
           position: 3,
-          waitingFor: { machineId: 'm1', name: 'xmonsMac' },
+          waitingFor: { machineId: 'm1', name: 'studioMac' },
         },
       }).stream?.at(-1),
     ).toMatchObject({
       kind: 'streaming',
       label: '正在连接 {machine}...',
-      labelVars: { machine: 'xmonsMac' },
+      labelVars: { machine: 'studioMac' },
     });
     expect(
       chiefOfThread({ ...THREAD_Q, turnQueue: { position: 1, waitingFor: null } }).stream?.at(-1),
@@ -573,14 +573,14 @@ describe('mapChief queue projection (#1108 Q6)', () => {
         ...THREAD_Q,
         turnQueue: {
           position: 1,
-          waitingFor: { machineId: 'm1', name: 'xmonsMac' },
+          waitingFor: { machineId: 'm1', name: 'studioMac' },
           blocked: { kind: 'machine-offline', missing: [] },
         },
       }).stream?.at(-1),
     ).toMatchObject({
       kind: 'streaming',
       label: '排队中：等执行机上线',
-      queueWait: { kind: 'machine-offline', machine: 'xmonsMac' },
+      queueWait: { kind: 'machine-offline', machine: 'studioMac' },
     });
   });
 

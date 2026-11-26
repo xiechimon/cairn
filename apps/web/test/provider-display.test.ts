@@ -774,8 +774,8 @@ it('announces availability for a host-login Antigravity subscription only when i
 
 it('names which runner is logged in and which is not across a multi-runner Antigravity setup', () => {
   const runnerLogins = [
-    { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' as const },
-    { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' as const },
+    { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' as const },
+    { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'ok' as const },
   ];
 
   const onMac = renderAccount(
@@ -784,7 +784,7 @@ it('names which runner is logged in and which is not across a multi-runner Antig
       vendor: 'antigravity',
       hasToken: false,
       runnerId: 'm-mac',
-      runnerName: 'xmonsMac',
+      runnerName: 'studioMac',
       runnerLogin: 'ok',
       runnerModels: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
       runnerLogins,
@@ -792,8 +792,8 @@ it('names which runner is logged in and which is not across a multi-runner Antig
     [],
   );
   expect(onMac.row).toContain('data-tone="ok"');
-  expect(onMac.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('已在 xmonsMac 登录，Ians-Mac-mini 未登录');
-  expect(onMac.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>已在 xmonsMac 登录，Ians-Mac-mini 未登录/);
+  expect(onMac.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('已在 studioMac 登录，Studio-Mac-mini 未登录');
+  expect(onMac.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>已在 studioMac 登录，Studio-Mac-mini 未登录/);
 
   const onMini = renderAccount(
     {
@@ -801,7 +801,7 @@ it('names which runner is logged in and which is not across a multi-runner Antig
       vendor: 'antigravity',
       hasToken: false,
       runnerId: 'm-mini',
-      runnerName: 'Ians-Mac-mini',
+      runnerName: 'Studio-Mac-mini',
       runnerLogin: 'missing_local_login',
       runnerModels: [],
       runnerLogins,
@@ -809,9 +809,9 @@ it('names which runner is logged in and which is not across a multi-runner Antig
     [],
   );
   expect(onMini.row).toContain('data-tone="warn"');
-  expect(onMini.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('Ians-Mac-mini 未登录，已在 xmonsMac 登录');
+  expect(onMini.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('Studio-Mac-mini 未登录，已在 studioMac 登录');
   expect(onMini.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).not.toContain('可用');
-  expect(onMini.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>Ians-Mac-mini 未登录，已在 xmonsMac 登录/);
+  expect(onMini.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>Studio-Mac-mini 未登录，已在 studioMac 登录/);
 
   const unbound = renderAccount(
     {
@@ -827,7 +827,7 @@ it('names which runner is logged in and which is not across a multi-runner Antig
     [],
   );
   expect(unbound.row).toContain('data-tone="warn"');
-  expect(unbound.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>已在 xmonsMac 登录，Ians-Mac-mini 未登录/);
+  expect(unbound.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>已在 studioMac 登录，Studio-Mac-mini 未登录/);
 
   const offlineMini = renderAccount(
     {
@@ -835,19 +835,19 @@ it('names which runner is logged in and which is not across a multi-runner Antig
       vendor: 'antigravity',
       hasToken: false,
       runnerId: 'm-mini',
-      runnerName: 'Ians-Mac-mini',
+      runnerName: 'Studio-Mac-mini',
       runnerLogin: 'unavailable',
       runnerOffline: true,
       runnerModels: [],
       runnerLogins: [
-        { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: false, status: 'unavailable' as const },
-        { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' as const },
+        { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: false, status: 'unavailable' as const },
+        { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'ok' as const },
       ],
     },
     [],
   );
   expect(offlineMini.row).toContain('data-tone="warn"');
-  expect(offlineMini.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>执行机 Ians-Mac-mini 离线 · 已在 xmonsMac 登录/);
+  expect(offlineMini.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>执行机 Studio-Mac-mini 离线 · 已在 studioMac 登录/);
 });
 
 it.each([

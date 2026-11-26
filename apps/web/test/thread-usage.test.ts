@@ -232,7 +232,7 @@ describe('thread run window and engines from the step journal', () => {
         usage({ buildId: 'b1', model: 'claude-code/claude-haiku-5-5' }),
         usage({ buildId: 'b2', model: 'swe-2-1-medium' }),
       ],
-      ['xmonsMac-3574.local', 'Ians-Mac-mini'],
+      ['studioMac-0001.local', 'Studio-Mac-mini'],
       steps,
       6000,
     );
@@ -240,8 +240,8 @@ describe('thread run window and engines from the step journal', () => {
     expect(summary.historyEngines).toEqual([{ label: 'Claude Code', runtime: 'claude-code' }]);
     expect(summary.latestModel).toMatchObject({ modelId: 'swe-2-1-medium', modelName: 'SWE-2.1' });
     expect(summary.historyModels?.map((m) => m.modelName)).toEqual(['Claude Haiku 5.5']);
-    expect(summary.latestMachine).toMatchObject({ name: 'Ians-Mac-mini' });
-    expect(summary.historyMachines?.map((m) => m.name)).toEqual(['xmonsMac-3574.local']);
+    expect(summary.latestMachine).toMatchObject({ name: 'Studio-Mac-mini' });
+    expect(summary.historyMachines?.map((m) => m.name)).toEqual(['studioMac-0001.local']);
   });
 });
 
@@ -278,7 +278,7 @@ describe('live activity usage and context merging', () => {
       activity,
       'build-new',
     );
-    const summary = threadUsageSummary(merged, ['Ians-Mac-mini']);
+    const summary = threadUsageSummary(merged, ['Studio-Mac-mini']);
     expect(summary.cost).toBe('$1.25');
     expect(summary.tokens).toBe('12k');
     expect(summary.cached).toBe('81.1%');

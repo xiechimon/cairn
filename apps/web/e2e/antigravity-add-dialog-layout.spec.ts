@@ -17,14 +17,14 @@ interface MachineStub {
 
 const LOCAL_MAC: MachineStub = {
   id: 'm-local',
-  name: 'xmonsMac',
+  name: 'studioMac',
   kind: 'local',
   online: true,
 };
 
 const MAC_MINI: MachineStub = {
   id: 'm-mini',
-  name: 'Ians-Mac-mini',
+  name: 'Studio-Mac-mini',
   kind: 'remote',
   online: true,
 };
@@ -170,7 +170,7 @@ for (const viewport of [
     );
     const loginButton = dialog.getByTestId('antigravity-local-login');
     await expect(loginButton).toBeVisible();
-    await expect(loginButton).toHaveText('在 Ians-Mac-mini 上登录 Antigravity');
+    await expect(loginButton).toHaveText('在 Studio-Mac-mini 上登录 Antigravity');
     await expect(dialog).not.toContainText('会打开浏览器');
 
     const afterDialog = await dialog.boundingBox();

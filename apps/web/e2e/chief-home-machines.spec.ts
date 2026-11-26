@@ -11,7 +11,7 @@ test('the computer chip names the Coordinator machine, its state and any offline
   page,
 }) => {
   await page.goto(HOME);
-  await expect(chip(page)).toHaveAccessibleName(/xmonsMac/);
+  await expect(chip(page)).toHaveAccessibleName(/studioMac/);
   await expect(chip(page)).not.toHaveAccessibleName(/在线/);
   await expect(chip(page)).not.toHaveAccessibleName(/在跑/);
   await expect(chip(page)).not.toHaveAccessibleName(/\+1/);
@@ -33,8 +33,8 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   await expect(panel(page).getByRole('heading', { name: '你的电脑' })).toHaveCount(0);
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0)).toContainText('xmonsMac');
-  await expect(rows.nth(0)).toHaveText('xmonsMac');
+  await expect(rows.nth(0)).toContainText('studioMac');
+  await expect(rows.nth(0)).toHaveText('studioMac');
   await expect(rows.nth(0)).not.toContainText('Coordinator');
   await expect(rows.nth(1)).toContainText('omarchy');
   await expect(rows.nth(1)).toContainText('离线');
@@ -53,7 +53,7 @@ test('each computer is one card in the list with no detail page, tabs or back co
   await page.goto(`${HOME}&pane=machines`);
   await expect(panel(page).getByTestId('machine-card')).toHaveCount(2);
   await expect(panel(page).getByRole('tab')).toHaveCount(0);
-  await expect(panel(page).getByRole('button', { name: /^(xmonsMac|omarchy)$/ })).toHaveCount(0);
+  await expect(panel(page).getByRole('button', { name: /^(studioMac|omarchy)$/ })).toHaveCount(0);
   await expect(panel(page).getByRole('button', { name: '所有电脑' })).toHaveCount(0);
   await expect(panel(page).getByText('Agent 的权限')).toHaveCount(0);
   await expect(panel(page).getByRole('switch')).toHaveCount(0);
@@ -80,7 +80,7 @@ test('the chip badge is green when every computer is online and the sidebar has 
 
 test('the chip name carries the Coordinator machine and its state', async ({ page }) => {
   await page.goto(HOME);
-  await expect(chip(page)).toHaveAccessibleName('执行机 · xmonsMac · 1 台离线（omarchy）');
+  await expect(chip(page)).toHaveAccessibleName('执行机 · studioMac · 1 台离线（omarchy）');
 });
 
 test('at phone width the chip stays an icon and the title stays for screen readers', async ({ page }) => {
@@ -100,7 +100,7 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   for (const [name, tip] of [
     ['任务', '任务，3 件等你'],
     ['成果', '成果'],
-    ['执行机', '执行机 · xmonsMac · 1 台离线（omarchy）'],
+    ['执行机', '执行机 · studioMac · 1 台离线（omarchy）'],
   ] as const) {
     const button = page.getByTestId('home-c-pane-buttons').getByRole('button', { name });
     await button.hover();
@@ -117,7 +117,7 @@ test('the computers and the add row are rows in one outlined list card, each wit
   await page.goto('/app?scenario=home-c-machines&pane=machines');
   const rows = panel(page).getByTestId('machine-list-row');
   await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText('xmonsMac');
+  await expect(rows.nth(0)).toContainText('studioMac');
   const dots = panel(page).getByTestId('machine-status-dot');
   await expect(dots).toHaveCount(4);
   await expect(dots.nth(0)).toHaveAttribute('data-online', 'true');

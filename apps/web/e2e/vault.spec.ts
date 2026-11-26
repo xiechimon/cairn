@@ -31,7 +31,7 @@ test('the vault lists saved site logins masked and site authorizations with revo
   const grants = page.getByTestId('resource-group').nth(1);
   await expect(grants.getByText('github.com', { exact: true })).toBeVisible();
   await expect(grants.getByText('www.notion.so', { exact: true })).toBeVisible();
-  await expect(grants.getByText('xmonsMac-3574.local', { exact: true }).first()).toBeVisible();
+  await expect(grants.getByText('studioMac-0001.local', { exact: true }).first()).toBeVisible();
   await expect(grants.getByTestId('vault-grant-revoke')).toHaveCount(1);
   await expect(grants.getByText('已失效', { exact: true })).toBeVisible();
   await expect(grants.getByText('已撤销', { exact: true })).toBeVisible();

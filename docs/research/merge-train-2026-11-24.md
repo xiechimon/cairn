@@ -75,7 +75,7 @@ Measured directly via `gh run list` and `gh api repos/xiechimon/cairn/actions/ru
 ### 2.3 Four concrete bottlenecks exposed by today's manual `train-1` / `train-3` / `train-5` runs
 
 1. **Defect #1 — 2× identical CI tax (`preflight` → `queue/main` on the exact same SHA)**:
-   - `train-3` (`bb12a7008`, 6 commits) passed `preflight/xmonsMac-3574.local/train-3` (run `45353705974`) in **32.5m** (`08:09:40Z → 08:42:13Z`; `e2e-gate` done at `08:19:03Z`, `eval` `08:12:29Z → 08:42:09Z` = **29.7m**) `[Measured]`.
+   - `train-3` (`bb12a7008`, 6 commits) passed `preflight/studioMac-0001.local/train-3` (run `45353705974`) in **32.5m** (`08:09:40Z → 08:42:13Z`; `e2e-gate` done at `08:19:03Z`, `eval` `08:12:29Z → 08:42:09Z` = **29.7m**) `[Measured]`.
    - One minute later, pushing **that exact same SHA `bb12a7008`** to `queue/main` triggered run `45358556450` (`08:43:04Z → 09:14:00Z`, **30.9m**, `eval` `08:43:35Z → 09:13:03Z` = **29.5m**) solely because `promote-queue.mjs:54` requires `r.head_branch.startsWith('queue/')` and `ci.yml:6` triggers fresh on `queue/**` `[Measured]`.
    - Total wall-clock to land `bb12a7008` once green: **63.4 minutes** (and 2× Devin CLI eval cost) for **one identical commit** `[Measured]`.
 2. **Defect #2 — 30-minute `eval` contagion + zero fail-fast cancellation**:
@@ -84,8 +84,8 @@ Measured directly via `gh run list` and `gh api repos/xiechimon/cairn/actions/ru
 3. **Defect #3 — `push-queue --wait` preflight storm (12.1 runs/landing)**:
    - With 29 active lane branches and one serial slot, waiting lanes rebase and re-preflight repeatedly while waiting for `queue/main` to clear, flooding GitHub Actions and stalling agent sessions `[Measured]`.
 4. **Defect #4 — Manual cherry-pick trains destroy owner trailers and break `planDrop`**:
-   - On `origin/main` (`88c33945c..bb12a7008`), all 6 commits in `train-3` were stamped by `push-queue.mjs:251-264` with the single trailer `Lane: xmonsMac-3574.local/train-3` `[Measured]`.
-   - On `refs/heads/train-5` (`8ceace280..9fe12cedd`), all 6 cherry-picked commits carry **no** `Lane:` or `Amp-Thread-ID:` trailer (only the tip manual fixup `9fe12cedd` carries `Lane: xmonsMac-3574.local/train-5`) `[Measured]`.
+   - On `origin/main` (`88c33945c..bb12a7008`), all 6 commits in `train-3` were stamped by `push-queue.mjs:251-264` with the single trailer `Lane: studioMac-0001.local/train-3` `[Measured]`.
+   - On `refs/heads/train-5` (`8ceace280..9fe12cedd`), all 6 cherry-picked commits carry **no** `Lane:` or `Amp-Thread-ID:` trailer (only the tip manual fixup `9fe12cedd` carries `Lane: studioMac-0001.local/train-5`) `[Measured]`.
    - Because `planDrop` (`promote-queue.mjs:25-34`) groups consecutive tip commits by identical `ownerOf(body)` key, clobbering every commit in a train with `train-N` destroys per-lane attribution — forcing all-or-nothing eviction instead of bisecting or dropping the single offending lane `[Measured/Inferred]`.
 
 ---

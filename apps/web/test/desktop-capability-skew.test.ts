@@ -175,12 +175,12 @@ describe('desktop shell descriptor & capability negotiation', () => {
 describe('runnerStep without browser fallback', () => {
   it('treats an offline local machine as reconnectable without falling back to cairn start', () => {
     const step = runnerStep(
-      [{ name: 'xmonsMac', online: false, kind: 'local' }],
+      [{ name: 'studioMac', online: false, kind: 'local' }],
       'cairn start',
       zh,
     );
     expect(step.reconnect).toBe(true);
-    expect(step.label).toBe('xmonsMac 离线');
+    expect(step.label).toBe('studioMac 离线');
     expect(step.hint).toBe('Cairn 会在这台电脑唤醒后自动重连');
   });
 

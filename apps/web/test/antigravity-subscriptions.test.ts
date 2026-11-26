@@ -26,13 +26,13 @@ describe('extractAntigravityToken', () => {
 });
 
 describe('defaultRunnerTarget', () => {
-  const localMac = { id: 'm-local', name: 'xmonsMac', kind: 'local' as const, online: true };
-  const macMini = { id: 'm-mini', name: 'Ians-Mac-mini', kind: 'remote' as const, online: true };
+  const localMac = { id: 'm-local', name: 'studioMac', kind: 'local' as const, online: true };
+  const macMini = { id: 'm-mini', name: 'Studio-Mac-mini', kind: 'remote' as const, online: true };
 
   test('names the default runner when it is another computer', () => {
     expect(defaultRunnerTarget([localMac, macMini], macMini.id)).toEqual({
       isThisComputer: false,
-      label: 'Ians-Mac-mini',
+      label: 'Studio-Mac-mini',
     });
   });
 
@@ -50,7 +50,7 @@ describe('defaultRunnerTarget', () => {
     });
     expect(defaultRunnerTarget([localMac, macMini], localMac.id, macMini.id)).toEqual({
       isThisComputer: false,
-      label: 'xmonsMac',
+      label: 'studioMac',
     });
   });
 
@@ -68,12 +68,12 @@ describe('defaultRunnerTarget', () => {
   test('uses computerName when hostname matches the machine name', () => {
     const mini = {
       ...macMini,
-      name: 'ians-mac-mini.local',
-      capabilities: { hostname: 'ians-mac-mini.local', computerName: 'Ians-Mac-mini' },
+      name: 'studio-mac-mini.local',
+      capabilities: { hostname: 'studio-mac-mini.local', computerName: 'Studio-Mac-mini' },
     };
     expect(defaultRunnerTarget([localMac, mini], mini.id)).toEqual({
       isThisComputer: false,
-      label: 'Ians-Mac-mini',
+      label: 'Studio-Mac-mini',
     });
   });
 });

@@ -18,9 +18,9 @@ describe('fleetStatus', () => {
     const status = fleetStatus([
       machine({ id: 'a', name: 'omarchy' }),
       machine({ id: 'b', name: 'ci-box' }),
-      machine({ id: 'c', name: 'xmonsMac', online: false }),
+      machine({ id: 'c', name: 'studioMac', online: false }),
     ]);
-    expect(status).toEqual({ online: 2, offline: 1, offlineNames: ['xmonsMac'] });
+    expect(status).toEqual({ online: 2, offline: 1, offlineNames: ['studioMac'] });
   });
 
   it('ignores machines whose online flag is unknown', () => {
@@ -38,8 +38,8 @@ describe('fleetStatus', () => {
 
 describe('fleetStatusLine', () => {
   it('writes the offline count and names, with no online count', () => {
-    expect(fleetStatusLine({ online: 2, offline: 1, offlineNames: ['xmonsMac'] }, t)).toBe(
-      '1 台离线（xmonsMac）',
+    expect(fleetStatusLine({ online: 2, offline: 1, offlineNames: ['studioMac'] }, t)).toBe(
+      '1 台离线（studioMac）',
     );
   });
 

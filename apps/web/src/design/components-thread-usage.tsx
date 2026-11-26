@@ -103,8 +103,8 @@ export function ThreadUsageSection() {
                   runtime: 'pi',
                 },
               ],
-              latestRunner: { id: 'm-mini', name: 'Ians-Mac-mini', osPlatform: 'darwin' },
-              historyRunners: [{ id: 'm-mac', name: 'xmonsMac-3574.local', osPlatform: 'darwin' }],
+              latestRunner: { id: 'm-mini', name: 'Studio-Mac-mini', osPlatform: 'darwin' },
+              historyRunners: [{ id: 'm-mac', name: 'studioMac-0001.local', osPlatform: 'darwin' }],
             }}
           />
         </div>

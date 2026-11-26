@@ -192,7 +192,7 @@ export const chiefAgentChip: FixtureSet = {
   },
   detail: {
     transcript: [
-      { kind: 'run', at: '13:35', machine: 'xmonsMac-3574' },
+      { kind: 'run', at: '13:35', machine: 'studioMac-0001' },
       { kind: 'user', text: '开始执行任务', seq: 1 },
       {
         kind: 'robot',

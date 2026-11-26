@@ -168,7 +168,7 @@ describe('ContextMeterLine channel usage stats', () => {
             ],
             durationSeconds: 14,
             engines: ['Claude Code'],
-            machines: ['Ians-Mac-mini'],
+            machines: ['Studio-Mac-mini'],
             turns: 1,
           },
         }),
@@ -180,7 +180,7 @@ describe('ContextMeterLine channel usage stats', () => {
     expect(html).toContain('Claude Code');
     expect(html).toContain('14s');
     expect(html).toContain('$0.07');
-    expect(html).toContain('Ians-Mac-mini');
+    expect(html).toContain('Studio-Mac-mini');
     expect(html).not.toContain('—');
   });
 
@@ -267,7 +267,7 @@ describe('ContextMeterLine channel usage stats', () => {
             ],
             durationSeconds: 32,
             engines: ['Claude Code', 'Devin'],
-            machines: ['xmonsMac-3574.local', 'Ians-Mac-mini'],
+            machines: ['studioMac-0001.local', 'Studio-Mac-mini'],
             turns: 3,
             latest: {
               engine: 'Devin',
@@ -282,7 +282,7 @@ describe('ContextMeterLine channel usage stats', () => {
               },
               machine: {
                 id: 'm-mini',
-                name: 'Ians-Mac-mini',
+                name: 'Studio-Mac-mini',
                 osPlatform: 'darwin',
               },
             },
@@ -293,7 +293,7 @@ describe('ContextMeterLine channel usage stats', () => {
     expect(html).toContain('SWE-2.1');
     expect(html).not.toContain('swe-2-1-medium');
     expect(html).not.toContain('Claude Code');
-    expect(html).not.toContain('xmonsMac-3574.local');
+    expect(html).not.toContain('studioMac-0001.local');
     expect(html).not.toContain('Claude Haiku 5.5');
     expect(html).toContain('data-testid="usage-current-engine"');
     expect(html).toContain('data-testid="usage-current-model"');
@@ -318,7 +318,7 @@ describe('ThreadUsageRing parity and placeholder hiding', () => {
             tokens: '50k',
             cached: '80%',
             models: ['anthropic-ultra/claude-sonnet-5-5'],
-            machines: ['Ians-Mac-mini'],
+            machines: ['Studio-Mac-mini'],
             duration: '12s',
             engines: ['Cairn'],
           },

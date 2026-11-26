@@ -88,7 +88,7 @@ const MIXED_USAGE = {
   ],
   durationSeconds: 94,
   engines: ['Claude Code', 'Devin'],
-  machines: ['xmonsMac-3574.local', 'Ians-Mac-mini'],
+  machines: ['studioMac-0001.local', 'Studio-Mac-mini'],
   turns: 8,
   latest: {
     engine: 'Devin',
@@ -103,7 +103,7 @@ const MIXED_USAGE = {
     },
     machine: {
       id: 'm-mini',
-      name: 'Ians-Mac-mini',
+      name: 'Studio-Mac-mini',
       osPlatform: 'darwin',
     },
   },
@@ -158,8 +158,8 @@ const MIXED_USAGE = {
     },
   ],
   machineDetails: [
-    { id: 'm-mini', name: 'Ians-Mac-mini', osPlatform: 'darwin' },
-    { id: 'm-mac', name: 'xmonsMac-3574.local', osPlatform: 'darwin' },
+    { id: 'm-mini', name: 'Studio-Mac-mini', osPlatform: 'darwin' },
+    { id: 'm-mac', name: 'studioMac-0001.local', osPlatform: 'darwin' },
   ],
 };
 
@@ -199,13 +199,13 @@ async function setupCoordinator(page: Page, theme: 'light' | 'dark') {
       machines: [
         {
           id: 'm-mini',
-          name: 'Ians-Mac-mini',
+          name: 'Studio-Mac-mini',
           online: true,
           capabilities: { osPlatform: 'darwin' },
         },
         {
           id: 'm-mac',
-          name: 'xmonsMac-3574.local',
+          name: 'studioMac-0001.local',
           online: true,
           capabilities: { osPlatform: 'darwin' },
         },
@@ -257,7 +257,7 @@ async function setupCoordinator(page: Page, theme: 'light' | 'dark') {
             {
               runtime: 'devin',
               installed: true,
-              hostname: 'Ians-Mac-mini',
+              hostname: 'Studio-Mac-mini',
               machineId: 'm-mini',
               models: [{ id: 'swe-2-1-medium', name: 'SWE-2.1' }],
             },
@@ -317,12 +317,12 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByTestId('usage-current-engine').locator('svg')).toHaveCount(1);
     await expect(page.getByTestId('usage-current-model')).toContainText('SWE-2.1');
     await expect(page.getByTestId('usage-current-model').locator('svg')).toHaveCount(1);
-    await expect(page.getByTestId('usage-current-runner')).toContainText('Ians-Mac-mini');
+    await expect(page.getByTestId('usage-current-runner')).toContainText('Studio-Mac-mini');
     await expect(page.getByTestId('usage-current-runner').locator('svg')).toHaveCount(1);
 
     await expect(channelUsage).not.toContainText('swe-2-1-medium');
     await expect(channelUsage).not.toContainText('Claude Code');
-    await expect(channelUsage).not.toContainText('xmonsMac-3574.local');
+    await expect(channelUsage).not.toContainText('studioMac-0001.local');
     await expect(channelUsage).not.toContainText('Claude Haiku 5.5');
     await expect(channelUsage).not.toContainText('Claude Opus 5.5');
     await expect(channelUsage).not.toContainText('MiniMax-M3');

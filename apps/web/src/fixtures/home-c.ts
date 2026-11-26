@@ -179,7 +179,7 @@ export const homeC: FixtureSet = {
       {
         id: 'home-c-mac',
         kind: 'local',
-        name: 'xmonsMac',
+        name: 'studioMac',
         online: true,
         chiefHost: true,
         runningSteps: 2,

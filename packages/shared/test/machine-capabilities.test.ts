@@ -252,13 +252,13 @@ describe('D71 executor kind (Orb sandbox vs plain host)', () => {
         mcpServers: [],
         skills: [],
         computerName: 'xmon 的 MacBook Pro',
-        hostname: 'xmonsMac-3574.local',
+        hostname: 'studioMac-0001.local',
       }),
     ).toEqual({
       mcpServers: [],
       skills: [],
       computerName: 'xmon 的 MacBook Pro',
-      hostname: 'xmonsMac-3574.local',
+      hostname: 'studioMac-0001.local',
     });
     expect(
       parseReportedCapabilities({

@@ -184,7 +184,7 @@ test('project channel renders reply footer parity and channel usage stats on des
       ],
       durationSeconds: 14,
       engines: ['Claude Code'],
-      machines: ['Ians-Mac-mini'],
+      machines: ['Studio-Mac-mini'],
       turns: 1,
     },
     watches: [],
@@ -221,7 +221,7 @@ test('project channel renders reply footer parity and channel usage stats on des
   await expect(stats).toContainText('Claude Code');
   await expect(stats).toContainText('14s');
   await expect(stats).toContainText('$0.07');
-  await expect(stats).toContainText('Ians-Mac-mini');
+  await expect(stats).toContainText('Studio-Mac-mini');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByTestId('composer-plus').click();

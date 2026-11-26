@@ -4,7 +4,7 @@ const MACHINES = '/app/settings/machines?scenario=06';
 const ITEM = '[data-testid="machine-item"]';
 const PANE = '[data-testid="machine-detail"]';
 
-const LOCAL_NAME = 'xmonsMac-3574.local';
+const LOCAL_NAME = 'studioMac-0001.local';
 const LOCAL_ID = 'TlZ2sSD4EJCxjNJqVhdo_';
 
 test('local machine pinned first: data-kind=local + id handle + hostname canon', async ({ page }) => {

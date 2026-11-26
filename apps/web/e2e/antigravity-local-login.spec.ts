@@ -505,12 +505,12 @@ test('manual Verify reports real wall time, runs one live check, and keeps remot
           label: 'Antigravity 订阅',
           hasToken: false,
           runnerId: 'm-mini',
-          runnerName: 'Ians-Mac-mini',
+          runnerName: 'Studio-Mac-mini',
           runnerLogin: 'missing_local_login',
           runnerModels: [],
           runnerLogins: [
-            { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
-            { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'missing_local_login' },
+            { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' },
+            { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'missing_local_login' },
           ],
           expiresAt: null,
           enabled: true,
@@ -524,13 +524,13 @@ test('manual Verify reports real wall time, runs one live check, and keeps remot
         json({
           ok: false,
           reason: 'missing_local_login',
-          runnerName: 'Ians-Mac-mini',
+          runnerName: 'Studio-Mac-mini',
           check: {
             at: Date.now(),
             ok: false,
             reason: 'missing_local_login',
             check: 'sign-in',
-            command: 'agy acp · Ians-Mac-mini',
+            command: 'agy acp · Studio-Mac-mini',
             model: null,
             durationMs: 1,
           },
@@ -546,22 +546,22 @@ test('manual Verify reports real wall time, runs one live check, and keeps remot
   await page.goto('/app/settings/routing');
   await page.locator('[data-instance-id="subscription:ag-sub-1"]').click();
   const detail = page.getByTestId('subscription-detail');
-  await expect(detail.getByTestId('subscription-status')).toHaveText('Ians-Mac-mini 未登录');
-  await expect(detail.getByTestId('subscription-reason')).toContainText('这个订阅绑定在 Ians-Mac-mini');
+  await expect(detail.getByTestId('subscription-status')).toHaveText('Studio-Mac-mini 未登录');
+  await expect(detail.getByTestId('subscription-reason')).toContainText('这个订阅绑定在 Studio-Mac-mini');
   await expect(detail.getByTestId('antigravity-relogin')).toHaveCount(0);
 
   await detail.getByTestId('subscription-verify').click();
   const feedback = page.getByTestId('subscription-verify-feedback');
   await expect(feedback).toHaveAttribute('data-phase', 'checking');
-  await expect(feedback).toContainText('正在让 Ians-Mac-mini 上的 Antigravity 检查这个凭据…');
+  await expect(feedback).toContainText('正在让 Studio-Mac-mini 上的 Antigravity 检查这个凭据…');
 
   await page.waitForTimeout(350);
   settleVerify();
   await expect(feedback).toHaveAttribute('data-phase', 'failed');
-  await expect(feedback).toContainText('Ians-Mac-mini 尚未登录 Antigravity');
+  await expect(feedback).toContainText('Studio-Mac-mini 尚未登录 Antigravity');
   const verifyDetail = page.getByTestId('subscription-verify-detail');
   await expect(verifyDetail).toContainText('未通过 · 执行机未登录');
-  await expect(verifyDetail).toContainText('agy acp · Ians-Mac-mini');
+  await expect(verifyDetail).toContainText('agy acp · Studio-Mac-mini');
   await expect(verifyDetail).not.toContainText('0.0 秒');
   expect(verifyCalls).toBe(1);
 });
@@ -590,17 +590,17 @@ test('using this Mac sign-in binds this Mac, refreshes status before showing Pas
             label: 'Antigravity 订阅',
             hasToken: false,
             runnerId: boundRunnerId,
-            runnerName: boundRunnerId === 'm-mac' ? 'xmonsMac' : null,
+            runnerName: boundRunnerId === 'm-mac' ? 'studioMac' : null,
             runnerLogin: boundRunnerId === 'm-mac' && macSignedIn ? 'ok' : 'unavailable',
             runnerModels:
               boundRunnerId === 'm-mac' && macSignedIn
                 ? [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }]
                 : [],
             runnerLogins: [
-              { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
+              { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' },
               {
                 runnerId: 'm-mac',
-                name: 'xmonsMac',
+                name: 'studioMac',
                 online: true,
                 status: macSignedIn ? 'ok' : 'missing_local_login',
               },
@@ -639,13 +639,13 @@ test('using this Mac sign-in binds this Mac, refreshes status before showing Pas
       holdNextRefresh = true;
       return json({
         ok: true,
-        runnerName: 'xmonsMac',
+        runnerName: 'studioMac',
         check: {
           at: Date.now(),
           ok: true,
           reason: null,
           check: 'sign-in',
-          command: 'agy acp · xmonsMac',
+          command: 'agy acp · studioMac',
           model: null,
           durationMs: 1400,
         },
@@ -668,20 +668,20 @@ test('using this Mac sign-in binds this Mac, refreshes status before showing Pas
 
   const feedback = page.getByTestId('subscription-verify-feedback');
   await expect(feedback).toHaveAttribute('data-phase', 'checking');
-  await expect(feedback).toContainText('正在让 xmonsMac 上的 Antigravity 检查这个凭据…');
+  await expect(feedback).toContainText('正在让 studioMac 上的 Antigravity 检查这个凭据…');
 
   settleRefresh();
   await expect(feedback).toHaveAttribute('data-phase', 'passed');
-  await expect(feedback).toContainText('xmonsMac 上的 Antigravity 接受了这个凭据。');
+  await expect(feedback).toContainText('studioMac 上的 Antigravity 接受了这个凭据。');
   const verifyDetail = page.getByTestId('subscription-verify-detail');
   await expect(verifyDetail).toContainText('通过');
   await expect(verifyDetail).toContainText('1.4 秒');
-  await expect(verifyDetail).toContainText('agy acp · xmonsMac');
+  await expect(verifyDetail).toContainText('agy acp · studioMac');
 
   expect(patches).toEqual([{ runnerId: 'm-mac' }]);
   await expect(detail).toHaveAttribute('data-tone', 'ok');
   await expect(detail.getByTestId('subscription-status')).toHaveText(
-    '已在 xmonsMac 登录，Ians-Mac-mini 未登录',
+    '已在 studioMac 登录，Studio-Mac-mini 未登录',
   );
   await expect(page.locator('[data-instance-id="subscription:ag-sub-1"]')).toHaveAttribute(
     'data-tone',
@@ -714,7 +714,7 @@ test('dismisses stale verify popover when login finishes elsewhere via SSE, refr
           label: 'Antigravity 订阅',
           hasToken: false,
           runnerId: 'm-mac',
-          runnerName: 'xmonsMac',
+          runnerName: 'studioMac',
           runnerLogin: macSignedIn ? 'ok' : 'missing_local_login',
           runnerModels: macSignedIn
             ? [
@@ -725,7 +725,7 @@ test('dismisses stale verify popover when login finishes elsewhere via SSE, refr
           runnerLogins: [
             {
               runnerId: 'm-mac',
-              name: 'xmonsMac',
+              name: 'studioMac',
               online: true,
               status: macSignedIn ? 'ok' : 'missing_local_login',
             },
@@ -740,13 +740,13 @@ test('dismisses stale verify popover when login finishes elsewhere via SSE, refr
       return json({
         ok: false,
         reason: 'missing_local_login',
-        runnerName: 'xmonsMac',
+        runnerName: 'studioMac',
         check: {
           at: Date.now(),
           ok: false,
           reason: 'missing_local_login',
           check: 'sign-in',
-          command: 'agy acp · xmonsMac',
+          command: 'agy acp · studioMac',
           model: null,
           durationMs: 320,
         },
@@ -779,7 +779,7 @@ test('dismisses stale verify popover when login finishes elsewhere via SSE, refr
     }
   });
   await expect(detail).toHaveAttribute('data-tone', 'ok');
-  await expect(detail.getByTestId('subscription-status')).toHaveText('已在 xmonsMac 登录');
+  await expect(detail.getByTestId('subscription-status')).toHaveText('已在 studioMac 登录');
   await expect(detail.getByTestId('subscription-models-summary')).toHaveText('2 个');
   await expect(feedback).toHaveCount(0);
 });
@@ -821,13 +821,13 @@ test('local Mac sign-in while a manual Verify is running supersedes the stale ch
                 runnerLogins: [
                   {
                     runnerId: 'm-mini',
-                    name: 'Ians-Mac-mini',
+                    name: 'Studio-Mac-mini',
                     online: true,
                     status: 'missing_local_login',
                   },
                   {
                     runnerId: 'm-mac',
-                    name: 'xmonsMac',
+                    name: 'studioMac',
                     online: true,
                     status: 'missing_local_login',
                   },
@@ -925,8 +925,8 @@ test('window focus updates local Mac sign-in button and creation shows checking 
       runnerLogin: 'unavailable',
       runnerModels: [],
       runnerLogins: [
-        { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
-        { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'missing_local_login' },
+        { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'missing_local_login' },
       ],
       expiresAt: null,
       enabled: true,
@@ -1036,12 +1036,12 @@ test('bound online Runner without agy reports unavailable accurately in both sta
           label: 'Mini Antigravity',
           hasToken: false,
           runnerId: 'm-mini',
-          runnerName: 'Ians-Mac-mini',
+          runnerName: 'Studio-Mac-mini',
           runnerLogin: 'unavailable',
           runnerModels: [],
           runnerLogins: [
-            { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'unavailable' },
-            { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' },
+            { runnerId: 'm-mini', name: 'Studio-Mac-mini', online: true, status: 'unavailable' },
+            { runnerId: 'm-mac', name: 'studioMac', online: true, status: 'ok' },
           ],
           expiresAt: null,
           enabled: true,
@@ -1053,13 +1053,13 @@ test('bound online Runner without agy reports unavailable accurately in both sta
       return json({
         ok: false,
         reason: 'unavailable',
-        runnerName: 'Ians-Mac-mini',
+        runnerName: 'Studio-Mac-mini',
         check: {
           at: Date.now(),
           ok: false,
           reason: 'unavailable',
           check: 'sign-in',
-          command: 'agy acp · Ians-Mac-mini',
+          command: 'agy acp · Studio-Mac-mini',
           model: null,
           durationMs: 120,
         },
@@ -1073,14 +1073,14 @@ test('bound online Runner without agy reports unavailable accurately in both sta
   await page.locator('[data-instance-id="subscription:ag-sub-unavail"]').click();
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByTestId('subscription-status')).toHaveText(
-    'Ians-Mac-mini 无法验证 · 已在 xmonsMac 登录',
+    'Studio-Mac-mini 无法验证 · 已在 studioMac 登录',
   );
-  await expect(detail.getByTestId('subscription-reason')).toContainText('Ians-Mac-mini');
+  await expect(detail.getByTestId('subscription-reason')).toContainText('Studio-Mac-mini');
   await expect(detail.getByTestId('subscription-reason')).not.toContainText('登录已失效');
 
   await detail.getByTestId('subscription-verify').click();
   const feedback = page.getByTestId('subscription-verify-feedback');
   await expect(feedback).toHaveAttribute('data-phase', 'failed');
-  await expect(feedback).toContainText('无法在 Ians-Mac-mini 上运行 Antigravity 检查');
+  await expect(feedback).toContainText('无法在 Studio-Mac-mini 上运行 Antigravity 检查');
   await expect(feedback).not.toContainText('登录已失效');
 });

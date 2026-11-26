@@ -266,7 +266,7 @@ describe('antigravity subscriptions REST & model sources', () => {
     });
     disposables.push(() => s.dispose());
     const runnerId = insertMachine(s, {
-      name: 'xmonsMac',
+      name: 'studioMac',
       capabilities: {
         mcpServers: [],
         skills: [],
@@ -286,8 +286,8 @@ describe('antigravity subscriptions REST & model sources', () => {
     expect(await disconnected.json()).toMatchObject({
       ok: false,
       reason: 'unavailable',
-      runnerName: 'xmonsMac',
-      check: { ok: false, reason: 'unavailable', command: 'agy acp · xmonsMac' },
+      runnerName: 'studioMac',
+      check: { ok: false, reason: 'unavailable', command: 'agy acp · studioMac' },
     });
 
     const createdSilent = await req(s.app, 'POST', path, { label: 'Silent Mac', runnerId });
@@ -300,8 +300,8 @@ describe('antigravity subscriptions REST & model sources', () => {
     expect(await timedOut.json()).toMatchObject({
       ok: false,
       reason: 'timeout',
-      runnerName: 'xmonsMac',
-      check: { ok: false, reason: 'timeout', command: 'agy acp · xmonsMac' },
+      runnerName: 'studioMac',
+      check: { ok: false, reason: 'timeout', command: 'agy acp · studioMac' },
     });
     expect(silent.checkIds).toHaveLength(1);
   });
@@ -310,7 +310,7 @@ describe('antigravity subscriptions REST & model sources', () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
     const runnerId = insertMachine(s, {
-      name: 'xmonsMac',
+      name: 'studioMac',
       capabilities: {
         mcpServers: [],
         skills: [],
@@ -349,8 +349,8 @@ describe('antigravity subscriptions REST & model sources', () => {
     expect(await res.json()).toMatchObject({
       ok: false,
       reason: 'timeout',
-      runnerName: 'xmonsMac',
-      check: { ok: false, reason: 'timeout', command: 'agy acp · xmonsMac', durationMs: 35_000 },
+      runnerName: 'studioMac',
+      check: { ok: false, reason: 'timeout', command: 'agy acp · studioMac', durationMs: 35_000 },
     });
     expect(
       s.db.select().from(machineTable).where(eq(machineTable.id, runnerId)).get()?.capabilities
@@ -369,8 +369,8 @@ describe('antigravity subscriptions REST & model sources', () => {
     expect(await errRes.json()).toMatchObject({
       ok: false,
       reason: 'failed',
-      runnerName: 'xmonsMac',
-      check: { ok: false, reason: 'failed', command: 'agy acp · xmonsMac', durationMs: 410 },
+      runnerName: 'studioMac',
+      check: { ok: false, reason: 'failed', command: 'agy acp · studioMac', durationMs: 410 },
     });
     expect(
       s.db.select().from(machineTable).where(eq(machineTable.id, runnerId)).get()?.capabilities
@@ -386,7 +386,7 @@ describe('antigravity subscriptions REST & model sources', () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
     insertMachine(s, {
-      name: 'Ians-Mac-mini',
+      name: 'Studio-Mac-mini',
       capabilities: {
         mcpServers: [],
         skills: [],
@@ -394,7 +394,7 @@ describe('antigravity subscriptions REST & model sources', () => {
       },
     });
     const macId = insertMachine(s, {
-      name: 'xmonsMac',
+      name: 'studioMac',
       capabilities: {
         mcpServers: [],
         skills: [],
@@ -432,8 +432,8 @@ describe('antigravity subscriptions REST & model sources', () => {
     expect(second.status).toBe(200);
     expect(await second.json()).toMatchObject({
       ok: true,
-      runnerName: 'xmonsMac',
-      check: { command: 'agy acp · xmonsMac' },
+      runnerName: 'studioMac',
+      check: { command: 'agy acp · studioMac' },
     });
   });
 
@@ -454,7 +454,7 @@ describe('antigravity subscriptions REST & model sources', () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
     const macId = insertMachine(s, {
-      name: 'xmonsMac',
+      name: 'studioMac',
       capabilities: {
         mcpServers: [],
         skills: [],
@@ -466,7 +466,7 @@ describe('antigravity subscriptions REST & model sources', () => {
       },
     });
     const miniId = insertMachine(s, {
-      name: 'Ians-Mac-mini',
+      name: 'Studio-Mac-mini',
       capabilities: {
         mcpServers: [],
         skills: [],
@@ -488,20 +488,20 @@ describe('antigravity subscriptions REST & model sources', () => {
     const listed = (await (await req(s.app, 'GET', path)).json()) as Array<Record<string, unknown>>;
     expect(listed.find((row) => row.id === macSub.id)).toMatchObject({
       runnerId: macId,
-      runnerName: 'xmonsMac',
+      runnerName: 'studioMac',
       runnerLogin: 'ok',
       runnerLogins: [
-        { runnerId: miniId, name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
-        { runnerId: macId, name: 'xmonsMac', online: true, status: 'ok' },
+        { runnerId: miniId, name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: macId, name: 'studioMac', online: true, status: 'ok' },
       ],
     });
     expect(listed.find((row) => row.id === miniSub.id)).toMatchObject({
       runnerId: miniId,
-      runnerName: 'Ians-Mac-mini',
+      runnerName: 'Studio-Mac-mini',
       runnerLogin: 'missing_local_login',
       runnerLogins: [
-        { runnerId: miniId, name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
-        { runnerId: macId, name: 'xmonsMac', online: true, status: 'ok' },
+        { runnerId: miniId, name: 'Studio-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: macId, name: 'studioMac', online: true, status: 'ok' },
       ],
     });
 
@@ -554,8 +554,8 @@ describe('antigravity subscriptions REST & model sources', () => {
     };
     expect(macResult).toMatchObject({
       ok: true,
-      runnerName: 'xmonsMac',
-      check: { command: 'agy acp · xmonsMac' },
+      runnerName: 'studioMac',
+      check: { command: 'agy acp · studioMac' },
     });
     expect(macResult.check?.durationMs).toBeGreaterThanOrEqual(420);
     expect(spoofStatus).toBe(404);
@@ -585,8 +585,8 @@ describe('antigravity subscriptions REST & model sources', () => {
     expect(miniResult).toMatchObject({
       ok: false,
       reason: 'missing_local_login',
-      runnerName: 'Ians-Mac-mini',
-      check: { command: 'agy acp · Ians-Mac-mini' },
+      runnerName: 'Studio-Mac-mini',
+      check: { command: 'agy acp · Studio-Mac-mini' },
     });
     expect(miniResult.check?.durationMs).toBeGreaterThanOrEqual(185);
     expect(miniProbe.checkIds).toHaveLength(1);

@@ -240,7 +240,7 @@ describe('daemon GitHub connection token precedence and refresh on every machine
         kind: 'unattributed',
       },
       refresh: undefined,
-      machineName: 'Ians-Mac-mini',
+      machineName: 'Studio-Mac-mini',
     });
     expect('error' in denied && denied.error).toContain('Only repositories granted to Cairn');
     expect('error' in denied && denied.error).toContain('xiechimon/offer');
@@ -260,7 +260,7 @@ describe('daemon GitHub connection token precedence and refresh on every machine
       workspacesRoot: '/tmp/ws',
       credentials: null,
       refresh: undefined,
-      machineName: 'Ians-Mac-mini',
+      machineName: 'Studio-Mac-mini',
     });
     expect('error' in noConn && noConn.error).toContain('Settings');
     expect('error' in noConn && noConn.error).toContain('GitHub');

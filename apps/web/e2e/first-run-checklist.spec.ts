@@ -158,7 +158,7 @@ async function openDesktop(page: Page, world: World) {
   await expect(page.getByTestId('chief-composer-input')).toBeVisible();
 }
 
-const OWN_OFFLINE = { id: 'm1', name: 'xmonsMac', online: false, kind: 'local' as const, lastSeenAt: 1 };
+const OWN_OFFLINE = { id: 'm1', name: 'studioMac', online: false, kind: 'local' as const, lastSeenAt: 1 };
 
 test('a re-registering Runner counts as a Runner already, so its startup shows no notice, and one reported offline again shows at once', async ({
   page,
@@ -180,7 +180,7 @@ test('a re-registering Runner counts as a Runner already, so its startup shows n
     for (const es of window.__es)
       es.emit({ type: 'machine_presence', machineId: 'm1', online: false });
   });
-  await expect(label(page)).toHaveText('xmonsMac 离线');
+  await expect(label(page)).toHaveText('studioMac 离线');
   await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
 });
 
@@ -201,7 +201,7 @@ test('opening the desktop app shows no Runner hint while its own Runner re-regis
     for (const es of window.__es)
       es.emit({ type: 'machine_presence', machineId: 'm1', online: false });
   });
-  await expect(label(page)).toHaveText('xmonsMac 离线');
+  await expect(label(page)).toHaveText('studioMac 离线');
   world.machines = [{ ...OWN_OFFLINE, online: true }];
   await page.evaluate(() => {
     for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
@@ -218,7 +218,7 @@ test('in the desktop app its own offline machine reconnects instead of asking fo
     bound: true,
     machines: [OWN_OFFLINE],
   });
-  await expect(label(page)).toHaveText('xmonsMac 离线');
+  await expect(label(page)).toHaveText('studioMac 离线');
   await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
   await expect(hint(page).locator('code')).toHaveCount(0);
   await page.getByTestId('setup-prompt-reconnect').click();
@@ -245,7 +245,7 @@ test('when the localRunner desktop bridge is absent an offline local machine off
     ...fresh(),
     providers: [{ id: 'p1', name: 'gw' }],
     bound: true,
-    machines: [{ id: 'm1', name: 'xmonsMac', online: false, kind: 'local', lastSeenAt: 1 }],
+    machines: [{ id: 'm1', name: 'studioMac', online: false, kind: 'local', lastSeenAt: 1 }],
   });
   await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
   await expect(page.getByTestId('setup-prompt-update-cairn')).toHaveText('更新 Cairn');

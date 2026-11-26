@@ -8,7 +8,7 @@ Evidence marking, per claim:
 - **`推断`** — derived from `实测` facts, reproducible.
 - **`猜测`** — not verified; treat as a lead, not a fact.
 
-Local probes ran on this Mac (`xmonsMac-3574`, macOS 27.2.1, `/usr/bin/sandbox-exec` present and working). Codex source was cloned read-only to `/tmp/codex-src` (codex-cli 0.166.0 installed locally; source at HEAD ~Nov 2026). Anthropic's `@anthropic-ai/sandbox-runtime` was cloned to `/tmp/srt-src`. Claude Code 2.1.330 and Amp binaries are installed locally.
+Local probes ran on this Mac (`studioMac-0001`, macOS 27.2.1, `/usr/bin/sandbox-exec` present and working). Codex source was cloned read-only to `/tmp/codex-src` (codex-cli 0.166.0 installed locally; source at HEAD ~Nov 2026). Anthropic's `@anthropic-ai/sandbox-runtime` was cloned to `/tmp/srt-src`. Claude Code 2.1.330 and Amp binaries are installed locally.
 
 ## TL;DR
 

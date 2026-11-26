@@ -167,7 +167,7 @@ The previous version only checked phenomena the owner mentioned, and had not see
 |---|---|---|
 | Coordinator pending question | A fake machine claims the Coordinator turn, and `POST /api/machine/ask/:stepId?holdMs=0` sends a three-option question | C060-C068 |
 | Failed thread | A build is claimed, then `done status=failed`; the server auto-retries once on zero usage, and it settles after failing a second time | C069 |
-| Offline machine | `xmons-mac` reports presence only once and is marked offline by the sweep after 150 seconds; it also reports its Claude login as expired | C072, C073 |
+| Offline machine | `studio-mac` reports presence only once and is marked offline by the sweep after 150 seconds; it also reports its Claude login as expired | C072, C073 |
 | Running and streaming | `studio-linux` keeps presence and heartbeat; one thread pushes transcript deltas and a running bash tool row, and the Coordinator turn pushes thinking and body deltas | C030, C035 |
 | PR awaiting review | A build `done success` with `prUrl/prNumber` (#42, #43) | C037, C112 |
 | Long conversation | Coordinator with 15 round trips (including tables and code blocks), one thread with 40 output segments, 24 projects, 21 tasks | C031, C115, C150, C197 |
