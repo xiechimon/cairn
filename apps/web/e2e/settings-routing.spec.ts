@@ -521,3 +521,179 @@ test('navigating to #route-compaction scrolls with scroll-mt-4 breathing room', 
   await expect(compaction).toBeVisible();
   await expect(compaction).toHaveClass(/scroll-mt-4/);
 });
+
+test('project override rows reset coordinator overrides via PATCH, disable while pending, and hide section when empty', async ({
+  page,
+}) => {
+  const patches: { id: string; body: unknown }[] = [];
+  let projects = [
+    {
+      id: 'proj-1',
+      name: 'cairn',
+      teamId: 't1',
+      repoKind: 'hosted',
+      repoName: 'cairn',
+      githubRepo: null,
+      localPath: null,
+      modelOverrides: {
+        coordinator: { provider: 'relay', modelId: 'glm-5.3', thinkingLevel: null },
+      },
+    },
+    {
+      id: 'proj-2',
+      name: 'docs',
+      teamId: 't1',
+      repoKind: 'hosted',
+      repoName: 'docs',
+      githubRepo: null,
+      localPath: null,
+      modelOverrides: {
+        coordinator: { provider: 'relay', modelId: 'glm-5.3', thinkingLevel: null },
+      },
+    },
+    {
+      id: 'proj-3',
+      name: 'plain',
+      teamId: 't1',
+      repoKind: 'hosted',
+      repoName: 'plain',
+      githubRepo: null,
+      localPath: null,
+    },
+  ];
+  let releaseFirstPatch: (() => void) | null = null;
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    const method = route.request().method();
+    if (path === '/api/projects' && method === 'GET') {
+      return json(projects);
+    }
+    const patchMatch = /^\/api\/projects\/([^/]+)$/.exec(path);
+    if (patchMatch !== null && method === 'PATCH') {
+      const id = patchMatch[1] ?? '';
+      const body = route.request().postDataJSON() as {
+        modelOverrides?: { coordinator?: unknown };
+      };
+      patches.push({ id, body });
+      const respond = () => {
+        projects = projects.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                modelOverrides: {
+                  ...p.modelOverrides,
+                  coordinator: body.modelOverrides?.coordinator ?? null,
+                },
+              }
+            : p,
+        );
+        const updated = projects.find((p) => p.id === id);
+        return json(updated ?? {});
+      };
+      if (patches.length === 1) {
+        return new Promise<void>((resolve) => {
+          releaseFirstPatch = () => {
+            void respond().then(resolve);
+          };
+        });
+      }
+      return respond();
+    }
+    if (path === '/api/teams/t1/model-sources') {
+      return json({
+        sources: [
+          {
+            runtime: 'pi',
+            provider: 'relay',
+            providerLabel: 'domestic-proxy',
+            installed: true,
+            models: [{ id: 'glm-5.3', name: 'GLM-5.3' }],
+          },
+        ],
+      });
+    }
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  const overrides = settings.getByTestId('routing-project-overrides');
+  await expect(overrides).toBeVisible();
+  await overrides.getByRole('button', { name: /2 个项目单独设置了模型/ }).click();
+
+  const resetButtons = overrides.getByTestId('project-override-reset');
+  await expect(resetButtons).toHaveCount(2);
+  await expect(resetButtons.nth(0)).toHaveAccessibleName('重置 cairn 的模型设置');
+  await expect(resetButtons.nth(1)).toHaveAccessibleName('重置 docs 的模型设置');
+  const box = await resetButtons.nth(0).boundingBox();
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(24);
+
+  await resetButtons.nth(0).click();
+  await expect(resetButtons.nth(0)).toBeDisabled();
+  await expect.poll(() => patches).toEqual([
+    { id: 'proj-1', body: { modelOverrides: { coordinator: null } } },
+  ]);
+  releaseFirstPatch?.();
+
+  await expect(resetButtons).toHaveCount(1);
+  await expect(overrides).toContainText('1 个项目单独设置了模型');
+  await expect(overrides.getByRole('link', { name: '项目设置' })).toHaveCount(1);
+
+  await resetButtons.nth(0).click();
+  await expect.poll(() => patches).toEqual([
+    { id: 'proj-1', body: { modelOverrides: { coordinator: null } } },
+    { id: 'proj-2', body: { modelOverrides: { coordinator: null } } },
+  ]);
+  await expect(overrides).toHaveCount(0);
+});
+
+test('project override reset keeps row and shows toast when PATCH fails', async ({ page }) => {
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    const method = route.request().method();
+    if (path === '/api/projects' && method === 'GET') {
+      return json([
+        {
+          id: 'proj-1',
+          name: 'cairn',
+          teamId: 't1',
+          repoKind: 'hosted',
+          repoName: 'cairn',
+          githubRepo: null,
+          localPath: null,
+          modelOverrides: {
+            coordinator: { provider: 'relay', modelId: 'glm-5.3', thinkingLevel: null },
+          },
+        },
+      ]);
+    }
+    if (path === '/api/projects/proj-1' && method === 'PATCH') {
+      return json({ error: 'boom' }, 500);
+    }
+    if (path === '/api/teams/t1/model-sources') {
+      return json({
+        sources: [
+          {
+            runtime: 'pi',
+            provider: 'relay',
+            providerLabel: 'domestic-proxy',
+            installed: true,
+            models: [{ id: 'glm-5.3', name: 'GLM-5.3' }],
+          },
+        ],
+      });
+    }
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  const overrides = settings.getByTestId('routing-project-overrides');
+  await overrides.getByRole('button', { name: /1 个项目单独设置了模型/ }).click();
+
+  const resetBtn = overrides.getByTestId('project-override-reset');
+  await expect(resetBtn).toBeVisible();
+  await resetBtn.click();
+
+  await expect(page.locator('[data-sonner-toast]').first()).toContainText('保存失败，请重试。');
+  await expect(resetBtn).toBeEnabled();
+  await expect(overrides).toContainText('cairn');
+});

@@ -1831,6 +1831,8 @@ export const EN: Record<string, string> = {
   路由图未能加载: 'Routing graph did not load',
   '{count} 个项目单独设置了模型': '{count#1 project sets|# projects set} their own models',
   项目单独设置: 'Set per project',
+  重置: 'Reset',
+  '重置 {project} 的模型设置': 'Reset model settings for {project}',
   常用模型: 'Frequently used models',
   'Coordinator 派活时按任务难度从这里挑一个。':
     'The Coordinator picks one from here for each task, by how hard it is.',

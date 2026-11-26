@@ -12,7 +12,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
 import { useFrequentModels, useFrequentModelsMutations } from '../api/frequent-models.js';
-import { useMachines, useModelSources, useProjects } from '../api/hooks.js';
+import { useApiMutations, useMachines, useModelSources, useProjects } from '../api/hooks.js';
 import { toModelOptions } from '../api/mappers.js';
 import { ROUTE_USE_LABELS } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
@@ -298,10 +298,35 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
+  const mutations = useApiMutations(teamId);
   const [open, setOpen] = useState(false);
-  const projects = (projectsQ.data ?? []).filter((p) => p.modelOverrides?.coordinator != null);
+  const [resetIds, setResetIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const projects = (projectsQ.data ?? []).filter(
+    (p) => p.modelOverrides?.coordinator != null && !resetIds.has(p.id),
+  );
   if (projects.length === 0) return null;
   const nameOf = (choice: RuleModel) => currentOption(choice, options)?.modelName ?? choice.modelId;
+  const reset = (projectId: string) => {
+    if (!live) {
+      setResetIds((prev) => new Set(prev).add(projectId));
+      return;
+    }
+    if (pendingIds.has(projectId)) return;
+    setPendingIds((prev) => new Set(prev).add(projectId));
+    mutations.patchProject.mutate(
+      { id: projectId, body: { modelOverrides: { coordinator: null } } },
+      {
+        onError: (error) => toastError(t('保存失败，请重试。'), error),
+        onSettled: () =>
+          setPendingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(projectId);
+            return next;
+          }),
+      },
+    );
+  };
   return (
     <div data-testid="routing-project-overrides" className="-mt-5 flex flex-col gap-2">
       <Button
@@ -328,10 +353,14 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
           {projects.map((p) => {
             const choice = p.modelOverrides?.coordinator;
             if (choice == null) return null;
+            const pending = pendingIds.has(p.id);
             return (
               <SettingsRow
                 key={p.id}
                 label={p.name}
+                className="flex-wrap gap-y-2 py-2.5 max-sm:[&>span:first-child]:max-w-none"
+                labelClassName="truncate"
+                valueClassName="flex-none max-sm:w-full"
                 hint={
                   <span className="inline-flex min-w-0 items-center gap-1.5">
                     <span>{`${t('Coordinator')} ·`}</span>
@@ -343,10 +372,22 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
               >
                 <Link
                   to={`/app/project/${p.id}/settings`}
-                  className="text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current"
+                  className="inline-flex min-h-6 flex-none items-center whitespace-nowrap text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current pointer-coarse:min-h-11"
                 >
                   {t('项目设置')}
                 </Link>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="project-override-reset"
+                  aria-label={t('重置 {project} 的模型设置', { project: p.name })}
+                  disabled={pending}
+                  onClick={() => reset(p.id)}
+                  className="flex-none pointer-coarse:min-h-11"
+                >
+                  {t('重置')}
+                </Button>
               </SettingsRow>
             );
           })}
