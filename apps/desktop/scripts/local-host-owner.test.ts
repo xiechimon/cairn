@@ -84,18 +84,18 @@ describe('resolveLocalHostOwner', () => {
     }) as unknown as typeof fetch;
 
     const resolved = await resolveLocalHostOwner({
-      origin: 'http://mac-mini.tailac09a9.ts.net:8787',
+      origin: 'http://mac-mini.tail0000.ts.net:8787',
       candidateHomes: [serverHome],
-      lookup: async () => [{ address: '100.83.149.60', family: 4 }],
+      lookup: async () => [{ address: '100.64.0.21', family: 4 }],
       networkInterfaces: () => ({
         utun4: [
           {
-            address: '100.83.149.60',
+            address: '100.64.0.21',
             netmask: '255.255.255.255',
             family: 'IPv4',
             mac: '00:00:00:00:00:00',
             internal: false,
-            cidr: '100.83.149.60/32',
+            cidr: '100.64.0.21/32',
           },
         ],
       }),
@@ -129,18 +129,18 @@ describe('resolveLocalHostOwner', () => {
     }) as unknown as typeof fetch;
 
     const resolved = await resolveLocalHostOwner({
-      origin: 'http://mac-mini.tailac09a9.ts.net:8787',
+      origin: 'http://mac-mini.tail0000.ts.net:8787',
       candidateHomes: [serverHome],
-      lookup: async () => [{ address: '100.83.149.60', family: 4 }],
+      lookup: async () => [{ address: '100.64.0.21', family: 4 }],
       networkInterfaces: () => ({
         utun4: [
           {
-            address: '100.83.149.60',
+            address: '100.64.0.21',
             netmask: '255.255.255.255',
             family: 'IPv4',
             mac: '00:00:00:00:00:00',
             internal: false,
-            cidr: '100.83.149.60/32',
+            cidr: '100.64.0.21/32',
           },
         ],
       }),
@@ -169,18 +169,18 @@ describe('resolveLocalHostOwner', () => {
     }) as unknown as typeof fetch;
 
     const resolved = await resolveLocalHostOwner({
-      origin: 'https://mac-mini.tailac09a9.ts.net',
+      origin: 'https://mac-mini.tail0000.ts.net',
       candidateHomes: [serverHome],
-      lookup: async () => [{ address: '100.83.149.60', family: 4 }],
+      lookup: async () => [{ address: '100.64.0.21', family: 4 }],
       networkInterfaces: () => ({
         utun4: [
           {
-            address: '100.83.149.60',
+            address: '100.64.0.21',
             netmask: '255.255.255.255',
             family: 'IPv4',
             mac: '00:00:00:00:00:00',
             internal: false,
-            cidr: '100.83.149.60/32',
+            cidr: '100.64.0.21/32',
           },
         ],
       }),
@@ -199,18 +199,18 @@ describe('resolveLocalHostOwner', () => {
     ) as unknown as typeof fetch;
 
     const resolved = await resolveLocalHostOwner({
-      origin: 'http://mac-mini.tailac09a9.ts.net:8787',
+      origin: 'http://mac-mini.tail0000.ts.net:8787',
       candidateHomes: [serverHome],
-      lookup: async () => [{ address: '100.83.149.60', family: 4 }],
+      lookup: async () => [{ address: '100.64.0.21', family: 4 }],
       networkInterfaces: () => ({
         utun4: [
           {
-            address: '100.125.21.46',
+            address: '100.64.0.22',
             netmask: '255.255.255.255',
             family: 'IPv4',
             mac: '00:00:00:00:00:00',
             internal: false,
-            cidr: '100.125.21.46/32',
+            cidr: '100.64.0.22/32',
           },
         ],
       }),

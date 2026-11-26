@@ -42,14 +42,14 @@ describe('desktop connection catalog', () => {
     const dir = tempDir();
     const { added } = addRemoteConnection(dir, {
       name: 'Mac mini',
-      url: 'http://100.83.149.60:8787/',
+      url: 'http://100.64.0.21:8787/',
     });
     const switched = setActiveConnection(dir, added.id);
     expect(activeConnectionOf(switched)).toEqual({
       kind: 'remote',
       id: added.id,
       name: 'Mac mini',
-      url: 'http://100.83.149.60:8787',
+      url: 'http://100.64.0.21:8787',
     });
 
     const baseRunner = join(dir, 'base-runner');

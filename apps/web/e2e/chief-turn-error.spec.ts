@@ -289,13 +289,13 @@ test('a turn waiting for a computer or an offline Runner shows the card and leav
     },
   });
   const state = {
-    threads: [waiting('machine-offline', 'xmon-mbp')] as unknown[],
+    threads: [waiting('machine-offline', 'studio-mbp')] as unknown[],
     messages: [{ id: 'm1', role: 'user', content: '你好', createdAt: 10 }],
   };
   await mockLive(page, state as Parameters<typeof mockLive>[1]);
   await page.goto('/app');
   const card = page.getByTestId('chief-queue-wait-card');
-  await expect(card).toContainText('执行机 xmon-mbp 离线');
+  await expect(card).toContainText('执行机 studio-mbp 离线');
   await expect(card.getByRole('link', { name: '查看执行机' })).toHaveAttribute(
     'href',
     /\/app\/settings\/machines/,
@@ -322,7 +322,7 @@ test('a turn on an online Runner whose Claude Code has no login says so and link
         activeRun: { phase: 'chief' },
         turnQueue: {
           position: 1,
-          waitingFor: { machineId: 'mx', name: 'xmon-mbp', running: 0, capacity: 1 },
+          waitingFor: { machineId: 'mx', name: 'studio-mbp', running: 0, capacity: 1 },
           blocked: { kind: 'claude-logged-out', missing: [] },
         },
       },

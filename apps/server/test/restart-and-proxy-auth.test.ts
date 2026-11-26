@@ -75,7 +75,7 @@ describe('session persistence across server restart', () => {
     const first = bootServer({ db: firstHandle.db, authToken: OWNER });
     const reqRes = await call(first, 'POST', '/api/remote/pair/request', {
       body: { name: 'macOS', detail: 'Chrome 156' },
-      peer: '100.83.149.60',
+      peer: '100.64.0.21',
     });
     expect(reqRes.status).toBe(201);
     const created = (await reqRes.json()) as { id: string; secret: string };
@@ -92,7 +92,7 @@ describe('session persistence across server restart', () => {
 
     const claimRes = await call(first, 'POST', '/api/remote/pair/claim', {
       body: { id: created.id, secret: created.secret },
-      peer: '100.83.149.60',
+      peer: '100.64.0.21',
     });
     expect(claimRes.status).toBe(200);
     const cookie = authCookieOf(claimRes);
@@ -350,7 +350,7 @@ describe('paired device cookie session approving pairing popup', () => {
 
     const httpReq = await call(s, 'POST', '/api/remote/pair/request', {
       body: { name: 'Browser', detail: 'Chrome 156' },
-      peer: '100.83.149.60',
+      peer: '100.64.0.21',
     });
     expect(httpReq.status).toBe(201);
     const req1 = (await httpReq.json()) as { id: string; secret: string };
@@ -362,7 +362,7 @@ describe('paired device cookie session approving pairing popup', () => {
         origin: 'http://mac-mini.tail.ts.net:8787',
       },
       body: {},
-      peer: '100.125.21.46',
+      peer: '100.64.0.22',
     });
     expect(approveHttp.status).toBe(200);
     const claim1 = (await (

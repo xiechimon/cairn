@@ -80,13 +80,13 @@ Enable with `systemctl --user daemon-reload && systemctl --user enable --now cai
 
 ### Path to dmit
 
-dmit (179.255.103.75) does not answer direct TCP from either of ian's ISPs; the drop is on the network path, not in dmit's firewall. omarchy's sing-box TUN routes everything except exactly that address (`route_exclude_address`, so sing-box's own tunnel to dmit does not loop), so plain ssh from omarchy goes out directly and times out. The push therefore goes through sing-box's local mixed proxy on 127.0.0.1:7890, the same tunnel the Mac uses.
+dmit does not answer direct TCP from either of ian's ISPs; the drop is on the network path, not in dmit's firewall. omarchy's sing-box TUN routes everything except exactly that address (`route_exclude_address`, so sing-box's own tunnel to dmit does not loop), so plain ssh from omarchy goes out directly and times out. The push therefore goes through sing-box's local mixed proxy on 127.0.0.1:7890, the same tunnel the Mac uses.
 
 `~/.ssh/config` on omarchy (mode 600):
 
 ```
 Host dmit-backup
-    HostName 179.255.103.75
+    HostName <backup-host-address>
     User cairnbak
     IdentityFile ~/.ssh/cairn_backup_ed25519
     IdentitiesOnly yes
