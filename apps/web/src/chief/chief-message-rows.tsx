@@ -7,7 +7,6 @@ import { useLiveData } from '../api/provider.js';
 import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
-import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { CHAT_BODY_CLS, ChatMessageBody } from '../components/chat/message-body.js';
 import { NoticeLine } from '../components/chat/notice-line.js';
@@ -752,16 +751,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   }
-  if (item.kind === 'thinking' || item.kind === 'thinking-group')
-    return (
-      <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
-          <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <ThinkingRow text={item.kind === 'thinking' ? item.text : item.texts} />
-          </MessageContent>
-        </Message>
-      </MessageScrollerItem>
-    );
+  if (item.kind === 'thinking' || item.kind === 'thinking-group') return null;
   if (item.kind === 'question' && item.status === 'pending') return null;
   if (item.kind === 'question')
     return (

@@ -111,7 +111,7 @@ async function setupMock(page: Page, messages: unknown[]) {
   });
 }
 
-test('consecutive same-turn thinking traces collapse into one expandable row and preserve all steps while single-thinking stays unchanged', async ({
+test('Coordinator thinking traces (single or consecutive) are completely hidden from the stream', async ({
   page,
 }) => {
   await setupMock(page, [
@@ -194,25 +194,19 @@ test('consecutive same-turn thinking traces collapse into one expandable row and
   await expect(stream).toContainText('已定位到工具注册入口。');
   await expect(stream).toContainText('第二部分也确认无误。');
 
-  const triggers = stream.getByRole('button', { name: '展开思考' });
-  await expect(triggers).toHaveCount(2);
-  await expect(triggers.nth(0)).toContainText('思考 3 步 · 缩小路径范围到 apps/server 再 grep 一次');
-  await expect(triggers.nth(1)).toHaveText('单独核对第二部分接口');
+  await expect(stream.getByRole('button', { name: '展开思考' })).toHaveCount(0);
+  await expect(stream.getByRole('button', { name: '收起思考' })).toHaveCount(0);
+  await expect(stream.locator('pre')).toHaveCount(0);
+  await expect(stream).not.toContainText('思考 3 步');
+  await expect(stream).not.toContainText('第 1 步');
+  await expect(stream).not.toContainText('第 2 步');
+  await expect(stream).not.toContainText('第 3 步');
+  await expect(stream).not.toContainText('先列出当前已连接的 MCP 工具');
+  await expect(stream).not.toContainText('mcp_list_tools 返回空，改用 grep 搜工具注册位置');
+  await expect(stream).not.toContainText('缩小路径范围到 apps/server 再 grep 一次');
+  await expect(stream).not.toContainText('单独核对第二部分接口');
 
-  await evidencePanelShot(page, 'thinking-collapsed-after.png', stream);
-
-  await triggers.nth(0).click();
-  const opened = stream.getByRole('button', { name: '收起思考' });
-  await expect(opened).toHaveCount(1);
-  await expect(opened).toContainText('思考 3 步');
-  await expect(stream).toContainText('第 1 步');
-  await expect(stream).toContainText('先列出当前已连接的 MCP 工具');
-  await expect(stream).toContainText('第 2 步');
-  await expect(stream).toContainText('mcp_list_tools 返回空，改用 grep 搜工具注册位置');
-  await expect(stream).toContainText('第 3 步');
-  await expect(stream).toContainText('缩小路径范围到 apps/server 再 grep 一次');
-
-  await evidencePanelShot(page, 'thinking-expanded-after.png', stream);
+  await evidencePanelShot(page, 'thinking-hidden-in-chief.png', stream);
 });
 
 test('Not finished and Stopped. No task was created. render with the same FailureMarker separator geometry and visual rhythm', async ({

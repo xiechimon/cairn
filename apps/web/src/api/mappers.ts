@@ -71,6 +71,7 @@ import {
   SUBAGENT_TOOL_NAME,
   SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
+  stripAgentTodoText,
   stripAnsiEscapes,
   stripSkillRouteSection,
   stripTurnContext,
@@ -905,10 +906,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       if (textTodo !== null) {
         todoSnapshots.push({ at: m.createdAt, order: msgIndex, items: textTodo });
       }
-      entries.push({
-        at: m.createdAt,
-        item: { kind: 'robot', markdown: text, id: m.id, createdAt: m.createdAt },
-      });
+      const markdown = textTodo !== null ? stripAgentTodoText(text) : text;
+      if (markdown.trim() !== '') {
+        entries.push({
+          at: m.createdAt,
+          item: { kind: 'robot', markdown, id: m.id, createdAt: m.createdAt },
+        });
+      }
       continue;
     }
     const thinking = m.role === 'assistant' ? thinkingOfContent(m.content) : null;
@@ -1022,10 +1026,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   const persistedTodo =
     todoSnapshots.sort((a, b) => a.at - b.at || a.order - b.order).at(-1)?.items ??
     (pageTodo !== null && pageTodo.length > 0 ? pageTodo : null);
+  const liveTodoText = parseAgentTodoText(liveText);
+  const shownLiveText = liveTodoText !== null ? stripAgentTodoText(liveText) : liveText;
   const liveReply: TranscriptItem | null =
-    liveText.trim() === ''
+    shownLiveText.trim() === ''
       ? null
-      : { kind: 'robot', paragraphs: [{ segments: [{ text: liveText }] }] };
+      : { kind: 'robot', paragraphs: [{ segments: [{ text: shownLiveText }] }] };
   if (!running && liveReply !== null) items.push(liveReply);
   if (running && build) {
     const act = activity != null && activity.stepId === running.id ? activity : null;
@@ -1050,7 +1056,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         : null;
     const shownReply = turnWork !== null ? null : liveReply;
     if (liveReply !== null && turnWork !== null)
-      turnWork.steps.push({ kind: 'say', id: 'live-say', text: liveText });
+      turnWork.steps.push({ kind: 'say', id: 'live-say', text: shownLiveText });
     const tailWork = items.at(-1);
     const hasActiveTailWork =
       shownReply === null &&
@@ -1068,7 +1074,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
     if (shownReply !== null) items.push(shownReply);
     const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
-    const shownTodo = liveTodo?.items ?? persistedTodo;
+    const shownTodo = liveTodo?.items ?? liveTodoText ?? persistedTodo;
     const backgroundRunning = backgroundTasks.filter((task) => task.status === 'running').length;
     const anchor = turnWork ?? (hasActiveTailWork ? tailWork : null);
     const placeAboveWork = (row: TranscriptItem) => {

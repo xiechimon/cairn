@@ -3,6 +3,10 @@
     "new-task": {
       "features": ["threads"],
       "modes": ["local-server", "remote-server"]
+    },
+    "chat-and-thread": {
+      "features": ["coordinator-chat", "thread-transcript", "engine-view"],
+      "modes": ["local-server", "remote-server"]
     }
   }
 }

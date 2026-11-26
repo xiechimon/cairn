@@ -4,6 +4,7 @@ import {
   AGENT_TODO_MARKER_STATES,
   agentTodoReportSchema,
   agentTodoSchema,
+  stripAgentTodoText,
   toolCallRecordSchema,
 } from '../src/index.js';
 import { machineToolBodySchema } from '../src/protocol/machine-wire.js';
@@ -75,5 +76,51 @@ describe("agent todo wire's three surfaces", () => {
     expect(line?.[1]).toBe('x');
     expect(AGENT_TODO_MARKER_STATES[line?.[1] ?? '']).toBe('done');
     expect(AGENT_TODO_LINE_RE.exec('plain prose')).toBeNull();
+  });
+});
+
+describe('stripAgentTodoText', () => {
+  it('strips checklist-only messages and standalone headers down to empty string', () => {
+    expect(stripAgentTodoText('- [ ] 读配置\n- [~] 改接口\n- [x] 跑测试')).toBe('');
+    expect(stripAgentTodoText('计划：\n- [ ] 读配置\n- [x] 跑测试')).toBe('');
+    expect(stripAgentTodoText('Plan:\n\n- [ ] Step 1\n- [~] Step 2')).toBe('');
+    expect(stripAgentTodoText('计划:\n* [ ] 第一步\n* [x] 第二步')).toBe('');
+  });
+
+  it('strips checklist blocks and standalone headers while preserving surrounding prose', () => {
+    const input = [
+      '我先检查配置文件。',
+      '',
+      '计划：',
+      '- [x] 读配置',
+      '- [~] 改接口',
+      '- [ ] 补测试',
+      '',
+      '下面开始修改接口。',
+    ].join('\n');
+    expect(stripAgentTodoText(input)).toBe('我先检查配置文件。\n\n下面开始修改接口。');
+  });
+
+  it('strips multiple checklist runs while preserving prose between them', () => {
+    const input = [
+      'Plan:',
+      '- [x] 旧计划第一条',
+      '- [x] 旧计划第二条',
+      '',
+      '进度说明',
+      '',
+      '- [ ] 新计划',
+      '- [~] 正在做',
+    ].join('\n');
+    expect(stripAgentTodoText(input)).toBe('进度说明');
+  });
+
+  it('keeps fenced checklist examples and plain prose untouched', () => {
+    const fencedOnly = ['```md', '- [ ] 围栏里的假清单', '```'].join('\n');
+    expect(stripAgentTodoText(fencedOnly)).toBe(fencedOnly);
+    const mixed = ['示例：', '```md', '- [ ] 围栏里的假清单', '```', '', '- [x] 真清单'].join('\n');
+    expect(stripAgentTodoText(mixed)).toBe(
+      ['示例：', '```md', '- [ ] 围栏里的假清单', '```'].join('\n'),
+    );
   });
 });

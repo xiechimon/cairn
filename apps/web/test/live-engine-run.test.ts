@@ -328,4 +328,25 @@ describe('liveEngineRun', () => {
     expect(stoppedRun?.state).toBe('stopped');
     expect(stoppedRun?.rawOutput).toContain(STOP_MESSAGE);
   });
+
+  test('strips checklist blocks from assistant events and liveText while keeping plan populated', () => {
+    const run = liveEngineRun({
+      messages: [
+        text('计划：\n- [x] 读配置\n- [~] 改接口'),
+        text('先检查入口。\n\nPlan:\n- [x] 读配置\n- [~] 改接口\n\n继续处理。'),
+      ],
+      steps: [step('claimed')],
+      agentTodo: null,
+      liveText: '- [x] 读配置\n- [~] 改接口',
+    });
+    expect(run?.events).toHaveLength(1);
+    expect(run?.events[0]).toMatchObject({
+      kind: 'text',
+      text: '先检查入口。\n\n继续处理。',
+    });
+    expect(run?.plan).toEqual([
+      { text: '读配置', state: 'done' },
+      { text: '改接口', state: 'doing' },
+    ]);
+  });
 });

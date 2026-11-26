@@ -5,9 +5,11 @@ import {
   BUILD_FAILURE_ROW_KIND,
   type BuildRecord,
   isActiveStepStatus,
+  parseAgentTodoText,
   RETRY_PARKED_MARK,
   STOP_MESSAGE,
   type StepJournalRow,
+  stripAgentTodoText,
   stripAnsiEscapes,
   systemRowOf,
   toolResultText,
@@ -134,10 +136,14 @@ function liveEvents(messages: readonly MessageRow[], liveText: string): EngineEv
     if (m.role !== 'assistant') continue;
     const text = textOfContent(m.content);
     if (text === '' || isJsonPlumbing(text)) continue;
-    events.push({ kind: 'text', id: m.id, text });
+    const stripped = parseAgentTodoText(text) !== null ? stripAgentTodoText(text) : text;
+    if (stripped.trim() === '') continue;
+    events.push({ kind: 'text', id: m.id, text: stripped });
   }
   if (liveText.trim() !== '' && !isJsonPlumbing(liveText)) {
-    events.push({ kind: 'text', id: 'live-text', text: liveText });
+    const stripped =
+      parseAgentTodoText(liveText) !== null ? stripAgentTodoText(liveText) : liveText;
+    if (stripped.trim() !== '') events.push({ kind: 'text', id: 'live-text', text: stripped });
   }
   return events;
 }
@@ -254,7 +260,7 @@ export function liveEngineRun({
     plan:
       agentTodo !== null && steps.some((step) => step.id === agentTodo.stepId)
         ? agentTodo.items
-        : (rowsTodo(messages) ?? pageTodo ?? []),
+        : (rowsTodo(messages) ?? parseAgentTodoText(liveText) ?? pageTodo ?? []),
     events,
     rawOutput: synthesizeRawOutput(events, messages, state, buildError),
     stepId: claimed?.id ?? engineSteps.at(-1)?.id,

@@ -151,11 +151,29 @@ test('expanding a row in the history keeps it where it was and opens below it', 
   }
   messages.push({ id: 'u-last', role: 'user', content: '最后看一下凭证面', createdAt: 40 });
   messages.push({
-    id: 'think',
+    id: 'appr',
     role: 'assistant',
-    content: [
-      { type: 'thinking', thinking: ['先把凭证面捋一遍', ...Array(16).fill('逐条核对每个入口的鉴权。')].join('\n') },
-    ],
+    content: JSON.stringify({
+      kind: 'ask_user_question',
+      requestId: 'approval-shell-1',
+      status: 'answered',
+      questions: [
+        {
+          header: '运行命令',
+          question: JSON.stringify({
+            kind: 'shell',
+            computer: 'MacBook Pro',
+            command: ['echo check-1', ...Array(8).fill('echo check-line')].join('\n'),
+            cwd: '/tmp/cairn',
+          }),
+          options: [
+            { label: '批准', description: '只运行这一次' },
+            { label: '拒绝', description: '不运行' },
+          ],
+        },
+      ],
+      answers: [{ header: '运行命令', choices: ['批准'] }],
+    }),
     createdAt: 41,
   });
   messages.push({ id: 'a-last', role: 'assistant', content: '凭证面没有问题。', createdAt: 42 });
@@ -165,23 +183,23 @@ test('expanding a row in the history keeps it where it was and opens below it', 
   await expect
     .poll(() => body.evaluate((n) => n.scrollHeight - n.scrollTop - n.clientHeight))
     .toBeLessThan(2);
-  const trigger = page.getByRole('button', { name: '展开思考' });
+  const trigger = page.getByTestId('approval-history-toggle');
   const before = await trigger.evaluate((n) => n.getBoundingClientRect().top);
   await trigger.click();
-  const opened = page.getByRole('button', { name: '收起思考' });
-  await expect(opened).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await page.evaluate(
     () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
   );
   await page.waitForTimeout(300);
-  const after = await opened.evaluate((n) => n.getBoundingClientRect());
+  const after = await trigger.evaluate((n) => n.getBoundingClientRect());
   expect(Math.abs(after.top - before), 'C23: the clicked header stays put').toBeLessThanOrEqual(1);
   const detail = await page
-    .locator('pre', { hasText: '先把凭证面捋一遍' })
+    .getByTestId('approval-history')
+    .locator('[data-slot="approval-card"]')
     .evaluate((n) => n.getBoundingClientRect().top);
   expect(detail).toBeGreaterThanOrEqual(after.bottom - 1);
-  await opened.click();
-  await expect(page.locator('pre', { hasText: '先把凭证面捋一遍' })).toHaveCount(0);
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   const gap = () => body.evaluate((n) => n.scrollHeight - n.scrollTop - n.clientHeight);
   await expect.poll(gap).toBeLessThan(2);
   await page.evaluate(

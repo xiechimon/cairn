@@ -1,5 +1,8 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { formatLiveElapsed } from '../src/components/chat/live-row.js';
+import { TraceGroupSummary } from '../src/components/chat/trace-parts.js';
 import { workPurposes, workResult } from '../src/detail/work-trace.js';
 import type { WorkStep } from '../src/fixtures/records.js';
 import { EN } from '../src/i18n/en.js';
@@ -180,5 +183,27 @@ describe('workResult', () => {
       call({ id: 'c', action: 'edit', label: 'edit', target: 'src/a.ts', running: true }),
     ];
     expect(workResult(steps, named)).toBeNull();
+  });
+});
+
+describe('TraceGroupSummary live spacing and tabular stability', () => {
+  test('renders elapsed and tokens separately with preserved spaces and no grow-digit spans', () => {
+    const html = renderToStaticMarkup(
+      createElement(TraceGroupSummary, {
+        summary: 'Calling exec',
+        elapsed: '7m 26s',
+        tokens: '4.7k tokens',
+        open: false,
+        running: true,
+      }),
+    );
+    expect(html).not.toContain('grow-digit');
+    expect(html).toContain('Calling exec');
+    expect(html).toContain('data-slot="trace-elapsed"');
+    expect(html).toContain('7m 26s');
+    expect(html).toContain('data-slot="trace-tokens"');
+    expect(html).toContain(' · 4.7k tokens');
+    expect(html).toContain('tabular-nums');
+    expect(html).toContain('whitespace-nowrap');
   });
 });

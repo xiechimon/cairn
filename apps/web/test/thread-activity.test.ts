@@ -1,7 +1,9 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, test } from 'vitest';
 import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
+import { ChiefStreamRow } from '../src/chief/chief-message-rows.js';
 import {
   foldTaskCards,
   placeReportCards,
@@ -10,6 +12,7 @@ import {
 } from '../src/chief/chief-task-refs.js';
 import { collapseThinkingRuns, groupThreadEvents } from '../src/chief/thread-activity.js';
 import { ThinkingRow } from '../src/components/chat/agent-rows.js';
+import { MessageScroller, MessageScrollerProvider } from '../src/components/ui/message-scroller.js';
 import type { TodoGlance } from '../src/detail/segments.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
 import { I18nProvider } from '../src/i18n/provider.js';
@@ -248,16 +251,26 @@ describe('consecutive thinking collapse in a Coordinator turn', () => {
     expect(collapsed[3]?.item).toEqual({ kind: 'thinking', text: '单独一条后续思考', id: 'th-4' });
   });
 
-  test('ThinkingRow renders count + latest preview when collapsed and numbered steps when expanded', () => {
-    const traces = ['先列出 MCP 工具', '第一次 grep 报错', '改用精确路径再查'];
+  test('ThinkingRow omits preview text when collapsed and shows full steps when expanded', () => {
+    const traces = ['先列出 MCP 工具', '第一次 grep 报错', 'English internal reasoning step'];
     const collapsedHtml = renderToStaticMarkup(
       createElement(I18nProvider, {
         initialLocale: 'zh',
         children: createElement(ThinkingRow, { text: traces }),
       }),
     );
-    expect(collapsedHtml).toContain('思考 3 步 · 改用精确路径再查');
+    expect(collapsedHtml).toContain('思考 3 步');
+    expect(collapsedHtml).not.toContain('English internal reasoning step');
     expect(collapsedHtml).not.toContain('先列出 MCP 工具');
+
+    const singleCollapsedHtml = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(ThinkingRow, { text: 'The task has been created.' }),
+      }),
+    );
+    expect(singleCollapsedHtml).toContain('思考');
+    expect(singleCollapsedHtml).not.toContain('The task has been created.');
 
     const expandedHtml = renderToStaticMarkup(
       createElement(I18nProvider, {
@@ -271,6 +284,50 @@ describe('consecutive thinking collapse in a Coordinator turn', () => {
     expect(expandedHtml).toContain('第 2 步');
     expect(expandedHtml).toContain('第一次 grep 报错');
     expect(expandedHtml).toContain('第 3 步');
-    expect(expandedHtml).toContain('改用精确路径再查');
+    expect(expandedHtml).toContain('English internal reasoning step');
+  });
+
+  test('ChiefStreamRow hides thinking and thinking-group rows while keeping streaming live pulse', () => {
+    const renderChiefRow = (item: Parameters<typeof ChiefStreamRow>[0]['item']) =>
+      renderToStaticMarkup(
+        createElement(MemoryRouter, {
+          children: createElement(I18nProvider, {
+            initialLocale: 'en',
+            children: createElement(MessageScrollerProvider, {
+              children: createElement(MessageScroller, {
+                children: createElement(ChiefStreamRow, {
+                  item,
+                  index: 0,
+                  onCopy: () => {},
+                  onRewindRequest: () => {},
+                }),
+              }),
+            }),
+          }),
+        }),
+      );
+
+    const emptyWrapper = renderToStaticMarkup(
+      createElement(MemoryRouter, {
+        children: createElement(I18nProvider, {
+          initialLocale: 'en',
+          children: createElement(MessageScrollerProvider, {
+            children: createElement(MessageScroller, { children: null }),
+          }),
+        }),
+      }),
+    );
+
+    expect(renderChiefRow({ kind: 'thinking', id: 'th-1', text: 'The task has been created.' })).toBe(
+      emptyWrapper,
+    );
+    expect(
+      renderChiefRow({
+        kind: 'thinking-group',
+        id: 'th-g',
+        texts: ['Step 1', 'The task has been created.'],
+      }),
+    ).toBe(emptyWrapper);
+    expect(renderChiefRow({ kind: 'streaming', label: '正在思考' })).toContain('data-testid="typing-dots"');
   });
 });

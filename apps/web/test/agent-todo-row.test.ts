@@ -427,3 +427,66 @@ describe('mapTranscript background tasks (docs/design/task-panel-live-row-subage
     expect(settled.find((i) => i.kind === 'agent-todo')).not.toHaveProperty('backgroundRunning');
   });
 });
+
+describe('mapTranscript checklist deduplication', () => {
+  test('checklist-only assistant message renders only in agent-todo and emits no duplicate robot prose', () => {
+    const items = render({
+      steps: [runningStep('s1')],
+      messages: [
+        {
+          id: 'm-checklist',
+          role: 'assistant',
+          createdAt: NOW - 5_000,
+          content: '计划：\n- [x] 读配置\n- [~] 改接口\n- [ ] 跑测试',
+        },
+      ],
+    });
+    expect(items.some((i) => i.kind === 'robot')).toBe(false);
+    expect(todoItems(items)).toEqual([
+      {
+        kind: 'agent-todo',
+        items: [
+          { text: '读配置', state: 'done' },
+          { text: '改接口', state: 'doing' },
+          { text: '跑测试', state: 'todo' },
+        ],
+      },
+    ]);
+  });
+
+  test('mixed prose and checklist strips the checklist from robot prose while keeping surrounding prose and agent-todo', () => {
+    const items = render({
+      steps: [runningStep('s1')],
+      messages: [
+        {
+          id: 'm-mixed',
+          role: 'assistant',
+          createdAt: NOW - 5_000,
+          content: '先查一下现有实现。\n\nPlan:\n- [x] 读配置\n- [~] 改接口\n\n接下来开始改动。',
+        },
+      ],
+    });
+    const robots = items.filter((i): i is Extract<TranscriptItem, { kind: 'robot' }> => i.kind === 'robot');
+    expect(robots).toHaveLength(1);
+    expect(robots[0]?.markdown).toBe('先查一下现有实现。\n\n接下来开始改动。');
+    expect(robots[0]?.markdown).not.toContain('- [x]');
+    expect(todoItems(items)).toHaveLength(1);
+  });
+
+  test('streaming liveText checklist emits no duplicate checklist in robot or work say', () => {
+    const items = render({
+      steps: [runningStep('s1')],
+      liveText: '计划：\n- [ ] 第一步\n- [~] 第二步',
+    });
+    expect(items.some((i) => i.kind === 'robot')).toBe(false);
+    expect(todoItems(items)).toEqual([
+      {
+        kind: 'agent-todo',
+        items: [
+          { text: '第一步', state: 'todo' },
+          { text: '第二步', state: 'doing' },
+        ],
+      },
+    ]);
+  });
+});

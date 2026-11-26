@@ -27,14 +27,6 @@ export function thinkingPreview(text: string, fallback: string): string {
 const AGENT_LINE_CLS =
   'text-meta leading-5 tabular-nums text-content-tertiary data-[status=error]:text-content-tertiary';
 
-function latestThinkingPreview(steps: readonly string[]): string {
-  for (let i = steps.length - 1; i >= 0; i--) {
-    const preview = thinkingPreview(steps[i] ?? '', '');
-    if (preview !== '') return preview;
-  }
-  return '';
-}
-
 export function ThinkingRow({
   text,
   defaultOpen = false,
@@ -46,19 +38,7 @@ export function ThinkingRow({
   const [open, setOpen] = useState(defaultOpen);
   const steps = typeof text === 'string' ? [text] : text;
   const single = steps.length <= 1 ? (steps[0] ?? '') : null;
-  const title =
-    single !== null
-      ? open
-        ? t('思考')
-        : thinkingPreview(single, t('思考'))
-      : open
-        ? t('思考 {n} 步', { n: steps.length })
-        : (() => {
-            const preview = latestThinkingPreview(steps);
-            return preview === ''
-              ? t('思考 {n} 步', { n: steps.length })
-              : t('思考 {n} 步 · {preview}', { n: steps.length, preview });
-          })();
+  const title = single !== null ? t('思考') : t('思考 {n} 步', { n: steps.length });
   return (
     <Trace>
       <TraceCollapsible open={open} onOpenChange={setOpen}>

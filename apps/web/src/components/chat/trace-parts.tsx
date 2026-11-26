@@ -100,6 +100,7 @@ export function TraceGroupSummary({
   summary,
   failed,
   elapsed,
+  tokens,
   open,
   summaryTitle,
   running = false,
@@ -109,11 +110,14 @@ export function TraceGroupSummary({
   summary: ReactNode;
   failed?: string | null;
   elapsed?: string;
+  tokens?: string | undefined;
   summaryTitle?: string;
   open: boolean;
   running?: boolean;
 }) {
   const state = running ? 'running' : failed != null ? 'failed' : 'done';
+  const hasElapsed = elapsed !== undefined && elapsed !== '';
+  const hasTokens = tokens !== undefined && tokens !== '';
   return (
     <Button
       variant="ghost"
@@ -147,18 +151,17 @@ export function TraceGroupSummary({
           {failed}
         </span>
       )}
-      {elapsed !== undefined && elapsed !== '' && (
+      {(hasElapsed || hasTokens) && (
         <span
-          className="flex-none text-meta tabular-nums text-(--text-tertiary)"
+          className="flex-none text-meta tabular-nums whitespace-nowrap text-(--text-tertiary)"
           data-slot="trace-elapsed"
         >
-          {running
-            ? Array.from(elapsed, (char, n) => (
-                <span key={`${elapsed.length}-${n}-${char}`} className="grow-digit inline-block">
-                  {char}
-                </span>
-              ))
-            : elapsed}
+          {elapsed}
+          {hasTokens && (
+            <span className="tabular-nums" data-slot="trace-tokens">
+              {hasElapsed ? ` · ${tokens}` : tokens}
+            </span>
+          )}
         </span>
       )}
       <TraceChevron open={open} />

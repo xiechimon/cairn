@@ -44,6 +44,9 @@ const TODO_ORDINAL = /^\d+[.)、]\s*/;
 
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
 
+const STANDALONE_TODO_HEADER_RE =
+  /^(?:#{1,6}\s+)?(?:\*{1,2}|_{1,2})?(?:计划|任务清单|清单|待办|待办事项|步骤|Plan|Plans|Todo|Todos|To-Do|Checklist|Task\s+list|Tasks|Steps)(?:\*{1,2}|_{1,2})?\s*[:：]?\s*$/i;
+
 export function parseAgentTodoText(text: string): AgentTodoItem[] | null {
   let run: AgentTodoItem[] | null = null;
   let closed: AgentTodoItem[] | null = null;
@@ -71,6 +74,80 @@ export function parseAgentTodoText(text: string): AgentTodoItem[] | null {
   }
   const last = run ?? closed;
   return last !== null && last.length > 0 ? last : null;
+}
+
+export function stripAgentTodoText(text: string): string {
+  if (parseAgentTodoText(text) === null) return text;
+  const lines = text.split('\n');
+  const fenced = new Array<boolean>(lines.length).fill(false);
+  const remove = new Array<boolean>(lines.length).fill(false);
+  let inFence = false;
+  let runStart = -1;
+  let runHasItem = false;
+
+  const flushRun = (endExclusive: number) => {
+    if (runStart < 0 || !runHasItem) {
+      runStart = -1;
+      runHasItem = false;
+      return;
+    }
+    for (let i = runStart; i < endExclusive; i++) remove[i] = true;
+    let back = runStart - 1;
+    while (back >= 0 && !fenced[back] && (lines[back] ?? '').trim() === '') back--;
+    if (back >= 0 && !fenced[back] && STANDALONE_TODO_HEADER_RE.test((lines[back] ?? '').trim())) {
+      for (let i = back; i < runStart; i++) remove[i] = true;
+    }
+    runStart = -1;
+    runHasItem = false;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i] ?? '';
+    if (FENCE_OPEN.test(raw)) {
+      flushRun(i);
+      fenced[i] = true;
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      fenced[i] = true;
+      continue;
+    }
+    const m = AGENT_TODO_LINE_RE.exec(raw);
+    if (m === null) {
+      flushRun(i);
+      continue;
+    }
+    if (runStart < 0) runStart = i;
+    const content = (m[2] ?? '').trim().replace(TODO_ORDINAL, '');
+    const state = AGENT_TODO_MARKER_STATES[m[1] ?? ''];
+    if (content !== '' && state !== undefined) runHasItem = true;
+  }
+  flushRun(lines.length);
+
+  const kept: string[] = [];
+  let sawRemoved = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (remove[i]) {
+      sawRemoved = true;
+      continue;
+    }
+    const line = lines[i] ?? '';
+    if (
+      sawRemoved &&
+      !fenced[i] &&
+      line.trim() === '' &&
+      (kept.length === 0 || (kept.at(-1) ?? '').trim() === '')
+    ) {
+      continue;
+    }
+    if (line.trim() !== '') sawRemoved = false;
+    kept.push(line);
+  }
+  while (kept.length > 0 && (kept.at(-1) ?? '').trim() === '' && sawRemoved) {
+    kept.pop();
+  }
+  return kept.join('\n');
 }
 
 export function todoFromTodoWrite(name: unknown, input: unknown): AgentTodoItem[] | null {

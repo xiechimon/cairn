@@ -56,11 +56,6 @@ const TEST_COMMAND =
   /\b(?:vitest|jest|pytest|mocha|playwright test|cargo test|go test)\b|\b(?:pnpm|npm|yarn|bun)(?: run)? (?:test|e2e)/;
 const NAMED_PURPOSES = 2;
 
-function liveMeta(elapsed: string, outputTokens: number | undefined, t: TFunc): string {
-  if (elapsed === '' || outputTokens === undefined) return elapsed;
-  return `${elapsed} · ${liveTokensLabel(outputTokens, t)}`;
-}
-
 export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TFunc): string[] {
   const purposes = steps.flatMap((step, index) => {
     if (step.kind === 'say') return [];
@@ -463,7 +458,12 @@ export function WorkTrace({
             .filter((part): part is string => part !== null && part !== '')
             .join(' · ')}
           failed={failed}
-          elapsed={running ? liveMeta(formatLiveElapsed(liveSeconds), item.outputTokens, t) : ''}
+          elapsed={running ? formatLiveElapsed(liveSeconds) : ''}
+          tokens={
+            running && item.outputTokens !== undefined
+              ? liveTokensLabel(item.outputTokens, t)
+              : undefined
+          }
           open={expanded}
           running={running}
           onClick={() => setDisclosure({ defaultExpanded, open: !expanded })}

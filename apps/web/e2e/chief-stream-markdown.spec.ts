@@ -437,7 +437,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expect(bubble.locator('.chat-para, .chat-md-item, .chat-md-code')).toHaveCount(0);
   });
 
-  test('F-R19: segment-row projection (#955) — thinking rows in a single column, the in-flight call stays out of the stream', async ({ page }) => {
+  test('F-R19: segment-row projection (#955) — thinking rows and in-flight calls stay out of Coordinator stream', async ({ page }) => {
     await stubEventSource(page);
     await stubCdnAvatar(page);
 
@@ -475,34 +475,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     const coordinator = page.getByTestId('home-c');
     await expect(coordinator).toBeVisible();
 
-    const thinking = coordinator.locator('.chief-msg', { hasText: '先把凭证面捋一遍' });
-    await expect(thinking).toHaveCount(1);
-
-    await expect
-      .poll(
-        () =>
-          thinking.evaluate((row) => {
-            const colEl = row.querySelector(':scope > div');
-            if (colEl == null) return null;
-            const colCs = getComputedStyle(colEl);
-            return {
-              display: getComputedStyle(row).display,
-              grow: colCs.flexGrow,
-              minW: colCs.minWidth,
-              images: row.querySelectorAll('img').length,
-            };
-          }),
-        { message: 'thinking 行几何（无头像列：flex 行 + min-w-0 flex-1 列）' },
-      )
-      .toEqual({
-        display: 'flex',
-        grow: '1',
-        minW: '0px',
-        images: 0,
-      });
-    await expect(thinking.locator('pre')).toHaveCount(0);
-    await thinking.getByRole('button', { name: '展开思考' }).click();
-    await expect(thinking.locator('pre')).toHaveText('先把凭证面捋一遍');
+    await expect(coordinator).not.toContainText('先把凭证面捋一遍');
+    await expect(coordinator.locator('.chief-msg', { hasText: '先把凭证面捋一遍' })).toHaveCount(0);
+    await expect(coordinator.getByRole('button', { name: '展开思考' })).toHaveCount(0);
+    await expect(coordinator.locator('pre')).toHaveCount(0);
+    await expect(coordinator).toContainText('先看现状');
+    await expect(coordinator.getByTestId('chief-msg')).toHaveCount(3);
 
     await expect(coordinator.locator('.chief-msg', { hasText: 'todo_write' })).toHaveCount(0);
     const live = coordinator.getByTestId('chief-msg').last();
@@ -597,12 +575,12 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     const rows = coordinator.locator('.chief-msg, [data-testid="chief-msg"]');
     const expectFolded = async () => {
-      await expect(rows).toHaveCount(5);
+      await expect(rows).toHaveCount(4);
       await expect(rows.nth(0)).toContainText('派一下凭证链路验证');
-      await expect(rows.nth(1)).toContainText('先盘点凭证面');
-      await expect(rows.nth(2)).toContainText('先看现状');
-      await expect(rows.nth(3)).toContainText('再核对补发语义');
-      await expect(rows.nth(4)).toContainText('最后收口票');
+      await expect(rows.nth(1)).toContainText('先看现状');
+      await expect(rows.nth(2)).toContainText('再核对补发语义');
+      await expect(rows.nth(3)).toContainText('最后收口票');
+      await expect(coordinator).not.toContainText('先盘点凭证面');
       await expect(coordinator.getByTestId('chief-turn-tools')).toHaveCount(0);
       await expect(coordinator.getByText('todo_write')).toHaveCount(0);
       await expect(rows.filter({ hasText: '正在调用' })).toHaveCount(0);
@@ -614,7 +592,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expectFolded();
   });
 
-  test('F-R22: long preview truncated by CSS — button width ≤ column width, ellipsis works, zero horizontal overflow (#1034)', async ({
+  test('F-R22: long thinking text stays hidden in Coordinator chat with zero horizontal overflow', async ({
     page,
   }) => {
 
@@ -653,34 +631,14 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     const coordinator = page.getByTestId('home-c');
     await expect(coordinator).toBeVisible();
-    for (const [text, tag] of [
-      [LONG_CJK, 'CJK 长预览'],
-      [LONG_LATIN, '拉丁长预览'],
-    ] as const) {
-      const row = coordinator.locator('.chief-msg', { hasText: text.slice(0, 16) });
-      await expect(row, tag).toHaveCount(1);
-      const btn = row.getByRole('button', { name: '展开思考' });
-      const m = await btn.evaluate((el) => {
-        const label = el.querySelector('[data-slot="trace-title"]') as HTMLElement;
-        const cs = getComputedStyle(label);
-
-        const col = el.closest('[data-testid="chief-msg-col"]') as HTMLElement;
-        return {
-          textOverflow: cs.textOverflow,
-          overflowX: cs.overflowX,
-          labelClient: label.clientWidth,
-          labelScroll: label.scrollWidth,
-          btnW: Math.round(el.getBoundingClientRect().width),
-          colW: Math.round(col.getBoundingClientRect().width),
-        };
-      });
-
-      expect(m.textOverflow, tag).toBe('ellipsis');
-      expect(m.overflowX, tag).toBe('hidden');
-      expect(m.labelScroll, tag).toBeGreaterThan(m.labelClient);
-
-      expect(m.btnW, tag).toBeLessThanOrEqual(m.colW);
-    }
+    await expect(coordinator).toContainText('收到。');
+    await expect(coordinator.getByRole('button', { name: '展开思考' })).toHaveCount(0);
+    await expect(coordinator.locator('.chief-msg', { hasText: LONG_CJK.slice(0, 16) })).toHaveCount(0);
+    await expect(coordinator.locator('.chief-msg', { hasText: LONG_LATIN.slice(0, 16) })).toHaveCount(0);
+    await expect(coordinator).not.toContainText(LONG_CJK.slice(0, 16));
+    await expect(coordinator).not.toContainText(LONG_LATIN.slice(0, 16));
+    await expect(coordinator.getByTestId('chief-stream')).not.toContainText('思考');
+    await expect(coordinator.locator('pre')).toHaveCount(0);
 
     const pageOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
