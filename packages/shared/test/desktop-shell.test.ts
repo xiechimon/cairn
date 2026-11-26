@@ -9,7 +9,7 @@ function manifest(version: string, archs: string[]) {
     files: Object.fromEntries(
       archs.map((arch) => [
         arch,
-        { name: `Cairn-${version}-${arch}.zip`, size: 130_000_000, sha256: SHA },
+        { name: `Cairn-${version}-mac-${arch}.zip`, size: 130_000_000, sha256: SHA },
       ]),
     ),
   });
@@ -19,7 +19,7 @@ describe('desktopUpdateFrom', () => {
   test('a newer manifest yields the download for the running arch', () => {
     expect(desktopUpdateFrom(manifest('0.1.12', ['arm64', 'x64']), '0.1.9', 'arm64')).toEqual({
       version: '0.1.12',
-      url: 'https://github.com/xiechimon/cairn/releases/download/desktop-v0.1.12/Cairn-0.1.12-arm64.zip',
+      url: 'https://github.com/xiechimon/cairn/releases/download/desktop-v0.1.12/Cairn-0.1.12-mac-arm64.zip',
       size: 130_000_000,
       sha256: SHA,
     });
@@ -37,7 +37,7 @@ describe('desktopUpdateFrom', () => {
 
 describe('desktopReleaseManifestSchema', () => {
   test('rejects a non-semver version, a bad digest, a non-zip name and unknown keys', () => {
-    const file = { name: 'Cairn-0.2.0-arm64.zip', size: 1, sha256: SHA };
+    const file = { name: 'Cairn-0.2.0-mac-arm64.zip', size: 1, sha256: SHA };
     expect(
       desktopReleaseManifestSchema.safeParse({ version: 'v0.2', files: { arm64: file } }).success,
     ).toBe(false);

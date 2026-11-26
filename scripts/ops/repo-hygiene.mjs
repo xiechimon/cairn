@@ -15,13 +15,10 @@ import { evaluateCoverage, manifestIssues } from '../issue-coverage.mjs';
 export const REPORT_TITLE = 'Repo hygiene report';
 export const PROTECTED_REFS = new Set(['main', 'queue/main', 'queue-state/main']);
 export const PREFLIGHT_AGE_DAYS = 7;
-export const PACKAGE_SHA_AGE_DAYS = 30;
 export const DRAFT_RELEASE_AGE_DAYS = 1;
 export const STALE_ISSUE_DAYS = 14;
-export const PACKAGE_NAME = 'cairn-computer';
 const DAY_MS = 86400000;
 const REPOSITORY = 'xiechimon/cairn';
-const PACKAGE_VERSIONS_API = `/users/xiechimon/packages/container/${PACKAGE_NAME}/versions`;
 
 const root = resolve(import.meta.dirname, '../..');
 
@@ -191,22 +188,6 @@ export function planBoard({ openIssues, closedIssueTitles = [], boardItems }) {
   return plan;
 }
 
-export function newestPackageVersion(versions) {
-  return versions.reduce(
-    (a, b) => (!a || Date.parse(b.created_at) > Date.parse(a.created_at) ? b : a),
-    null,
-  );
-}
-
-export function classifyPackageVersion({ tags, digest, ageDays, latest, referenced }) {
-  if (latest || referenced.has(digest)) return 'keep';
-  if (tags.length === 0) return 'delete';
-  if (tags.every((tag) => /^[0-9a-f]{7,40}$/i.test(tag)) && ageDays > PACKAGE_SHA_AGE_DAYS) {
-    return 'delete';
-  }
-  return 'keep';
-}
-
 export function classifyRelease({ isDraft, ageDays, tagDisposition }) {
   if (!isDraft || !Number.isFinite(ageDays) || ageDays <= DRAFT_RELEASE_AGE_DAYS) return 'keep';
   if (tagDisposition === 'delete') return 'delete';
@@ -276,15 +257,7 @@ export function renderReport(state, format = 'summary') {
     for (const d of drafts) lines.push(`- draft “${d.title}” — convert to an issue or remove`);
     if (!state.board?.error && drafts.length === 0) lines.push('- in sync');
     lines.push('');
-    for (const key of [
-      'packages',
-      'releases',
-      'actions',
-      'security',
-      'settings',
-      'docs',
-      'workflows',
-    ]) {
+    for (const key of ['releases', 'actions', 'security', 'settings', 'docs', 'workflows']) {
       const items = state[key]?.report ?? [];
       lines.push(`## ${key[0].toUpperCase()}${key.slice(1)}`);
       if (state[key]?.error) lines.push(`- ${state[key].error}`);
@@ -703,35 +676,6 @@ async function collectBoard({ token, login, projectNumber }) {
   }
 }
 
-async function ghcrChildren(rootDigests, token) {
-  if (!token) return null;
-  const tokenRes = await fetch(
-    `https://ghcr.io/token?scope=repository:xiechimon/${PACKAGE_NAME}:pull`,
-    { headers: { Authorization: `Basic ${Buffer.from(`x:${token}`).toString('base64')}` } },
-  ).catch(() => null);
-  if (!tokenRes?.ok) return null;
-  const bearer = (await tokenRes.json()).token;
-  const seen = new Set();
-  const queue = [...rootDigests];
-  while (queue.length > 0) {
-    const digest = queue.shift();
-    if (seen.has(digest)) continue;
-    seen.add(digest);
-    const res = await fetch(`https://ghcr.io/v2/xiechimon/${PACKAGE_NAME}/manifests/${digest}`, {
-      headers: {
-        Authorization: `Bearer ${bearer}`,
-        Accept:
-          'application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json',
-      },
-    }).catch(() => null);
-    if (!res?.ok) return null;
-    const body = await res.json().catch(() => null);
-    if (body === null) return null;
-    for (const child of body?.manifests ?? []) if (child.digest) queue.push(child.digest);
-  }
-  return seen;
-}
-
 // ---------------------------------------------------------------------------
 // Executors
 
@@ -912,69 +856,7 @@ async function main() {
     }
   }
 
-  // 5. packages -----------------------------------------------------------------
-  {
-    const versions = ghPaged(PACKAGE_VERSIONS_API, '.[]');
-    if (!Array.isArray(versions)) {
-      state.packages = {
-        error: `ghcr.io/xiechimon/${PACKAGE_NAME} versions not readable with this token`,
-        report: [],
-      };
-    } else {
-      const list = versions;
-      const digestOf = (v) => (v.name?.startsWith('sha256:') ? v.name : `sha256:${v.name}`);
-      const imageRefs = [
-        'HEAD',
-        ...(git(['tag', '-l', 'desktop-v*']) ?? '').split('\n').filter(Boolean),
-      ];
-      const referenced = new Set(
-        (git(['grep', '-hoE', `${PACKAGE_NAME}@sha256:[0-9a-f]{64}`, ...imageRefs]) ?? '')
-          .split('\n')
-          .map((l) => l.trim().replace(`${PACKAGE_NAME}@`, ''))
-          .filter((l) => /^sha256:[0-9a-f]{64}$/.test(l)),
-      );
-      const newest = newestPackageVersion(list);
-      const kept = new Map();
-      const candidates = [];
-      for (const v of list) {
-        const digest = digestOf(v);
-        const tags = v.metadata?.container?.tags ?? [];
-        const verdict = classifyPackageVersion({
-          tags,
-          digest,
-          ageDays: (Date.now() - Date.parse(v.created_at)) / DAY_MS,
-          latest: v === newest || tags.includes('latest'),
-          referenced,
-        });
-        if (verdict === 'delete') candidates.push({ v, digest, tags });
-        else kept.set(digest, v);
-      }
-      const ghcrToken = process.env.GH_TOKEN ?? tryExec('gh', ['auth', 'token']);
-      const protectedSet =
-        candidates.length > 0 ? await ghcrChildren([...kept.keys()], ghcrToken) : new Set();
-      if (protectedSet === null && candidates.length > 0) {
-        state.packages = {
-          error:
-            'ghcr.io manifests of kept versions could not be read — refusing to delete, a kept index may reference them',
-          report: [],
-        };
-      } else {
-        state.packages = { deleted: [], report: [], referenced: [...referenced] };
-        for (const { v, digest, tags } of candidates) {
-          if (protectedSet?.has(digest)) continue;
-          state.packages.deleted.push(v.id ?? digest);
-          act(
-            mode,
-            actions,
-            `delete package version ${digest} (tags: ${tags.join(',') || 'untagged'})`,
-            () => gh(['api', '-X', 'DELETE', `${PACKAGE_VERSIONS_API}/${v.id}`]),
-          );
-        }
-      }
-    }
-  }
-
-  // 6. releases ------------------------------------------------------------------
+  // 5. releases ------------------------------------------------------------------
   {
     const releases =
       ghJson(['release', 'list', '--limit', '1000', '--json', 'tagName,isDraft,createdAt']) ?? [];
@@ -1053,7 +935,7 @@ async function main() {
     }
   }
 
-  // 7. actions ------------------------------------------------------------------
+  // 6. actions ------------------------------------------------------------------
   {
     state.actions = { deletedCaches: [], report: [] };
     let liveRefs = null;
@@ -1105,7 +987,7 @@ async function main() {
     }
   }
 
-  // 8. docs ----------------------------------------------------------------------
+  // 7. docs ----------------------------------------------------------------------
   {
     const docOut = tryExec('node', [join(root, 'scripts/doc-refs-gate.mjs'), '--report'], {
       cwd: root,
@@ -1126,7 +1008,7 @@ async function main() {
       state.docs.report.push('doc-refs-gate found broken references — see preflight');
   }
 
-  // 9. security -----------------------------------------------------------------
+  // 8. security -----------------------------------------------------------------
   {
     const sec = { report: [] };
     if (tryExec('gh', ['api', 'repos/xiechimon/cairn/vulnerability-alerts']) === null) {
@@ -1170,7 +1052,7 @@ async function main() {
     state.security = sec;
   }
 
-  // 10. settings drift -------------------------------------------------------------
+  // 9. settings drift -------------------------------------------------------------
   {
     const drift = { report: [] };
     const repoMeta = ghJson(['api', 'repos/xiechimon/cairn']);

@@ -196,7 +196,7 @@ jobs:
         working-directory: apps/desktop
         run: |
           mkdir -p "$RUNNER_TEMP/unzipped"
-          ditto -x -k "release/Cairn-$VERSION-$ARCH.zip" "$RUNNER_TEMP/unzipped"
+          ditto -x -k "release/Cairn-$VERSION-mac-$ARCH.zip" "$RUNNER_TEMP/unzipped"
           node scripts/check-signature.mjs signing/cairn-mac-self-signed.crt \
             "$RUNNER_TEMP/unzipped/Cairn.app"
 
@@ -268,8 +268,8 @@ jobs:
         with:
           name: desktop-${{ matrix.arch }}
           path: |
-            apps/desktop/release/Cairn-${{ env.VERSION }}-${{ matrix.arch }}.dmg
-            apps/desktop/release/Cairn-${{ env.VERSION }}-${{ matrix.arch }}.zip
+            apps/desktop/release/Cairn-${{ env.VERSION }}-mac-${{ matrix.arch }}.dmg
+            apps/desktop/release/Cairn-${{ env.VERSION }}-mac-${{ matrix.arch }}.zip
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -468,8 +468,8 @@ jobs:
       - name: Check the packaged builds carry the decided version
         working-directory: apps/desktop/release
         run: |
-          arm64=$(ls Cairn-*-arm64.zip | sed -n 's/^Cairn-\(.*\)-arm64\.zip$/\1/p')
-          x64=$(ls Cairn-*-x64.zip | grep -v -- '-win-x64\.zip$' | sed -n 's/^Cairn-\(.*\)-x64\.zip$/\1/p')
+          arm64=$(ls Cairn-*-mac-arm64.zip | sed -n 's/^Cairn-\(.*\)-mac-arm64\.zip$/\1/p')
+          x64=$(ls Cairn-*-mac-x64.zip | sed -n 's/^Cairn-\(.*\)-mac-x64\.zip$/\1/p')
           win=$(ls Cairn-*-win-x64.zip | sed -n 's/^Cairn-\(.*\)-win-x64\.zip$/\1/p')
           linux=$(ls Cairn-*-linux-x64.tar.gz | sed -n 's/^Cairn-\(.*\)-linux-x64\.tar\.gz$/\1/p')
           if [ "$arm64" != "$VERSION" ] || [ "$x64" != "$VERSION" ] || [ "$win" != "$VERSION" ] || [ "$linux" != "$VERSION" ]; then
@@ -517,7 +517,24 @@ jobs:
               bail "the tag $tag could not be read: $probe"
           }
           require_free_tag
-          body="Built from $RELEASE_SHA. Desktop builds for macOS (arm64, x64), Windows (x64), and Linux (x64). macOS builds are signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open."
+          body=$(cat <<'EOF'
+          Built from __RELEASE_SHA__.
+
+          | Platform | Download |
+          | --- | --- |
+          | macOS (Apple Silicon) | `Cairn-__VERSION__-mac-arm64.dmg` |
+          | macOS (Intel) | `Cairn-__VERSION__-mac-x64.dmg` |
+          | Windows (64-bit Installer) | `Cairn-__VERSION__-win-x64.exe` |
+          | Windows (64-bit Portable ZIP) | `Cairn-__VERSION__-win-x64.zip` |
+          | Linux (64-bit) | `Cairn-__VERSION__-linux-x64.tar.gz` |
+
+          `-mac-*.zip` and `desktop-latest.json` are for in-app auto-updates.
+
+          macOS builds are signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open.
+          EOF
+          )
+          body="${body//__RELEASE_SHA__/$RELEASE_SHA}"
+          body="${body//__VERSION__/$VERSION}"
           release_id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
             -F draft=true \
             -f tag_name="$tag" \
@@ -529,8 +546,8 @@ jobs:
             ''|*[!0-9]*) bail "the draft $tag returned '$release_id', not a numeric release id" ;;
           esac
           for asset in \
-            Cairn-"$VERSION"-arm64.dmg Cairn-"$VERSION"-x64.dmg \
-            Cairn-"$VERSION"-arm64.zip Cairn-"$VERSION"-x64.zip \
+            Cairn-"$VERSION"-mac-arm64.dmg Cairn-"$VERSION"-mac-x64.dmg \
+            Cairn-"$VERSION"-mac-arm64.zip Cairn-"$VERSION"-mac-x64.zip \
             Cairn-"$VERSION"-win-x64.exe Cairn-"$VERSION"-win-x64.zip \
             Cairn-"$VERSION"-linux-x64.tar.gz \
             desktop-latest.json

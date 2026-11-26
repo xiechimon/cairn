@@ -11,7 +11,7 @@ if (version === undefined || releaseDir === undefined) {
 
 const files = Object.fromEntries(
   ARCHS.map((arch) => {
-    const name = `Cairn-${version}-${arch}.zip`;
+    const name = `Cairn-${version}-mac-${arch}.zip`;
     const path = join(releaseDir, name);
     const sha256 = createHash('sha256').update(readFileSync(path)).digest('hex');
     return [arch, { name, size: statSync(path).size, sha256 }];

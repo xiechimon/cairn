@@ -750,10 +750,10 @@ const callIndex = (calls, pattern) =>
     .findIndex((line) => pattern.test(line));
 
 const ASSETS = [
-  'Cairn-0.1.2-arm64.dmg',
-  'Cairn-0.1.2-x64.dmg',
-  'Cairn-0.1.2-arm64.zip',
-  'Cairn-0.1.2-x64.zip',
+  'Cairn-0.1.2-mac-arm64.dmg',
+  'Cairn-0.1.2-mac-x64.dmg',
+  'Cairn-0.1.2-mac-arm64.zip',
+  'Cairn-0.1.2-mac-x64.zip',
   'Cairn-0.1.2-win-x64.exe',
   'Cairn-0.1.2-win-x64.zip',
   'Cairn-0.1.2-linux-x64.tar.gz',
@@ -1254,7 +1254,28 @@ test('both architectures are packaged in parallel and published only after both 
   const versionCheck = workflow.jobs.publish.steps.find(
     (step) => step.name === 'Check the packaged builds carry the decided version',
   );
+  assert.match(versionCheck.run, /Cairn-\*-mac-arm64\.zip/);
+  assert.match(versionCheck.run, /Cairn-\*-mac-x64\.zip/);
   assert.match(versionCheck.run, /Cairn-\*-linux-x64\.tar\.gz/);
+  assert.match(
+    publishScript,
+    /\| macOS \(Apple Silicon\) \| `Cairn-__VERSION__-mac-arm64\.dmg` \|/,
+  );
+  assert.match(publishScript, /\| macOS \(Intel\) \| `Cairn-__VERSION__-mac-x64\.dmg` \|/);
+  assert.match(
+    publishScript,
+    /\| Windows \(64-bit Installer\) \| `Cairn-__VERSION__-win-x64\.exe` \|/,
+  );
+  assert.match(
+    publishScript,
+    /\| Windows \(64-bit Portable ZIP\) \| `Cairn-__VERSION__-win-x64\.zip` \|/,
+  );
+  assert.match(publishScript, /\| Linux \(64-bit\) \| `Cairn-__VERSION__-linux-x64\.tar\.gz` \|/);
+  assert.match(
+    publishScript,
+    /`-mac-\*\.zip` and `desktop-latest\.json` are for in-app auto-updates/,
+  );
+  assert.match(publishScript, /right-click, Open/);
 });
 
 test('the package upload overwrites so a rerun replaces only its own architecture', () => {
@@ -1292,7 +1313,7 @@ test('a leftover draft holding the decided name refuses the staging instead of a
   const run = publish({ RELEASES_PAGE: page });
   assert.notEqual(run.result.status, 0);
   assert.match(run.result.stderr, /could not be created/);
-  for (const suffix of ['arm64.dmg', 'x64.dmg', 'arm64.zip', 'x64.zip']) {
+  for (const suffix of ['mac-arm64.dmg', 'mac-x64.dmg', 'mac-arm64.zip', 'mac-x64.zip']) {
     assert.ok(
       existsSync(join(releaseDir, `Cairn-0.1.2-${suffix}`)),
       `the archive keeps the decided version, never a rename: ${suffix}`,
@@ -1306,4 +1327,27 @@ test('a leftover draft holding the decided name refuses the staging instead of a
     'the leftover draft keeps the name it holds',
   );
   assert.equal(git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.2'), '');
+});
+
+test('release-manifest labels macOS update zips with -mac- while keeping manifest keys unchanged', (t) => {
+  const dir = makeTestTempDir('release-manifest-');
+  t.after(() => releaseTestTempDir(dir));
+  for (const name of [
+    'Cairn-0.1.2-mac-arm64.zip',
+    'Cairn-0.1.2-mac-x64.zip',
+    'Cairn-0.1.2-win-x64.exe',
+  ]) {
+    writeFileSync(join(dir, name), `payload-${name}`);
+  }
+  execFileSync(
+    process.execPath,
+    [resolve(repoRoot, 'apps/desktop/scripts/release-manifest.mjs'), '0.1.2', dir],
+    { encoding: 'utf8' },
+  );
+  const manifest = JSON.parse(readFileSync(join(dir, 'desktop-latest.json'), 'utf8'));
+  assert.equal(manifest.version, '0.1.2');
+  assert.deepEqual(Object.keys(manifest.files), ['arm64', 'x64', 'win-x64']);
+  assert.equal(manifest.files.arm64.name, 'Cairn-0.1.2-mac-arm64.zip');
+  assert.equal(manifest.files.x64.name, 'Cairn-0.1.2-mac-x64.zip');
+  assert.equal(manifest.files['win-x64'].name, 'Cairn-0.1.2-win-x64.exe');
 });

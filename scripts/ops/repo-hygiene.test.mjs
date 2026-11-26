@@ -9,14 +9,12 @@ import {
   classifyBranch,
   classifyCache,
   classifyIssue,
-  classifyPackageVersion,
   classifyPreflightRef,
   classifyPullRequest,
   classifyRelease,
   classifyScheduledRun,
   closesCommitsFor,
   liveChecks,
-  newestPackageVersion,
   planBoard,
   renderReport,
 } from './repo-hygiene.mjs';
@@ -480,69 +478,6 @@ test('board plan adds missing open issues, marks closed Done, removes duplicate 
   assert.deepEqual(
     plan.reportDraft.map((d) => d.id),
     ['draft-keep'],
-  );
-});
-
-test('an empty package version list has no newest version', () => {
-  assert.equal(newestPackageVersion([]), null);
-});
-
-test('package versions: untagged and old sha tags are pruned; pinned and latest digests kept', () => {
-  const referenced = new Set(['sha256:pinned']);
-  assert.equal(
-    classifyPackageVersion({
-      id: 1,
-      tags: [],
-      digest: 'sha256:unt',
-      ageDays: 2,
-      latest: false,
-      referenced,
-    }),
-    'delete',
-  );
-  assert.equal(
-    classifyPackageVersion({
-      id: 2,
-      tags: ['a1b2c3d'],
-      digest: 'sha256:old',
-      ageDays: 40,
-      latest: false,
-      referenced,
-    }),
-    'delete',
-  );
-  assert.equal(
-    classifyPackageVersion({
-      id: 3,
-      tags: ['e4f5g6h'],
-      digest: 'sha256:pinned',
-      ageDays: 40,
-      latest: false,
-      referenced,
-    }),
-    'keep',
-  );
-  assert.equal(
-    classifyPackageVersion({
-      id: 4,
-      tags: ['latest'],
-      digest: 'sha256:lat',
-      ageDays: 40,
-      latest: true,
-      referenced,
-    }),
-    'keep',
-  );
-  assert.equal(
-    classifyPackageVersion({
-      id: 5,
-      tags: ['a1b2c3d'],
-      digest: 'sha256:young',
-      ageDays: 3,
-      latest: false,
-      referenced,
-    }),
-    'keep',
   );
 });
 

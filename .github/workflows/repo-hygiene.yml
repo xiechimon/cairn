@@ -1,7 +1,7 @@
 name: repo-hygiene
 
 # Daily deterministic maintenance over every repository surface: landed PRs,
-# closed-by-commit issues, dead branches, the roadmap board, GHCR versions,
+# closed-by-commit issues, dead branches, the roadmap board,
 # draft releases, actions caches and settings drift. The schedule runs for
 # real; workflow_dispatch defaults to dry so it can be rehearsed on any ref.
 # Judgement items are written to the one pinned "Repo hygiene report" issue.
@@ -26,7 +26,6 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
-  packages: write
   actions: write
   security-events: read
 

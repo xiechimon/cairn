@@ -4,7 +4,7 @@ Cairn is one server you browse plus a daemon on every machine that runs builds. 
 
 ## Cairn for Mac
 
-On a Mac, the desktop app is the whole install. Download it from the [latest release](https://github.com/xiechimon/cairn/releases/latest) (`-arm64.dmg` for Apple silicon, `-x64.dmg` for Intel), drag it to Applications and open it. The app is not notarized yet, so macOS blocks the first launch: open System Settings, then Privacy & Security, and click **Open Anyway** next to Cairn; on macOS 14 and earlier, right-click Cairn in Applications and choose Open instead.
+On a Mac, the desktop app is the whole install. Download it from the [latest release](https://github.com/xiechimon/cairn/releases/latest) (`-mac-arm64.dmg` for Apple silicon, `-mac-x64.dmg` for Intel), drag it to Applications and open it. The app is not notarized yet, so macOS blocks the first launch: open System Settings, then Privacy & Security, and click **Open Anyway** next to Cairn; on macOS 14 and earlier, right-click Cairn in Applications and choose Open instead.
 
 The app runs the server and a Runner on this Mac, approves that Runner and signs you in as the owner. The Runner includes pi: connect your ChatGPT subscription inside Cairn or add a provider API key; neither the Codex CLI nor Claude Code is required for this route. Follow [Connect a model and get your first result](../README.md#connect-a-model-and-get-your-first-result). Claude Code is optional; its subscription setup is below.
 

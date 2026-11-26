@@ -29,7 +29,7 @@ linux:
     - target: tar.gz
       arch: [x64]
 mac:
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
   icon: ../../assets/AppIcon.icns
   category: public.app-category.developer-tools
   extraResources:
