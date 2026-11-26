@@ -56,6 +56,10 @@ const WINDOW_LABELS = new Map([
   ['five_hour', '5 小时'],
   ['seven_day', '每周'],
   ['billing_period', '计费周期'],
+  ['gemini-5h', 'Gemini · 5 小时'],
+  ['gemini-weekly', 'Gemini · 每周'],
+  ['3p-5h', 'Claude / GPT · 5 小时'],
+  ['3p-weekly', 'Claude / GPT · 每周'],
 ]);
 
 const AUTH_RENEWAL: Record<AccountVendor, string> = {
@@ -508,14 +512,16 @@ function QuotaSection({ account, now }: { account: SubscriptionAccount; now: num
             <span className="text-foreground">
               {t('{n} 次运行', { n: account.stepsLast24h ?? 0 })}
             </span>
-            {ordered.length === 0 && account.vendor !== 'claude' && (
-              <span
-                data-testid="subscription-usage-note"
-                className="col-span-2 text-caption text-content-tertiary"
-              >
-                {t('{vendor} 不提供剩余用量', { vendor: VENDORS[account.vendor].short })}
-              </span>
-            )}
+            {ordered.length === 0 &&
+              account.vendor !== 'claude' &&
+              account.vendor !== 'antigravity' && (
+                <span
+                  data-testid="subscription-usage-note"
+                  className="col-span-2 text-caption text-content-tertiary"
+                >
+                  {t('{vendor} 不提供剩余用量', { vendor: VENDORS[account.vendor].short })}
+                </span>
+              )}
           </div>
         </SettingsCard>
       </SettingsSection>

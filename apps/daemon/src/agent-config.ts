@@ -219,28 +219,33 @@ export function writeAntigravityOAuthCredential(
     credential.expiresAt > Date.now()
       ? { token: credential.token, expiry: new Date(credential.expiresAt).toISOString() }
       : null;
-  if (credential.refreshToken !== undefined) {
-    writeJsonObject(home, '.gemini/antigravity-acp/antigravity-oauth-token', {
-      token: {
-        access_token: freshAccess?.token ?? '',
-        token_type: 'Bearer',
-        refresh_token: credential.refreshToken,
-        expiry: freshAccess?.expiry ?? '2020-01-01T00:00:00Z',
-      },
-      auth_method: credential.authMethod ?? 'consumer',
-    });
-    return;
-  }
-  if (credential.token === undefined || credential.expiresAt === undefined) {
-    throw new Error('Antigravity OAuth credential is missing both refresh token and access token');
-  }
-  writeJsonObject(home, '.gemini/antigravity-acp/antigravity-oauth-token', {
-    token: {
-      access_token: credential.token,
-      token_type: 'Bearer',
-      expiry: new Date(credential.expiresAt).toISOString(),
-    },
-  });
+  const payload =
+    credential.refreshToken !== undefined
+      ? {
+          token: {
+            access_token: freshAccess?.token ?? '',
+            token_type: 'Bearer',
+            refresh_token: credential.refreshToken,
+            expiry: freshAccess?.expiry ?? '2020-01-01T00:00:00Z',
+          },
+          auth_method: credential.authMethod ?? 'consumer',
+        }
+      : (() => {
+          if (credential.token === undefined || credential.expiresAt === undefined) {
+            throw new Error(
+              'Antigravity OAuth credential is missing both refresh token and access token',
+            );
+          }
+          return {
+            token: {
+              access_token: credential.token,
+              token_type: 'Bearer',
+              expiry: new Date(credential.expiresAt).toISOString(),
+            },
+          };
+        })();
+  writeJsonObject(home, '.gemini/antigravity-acp/antigravity-oauth-token', payload);
+  writeJsonObject(home, '.gemini/antigravity-cli/antigravity-oauth-token', payload);
 }
 
 export function antigravityFileStorageEnv(home: string): Record<string, string> {

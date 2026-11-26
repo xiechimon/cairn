@@ -1288,6 +1288,7 @@ async function openConfiguredPicker(path: typeof pickerPaths[number]) {
     });
     api.post.mockImplementation(async (url: string) => {
       if (url === `${prefix}/claude-subscriptions/quota`) return [];
+      if (url === `${prefix}/antigravity-subscriptions/quota`) return [];
       if (url === `${subscriptionPath}/upstream-models`) return load();
       throw new Error(`Unexpected POST ${url}`);
     });
@@ -1354,6 +1355,7 @@ it.each([
   const subscriptionPath = `${prefix}/${vendor}-subscriptions`;
   api.post.mockImplementation(async (path: string) => {
     if (path === `${prefix}/claude-subscriptions/quota`) return [];
+    if (path === `${prefix}/antigravity-subscriptions/quota`) return [];
     if (path === `${subscriptionPath}/subscription/upstream-models`) return { status: 'ok', models: [models[0]!] };
     throw new Error(`Unexpected POST ${path}`);
   });
@@ -1408,6 +1410,7 @@ it.each(['settled', 'late'] as const)('does not reuse a %s catalog from another 
   });
   api.post.mockImplementation(async (path: string) => {
     if (path === `${prefix}/claude-subscriptions/quota`) return [];
+    if (path === `${prefix}/antigravity-subscriptions/quota`) return [];
     if (path === `${prefix}/antigravity-subscriptions/first/upstream-models`) return first.promise;
     if (path === `${prefix}/antigravity-subscriptions/second/upstream-models`) {
       return { status: 'failed', failure: 'network', httpStatus: null };

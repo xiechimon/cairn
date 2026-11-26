@@ -5,7 +5,9 @@ import type {
   AntigravitySubscriptionListEntry,
   AntigravitySubscriptionModel,
   AntigravitySubscriptionVerifyResult,
+  ClaudeSubscriptionQuotaWindow,
   CreateAntigravitySubscription,
+  MachineAntigravityUsageProbeClaim,
   MachineCapabilities,
   PatchAntigravitySubscription,
   ProviderFailure,
@@ -38,6 +40,7 @@ import {
   refreshAntigravityOAuthAccessToken,
   verifyAntigravitySubscription,
 } from './antigravity-subscription-verification.js';
+import { dispatchAntigravityUsageProbe } from './antigravity-usage-probes.js';
 import { requestAntigravityVerify } from './machine-antigravity-verify.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { timedCheck } from './subscription-check.js';
@@ -87,6 +90,13 @@ const runnerColumns = {
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
 const activeVerifications = new WeakMap<Db, Set<string>>();
 const upstreamModelsWindows = new WeakMap<Db, Map<string, number>>();
+const quotaProbes = new WeakMap<
+  Db,
+  Map<string, { at: number; pending: boolean; done: Promise<void> }>
+>();
+export const ANTIGRAVITY_QUOTA_REFRESH_MS = 60_000;
+export const ANTIGRAVITY_QUOTA_FRESH_MS = 5 * 60_000;
+export const ANTIGRAVITY_QUOTA_POLL_MS = 5 * 60_000;
 const OAUTH_CIPHER_PREFIX = 'oauth-personal:';
 const BOUND_OAUTH_CIPHER_PREFIX = `${OAUTH_CIPHER_PREFIX}v2:`;
 const googleSubjectSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,255}$/);
@@ -459,6 +469,7 @@ export function patchAntigravitySubscription(
   if (row.runnerId === null && updated.runnerId != null) {
     verificationWindows.get(deps.db)?.delete(id);
     upstreamModelsWindows.get(deps.db)?.delete(id);
+    quotaProbes.get(deps.db)?.delete(id);
   }
   return updated;
 }
@@ -602,6 +613,14 @@ export function listAntigravitySubscriptionSteps(
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function quotaWindowWire(
+  window: ClaudeSubscriptionQuotaWindow,
+  now: number,
+): ClaudeSubscriptionQuotaWindow | null {
+  if (window.resetsAt !== null && window.resetsAt <= now) return null;
+  return window;
+}
+
 export function listAntigravitySubscriptions(
   deps: Pick<Deps, 'db'>,
   teamId: string,
@@ -612,11 +631,12 @@ export function listAntigravitySubscriptions(
     .where(eq(antigravitySubscription.teamId, teamId))
     .orderBy(desc(antigravitySubscription.createdAt), desc(antigravitySubscription.id))
     .all();
+  const now = nowMs();
   const usage = subscriptionUsageStats(
     deps.db,
     step.antigravitySubscriptionId,
     rows.map((row) => row.id),
-    nowMs() - DAY_MS,
+    now - DAY_MS,
   );
   const runnerLogins = teamRunnerLogins(deps.db, teamId);
   return rows.map((row) => {
@@ -628,8 +648,12 @@ export function listAntigravitySubscriptions(
       login === undefined
         ? row.models
         : row.models.filter((model) => runnerModels.some((entry) => entry.id === model.id));
+    const windows = (row.quotaWindows ?? [])
+      .map((window) => quotaWindowWire(window, now))
+      .filter((window) => window !== null);
     return {
       ...toRecord(login === undefined ? row : { ...row, runnerId: login.runnerId, models }),
+      windows,
       ...(login !== undefined
         ? { runnerName: login.hostname, runnerLogin: login.status, runnerModels, runnerLogins }
         : {}),
@@ -821,6 +845,7 @@ export function createAntigravitySubscription(
     runnerId: null,
     expiresAt,
     enabledAt: null,
+    quotaWindows: null,
     models:
       body.models !== undefined && body.models.length > 0
         ? dedupeSubscriptionModels(body.models, true)
@@ -974,6 +999,7 @@ export async function attachAntigravityOAuthCredential(
       runnerId: null,
       expiresAt: hasRefreshToken ? null : tokenExpiresAt,
       ...(seededModels !== undefined ? { models: seededModels } : {}),
+      quotaWindows: null,
       lastCheck: null,
     };
     tx.update(antigravitySubscription)
@@ -984,6 +1010,7 @@ export async function attachAntigravityOAuthCredential(
   });
   verificationWindows.get(deps.db)?.delete(id);
   upstreamModelsWindows.get(deps.db)?.delete(id);
+  quotaProbes.get(deps.db)?.delete(id);
   return toRecord(saved);
 }
 
@@ -1213,6 +1240,216 @@ export async function antigravitySubscriptionUpstreamModels(
   return models.length > 0 ? { status: 'ok', models } : fallback('upstream');
 }
 
+function oauthCredentialFromRow(box: SecretBox, row: Row): AntigravityOAuthStepCredential {
+  if (row.tokenCipher === null || !row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX)) {
+    throw new HttpError(409, 'Subscription does not carry an OAuth credential.');
+  }
+  const stored = openStoredOAuth(box, row.tokenCipher);
+  if (stored.refreshToken !== undefined) {
+    const hasFreshAccessToken =
+      stored.token !== undefined &&
+      stored.tokenExpiresAt !== undefined &&
+      stored.tokenExpiresAt > nowMs();
+    return {
+      kind: 'oauth-personal',
+      refreshToken: stored.refreshToken,
+      authMethod: stored.authMethod ?? 'consumer',
+      ...(hasFreshAccessToken ? { token: stored.token, expiresAt: stored.tokenExpiresAt } : {}),
+    };
+  }
+  if (row.expiresAt === null || stored.token === undefined) {
+    throw new HttpError(409, 'Missing Antigravity OAuth expiration');
+  }
+  return {
+    kind: 'oauth-personal',
+    token: stored.token,
+    expiresAt: row.expiresAt,
+  };
+}
+
+function observedQuotaFresh(row: Row, now: number): boolean {
+  return (row.quotaWindows ?? []).some(
+    (window) => now - window.observedAt < ANTIGRAVITY_QUOTA_FRESH_MS,
+  );
+}
+
+function isQuotaEligibleRow(row: Row, now: number): boolean {
+  if (row.enabledAt === null) return false;
+  if (row.expiresAt !== null && row.expiresAt <= now) return false;
+  return row.tokenCipher === null || row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX);
+}
+
+async function probeAndStoreAntigravityQuota(
+  deps: Deps,
+  row: Row,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (deps.machineHub === undefined) return;
+  const hub = deps.machineHub;
+  const now = nowMs();
+  if (!isQuotaEligibleRow(row, now)) return;
+
+  let candidateIds: string[];
+  let buildClaim: () => MachineAntigravityUsageProbeClaim;
+  let isAuthorized: (machineId: string) => boolean;
+
+  if (row.tokenCipher === null) {
+    const { runner } = resolveBoundRunner(deps.db, row);
+    if (
+      runner === undefined ||
+      !runner.online ||
+      !hub.isConnected(runner.id) ||
+      runner.capabilities?.antigravityUsage !== true ||
+      runner.capabilities?.antigravity?.installed !== true ||
+      runner.capabilities?.antigravity?.authenticated !== true
+    ) {
+      return;
+    }
+    candidateIds = [runner.id];
+    buildClaim = () => ({ mode: 'host' });
+    isAuthorized = (machineId: string) => {
+      const fresh = subscriptionRow(deps.db, row.teamId, row.id);
+      if (
+        fresh === undefined ||
+        fresh.enabledAt === null ||
+        fresh.tokenCipher !== null ||
+        (fresh.expiresAt !== null && fresh.expiresAt <= nowMs())
+      ) {
+        return false;
+      }
+      const resolved = resolveBoundRunner(deps.db, fresh);
+      return (
+        resolved.runnerId === machineId &&
+        resolved.runner !== undefined &&
+        resolved.runner.online &&
+        resolved.runner.capabilities?.antigravityUsage === true &&
+        resolved.runner.capabilities?.antigravity?.installed === true &&
+        resolved.runner.capabilities?.antigravity?.authenticated === true
+      );
+    };
+  } else {
+    let credential: AntigravityOAuthStepCredential;
+    try {
+      credential = oauthCredentialFromRow(deps.box, row);
+    } catch {
+      return;
+    }
+    const runners = registeredRunners(deps.db, row.teamId).filter(
+      (runner) =>
+        runner.online &&
+        hub.isConnected(runner.id) &&
+        runner.capabilities?.antigravityUsage === true &&
+        runner.capabilities?.antigravity?.installed !== false,
+    );
+    if (runners.length === 0) return;
+    candidateIds = runners.map((runner) => runner.id);
+    buildClaim = () => ({ mode: 'oauth', credential });
+    isAuthorized = (machineId: string) => {
+      const fresh = subscriptionRow(deps.db, row.teamId, row.id);
+      if (
+        fresh === undefined ||
+        fresh.enabledAt === null ||
+        fresh.tokenCipher !== row.tokenCipher ||
+        (fresh.expiresAt !== null && fresh.expiresAt <= nowMs())
+      ) {
+        return false;
+      }
+      const runner = subscriptionRunner(deps.db, row.teamId, machineId);
+      return (
+        runner?.online === true &&
+        runner.capabilities?.antigravityUsage === true &&
+        runner.capabilities?.antigravity?.installed !== false
+      );
+    };
+  }
+
+  const probed = await dispatchAntigravityUsageProbe(
+    hub,
+    candidateIds,
+    buildClaim,
+    isAuthorized,
+    signal,
+  );
+  if (probed.status !== 'ok' || !isAuthorized(probed.machineId)) return;
+
+  deps.db.transaction((tx) => {
+    const fresh = subscriptionRow(tx, row.teamId, row.id);
+    if (
+      fresh === undefined ||
+      fresh.enabledAt === null ||
+      fresh.tokenCipher !== row.tokenCipher ||
+      fresh.runnerId !== row.runnerId
+    ) {
+      return;
+    }
+    tx.update(antigravitySubscription)
+      .set({ quotaWindows: probed.windows })
+      .where(
+        and(eq(antigravitySubscription.teamId, row.teamId), eq(antigravitySubscription.id, row.id)),
+      )
+      .run();
+  });
+}
+
+export async function refreshAntigravityQuota(
+  deps: Deps,
+  teamId: string,
+  options: { force?: boolean; signal?: AbortSignal } = {},
+): Promise<AntigravitySubscriptionListEntry[]> {
+  const row = activeSubscriptionRow(deps, teamId);
+  const now = nowMs();
+  if (
+    row !== undefined &&
+    isQuotaEligibleRow(row, now) &&
+    (options.force === true || !observedQuotaFresh(row, now))
+  ) {
+    const probes =
+      quotaProbes.get(deps.db) ??
+      new Map<string, { at: number; pending: boolean; done: Promise<void> }>();
+    quotaProbes.set(deps.db, probes);
+    const last = probes.get(row.id);
+    if (last?.pending) {
+      await last.done;
+    } else if (
+      last === undefined ||
+      options.force === true ||
+      now - last.at >= ANTIGRAVITY_QUOTA_REFRESH_MS
+    ) {
+      const entry = {
+        at: now,
+        pending: true,
+        done: Promise.resolve(),
+      };
+      entry.done = probeAndStoreAntigravityQuota(deps, row, options.signal)
+        .catch(() => undefined)
+        .finally(() => {
+          entry.pending = false;
+        });
+      probes.set(row.id, entry);
+      await entry.done;
+    }
+  }
+  return listAntigravitySubscriptions(deps, teamId);
+}
+
+export async function pollAllAntigravityQuotas(deps: Deps): Promise<void> {
+  const now = nowMs();
+  const rows = deps.db
+    .select({ teamId: antigravitySubscription.teamId })
+    .from(antigravitySubscription)
+    .where(
+      and(
+        isNotNull(antigravitySubscription.enabledAt),
+        or(isNull(antigravitySubscription.expiresAt), gt(antigravitySubscription.expiresAt, now)),
+      ),
+    )
+    .all();
+  const teamIds = [...new Set(rows.map((row) => row.teamId))];
+  for (const teamId of teamIds) {
+    await refreshAntigravityQuota(deps, teamId).catch(() => undefined);
+  }
+}
+
 export function openAntigravitySubscription(
   deps: Deps,
   teamId: string,
@@ -1231,29 +1468,7 @@ export function openAntigravitySubscription(
   if (!row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX)) {
     return deps.box.open(row.tokenCipher);
   }
-  const stored = openStoredOAuth(deps.box, row.tokenCipher);
-  if (stored.refreshToken !== undefined) {
-    const hasFreshAccessToken =
-      stored.token !== undefined &&
-      stored.tokenExpiresAt !== undefined &&
-      stored.tokenExpiresAt > nowMs();
-    const credential: AntigravityOAuthStepCredential = {
-      kind: 'oauth-personal',
-      refreshToken: stored.refreshToken,
-      authMethod: stored.authMethod ?? 'consumer',
-      ...(hasFreshAccessToken ? { token: stored.token, expiresAt: stored.tokenExpiresAt } : {}),
-    };
-    return JSON.stringify(credential);
-  }
-  if (row.expiresAt === null || stored.token === undefined) {
-    throw new HttpError(409, 'Missing Antigravity OAuth expiration');
-  }
-  const credential: AntigravityOAuthStepCredential = {
-    kind: 'oauth-personal',
-    token: stored.token,
-    expiresAt: row.expiresAt,
-  };
-  return JSON.stringify(credential);
+  return JSON.stringify(oauthCredentialFromRow(deps.box, row));
 }
 
 export function enabledAntigravitySubscriptionId(

@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import type {
@@ -46,6 +47,7 @@ import {
   createAntigravityManaged,
 } from './backend/antigravity-managed.js';
 import { probeAntigravitySubscriptionModels } from './backend/antigravity-subscription-models.js';
+import { probeAntigravityUsage } from './backend/antigravity-usage.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
@@ -663,6 +665,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       antigravityOAuthProfile: true,
       ...(client.claimAntigravityModelProbe && client.finishAntigravityModelProbe
         ? { antigravitySubscriptionModels: true as const }
+        : {}),
+      ...(client.claimAntigravityUsageProbe && client.finishAntigravityUsageProbe
+        ? { antigravityUsage: true as const }
         : {}),
       mcpConnectors: true,
       claimGeneration: true,
@@ -1466,6 +1471,47 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       if (!signal.aborted) logger.machine('Antigravity subscription model probe delivery failed');
     }
   };
+  const deliverAntigravityUsageProbe = async (
+    requestId: string,
+    connectionId: string,
+    signal: AbortSignal,
+  ) => {
+    if (!client.claimAntigravityUsageProbe || !client.finishAntigravityUsageProbe) return;
+    try {
+      const claim = await client.claimAntigravityUsageProbe(
+        requestId,
+        connectionId,
+        AbortSignal.any([signal, AbortSignal.timeout(3_000)]),
+      );
+      const install = antigravityManaged.current();
+      const realHome = process.env[ENV_VARS.agentImportHome] ?? homedir();
+      const result =
+        install === null
+          ? ({ status: 'failed', failure: 'not-found' } as const)
+          : await (() => {
+              const version = install.version;
+              activeAntigravityVersions.set(
+                version,
+                (activeAntigravityVersions.get(version) ?? 0) + 1,
+              );
+              return probeAntigravityUsage(install, claim, paths.home, realHome, signal)
+                .catch(() => ({ status: 'failed', failure: 'upstream' }) as const)
+                .finally(() => {
+                  const next = (activeAntigravityVersions.get(version) ?? 1) - 1;
+                  if (next > 0) activeAntigravityVersions.set(version, next);
+                  else activeAntigravityVersions.delete(version);
+                });
+            })();
+      await client.finishAntigravityUsageProbe(
+        requestId,
+        connectionId,
+        result,
+        AbortSignal.any([signal, AbortSignal.timeout(2_000)]),
+      );
+    } catch {
+      if (!signal.aborted) logger.machine('Antigravity usage probe delivery failed');
+    }
+  };
   const MAX_CONCURRENT_ANTIGRAVITY_VERIFIES = 4;
   let activeAntigravityVerifies = 0;
   const runAntigravityVerify = async (checkId: string) => {
@@ -1581,6 +1627,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             }
             if (ev.type === 'antigravity.models' && connectionId !== null) {
               void deliverAntigravityModelProbe(ev.requestId, connectionId, probeSignal);
+            }
+            if (ev.type === 'antigravity.usage' && connectionId !== null) {
+              void deliverAntigravityUsageProbe(ev.requestId, connectionId, probeSignal);
             }
             if (ev.type === 'antigravity.verify') {
               void runAntigravityVerify(ev.checkId);

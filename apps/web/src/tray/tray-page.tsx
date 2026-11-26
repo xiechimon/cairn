@@ -12,6 +12,10 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  useAntigravitySubscriptions,
+  useRefreshAntigravityQuota,
+} from '../api/antigravity-subscriptions.js';
 import { useClaudeSubscriptions, useRefreshClaudeQuota } from '../api/claude-subscriptions.js';
 import { useChiefThreads, useMachines, useTasks } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -56,6 +60,8 @@ function useTrayData(onOpened: (refresh: () => void) => () => void): {
   const usageQ = useDailyUsage(teamId, 1, TIME_ZONE, live);
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
   const refreshQuota = useRefreshClaudeQuota(teamId).mutate;
+  const antigravitySubscriptionsQ = useAntigravitySubscriptions(teamId, live);
+  const refreshAntigravityQuota = useRefreshAntigravityQuota(teamId).mutate;
   const threadsQ = useChiefThreads(teamId, live);
 
   useEffect(() => {
@@ -63,20 +69,26 @@ function useTrayData(onOpened: (refresh: () => void) => () => void): {
       setNow(Date.now());
       void client.invalidateQueries({ queryKey: ['machines', teamId] });
       void client.invalidateQueries({ queryKey: ['usage-daily', teamId] });
-      if (live && teamId !== undefined && document.visibilityState === 'visible') refreshQuota();
+      if (live && teamId !== undefined && document.visibilityState === 'visible') {
+        refreshQuota();
+        refreshAntigravityQuota();
+      }
     }, TRAY_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [client, live, teamId, refreshQuota]);
+  }, [client, live, teamId, refreshQuota, refreshAntigravityQuota]);
 
   useEffect(() => {
     if (!live || teamId === undefined) return;
     const onShow = () => {
-      if (document.visibilityState === 'visible') refreshQuota();
+      if (document.visibilityState === 'visible') {
+        refreshQuota();
+        refreshAntigravityQuota();
+      }
     };
     onShow();
     document.addEventListener('visibilitychange', onShow);
     return () => document.removeEventListener('visibilitychange', onShow);
-  }, [live, teamId, refreshQuota]);
+  }, [live, teamId, refreshQuota, refreshAntigravityQuota]);
 
   useEffect(
     () =>
@@ -84,9 +96,12 @@ function useTrayData(onOpened: (refresh: () => void) => () => void): {
         setNow(Date.now());
         void client.invalidateQueries({ queryKey: ['machines', teamId] });
         void client.invalidateQueries({ queryKey: ['usage-daily', teamId] });
-        if (live && teamId !== undefined) refreshQuota();
+        if (live && teamId !== undefined) {
+          refreshQuota();
+          refreshAntigravityQuota();
+        }
       }),
-    [onOpened, client, live, teamId, refreshQuota],
+    [onOpened, client, live, teamId, refreshQuota, refreshAntigravityQuota],
   );
 
   const groups = useMemo(
@@ -94,8 +109,8 @@ function useTrayData(onOpened: (refresh: () => void) => () => void): {
     [tasksQ.data, machinesQ.data, now],
   );
   const usage = useMemo(
-    () => trayUsage(usageQ.data, subscriptionsQ.data, now),
-    [usageQ.data, subscriptionsQ.data, now],
+    () => trayUsage(usageQ.data, subscriptionsQ.data, now, antigravitySubscriptionsQ.data),
+    [usageQ.data, subscriptionsQ.data, now, antigravitySubscriptionsQ.data],
   );
   return {
     groups,

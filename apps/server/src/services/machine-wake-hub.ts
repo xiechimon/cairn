@@ -234,6 +234,17 @@ export class MachineWakeHub {
     }
   }
 
+  pushAntigravityUsageProbe(machineId: string, requestId: string): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'antigravity.usage', requestId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   pushAntigravityVerify(machineId: string, checkId: string): boolean {
     const entry = this.streamsByMachine.get(machineId);
     if (!entry) return false;

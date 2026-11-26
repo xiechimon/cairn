@@ -1,4 +1,5 @@
 import {
+  type AntigravitySubscriptionListEntry,
   type ClaudeSubscriptionListEntry,
   type DailyUsage,
   isRegisteredMachine,
@@ -293,6 +294,7 @@ export function trayUsage(
   usage: DailyUsage | undefined,
   subscriptions: readonly ClaudeSubscriptionListEntry[] | undefined,
   now: number,
+  antigravitySubscriptions?: readonly AntigravitySubscriptionListEntry[],
 ): TrayUsage | null {
   const today = usage?.days.at(-1);
   const total = today === undefined ? 0 : today.coordinator + today.tasks;
@@ -308,11 +310,21 @@ export function trayUsage(
       ? { key: 'Claude 额度用完 · {at} 恢复', vars: { at: clockTime(back) } }
       : { key: 'Claude 额度用完' };
   } else {
-    const used = live.flatMap((sub) => (sub.windows ?? []).map((w) => w.utilization));
-    if (used.length > 0) {
+    const claudeUsed = live.flatMap((sub) => (sub.windows ?? []).map((w) => w.utilization));
+    const agyUsed = (antigravitySubscriptions ?? [])
+      .filter((sub) => sub.enabled !== false && (sub.expiresAt === null || sub.expiresAt > now))
+      .flatMap((sub) => (sub.windows ?? []).map((w) => w.utilization));
+    const claudeMax = claudeUsed.length > 0 ? Math.max(...claudeUsed) : null;
+    const agyMax = agyUsed.length > 0 ? Math.max(...agyUsed) : null;
+    if (agyMax !== null && (claudeMax === null || agyMax > claudeMax)) {
+      quota = {
+        key: 'Antigravity 额度 {pct}%',
+        vars: { pct: Math.round(Math.min(1, agyMax) * 100) },
+      };
+    } else if (claudeMax !== null) {
       quota = {
         key: 'Claude 额度 {pct}%',
-        vars: { pct: Math.round(Math.min(1, Math.max(...used)) * 100) },
+        vars: { pct: Math.round(Math.min(1, claudeMax) * 100) },
       };
     }
   }

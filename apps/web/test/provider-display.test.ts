@@ -901,3 +901,37 @@ it('leaves Devin without a badge and keeps its usage note in the detail', () => 
   expect(detail).toContain('Devin 不提供剩余用量');
   expect(detail).not.toContain('role="progressbar"');
 });
+
+it('renders Antigravity quota windows with labels and hides the unsupported note', () => {
+  const withWindows = renderAccount({
+    ...CLAUDE,
+    id: 'agy-work',
+    vendor: 'antigravity',
+    label: 'Antigravity',
+    hasToken: true,
+    windows: [
+      windowOf('gemini-5h', 0.12, NOW + 2 * HOUR),
+      windowOf('gemini-weekly', 0.05, NOW + 48 * HOUR),
+      windowOf('3p-5h', 0, null),
+      windowOf('3p-weekly', 0.35, NOW + 72 * HOUR),
+    ],
+  });
+  expect(withWindows.row).toContain('data-testid="subscription-quota-mini"');
+  expect(withWindows.row).toContain('data-window="3p-weekly"');
+  expect(withWindows.row).toContain('剩 65%');
+  expect(withWindows.detail).toContain('Gemini · 5 小时');
+  expect(withWindows.detail).toContain('Gemini · 每周');
+  expect(withWindows.detail).toContain('Claude / GPT · 5 小时');
+  expect(withWindows.detail).toContain('Claude / GPT · 每周');
+  expect(withWindows.detail).not.toContain('Antigravity 不提供剩余用量');
+
+  const withoutWindows = renderAccount({
+    ...CLAUDE,
+    id: 'agy-empty',
+    vendor: 'antigravity',
+    label: 'Antigravity',
+    hasToken: true,
+    windows: [],
+  });
+  expect(withoutWindows.detail).not.toContain('Antigravity 不提供剩余用量');
+});

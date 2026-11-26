@@ -6,6 +6,8 @@ import {
   type ClaudeCodeReport,
   type ClaudeRateLimitReport,
   type MachineAntigravityModelProbeResult,
+  type MachineAntigravityUsageProbeClaim,
+  type MachineAntigravityUsageProbeResult,
   type MachineAntigravityVerifyBody,
   type MachineAskBody,
   type MachineAskResponse,
@@ -34,6 +36,7 @@ import {
   type MachineTokenResponse,
   type MachineUploadUrlsResponse,
   machineAntigravityModelProbeCredentialSchema,
+  machineAntigravityUsageProbeClaimSchema,
   machineAskResponseSchema,
   machineAttachmentResponseSchema,
   machineClaimResponseSchema,
@@ -176,6 +179,17 @@ export interface MachineApi {
     requestId: string,
     connectionId: string,
     result: MachineAntigravityModelProbeResult,
+    signal: AbortSignal,
+  ): Promise<void>;
+  claimAntigravityUsageProbe?(
+    requestId: string,
+    connectionId: string,
+    signal: AbortSignal,
+  ): Promise<MachineAntigravityUsageProbeClaim>;
+  finishAntigravityUsageProbe?(
+    requestId: string,
+    connectionId: string,
+    result: MachineAntigravityUsageProbeResult,
     signal: AbortSignal,
   ): Promise<void>;
   reportAntigravityVerify?(body: MachineAntigravityVerifyBody, signal?: AbortSignal): Promise<void>;
@@ -384,6 +398,39 @@ export class MachineClient implements MachineApi {
       `/api/machine/antigravity/model-probes/${encodeURIComponent(requestId)}`,
       {
         body: { phase: 'result', connectionId, result },
+        signal,
+        parse: (raw) => machineOkResponseSchema.parse(raw),
+      },
+    );
+  }
+
+  async claimAntigravityUsageProbe(
+    requestId: string,
+    connectionId: string,
+    signal: AbortSignal,
+  ): Promise<MachineAntigravityUsageProbeClaim> {
+    return this.request(
+      'POST',
+      `/api/machine/antigravity/usage/${encodeURIComponent(requestId)}/claim`,
+      {
+        body: { connectionId },
+        signal,
+        parse: (raw) => machineAntigravityUsageProbeClaimSchema.parse(raw),
+      },
+    );
+  }
+
+  async finishAntigravityUsageProbe(
+    requestId: string,
+    connectionId: string,
+    result: MachineAntigravityUsageProbeResult,
+    signal: AbortSignal,
+  ): Promise<void> {
+    await this.request(
+      'POST',
+      `/api/machine/antigravity/usage/${encodeURIComponent(requestId)}/result`,
+      {
+        body: { connectionId, result },
         signal,
         parse: (raw) => machineOkResponseSchema.parse(raw),
       },

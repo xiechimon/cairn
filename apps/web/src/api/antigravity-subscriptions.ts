@@ -45,7 +45,7 @@ export function toAntigravityAccount(
     plan: null,
     state: expired ? 'expired' : 'ok',
     cooldownUntil: null,
-    windows: [],
+    windows: Array.isArray(wire.windows) ? wire.windows : [],
     lastUsedAt: wire.lastUsedAt ?? null,
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
     models: Array.isArray(wire.models) ? wire.models : [],
@@ -65,6 +65,17 @@ export function useAntigravitySubscriptions(teamId: string | undefined, live: bo
     queryFn: () =>
       api.get<AntigravitySubscriptionListEntry[]>(`/api/teams/${teamId}/antigravity-subscriptions`),
     enabled: live && teamId !== undefined,
+  });
+}
+
+export function useRefreshAntigravityQuota(teamId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<AntigravitySubscriptionListEntry[]>(
+        `/api/teams/${teamId}/antigravity-subscriptions/quota`,
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] }),
   });
 }
 

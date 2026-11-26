@@ -40,6 +40,10 @@ import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
 import { clearLaunchdServerOwner, writeLaunchdServerOwner } from './server-owner.js';
+import {
+  ANTIGRAVITY_QUOTA_POLL_MS,
+  pollAllAntigravityQuotas,
+} from './services/antigravity-subscriptions.js';
 import { loadApnsConfig } from './services/apns.js';
 import { createS3BackupStore, loadBackupS3Config } from './services/backup-s3.js';
 import { applyPendingRestoreIfAny, createBackupService } from './services/backup-service.js';
@@ -524,6 +528,30 @@ const hostUpdateIdleWatch = setInterval(() => {
 }, 15_000);
 hostUpdateIdleWatch.unref();
 
+const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined;
+const antigravityQuotaDeps = {
+  db,
+  box: secretBox,
+  dataDir: config.dataDir,
+  machineHub,
+};
+const antigravityQuotaBootTimer = isTestMode
+  ? null
+  : setTimeout(() => {
+      void pollAllAntigravityQuotas(antigravityQuotaDeps).catch((error: unknown) => {
+        logger.warn({ err: error }, 'initial antigravity quota poll failed');
+      });
+    }, 15_000);
+antigravityQuotaBootTimer?.unref();
+const antigravityQuotaPollTimer = isTestMode
+  ? null
+  : setInterval(() => {
+      void pollAllAntigravityQuotas(antigravityQuotaDeps).catch((error: unknown) => {
+        logger.warn({ err: error }, 'periodic antigravity quota poll failed');
+      });
+    }, ANTIGRAVITY_QUOTA_POLL_MS);
+antigravityQuotaPollTimer?.unref();
+
 const COORDINATOR_CLOSE_MS = 5_000;
 const TAILSCALE_WITHDRAW_MS = 3_000;
 let shuttingDown = false;
@@ -531,6 +559,8 @@ async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(hostUpdateIdleWatch);
+  if (antigravityQuotaBootTimer !== null) clearTimeout(antigravityQuotaBootTimer);
+  if (antigravityQuotaPollTimer !== null) clearInterval(antigravityQuotaPollTimer);
   backupService?.stop();
   scheduler.stop();
   killInFlightPick();

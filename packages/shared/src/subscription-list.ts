@@ -36,6 +36,7 @@ export interface AntigravityRunnerLogin {
 }
 
 export interface AntigravitySubscriptionListEntry extends AntigravitySubscription {
+  windows?: ClaudeSubscriptionQuotaWindow[];
   runnerName?: string | null;
   runnerLogin?: 'ok' | 'unavailable' | 'missing_local_login';
   runnerOffline?: boolean;

@@ -3,6 +3,7 @@ import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '..
 import { agentTodoReportSchema } from '../agent-todo.js';
 import {
   ANTIGRAVITY_TOKEN_REGEX,
+  antigravityOAuthStepCredentialSchema,
   antigravityProbedModelSchema,
 } from '../antigravity-subscription.js';
 import { backgroundTaskSchema } from '../background-task.js';
@@ -19,6 +20,7 @@ import {
 } from '../records/message.js';
 import { claudeCodeReportSchema, managedUpdateRuntimeSchema } from '../records/model-source.js';
 import { PROJECT_REPO_KINDS } from '../records/project.js';
+import { providerFailureSchema } from '../records/provider.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
 import { taskRequestSchema } from '../records/task-request.js';
@@ -343,6 +345,43 @@ export const machineAntigravityModelProbeCredentialSchema = z.object({
   token: z.string().regex(ANTIGRAVITY_TOKEN_REGEX),
 });
 
+export const subscriptionQuotaWindowSchema = z.object({
+  name: z.string().min(1).max(64),
+  utilization: z.number().min(0).max(1),
+  resetsAt: z.number().int().nullable(),
+  observedAt: z.number().int().nonnegative(),
+});
+
+export const machineAntigravityUsageProbeClaimSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('oauth'), credential: antigravityOAuthStepCredentialSchema }),
+  z.object({ mode: z.literal('host') }),
+]);
+export type MachineAntigravityUsageProbeClaim = z.infer<
+  typeof machineAntigravityUsageProbeClaimSchema
+>;
+
+export const machineAntigravityUsageProbeResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('ok'),
+    windows: z.array(subscriptionQuotaWindowSchema).max(32),
+  }),
+  z.object({
+    status: z.literal('failed'),
+    failure: providerFailureSchema,
+  }),
+]);
+export type MachineAntigravityUsageProbeResult = z.infer<
+  typeof machineAntigravityUsageProbeResultSchema
+>;
+
+export const machineAntigravityUsageProbeClaimBodySchema = z.object({
+  connectionId: modelProbeConnectionId,
+});
+export const machineAntigravityUsageProbeResultBodySchema = z.object({
+  connectionId: modelProbeConnectionId,
+  result: machineAntigravityUsageProbeResultSchema,
+});
+
 export const antigravityCheckIdSchema = z
   .string()
   .min(1)
@@ -362,6 +401,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
   z.object({ type: z.literal('antigravity.models'), requestId: z.string().uuid() }),
+  z.object({ type: z.literal('antigravity.usage'), requestId: z.string().uuid() }),
   z.object({ type: z.literal('antigravity.verify'), checkId: antigravityCheckIdSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
@@ -667,6 +707,16 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'POST',
     path: '/api/machine/antigravity/model-probes/{requestId}',
     reason: '[design] Claim and complete a subscription model probe on its assigned connection',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/antigravity/usage/{requestId}/claim',
+    reason: '[design] Claim an Antigravity usage probe on its assigned connection',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/antigravity/usage/{requestId}/result',
+    reason: '[design] Report the result of an Antigravity usage probe on its assigned connection',
   },
   {
     method: 'POST',

@@ -72,6 +72,7 @@ import {
   listAntigravitySubscriptionSteps,
   listAntigravitySubscriptions,
   patchAntigravitySubscription,
+  refreshAntigravityQuota,
   resolveAntigravitySubscription,
   verifyAntigravitySubscriptionConnection,
 } from './services/antigravity-subscriptions.js';
@@ -746,6 +747,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return c.json(listAntigravitySubscriptions(keysvc, teamId));
+  });
+
+  app.post('/api/teams/:id/antigravity-subscriptions/quota', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(
+      await refreshAntigravityQuota(antigravitySvc, teamId, { signal: c.req.raw.signal }),
+    );
   });
 
   app.post('/api/teams/:id/antigravity-subscriptions', async (c) => {

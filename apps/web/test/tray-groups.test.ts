@@ -268,4 +268,21 @@ test('usage is hidden before anything ran today and reports the tightest Claude 
   expect(trayUsage(day(1, 0), [sub([1], { state: 'exhausted', cooldownUntil: 50 })], 10)?.quota?.key).toBe(
     'Claude 额度用完 · {at} 恢复',
   );
+  const agy = (utilization: number[]) => ({
+    id: 'agy-1',
+    kind: 'antigravity-subscription' as const,
+    label: 'Antigravity',
+    hasToken: true,
+    expiresAt: null,
+    createdAt: 0,
+    windows: utilization.map((u) => ({ name: 'gemini-5h', utilization: u, resetsAt: null, observedAt: 0 })),
+  });
+  expect(trayUsage(day(100_000, 0), [], 0, [agy([0.12, 0.44])])?.quota).toEqual({
+    key: 'Antigravity 额度 {pct}%',
+    vars: { pct: 44 },
+  });
+  expect(trayUsage(day(100_000, 0), [sub([0.2])], 0, [agy([0.44])])?.quota).toEqual({
+    key: 'Antigravity 额度 {pct}%',
+    vars: { pct: 44 },
+  });
 });

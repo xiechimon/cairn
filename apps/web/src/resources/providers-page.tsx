@@ -24,6 +24,7 @@ import {
   useAntigravitySubscriptions,
   useAntigravitySubscriptionVerification,
   useDeleteAntigravitySubscription,
+  useRefreshAntigravityQuota,
   useRenameAntigravitySubscription,
   useUpdateAntigravitySubscriptionModels,
 } from '../api/antigravity-subscriptions.js';
@@ -279,6 +280,7 @@ export function ProvidersSection() {
   const refreshQuota = useRefreshClaudeQuota(teamId).mutate;
   const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
   const antigravitySubscriptionsQ = useAntigravitySubscriptions(teamId, live);
+  const refreshAntigravityQuota = useRefreshAntigravityQuota(teamId).mutate;
   const deleteSubscription = useDeleteClaudeSubscription(teamId);
   const deleteDevinSubscription = useDeleteDevinSubscription(teamId);
   const deleteAntigravitySubscription = useDeleteAntigravitySubscription(teamId);
@@ -359,8 +361,11 @@ export function ProvidersSection() {
   );
 
   useEffect(() => {
-    if (live && teamId !== undefined) refreshQuota();
-  }, [live, teamId, refreshQuota]);
+    if (live && teamId !== undefined) {
+      refreshQuota();
+      refreshAntigravityQuota();
+    }
+  }, [live, teamId, refreshQuota, refreshAntigravityQuota]);
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');

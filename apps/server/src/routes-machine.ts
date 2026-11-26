@@ -9,6 +9,8 @@ import {
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
   machineAntigravityModelProbeBodySchema,
+  machineAntigravityUsageProbeClaimBodySchema,
+  machineAntigravityUsageProbeResultBodySchema,
   machineAntigravityVerifyBodySchema,
   machineAskBodySchema,
   machineBackgroundTaskBodySchema,
@@ -61,6 +63,10 @@ import {
   claimAntigravityModelProbe,
   finishAntigravityModelProbe,
 } from './services/antigravity-model-probes.js';
+import {
+  claimAntigravityUsageProbe,
+  finishAntigravityUsageProbe,
+} from './services/antigravity-usage-probes.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
@@ -635,6 +641,50 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         if (accepted === 'not-found') throw new HttpError(404, 'Model probe not found');
         if (accepted === 'revoked') {
           throw new HttpError(409, 'Model probe authorization changed after claim', undefined, {
+            code: 'probe-authorization-changed',
+          });
+        }
+        return c.json({ ok: true as const });
+      },
+    );
+  });
+
+  app.post('/api/machine/antigravity/usage/:requestId/claim', async (c) => {
+    const requestId = c.req.param('requestId');
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      (row, decoded) => {
+        const body = parseWith(machineAntigravityUsageProbeClaimBodySchema, decoded, 'body');
+        const claim = claimAntigravityUsageProbe(
+          ctx.machineHub,
+          requestId,
+          row.id,
+          body.connectionId,
+        );
+        if (claim === undefined) throw new HttpError(404, 'Usage probe not found');
+        return c.json(claim, 200, { 'Cache-Control': 'no-store' });
+      },
+    );
+  });
+
+  app.post('/api/machine/antigravity/usage/:requestId/result', async (c) => {
+    const requestId = c.req.param('requestId');
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      (row, decoded) => {
+        const body = parseWith(machineAntigravityUsageProbeResultBodySchema, decoded, 'body');
+        const accepted = finishAntigravityUsageProbe(
+          ctx.machineHub,
+          requestId,
+          row.id,
+          body.connectionId,
+          body.result,
+        );
+        if (accepted === 'not-found') throw new HttpError(404, 'Usage probe not found');
+        if (accepted === 'revoked') {
+          throw new HttpError(409, 'Usage probe authorization changed after claim', undefined, {
             code: 'probe-authorization-changed',
           });
         }
