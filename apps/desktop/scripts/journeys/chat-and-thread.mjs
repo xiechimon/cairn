@@ -36,9 +36,6 @@ export default async function chatAndThread({ window, mode, evidenceDir }) {
   await window.getByTestId('side-chat').waitFor({ timeout: 15_000 });
   await window.getByTestId('transcript-col').waitFor({ timeout: 15_000 });
 
-  const engineRunCount = await window.getByTestId('engine-run').count();
-  assert.equal(engineRunCount, 0, 'engine-view');
-
   const chiefStatus = await window.evaluate(async () => {
     const teams = await fetch('/api/teams');
     const list = await teams.json();

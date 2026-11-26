@@ -5,15 +5,13 @@
       "modes": ["local-server", "remote-server"]
     },
     "chat-and-thread": {
-      "features": ["coordinator-chat", "thread-transcript", "engine-view"],
+      "features": ["coordinator-chat", "thread-transcript"],
       "modes": ["local-server", "remote-server"]
     },
     "providers-and-routing": {
       "features": [
         "coordinator-chat",
         "harness-dispatch",
-        "step-claim",
-        "agent-computer",
         "providers"
       ],
       "modes": ["local-server", "remote-server"]

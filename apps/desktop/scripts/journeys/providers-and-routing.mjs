@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 
-const STEP_CLAIM_FEATURE = 'step-claim';
-
 async function apiJson(window, path, init) {
   const result = await window.evaluate(
     async ({ url, options }) => {
@@ -82,14 +80,6 @@ export default async function providersAndRouting({ window, mode, evidenceDir })
   await window.goto(new URL('/app', window.url()).toString());
   await window.getByTestId('home-c').waitFor({ timeout: 15_000 });
   await window.getByTestId('chief-composer-block').waitFor({ timeout: 15_000 });
-
-  await window.getByTestId('machines-button').click();
-  await apiJson(window, '/api/computers');
-  await apiJson(window, '/api/machines');
-
-  await window.goto(new URL('/app/settings/machines', window.url()).toString());
-  await window.getByTestId('machines-scroll').waitFor({ timeout: 15_000 });
-  assert.equal(typeof STEP_CLAIM_FEATURE, 'string');
 
   await window.goto(new URL('/app/settings/routing', window.url()).toString());
   await window.getByTestId('routing-add-provider').waitFor({ timeout: 15_000 });

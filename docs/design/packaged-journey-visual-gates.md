@@ -4,21 +4,22 @@
 
 | Case | Required behavior | Control |
 |---|---|---|
-| A diff touches a file owned by a `shipped` or `partial` feature-map row (`code`, `verify` or `evidence`) | The candidate tree registers a packaged-app journey covering that feature in `local-server` and in `remote-server`; otherwise `check` fails and names the missing mode | Today's registry replayed over `bbf7d78bd` (Antigravity re-sign-in) is red on `providers` |
-| The diff of the update button that was dead in remote mode | Same failure with `remote-server` named; local coverage never satisfies it | Today's registry replayed over `67299d5d4` is red on `server-status` |
-| A diff touches no feature-owned path, or only a `planned` row | Pass | `f9b6c3340` is green |
-| A feature row is added or changed in `feature-map.json` | The new or changed `shipped`/`partial` row needs both modes | merge-base row comparison |
-| A feature file is renamed out of its row | The old path still counts (`--no-renames`) | diff listing |
-| A journey lists a feature it never drives | Red: `apps/desktop/scripts/journeys/<id>.mjs` must name one of that feature's own test ids or static routes (feature id when the row has neither) | `providers` appended to `new-task` is red |
+| A feature has no real walk when the ratchet starts | It is listed in `.claude/skills/verify-cairn/packaged-journey-baseline.json`, and changing its files does not require a walk | the checked-in registry and baseline pass |
+| A `shipped` or `partial` feature is not on the baseline (new, or taken off) | A registered journey covers it in `local-server` and in `remote-server`; otherwise `check` fails and names the missing mode | unit control |
+| A change adds an id to the baseline | Red against the merge base: the list only shrinks | unit control |
+| A journey covers a feature that is still listed | Red until the id is removed, so the coverage cannot be lost again | unit control |
+| A listed id is unknown or `planned` | Red | invariant |
+| A journey lists a feature it never drives | Red: the walk must pass one of the feature's `testid:` reach steps to `getByTestId` or a `data-testid` selector, or navigate to one of its static routes. A feature with neither cannot be claimed until its feature-map row gains one, so a feature name in a string proves nothing | the hollow `step-claim` walk (a constant asserted to be a string) is red |
+| A journey performs no UI action or asserts nothing | Red | unit control |
 | A journey is registered without a walk file, or names an unknown feature or mode | Red | registry validation |
 | A packaged-app workflow stops running the journeys | Red: `desktop-mac.yml` and `desktop-release.yml` must call `apps/desktop/scripts/packaged-journey.mjs`; the runner walks every registered journey in each of its modes, so no per-workflow case list can drift | registry validation |
 | The remote walk silently runs against the app's own server | The walk fails unless the window origin is the seeded remote server | packaged run |
-| The remote server asks the app to sign in | The runner gives the scratch server its own access token and enters it in the app's access-token form before the walk, then refuses the pairing request the sign-in screen itself created; without that the walk fails on the sign-in screen | `desktop-mac` run 45749582376 is red with 401; run 45752928529 is green in both modes |
+| The remote server asks the app to sign in | The runner gives the scratch server its own access token and enters it in the app's access-token form before the walk, then refuses the pairing request the sign-in screen itself created; without that the walk fails on the sign-in screen | packaged run |
 | A journey touches the real user home | Both modes run with a scratch `HOME` and no inherited `CAIRN_HOME` | packaged run |
-| Several features are touched | All are reported at once; one journey covers several only when it drives each | gate output |
-| Escape hatch | None. Carry the journey in the same candidate, or narrow the diff | — |
+| Several features are uncovered | All are reported at once; one journey covers several only when it drives each | gate output |
+| Escape hatch | None. A new feature, or one taken off the baseline, carries its walk in the same change | — |
 
-What this gate does not prove: an anchor shows the walk reaches the feature's surface, not that it exercises the changed behavior. The wrap-up cites the packaged-app run id.
+What this gate does not prove: the check is static. It shows that a walk reaches the feature's surface, not that its assertions test that feature or the changed behavior, and a change to a feature on the baseline ships without any packaged walk. The wrap-up cites the packaged-app run id.
 
 | Visual case | Required behavior | Control |
 |---|---|---|
