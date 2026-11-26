@@ -6,8 +6,8 @@ When a browser signs in, the server voids that browser's open pairing requests, 
 
 ## Browser mark
 
-- Cookie `cairn_browser`: 32 random bytes, base64url. HttpOnly, SameSite=Lax, Path=/api, Secure when the request is HTTPS, Max-Age 30 days, renewed on each response that reads it.
-- Set by `GET /api/auth/session` (including its 401, which precedes the sign-in screen), by `POST /api/remote/pair/request`, and by every response that sets the session cookie. A value that is not 43 base64url characters is replaced.
+- Cookie `cairn_browser`: 32 random bytes, base64url. HttpOnly, SameSite=Lax, Path=/api, Secure when the request is HTTPS, Max-Age 30 days, renewed by the routes below on a successful response and on the signed-out probe.
+- Set by every successful response of the listed routes (the session probe and access-token sign-in, which share `/api/auth/session`, Cloudflare Access, account sign-in, sign-out, pairing code, pair request and every pair claim, including one still `pending`) and by the session probe's 401, which precedes the sign-in screen. A value that is not 43 base64url characters is replaced.
 - It is not a credential and admits nothing. The server stores only its hash.
 - Cookies are scoped by host, not port. Servers sharing a host reuse one value; each matches it only in its own database.
 
@@ -17,7 +17,7 @@ Two nullable columns, one additive migration: `pairing_request.browserMarkHash` 
 
 ## States
 
-`pending` → `approved` → `consumed`; `pending` → `denied`; `pending` or unclaimed `approved` → `superseded` (newer request from the same peer, or the browser signed in). A request is inserted as `superseded` when it carries a session cookie this server accepts (a sign-in screen left open and asking again), or when it arrives within 30 seconds of a sign-in under its mark. A live session in the database alone does not count: the server cannot know the browser still holds it. A request born `superseded` replaces no other request.
+`pending` → `approved` → `consumed`; `pending` → `denied`; `pending` → `superseded` (a newer request from the same peer, or the browser signed in); unclaimed `approved` → `superseded` (the browser signed in). A request is inserted as `superseded` when it carries a session cookie this server accepts (a sign-in screen left open and asking again), or when it arrives within 30 seconds of a sign-in under its mark. A live session in the database alone does not count: the server cannot know the browser still holds it. A request born `superseded` replaces no other request.
 
 ## Writers and readers of the request store
 
@@ -61,4 +61,4 @@ A window whose request was already replaced by a newer tab stops polling, so it 
 
 ## Proof
 
-Red on the parent: for each of the five sign-in routes, a server test with a pending request under the mark; closed-window case (the request's owner never calls again); late request after sign-in; approve-after-void answers 409; another mark and NULL mark stay pending; sign-out lets the browser request again at once, and so does a browser that lost only its session cookie. A browser test closes the second sign-in tab and signs in on the first. The packaged remote walk signs in with the token and asserts no pending request and no banner, with the banner-deny click removed.
+Red on the parent: for each of the five sign-in routes, a server test with a pending request under the mark; closed-window case (the request's owner never calls again); late request after sign-in; approve-after-void answers 409; another mark and NULL mark stay pending; a request born `superseded` replaces no other request. Guards that pass on the parent and must stay green: sign-out lets the browser request again at once; a browser that lost only its session cookie can request again once 30 seconds have passed since that sign-in. A browser test closes the second sign-in tab and signs in on the first. The packaged remote walk signs in with the token and asserts no pending request and no banner, with the banner-deny click removed.

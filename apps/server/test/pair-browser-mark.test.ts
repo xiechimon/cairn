@@ -207,6 +207,20 @@ describe('signing in withdraws the pairing requests of that browser', () => {
     expect((await browser.claim(retried)).status).toBe('expired');
   });
 
+  test('a stale signed-in screen asking again replaces no other request from the same peer', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const server = boot();
+    const stale = new Browser(server, '10.0.0.1');
+    await stale.open();
+    await stale.send('POST', BROWSER_SESSION_PATH, { headers: ownerHeaders });
+    vi.setSystemTime(Date.now() + 31_000);
+    const neighbour = new Browser(server, '10.0.0.1');
+    await neighbour.open();
+    const waiting = await neighbour.requestPair();
+    await stale.requestPair();
+    expect(await pendingIds(server)).toEqual([waiting.id]);
+  });
+
   test('after sign-out the same browser can ask again at once, even with an older session left behind', async () => {
     const server = boot();
     const browser = new Browser(server, '10.0.0.1');
