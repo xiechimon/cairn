@@ -1,4 +1,10 @@
-import { CHIEF_REMOTE_TOOLS, CHIEF_ROUTER_TOOLS, COMPUTER_REMOTE_TOOLS } from '@cairn/shared';
+import {
+  CHIEF_REMOTE_TOOLS,
+  CHIEF_ROUTER_TOOLS,
+  COMPUTER_REMOTE_TOOLS,
+  MEMORY_VERIFY_NOTE,
+  MEMORY_WRITE_CRITERION,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -195,6 +201,7 @@ describe('chief envelope; PATCH /chief is gone', () => {
     expect(prompt).toContain("Reply in the language of the user's latest message");
     expect(prompt).not.toMatch(/[\u4e00-\u9fff]/);
     expect(prompt).not.toContain('## 章程');
+    expect(prompt).toContain(MEMORY_VERIFY_NOTE);
   });
 
   test('systemPrompt carries no live data: projects, tasks and the model go in the turn notes', () => {
@@ -238,7 +245,7 @@ describe('chief envelope; PATCH /chief is gone', () => {
     expect(tool('browser_act')).toContain('at most 3 retries in a turn');
     expect(tool('browser_act')).toContain('fill_secret');
     expect(tool('browser_navigate')).toContain('stealth: true');
-    expect(tool('update_memory')).toContain('一个月后这条还对');
+    expect(tool('update_memory')).toContain(MEMORY_WRITE_CRITERION);
     const prompt = composeChiefSystemPrompt(promptDeps(), H.teamId);
     for (const moved of [
       'fill_secret',

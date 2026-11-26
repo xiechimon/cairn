@@ -13,6 +13,12 @@ export const TEAM_MEMORY_MAX_CHARS = 2_000;
 export const TEAM_MEMORY_RETIRE_AFTER_DAYS = 90;
 export const TEAM_MEMORY_RETIRE_MAX_SHARE = 0.25;
 
+export const MEMORY_WRITE_CRITERION =
+  'Write only what will still be worth reading a month from now and cannot be derived from the repository. Skip task progress, status, one-off details, the project list, tool lookups and matters of only this conversation, even when the user said them. Lasting preferences, decisions and facts the user asks you to remember qualify. If it updates, duplicates or contradicts a saved entry, edit that entry and state what it replaces. Write absolute dates (YYYY-MM-DD). Saving nothing is a normal result.';
+
+export const MEMORY_VERIFY_NOTE =
+  'Memory may be out of date: check what it says is in a repository against the repository before relying on it. For what a repository contains, the repository wins; preferences and decisions the user set still apply even where its files say otherwise.';
+
 export const memoryRecordSchema = z.object({
   id: recordId,
   agentId: recordId,

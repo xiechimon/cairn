@@ -3,7 +3,11 @@ import { SHOW_CHART_TOOL, SHOW_DIFF_TOOL } from '../records/chat-block.js';
 import { CHART_MAX_CATEGORIES, CHART_MAX_SERIES } from '../records/chat-chart.js';
 import { GLANCE_MAX_LINES, GLANCE_NOTE_MAX_CHARS } from '../records/diff-glance.js';
 import { RUNNER_OS, runnerOsSchema } from '../records/machine-capabilities.js';
-import { memoryToolParamsSchemas, TEAM_MEMORY_MAX_CHARS } from '../records/memory.js';
+import {
+  MEMORY_WRITE_CRITERION,
+  memoryToolParamsSchemas,
+  TEAM_MEMORY_MAX_CHARS,
+} from '../records/memory.js';
 import { THREAD_REPORT_LINE_MAX } from '../records/message.js';
 import {
   QUICK_REPLIES_MAX,
@@ -304,14 +308,12 @@ function memoryParameters(schema: z.ZodType) {
 export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'save_memory',
-    description:
-      'Create a memory file in the scope. Never overwrites: an occupied name returns 409. MEMORY.md is reserved; edit it with update_memory. There is no file count or content length limit.',
+    description: `Create a memory file in the scope. Never overwrites: an occupied name returns 409. MEMORY.md is reserved; edit it with update_memory. There is no file count or content length limit. ${MEMORY_WRITE_CRITERION}`,
     parameters: memoryParameters(memoryToolParamsSchemas.save_memory),
   },
   {
     name: 'update_memory',
-    description:
-      'Edit a memory document directly using its current baseVersion from memories. Supply content or one unique verbatim old_str and new_str; optionally renameTo or moveTo. restoreVersion selects a retained version id and restores it as a new version using the current live or deleted revision. Missing base returns 400, stale base or occupied destination returns 409. MEMORY.md cannot move or rename. Keep MEMORY.md to short one-line entries, move detail into files, and merge or drop stale lines. A long index write succeeds with a tidy reminder. GitHub issue fence text is rejected.',
+    description: `Edit a memory document directly using its current baseVersion from memories. Supply content or one unique verbatim old_str and new_str; optionally renameTo or moveTo. restoreVersion selects a retained version id and restores it as a new version using the current live or deleted revision. Missing base returns 400, stale base or occupied destination returns 409. MEMORY.md cannot move or rename. Keep MEMORY.md to short one-line entries, move detail into files, and merge or drop stale lines. A long index write succeeds with a tidy reminder. GitHub issue fence text is rejected. ${MEMORY_WRITE_CRITERION}`,
     parameters: memoryParameters(memoryToolParamsSchemas.update_memory),
   },
   {
@@ -331,9 +333,8 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
 
 const COORDINATOR_UPDATE_MEMORY_DESCRIPTION = [
   '在团队偏好里新增、修改或删除一条。只在用户说"记住"或纠正你时调用。',
-  '写之前问自己：一个月后这条还对、还值得读吗？任务进度、状态、项目列表、能用工具查到的事、只和这次对话有关的事都不写，哪怕用户明说过。',
-  '写陈述句，用 YYYY-MM-DD 格式的绝对日期，不写"今天""最近"。',
-  '和已有条目重复或冲突时改那一条，不另写一条。属于某个项目的事写进那个项目的记忆：scope 填项目 id；团队偏好里新写的一行提到项目名会被拒。',
+  MEMORY_WRITE_CRITERION,
+  '写陈述句。属于某个项目的事写进那个项目的记忆：scope 填项目 id；团队偏好里新写的一行提到项目名会被拒。',
   `偏好总长不能超过 ${TEAM_MEMORY_MAX_CHARS.toLocaleString('en-US')} 字；超了会写入失败，先合并或删掉旧条目。`,
   '用法：先用 memories 读 scope 的 MEMORY.md 拿到 baseVersion；传 content 整体替换，或传一段唯一的原文 old_str 和 new_str。restoreVersion 恢复保留的旧版本；记忆文件可以 renameTo 或 moveTo，MEMORY.md 不能。baseVersion 过期返回 409。',
 ].join('\n');

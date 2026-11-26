@@ -152,6 +152,7 @@ function receiptsForPrompt(rows: ReceiptRow[]): string {
 function memoryEditTurnPrompt(db: Db, owner: MemoryOwner, row: EditRow): string {
   const sections: string[] = [
     "You are editing the owner's memory documents on a dedicated memory-edit turn.",
+    'The write criterion in the tool descriptions limits only what you save on your own: when the owner asks on this turn to save or change something, do it.',
     "Only the four memory tools are available. Every mutating call needs the document's current baseVersion; read it with memories first when you do not have a fresh one.",
     `If the request is ambiguous or unsafe to act on without an answer, reply starting with "${MEMORY_EDIT_CLARIFY_PREFIX}" followed by one short question for the owner, and change nothing else.`,
     'Otherwise reply with one short line naming each document you changed, or explain in one line why nothing needed changing.',

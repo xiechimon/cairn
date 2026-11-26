@@ -15,6 +15,7 @@ import {
   conversationBranch,
   isBuildStepKind,
   isIssueSourcedTask,
+  MEMORY_VERIFY_NOTE,
   missingSetupCommand,
   PLAN_FILE_NAME,
   parseReviewPromptMeta,
@@ -152,7 +153,9 @@ export function composeWorkerSystemPrompt(
     parts.push(`## 项目说明（${opts.project.name}）\n${opts.project.instructions}`);
   }
   if (memories && memories.length > 0) {
-    parts.push(`## 记忆\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`);
+    parts.push(
+      `## 记忆\n${MEMORY_VERIFY_NOTE}\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`,
+    );
   }
   if (opts?.taskMeta) {
     parts.push(composeTaskMetaInstruction(opts.taskMeta.currentTitle, opts.taskMeta.meta));

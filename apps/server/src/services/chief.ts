@@ -32,6 +32,7 @@ import {
   isChiefSideThreadId,
   isInfoOutput,
   isRegisteredMachine,
+  MEMORY_VERIFY_NOTE,
   mailSharedTranscript,
   neutralizeIssueAttachmentTokens,
   newChiefThreadId,
@@ -2334,6 +2335,7 @@ This is the channel of the project ${promptProjectName(channelProject.name)} (id
 </channel>`;
   const preferences = `<preferences>
 The team's saved preferences, as of the start of this conversation context. They may be out of date; the user's latest words win.
+${MEMORY_VERIFY_NOTE}
 ${memories.length > 0 ? memories.map((m) => `- ${m.title}: ${m.content}`).join('\n') : '(none yet)'}
 Memory files: ${injected.fileCount}; read them with memories when needed.
 </preferences>`;

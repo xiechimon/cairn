@@ -1,4 +1,8 @@
-import { PROJECT_INSTRUCTIONS_HEADING, PROJECT_MEMORY_HEADING } from '@cairn/shared';
+import {
+  MEMORY_VERIFY_NOTE,
+  PROJECT_INSTRUCTIONS_HEADING,
+  PROJECT_MEMORY_HEADING,
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project } from '../db/schema.js';
@@ -51,7 +55,7 @@ export function projectTurnContextTraced(
       : []),
     ...(memories.length > 0 || injected.omitted > 0
       ? [
-          `${PROJECT_MEMORY_HEADING}${name}）\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`,
+          `${PROJECT_MEMORY_HEADING}${name}）\n${MEMORY_VERIFY_NOTE}\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`,
         ]
       : []),
   ];

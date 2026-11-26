@@ -6,6 +6,7 @@ import {
   type ComputerCall,
   infoTaskDir,
   type MachineCapabilities,
+  MEMORY_VERIFY_NOTE,
   machineEnrollResponseSchema,
   machineUploadUrlsResponseSchema,
 } from '@cairn/shared';
@@ -329,9 +330,11 @@ describe('info cards run in the agent computer', () => {
 
   test('a provider route writes its report through submit_report from the computer', async () => {
     let shellResult = '';
+    let systemPrompt = '';
     const { s, buildId, todoId, vm } = await runInfoCard((dir) => [
-      () =>
-        fauxAssistantMessage(
+      (context) => {
+        systemPrompt = JSON.stringify(context);
+        return fauxAssistantMessage(
           [
             fauxToolCall('shell', { command: 'echo hello' }),
             fauxToolCall('write_file', { path: `${dir}/report.md`, content: REPORT }),
@@ -341,7 +344,8 @@ describe('info cards run in the agent computer', () => {
             }),
           ],
           { stopReason: 'toolUse' },
-        ),
+        );
+      },
       (context) => {
         shellResult = JSON.stringify(context.messages.filter((m) => m.role === 'toolResult'));
         return fauxAssistantMessage([fauxToolCall('submit_report', { path: `${dir}/report.md` })], {
@@ -374,6 +378,7 @@ describe('info cards run in the agent computer', () => {
     expect(JSON.stringify(deliverables?.content)).toContain('summary.html');
     expect(vm.calls.map((call) => call.tool)).toContain('write_file');
     expect(shellResult).toContain('hello');
+    expect(systemPrompt).toContain(JSON.stringify(MEMORY_VERIFY_NOTE).slice(1, -1));
     expect(vm.calls.every((call) => call.scopeKey?.startsWith('chief:') === true)).toBe(true);
   });
 

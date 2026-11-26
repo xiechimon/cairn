@@ -1,4 +1,4 @@
-import type { ClaimedStep } from '@cairn/shared';
+import { type ClaimedStep, MEMORY_VERIFY_NOTE } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -96,6 +96,11 @@ test.each(paths)(
     }
   },
 );
+
+test('project memory in a Coordinator turn tells it to check the repository first', () => {
+  const traced = projectTurnContextTraced(H.s.db, { ...teamScope(), projectId: H.projectId });
+  expect(traced?.text).toContain(MEMORY_VERIFY_NOTE);
+});
 
 test('empty injection ensures one persisted index', () => {
   const scope = { ...teamScope(), threadId: H.threadId };

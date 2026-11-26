@@ -10,6 +10,7 @@ import {
   INFO_SUBMIT_REPORT_TOOL,
   infoCardBrief,
   type MachineDoneBody,
+  MEMORY_VERIFY_NOTE,
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import type { Provider } from '@earendil-works/pi-ai';
@@ -166,7 +167,7 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
     const systemPrompt = [
       plan.profile.description,
       memories.length > 0
-        ? `## 记忆\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`
+        ? `## 记忆\n${MEMORY_VERIFY_NOTE}\n${memories.map((m) => `- ${m.title}：${m.content}`).join('\n')}`
         : null,
       infoCardBrief(stepRow.buildId, infoRepoOffered(machine, todoRow)),
     ]

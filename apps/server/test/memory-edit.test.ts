@@ -62,6 +62,9 @@ test('submit creates a dedicated side thread, one edit row and no main-thread me
   const stepRow = editStep(record.id);
   expect(stepRow.buildId).toBe(thread!.id);
   expect(stepRow.prompt).toContain(`memory-edit:${record.id}`);
+  expect(stepRow.prompt).toContain(
+    'The write criterion in the tool descriptions limits only what you save on your own',
+  );
   const mainMessages = H.s.db
     .select()
     .from(chiefMessage)
