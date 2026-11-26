@@ -621,8 +621,28 @@ describe('stop (T5)', () => {
     await w.done(running!.step.id, { status: 'success' });
     const refused = await w.stop();
     expect(refused.status).toBe(409);
-    expect(await refused.json()).toStrictEqual({ error: expect.any(String) });
+    expect(await refused.json()).toStrictEqual({
+      error: expect.any(String),
+      reason: 'nothing-to-stop',
+    });
     expect(w.stepRow(queued)?.status).toBe('pending');
+  });
+
+  test('withdrawing a message whose turn already ended says there is nothing to stop', async () => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    const running = await w.claim();
+    const early = await w.withdraw(first);
+    expect(early.status).toBe(409);
+    expect(await early.json()).toStrictEqual({ error: expect.any(String) });
+    await w.done(running!.step.id, { status: 'success' });
+    const late = await w.withdraw(first);
+    expect(late.status).toBe(409);
+    expect(await late.json()).toStrictEqual({
+      error: expect.any(String),
+      reason: 'nothing-to-stop',
+    });
+    expect(w.messages().map((m) => m.id)).toContain(first);
   });
 
   test('the thread says a turn is running only while one is claimed', async () => {
@@ -660,6 +680,23 @@ describe('stop (T5)', () => {
     const refused = await w.stop();
     expect(refused.status).toBe(409);
     expect(await refused.json()).toMatchObject({ reason: 'nothing-to-stop' });
+  });
+
+  test.each([
+    ['moved to its backup model', '429: too many requests'],
+    ['was held for quota', QUOTA_ERROR],
+  ])('a turn that %s is not reported as already stopped', async (name, errorMessage) => {
+    const w = await setupWorld(
+      name === 'was held for quota' ? null : [{ provider: 'relay-b', modelId: 'model-b' }],
+    );
+    await w.send('第一句');
+    const running = await w.claim();
+    await w.done(running!.step.id, { status: 'failed', errorMessage });
+    expect(w.stepRow(running!.step.id)?.status).toBe('pending');
+    const refused = await w.stop();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ reason: 'chief-turn-waiting-to-retry' });
+    expect(w.stepRow(running!.step.id)?.status).toBe('pending');
   });
 
   test.each([

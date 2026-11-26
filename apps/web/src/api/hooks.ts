@@ -1583,7 +1583,7 @@ export function useApiMutations(teamId: string | undefined) {
           ),
           { delegated: false },
         ),
-      onSuccess: invalidateAll,
+      onSettled: invalidateAll,
     }),
     chiefAnswerQuestion: useMutation({
       mutationFn: (input: { threadId: string; requestId: string; answers: AskUserAnswer[] }) =>

@@ -110,3 +110,9 @@ test('a withdraw the Coordinator already read still says so', async () => {
   await expect(withdrawOnce()).rejects.toThrow();
   expect(toastError).toHaveBeenCalledOnce();
 });
+
+test('a withdraw of a message whose turn already ended stays quiet and keeps it sent', async () => {
+  refuse(409, { error: 'chief turn already started', reason: 'nothing-to-stop' });
+  await expect(withdrawOnce()).rejects.toThrow();
+  expect(toastError).not.toHaveBeenCalled();
+});

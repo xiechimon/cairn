@@ -1,6 +1,7 @@
 import {
   ACTIVE_STEP_STATUSES,
   CHIEF_TURN_STOPPED_KIND,
+  CHIEF_TURN_WAITING_TO_RETRY,
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
   isChiefSideThreadId,
@@ -204,6 +205,9 @@ export async function withdrawChiefMessage(
 ): Promise<{ ok: true }> {
   const thread = requireThread(deps.db, teamId, threadId);
   requireUserMessage(deps.db, threadId, messageId);
+  if (!liveChiefSteps(deps.db, threadId).some((live) => stepOwners(live).includes(messageId))) {
+    throw new HttpError(409, 'the turn for this message already ended', NOTHING_TO_STOP);
+  }
   const row = waitingStepOf(deps.db, threadId, messageId);
   if (stepOwners(row).length > 1) {
     throw new HttpError(409, 'message was merged with others (这条已经和其他消息合在一起了)');
@@ -576,10 +580,11 @@ export function stopChiefTurn(
   const live = liveChiefSteps(deps.db, threadId);
   const head = live.find((row) => row.status === 'claimed');
   if (head === undefined) {
+    const startedTurnWillRunAgain = live.some((row) => row.claimedAt !== null);
     throw new HttpError(
       409,
       'no chief turn in flight (Coordinator 当前没有在回复)',
-      live.length === 0 ? NOTHING_TO_STOP : undefined,
+      startedTurnWillRunAgain ? CHIEF_TURN_WAITING_TO_RETRY : NOTHING_TO_STOP,
     );
   }
   return stopClaimedChiefStep(deps, thread, head, nowMs());

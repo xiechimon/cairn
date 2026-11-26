@@ -1,4 +1,9 @@
-import { type AskUserAnswer, type TranscriptRow, transcriptRowSchema } from '@cairn/shared';
+import {
+  type AskUserAnswer,
+  NOTHING_TO_STOP,
+  type TranscriptRow,
+  transcriptRowSchema,
+} from '@cairn/shared';
 import { replaceEqualDeep, useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
@@ -453,8 +458,12 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           .mutateAsync({ threadId: activeThread.id, messageId })
           .then(() => undefined)
           .catch((error: unknown) => {
-            if (!(error instanceof ApiError && error.status === 404))
-              toastError(t('撤回失败，Coordinator 已经读到这条了。'), error);
+            const alreadyGone =
+              error instanceof ApiError &&
+              (error.status === 404 || error.reason === NOTHING_TO_STOP);
+            const alreadyRead = error instanceof ApiError && error.status === 409;
+            if (!alreadyGone)
+              toastError(t('撤回失败，Coordinator 已经读到这条了。'), alreadyRead ? null : error);
             throw error;
           });
       }

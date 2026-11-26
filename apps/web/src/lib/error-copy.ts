@@ -1,4 +1,4 @@
-import { COORDINATOR_NOT_READY } from '@cairn/shared';
+import { CHIEF_TURN_WAITING_TO_RETRY, COORDINATOR_NOT_READY } from '@cairn/shared';
 import { ApiError } from '../api/client.js';
 import { EN } from '../i18n/en.js';
 import { activeLocale } from '../i18n/locale.js';
@@ -18,6 +18,7 @@ const REASON_COPY: Record<string, string> = {
   rate_limited: '请求过于频繁，请稍后重试。',
   [COORDINATOR_NOT_READY]: 'Coordinator 暂无可用模型，请先在设置里配置模型来源。',
   timeout: '请求超时，请检查网络后重试。',
+  [CHIEF_TURN_WAITING_TO_RETRY]: '这一轮正在等待重新运行，这次没有停掉。',
 };
 
 const NETWORK_ERROR_RE = /failed to fetch|networkerror|load failed|network request failed/i;

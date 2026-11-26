@@ -3142,6 +3142,8 @@ export const EN: Record<string, string> = {
   '存在同名记录，请更换名称后重试。':
     'An entry with this name already exists. Choose another name and try again.',
   '当前未连接到服务，请稍后重试。': 'Not connected to the service right now. Try again later.',
+  '这一轮正在等待重新运行，这次没有停掉。':
+    'This turn is waiting to run again, so it was not stopped.',
   '登录状态已失效，请重新登录后重试。': 'Your sign-in expired. Sign in again and try again.',
   '没有操作权限，请联系团队管理员。': 'Permission denied. Contact a team admin.',
   '没有操作权限，请重新登录后重试。': 'Permission denied. Sign in again and try again.',

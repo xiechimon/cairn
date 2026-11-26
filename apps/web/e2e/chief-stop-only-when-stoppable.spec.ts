@@ -7,7 +7,14 @@ const QUEUED = {
   blocked: { kind: 'machine-offline', missing: [] },
 };
 
-async function open(page: Page, thread: Record<string, unknown>, messages: Row[]) {
+type Reply = { status: number; body: unknown };
+
+async function open(
+  page: Page,
+  thread: Record<string, unknown>,
+  messages: Row[],
+  refusal?: Reply,
+) {
   const stops: string[] = [];
   page.on('request', (request) => {
     const path = new URL(request.url()).pathname;
@@ -17,10 +24,16 @@ async function open(page: Page, thread: Record<string, unknown>, messages: Row[]
     )
       stops.push(`${request.method()} ${path}`);
   });
-  await mockLive(page, {
-    threads: [{ ...THREAD, activeRun: { phase: 'chief' }, ...thread }],
-    messages,
-  });
+  await mockLive(
+    page,
+    { threads: [{ ...THREAD, activeRun: { phase: 'chief' }, ...thread }], messages },
+    (path, route, json) => {
+      const stopping =
+        (route.request().method() === 'POST' && path.endsWith('/stop')) ||
+        (route.request().method() === 'DELETE' && path.includes('/chief/threads/'));
+      return stopping && refusal !== undefined ? json(refusal.body, refusal.status) : undefined;
+    },
+  );
   await page.goto('/app');
   await expect(page.getByTestId('chief-composer-input')).toBeVisible();
   return stops;
@@ -90,4 +103,26 @@ test('a running turn keeps stop while a later message is held', async ({ page })
   await expect(page.getByTestId('chief-composer-stop')).toBeVisible();
   await pressEscape(page);
   await expect.poll(() => stops).toEqual(['POST /api/teams/t1/chief/threads/chief-home/stop']);
+});
+
+test('stop on a queued message whose turn already ended stays quiet and keeps the message sent', async ({
+  page,
+}) => {
+  const stops = await open(
+    page,
+    { turnRunning: false, turnQueue: { ...QUEUED, stepId: 'q1' } },
+    [{ id: 'q1', role: 'user', content: '排着队的一句', createdAt: 10 }],
+    {
+      status: 409,
+      body: {
+        error: 'chief turn already started (Coordinator 已经开始处理这条了)',
+        reason: 'nothing-to-stop',
+      },
+    },
+  );
+  await page.getByTestId('chief-composer-stop').click();
+  await expect.poll(() => stops.length).toBe(1);
+  await page.waitForTimeout(500);
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).toHaveValue('');
 });
