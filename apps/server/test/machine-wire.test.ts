@@ -664,7 +664,7 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
       call(w.s.app, 'POST', `/api/builds/${buildId}/tasks/${taskId}/stop`);
     const disconnected = await stop('live');
     expect(disconnected.status).toBe(409);
-    expect(await disconnected.json()).not.toHaveProperty('reason');
+    expect(await disconnected.json()).toMatchObject({ reason: 'task-computer-offline' });
     const push = vi.spyOn(w.s.machineHub, 'pushTaskStop').mockReturnValue(true);
     expect((await stop('live')).status).toBe(202);
     expect(push).toHaveBeenCalledWith(w.machineId, stepId, 'live');

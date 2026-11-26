@@ -105,6 +105,8 @@ test('a running turn keeps stop while a later message is held', async ({ page })
   await expect.poll(() => stops).toEqual(['POST /api/teams/t1/chief/threads/chief-home/stop']);
 });
 
+const SERVER_TEXT = /chief|database|message|already|Coordinator 已经开始/;
+
 test('stop on a queued message whose turn already ended stays quiet and keeps the message sent', async ({
   page,
 }) => {
@@ -126,3 +128,30 @@ test('stop on a queued message whose turn already ended stays quiet and keeps th
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
   await expect(page.getByTestId('chief-composer-input')).toHaveValue('');
 });
+
+for (const [name, thread, title, body] of [
+  [
+    'a running turn',
+    { turnRunning: true, turnQueue: null },
+    '停止失败，请重试。',
+    { error: 'database is locked' },
+  ],
+  [
+    'a queued message the turn already read',
+    { turnRunning: false, turnQueue: { ...QUEUED, stepId: 'm1' } },
+    '撤回失败，Coordinator 已经读到这条了。',
+    { error: 'message already read by the running turn' },
+  ],
+] as const) {
+  test(`a failed stop of ${name} shows no server text`, async ({ page }) => {
+    await open(page, thread, [{ id: 'm1', role: 'user', content: '一句话', createdAt: 10 }], {
+      status: name === 'a running turn' ? 500 : 409,
+      body,
+    });
+    await page.getByTestId('chief-composer-stop').click();
+    const toast = page.locator('[data-sonner-toast]');
+    await expect(toast).toContainText(title);
+    await expect(toast).not.toContainText(SERVER_TEXT);
+    if (name !== 'a running turn') await expect(toast).not.toContainText('请刷新');
+  });
+}

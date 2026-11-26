@@ -1,5 +1,6 @@
 import {
   type AskUserAnswer,
+  CHIEF_MESSAGE_MERGED,
   NOTHING_TO_STOP,
   type TranscriptRow,
   transcriptRowSchema,
@@ -462,7 +463,9 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
               error instanceof ApiError &&
               (error.status === 404 || error.reason === NOTHING_TO_STOP);
             const alreadyRead = error instanceof ApiError && error.status === 409;
-            if (!alreadyGone)
+            const merged = error instanceof ApiError && error.reason === CHIEF_MESSAGE_MERGED;
+            if (merged) toastError(t('撤回失败。'), error);
+            else if (!alreadyGone)
               toastError(t('撤回失败，Coordinator 已经读到这条了。'), alreadyRead ? null : error);
             throw error;
           });

@@ -1,5 +1,7 @@
 import {
   ACTIVE_STEP_STATUSES,
+  CHIEF_MESSAGE_MERGED,
+  CHIEF_MESSAGE_READ,
   CHIEF_TURN_STOPPED_KIND,
   CHIEF_TURN_WAITING_TO_RETRY,
   type ChiefPendingMessage,
@@ -172,7 +174,11 @@ export function waitingStepOf(db: Db, threadId: string, messageId: string): Step
       stepOwners(candidate).includes(messageId),
   );
   if (row === undefined) {
-    throw new HttpError(409, 'chief turn already started (Coordinator 已经开始处理这条了)');
+    throw new HttpError(
+      409,
+      'chief turn already started (Coordinator 已经开始处理这条了)',
+      CHIEF_MESSAGE_READ,
+    );
   }
   return row;
 }
@@ -210,9 +216,14 @@ export async function withdrawChiefMessage(
   }
   const row = waitingStepOf(deps.db, threadId, messageId);
   if (stepOwners(row).length > 1) {
-    throw new HttpError(409, 'message was merged with others (这条已经和其他消息合在一起了)');
+    throw new HttpError(
+      409,
+      'message was merged with others (这条已经和其他消息合在一起了)',
+      CHIEF_MESSAGE_MERGED,
+    );
   }
-  if (row.holdReason === STEER_SENT_HOLD) throw new HttpError(409, READ_ALREADY);
+  if (row.holdReason === STEER_SENT_HOLD)
+    throw new HttpError(409, READ_ALREADY, CHIEF_MESSAGE_READ);
   if (row.holdReason !== STEERED_HOLD && row.holdReason !== STEER_WITHDRAW_HOLD) {
     deleteWaitingMessage(deps, threadId, row, messageId);
     return { ok: true };
@@ -235,7 +246,7 @@ export async function withdrawChiefMessage(
     return { ok: true };
   }
   const withdraw = steerWithdrawals.get(input.stepId);
-  if (withdraw === undefined) throw new HttpError(409, READ_ALREADY);
+  if (withdraw === undefined) throw new HttpError(409, READ_ALREADY, CHIEF_MESSAGE_READ);
   const message = requireUserMessage(deps.db, threadId, messageId);
   deps.db
     .update(step)
@@ -249,7 +260,7 @@ export async function withdrawChiefMessage(
       .set({ holdReason: STEERED_HOLD })
       .where(and(eq(step.id, row.id), eq(step.holdReason, STEER_WITHDRAW_HOLD)))
       .run();
-    throw new HttpError(409, READ_ALREADY);
+    throw new HttpError(409, READ_ALREADY, CHIEF_MESSAGE_READ);
   }
   deps.db.transaction(() => {
     deps.db

@@ -7,6 +7,7 @@ import { useApiMutations, useStopBackgroundTask } from '../src/api/hooks.js';
 import { useChiefSurface } from '../src/chief/use-chief-surface.js';
 import { toastError } from '../src/components/ui/toaster.js';
 import { I18nProvider } from '../src/i18n/provider.js';
+import { describeErrorDefault } from '../src/lib/error-copy.js';
 
 vi.mock('react', async (original) => {
   const react = await original<typeof import('react')>();
@@ -82,6 +83,48 @@ test.each(Object.keys(stops()) as (keyof ReturnType<typeof stops>)[])(
   async (name) => {
     refuse(409, { error: 'the computer running this task is not connected' });
     await expect(stops()[name]()).rejects.toThrow('not connected');
+  },
+);
+
+const SERVER_ENGLISH = 'server english for the log';
+
+const REFUSAL_COPY = [
+  ['task-computer-offline', '运行这个任务的电脑当前未连接，等它上线后再停止。'],
+  ['memory-edit-moved', '这次记忆修改已经重新开始，请看最新的一次。'],
+  ['chief-turn-waiting-to-retry', '这一轮正在等待重新运行，这次没有停掉。'],
+  ['chief-message-read', 'Coordinator 已经读到这条了。'],
+  ['chief-message-merged', '这条已经和其他消息合在一起了，不能单独撤回。'],
+] as const;
+
+test.each(REFUSAL_COPY)('the stop refusal %s has its own Chinese line', async (reason, copy) => {
+  refuse(409, { error: SERVER_ENGLISH, reason });
+  const failure = await stops()['Coordinator turn']().then(
+    () => null,
+    (error: unknown) => error,
+  );
+  expect(describeErrorDefault(failure)).toBe(copy);
+});
+
+test.each(['Coordinator turn', 'memory edit', 'background task'] as const)(
+  'a %s stop that fails after the view is left shows no server text',
+  async (name) => {
+    refuse(500, { error: SERVER_ENGLISH });
+    const { createProductQueryClient } =
+      await vi.importActual<typeof import('../src/api/provider.js')>('../src/api/provider.js');
+    const { chiefStop, stopMemoryEdit, task } = renderHooks(
+      () => ({ ...useApiMutations('team'), task: useStopBackgroundTask() }),
+      createProductQueryClient(),
+    );
+    const viewHandler = vi.fn();
+    const left = { onError: viewHandler };
+    if (name === 'Coordinator turn') chiefStop.mutate({ threadId: 'chief-thread' }, left);
+    if (name === 'memory edit') stopMemoryEdit.mutate({ editId: 'edit', attempt: 1 }, left);
+    if (name === 'background task') task.mutate({ buildId: 'build', taskId: 'task' }, left);
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalledOnce());
+    expect(viewHandler).not.toHaveBeenCalled();
+    expect(describeErrorDefault(vi.mocked(toastError).mock.calls[0]?.[1])).toBe(
+      '服务暂时异常，请稍后重试。',
+    );
   },
 );
 

@@ -5,6 +5,7 @@ import {
   NOTHING_TO_STOP,
   STOP_MESSAGE,
   type StopAttribution,
+  TASK_COMPUTER_OFFLINE,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
@@ -124,7 +125,11 @@ export function requestBackgroundTaskStop(deps: BuildDeps, buildId: string, task
   if ((row?.content as { task?: { status?: string } } | undefined)?.task?.status !== 'running')
     throw new HttpError(409, 'background task is not running', NOTHING_TO_STOP);
   if (deps.machineHub?.pushTaskStop(active.machineId, active.id, taskId) !== true)
-    throw new HttpError(409, 'the computer running this task is not connected');
+    throw new HttpError(
+      409,
+      'the computer running this task is not connected',
+      TASK_COMPUTER_OFFLINE,
+    );
 }
 
 function stopFallbackPhase(db: Db, buildRow: BuildRow): Phase {

@@ -1,4 +1,11 @@
-import { CHIEF_TURN_WAITING_TO_RETRY, COORDINATOR_NOT_READY } from '@cairn/shared';
+import {
+  CHIEF_MESSAGE_MERGED,
+  CHIEF_MESSAGE_READ,
+  CHIEF_TURN_WAITING_TO_RETRY,
+  COORDINATOR_NOT_READY,
+  MEMORY_EDIT_MOVED,
+  TASK_COMPUTER_OFFLINE,
+} from '@cairn/shared';
 import { ApiError } from '../api/client.js';
 import { EN } from '../i18n/en.js';
 import { activeLocale } from '../i18n/locale.js';
@@ -19,6 +26,10 @@ const REASON_COPY: Record<string, string> = {
   [COORDINATOR_NOT_READY]: 'Coordinator 暂无可用模型，请先在设置里配置模型来源。',
   timeout: '请求超时，请检查网络后重试。',
   [CHIEF_TURN_WAITING_TO_RETRY]: '这一轮正在等待重新运行，这次没有停掉。',
+  [CHIEF_MESSAGE_READ]: 'Coordinator 已经读到这条了。',
+  [CHIEF_MESSAGE_MERGED]: '这条已经和其他消息合在一起了，不能单独撤回。',
+  [MEMORY_EDIT_MOVED]: '这次记忆修改已经重新开始，请看最新的一次。',
+  [TASK_COMPUTER_OFFLINE]: '运行这个任务的电脑当前未连接，等它上线后再停止。',
 };
 
 const NETWORK_ERROR_RE = /failed to fetch|networkerror|load failed|network request failed/i;
@@ -62,7 +73,11 @@ export function describeError(error: unknown, t: TFunc): string | null {
   if (error instanceof ApiError) {
     const byReason = error.reason !== undefined ? REASON_COPY[error.reason] : undefined;
     if (byReason !== undefined) return t(byReason);
-    if (!MASKED_GATEWAY_STATUSES.has(error.status) && isSafeServerMessage(error.message)) {
+    if (
+      !error.hideServerText &&
+      !MASKED_GATEWAY_STATUSES.has(error.status) &&
+      isSafeServerMessage(error.message)
+    ) {
       return error.message.trim();
     }
     if (error.status === 401 || error.status === 403) {

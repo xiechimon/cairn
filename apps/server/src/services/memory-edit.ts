@@ -1,5 +1,6 @@
 import {
   chiefMemoryThreadId,
+  MEMORY_EDIT_MOVED,
   type MemoryEditBody,
   type MemoryEditReceiptRecord,
   type MemoryEditRecord,
@@ -295,7 +296,7 @@ export function stopMemoryEdit(
   const record = deps.db.transaction((tx) => {
     const row = requireEditRow(tx, teamId, editId);
     if (attempt !== undefined && attempt !== row.attempt)
-      throw new HttpError(409, `memory edit moved to attempt ${row.attempt}`);
+      throw new HttpError(409, `memory edit moved to attempt ${row.attempt}`, MEMORY_EDIT_MOVED);
     if (row.status !== 'working' && row.status !== 'awaiting_input')
       throw new HttpError(409, `memory edit is ${row.status}`, NOTHING_TO_STOP);
     const receipts = memoryEditReceipts(tx, row.id);

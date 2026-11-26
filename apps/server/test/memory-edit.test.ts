@@ -345,3 +345,15 @@ test('REST round-trip: post, get current, stop', async () => {
   expect(again.status).toBe(409);
   expect(await again.json()).toMatchObject({ reason: 'nothing-to-stop' });
 });
+
+test('a stop aimed at an earlier attempt names that reason', async () => {
+  const record = submitEdit();
+  const refused = await req(
+    H.s.app,
+    'POST',
+    `/api/teams/${H.teamId}/memory-edits/${record.id}/stop`,
+    { attempt: record.attempt + 1 },
+  );
+  expect(refused.status).toBe(409);
+  expect(await refused.json()).toMatchObject({ reason: 'memory-edit-moved' });
+});

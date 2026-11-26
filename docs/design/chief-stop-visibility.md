@@ -24,7 +24,12 @@ A turn claimed or ended after the last read is corrected by the next thread refe
 | Stop a turn | no live turn has started, queued turns or none | 409 `nothing-to-stop`; queued turns are untouched | stopped; Stop then follows the table above |
 | Stop a turn | a turn that started now waits to run again (backup model, quota hold or wait) | 409 `chief-turn-waiting-to-retry`; nothing changes | Chinese failure line; the thread is read again and Stop follows the table above |
 | Withdraw a message | no live turn owns it | 409 `nothing-to-stop`; the message stays | stopped; the composer is not refilled |
-| Withdraw a message | a claimed turn owns it | 409 without reason | Chinese line saying the Coordinator already read it; Stop now stops that turn |
+| Withdraw a message | a claimed turn owns it | 409 `chief-message-read` | Chinese line saying the Coordinator already read it; Stop now stops that turn |
 | Withdraw a message already removed | no such message | 404 | nothing |
+| Withdraw a message | folded into one turn with other messages | 409 `chief-message-merged` | Chinese line saying it cannot be withdrawn on its own |
+| Stop a memory edit | the edit moved to a newer attempt | 409 `memory-edit-moved` | Chinese line pointing at the latest attempt |
+| Stop a background task | its computer is not connected | 409 `task-computer-offline` | Chinese line saying to stop it once the computer is back |
+
+A failed stop request never carries the server's own text, whichever handler reports it, including after the view that sent it is gone: the stop hooks mark the error, and the toast uses the copy for the reason code, or for the status when there is none.
 
 Task threads need no field: `POST .../stop` on a build accepts `pending`, `claimed` and `waiting_quota` steps, which are exactly the states that show Stop there.

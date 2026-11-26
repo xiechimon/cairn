@@ -1154,9 +1154,18 @@ export function useStopBackgroundTask() {
   });
 }
 
-async function stopIfRunning<T>(request: Promise<T>, alreadyStopped: T): Promise<T> {
+async function withoutServerText<T>(request: Promise<T>): Promise<T> {
   try {
     return await request;
+  } catch (error) {
+    if (error instanceof ApiError) error.hideServerText = true;
+    throw error;
+  }
+}
+
+async function stopIfRunning<T>(request: Promise<T>, alreadyStopped: T): Promise<T> {
+  try {
+    return await withoutServerText(request);
   } catch (error) {
     if (error instanceof ApiError && error.reason === NOTHING_TO_STOP) return alreadyStopped;
     throw error;
@@ -1568,8 +1577,10 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     chiefWithdraw: useMutation({
       mutationFn: (input: { threadId: string; messageId: string }) =>
-        api.del<{ ok: boolean }>(
-          `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}`,
+        withoutServerText(
+          api.del<{ ok: boolean }>(
+            `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}`,
+          ),
         ),
       onSuccess: invalidateAll,
       onError: invalidateAll,

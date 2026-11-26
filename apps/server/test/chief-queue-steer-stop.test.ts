@@ -454,7 +454,9 @@ describe('steer (T5): `现在插话`', () => {
     expect((await w.steer(queued)).status).toBe(200);
     expect(await w.fetchSteer(running!.step.id)).toBe('改成只看 cairn 项目');
     expect((await w.thread()).pending).toEqual([{ messageId: queued, state: 'steering' }]);
-    expect((await w.withdraw(queued)).status).toBe(409);
+    const sent = await w.withdraw(queued);
+    expect(sent.status).toBe(409);
+    expect(await sent.json()).toMatchObject({ reason: 'chief-message-read' });
     await w.done(running!.step.id, { status: 'success' });
     const next = await w.claim();
     expect(next?.step.id).toBe(queued);
@@ -628,13 +630,31 @@ describe('stop (T5)', () => {
     expect(w.stepRow(queued)?.status).toBe('pending');
   });
 
+  test('withdrawing a message folded together with others names that reason', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    await w.claim();
+    const second = w.queue('第二句');
+    w.s.db
+      .update(stepTable)
+      .set({ ownerMessageIds: [second, 'another-message'] })
+      .where(eq(stepTable.id, second))
+      .run();
+    const refused = await w.withdraw(second);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ reason: 'chief-message-merged' });
+  });
+
   test('withdrawing a message whose turn already ended says there is nothing to stop', async () => {
     const w = await setupWorld();
     const first = await w.send('第一句');
     const running = await w.claim();
     const early = await w.withdraw(first);
     expect(early.status).toBe(409);
-    expect(await early.json()).toStrictEqual({ error: expect.any(String) });
+    expect(await early.json()).toStrictEqual({
+      error: expect.any(String),
+      reason: 'chief-message-read',
+    });
     await w.done(running!.step.id, { status: 'success' });
     const late = await w.withdraw(first);
     expect(late.status).toBe(409);

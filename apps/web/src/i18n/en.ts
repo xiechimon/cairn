@@ -3142,6 +3142,14 @@ export const EN: Record<string, string> = {
   '存在同名记录，请更换名称后重试。':
     'An entry with this name already exists. Choose another name and try again.',
   '当前未连接到服务，请稍后重试。': 'Not connected to the service right now. Try again later.',
+  'Coordinator 已经读到这条了。': 'The Coordinator has already read this message.',
+  '这条已经和其他消息合在一起了，不能单独撤回。':
+    'This message was combined with others, so it cannot be withdrawn on its own.',
+  '这次记忆修改已经重新开始，请看最新的一次。':
+    'This memory edit has restarted. Check the latest attempt.',
+  '运行这个任务的电脑当前未连接，等它上线后再停止。':
+    'The computer running this task is not connected. Stop it once it is back online.',
+  '撤回失败。': 'Could not withdraw the message.',
   '这一轮正在等待重新运行，这次没有停掉。':
     'This turn is waiting to run again, so it was not stopped.',
   '登录状态已失效，请重新登录后重试。': 'Your sign-in expired. Sign in again and try again.',

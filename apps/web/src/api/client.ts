@@ -2,6 +2,8 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import { clearLegacyBrowserToken, fetchWithSession } from './auth.js';
 
 export class ApiError extends Error {
+  hideServerText = false;
+
   constructor(
     readonly status: number,
     message: string,
