@@ -28,7 +28,7 @@
       "id": "doc-drift-sweep",
       "pattern": "\\bdoc-drift\\b",
       "canary": "node scripts/doc-drift.mjs",
-      "reason": "the spec drift sweep was removed; living docs are kept true by the change that retires a mechanism and a monthly agent review"
+      "reason": "the spec drift sweep was removed; living docs are kept true by the change that retires a mechanism"
     }
   ],
   "baseline": {

@@ -116,7 +116,6 @@ playwright-report/
 /artifacts/
 /.codex-probe
 
-# gardener weekly sweep output (#1617): local run default; CI uploads it as an artifact
 .gardener/
 apps/web/.ds-sync/
 apps/web/ds-bundle/
