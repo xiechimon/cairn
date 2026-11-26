@@ -2,6 +2,8 @@
 
 > Kept sections only. The header of the full volume said it was superseded in part (ADR 0012 / #980) and that §1.1 and §3 stay in effect. ADR 0012 is not in this tree, so those two sections are kept here as the contract an agent can read. The rest of the volume (the #912-era measurement tables, the geometry canon, the prototype callback list and the §5 retirement ledger) described work that has landed and is deleted; it stays in git history.
 
+<!-- ruling:tokens.canonical -->The canonical color and geometry token table lives here; UI code consumes tokens, not literals.<!-- /ruling -->
+
 ## 1.1 Slots unchanged, only values flip
 
 A name-level diff measured 111 color slots, **0 added, 0 retired** — the finalized palette c.css is a 1:1 value replacement of the #787/#813 slot architecture, confirming ADR 0010 D1's "what flips is the values inside the slots, not the slots". #915's value-flip execution is therefore **pure value replacement**: move each color slot's held value in `shadcn.css`'s `:root` (dark) and `.light` (light) to the c.css corresponding value, the slot names and the `@theme inline` Tailwind mapping (`--color-*`) zero change.

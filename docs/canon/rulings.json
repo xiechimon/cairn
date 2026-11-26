@@ -3,115 +3,83 @@
   "rulings": [
     {
       "id": "positioning.thesis",
-      "date": "2026-11-14",
-      "ruling": "cairn is a self-hosted personal assistant for people who write code: code work and personal affairs in one loop, one person and not a team.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§1"
+      "date": "2026-11-14"
     },
     {
       "id": "positioning.second-person",
-      "date": "2026-11-14",
-      "ruling": "Every trade-off first asks whether a second person can run it, then whether it differentiates; replaces self-use first.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§2"
+      "date": "2026-11-14"
     },
     {
       "id": "positioning.merge-gate-axis",
-      "date": "2026-11-01",
-      "ruling": "The semantic axis is the machine-verified, evidence-bound merge gate; a verdict counts only for the patch digest it judged.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§3.1"
+      "date": "2026-11-01"
     },
     {
       "id": "positioning.runtime-axis",
-      "date": "2026-09-30",
-      "ruling": "The runtime axis follows the Multica runtime model: runtime = one computer x one CLI tool, daemon as runtime, self-hosted single data root.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§3.2"
+      "date": "2026-09-30"
     },
     {
       "id": "positioning.action-bound-approvals",
-      "date": "2026-11-17",
-      "ruling": "Approvals bind the irreversible-action boundary, not a mandatory lifecycle stage: merge/send/submit-class actions gate at the moment of effect via the action registry; the phase machine stays as the work-lifecycle spine for code output.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§3.5"
+      "date": "2026-11-17"
     },
     {
       "id": "positioning.im-entry",
-      "date": "2026-11-17",
-      "ruling": "Chat apps are entry points, not the residence: Telegram, Slack (DM-only) and WeChat iLink are the IM entries; further platforms stay C class.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§4"
+      "date": "2026-11-17"
     },
     {
       "id": "positioning.desktop-x3",
-      "date": "2026-11-17",
-      "ruling": "Electron desktop on all three OSes is decided; Windows and Linux join the shipped macOS app.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§4"
+      "date": "2026-11-17"
     },
     {
       "id": "positioning.no-team",
-      "date": "2026-11-14",
-      "ruling": "No team features: no shared channels, roles and permissions, or team billing; another person runs their own copy.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§4"
+      "date": "2026-11-14"
     },
     {
       "id": "positioning.hosted-cloud",
-      "date": "2026-11-25",
-      "ruling": "Today Cairn runs on the user's own machines, with no project-run hosted control plane and no resold compute. Direction: an official paid hosted service, Cairn Cloud, is in scope and not yet available (no free cloud tier; zero-markup BYOK first, optional model credits later), with its control plane, orchestration and billing in a separate private repository; local execution credentials stay on the user's own machines.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§4"
+      "date": "2026-11-25"
     },
     {
       "id": "positioning.license",
-      "date": "2026-11-25",
-      "ruling": "This repository stays Apache-2.0 open source with DCO sign-off and no CLA, and free self-hosting with full functionality stays un-gated (only the private rotating eval holdout stays unpublished). Nothing is sold today; the one paid offering in scope is the hosted service in positioning.hosted-cloud.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§4"
+      "date": "2026-11-25"
     },
     {
       "id": "positioning.roadmap-board",
-      "date": "2026-11-17",
-      "ruling": "Remaining direction work is tracked on the owner's roadmap board as the single checklist entry; no in-repo plan tracker.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§1"
+      "date": "2026-11-17"
     },
     {
       "id": "positioning.eval-scope",
-      "date": "2026-11-16",
-      "ruling": "Evaluation and harness self-improvement stay in scope; judged adoption and self-evolution are not built (the in-repo bench and adoption judge were removed on 2026-11-16).",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§1"
+      "date": "2026-11-16"
     },
     {
       "id": "positioning.shape",
-      "date": "2026-10-24",
-      "ruling": "One chief; the entry is chosen by the user; output that is code passes the gates; whether a PR opens is only how the code lands.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "section": "§3.5"
+      "date": "2026-10-24"
     },
     {
       "id": "eval.data-loop",
-      "date": "2026-10-08",
-      "ruling": "The eval suite's task set, scorers and run configuration (eval/**) are protected paths; no change may edit what judges it.",
       "spec": "docs/spec/29-evaluation-and-data-loop.md",
-      "section": "volume"
+      "date": "2026-10-08"
     },
     {
       "id": "test.scope",
-      "date": "2026-10-08",
-      "ruling": "Test layering and blast-radius rules live here; use real e2e for complex features, fixture surfaces for regression.",
       "spec": "docs/spec/19-test-layering-and-blast-radius.md",
-      "section": "volume"
+      "date": "2026-10-08"
     },
     {
       "id": "tokens.canonical",
-      "date": "2026-10-08",
-      "ruling": "The canonical color and geometry token table lives here; UI code consumes tokens, not literals.",
       "spec": "docs/spec/22-color-and-geometry-token-scale-canonical-table.md",
-      "section": "volume"
+      "date": "2026-10-08"
     }
   ]
 }

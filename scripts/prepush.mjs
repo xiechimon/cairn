@@ -119,6 +119,7 @@ const FEATURE_REGISTRY = '.claude/skills/verify-cairn/feature-map.json';
 const OPS_SELFTEST_PATHS =
   /^(?:scripts\/|\.github\/|\.claude\/skills\/verify-cairn\/scripts\/|ops\/langfuse\/|packages\/shared\/|package\.json$|pnpm-lock\.yaml$)/;
 const DRIZZLE_CHANGE = /^apps\/server\/(?:drizzle\/|src\/db\/schema\.ts$)/;
+const CANON_INPUTS = /^docs\/(?:spec\/|canon\/|CANON\.md$)/;
 const conflictMarker = ['node', 'scripts/conflict-marker-gate.mjs'];
 
 export function testsRead(path) {
@@ -175,6 +176,8 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
       ['node', 'scripts/doc-refs-gate.mjs'],
       ['node', 'scripts/doc-retired-terms-gate.mjs'],
     ];
+    if (paths.some((path) => CANON_INPUTS.test(path)))
+      checks.push(['node', 'scripts/generate-canon.mjs', '--check']);
     checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
     return checks;
   }

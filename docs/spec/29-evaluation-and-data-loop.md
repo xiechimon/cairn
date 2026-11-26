@@ -8,6 +8,8 @@
 >
 > Related: ADR 0021 D4 (protected paths, amended for the eval surface by ADR 0025), ADR 0022 (evidence pruning — nothing here depends on merged evidence staying on main), `docs/research/eval-methods.md` (methodology survey). Tickets: §4 ledger.
 
+<!-- ruling:eval.data-loop -->The eval suite's task set, scorers and run configuration (`eval/**`) are protected paths; no change may edit what judges it.<!-- /ruling -->
+
 ## 0 · Goal and end state
 
 Every claim "the harness got better" becomes a measured number: a change to prompts, skills, tool descriptions, context assembly, or routing must pass a code judge on paired trials before it is adopted, and the benches, judges, and trajectory exporters that produce those numbers cannot be edited by the agent being measured.

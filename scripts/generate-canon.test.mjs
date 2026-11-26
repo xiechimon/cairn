@@ -1,59 +1,143 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const SCRIPT = join(ROOT, 'scripts', 'generate-canon.mjs');
-const DOC = join(ROOT, 'docs', 'CANON.md');
-const REGISTRY = join(ROOT, 'docs', 'canon', 'rulings.json');
+const SPEC = 'docs/spec/18-a.md';
+const SENTENCE = 'No team features: another person runs their own copy of it.';
+const marked = (id, text) => `<!-- ruling:${id} -->${text}<!-- /ruling -->`;
+const row = { id: 'a.team', spec: SPEC, date: '2026-11-14' };
+const goodSpec = `# 18\n\n## 4. Not to do\n\n- ${marked('a.team', SENTENCE)} More detail.\n`;
 
-test('canon digest is in step with the rulings registry', () => {
+function sandbox(t) {
+  const root = makeTestTempDir('canon-');
+  t.after(() => releaseTestTempDir(root));
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'docs', 'canon'), { recursive: true });
+  mkdirSync(join(root, 'docs', 'spec'));
+  copyFileSync(SCRIPT, join(root, 'scripts', 'generate-canon.mjs'));
+  const run = (...args) =>
+    spawnSync(process.execPath, [join(root, 'scripts', 'generate-canon.mjs'), ...args], {
+      encoding: 'utf8',
+    });
+  const put = ({ spec = goodSpec, rulings = [row], other } = {}) => {
+    writeFileSync(join(root, SPEC), spec);
+    if (other) writeFileSync(join(root, 'docs/spec/19-b.md'), other);
+    writeFileSync(join(root, 'docs/canon/rulings.json'), JSON.stringify({ rulings }));
+  };
+  put();
+  assert.equal(run().status, 0);
+  assert.equal(run('--check').status, 0);
+  return { run, put };
+}
+
+test('the committed canon is in step with the marked spec sentences', () => {
   const out = execFileSync('node', [SCRIPT, '--check'], { cwd: ROOT, encoding: 'utf8' });
   assert.match(out, /up to date/);
 });
 
-test('registry rulings are unique, dated and point at real specs', () => {
-  const { rulings } = JSON.parse(readFileSync(REGISTRY, 'utf8'));
-  const ids = new Set();
-  for (const r of rulings) {
-    assert.ok(!ids.has(r.id), `duplicate id ${r.id}`);
-    ids.add(r.id);
-    assert.match(r.date, /^\d{4}-\d{2}-\d{2}$/, r.id);
-    assert.ok(r.ruling.length > 20, r.id);
-    assert.ok(r.spec.startsWith('docs/spec/'), r.id);
-  }
-  const doc = readFileSync(DOC, 'utf8');
-  for (const r of rulings) assert.ok(doc.includes(r.id), `${DOC} missing ${r.id}`);
+test('rewording the marked sentence leaves the canon stale', (t) => {
+  const { run, put } = sandbox(t);
+  put({ spec: goodSpec.replace('their own copy', 'a copy that is theirs') });
+  assert.match(run('--check').stderr, /stale/);
 });
 
-test('check mode fails when the digest is stale', (t) => {
-  const sandbox = makeTestTempDir('canon-');
-  t.after(() => releaseTestTempDir(sandbox));
-  execFileSync('mkdir', ['-p', join(sandbox, 'docs', 'canon'), join(sandbox, 'docs', 'spec')]);
-  execFileSync('cp', [SCRIPT, join(sandbox, 'generate-canon.mjs')]);
-  execFileSync('cp', [DOC, join(sandbox, 'docs', 'CANON.md')]);
-  writeFileSync(join(sandbox, 'docs', 'spec', '18-positioning-and-differentiation.md'), '# stub\n');
-  const registry = JSON.parse(readFileSync(REGISTRY, 'utf8'));
-  registry.rulings = registry.rulings.filter((r) => r.spec.includes('18-'));
-  registry.rulings.push({
-    id: 'sandbox.stale',
-    date: '2026-01-01',
-    ruling: 'A sandbox ruling that never landed in the digest file.',
-    spec: 'docs/spec/18-positioning-and-differentiation.md',
-    section: '§1',
+test('quoted mark syntax, a closed comment and a nested list item keep the check green', (t) => {
+  const { run, put } = sandbox(t);
+  put({
+    spec: `# 18\n\nWrap it in \`<!-- ruling:area.topic -->\`, and a lone \`<!--\` is only text.\n\n<!-- note -->\n\n## 4. Not to do\n\n- Outer\n    - ${marked('a.team', SENTENCE)} More detail.\n`,
   });
-  writeFileSync(join(sandbox, 'docs', 'canon', 'rulings.json'), JSON.stringify(registry));
-  let failed = false;
-  try {
-    execFileSync('node', [join(sandbox, 'generate-canon.mjs'), '--check'], {
-      cwd: sandbox,
-      stdio: 'pipe',
-    });
-  } catch {
-    failed = true;
-  }
-  assert.equal(failed, true, 'stale digest must fail --check');
+  assert.equal(run('--check').stderr, '');
 });
+
+test('code spans holding dots or tildes, and an unrelated earlier strikethrough, keep the check green', (t) => {
+  const { run, put } = sandbox(t);
+  const sentence = 'The gate judges the diff of `main...HEAD` and nothing older than that.';
+  put({
+    spec: `# 18\n\n~~Old text\n\n## 4. X\n\nType \`~~\` to strike. ${marked('a.team', sentence)}\n`,
+  });
+  assert.equal(run().stderr, '');
+  assert.equal(run('--check').stderr, '');
+});
+
+for (const [name, change, message] of [
+  ['the mark was removed', { spec: `## 4. X\n\n- ${SENTENCE}\n` }, /has no ruling mark/],
+  ['the registry row was removed', { rulings: [{ ...row, id: 'a.other' }] }, /has no row/],
+  ['the registry is empty', { rulings: [] }, /non-empty/],
+  [
+    'the row carries its own copy of the text',
+    { rulings: [{ ...row, ruling: 'x' }] },
+    /unknown key/,
+  ],
+  ['the mark is empty', { spec: marked('a.team', '') }, /no complete sentence/],
+  [
+    'the mark holds a placeholder',
+    { spec: marked('a.team', 'TODO write the ruling about teams here later on.') },
+    /no complete sentence/,
+  ],
+  ['the mark holds the id', { spec: marked('a.team', 'a.team') }, /no complete sentence/],
+  [
+    'the sentence is commented out',
+    { spec: marked('a.team', `<!-- ${SENTENCE} -->`) },
+    /no complete sentence/,
+  ],
+  [
+    'the mark cuts the sentence short',
+    { spec: marked('a.team', 'No team features: another person runs their own') },
+    /sentence ends/,
+  ],
+  [
+    'the mark sits in a code block',
+    { spec: `\`\`\`\n${goodSpec}\n\`\`\`\n` },
+    /has no ruling mark/,
+  ],
+  ['the mark is left open', { spec: `<!-- ruling:a.team -->${SENTENCE}\n` }, /same line/],
+  [
+    'the sentence is struck through',
+    { spec: `~~${marked('a.team', SENTENCE)}~~\n` },
+    /no ruling mark/,
+  ],
+  ['the mark sits inside a longer comment', { spec: `<!--\n${goodSpec}\n-->\n` }, /no ruling mark/],
+  [
+    'the mark sits in an indented code block',
+    { spec: `## 4. X\n\n    ${marked('a.team', SENTENCE)}\n` },
+    /no ruling mark/,
+  ],
+  [
+    'a strikethrough runs across lines around the sentence',
+    { spec: `## 4. X\n\n~~Dropped:\n${marked('a.team', SENTENCE)}\ndone.~~\n` },
+    /no ruling mark/,
+  ],
+  [
+    'the sentence sits inside a deleted-text element',
+    { spec: `<del>\n${marked('a.team', SENTENCE)}\n</del>\n` },
+    /no ruling mark/,
+  ],
+  [
+    'the mark sits in inline code',
+    { spec: `Write \`${marked('a.team', SENTENCE)}\` here.\n` },
+    /no ruling mark/,
+  ],
+  [
+    'two rulings share one sentence',
+    {
+      spec: `${goodSpec}\n${marked('a.again', SENTENCE)}\n`,
+      rulings: [row, { ...row, id: 'a.again' }],
+    },
+    /repeats another ruling/,
+  ],
+  ['the id is marked twice', { spec: `${goodSpec}\n${goodSpec}` }, /marked twice/],
+  ['the mark moved to another spec', { spec: '# 18\n', other: goodSpec }, /belongs in/],
+]) {
+  test(`--check is red when ${name}`, (t) => {
+    const { run, put } = sandbox(t);
+    put(change);
+    const result = run('--check');
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, message);
+  });
+}

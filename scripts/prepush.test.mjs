@@ -1251,3 +1251,19 @@ test('forced push coverage preserves the English gate range across multiple comm
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('a change to only a marked spec volume still checks the canon', () => {
+  const { rulings } = JSON.parse(
+    readFileSync(new URL('../docs/canon/rulings.json', import.meta.url), 'utf8'),
+  );
+  const specs = new Set(rulings.map((ruling) => ruling.spec));
+  assert.ok(specs.size > 0);
+  for (const spec of specs)
+    for (const mode of ['local', 'ci'])
+      assert.ok(
+        prepushPlan([spec], mode).some(
+          (step) => step.join(' ') === 'node scripts/generate-canon.mjs --check',
+        ),
+        `${mode} ${spec}`,
+      );
+});

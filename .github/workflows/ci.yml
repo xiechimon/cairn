@@ -630,7 +630,7 @@ jobs:
           if [ -n "$FEATURE_REGISTRY_BASE_SHA" ]; then git fetch origin "$FEATURE_REGISTRY_BASE_SHA"; fi
           node scripts/ops/ci-failed-only.mjs step --key gates-feature-map -- node scripts/generate-feature-map.mjs --check
 
-      - name: Canon digest stays in step with the rulings registry
+      - name: Canon digest stays in step with the marked ruling sentences
         if: ${{ !cancelled() }}
         run: node scripts/ops/ci-failed-only.mjs step --key gates-canon -- node scripts/generate-canon.mjs --check
 

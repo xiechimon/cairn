@@ -1,35 +1,134 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const REGISTRY_REL = 'docs/canon/rulings.json';
 const DOC_REL = 'docs/CANON.md';
-const RULING_KEYS = new Set(['id', 'date', 'ruling', 'spec', 'section']);
+const SPEC_DIR = 'docs/spec';
+const RULING_KEYS = ['id', 'spec', 'date'];
+const MARK = /<!--\s*ruling:([\w.-]+)\s*-->|<!--\s*\/ruling\s*-->/g;
+const CODE_SPAN = /(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)/g;
+const COMMENT_EDGE = /<!--\s*(?:ruling:[\w.-]+|\/ruling)\s*-->|<!--|-->/g;
+const DELETED_EDGE = /<(\/?)(?:del|s|strike)\b[^>]*>/gi;
+const INDENTED_CODE = /^(?: {4}|\t)(?!\s*(?:[-*+]|\d+\.) )/;
+const FENCE = /^\s*(```|~~~)/;
+const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*)\.?\s/;
+const PLACEHOLDER = /\b(?:TODO|TBD|FIXME|XXX|placeholder|lorem ipsum)\b|\.\.\.|…|<!--/i;
+const MIN_WORDS = 8;
 
 function fail(lines) {
   for (const line of [lines].flat()) process.stderr.write(`generate-canon: ${line}\n`);
   process.exit(1);
 }
 
-const registry = JSON.parse(readFileSync(join(REPO_ROOT, REGISTRY_REL), 'utf8'));
-const rulings = registry.rulings;
-if (!Array.isArray(rulings)) fail(`${REGISTRY_REL}: rulings must be an array`);
-
-const seen = new Set();
-for (const r of rulings) {
-  for (const key of Object.keys(r)) {
-    if (!RULING_KEYS.has(key)) fail(`${r.id ?? 'ruling'}: unknown key ${key}`);
+function shownMarks(line, state) {
+  const prose = line.replace(CODE_SPAN, (span) => ' '.repeat(span.length));
+  const commented = new Set();
+  for (const edge of prose.matchAll(COMMENT_EDGE)) {
+    if (edge[0] === '<!--') state.comment = true;
+    else if (edge[0] === '-->') state.comment = false;
+    else if (state.comment) commented.add(edge.index);
   }
-  for (const key of RULING_KEYS) {
-    if (typeof r[key] !== 'string' || r[key] === '') fail(`${r.id ?? 'ruling'}: missing ${key}`);
+  if (prose.trim() === '') state.struck = false;
+  if (INDENTED_CODE.test(line)) return [];
+  const edges = [...prose.matchAll(DELETED_EDGE), ...prose.matchAll(/~~/g)].sort(
+    (a, b) => a.index - b.index,
+  );
+  const shown = [];
+  let next = 0;
+  const apply = (edge) => {
+    if (edge[0] === '~~') state.struck = !state.struck;
+    else state.deleted = Math.max(0, state.deleted + (edge[1] ? -1 : 1));
+  };
+  for (const mark of line.matchAll(MARK)) {
+    while (next < edges.length && edges[next].index < mark.index) apply(edges[next++]);
+    if (prose[mark.index] === '<' && !commented.has(mark.index) && !state.struck && !state.deleted)
+      shown.push(mark);
   }
-  if (seen.has(r.id)) fail(`duplicate ruling id ${r.id}`);
-  seen.add(r.id);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date)) fail(`${r.id}: date must be YYYY-MM-DD`);
-  if (!existsSync(join(REPO_ROOT, r.spec))) fail(`${r.id}: spec ${r.spec} does not exist`);
+  while (next < edges.length) apply(edges[next++]);
+  return shown;
 }
+
+function readMarks(spec, problems) {
+  const marks = [];
+  let fence = null;
+  let section = 'volume';
+  const state = { comment: false, struck: false, deleted: 0 };
+  for (const [index, line] of readFileSync(join(REPO_ROOT, spec), 'utf8').split('\n').entries()) {
+    const fenceMark = FENCE.exec(line)?.[1];
+    if (fenceMark) fence = fence === null ? fenceMark : fence === fenceMark ? null : fence;
+    if (fence !== null || fenceMark) continue;
+    const heading = NUMBERED_HEADING.exec(line)?.[1];
+    if (heading) section = `§${heading}`;
+    const at = `${spec}:${index + 1}`;
+    let open = null;
+    for (const match of shownMarks(line, state)) {
+      if (match[1]) {
+        if (open) problems.push(`${at}: ruling mark ${open.id} is not closed`);
+        open = { id: match[1], from: match.index + match[0].length };
+      } else if (open) {
+        const ruling = line.slice(open.from, match.index).trim();
+        marks.push({ id: open.id, spec, section, ruling, at });
+        open = null;
+      } else problems.push(`${at}: closing ruling mark without an opening one`);
+    }
+    if (open) problems.push(`${at}: ruling mark ${open.id} must close on the same line`);
+  }
+  return marks;
+}
+
+const registry = JSON.parse(readFileSync(join(REPO_ROOT, REGISTRY_REL), 'utf8'));
+if (!Array.isArray(registry.rulings) || registry.rulings.length === 0)
+  fail(`${REGISTRY_REL}: rulings must be a non-empty array`);
+
+const problems = [];
+const rows = new Map();
+for (const row of registry.rulings) {
+  const name = row.id ?? 'ruling';
+  for (const key of Object.keys(row))
+    if (!RULING_KEYS.includes(key)) problems.push(`${name}: unknown key ${key}`);
+  for (const key of RULING_KEYS)
+    if (typeof row[key] !== 'string' || row[key] === '') problems.push(`${name}: missing ${key}`);
+  if (rows.has(row.id)) problems.push(`duplicate ruling id ${row.id}`);
+  rows.set(row.id, row);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) problems.push(`${name}: date must be YYYY-MM-DD`);
+  if (!existsSync(join(REPO_ROOT, row.spec ?? '')))
+    problems.push(`${name}: spec ${row.spec} does not exist`);
+}
+if (problems.length > 0) fail(problems);
+
+const marks = new Map();
+const sentences = new Set();
+const specs = readdirSync(join(REPO_ROOT, SPEC_DIR))
+  .filter((file) => file.endsWith('.md'))
+  .map((file) => `${SPEC_DIR}/${file}`);
+for (const spec of new Set([...specs, ...[...rows.values()].map((row) => row.spec)])) {
+  for (const mark of readMarks(spec, problems)) {
+    const row = rows.get(mark.id);
+    if (!row) problems.push(`${mark.at}: ruling ${mark.id} has no row in ${REGISTRY_REL}`);
+    else if (row.spec !== mark.spec)
+      problems.push(`${mark.at}: ruling ${mark.id} belongs in ${row.spec}`);
+    if (marks.has(mark.id)) problems.push(`${mark.at}: ruling ${mark.id} is marked twice`);
+    if (
+      mark.ruling.split(/\s+/).length < MIN_WORDS ||
+      PLACEHOLDER.test(mark.ruling.replace(CODE_SPAN, 'code'))
+    )
+      problems.push(`${mark.at}: ruling ${mark.id} marks no complete sentence`);
+    else if (!/[.!?]["')\]*_`]*$/.test(mark.ruling))
+      problems.push(`${mark.at}: ruling ${mark.id} must end where its sentence ends`);
+    if (sentences.has(mark.ruling))
+      problems.push(`${mark.at}: ruling ${mark.id} repeats another ruling's sentence`);
+    sentences.add(mark.ruling);
+    marks.set(mark.id, mark);
+  }
+}
+for (const row of rows.values())
+  if (!marks.has(row.id)) problems.push(`${row.id}: ${row.spec} has no ruling mark for it`);
+if (problems.length > 0) fail(problems);
+
+const rulings = [...rows.values()].map((row) => ({ ...row, ...marks.get(row.id) }));
 
 function specSortKey(spec) {
   const m = spec.match(/spec\/(\d+)/);
@@ -46,9 +145,10 @@ const sorted = [...rulings].sort(
 const lines = [
   '# CANON — current rulings',
   '',
-  `Generated from \`${REGISTRY_REL}\` by \`scripts/generate-canon.mjs\`. Edit the registry, not this file;`,
-  'CI fails when this file is stale. One line per standing ruling; the spec volume stays the full record.',
-  'Lanes add an entry when they land or revise a ruling, keyed `area.topic`.',
+  `Generated by \`scripts/generate-canon.mjs\` from the ruling sentences marked in the spec volumes; \`${REGISTRY_REL}\``,
+  'lists each ruling id, spec and date. Edit the marked sentence, not this file; CI fails when this file is stale.',
+  'One line per standing ruling; the spec volume stays the full record. To add one, wrap its sentence on one line in',
+  '`<!-- ruling:area.topic -->` and `<!-- /ruling -->`, then add its registry row.',
   '',
 ];
 

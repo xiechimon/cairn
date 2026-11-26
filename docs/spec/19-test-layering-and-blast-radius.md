@@ -2,6 +2,8 @@
 
 > Scope: establishes each of the four test layers' run responsibilities — during development locally **no longer runs the full e2e**, a change only runs the **affected surface**; the full e2e's execution point converges to **CI (4 shards)**. Includes baseline measurement (2026-10-03, this machine 8 cores / 16GB), the affected-surface selection mechanism (`e2e:affected`), the vitest `related` / `--changed` usability verification, and the comparative assessment of pi's cheap structural gate (**assess + propose only, this ticket does not land**). Reference implementation = `~/Code/AgentProjects/pi` (599 .ts tests are mostly package-level unit/integration, the browser layer keeps only one esbuild bundling smoke).
 
+<!-- ruling:test.scope -->Test layering and blast-radius rules live here; use real e2e for complex features, fixture surfaces for regression.<!-- /ruling -->
+
 ## Problem Statement
 
 1. **Duplicate labor at the most expensive layer.** The local full e2e measured 154.3s / 617 cases (see below), CI already runs the same set (223s/step). Running the full set locally during development = repeating CI's work the most expensive way; on a 16GB machine under multi-lane parallelism (the real pressure of compressor 4.45GB + swap 3.89GB), the full e2e's +44 processes / +3.4GB peak is exactly one of the crush points.
