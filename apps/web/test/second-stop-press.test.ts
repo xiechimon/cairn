@@ -91,7 +91,6 @@ const SERVER_ENGLISH = 'server english for the log';
 const REFUSAL_COPY = [
   ['task-computer-offline', '运行这个任务的电脑当前未连接，等它上线后再停止。'],
   ['memory-edit-moved', '这次记忆修改已经重新开始，请看最新的一次。'],
-  ['chief-turn-waiting-to-retry', '这一轮正在等待重新运行，这次没有停掉。'],
   ['chief-message-read', 'Coordinator 已经读到这条了。'],
   ['chief-message-merged', '这条已经和其他消息合在一起了，不能单独撤回。'],
 ] as const;
@@ -105,19 +104,20 @@ test.each(REFUSAL_COPY)('the stop refusal %s has its own Chinese line', async (r
   expect(describeErrorDefault(failure)).toBe(copy);
 });
 
-test.each(['Coordinator turn', 'memory edit', 'background task'] as const)(
+test.each(['Coordinator turn', 'task run', 'memory edit', 'background task'] as const)(
   'a %s stop that fails after the view is left shows no server text',
   async (name) => {
     refuse(500, { error: SERVER_ENGLISH });
     const { createProductQueryClient } =
       await vi.importActual<typeof import('../src/api/provider.js')>('../src/api/provider.js');
-    const { chiefStop, stopMemoryEdit, task } = renderHooks(
+    const { chiefStop, stopBuild, stopMemoryEdit, task } = renderHooks(
       () => ({ ...useApiMutations('team'), task: useStopBackgroundTask() }),
       createProductQueryClient(),
     );
     const viewHandler = vi.fn();
     const left = { onError: viewHandler };
     if (name === 'Coordinator turn') chiefStop.mutate({ threadId: 'chief-thread' }, left);
+    if (name === 'task run') stopBuild.mutate({ buildId: 'build', discard: false }, left);
     if (name === 'memory edit') stopMemoryEdit.mutate({ editId: 'edit', attempt: 1 }, left);
     if (name === 'background task') task.mutate({ buildId: 'build', taskId: 'task' }, left);
     await vi.waitFor(() => expect(toastError).toHaveBeenCalledOnce());
@@ -149,9 +149,21 @@ test('a second press that finds the queued message already withdrawn stays quiet
 });
 
 test('a withdraw the Coordinator already read still says so', async () => {
-  refuse(409, { error: 'message already read by the running turn' });
+  refuse(409, { error: 'message already read by the running turn', reason: 'chief-message-read' });
   await expect(withdrawOnce()).rejects.toThrow();
   expect(toastError).toHaveBeenCalledOnce();
+});
+
+test.each([
+  [409, 'chief-message-read', '撤回失败，Coordinator 已经读到这条了。', null],
+  [409, 'chief-message-merged', '撤回失败。', '这条已经和其他消息合在一起了，不能单独撤回。'],
+  [500, undefined, '撤回失败，请重试。', '服务暂时异常，请稍后重试。'],
+] as const)('a withdraw refused with %i %s is titled by its cause', async (status, reason, title, line) => {
+  refuse(status, { error: SERVER_ENGLISH, ...(reason !== undefined ? { reason } : {}) });
+  await expect(withdrawOnce()).rejects.toThrow();
+  const [shownTitle, shownError] = vi.mocked(toastError).mock.calls[0] ?? [];
+  expect(shownTitle).toBe(title);
+  expect(shownError === null ? null : describeErrorDefault(shownError)).toBe(line);
 });
 
 test('a withdraw of a message whose turn already ended stays quiet and keeps it sent', async () => {

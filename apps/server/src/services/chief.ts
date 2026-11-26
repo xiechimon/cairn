@@ -101,6 +101,7 @@ import {
   CHIEF_ABANDONED_STEP_MS,
   chiefPendingMessages,
   chiefThreadFallbackModel,
+  chiefWaitingRerun,
   endDeadChiefTurn,
   hasRunningChiefTurn,
   settleChiefActiveRun,
@@ -609,6 +610,7 @@ function toLiveChiefThreadRecord(db: Db, teamId: string, row: ThreadRow): ChiefT
   return {
     ...toChiefThreadRecord(row, stepQueueProjector(db, teamId).chiefTurnQueueOf(row.id)),
     turnRunning: hasRunningChiefTurn(db, row.id),
+    waitingRerun: chiefWaitingRerun(db, row.id),
   };
 }
 

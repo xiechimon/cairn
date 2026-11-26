@@ -778,8 +778,9 @@ export interface ChiefContent {
   streamAt?: number[];
   running?: boolean;
   runningTool?: string;
-  waitingTurn?: { messageId: string; text: string };
+  waitingTurn?: { messageId: string };
   noRunningTurn?: boolean;
+  waitingRerun?: boolean;
   outage?: ChiefOutage;
   fallbackModel?: string;
   hasEarlier?: boolean;

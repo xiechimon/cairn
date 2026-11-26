@@ -1,7 +1,7 @@
 import {
   type AskUserAnswer,
   CHIEF_MESSAGE_MERGED,
-  CHIEF_TURN_WAITING_TO_RETRY,
+  CHIEF_MESSAGE_READ,
   NOTHING_TO_STOP,
   type TranscriptRow,
   transcriptRowSchema,
@@ -463,26 +463,21 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
             const alreadyGone =
               error instanceof ApiError &&
               (error.status === 404 || error.reason === NOTHING_TO_STOP);
-            const alreadyRead = error instanceof ApiError && error.status === 409;
-            const merged = error instanceof ApiError && error.reason === CHIEF_MESSAGE_MERGED;
-            if (merged) toastError(t('撤回失败。'), error);
-            else if (!alreadyGone)
-              toastError(t('撤回失败，Coordinator 已经读到这条了。'), alreadyRead ? null : error);
+            const reason = error instanceof ApiError ? error.reason : undefined;
+            if (reason === CHIEF_MESSAGE_READ)
+              toastError(t('撤回失败，Coordinator 已经读到这条了。'), null);
+            else if (reason === CHIEF_MESSAGE_MERGED) toastError(t('撤回失败。'), error);
+            else if (!alreadyGone) toastError(t('撤回失败，请重试。'), error);
             throw error;
           });
       }
     : undefined;
   const onStop = live
-    ? () => {
+    ? (messageId?: string) => {
         if (activeThread === null) return;
         mutations.chiefStop.mutate(
-          { threadId: activeThread.id },
-          {
-            onError: (e) => {
-              const stopRemoved = e instanceof ApiError && e.reason === CHIEF_TURN_WAITING_TO_RETRY;
-              toastError(t(stopRemoved ? '停止失败。' : '停止失败，请重试。'), e);
-            },
-          },
+          { threadId: activeThread.id, messageId },
+          { onError: (e) => toastError(t('停止失败，请重试。'), e) },
         );
       }
     : undefined;

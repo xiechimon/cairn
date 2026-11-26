@@ -1,7 +1,6 @@
 import {
   CHIEF_MESSAGE_MERGED,
   CHIEF_MESSAGE_READ,
-  CHIEF_TURN_WAITING_TO_RETRY,
   COORDINATOR_NOT_READY,
   MEMORY_EDIT_MOVED,
   TASK_COMPUTER_OFFLINE,
@@ -25,7 +24,6 @@ const REASON_COPY: Record<string, string> = {
   rate_limited: '请求过于频繁，请稍后重试。',
   [COORDINATOR_NOT_READY]: 'Coordinator 暂无可用模型，请先在设置里配置模型来源。',
   timeout: '请求超时，请检查网络后重试。',
-  [CHIEF_TURN_WAITING_TO_RETRY]: '这一轮正在等待重新运行，这次没有停掉。',
   [CHIEF_MESSAGE_READ]: 'Coordinator 已经读到这条了。',
   [CHIEF_MESSAGE_MERGED]: '这条已经和其他消息合在一起了，不能单独撤回。',
   [MEMORY_EDIT_MOVED]: '这次记忆修改已经重新开始，请看最新的一次。',

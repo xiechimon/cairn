@@ -455,7 +455,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     expect(calls).not.toContain('POST /stop');
   });
 
-  test('stop on a turn still waiting for a machine withdraws that message and returns its text', async ({
+  test('stop on a turn still waiting for a machine ends it and keeps its message', async ({
     page,
   }) => {
     const calls = await mockLive(page, {
@@ -476,9 +476,10 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const input = home.getByTestId('chief-composer-input');
     await input.focus();
     await input.press('Escape');
-    await expect.poll(() => calls).toContain('DELETE /messages/m1');
-    expect(calls).not.toContain('POST /stop');
-    await expect(input).toHaveValue(FIRST.content);
+    await expect.poll(() => calls).toContain('POST /stop');
+    expect(calls).not.toContain('DELETE /messages/m1');
+    await expect(input).toHaveValue('');
+    await expect(home.getByText(FIRST.content, { exact: true })).toBeVisible();
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
     await evidenceShot(page, 'stop-queued-turn.png');
   });

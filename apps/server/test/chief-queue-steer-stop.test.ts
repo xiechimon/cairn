@@ -17,6 +17,7 @@ import {
 import { sendChiefMessage } from '../src/services/chief.js';
 import { CHIEF_TURN_STOP_GRACE_MS, sweepOverlongChiefTurns } from '../src/services/chief-turns.js';
 import { providerHealth } from '../src/services/provider-health.js';
+import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import {
   bootServer,
   claimedGeneration,
@@ -66,6 +67,7 @@ interface ThreadView {
   fallbackModel?: string | null;
   turnQueue?: unknown;
   turnRunning?: boolean;
+  waitingRerun?: 'ready' | 'held' | null;
 }
 
 async function setupWorld(fallbackModels: { provider: string; modelId: string }[] | null = null) {
@@ -198,8 +200,10 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
         `/api/teams/${teamId}/chief/threads/${threadId}/messages/${messageId}/steer`,
       );
     },
-    stop() {
-      return call(s.app, 'POST', `/api/teams/${teamId}/chief/threads/${threadId}/stop`);
+    stop(messageId?: string) {
+      return call(s.app, 'POST', `/api/teams/${teamId}/chief/threads/${threadId}/stop`, {
+        body: messageId === undefined ? {} : { messageId },
+      });
     },
     async ackSteer(stepId: string) {
       const res = await call(s.app, 'POST', `/api/machine/steer/ack?stepId=${stepId}`, {
@@ -689,7 +693,22 @@ describe('stop (T5)', () => {
     expect(view.turnQueue ?? null).toBeNull();
     expect(view.pending).toEqual([]);
     expect(view.turnRunning).toBe(false);
-    expect((await w.stop()).status).toBe(409);
+    expect(view.waitingRerun).toBe('held');
+  });
+
+  test('a system turn that never started cannot be stopped', async () => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    w.s.db
+      .update(stepTable)
+      .set({ ownerMessageIds: ['wake-without-a-message'] })
+      .where(eq(stepTable.id, first))
+      .run();
+    expect((await w.thread()).waitingRerun ?? null).toBeNull();
+    const refused = await w.stop();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ reason: 'nothing-to-stop' });
+    expect(w.stepRow(first)?.status).toBe('pending');
   });
 
   test('stop after the only turn ended says there is nothing to stop', async () => {
@@ -700,23 +719,6 @@ describe('stop (T5)', () => {
     const refused = await w.stop();
     expect(refused.status).toBe(409);
     expect(await refused.json()).toMatchObject({ reason: 'nothing-to-stop' });
-  });
-
-  test.each([
-    ['moved to its backup model', '429: too many requests'],
-    ['was held for quota', QUOTA_ERROR],
-  ])('a turn that %s is not reported as already stopped', async (name, errorMessage) => {
-    const w = await setupWorld(
-      name === 'was held for quota' ? null : [{ provider: 'relay-b', modelId: 'model-b' }],
-    );
-    await w.send('第一句');
-    const running = await w.claim();
-    await w.done(running!.step.id, { status: 'failed', errorMessage });
-    expect(w.stepRow(running!.step.id)?.status).toBe('pending');
-    const refused = await w.stop();
-    expect(refused.status).toBe(409);
-    expect(await refused.json()).toMatchObject({ reason: 'chief-turn-waiting-to-retry' });
-    expect(w.stepRow(running!.step.id)?.status).toBe('pending');
   });
 
   test.each([
@@ -812,6 +814,145 @@ describe('stop (T5)', () => {
   });
 });
 
+const CAPACITY_ERROR = '529: overloaded_error';
+
+const REQUEUES = [
+  {
+    cause: 'moved to its backup model',
+    errorMessage: '429: too many requests',
+    fallback: [{ provider: 'relay-b', modelId: 'model-b' }],
+    waiting: 'ready',
+  },
+  { cause: 'was held for quota', errorMessage: QUOTA_ERROR, fallback: null, waiting: 'held' },
+  {
+    cause: 'is waiting on capacity',
+    errorMessage: CAPACITY_ERROR,
+    fallback: null,
+    waiting: 'held',
+  },
+] as const;
+
+type World = Awaited<ReturnType<typeof setupWorld>>;
+
+async function requeued(w: World, errorMessage: string, content = '第一句') {
+  const first = await w.send(content);
+  const running = await w.claim();
+  await w.done(running!.step.id, { status: 'failed', errorMessage });
+  expect(w.stepRow(first)?.status).not.toBe('claimed');
+  return first;
+}
+
+function userIds(w: World): string[] {
+  return w
+    .messages()
+    .filter((m) => m.role === 'user')
+    .map((m) => m.id);
+}
+
+describe('a Stop press never deletes a message', () => {
+  test.each(REQUEUES)(
+    'stop ends a turn that $cause, keeps the message and marks it stopped',
+    async ({ errorMessage, fallback, waiting }) => {
+      const w = await setupWorld(fallback === null ? null : [...fallback]);
+      const first = await requeued(w, errorMessage);
+      const view = await w.thread();
+      expect(view.waitingRerun).toBe(waiting);
+      expect(view.pending).toEqual([]);
+      const res = await w.stop();
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ delegated: false });
+      expect(w.stepRow(first)?.status).toBe('stopped');
+      expect(userIds(w)).toEqual([first]);
+      expect(w.messages().map((m) => m.id)).toContain(`chief-stop-${first}`);
+      expect((await w.thread()).activeRun).toBeNull();
+      expect((await w.thread()).waitingRerun ?? null).toBeNull();
+      sweepQuotaWaitSteps(w.s.svc, Date.now() + 365 * 24 * 60 * 60_000);
+      expect(await w.claim()).toBeNull();
+      expect(w.stepRow(first)?.status).toBe('stopped');
+    },
+  );
+
+  test.each(REQUEUES)(
+    'the message of a turn that $cause can no longer be withdrawn',
+    async ({ errorMessage, fallback }) => {
+      const w = await setupWorld(fallback === null ? null : [...fallback]);
+      const first = await requeued(w, errorMessage);
+      const refused = await w.withdraw(first);
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toMatchObject({ reason: 'chief-message-read' });
+      expect(userIds(w)).toEqual([first]);
+      expect(w.stepRow(first)).toBeDefined();
+    },
+  );
+
+  test('stop ends a merged turn that waits to run again and keeps every message', async () => {
+    const w = await setupWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
+    const first = await w.send('第一句');
+    const running = await w.claim();
+    const second = w.queue('第二句');
+    const third = w.queue('第三句');
+    await w.done(running!.step.id, { status: 'success' });
+    const folded = await w.claim();
+    await w.done(folded!.step.id, { status: 'failed', errorMessage: '429: too many requests' });
+    expect(w.stepRow(second)?.ownerMessageIds).toEqual([second, third]);
+    expect((await w.stop(second)).status).toBe(200);
+    expect(w.stepRow(second)?.status).toBe('stopped');
+    expect(userIds(w)).toEqual([first, second, third]);
+  });
+
+  test('stop on a message that waits for a computer ends its turn and keeps it', async () => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    const res = await w.stop(first);
+    expect(res.status).toBe(200);
+    expect(w.stepRow(first)?.status).toBe('stopped');
+    expect(userIds(w)).toEqual([first]);
+    expect(w.messages().map((m) => m.id)).toContain(`chief-stop-${first}`);
+    expect(await w.claim()).toBeNull();
+  });
+
+  test('stop naming a message ends only its turn, and the next queued message still runs', async () => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    w.queue('第二句');
+    expect((await w.stop(first)).status).toBe(200);
+    expect(stripTurnContext((await w.claim())?.instruction ?? '')).toBe('第二句');
+  });
+
+  test('a press that names a message claimed in the meantime stops that running turn', async () => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    await w.claim();
+    const res = await w.stop(first);
+    expect(await res.json()).toEqual({ delegated: true });
+  });
+
+  test.each([
+    ['its turn already ended', 'success'],
+    ['another turn is running', 'running'],
+  ])('a press that names a message after %s touches nothing', async (_name, state) => {
+    const w = await setupWorld();
+    const first = await w.send('第一句');
+    const running = await w.claim();
+    const second = w.queue('第二句');
+    await w.done(running!.step.id, { status: 'success' });
+    if (state === 'running') await w.claim();
+    const refused = await w.stop(first);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ reason: 'nothing-to-stop' });
+    expect(w.stepRow(second)?.status).toBe(state === 'running' ? 'claimed' : 'pending');
+    expect(w.s.db.select().from(stopPending).all()).toHaveLength(0);
+  });
+
+  test('a later message held behind a waiting turn stays withdrawable', async () => {
+    const w = await setupWorld();
+    await requeued(w, QUOTA_ERROR);
+    const second = w.queue('第二句');
+    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'held' }]);
+    expect((await w.withdraw(second)).status).toBe(200);
+  });
+});
+
 describe('a message sent to a dead turn starts a new turn at once', () => {
   test('the claimed turn stopped heartbeating: sending ends it and the message runs as the next turn', async () => {
     const w = await setupWorld();
@@ -862,10 +1003,8 @@ describe('chief unavailable (T4)', () => {
     expect(env.outage?.model).toBe('relay-a/model-a');
     expect(typeof env.outage?.retryAt).toBe('number');
     const second = w.queue('第二句');
-    expect((await w.thread()).pending).toEqual([
-      { messageId: first, state: 'held' },
-      { messageId: second, state: 'held' },
-    ]);
+    expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'held' }]);
+    expect((await w.thread()).waitingRerun).toBe('held');
     expect(await w.claim()).toBeNull();
     w.s.db.update(stepTable).set({ holdUntil: 0 }).where(eq(stepTable.id, first)).run();
     const resumed = await w.claim();

@@ -1329,8 +1329,7 @@ export function useApiMutations(teamId: string | undefined) {
           }),
           { delegated: false },
         ),
-      onSuccess: invalidateAll,
-      onError: invalidateAll,
+      onSettled: invalidateAll,
     }),
     retryBuildNow: useMutation({
       mutationFn: (input: { buildId: string; clientMessageId?: string }) =>
@@ -1586,11 +1585,11 @@ export function useApiMutations(teamId: string | undefined) {
       onError: invalidateAll,
     }),
     chiefStop: useMutation({
-      mutationFn: (input: { threadId: string }) =>
+      mutationFn: (input: { threadId: string; messageId?: string }) =>
         stopIfRunning(
           api.post<{ delegated: boolean }>(
             `/api/teams/${teamId}/chief/threads/${input.threadId}/stop`,
-            {},
+            { messageId: input.messageId },
           ),
           { delegated: false },
         ),

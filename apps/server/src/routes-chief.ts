@@ -3,6 +3,7 @@ import {
   type ChiefSendMessageBody,
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
+  chiefStopBodySchema,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -202,10 +203,11 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     return c.json(steerChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid')));
   });
 
-  app.post('/api/teams/:id/chief/threads/:tid/stop', (c) => {
+  app.post('/api/teams/:id/chief/threads/:tid/stop', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(stopChiefTurn(svc, teamId, c.req.param('tid')));
+    const body = parseWith(chiefStopBodySchema, (await jsonBody(c)) ?? {}, 'body');
+    return c.json(stopChiefTurn(svc, teamId, c.req.param('tid'), body.messageId));
   });
 
   app.post('/api/teams/:id/chief/threads/:tid/questions/:requestId/answer', async (c) => {

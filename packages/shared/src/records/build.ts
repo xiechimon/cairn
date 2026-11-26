@@ -17,7 +17,6 @@ export const stopAttributionSchema = z.object({
 export type StopAttribution = z.infer<typeof stopAttributionSchema>;
 
 export const NOTHING_TO_STOP = 'nothing-to-stop';
-export const CHIEF_TURN_WAITING_TO_RETRY = 'chief-turn-waiting-to-retry';
 export const CHIEF_MESSAGE_READ = 'chief-message-read';
 export const CHIEF_MESSAGE_MERGED = 'chief-message-merged';
 export const MEMORY_EDIT_MOVED = 'memory-edit-moved';

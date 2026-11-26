@@ -2474,7 +2474,9 @@ export function mapChief(
       ? (opts.threads.find((t) => t.id === opts.activeThreadId) ?? null)
       : null;
   const pendingIds = new Map((active?.pending ?? []).map((p) => [p.messageId, p.state] as const));
-  const parked = active?.turnRunning !== true && [...pendingIds.values()].includes('held');
+  const parked =
+    active?.turnRunning !== true &&
+    (active?.waitingRerun === 'held' || [...pendingIds.values()].includes('held'));
   const running = active?.activeRun != null && !parked;
   const collected = active === null ? null : collectChiefStream(opts.messages, pendingIds);
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
@@ -2552,8 +2554,7 @@ export function mapChief(
     const asked = collected?.items.find(
       (item) => item.kind === 'user' && item.id !== undefined && item.id === waitingQueue.stepId,
     );
-    if (asked?.kind === 'user' && asked.id !== undefined)
-      waitingTurn = { messageId: asked.id, text: asked.markdown ?? asked.text };
+    if (asked?.kind === 'user' && asked.id !== undefined) waitingTurn = { messageId: asked.id };
   }
   chiefStream.push(...(collected?.pending ?? []));
   const quickReplies =
@@ -2595,6 +2596,7 @@ export function mapChief(
         : {}),
     ...(waitingTurn !== undefined ? { waitingTurn } : {}),
     ...(active?.turnRunning === false ? { noRunningTurn: true } : {}),
+    ...(active?.waitingRerun != null ? { waitingRerun: true } : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
     ...(env.outage != null ? { outage: env.outage } : {}),
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),

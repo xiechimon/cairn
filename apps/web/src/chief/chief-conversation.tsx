@@ -215,7 +215,7 @@ export interface ChiefConversationProps {
   onRetryGreeting?: () => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   unsent?: UnsentSends | undefined;
-  onStop?: () => void;
+  onStop?: (messageId?: string) => void;
   earlier?: EarlierPages;
   hero?: ReactNode;
   below?: ReactNode;
@@ -476,15 +476,12 @@ export function ChiefConversation({
     (messageId: string, text: string) => withdrawRef.current?.(messageId, text),
     [],
   );
-  const waitingTurn = chief.waitingTurn;
-  const stopTurn =
-    waitingTurn !== undefined && withdraw !== undefined
-      ? () => withdraw(waitingTurn.messageId, waitingTurn.text)
-      : chief.noRunningTurn === true
-        ? undefined
-        : onStop;
+  const waitingRerun = chief.waitingRerun === true;
+  const waitingMessageId = waitingRerun ? undefined : chief.waitingTurn?.messageId;
+  const stoppable = waitingRerun || waitingMessageId !== undefined || chief.noRunningTurn !== true;
+  const stopTurn = onStop === undefined || !stoppable ? undefined : () => onStop(waitingMessageId);
   stopTurnRef.current = stopTurn;
-  const canStop = chief.running === true && stopTurn !== undefined;
+  const canStop = stopTurn !== undefined && (waitingRerun || chief.running === true);
   const allRows = useMemo(
     () =>
       awaitingStream(workingRowLast(chief.stream ?? []), questionPending).map((item, i) => ({

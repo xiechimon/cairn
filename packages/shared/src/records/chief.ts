@@ -180,6 +180,9 @@ export const chiefOrchestrationSchema = z.object({
 });
 export type ChiefOrchestration = z.infer<typeof chiefOrchestrationSchema>;
 
+export const chiefWaitingRerunSchema = z.enum(['ready', 'held']);
+export type ChiefWaitingRerun = z.infer<typeof chiefWaitingRerunSchema>;
+
 export const chiefThreadSchema = z.object({
   id: z.string(),
   chiefId: recordId,
@@ -203,6 +206,7 @@ export const chiefThreadSchema = z.object({
   retryGreetingStepId: recordId.nullable().optional(),
   pending: z.array(chiefPendingMessageSchema).optional(),
   turnRunning: z.boolean().optional(),
+  waitingRerun: chiefWaitingRerunSchema.nullable().optional(),
   fallbackModel: z.string().nullable().optional(),
   orchestration: chiefOrchestrationSchema.nullable().optional(),
   turnQueue: z
@@ -266,6 +270,11 @@ export const chiefMemoryUsageResponseSchema = z.object({
     .nullable(),
 });
 export type ChiefMemoryUsageResponse = z.infer<typeof chiefMemoryUsageResponseSchema>;
+
+export const chiefStopBodySchema = z.object({
+  messageId: z.string().min(1).optional(),
+});
+export type ChiefStopBody = z.infer<typeof chiefStopBodySchema>;
 
 export const chiefRewindBodySchema = z.object({
   messageId: z.string().min(1),

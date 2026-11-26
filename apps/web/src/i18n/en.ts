@@ -1557,9 +1557,9 @@ export const EN: Record<string, string> = {
   '服务商不接受这个 API key': 'The provider did not accept this API key',
   '重新填写 API key': 'Re-enter the API key',
   '撤回失败，Coordinator 已经读到这条了。': 'Could not withdraw: the Coordinator already read it.',
+  '撤回失败，请重试。': 'Could not withdraw the message. Try again.',
   '插话失败，请重试。': 'Could not steer. Try again.',
   '停止失败，请重试。': 'Could not stop. Try again.',
-  '停止失败。': 'Could not stop.',
   '已停止，没有建任务。': 'Stopped. No task was created.',
   '已停止。停之前已经建了任务': 'Stopped. A task was already created before the stop:',
   '{name} 已恢复，{n} 个任务已开工。': '{name} is back. {n#1 task|# tasks} started.',
@@ -3153,8 +3153,6 @@ export const EN: Record<string, string> = {
   '运行这个任务的电脑当前未连接，等它上线后再停止。':
     'The computer running this task is not connected. Stop it once it is back online.',
   '撤回失败。': 'Could not withdraw the message.',
-  '这一轮正在等待重新运行，这次没有停掉。':
-    'This turn is waiting to run again, so it was not stopped.',
   '登录状态已失效，请重新登录后重试。': 'Your sign-in expired. Sign in again and try again.',
   '没有操作权限，请联系团队管理员。': 'Permission denied. Contact a team admin.',
   '没有操作权限，请重新登录后重试。': 'Permission denied. Sign in again and try again.',

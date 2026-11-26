@@ -3,9 +3,9 @@ import {
   CHIEF_MESSAGE_MERGED,
   CHIEF_MESSAGE_READ,
   CHIEF_TURN_STOPPED_KIND,
-  CHIEF_TURN_WAITING_TO_RETRY,
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
+  type ChiefWaitingRerun,
   isChiefSideThreadId,
   NOTHING_TO_STOP,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -87,6 +87,18 @@ export function isParkedChiefStep(row: StepRow, now: number): boolean {
   );
 }
 
+function hasStarted(row: StepRow): boolean {
+  return row.claimedAt !== null;
+}
+
+export function chiefWaitingRerun(db: Db, threadId: string): ChiefWaitingRerun | null {
+  const live = liveChiefSteps(db, threadId);
+  if (live.some((row) => row.status === 'claimed')) return null;
+  const rerun = live.find(hasStarted);
+  if (rerun === undefined) return null;
+  return isParkedChiefStep(rerun, nowMs()) ? 'held' : 'ready';
+}
+
 export function hasEarlierLiveChiefStep(db: Db, candidate: StepRow): boolean {
   const live = liveChiefSteps(db, candidate.buildId);
   const at = live.findIndex((row) => row.id === candidate.id);
@@ -105,6 +117,7 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
     if (row.status === 'claimed') return;
     const steered = STEER_HOLDS.includes(row.holdReason ?? '');
     if (!steered) parked = parked || isParkedChiefStep(row, now);
+    if (hasStarted(row)) return;
     for (const messageId of stepOwners(row)) {
       const userRow = db
         .select({ id: chiefMessage.id })
@@ -175,6 +188,7 @@ export function waitingStepOf(db: Db, threadId: string, messageId: string): Step
   const row = liveChiefSteps(db, threadId).find(
     (candidate) =>
       (candidate.status === 'pending' || candidate.status === 'waiting_quota') &&
+      !hasStarted(candidate) &&
       stepOwners(candidate).includes(messageId),
   );
   if (row === undefined) {
@@ -603,23 +617,32 @@ export function endDeadChiefTurn(
   return true;
 }
 
+function chiefTurnToStop(live: StepRow[], messageId: string | undefined): StepRow | undefined {
+  const claimed = live.find((row) => row.status === 'claimed');
+  if (messageId === undefined) return claimed ?? live.find(hasStarted);
+  const named = live.find((row) => stepOwners(row).includes(messageId));
+  return claimed === undefined || claimed === named ? named : undefined;
+}
+
 export function stopChiefTurn(
   deps: ChiefTurnDeps,
   teamId: string,
   threadId: string,
+  messageId?: string,
 ): { delegated: boolean } {
   const thread = requireThread(deps.db, teamId, threadId);
-  const live = liveChiefSteps(deps.db, threadId);
-  const head = live.find((row) => row.status === 'claimed');
-  if (head === undefined) {
-    const startedTurnWillRunAgain = live.some((row) => row.claimedAt !== null);
+  const target = chiefTurnToStop(liveChiefSteps(deps.db, threadId), messageId);
+  if (target === undefined) {
     throw new HttpError(
       409,
       'no chief turn in flight (Coordinator 当前没有在回复)',
-      startedTurnWillRunAgain ? CHIEF_TURN_WAITING_TO_RETRY : NOTHING_TO_STOP,
+      NOTHING_TO_STOP,
     );
   }
-  return stopClaimedChiefStep(deps, thread, head, nowMs());
+  if (target.status === 'claimed') return stopClaimedChiefStep(deps, thread, target, nowMs());
+  endChiefStepAsStopped(deps, thread, target, nowMs());
+  deps.machineHub?.wake(thread.teamId);
+  return { delegated: false };
 }
 
 export function sweepOverlongChiefTurns(deps: ChiefTurnDeps, now: number = nowMs()): void {
@@ -684,6 +707,18 @@ function stopClaimedChiefStep(
     signalCoordinator(threadId, 'stop');
     return { delegated: true };
   }
+  endChiefStepAsStopped(deps, thread, head, now, 'executor lost');
+  return { delegated: false };
+}
+
+function endChiefStepAsStopped(
+  deps: ChiefTurnDeps,
+  thread: typeof chiefThread.$inferSelect,
+  head: StepRow,
+  now: number,
+  memoryEditReason?: string,
+): void {
+  const threadId = thread.id;
   deps.db
     .update(step)
     .set({ status: 'stopped', finishedAt: now, archiveStop: null })
@@ -691,7 +726,7 @@ function stopClaimedChiefStep(
     .run();
   deps.db.delete(stopPending).where(eq(stopPending.stepId, head.id)).run();
   releaseUnconsumedSteer(deps.db, head);
-  settleMemoryEditTurn(deps.db, head, 'stopped', 'executor lost');
+  settleMemoryEditTurn(deps.db, head, 'stopped', memoryEditReason);
   deps.machineHub?.stopSignal(thread.teamId, head.id);
   signalCoordinator(threadId, 'stop');
   settleChiefActiveRun(deps.db, threadId);
@@ -699,7 +734,6 @@ function stopClaimedChiefStep(
   if (stopped) publishStepRow(deps, stopped);
   recordChiefStop(deps, head);
   cancelPendingQuestions(deps, threadId, CHIEF_TURN_END_REASON);
-  return { delegated: false };
 }
 
 function createdTodoIdOf(content: unknown): string | null {

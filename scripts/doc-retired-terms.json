@@ -29,6 +29,12 @@
       "pattern": "\\bdoc-drift\\b",
       "canary": "node scripts/doc-drift.mjs",
       "reason": "the spec drift sweep was removed; living docs are kept true by the change that retires a mechanism"
+    },
+    {
+      "id": "chief-stop-waiting-to-retry",
+      "pattern": "chief-turn-waiting-to-retry|CHIEF_TURN_WAITING_TO_RETRY",
+      "canary": "chief-turn-waiting-to-retry",
+      "reason": "Stop ends a turn that waits to run again; docs/design/chief-stop-visibility.md describes it"
     }
   ],
   "baseline": {
@@ -67,6 +73,7 @@
       "AGENTS.md": 3
     },
     "design-rules-file": {},
-    "doc-drift-sweep": {}
+    "doc-drift-sweep": {},
+    "chief-stop-waiting-to-retry": {}
   }
 }

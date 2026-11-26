@@ -55,7 +55,7 @@ describe('stop on a turn waiting for a machine targets that turn', () => {
       activeThreadId: 'chief-ttt',
       messages: MESSAGES,
     });
-    expect(chief.waitingTurn).toEqual({ messageId: 'u-wait', text: '停止' });
+    expect(chief.waitingTurn).toEqual({ messageId: 'u-wait' });
   });
 
   test('a waiting turn with no user message of its own offers nothing to withdraw', () => {
@@ -76,6 +76,19 @@ describe('stop on a turn waiting for a machine targets that turn', () => {
         { id: 'a-new', role: 'assistant', content: '答完了', createdAt: 2 },
       ],
     });
-    expect(chief.waitingTurn).toEqual({ messageId: 'u-asked', text: '插一句' });
+    expect(chief.waitingTurn).toEqual({ messageId: 'u-asked' });
   });
+});
+
+test.each([
+  ['ready', true],
+  ['held', undefined],
+] as const)('a started turn waiting to run again (%s) can be stopped', (waitingRerun, running) => {
+  const chief = mapChief(ENV, {
+    threads: [{ ...thread('u-wait'), turnRunning: false, waitingRerun, turnQueue: null }],
+    activeThreadId: 'chief-ttt',
+    messages: MESSAGES,
+  });
+  expect(chief.waitingRerun).toBe(true);
+  expect(chief.running).toBe(running);
 });

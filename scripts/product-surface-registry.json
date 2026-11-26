@@ -1,4 +1,10 @@
 {
   "version": 1,
-  "surfaces": []
+  "surfaces": [
+    {
+      "type": "setting",
+      "key": "chiefStopBodySchema.messageId",
+      "userScenario": "Nothing to set: pressing Stop on your own message that has not started sends its id, so that turn is the one stopped."
+    }
+  ]
 }

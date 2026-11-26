@@ -12902,6 +12902,20 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
     "userId": {
       "type": "string",
     },
+    "waitingRerun": {
+      "anyOf": [
+        {
+          "enum": [
+            "ready",
+            "held",
+          ],
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
   },
   "required": [
     "id",
