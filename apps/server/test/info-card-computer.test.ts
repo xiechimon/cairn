@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   type ClaudeCodeReport,
   type ComputerCall,
+  INFO_REPORT_MAX_BYTES,
   infoTaskDir,
   type MachineCapabilities,
   MEMORY_VERIFY_NOTE,
@@ -19,7 +20,10 @@ import type { MachineApi } from '../../daemon/src/machine-client.js';
 import { performRepoArchive } from '../../daemon/src/repo-archive.js';
 import { startCoordinator } from '../src/coordinator/index.js';
 import { attachment, build, machine, message, step, todo } from '../src/db/schema.js';
+import { completeStep } from '../src/services/builds.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
+import { acceptedInfoReport } from '../src/services/info-card.js';
+import { executeInfoCardTool } from '../src/services/info-card-tools.js';
 import { dropComputerWaiters, receiveComputerFrames } from '../src/services/machine-computer.js';
 import { claimStep } from '../src/services/machines.js';
 import { createProvider } from '../src/services/providers.js';
@@ -615,5 +619,89 @@ describe('info cards run in the agent computer', () => {
 
     s.db.update(machine).set({ online: true }).where(eq(machine.id, machineId)).run();
     expect(projectQueue()?.blocked).toBeUndefined();
+  });
+
+  test('non-computer host runner claims info card without relayOnly and submits report directly via content', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    insertClaudeSubscription(s);
+    const report = {
+      installed: true,
+      hostname: 'mac',
+      models: [{ id: 'sonnet', name: 'sonnet' }],
+      auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+    } as ClaudeCodeReport;
+    const runner = insertMachine(s, { name: 'host-runner', claudeCodeReport: report });
+    seedRoute(s, 'session', { provider: 'claude-code', modelId: 'sonnet', machineId: runner });
+    const { todoId, buildId } = await infoCard(s);
+
+    const deps = {
+      ...s.svc,
+      box: s.secretBox,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+      skillsDir: s.skillsDir,
+    };
+    const claimed = await claimStep(deps, runner, s.team.id, 10, 'http://localhost');
+    expect(claimed).not.toBeNull();
+    expect(claimed?.remoteToolsOnly).toBeUndefined();
+    expect(claimed?.agent?.description).not.toContain('/home/agent/tasks/');
+    expect(claimed?.agent?.description).toContain('submit_report');
+    const names = claimed?.remoteTools?.map((tool) => tool.name) ?? [];
+    expect(names).toEqual(['submit_report', 'ask_user']);
+    const submitDef = claimed?.remoteTools?.find((tool) => tool.name === 'submit_report');
+    expect(submitDef?.parameters).toMatchObject({
+      required: ['content'],
+      properties: { content: { type: 'string' } },
+    });
+
+    const stepRow = s.db.select().from(step).where(eq(step.buildId, buildId)).get();
+    expect(stepRow).toBeDefined();
+    if (!stepRow) throw new Error('missing step');
+
+    await expect(
+      executeInfoCardTool(
+        deps,
+        runner,
+        stepRow,
+        'submit_report',
+        { content: '   ' },
+        'c1',
+        undefined,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      executeInfoCardTool(
+        deps,
+        runner,
+        stepRow,
+        'submit_report',
+        { content: 'a'.repeat(INFO_REPORT_MAX_BYTES + 1) },
+        'c2',
+        undefined,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+
+    const acceptedMsg = await executeInfoCardTool(
+      deps,
+      runner,
+      stepRow,
+      'submit_report',
+      { content: '# Report\nVerified' },
+      'c3',
+      undefined,
+    );
+    expect(acceptedMsg).toContain('report accepted');
+
+    const storedReport = acceptedInfoReport(deps, stepRow);
+    expect(storedReport).toBe('# Report\nVerified');
+    completeStep(deps, stepRow.id, { hasChanges: false, report: storedReport });
+
+    const doneStep = s.db.select().from(step).where(eq(step.id, stepRow.id)).get();
+    expect(doneStep?.status).toBe('done');
+    expect(s.db.select().from(todo).where(eq(todo.id, todoId)).get()?.phase).toBe('review');
+    expect(
+      s.db.select().from(build).where(eq(build.id, buildId)).get()?.reportAttachmentId,
+    ).not.toBeNull();
   });
 });

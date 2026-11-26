@@ -5,6 +5,8 @@ import {
   spawn,
 } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import {
   type ContentBlock,
@@ -43,10 +45,11 @@ import {
   CLAUDE_TODO_STATUS_STATES,
   isInternalAntigravityModelId,
 } from '@cairn/shared';
-import { writeJsonObject } from '../agent-config.js';
+import { readJsonObject, writeJsonObject } from '../agent-config.js';
 import { DAEMON_VERSION } from '../version.js';
 import {
   type AcpToolCall,
+  type AcpTurnPolicy,
   acpTurnPolicy,
   claudeAcpSessionMeta,
   decideAcpPermission,
@@ -243,6 +246,24 @@ function geminiCompressionSettingsPath(home: string, modelId: string, compactAt:
   return writeJsonObject(home, `.gemini/cairn-system/compress-${compactAt}-of-${limit}.json`, {
     model: { compressionThreshold: compactAt / limit },
   });
+}
+
+const ANTIGRAVITY_ACP_SETTINGS_FILE = '.gemini/antigravity-acp/settings.json';
+
+function syncAntigravityToolPermission(home: string | undefined, policy: AcpTurnPolicy): void {
+  if (!home || resolve(home) === resolve(homedir())) return;
+  const existing = readJsonObject(join(home, ANTIGRAVITY_ACP_SETTINGS_FILE));
+  if (policy === 'relay-only') {
+    writeJsonObject(home, ANTIGRAVITY_ACP_SETTINGS_FILE, {
+      ...existing,
+      toolPermission: 'strict',
+    });
+    return;
+  }
+  if ('toolPermission' in existing) {
+    const { toolPermission: _removed, ...rest } = existing;
+    writeJsonObject(home, ANTIGRAVITY_ACP_SETTINGS_FILE, rest);
+  }
 }
 
 class AcpSession implements AgentSessionHandle {
@@ -724,6 +745,7 @@ class AcpBackend implements AgentBackend {
       }
       if (adapter?.harness === 'antigravity') {
         sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
+        syncAntigravityToolPermission(sessionEnv.HOME, policy);
       }
       const env = runtimeChildEnv(sessionEnv);
       child = spawnProcess(command, args, {

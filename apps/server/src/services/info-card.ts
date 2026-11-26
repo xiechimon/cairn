@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   INFO_CARD_TOOLS,
+  INFO_HOST_SUBMIT_REPORT_DEF,
   type RemoteToolDef,
   type StepKind,
   type StepQueueBlocked,
@@ -17,7 +18,13 @@ import { profileForStep, providerRefusal, type RouteProfile } from './routing-ru
 
 export type InfoCardPlan =
   | { kind: 'pi'; profile: RouteProfile; provider: string; modelId: string; machineId: string }
-  | { kind: 'runner'; profile: RouteProfile; machineId: string; relayOnly: boolean }
+  | {
+      kind: 'runner';
+      profile: RouteProfile;
+      machineId: string;
+      relayOnly: boolean;
+      hasComputer: boolean;
+    }
   | { kind: 'wait'; blocked: StepQueueBlocked };
 
 export function infoComputerHosts(db: Pick<Db, 'select'>, teamId: string) {
@@ -51,9 +58,16 @@ export function infoCardPlan(
   if (model.provider === null || model.modelId === null) {
     return { kind: 'wait', blocked: { kind: 'model-unavailable', missing: [] } };
   }
+  const hasComputer = host.capabilities?.computer === true;
   const runtime = stepRuntimeFor(model.provider);
   if (runtime !== 'pi') {
-    return { kind: 'runner', profile, machineId: host.id, relayOnly: runtime === 'claude-code' };
+    return {
+      kind: 'runner',
+      profile,
+      machineId: host.id,
+      relayOnly: runtime === 'claude-code' && hasComputer,
+      hasComputer,
+    };
   }
   if (
     !coordinatorInServerEnabled() ||
@@ -95,6 +109,7 @@ export function acceptedInfoReport(
   }
 }
 
-export function infoCardRemoteTools(kind: StepKind): RemoteToolDef[] {
-  return [...INFO_CARD_TOOLS, ...(kind === 'session' ? [WORKER_ASK_USER_TOOL] : [])];
+export function infoCardRemoteTools(kind: StepKind, hasComputer = true): RemoteToolDef[] {
+  const tools = hasComputer ? INFO_CARD_TOOLS : [INFO_HOST_SUBMIT_REPORT_DEF];
+  return [...tools, ...(kind === 'session' ? [WORKER_ASK_USER_TOOL] : [])];
 }

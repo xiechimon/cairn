@@ -96,7 +96,7 @@ function linkCredentials(home: string, realHome: string, files: readonly string[
   }
 }
 
-function readJsonObject(path: string): Record<string, unknown> {
+export function readJsonObject(path: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
     return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)

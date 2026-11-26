@@ -197,8 +197,21 @@ interface CompactedToolDoc {
   parameters: Record<string, unknown>;
 }
 
-function toolByteLength(name: string, description: string, inputSchema: unknown): number {
-  return Buffer.byteLength(JSON.stringify({ name, description, inputSchema }), 'utf8');
+function toolByteLength(
+  name: string,
+  description: string,
+  inputSchema: unknown,
+  annotations?: { readOnlyHint: boolean },
+): number {
+  return Buffer.byteLength(
+    JSON.stringify({
+      name,
+      description,
+      inputSchema,
+      ...(annotations !== undefined ? { annotations } : {}),
+    }),
+    'utf8',
+  );
 }
 
 function firstSentence(text: string): string {
@@ -235,11 +248,12 @@ function fitDescriptionToBytes(
   description: string,
   inputSchema: Record<string, unknown>,
   maxBytes: number,
+  annotations?: { readOnlyHint: boolean },
 ): { description: string; inputSchema: Record<string, unknown> } {
   const suffix = ' (see system prompt)';
   const base = firstSentence(description) || description;
   const fullSummary = `${base}${suffix}`;
-  if (toolByteLength(name, fullSummary, inputSchema) <= maxBytes) {
+  if (toolByteLength(name, fullSummary, inputSchema, annotations) <= maxBytes) {
     return { description: fullSummary, inputSchema };
   }
   const chars = Array.from(base);
@@ -250,7 +264,7 @@ function fitDescriptionToBytes(
     const mid = Math.floor((low + high) / 2);
     const prefix = chars.slice(0, mid).join('').trimEnd();
     const candidate = prefix.length > 0 ? `${prefix}...${suffix}` : 'See system prompt';
-    if (toolByteLength(name, candidate, inputSchema) <= maxBytes) {
+    if (toolByteLength(name, candidate, inputSchema, annotations) <= maxBytes) {
       best = candidate;
       low = mid + 1;
     } else {
@@ -259,7 +273,7 @@ function fitDescriptionToBytes(
   }
   if (best !== '') return { description: best, inputSchema };
   for (const fallback of ['See system prompt', 'See prompt', '']) {
-    if (toolByteLength(name, fallback, inputSchema) <= maxBytes) {
+    if (toolByteLength(name, fallback, inputSchema, annotations) <= maxBytes) {
       return { description: fallback, inputSchema };
     }
   }
@@ -270,25 +284,31 @@ function buildToolSearchDescription(
   deferred: readonly RemoteToolDef[],
   inputSchema: Record<string, unknown>,
   maxBytes: number,
+  annotations?: { readOnlyHint: boolean },
 ): string {
   const prefix = 'Search deferred Cairn tools by name or keyword. Available: ';
   const names = deferred.map((tool) => tool.name);
   const full = `${prefix}${names.join(', ')}`;
-  if (toolByteLength(TOOL_SEARCH_NAME, full, inputSchema) <= maxBytes) return full;
+  if (toolByteLength(TOOL_SEARCH_NAME, full, inputSchema, annotations) <= maxBytes) return full;
   const chosen: string[] = [];
   for (const toolName of names) {
     const remaining = names.length - chosen.length - 1;
     const suffix = remaining > 0 ? `, ... (+${remaining} more)` : '';
     const candidate = `${prefix}${[...chosen, toolName].join(', ')}${suffix}`;
-    if (toolByteLength(TOOL_SEARCH_NAME, candidate, inputSchema) > maxBytes) break;
+    if (toolByteLength(TOOL_SEARCH_NAME, candidate, inputSchema, annotations) > maxBytes) break;
     chosen.push(toolName);
   }
   if (chosen.length > 0) {
     const remaining = names.length - chosen.length;
     return `${prefix}${chosen.join(', ')}${remaining > 0 ? `, ... (+${remaining} more)` : ''}`;
   }
-  return fitDescriptionToBytes(TOOL_SEARCH_NAME, prefix.trimEnd(), inputSchema, maxBytes)
-    .description;
+  return fitDescriptionToBytes(
+    TOOL_SEARCH_NAME,
+    prefix.trimEnd(),
+    inputSchema,
+    maxBytes,
+    annotations,
+  ).description;
 }
 
 function searchDeferredTools(
@@ -352,6 +372,7 @@ export async function openAcpTools(
   const eagerRemote = deferTools ? remote.filter((tool) => tool.deferred !== true) : remote;
   const deferredRemote = deferTools ? remote.filter((tool) => tool.deferred === true) : [];
   const locked = acpTurnPolicy(opts) !== 'normal';
+  const annotations = locked ? { readOnlyHint: true } : undefined;
 
   const exposedTools: Array<{ name: string; description: string; parameters?: unknown }> = [
     ...eagerRemote,
@@ -382,6 +403,7 @@ export async function openAcpTools(
           deferredRemote,
           toolSearchSchema,
           options?.maxToolBytes ?? DEFAULT_TOOL_SEARCH_MAX_BYTES,
+          annotations,
         ),
         parameters: toolSearchSchema,
       },
@@ -402,7 +424,7 @@ export async function openAcpTools(
       .object({ type: z.literal('object') })
       .loose()
       .parse(tool.parameters ?? EMPTY_INPUT_SCHEMA),
-    ...(locked ? { annotations: { readOnlyHint: true } } : {}),
+    ...(annotations !== undefined ? { annotations } : {}),
   }));
 
   const maxToolBytes = options?.maxToolBytes;
@@ -411,7 +433,10 @@ export async function openAcpTools(
     maxToolBytes === undefined
       ? rawDefinitions
       : rawDefinitions.map((def) => {
-          if (toolByteLength(def.name, def.description, def.inputSchema) <= maxToolBytes) {
+          if (
+            toolByteLength(def.name, def.description, def.inputSchema, def.annotations) <=
+            maxToolBytes
+          ) {
             return def;
           }
           compactedDocs.push({
@@ -428,6 +453,7 @@ export async function openAcpTools(
             def.description,
             strippedSchema,
             maxToolBytes,
+            def.annotations,
           );
           return {
             ...def,

@@ -20,11 +20,12 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import type { step, todo } from '../db/schema.js';
-import { build } from '../db/schema.js';
+import { build, machine } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { publishBuild } from './builds.js';
 import { infoCardTodoOf } from './computer-thread.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
+import { infoComputerHosts } from './info-card.js';
 import { storeInfoReport } from './info-handoff.js';
 import { infoRepoOffered, infoRepoSnapshot } from './info-repo-snapshot.js';
 import { COMPUTER_BUSY, COMPUTER_USER_CONTROL, forwardComputerCall } from './machine-computer.js';
@@ -261,22 +262,12 @@ export async function readComputerFile(
   return bytes;
 }
 
-async function submitInfoReport(
+function persistInfoReport(
   deps: MachineDeps,
-  machineId: string | null,
   row: StepRow,
-  params: Record<string, unknown>,
-  signal: AbortSignal | undefined,
-): Promise<string> {
-  if (row.status !== 'claimed') {
-    throw new HttpError(409, 'submit_report requires a currently claimed step');
-  }
-  const todoRow = infoCardTodoOf(deps.db, row);
-  if (todoRow === null) throw new HttpError(400, 'submit_report is only for info cards');
-  const path = reportPathOf(row.buildId, params.path);
-  const bytes = await readComputerFile(deps, machineId, row, path, signal);
-  const report = bytes.toString('utf8');
-  if (report.trim() === '') throw new HttpError(400, `${path} has no text; write the report first`);
+  todoRow: typeof todo.$inferSelect,
+  report: string,
+): void {
   if (deps.attachmentsDir === undefined) throw new HttpError(500, 'attachments are not configured');
   withFencedTransaction(deps, (settled) => {
     settled.assertClaim?.();
@@ -289,6 +280,44 @@ async function submitInfoReport(
   });
   const stored = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
   if (stored) publishBuild(deps, stored);
+}
+
+async function submitInfoReport(
+  deps: MachineDeps,
+  machineId: string | null,
+  row: StepRow,
+  params: Record<string, unknown>,
+  signal: AbortSignal | undefined,
+): Promise<string> {
+  if (row.status !== 'claimed') {
+    throw new HttpError(409, 'submit_report requires a currently claimed step');
+  }
+  const todoRow = infoCardTodoOf(deps.db, row);
+  if (todoRow === null) throw new HttpError(400, 'submit_report is only for info cards');
+  const targetMachineId = machineId ?? row.machineId;
+  const host =
+    targetMachineId === null
+      ? infoComputerHosts(deps.db, todoRow.teamId)[0]
+      : deps.db.select().from(machine).where(eq(machine.id, targetMachineId)).get();
+  if (host?.capabilities?.computer !== true) {
+    if (typeof params.content !== 'string' || params.content.trim() === '') {
+      throw new HttpError(400, 'submit_report needs the report markdown in content');
+    }
+    const byteLength = Buffer.byteLength(params.content, 'utf8');
+    if (byteLength > INFO_REPORT_MAX_BYTES) {
+      throw new HttpError(
+        400,
+        `report is ${byteLength} bytes, over the ${INFO_REPORT_MAX_BYTES} byte limit; make it smaller and submit again`,
+      );
+    }
+    persistInfoReport(deps, row, todoRow, params.content);
+    return `report accepted (${byteLength} bytes). Give a short final reply and end your turn.`;
+  }
+  const path = reportPathOf(row.buildId, params.path);
+  const bytes = await readComputerFile(deps, machineId, row, path, signal);
+  const report = bytes.toString('utf8');
+  if (report.trim() === '') throw new HttpError(400, `${path} has no text; write the report first`);
+  persistInfoReport(deps, row, todoRow, report);
   const deliverables = await collectDeliverables(deps, machineId, row, todoRow, signal);
   return `report accepted (${bytes.length} bytes).${deliverables} Give a short final reply and end your turn.`;
 }

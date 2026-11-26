@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { createServer as createHttpServer } from 'node:http';
 import { createConnection } from 'node:net';
 import { createInterface } from 'node:readline';
-import { CHIEF_REMOTE_TOOLS, CORE_COORDINATOR_TOOLS } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS, CHIEF_ROUTER_TOOLS, CORE_COORDINATOR_TOOLS } from '@cairn/shared';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -509,6 +509,52 @@ describe('ACP stdio host tools lifecycle', () => {
           'utf8',
         ),
       ).toBeLessThanOrEqual(400);
+    } finally {
+      rpc.close();
+      bridge.close();
+    }
+  });
+
+  test('locked turn keeps serialized tool definitions including annotations strictly within maxToolBytes', async () => {
+    const remoteTools = [...CHIEF_REMOTE_TOOLS, ...CHIEF_ROUTER_TOOLS].map((tool) =>
+      CORE_COORDINATOR_TOOLS.has(tool.name) ? tool : { ...tool, deferred: true },
+    );
+    const bridge = await openAcpTools(
+      {
+        ...opts,
+        remoteTools,
+        remoteToolsOnly: true,
+        executeRemoteTool: async (name: string) => `ran:${name}`,
+      },
+      { maxToolBytes: 950, deferTools: true },
+    );
+    expect(bridge).not.toBeNull();
+    if (!bridge) throw new Error('Missing bridge');
+
+    const rpc = spawnStdioRpc(bridge.declaration);
+    try {
+      await rpc.call('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '1' },
+      });
+      const listed = (await rpc.call('tools/list')) as {
+        result: {
+          tools: Array<{
+            name: string;
+            description: string;
+            inputSchema: Record<string, unknown>;
+            annotations?: { readOnlyHint?: boolean };
+          }>;
+        };
+      };
+      const names = listed.result.tools.map((tool) => tool.name);
+      expect(names).toContain('tool_search');
+      expect(names).toContain('threads');
+      for (const tool of listed.result.tools) {
+        expect(tool.annotations).toEqual({ readOnlyHint: true });
+        expect(Buffer.byteLength(JSON.stringify(tool), 'utf8')).toBeLessThanOrEqual(950);
+      }
     } finally {
       rpc.close();
       bridge.close();

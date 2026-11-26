@@ -71,6 +71,17 @@ export const INFO_SUBMIT_REPORT_DEF: RemoteToolDef = {
   },
 };
 
+export const INFO_HOST_SUBMIT_REPORT_DEF: RemoteToolDef = {
+  name: INFO_SUBMIT_REPORT_TOOL,
+  description:
+    'Hand in your finished Markdown report directly in content (up to 512 KiB). The call fails with the reason when content is empty or too large; fix it and call again. Ending without an accepted report fails the task.',
+  parameters: {
+    type: 'object',
+    properties: { content: str('The complete Markdown report text (up to 512 KiB).') },
+    required: ['content'],
+  },
+};
+
 export const INFO_CARD_TOOLS: readonly RemoteToolDef[] = [
   ...INFO_FILE_TOOLS,
   ...COMPUTER_REMOTE_TOOLS.map((def) => ({
@@ -79,6 +90,19 @@ export const INFO_CARD_TOOLS: readonly RemoteToolDef[] = [
   })),
   INFO_SUBMIT_REPORT_DEF,
 ];
+
+export function infoCardHostBrief(hasRepo: boolean): string {
+  return [
+    '## 信息卡工作方式',
+    '当前 Runner 没有 Linux 电脑容器，请直接使用你自带的工作区、Shell 与文件工具完成调研与整理。若任务要求只读，只读取所需文件，不要修改仓库或提交代码。',
+    ...(hasRepo
+      ? ['本项目已提供代码仓库只读上下文，请直接查看默认分支或当前工作区中的代码，不要改动源码。']
+      : []),
+    `本步的交付物是一份 markdown 报告：完成调研后，直接调用 \`${INFO_SUBMIT_REPORT_TOOL}\` 工具，在 \`content\` 参数中传入完整报告正文（不超过 512 KiB）。工具报错时按原因修正后再交；没有成功交出报告就结束，本步会失败。`,
+    '报告只写主人要的内容：发现、来源、没查到的缺口。和这次运行本身有关的事（更正上一轮的结论、核对上一轮、记忆更新、归档或停掉别的任务、重试经过）一律写进你最后的回复，不要写进报告。任务正文里若有这类安排，照做，但只在最后的回复里说明。',
+    '任务的输入在任务正文里：主人的原话，加上「Coordinator briefing」里它已经查到的链接、名称和结果。先读正文，正文确实没给你要的东西时，用提问工具问主人，不要猜。',
+  ].join('\n');
+}
 
 export function infoCardBrief(conversationId: string, hasRepo: boolean, relayOnly = true): string {
   const dir = infoTaskDir(conversationId);

@@ -8,6 +8,7 @@ import {
   CORE_COORDINATOR_TOOLS,
   fencedTitle,
   infoCardBrief,
+  infoCardHostBrief,
   isBuildStepKind,
   isInfoOutput,
   LOCAL_TOOL_CREATE_TAG,
@@ -942,6 +943,7 @@ async function tryClaim(
           .map((answer) => answer.requestId)
           .filter((requestId) => decided.has(requestId))
       : [];
+    const infoHasComputer = infoPlan?.kind === 'runner' && infoPlan.hasComputer;
     return {
       step: {
         id: cand.stepRow.id,
@@ -986,11 +988,13 @@ async function tryClaim(
         description: infoCard
           ? [
               agentRow.description,
-              infoCardBrief(
-                cand.stepRow.buildId,
-                infoRepoOffered(deps, cand.todoRow),
-                infoPlan?.relayOnly === true,
-              ),
+              infoHasComputer
+                ? infoCardBrief(
+                    cand.stepRow.buildId,
+                    infoRepoOffered(deps, cand.todoRow),
+                    infoPlan.relayOnly,
+                  )
+                : infoCardHostBrief(infoRepoOffered(deps, cand.todoRow)),
             ]
               .filter((part): part is string => part !== null && part !== '')
               .join('\n\n')
@@ -1011,10 +1015,10 @@ async function tryClaim(
         tools: [...agentRow.tools],
       },
       remoteTools: infoCard
-        ? infoCardRemoteTools(cand.stepRow.kind)
+        ? infoCardRemoteTools(cand.stepRow.kind, infoHasComputer)
         : workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
       ...(infoPlan?.relayOnly === true ? { remoteToolsOnly: true as const } : {}),
-      localTools: infoCard ? [] : claimLocalTools(agentRow.tools),
+      localTools: infoCard && infoHasComputer ? [] : claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }

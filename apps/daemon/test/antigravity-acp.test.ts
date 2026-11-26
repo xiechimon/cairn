@@ -839,4 +839,61 @@ describe('antigravity ACP runtime and credentials', () => {
     expect(summary.promptText).toContain((createTodoDef as RemoteToolDef).description);
     expect(summary.promptText).toContain('Inspect machines and create a todo.');
   });
+
+  test('relay-only writes toolPermission strict into isolated antigravity settings and normal mode clears it', async () => {
+    const dir = tempDir('ag-tool-perm-');
+    const isolatedHome = tempDir('ag-isolated-home-');
+    const settingsDir = join(isolatedHome, '.gemini', 'antigravity-acp');
+    const settingsPath = join(settingsDir, 'settings.json');
+    mkdirSync(settingsDir, { recursive: true });
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({ auth: { type: 'oauth-personal' }, gcp: { project: 'demo-proj' } }),
+    );
+
+    const agent = writeModeMock(dir, 'agy-perm', {
+      currentModeId: 'default',
+      availableModes: [
+        { id: 'default', name: 'Default' },
+        { id: 'auto', name: 'Auto' },
+      ],
+    });
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+    });
+
+    const lockedSession = await backend.createSession({
+      cwd: dir,
+      env: { HOME: isolatedHome },
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-carbon',
+      prompt: 'hi',
+      remoteToolsOnly: true,
+      lockedDown: true,
+    });
+    await collect(lockedSession.events);
+
+    expect(JSON.parse(readFileSync(settingsPath, 'utf8'))).toEqual({
+      auth: { type: 'oauth-personal' },
+      gcp: { project: 'demo-proj' },
+      toolPermission: 'strict',
+    });
+
+    const normalSession = await backend.createSession({
+      cwd: dir,
+      env: { HOME: isolatedHome },
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-carbon',
+      prompt: 'hi',
+    });
+    await collect(normalSession.events);
+
+    expect(JSON.parse(readFileSync(settingsPath, 'utf8'))).toEqual({
+      auth: { type: 'oauth-personal' },
+      gcp: { project: 'demo-proj' },
+    });
+  });
 });
