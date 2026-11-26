@@ -117,6 +117,7 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
       credential.refreshToken ?? credential.token ?? input.antigravityToken ?? 'default';
     const profile = acquireDeterministicCredentialProfile(input.agentConfig.cairnHome, profileKey);
     try {
+      unlinkedAgentHome(profile.home);
       writeAntigravityOAuthCredential(profile.home, credential, input.agentConfig.cairnHome);
       Object.assign(env, profile.env, antigravityFileStorageEnv(profile.home));
       isolatedHome = profile.home;

@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -290,6 +291,25 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
       expect(readFileSync(join(host.home, '.profile'), 'utf8')).toBe('export MINE=1\n');
     },
   );
+
+  test('a shared subscription home swapped for a link mid-step is refused', async () => {
+    const host = fakeHost();
+    const token = join(host.home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
+    mkdirSync(dirname(token), { recursive: true });
+    writeFileSync(token, '{"mine":true}');
+    writeFileSync(join(host.home, '.profile'), 'export MINE=1\n');
+    writeFileSync(join(host.home, '.bash_profile'), 'export MINE=2\n');
+    const patch = { runtimeId: 'antigravity', antigravityToken: OAUTH };
+    await withStep(host, patch, async (env) => {
+      const isolated = env.HOME as string;
+      renameSync(isolated, `${isolated}-moved`);
+      symlinkSync(host.home, isolated);
+      await expect(withStep(host, patch, () => {})).rejects.toThrow(/is a link/);
+    });
+    expect(readFileSync(token, 'utf8')).toBe('{"mine":true}');
+    expect(readFileSync(join(host.home, '.profile'), 'utf8')).toBe('export MINE=1\n');
+    expect(readFileSync(join(host.home, '.bash_profile'), 'utf8')).toBe('export MINE=2\n');
+  });
 
   test.runIf(process.env.CI === 'true')('CI has fish, so the fish login path is covered', () => {
     expect(LOGIN_SHELLS.some((shell) => shell.endsWith('/fish'))).toBe(true);
