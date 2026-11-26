@@ -1,15 +1,7 @@
-#!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
 
-import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
-
-export const QUEUE_REF = process.env.PROMOTE_QUEUE_REF ?? 'refs/heads/queue/main';
 export const REQUIRED_CHECKS = ['check', 'pack-smoke', 'e2e-gate'];
-const POLL_SECONDS = 30;
-const WAIT_SECONDS = Number(process.env.PROMOTE_WAIT_SECONDS ?? 40 * 60);
-const RERUN_WAIT_SECONDS = Number(process.env.PROMOTE_RERUN_WAIT_SECONDS ?? 25 * 60);
-const FAILED_JOB_CONCLUSIONS = ['failure', 'timed_out'];
-
+export const RELEASE_MARKER = 'queue/main release:';
 const OWNER_TRAILER = /^(Amp-Thread-ID|Lane):[ \t]*(.+?)[ \t]*$/gim;
 
 export function ownerOf(message) {
@@ -22,82 +14,6 @@ export function ownerOf(message) {
   return { key: `lane:${last[2]}`, label: `lane ${last[2]}` };
 }
 
-export function planDrop(chain) {
-  if (chain.length === 0) return { dropped: [], keepTip: null };
-  const owner = chain.at(-1).owner?.key ?? null;
-  let boundary = chain.length;
-  while (boundary > 0 && (chain[boundary - 1].owner?.key ?? null) === owner) boundary -= 1;
-  return {
-    dropped: chain.slice(boundary),
-    keepTip: boundary > 0 ? chain[boundary - 1].sha : null,
-  };
-}
-
-const isCandidateBranch = (branch) =>
-  typeof branch === 'string' && (branch.startsWith('queue/') || branch.startsWith('preflight/'));
-
-export function evaluate({
-  queueHead,
-  ciRuns,
-  checkRuns,
-  mainTip,
-  candidateContainsMain,
-  jobs = [],
-}) {
-  if (!queueHead) return { action: 'idle', reason: 'queue/main does not exist' };
-  if (!candidateContainsMain) {
-    return {
-      action: 'drop',
-      reason: 'stale',
-      sha: queueHead,
-      dropReason: 'it does not contain main, which moved past it',
-    };
-  }
-  const matchingRuns = ciRuns.filter(
-    (r) => r.name === 'ci' && r.head_sha === queueHead && isCandidateBranch(r.head_branch),
-  );
-  const run =
-    matchingRuns.find((r) => r.status === 'completed' && r.conclusion === 'success') ??
-    matchingRuns[0];
-  if (run?.status !== 'completed')
-    return { action: 'wait', reason: run ? `run ${run.status}` : 'no ci run yet' };
-  if (run.conclusion !== 'success') {
-    const failedJobs = jobs
-      .filter((job) => FAILED_JOB_CONCLUSIONS.includes(job.conclusion))
-      .map((job) => job.name);
-    const realFailure = failedJobs.length > 0;
-    const again = (run.run_attempt ?? 1) > 1;
-    const what = realFailure ? `ci failure in ${failedJobs.join(', ')}` : `ci ${run.conclusion}`;
-    return {
-      action: again ? 'drop' : 'retry',
-      reason: what,
-      sha: queueHead,
-      runId: run.id,
-      runUrl: run.html_url,
-      rerun: realFailure ? 'rerun-failed-jobs' : 'rerun',
-      dropReason: realFailure
-        ? `ci failed again after one rerun of the failed jobs (${failedJobs.join(', ')})`
-        : `ci ended ${run.conclusion} again after one rerun`,
-    };
-  }
-  const byName = new Map(
-    checkRuns
-      .toSorted(
-        (a, b) =>
-          (Date.parse(a.completed_at ?? a.started_at) || 0) -
-            (Date.parse(b.completed_at ?? b.started_at) || 0) || (a.id ?? 0) - (b.id ?? 0),
-      )
-      .map((c) => [c.name, c.conclusion]),
-  );
-  const missing = REQUIRED_CHECKS.filter(
-    (name) => !['success', 'skipped'].includes(byName.get(name) ?? ''),
-  );
-  if (missing.length > 0)
-    return { action: 'wait', reason: `checks pending: ${missing.join(', ')}` };
-  void mainTip;
-  return { action: 'promote', sha: queueHead };
-}
-
 const gh = (args, options = {}) =>
   JSON.parse(
     execFileSync('gh', ['api', ...args], {
@@ -106,10 +22,6 @@ const gh = (args, options = {}) =>
       ...options,
     }),
   );
-
-export function ghPages(gh, path, key) {
-  return gh(['--paginate', '--slurp', path]).flatMap((page) => page?.[key] ?? []);
-}
 
 const CLOSING_KEYWORD = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)\b/gi;
 
@@ -165,119 +77,7 @@ export function closeLandedIssues({ commits, getIssue, postComment, closeIssue, 
   return closed;
 }
 
-export function evaluateHead(repo) {
-  let queueHead;
-  try {
-    queueHead = gh([`repos/${repo}/git/ref/heads/queue%2Fmain`], { stdio: 'pipe' }).object.sha;
-  } catch (error) {
-    if (!/HTTP 404/.test(String(error.stderr ?? error.message))) throw error;
-    return evaluate({ queueHead: null, ciRuns: [], checkRuns: [] });
-  }
-  const { workflow_runs: ciRuns } = gh([
-    `repos/${repo}/actions/runs?head_sha=${queueHead}&event=push&per_page=30`,
-  ]);
-  const checkRuns = ghPages(
-    gh,
-    `repos/${repo}/commits/${queueHead}/check-runs?per_page=100`,
-    'check_runs',
-  );
-  const mainTip = gh([`repos/${repo}/git/ref/heads/main`]).object.sha;
-  spawnSync('git', ['fetch', '--quiet', 'origin', 'main', 'queue/main'], { stdio: 'inherit' });
-  const contains =
-    spawnSync('git', ['merge-base', '--is-ancestor', 'origin/main', queueHead]).status === 0;
-  const failed = ciRuns.find(
-    (r) =>
-      r.name === 'ci' &&
-      r.head_sha === queueHead &&
-      r.status === 'completed' &&
-      r.conclusion === 'failure',
-  );
-  const jobs = failed
-    ? ghPages(gh, `repos/${repo}/actions/runs/${failed.id}/jobs?filter=latest&per_page=100`, 'jobs')
-    : [];
-  return evaluate({
-    queueHead,
-    ciRuns,
-    checkRuns,
-    mainTip,
-    candidateContainsMain: contains,
-    jobs,
-  });
-}
-
 const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
-
-export function queueCandidates(head) {
-  return git(['log', '--reverse', '--format=%H%x1f%s%x1f%B%x1e', `origin/main..${head}`])
-    .split('\x1e')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const [sha, subject, body] = entry.split('\x1f');
-      return { sha, subject, owner: ownerOf(body) };
-    });
-}
-
-export function dropNotice({ verdict, dropped, keepTip }) {
-  const lines = dropped.map(
-    (c) => `- ${c.sha.slice(0, 9)} ${c.subject} (${c.owner?.label ?? 'no owner trailer'})`,
-  );
-  const owners = [...new Set(dropped.map((c) => c.owner?.label).filter(Boolean))];
-  return [
-    `queue/main candidate dropped: ${verdict.dropReason}.`,
-    '',
-    verdict.runUrl ? `Run: ${verdict.runUrl}` : null,
-    'Dropped commits:',
-    ...lines,
-    keepTip
-      ? `Commits below them stay queued; queue/main now points at ${keepTip.slice(0, 9)}.`
-      : 'queue/main was deleted.',
-    '',
-    owners.length > 0
-      ? `Owner${owners.length > 1 ? 's' : ''}: ${owners.join(', ')}. Fix the cause, then push again with node scripts/ops/push-queue.mjs.`
-      : 'No Amp-Thread-ID or Lane trailer on the dropped commits; whoever pushed them should fix and push again with node scripts/ops/push-queue.mjs.',
-    'This workflow cannot message Amp threads, Claude Code sessions or Cairn tasks (no credential in Actions), so the owner has to read this note.',
-  ]
-    .filter((line) => line !== null)
-    .join('\n');
-}
-
-export function dropCandidate(repo, verdict) {
-  const dropped = planDrop(queueCandidates(verdict.sha));
-  if (dropped.dropped.length === 0) {
-    console.log('[promote-queue] nothing to drop: queue head is already on main');
-    return;
-  }
-  const target = dropped.keepTip ? `${dropped.keepTip}:${QUEUE_REF}` : `:${QUEUE_REF}`;
-  const push = spawnSync(
-    'git',
-    ['push', `--force-with-lease=${QUEUE_REF}:${verdict.sha}`, 'origin', target],
-    { stdio: 'inherit' },
-  );
-  if (push.status !== 0) {
-    console.log('[promote-queue] queue/main moved while dropping; left it alone');
-    return;
-  }
-  const notice = dropNotice({ verdict, ...dropped });
-  console.log(`::error title=queue/main candidate dropped::${notice.split('\n')[0]}`);
-  console.log(notice);
-  console.log(`[promote-queue] dropped ${dropped.dropped.length} commit(s) from queue/main`);
-  if (process.env.GITHUB_STEP_SUMMARY)
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${notice}\n`);
-  try {
-    gh(
-      ['--method', 'POST', `repos/${repo}/commits/${verdict.sha}/comments`, '-f', `body=${notice}`],
-      {
-        env: { ...process.env, GH_TOKEN: process.env.QUEUE_WRITE_TOKEN ?? process.env.GH_TOKEN },
-      },
-    );
-  } catch (error) {
-    console.log(`::warning::could not comment on ${verdict.sha}: ${error.message.split('\n')[0]}`);
-  }
-}
-
-const sleep = (seconds) =>
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
 
 const CHECK_LAG_REFUSAL = /GH013: Repository rule violations[\s\S]*required status check/i;
 const LAND_PUSH_ATTEMPTS = 8;
@@ -291,7 +91,6 @@ export function isCheckLagRefusal(output) {
 export function pushToMain({
   sha,
   mainTip,
-  expectedQueueHead = sha,
   push,
   recheck,
   sleep,
@@ -324,29 +123,12 @@ export function pushToMain({
       log('[promote-queue] main already contains the candidate; landed while backing off');
       return;
     }
-    if (state.queueHead !== expectedQueueHead || state.mainTip !== mainTip) {
-      const error = new Error(
-        `queue head ${state.queueHead ?? 'deleted'} or main moved during the GH013 backoff; not retrying`,
-      );
+    if (state.mainTip !== mainTip) {
+      const error = new Error('main moved during the GH013 backoff; not retrying');
       error.status = 1;
       throw error;
     }
   }
-}
-
-export function landingState(repo, sha) {
-  spawnSync('git', ['fetch', '--quiet', 'origin', 'main', 'queue/main'], { stdio: 'inherit' });
-  let queueHead = null;
-  try {
-    queueHead = gh([`repos/${repo}/git/ref/heads/queue%2Fmain`], { stdio: 'pipe' }).object.sha;
-  } catch (error) {
-    if (!/HTTP 404/.test(String(error.stderr ?? error.message))) throw error;
-  }
-  return {
-    queueHead,
-    mainTip: git(['rev-parse', 'origin/main']),
-    landed: spawnSync('git', ['merge-base', '--is-ancestor', sha, 'origin/main']).status === 0,
-  };
 }
 
 export function closeIssuesAfterLanding({ repo, before, after, logPrefix = '[promote-queue]' }) {
@@ -378,67 +160,5 @@ export function closeIssuesAfterLanding({ repo, before, after, logPrefix = '[pro
     console.log(
       `::warning::issue closing after landing failed: ${String(error.message ?? error).split('\n')[0]}`,
     );
-  }
-}
-
-if (process.argv[1] && import.meta.filename === process.argv[1]) {
-  const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
-  const wait = process.argv.includes('--wait');
-  const enforce = process.argv.includes('--enforce');
-  let deadline = Date.now() + WAIT_SECONDS * 1000;
-  const retried = new Set();
-  for (;;) {
-    const verdict = evaluateHead(repo);
-    console.log(`[promote-queue] ${verdict.action}: ${verdict.reason ?? verdict.sha}`);
-    if (verdict.action === 'idle') process.exit(0);
-    if (verdict.action === 'promote') {
-      let before = 'origin/main';
-      try {
-        before = git(['rev-parse', 'origin/main']);
-      } catch {
-        console.log('::warning::could not resolve origin/main; issue closing range may be empty');
-      }
-      try {
-        pushToMain({
-          sha: verdict.sha,
-          mainTip: before,
-          push: () => {
-            const result = spawnSync('git', ['push', 'origin', `${verdict.sha}:refs/heads/main`], {
-              encoding: 'utf8',
-            });
-            process.stdout.write(result.stdout ?? '');
-            process.stderr.write(result.stderr ?? '');
-            return result;
-          },
-          recheck: () => landingState(repo, verdict.sha),
-          sleep,
-        });
-      } catch (error) {
-        console.error(`[promote-queue] ${error.message}`);
-        process.exit(error.status ?? 1);
-      }
-      console.log(`[promote-queue] promoted ${verdict.sha} to main`);
-      closeIssuesAfterLanding({ repo, before, after: verdict.sha });
-      process.exit(0);
-    }
-    if (enforce && verdict.action === 'drop') {
-      dropCandidate(repo, verdict);
-      process.exit(0);
-    }
-    if (enforce && verdict.action === 'retry' && !retried.has(verdict.runId)) {
-      retried.add(verdict.runId);
-      execFileSync(
-        'gh',
-        ['api', '--method', 'POST', `repos/${repo}/actions/runs/${verdict.runId}/${verdict.rerun}`],
-        { stdio: 'inherit' },
-      );
-      console.log(`[promote-queue] ${verdict.rerun} ${verdict.runUrl} once`);
-      deadline = Math.max(deadline, Date.now() + RERUN_WAIT_SECONDS * 1000);
-    }
-    const pending = verdict.action === 'wait' || verdict.action === 'retry';
-    if (!pending || !wait || Date.now() > deadline) {
-      process.exit(pending ? 2 : 1);
-    }
-    sleep(POLL_SECONDS);
   }
 }

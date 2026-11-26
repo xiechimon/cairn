@@ -524,7 +524,7 @@ test('CI ops-selftests paths run the same self-tests locally, once', () => {
   const commands = (paths) => prepushPlan(paths).map((args) => args.join(' '));
   const vpSelftest = 'node .claude/skills/verify-cairn/scripts/vp-selftest.mjs';
   for (const path of [
-    'scripts/ops/rebuild-queue.mjs',
+    'scripts/ops/push-queue.mjs',
     'ops/langfuse/compose.yml',
     'packages/shared/src/vocabulary.ts',
     'pnpm-lock.yaml',

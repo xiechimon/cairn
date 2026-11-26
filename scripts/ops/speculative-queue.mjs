@@ -4,8 +4,13 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { RELEASE_MARKER } from './guard-queue.mjs';
-import { closeIssuesAfterLanding, ownerOf, pushToMain, REQUIRED_CHECKS } from './promote-queue.mjs';
+import {
+  closeIssuesAfterLanding,
+  ownerOf,
+  pushToMain,
+  RELEASE_MARKER,
+  REQUIRED_CHECKS,
+} from './promote-queue.mjs';
 
 export const ENQUEUE_PREFIX = 'refs/heads/enqueue/';
 export const TRY_PREFIX = 'refs/heads/queue/try/';
@@ -588,7 +593,6 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
           pushToMain({
             sha: targetSha,
             mainTip,
-            expectedQueueHead: null,
             push: () =>
               spawnSync('git', ['push', 'origin', `${targetSha}:refs/heads/main`], {
                 cwd,
@@ -597,7 +601,6 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
             recheck: () => {
               const latest = listRemoteQueueRefs(cwd);
               return {
-                queueHead: null,
                 mainTip: latest.mainTip,
                 landed: isAncestor(cwd, targetSha, latest.mainTip),
               };

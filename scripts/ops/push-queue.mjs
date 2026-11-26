@@ -3,8 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename, join } from 'node:path';
-import { RELEASE_MARKER } from './guard-queue.mjs';
-import { ownerOf } from './promote-queue.mjs';
+import { ownerOf, RELEASE_MARKER } from './promote-queue.mjs';
 import { ENQUEUE_PREFIX, makeEnqueueId, sortEnqueueEntries } from './speculative-queue.mjs';
 
 export const DEFAULT_POLL_SECONDS = 15;

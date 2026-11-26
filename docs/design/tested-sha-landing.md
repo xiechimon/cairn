@@ -103,15 +103,6 @@ close only warns.
 `main` may use: a `GITHUB_TOKEN` push cannot carry workflow-file changes and
 would not wake `desktop-release`.
 
-## The former single-candidate ref
-
-No lane pushes to `refs/heads/queue/main`. `queue-guard.yml` and
-`guard-queue.mjs` still react to pushes and deletions of it, and
-`promote-queue.mjs` and `rebuild-queue.mjs` still have command-line entry points
-for it that no workflow runs. The live queue imports the push, owner and
-issue-closing helpers from `promote-queue.mjs` and the release marker from
-`guard-queue.mjs`.
-
 ## Desktop release
 
 `desktop-release` is
@@ -228,8 +219,9 @@ original revision, so such a rerun publishes without the current gate.
   stamping, waiting, and the invariants a scheduling change must keep.
 - `workflow-concurrency.test.mjs`: queue, `main` and other refs use per-SHA
   groups that never cancel.
-- `promote-queue.test.mjs`, `guard-queue.test.mjs`, `rebuild-queue.test.mjs`:
-  the shared helpers and the former single-candidate ref.
+- `promote-queue.test.mjs`: the helpers the live queue imports from
+  `promote-queue.mjs`: owner trailer, issue closing, and the push to `main` with
+  its retry on ruleset check lag.
 - `release-gate.test.mjs`: the release gate waits on a missing or running
   `ci` run, re-reads the run around the pinned jobs so a superseded attempt
   cannot publish, blocks a red or cancelled latest attempt, and releases
