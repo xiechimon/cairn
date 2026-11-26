@@ -63,7 +63,7 @@ function boxesOverlap(
 test.describe('desktop shell', () => {
   test.use({ userAgent: `Mozilla/5.0 ${DESKTOP_SHELL_USER_AGENT}` });
 
-  test('the footer shows the brand at the left and the update button before usage and settings', async ({
+  test('the footer shows the brand at the left and hides desktop-update for routine states, showing it on error/installing/restarting before usage and settings', async ({
     page,
   }) => {
     await fakeBridge(page);
@@ -73,7 +73,38 @@ test.describe('desktop shell', () => {
     await expect(brand).toBeVisible();
     await expect(brand).toHaveText('Cairn');
     const update = footer.getByTestId('desktop-update');
-    await expect(update).toHaveAccessibleName('更新到 0.43.0');
+    await expect(update).toHaveCount(0);
+
+    for (const routine of [
+      { status: 'idle' },
+      { status: 'checking' },
+      { status: 'current', version: '0.43.0' },
+      { status: 'available', version: '0.43.0' },
+      { status: 'downloading', version: '0.43.0', percent: 62.4 },
+      { status: 'ready', version: '0.43.0' },
+      { status: 'offline' },
+    ]) {
+      await emit(page, routine);
+      await expect(update).toHaveCount(0);
+    }
+
+    await emit(page, { status: 'installing', version: '0.43.0' });
+    await expect(update).toHaveCount(1);
+    await expect(update.locator('svg')).toHaveAttribute('data-level', '100');
+    await expect(update).toHaveAttribute('aria-disabled', 'true');
+    await expect(update).toHaveAccessibleName('正在安装…');
+
+    await emit(page, { status: 'restarting', version: '0.43.0' });
+    await expect(update).toHaveCount(1);
+    await expect(update.locator('svg')).toHaveAttribute('data-level', '100');
+    await expect(update).toHaveAccessibleName('正在重启…');
+
+    await emit(page, { status: 'error', message: '下载中断' });
+    await expect(update).toHaveCount(1);
+    await expect(update).toHaveAccessibleName('更新失败，点击重试');
+    await expect(update.locator('[data-slot="update-mark"]')).toHaveAttribute('data-mark', 'failed');
+    await update.hover();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('更新失败，点击重试');
     const x = async (id: string) => (await footer.getByTestId(id).boundingBox())?.x ?? -1;
     const brandX = (await brand.boundingBox())?.x ?? -1;
     expect(brandX).toBeLessThan(await x('desktop-update'));
@@ -81,53 +112,70 @@ test.describe('desktop shell', () => {
     expect(await x('sidebar-usage')).toBeLessThan(await x('sidebar-settings'));
   });
 
-  test('the icon fills with the download and a click installs only when an update is available', async ({
+  test('Settings Account About surfaces desktop update status and actions for every state', async ({
     page,
   }) => {
     await fakeBridge(page);
     await page.goto('/app?scenario=providers-fleet');
-    const update = page.getByTestId('desktop-update');
-    const glyph = update.locator('svg');
-    const mark = update.locator('[data-slot="update-mark"]');
+    await page.getByTestId('sidebar-settings').click();
 
-    await expect(glyph).toHaveAttribute('data-level', '0');
-    await expect(mark).toHaveAttribute('data-mark', 'waiting');
-    await update.click();
+    const about = page.getByTestId('account-about');
+    const row = about.getByTestId('account-desktop-update-row');
+    const status = about.getByTestId('account-desktop-update-status');
+    const action = about.getByTestId('account-desktop-update-action');
+    const sidebarUpdate = page.getByTestId('sidebar-footer').getByTestId('desktop-update');
+
+    await expect(row).toHaveAttribute('data-status', 'available');
+    await expect(status).toHaveText('更新到 0.43.0');
+    await expect(action).toHaveText('立即更新');
+    await expect(action).toBeEnabled();
+    await expect(sidebarUpdate).toHaveCount(0);
+    await action.click();
     expect(await calls(page)).toEqual({ install: 1, check: 0, remoteRetry: 0 });
 
     await emit(page, { status: 'downloading', version: '0.43.0', percent: 62.4 });
-    await expect(glyph).toHaveAttribute('data-level', '62');
-    await expect(update).toHaveAccessibleName('正在更新 62%');
-    await expect(update).toHaveAttribute('aria-disabled', 'true');
-    await expect(mark).toHaveCount(0);
-    await page.mouse.move(0, 0);
-    await update.hover();
-    await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('正在更新 62%');
-    await update.click({ force: true });
-    expect(await calls(page)).toEqual({ install: 1, check: 0, remoteRetry: 0 });
+    await expect(status).toHaveText('正在更新 62%');
+    await expect(action).toBeDisabled();
+    await expect(sidebarUpdate).toHaveCount(0);
 
     await emit(page, { status: 'ready', version: '0.43.0' });
-    await expect(glyph).toHaveAttribute('data-level', '100');
-    await expect(mark).toHaveCount(0);
-    await expect(update).toHaveAccessibleName('离开时自动更新到 0.43.0');
-    await update.click();
+    await expect(status).toHaveText('离开时自动更新到 0.43.0');
+    await expect(action).toHaveText('立即更新');
+    await expect(action).toBeEnabled();
+    await expect(sidebarUpdate).toHaveCount(0);
+    await action.click();
     expect(await calls(page)).toEqual({ install: 2, check: 0, remoteRetry: 0 });
 
     await emit(page, { status: 'installing', version: '0.43.0' });
-    await expect(glyph).toHaveAttribute('data-level', '100');
+    await expect(status).toHaveText('正在安装…');
+    await expect(action).toBeDisabled();
+    await expect(sidebarUpdate).toHaveCount(1);
 
-    await emit(page, { status: 'offline' });
-    await expect(glyph).toHaveAttribute('data-level', '0');
-    await expect(mark).toHaveCount(0);
-    await expect(update).toHaveAccessibleName('无法连接网络，未能检查更新');
-    await update.click();
+    await emit(page, { status: 'current', version: '0.43.0' });
+    await expect(status).toHaveText('已是最新版本 0.43.0');
+    await expect(action).toHaveText('检查更新');
+    await expect(action).toBeEnabled();
+    await expect(sidebarUpdate).toHaveCount(0);
+    await action.click();
     expect(await calls(page)).toEqual({ install: 2, check: 1, remoteRetry: 0 });
 
-    await emit(page, { status: 'error', message: '下载中断' });
-    await expect(glyph).toHaveAttribute('data-level', '0');
-    await expect(mark).toHaveAttribute('data-mark', 'failed');
-    await update.click();
+    await emit(page, { status: 'offline' });
+    await expect(status).toHaveText('无法连接网络，未能检查更新');
+    await expect(action).toHaveText('重试');
+    await expect(sidebarUpdate).toHaveCount(0);
+    await action.click();
     expect(await calls(page)).toEqual({ install: 2, check: 2, remoteRetry: 0 });
+
+    await emit(page, { status: 'error', message: '下载中断' });
+    await expect(status).toHaveText('更新失败，点击重试');
+    await expect(action).toHaveText('重试');
+    await expect(sidebarUpdate).toHaveCount(1);
+    await expect(sidebarUpdate.locator('[data-slot="update-mark"]')).toHaveAttribute(
+      'data-mark',
+      'failed',
+    );
+    await action.click();
+    expect(await calls(page)).toEqual({ install: 2, check: 3, remoteRetry: 0 });
   });
 
   test('an install refusal answers immediately with error state and reason', async ({ page }) => {
@@ -150,18 +198,28 @@ test.describe('desktop shell', () => {
       };
     });
     await page.goto('/app?scenario=providers-fleet');
-    const update = page.getByTestId('desktop-update');
-    await expect(update).toHaveAttribute('data-status', 'ready');
-    await update.click();
-    await expect(update).toHaveAttribute('data-status', 'error');
-    await expect(update).toHaveAttribute(
+    const sidebarUpdate = page.getByTestId('sidebar-footer').getByTestId('desktop-update');
+    await expect(sidebarUpdate).toHaveCount(0);
+
+    await page.getByTestId('sidebar-settings').click();
+    const row = page.getByTestId('account-desktop-update-row');
+    const action = page.getByTestId('account-desktop-update-action');
+    await expect(row).toHaveAttribute('data-status', 'ready');
+    await action.click();
+    await expect(row).toHaveAttribute('data-status', 'error');
+    await expect(action).toHaveAttribute(
+      'title',
+      'the staged update is not signed by the Cairn certificate',
+    );
+    await expect(sidebarUpdate).toHaveAttribute('data-status', 'error');
+    await expect(sidebarUpdate).toHaveAttribute(
       'title',
       'the staged update is not signed by the Cairn certificate',
     );
     await expect(page.getByText('更新包签名验证未通过，无法安装')).toBeVisible();
   });
 
-  test('an unsupported desktop update still answers with the blocker hint on click', async ({
+  test('an unsupported desktop update still answers with the blocker hint and renders no dead button in Settings', async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -188,6 +246,14 @@ test.describe('desktop shell', () => {
     await update.click({ force: true });
     await expect(page.getByText('把 Cairn 移到「应用程序」后才能自动更新')).toBeVisible();
     expect(await calls(page)).toEqual({ install: 0, check: 0 });
+
+    await page.getByTestId('sidebar-settings').click();
+    const row = page.getByTestId('account-desktop-update-row');
+    await expect(row).toHaveAttribute('data-status', 'unsupported');
+    await expect(page.getByTestId('account-desktop-update-status')).toHaveText(
+      '把 Cairn 移到「应用程序」后才能自动更新',
+    );
+    await expect(page.getByTestId('account-desktop-update-action')).toHaveCount(0);
   });
 
   for (const theme of ['light', 'dark'] as const) {
@@ -214,6 +280,7 @@ test.describe('desktop shell', () => {
       const composer = page.locator('[data-testid="home-c"] .chief-composer');
 
       await expect(bar).toBeVisible();
+      await emit(page, { status: 'error', message: '下载中断' });
       await expect(update).toBeVisible();
       await expect(composer).toBeVisible();
 
@@ -255,7 +322,7 @@ test.describe('desktop shell', () => {
         reason: 'no-updater',
       });
       await update.click();
-      expect((await calls(page)).install).toBe(1);
+      expect((await calls(page)).check).toBe(1);
 
       const shot = testInfo.outputPath(`remote-update-bar-1440-${theme}.png`);
       await page.screenshot({ path: shot });
@@ -292,6 +359,7 @@ test.describe('desktop shell', () => {
 
     const bar = page.getByTestId('remote-update-bar');
     await expect(bar).toBeVisible();
+    await emit(page, { status: 'error', message: '下载中断' });
     await page.getByTestId('sidebar-reopen').hover();
     const peek = page.getByTestId('sidebar-peek');
     await expect(peek).toHaveAttribute('data-open', '');
@@ -305,7 +373,7 @@ test.describe('desktop shell', () => {
       contentType: 'image/png',
     });
     await update.click();
-    expect((await calls(page)).install).toBe(1);
+    expect((await calls(page)).check).toBe(1);
   });
 
   test('remote update bar does not overlap phone tabs or overflow on 390px narrow viewports', async ({

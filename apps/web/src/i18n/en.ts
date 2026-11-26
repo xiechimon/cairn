@@ -7,8 +7,6 @@ export const EN: Record<string, string> = {
   '去{channel}': 'Open {channel}',
   进度: 'Progress',
   改代码: 'Code',
-  有新版本: 'A new version is available',
-  点此刷新: 'Refresh',
   订阅账户未能加载: 'Subscriptions could not be loaded',
   移除订阅: 'Remove subscription',
   '移除后，后续步骤不再使用这个订阅。':
@@ -2954,6 +2952,8 @@ export const EN: Record<string, string> = {
   生成链接: 'Create link',
   该服务商: 'the provider',
   更新: 'Update',
+  应用更新: 'App updates',
+  立即更新: 'Update now',
   '更新中…': 'Updating…',
   '有新版本 v{version} 可用': 'Version v{version} is available',
   '更新未能通过验证，仍在使用当前版本。':

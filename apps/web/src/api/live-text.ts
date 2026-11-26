@@ -8,6 +8,7 @@ export interface LiveTextStore {
   getVisible(conversationId: string, knownIds?: Set<string>): string;
   prune(conversationId: string, knownIds?: Set<string>): void;
   get(conversationId: string): string;
+  hasActive(): boolean;
   subscribe(listener: Listener): () => void;
 }
 
@@ -75,6 +76,9 @@ export function createLiveTextStore(): LiveTextStore {
     },
     get(conversationId: string): string {
       return buffers.get(conversationId) ?? '';
+    },
+    hasActive(): boolean {
+      return buffers.size > 0;
     },
     subscribe(listener: Listener): () => void {
       listeners.add(listener);

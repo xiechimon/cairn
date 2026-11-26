@@ -625,7 +625,7 @@ Reach:
 - Web routes: `/app/account`
 - Settings: `设置` (Settings) › `账号` (Account)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `account-about`, `account-appearance`, `server-version`
+- Test ids in its code: `account-about`, `account-appearance`, `account-desktop-update-action`, `account-desktop-update-row`, `account-desktop-update-status`, `server-version`
 - Verify recipes: [.claude/skills/verify-cairn/features/avatars.md](features/avatars.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)

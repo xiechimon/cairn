@@ -2088,10 +2088,14 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
 
     const remoteShot = baseShot.replace(/\.png$/, '-remote-update.png');
     try {
-      const updateButton = remoteWindow.getByTestId('desktop-update');
-      await updateButton.waitFor({ timeout: GATE_SETTLE_MS * 4 });
+      const settingsButton = remoteWindow.getByTestId('sidebar-settings');
+      await settingsButton.waitFor({ timeout: GATE_SETTLE_MS * 4 });
+      await settingsButton.click();
+      const updateRow = remoteWindow.getByTestId('account-desktop-update-row');
+      const updateAction = remoteWindow.getByTestId('account-desktop-update-action');
+      await updateAction.waitFor({ timeout: GATE_SETTLE_MS * 4 });
       await remoteWindow.evaluate(() => window.cairnDesktop.update.check());
-      await updateButton
+      await updateRow
         .locator('xpath=self::*[@data-status="available"]')
         .waitFor({ timeout: OPEN_TIMEOUT_MS * 3 });
       assert.ok(manifestHits >= 1, 'remote mode never checked the update feed');
@@ -2107,12 +2111,12 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
         });
       });
 
-      await updateButton.click();
+      await updateAction.click();
 
       const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
       let lastStatus = null;
       while (Date.now() < deadline) {
-        lastStatus = await updateButton.getAttribute('data-status');
+        lastStatus = await updateRow.getAttribute('data-status');
         if (zipHits >= 1 && lastStatus === 'error') {
           break;
         }
@@ -2138,11 +2142,14 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
         'error',
         `expected refused install to settle in error (status=${lastStatus} states=${JSON.stringify(observedStates)})`,
       );
-      const refusalTitle = await updateButton.getAttribute('title');
+      const refusalTitle = await updateAction.getAttribute('title');
       assert.ok(
         refusalTitle !== null && refusalTitle.trim() !== '',
-        'update button did not answer with a reason when install was refused',
+        'update action did not answer with a reason when install was refused',
       );
+      const sidebarUpdateButton = remoteWindow.getByTestId('desktop-update');
+      await sidebarUpdateButton.waitFor({ timeout: OPEN_TIMEOUT_MS });
+      assert.equal(await sidebarUpdateButton.getAttribute('data-status'), 'error');
       console.log(
         `remote update smoke passed: origin=${remoteOrigin} states=${JSON.stringify(observedStates)} refusal=${refusalTitle}`,
       );

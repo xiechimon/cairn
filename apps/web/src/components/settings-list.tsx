@@ -137,6 +137,8 @@ interface SettingsRowProps {
   label: string;
   hint?: ReactNode;
   info?: string;
+  testId?: string;
+  dataStatus?: string;
   labelTestId?: string;
   icon?: ReactNode;
   className?: string;
@@ -162,6 +164,8 @@ export function SettingsRow({
   label,
   hint,
   info,
+  testId,
+  dataStatus,
   labelTestId,
   icon,
   className,
@@ -207,6 +211,8 @@ export function SettingsRow({
   return (
     <div
       ref={rowRef}
+      data-testid={testId}
+      data-status={dataStatus}
       data-settings-label={label}
       data-match={matched ? '' : undefined}
       className={cn(

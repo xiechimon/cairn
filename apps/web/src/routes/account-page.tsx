@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useServerVersion } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { useDesktopUpdateControl } from '../board/desktop-update.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
 import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
 import { formatServerVersion } from '../board/remote-update-bar.js';
@@ -75,6 +76,14 @@ export function AccountPage() {
   const notifyBlocked = !desktopShell && notifyPrefOn && notifyPermission === 'denied';
   const devicePushLive = live && teamId !== undefined && !desktopShell && pushDeviceSupported();
   const serverVersion = useServerVersion(live);
+  const desktopUpdate = useDesktopUpdateControl();
+  const showDesktopUpdate = desktopUpdate.bridge !== null;
+  const desktopActionLabel =
+    desktopUpdate.state.status === 'available' || desktopUpdate.state.status === 'ready'
+      ? t('立即更新')
+      : desktopUpdate.state.status === 'error' || desktopUpdate.state.status === 'offline'
+        ? t('重试')
+        : t('检查更新');
   const [theme, setTheme] = useState<ThemePreference>(() => readStoredTheme(safeLocalStorage()));
   const [deviceSubscribed, setDeviceSubscribed] = useState<boolean | null>(null);
   const deviceActual = useRef<boolean | null>(null);
@@ -229,21 +238,54 @@ export function AccountPage() {
             </SettingsRow>
           </SettingsCard>
         </SettingsSection>
-        {live && !serverVersion.isPending && (
+        {((live && !serverVersion.isPending) || showDesktopUpdate) && (
           <SettingsSection title={t('关于')} testId="account-about">
             <SettingsCard>
-              <SettingsRow label={t('当前版本')}>
-                <span
-                  className="text-ui text-content-secondary tabular-nums"
-                  data-testid="server-version"
+              {live && !serverVersion.isPending && (
+                <SettingsRow label={t('当前版本')}>
+                  <span
+                    className="text-ui text-content-secondary tabular-nums"
+                    data-testid="server-version"
+                  >
+                    {formatServerVersion(
+                      serverVersion.data?.version ?? null,
+                      serverVersion.data?.commit ?? null,
+                      t,
+                    )}
+                  </span>
+                </SettingsRow>
+              )}
+              {showDesktopUpdate && (
+                <SettingsRow
+                  label={t('应用更新')}
+                  testId="account-desktop-update-row"
+                  dataStatus={desktopUpdate.state.status}
                 >
-                  {formatServerVersion(
-                    serverVersion.data?.version ?? null,
-                    serverVersion.data?.commit ?? null,
-                    t,
+                  <span
+                    className="text-ui text-content-secondary tabular-nums"
+                    data-testid="account-desktop-update-status"
+                  >
+                    {desktopUpdate.view.label}
+                  </span>
+                  {desktopUpdate.state.status !== 'unsupported' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-none pointer-coarse:min-h-11"
+                      data-testid="account-desktop-update-action"
+                      disabled={desktopUpdate.view.busy}
+                      title={
+                        desktopUpdate.state.status === 'error'
+                          ? desktopUpdate.state.message
+                          : undefined
+                      }
+                      onClick={() => void desktopUpdate.triggerUpdate()}
+                    >
+                      {desktopActionLabel}
+                    </Button>
                   )}
-                </span>
-              </SettingsRow>
+                </SettingsRow>
+              )}
             </SettingsCard>
           </SettingsSection>
         )}

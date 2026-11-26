@@ -1,6 +1,6 @@
 import type { DesktopUpdateBlocker, DesktopUpdateState } from '@cairn/shared';
 import { cn } from 'cn';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -74,19 +74,106 @@ export function desktopUpdateSkewView(state: DesktopUpdateState, t: TFunc): Desk
   };
 }
 
+export function shouldShowSidebarDesktopUpdate(state: DesktopUpdateState): boolean {
+  return (
+    state.status === 'error' ||
+    state.status === 'unsupported' ||
+    state.status === 'installing' ||
+    state.status === 'restarting'
+  );
+}
+
+let sharedRefusal: string | null = null;
+const refusalListeners = new Set<() => void>();
+
+function setSharedRefusal(next: string | null): void {
+  if (sharedRefusal === next) return;
+  sharedRefusal = next;
+  for (const listener of refusalListeners) listener();
+}
+
+function subscribeRefusal(listener: () => void): () => void {
+  refusalListeners.add(listener);
+  return () => refusalListeners.delete(listener);
+}
+
 export function useDesktopUpdateState(): DesktopUpdateState {
   const [bridge] = useState(desktopUpdates);
   const [state, setState] = useState<DesktopUpdateState>({ status: 'idle' });
 
   useEffect(() => {
     if (bridge === null) return;
-    void bridge.state().then((initial) => {
-      if (initial !== null) setState(initial);
+    let active = true;
+    let fromEvent = false;
+    const unsubscribe = bridge.subscribe((next) => {
+      fromEvent = true;
+      setSharedRefusal(null);
+      setState(next);
     });
-    return bridge.subscribe(setState);
+    void bridge.state().then((initial) => {
+      if (active && !fromEvent && initial !== null) setState(initial);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [bridge]);
 
   return state;
+}
+
+export function useDesktopUpdateControl() {
+  const { t } = useI18n();
+  const [bridge] = useState(desktopUpdates);
+  const subscribedState = useDesktopUpdateState();
+  const refusal = useSyncExternalStore(subscribeRefusal, () => sharedRefusal);
+  const latestStatusRef = useRef(subscribedState.status);
+  latestStatusRef.current = subscribedState.status;
+
+  const state: DesktopUpdateState =
+    refusal !== null &&
+    subscribedState.status !== 'error' &&
+    subscribedState.status !== 'offline' &&
+    subscribedState.status !== 'unsupported'
+      ? { status: 'error', message: refusal }
+      : subscribedState;
+
+  const view = desktopUpdateView(state, t);
+
+  const showRefusal = (reason: string): void => {
+    const current = latestStatusRef.current;
+    if (current !== 'error' && current !== 'offline' && current !== 'unsupported') {
+      setSharedRefusal(reason);
+    }
+    toastError(updateInstallRefusalCopy(reason, t), null);
+  };
+
+  const triggerUpdate = async (): Promise<void> => {
+    if (bridge === null) return;
+    if (state.status === 'unsupported') {
+      toastError(view.label, null);
+      return;
+    }
+    if (view.busy) return;
+    if (state.status === 'available' || state.status === 'ready') {
+      try {
+        const result = await bridge.install();
+        if (result !== undefined && !result.ok) {
+          showRefusal(result.reason);
+        }
+      } catch (error) {
+        showRefusal(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
+    try {
+      await bridge.check();
+    } catch (error) {
+      showRefusal(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  return { bridge, state, view, triggerUpdate };
 }
 
 export function UpdateCairnButton({
@@ -312,60 +399,12 @@ export function DesktopUpdateButton({
   idleClassName: string;
 }) {
   const { t } = useI18n();
-  const [bridge] = useState(desktopUpdates);
-  const subscribedState = useDesktopUpdateState();
-  const [refusal, setRefusal] = useState<string | null>(null);
-  const latestStatusRef = useRef(subscribedState.status);
-  latestStatusRef.current = subscribedState.status;
+  const { bridge, state, view, triggerUpdate } = useDesktopUpdateControl();
 
-  useEffect(() => {
-    setRefusal(null);
-  }, [subscribedState]);
+  if (bridge === null || !shouldShowSidebarDesktopUpdate(state)) return null;
 
-  const state: DesktopUpdateState =
-    refusal !== null &&
-    subscribedState.status !== 'error' &&
-    subscribedState.status !== 'offline' &&
-    subscribedState.status !== 'unsupported'
-      ? { status: 'error', message: refusal }
-      : subscribedState;
-
-  if (bridge === null) return null;
-
-  const { label, busy, mark } = desktopUpdateView(state, t);
+  const { label, busy, mark } = view;
   const errorDetail = state.status === 'error' ? updateInstallRefusalCopy(state.message, t) : null;
-
-  const showRefusal = (reason: string): void => {
-    const current = latestStatusRef.current;
-    if (current !== 'error' && current !== 'offline' && current !== 'unsupported') {
-      setRefusal(reason);
-    }
-    toastError(updateInstallRefusalCopy(reason, t), null);
-  };
-
-  const handleClick = async (): Promise<void> => {
-    if (state.status === 'unsupported') {
-      toastError(label, null);
-      return;
-    }
-    if (busy) return;
-    if (state.status === 'available' || state.status === 'ready') {
-      try {
-        const result = await bridge.install();
-        if (result !== undefined && !result.ok) {
-          showRefusal(result.reason);
-        }
-      } catch (error) {
-        showRefusal(error instanceof Error ? error.message : String(error));
-      }
-      return;
-    }
-    try {
-      await bridge.check();
-    } catch (error) {
-      showRefusal(error instanceof Error ? error.message : String(error));
-    }
-  };
 
   return (
     <Tooltip>
@@ -380,7 +419,7 @@ export function DesktopUpdateButton({
             title={state.status === 'error' ? state.message : undefined}
             aria-disabled={busy || undefined}
             className={cn(idleClassName, busy && 'cursor-default')}
-            onClick={() => void handleClick()}
+            onClick={() => void triggerUpdate()}
           >
             <UpdateGlyph level={fillLevel(state)} mark={mark} className={iconClassName} />
           </Button>

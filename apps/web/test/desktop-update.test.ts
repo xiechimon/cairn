@@ -2,6 +2,7 @@ import { toast } from 'sonner';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   desktopUpdateView,
+  shouldShowSidebarDesktopUpdate,
   updateDesktopNow,
   updateInstallRefusalCopy,
 } from '../src/board/desktop-update.js';
@@ -86,5 +87,24 @@ describe('desktop update button presentation', () => {
     currentState = { status: 'offline' };
     await updateDesktopNow();
     expect(errorSpy).toHaveBeenCalledWith('无法连接网络，未能检查更新', undefined);
+  });
+
+  it('shouldShowSidebarDesktopUpdate hides routine states and surfaces attention/active states only', () => {
+    expect(shouldShowSidebarDesktopUpdate({ status: 'idle' })).toBe(false);
+    expect(shouldShowSidebarDesktopUpdate({ status: 'checking' })).toBe(false);
+    expect(shouldShowSidebarDesktopUpdate({ status: 'current', version: '0.43.0' })).toBe(false);
+    expect(shouldShowSidebarDesktopUpdate({ status: 'available', version: '0.43.0' })).toBe(false);
+    expect(
+      shouldShowSidebarDesktopUpdate({ status: 'downloading', version: '0.43.0', percent: 50 }),
+    ).toBe(false);
+    expect(shouldShowSidebarDesktopUpdate({ status: 'ready', version: '0.43.0' })).toBe(false);
+    expect(shouldShowSidebarDesktopUpdate({ status: 'offline' })).toBe(false);
+
+    expect(shouldShowSidebarDesktopUpdate({ status: 'error', message: '下载中断' })).toBe(true);
+    expect(
+      shouldShowSidebarDesktopUpdate({ status: 'unsupported', blocker: 'not-in-applications' }),
+    ).toBe(true);
+    expect(shouldShowSidebarDesktopUpdate({ status: 'installing', version: '0.43.0' })).toBe(true);
+    expect(shouldShowSidebarDesktopUpdate({ status: 'restarting', version: '0.43.0' })).toBe(true);
   });
 });

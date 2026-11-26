@@ -23,13 +23,23 @@ function preloadError(): Event {
   return new Event('vite:preloadError', { cancelable: true });
 }
 
-test('a chunk from an older build reloads the page once and swallows the error', () => {
+test('a chunk from an older build flushes drafts, reloads the page once, and swallows the error', () => {
   const target = new EventTarget();
-  const reload = vi.fn();
-  reloadOnStaleBuild({ target, storage: memoryStorage(), reload, now: () => 1_000_000 });
+  const order: string[] = [];
+  const reload = vi.fn(() => order.push('reload'));
+  const prepareReload = vi.fn(() => order.push('prepare'));
+  reloadOnStaleBuild({
+    target,
+    storage: memoryStorage(),
+    reload,
+    prepareReload,
+    now: () => 1_000_000,
+  });
   const event = preloadError();
   target.dispatchEvent(event);
   expect(reload).toHaveBeenCalledTimes(1);
+  expect(prepareReload).toHaveBeenCalledTimes(1);
+  expect(order).toEqual(['prepare', 'reload']);
   expect(event.defaultPrevented).toBe(true);
 });
 
