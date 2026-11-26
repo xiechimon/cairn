@@ -16,8 +16,13 @@ import {
   CLAIM_POLL_INTERVAL_MS,
   type ClaudeLogin,
   classifyClaudeCodeLogin,
+  ENROLL_BACKOFF_CAP_MS,
   ENV_VARS,
+  HOST_NAME_NEEDS_LOOPBACK_REFUSAL,
+  HOST_NAME_TAKEN_REFUSAL,
   isBackendRuntimeId,
+  LOCAL_HOST_PROOF_REFUSAL,
+  LOCAL_MACHINE_NEEDS_OWNER_REFUSAL,
   type ManagedUpdateRuntime,
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
@@ -232,6 +237,25 @@ function machineApiErrorCause(error: MachineApiError): string {
   return body === '' ? `HTTP ${error.status}` : body.slice(0, 200);
 }
 
+function enrollmentRefusalAdvice(status: number, cause: string): string {
+  if (cause === LOCAL_HOST_PROOF_REFUSAL) {
+    return "the server's local Runner record belongs to another computer; delete that offline Runner on the Runners page (执行机)";
+  }
+  if (cause === HOST_NAME_NEEDS_LOOPBACK_REFUSAL) {
+    return "on the server's computer point --server at its 127.0.0.1 address; on any other computer pick a different --name";
+  }
+  if (cause === HOST_NAME_TAKEN_REFUSAL) {
+    return 'delete that Runner on the Runners page (执行机) or pick a different --name';
+  }
+  if (cause === LOCAL_MACHINE_NEEDS_OWNER_REFUSAL) {
+    return "an API key cannot enroll the server's own computer: start without --api-key and approve it in the browser; a different computer that only shares its name needs another --name";
+  }
+  if (cause.includes('revoked machine')) {
+    return 'approve this computer again through browser enrollment';
+  }
+  return status === 401 ? 'check the API key or enroll again' : '';
+}
+
 function retryableEnrollmentFailure(
   error: unknown,
 ): { kind: string; cause: string; advice: string; signature: string } | null {
@@ -246,15 +270,7 @@ function retryableEnrollmentFailure(
   if (error instanceof MachineApiError) {
     if (![401, 403, 409, 429].includes(error.status) && error.status < 500) return null;
     const cause = machineApiErrorCause(error);
-    let advice = '';
-    if (cause.includes('does not prove it is the local host runner')) {
-      advice =
-        "the server's local Runner record belongs to another computer; delete that stale Runner on the Runners settings page";
-    } else if (cause.includes('revoked machine')) {
-      advice = 'approve this computer again through browser enrollment';
-    } else if (error.status === 401) {
-      advice = 'check the API key or enroll again';
-    }
+    const advice = enrollmentRefusalAdvice(error.status, cause);
     return {
       kind: `enrollment refused (${error.status})`,
       cause,
@@ -296,7 +312,7 @@ async function retryEnrollment<T>(
         lastSignature = failure.signature;
       }
       await ctx.sleep(backoff);
-      backoff = nextBackoffMs(backoff);
+      backoff = nextBackoffMs(backoff, ENROLL_BACKOFF_CAP_MS);
     }
   }
 }
@@ -1222,11 +1238,20 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           });
         } else {
           logger.recover(`step ${stepRecord.id} has no local journal — reporting failed`);
-          await client.done(stepRecord.id, {
-            status: 'failed',
-            errorMessage: 'daemon journal lost across restart',
-            generation: stepRecord.generation,
-          });
+          try {
+            await client.done(stepRecord.id, {
+              status: 'failed',
+              errorMessage: 'daemon journal lost across restart',
+              generation: stepRecord.generation,
+            });
+          } catch (error) {
+            if (!(error instanceof MachineApiError) || ![404, 409, 410].includes(error.status)) {
+              throw error;
+            }
+            logger.recover(
+              `step ${stepRecord.id}: server refused the lost-journal report (${error.status}): ${machineApiErrorCause(error)}`,
+            );
+          }
         }
       }
     }

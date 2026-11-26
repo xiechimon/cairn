@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, onTestFinished, test } from 'vitest';
+import { HOST_NAME_NEEDS_LOOPBACK_REFUSAL } from '@cairn/shared';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
@@ -152,6 +153,94 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     await handle.stop();
     await handle.done;
     expect(started.lines).toContain('Enrolled in team team-1 (machine m1)');
+  });
+
+  test('a lasting enrollment refusal stays inside the server start limit and keeps one log line', async () => {
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const api = new FakeMachineApi();
+    let sawFirstAttempt = () => {};
+    const firstAttempt = new Promise<void>((resolve) => {
+      sawFirstAttempt = resolve;
+    });
+    const admitted: number[] = [];
+    let throttled = 0;
+    let refused = true;
+    api.enrollStart = async () => {
+      if (!vi.isFakeTimers()) vi.useFakeTimers();
+      sawFirstAttempt();
+      const cutoff = Date.now() - 600_000;
+      if (admitted.filter((at) => at > cutoff).length >= 20) {
+        throttled += 1;
+        throw new MachineApiError(429, '{"error":"too many enrollment requests; wait and retry"}');
+      }
+      admitted.push(Date.now());
+      if (refused) {
+        throw new MachineApiError(
+          409,
+          '{"error":"this enrollment does not prove it is the local host runner"}',
+        );
+      }
+      return {
+        enrollId: 'e1',
+        url: 'http://server/app/machines/authorize?enroll=e1',
+        pollSecret: 'sec',
+      };
+    };
+    const started = startMachine({ api, browserEnrollment: true, claimBackoffBaseMs: 1_000 });
+    onTestFinished(() => {
+      releaseTestTempDir(started.home);
+    });
+    await firstAttempt;
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    expect(throttled).toBe(0);
+    expect(started.lines.filter((l) => l.includes('enrollment refused'))).toHaveLength(1);
+    const busiestWindow = Math.max(
+      ...admitted.map((at) => admitted.filter((t) => t >= at && t < at + 600_000).length),
+    );
+    expect(busiestWindow).toBeLessThanOrEqual(16);
+    refused = false;
+    await vi.advanceTimersByTimeAsync(61_000);
+    vi.useRealTimers();
+    const handle = await started.handlePromise;
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a loopback refusal never tells the user to delete a Runner', async () => {
+    const api = new FakeMachineApi();
+    const start = api.enrollStart.bind(api);
+    let refusals = 1;
+    api.enrollStart = async (body) => {
+      if (refusals > 0) {
+        refusals -= 1;
+        throw new MachineApiError(409, JSON.stringify({ error: HOST_NAME_NEEDS_LOOPBACK_REFUSAL }));
+      }
+      return start(body);
+    };
+    const { handle, lines } = await boot({ api, browserEnrollment: true });
+    const line = lines.find((l) => l.includes('enrollment refused')) ?? '';
+    expect(line).toContain('--name');
+    expect(line).not.toContain('delete');
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a refused lost-journal report at startup does not exit the runner', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [
+      { id: 'gone', buildId: 'b1', kind: 'build', machineId: 'm1', createdAt: 1 },
+    ];
+    api.done = async () => {
+      throw new MachineApiError(410, '{"error":"step gone no longer exists"}');
+    };
+    const { handle, lines } = await boot({ api });
+    expect(lines.some((l) => l.includes('server refused the lost-journal report (410)'))).toBe(
+      true,
+    );
+    await handle.stop();
+    await handle.done;
   });
 
   test('an api-key enrollment refusal backs off instead of exiting and continues when the server accepts', async () => {

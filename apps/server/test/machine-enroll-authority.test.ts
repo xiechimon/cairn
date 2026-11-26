@@ -1,4 +1,5 @@
 import { hostname } from 'node:os';
+import { HOST_NAME_NEEDS_LOOPBACK_REFUSAL, LOCAL_HOST_PROOF_REFUSAL } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
@@ -66,6 +67,63 @@ async function ownerClaimLocal(s: TestServer): Promise<{ machineId: string; toke
   };
   return machine;
 }
+
+describe('enrollment refusals name their real cause (#5411)', () => {
+  test('a caller off the loopback address is not told the local record is stale', async () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    try {
+      seedLocalMachine(s.db, s.team.id);
+      const response = await call(s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: HOST, teamId: s.team.id, hostKey: HOST_KEY },
+        peer: '203.0.113.10',
+      });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ error: HOST_NAME_NEEDS_LOOPBACK_REFUSAL });
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a stale local record refuses until the owner deletes it on the Runners page', async () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    try {
+      seedLocalMachine(s.db, s.team.id);
+      const stale = await ownerClaimLocal(s);
+      s.db
+        .update(machineTable)
+        .set({ hostKey: 'b'.repeat(64) })
+        .where(eq(machineTable.id, stale.machineId))
+        .run();
+      const start = () =>
+        call(s.app, 'POST', '/api/machine/enroll/start', {
+          body: { name: HOST, teamId: s.team.id, hostKey: HOST_KEY },
+          peer: '127.0.0.1',
+        });
+      const refused = await start();
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toEqual({ error: LOCAL_HOST_PROOF_REFUSAL });
+      const deleted = await call(s.app, 'DELETE', `/api/machines/${stale.machineId}`, {
+        cred: OWNER_TOKEN,
+      });
+      expect(deleted.status).toBe(204);
+      const accepted = await start();
+      expect(accepted.status).toBe(200);
+      const { enrollId } = (await accepted.json()) as { enrollId: string };
+      const confirmed = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
+        cred: OWNER_TOKEN,
+        body: { enrollId },
+      });
+      expect(confirmed.status).toBe(200);
+      const { machine } = (await confirmed.json()) as { machine: { machineId: string } };
+      expect(machineRow(s, machine.machineId)).toMatchObject({
+        kind: 'local',
+        hostKey: HOST_KEY,
+      });
+    } finally {
+      s.dispose();
+    }
+  });
+});
 
 describe('machine enrollment authority (#2054)', () => {
   test('restricted MCP key without machineAccess is refused at enroll', async () => {

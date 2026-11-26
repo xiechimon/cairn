@@ -18,7 +18,11 @@ import type {
 import {
   backgroundTaskMessageId,
   claudeLoginSchema,
+  HOST_NAME_NEEDS_LOOPBACK_REFUSAL,
+  HOST_NAME_TAKEN_REFUSAL,
   isActiveStepStatus,
+  LOCAL_HOST_PROOF_REFUSAL,
+  LOCAL_MACHINE_NEEDS_OWNER_REFUSAL,
   machineRecordSchema,
   machineStrain,
   PROGRESS_ACTIVITY_PHASES,
@@ -457,7 +461,7 @@ export function enrollMachine(
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   if (input.name === hostname()) {
-    throw new HttpError(403, 'local machine requires owner approval');
+    throw new HttpError(403, LOCAL_MACHINE_NEEDS_OWNER_REFUSAL);
   }
   const token = newMachineToken();
   const capabilities = parseCapabilitiesField(input.capabilities);
@@ -479,7 +483,7 @@ export function enrollMachine(
       : undefined;
   const existing = byHost ?? byKey;
   if (existing !== undefined && existing.kind === 'local') {
-    throw new HttpError(403, 'local machine requires owner approval');
+    throw new HttpError(403, LOCAL_MACHINE_NEEDS_OWNER_REFUSAL);
   }
   if (byHost !== undefined && byHost.apiKeyId !== input.keyId) {
     throw new HttpError(403, 'another enrollment owns this host key');
@@ -633,10 +637,10 @@ export function localEnrollmentRefusal(
   if (row?.kind !== 'local' && !namesThisHost) return null;
   if (row !== undefined && row.kind !== 'local') {
     if (byHost === undefined) {
-      return 'another enrolled machine already holds this host name';
+      return HOST_NAME_TAKEN_REFUSAL;
     }
     if (!input.fromLocalHost) {
-      return 'this enrollment does not prove it is the local host runner';
+      return HOST_NAME_NEEDS_LOOPBACK_REFUSAL;
     }
     const localRow = db
       .select()
@@ -649,15 +653,13 @@ export function localEnrollmentRefusal(
         localRow.retiredAt !== null ||
         (localRow.hostKey !== null && !keySet.has(localRow.hostKey)))
     ) {
-      return 'this enrollment does not prove it is the local host runner';
+      return LOCAL_HOST_PROOF_REFUSAL;
     }
     return null;
   }
-  if (
-    !input.fromLocalHost ||
-    (row !== undefined && row.hostKey !== null && !keySet.has(row.hostKey))
-  ) {
-    return 'this enrollment does not prove it is the local host runner';
+  if (!input.fromLocalHost) return HOST_NAME_NEEDS_LOOPBACK_REFUSAL;
+  if (row !== undefined && row.hostKey !== null && !keySet.has(row.hostKey)) {
+    return LOCAL_HOST_PROOF_REFUSAL;
   }
   return null;
 }
@@ -684,7 +686,7 @@ export function authorizeEnrollmentMachine(
   const existing = enrollmentExistingRow(db, input.teamId, input.name, hostKey, legacyHostKeys);
   const claimsLocal = existing?.kind === 'local' || isLocal;
   if (claimsLocal && !input.ownerApproved) {
-    throw new HttpError(403, 'local machine requires owner approval');
+    throw new HttpError(403, LOCAL_MACHINE_NEEDS_OWNER_REFUSAL);
   }
   if (existing !== undefined && existing.retiredAt !== null && !input.ownerApproved) {
     throw new HttpError(403, 'a revoked machine requires owner approval to re-register');

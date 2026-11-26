@@ -31,6 +31,15 @@ export const CLAIM_POLL_INTERVAL_MS = 75_000;
 
 export const CLAIM_BACKOFF_CAP_MS = 30_000;
 
+export const ENROLL_BACKOFF_CAP_MS = 60_000;
+
+export const LOCAL_HOST_PROOF_REFUSAL =
+  'this enrollment does not prove it is the local host runner';
+export const HOST_NAME_NEEDS_LOOPBACK_REFUSAL =
+  "only the server's own computer may enroll under its host name, through the server's loopback address";
+export const LOCAL_MACHINE_NEEDS_OWNER_REFUSAL = 'local machine requires owner approval';
+export const HOST_NAME_TAKEN_REFUSAL = 'another enrolled machine already holds this host name';
+
 export const REMOTE_TOOL_RETRY_DELAYS_MS = [500, 2000] as const;
 export const REMOTE_TOOL_TIMEOUT_MS = 10_000;
 

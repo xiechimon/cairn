@@ -58,6 +58,8 @@ Rows created before this change have `hostKey = null` and are not matched by har
 - A Runner that cannot read its hardware id enrolls without a `hostKey`: it keeps today's identity churn (a lost `machine.json` means a new row), and the release rules above keep its stale row from pinning work forever once the owner removes it.
 - A Runner whose runner home moves is a new machine, as the key says. Its old steps keep waiting with the `machine-retired`/pin rules above.
 - An older daemon (no `hostKey` in the body) keeps today's behavior; the fields are optional on the wire.
+- A refused or unanswered enrollment (401, 403, 409, 429, 5xx, unreachable server, expired or already-claimed approval) never ends the Runner process: a supervisor that restarts on failure would turn the refusal into a loop. The Runner retries in process, doubling up to 60 s so one waiting Runner stays inside the enrollment start limit it shares with other callers on the same address, and logs a cause once until it changes.
+- A stale `kind: 'local'` row (another computer's `hostKey`) refuses the server host's own Runner with `this enrollment does not prove it is the local host runner`. Recovery is deleting that offline Runner on the Runners page; the next retry is accepted and, once approved, creates the new local row. A caller that is not on the loopback address gets a different refusal that never suggests deleting a row. Not covered: a local row revoked through the API is hidden from the Runners page, so only `DELETE /api/machines/:id` clears it.
 
 ## Tests
 

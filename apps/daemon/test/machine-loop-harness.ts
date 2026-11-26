@@ -334,6 +334,7 @@ export interface BootOpts {
   capabilitiesProbe?: () => MachineCapabilities;
   withMachineJson?: boolean;
   browserEnrollment?: boolean;
+  claimBackoffBaseMs?: number;
   preEnrolled?: { serverUrl: string };
   seedJournal?: (paths: StatePaths) => void;
   capEnv?: NodeJS.ProcessEnv;
@@ -419,7 +420,7 @@ export function startMachine(opts: BootOpts) {
       ...(opts.antigravityUpdateCheckMs !== undefined
         ? { antigravityUpdateCheckMs: opts.antigravityUpdateCheckMs }
         : {}),
-      claimBackoffBaseMs: 10,
+      claimBackoffBaseMs: opts.claimBackoffBaseMs ?? 10,
       proxyEnv: {},
       ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),
       ...(opts.orbComputer !== undefined ? { orbComputer: opts.orbComputer } : {}),
