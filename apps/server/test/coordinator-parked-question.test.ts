@@ -42,7 +42,7 @@ async function askFromProjectTurn(projectId: string, ageMs: number, questions = 
   );
   H.s.db
     .update(chiefMessage)
-    .set({ createdAt: Date.now() - ageMs })
+    .set({ createdAt: Date.now() - ageMs - 1 })
     .where(eq(chiefMessage.id, 'ask-q'))
     .run();
   H.s.db
