@@ -72,7 +72,7 @@ export async function queueTaskMessage(
   if (replied !== undefined) return { conversationId: replied.conversationId };
   const earlier =
     task && clientMessageId !== undefined
-      ? queuedSendUnderKey(deps.db, task, clientMessageId, deliverAfterStop)
+      ? queuedSendUnderKey(deps.db, task.id, clientMessageId, deliverAfterStop)
       : undefined;
   if (earlier?.kind === 'cancelled') throw removedFromQueue();
   if (earlier?.kind === 'received') {
@@ -142,7 +142,7 @@ export async function queueTaskMessage(
   return coalesceClientMessage(deps.db, task.id, clientMessageId, () =>
     replacingStrandedSend<BuildSteerResult | QueuedTaskMessageResult>(
       deps.db,
-      task,
+      task.id,
       { clientMessageId, content, sendNow: deliverAfterStop },
       send,
     ),

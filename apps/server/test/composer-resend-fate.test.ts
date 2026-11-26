@@ -165,9 +165,8 @@ test('a message cancelled while its resend is failing stays cancelled', async ()
   expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
   const [row] = queuedRows(w);
   expect((await w.finish('failed')).status).toBe(200);
-  const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
   await expect(
-    replacingStrandedSend(w.s.db, task, { clientMessageId: KEY, content: TEXT }, async () => {
+    replacingStrandedSend(w.s.db, 'task', { clientMessageId: KEY, content: TEXT }, async () => {
       await w.send({ content: TEXT, queuedMessageId: row!.id, cancelQueued: true });
       throw new Error('refused');
     }),
@@ -344,13 +343,14 @@ test.each([
   },
 );
 
-async function strandedBehindASlowPrCheck() {
+async function strandedBehindASlowPrCheck(prState = 'open', delayOf = (_probe: number) => 100) {
   let probes = 0;
+  let before = Number.POSITIVE_INFINITY;
   const w = await runningTask({
     githubFetch: async () => {
       probes += 1;
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      return Response.json({ state: 'open', merged: false });
+      await new Promise((resolve) => setTimeout(resolve, delayOf(probes - before)));
+      return Response.json({ state: prState, merged: false });
     },
   });
   const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
@@ -367,7 +367,7 @@ async function strandedBehindASlowPrCheck() {
     .set({ prNumber: 43, prUrl: 'https://github.com/demo-owner/demo-repo/pull/43' })
     .where(eq(build.id, 'build'))
     .run();
-  const before = probes;
+  before = probes;
   const reachesThePrCheck = () => vi.waitFor(() => expect(probes).toBeGreaterThan(before));
   return { w, rowId: row!.id, reachesThePrCheck };
 }
@@ -413,9 +413,8 @@ test('an edited message removed while an earlier resend is failing is never repo
   const [row] = queuedRows(w);
   await w.send({ content: EDITED, queuedMessageId: row!.id, editQueued: true });
   expect((await w.finish('failed')).status).toBe(200);
-  const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
   await expect(
-    replacingStrandedSend(w.s.db, task, { clientMessageId: KEY, content: TEXT }, async () => {
+    replacingStrandedSend(w.s.db, 'task', { clientMessageId: KEY, content: TEXT }, async () => {
       await w.send({ content: EDITED, queuedMessageId: row!.id, cancelQueued: true });
       throw new Error('refused');
     }),
@@ -489,10 +488,9 @@ test('a resend that loses to send now on the same queued message is still acknow
   expect((await w.send({ content: TEXT, mode: 'queue', clientMessageId: KEY })).status).toBe(201);
   const [row] = queuedRows(w);
   expect((await w.finish('failed')).status).toBe(200);
-  const task = w.s.db.select().from(todo).where(eq(todo.id, 'task')).get()!;
   const answer = await replacingStrandedSend<object>(
     w.s.db,
-    task,
+    'task',
     { clientMessageId: KEY, content: TEXT },
     async () => {
       await w.send({ content: TEXT, queuedMessageId: row!.id });
@@ -539,4 +537,40 @@ test('send now on a queued message removed while it waits is still refused', asy
   await w.send({ content: TEXT, queuedMessageId: rowId, cancelQueued: true });
   expect((await sendNow).status).toBe(409);
   expect(copies(w)).toEqual([]);
+});
+
+test.each(['reply', 'queue'] as const)(
+  'Retry pressed during a resend through the %s route leaves the resend acknowledged',
+  async (route) => {
+    const { w, reachesThePrCheck } = await strandedBehindASlowPrCheck('closed', (probe) =>
+      probe === 1 ? 600 : 0,
+    );
+    const resend = routes[route](w);
+    await reachesThePrCheck();
+    const retry = await req(w.s.app, 'POST', '/api/builds/build/steps', {
+      action: 'restart',
+      feedback: 'Try again',
+      clientMessageId: 'press-retry',
+    });
+    expect(retry.status).toBe(202);
+    expect(latestBuild(w)).not.toBe('build');
+    expect((await resend).status).toBe(201);
+    expect(copies(w)).toEqual([latestBuild(w)]);
+    expect(willReachTheAgent(w)).toBe(true);
+  },
+);
+
+test('a Coordinator answer never restarts a task the user stopped', async () => {
+  const w = await runningTask();
+  await userStop(w);
+  await expect(
+    sendBuildSteer(
+      { db: w.s.db, hub: w.s.hub, user: w.s.user },
+      'build',
+      { content: TEXT },
+      { actor: 'Coordinator', afterTurn: true },
+    ),
+  ).rejects.toThrow('Conversation phase cannot accept a continuation');
+  expect(copies(w)).toEqual([]);
+  expect(stepStatuses(w)).toEqual(['stopped']);
 });

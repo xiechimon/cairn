@@ -1,7 +1,7 @@
 import { ACTIVE_STEP_STATUSES, type ThreadMessageDelivery } from '@cairn/shared';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, clientMessage, queuedMessage, step, type todo } from '../db/schema.js';
+import { build, clientMessage, queuedMessage, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { completeClientMessage, findClientMessage, removedFromQueue } from './client-message.js';
 
@@ -101,12 +101,13 @@ function staysQueued(db: Db, task: TodoRow, row: QueuedRow, sendNow: boolean): b
 
 export function queuedSendUnderKey(
   db: Db,
-  task: TodoRow,
+  todoId: string,
   clientMessageId: string,
   sendNow = false,
 ): QueuedSend | undefined {
-  const scopes = buildsOf(db, task.id);
-  if (scopes.length === 0) return undefined;
+  const task = db.select().from(todo).where(eq(todo.id, todoId)).get();
+  const scopes = buildsOf(db, todoId);
+  if (task === undefined || scopes.length === 0) return undefined;
   const found = db
     .select({ scopeId: clientMessage.scopeId, response: clientMessage.response })
     .from(clientMessage)
@@ -213,13 +214,13 @@ export function sentByResend(db: Db, todoId: string, messageId: string): boolean
 
 export async function replacingStrandedSend<T>(
   db: Db,
-  task: TodoRow,
+  todoId: string,
   resend: { clientMessageId?: string; content: string; sendNow?: boolean },
   send: (replacement?: Replacement) => Promise<T>,
 ): Promise<T> {
   const { clientMessageId, content, sendNow } = resend;
   if (clientMessageId === undefined) return send();
-  const found = queuedSendUnderKey(db, task, clientMessageId, sendNow);
+  const found = queuedSendUnderKey(db, todoId, clientMessageId, sendNow);
   if (found?.kind === 'cancelled') throw removedFromQueue();
   if (found?.kind !== 'stranded') return send();
   const queuedRow = eq(queuedMessage.id, found.messageId);
@@ -244,7 +245,7 @@ export async function replacingStrandedSend<T>(
   try {
     return await send({ messageId: found.messageId, commit });
   } catch (error) {
-    const now = queuedSendUnderKey(db, task, clientMessageId, sendNow);
+    const now = queuedSendUnderKey(db, todoId, clientMessageId, sendNow);
     if (now?.kind === 'received') return now.answer as T;
     throw error;
   }

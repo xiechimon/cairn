@@ -68,7 +68,10 @@ function continuationTodo(
     row?.phase === 'done' ||
     row?.phase === 'building' ||
     (options.allowReviewContinuation === true && row?.phase === 'review') ||
-    (options.afterTurn === true && options.schedule === undefined && row?.phase === 'stopped') ||
+    (options.afterTurn === true &&
+      options.schedule === undefined &&
+      options.actor === undefined &&
+      row?.phase === 'stopped') ||
     row?.phase === 'needs_input' ||
     (options.afterTurn === true &&
       row !== undefined &&

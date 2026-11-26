@@ -297,7 +297,7 @@ function settleStoredSend(
   if (outer !== undefined) return outer;
   const nested = nestedSendReceipt(deps, row, body.clientMessageId);
   if (nested === undefined) {
-    const queued = queuedSendUnderKey(deps.db, row, body.clientMessageId);
+    const queued = queuedSendUnderKey(deps.db, row.id, body.clientMessageId);
     if (queued?.kind === 'cancelled') throw removedFromQueue();
     return queued?.kind === 'received'
       ? { todoId: row.id, conversationId: queued.conversationId, delivered: queued.delivered }
@@ -391,7 +391,7 @@ export async function messageThreadAsUser(
   const result = await coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
     const again = settleStoredSend(deps, row, body, origin);
     if (again !== undefined) return again;
-    return replacingStrandedSend(deps.db, row, body, send);
+    return replacingStrandedSend(deps.db, row.id, body, send);
   });
   if ('todoId' in result) return result;
   const queuedFirst = settleStoredSend(deps, row, body, origin);
