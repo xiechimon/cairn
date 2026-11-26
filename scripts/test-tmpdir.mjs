@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
   appendFileSync,
@@ -6,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,30 +16,61 @@ import { join } from 'node:path';
 const allocations = new Map();
 const removal = { recursive: true, force: true, maxRetries: 5, retryDelay: 50 };
 
-function reapProcessesUnder(path) {
-  let names;
-  try {
-    names = readdirSync('/proc');
-  } catch {
-    return;
+function procProcesses(names) {
+  return names
+    .filter((name) => /^\d+$/.test(name))
+    .map((name) => ({
+      pid: Number(name),
+      paths() {
+        const cwd = readlinkSync(`/proc/${name}/cwd`).replace(/ \(deleted\)$/, '');
+        return [cwd, ...readFileSync(`/proc/${name}/cmdline`, 'utf8').split('\0')];
+      },
+    }));
+}
+
+function listingRows(command, args) {
+  return (spawnSync(command, args, { encoding: 'utf8' }).stdout ?? '').split('\n');
+}
+
+function listedProcesses() {
+  const found = new Map();
+  const add = (pid, ...paths) => {
+    const known = found.get(pid) ?? [];
+    found.set(pid, known.concat(paths));
+  };
+  let pid;
+  const user = String(process.getuid());
+  for (const row of listingRows('/usr/sbin/lsof', [
+    ...['-w', '-n', '-P', '-a', '-u', user, '-d', 'cwd', '-Fpn'],
+  ])) {
+    if (row.startsWith('p')) pid = Number(row.slice(1));
+    else if (row.startsWith('n')) add(pid, row.slice(1));
   }
-  const inside = (candidate) => candidate === path || candidate.startsWith(`${path}/`);
-  for (const name of names) {
-    if (!/^\d+$/.test(name) || Number(name) === process.pid) continue;
-    let located = false;
+  for (const row of listingRows('/bin/ps', ['-U', user, '-ww', '-o', 'pid=,command='])) {
+    const [id, ...commandArguments] = row.trim().split(/\s+/);
+    if (id) add(Number(id), ...commandArguments);
+  }
+  return [...found].map(([id, paths]) => ({ pid: id, paths: () => paths }));
+}
+
+function runningProcesses() {
+  try {
+    return procProcesses(readdirSync('/proc'));
+  } catch {
+    return process.platform === 'darwin' ? listedProcesses() : [];
+  }
+}
+
+function reapProcessesUnder(path) {
+  if (!existsSync(path)) return;
+  const roots = new Set([path, realpathSync(path)]);
+  const inside = (candidate) =>
+    [...roots].some((root) => candidate === root || candidate.startsWith(`${root}/`));
+  for (const candidate of runningProcesses()) {
+    if (candidate.pid === process.pid) continue;
     try {
-      located = inside(readlinkSync(`/proc/${name}/cwd`).replace(/ \(deleted\)$/, ''));
-      if (!located) {
-        located = readFileSync(`/proc/${name}/cmdline`, 'utf8')
-          .split('\0')
-          .some((argument) => inside(argument));
-      }
-    } catch {
-      continue;
-    }
-    if (!located) continue;
-    try {
-      process.kill(Number(name), 'SIGKILL');
+      if (!candidate.paths().some(inside)) continue;
+      process.kill(candidate.pid, 'SIGKILL');
     } catch {}
   }
 }

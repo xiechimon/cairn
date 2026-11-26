@@ -29,12 +29,16 @@ test('release kills processes still running inside the allocation before removin
     detached: true,
     stdio: 'ignore',
   });
-  await once(child, 'spawn');
-  const exited = once(child, 'exit');
-  assert.equal(run.release(dir), true);
-  assert.equal(existsSync(dir), false);
-  const [, signal] = await exited;
-  assert.equal(signal, 'SIGKILL');
+  try {
+    await once(child, 'spawn');
+    const exited = once(child, 'exit', { signal: AbortSignal.timeout(10_000) });
+    assert.equal(run.release(dir), true);
+    assert.equal(existsSync(dir), false);
+    const [, signal] = await exited;
+    assert.equal(signal, 'SIGKILL');
+  } finally {
+    child.kill('SIGKILL');
+  }
 });
 
 test('explicit cleanup works after an exception and allows later allocations', () => {
