@@ -35,7 +35,7 @@ const CLAMPED_BASE =
 const PLACEMENT_CLS: Record<ToolbarPlacement, string> = {
   left: `absolute top-1/2 right-full z-10 -translate-y-1/2 pr-3 data-clamped:right-0 data-clamped:pr-0 ${CLAMPED_BASE} ${HOVER_REVEAL}`,
   'below-start': `mt-1 hidden ${TOUCH_REVEAL}`,
-  'below-start-hover': `absolute top-full left-0 z-10 mt-1 rounded-(--radius-control) bg-background/95 before:absolute before:inset-x-0 before:-top-1 before:h-1 before:content-[''] ${HOVER_REVEAL}`,
+  'below-start-hover': `absolute top-full left-0 z-10 mt-0.5 rounded-(--radius-control) bg-background/95 before:absolute before:inset-x-0 before:-top-0.5 before:h-0.5 before:content-[''] ${HOVER_REVEAL}`,
   'below-end': `mt-1 hidden justify-end self-end ${TOUCH_REVEAL}`,
 };
 
