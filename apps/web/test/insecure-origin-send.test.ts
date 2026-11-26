@@ -85,15 +85,16 @@ test('a rejected send is reported once, and keeps the text for a retry', async (
 test('a reply that only queues on the server shows as sending until the server has it', async () => {
   let accept = () => {};
   const key = enqueueTaskSend({
+    account: null,
     todoId: 'todo-queued',
     buildId: 'build-1',
     text: 'hold this',
-    queueOnly: true,
+    mode: 'queue',
     deliver: () =>
       new Promise((resolve) => {
         accept = () => resolve({ threadId: 'build-1', messageId: null });
       }),
-    onError: () => {},
+    onFailed: () => {},
   });
   const bubbles = () => unlandedTaskBubbles(taskOutbox.entries(), 'todo-queued', new Set());
   await settled();

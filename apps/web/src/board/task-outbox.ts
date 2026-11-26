@@ -1,4 +1,12 @@
-import { createOutbox, type Deliver, type OutboxEntry } from '../chief/outbox.js';
+import {
+  createOutbox,
+  type Deliver,
+  indexedDbOutboxStore,
+  type OutboxEntry,
+  pageLockOwner,
+  type SendFailed,
+  type TaskSendMode,
+} from '../chief/outbox.js';
 
 export interface OptimisticTaskUser {
   id: string;
@@ -8,7 +16,6 @@ export interface OptimisticTaskUser {
   delivery?: 'sending';
 }
 
-const queueOnlyKeys = new Set<string>();
 const readyToSettleKeys = new Set<string>();
 const errorsByTodo = new Map<string, string>();
 const errorListeners = new Set<() => void>();
@@ -17,7 +24,10 @@ function notifyErrorListeners(): void {
   for (const listener of errorListeners) listener();
 }
 
-export const taskOutbox = createOutbox();
+export const taskOutbox = createOutbox({
+  store: indexedDbOutboxStore('cairn-task-outbox'),
+  owner: pageLockOwner(),
+});
 
 export const taskOutboxErrors = {
   subscribe(listener: () => void): () => void {
@@ -38,35 +48,43 @@ export const taskOutboxErrors = {
   },
 };
 
+const watchers = new Map<string, number>();
+
+export function watchTask(todoId: string): () => void {
+  watchers.set(todoId, (watchers.get(todoId) ?? 0) + 1);
+  return () => {
+    const left = (watchers.get(todoId) ?? 1) - 1;
+    if (left === 0) watchers.delete(todoId);
+    else watchers.set(todoId, left);
+  };
+}
+
+export function taskIsWatched(todoId: string): boolean {
+  return watchers.has(todoId);
+}
+
 export function enqueueTaskSend(input: {
+  account: string | null;
   todoId: string;
   buildId: string;
   text: string;
-  queueOnly: boolean;
+  mode: TaskSendMode;
   deliver: Deliver;
-  onError: (error: unknown) => void;
+  onFailed: SendFailed;
 }): string {
   taskOutboxErrors.clear(input.todoId);
-  const key = taskOutbox.enqueue(
+  return taskOutbox.enqueue(
     {
-      scope: input.todoId,
+      scope: input.account,
       threadId: input.buildId,
       globalThreadId: null,
       projectId: null,
       text: input.text,
+      task: { todoId: input.todoId, mode: input.mode },
     },
-    async (entry) => {
-      try {
-        return await input.deliver(entry);
-      } catch (error) {
-        input.onError(error);
-        throw error;
-      }
-    },
-    { awaitRefetch: !input.queueOnly },
+    input.deliver,
+    { awaitRefetch: input.mode === 'reply', onFailed: input.onFailed },
   );
-  if (input.queueOnly) queueOnlyKeys.add(key);
-  return key;
 }
 
 export function markTaskReadyToSettle(key: string): void {
@@ -78,13 +96,12 @@ export function consumeTaskReadyToSettle(key: string): boolean {
 }
 
 export function discardTaskFailed(key: string): string | null {
-  queueOnlyKeys.delete(key);
   readyToSettleKeys.delete(key);
   return taskOutbox.discard(key)?.text ?? null;
 }
 
 export function failedTaskOutbox(entries: readonly OutboxEntry[], todoId: string): OutboxEntry[] {
-  return entries.filter((entry) => entry.scope === todoId && entry.state === 'failed');
+  return entries.filter((entry) => entry.task?.todoId === todoId && entry.state === 'failed');
 }
 
 export function unlandedTaskBubbles(
@@ -93,9 +110,9 @@ export function unlandedTaskBubbles(
   known: ReadonlySet<string>,
 ): OptimisticTaskUser[] {
   return entries.flatMap((entry) =>
-    entry.scope !== todoId ||
+    entry.task?.todoId !== todoId ||
     entry.state === 'failed' ||
-    (queueOnlyKeys.has(entry.key) && entry.state !== 'sending') ||
+    (entry.task.mode !== 'reply' && entry.state !== 'sending') ||
     (entry.messageId !== null && known.has(entry.messageId))
       ? []
       : [

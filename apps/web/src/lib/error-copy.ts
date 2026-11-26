@@ -10,6 +10,7 @@ import { EN } from '../i18n/en.js';
 import { activeLocale } from '../i18n/locale.js';
 import { type TFunc, translate } from '../i18n/translate.js';
 import { safeLocalStorage } from '../safe-storage.js';
+import { SendStaleError, SendTimeoutError } from './send-errors.js';
 
 const REASON_COPY: Record<string, string> = {
   'already-started': '这个任务已经开始过，无法退回待开始。',
@@ -68,6 +69,8 @@ function isNetworkFailure(error: unknown): boolean {
 
 export function describeError(error: unknown, t: TFunc): string | null {
   if (error == null) return null;
+  if (error instanceof SendTimeoutError) return t('不确定是否送达，重发前请先看对话里有没有这条。');
+  if (error instanceof SendStaleError) return t('超过 10 分钟未确认送达，已停止自动重发。');
   if (error instanceof ApiError) {
     const byReason = error.reason !== undefined ? REASON_COPY[error.reason] : undefined;
     if (byReason !== undefined) return t(byReason);

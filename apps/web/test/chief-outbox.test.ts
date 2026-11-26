@@ -111,7 +111,7 @@ describe('chief outbox', () => {
     box.land('key-1', 'm1');
     calls[0]?.resolve({ threadId: 'b1', messageId: null });
     await flush();
-    box.settle('b1', new Set(), 'todo-1');
+    box.settle('b1', new Set(), (entry) => entry.scope === 'todo-1');
     expect(box.entries()[0]).toMatchObject({ key: 'key-1', state: 'sent', messageId: 'm1' });
 
     box.enqueue({ scope: 'todo-1', globalThreadId: null, threadId: 'b1', projectId: null, text: 'second' }, deliver, { awaitRefetch: true });
@@ -119,13 +119,13 @@ describe('chief outbox', () => {
     calls[1]?.resolve({ threadId: 'b1', messageId: null });
     await flush();
     box.land('key-2', 'm2');
-    box.settle('b1', new Set(), 'todo-1');
+    box.settle('b1', new Set(), (entry) => entry.scope === 'todo-1');
     expect(box.entries().find((entry) => entry.key === 'key-2')).toMatchObject({
       state: 'sent',
       messageId: 'm2',
     });
     expect(box.sentKey('m2')).toBe('key-2');
-    box.settle('b1', new Set(['m1', 'm2']), 'todo-1');
+    box.settle('b1', new Set(['m1', 'm2']), (entry) => entry.scope === 'todo-1');
     expect(box.entries()).toEqual([]);
   });
 

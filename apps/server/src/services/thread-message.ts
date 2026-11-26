@@ -28,6 +28,7 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import { assertProjectWritable } from './project-writable.js';
+import { nestedLedgerId, queuedSendUnderKey, replacingStrandedSend } from './queued-send.js';
 import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
 import { settleQuestionAnswers } from './worker-questions.js';
 
@@ -36,10 +37,6 @@ type TodoRow = typeof todo.$inferSelect;
 export type ThreadMessageOrigin = { origin: 'user' } | { origin: 'coordinator'; actor: string };
 
 const USER_ORIGIN: ThreadMessageOrigin = { origin: 'user' };
-
-function nestedLedgerId(todoId: string, clientMessageId: string): string {
-  return `nested:${todoId}:${clientMessageId}`;
-}
 
 function excerptOf(content: string): string {
   const flat = tidyText(redactSecrets(content).value as string);
@@ -264,6 +261,17 @@ function nestedSendReceipt(
   return undefined;
 }
 
+export function threadSendUnderKey(
+  deps: BuildDeps,
+  row: TodoRow,
+  clientMessageId: string,
+): { conversationId: string } | undefined {
+  return (
+    findClientMessage<ThreadMessageResult>(deps.db, row.id, clientMessageId) ??
+    nestedSendReceipt(deps, row, clientMessageId)
+  );
+}
+
 function settleStoredSend(
   deps: BuildDeps,
   row: TodoRow,
@@ -273,7 +281,12 @@ function settleStoredSend(
   const outer = findClientMessage<ThreadMessageResult>(deps.db, row.id, body.clientMessageId);
   if (outer !== undefined) return outer;
   const nested = nestedSendReceipt(deps, row, body.clientMessageId);
-  if (nested === undefined) return undefined;
+  if (nested === undefined) {
+    const queued = queuedSendUnderKey(deps.db, row, body.clientMessageId);
+    return queued?.kind === 'received'
+      ? { todoId: row.id, conversationId: queued.conversationId, delivered: queued.delivered }
+      : undefined;
+  }
   try {
     recordInCoordinator(deps, row, body, nested, origin);
   } catch (error) {
@@ -328,9 +341,7 @@ export async function messageThreadAsUser(
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
   }
   const buildId = row.latestBuildId;
-  return coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
-    const again = settleStoredSend(deps, row, body, origin);
-    if (again !== undefined) return again;
+  const send = async (): Promise<ThreadMessageResult> => {
     if (row.phase === 'stopped') {
       try {
         return commitStoppedRestart(deps, row, body, origin);
@@ -354,7 +365,16 @@ export async function messageThreadAsUser(
       return replayAfterConflict<ThreadMessageResult>(deps.db, row.id, body.clientMessageId, error);
     }
     return { todoId: row.id, ...sent };
+  };
+  const result = await coalesceClientMessage(deps.db, row.id, body.clientMessageId, async () => {
+    const again = settleStoredSend(deps, row, body, origin);
+    if (again !== undefined) return again;
+    return replacingStrandedSend(deps.db, row, body, send);
   });
+  if ('todoId' in result) return result;
+  const queuedFirst = settleStoredSend(deps, row, body, origin);
+  if (queuedFirst === undefined) throw new Error('send receipt missing');
+  return queuedFirst;
 }
 
 export interface QuestionAnswerResult {

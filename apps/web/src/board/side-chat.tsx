@@ -23,6 +23,7 @@ import { activityStore } from '../api/activity.js';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
+import { withoutReturnedText } from '../chief/outbox.js';
 import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
 import { isFinalReportPhase, ReportThreadContext } from '../chief/research-report.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
@@ -462,7 +463,9 @@ function ThreadBody({
     enabled: live,
   });
   const composerRef = useRef<{ focus: (options?: FocusOptions) => void } | null>(null);
+  const takesText = chat.send !== undefined;
   useEffect(() => {
+    if (!takesText) return;
     for (const entry of chat.unsent?.failed ?? []) {
       const text = chat.unsent?.discard(entry.key) ?? null;
       if (text !== null) {
@@ -470,7 +473,15 @@ function ThreadBody({
         composerRef.current?.focus({ preventScroll: true });
       }
     }
-  }, [chat.unsent, setDraft]);
+  }, [takesText, chat.unsent, setDraft]);
+  useEffect(
+    () =>
+      chat.unsent?.onArrivedLate((entry) => {
+        setDraft((current) => withoutReturnedText(current, entry.text));
+        return true;
+      }),
+    [chat.unsent, setDraft],
+  );
   const reportThread = { title: todo.title, final: isFinalReportPhase(todo.phase) };
   return (
     <>
@@ -537,6 +548,16 @@ function ThreadBody({
           {chat.sendError}
         </p>
       )}
+      {!takesText &&
+        chat.unsent?.failed.map((entry) => (
+          <p
+            key={entry.key}
+            data-testid="side-chat-unsent-text"
+            className="m-0 mx-4 mb-2 max-h-40 select-text overflow-y-auto whitespace-pre-wrap wrap-anywhere text-center text-meta text-foreground"
+          >
+            {entry.text}
+          </p>
+        ))}
       {actions.card}
       {chat.send === undefined && (chat.queuedMessages?.length ?? 0) > 0 && (
         <div

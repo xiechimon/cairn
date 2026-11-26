@@ -1506,6 +1506,7 @@ export function useApiMutations(teamId: string | undefined) {
         projectId?: string | null;
         clientMessageId?: string;
         designCommentIds?: readonly string[];
+        signal?: AbortSignal;
       }) => {
         const body = {
           content: input.content,
@@ -1519,10 +1520,12 @@ export function useApiMutations(teamId: string | undefined) {
           ? api.post<{ thread: ChiefThread; message: TranscriptRow }>(
               `/api/teams/${teamId}/chief/threads`,
               body,
+              input.signal,
             )
           : api.post<{ thread: ChiefThread; message: TranscriptRow }>(
               `/api/conversations/${input.threadId}/messages`,
               body,
+              input.signal,
             );
       },
       onSuccess: (result) => {
@@ -1953,6 +1956,7 @@ export function useApiMutations(teamId: string | undefined) {
         editQueued?: boolean;
         queuedMessageId?: string;
         clientMessageId?: string;
+        signal?: AbortSignal;
       }) =>
         api.post<{ conversationId?: string; message?: unknown }>(
           `/api/conversations/${input.conversationId}/messages`,
@@ -1965,6 +1969,7 @@ export function useApiMutations(teamId: string | undefined) {
             ...(input.queuedMessageId ? { queuedMessageId: input.queuedMessageId } : {}),
             ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
           },
+          input.signal,
         ),
       onError: (_error, input) => {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
@@ -1989,11 +1994,13 @@ export function useApiMutations(teamId: string | undefined) {
         content: string;
         clientMessageId?: string;
         conversationId?: string | null;
+        signal?: AbortSignal;
       }) =>
-        api.post<ThreadMessageResult>(`/api/todos/${input.todoId}/messages`, {
-          content: input.content,
-          clientMessageId: input.clientMessageId ?? randomId(),
-        }),
+        api.post<ThreadMessageResult>(
+          `/api/todos/${input.todoId}/messages`,
+          { content: input.content, clientMessageId: input.clientMessageId ?? randomId() },
+          input.signal,
+        ),
       onSuccess: (result, input) => {
         if (input.conversationId != null && result.conversationId != null)
           moveQueueToReplacement(qc, input.conversationId, result.conversationId);

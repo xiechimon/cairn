@@ -13,6 +13,7 @@ import { type RouteObject, useLocation, useNavigate, useRoutes } from 'react-rou
 import { useLiveData } from '../api/provider.js';
 import { ArtifactHost } from '../board/artifact/artifact-host.js';
 import { coordinatorSearch, useOpenComposer, useOpenNewTask } from '../board/open-composer.js';
+import { useTaskOutboxResume } from '../board/task-delivery.js';
 import { useDesktopMenu } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { isEditableTarget } from '../overlay/hotkeys.js';
@@ -122,6 +123,7 @@ export function ChiefRoot({
   );
   const { teamId } = useLiveData();
   const surface = useChiefSurface(fixture, deepLink);
+  useTaskOutboxResume();
   useOverlayFocusRestore(settings.open);
   useOpenCoordinatorKey();
   useOpenSettingsMenu();

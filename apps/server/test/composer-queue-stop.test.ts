@@ -9,84 +9,9 @@ import {
   stopPending,
   todo,
 } from '../src/db/schema.js';
-import type { FetchLike } from '../src/lib/github.js';
 import { failStepWithEvents } from '../src/services/builds.js';
-import { bootServer, claimedGeneration, issueApiKey, postProject, req } from './helpers.js';
-
-async function runningTask(opts: { githubFetch?: FetchLike } = {}) {
-  const s = bootServer(opts);
-  const projectId = await postProject(s.app);
-  s.db
-    .insert(todo)
-    .values({
-      id: 'task',
-      teamId: s.team.id,
-      projectId,
-      title: 'Queue test',
-      phase: 'building',
-      phaseAt: 1,
-      seqNum: 1,
-      latestBuildId: 'build',
-    })
-    .run();
-  s.db
-    .insert(build)
-    .values({
-      id: 'build',
-      todoId: 'task',
-      withPlan: false,
-      prevPhase: 'todo',
-      triggerSource: 'user',
-      createdAt: 1,
-      changes: [],
-    })
-    .run();
-  const key = await issueApiKey(s);
-  const enrolled = await s.app.request('/api/machine/enroll', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ teamId: s.team.id, name: 'queue-machine', cliVersion: '0.1.0' }),
-  });
-  const machine = (await enrolled.json()) as { machineId: string; token: string };
-  s.db
-    .update(machineTable)
-    .set({ online: true })
-    .where(eq(machineTable.id, machine.machineId))
-    .run();
-  const now = Date.now();
-  s.db
-    .insert(step)
-    .values({
-      id: 'running',
-      buildId: 'build',
-      kind: 'build',
-      status: 'claimed',
-      machineId: machine.machineId,
-      sessionId: 'builder-session',
-      createdAt: now,
-      claimedAt: now,
-    })
-    .run();
-  const send = (body: object) => req(s.app, 'POST', '/api/conversations/build/messages', body);
-  const face = async () =>
-    (await req(s.app, 'GET', '/api/conversations/build/messages')).json() as Promise<{
-      messages: { id: string; content: unknown }[];
-      steerPending: string[];
-      queuedMessages?: { id: string; content: string }[];
-    }>;
-  const finish = (status: 'success' | 'stopped' | 'failed', stepId = 'running') =>
-    s.app.request(`/api/machine/done/${stepId}`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${machine.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        status,
-        sessionId: 'builder-session',
-        hasChanges: true,
-        generation: claimedGeneration(s.db, stepId),
-      }),
-    });
-  return { s, send, face, finish };
-}
+import { req } from './helpers.js';
+import { runningTask } from './running-task.js';
 
 test.each(['success', 'stopped', 'manual'] as const)(
   'correlates %s queue delivery with its source capsule without consuming equal text',
@@ -123,6 +48,87 @@ test.each(['success', 'stopped', 'manual'] as const)(
     stop();
   },
 );
+
+test('a queued message reaches the stream with the key it was sent under', async () => {
+  const w = await runningTask();
+  const frames: object[] = [];
+  const stop = w.s.convHub.subscribe('build', {
+    nextSeq: () => 1,
+    send: async (payload) => {
+      frames.push(payload);
+    },
+  });
+  await w.send({ content: 'Keyed turn', mode: 'queue', clientMessageId: 'key-from-the-page' });
+  expect(frames).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        message: expect.objectContaining({ content: 'Keyed turn' }),
+        clientMessageId: 'key-from-the-page',
+      }),
+    ]),
+  );
+  stop();
+});
+
+const copiesOf = async (w: Awaited<ReturnType<typeof runningTask>>, text: string) => {
+  const face = await w.face();
+  return [...face.messages, ...(face.queuedMessages ?? [])].filter((row) => row.content === text)
+    .length;
+};
+
+test.each(['reply first', 'queue first'] as const)(
+  'one typed message resent through the other route stays one message (%s)',
+  async (order) => {
+    const w = await runningTask();
+    const key = 'one-typed-message';
+    const reply = () =>
+      req(w.s.app, 'POST', '/api/todos/task/messages', {
+        content: 'Say it once',
+        clientMessageId: key,
+      });
+    const queue = () => w.send({ content: 'Say it once', mode: 'queue', clientMessageId: key });
+    const [first, second] = order === 'reply first' ? [reply, queue] : [queue, reply];
+    expect((await first()).status).toBe(201);
+    const again = await second();
+    expect(again.status).toBe(201);
+    expect(await again.json()).toMatchObject({ conversationId: 'build' });
+    expect(await copiesOf(w, 'Say it once')).toBe(1);
+  },
+);
+
+test('a queued send that starts a new turn is reported as one by the other route', async () => {
+  const w = await runningTask();
+  expect((await w.finish('success')).status).toBe(200);
+  const typed = { content: 'Next round', clientMessageId: 'idle-queue' };
+  expect((await w.send({ ...typed, mode: 'queue' })).status).toBe(201);
+  const again = await req(w.s.app, 'POST', '/api/todos/task/messages', typed);
+  expect(await again.json()).toEqual({
+    todoId: 'task',
+    conversationId: 'build',
+    delivered: 'new-turn',
+  });
+  expect(await copiesOf(w, 'Next round')).toBe(1);
+});
+
+test('one typed message that reaches both routes at once stays one message', async () => {
+  const w = await runningTask();
+  const key = 'raced';
+  const answers = await Promise.all([
+    req(w.s.app, 'POST', '/api/todos/task/messages', { content: 'Race', clientMessageId: key }),
+    w.send({ content: 'Race', mode: 'queue', clientMessageId: key }),
+  ]);
+  expect(answers.map((answer) => answer.status)).toEqual([201, 201]);
+  expect(await copiesOf(w, 'Race')).toBe(1);
+});
+
+test('resending a queued message as stop-and-send makes it run after the stop', async () => {
+  const w = await runningTask();
+  const typed = { content: 'Now this one', mode: 'queue', clientMessageId: 'upgrade' };
+  await w.send(typed);
+  expect((await w.send({ ...typed, deliverAfterStop: true })).status).toBe(201);
+  expect((await w.face()).queuedMessages).toMatchObject([{ deliverAfterStop: true }]);
+  expect(await copiesOf(w, 'Now this one')).toBe(1);
+});
 
 test('queued text persists without steering and completion starts exactly one continuation', async () => {
   const w = await runningTask();

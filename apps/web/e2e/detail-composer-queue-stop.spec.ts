@@ -141,6 +141,8 @@ async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 're
     if (path === `/api/conversations/${build.id}/messages`) {
       if (request.method() === 'POST') {
         const input = request.postDataJSON() as { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean; editQueued?: boolean };
+        const replayed = input.clientMessageId !== undefined && sent.some((earlier) => earlier.clientMessageId === input.clientMessageId);
+        if (replayed) return route.fulfill({ status: 201, json: { conversationId: build.id } });
         sent.push(input);
         const message = { id: `message-${sent.length}`, role: 'user', content: input.content, createdAt: Date.now(), ...(input.mode === 'queue' ? { deliverAfterStop: input.deliverAfterStop ?? false } : {}) };
         if (input.editQueued) {
@@ -215,7 +217,10 @@ async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 're
       active.onmessage?.({ data: JSON.stringify(event) });
     }, { type: 'message', conversationId: build.id, message, deliveredQueue: { conversationId: source, messageId: queued.id } });
   };
-  return { input, sent, stops, steerPending, queuedMessages, finish, rollover, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
+  const archive = () => {
+    Object.assign(task, { archivedAt: 5, v: task.v + 1 });
+  };
+  return { input, sent, stops, steerPending, queuedMessages, finish, rollover, archive, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
 }
 
 test('a confirmed queue capsule is visible before a slow transcript read without becoming a delivered bubble', async ({ page }) => {
@@ -392,7 +397,7 @@ test('Escape stops and a second Escape queues the draft after cancellation', asy
   await expect.poll(() => task.stops).toEqual([{ discard: false }]);
   await expect(task.input).toHaveValue('');
   expect(task.stops).toHaveLength(1);
-  expect(task.sent).toEqual([{ content: 'A stays queued', mode: 'queue', clientMessageId: expect.any(String) }, { content: 'Use this draft next', mode: 'queue', deliverAfterStop: true, clientMessageId: expect.any(String) }]);
+  await expect.poll(() => task.sent).toEqual([{ content: 'A stays queued', mode: 'queue', clientMessageId: expect.any(String) }, { content: 'Use this draft next', mode: 'queue', deliverAfterStop: true, clientMessageId: expect.any(String) }]);
   expect(task.steerPending).toEqual([]);
   expect(task.turns()).toBe(0);
   task.finish('stopped');
@@ -481,4 +486,63 @@ test('queued capsules stay usable when the phase has no composer', async ({ page
   await capsule.getByRole('button', { name: '移除' }).click();
   await expect(capsule).toHaveCount(0);
   expect(task.sent.at(-1)?.cancelQueued).toBe(true);
+});
+
+test('a reload during an unanswered send resends it under its key without opening the task', async ({ page }) => {
+  const task = await runningTask(page);
+  const held: { clientMessageId?: string }[] = [];
+  await page.route('**/api/conversations/completed-build/messages', (route) => {
+    if (route.request().method() !== 'POST' || held.length > 0) return route.fallback();
+    held.push(route.request().postDataJSON() as { clientMessageId?: string });
+    return new Promise<void>(() => {});
+  });
+  await task.input.fill('Survive the reload');
+  await task.input.press('Control+Enter');
+  await expect.poll(() => held.length).toBe(1);
+  await page.goto('/app');
+  await expect.poll(() => task.sent).toEqual([
+    { content: 'Survive the reload', mode: 'queue', clientMessageId: held[0]!.clientMessageId },
+  ]);
+  expect(held[0]!.clientMessageId).toEqual(expect.any(String));
+});
+
+test('a send that fails after its task was closed says so and brings the text back', async ({ page }) => {
+  const task = await runningTask(page);
+  let refuse: (() => Promise<void>) | undefined;
+  await page.route('**/api/conversations/completed-build/messages', (route) => {
+    if (route.request().method() !== 'POST' || refuse !== undefined) return route.fallback();
+    refuse = () => route.fulfill({ status: 500, json: { error: 'refused' } });
+  });
+  await task.input.fill('Fails behind my back');
+  await task.input.press('Control+Enter');
+  await expect.poll(() => refuse !== undefined).toBe(true);
+  await page.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '回复这个任务' })).toHaveCount(0);
+  await refuse!();
+  const toast = page.locator('[data-sonner-toast]');
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toContainText('有一条消息尚未确认发出');
+  await toast.getByRole('button', { name: '打开对话' }).click();
+  await expect(page.getByTestId('composer-card').getByRole('textbox')).toHaveValue('Fails behind my back');
+});
+
+for (const shut of ['archived', 'closed'] as const)
+  test(`an unsent reply on a task ${shut} meanwhile can still be read`, async ({ page }) => {
+  const task = await runningTask(page);
+  let posts = 0;
+  await page.route('**/api/conversations/completed-build/messages', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    posts += 1;
+    if (posts === 1) return new Promise<void>(() => {});
+    return route.fulfill({ status: 409, json: { error: 'Unarchive to continue' } });
+  });
+  await task.input.fill('Keep these words readable');
+  await task.input.press('Control+Enter');
+  await expect.poll(() => posts).toBe(1);
+  if (shut === 'archived') task.archive();
+  else task.setPhase('closed');
+  await page.reload();
+  await expect(page.getByTestId('side-chat-unsent-text')).toHaveText('Keep these words readable');
+  await page.waitForTimeout(1000);
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
 });

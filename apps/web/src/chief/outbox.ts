@@ -1,7 +1,17 @@
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { randomId } from '../lib/random-id.js';
+import { SendStaleError, SendTimeoutError } from '../lib/send-errors.js';
 
 export type OutboxState = 'sending' | 'failed' | 'sent';
+
+export type OutboxFailure = 'error' | 'timeout' | 'stale';
+
+export type TaskSendMode = 'reply' | 'queue' | 'stop-and-send';
+
+export interface TaskSend {
+  todoId: string;
+  mode: TaskSendMode;
+}
 
 export interface OutboxEntry {
   key: string;
@@ -10,9 +20,12 @@ export interface OutboxEntry {
   projectId: string | null;
   text: string;
   designCommentIds?: readonly string[];
+  task?: TaskSend;
+  failure?: OutboxFailure;
   state: OutboxState;
   messageId: string | null;
   createdAt: number;
+  unsaved?: true;
 }
 
 export interface StoredOutboxEntry {
@@ -23,6 +36,8 @@ export interface StoredOutboxEntry {
   projectId: string | null;
   text: string;
   designCommentIds?: readonly string[];
+  task?: TaskSend;
+  failure?: OutboxFailure;
   state: 'sending' | 'failed' | 'returned';
   createdAt: number;
 }
@@ -44,11 +59,16 @@ export interface Delivered {
   messageId: string | null;
 }
 
-export type Deliver = (entry: OutboxEntry) => Promise<Delivered>;
+export type Deliver = (entry: OutboxEntry, signal?: AbortSignal) => Promise<Delivered>;
+
+export type SendFailed = (entry: OutboxEntry, error: unknown, repeat?: boolean) => void;
+
+export type LateArrival = (entry: OutboxEntry) => boolean;
 
 export interface UnsentSends {
   failed: readonly OutboxEntry[];
   discard: (outboxKey: string) => string | null;
+  onArrivedLate: (listener: LateArrival) => () => void;
 }
 
 export interface Outbox {
@@ -62,19 +82,35 @@ export interface Outbox {
       projectId: string | null;
       text: string;
       designCommentIds?: readonly string[];
+      task?: TaskSend;
     },
     deliver: Deliver,
-    options?: { awaitRefetch?: boolean },
+    options?: { awaitRefetch?: boolean; onFailed?: SendFailed },
   ): string;
   discard(key: string): OutboxEntry | null;
   land(key: string, messageId: string): void;
+  subscribeLateArrival(listener: LateArrival): () => void;
   markRefetched(key: string): void;
   sentKey(messageId: string): string | null;
-  settle(threadId: string | null, known: ReadonlySet<string>, scope?: string): void;
-  resume(scope: string, deliver: Deliver): Promise<void>;
+  settle(
+    threadId: string | null,
+    known: ReadonlySet<string>,
+    belongs?: (entry: OutboxEntry) => boolean,
+  ): void;
+  resume(
+    scope: string,
+    deliver: Deliver,
+    options?: { onFailed?: SendFailed; awaitRefetch?: (entry: OutboxEntry) => boolean },
+  ): Promise<void>;
 }
 
 export const RETURNED_KEY_TTL_MS = 10 * 60_000;
+
+export const RESEND_WINDOW_MS = 10 * 60_000;
+
+export const SEND_TIMEOUT_MS = 30_000;
+
+const LOAD_TIMEOUT_MS = 5_000;
 
 const unstored: OutboxStore = {
   put: () => Promise.resolve(),
@@ -97,11 +133,11 @@ function settled<T>(request: IDBRequest<T> | IDBTransaction): Promise<T | undefi
   });
 }
 
-export function indexedDbOutboxStore(): OutboxStore {
+export function indexedDbOutboxStore(name = 'cairn-chief-outbox'): OutboxStore {
   let opened: Promise<IDBDatabase> | null = null;
   const database = () => {
     if (opened !== null) return opened;
-    const request = indexedDB.open('cairn-chief-outbox', 1);
+    const request = indexedDB.open(name, 1);
     request.onupgradeneeded = () => request.result.createObjectStore('entries', { keyPath: 'key' });
     opened = new Promise<IDBDatabase>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
@@ -163,22 +199,36 @@ export function pageLockOwner(): OutboxOwner {
   };
 }
 
+function conversationOf(
+  entry: Pick<OutboxEntry, 'scope' | 'threadId' | 'projectId' | 'task'>,
+): string {
+  if (entry.task !== undefined) return `task:${entry.task.todoId}`;
+  return entry.threadId === null
+    ? `new:${entry.scope}:${entry.projectId}`
+    : `thread:${entry.scope}:${entry.threadId}`;
+}
+
 export function createOutbox({
   now = Date.now,
   mintKey = randomId,
   store = unstored,
   owner = solitary,
   writeTimeoutMs = 1000,
+  sendTimeoutMs = SEND_TIMEOUT_MS,
 }: {
   now?: () => number;
   mintKey?: () => string;
   store?: OutboxStore;
   owner?: OutboxOwner;
   writeTimeoutMs?: number;
+  sendTimeoutMs?: number;
 } = {}): Outbox {
   let list: readonly OutboxEntry[] = [];
   let returned: readonly OutboxEntry[] = [];
-  let tail: Promise<void> = Promise.resolve();
+  let loading: Promise<unknown> | null = null;
+  const lanes = new Map<string, Promise<void>>();
+  const laneAliases = new Map<string, string>();
+  const lateListeners = new Set<LateArrival>();
   const resumed = new Map<string, Promise<void>>();
   const sentKeys = new Map<string, string>();
   const pendingRefetchKeys = new Set<string>();
@@ -196,23 +246,33 @@ export function createOutbox({
           ...(entry.designCommentIds !== undefined
             ? { designCommentIds: entry.designCommentIds }
             : {}),
+          ...(entry.task !== undefined ? { task: entry.task } : {}),
+          ...(entry.failure !== undefined ? { failure: entry.failure } : {}),
           state,
           createdAt: entry.createdAt,
         };
+  const unwritten = new Set<string>();
   const bounded = (write: Promise<void>) =>
     Promise.race([
-      write.catch((error) => {
-        console.debug('cairn: recoverable operation failed', error);
-      }),
-      new Promise<void>((resolve) => setTimeout(resolve, writeTimeoutMs)),
+      write.then(
+        () => true,
+        (error) => {
+          console.debug('cairn: recoverable operation failed', error);
+          return false;
+        },
+      ),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), writeTimeoutMs)),
     ]);
-  const keep = (entry: OutboxEntry, state: StoredOutboxEntry['state']) => {
+  const keep = async (entry: OutboxEntry, state: StoredOutboxEntry['state']) => {
     const row = rowOf(entry, state);
-    return row === null ? Promise.resolve() : bounded(store.put(row));
+    if (row === null) return;
+    if (await bounded(store.put(row))) unwritten.delete(entry.key);
+    else unwritten.add(entry.key);
   };
-  const amend = (entry: OutboxEntry, state: StoredOutboxEntry['state']) => {
+  const amend = async (entry: OutboxEntry, state: StoredOutboxEntry['state']) => {
     const row = rowOf(entry, state);
-    return row === null ? Promise.resolve() : bounded(store.putIfPresent(row));
+    if (row === null) return true;
+    return (await bounded(store.putIfPresent(row))) && !unwritten.has(entry.key);
   };
   const forget = (key: string) => {
     void store.remove(key).catch((error) => {
@@ -227,12 +287,54 @@ export function createOutbox({
     const entry = list.find((candidate) => candidate.key === key);
     return entry?.state === 'sending' ? entry : null;
   };
-  const send = async (key: string, deliver: Deliver) => {
+  const laneOf = (entry: OutboxEntry) => {
+    const own = conversationOf(entry);
+    return laneAliases.get(own) ?? own;
+  };
+  const withinTimeout = async (entry: OutboxEntry, deliver: Deliver) => {
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        const error = new SendTimeoutError();
+        controller.abort(error);
+        reject(error);
+      }, sendTimeoutMs);
+    });
+    try {
+      return await Promise.race([deliver(entry, controller.signal), expired]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const fail = async (
+    key: string,
+    failure: OutboxFailure,
+    error: unknown,
+    onFailed: SendFailed | undefined,
+  ) => {
+    const failing = sendingEntry(key);
+    if (failing === null) return;
+    const saved = await amend({ ...failing, failure }, 'failed');
+    const current = sendingEntry(key);
+    if (current === null) return;
+    const failed: OutboxEntry = {
+      ...current,
+      state: 'failed',
+      failure,
+      ...(saved ? {} : { unsaved: true as const }),
+    };
+    replace(list.map((other) => (other === current ? failed : other)));
+    onFailed?.(failed, error);
+  };
+  const send = async (key: string, lane: string, deliver: Deliver, onFailed?: SendFailed) => {
     const entry = sendingEntry(key);
     if (entry === null) return;
     try {
-      const delivered = await deliver(entry);
+      const delivered = await withinTimeout(entry, deliver);
       if (delivered.messageId !== null) sentKeys.set(delivered.messageId, key);
+      if (delivered.threadId !== entry.threadId)
+        laneAliases.set(conversationOf({ ...entry, threadId: delivered.threadId }), lane);
       replace(
         list.map((other) =>
           other.key === key
@@ -252,21 +354,17 @@ export function createOutbox({
         ),
       );
       forget(key);
-    } catch {
-      const failing = sendingEntry(key);
-      if (failing === null) return;
-      await amend(failing, 'failed');
-      const current = sendingEntry(key);
-      if (current === null) return;
-      replace(list.map((other) => (other === current ? { ...other, state: 'failed' } : other)));
+    } catch (error) {
+      await fail(key, error instanceof SendTimeoutError ? 'timeout' : 'error', error, onFailed);
     }
   };
-  const after = (work: () => Promise<void>) => {
-    const run = tail.then(work).catch((error) => {
-      console.debug('cairn: recoverable operation failed', error);
-    });
-    tail = run;
-    return run;
+  const chain = (lane: string, work: () => Promise<void>) => {
+    lanes.set(
+      lane,
+      (lanes.get(lane) ?? Promise.resolve()).then(work).catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      }),
+    );
   };
   return {
     subscribe(listener) {
@@ -275,16 +373,22 @@ export function createOutbox({
     },
     entries: () => list,
     enqueue({ globalThreadId, ...input }, deliver, options) {
+      const conversation = conversationOf(input);
       const replaced = returned.filter(
         (entry) =>
-          entry.scope === input.scope &&
-          (entry.threadId === input.threadId ||
-            (entry.threadId === null && input.threadId === globalThreadId)),
+          conversationOf(entry) === conversation ||
+          (entry.scope === input.scope &&
+            entry.threadId === null &&
+            input.threadId === globalThreadId),
       );
       returned = returned.filter((entry) => !replaced.includes(entry));
       const key =
-        replaced.find((entry) => entry.text === input.text && entry.projectId === input.projectId)
-          ?.key ?? mintKey();
+        replaced.find(
+          (entry) =>
+            entry.text === input.text &&
+            entry.projectId === input.projectId &&
+            now() - entry.createdAt <= RETURNED_KEY_TTL_MS,
+        )?.key ?? mintKey();
       for (const retired of replaced) if (retired.key !== key) forget(retired.key);
       if (options?.awaitRefetch === true) pendingRefetchKeys.add(key);
       const entry: OutboxEntry = {
@@ -296,24 +400,40 @@ export function createOutbox({
       };
       replace([...list, entry]);
       const written = keep(entry, 'sending');
-      void after(async () => {
-        await written;
-        await send(key, deliver);
-      });
+      const start = () => {
+        const lane = laneOf(entry);
+        chain(lane, async () => {
+          await written;
+          await send(key, lane, deliver, options?.onFailed);
+        });
+      };
+      if (loading === null) start();
+      else void loading.then(start);
       return key;
     },
     discard(key) {
       const entry = list.find((candidate) => candidate.key === key);
       if (entry?.state !== 'failed') return null;
       pendingRefetchKeys.delete(key);
-      returned = [...returned, entry];
+      const handedBack = { ...entry, createdAt: now() };
+      returned = [...returned, handedBack];
       replace(list.filter((candidate) => candidate.key !== key));
-      void amend(entry, 'returned');
+      void amend(handedBack, 'returned');
       return entry;
     },
     land(key, messageId) {
       pendingRefetchKeys.delete(key);
-      const entry = list.find((candidate) => candidate.key === key && candidate.state !== 'failed');
+      const handedBack = returned.find((candidate) => candidate.key === key);
+      if (handedBack !== undefined) {
+        const seenByItsComposer = [...lateListeners].map((listener) => listener(handedBack));
+        if (seenByItsComposer.includes(true)) {
+          returned = returned.filter((candidate) => candidate !== handedBack);
+          sentKeys.set(messageId, key);
+          forget(key);
+        }
+        return;
+      }
+      const entry = list.find((candidate) => candidate.key === key);
       if (entry === undefined) return;
       sentKeys.set(messageId, key);
       replace(
@@ -321,25 +441,29 @@ export function createOutbox({
       );
       forget(key);
     },
+    subscribeLateArrival(listener) {
+      lateListeners.add(listener);
+      return () => lateListeners.delete(listener);
+    },
     markRefetched(key) {
       if (!pendingRefetchKeys.delete(key)) return;
       for (const listener of listeners) listener();
     },
     sentKey: (messageId) => sentKeys.get(messageId) ?? null,
-    settle(threadId, known, scope) {
+    settle(threadId, known, belongs) {
       const kept = list.filter(
         (entry) =>
-          (scope !== undefined && entry.scope !== scope) ||
+          (belongs !== undefined && !belongs(entry)) ||
           entry.state !== 'sent' ||
           pendingRefetchKeys.has(entry.key) ||
           (entry.threadId === threadId && entry.messageId !== null && !known.has(entry.messageId)),
       );
       if (kept.length !== list.length) replace(kept);
     },
-    resume(scope, deliver) {
+    resume(scope, deliver, options) {
       const started = resumed.get(scope);
       if (started !== undefined) return started;
-      const run = after(async () => {
+      const place = async () => {
         const [rows, live] = await Promise.all([store.load(), owner.live()]);
         const held = new Set([...list, ...returned].map((entry) => entry.key));
         const orphaned = rows.filter(
@@ -351,32 +475,86 @@ export function createOutbox({
         const restored = orphaned
           .filter((row) => !expired(row))
           .toSorted((a, b) => a.createdAt - b.createdAt);
-        const entryOf = (row: StoredOutboxEntry, state: OutboxState): OutboxEntry => ({
-          key: row.key,
-          scope: row.scope,
-          threadId: row.threadId,
-          projectId: row.projectId,
-          text: row.text,
-          ...(row.designCommentIds !== undefined ? { designCommentIds: row.designCommentIds } : {}),
-          state,
-          messageId: null,
-          createdAt: row.createdAt,
-        });
-        returned = [
-          ...returned,
-          ...restored.flatMap((row) => (row.state === 'returned' ? [entryOf(row, 'failed')] : [])),
-        ];
-        const unsent = restored.flatMap((row) =>
-          row.state === 'returned' ? [] : [entryOf(row, row.state)],
+        const entryOf = ({ owner: _owner, state, ...row }: StoredOutboxEntry): OutboxEntry => {
+          const tooOld = state === 'sending' && now() - row.createdAt > RESEND_WINDOW_MS;
+          return {
+            ...row,
+            ...(tooOld ? { failure: 'stale' as const } : {}),
+            state: state === 'sending' && !tooOld ? 'sending' : 'failed',
+            messageId: null,
+          };
+        };
+        const onRecord = new Set(
+          restored.filter((row) => row.state === 'failed').map((row) => row.key),
         );
-        await Promise.all(restored.map((row) => keep(entryOf(row, 'sending'), row.state)));
+        const unsent: OutboxEntry[] = [];
+        const writes: Promise<void>[] = [];
+        for (const row of restored) {
+          const entry = entryOf(row);
+          if (row.state === 'returned') {
+            returned = [...returned, entry];
+            writes.push(keep(entry, 'returned'));
+          } else {
+            unsent.push(entry);
+            writes.push(keep(entry, entry.state === 'sending' ? 'sending' : 'failed'));
+          }
+        }
+        const written = Promise.all(writes);
+        for (const entry of unsent) {
+          if (entry.state !== 'sending') continue;
+          if (options?.awaitRefetch?.(entry) === true) pendingRefetchKeys.add(entry.key);
+          const lane = laneOf(entry);
+          chain(lane, async () => {
+            await written;
+            await send(entry.key, lane, deliver, options?.onFailed);
+          });
+        }
         if (unsent.length > 0) replace([...unsent, ...list]);
-        for (const entry of unsent) if (entry.state === 'sending') await send(entry.key, deliver);
+        for (const entry of unsent)
+          if (entry.state === 'failed')
+            options?.onFailed?.(
+              entry,
+              entry.failure === 'stale'
+                ? new SendStaleError()
+                : entry.failure === 'timeout'
+                  ? new SendTimeoutError()
+                  : null,
+              onRecord.has(entry.key),
+            );
+      };
+      const run = place().catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
       });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const waited: Promise<void> = Promise.race([
+        run,
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, LOAD_TIMEOUT_MS);
+        }),
+      ]).then(() => {
+        clearTimeout(timer);
+        if (loading === waited) loading = null;
+      });
+      loading = waited;
       resumed.set(scope, run);
       return run;
     },
   };
+}
+
+export function withoutReturnedText(draft: string, text: string): string {
+  if (draft === text) return '';
+  if (draft.endsWith(`\n${text}`)) return draft.slice(0, -text.length - 1);
+  if (draft.startsWith(`${text}\n`)) return draft.slice(text.length + 1);
+  return draft.replace(`\n${text}\n`, () => '\n');
+}
+
+export function hasPendingSend(entries: readonly OutboxEntry[]): boolean {
+  return entries.some(
+    (entry) =>
+      entry.state === 'sending' ||
+      (entry.state === 'failed' && (entry.scope === null || entry.unsaved === true)),
+  );
 }
 
 export function failedOutboxForChannel(

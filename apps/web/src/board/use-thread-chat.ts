@@ -23,6 +23,7 @@ import {
   useConversationMessages,
   useMachines,
   usePlans,
+  useSession,
   useSteps,
   useTodo,
 } from '../api/hooks.js';
@@ -41,7 +42,7 @@ import { useConversationStream } from '../api/sse.js';
 import { globalCoordinatorThread } from '../chief/coordinator-load.js';
 import { resolveCoordinatorOutage } from '../chief/coordinator-outage.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
-import type { UnsentSends } from '../chief/outbox.js';
+import type { TaskSendMode, UnsentSends } from '../chief/outbox.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import type { NamedMachine } from '../components/machine-label.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
@@ -58,11 +59,16 @@ import { useThreadPresence } from '../pwa/thread-presence.js';
 import type { EngineRun, EngineRunStage } from './engine-run.js';
 import { liveEngineRun } from './live-engine-run.js';
 import {
+  liveTaskDelivery,
+  liveTaskSendFailed,
+  openTaskChat,
+  taskDelivery,
+} from './task-delivery.js';
+import {
   consumeTaskReadyToSettle,
   discardTaskFailed,
   enqueueTaskSend,
   failedTaskOutbox,
-  markTaskReadyToSettle,
   taskOutbox,
   taskOutboxErrors,
   unlandedTaskBubbles,
@@ -135,6 +141,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const mutations = useApiMutations(teamId);
+  const userId = useSession(live).data?.id;
   const [stopping, setStopping] = useState(false);
   const stopRequested = useRef(false);
 
@@ -192,7 +199,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       !messagesQ.isPending && !messagesQ.isFetching && messagesState?.isInvalidated !== true;
     for (const entry of outbox) {
       if (
-        entry.scope === todoId &&
+        entry.task?.todoId === todoId &&
         entry.state === 'sent' &&
         entry.threadId === buildId &&
         entry.messageId === null &&
@@ -202,7 +209,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         taskOutbox.markRefetched(entry.key);
       }
     }
-    taskOutbox.settle(buildId, known, todoId);
+    taskOutbox.settle(buildId, known, (entry) => entry.task?.todoId === todoId);
   }, [
     live,
     qc,
@@ -371,65 +378,41 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     : () => Promise.resolve();
 
   const queueReply = todo != null && replyRouteOf(todo.phase, steps) === 'queue';
-  const postQueued =
-    writable && buildId != null
-      ? (text: string, deliverAfterStop: boolean, clientMessageId: string) =>
-          mutations.sendSteer.mutateAsync({
-            conversationId: buildId,
-            content: text,
-            mode: 'queue',
-            deliverAfterStop,
-            clientMessageId,
-          })
-      : undefined;
   const enqueueReply =
     writable && buildId != null
-      ? (text: string, queued: { deliverAfterStop: boolean } | null) => {
+      ? (text: string, mode: TaskSendMode) => {
           if (mutations.sendSteer.isError) mutations.sendSteer.reset();
           enqueueTaskSend({
+            account: userId !== undefined && teamId !== undefined ? `${userId}/${teamId}` : null,
             todoId,
             buildId,
             text,
-            queueOnly: queued !== null,
-            deliver: async (entry) => {
-              if (queued !== null && postQueued !== undefined) {
-                await postQueued(entry.text, queued.deliverAfterStop, entry.key);
-                return { threadId: buildId, messageId: null };
-              }
-              const result = await mutations.messageThread.mutateAsync({
-                todoId,
-                conversationId: buildId,
-                content: entry.text,
-                clientMessageId: entry.key,
-              });
-              const targetId = result?.conversationId ?? buildId;
-              markTaskReadyToSettle(entry.key);
-              if (targetId === buildId) {
-                void qc.refetchQueries(
-                  { queryKey: ['messages', targetId, 'pages'], type: 'active' },
-                  { cancelRefetch: false },
-                );
-              }
-              return { threadId: targetId, messageId: null };
-            },
-            onError: (error) => {
-              taskOutboxErrors.set(todoId, describeError(error, t) ?? t('发送失败，请重试。'));
-            },
+            mode,
+            deliver: liveTaskDelivery(taskDelivery(mutations, qc)),
+            onFailed: liveTaskSendFailed(t),
           });
         }
       : undefined;
   const send =
     enqueueReply !== undefined
-      ? (text: string) => enqueueReply(text, queueReply ? { deliverAfterStop: false } : null)
+      ? (text: string) => enqueueReply(text, queueReply ? 'queue' : 'reply')
       : !live && open
         ? fixtureSend
         : undefined;
+  useEffect(() => openTaskChat(todoId), [todoId]);
   const unsent = useMemo<UnsentSends | undefined>(
     () =>
       live
         ? {
             failed: failedTaskOutbox(outbox, todoId),
             discard: discardTaskFailed,
+            onArrivedLate: (listener) =>
+              taskOutbox.subscribeLateArrival((entry) => {
+                if (entry.task?.todoId !== todoId) return false;
+                listener(entry);
+                taskOutboxErrors.clear(todoId);
+                return true;
+              }),
           }
         : undefined,
     [live, outbox, todoId],
@@ -533,7 +516,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     sendError:
       outboxError ??
       (mutations.sendSteer.isError &&
-      mutations.sendSteer.variables?.cancelQueued !== true &&
+      mutations.sendSteer.variables?.queuedMessageId !== undefined &&
+      mutations.sendSteer.variables.cancelQueued !== true &&
       mutations.sendSteer.variables?.editQueued !== true
         ? (describeError(mutations.sendSteer.error, t) ?? t('发送失败，请重试。'))
         : null),
@@ -545,8 +529,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     ...(send !== undefined ? { send } : {}),
     ...(enqueueReply !== undefined && running
       ? {
-          queue: (text: string) => enqueueReply(text, { deliverAfterStop: false }),
-          stopAndSend: (text: string) => enqueueReply(text, { deliverAfterStop: true }),
+          queue: (text: string) => enqueueReply(text, 'queue'),
+          stopAndSend: (text: string) => enqueueReply(text, 'stop-and-send'),
         }
       : {}),
     ...(stop !== undefined ? { stop } : {}),

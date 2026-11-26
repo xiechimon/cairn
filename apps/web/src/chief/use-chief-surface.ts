@@ -49,6 +49,7 @@ import { useI18n } from '../i18n/provider.js';
 import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import { ensureGestureKeys } from '../overlay/gesture-machine.js';
 import { settingsHref } from '../settings/settings-href.js';
+import { announceUnsent, reportedByOutbox } from './announce-unsent.js';
 import { isApprovalRequest } from './approval-card-model.js';
 import {
   type CoordinatorLoad,
@@ -162,6 +163,14 @@ function placeOf(pathname: string, search: string): string {
   params.delete('chief');
   params.delete(THREAD_PARAM);
   return `${pathname}?${params.toString()}`;
+}
+
+function unsentCoordinatorHref(entry: OutboxEntry): string {
+  const params = new URLSearchParams();
+  if (entry.projectId !== null) params.set('project', entry.projectId);
+  else if (entry.threadId !== null) params.set('chief', entry.threadId);
+  const query = params.toString();
+  return query === '' ? '/app' : `/app?${query}`;
 }
 
 export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): ChiefSurface {
@@ -482,7 +491,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
       }
     : undefined;
 
-  const deliver = (entry: OutboxEntry) =>
+  const deliver = (entry: OutboxEntry, signal?: AbortSignal) =>
     mutations.chiefSend
       .mutateAsync({
         threadId: entry.threadId,
@@ -492,29 +501,37 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         ...(entry.designCommentIds !== undefined
           ? { designCommentIds: entry.designCommentIds }
           : {}),
+        ...(signal !== undefined ? { signal } : {}),
       })
       .then(
         (result) => ({
           threadId: result.thread.id,
           messageId: transcriptRowSchema.safeParse(result.message).data?.id ?? null,
         }),
-        (error: unknown) => {
-          if (isCoordinatorNotReady(error))
-            toastCoordinatorNotReady(
-              t('Coordinator 还不能回答'),
-              t('先接入模型来源，再发一次。'),
-              error,
-            );
-          else toastError(t('发送失败，请重试。'), error);
-          throw error;
-        },
+        reportedByOutbox,
       );
+  const sendFailed = (_entry: OutboxEntry, error: unknown) => {
+    if (isCoordinatorNotReady(error))
+      toastCoordinatorNotReady(t('Coordinator 还不能回答'), t('先接入模型来源，再发一次。'), error);
+    else toastError(t('发送失败，请重试。'), error);
+  };
   const outboxScope = userId !== undefined && teamId !== undefined ? `${userId}/${teamId}` : null;
-  const deliverRef = useRef(deliver);
-  deliverRef.current = deliver;
+  const resumeRef = useRef({ deliver, t, navigate });
+  resumeRef.current = { deliver, t, navigate };
   useEffect(() => {
     if (live && outboxScope !== null)
-      void chiefOutbox.resume(outboxScope, (entry) => deliverRef.current(entry));
+      void chiefOutbox.resume(
+        outboxScope,
+        (entry, signal) => resumeRef.current.deliver(entry, signal),
+        {
+          onFailed: (entry, error, repeat) => {
+            if (repeat !== true)
+              announceUnsent(error, resumeRef.current.t, () =>
+                resumeRef.current.navigate(unsentCoordinatorHref(entry)),
+              );
+          },
+        },
+      );
   }, [live, outboxScope]);
   const unsent = useMemo<UnsentSends | undefined>(
     () =>
@@ -522,6 +539,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         ? {
             failed: failedOutboxForChannel(outbox, activeThreadId, channel),
             discard: (outboxKey) => chiefOutbox.discard(outboxKey)?.text ?? null,
+            onArrivedLate: (listener) => chiefOutbox.subscribeLateArrival(listener),
           }
         : undefined,
     [live, outbox, activeThreadId, channel],
@@ -553,6 +571,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
               : {}),
           },
           deliver,
+          { onFailed: sendFailed },
         );
         return Promise.resolve();
       }

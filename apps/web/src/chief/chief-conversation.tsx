@@ -86,6 +86,7 @@ import { serverDraftBinding } from './composer-binding.js';
 import { composerMode } from './composer-mode.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
 import type { UnsentSends } from './outbox.js';
+import { type LateArrival, withoutReturnedText } from './outbox.js';
 import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
 import { type QueuedMessage, QueueTabs } from './queue-tabs.js';
@@ -461,6 +462,21 @@ export function ChiefConversation({
       if (text !== null) restoreSentRef.current(text);
     }
   }, [unsent, activeThreadId, scopeProjectId]);
+  const clearArrivedRef = useRef<LateArrival>(() => false);
+  clearArrivedRef.current = (entry) => {
+    const here =
+      entry.threadId !== null
+        ? entry.threadId === activeThreadId
+        : entry.projectId === scopeProjectId;
+    if (!here) return false;
+    const body = parseReplyQuote(entry.text)?.body ?? entry.text;
+    if (withoutReturnedText(liveDraft, body) !== liveDraft) {
+      restoreToThread((cur) => withoutReturnedText(cur, body));
+      setReplyQuote(null);
+    }
+    return true;
+  };
+  useEffect(() => unsent?.onArrivedLate((entry) => clearArrivedRef.current(entry)), [unsent]);
   const withdraw =
     onWithdraw == null
       ? undefined

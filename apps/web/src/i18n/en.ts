@@ -1605,6 +1605,12 @@ export const EN: Record<string, string> = {
   '还有 {n} 条': '{n} more',
   '尚未开始，新消息会排在后面': 'New messages queue behind it',
   '发送失败，请重试。': 'Send failed. Try again.',
+  '不确定是否送达，重发前请先看对话里有没有这条。':
+    'Delivery is not confirmed. Check the conversation for this message before sending it again.',
+  '超过 10 分钟未确认送达，已停止自动重发。':
+    'Not confirmed for over 10 minutes. It will not be resent automatically.',
+  有一条消息尚未确认发出: 'A message is not confirmed as sent',
+  打开对话: 'Open conversation',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   '附件超过 10MB 上限': 'Attachment exceeds the 10 MB limit',
   不支持该文件类型: 'That file type is not supported',

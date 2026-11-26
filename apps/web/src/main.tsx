@@ -5,7 +5,7 @@ import { App, router } from './App.js';
 import { liveTextStore } from './api/live-text.js';
 import { liveThinkingStore } from './api/live-thinking.js';
 import { taskOutbox } from './board/task-outbox.js';
-import { chiefOutbox } from './chief/outbox.js';
+import { chiefOutbox, hasPendingSend } from './chief/outbox.js';
 import {
   followDesktopNavigation,
   markDesktopShell,
@@ -115,10 +115,8 @@ if (currentEntry !== null) {
     visible: () => document.visibilityState === 'visible',
     busy: () => {
       if (
-        chiefOutbox.entries().some((entry) => entry.state === 'sending') ||
-        taskOutbox
-          .entries()
-          .some((entry) => entry.state === 'sending' || entry.state === 'failed') ||
+        hasPendingSend(chiefOutbox.entries()) ||
+        hasPendingSend(taskOutbox.entries()) ||
         composing ||
         document.querySelector('[role="dialog"], [role="alertdialog"]') !== null ||
         liveTextStore.hasActive() ||
