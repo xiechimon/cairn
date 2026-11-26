@@ -1,7 +1,5 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { ENV_VARS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { step as stepTable } from '../../apps/server/src/db/schema.js';
@@ -12,11 +10,10 @@ import {
   makeDaemonHome,
   type RealServer,
   seedWorld,
+  spawnCliDaemon,
   waitFor,
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
-
-const DAEMON_DIR = fileURLToPath(new URL('../../apps/daemon', import.meta.url));
 
 let stub: StubLlm;
 let server: RealServer;
@@ -32,36 +29,13 @@ afterAll(async () => {
 });
 
 function spawnDaemon(): ChildProcess {
-  const child = spawn(
-    process.execPath,
-    [
-      '--import',
-      'tsx',
-      'src/cli.ts',
-      'start',
-      '--foreground',
-      '--server',
-      server.url,
-      '--api-key',
-      server.apiKey,
-      '--team',
-      server.teamId,
-      '--name',
-      'crash-mbp',
-    ],
-    {
-      cwd: DAEMON_DIR,
-      env: {
-        ...process.env,
-        [ENV_VARS.home]: home,
-        HTTP_PROXY: '',
-        HTTPS_PROXY: '',
-        http_proxy: '',
-        https_proxy: '',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
+  const child = spawnCliDaemon({
+    home,
+    serverUrl: server.url,
+    apiKey: server.apiKey,
+    teamId: server.teamId,
+    name: 'crash-mbp',
+  });
   children.push(child);
   return child;
 }
@@ -93,6 +67,9 @@ describe('crash recovery (T2: AgentSession seam × host durable orchestration)',
 
     const first = spawnDaemon();
     await waitFor(() => logLines().includes('[wake] push channel connected'), 60_000);
+    expect(logLines().find((l) => l.startsWith('[machine] agent config import:'))).toMatch(
+      /agent config import: 0 copied/,
+    );
 
     const started = await api(server.url, 'POST', `/api/projects/${world.projectId}/builds`, {
       todoIds: [world.todoId],

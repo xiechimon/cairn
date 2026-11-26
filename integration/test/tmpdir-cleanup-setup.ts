@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach } from 'vitest';
 import {
   installNetworkGuard,
@@ -6,6 +7,7 @@ import {
 import { cleanupTestTempDirs } from '../../scripts/test-tmpdir.mjs';
 
 installNetworkGuard({ suite: 'integration' });
+process.env.CAIRN_AGENT_IMPORT_HOME = fileURLToPath(new URL('./no-agent-config', import.meta.url));
 
 afterEach(() => {
   const calls = takeUnstubbedNetworkCalls();

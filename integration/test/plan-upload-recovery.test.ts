@@ -1,9 +1,8 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { Agent, createServer as createTcpServer, request } from 'node:http';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { type ClaimedStep, claimedStepSchema, ENV_VARS, PLAN_FILE_NAME } from '@cairn/shared';
+import { type ClaimedStep, claimedStepSchema, PLAN_FILE_NAME } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -20,12 +19,13 @@ import {
   pinSessionRouteMachine,
   type RealServer,
   seedWorld,
+  spawnCliDaemon,
   startLegacyBuild,
   waitFor,
+  waitForLiveDaemon,
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
-const DAEMON_DIR = fileURLToPath(new URL('../../apps/daemon', import.meta.url));
 const PLAN_CONTENT =
   '# 方案\nKind: fix\n\nContext: 恢复探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\n';
 
@@ -82,7 +82,6 @@ let stub: StubLlm;
 let server: RealServer;
 let home: string;
 const children: ChildProcess[] = [];
-const daemonStderr = new WeakMap<ChildProcess, () => string>();
 let proxyHandle: Awaited<ReturnType<typeof startProxy>> | null = null;
 
 afterAll(async () => {
@@ -95,60 +94,9 @@ afterAll(async () => {
 });
 
 function spawnDaemon(serverUrl: string, name: string, apiKey: string): ChildProcess {
-  const child = spawn(
-    process.execPath,
-    [
-      '--import',
-      'tsx',
-      'src/cli.ts',
-      'start',
-      '--foreground',
-      '--server',
-      serverUrl,
-      '--api-key',
-      apiKey,
-      '--team',
-      server.teamId,
-      '--name',
-      name,
-    ],
-    {
-      cwd: DAEMON_DIR,
-      env: {
-        ...process.env,
-        [ENV_VARS.home]: home,
-        HTTP_PROXY: '',
-        HTTPS_PROXY: '',
-        http_proxy: '',
-        https_proxy: '',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
-  child.stdout?.resume();
-  let stderrTail = '';
-  child.stderr?.on('data', (chunk: Buffer) => {
-    stderrTail = `${stderrTail}${chunk.toString()}`.slice(-4_000);
-  });
-  daemonStderr.set(child, () => stderrTail);
+  const child = spawnCliDaemon({ home, serverUrl, apiKey, teamId: server.teamId, name });
   children.push(child);
   return child;
-}
-
-async function waitForLiveDaemon(
-  child: ChildProcess,
-  condition: () => boolean,
-  timeoutMs: number,
-): Promise<void> {
-  await waitFor(() => {
-    if (condition()) return true;
-    if (child.exitCode !== null || child.signalCode !== null) {
-      throw new Error(
-        `daemon exited (${child.exitCode ?? child.signalCode}) while the test was waiting on it\n${daemonStderr.get(child)?.()}`,
-      );
-    }
-    return false;
-  }, timeoutMs);
 }
 
 function logLines(): string[] {

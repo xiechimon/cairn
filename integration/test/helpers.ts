@@ -1,8 +1,10 @@
+import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
-import type { ProjectRepoKind, Scheduler } from '@cairn/shared';
+import { fileURLToPath } from 'node:url';
+import { ENV_VARS, type ProjectRepoKind, type Scheduler } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -45,6 +47,75 @@ export const AGENT_ID = 'agent-it-1';
 
 export function runTestDaemon(opts: MachineLoopOpts): Promise<MachineHandle> {
   return runMachine({ ...offlineDaemonRuntimeOpts(), ...opts });
+}
+
+const DAEMON_DIR = fileURLToPath(new URL('../../apps/daemon', import.meta.url));
+const daemonStderr = new WeakMap<ChildProcess, () => string>();
+
+export function spawnCliDaemon(opts: {
+  home: string;
+  serverUrl: string;
+  apiKey: string;
+  teamId: string;
+  name: string;
+}): ChildProcess {
+  const userHome = makeTestTempDir('cairn-it-user-home-');
+  const child = spawn(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      'src/cli.ts',
+      'start',
+      '--foreground',
+      '--server',
+      opts.serverUrl,
+      '--api-key',
+      opts.apiKey,
+      '--team',
+      opts.teamId,
+      '--name',
+      opts.name,
+    ],
+    {
+      cwd: DAEMON_DIR,
+      env: {
+        ...process.env,
+        HOME: userHome,
+        [ENV_VARS.agentImportHome]: userHome,
+        [ENV_VARS.skillsDir]: join(userHome, '.agents', 'skills'),
+        [ENV_VARS.home]: opts.home,
+        HTTP_PROXY: '',
+        HTTPS_PROXY: '',
+        http_proxy: '',
+        https_proxy: '',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  child.stdout?.resume();
+  let stderrTail = '';
+  child.stderr?.on('data', (chunk: Buffer) => {
+    stderrTail = `${stderrTail}${chunk.toString()}`.slice(-4_000);
+  });
+  daemonStderr.set(child, () => stderrTail);
+  return child;
+}
+
+export async function waitForLiveDaemon(
+  child: ChildProcess,
+  condition: () => boolean,
+  timeoutMs: number,
+): Promise<void> {
+  await waitFor(() => {
+    if (condition()) return true;
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(
+        `daemon exited (${child.exitCode ?? child.signalCode}) while the test was waiting on it\n${daemonStderr.get(child)?.()}`,
+      );
+    }
+    return false;
+  }, timeoutMs);
 }
 
 export function makeDaemonHome(prefix: string): string {
