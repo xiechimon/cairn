@@ -2,7 +2,7 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { enrollDisplayName } from '@cairn/shared';
 import { z } from 'zod';
-import type { MachineClient } from './machine-client.js';
+import { MachineApiError, type MachineClient } from './machine-client.js';
 import { writePrivateFile } from './private-fs.js';
 import type { StatePaths } from './state.js';
 import { saveMachineJson } from './state.js';
@@ -36,6 +36,13 @@ export interface EnrolledMachine {
   token: string;
   teamId: string;
   serverUrl: string;
+}
+
+export class RetryableEnrollmentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RetryableEnrollmentError';
+  }
 }
 
 function pendingPath(paths: StatePaths): string {
@@ -116,12 +123,20 @@ export async function enrollThroughBrowser(
   }
   for (;;) {
     if (io.stop?.aborted === true) throw new Error('enrollment stopped before approval');
-    const polled = await api.enrollPoll(pending.enrollId, pending.pollSecret);
+    let polled: Awaited<ReturnType<EnrollApi['enrollPoll']>>;
+    try {
+      polled = await api.enrollPoll(pending.enrollId, pending.pollSecret);
+    } catch (error) {
+      if (error instanceof MachineApiError && error.status === 403) {
+        rmSync(path, { force: true });
+      }
+      throw error;
+    }
     if (polled.status === 'authorized') {
       if (polled.machine === undefined) {
         rmSync(path, { force: true });
-        throw new Error(
-          'enrollment credentials were already claimed or missing poll secret; run start again',
+        throw new RetryableEnrollmentError(
+          'enrollment credentials were already claimed or missing poll secret; starting a new enrollment',
         );
       }
       if (existsSync(paths.machineJson))
@@ -144,14 +159,14 @@ export async function enrollThroughBrowser(
     }
     if (polled.status === 'expired') {
       rmSync(path, { force: true });
-      throw new Error(
-        'enrollment expired: nobody approved this machine within 10 minutes; run start again',
+      throw new RetryableEnrollmentError(
+        'enrollment expired: nobody approved this machine within 10 minutes; starting a new enrollment',
       );
     }
     if (io.now() >= pending.expiresAt) {
       rmSync(path, { force: true });
-      throw new Error(
-        'enrollment expired: nobody approved this machine within 10 minutes; run start again',
+      throw new RetryableEnrollmentError(
+        'enrollment expired: nobody approved this machine within 10 minutes; starting a new enrollment',
       );
     }
     await io.sleep(POLL_INTERVAL_MS);

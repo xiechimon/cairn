@@ -101,6 +101,192 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     expect(await outcome).toContain('machine.json changed');
   });
 
+  test('a local-host-proof enrollment refusal backs off, logs one recovery line, and continues after the stale row is gone', async () => {
+    const api = new FakeMachineApi();
+    let refused = true;
+    let starts = 0;
+    api.enrollStart = async () => {
+      starts += 1;
+      if (refused) {
+        throw new MachineApiError(
+          409,
+          '{"error":"this enrollment does not prove it is the local host runner"}',
+        );
+      }
+      return {
+        enrollId: 'e1',
+        url: 'http://server/app/machines/authorize?enroll=e1',
+        pollSecret: 'sec',
+      };
+    };
+    const started = startMachine({ api, browserEnrollment: true });
+    onTestFinished(() => {
+      releaseTestTempDir(started.home);
+    });
+    let settled = false;
+    const observed = started.handlePromise.then(
+      () => {
+        settled = true;
+        return 'online';
+      },
+      (error: unknown) => {
+        settled = true;
+        return error instanceof Error ? error.message : String(error);
+      },
+    );
+    await waitFor(
+      () =>
+        settled ||
+        started.lines.some((l) => l.includes('local Runner record belongs to another computer')),
+    );
+    expect(settled).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    expect(starts).toBeGreaterThan(1);
+    expect(settled).toBe(false);
+    expect(
+      started.lines.filter((l) => l.includes('local Runner record belongs to another computer')),
+    ).toHaveLength(1);
+    refused = false;
+    expect(await observed).toBe('online');
+    const handle = await started.handlePromise;
+    await handle.stop();
+    await handle.done;
+    expect(started.lines).toContain('Enrolled in team team-1 (machine m1)');
+  });
+
+  test('an api-key enrollment refusal backs off instead of exiting and continues when the server accepts', async () => {
+    const api = new FakeMachineApi();
+    let refused = true;
+    let attempts = 0;
+    api.enroll = async (body) => {
+      attempts += 1;
+      if (refused) {
+        throw new MachineApiError(
+          403,
+          '{"error":"a revoked machine re-registers through the authorize page"}',
+        );
+      }
+      return {
+        machineId: 'm1',
+        token: 'a'.repeat(64),
+        teamId: body.teamId,
+        serverUrl: 'http://server',
+      };
+    };
+    const started = startMachine({ api });
+    onTestFinished(() => {
+      releaseTestTempDir(started.home);
+    });
+    let settled = false;
+    const observed = started.handlePromise.then(
+      () => {
+        settled = true;
+        return 'online';
+      },
+      (error: unknown) => {
+        settled = true;
+        return error instanceof Error ? error.message : String(error);
+      },
+    );
+    await waitFor(
+      () => settled || started.lines.some((l) => l.includes('approve this computer again')),
+    );
+    expect(settled).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    expect(attempts).toBeGreaterThan(1);
+    expect(
+      started.lines.filter((l) => l.includes('a revoked machine re-registers through')),
+    ).toHaveLength(1);
+    refused = false;
+    expect(await observed).toBe('online');
+    const handle = await started.handlePromise;
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('an unreachable server during browser enrollment backs off before enrollment exists', async () => {
+    const api = new FakeMachineApi();
+    let failures = 2;
+    const start = api.enrollStart.bind(api);
+    api.enrollStart = async (body) => {
+      if (failures > 0) {
+        failures -= 1;
+        throw new TypeError('fetch failed');
+      }
+      return start(body);
+    };
+    const { handle, lines } = await boot({ api, browserEnrollment: true });
+    expect(lines.filter((l) => l.includes('enrollment unreachable: fetch failed'))).toHaveLength(1);
+    expect(
+      lines.filter((l) => l.includes('check that the server is running and reachable')),
+    ).toHaveLength(1);
+    expect(lines).toContain('Enrolled in team team-1 (machine m1)');
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('an expired or burned browser enrollment starts over inside the same process', async () => {
+    const api = new FakeMachineApi();
+    let enrollments = 0;
+    api.enrollStart = async () => {
+      enrollments += 1;
+      return {
+        enrollId: `e${enrollments}`,
+        url: `http://server/app/machines/authorize?enroll=e${enrollments}`,
+        pollSecret: 'sec',
+      };
+    };
+    api.enrollPoll = async (enrollId: string) => {
+      if (enrollId === 'e1') return { status: 'expired' as const };
+      return {
+        status: 'authorized' as const,
+        machine: {
+          machineId: 'm1',
+          token: 'a'.repeat(64),
+          teamId: 'team-1',
+          serverUrl: 'http://server',
+        },
+      };
+    };
+    const { handle, lines } = await boot({ api, browserEnrollment: true });
+    expect(enrollments).toBe(2);
+    expect(lines.filter((l) => l.includes('enrollment expired: nobody approved'))).toHaveLength(1);
+    expect(lines).toContain('Enrolled in team team-1 (machine m1)');
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('an invalid poll secret discards only the burned pending enrollment and starts a new one', async () => {
+    const api = new FakeMachineApi();
+    let enrollments = 0;
+    api.enrollStart = async () => {
+      enrollments += 1;
+      return {
+        enrollId: `e${enrollments}`,
+        url: `http://server/app/machines/authorize?enroll=e${enrollments}`,
+        pollSecret: 'sec',
+      };
+    };
+    api.enrollPoll = async (enrollId: string) => {
+      if (enrollId === 'e1') throw new MachineApiError(403, '{"error":"invalid poll secret"}');
+      return {
+        status: 'authorized' as const,
+        machine: {
+          machineId: 'm1',
+          token: 'a'.repeat(64),
+          teamId: 'team-1',
+          serverUrl: 'http://server',
+        },
+      };
+    };
+    const { handle, lines } = await boot({ api, browserEnrollment: true });
+    expect(enrollments).toBe(2);
+    expect(lines.filter((l) => l.includes('invalid poll secret'))).toHaveLength(1);
+    expect(lines).toContain('Enrolled in team team-1 (machine m1)');
+    await handle.stop();
+    await handle.done;
+  });
+
   test('#1251 capability manifest uploaded with enroll and every presence beat (injected stub pins content)', async () => {
     const { handle, api } = await boot({
       capabilitiesProbe: () => ({ mcpServers: ['figma'], skills: ['verify-cairn'] }),

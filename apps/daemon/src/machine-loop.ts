@@ -88,7 +88,7 @@ import {
   MachineApiError,
   MachineClient,
 } from './machine-client.js';
-import { enrollThroughBrowser } from './machine-enroll.js';
+import { enrollThroughBrowser, RetryableEnrollmentError } from './machine-enroll.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { STEP_TREE_ENV, StepReaper } from './process-tree.js';
 import { setupProxy } from './proxy.js';
@@ -222,6 +222,84 @@ function readFileOrNull(path: string): string | null {
     return readFileSync(path, 'utf8');
   } catch {
     return null;
+  }
+}
+
+function machineApiErrorCause(error: MachineApiError): string {
+  try {
+    const parsed = JSON.parse(error.body) as { error?: unknown };
+    if (typeof parsed.error === 'string' && parsed.error.trim() !== '') return parsed.error;
+  } catch {}
+  const body = error.body.trim();
+  return body === '' ? `HTTP ${error.status}` : body.slice(0, 200);
+}
+
+function retryableEnrollmentFailure(
+  error: unknown,
+): { kind: string; cause: string; advice: string; signature: string } | null {
+  if (error instanceof RetryableEnrollmentError) {
+    return {
+      kind: 'enrollment retry',
+      cause: error.message,
+      advice: '',
+      signature: `local:${error.message}`,
+    };
+  }
+  if (error instanceof MachineApiError) {
+    if (![401, 403, 409, 429].includes(error.status) && error.status < 500) return null;
+    const cause = machineApiErrorCause(error);
+    let advice = '';
+    if (cause.includes('does not prove it is the local host runner')) {
+      advice =
+        "the server's local Runner record belongs to another computer; delete that stale Runner on the Runners settings page";
+    } else if (cause.includes('revoked machine')) {
+      advice = 'approve this computer again through browser enrollment';
+    } else if (error.status === 401) {
+      advice = 'check the API key or enroll again';
+    }
+    return {
+      kind: `enrollment refused (${error.status})`,
+      cause,
+      advice,
+      signature: `api:${error.status}:${cause}`,
+    };
+  }
+  if (error instanceof TypeError && error.message === 'fetch failed') {
+    return {
+      kind: 'enrollment unreachable',
+      cause: 'fetch failed',
+      advice: 'check that the server is running and reachable',
+      signature: 'network:fetch failed',
+    };
+  }
+  return null;
+}
+
+async function retryEnrollment<T>(
+  enroll: () => Promise<T>,
+  ctx: {
+    log: (line: string) => void;
+    sleep: (ms: number) => Promise<void>;
+    initialBackoffMs: number;
+  },
+): Promise<T> {
+  let backoff = ctx.initialBackoffMs;
+  let lastSignature: string | null = null;
+  for (;;) {
+    try {
+      return await enroll();
+    } catch (error) {
+      const failure = retryableEnrollmentFailure(error);
+      if (failure === null) throw error;
+      if (failure.signature !== lastSignature) {
+        ctx.log(
+          `${failure.kind}: ${failure.cause}${failure.advice === '' ? '' : ` — ${failure.advice}`}; retrying in ${backoff}ms`,
+        );
+        lastSignature = failure.signature;
+      }
+      await ctx.sleep(backoff);
+      backoff = nextBackoffMs(backoff);
+    }
   }
 }
 
@@ -774,19 +852,35 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     );
   }
   if (!machineJson) {
-    if (!config.apiKey || !config.teamId) {
-      const enrolled = await enrollThroughBrowser(
-        client,
-        paths,
-        config.serverUrl,
-        config.name,
-        {
-          now: () => Date.now(),
-          sleep,
-          log: (line) => logger.raw(line),
-        },
-        hostKey ?? undefined,
-        legacyHostKeys,
+    const enrollmentRetry = {
+      log: (line: string) => logger.machine(line),
+      sleep,
+      initialBackoffMs: opts.claimBackoffBaseMs ?? 1_000,
+    };
+    const enrollmentApiKey = config.apiKey;
+    const enrollmentTeamId = config.teamId;
+    if (!enrollmentApiKey || !enrollmentTeamId) {
+      const seenEnrollmentLines = new Set<string>();
+      const enrolled = await retryEnrollment(
+        () =>
+          enrollThroughBrowser(
+            client,
+            paths,
+            config.serverUrl,
+            config.name,
+            {
+              now: () => Date.now(),
+              sleep,
+              log: (line) => {
+                if (seenEnrollmentLines.has(line)) return;
+                seenEnrollmentLines.add(line);
+                logger.raw(line);
+              },
+            },
+            hostKey ?? undefined,
+            legacyHostKeys,
+          ),
+        enrollmentRetry,
       );
       machineJson = {
         machineId: enrolled.machineId,
@@ -796,16 +890,20 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       };
       logger.raw(`Enrolled in team ${machineJson.teamId} (machine ${machineJson.machineId})`);
     } else {
-      const enrolled = await client.enroll({
-        apiKey: config.apiKey,
-        teamId: config.teamId,
-        name: config.name,
-        cliVersion: DAEMON_VERSION,
-        claudeCode: claudeReport(),
-        capabilities: capabilitiesReport(),
-        hostKey: hostKey ?? undefined,
-        ...(legacyHostKeys.length > 0 ? { legacyHostKeys } : {}),
-      });
+      const enrolled = await retryEnrollment(
+        () =>
+          client.enroll({
+            apiKey: enrollmentApiKey,
+            teamId: enrollmentTeamId,
+            name: config.name,
+            cliVersion: DAEMON_VERSION,
+            claudeCode: claudeReport(),
+            capabilities: capabilitiesReport(),
+            hostKey: hostKey ?? undefined,
+            ...(legacyHostKeys.length > 0 ? { legacyHostKeys } : {}),
+          }),
+        enrollmentRetry,
+      );
       machineJson = {
         machineId: enrolled.machineId,
         token: enrolled.token,

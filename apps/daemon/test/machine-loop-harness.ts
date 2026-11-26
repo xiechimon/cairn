@@ -7,6 +7,7 @@ import type {
   MachineAttachmentResponse,
   MachineCapabilities,
   MachineDoneBody,
+  MachineEnrollResponse,
   MachinePresenceBody,
   MachineSteerAckBody,
   MachineStreamEvent,
@@ -101,9 +102,40 @@ export class FakeMachineApi implements MachineApi {
   claimBodies: unknown[] = [];
 
   enrollBodies: unknown[] = [];
+  enrollStartBodies: unknown[] = [];
   presenceBodies: unknown[] = [];
   antigravityVerifyBodies: MachineAntigravityVerifyBody[] = [];
   mePatch: Record<string, unknown> = {};
+
+  async enrollStart(body: { teamId?: string; name?: string }) {
+    this.calls.push('enroll-start');
+    this.enrollStartBodies.push(body);
+    return {
+      enrollId: 'e1',
+      url: 'http://server/app/machines/authorize?enroll=e1',
+      pollSecret: 'sec',
+    };
+  }
+
+  async enrollPoll(
+    _enrollId?: string,
+    _pollSecret?: string,
+  ): Promise<
+    | { status: 'pending' }
+    | { status: 'expired' }
+    | { status: 'authorized'; machine: MachineEnrollResponse }
+  > {
+    this.calls.push('enroll-poll');
+    return {
+      status: 'authorized' as const,
+      machine: {
+        machineId: 'm1',
+        token: 'a'.repeat(64),
+        teamId: 'team-1',
+        serverUrl: 'http://server',
+      },
+    };
+  }
 
   async enroll(body: { teamId: string; apiKey: string; name?: string; claudeCode?: unknown }) {
     this.calls.push(`enroll:${body.teamId}`);
@@ -301,6 +333,7 @@ export interface BootOpts {
   antigravityUpdateCheckMs?: number;
   capabilitiesProbe?: () => MachineCapabilities;
   withMachineJson?: boolean;
+  browserEnrollment?: boolean;
   preEnrolled?: { serverUrl: string };
   seedJournal?: (paths: StatePaths) => void;
   capEnv?: NodeJS.ProcessEnv;
@@ -327,8 +360,7 @@ export function startMachine(opts: BootOpts) {
     const config = loadDaemonConfig(
       {
         serverUrl: 'http://server',
-        apiKey: 'cairn_k',
-        teamId: 'team-1',
+        ...(opts.browserEnrollment === true ? {} : { apiKey: 'cairn_k', teamId: 'team-1' }),
         home,
         name: 'test-mbp',
       },
