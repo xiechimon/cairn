@@ -1,5 +1,7 @@
 import {
+  AGGREGATOR_PRESET_IDS,
   distinctThinkingLevels,
+  type ModelCostRates,
   type ProviderConfig,
   piCatalogProviderId,
   resolveModelInput,
@@ -71,6 +73,86 @@ function catalogModel(
         (model) => model.id === modelId && (api === undefined || model.api === api),
       )
     : undefined;
+}
+
+const CANONICAL_COST_PROVIDERS: readonly string[] = [
+  'anthropic',
+  'openai',
+  'openai-codex',
+  'google',
+  'deepseek',
+  'xai',
+  'minimax',
+  'minimax-cn',
+  'moonshotai',
+  'moonshotai-cn',
+  'kimi-coding',
+  'zai',
+  'zai-coding-cn',
+  'xiaomi',
+  'ant-ling',
+];
+
+function orderedCostProviders(): BuiltinProvider[] {
+  const all = getBuiltinProviders();
+  const seen = new Set<string>();
+  const out: BuiltinProvider[] = [];
+  const push = (id: string) => {
+    if (!seen.has(id) && isBuiltinProvider(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  };
+  for (const id of CANONICAL_COST_PROVIDERS) push(id);
+  for (const id of all) {
+    if (!AGGREGATOR_PRESET_IDS.includes(id)) push(id);
+  }
+  for (const id of all) push(id);
+  return out;
+}
+
+function toCostRates(entry: Model<Api> | undefined): ModelCostRates | undefined {
+  if (entry?.cost === undefined) return undefined;
+  return {
+    input: entry.cost.input,
+    output: entry.cost.output,
+    cacheRead: entry.cost.cacheRead,
+    cacheWrite: entry.cost.cacheWrite,
+  };
+}
+
+export function catalogModelCost(
+  providerId: string,
+  modelId: string,
+  api?: string,
+): ModelCostRates | undefined {
+  const catalogId = piCatalogProviderId(providerId);
+  if (isBuiltinProvider(catalogId)) {
+    const models = getBuiltinModels(catalogId);
+    const exact =
+      (api !== undefined ? models.find((m) => m.id === modelId && m.api === api) : undefined) ??
+      models.find((m) => m.id === modelId);
+    const rates = toCostRates(exact);
+    if (rates !== undefined) return rates;
+  }
+  const stripped = modelId.includes('/') ? modelId.split('/').at(-1) : undefined;
+  const candidates = stripped !== undefined && stripped !== '' ? [modelId, stripped] : [modelId];
+  const providers = orderedCostProviders();
+  for (const id of candidates) {
+    if (api !== undefined) {
+      for (const p of providers) {
+        const match = getBuiltinModels(p).find((m) => m.id === id && m.api === api);
+        const rates = toCostRates(match);
+        if (rates !== undefined) return rates;
+      }
+    }
+    for (const p of providers) {
+      const match = getBuiltinModels(p).find((m) => m.id === id);
+      const rates = toCostRates(match);
+      if (rates !== undefined) return rates;
+    }
+  }
+  return undefined;
 }
 
 function isCodexSubscription(config: Pick<ProviderConfig, 'providerId' | 'baseUrl'>): boolean {

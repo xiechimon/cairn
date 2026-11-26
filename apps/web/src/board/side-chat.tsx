@@ -9,8 +9,16 @@ import {
   UnfoldVertical,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { activityStore } from '../api/activity.js';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
@@ -742,8 +750,11 @@ function ReadyThread({
   const updates = threadUpdates(todo, chat.transcript);
   const openPlan =
     chat.planDoc !== undefined || updates !== null ? () => setPlanOpen(true) : undefined;
-  const usage = useThreadUsage(todo);
   const { live, teamId } = useLiveData();
+  const liveActivity = useSyncExternalStore(activityStore.subscribe, () =>
+    live && chat.running && chat.buildId != null ? activityStore.get(chat.buildId) : null,
+  );
+  const usage = useThreadUsage(todo, liveActivity);
   const actions = useThreadActions({
     todo,
     chat,
@@ -824,7 +835,7 @@ function ReadyThread({
         usage={
           engine !== undefined ||
           (usage.hasRuns && threadUsageShown(usage.summary, usage.state)) ||
-          contextPercentOf(todo.context) !== null
+          contextPercentOf(usage.context) !== null
             ? {
                 summary:
                   engine === undefined
@@ -832,7 +843,7 @@ function ReadyThread({
                     : engineUsageSummary(usage.summary, engine.run),
                 state: usage.state,
                 onRetry: usage.retry,
-                context: todo.context,
+                context: usage.context,
               }
             : null
         }

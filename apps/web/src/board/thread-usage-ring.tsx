@@ -34,13 +34,12 @@ export interface ThreadUsageView {
   context?: ChiefContextUsage | null | undefined;
 }
 
-const UNKNOWN = '—';
-
 export function threadUsageShown(summary: ThreadUsageSummary, state: ThreadUsageState): boolean {
   return (
     state !== 'ready' ||
-    summary.cost !== UNKNOWN ||
-    summary.tokens !== UNKNOWN ||
+    (summary.cost !== '' && summary.cost !== '—') ||
+    (summary.tokens !== '' && summary.tokens !== '—') ||
+    (summary.cached !== '' && summary.cached !== '—') ||
     summary.models.length > 0 ||
     summary.machines.length > 0 ||
     summary.duration !== '' ||
@@ -202,7 +201,6 @@ export function ThreadUsageRing(view: ThreadUsageView & { running?: boolean }) {
             key={percent === null ? 'pending' : 'read'}
             {...contextGlyphProps(context, percent ?? 0)}
           />
-          {percent !== null && <span aria-hidden="true">{`${percent}%`}</span>}
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8} className="flex-col items-start gap-0.5">
           {[...lines, ...(usage === null ? [] : [usage])].map((line, index) => (

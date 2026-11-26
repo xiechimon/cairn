@@ -1,4 +1,8 @@
-import { STEP_ACTIVITY_PHASES, type StepActivityReport } from '@cairn/shared';
+import {
+  STEP_ACTIVITY_PHASES,
+  type StepActivityReport,
+  stepActivityReportSchema,
+} from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
 import { createActivityTracker, SKILL_FACTS_CAP } from '../src/activity.js';
 
@@ -215,6 +219,7 @@ describe('activity tracker', () => {
     expect(h.sent.at(-1)?.report).toEqual({
       phase: 'responding',
       tokens: { input: 115, output: 42 },
+      cacheRead: 10,
     });
     h.tracker.noteUsage([row(20, 3)]);
     h.tracker.setPhase('tool', { tool: 'bash' });
@@ -222,9 +227,89 @@ describe('activity tracker', () => {
       phase: 'tool',
       tool: 'bash',
       tokens: { input: 115, output: 42 },
+      cacheRead: 10,
     });
     h.tracker.noteUsage([row(300, 90)]);
     h.tracker.setPhase('awaiting_model');
     expect(h.sent.at(-1)?.report.tokens).toEqual({ input: 310, output: 90 });
+  });
+
+  it('reports live cache, context window, compactAt, and priced costTotal in StepActivityReport', () => {
+    const h = harness({ repeatMs: 5_000 });
+    h.tracker.setPhase('thinking');
+    h.tracker.noteUsage([
+      {
+        model: 'anthropic-ultra/claude-sonnet-5-5',
+        input: 500,
+        output: 120,
+        cacheRead: 8_000,
+        cacheWrite: 400,
+        contextTokens: 8_900,
+        contextWindow: 200_000,
+        compactAt: 150_000,
+        cost: { input: 0.001, output: 0.0012, cacheRead: 0.0008, cacheWrite: 0.001, total: 0.004 },
+      },
+    ]);
+    h.advance(5_000);
+    h.tracker.noteEvent();
+    const first = h.sent.at(-1)?.report;
+    expect(first).toEqual({
+      phase: 'thinking',
+      tokens: { input: 8_900, output: 120 },
+      cacheRead: 8_000,
+      cacheWrite: 400,
+      contextTokens: 8_900,
+      contextWindow: 200_000,
+      compactAt: 150_000,
+      costTotal: 0.004,
+    });
+    expect(stepActivityReportSchema.parse(first)).toEqual(first);
+
+    h.tracker.noteUsage([
+      {
+        model: 'anthropic-ultra/claude-sonnet-5-5',
+        input: 600,
+        output: 200,
+        cacheRead: 9_000,
+        cacheWrite: 400,
+        contextTokens: 4_200,
+        contextWindow: 200_000,
+        compactAt: 150_000,
+        cost: { input: 0.0012, output: 0.002, cacheRead: 0.0009, cacheWrite: 0.001, total: 0.0051 },
+      },
+    ]);
+    h.tracker.setPhase('responding');
+    expect(h.sent.at(-1)?.report).toEqual({
+      phase: 'responding',
+      tokens: { input: 10_000, output: 200 },
+      cacheRead: 9_000,
+      cacheWrite: 400,
+      contextTokens: 4_200,
+      contextWindow: 200_000,
+      compactAt: 150_000,
+      costTotal: 0.0051,
+    });
+  });
+
+  it('omits costTotal when any usage row lacks cost or reports zero total', () => {
+    const h = harness({ repeatMs: 5_000 });
+    h.tracker.setPhase('thinking');
+    h.tracker.noteUsage([
+      {
+        model: 'claude-code/claude-opus-5-5',
+        input: 100,
+        output: 50,
+        cacheRead: 2_000,
+        cacheWrite: 0,
+        contextTokens: 2_150,
+        contextWindow: 200_000,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    ]);
+    h.advance(5_000);
+    h.tracker.noteEvent();
+    expect(h.sent.at(-1)?.report.costTotal).toBeUndefined();
+    expect(h.sent.at(-1)?.report.cacheRead).toBe(2_000);
+    expect(h.sent.at(-1)?.report.contextTokens).toBe(2_150);
   });
 });

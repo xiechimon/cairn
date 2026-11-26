@@ -27,24 +27,38 @@ export interface ActivityTracker {
   noteUsage: (usage: AgentTokenUsage) => void;
 }
 
+type ActivityBase = Pick<StepActivityReport, 'phase' | 'tool' | 'attempt' | 'resetLive'>;
+
 export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracker {
   const now = deps.now ?? (() => Date.now());
   const repeatMs = deps.repeatMs ?? ACTIVITY_REPEAT_MS;
   const pendingTools = new Map<string, string>();
   const skills: SkillFact[] = [];
   let tokens: StepActivityReport['tokens'];
-  let base: Omit<StepActivityReport, 'skills' | 'tokens'> | null = null;
+  let cacheRead: StepActivityReport['cacheRead'];
+  let cacheWrite: StepActivityReport['cacheWrite'];
+  let contextTokens: StepActivityReport['contextTokens'];
+  let contextWindow: StepActivityReport['contextWindow'];
+  let compactAt: StepActivityReport['compactAt'];
+  let costTotal: StepActivityReport['costTotal'];
+  let base: ActivityBase | null = null;
   let current: StepActivityReport | null = null;
   let lastSent: StepActivityReport | null = null;
   let lastSentAt = Number.NEGATIVE_INFINITY;
   let lastEventAt = 0;
   let lastSentEventAt = 0;
 
-  function withSkills(report: Omit<StepActivityReport, 'skills' | 'tokens'>): StepActivityReport {
+  function withSkills(report: ActivityBase): StepActivityReport {
     return {
       ...report,
       ...(skills.length > 0 ? { skills: [...skills] } : {}),
       ...(tokens !== undefined ? { tokens } : {}),
+      ...(cacheRead !== undefined ? { cacheRead } : {}),
+      ...(cacheWrite !== undefined ? { cacheWrite } : {}),
+      ...(contextTokens !== undefined ? { contextTokens } : {}),
+      ...(contextWindow !== undefined ? { contextWindow } : {}),
+      ...(compactAt !== undefined ? { compactAt } : {}),
+      ...(costTotal !== undefined ? { costTotal } : {}),
     };
   }
 
@@ -118,17 +132,67 @@ export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracke
     noteUsage(usage) {
       let input = 0;
       let output = 0;
+      let read = 0;
+      let write = 0;
+      let latestContextTokens: number | undefined;
+      let latestContextWindow: number | undefined;
+      let latestCompactAt: number | undefined;
+      let hasAllCosts = usage.length > 0;
+      let costSum = 0;
       for (const row of usage) {
         input += row.input + row.cacheRead + row.cacheWrite;
         output += row.output;
+        read += row.cacheRead;
+        write += row.cacheWrite;
+        if (row.contextTokens !== undefined) latestContextTokens = row.contextTokens;
+        if (row.contextWindow !== undefined) latestContextWindow = row.contextWindow;
+        if (row.compactAt !== undefined) latestCompactAt = row.compactAt;
+        if (row.cost === undefined) hasAllCosts = false;
+        else costSum += row.cost.total;
       }
-      if (input === 0 && output === 0) return;
-      const next = {
-        input: Math.max(input, tokens?.input ?? 0),
-        output: Math.max(output, tokens?.output ?? 0),
-      };
-      if (next.input === tokens?.input && next.output === tokens?.output) return;
-      tokens = next;
+      const nextContextTokens = latestContextTokens ?? contextTokens;
+      const nextContextWindow = latestContextWindow ?? contextWindow;
+      const nextCompactAt = latestCompactAt ?? compactAt;
+      const nextCostTotal =
+        hasAllCosts && costSum > 0 ? Math.max(costSum, costTotal ?? 0) : costTotal;
+      if (
+        input === 0 &&
+        output === 0 &&
+        nextContextTokens === undefined &&
+        nextCostTotal === undefined
+      ) {
+        return;
+      }
+      const nextTokens =
+        input > 0 || output > 0 || tokens !== undefined
+          ? {
+              input: Math.max(input, tokens?.input ?? 0),
+              output: Math.max(output, tokens?.output ?? 0),
+            }
+          : undefined;
+      const nextCacheRead =
+        read > 0 || cacheRead !== undefined ? Math.max(read, cacheRead ?? 0) : undefined;
+      const nextCacheWrite =
+        write > 0 || cacheWrite !== undefined ? Math.max(write, cacheWrite ?? 0) : undefined;
+      if (
+        nextTokens?.input === tokens?.input &&
+        nextTokens?.output === tokens?.output &&
+        nextCacheRead === cacheRead &&
+        nextCacheWrite === cacheWrite &&
+        nextContextTokens === contextTokens &&
+        nextContextWindow === contextWindow &&
+        nextCompactAt === compactAt &&
+        nextCostTotal === costTotal
+      ) {
+        return;
+      }
+      tokens = nextTokens;
+      cacheRead = nextCacheRead;
+      cacheWrite = nextCacheWrite;
+      contextTokens = nextContextTokens;
+      contextWindow = nextContextWindow;
+      compactAt = nextCompactAt;
+      costTotal = nextCostTotal;
       if (base !== null) current = withSkills(base);
     },
   };
@@ -143,6 +207,12 @@ function sameReport(a: StepActivityReport | null, b: StepActivityReport | null):
     a.resetLive === b.resetLive &&
     a.tokens?.input === b.tokens?.input &&
     a.tokens?.output === b.tokens?.output &&
+    a.cacheRead === b.cacheRead &&
+    a.cacheWrite === b.cacheWrite &&
+    a.contextTokens === b.contextTokens &&
+    a.contextWindow === b.contextWindow &&
+    a.compactAt === b.compactAt &&
+    a.costTotal === b.costTotal &&
     sameSkills(a.skills, b.skills)
   );
 }

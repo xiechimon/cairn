@@ -321,24 +321,18 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByTestId('usage-current-runner').locator('svg')).toHaveCount(1);
 
     await expect(channelUsage).not.toContainText('swe-2-1-medium');
-    await expect(channelUsage).not.toContainText('Claude Code · Devin');
-    await expect(channelUsage).not.toContainText('xmonsMac-3574.local · Ians-Mac-mini');
+    await expect(channelUsage).not.toContainText('Claude Code');
+    await expect(channelUsage).not.toContainText('xmonsMac-3574.local');
+    await expect(channelUsage).not.toContainText('Claude Haiku 5.5');
+    await expect(channelUsage).not.toContainText('Claude Opus 5.5');
+    await expect(channelUsage).not.toContainText('MiniMax-M3');
+    await expect(channelUsage).not.toContainText('DeepSeek V4.1 Flash');
+    await expect(channelUsage).not.toContainText('Earlier');
+    await expect(channelUsage).not.toContainText('—');
+    await expect(page.getByTestId('usage-history-toggle')).toHaveCount(0);
+    await expect(page.getByTestId('usage-history-list')).toHaveCount(0);
 
-    await evidencePanelShot(page, `after-coordinator-popover-collapsed-${theme}.png`, popover);
-
-    const toggle = page.getByTestId('usage-history-toggle');
-    await expect(toggle).toBeVisible();
-    await toggle.click();
-    const history = page.getByTestId('usage-history-list');
-    await expect(history).toBeVisible();
-    await expect(history).toContainText('Claude Code');
-    await expect(history).toContainText('Claude Haiku 5.5');
-    await expect(history).toContainText('MiniMax-M3');
-    await expect(history).toContainText('DeepSeek V4.1 Flash');
-    await expect(history).toContainText('xmonsMac-3574.local');
-    expect(await history.locator('svg').count()).toBeGreaterThanOrEqual(7);
-
-    await evidencePanelShot(page, `after-coordinator-popover-expanded-${theme}.png`, popover);
+    await evidencePanelShot(page, `after-coordinator-popover-${theme}.png`, popover);
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const violations = (

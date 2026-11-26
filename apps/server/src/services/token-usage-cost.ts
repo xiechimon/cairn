@@ -1,5 +1,6 @@
 import type { ModelCostRates } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
+import { catalogModelCost } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import { build, provider, todo, tokenUsage } from '../db/schema.js';
 
@@ -40,12 +41,17 @@ export function ratesForModel(
   if (teamId === null) return undefined;
   const slash = modelKey.indexOf('/');
   if (slash <= 0) return undefined;
+  const providerId = modelKey.slice(0, slash);
+  const modelId = modelKey.slice(slash + 1);
   const row = db
-    .select({ models: provider.models })
+    .select({ api: provider.api, models: provider.models })
     .from(provider)
-    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, modelKey.slice(0, slash))))
+    .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
     .get();
-  return row?.models.find((model) => model.id === modelKey.slice(slash + 1))?.cost;
+  if (row === undefined) return undefined;
+  const declared = row.models.find((model) => model.id === modelId)?.cost;
+  if (declared !== undefined) return declared;
+  return catalogModelCost(providerId, modelId, row.api);
 }
 
 export function backfillTokenUsageCost(db: Db): void {

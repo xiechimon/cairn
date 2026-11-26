@@ -48,7 +48,7 @@ export function ThreadUsageSection() {
       <Specimen id="unpriced-thread-usage" title="Unpriced thread usage" stage="canvas">
         <div className="w-full max-w-72">
           <ThreadUsageDetails
-            summary={{ ...SUMMARY, cost: '—' }}
+            summary={{ ...SUMMARY, cost: '' }}
             state="ready"
             onRetry={() => setRetryState('ready')}
           />
@@ -61,7 +61,7 @@ export function ThreadUsageSection() {
       >
         <div className="flex w-full max-w-72 flex-col gap-6">
           <ThreadUsageDetails
-            summary={{ ...SUMMARY, tokens: '—', cached: '—', models: [], machines: [] }}
+            summary={{ ...SUMMARY, tokens: '', cached: '', models: [], machines: [] }}
             state="loading"
             onRetry={() => setRetryState('ready')}
           />

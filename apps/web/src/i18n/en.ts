@@ -1888,7 +1888,6 @@ export const EN: Record<string, string> = {
   范围: 'Scope',
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',
-  模型列表: 'Models',
   '{online}/{total} 台执行机在线': '{online} of {total#1 Runner|# Runners} online',
   '{offline} 台离线（{names}）': '{offline#1 offline|# offline} ({names})',
   设置分区: 'Settings sections',
@@ -3276,5 +3275,4 @@ export const EN: Record<string, string> = {
     'On a fresh launch, click Connect existing Cairn host, paste this URL, and restart; an existing setup can connect under Host connection and resident service at the bottom of the Runners page. After sign-in, that computer automatically joins team {team}, ready as a Runner.',
   '连接并登录后，这台电脑会自动注册为该主机的执行机。':
     'After connecting and signing in, this computer registers as a Runner on that host automatically.',
-  之前还用过: 'Earlier',
 };

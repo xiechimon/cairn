@@ -1,5 +1,9 @@
-import type { StepJournalRow, TokenUsage } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import type { StepActivity, StepJournalRow, TokenUsage } from '@cairn/shared';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router';
+import { describe, expect, test, vi } from 'vitest';
 import { threadContextOf } from '../src/api/mappers.js';
 import {
   type ThreadUsageSummary,
@@ -9,7 +13,18 @@ import {
   threadUsageCaption,
   threadUsageSummary,
 } from '../src/board/thread-usage-model.js';
+import {
+  mergeLiveContext,
+  mergeLiveUsageRows,
+  useThreadUsage,
+} from '../src/board/use-thread-usage.js';
+import type { TodoRecord } from '../src/fixtures/records.js';
+import { I18nProvider } from '../src/i18n/provider.js';
 import type { TFunc, TVars } from '../src/i18n/translate.js';
+
+vi.mock('../src/api/provider.js', () => ({
+  useLiveData: () => ({ live: true, teamId: 't1', userName: 'Owner' }),
+}));
 
 function usage(overrides: Partial<TokenUsage> = {}): TokenUsage {
   return {
@@ -61,34 +76,34 @@ describe('threadUsageSummary', () => {
     expect(threadUsageSummary([usage()], []).cost).toBe('$1.25');
   });
 
-  test('one unpriced model makes the aggregate price unknown', () => {
-    expect(threadUsageSummary([usage(), usage({ costTotal: null })], []).cost).toBe('—');
+  test('one unpriced model makes the aggregate price empty instead of a dash placeholder', () => {
+    expect(threadUsageSummary([usage(), usage({ costTotal: null })], []).cost).toBe('');
   });
 
   test('known free usage is distinct from absent usage', () => {
     expect(threadUsageSummary([usage({ costTotal: 0 })], []).cost).toBe('$0.00');
-    expect(threadUsageSummary([], [])).toMatchObject({ cost: '—', tokens: '—', cached: '—', models: [] });
-    expect(threadUsageSummary([], []).cost).toBe('—');
+    expect(threadUsageSummary([], [])).toMatchObject({ cost: '', tokens: '', cached: '', models: [] });
+    expect(threadUsageSummary([], []).cost).toBe('');
   });
 
   test('a missing run response never exposes an aggregate price or partial usage', () => {
     expect(threadUsageSummary(null, ['omarchy'])).toMatchObject({
-      cost: '—', tokens: '—', cached: '—', models: [],
+      cost: '', tokens: '', cached: '', models: [],
     });
   });
 
   test('mixed pricing keeps tokens but cannot become a partial price', () => {
     const rows = [usage(), usage({ buildId: 'build-2', costTotal: null })];
-    expect(threadUsageSummary(rows, [])).toMatchObject({ cost: '—', tokens: '2.5k' });
+    expect(threadUsageSummary(rows, [])).toMatchObject({ cost: '', tokens: '2.5k' });
   });
 
   test('empty and incomplete detail cannot establish a known-free aggregate', () => {
-    expect(threadUsageSummary(null, []).cost).toBe('—');
-    expect(threadUsageSummary([], []).cost).toBe('—');
+    expect(threadUsageSummary(null, []).cost).toBe('');
+    expect(threadUsageSummary([], []).cost).toBe('');
   });
 
   test('zero input tokens has no invented cache hit percentage', () => {
-    expect(threadUsageSummary([usage({ input: 0, cacheRead: 0, cacheWrite: 0 })], []).cached).toBe('—');
+    expect(threadUsageSummary([usage({ input: 0, cacheRead: 0, cacheWrite: 0 })], []).cached).toBe('');
   });
 
   test('cache writes count against the hit rate', () => {
@@ -112,12 +127,12 @@ describe('threadUsageCaption', () => {
 
   test('joins only the cost and the token total that are known, with no dash placeholders', () => {
     expect(threadUsageCaption(summary(), t)).toBe('$1.25 · Token 数：2.5k');
-    expect(threadUsageCaption(summary({ cost: '—' }), t)).toBe('Token 数：2.5k');
-    expect(threadUsageCaption(summary({ tokens: '—', models: [] }), t)).toBe('$1.25');
+    expect(threadUsageCaption(summary({ cost: '' }), t)).toBe('Token 数：2.5k');
+    expect(threadUsageCaption(summary({ tokens: '', models: [] }), t)).toBe('$1.25');
   });
 
   test('says the usage is unavailable instead of printing placeholders', () => {
-    const caption = threadUsageCaption(summary({ cost: '—', tokens: '—', models: [] }), t);
+    const caption = threadUsageCaption(summary({ cost: '', tokens: '', models: [] }), t);
     expect(caption).toBe('用量暂不可用');
     expect(caption).not.toContain('—');
   });
@@ -227,5 +242,107 @@ describe('thread run window and engines from the step journal', () => {
     expect(summary.historyModels?.map((m) => m.modelName)).toEqual(['Claude Haiku 5.5']);
     expect(summary.latestMachine).toMatchObject({ name: 'Ians-Mac-mini' });
     expect(summary.historyMachines?.map((m) => m.name)).toEqual(['xmonsMac-3574.local']);
+  });
+});
+
+describe('live activity usage and context merging', () => {
+  const activity: StepActivity = {
+    stepId: 'step-live',
+    at: 5_000,
+    phase: 'thinking',
+    tokens: { input: 10_000, output: 500 },
+    cacheRead: 8_000,
+    cacheWrite: 1_000,
+    contextTokens: 32_000,
+    contextWindow: 200_000,
+    compactAt: 150_000,
+    costTotal: 0.25,
+  };
+
+  test('appends live step tokens, cache hit, and cost onto completed earlier build rows', () => {
+    const merged = mergeLiveUsageRows(
+      [usage({ buildId: 'build-old', input: 100, output: 400, cacheRead: 1_000, cacheWrite: 0, costTotal: 1.0 })],
+      [
+        {
+          id: 'step-live',
+          buildId: 'build-new',
+          kind: 'build',
+          machineId: 'm1',
+          createdAt: 1_000,
+          status: 'claimed',
+          checkpointCommit: null,
+          skillInjection: null,
+          route: { harness: 'pi', modelId: 'claude-sonnet-5-5' },
+        },
+      ],
+      activity,
+      'build-new',
+    );
+    const summary = threadUsageSummary(merged, ['Ians-Mac-mini']);
+    expect(summary.cost).toBe('$1.25');
+    expect(summary.tokens).toBe('12k');
+    expect(summary.cached).toBe('81.1%');
+    expect(summary.models).toEqual(['provider/model-a', 'pi/claude-sonnet-5-5']);
+  });
+
+  test('keeps live tokens and cache hit when DB usage is empty for a running build', () => {
+    const merged = mergeLiveUsageRows([], [], activity, 'build-1');
+    const summary = threadUsageSummary(merged, []);
+    expect(summary.cost).toBe('$0.25');
+    expect(summary.tokens).toBe('10.5k');
+    expect(summary.cached).toBe('80%');
+    expect(summary.models).toEqual([]);
+  });
+
+  test('merges live context tokens, window, compactAt, and cache into ChiefContextUsage', () => {
+    expect(mergeLiveContext(null, activity)).toEqual({
+      tokens: 32_000,
+      contextWindow: 200_000,
+      compactAt: 150_000,
+      cache: { read: 8_000, write: 1_000, input: 1_000 },
+    });
+  });
+
+  test('useThreadUsage preserves earlier build rows when a newly started build has 0 DB rows', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    qc.setQueryData(['usage', 'build-old'], [usage({ buildId: 'build-old', costTotal: 1.5 })]);
+    qc.setQueryData(['usage', 'build-new'], []);
+    qc.setQueryData(['steps', 'build-old'], []);
+    qc.setQueryData(['steps', 'build-new'], []);
+    qc.setQueryData(['machines', 't1'], []);
+    qc.setQueryData(['modelSources', 't1'], { sources: [] });
+    const todo = {
+      id: 'todo-1',
+      latestBuildId: 'build-new',
+      buildHistory: [
+        { buildId: 'build-old', createdAt: 10 },
+        { buildId: 'build-new', createdAt: 20 },
+      ],
+    } as unknown as TodoRecord;
+    const results: ReturnType<typeof useThreadUsage>[] = [];
+    function Probe() {
+      results.push(useThreadUsage(todo, activity));
+      return null;
+    }
+    renderToStaticMarkup(
+      createElement(QueryClientProvider, {
+        client: qc,
+        children: createElement(MemoryRouter, {
+          children: createElement(I18nProvider, {
+            initialLocale: 'en',
+            children: createElement(Probe),
+          }),
+        }),
+      }),
+    );
+    const captured = results.at(-1);
+    expect(captured?.summary.cost).toBe('$1.75');
+    expect(captured?.summary.tokens).toBe('11.8k');
+    expect(captured?.context).toEqual({
+      tokens: 32_000,
+      contextWindow: 200_000,
+      compactAt: 150_000,
+      cache: { read: 8_000, write: 1_000, input: 1_000 },
+    });
   });
 });

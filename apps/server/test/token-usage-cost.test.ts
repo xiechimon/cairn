@@ -409,4 +409,99 @@ describe('token usage cost at write time', () => {
       w.s.dispose();
     }
   });
+
+  test('custom providers without declared model costs fall back to built-in catalog pricing by api and model id', async () => {
+    const w = await world();
+    try {
+      w.s.db
+        .insert(providerTable)
+        .values([
+          {
+            id: 'prov-anthropic-ultra',
+            teamId: w.s.team.id,
+            kind: 'custom',
+            providerId: 'anthropic-ultra',
+            label: 'Anthropic Ultra',
+            baseUrl: 'https://ultra.example.com',
+            api: 'anthropic-messages',
+            authHeader: false,
+            compat: {},
+            models: [
+              { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+              { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+              { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
+            ],
+            createdBy: w.s.user.id,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          {
+            id: 'prov-relay',
+            teamId: w.s.team.id,
+            kind: 'custom',
+            providerId: 'my-relay',
+            label: 'My Relay',
+            baseUrl: 'https://relay.example.com/v1',
+            api: 'openai-completions',
+            authHeader: true,
+            compat: {},
+            models: [],
+            createdBy: w.s.user.id,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+        ])
+        .run();
+      const todoId = await createTodo(w.s, w.projectId, 'Custom endpoint catalog fallback');
+      await startBuild(w.s, w.projectId, todoId);
+      const claimed = await claimStep(w.s.app, w.token);
+      await reportDone(w.s, w.token, claimed.stepId, [
+        {
+          model: 'anthropic-ultra/claude-sonnet-5-5',
+          input: 1_000_000,
+          output: 100_000,
+          cacheRead: 2_000_000,
+          cacheWrite: 100_000,
+        },
+        {
+          model: 'anthropic-ultra/claude-opus-5-5',
+          input: 100_000,
+          output: 10_000,
+          cacheRead: 0,
+          cacheWrite: 0,
+        },
+        {
+          model: 'my-relay/anthropic/claude-haiku-5-5',
+          input: 1_000_000,
+          output: 100_000,
+          cacheRead: 0,
+          cacheWrite: 0,
+        },
+      ]);
+      const sonnet = usageRow(w.s, 'anthropic-ultra/claude-sonnet-5-5');
+      expect(sonnet?.costTotal).toBeGreaterThan(0);
+      expect(sonnet?.costInput).toBeCloseTo(2, 6);
+      expect(sonnet?.costOutput).toBeCloseTo(1, 6);
+      expect(sonnet?.costCacheRead).toBeCloseTo(0.2, 6);
+      expect(sonnet?.costCacheWrite).toBeCloseTo(0.25, 6);
+      expect(sonnet?.costTotal).toBeCloseTo(3.45, 6);
+
+      const opus = usageRow(w.s, 'anthropic-ultra/claude-opus-5-5');
+      expect(opus?.costTotal).toBeGreaterThan(0);
+
+      const haiku = usageRow(w.s, 'my-relay/anthropic/claude-haiku-5-5');
+      expect(haiku?.costTotal).toBeGreaterThan(0);
+      expect(haiku?.costInput).toBeCloseTo(0.1, 6);
+      expect(haiku?.costOutput).toBeCloseTo(0.05, 6);
+
+      const task = await readTodo(w.s, todoId);
+      expect(task.usageCost?.priced).toBe(true);
+      expect(task.usageCost?.total).toBeCloseTo(
+        (sonnet?.costTotal ?? 0) + (opus?.costTotal ?? 0) + (haiku?.costTotal ?? 0),
+        6,
+      );
+    } finally {
+      w.s.dispose();
+    }
+  });
 });

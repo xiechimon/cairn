@@ -1,9 +1,7 @@
 import { cn } from 'cn';
-import { ChevronRight } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useI18n } from '../i18n/provider.js';
 import { EngineLabel, ModelLabel, RunnerLabel } from './model-identity.js';
-import { Button } from './ui/button.js';
 
 export interface UsageEngineItem {
   label: string;
@@ -33,16 +31,11 @@ export interface UsageBreakdownData {
   tokens: string;
   cached: string;
   latestEngine: UsageEngineItem | null;
-  historyEngines: UsageEngineItem[];
+  historyEngines?: UsageEngineItem[];
   latestModel: UsageModelItem | null;
-  historyModels: UsageModelItem[];
+  historyModels?: UsageModelItem[];
   latestRunner: UsageRunnerItem | null;
-  historyRunners: UsageRunnerItem[];
-}
-
-function sameProviderSlug(model: UsageModelItem): boolean {
-  if (model.providerLabel == null || model.providerLabel === '') return false;
-  return model.providerLabel.toLowerCase() === model.modelName.toLowerCase();
+  historyRunners?: UsageRunnerItem[];
 }
 
 export function UsageBreakdownSection({
@@ -63,7 +56,6 @@ export function UsageBreakdownSection({
   className?: string;
 }) {
   const { t } = useI18n();
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   const statRows: { id: string; label: string; value: ReactNode; testId?: string }[] = [
     data.turns !== undefined && data.turns > 0
@@ -113,10 +105,7 @@ export function UsageBreakdownSection({
       : null,
   ].filter((row): row is NonNullable<typeof row> => row !== null);
 
-  const historyCount =
-    data.historyEngines.length + data.historyModels.length + data.historyRunners.length;
-
-  if (statRows.length === 0 && historyCount === 0 && footer === undefined) return null;
+  if (statRows.length === 0 && footer === undefined) return null;
 
   const Container = as;
 
@@ -146,96 +135,7 @@ export function UsageBreakdownSection({
               </dd>
             </div>
           ))}
-          {historyCount > 0 && (
-            <div className="contents">
-              <dt className="text-content-secondary">{t('之前还用过')}</dt>
-              <dd className="m-0 flex justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  data-testid="usage-history-toggle"
-                  aria-expanded={historyOpen}
-                  onClick={() => setHistoryOpen((prev) => !prev)}
-                  className="-mr-1.5 h-6 min-h-6 gap-1 px-1.5 text-caption font-medium text-content-secondary tabular-nums hover:text-foreground pointer-coarse:min-h-11"
-                >
-                  <span>{`+${historyCount}`}</span>
-                  <ChevronRight
-                    aria-hidden="true"
-                    className={cn(
-                      'size-4 transition-transform duration-(--dur-press) ease-(--ease-out-strong) motion-reduce:transition-none',
-                      historyOpen && 'rotate-90',
-                    )}
-                  />
-                </Button>
-              </dd>
-            </div>
-          )}
         </dl>
-      )}
-      {historyCount > 0 && historyOpen && (
-        <div
-          data-testid="usage-history-list"
-          className="flex min-w-0 flex-col gap-2 border-t border-border pt-2 text-meta"
-        >
-          {data.historyEngines.length > 0 && (
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-caption text-content-tertiary">{t('引擎')}</span>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {data.historyEngines.map((engine) => (
-                  <li
-                    key={`${engine.runtime ?? ''}:${engine.label}`}
-                    className="flex min-w-0 items-center justify-between gap-2 text-foreground"
-                  >
-                    <EngineLabel engine={engine.label} runtime={engine.runtime} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {data.historyModels.length > 0 && (
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-caption text-content-tertiary">{t('模型列表')}</span>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {data.historyModels.map((model) => (
-                  <li
-                    key={`${model.provider ?? ''}:${model.modelId}:${model.raw}`}
-                    className="flex min-w-0 items-center justify-between gap-2 text-foreground"
-                  >
-                    <ModelLabel
-                      modelId={model.modelId}
-                      modelName={model.modelName}
-                      provider={model.provider}
-                      runtime={model.runtime}
-                    />
-                    {model.providerLabel != null &&
-                      model.providerLabel !== '' &&
-                      !sameProviderSlug(model) && (
-                        <span className="shrink-0 truncate text-caption text-content-tertiary">
-                          {model.providerLabel}
-                        </span>
-                      )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {data.historyRunners.length > 0 && (
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-caption text-content-tertiary">{t('执行机')}</span>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                {data.historyRunners.map((runner) => (
-                  <li
-                    key={`${runner.id ?? ''}:${runner.name}`}
-                    className="flex min-w-0 items-center justify-between gap-2 text-foreground"
-                  >
-                    <RunnerLabel machine={runner} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
       )}
       {footer}
     </Container>

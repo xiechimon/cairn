@@ -200,6 +200,12 @@ export const stepActivityReportSchema = z.object({
   tokens: z
     .object({ input: z.number().int().nonnegative(), output: z.number().int().nonnegative() })
     .optional(),
+  cacheRead: z.number().int().nonnegative().optional(),
+  cacheWrite: z.number().int().nonnegative().optional(),
+  contextTokens: z.number().int().nonnegative().optional(),
+  contextWindow: z.number().int().positive().optional(),
+  compactAt: z.number().int().positive().optional(),
+  costTotal: z.number().nonnegative().optional(),
 });
 export type StepActivityReport = z.infer<typeof stepActivityReportSchema>;
 

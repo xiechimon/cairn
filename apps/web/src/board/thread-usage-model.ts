@@ -113,7 +113,9 @@ export function threadUsageSummary(
     historyEngines.push({ label, runtime: engineRuntimeOf(label) });
   }
 
-  const rawModels = [...new Set(knownUsage?.map((row) => row.model) ?? [])];
+  const rawModels = [
+    ...new Set(knownUsage?.map((row) => row.model).filter((model) => model !== '') ?? []),
+  ];
   const stepProviderByModelId = new Map<string, string>();
   for (const s of orderedSteps) {
     if (s.route?.modelId != null && s.route.harness != null) {
@@ -180,9 +182,9 @@ export function threadUsageSummary(
   }
 
   return {
-    cost: price === null ? '—' : formatUsd(price),
-    tokens: tokenUsage?.total ?? '—',
-    cached: tokenUsage?.cacheHitRate ?? '—',
+    cost: price === null ? '' : formatUsd(price),
+    tokens: tokenUsage?.total ?? '',
+    cached: tokenUsage !== null && tokenUsage.cacheHitRate !== '—' ? tokenUsage.cacheHitRate : '',
     models: rawModels,
     machines: uniqueMachineNames,
     duration: steps === null ? '' : formatWorkDuration(threadRunSeconds(steps, now)),
@@ -196,12 +198,12 @@ export function threadUsageSummary(
   };
 }
 
-const UNKNOWN = '—';
-
 export function threadUsageCaption(summary: ThreadUsageSummary, t: TFunc): string {
   const parts = [
-    summary.cost === UNKNOWN ? null : summary.cost,
-    summary.tokens === UNKNOWN ? null : t('Token 数：{tokens}', { tokens: summary.tokens }),
+    summary.cost === '' || summary.cost === '—' ? null : summary.cost,
+    summary.tokens === '' || summary.tokens === '—'
+      ? null
+      : t('Token 数：{tokens}', { tokens: summary.tokens }),
   ].filter((part) => part !== null);
   return parts.length === 0 ? t('用量暂不可用') : parts.join(' · ');
 }

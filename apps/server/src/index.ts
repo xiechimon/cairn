@@ -179,6 +179,7 @@ if (seedLocalMachine(db, seeded.team.id) === 'blocked') {
 setCoordinatorInServer(config.coordinatorInServer);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 runDataMigrationOnce(db, 'token-usage-cost-backfill', () => backfillTokenUsageCost(db));
+runDataMigrationOnce(db, 'token-usage-cost-catalog-backfill', () => backfillTokenUsageCost(db));
 const originsStamped = runDataMigrationOnce(db, 'transcript-origin-backfill', () =>
   backfillTranscriptOrigins(db),
 );

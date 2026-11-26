@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
+import { ThreadUsageDetails, ThreadUsageRing } from '../src/board/thread-usage-ring.js';
 import {
   clampContextPercent,
   ContextMeterLine,
@@ -216,7 +217,7 @@ describe('ContextMeterLine channel usage stats', () => {
     expect(en).toContain('Last turn hit rate');
   });
 
-  test('separates current engine/model/runner with icons and tucks history behind a toggle without raw-slug walls', () => {
+  test('shows only current engine/model/runner with icons and omits historical clutter', () => {
     const html = renderToStaticMarkup(
       createElement(I18nProvider, {
         initialLocale: 'en',
@@ -291,13 +292,66 @@ describe('ContextMeterLine channel usage stats', () => {
     );
     expect(html).toContain('SWE-2.1');
     expect(html).not.toContain('swe-2-1-medium');
-    expect(html).not.toContain('Claude Code · Devin');
-    expect(html).not.toContain('xmonsMac-3574.local · Ians-Mac-mini');
+    expect(html).not.toContain('Claude Code');
+    expect(html).not.toContain('xmonsMac-3574.local');
+    expect(html).not.toContain('Claude Haiku 5.5');
     expect(html).toContain('data-testid="usage-current-engine"');
     expect(html).toContain('data-testid="usage-current-model"');
     expect(html).toContain('data-testid="usage-current-runner"');
-    expect(html).toContain('data-testid="usage-history-toggle"');
-    expect(html).toContain('+4');
+    expect(html).not.toContain('data-testid="usage-history-toggle"');
+    expect(html).not.toContain('data-testid="usage-history-list"');
     expect(html).toContain('<svg');
+  });
+});
+
+describe('ThreadUsageRing parity and placeholder hiding', () => {
+  test('renders only the context ring glyph without a percentage text node', () => {
+    const html = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'en',
+        children: createElement(ThreadUsageRing, {
+          state: 'ready',
+          onRetry: () => {},
+          context: { tokens: 50_000, contextWindow: 200_000 },
+          summary: {
+            cost: '$0.25',
+            tokens: '50k',
+            cached: '80%',
+            models: ['anthropic-ultra/claude-sonnet-5-5'],
+            machines: ['Ians-Mac-mini'],
+            duration: '12s',
+            engines: ['Cairn'],
+          },
+        }),
+      }),
+    );
+    expect(html).toContain('data-testid="thread-usage-ring"');
+    expect(html).toContain('data-percent="25"');
+    expect(html).not.toContain('25%');
+  });
+
+  test('hides unavailable cost, tokens, and cache hit rows without dash placeholders', () => {
+    const html = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'en',
+        children: createElement(ThreadUsageDetails, {
+          state: 'ready',
+          onRetry: () => {},
+          summary: {
+            cost: '',
+            tokens: '',
+            cached: '',
+            models: [],
+            machines: [],
+            duration: '',
+            engines: [],
+          },
+        }),
+      }),
+    );
+    expect(html).not.toContain('—');
+    expect(html).not.toContain('>Cost<');
+    expect(html).not.toContain('>Tokens<');
+    expect(html).not.toContain('>Cache hit<');
   });
 });

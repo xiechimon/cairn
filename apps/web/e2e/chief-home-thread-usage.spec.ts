@@ -86,9 +86,15 @@ async function setup(page: Page, options: SetupOptions = {}) {
 
 const ring = (page: Page) => page.getByTestId('thread-usage-ring');
 const usage = (page: Page) => page.getByTestId('thread-usage');
-const stat = (page: Page, index: number) => usage(page).getByTestId('thread-usage-stats').locator('dd').nth(index);
-const cost = (page: Page) => stat(page, 0);
-const tokens = (page: Page) => stat(page, 1);
+const statByLabel = (page: Page, label: string) =>
+  usage(page).getByTestId('thread-usage-stats').locator('dt', { hasText: label });
+const statValue = (page: Page, label: string) =>
+  usage(page)
+    .getByTestId('thread-usage-stats')
+    .locator('div.contents', { has: page.locator('dt', { hasText: label }) })
+    .locator('dd');
+const cost = (page: Page) => statValue(page, 'Cost');
+const tokens = (page: Page) => statValue(page, 'Tokens');
 const ringFace = (page: Page) =>
   ring(page).evaluate((button) => ({
     label: (button as HTMLElement).innerText.trim(),
@@ -139,14 +145,15 @@ test(`usage opens from the ring in the composer tool row (${theme})`, async ({ p
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await expect(ring(page)).toHaveAttribute('aria-expanded', 'true');
   await expect(usage(page)).toContainText('85.7%');
-  await expect(usage(page).locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Model', 'Runners', 'Earlier']);
+  await expect(usage(page).locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Model', 'Runners']);
   await expect(usage(page).getByTestId('usage-current-model')).toContainText('model-b');
   await expect(usage(page).getByTestId('usage-current-model').locator('svg')).toHaveCount(1);
   await expect(usage(page).getByTestId('usage-current-runner')).toContainText('Mac');
   await expect(usage(page).getByTestId('usage-current-runner').locator('svg')).toHaveCount(1);
-  await usage(page).getByTestId('usage-history-toggle').click();
-  await expect(usage(page).getByTestId('usage-history-list')).toContainText('model-a');
-  await expect(usage(page).getByTestId('usage-history-list')).toContainText('omarchy');
+  await expect(usage(page).getByTestId('usage-history-toggle')).toHaveCount(0);
+  await expect(usage(page).getByTestId('usage-history-list')).toHaveCount(0);
+  await expect(usage(page)).not.toContainText('model-a');
+  await expect(usage(page)).not.toContainText('omarchy');
   await expect(usage(page).locator('dd').filter({ hasText: /^—$/ })).toHaveCount(0);
   await expect(usage(page)).not.toContainText('Total duration—');
   expect(new Set(requested).size).toBe(2);
@@ -175,7 +182,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(ring(page)).toHaveAttribute('data-state', 'ready');
     await expect(ring(page)).toHaveAccessibleName('Context 62K / 200K');
     await expect(ring(page)).toHaveAccessibleDescription('Thread usage');
-    expect(await ringFace(page)).toEqual({ label: '31%', arcs: 1, tracks: 1, percent: '31' });
+    expect(await ringFace(page)).toEqual({ label: '', arcs: 1, tracks: 1, percent: '31' });
     const type = await ring(page).evaluate((button) => {
       const cs = getComputedStyle(button);
       const glyph = button.querySelector('svg')!.getBoundingClientRect();
@@ -188,9 +195,9 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(tip).toContainText('$4.00 · Tokens: 2.5k');
     await openUsage(page);
     await expect(usage(page).getByTestId('context-panel-reading')).toHaveText('62K / 200K');
-    await expect(usage(page).getByTestId('thread-usage-stats').locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Model', 'Runners', 'Earlier']);
-    await expect(stat(page, 0)).toHaveText('$4.00');
-    await expect(stat(page, 1)).toHaveText('2.5k');
+    await expect(usage(page).getByTestId('thread-usage-stats').locator('dt')).toHaveText(['Cost', 'Tokens', 'Cache hit', 'Model', 'Runners']);
+    await expect(cost(page)).toHaveText('$4.00');
+    await expect(tokens(page)).toHaveText('2.5k');
     await expect(ring(page)).not.toContainText('2.5k');
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await evidencePanelShot(page, `thread-usage-context-${theme}.png`, usage(page));
@@ -220,26 +227,32 @@ test('a thread that has not started has no usage ring or usage request', async (
   expect(requested).toEqual([]);
 });
 
-test('an unpriced thread shows an unknown cost and never a free price', async ({ page }) => {
+test('an unpriced thread hides cost without a dash placeholder and never shows a free price', async ({ page }) => {
   await setup(page, { unpriced: true });
   await page.goto('/app?thread=todo-1');
   await openUsage(page);
   await expect(tokens(page)).toHaveText('2.5k');
   await expect(usage(page)).not.toContainText('$0.00');
-  await expect(cost(page)).toHaveText('—');
+  await expect(statByLabel(page, 'Cost')).toHaveCount(0);
+  await expect(usage(page)).not.toContainText('—');
 });
 
 for (const missing of ['unpriced row', 'empty run'] as const) {
-  test(`a priced aggregate stays unknown with an ${missing}`, async ({ page }) => {
+  test(`a priced aggregate stays hidden with an ${missing}`, async ({ page }) => {
     await setup(page, { mixedPricing: missing === 'unpriced row', emptyRun: missing === 'empty run' });
     await page.goto('/app?thread=todo-1');
     await openUsage(page);
     await expect(usage(page)).toHaveAttribute('data-state', 'ready');
-      await expect(cost(page)).toHaveText('—');
     await expect(usage(page)).not.toContainText('$4.00');
     await expect(usage(page)).not.toContainText('$0.00');
-    if (missing === 'empty run') await expect(tokens(page)).toHaveText('—');
-    else await expect(tokens(page)).toHaveText('2.5k');
+    await expect(usage(page)).not.toContainText('—');
+    if (missing === 'empty run') {
+      await expect(cost(page)).toHaveText('$2.00');
+      await expect(tokens(page)).toHaveText('1.3k');
+    } else {
+      await expect(statByLabel(page, 'Cost')).toHaveCount(0);
+      await expect(tokens(page)).toHaveText('2.5k');
+    }
   });
 }
 
@@ -252,7 +265,8 @@ test('a pending run never appears as a partial thread total', async ({ page }) =
   await expect(usage(page)).toHaveAttribute('data-state', 'loading');
   await expect(ring(page)).toHaveText('');
   await expect(usage(page)).not.toContainText('1.3k');
-  await expect(cost(page)).toHaveText('—');
+  await expect(statByLabel(page, 'Cost')).toHaveCount(0);
+  await expect(usage(page)).not.toContainText('—');
   release();
   await expect(usage(page)).toHaveAttribute('data-state', 'ready');
   await expect(tokens(page)).toHaveText('2.5k');
@@ -267,7 +281,8 @@ test(`usage errors offer retry without claiming an unvalidated cost (${theme})`,
   await openUsage(page);
   await expect(usage(page)).toHaveAttribute('data-state', 'error');
   await expect(usage(page).getByTestId('thread-usage-retry')).toBeVisible();
-  await expect(cost(page)).toHaveText('—');
+  await expect(statByLabel(page, 'Cost')).toHaveCount(0);
+  await expect(usage(page)).not.toContainText('—');
   await expect(usage(page)).not.toContainText('$4.00');
   await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   await evidencePanelShot(page, `thread-usage-error-${theme}.png`, usage(page));
@@ -303,8 +318,8 @@ for (const teams of ['error', 'empty'] as const) {
     await usage(page).getByTestId('thread-usage-retry').click();
     await expect(usage(page)).toHaveAttribute('data-state', 'ready');
     await expect(usage(page)).toContainText('Mac');
-    await usage(page).getByTestId('usage-history-toggle').click();
-    await expect(usage(page).getByTestId('usage-history-list')).toContainText('omarchy');
+    await expect(usage(page).getByTestId('usage-history-toggle')).toHaveCount(0);
+    await expect(usage(page)).not.toContainText('omarchy');
     expect(requests.filter((path) => path === '/api/teams')).toHaveLength(teamRequestsAfterRecovery);
     expect(requests.filter((path) => path.endsWith('/machines')).every((path) => path === '/api/teams/t1/machines')).toBe(true);
   });
@@ -363,7 +378,8 @@ test('finishing a step refreshes whole-thread cost and current-run tokens withou
     stream.emit(ev);
   }, event);
   await expect(usage(page)).toHaveAttribute('data-state', 'loading');
-  await expect(cost(page)).toHaveText('—');
+  await expect(statByLabel(page, 'Cost')).toHaveCount(0);
+  await expect(usage(page)).not.toContainText('—');
   release();
   await expect(usage(page)).toHaveAttribute('data-state', 'ready');
   await expect(tokens(page)).toHaveText('2.6k');
