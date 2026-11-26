@@ -44,6 +44,62 @@ export function parseInputRequestId(requestId: string): { id: string; attempt: n
     : { id: requestId, attempt: 1 };
 }
 
+export function stoppedCoordinatorTurns(
+  db: Db,
+  threadId: string,
+): { stepId: string; requestIds: string[] }[] {
+  const ended = db
+    .select()
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, threadId),
+        eq(step.kind, 'chief'),
+        inArray(step.status, ['done', 'stopped']),
+      ),
+    )
+    .orderBy(asc(step.finishedAt), sql`rowid`)
+    .all();
+  const answeredSince = Math.max(
+    0,
+    ...ended
+      .filter((row) => row.status === 'done' && !isMailWakeText(row.prompt ?? ''))
+      .map((row) => row.claimedAt ?? row.finishedAt ?? 0),
+  );
+  const inputs = coordinatorInputs(db, threadId);
+  return ended
+    .filter((row) => row.status === 'stopped' && (row.finishedAt ?? answeredSince) >= answeredSince)
+    .map((row) => ({
+      stepId: row.id,
+      requestIds: [
+        ...new Set([
+          row.id,
+          ...inputs
+            .filter((input) => input.stepId === row.id)
+            .flatMap((input) => inputRequestIds(inputRequestId(input))),
+        ]),
+      ],
+    }));
+}
+
+export function stoppedTurnRequests(db: Db, stepId: string): string[] {
+  const prompt = db.select().from(step).where(eq(step.id, stepId)).get()?.prompt ?? '';
+  if (isMailWakeText(prompt)) return [];
+  const steered = db
+    .select()
+    .from(coordinatorInput)
+    .where(
+      and(
+        eq(coordinatorInput.stepId, stepId),
+        eq(coordinatorInput.kind, 'steer'),
+        eq(coordinatorInput.state, 'consumed'),
+      ),
+    )
+    .orderBy(asc(coordinatorInput.createdAt), sql`rowid`)
+    .all();
+  return [prompt, ...steered.map((input) => input.content)].filter((text) => text !== '');
+}
+
 export function inputForRequestId(
   db: Db,
   requestId: string,

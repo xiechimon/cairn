@@ -27,6 +27,7 @@ import {
   pullCoordinatorInput,
   releaseCoordinatorInput,
   requireCoordinatorConversation,
+  stoppedCoordinatorTurns,
 } from '../services/coordinator-inputs.js';
 import { bindCoordinatorRun, coordinatorRuns } from '../services/coordinator-runs.js';
 import { finishCoordinatorTurn, recordStepUsage } from '../services/coordinator-steps.js';
@@ -143,6 +144,7 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
       if (owned === undefined || owned.status !== 'claimed') return false;
       return fetchStop(deps, { id: null }, stepId).discard;
     },
+    stoppedTurns: async (threadId) => stoppedCoordinatorTurns(deps.db, threadId),
     inputs: {
       position: async (threadId) =>
         deps.db

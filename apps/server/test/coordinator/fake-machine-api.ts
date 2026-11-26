@@ -58,6 +58,8 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
       api.stopPolls.push(stepId);
       return api.stopRequested.has(stepId) ? false : null;
     },
+    stoppedTurns: async () =>
+      [...api.stopRequested].map((id) => ({ stepId: id, requestIds: [id] })),
     askUser: async (stepId, body) => {
       api.asks.push({ stepId, body });
       return { status: 'cancelled', requestId: body.requestId, answers: null, reason: 'no user' };

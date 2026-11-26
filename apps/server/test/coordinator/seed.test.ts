@@ -76,6 +76,40 @@ describe('seeding the Coordinator store from thread rows', () => {
     expect(messages[1]?.text).toContain('read_history ids ["a2"]');
   });
 
+  const threadRow = (id: string, role: string, content: unknown) => ({
+    id,
+    role,
+    content: JSON.stringify(content),
+    createdAt: 1,
+  });
+  const stopRow = (...stoppedRequests: string[]) => ({
+    ...threadRow('chief-stop-s1', 'system', { kind: 'chief_turn_stopped', todos: [] }),
+    stoppedRequests,
+  });
+
+  it('rebuilds a stop as cancelling only the request its turn was working on', () => {
+    const messages = seedMessages([
+      threadRow('u1', 'user', 'summarise the repository'),
+      threadRow('u2', 'user', 'write a long article'),
+      stopRow('write a long article'),
+      threadRow('u3', 'user', 'what time is it'),
+    ]);
+    expect(messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(messages[1]?.text).toContain('write a long article');
+    expect(messages[1]?.text).toContain('is cancelled');
+    expect(messages[1]?.text).not.toContain('summarise the repository');
+  });
+
+  it('keeps a finished answer finished when Stop came after it', () => {
+    const messages = seedMessages([
+      threadRow('u1', 'user', 'what is 2+2'),
+      threadRow('a1', 'assistant', [{ type: 'text', text: 'The answer is 4.' }]),
+      stopRow('what is 2+2'),
+    ]);
+    expect(messages[1]?.text).toContain('Whatever I had not finished for it is cancelled');
+    expect(messages[1]?.text).toContain('Answers already finished and work already done stay done');
+  });
+
   it('writes the rows as the head of the context and refuses to seed twice', async () => {
     const dir = tempDir();
     const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });

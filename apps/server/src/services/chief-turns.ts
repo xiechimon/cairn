@@ -753,6 +753,8 @@ function createdTodoIdOf(content: unknown): string | null {
   return typeof id === 'string' ? id : null;
 }
 
+export const CHIEF_STOP_ROW_ID_PREFIX = 'chief-stop-';
+
 export function recordChiefStop(
   deps: Pick<ChiefTurnDeps, 'db' | 'convHub'>,
   stepRow: StepRow,
@@ -783,7 +785,7 @@ export function recordChiefStop(
   }
   const content: ChiefTurnStoppedContent = { kind: CHIEF_TURN_STOPPED_KIND, todos };
   const row = {
-    id: `chief-stop-${stepRow.id}`,
+    id: `${CHIEF_STOP_ROW_ID_PREFIX}${stepRow.id}`,
     threadId: stepRow.buildId,
     role: 'system' as const,
     content: JSON.stringify(content),

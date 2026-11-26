@@ -11,6 +11,7 @@ import type {
 } from '@cairn/shared';
 
 import type { InputChannel } from './input-channel.js';
+import type { StoppedTurn } from './stopped-turn.js';
 
 export interface MachineApi {
   inputs?: InputChannel;
@@ -20,6 +21,7 @@ export interface MachineApi {
   reusedInstructions?(stepId: string, sentBy: string): Promise<void>;
   heartbeat(stepId: string): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
+  stoppedTurns(threadId: string): Promise<StoppedTurn[]>;
   steer?(
     stepId: string,
     admittedRequestIds?: readonly string[],

@@ -33,6 +33,7 @@ import type { InputReceipts } from './input-receipts.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
+import { cancelStoppedRequests } from './stopped-turn.js';
 import { suggestAfterTurn } from './suggest-replies.js';
 import type { ConversationGate, StepGate } from './tools.js';
 import { emitTurnSpans } from './turn-spans.js';
@@ -407,6 +408,7 @@ export async function runCoordinatorTurn(
       previousInitial !== undefined && (prior === undefined || prior.status === 'unanswered'),
     );
     deps.setupPhase?.('input prepare');
+    await cancelStoppedRequests(harness, root, await api.stoppedTurns(threadId), context);
     const initialRequestId = initial?.id ?? stepId;
     const submission = await root.submit(
       {
@@ -417,6 +419,7 @@ export async function runCoordinatorTurn(
       context,
     );
     deps.setupPhase?.('submit');
+    if (stopping !== null) await root.abort(context);
     activeSubmission = submission;
     activeRequestId = initialRequestId;
     inFlight = true;

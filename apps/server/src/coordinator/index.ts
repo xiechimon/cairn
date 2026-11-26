@@ -25,11 +25,15 @@ import {
 import { nowMs } from '../lib/ids.js';
 import { blockedNow } from '../services/blockers.js';
 import { greetingReadmeSection, parseChiefTrigger } from '../services/chief.js';
-import { hasEarlierLiveChiefStep, STEER_HOLDS } from '../services/chief-turns.js';
+import {
+  CHIEF_STOP_ROW_ID_PREFIX,
+  hasEarlierLiveChiefStep,
+  STEER_HOLDS,
+} from '../services/chief-turns.js';
 import { connectorToolDefsForTeam } from '../services/connector-broker.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
-import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
+import { coordinatorInputIsLive, stoppedTurnRequests } from '../services/coordinator-inputs.js';
 import {
   chiefTurnContext,
   claimPendingChiefStep,
@@ -234,7 +238,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           .all()
           .filter(
             ({ message: m }) =>
-              m.role !== 'system' &&
+              (m.role !== 'system' || m.id.startsWith(CHIEF_STOP_ROW_ID_PREFIX)) &&
               !pendingUsers.has(m.id) &&
               !m.id.startsWith('chief-digest-') &&
               !m.id.startsWith('chief-report-'),
@@ -247,6 +251,14 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             role: m.role,
             content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
             createdAt: m.createdAt,
+            ...(m.id.startsWith(CHIEF_STOP_ROW_ID_PREFIX)
+              ? {
+                  stoppedRequests: stoppedTurnRequests(
+                    db,
+                    m.id.slice(CHIEF_STOP_ROW_ID_PREFIX.length),
+                  ),
+                }
+              : {}),
           }),
         );
         return {

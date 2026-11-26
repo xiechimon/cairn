@@ -20,6 +20,7 @@ import { parseWatermark } from '../watermark.js';
 import { InputAuthorityError, type InputChannel } from './input-channel.js';
 import type { MachineApi } from './machine-api.js';
 import { entryRowSources } from './mirror.js';
+import { StoppedEntry } from './stopped-turn.js';
 
 export async function replayCoordinatorInputs(
   harness: Harness,
@@ -134,6 +135,7 @@ export async function replayCoordinatorInputs(
       }
     } else if (
       SystemEntry.is(entry) ||
+      StoppedEntry.is(entry) ||
       CompactionEntry.is(entry) ||
       (ResetEntry.is(entry) && entry.model === undefined)
     ) {
