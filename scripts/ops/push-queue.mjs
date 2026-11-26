@@ -8,15 +8,6 @@ import { ENQUEUE_PREFIX, makeEnqueueId, sortEnqueueEntries } from './speculative
 
 export const DEFAULT_POLL_SECONDS = 15;
 
-export function planPush({ live, queueHead }) {
-  if (!live) return { action: 'push' };
-  return { action: 'wait', sha: live, restoring: queueHead === null };
-}
-
-export function planEnqueueOrLand({ pushedSha }) {
-  return { action: 'enqueue', sha: pushedSha };
-}
-
 export function commitCommentsApiArgs(repo, sha) {
   return ['api', `repos/${repo}/commits/${sha}/comments?per_page=20`];
 }
@@ -130,31 +121,6 @@ export const RED_CONCLUSIONS = ['failure', 'timed_out', 'cancelled'];
 export function failedGreenContexts(checkRuns) {
   const byName = new Map(checkRuns.map((run) => [run.name, run.conclusion]));
   return GREEN_CONTEXTS.filter((name) => RED_CONCLUSIONS.includes(byName.get(name) ?? ''));
-}
-
-export function nextWaitAction({
-  live,
-  headOnLive,
-  headOnMain,
-  deadBase,
-  headTree,
-  armedTree,
-  evidence,
-  failed,
-}) {
-  if (live) {
-    if (!headOnLive) return { action: 'rebase', onto: live };
-    if (headTree !== armedTree) return { action: 'preflight' };
-    if (failed.length > 0) return { action: 'fail', contexts: failed };
-    return { action: 'poll' };
-  }
-  if (deadBase || headOnMain === false) return { action: 'rebase', onto: 'origin/main' };
-  if (failed.length > 0) return { action: 'fail', contexts: failed };
-  if (!evidence.ok) {
-    if (headTree !== armedTree) return { action: 'preflight' };
-    return { action: 'poll' };
-  }
-  return { action: 'push' };
 }
 
 export function unownedCommits(commits) {

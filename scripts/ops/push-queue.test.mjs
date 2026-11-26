@@ -19,15 +19,11 @@ import {
 import {
   classifyWaitStatus,
   commitCommentsApiArgs,
-  DEFAULT_POLL_SECONDS,
   failedGreenContexts,
   fetchCheckRuns,
   isTransientGitNetworkError,
   laneName,
   missingGreenContexts,
-  nextWaitAction,
-  planEnqueueOrLand,
-  planPush,
   pollWaitStep,
   preflightEvidence,
   stampCommand,
@@ -35,24 +31,6 @@ import {
 } from './push-queue.mjs';
 
 const X = 'a'.repeat(40);
-
-test('with no live candidate the push goes through', () => {
-  assert.equal(planPush({ live: null, queueHead: null }).action, 'push');
-  assert.equal(planPush({ live: null, queueHead: X }).action, 'push');
-});
-
-test('a live candidate makes the push wait on it, and says when queue/main was deleted under it', () => {
-  assert.deepEqual(planPush({ live: X, queueHead: X }), {
-    action: 'wait',
-    sha: X,
-    restoring: false,
-  });
-  assert.deepEqual(planPush({ live: X, queueHead: null }), {
-    action: 'wait',
-    sha: X,
-    restoring: true,
-  });
-});
 
 test('commits without an Amp-Thread-ID or Lane trailer are the ones that get stamped', () => {
   const commits = [
@@ -182,51 +160,6 @@ test('the pre-flight ref and run lookup are lane-scoped', () => {
   assert.equal(preflightRun([], 'S', 'preflight/mac/wt'), null);
 });
 
-test('--wait rebases onto the live candidate, arms preflight once, then polls', () => {
-  const base = {
-    live: X,
-    headOnLive: false,
-    deadBase: false,
-    headTree: 'T1',
-    armedTree: null,
-    evidence: { ok: false },
-    failed: [],
-  };
-  assert.deepEqual(nextWaitAction(base), { action: 'rebase', onto: X });
-  assert.deepEqual(nextWaitAction({ ...base, headOnLive: true }), { action: 'preflight' });
-  assert.deepEqual(nextWaitAction({ ...base, headOnLive: true, armedTree: 'T1' }), {
-    action: 'poll',
-  });
-  assert.deepEqual(
-    nextWaitAction({ ...base, headOnLive: true, armedTree: 'T1', failed: ['check'] }),
-    { action: 'fail', contexts: ['check'] },
-  );
-});
-
-test('--wait on a freed queue rebases off a dropped base, waits for evidence, then pushes', () => {
-  const base = {
-    live: null,
-    headOnLive: false,
-    deadBase: true,
-    headTree: 'T1',
-    armedTree: 'T1',
-    evidence: { ok: false },
-    failed: [],
-  };
-  assert.deepEqual(nextWaitAction(base), { action: 'rebase', onto: 'origin/main' });
-  assert.deepEqual(nextWaitAction({ ...base, deadBase: false, failed: ['e2e-gate'] }), {
-    action: 'fail',
-    contexts: ['e2e-gate'],
-  });
-  assert.deepEqual(nextWaitAction({ ...base, deadBase: false, armedTree: 'T2' }), {
-    action: 'preflight',
-  });
-  assert.deepEqual(nextWaitAction({ ...base, deadBase: false }), { action: 'poll' });
-  assert.deepEqual(nextWaitAction({ ...base, deadBase: false, evidence: { ok: true, sha: 's' } }), {
-    action: 'push',
-  });
-});
-
 test('failedGreenContexts flags only required contexts that went red', () => {
   const run = (name, conclusion) => ({ name, conclusion });
   assert.deepEqual(
@@ -274,22 +207,6 @@ test('fetchCheckRuns returns null when the commit is unknown to GitHub', () => {
       },
     }),
     null,
-  );
-});
-
-test('--wait rebases onto origin/main when main moved ahead of HEAD while queue/main is free', () => {
-  assert.deepEqual(
-    nextWaitAction({
-      live: null,
-      headOnLive: false,
-      headOnMain: false,
-      deadBase: false,
-      headTree: 'T1',
-      armedTree: 'T1',
-      evidence: { ok: true, sha: X },
-      failed: [],
-    }),
-    { action: 'rebase', onto: 'origin/main' },
   );
 });
 
@@ -383,40 +300,6 @@ test('stamp-then-preflight produces exact-SHA evidence for train admission', () 
         : null,
   });
   assert.deepEqual(evidence, { ok: true, sha: stampedSha });
-});
-
-test('planEnqueueOrLand uses the merge train even when queue is empty and HEAD is directly green on main', () => {
-  assert.equal(DEFAULT_POLL_SECONDS, 15);
-  assert.deepEqual(
-    planEnqueueOrLand({
-      activeEnqueueCount: 0,
-      hasLegacyLive: false,
-      pushedSha: X,
-      evidenceSha: X,
-      containsMain: true,
-    }),
-    { action: 'enqueue', sha: X },
-  );
-  assert.deepEqual(
-    planEnqueueOrLand({
-      activeEnqueueCount: 1,
-      hasLegacyLive: false,
-      pushedSha: X,
-      evidenceSha: X,
-      containsMain: true,
-    }),
-    { action: 'enqueue', sha: X },
-  );
-  assert.deepEqual(
-    planEnqueueOrLand({
-      activeEnqueueCount: 0,
-      hasLegacyLive: false,
-      pushedSha: X,
-      evidenceSha: X,
-      containsMain: false,
-    }),
-    { action: 'enqueue', sha: X },
-  );
 });
 
 test('classifyWaitStatus distinguishes landed (including rebased cherry), queued, and ejected', () => {
