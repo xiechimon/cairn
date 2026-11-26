@@ -81,11 +81,11 @@ export function createTestTempRun({ runId = randomUUID() } = {}) {
   return {
     runId,
     env: { CAIRN_TEST_RUN_ID: runId },
-    allocate(prefix = 'fixture-') {
+    allocate(prefix = 'fixture-', root = testTempRoot()) {
       if (typeof prefix !== 'string' || !/^[a-zA-Z0-9_-]*$/.test(prefix)) {
         throw new TypeError('prefix must contain only letters, digits, underscores or hyphens');
       }
-      const path = mkdtempSync(join(testTempRoot(), `${testTempPrefix(runId)}${prefix}`));
+      const path = mkdtempSync(join(root, `${testTempPrefix(runId)}${prefix}`));
       try {
         if (process.env.CAIRN_TEST_TEMP_STRICT === '1' && process.env.CAIRN_TEST_TEMP_REPORT) {
           appendFileSync(

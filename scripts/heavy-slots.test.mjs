@@ -37,6 +37,7 @@ import {
 import { prepushModules } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
 import { lightTestRun, selectedTestFiles } from './test-admission.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const moduleUrl = pathToFileURL(resolve('scripts/heavy-slots.mjs')).href;
 const cli = resolve('scripts/heavy-slots.mjs');
@@ -614,6 +615,10 @@ test('a probe whose listener closes before accepting it reads as gone', {
   }
 });
 
+function bindableSocketDir() {
+  return makeTestTempDir('hs-', '/tmp');
+}
+
 async function droppedSocket(path) {
   const server = createServer();
   await new Promise((done, reject) => {
@@ -673,7 +678,9 @@ test('the liveness probe socket lives under the os tmpdir, bounded in length', a
 
 test('a dead holder whose probe sits in the locks dir is reclaimed and its socket cleaned', async () => {
   const { env, cleanup } = sandbox(1);
+  const sockets = bindableSocketDir();
   try {
+    env.CAIRN_HEAVY_SLOTS_DIR = join(sockets, 'locks');
     const locks = env.CAIRN_HEAVY_SLOTS_DIR;
     mkdirSync(locks, { recursive: true });
     const token = randomUUID();
@@ -684,6 +691,7 @@ test('a dead holder whose probe sits in the locks dir is reclaimed and its socke
     assert.equal(existsSync(probe), false);
   } finally {
     cleanup();
+    releaseTestTempDir(sockets);
   }
 });
 
@@ -715,11 +723,12 @@ test('a dead holder with a legacy /tmp probe path is reclaimed and its socket cl
 });
 
 test('a holder whose probe cannot be reached and whose pid is dead is still reclaimed', async () => {
-  const { dir, env, cleanup } = sandbox(1);
+  const { env, cleanup } = sandbox(1);
+  const sockets = bindableSocketDir();
   try {
     const locks = env.CAIRN_HEAVY_SLOTS_DIR;
     mkdirSync(locks, { recursive: true });
-    const sealed = join(dir, 'sealed');
+    const sealed = join(sockets, 'sealed');
     mkdirSync(sealed, { recursive: true });
     const token = randomUUID();
     await droppedSocket(join(sealed, `cairn-heavy-${token}.sock`));
@@ -740,15 +749,17 @@ test('a holder whose probe cannot be reached and whose pid is dead is still recl
     }
   } finally {
     cleanup();
+    releaseTestTempDir(sockets);
   }
 });
 
 test('a holder whose probe cannot be reached but whose pid lives keeps its slot', async () => {
-  const { dir, env, cleanup } = sandbox(1);
+  const { env, cleanup } = sandbox(1);
+  const sockets = bindableSocketDir();
   try {
     const locks = env.CAIRN_HEAVY_SLOTS_DIR;
     mkdirSync(locks, { recursive: true });
-    const sealed = join(dir, 'sealed');
+    const sealed = join(sockets, 'sealed');
     mkdirSync(sealed, { recursive: true });
     const token = randomUUID();
     await droppedSocket(join(sealed, `cairn-heavy-${token}.sock`));
@@ -771,6 +782,7 @@ test('a holder whose probe cannot be reached but whose pid lives keeps its slot'
     }
   } finally {
     cleanup();
+    releaseTestTempDir(sockets);
   }
 });
 
