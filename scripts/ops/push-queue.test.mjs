@@ -620,3 +620,23 @@ test('runs this push is about to replace do not count against the preflight cap'
   });
   assert.deepEqual(verdict, { ok: true, activeCount: 1 });
 });
+
+test('pollWaitStep retries when another worktree holds or has moved the shared origin/main ref', () => {
+  for (const reason of [
+    'is at 7d69ef17fade78995ff2289f9768ce6e7aed78ab but expected 65f587b2647f07abfbc9d09cf57d981ac68283ec',
+    "Unable to create '/repo/.git/refs/remotes/origin/main.lock': File exists.",
+  ]) {
+    const raced = pollWaitStep({
+      fetchMain: () => {
+        throw new Error(`error: cannot lock ref 'refs/remotes/origin/main': ${reason}\n`);
+      },
+      listQueue: () => ({ entries: [], mainSha: null }),
+      isOnMain: () => false,
+      hasUnappliedCherry: () => true,
+      readRemovalNote: () => null,
+      sleep: () => {},
+      enqueueRef: 'refs/heads/enqueue/1-abc',
+    });
+    assert.equal(raced.state, 'retry', reason);
+  }
+});

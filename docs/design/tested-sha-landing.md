@@ -43,7 +43,7 @@ accepted and pushing an untested one is rejected.
   missing and stops on a red run. After enqueueing it polls every 15s
   (`PUSH_QUEUE_POLL_SECONDS`) until the change is on `origin/main` or the entry
   is gone with a removal comment. `PUSH_QUEUE_WAIT_MINUTES` (default 120) bounds
-  the wait; transient network errors are retried.
+  the wait; transient network errors, and a fetch that lost a race with another worktree updating the shared `origin/main` ref, are retried.
 
 ## Promoting (`scripts/ops/speculative-queue.mjs --enforce`)
 

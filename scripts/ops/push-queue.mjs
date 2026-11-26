@@ -29,7 +29,7 @@ export function classifyWaitStatus({
 }
 
 const TRANSIENT_NET_ERROR_RE =
-  /SSL_ERROR_SYSCALL|LibreSSL|Could not resolve host|Connection reset|unexpected EOF|ETIMEDOUT|ECONNRESET|EAI_AGAIN|HTTP (?:403|429|500|502|503|504)|Failed to connect to github\.com|Transferred a partial file|expected flush after ref listing/i;
+  /SSL_ERROR_SYSCALL|LibreSSL|Could not resolve host|Connection reset|unexpected EOF|ETIMEDOUT|ECONNRESET|EAI_AGAIN|HTTP (?:403|429|500|502|503|504)|Failed to connect to github\.com|Transferred a partial file|expected flush after ref listing|cannot lock ref 'refs\/remotes\/[^']+': (?:is at [0-9a-f]+ but expected [0-9a-f]+|Unable to create '[^']+\.lock': File exists)/i;
 
 export function isTransientGitNetworkError(error) {
   const message = `${error?.stderr ?? ''}\n${error?.message ?? error ?? ''}`;
@@ -416,7 +416,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     });
     if (status.state === 'retry') {
       console.log(
-        `[push-queue] transient network error while polling (${status.reason}); retrying in ${POLL_SECONDS}s`,
+        `[push-queue] transient git error while polling (${status.reason}); retrying in ${POLL_SECONDS}s`,
       );
       sleep(POLL_SECONDS);
       continue;
