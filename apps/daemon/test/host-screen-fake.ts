@@ -1,4 +1,4 @@
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -23,7 +23,7 @@ export interface FakeRule {
   override?: (fixture: unknown) => unknown;
 }
 
-const SCRIPT = `#!${process.execPath}
+const SCRIPT = `
 const fs = require('node:fs');
 const path = require('node:path');
 const scenario = JSON.parse(fs.readFileSync(path.join(__dirname, 'scenario.json'), 'utf8'));
@@ -65,7 +65,9 @@ export function fakeScreen(
 ): FakeScreen {
   const dir = makeTestTempDir('screen-');
   const binary = path.join(dir, 'agent-desktop');
-  writeFileSync(binary, SCRIPT);
+  const interpreter = path.join(dir, 'node');
+  symlinkSync(process.execPath, interpreter);
+  writeFileSync(binary, `#!${interpreter}${SCRIPT}`);
   chmodSync(binary, 0o755);
   const resolved = rules.map(({ override, fixture, ...rule }) => {
     if (!override || !fixture) return { ...rule, ...(fixture ? { fixture } : {}) };
