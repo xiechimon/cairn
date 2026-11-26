@@ -28,7 +28,7 @@
 
 ## 你会得到什么
 
-- **用你自己的订阅。** Claude Code、Codex，或任意服务商的 API key（包括 Google 的 Gemini）。Cairn 不转售算力。
+- **用你自己的订阅。** Claude Code、Codex，或任意服务商的 API key（包括 Google 的 Gemini）。Cairn 目前不转售算力。
 - **先研究，再动手。** thread 改东西之前，先看几个强的开源项目是怎么解决的，细节自己定。
 - **只在需要你时打扰。** 首页只置顶等你拍板的事，推送也只发需要你动手的事。
 - **结果可信。** agent 合并前，合并闸只认绑定当前补丁的审核结论。撤不回的动作都等你点头。
@@ -107,7 +107,9 @@ cairn start --server http://127.0.0.1:8787
 
 ## 「等等，你们卖什么？」
 
-什么都不卖。全部代码 Apache-2.0 开源，不做功能门控；只有私有轮换的评测任务 holdout 子集不公开。没有托管后台，也不转售算力：Cairn 跑在你的机器上，用你的订阅。
+目前什么都不卖。全部代码 Apache-2.0 开源，不做功能门控；只有私有轮换的评测任务 holdout 子集不公开。目前没有托管服务，也不转售算力：Cairn 跑在你的机器上，用你的订阅。
+
+方向：计划推出官方付费托管服务 Cairn Cloud，现在还不能用。自托管保持免费、功能完整。
 
 ## 适合谁
 
@@ -125,7 +127,7 @@ Cairn 是给一个人用的，不是给团队用的：你装一份自己用，�
 - 团队一起用的工具，有共享频道、角色和计费（看 [Amp Spaces](https://ampcode.com/docs/spaces) 或 [Multica](https://github.com/multica-ai/multica)）；
 - 只是一个更好用的界面，自己来操作 Claude Code 或 Codex（看 [T3 Code](https://github.com/pingdotgg/t3code)）；
 - 把家安在聊天软件里的助理，比如 Telegram、WhatsApp（看 [OpenClaw](https://github.com/openclaw/openclaw) 或 [Hermes Agent](https://github.com/NousResearch/hermes-agent)）——cairn 把聊天软件当入口，不当住所；
-- 不用安装、不用维护任何东西的托管服务。
+- 现在就要一个不用安装、不用维护任何东西的托管服务。
 
 ## 文档
 

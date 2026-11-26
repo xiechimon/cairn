@@ -28,7 +28,7 @@ Tell one Coordinator what you want, from code to your own affairs. It opens a th
 
 ## What you get
 
-- **Your own subscriptions.** Claude Code, Codex, or an API key from any provider, Google's Gemini included. Cairn never resells compute.
+- **Your own subscriptions.** Claude Code, Codex, or an API key from any provider, Google's Gemini included. Today Cairn resells no compute.
 - **Research, then build.** A thread reads how strong open-source projects solved the problem before it changes anything, and decides the details itself.
 - **Only what needs you.** The home page pins the decisions waiting on you, and a push goes out only when you must act.
 - **Results you can trust.** Before an agent merges, the gate counts only review verdicts bound to the current patch. Anything that cannot be undone waits for your yes.
@@ -107,7 +107,9 @@ For optional Claude Code tasks, install `claude` on each Runner and connect a su
 
 ## "Wait, what are you selling?"
 
-Nothing. All code is Apache-2.0 with no feature gating; only a private, rotating holdout subset of the eval task set stays unpublished. There is no hosted control plane and no resold compute: Cairn runs on your machines with your subscriptions.
+Today, nothing. All code is Apache-2.0 with no feature gating; only a private, rotating holdout subset of the eval task set stays unpublished. There is no hosted service and no resold compute: Cairn runs on your machines with your subscriptions.
+
+Direction: an official paid hosted service, Cairn Cloud, is planned and not available yet. Self-hosting stays free with full functionality.
 
 ## Who it's for
 
@@ -125,7 +127,7 @@ It is not the right fit if you want:
 - a tool for a team to share, with shared channels, roles and billing ([Amp Spaces](https://ampcode.com/docs/spaces) or [Multica](https://github.com/multica-ai/multica));
 - only a better interface for driving Claude Code or Codex yourself ([T3 Code](https://github.com/pingdotgg/t3code));
 - an assistant whose home is a chat app, such as Telegram or WhatsApp ([OpenClaw](https://github.com/openclaw/openclaw) or [Hermes Agent](https://github.com/NousResearch/hermes-agent)) — for cairn, chat apps are entry points, not the residence;
-- a hosted service with nothing to install or keep running.
+- today, a hosted service with nothing to install or keep running.
 
 ## Documentation
 

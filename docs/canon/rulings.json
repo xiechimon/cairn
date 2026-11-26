@@ -58,16 +58,16 @@
       "section": "§4"
     },
     {
-      "id": "positioning.no-hosted-plane",
-      "date": "2026-11-06",
-      "ruling": "No project-run hosted control plane and no resold compute; credentials stay on the user's machine.",
+      "id": "positioning.hosted-cloud",
+      "date": "2026-11-25",
+      "ruling": "Today Cairn runs on the user's own machines, with no project-run hosted control plane and no resold compute. Direction: an official paid hosted service, Cairn Cloud, is in scope and not yet available (no free cloud tier; zero-markup BYOK first, optional model credits later), with its control plane, orchestration and billing in a separate private repository; local execution credentials stay on the user's own machines.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
       "section": "§4"
     },
     {
       "id": "positioning.license",
-      "date": "2026-11-06",
-      "ruling": "All code is Apache-2.0 open source with DCO sign-off and no CLA; nothing is sold and no feature is gated.",
+      "date": "2026-11-25",
+      "ruling": "This repository stays Apache-2.0 open source with DCO sign-off and no CLA, and free self-hosting with full functionality stays un-gated (only the private rotating eval holdout stays unpublished). Nothing is sold today; the one paid offering in scope is the hosted service in positioning.hosted-cloud.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
       "section": "§4"
     },
