@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
@@ -19,6 +19,13 @@ function sandbox(t) {
   mkdirSync(join(root, 'scripts'));
   mkdirSync(join(root, 'docs', 'canon'), { recursive: true });
   mkdirSync(join(root, 'docs', 'spec'));
+  mkdirSync(join(root, 'apps', 'server'), { recursive: true });
+  writeFileSync(join(root, 'apps/server/package.json'), '{}');
+  symlinkSync(
+    join(ROOT, 'apps/server/node_modules'),
+    join(root, 'apps/server/node_modules'),
+    'dir',
+  );
   copyFileSync(SCRIPT, join(root, 'scripts', 'generate-canon.mjs'));
   const run = (...args) =>
     spawnSync(process.execPath, [join(root, 'scripts', 'generate-canon.mjs'), ...args], {
@@ -68,6 +75,76 @@ test('code spans holding dots or tildes, and an unrelated earlier strikethrough,
   assert.equal(run('--check').stderr, '');
 });
 
+for (const [name, body] of [
+  [
+    'a lone comment opener sits mid-line',
+    `Type <!-- to start one.\n\n${marked('a.team', SENTENCE)}\n`,
+  ],
+  ['an unpaired double tilde precedes it', `Costs ~~ about that. ${marked('a.team', SENTENCE)}\n`],
+  [
+    'an unquoted tag-like placeholder precedes it',
+    `Use <s-id> here. ${marked('a.team', SENTENCE)}\n`,
+  ],
+  [
+    'it continues a list item behind four spaces',
+    `- Outer item\n\n    ${marked('a.team', SENTENCE)}\n`,
+  ],
+  [
+    'an earlier paragraph left an inline tag open',
+    `Press <s> now.\n\n${marked('a.team', SENTENCE)}\n`,
+  ],
+]) {
+  test(`--check stays green when ${name}`, (t) => {
+    const { run, put } = sandbox(t);
+    put({ spec: `# 18\n\n## 4. Not to do\n\n${body}` });
+    assert.equal(run().stderr, '');
+    assert.equal(run('--check').status, 0);
+  });
+}
+
+for (const [name, body, why] of [
+  [
+    'a longer fence holds a shorter one',
+    `\`\`\`\`\n\`\`\`\n${marked('a.team', SENTENCE)}\n\`\`\`\`\n`,
+    /inside a code block starting at line 1/,
+  ],
+  [
+    'a fence sits in a blockquote',
+    `> \`\`\`\n> ${marked('a.team', SENTENCE)}\n> \`\`\`\n`,
+    /inside a code block/,
+  ],
+  [
+    'a code span runs across lines',
+    `Write \`this:\ntext ${marked('a.team', SENTENCE)}\nend\` now.\n`,
+    /inside a code span/,
+  ],
+  [
+    'a pre element holds it',
+    `<pre>\n${marked('a.team', SENTENCE)}\n</pre>\n`,
+    /inside a <pre> element/,
+  ],
+  [
+    'a hidden element holds it',
+    `<div hidden>\n\n${marked('a.team', SENTENCE)}\n\n</div>\n`,
+    /inside a <div> element opened at line 1/,
+  ],
+  ['single tildes strike it', `~${marked('a.team', SENTENCE)}~\n`, /struck through/],
+  [
+    'an unclosed comment precedes it',
+    `<!-- draft\n\n${marked('a.team', SENTENCE)}\n`,
+    /inside a comment opened at line 1/,
+  ],
+]) {
+  test(`--check is red and says why when ${name}`, (t) => {
+    const { run, put } = sandbox(t);
+    put({ spec: body });
+    const result = run('--check');
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /has no ruling mark/);
+    assert.match(result.stderr, why);
+  });
+}
+
 for (const [name, change, message] of [
   ['the mark was removed', { spec: `## 4. X\n\n- ${SENTENCE}\n` }, /has no ruling mark/],
   ['the registry row was removed', { rulings: [{ ...row, id: 'a.other' }] }, /has no row/],
@@ -113,7 +190,7 @@ for (const [name, change, message] of [
   ],
   [
     'a strikethrough runs across lines around the sentence',
-    { spec: `## 4. X\n\n~~Dropped:\n${marked('a.team', SENTENCE)}\ndone.~~\n` },
+    { spec: `## 4. X\n\n~~Dropped:\nand ${marked('a.team', SENTENCE)}\ndone.~~\n` },
     /no ruling mark/,
   ],
   [

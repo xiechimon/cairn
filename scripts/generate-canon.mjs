@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -8,12 +9,41 @@ const REGISTRY_REL = 'docs/canon/rulings.json';
 const DOC_REL = 'docs/CANON.md';
 const SPEC_DIR = 'docs/spec';
 const RULING_KEYS = ['id', 'spec', 'date'];
-const MARK = /<!--\s*ruling:([\w.-]+)\s*-->|<!--\s*\/ruling\s*-->/g;
+const requireParser = createRequire(join(REPO_ROOT, 'apps/server/package.json'));
+const { fromMarkdown } = requireParser('mdast-util-from-markdown');
+const { gfm } = requireParser('micromark-extension-gfm');
+const { gfmFromMarkdown } = requireParser('mdast-util-gfm');
+const OPENING_MARK = /^<!--\s*ruling:([\w.-]+)\s*-->$/;
+const CLOSING_MARK = /^<!--\s*\/ruling\s*-->$/;
+const MENTIONED_MARK = /<!--\s*ruling:([\w.-]+)\s*-->/g;
+const HTML_TOKEN =
+  /<!--[\s\S]*?(?:-->|$)|<(\/?)([A-Za-z][\w:-]*)((?:[^<>"']|"[^"]*"|'[^']*')*?)(\/?)>/g;
+const HIDING_ELEMENTS = new Set([
+  'code',
+  'del',
+  'noscript',
+  'pre',
+  's',
+  'script',
+  'strike',
+  'style',
+  'template',
+  'textarea',
+]);
+const VOID_ELEMENTS = new Set(['br', 'hr', 'img', 'input', 'link', 'meta', 'source', 'wbr']);
+const HIDDEN_ATTRIBUTE = /(?:^|\s)hidden(?=\s|=|$)/i;
+const HIDDEN_STYLE = /display\s*:\s*none/i;
+const PHRASING_PARENTS = new Set([
+  'delete',
+  'emphasis',
+  'heading',
+  'link',
+  'linkReference',
+  'paragraph',
+  'strong',
+  'tableCell',
+]);
 const CODE_SPAN = /(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)/g;
-const COMMENT_EDGE = /<!--\s*(?:ruling:[\w.-]+|\/ruling)\s*-->|<!--|-->/g;
-const DELETED_EDGE = /<(\/?)(?:del|s|strike)\b[^>]*>/gi;
-const INDENTED_CODE = /^(?: {4}|\t)(?!\s*(?:[-*+]|\d+\.) )/;
-const FENCE = /^\s*(```|~~~)/;
 const NUMBERED_HEADING = /^#{2,6}\s+(\d+(?:\.\d+)*)\.?\s/;
 const PLACEHOLDER = /\b(?:TODO|TBD|FIXME|XXX|placeholder|lorem ipsum)\b|\.\.\.|…|<!--/i;
 const MIN_WORDS = 8;
@@ -23,59 +53,145 @@ function fail(lines) {
   process.exit(1);
 }
 
-function shownMarks(line, state) {
-  const prose = line.replace(CODE_SPAN, (span) => ' '.repeat(span.length));
-  const commented = new Set();
-  for (const edge of prose.matchAll(COMMENT_EDGE)) {
-    if (edge[0] === '<!--') state.comment = true;
-    else if (edge[0] === '-->') state.comment = false;
-    else if (state.comment) commented.add(edge.index);
-  }
-  if (prose.trim() === '') state.struck = false;
-  if (INDENTED_CODE.test(line)) return [];
-  const edges = [...prose.matchAll(DELETED_EDGE), ...prose.matchAll(/~~/g)].sort(
-    (a, b) => a.index - b.index,
+const newlines = (text) => text.split('\n').length - 1;
+
+function hidingElement(name, attributes) {
+  return (
+    HIDING_ELEMENTS.has(name) ||
+    HIDDEN_ATTRIBUTE.test(attributes.replace(/"[^"]*"|'[^']*'/g, '')) ||
+    HIDDEN_STYLE.test(attributes)
   );
-  const shown = [];
-  let next = 0;
-  const apply = (edge) => {
-    if (edge[0] === '~~') state.struck = !state.struck;
-    else state.deleted = Math.max(0, state.deleted + (edge[1] ? -1 : 1));
-  };
-  for (const mark of line.matchAll(MARK)) {
-    while (next < edges.length && edges[next].index < mark.index) apply(edges[next++]);
-    if (prose[mark.index] === '<' && !commented.has(mark.index) && !state.struck && !state.deleted)
-      shown.push(mark);
-  }
-  while (next < edges.length) apply(edges[next++]);
-  return shown;
 }
 
-function readMarks(spec, problems) {
-  const marks = [];
-  let fence = null;
-  let section = 'volume';
-  const state = { comment: false, struck: false, deleted: 0 };
-  for (const [index, line] of readFileSync(join(REPO_ROOT, spec), 'utf8').split('\n').entries()) {
-    const fenceMark = FENCE.exec(line)?.[1];
-    if (fenceMark) fence = fence === null ? fenceMark : fence === fenceMark ? null : fence;
-    if (fence !== null || fenceMark) continue;
-    const heading = NUMBERED_HEADING.exec(line)?.[1];
-    if (heading) section = `§${heading}`;
-    const at = `${spec}:${index + 1}`;
-    let open = null;
-    for (const match of shownMarks(line, state)) {
-      if (match[1]) {
-        if (open) problems.push(`${at}: ruling mark ${open.id} is not closed`);
-        open = { id: match[1], from: match.index + match[0].length };
-      } else if (open) {
-        const ruling = line.slice(open.from, match.index).trim();
-        marks.push({ id: open.id, spec, section, ruling, at });
-        open = null;
-      } else problems.push(`${at}: closing ruling mark without an opening one`);
+function readHtml(node, source, inline, context) {
+  const text = inline
+    ? source.slice(node.position.start.offset, node.position.end.offset)
+    : node.value;
+  const container = inline ? source : node;
+  const base = inline ? node.position.start.offset : 0;
+  const elements = inline ? context.inlineElements : context.blockElements;
+  for (const token of text.matchAll(HTML_TOKEN)) {
+    const line = node.position.start.line + newlines(text.slice(0, token.index));
+    const [whole, closing, rawName, attributes, selfClosing] = token;
+    if (rawName) {
+      const name = rawName.toLowerCase();
+      if (closing) {
+        const at = elements.findLastIndex((element) => element.name === name);
+        if (at !== -1) elements.splice(at, 1);
+      } else if (!selfClosing && !VOID_ELEMENTS.has(name))
+        elements.push({ name, line, hides: hidingElement(name, attributes) });
+      continue;
     }
-    if (open) problems.push(`${at}: ruling mark ${open.id} must close on the same line`);
+    const opening = OPENING_MARK.exec(whole);
+    if (!opening && !CLOSING_MARK.test(whole)) {
+      for (const mention of whole.matchAll(MENTIONED_MARK))
+        context.unrendered(
+          mention[1],
+          line + newlines(whole.slice(0, mention.index)),
+          `inside a comment opened at line ${line}`,
+        );
+      continue;
+    }
+    const hider = [...context.blockElements, ...context.inlineElements].find(
+      (element) => element.hides,
+    );
+    const why = context.struck
+      ? 'struck through'
+      : hider && `inside a <${hider.name}> element opened at line ${hider.line}`;
+    if (why) {
+      if (opening) context.unrendered(opening[1], line, why);
+      continue;
+    }
+    context.shown.push({
+      id: opening?.[1],
+      line,
+      container,
+      from: base + token.index,
+      to: base + token.index + whole.length,
+    });
   }
+}
+
+function renderedMarks(source) {
+  const tree = fromMarkdown(source, {
+    extensions: [gfm()],
+    mdastExtensions: [gfmFromMarkdown()],
+  });
+  const hidden = [];
+  const context = {
+    shown: [],
+    headings: [],
+    blockElements: [],
+    inlineElements: [],
+    struck: false,
+    unrendered: (id, line, why) => hidden.push({ id, line, why }),
+  };
+  const walk = (node, parent) => {
+    if (node.type === 'html') {
+      readHtml(node, source, PHRASING_PARENTS.has(parent?.type), context);
+      return;
+    }
+    if (node.type === 'code' || node.type === 'inlineCode') {
+      const kind = node.type === 'code' ? 'code block' : 'code span';
+      for (const mention of node.value.matchAll(MENTIONED_MARK))
+        context.unrendered(
+          mention[1],
+          node.position.start.line,
+          `inside a ${kind} starting at line ${node.position.start.line}`,
+        );
+      return;
+    }
+    if (node.type === 'heading') context.headings.push(node.position.start.line);
+    const wasStruck = context.struck;
+    if (node.type === 'delete') context.struck = true;
+    for (const child of node.children ?? []) walk(child, node);
+    context.struck = wasStruck;
+    if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'tableCell')
+      context.inlineElements.length = 0;
+  };
+  walk(tree);
+  return { shown: context.shown, headings: context.headings, hidden };
+}
+
+function readMarks(spec, problems, unrendered) {
+  const source = readFileSync(join(REPO_ROOT, spec), 'utf8');
+  const lines = source.split('\n');
+  const { shown, headings, hidden } = renderedMarks(source);
+  unrendered.push(...hidden.map((mark) => ({ ...mark, spec })));
+  const sectionAt = (line) =>
+    headings
+      .filter((at) => at <= line)
+      .map((at) => NUMBERED_HEADING.exec(lines[at - 1])?.[1])
+      .findLast(Boolean);
+  const marks = [];
+  let open = null;
+  const unclosed = () => {
+    if (open)
+      problems.push(`${spec}:${open.line}: ruling mark ${open.id} must close on the same line`);
+  };
+  for (const mark of shown) {
+    if (mark.id) {
+      unclosed();
+      open = mark;
+    } else if (!open) {
+      problems.push(`${spec}:${mark.line}: closing ruling mark without an opening one`);
+    } else {
+      if (open.line !== mark.line || open.container !== mark.container) unclosed();
+      else {
+        const text = typeof mark.container === 'string' ? mark.container : mark.container.value;
+        const number = sectionAt(mark.line);
+        marks.push({
+          id: open.id,
+          spec,
+          section: number ? `§${number}` : 'volume',
+          ruling: text.slice(open.to, mark.from).trim(),
+          at: `${spec}:${open.line}`,
+        });
+      }
+      open = null;
+    }
+  }
+  unclosed();
   return marks;
 }
 
@@ -102,12 +218,13 @@ for (const row of registry.rulings) {
 if (problems.length > 0) fail(problems);
 
 const marks = new Map();
+const unrendered = [];
 const sentences = new Set();
 const specs = readdirSync(join(REPO_ROOT, SPEC_DIR))
   .filter((file) => file.endsWith('.md'))
   .map((file) => `${SPEC_DIR}/${file}`);
 for (const spec of new Set([...specs, ...[...rows.values()].map((row) => row.spec)])) {
-  for (const mark of readMarks(spec, problems)) {
+  for (const mark of readMarks(spec, problems, unrendered)) {
     const row = rows.get(mark.id);
     if (!row) problems.push(`${mark.at}: ruling ${mark.id} has no row in ${REGISTRY_REL}`);
     else if (row.spec !== mark.spec)
@@ -126,8 +243,14 @@ for (const spec of new Set([...specs, ...[...rows.values()].map((row) => row.spe
     marks.set(mark.id, mark);
   }
 }
-for (const row of rows.values())
-  if (!marks.has(row.id)) problems.push(`${row.id}: ${row.spec} has no ruling mark for it`);
+for (const row of rows.values()) {
+  if (marks.has(row.id)) continue;
+  problems.push(`${row.id}: ${row.spec} has no ruling mark for it`);
+  for (const mark of unrendered.filter((hidden) => hidden.id === row.id))
+    problems.push(
+      `${mark.spec}:${mark.line}: the ${row.id} mark does not render: it is ${mark.why}`,
+    );
+}
 if (problems.length > 0) fail(problems);
 
 const rulings = [...rows.values()].map((row) => ({ ...row, ...marks.get(row.id) }));
