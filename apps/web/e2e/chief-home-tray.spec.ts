@@ -105,10 +105,11 @@ test('every option shows its description under its label, and the first is tagge
   ).toHaveText('Docs only, low risk');
 });
 
-test('on a phone the card sits above the composer, and Skip takes it away with an undo', async ({ page }) => {
+test('on a phone the card sits in the conversation inside the window, and Skip takes it away with an undo', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await openWithQuestion(page);
-  const block = page.getByTestId('chief-composer-block').getByTestId('chief-question');
+  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toHaveCount(0);
+  const block = page.getByTestId('chief-stream').getByTestId('chief-question');
   await expect(block.getByTestId('chief-question-text')).toBeVisible();
   await expect(block.getByTestId('chief-question-option-0-0')).toBeInViewport({ ratio: 1 });
   await expect(block.getByTestId('chief-question-pager')).toHaveCount(0);
@@ -137,6 +138,5 @@ test('an answer leaves one receipt in the conversation: the question over the an
     JSON.parse(QUESTION.content).questions[0].question,
   );
   await expect(receipt.getByTestId('chief-question-receipt-answer')).toHaveText('Wait for CI');
-  await expect(page.getByTestId('chief-stream').locator('[data-question-answer]')).toHaveCount(0);
   await expect(page).toHaveTitle('Cairn');
 });

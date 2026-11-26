@@ -64,7 +64,10 @@ const ONE = { ...TWO, messages: TWO.messages.slice(0, 2) };
 
 const A = 'Model · #74';
 const B = 'Merge · #2271';
-const shown = (page: Page) => page.getByTestId('chief-question').getByTestId('chief-question-text');
+const cardOf = (page: Page, requestId: string) =>
+  page.getByTestId('chief-stream').locator(`[data-testid="chief-question"][data-request-id="${requestId}"]`);
+const cardA = (page: Page) => cardOf(page, 'ask-0000000a');
+const cardB = (page: Page) => cardOf(page, 'ask-0000000b');
 
 async function focusQuestion(page: Page, header: string) {
   const panel = page.getByRole('complementary', { name: '任务' });
@@ -84,7 +87,21 @@ const receipts = (page: Page) =>
       ),
     );
 
-test('C11: a pending question is one card docked above the composer: the question in the reply serif, numbered rows with their descriptions, the first tagged 推荐 and none picked', async ({
+function releaseHeld(held: Route[], name: string) {
+  return async () => {
+    let n = 0;
+    for (const route of held.splice(0)) {
+      n += 1;
+      if (route.request().url().endsWith('/grant'))
+        await route.fulfill({
+          json: { uploadUrl: '/api/uploads', grant: `grant-${n}`, key: `t1/${name}-${n}.log`, attachmentId: `${name}-${n}` },
+        });
+      else await route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 4 } });
+    }
+  };
+}
+
+test('C11: a pending question is a card in the conversation where it was asked: the question in the reply serif, numbered rows with their descriptions, the first tagged 推荐 and none picked, its own text row and 跳过; the composer stays the chat composer', async ({
   page,
 }) => {
   const posts: string[] = [];
@@ -93,19 +110,20 @@ test('C11: a pending question is one card docked above the composer: the questio
     return undefined;
   });
   await page.goto('/app');
-  const question = page.getByTestId('chief-composer-block').getByTestId('chief-question');
+  const question = cardA(page);
   await expect(question).toBeVisible();
-  await expect(page.getByTestId('chief-stream').getByTestId('chief-question')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toHaveCount(0);
   const text = question.getByTestId('chief-question-text');
   await expect(text).toHaveText('relay-186 cannot run glm-5.3-flash. Which model?');
   await expect(text).toHaveAttribute('title', 'Model · #74');
   await expect(text).toHaveCSS('font-family', /Songti|serif/i);
   await expect(question.getByTestId('chief-question-prev')).toHaveCount(0);
+  await expect(question.getByTestId('chief-question-pager')).toHaveCount(0);
   const card = (await question.boundingBox())!;
+  const asked = (await page.getByTestId('chief-stream').getByText('Ship the relay fix').boundingBox())!;
   const composer = (await page.getByTestId('home-c').locator('.chief-composer').boundingBox())!;
-  expect(Math.round(composer.y - (card.y + card.height))).toBe(8);
-  expect(Math.round(card.x)).toBe(Math.round(composer.x));
-  expect(Math.round(card.width)).toBe(Math.round(composer.width));
+  expect(card.y).toBeGreaterThan(asked.y + asked.height);
+  expect(card.y + card.height).toBeLessThanOrEqual(composer.y);
   await expect(question).toHaveCSS('border-top-left-radius', '14px');
   const first = question.getByTestId('chief-question-option-0-0');
   const second = question.getByTestId('chief-question-option-0-1');
@@ -120,10 +138,80 @@ test('C11: a pending question is one card docked above the composer: the questio
     '输入你自己的回答…',
   );
   await expect(question.getByTestId('chief-question-skip')).toHaveText('跳过');
-  await expect(question.getByTestId('chief-question-minimize')).toHaveAccessibleName('收起');
-  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
+  await expect(question.getByRole('button', { name: '收起' })).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).not.toHaveAttribute(
+    'placeholder',
+    'relay-186 cannot run glm-5.3-flash. Which model?',
+  );
   await expect.poll(() => posts.some((path) => path.includes('/questions/'))).toBe(false);
 });
+
+const FREE_ROW = {
+  ...question('ask-0000000f', 'Branch · #5', 'What should the branch be called?', []),
+  createdAt: 15,
+};
+
+const FREE = {
+  threads: [THREAD],
+  messages: [
+    { id: 'request', role: 'user', content: 'Ship the relay fix', createdAt: 10 },
+    FREE_ROW,
+    ...TWO.messages.slice(1),
+  ],
+  todos: [],
+};
+
+test('a question with no options is a Coordinator message among the choice cards, and the next composer message is an ordinary send that leaves the cards waiting', async ({
+  page,
+}) => {
+  const answered: { path: string; body: unknown }[] = [];
+  const state = structuredClone(FREE);
+  const sent = await mockLive(page, state, answerRoute(state, answered));
+  await page.goto('/app');
+  const stream = page.getByTestId('chief-stream');
+  const asked = stream.getByTestId('chief-reply').filter({ hasText: 'What should the branch be called?' });
+  await expect(asked).toBeVisible();
+  await expect(cardOf(page, 'ask-0000000f')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-question')).toHaveCount(2);
+  const askedBox = (await asked.boundingBox())!;
+  const aBox = (await cardA(page).boundingBox())!;
+  expect(askedBox.y + askedBox.height).toBeLessThanOrEqual(aBox.y);
+  const composer = page.getByTestId('chief-composer-input');
+  await composer.fill('relay-fix');
+  await composer.press('Enter');
+  await expect.poll(() => sent).toContain('relay-fix');
+  await expect(stream.getByTestId('chief-bubble').filter({ hasText: 'relay-fix' })).toBeVisible();
+  await expect(composer).toHaveValue('');
+  await expect(stream.getByTestId('chief-question')).toHaveCount(2);
+  expect(answered).toEqual([]);
+});
+
+for (const status of ['answered', 'cancelled'] as const) {
+  test(`a question with no options stays a Coordinator message once ${status}, with no receipt`, async ({
+    page,
+  }) => {
+    const row = {
+      ...FREE_ROW,
+      content: JSON.stringify({
+        ...JSON.parse(FREE_ROW.content),
+        status,
+        answers: status === 'answered' ? [{ header: 'Branch · #5', text: 'relay-fix' }] : null,
+      }),
+    };
+    await mockLive(page, {
+      threads: [THREAD],
+      messages: [{ id: 'request', role: 'user', content: 'Ship the relay fix', createdAt: 10 }, row],
+      todos: [],
+    });
+    await page.goto('/app');
+    const stream = page.getByTestId('chief-stream');
+    await expect(
+      stream.getByTestId('chief-reply').filter({ hasText: 'What should the branch be called?' }),
+    ).toBeVisible();
+    await expect(stream.getByTestId('chief-question')).toHaveCount(0);
+    await expect(stream.getByTestId('chief-question-receipt')).toHaveCount(0);
+  });
+}
 
 test('no pending question means no chips and no pill', async ({ page }) => {
   await mockLive(page, structuredClone(NONE));
@@ -141,7 +229,7 @@ test('the header carries no question pill on any page', async ({ page }) => {
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
 });
 
-test('a row answers at once and the badge drops; the next question takes its place, and each answer leaves one receipt', async ({
+test('every pending request is its own card in stream order; a row answers at once and the badge drops, the other card stays, and each answer leaves one receipt', async ({
   page,
 }) => {
   const answered: { path: string; body: unknown }[] = [];
@@ -149,20 +237,25 @@ test('a row answers at once and the badge drops; the next question takes its pla
   await mockLive(page, state, answerRoute(state, answered));
   await page.goto('/app');
   const question = page.getByTestId('chief-question');
-  await expect(shown(page)).toContainText('Which model?');
+  await expect(question).toHaveCount(2);
+  await expect(cardA(page).getByTestId('chief-question-text')).toContainText('Which model?');
+  await expect(cardB(page).getByTestId('chief-question-text')).toContainText('Who merges it?');
+  const [aBox, bBox] = [(await cardA(page).boundingBox())!, (await cardB(page).boundingBox())!];
+  expect(aBox.y + aBox.height).toBeLessThanOrEqual(bBox.y);
   await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
+  await expect(page.getByTestId('chief-question-pager')).toHaveCount(0);
   await expect(page).toHaveTitle('(2) Cairn');
-  await question.getByTestId('chief-question-option-0-0').click();
+  await cardA(page).getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]?.path).toContain(`/chief/threads/${THREAD.id}/questions/ask-0000000a/answer`);
   expect(answered[0]?.body).toEqual({ answers: [{ header: 'Model · #74', choices: ['Claude subscription'] }] });
-  await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
-  await expect(question.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(cardA(page)).toHaveCount(0);
+  await expect(question).toHaveCount(1);
+  await expect(cardB(page).getByTestId('chief-question-text')).toContainText('Who merges it?');
   await expect(page).toHaveTitle('(1) Cairn');
-  await question.getByTestId('chief-question-option-0-0').click();
+  await cardB(page).getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(2);
   await expect(question).toHaveCount(0);
-  await expect(page.getByTestId('chief-stream').locator('[data-question-answer]')).toHaveCount(0);
   await expect.poll(() => receipts(page)).toEqual([
     ['relay-186 cannot run glm-5.3-flash. Which model?', 'Claude subscription'],
     ['This touches a protected path. Who merges it?', 'Send it to ian'],
@@ -184,18 +277,18 @@ test('a failed answer keeps the card and says so', async ({ page }) => {
   await expect(page.getByTestId('chief-question-option-0-1')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('free text answers inline', async ({ page }) => {
+test('the card text row answers with what is typed', async ({ page }) => {
   const answered: { path: string; body: unknown }[] = [];
   const state = structuredClone(ONE);
   await mockLive(page, state, answerRoute(state, answered));
   await page.goto('/app');
-  const question = page.getByTestId('chief-question');
-  await page.getByTestId('chief-composer-input').fill('Use the metered key this once');
-  await page.getByTestId('chief-question-primary').click();
+  const other = cardA(page).getByTestId('chief-question-other-0');
+  await other.fill('Use the metered key this once');
+  await other.press('Enter');
   await expect
     .poll(() => answered.map((row) => row.body))
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
-  await expect(question).toHaveCount(0);
+  await expect(cardA(page)).toHaveCount(0);
 });
 
 test('the tab title counts pending questions and the Coordinator row opens the question from another page', async ({
@@ -214,11 +307,13 @@ test('the tab title counts pending questions and the Coordinator row opens the q
   await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await expect(page).not.toHaveURL(/tab=scheduled/);
-  await expect(page.getByTestId('chief-question')).toBeInViewport();
-  await expect(shown(page)).toContainText('Which model?');
+  await expect(cardB(page)).toBeInViewport();
+  await expect(cardB(page).getByTestId('chief-question-text')).toContainText('Who merges it?');
 });
 
-test('moving between questions from the tasks panel keeps a typed draft, and a failed submit keeps it too', async ({ page }) => {
+test('each card keeps its own written answer while the tasks panel moves between them, the composer stays untouched, and a failed submit keeps the text', async ({
+  page,
+}) => {
   let fail = true;
   await mockLive(page, structuredClone(TWO), (path, route, json) => {
     if (!path.endsWith('/answer') || route.request().method() !== 'POST') return undefined;
@@ -230,19 +325,26 @@ test('moving between questions from the tasks panel keeps a typed draft, and a f
   });
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
-  await composer.fill('Keep this text');
-  await focusQuestion(page, B);
-  await expect(shown(page)).toContainText('Who merges it?');
-  await expect(composer).toHaveValue('');
+  const otherA = cardA(page).getByTestId('chief-question-other-0');
+  const otherB = cardB(page).getByTestId('chief-question-other-0');
+  await otherA.fill('draft for A');
+  await otherB.fill('draft for B');
   await focusQuestion(page, A);
-  await expect(composer).toHaveValue('Keep this text');
-  await page.getByTestId('chief-question-primary').click();
-  await expect(page.getByTestId('chief-question-error')).toBeVisible();
-  await expect(composer).toHaveValue('Keep this text');
-  await expect(shown(page)).toContainText('Which model?');
+  await expect(cardA(page)).toBeInViewport();
+  await focusQuestion(page, B);
+  await expect(cardB(page)).toBeInViewport();
+  await focusQuestion(page, A);
+  await expect(otherA).toHaveValue('draft for A');
+  await expect(otherB).toHaveValue('draft for B');
+  await expect(composer).toHaveValue('');
+  await otherA.press('Enter');
+  await expect(cardA(page).getByTestId('chief-question-error')).toBeVisible();
+  await expect(otherA).toHaveValue('draft for A');
+  await expect(otherB).toHaveValue('draft for B');
+  await expect(composer).toHaveValue('');
 });
 
-test('at 375px the card sits under the conversation, above the composer, inside the window', async ({
+test('at 375px each card sits in the conversation where it was asked, inside the window, with the composer whole below', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 667 });
@@ -260,18 +362,24 @@ test('at 375px the card sits under the conversation, above the composer, inside 
   ];
   await mockLive(page, state);
   await page.goto('/app');
-  const question = page.getByTestId('chief-question');
-  await expect(question).toBeVisible();
   const composer = page.getByTestId('home-c').locator('.chief-composer');
+  await expect(page.getByText('The final message')).toBeVisible();
   await expect(composer).toBeInViewport({ ratio: 1 });
-  await expect(question.getByTestId('chief-question-option-0-0')).toBeInViewport({ ratio: 1 });
-  const questionBox = (await question.boundingBox())!;
-  const composerBox = (await composer.boundingBox())!;
+  for (const card of [cardA(page), cardB(page)]) {
+    await card.scrollIntoViewIfNeeded();
+    await expect(card.getByTestId('chief-question-option-0-0')).toBeInViewport({ ratio: 1 });
+    const box = (await card.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(375);
+  }
+  const before = (await page.getByText('History message 13').boundingBox())!;
+  const aBox = (await cardA(page).boundingBox())!;
+  const bBox = (await cardB(page).boundingBox())!;
   const lastBox = (await page.getByText('The final message').boundingBox())!;
-  expect(questionBox.y + questionBox.height).toBeLessThanOrEqual(composerBox.y);
-  expect(questionBox.x).toBeGreaterThanOrEqual(0);
-  expect(questionBox.x + questionBox.width).toBeLessThanOrEqual(375);
-  expect(lastBox.y + lastBox.height).toBeLessThanOrEqual(questionBox.y);
+  expect(before.y + before.height).toBeLessThanOrEqual(aBox.y);
+  expect(aBox.y + aBox.height).toBeLessThanOrEqual(bBox.y);
+  expect(bBox.y + bBox.height).toBeLessThanOrEqual(lastBox.y);
+  await expect(composer).toBeInViewport({ ratio: 1 });
 });
 
 const LONG_OPTIONS = Array.from({ length: 6 }, (_, n) => ({
@@ -297,7 +405,7 @@ for (const size of [
   { name: '1440 desktop', width: 1440, height: 900 },
   { name: '375px phone', width: 375, height: 667 },
 ]) {
-  test(`six long options with descriptions scroll inside the card and every row, the composer and send stay reachable (${size.name})`, async ({
+  test(`six long options with descriptions: every row and the text row are reachable in the conversation while the composer stays in view (${size.name})`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
@@ -310,8 +418,6 @@ for (const size of [
     expect((await question.boundingBox())!.height).toBeLessThanOrEqual(Math.min(size.height * 0.6, 560) + 1);
     const input = coordinator.getByTestId('chief-composer-input');
     await expect(input).toBeInViewport({ ratio: 1 });
-    const send = coordinator.getByTestId('chief-question-primary');
-    await expect(send).toBeInViewport({ ratio: 1 });
     for (let n = 0; n < 6; n += 1) {
       const chip = question.getByTestId(`chief-question-option-0-${n}`);
       await chip.scrollIntoViewIfNeeded();
@@ -319,7 +425,10 @@ for (const size of [
       const box = (await chip.boundingBox())!;
       expect(box.x + box.width).toBeLessThanOrEqual(size.width);
     }
-    await expect(send).toBeInViewport({ ratio: 1 });
+    const other = question.getByTestId('chief-question-other-0');
+    await other.scrollIntoViewIfNeeded();
+    await expect(other).toBeInViewport({ ratio: 1 });
+    await expect(input).toBeInViewport({ ratio: 1 });
   });
 }
 
@@ -335,17 +444,23 @@ for (const size of [
     await page.goto('/app?chief=chief-home');
     const question = page.getByTestId('home-c').getByTestId('chief-question');
     await expect(question).toBeVisible();
-    const list = question.locator('fieldset');
+    const list = question.locator('[data-slot="question-list"]');
     const inset = () =>
       question.evaluate((dock) =>
-        Math.round(dock.getBoundingClientRect().bottom - dock.querySelector('fieldset')!.getBoundingClientRect().bottom),
+        Math.round(dock.getBoundingClientRect().bottom - dock.querySelector('[data-slot="question-list"]')!.getBoundingClientRect().bottom),
       );
     expect(await inset()).toBeGreaterThanOrEqual(8);
+    const listBox = (await list.boundingBox())!;
+    await page.mouse.move(listBox.x + listBox.width / 2, listBox.y + listBox.height / 2);
+    await page.mouse.wheel(0, 200);
+    await expect
+      .poll(() => list.evaluate((el) => el.scrollHeight <= el.clientHeight || el.scrollTop > 0))
+      .toBe(true);
     await list.evaluate((el) => {
       el.scrollTop = el.scrollHeight;
     });
     const geometry = await question.evaluate((dock) => {
-      const list = dock.querySelector('fieldset')!;
+      const list = dock.querySelector('[data-slot="question-list"]')!;
       const rows = [...list.querySelectorAll('[data-dock-row]')].map(
         (row) => (row.closest('[data-dock-row], div') as HTMLElement).getBoundingClientRect(),
       );
@@ -392,32 +507,34 @@ const MIXED = {
   todos: [],
 };
 
-test('one card at a time, the oldest first; the 1/N pager walks every question and step; a row on an early step moves on; the tasks panel focuses another request', async ({
+test('each request is its own card; the 1/N pager walks only the steps of its own request; a row on an early step moves on; the tasks panel scrolls to the card it names', async ({
   page,
 }) => {
   await mockLive(page, structuredClone(MIXED));
   await page.goto('/app');
-  const block = page.getByTestId('chief-question');
+  const block = cardA(page);
+  const other = cardB(page);
+  await expect(page.getByTestId('chief-question')).toHaveCount(2);
   await expect(block.getByTestId('chief-question-text')).toHaveCount(1);
   await expect(block.getByTestId('chief-question-text')).toContainText('Which theme?');
+  await expect(other.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(other.getByTestId('chief-question-pager')).toHaveCount(0);
   const pager = block.getByTestId('chief-question-pager');
-  await expect(pager).toHaveText('1/3');
+  await expect(pager).toHaveText('1/2');
   await expect(block.getByTestId('chief-question-prev')).toBeDisabled();
   await block.getByTestId('chief-question-next').click();
   await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
-  await expect(pager).toHaveText('2/3');
-  await block.getByTestId('chief-question-next').click();
-  await expect(block.getByTestId('chief-question-text')).toContainText('Who merges it?');
-  await expect(pager).toHaveText('3/3');
+  await expect(pager).toHaveText('2/2');
   await expect(block.getByTestId('chief-question-next')).toBeDisabled();
-  await block.getByTestId('chief-question-prev').click();
+  await expect(other.getByTestId('chief-question-text')).toContainText('Who merges it?');
   await block.getByTestId('chief-question-prev').click();
   await expect(block.getByTestId('chief-question-text')).toContainText('Which theme?');
   await block.getByTestId('chief-question-option-0-0').click();
   await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
   await focusQuestion(page, 'Merge · #2271');
-  await expect(block.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(other).toBeInViewport();
   await focusQuestion(page, 'Theme');
+  await expect(block).toBeInViewport();
   await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
 });
 
@@ -435,7 +552,7 @@ test('a multi-question request sends nothing and starts no turn until its last q
   });
   await page.goto('/app');
   const stream = page.getByTestId('chief-stream');
-  const block = page.getByTestId('chief-question');
+  const block = cardA(page);
   await expect(block.getByTestId('chief-question-text')).toContainText('Which theme?');
   const bubblesBefore = await stream.getByTestId('chief-bubble').count();
   expect(bubblesBefore).toBe(1);
@@ -448,7 +565,7 @@ test('a multi-question request sends nothing and starts no turn until its last q
   expect(posts.map((post) => post.path)).toEqual([]);
   await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore);
   await expect(stream.getByTestId('chief-question-receipt')).toHaveCount(0);
-  await page.getByTestId('chief-question-submit').click();
+  await block.getByTestId('chief-question-submit').click();
   await expect.poll(() => posts.length).toBe(1);
   expect(posts[0]?.path).toContain('/questions/ask-0000000a/answer');
   expect(posts[0]?.body).toEqual({
@@ -476,7 +593,7 @@ test('a multi-question request sends nothing and starts no turn until its last q
   await page.screenshot({ path: test.info().outputPath('answered-request.png') });
 });
 
-test('the send button answers with what is typed, and Ctrl+Enter submits it from a focused row', async ({
+test('the text row send button appears once something is typed and answers with it, and Ctrl+Enter submits it from a focused row', async ({
   page,
 }) => {
   const answered: unknown[] = [];
@@ -487,21 +604,21 @@ test('the send button answers with what is typed, and Ctrl+Enter submits it from
     return json({});
   });
   await page.goto('/app');
-  const question = page.getByTestId('chief-question');
-  const primary = page.locator('.chief-composer').getByTestId('chief-question-primary');
-  await expect(primary).toBeVisible();
-  await expect(primary).toHaveAttribute('aria-label', '提交回答');
-  await expect(primary.locator('[data-slot="kbd"]')).toHaveCount(0);
-  await expect(question.getByRole('button', { name: /提交回答/ })).toHaveCount(0);
-  await expect(primary).toBeDisabled();
-  await page.getByTestId('chief-composer-input').fill('the cheaper one');
-  await expect(primary).toBeEnabled();
+  const question = cardA(page);
+  const submit = question.getByTestId('chief-question-submit');
+  await expect(submit).toHaveCount(0);
+  await expect(question.getByTestId('chief-question-skip')).toBeVisible();
+  await question.getByTestId('chief-question-other-0').fill('the cheaper one');
+  await expect(submit).toHaveAttribute('aria-label', '提交回答');
+  await expect(submit).toBeEnabled();
+  await expect(question.getByTestId('chief-question-skip')).toHaveCount(0);
+  await expect(page.locator('.chief-composer').getByRole('button', { name: '提交回答' })).toHaveCount(0);
   await question.getByTestId('chief-question-option-0-1').press('Control+Enter');
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({ answers: [{ header: 'Model · #74', choices: ['the cheaper one'] }] });
 });
 
-test('a clicked option answers at once, and an empty composer with nothing picked cannot send', async ({
+test('a clicked option answers at once, and an empty text row with nothing picked sends nothing', async ({
   page,
 }) => {
   const answered: unknown[] = [];
@@ -511,18 +628,16 @@ test('a clicked option answers at once, and an empty composer with nothing picke
     return json({});
   });
   await page.goto('/app');
-  const primary = page.getByTestId('chief-question-primary');
-  const composer = page.getByTestId('chief-composer-input');
-  await expect(primary).toBeDisabled();
-  await composer.press('Enter');
+  await cardA(page).getByTestId('chief-question-other-0').press('Enter');
+  await page.waitForTimeout(300);
   expect(answered).toEqual([]);
-  await page.getByTestId('chief-question-option-0-0').click();
+  await cardA(page).getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered).toEqual([
     { answers: [{ header: 'Model · #74', choices: ['Claude subscription'] }] },
   ]);
 });
 
-test('a multi-step request: a row moves on with the composer cleared, multi-select rows check, and send submits every answer', async ({
+test('a multi-step request: a row moves on, multi-select rows check, the text row adds a custom choice, and submit sends every answer', async ({
   page,
 }) => {
   const answered: unknown[] = [];
@@ -533,25 +648,23 @@ test('a multi-step request: a row moves on with the composer cleared, multi-sele
     return json({});
   });
   await page.goto('/app');
-  const primary = page.getByTestId('chief-question-primary');
-  const composer = page.getByTestId('chief-composer-input');
-  await expect(primary).toHaveAttribute('aria-label', '下一步');
-  await expect(primary).toBeDisabled();
-  await page.getByTestId('chief-question-option-0-0').click();
-  await expect(shown(page)).toContainText('Which sections?');
-  await expect(composer).toHaveValue('');
-  await expect(primary).toBeDisabled();
-  await expect(primary).toHaveAttribute('aria-label', '提交回答');
-  const submit = page.getByTestId('chief-question-submit');
+  const card = cardA(page);
+  await card.getByTestId('chief-question-option-0-0').click();
+  await expect(card.getByTestId('chief-question-text')).toContainText('Which sections?');
+  const submit = card.getByTestId('chief-question-submit');
   await expect(submit).toBeDisabled();
-  await page.getByTestId('chief-question-option-1-1').click();
+  const details = card.getByTestId('chief-question-option-1-1');
+  await expect(async () => {
+    await details.click();
+    await expect(details).toHaveAttribute('aria-pressed', 'true', { timeout: 1000 });
+  }).toPass();
   await page.mouse.move(0, 0);
-  await expect(page.getByTestId('chief-question-option-1-1')).toHaveAttribute('aria-pressed', 'true');
   await expect(submit).toBeEnabled();
+  await expect(submit).toHaveAttribute('aria-label', '提交回答');
   expect(answered).toEqual([]);
-  await composer.fill('a custom section');
-  await expect(primary).toBeEnabled();
-  await primary.click();
+  await card.getByTestId('chief-question-other-1').fill('a custom section');
+  await expect(card.getByTestId('chief-question-count')).toHaveText('已选 2 个');
+  await submit.click();
   await expect
     .poll(() => answered)
     .toEqual([
@@ -614,8 +727,10 @@ for (const locale of ['zh', 'en'] as const) {
         return found;
       });
       expect(defects).toEqual([]);
-      await expect(coordinator.getByTestId('chief-question-minimize')).toBeInViewport({ ratio: 1 });
-      await expect(coordinator.getByTestId('chief-question-primary')).toBeInViewport({ ratio: 1 });
+      const skip = coordinator.getByTestId('chief-question-skip');
+      await skip.scrollIntoViewIfNeeded();
+      await expect(skip).toBeInViewport({ ratio: 1 });
+      await expect(coordinator.getByTestId('chief-composer-input')).toBeInViewport({ ratio: 1 });
     });
   }
 }
@@ -651,24 +766,6 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('Escape or 收起 minimizes the card: the composer shows the question and a restore chevron brings it back', async ({
-  page,
-}) => {
-  await mockLive(page, structuredClone(ONE));
-  await page.goto('/app');
-  const card = page.getByTestId('chief-question');
-  await page.getByTestId('chief-question-option-0-0').focus();
-  await page.keyboard.press('Escape');
-  await expect(card).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', 'relay-186 cannot run glm-5.3-flash. Which model?');
-  await page.getByTestId('chief-question-restore').click();
-  await expect(card).toBeVisible();
-  await card.getByTestId('chief-question-minimize').click();
-  await expect(card).toHaveCount(0);
-  await page.getByTestId('chief-question-restore').click();
-  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
-});
-
 test('Skip takes the card away with a five-second undo; undo keeps the question, waiting skips it and leaves 已跳过', async ({
   page,
 }) => {
@@ -685,15 +782,15 @@ test('Skip takes the card away with a five-second undo; undo keeps the question,
     return json({});
   });
   await page.goto('/app');
-  const card = page.getByTestId('chief-question');
-  await page.getByTestId('chief-question-skip').click();
+  const card = cardA(page);
+  await card.getByTestId('chief-question-skip').click();
   await expect(card).toHaveCount(0);
   const toast = page.locator('[data-sonner-toast]').filter({ hasText: '已跳过提问' });
   await expect(toast).toBeVisible();
   await toast.getByRole('button', { name: '撤销' }).click();
   await expect(card).toBeVisible();
   expect(cancelled).toEqual([]);
-  await page.getByTestId('chief-question-skip').click();
+  await card.getByTestId('chief-question-skip').click();
   await expect(card).toHaveCount(0);
   await expect.poll(() => cancelled.length, { timeout: 8000 }).toBe(1);
   await expect.poll(() => receipts(page), { timeout: 8000 }).toEqual([
@@ -719,7 +816,7 @@ for (const size of [
   { name: '1440 desktop', url: '/app?chief=chief-home', width: 1440, height: 900 },
   { name: '375px phone', url: '/app?chief=chief-home', width: 375, height: 667 },
 ]) {
-  test(`a very long prompt wraps in the card and keeps the rows, Escape-minimize and send working (${size.name})`, async ({
+  test(`a very long prompt wraps in the card and keeps the rows and the text row send working (${size.name})`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
@@ -732,36 +829,20 @@ for (const size of [
     expect(text.x + text.width).toBeLessThanOrEqual(size.width);
     await coordinator.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
     await coordinator.getByTestId('chief-question-option-0-0').click({ trial: true });
-    await coordinator.getByTestId('chief-composer-input').fill('Maybe');
-    const submit = coordinator.getByTestId('chief-question-primary');
+    const other = card.getByTestId('chief-question-other-0');
+    await other.scrollIntoViewIfNeeded();
+    await other.fill('Maybe');
+    const submit = card.getByTestId('chief-question-submit');
     await expect(submit).toBeInViewport({ ratio: 1 });
     await submit.click({ trial: true });
-    await card.getByTestId('chief-question-option-0-0').press('Escape');
-    await expect(card).toHaveCount(0);
+    const submitBox = (await submit.boundingBox())!;
+    expect(submitBox.x + submitBox.width).toBeLessThanOrEqual(size.width);
   });
 }
 
-test('each pending request keeps its own composer draft when moving A, B, A, B', async ({ page }) => {
-  await mockLive(page, structuredClone(TWO));
-  await page.goto('/app');
-  const composer = page.getByTestId('chief-composer-input');
-  await composer.fill('draft for A');
-  await focusQuestion(page, B);
-  await expect(shown(page)).toContainText('Who merges it?');
-  await expect(composer).toHaveValue('');
-  await composer.fill('draft for B');
-  await focusQuestion(page, A);
-  await expect(composer).toHaveValue('draft for A');
-  await focusQuestion(page, B);
-  await expect(composer).toHaveValue('draft for B');
-  await focusQuestion(page, A);
-  await expect(composer).toHaveValue('draft for A');
-});
-
-test('an answer upload in flight still blocks a row answer and moving to another question after a withdraw switches to the thread composer', async ({
+test('text typed while the conversation loads stays in the composer when the card shows, and a withdrawn queued message comes back there with the card still usable', async ({
   page,
 }) => {
-  const answered: { path: string; body: unknown }[] = [];
   const state = {
     ...structuredClone(TWO),
     threads: [
@@ -769,104 +850,14 @@ test('an answer upload in flight still blocks a row answer and moving to another
     ],
   };
   state.messages = [...state.messages, { id: 'q1', role: 'user', content: 'queued note', createdAt: 30 }];
-  const answer = answerRoute(state, answered);
   await mockLive(page, state, (path, route, json) => {
     if (path === `/api/teams/t1/chief/threads/${THREAD.id}/messages/q1` && route.request().method() === 'DELETE') {
       state.threads = [{ ...THREAD, activeRun: null, pending: [] }];
       state.messages = state.messages.filter((row) => row.id !== 'q1');
       return json({ ok: true });
     }
-    return answer(path, route, json);
+    return undefined;
   });
-  const held: Route[] = [];
-  await page.route('**/api/uploads/grant', (route) => {
-    held.push(route);
-  });
-  await page.route('**/api/uploads/upload', (route) => {
-    held.push(route);
-  });
-  await page.goto('/app');
-  const composer = page.getByTestId('chief-composer-input');
-  const activeComposer = page.getByTestId('home-c').locator('.chief-composer');
-  const dock = page.getByTestId('chief-question');
-  await composer.fill('typed answer');
-  await activeComposer.locator('input[type="file"]').setInputFiles({
-    name: 'slow.log',
-    mimeType: 'text/plain',
-    buffer: Buffer.from('slow'),
-  });
-  await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
-  await page.getByTestId('home-c').getByTestId('chief-queued-message').getByRole('button', { name: '撤回' }).click();
-  await expect(composer).toHaveValue('queued note');
-  const chip = dock.getByTestId('chief-question-option-0-0');
-  await expect(chip).toBeDisabled();
-  await focusQuestion(page, B);
-  await expect(page.locator('[data-sonner-toast]').filter({ hasText: '附件上传中' })).toBeVisible();
-  await expect(shown(page)).toContainText('Which model?');
-  await expect(async () => {
-    let n = 0;
-    for (const route of held.splice(0)) {
-      n += 1;
-      if (route.request().url().endsWith('/grant'))
-        await route.fulfill({
-          json: { uploadUrl: '/api/uploads', grant: `grant-${n}`, key: `t1/slow-${n}.log`, attachmentId: `slow-${n}` },
-        });
-      else await route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 4 } });
-    }
-    await expect(chip).toBeEnabled({ timeout: 500 });
-  }).toPass();
-  await focusQuestion(page, B);
-  await expect(shown(page)).toContainText('Who merges it?');
-  await focusQuestion(page, A);
-  await expect(shown(page)).toContainText('Which model?');
-  expect(answered).toEqual([]);
-  await composer.fill('');
-  await expect(composer).toHaveValue('typed answer');
-  await expect(activeComposer.getByTestId('composer-attachments')).toContainText('slow.log');
-});
-
-test('answer drafts per request and the thread draft stay separate through every transition', async ({
-  page,
-}) => {
-  const answered: { path: string; body: { answers: unknown[] } }[] = [];
-  const state = {
-    ...structuredClone(TWO),
-    threads: [
-      { ...THREAD, activeRun: { phase: 'chief' }, pending: [{ messageId: 'q1', state: 'held' }] },
-    ],
-  };
-  state.messages = [...state.messages, { id: 'q1', role: 'user', content: 'queued note', createdAt: 30 }];
-  const answer = answerRoute(state, answered as { path: string; body: unknown }[]);
-  await mockLive(page, state, (path, route, json) => {
-    if (path === `/api/teams/t1/chief/threads/${THREAD.id}/messages/q1` && route.request().method() === 'DELETE') {
-      state.threads = [{ ...THREAD, activeRun: null, pending: [] }];
-      state.messages = state.messages.filter((row) => row.id !== 'q1');
-      return json({ ok: true });
-    }
-    return answer(path, route, json);
-  });
-  const heldUploads: Route[] = [];
-  await page.route('**/api/uploads/grant', (route) => {
-    heldUploads.push(route);
-  });
-  await page.route('**/api/uploads/upload', (route) => {
-    heldUploads.push(route);
-  });
-  let uploadsDone = 0;
-  const releaseUploads = async () => {
-    let n = 0;
-    for (const route of heldUploads.splice(0)) {
-      n += 1;
-      if (route.request().url().endsWith('/grant'))
-        await route.fulfill({
-          json: { uploadUrl: '/api/uploads', grant: `grant-${n}`, key: `t1/att-${n}.log`, attachmentId: `att-${n}` },
-        });
-      else {
-        await route.fulfill({ json: { id: 'x', key: 'x', sizeBytes: 3 } });
-        uploadsDone += 1;
-      }
-    }
-  };
   let releaseLoad: () => void = () => undefined;
   const loadGate = new Promise<void>((resolve) => {
     releaseLoad = resolve;
@@ -878,304 +869,67 @@ test('answer drafts per request and the thread draft stay separate through every
   });
   await page.goto('/app');
   const composer = page.getByTestId('chief-composer-input');
+  await page.getByTestId('loading-composer').getByRole('textbox').fill('typed while loading');
+  releaseLoad();
+  await expect(page.getByTestId('chief-question')).toHaveCount(2);
+  await expect(composer).toHaveValue('typed while loading');
+  await expect(cardB(page).getByTestId('chief-question-option-0-0')).toBeEnabled();
+  await composer.fill('');
+  await page.getByTestId('home-c').getByTestId('chief-queued-message').getByRole('button', { name: '撤回' }).click();
+  await expect(composer).toHaveValue('queued note');
+  await expect(composer).toBeFocused();
+  await expect(page.getByTestId('home-c').getByTestId('chief-queued-message')).toHaveCount(0);
+  await expect(cardB(page)).toBeVisible();
+  await expect(cardB(page).getByTestId('chief-question-option-0-0')).toBeEnabled();
+});
+
+test('a question that arrives while you write leaves the composer text and its upload where they are', async ({
+  page,
+}) => {
+  const answered: { path: string; body: unknown }[] = [];
+  const state = structuredClone(NONE);
+  await mockLive(page, state, answerRoute(state, answered));
+  const held: Route[] = [];
+  await page.route('**/api/uploads/grant', (route) => {
+    held.push(route);
+  });
+  await page.route('**/api/uploads/upload', (route) => {
+    held.push(route);
+  });
+  const release = releaseHeld(held, 'late');
+  await page.goto('/app');
+  await expect(page.getByText('Ship the relay fix')).toBeVisible();
+  await page.waitForFunction(() => window.__es.some((es) => es.url.includes('/stream')));
+  const composer = page.getByTestId('chief-composer-input');
   const activeComposer = page.getByTestId('home-c').locator('.chief-composer');
-  const option = (n: number) =>
-    page.getByTestId('chief-question').getByTestId(`chief-question-option-0-${n}`);
-  const goInApp = (path: string) =>
-    page.evaluate((to) => {
-      window.history.pushState({}, '', to);
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    }, path);
-  const focusComposer = async () => {
-    await composer.click();
-    await expect(composer).toBeFocused();
-  };
-  const steps: {
-    name: string;
-    run: () => Promise<void>;
-    composer: string;
-    extra?: () => Promise<void>;
-  }[] = [
-    {
-      name: 'text typed while loading lands in the thread composer while a question is pending',
-      run: async () => {
-        await page.getByTestId('loading-composer').getByRole('textbox').fill('typed while loading');
-        releaseLoad();
-        await expect(page.getByTestId('chief-question')).toBeVisible();
-      },
-      composer: 'typed while loading',
-      extra: async () => {
-        await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
-        await expect(option(0)).toBeEnabled();
-      },
-    },
-    {
-      name: 'emptying the thread text returns the composer to the answer',
-      run: () => composer.fill(''),
-      composer: '',
-      extra: async () => {
-        await expect(page.getByTestId('chief-question-primary')).toBeVisible();
-        await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
-      },
-    },
-    {
-      name: 'withdrawing a queued message while answering shows it in the focused thread composer',
-      run: async () => {
-        await composer.fill('customA');
-        await page.getByTestId('home-c').getByTestId('chief-queued-message').getByRole('button', { name: '撤回' }).click();
-      },
-      composer: 'queued note',
-      extra: async () => {
-        await expect(composer).toBeFocused();
-        await expect(page.getByTestId('home-c').getByTestId('chief-queued-message')).toHaveCount(0);
-        await expect(page.getByTestId('chief-question')).toBeVisible();
-        await expect(page.getByTestId('chief-question-primary')).toHaveCount(0);
-        await expect(option(0)).toBeEnabled();
-      },
-    },
-    {
-      name: 'emptying the restored text returns to the answer, whose draft is untouched',
-      run: () => composer.fill(''),
-      composer: 'customA',
-      extra: async () => {
-        await expect(page.getByTestId('chief-question-primary')).toBeVisible();
-      },
-    },
-    {
-      name: 'slash and mention in the answer are plain text with no menu',
-      run: async () => {
-        await composer.fill('');
-        await focusComposer();
-        await page.keyboard.type('/re @ag');
-      },
-      composer: '/re @ag',
-      extra: async () => {
-        await expect(page.getByRole('listbox')).toHaveCount(0);
-        await expect(composer).not.toHaveAttribute('aria-expanded');
-      },
-    },
-    { name: 'type the answer for A', run: () => composer.fill('ansA'), composer: 'ansA' },
-    { name: 'retype the answer for A', run: () => composer.fill('ansA2'), composer: 'ansA2' },
-    {
-      name: 'focus B: empty',
-      run: () => focusQuestion(page, B),
-      composer: '',
-    },
-    { name: 'type the answer for B', run: () => composer.fill('ansB'), composer: 'ansB' },
-    {
-      name: 'an answer upload finishes into its answer while the user is on another page',
-      run: async () => {
-        await activeComposer.locator('input[type="file"]').setInputFiles({
-          name: 'away.log',
-          mimeType: 'text/plain',
-          buffer: Buffer.from('away'),
-        });
-        await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
-        await goInApp('/app/machines/authorize');
-        await expect(page.getByTestId('home-c')).toHaveCount(0);
-        const before = uploadsDone;
-        await expect(async () => {
-          await releaseUploads();
-          expect(uploadsDone).toBeGreaterThan(before);
-        }).toPass();
-        await goInApp('/app');
-        await expect(shown(page)).toContainText('Who merges it?');
-      },
-      composer: 'ansB',
-      extra: async () => {
-        await expect(activeComposer.getByTestId('composer-attachments')).toContainText('away.log');
-      },
-    },
-    {
-      name: 'start a slow upload on B',
-      run: async () => {
-        await activeComposer.locator('input[type="file"]').setInputFiles({
-          name: 'notes.log',
-          mimeType: 'text/plain',
-          buffer: Buffer.from('boom'),
-        });
-        await expect(page.getByTestId('attachment-pending')).toBeVisible();
-      },
-      composer: 'ansB',
-    },
-    {
-      name: 'moving to A is blocked while it uploads',
-      run: async () => {
-        await focusQuestion(page, A);
-        await expect(page.locator('[data-sonner-toast]').filter({ hasText: '附件上传中' }).first()).toBeVisible();
-      },
-      composer: 'ansB',
-      extra: async () => {
-        await expect(shown(page)).toContainText('Who merges it?');
-      },
-    },
-    {
-      name: 'the upload finishes into B',
-      run: async () => {
-        await expect(async () => {
-          await releaseUploads();
-          await expect(page.getByTestId('attachment-pending')).toHaveCount(0, { timeout: 500 });
-        }).toPass();
-      },
-      composer: 'ansB',
-      extra: async () => {
-        await expect(page.getByTestId('composer-attachments')).toContainText('notes.log');
-      },
-    },
-    {
-      name: 'A is unchanged after the upload on B',
-      run: () => focusQuestion(page, A),
-      composer: 'ansA2',
-      extra: async () => {
-        await expect(page.getByTestId('composer-attachments')).toHaveCount(0);
-      },
-    },
-    {
-      name: 'B kept its attachment',
-      run: () => focusQuestion(page, B),
-      composer: 'ansB',
-      extra: async () => {
-        await expect(page.getByTestId('composer-attachments')).toContainText('notes.log');
-      },
-    },
-    {
-      name: 'back to A: its answer is intact',
-      run: () => focusQuestion(page, A),
-      composer: 'ansA2',
-    },
-    {
-      name: 'a digit in a non-empty answer types',
-      run: async () => {
-        await focusComposer();
-        await page.keyboard.press('End');
-        await page.keyboard.type('2');
-      },
-      composer: 'ansA22',
-      extra: async () => {
-        await expect(option(1)).toHaveAttribute('aria-pressed', 'false');
-      },
-    },
-    {
-      name: 'forward to B: its answer is intact',
-      run: () => focusQuestion(page, B),
-      composer: 'ansB',
-    },
-    {
-      name: 'custom text then an option on B: the option is sent at once and A shows its text again',
-      run: async () => {
-        await option(0).click();
-        await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
-      },
-      composer: 'ansA22',
-      extra: async () => {
-        await expect
-          .poll(() => answered.map((row) => row.body.answers))
-          .toEqual([[{ header: 'Merge · #2271', choices: ['Send it to ian'] }]]);
-      },
-    },
-    { name: 'replace the answer for A', run: () => composer.fill('finalA'), composer: 'finalA' },
-    {
-      name: 'Enter with an upload in flight sends nothing until the upload finishes',
-      run: async () => {
-        await activeComposer.locator('input[type="file"]').setInputFiles({
-          name: 'notes.log',
-          mimeType: 'text/plain',
-          buffer: Buffer.from('boom'),
-        });
-        await expect(page.getByTestId('attachment-pending')).toBeVisible();
-        await composer.press('Enter');
-        await page.waitForTimeout(500);
-      },
-      composer: 'finalA',
-      extra: async () => {
-        expect(answered).toHaveLength(1);
-        await expect(page.getByTestId('chief-question-primary')).toBeDisabled();
-        await expect.poll(() => heldUploads.length).toBeGreaterThan(0);
-        await expect(async () => {
-          await releaseUploads();
-          await expect(page.getByTestId('attachment-pending')).toHaveCount(0, { timeout: 500 });
-        }).toPass();
-        await expect(page.getByTestId('chief-question-primary')).toBeEnabled();
-        expect(answered).toHaveLength(1);
-      },
-    },
-    {
-      name: 'Enter twice fast sends exactly one answer, the text',
-      run: async () => {
-        await Promise.all([composer.press('Enter'), composer.press('Enter')]);
-        await page.waitForTimeout(800);
-      },
-      composer: '',
-      extra: async () => {
-        await expect
-          .poll(() => answered.map((row) => row.body.answers))
-          .toEqual([
-            [{ header: 'Merge · #2271', choices: ['Send it to ian'] }],
-            [{ header: 'Model · #74', choices: [expect.stringMatching(/attachment:t1\/att-1\.log\)\nfinalA$/)] }],
-          ]);
-      },
-    },
-    {
-      name: 'an upload in the thread composer finishes there when a question arrives mid-upload',
-      run: async () => {
-        await expect(page.getByTestId('chief-question')).toHaveCount(0);
-        await composer.fill('threadDraft');
-        await activeComposer.locator('input[type="file"]').setInputFiles({
-          name: 'late.log',
-          mimeType: 'text/plain',
-          buffer: Buffer.from('late'),
-        });
-        await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
-        const late = question('ask-0000000c', 'Late · #9', 'One more thing?', [
-          { label: 'Yes' },
-          { label: 'No' },
-        ]);
-        state.messages = [...state.messages, { ...late, createdAt: 40 }];
-        await page.evaluate(
-          ([u, message]) =>
-            window.__es.find((es) => es.url.includes(u as string))?.emit({ type: 'message', message }),
-          [`/api/conversations/${THREAD.id}/stream`, late] as const,
-        );
-        await expect(page.getByTestId('chief-question')).toBeVisible();
-        await expect(composer).toHaveValue('');
-        await expect(async () => {
-          await releaseUploads();
-          await expect(page.getByTestId('home-c').getByTestId('attachment-pending')).toHaveCount(0, {
-            timeout: 500,
-          });
-        }).toPass();
-      },
-      composer: '',
-      extra: async () => {
-        await expect(activeComposer.getByTestId('composer-attachments')).toHaveCount(0);
-      },
-    },
-    {
-      name: 'the answer draft stayed empty and the thread draft holds the late upload',
-      run: async () => {
-        await option(0).click();
-        await expect(page.getByTestId('chief-question')).toHaveCount(0);
-      },
-      composer: 'threadDraft',
-      extra: async () => {
-        await expect
-          .poll(() => answered.at(-1)?.body.answers)
-          .toEqual([{ header: 'Late · #9', choices: ['Yes'] }]);
-        await expect(activeComposer.getByTestId('composer-attachments')).toContainText('late.log');
-      },
-    },
-  ];
-  const failed: string[] = [];
-  for (const step of steps) {
-    try {
-      await step.run();
-      await expect(composer).toHaveValue(step.composer, { timeout: 2000 });
-      await step.extra?.();
-    } catch {
-      failed.push(step.name);
-    }
-  }
-  expect(failed).toEqual([]);
+  await composer.fill('threadDraft');
+  await activeComposer.locator('input[type="file"]').setInputFiles({
+    name: 'late.log',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('late'),
+  });
+  await expect(activeComposer.getByTestId('attachment-pending')).toBeVisible();
+  const late = question('ask-0000000c', 'Late · #9', 'One more thing?', [{ label: 'Yes' }, { label: 'No' }]);
+  state.messages = [...state.messages, { ...late, createdAt: 40 }];
+  await page.evaluate(
+    ([u, message]) =>
+      window.__es.find((es) => es.url.includes(u as string))?.emit({ type: 'message', message }),
+    [`/api/conversations/${THREAD.id}/stream`, late] as const,
+  );
+  const card = cardOf(page, 'ask-0000000c');
+  await expect(card).toBeVisible();
+  await expect(composer).toHaveValue('threadDraft');
+  await expect(async () => {
+    await release();
+    await expect(activeComposer.getByTestId('attachment-pending')).toHaveCount(0, { timeout: 500 });
+  }).toPass();
+  await expect(activeComposer.getByTestId('composer-attachments')).toContainText('late.log');
+  await card.getByTestId('chief-question-option-0-0').click();
+  await expect
+    .poll(() => answered.at(-1)?.body)
+    .toEqual({ answers: [{ header: 'Late · #9', choices: ['Yes'] }] });
+  await expect(composer).toHaveValue('threadDraft');
+  await expect(activeComposer.getByTestId('composer-attachments')).toContainText('late.log');
 });
 
 test('a question that arrives while you watch rises into its card; a reload shows it still', async ({

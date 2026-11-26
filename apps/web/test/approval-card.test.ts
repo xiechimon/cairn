@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { ApprovalAnswered } from '../src/chief/question-answered-line.js';
-import { DecisionDock } from '../src/chief/decision-dock.js';
+import { QuestionCard } from '../src/chief/question-card.js';
 import type { ChiefQuestionItem } from '../src/chief/question-item.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
@@ -50,7 +50,7 @@ function inI18n(
 }
 
 const render = (item: ChiefQuestionItem, locale: 'zh' | 'en' = 'zh') =>
-  inI18n(createElement(DecisionDock, { item, onAnswer: () => {}, onCancel: () => {} }), locale);
+  inI18n(createElement(QuestionCard, { item, onAnswer: () => {}, onCancel: () => {} }), locale);
 
 const textOf = (html: string) =>
   html

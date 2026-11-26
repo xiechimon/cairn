@@ -77,17 +77,15 @@ describe('fluid motion system: unified disclosure & single-chevron rotation', ()
 });
 
 describe('fluid motion system: icon cross-fade, gliding indicators, and direct-manipulation resize', () => {
-  test('CopyIconButton and MessageToolbar keep both Copy and Check icons mounted for cross-fade', () => {
+  test('CopyIconButton and MessageMeta keep both Copy and Check icons mounted for cross-fade', () => {
     const copyBtn = read('components/copy-icon-button.tsx');
-    const toolbar = read('chief/message-toolbar.tsx');
+    const toolbar = read('components/chat/message-meta.tsx');
 
     expect(copyBtn).toContain('check-scale');
     expect(copyBtn).not.toMatch(/\?\s*\(icons\?\.(?:copied|copy)/);
     expect(copyBtn).toContain("t('已复制')");
 
-    expect(toolbar).toContain('check-scale');
-    expect(toolbar).toContain('data-copied');
-    expect(toolbar).toContain("t('已复制')");
+    expect(toolbar).toContain('<CopyIconButton');
     expect(toolbar).toContain('transition-opacity');
   });
 

@@ -13,9 +13,18 @@ import { postProject, req } from './helpers.js';
 
 registerChiefHarness();
 
-const QUESTIONS = [{ header: 'scope', question: 'Which pages?', options: [] }];
+type AskedQuestion = { header: string; question: string; options: { label: string }[] };
 
-async function askFromProjectTurn(projectId: string, ageMs: number) {
+const QUESTIONS: AskedQuestion[] = [{ header: 'scope', question: 'Which pages?', options: [] }];
+const CHOICE: AskedQuestion[] = [
+  {
+    header: 'scope',
+    question: 'Which pages?',
+    options: [{ label: 'the board' }, { label: 'settings' }],
+  },
+];
+
+async function askFromProjectTurn(projectId: string, ageMs: number, questions = QUESTIONS) {
   const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
     content: 'plan it',
     projectId,
@@ -29,7 +38,7 @@ async function askFromProjectTurn(projectId: string, ageMs: number) {
     .run();
   createOrGetQuestion(
     { db: H.s.db },
-    { threadId: H.threadId, requestId: 'ask-q', questions: QUESTIONS, askedFor: [stepId] },
+    { threadId: H.threadId, requestId: 'ask-q', questions, askedFor: [stepId] },
   );
   H.s.db
     .update(chiefMessage)
@@ -62,6 +71,7 @@ function questionRow() {
       status: string;
       parkedAt?: number;
       cancelReason?: string;
+      answers?: { header: string; text?: string; choices?: string[] }[] | null;
     },
   };
 }
@@ -181,6 +191,49 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     expect(chiefSteps().map((s) => s.id)).toEqual([asker]);
     expect((await answer()).status).toBe(409);
   });
+
+  test('an owner message sent while a choice question waits parks it at once, so the turn ends and the message is answered', async () => {
+    await askFromProjectTurn(H.projectId, 0, CHOICE);
+    const sent = await req(H.s.app, 'POST', `/api/conversations/${H.threadId}/messages`, {
+      content: 'meanwhile, check the deploy',
+    });
+    expect(sent.status).toBeLessThan(300);
+    const held = await holdForQuestion(
+      { db: H.s.db },
+      { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 },
+    );
+    expect(held?.status).toBe('cancelled');
+    expect(held?.cancelReason).toBe(ASK_PARKED_REASON);
+    expect(questionRow().content.status).toBe('pending');
+    expect(typeof questionRow().content.parkedAt).toBe('number');
+    const answered = await req(
+      H.s.app,
+      'POST',
+      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/questions/ask-q/answer`,
+      { answers: [{ header: 'scope', choices: ['the board'] }] },
+    );
+    expect(answered.status).toBe(200);
+  });
+
+  for (const [when, ageMs] of [
+    ['while its turn waits', 0],
+    ['after it was parked', ASK_PARK_MS + 1],
+  ] as const) {
+    test(`the owner's next message answers a plain question ${when}`, async () => {
+      await askFromProjectTurn(H.projectId, ageMs);
+      if (ageMs > 0)
+        await holdForQuestion(
+          { db: H.s.db },
+          { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 },
+        );
+      const sent = await req(H.s.app, 'POST', `/api/conversations/${H.threadId}/messages`, {
+        content: '  only the board  ',
+      });
+      expect(sent.status).toBeLessThan(300);
+      expect(questionRow().content.status).toBe('answered');
+      expect(questionRow().content.answers).toEqual([{ header: 'scope', text: 'only the board' }]);
+    });
+  }
 
   test('a rewind past a parked question is refused until it is answered or cancelled', async () => {
     const asker = await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1);

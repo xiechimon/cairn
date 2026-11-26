@@ -17,7 +17,9 @@ import { chief, chiefThread } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import {
+  ownerSpokeSince,
   parkedReply,
+  pendingPlainQuestionIds,
   proposalIdOfCard,
   publishQuestion,
   questionAskedAt,
@@ -162,7 +164,10 @@ export async function holdForQuestion(
     const content = readQuestion(deps.db, input.threadId, input.requestId);
     if (content === null || content.status !== 'pending') return content;
     if (content.parkedAt !== undefined) return parkedReply(content);
-    if (askedAt !== null && Date.now() - askedAt >= ASK_PARK_MS) {
+    if (
+      askedAt !== null &&
+      (Date.now() - askedAt >= ASK_PARK_MS || ownerSpokeSince(deps.db, input.threadId, askedAt))
+    ) {
       const parked: AskUserQuestionContent = { ...content, parkedAt: Date.now() };
       writeQuestion(deps.db, input.threadId, input.requestId, parked, askedAt);
       publishQuestion(deps, input.threadId, input.requestId);
@@ -234,6 +239,20 @@ export function answerQuestion(
   writeQuestion(deps.db, input.threadId, input.requestId, next, answeredAt);
   publishQuestion(deps, input.threadId, input.requestId);
   return next;
+}
+
+export function answerPlainQuestionsWith(
+  deps: ChiefQuestionDeps,
+  threadId: string,
+  projectId: string | null,
+  text: string,
+): void {
+  const answer = text.trim();
+  if (answer === '') return;
+  for (const requestId of pendingPlainQuestionIds(deps.db, threadId, projectId)) {
+    const header = readQuestion(deps.db, threadId, requestId)?.questions[0]?.header ?? '';
+    answerQuestion(deps, { threadId, requestId, answers: [{ header, text: answer }] });
+  }
 }
 
 export function parseAnswerBody(raw: unknown): AskUserAnswer[] {

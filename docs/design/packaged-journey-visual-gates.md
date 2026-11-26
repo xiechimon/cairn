@@ -31,7 +31,7 @@ What this gate does not prove: the check is static. It shows that a walk reaches
 | A baseline is modified, or removed together with its surface, without `Visual-Surfaces:` naming it (or `all`) | `check` fails; removal is allowed once declared | unit control |
 | A baseline is deleted or renamed while its surface remains registered | `check` fails even when declared (renames are listed as delete plus add) | unit control |
 | A new surface arrives with its baselines | Pass | unit control |
-| A diff touches a file under `apps/web/src/components` that two or more pages render | Pages are discovered from the source tree (`*-page.tsx` plus the board, thread and coordinator views), following runtime imports and not walking through another page; every one needs a surface with light and dark baselines | removing the `thread` surface is red for `message-body.tsx` |
+| A diff touches a file under `apps/web/src/components` that two or more pages render | Pages are discovered from the source tree (`*-page.tsx` plus the board, thread and coordinator views), following runtime imports and not walking through another page; every one needs a surface with light and dark baselines | removing the `thread` surface is red for `message-bubble.tsx` |
 | A new page appears without a surface and renders shared components | Red | inventory test |
 | Only types are imported | The page does not count as rendering the component | unit control |
 | Code highlighting is switched off | No highlight token renders, so `coordinator-chat-markdown-code-highlighting` fails in light and dark before any pixel comparison; the check waits for asynchronous highlighting | CI run 45751814764 |

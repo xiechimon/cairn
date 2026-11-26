@@ -87,11 +87,11 @@ test('a sent message scrolls into view even when the reader was scrolled up', as
   await expect.poll(() => gapToBottom(page)).toBeLessThanOrEqual(2);
   await expect(row(page, 'follow me down')).toBeInViewport();
   await messageOf(page, 'follow me down')
-    .getByTestId('chief-msg-tools')
-    .getByTestId('chief-msg-more')
+    .locator('[data-slot="message-meta"]')
+    .getByTestId('message-copy')
     .focus();
   await expect
-    .poll(() => opacityOf(messageOf(page, 'follow me down').getByTestId('chief-msg-tools')))
+    .poll(() => opacityOf(messageOf(page, 'follow me down').locator('[data-slot="message-meta"]')))
     .toBe(1);
   await evidenceShot(page, 'chief-follow-send.png');
 });
@@ -107,19 +107,19 @@ test('messages show their actions on hover, including the newest reply', async (
   await page.mouse.move(0, 0);
   await expect(row(page, 'answer 5')).toBeInViewport();
 
-  const newestFoot = messageOf(page, 'answer 5').getByTestId('chief-msg-foot');
-  const olderFoot = messageOf(page, 'answer 3').getByTestId('chief-msg-foot');
-  const olderUserTools = messageOf(page, 'question 4').getByTestId('chief-msg-tools');
+  const newestFoot = messageOf(page, 'answer 5').locator('[data-slot="message-meta"]');
+  const olderFoot = messageOf(page, 'answer 3').locator('[data-slot="message-meta"]');
+  const olderUserTools = messageOf(page, 'question 4').locator('[data-slot="message-meta"]');
 
   await expect.poll(() => opacityOf(newestFoot)).toBe(0);
   await expect.poll(() => opacityOf(olderFoot)).toBe(0);
   await expect.poll(() => opacityOf(olderUserTools)).toBe(0);
 
-  await messageOf(page, 'answer 3').getByTestId('chief-reply-bubble').first().hover();
+  await messageOf(page, 'answer 3').getByTestId('chief-reply').hover();
   await expect.poll(() => opacityOf(olderFoot)).toBe(1);
   await messageOf(page, 'question 4').getByTestId('chief-bubble').hover();
   await expect.poll(() => opacityOf(olderUserTools)).toBe(1);
-  await messageOf(page, 'answer 5').getByTestId('chief-reply-bubble').first().hover();
+  await messageOf(page, 'answer 5').getByTestId('chief-reply').hover();
   await expect.poll(() => opacityOf(newestFoot)).toBe(1);
 });
 

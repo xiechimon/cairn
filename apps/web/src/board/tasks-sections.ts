@@ -276,7 +276,7 @@ export interface QuestionThreadView {
 
 export type QuestionOpenStep =
   | { kind: 'open-thread'; threadId: string }
-  | { kind: 'focus'; at: number }
+  | { kind: 'focus'; requestId: string }
   | { kind: 'load-earlier' }
   | { kind: 'wait' }
   | { kind: 'missing' };
@@ -290,14 +290,8 @@ export function questionOpenStep(
   const pending = pendingQuestions(view.stream);
   if (pending.some((question) => question.requestId === target.requestId)) {
     if (view.dismissing(target.requestId)) return { kind: 'missing' };
-    const at = pending
-      .filter(
-        (question) =>
-          !view.dismissing(question.requestId) &&
-          (view.shown == null || view.shown.has(question.requestId)),
-      )
-      .findIndex((question) => question.requestId === target.requestId);
-    return at < 0 ? { kind: 'missing' } : { kind: 'focus', at };
+    if (view.shown != null && !view.shown.has(target.requestId)) return { kind: 'missing' };
+    return { kind: 'focus', requestId: target.requestId };
   }
   if (!view.hasEarlier || view.failedEarlier) return { kind: 'missing' };
   return view.loadingEarlier ? { kind: 'wait' } : { kind: 'load-earlier' };

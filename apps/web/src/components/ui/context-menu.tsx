@@ -38,4 +38,25 @@ function ContextMenuItem({ className, ...props }: ContextMenuPrimitive.Item.Prop
   );
 }
 
-export { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger };
+function ContextMenuGroup({ ...props }: ContextMenuPrimitive.Group.Props) {
+  return <ContextMenuPrimitive.Group data-slot="context-menu-group" {...props} />;
+}
+
+function ContextMenuLabel({ className, ...props }: ContextMenuPrimitive.GroupLabel.Props) {
+  return (
+    <ContextMenuPrimitive.GroupLabel
+      data-slot="context-menu-label"
+      className={cn('px-2 py-1.5 text-caption text-content-tertiary', className)}
+      {...props}
+    />
+  );
+}
+
+export {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuTrigger,
+};

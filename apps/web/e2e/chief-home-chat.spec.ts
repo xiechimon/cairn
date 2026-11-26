@@ -125,7 +125,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(handoff).toContainText('已转给任务');
     await expect(handoff).toContainText('修复看板拖拽后计数不刷新');
     await expect(handoff).not.toContainText('#9');
-    const reply = stream.getByTestId('chief-reply-bubble').first();
+    const reply = stream.getByTestId('chief-reply').first();
     const replyLook = await reply.evaluate((el) => ({
       fill: getComputedStyle(el).backgroundColor,
       left: el.getBoundingClientRect().left,

@@ -250,8 +250,14 @@ export const FILE_RULES = new Map([
     ['notice-line-', 'chief-turn-error', 'quota-wait-board', 'chat-'],
   ],
   [
-    'apps/web/src/components/chat/message-body.tsx',
-    ['chat-code-highlight-', 'chief-reply-bubbles', 'chief-stream-markdown', 'chat-'],
+    'apps/web/src/components/chat/message-bubble.tsx',
+    [
+      'chat-code-highlight-',
+      'chief-reply-bubbles',
+      'chief-stream-markdown',
+      'chief-message-',
+      'chat-',
+    ],
   ],
   ['apps/web/src/components/thread/pr-card.tsx', ['pr-card', 'thread-pr-panel']],
   ['apps/web/src/components/thread/pr-card-model.ts', ['pr-card', 'thread-pr-panel']],

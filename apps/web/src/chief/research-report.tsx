@@ -12,7 +12,7 @@ import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { TodoGlanceContext } from '../detail/segments.js';
 import { useI18n } from '../i18n/provider.js';
-import { messageStampLabel } from './time-dividers.js';
+import { messageStampLabel } from '../lib/message-time.js';
 
 export interface ResearchReport {
   title: string;

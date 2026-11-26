@@ -347,22 +347,22 @@ describe('a question row opens the question in the Coordinator thread that asked
   test('a question in the open thread focuses its card', () => {
     expect(questionOpenStep({ requestId: 'r1', threadId: 'chief-a' }, view())).toEqual({
       kind: 'focus',
-      at: 1,
+      requestId: 'r1',
     });
   });
 
-  test('focus counts only the questions the project view shows', () => {
+  test('focus reaches only the questions the project view shows', () => {
     const stream = [pending('a1'), pending('b1'), pending('b2')];
     const shown = new Set(['b1', 'b2']);
     expect(
-      questionOpenStep({ requestId: 'b1', threadId: 'chief-a' }, view({ stream, shown })),
-    ).toEqual({ kind: 'focus', at: 0 });
-    expect(
       questionOpenStep({ requestId: 'b2', threadId: 'chief-a' }, view({ stream, shown })),
-    ).toEqual({ kind: 'focus', at: 1 });
-    expect(questionOpenStep({ requestId: 'b1', threadId: 'chief-a' }, view({ stream }))).toEqual({
+    ).toEqual({ kind: 'focus', requestId: 'b2' });
+    expect(
+      questionOpenStep({ requestId: 'a1', threadId: 'chief-a' }, view({ stream, shown })),
+    ).toEqual({ kind: 'missing' });
+    expect(questionOpenStep({ requestId: 'a1', threadId: 'chief-a' }, view({ stream }))).toEqual({
       kind: 'focus',
-      at: 1,
+      requestId: 'a1',
     });
   });
 
@@ -389,11 +389,11 @@ describe('a question row opens the question in the Coordinator thread that asked
     });
   });
 
-  test('a card in its dismiss-undo window is not counted, so the next row focuses its own card', () => {
+  test('a card in its dismiss-undo window does not stop the next row focusing its own card', () => {
     const shown = view({ stream: [pending('r0'), pending('r1'), pending('r2')], dismissing: (id) => id === 'r0' });
     expect(questionOpenStep({ requestId: 'r2', threadId: 'chief-a' }, shown)).toEqual({
       kind: 'focus',
-      at: 1,
+      requestId: 'r2',
     });
   });
 
@@ -407,7 +407,7 @@ describe('a question row opens the question in the Coordinator thread that asked
   test('a fixture question without a thread belongs to the open conversation', () => {
     expect(questionOpenStep({ requestId: 'r0', threadId: null }, view({ threadId: null }))).toEqual({
       kind: 'focus',
-      at: 0,
+      requestId: 'r0',
     });
   });
 });

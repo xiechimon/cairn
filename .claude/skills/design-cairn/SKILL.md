@@ -45,7 +45,7 @@ The owner's order for UI work (mon X 2026-11-19): 1. the owner says the idea; 2.
 
 ## Draft first
 
-A new feature that touches first run, Coordinator chat, thread list and sidebar, thread and review, or settings needs a page draft (sketch or screenshot mock, built from the real components) and the owner's pick before code. Get the pick with `options-prototype-cairn`: three grayscale directions with why-notes; the draft then builds the picked one. Backend-only changes and single settings are exempt. A fix to an existing screen needs no draft but still needs the reference comparison below.
+A new feature that touches first run, Coordinator chat, thread list and sidebar, thread and review, or settings needs a page draft (sketch or screenshot mock, built from the real components) and the owner's pick before code. Get the pick with `options-prototype-cairn`: one to three grayscale directions, as many as the problem really has (the owner, 2026-11-26), with why-notes; the draft then builds the picked one. Backend-only changes and single settings are exempt. A fix to an existing screen needs no draft but still needs the reference comparison below.
 
 ## Brief template
 

@@ -134,7 +134,11 @@ test('a waiting task with one request opens at its start and cannot scroll into 
   await expect(column.getByTestId('user-bubble')).toHaveCount(1);
   await page.waitForTimeout(1000);
   expect(await column.evaluate((el) => el.scrollTop)).toBe(0);
-  const blankBelow = await column.evaluate((el) => el.scrollHeight - el.clientHeight);
+  const blankBelow = await column.evaluate((el) => {
+    const metaRows = [...el.querySelectorAll('.chat-row--agent [data-slot="message-meta"]')];
+    const lastMeta = metaRows.at(-1)?.getBoundingClientRect().height ?? 0;
+    return el.scrollHeight - el.clientHeight - lastMeta;
+  });
   expect(blankBelow).toBeLessThanOrEqual(24);
   await page.setViewportSize({ width: 1440, height: 560 });
   const gapUnderLastRow = await column.evaluate((el) => {

@@ -2,23 +2,30 @@ import { describe, expect, test } from 'vitest';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
 import { answerLineOf, awaitingStream } from '../src/chief/question-lifecycle.js';
 
-describe('a pending question stops the conversation saying it is working', () => {
-  const stream: ChiefStreamItem[] = [
-    { kind: 'streaming', label: '处理中...', startedAt: 5, signalAt: 6 },
-  ];
+describe('a pending question stops the conversation saying it is working, until the owner speaks', () => {
+  const working: ChiefStreamItem = { kind: 'streaming', label: '处理中...', startedAt: 5, signalAt: 6 };
+  const asked = {
+    kind: 'question',
+    id: 'ask-1',
+    requestId: 'ask-1',
+    status: 'pending',
+    questions: [{ header: 'H', question: 'Q?', options: [{ label: 'A' }] }],
+    answers: null,
+  } as ChiefStreamItem;
+  const user: ChiefStreamItem = { kind: 'user', text: 'hi' };
 
-  test('the working row leaves the stream so the question card stands alone', () => {
-    const user: ChiefStreamItem = { kind: 'user', text: 'hi' };
-    expect(awaitingStream([user, ...stream], true)).toEqual([user]);
+  test('the working row leaves the stream while the question waits', () => {
+    expect(awaitingStream([user, asked, working])).toEqual([user, asked]);
+  });
+
+  test('a message sent after the question brings the working row back', () => {
+    const stream = [asked, user, working];
+    expect(awaitingStream(stream)).toBe(stream);
   });
 
   test('with no pending question the stream is returned untouched', () => {
-    expect(awaitingStream(stream, false)).toBe(stream);
-  });
-
-  test('other rows pass through', () => {
-    const user: ChiefStreamItem = { kind: 'user', text: 'hi' };
-    expect(awaitingStream([user], true)).toEqual([user]);
+    const stream = [user, working];
+    expect(awaitingStream(stream)).toBe(stream);
   });
 });
 

@@ -1,5 +1,6 @@
+import { needsTimeDivider } from '../lib/message-time.js';
+import { plainQuestionText } from './question-item.js';
 import type { GroupedRow } from './thread-activity.js';
-import { needsTimeDivider } from './time-dividers.js';
 
 export interface BubbleRun {
   joinsPrev: boolean;
@@ -11,6 +12,7 @@ type Author = 'user' | 'robot' | null;
 function opensAs(item: GroupedRow['item']): Author {
   if (item.kind === 'user') return 'user';
   if (item.kind === 'robot' || item.kind === 'chat-block') return 'robot';
+  if (item.kind === 'question' && plainQuestionText(item) !== null) return 'robot';
   return null;
 }
 

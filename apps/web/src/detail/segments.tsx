@@ -126,6 +126,27 @@ export function taskStatusInk(phase: Phase): string {
   return TONE_INK[PHASE_TONE[phase]];
 }
 
+const TONE_TILE: Record<StatusTone, string> = {
+  working: 'bg-tint-working',
+  wait: 'bg-(--task-wait-tint)',
+  quiet: 'bg-tint-quiet',
+  fail: 'bg-tint-fail',
+};
+
+export function TaskTile({ phase }: { phase: Phase }) {
+  return (
+    <span
+      data-slot="task-tile"
+      className={cn(
+        'grid size-5 flex-none place-items-center rounded-sm',
+        TONE_TILE[PHASE_TONE[phase]],
+      )}
+    >
+      <TaskGlyph phase={phase} className={cn('size-3', taskStatusInk(phase))} />
+    </span>
+  );
+}
+
 const QUIET_GLYPH = 'text-content-tertiary';
 const WAIT_GLYPH = { glyph: 'attention', ink: 'text-tint-wait-ink' } as const;
 const RUN_GLYPH = { glyph: 'working', ink: 'text-running' } as const;
@@ -178,7 +199,7 @@ function useJustSealed(phase: Phase): boolean {
   return done && sealedAt.current !== null && Date.now() - sealedAt.current < SEAL_MS;
 }
 
-function useStartsAfter(todoId: string, phase: Phase | undefined): string | undefined {
+export function useStartsAfter(todoId: string, phase: Phase | undefined): string | undefined {
   const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
   if (phase === undefined || phase === 'done' || phase === 'failed') return undefined;

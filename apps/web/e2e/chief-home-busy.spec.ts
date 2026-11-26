@@ -344,6 +344,11 @@ test.describe('chief unavailable (T4)', () => {
     await expect(notes.nth(1)).toHaveText(
       '主模型 relay-a/claude-opus 恢复了，这轮起改回 relay-a/claude-opus',
     );
+    for (const note of await notes.all())
+      await expect(note, 'a Coordinator note is a centred line marker').toHaveAttribute(
+        'data-variant',
+        'separator',
+      );
     await evidenceShot(page, 'fallback-switch-lines.png');
   });
 });
@@ -377,9 +382,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const home = page.getByTestId('home-c');
     const row = home.getByTestId('chief-msg').filter({ hasText: '再顺便看下空列提示' });
     await row.getByTestId('chief-bubble').hover();
-    await expect(row.locator('[data-placement="left"] [data-testid="chief-steer-withdraw"]')).toHaveCount(0);
-    await row.locator('[data-placement="left"] [data-testid="chief-msg-more"]').click();
-    await page.getByTestId('chief-steer-withdraw').click();
+    await row.locator('[data-slot="message-meta"]').getByTestId('chief-steer-withdraw').click();
     await expect.poll(() => calls).toContain('DELETE /messages/m4');
     await expect(home.getByTestId('chief-composer-input')).toHaveValue('再顺便看下空列提示');
   });

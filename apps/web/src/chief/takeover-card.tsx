@@ -6,6 +6,7 @@ import { useLiveData } from '../api/provider.js';
 import { useComputerControl } from '../api/use-computer-control.js';
 import { ComputerScreenDialog } from '../board/computer-screen-dialog.js';
 import { useScreenControl } from '../board/screen-control.js';
+import { MessageBubble } from '../components/chat/message-bubble.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -130,12 +131,14 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
 
   return (
     <MessageScrollerItem style={{ contentVisibility: 'visible' }} className="mt-5">
-      <section
+      <MessageBubble
+        side="coordinator"
+        role="region"
         data-testid="chief-takeover"
         data-outcome={item.outcome}
         data-held={held ? 'true' : 'false'}
         aria-label={t('需要你登录')}
-        className="flex w-fit max-w-[min(100%,var(--container-reply-bubble))] flex-col gap-1 rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-3"
+        className="flex max-w-[min(100%,var(--container-reply-bubble))] flex-col gap-1 py-3"
       >
         <p className="m-0 flex items-center gap-2 text-ui font-title text-foreground">
           {waiting && !held && (
@@ -197,7 +200,7 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
             )}
           </div>
         )}
-      </section>
+      </MessageBubble>
       {open && waiting && computer !== null && teamId !== undefined && (
         <ComputerScreenDialog
           onClose={() => setOpen(false)}

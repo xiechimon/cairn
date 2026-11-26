@@ -3,10 +3,8 @@ import { cn } from 'cn';
 import { CircleCheck, Plus, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
-import { toast } from 'sonner';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { questionDockState } from '../chief/question-dock-state.js';
 import { RollNumber, useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
@@ -470,13 +468,7 @@ export function TasksPanel({
       waiting
       why={t('Coordinator 在问你，到对话里回答')}
       check="none"
-      onOpen={() => {
-        if (questionDockState.uploading()) {
-          toast(t('附件上传中'));
-          return;
-        }
-        onOpenQuestion(question);
-      }}
+      onOpen={() => onOpenQuestion(question)}
     />
   ));
   const count = (section: ActiveSection) =>

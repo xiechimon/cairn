@@ -75,8 +75,8 @@ test('shows the latest reply suggestions under the reply as outlined, keyboard-r
     .getByTestId('home-c')
     .getByTestId('chief-msg')
     .filter({ hasText: '要不要先只看 README？' });
-  const reply = await replyMsg.getByTestId('chief-reply-bubble').boundingBox();
-  const replyTools = replyMsg.getByTestId('chief-msg-foot');
+  const reply = await replyMsg.getByTestId('chief-reply').boundingBox();
+  const replyTools = replyMsg.locator('[data-slot="message-meta"]');
   await expect(replyTools).toHaveCSS('opacity', '0');
   expect(group!.y - (reply!.y + reply!.height)).toBeGreaterThanOrEqual(12);
   expect(group!.y - (reply!.y + reply!.height)).toBeLessThanOrEqual(32);
@@ -161,13 +161,15 @@ test('clicking a chip sends exactly its text as an owner message and the chips g
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue('');
 });
 
-test('a pending question hides the suggested replies: the question card wins', async ({ page }) => {
+test('a pending question hides the suggested replies: the question card wins, even after the composer is typed in and cleared', async ({ page }) => {
   await mockLive(page, state({ messages: [...TURN, pendingQuestion] }));
   await page.goto('/app');
-  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toBeVisible();
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-question')).toBeVisible();
   await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
-  await page.getByTestId('chief-question-minimize').click();
-  await expect(page.getByTestId('chief-question')).toHaveCount(0);
+  const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
+  await composer.fill('先等等');
+  await composer.fill('');
+  await expect(page.getByTestId('chief-question')).toBeVisible();
   await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
 });
 

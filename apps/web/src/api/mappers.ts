@@ -2434,6 +2434,7 @@ function collectChiefStream(
     if (
       item.kind === 'user' ||
       item.kind === 'robot' ||
+      item.kind === 'question' ||
       item.kind === 'error' ||
       item.kind === 'stopped'
     )

@@ -12,8 +12,7 @@ import {
 import { QuestionScopeContext } from '../chief/chief-question.js';
 import { ChiefStatusMark } from '../chief/chief-status-mark.js';
 import { todoGlanceOf } from '../chief/chief-task-refs.js';
-import { questionDockState } from '../chief/question-dock-state.js';
-import { useTouchMessageTools } from '../chief/touch-message-tools.js';
+import { questionState } from '../chief/question-state.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -288,9 +287,7 @@ export function HomeC({
   const fallbackOnly =
     only !== undefined && rest.length === 0 && !(chiefData.stream ?? []).includes(only);
   const setupEmpty = modelsMissing && fallbackOnly;
-  const conversation = setupEmpty
-    ? []
-    : stream.filter((item) => !(item.kind === 'question' && item.status === 'pending'));
+  const conversation = setupEmpty ? [] : stream;
   const questionScope = useMemo(
     () =>
       projectId === null
@@ -330,14 +327,14 @@ export function HomeC({
   const waitingIds = useMemo(() => waitingProjectIds(tasks), [tasks]);
   const badge = needsYouBadge(scopedTasks.entries, scopedTasks.questions);
   const [questionTarget, setQuestionTarget] = useState<QuestionTarget | null>(null);
-  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  useSyncExternalStore(questionState.subscribe, questionState.snapshot, () => 0);
   const questionView: QuestionThreadView = {
     threadId: chiefData.threadId ?? null,
     stream: chiefData.stream ?? [],
     hasEarlier: chiefData.hasEarlier === true,
     loadingEarlier: surface.earlier?.loading === true,
     failedEarlier: surface.earlier?.failed === true,
-    dismissing: questionDockState.isDismissing,
+    dismissing: questionState.isDismissing,
     shown: questionScope,
   };
   const openQuestion = (target: QuestionTarget) => {
@@ -352,22 +349,24 @@ export function HomeC({
   const questionStep =
     questionTarget === null || !loaded ? null : questionOpenStep(questionTarget, questionView);
   const stepKind = questionStep?.kind ?? null;
-  const focusAt = questionStep?.kind === 'focus' ? questionStep.at : -1;
+  const focusId = questionStep?.kind === 'focus' ? questionStep.requestId : '';
   const loadEarlier = surface.earlier?.onLoad;
   useEffect(() => {
     if (questionTarget === null) return;
     if (stepKind === 'focus') {
-      questionDockState.setFocus(focusAt);
-      questionDockState.reveal();
+      const id = CSS.escape(focusId);
+      document
+        .querySelector(
+          `[data-testid="chief-stream"] :is([data-request-id="${id}"], [data-reply-source="${id}"])`,
+        )
+        ?.scrollIntoView({ block: 'center' });
       setQuestionTarget(null);
     } else if (stepKind === 'load-earlier') {
       loadEarlier?.();
     } else if (stepKind === 'missing') {
       setQuestionTarget(null);
     }
-  }, [questionTarget, stepKind, focusAt, loadEarlier]);
-  const [section, setSection] = useState<HTMLElement | null>(null);
-  useTouchMessageTools(section);
+  }, [questionTarget, stepKind, focusId, loadEarlier]);
 
   const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
   const paneButtons = narrow ? (
@@ -569,7 +568,6 @@ export function HomeC({
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <section
-          ref={setSection}
           data-testid="home-c"
           data-chat-top={!narrow && banner == null ? 'under-header' : undefined}
           aria-label={t('与 Coordinator 的对话')}

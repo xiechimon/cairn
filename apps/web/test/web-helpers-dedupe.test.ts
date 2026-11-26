@@ -33,14 +33,14 @@ describe('web helper deduplication guards', () => {
 
   test('clockTime formatters delegate to formatClockTime in lib/date-format.ts', () => {
     for (const rel of [
-      'chief/time-dividers.ts',
+      'lib/message-time.ts',
       'board/thread-panel-model.ts',
       'api/mappers.ts',
     ]) {
       const source = readWeb(rel);
       expect(source, rel).toContain('formatClockTime');
     }
-    expect(readWeb('chief/time-dividers.ts')).not.toMatch(/function\s+clockTime\s*\(/);
+    expect(readWeb('lib/message-time.ts')).not.toMatch(/function\s+clockTime\s*\(/);
   });
 
   test('GitHub device dialogs share polling and ended-copy helpers from lib/github-device-flow.ts', () => {

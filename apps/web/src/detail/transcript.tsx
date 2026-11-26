@@ -2,11 +2,15 @@ import type { StepPromptOrigin } from '@cairn/shared';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { joinMeta } from '../board/rel-time.js';
 import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
-import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { liveTokensLabel, TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
-import { ChatMessageBody } from '../components/chat/message-body.js';
+import {
+  type BubbleRun,
+  MESSAGE_COL_MAX_CLS,
+  MessageBubble,
+} from '../components/chat/message-bubble.js';
+import { MessageMeta } from '../components/chat/message-meta.js';
 import { NoticeLine, RawTextDialog } from '../components/chat/notice-line.js';
 import { MachineIcon } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
@@ -16,12 +20,10 @@ import {
   CollapsibleTrigger,
 } from '../components/ui/collapsible.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock } from '../icons/index.js';
-import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { BackgroundTasks } from './background-tasks.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
@@ -37,12 +39,10 @@ interface TranscriptProps {
 const ROW_BASE = 'flex items-start';
 const AGENT_ROW = 'chat-row--agent group/message flex flex-col items-start';
 const USER_ROW = 'chat-row--user group/message flex flex-col items-end';
-const TOOLS_ROW =
-  '-ml-4 -mr-[calc(1rem-var(--scrollbar-gutter,0px))] overflow-x-clip pl-4 pr-[calc(1rem-var(--scrollbar-gutter,0px))]';
 
 const SCROLLER_ITEM_STYLE = { contentVisibility: 'visible' } as const;
 
-function hasAgentTools(item: TranscriptItem | undefined): boolean {
+function hasMessageMeta(item: TranscriptItem | undefined): boolean {
   return item?.kind === 'robot' || item?.kind === 'review' || item?.kind === 'verify';
 }
 
@@ -71,15 +71,15 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
     case 'review':
     case 'verify':
     case 'report':
-      return hasAgentTools(prev)
+      return hasMessageMeta(prev)
         ? 'mt-5 border-t border-border/60 pt-5'
         : endsWithAgentRow(prev)
           ? 'mt-1'
           : 'mt-5';
     case 'chief':
-      return hasAgentTools(prev) ? 'mt-9' : 'mt-1';
+      return hasMessageMeta(prev) ? 'mt-3' : 'mt-1';
     case 'user':
-      return hasAgentTools(prev) ? 'mt-9' : prev?.kind === 'user' ? 'mt-1' : 'mt-5';
+      return hasMessageMeta(prev) ? 'mt-3' : prev?.kind === 'user' ? 'mt-0.5' : 'mt-5';
     default:
       return prev?.kind === 'step-prompt' ? 'mt-1.5' : '';
   }
@@ -93,39 +93,8 @@ const FINDING_SEVERITY_LABEL = {
   info: '备注',
 } as const;
 
-function RowTools({
-  placement,
-  copy,
-  stamp,
-}: {
-  placement: 'left' | 'below-start' | 'below-start-hover' | 'below-end';
-  copy: string;
-  stamp?: string | undefined;
-}) {
-  const { t } = useI18n();
-  return (
-    <MessageToolbar
-      placement={placement}
-      testId={
-        placement === 'left' || placement === 'below-start-hover' ? 'msg-tools' : 'msg-tools-touch'
-      }
-      stamp={
-        stamp == null ? null : (
-          <span className="text-caption whitespace-nowrap tabular-nums" data-testid="msg-stamp">
-            {stamp}
-          </span>
-        )
-      }
-      onCopy={() => {
-        copyTextWithFeedback(
-          copy,
-          () => toastSuccess(t('已复制')),
-          (error) => toastError(t('复制失败，请重试。'), error),
-        );
-      }}
-    />
-  );
-}
+const AGENT_TEXT_CLS =
+  'chat-text agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)';
 
 function Para({ para, gap = false }: { para: RobotPara; gap?: boolean }) {
   const quoteSkin =
@@ -155,9 +124,22 @@ function Para({ para, gap = false }: { para: RobotPara; gap?: boolean }) {
   );
 }
 
+function ownerRun(
+  prev: TranscriptItem | undefined,
+  next: TranscriptItem | undefined,
+): BubbleRun | undefined {
+  const joinsPrev = prev?.kind === 'user';
+  const joinsNext = next?.kind === 'user';
+  if (joinsPrev && joinsNext) return 'middle';
+  if (joinsPrev) return 'last';
+  if (joinsNext) return 'first';
+  return undefined;
+}
+
 function Row({
   item,
   prev,
+  next,
   t,
   defaultExpanded,
   entering,
@@ -165,6 +147,7 @@ function Row({
 }: {
   item: TranscriptItem;
   prev: TranscriptItem | undefined;
+  next: TranscriptItem | undefined;
   t: TFunc;
   defaultExpanded: boolean;
   entering: Set<string>;
@@ -285,34 +268,34 @@ function Row({
       const keyId = item.outboxKey ?? item.id;
       return (
         <div
-          className={`${USER_ROW} ${TOOLS_ROW} ${margin} ${keyId != null && keyId === enteringUser ? 'message-enter' : ''}`}
-          data-tools-root=""
+          className={`${USER_ROW} ${margin} ${keyId != null && keyId === enteringUser ? 'message-enter' : ''}`}
         >
-          <div
-            className="group/reply-block relative max-w-[min(85%,42rem)]"
-            data-slot="reply-block"
-          >
-            <ChatMessageBody
-              speaker="user"
-              className={`chat-bubble w-fit max-w-full break-words ${
-                item.markdown != null
-                  ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
-                  : 'whitespace-pre-wrap'
-              } ${sending ? 'opacity-55' : ''}`}
-              data-testid="user-bubble"
-              {...(sending ? { 'data-delivery': 'sending' } : {})}
-              {...(item.markdown != null ? { 'data-md': 'true' } : {})}
+          <div className={`relative flex ${MESSAGE_COL_MAX_CLS} flex-col items-end`}>
+            <MessageMeta
+              side="owner"
+              actions={{ at: item.createdAt, fallbackAt: item.at, text: copy }}
+              disabled={sending}
             >
-              {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
-            </ChatMessageBody>
-            {!sending && <RowTools placement="left" copy={copy} stamp={item.at} />}
+              <MessageBubble
+                side="owner"
+                run={ownerRun(prev, next)}
+                className={`break-words ${
+                  item.markdown != null
+                    ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
+                    : 'whitespace-pre-wrap'
+                } ${sending ? 'opacity-55' : ''}`}
+                data-testid="user-bubble"
+                {...(sending ? { 'data-delivery': 'sending' } : {})}
+                {...(item.markdown != null ? { 'data-md': 'true' } : {})}
+              >
+                {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
+              </MessageBubble>
+            </MessageMeta>
           </div>
-          {sending ? (
+          {sending && (
             <span role="status" className="sr-only" data-testid="user-msg-sending">
               {t('发送中')}
             </span>
-          ) : (
-            <RowTools placement="below-end" copy={copy} stamp={item.at} />
           )}
         </div>
       );
@@ -320,13 +303,13 @@ function Row({
     case 'robot': {
       const copy = robotCopyText(item);
       return (
-        <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
-            <ChatMessageBody
-              speaker="assistant"
-              className="chat-text agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)"
-              data-testid="agent-text"
-            >
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
+          <MessageMeta
+            side="coordinator"
+            placement="below"
+            actions={{ at: item.createdAt, text: copy }}
+          >
+            <div className={AGENT_TEXT_CLS} data-testid="agent-text">
               {item.markdown != null ? (
                 <ChatMarkdown text={item.markdown} />
               ) : (
@@ -334,10 +317,8 @@ function Row({
                   <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />
                 ))
               )}
-            </ChatMessageBody>
-            <RowTools placement="below-start-hover" copy={copy} />
-          </div>
-          <RowTools placement="below-start" copy={copy} />
+            </div>
+          </MessageMeta>
         </div>
       );
     }
@@ -424,13 +405,13 @@ function Row({
       );
     case 'review':
       return (
-        <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
-            <ChatMessageBody
-              speaker="assistant"
-              className="chat-text agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
-              data-testid="agent-text"
-            >
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
+          <MessageMeta
+            side="coordinator"
+            placement="below"
+            actions={{ at: item.createdAt, text: reviewCopyText(item) }}
+          >
+            <div className={AGENT_TEXT_CLS} data-testid="agent-text">
               <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
                 <span
                   className={`chat-review-tag flex-shrink-0 font-semibold ${
@@ -487,21 +468,19 @@ function Row({
                   )}
                 </div>
               ))}
-            </ChatMessageBody>
-            <RowTools placement="below-start-hover" copy={reviewCopyText(item)} />
-          </div>
-          <RowTools placement="below-start" copy={reviewCopyText(item)} />
+            </div>
+          </MessageMeta>
         </div>
       );
     case 'verify':
       return (
-        <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
-            <ChatMessageBody
-              speaker="assistant"
-              className="chat-text agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
-              data-testid="agent-text"
-            >
+        <div className={`${AGENT_ROW} ${margin}`} data-row="agent">
+          <MessageMeta
+            side="coordinator"
+            placement="below"
+            actions={{ at: item.createdAt, text: verifyCopyText(item) }}
+          >
+            <div className={AGENT_TEXT_CLS} data-testid="agent-text">
               <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
                 <span
                   className={`chat-review-tag flex-shrink-0 font-semibold ${
@@ -537,10 +516,8 @@ function Row({
                   />
                 </p>
               ))}
-            </ChatMessageBody>
-            <RowTools placement="below-start-hover" copy={verifyCopyText(item)} />
-          </div>
-          <RowTools placement="below-start" copy={verifyCopyText(item)} />
+            </div>
+          </MessageMeta>
         </div>
       );
   }
@@ -661,17 +638,17 @@ function verifyCopyText(item: Extract<TranscriptItem, { kind: 'verify' }>): stri
 
 function EnteringItem({
   enter,
-  clearTools,
+  afterAgent,
   messageId,
   children,
 }: {
   enter: boolean;
-  clearTools: boolean;
+  afterAgent: boolean;
   messageId: string | undefined;
   children: ReactNode;
 }) {
   const [entered] = useState(enter);
-  const cls = [entered ? 'row-enter' : '', clearTools ? 'mt-9' : ''].filter(Boolean).join(' ');
+  const cls = [entered ? 'row-enter' : '', afterAgent ? 'mt-3' : ''].filter(Boolean).join(' ');
   return (
     <MessageScrollerItem
       messageId={messageId}
@@ -743,8 +720,8 @@ export function Transcript({ transcript, result }: TranscriptProps) {
     const key = stableId ?? (item.kind === 'user' ? `user-${index}` : undefined);
     const messageId = ('id' in item ? item.id : undefined) ?? key;
     const prev = transcript[index - 1];
-    const clearTools =
-      hasAgentTools(prev) &&
+    const afterAgent =
+      hasMessageMeta(prev) &&
       !ROW_MARGIN_KINDS.has(item.kind) &&
       !(item.kind === 'streaming' && item.quotaHeld !== true);
     return (
@@ -752,11 +729,12 @@ export function Transcript({ transcript, result }: TranscriptProps) {
         key={key ?? index}
         messageId={messageId}
         enter={stableId !== undefined && enteringRows.has(stableId)}
-        clearTools={clearTools}
+        afterAgent={afterAgent}
       >
         <Row
           item={item}
           prev={prev}
+          next={transcript[index + 1]}
           t={t}
           defaultExpanded={item.kind === 'work' && item.expanded === true}
           entering={entering}

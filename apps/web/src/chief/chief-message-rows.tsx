@@ -1,15 +1,21 @@
 import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
-import { cn } from 'cn';
 import { CircleAlert, CircleStop } from 'lucide-react';
 import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
+import { relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
-import { CHAT_BODY_CLS, ChatMessageBody } from '../components/chat/message-body.js';
+import {
+  type BubbleRun,
+  CHAT_BODY_CLS,
+  MESSAGE_COL_MAX_CLS,
+  MessageBubble,
+} from '../components/chat/message-bubble.js';
+import { MessageMeta } from '../components/chat/message-meta.js';
+import type { MessageActions } from '../components/chat/message-press-menu.js';
 import { NoticeLine } from '../components/chat/notice-line.js';
 import { useArrivals } from '../components/growth.js';
 import { MachineName } from '../components/machine-label.js';
@@ -19,28 +25,27 @@ import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
-import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_TEXT_CLS } from '../detail/chat-markdown.js';
+import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { Segments as DocSegments, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefSegment, ChiefSubagentInfo } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { dateTimeFormat } from '../lib/date-format.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
 import { ChatBlockRow } from './chat-block-row.js';
+import { PendingQuestion } from './chief-question.js';
 import { ChiefReportMessage } from './chief-report-row.js';
 import { chiefRowShows } from './chief-row-kinds.js';
+import { TaskTrunk } from './chief-task-trunk.js';
 import { isLiveNotice } from './live-notice.js';
-import { MessageToolbar } from './message-toolbar.js';
 import { ApprovalAnswered, QuestionReceipt } from './question-answered-line.js';
-import { ReplyPressMenu, useReplyPressMenu } from './reply-press-menu.js';
+import { plainQuestionText } from './question-item.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
   REPLY_HIGHLIGHT_ATTR,
-  REPLY_HIGHLIGHT_CLS,
   REPLY_SOURCE_ATTR,
   ReplySourceHighlightContext,
 } from './reply-source-highlight.js';
@@ -50,45 +55,9 @@ import { SecretRequestCard } from './secret-request-card.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
 import type { ChannelMirror, GroupedRow } from './thread-activity.js';
-import { messageStampLabel } from './time-dividers.js';
 import { CardFailureContext } from './turn-failure.js';
 
-const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
-
-function MessageStamp({
-  createdAt,
-  fallback,
-}: {
-  createdAt?: number | undefined;
-  fallback?: string | undefined;
-}) {
-  const { t, locale } = useI18n();
-  const now = useMinuteClock();
-  if (createdAt != null && !isUsableTimestamp(createdAt, now)) return null;
-  if (createdAt == null) {
-    return fallback == null ? null : (
-      <span className={STAMP_CLS} data-testid="chief-msg-stamp">
-        {fallback}
-      </span>
-    );
-  }
-  const absolute = dateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(createdAt);
-  return (
-    <time
-      className={STAMP_CLS}
-      data-testid="chief-msg-stamp"
-      dateTime={new Date(createdAt).toISOString()}
-      title={absolute}
-    >
-      {messageStampLabel(createdAt, Math.max(now, createdAt), locale, t)}
-    </time>
-  );
-}
-
-function runAttr(joinsPrev: boolean, joinsNext: boolean): string | undefined {
+function runAttr(joinsPrev: boolean, joinsNext: boolean): BubbleRun | undefined {
   if (joinsPrev && joinsNext) return 'middle';
   if (joinsPrev) return 'last';
   if (joinsNext) return 'first';
@@ -96,28 +65,26 @@ function runAttr(joinsPrev: boolean, joinsNext: boolean): string | undefined {
 }
 
 const MSG_COL_CLS = `relative min-w-0 flex-1 ${CHAT_BODY_CLS} text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!`;
+const BUBBLE_COL_CLS = `relative ${MESSAGE_COL_MAX_CLS} flex-none gap-0`;
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 const SCROLLER_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
-const USER_ROW_CLS = 'mt-6';
-const RUN_ROW_CLS = 'mt-1';
 const EVENT_ROW_CLS = 'mt-5';
 const REPLY_ROW_CLS = 'mt-6';
+
+function messageRowCls(joinsPrev: boolean): string {
+  return joinsPrev ? 'mt-0.5' : 'mt-6';
+}
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
-
-const BUBBLE_WRAP_CLS = `group/reply-block relative w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
-const REPLY_TOOL_GUTTER_CLS =
-  '[&_[data-slot=reply-blocks]>:first-child]:max-w-[min(100%_-_2.5rem,var(--container-reply))]';
-const SAID_CLS = `${REPLY_TEXT_CLS} min-w-0 text-(--foreground)`;
 
 function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
   return (
     <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
-      <div className={SAID_CLS} data-testid={testId}>
+      <MessageBubble side="coordinator" className="max-w-[min(85%,42rem)]" data-testid={testId}>
         {children}
-      </div>
+      </MessageBubble>
     </MessageScrollerItem>
   );
 }
@@ -154,22 +121,6 @@ function TaskChip({ todoId, label }: { todoId: string; label: string }) {
       codeClassName="chat-code"
       segments={[{ text: label, style: 'mention', mentionKind: 'todo', mentionId: todoId }]}
     />
-  );
-}
-
-function StartedTasksLine({ todoIds }: { todoIds: readonly string[] }) {
-  const { t } = useI18n();
-  const glances = useContext(TodoGlanceContext);
-  return (
-    <div className={`${SAID_CLS} mt-2`} data-testid="chief-task-started-said">
-      {t('已建任务')}
-      {todoIds.map((todoId, n) => (
-        <span key={todoId}>
-          {n > 0 && t('、')}
-          <TaskChip todoId={todoId} label={glances?.get(todoId)?.title ?? t('任务')} />
-        </span>
-      ))}
-    </div>
   );
 }
 
@@ -254,11 +205,16 @@ function TaskStartedRow({ todoId, title }: { todoId: string; title: string | nul
       data-testid="chief-task-started"
       className={EVENT_ROW_CLS}
     >
-      <div className={SAID_CLS} data-testid="chief-task-started-said">
-        {t('已建任务')}
-        <TaskChip todoId={todoId} label={glance?.title ?? title ?? t('任务')} />
-      </div>
-      {glance !== undefined && <ResearchReportRow todoId={todoId} indent="mt-2" />}
+      {glance !== undefined ? (
+        <>
+          <TaskTrunk todoIds={[todoId]} rooted={false} />
+          <ResearchReportRow todoId={todoId} indent="mt-2" />
+        </>
+      ) : (
+        <span className="text-ui text-foreground">
+          <TaskChip todoId={todoId} label={title ?? t('任务')} />
+        </span>
+      )}
     </MessageScrollerItem>
   );
 }
@@ -322,15 +278,11 @@ export function chiefStreamRowKey(item: GroupedRow['item'], index: number): stri
 
 interface ChiefStreamRowProps {
   item: GroupedRow['item'];
-  index: number;
-  onCopy: (text: string) => void;
-  onRewindRequest: (index: number, id: string | null) => void;
-  rewindDisabled?: boolean;
   onWithdraw?: ((messageId: string, text: string) => void) | undefined;
   entering?: boolean;
   joinsPrev?: boolean;
   joinsNext?: boolean;
-  unmentioned?: readonly string[];
+  started?: readonly string[];
   reports?: readonly string[];
 }
 
@@ -563,61 +515,17 @@ function SubagentProgressList({ items }: { items: readonly ChiefSubagentInfo[] }
   );
 }
 
-function ChiefMessageTools({
-  side,
-  touch = false,
-  testId,
-  createdAt,
-  fallbackAt,
-  copyText,
-  onCopy,
-  onRewind,
-  rewindDisabled = false,
-  onWithdraw,
-}: {
-  side: 'user' | 'assistant';
-  touch?: boolean;
-  testId: string;
-  createdAt: number | undefined;
-  fallbackAt?: string | undefined;
-  copyText: string;
-  onCopy: (text: string) => void;
-  onRewind?: (() => void) | undefined;
-  rewindDisabled?: boolean;
-  onWithdraw?: (() => void) | undefined;
-}) {
-  const placement = side === 'assistant' ? 'top-end-hover' : touch ? 'below-end' : 'left';
-  return (
-    <MessageToolbar
-      placement={placement}
-      testId={testId}
-      stamp={
-        side === 'assistant' ? null : <MessageStamp createdAt={createdAt} fallback={fallbackAt} />
-      }
-      onCopy={() => onCopy(copyText)}
-      onRewind={onRewind}
-      rewindDisabled={rewindDisabled}
-      onWithdraw={onWithdraw}
-    />
-  );
-}
-
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
-  index: i,
-  onCopy,
-  onRewindRequest,
-  rewindDisabled = false,
   onWithdraw,
   entering = false,
   joinsPrev = false,
   joinsNext = false,
-  unmentioned = NO_TASKS,
+  started = NO_TASKS,
   reports = NO_REPORTS,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
-  const pressMenu = useReplyPressMenu();
   const cardFailure = useContext(CardFailureContext);
   const highlight = (id: string | undefined) =>
     id !== undefined && id === highlightedSource?.sourceMessageId
@@ -648,7 +556,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
-        <NoticeLine layout="plain" testId="chief-note">
+        <NoticeLine icon={null} testId="chief-note">
           {t(item.text, item.vars)}
           {item.machineName && (
             <>
@@ -671,78 +579,82 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const sending = item.delivery === 'sending';
     const steering = item.pending === 'steering';
     const fade = sending ? 'opacity-55' : '';
-    const userToolProps = {
-      side: 'user' as const,
-      createdAt: item.createdAt,
+    const actions: MessageActions = {
+      at: item.createdAt,
       fallbackAt: item.at,
-      copyText: item.text,
-      onCopy,
-      onRewind: () => onRewindRequest(i, item.id ?? null),
-      rewindDisabled,
+      text: item.text,
       onWithdraw:
         steering && onWithdraw !== undefined && item.id != null
           ? () => onWithdraw(item.id ?? '', item.text)
           : undefined,
     };
+    const bubble = (
+      <MessageBubble
+        side="owner"
+        data-testid="chief-bubble"
+        run={runAttr(joinsPrev, joinsNext)}
+        data-md={shown != null ? '' : undefined}
+        {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+        {...highlight(item.id)}
+        {...(sending ? { 'data-delivery': 'sending' } : {})}
+        {...(steering ? { 'data-steering': '' } : {})}
+        className={`${shown != null ? BUBBLE_MD_CLS : ''} ${fade} ${steering ? STEERING_BUBBLE_CLS : ''}`}
+      >
+        {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
+        {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
+      </MessageBubble>
+    );
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message
-          className={`${joinsPrev ? RUN_ROW_CLS : USER_ROW_CLS} justify-end ${entering ? 'message-enter' : ''}`}
+          className={`${messageRowCls(joinsPrev)} justify-end ${entering ? 'message-enter' : ''}`}
           data-testid="chief-msg"
           data-run={runAttr(joinsPrev, joinsNext)}
         >
-          <MessageContent
-            className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
-            data-testid="chief-msg-col"
-          >
+          <MessageContent className={`${BUBBLE_COL_CLS} items-end`} data-testid="chief-msg-col">
             {sentFiles.length > 0 && (
-              <div
-                className={`group/reply-block relative max-w-full ${fade}`}
-                data-slot="reply-block"
-              >
+              <div className={`relative max-w-full ${showBubble ? 'mb-2' : ''} ${fade}`}>
                 <SentAttachments files={sentFiles} />
-                {!showBubble && !sending && (
-                  <ChiefMessageTools {...userToolProps} testId="chief-msg-tools" />
-                )}
               </div>
             )}
             {showBubble && (
-              <div className="group/reply-block relative max-w-full" data-slot="reply-block">
-                <ChatMessageBody
-                  speaker="user"
-                  data-testid="chief-bubble"
-                  tail={!joinsNext}
-                  data-md={shown != null ? '' : undefined}
-                  {...(item.id != null ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-                  {...highlight(item.id)}
-                  {...(sending ? { 'data-delivery': 'sending' } : {})}
-                  {...(steering ? { 'data-steering': '' } : {})}
-                  className={`w-fit max-w-full [overflow-wrap:anywhere] ${REPLY_HIGHLIGHT_CLS} ${shown != null ? BUBBLE_MD_CLS : ''} ${fade} ${steering ? STEERING_BUBBLE_CLS : ''}`}
-                >
-                  {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
-                  {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
-                </ChatMessageBody>
-                {!sending && <ChiefMessageTools {...userToolProps} testId="chief-msg-tools" />}
-              </div>
+              <MessageMeta side="owner" actions={actions} disabled={sending}>
+                {bubble}
+              </MessageMeta>
             )}
-            {sending ? (
+            {sending && (
               <span role="status" className="sr-only" data-testid="chief-msg-sending">
                 {t('发送中')}
               </span>
-            ) : (
-              <ChiefMessageTools {...userToolProps} touch testId="chief-msg-tools-touch" />
             )}
           </MessageContent>
         </Message>
       </MessageScrollerItem>
     );
   }
+  const asked = item.kind === 'question' ? plainQuestionText(item) : null;
+  if (item.kind === 'question' && asked !== null)
+    return (
+      <ChiefStreamRow
+        item={{
+          kind: 'robot',
+          id: item.id,
+          markdown: asked,
+          seconds: '',
+          ...(item.createdAt !== undefined ? { createdAt: item.createdAt } : {}),
+        }}
+        joinsPrev={joinsPrev}
+        joinsNext={joinsNext}
+      />
+    );
   if (item.kind === 'question')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            {isApprovalRequest(item.requestId) ? (
+            {item.status === 'pending' ? (
+              <PendingQuestion item={item} />
+            ) : isApprovalRequest(item.requestId) ? (
               <ApprovalAnswered item={item} />
             ) : (
               <QuestionReceipt item={item} />
@@ -759,6 +671,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
           <MessageContent className={MSG_COL_LIVE_CLS}>
+            <TaskTrunk todoIds={started} />
             <LiveRow
               variant="chief"
               label={item.label}
@@ -791,13 +704,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   const sourceHighlighted =
     highlightedSource !== null && highlightedSource.sourceMessageId === item.id;
   const quoted = highlightedSource?.quote ?? '';
-  const replyBody = (
-    <ChatMessageBody
-      speaker="assistant"
-      className={cn(BUBBLE_WRAP_CLS, !pressMenu && REPLY_TOOL_GUTTER_CLS)}
+  const actions: MessageActions = { at: item.createdAt, text: whole };
+  const bubble = (
+    <MessageBubble
+      side="coordinator"
+      run={runAttr(joinsPrev && started.length === 0, joinsNext)}
       data-testid="chief-reply"
       {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-      {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
     >
       {markdown != null ? (
         <ChatMarkdown
@@ -810,59 +723,53 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           }
         />
       ) : (
-        <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
-          <div
-            className={REPLY_TEXT_CLS}
-            data-slot="reply-bubble"
-            data-testid="chief-reply-bubble"
-            {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
-          >
-            {(item.paragraphs ?? []).map((p, j) => (
-              <p key={j} className={j > 0 ? 'mt-3' : undefined}>
-                <Segments segments={p} />
-              </p>
-            ))}
-            {item.bullets != null && item.bullets.length > 0 && (
-              <ul className="mt-1 list-disc ps-9">
-                {item.bullets.map((b, j) => (
-                  <li key={`b${j}`}>
-                    <Segments segments={b} />
-                  </li>
-                ))}
-              </ul>
-            )}
-            <BubbleReports todoIds={reports} />
-          </div>
+        <div
+          data-slot="reply-bubble"
+          data-testid="chief-reply-bubble"
+          className="rounded-sm data-reply-highlight:bg-(--reply-bubble-highlight)"
+          {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
+        >
+          {(item.paragraphs ?? []).map((p, j) => (
+            <p key={j} className={j > 0 ? 'mt-3' : undefined}>
+              <Segments segments={p} />
+            </p>
+          ))}
+          {item.bullets != null && item.bullets.length > 0 && (
+            <ul className="mt-1 list-disc ps-5">
+              {item.bullets.map((b, j) => (
+                <li key={`b${j}`}>
+                  <Segments segments={b} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <BubbleReports todoIds={reports} />
         </div>
       )}
-      {settled && !pressMenu && (
-        <ChiefMessageTools
-          side="assistant"
-          createdAt={item.createdAt}
-          copyText={whole}
-          onCopy={onCopy}
-          testId="chief-msg-foot"
-        />
-      )}
-    </ChatMessageBody>
+    </MessageBubble>
   );
+  const hasBody = whole.trim() !== '' || reports.length > 0;
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-      <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
-        <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
+      <Message
+        className={messageRowCls(joinsPrev && started.length === 0)}
+        data-testid="chief-msg"
+        data-run={runAttr(joinsPrev, joinsNext)}
+      >
+        <MessageContent className={BUBBLE_COL_CLS} data-testid="chief-msg-col">
           {subagents.length > 0 && <SubagentProgressList items={subagents} />}
-          {pressMenu ? (
-            <ReplyPressMenu text={whole} onCopy={onCopy} disabled={!settled}>
-              {replyBody}
-            </ReplyPressMenu>
-          ) : (
-            replyBody
-          )}
-          {fallbackNote !== undefined && (
-            <div className="mt-1 text-caption text-(--text-tertiary)">{fallbackNote}</div>
+          <TaskTrunk todoIds={started} />
+          {hasBody && (
+            <MessageMeta
+              side="coordinator"
+              actions={actions}
+              note={settled ? fallbackNote : undefined}
+              streaming={!settled}
+            >
+              {bubble}
+            </MessageMeta>
           )}
           {item.typing === true && <TypingDots className="mt-1" />}
-          {unmentioned.length > 0 && <StartedTasksLine todoIds={unmentioned} />}
         </MessageContent>
       </Message>
     </MessageScrollerItem>

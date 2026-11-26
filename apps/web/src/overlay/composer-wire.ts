@@ -52,7 +52,6 @@ export interface ComposerWireOptions {
   editable?: boolean;
   draft?: string;
   onDraftChange?: (next: string) => void;
-  readDraft?: () => string;
   onSend?: (text: string) => void | Promise<void>;
   onQueue?: (text: string) => void | Promise<void>;
   onStopAndSend?: (text: string) => void | Promise<void>;
@@ -113,7 +112,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     editable = false,
     draft: draftProp,
     onDraftChange,
-    readDraft,
     onSend,
     onQueue,
     onStopAndSend,
@@ -303,14 +301,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         failPending(uid, takeAttachmentErrorReason(file));
         return;
       }
-      const base =
-        readDraft === undefined ? undefined : splitDraft(toDisplay(readDraft(), registry));
-      writeFull(
-        joinDraft(
-          [...(base?.tokens ?? tokensRef.current), ...tokens],
-          base?.text ?? draftRef.current,
-        ),
-      );
+      writeFull(joinDraft([...tokensRef.current, ...tokens], draftRef.current));
       untrackPending([uid]);
     };
     void files

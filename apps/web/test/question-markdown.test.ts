@@ -2,8 +2,8 @@ import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, test } from 'vitest';
-import { DecisionDock } from '../src/chief/decision-dock.js';
 import { QuestionReceipt } from '../src/chief/question-answered-line.js';
+import { QuestionCard } from '../src/chief/question-card.js';
 import type { ChiefQuestionItem } from '../src/chief/question-item.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
@@ -34,9 +34,9 @@ function plain(markup: string): string {
 }
 
 describe('question markdown rendering (dogfood)', () => {
-  test('a docked pending question renders todo mentions and code, not raw markdown', () => {
+  test('a pending question card renders todo mentions and code, not raw markdown', () => {
     const html = page(
-      createElement(DecisionDock, {
+      createElement(QuestionCard, {
         item: questionItem('pending'),
         onAnswer: () => {},
         onCancel: () => {},

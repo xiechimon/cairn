@@ -50,8 +50,6 @@ export function chiefRowShows<T extends ChiefRowItem>(
     case 'thinking':
     case 'thinking-group':
       return false;
-    case 'question':
-      return item.status !== 'pending';
     case 'error':
       return item.id === undefined || item.id !== cardFailure;
     case 'chat-block':

@@ -1,6 +1,6 @@
 import type { AskUserAnswer } from '@cairn/shared';
 import { cn } from 'cn';
-import { ArrowUp, Check, ChevronDown, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { ArrowUp, Check, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -18,7 +18,6 @@ import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalCard } from './approval-card.js';
 import { approvalCardOf, approvalChoiceLabel, isApprovalRequest } from './approval-card-model.js';
-import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import {
   applyQuestionPick,
   emptyQuestionDrafts,
@@ -33,34 +32,25 @@ import {
   type ChiefQuestionPrompt,
   recommendedFirst,
 } from './question-item.js';
+import { questionState } from './question-state.js';
 
-export interface DockPager {
-  at: number;
-  total: number;
-  onPrev: () => void;
-  onNext: () => void;
-}
-
-export interface DecisionDockProps {
+export interface QuestionCardProps {
   item: ChiefQuestionItem;
   onAnswer?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
   onCancel?: (requestId: string) => unknown;
-  onMinimize?: () => void;
   draftKey?: string;
-  bound?: boolean;
-  pager?: DockPager | null;
   footer?: ReactNode;
   enter?: boolean;
 }
 
-export const DOCK_CLS =
+const CARD_CLS =
   'flex max-h-[min(60dvh,560px)] min-h-0 w-full flex-col overflow-hidden rounded-(--radius-composer) bg-popover shadow-[0_0_0_1px_var(--border),var(--composer-drop)] dark:bg-(--composer-fill) dark:shadow-(--composer-drop)';
 
 const ICON_BTN_CLS =
   'size-6 rounded-md p-0 text-content-tertiary hover:bg-(--menu-hover) hover:text-foreground disabled:opacity-40 pointer-coarse:size-11';
 
 const ROW_CLS =
-  "relative grid min-h-10 w-full grid-cols-[24px_minmax(0,1fr)] items-center gap-x-3 rounded-lg p-2 text-left [&+&]:before:absolute [&+&]:before:inset-x-2 [&+&]:before:top-0 [&+&]:before:h-px [&+&]:before:bg-border [&+&]:before:content-[''] hover:before:opacity-0 [&:hover+&]:before:opacity-0 focus-within:before:opacity-0 [&:focus-within+&]:before:opacity-0 pointer-coarse:min-h-11";
+  'relative grid min-h-10 w-full grid-cols-[24px_minmax(0,1fr)] items-center gap-x-3 rounded-lg p-2 text-left before:pointer-events-none before:absolute before:inset-x-2 before:top-0 before:h-px [&+&]:before:bg-border hover:before:opacity-0 [&:hover+&]:before:opacity-0 focus-within:before:opacity-0 [&:focus-within+&]:before:opacity-0 pointer-coarse:min-h-11';
 
 const ROW_BUTTON_CLS =
   'h-auto cursor-pointer justify-items-stretch border-0 font-normal whitespace-normal select-auto hover:bg-(--menu-hover) disabled:cursor-default disabled:opacity-100 dark:hover:bg-(--menu-hover)';
@@ -161,66 +151,54 @@ function CheckBox({ on }: { on: boolean }) {
   );
 }
 
-function DockTools({ pager, onMinimize }: { pager: DockPager | null; onMinimize?: () => void }) {
+function StepPager({
+  at,
+  total,
+  onMove,
+}: {
+  at: number;
+  total: number;
+  onMove: (to: number) => void;
+}) {
   const { t } = useI18n();
   return (
     <div className="sticky top-0 flex h-6 flex-none items-center">
-      {pager !== null && pager.total > 1 && (
-        <>
-          <IconTooltip
-            label={t('上一个问题')}
-            trigger={
-              <Button
-                variant="ghost"
-                data-testid="chief-question-prev"
-                aria-label={t('上一个问题')}
-                disabled={pager.at === 0}
-                className={ICON_BTN_CLS}
-                onClick={pager.onPrev}
-              />
-            }
-          >
-            <ChevronLeft className="size-4" />
-          </IconTooltip>
-          <span
-            data-testid="chief-question-pager"
-            className="min-w-7 text-center text-meta text-content-tertiary tabular-nums"
-          >
-            {pager.at + 1}/{pager.total}
-          </span>
-          <IconTooltip
-            label={t('下一个问题')}
-            trigger={
-              <Button
-                variant="ghost"
-                data-testid="chief-question-next"
-                aria-label={t('下一个问题')}
-                disabled={pager.at === pager.total - 1}
-                className={ICON_BTN_CLS}
-                onClick={pager.onNext}
-              />
-            }
-          >
-            <ChevronRight className="size-4" />
-          </IconTooltip>
-        </>
-      )}
-      {onMinimize !== undefined && (
-        <IconTooltip
-          label={t('收起')}
-          trigger={
-            <Button
-              variant="ghost"
-              data-testid="chief-question-minimize"
-              aria-label={t('收起')}
-              className={cn(ICON_BTN_CLS, 'ml-1')}
-              onClick={onMinimize}
-            />
-          }
-        >
-          <ChevronDown className="size-4" />
-        </IconTooltip>
-      )}
+      <IconTooltip
+        label={t('上一个问题')}
+        trigger={
+          <Button
+            variant="ghost"
+            data-testid="chief-question-prev"
+            aria-label={t('上一个问题')}
+            disabled={at === 0}
+            className={ICON_BTN_CLS}
+            onClick={() => onMove(at - 1)}
+          />
+        }
+      >
+        <ChevronLeft className="size-4" />
+      </IconTooltip>
+      <span
+        data-testid="chief-question-pager"
+        className="min-w-7 text-center text-meta text-content-tertiary tabular-nums"
+      >
+        {at + 1}/{total}
+      </span>
+      <IconTooltip
+        label={t('下一个问题')}
+        trigger={
+          <Button
+            variant="ghost"
+            data-testid="chief-question-next"
+            aria-label={t('下一个问题')}
+            disabled={at === total - 1}
+            className={ICON_BTN_CLS}
+            onClick={() => onMove(at + 1)}
+          />
+        }
+      >
+        <ChevronRight className="size-4" />
+      </IconTooltip>
     </div>
   );
 }
@@ -229,17 +207,14 @@ function rowsOf(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>('[data-dock-row]')];
 }
 
-export function DecisionDock({
+export function QuestionCard({
   item,
   onAnswer,
   onCancel,
-  onMinimize,
   draftKey,
-  bound = false,
-  pager = null,
   footer,
   enter = false,
-}: DecisionDockProps) {
+}: QuestionCardProps) {
   const { t } = useI18n();
   const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
   const { drafts, step, commit } = useQuestionDrafts(item, questions, draftKey);
@@ -254,29 +229,13 @@ export function DecisionDock({
   const question = questions[step] ?? questions[0];
   const draft = drafts[step];
   const headId = useId();
-  const listRef = useRef<HTMLFieldSetElement | null>(null);
-  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const approvalRequest = isApprovalRequest(item.requestId);
-  const typedAt = (index: number): string =>
-    draftKey === undefined ? '' : questionDockState.answerText(answerKeyOf(draftKey, index));
-  const withTyped = (
-    stored: QuestionDraft,
-    prompt: ChiefQuestionPrompt | undefined,
-    text: string,
-  ) => {
-    if (!bound || approvalRequest || prompt === undefined || text.trim() === '') return stored;
-    if (stored.kind === 'text') return { kind: 'text' as const, value: text };
-    if (prompt.multiSelect === true) return { ...stored, other: true, otherText: text };
-    return { kind: 'choices' as const, picked: [], other: true, otherText: text };
-  };
-  const effectiveOf = (source: QuestionDraft[]) =>
-    source.map((stored, index) => withTyped(stored, questions[index], typedAt(index)));
-  const effectiveDrafts = effectiveOf(drafts);
-  const stepComplete = questionDraftComplete(effectiveDrafts[step], question);
+  const stepComplete = questionDraftComplete(drafts[step], question);
   const completeIn = (source: QuestionDraft[]) =>
     pending && questions.every((q, i) => questionDraftComplete(source[i], q));
-  const allComplete = completeIn(effectiveDrafts);
+  const allComplete = completeIn(drafts);
   const firstOpen = (source: QuestionDraft[]) =>
     questions.findIndex((q, i) => !questionDraftComplete(source[i], q));
 
@@ -299,12 +258,11 @@ export function DecisionDock({
     });
   };
 
-  const blockedByUpload = bound && !approvalRequest && questionDockState.uploading();
-  const canAdvance = pending && stepComplete && !blockedByUpload;
+  const canAdvance = pending && stepComplete;
   const advance = () => {
-    if (!canAdvance || (bound && !approvalRequest && questionDockState.uploading())) return;
+    if (!canAdvance) return;
     if (last) {
-      submitWith(effectiveDrafts);
+      submitWith(drafts);
       return;
     }
     commit(drafts, Math.min(lastStep, step + 1));
@@ -313,21 +271,18 @@ export function DecisionDock({
   advanceRef.current = advance;
 
   const choose = (optionIndex: number) => {
-    if (question === undefined || !pending || blockedByUpload) return;
+    if (question === undefined || !pending) return;
     const picked = applyQuestionPick(drafts, step, question, optionIndex);
     if (question.multiSelect === true) {
       commit(picked, step);
       return;
     }
-    if (draftKey !== undefined) questionDockState.setAnswerText(answerKeyOf(draftKey, step), '');
     if (!last) {
       commit(picked, step + 1);
       return;
     }
     commit(picked, step);
-    submitWith(
-      picked.map((stored, index) => (index === step ? stored : (effectiveDrafts[index] ?? stored))),
-    );
+    submitWith(picked);
   };
 
   const otherText =
@@ -351,41 +306,15 @@ export function DecisionDock({
 
   const skip = () => {
     if (!pending || onCancel === undefined) return;
-    questionDockState.dismissWithUndo(
-      item.requestId,
-      { title: t('已跳过提问'), undo: t('撤销') },
-      () => onCancel(item.requestId),
+    questionState.dismissWithUndo(item.requestId, { title: t('已跳过提问'), undo: t('撤销') }, () =>
+      onCancel(item.requestId),
     );
   };
-
-  useEffect(() => {
-    if (draftKey !== undefined && item.status !== 'pending')
-      questionDockState.clearAnswers(draftKey);
-  }, [draftKey, item.status]);
-
-  useEffect(() => {
-    if (!pending || !bound || approvalRequest) {
-      questionDockState.clearPrimary(item.requestId);
-      return;
-    }
-    questionDockState.setPrimary({
-      requestId: item.requestId,
-      last,
-      enabled: canAdvance,
-      advance: () => advanceRef.current(),
-    });
-  }, [pending, bound, approvalRequest, item.requestId, last, canAdvance]);
-  useEffect(() => () => questionDockState.clearPrimary(item.requestId), [item.requestId]);
 
   if (question === undefined || item.status !== 'pending') return null;
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.nativeEvent.isComposing) return;
-    if (event.key === 'Escape' && onMinimize !== undefined) {
-      event.preventDefault();
-      onMinimize();
-      return;
-    }
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       if (approvalRequest) return;
       event.preventDefault();
@@ -426,14 +355,9 @@ export function DecisionDock({
         onKeyDown={onKeyDown}
         className="flex w-full min-w-0 flex-col items-stretch gap-1"
       >
-        {(onMinimize !== undefined || (pager?.total ?? 0) > 1) && (
-          <div className="flex justify-end">
-            <DockTools pager={pager} onMinimize={onMinimize} />
-          </div>
-        )}
         <ApprovalCard
           card={approval}
-          disabled={!pending || blockedByUpload}
+          disabled={!pending}
           busy={submittedIndex < 0 ? null : `chief-question-option-${step}-${submittedIndex}`}
           actions={question.options.map((option, oi) => ({
             label: approvalChoiceLabel(option.label, t),
@@ -448,10 +372,9 @@ export function DecisionDock({
 
   const multi = question.multiSelect === true;
   const typed = otherText.trim() !== '';
-  const hasTyped = typed || (bound && typedAt(step).trim() !== '');
   const picked = draft?.kind === 'choices' ? draft.picked : [];
-  const count = picked.length + (hasTyped ? 1 : 0);
-  const disabled = !pending || blockedByUpload;
+  const count = picked.length + (typed ? 1 : 0);
+  const disabled = !pending;
   const submitLabel = last ? (allComplete ? t('提交回答') : t('跳到未回答的问题')) : t('下一步');
   const go = (testId: string, enabled: boolean) => (
     <IconTooltip
@@ -490,7 +413,7 @@ export function DecisionDock({
       data-multi={multi ? '' : undefined}
       aria-label={t('待回答的提问')}
       onKeyDown={onKeyDown}
-      className={cn(DOCK_CLS, enter && 'dock-enter')}
+      className={cn(CARD_CLS, enter && 'dock-enter')}
     >
       <div className="flex min-h-0 flex-[0_1_auto] items-start gap-2 overflow-y-auto overscroll-contain pt-3 pr-2 pb-1 pl-4 [scrollbar-width:thin]">
         <div
@@ -501,94 +424,101 @@ export function DecisionDock({
         >
           <ChatMarkdown text={question.question} />
         </div>
-        <DockTools pager={pager} onMinimize={onMinimize} />
+        {questions.length > 1 && (
+          <StepPager at={step} total={questions.length} onMove={(to) => commit(drafts, to)} />
+        )}
       </div>
-      <fieldset
+      <div
         ref={listRef}
-        aria-labelledby={headId}
-        className="m-0 mb-2 min-h-0 min-w-0 flex-[0_1_auto] border-0 overflow-y-auto overscroll-contain px-2 pt-1 pb-1 [scrollbar-width:thin]"
+        data-slot="question-list"
+        className="mb-2 min-h-0 flex-[0_1_auto] overflow-y-auto overscroll-contain [scrollbar-width:thin]"
       >
-        {question.options.map((option, oi) => {
-          const description =
-            option.description !== undefined && option.description !== ''
-              ? option.description
-              : null;
-          const label = (
-            <OptionLabel
-              label={option.label}
-              description={description}
-              recommended={oi === 0 && option.recommended === true}
-            />
-          );
-          const on = picked.includes(option.label);
-          return multi ? (
-            <Button
-              key={oi}
-              type="button"
-              aria-pressed={on}
-              data-dock-row=""
-              data-testid={`chief-question-option-${step}-${oi}`}
-              disabled={disabled}
-              variant="ghost"
-              className={cn(ROW_CLS, ROW_BUTTON_CLS)}
-              onClick={() => choose(oi)}
-            >
-              <CheckBox on={on} />
-              {label}
-            </Button>
-          ) : (
-            <Button
-              key={oi}
-              type="button"
-              data-dock-row=""
-              data-testid={`chief-question-option-${step}-${oi}`}
-              aria-pressed={on}
-              disabled={disabled}
-              variant="ghost"
-              className={cn(ROW_CLS, ROW_BUTTON_CLS)}
-              onClick={() => choose(oi)}
-            >
+        <fieldset aria-labelledby={headId} className="m-0 min-w-0 border-0 px-2 pt-1 pb-1">
+          {question.options.map((option, oi) => {
+            const description =
+              option.description !== undefined && option.description !== ''
+                ? option.description
+                : null;
+            const label = (
+              <OptionLabel
+                label={option.label}
+                description={description}
+                recommended={oi === 0 && option.recommended === true}
+              />
+            );
+            const on = picked.includes(option.label);
+            return multi ? (
+              <Button
+                key={oi}
+                type="button"
+                aria-pressed={on}
+                data-dock-row=""
+                data-testid={`chief-question-option-${step}-${oi}`}
+                disabled={disabled}
+                variant="ghost"
+                className={cn(ROW_CLS, ROW_BUTTON_CLS)}
+                onClick={() => choose(oi)}
+              >
+                <CheckBox on={on} />
+                {label}
+              </Button>
+            ) : (
+              <Button
+                key={oi}
+                type="button"
+                data-dock-row=""
+                data-testid={`chief-question-option-${step}-${oi}`}
+                aria-pressed={on}
+                disabled={disabled}
+                variant="ghost"
+                className={cn(ROW_CLS, ROW_BUTTON_CLS)}
+                onClick={() => choose(oi)}
+              >
+                <span aria-hidden className={KEY_CLS}>
+                  {oi + 1}
+                </span>
+                {label}
+              </Button>
+            );
+          })}
+          <div
+            className={cn(
+              ROW_CLS,
+              'grid-cols-[24px_minmax(0,1fr)_auto] focus-within:bg-(--menu-hover)',
+            )}
+          >
+            {multi ? (
+              <CheckBox on={typed} />
+            ) : (
               <span aria-hidden className={KEY_CLS}>
-                {oi + 1}
+                <Pencil className="size-4" strokeWidth={1.75} />
               </span>
-              {label}
-            </Button>
-          );
-        })}
-        <div
-          className={cn(
-            ROW_CLS,
-            'grid-cols-[24px_minmax(0,1fr)_auto] focus-within:bg-(--menu-hover)',
-          )}
-        >
-          {multi ? (
-            <CheckBox on={typed} />
-          ) : (
-            <span aria-hidden className={KEY_CLS}>
-              <Pencil className="size-4" strokeWidth={1.75} />
-            </span>
-          )}
-          <Input
-            data-dock-row=""
-            data-testid={`chief-question-other-${step}`}
-            type="text"
-            autoComplete="off"
-            value={otherText}
-            disabled={disabled}
-            placeholder={freeText ? t('输入你的回答') : t('输入你自己的回答…')}
-            aria-label={freeText ? t('输入你的回答') : t('输入你自己的回答…')}
-            className={OTHER_INPUT_CLS}
-            onChange={(event) => setOther(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
-              if (event.ctrlKey || event.metaKey) return;
-              event.preventDefault();
-              advance();
-            }}
-          />
-          {!multi && (typed ? go('chief-question-submit', canAdvance) : skipButton)}
-        </div>
-      </fieldset>
+            )}
+            <Input
+              data-dock-row=""
+              data-testid={`chief-question-other-${step}`}
+              type="text"
+              autoComplete="off"
+              value={otherText}
+              disabled={disabled}
+              placeholder={freeText ? t('输入你的回答') : t('输入你自己的回答…')}
+              aria-label={freeText ? t('输入你的回答') : t('输入你自己的回答…')}
+              className={OTHER_INPUT_CLS}
+              onChange={(event) => setOther(event.target.value)}
+              onFocus={(event) =>
+                event.currentTarget.parentElement?.scrollIntoView({ block: 'nearest' })
+              }
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                if (event.ctrlKey || event.metaKey) return;
+                event.preventDefault();
+                advance();
+              }}
+            />
+            {!multi && (typed ? go('chief-question-submit', canAdvance) : skipButton)}
+          </div>
+        </fieldset>
+      </div>
       {multi && (
         <div className="flex min-h-11 flex-none items-center gap-2 border-t border-border py-2 pr-3 pl-4">
           <span

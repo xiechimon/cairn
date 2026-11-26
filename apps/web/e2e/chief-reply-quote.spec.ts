@@ -38,16 +38,20 @@ test('neither user nor Coordinator hover toolbar shows a reply button; select-to
 }) => {
   const { sent, stream } = await openChat(page);
   const source = page.locator('[data-reply-source="m6"]');
-  await source.locator('[data-slot="reply-bubble"]').first().hover();
-  const tools = source.getByTestId('chief-msg-foot');
-  await expect(tools.getByTestId('chief-msg-copy')).toBeVisible();
+  await source.hover();
+  const tools = source
+    .locator('xpath=ancestor::*[@data-slot="message"][1]')
+    .locator('[data-slot="message-meta"]');
+  await expect(tools.getByTestId('message-copy')).toBeVisible();
   await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
-  await expect(tools.getByTestId('chief-msg-more')).toHaveCount(0);
+  await expect(tools.getByRole('button')).toHaveCount(1);
 
   const ownSource = page.locator('[data-reply-source="m4"]');
   await ownSource.hover();
-  const ownTools = ownSource.locator('xpath=..').locator('[data-placement="left"]');
-  await expect(ownTools.getByTestId('chief-msg-copy')).toBeVisible();
+  const ownTools = ownSource
+    .locator('xpath=ancestor::*[@data-slot="message"][1]')
+    .locator('[data-slot="message-meta"]');
+  await expect(ownTools.getByTestId('message-copy')).toBeVisible();
   await expect(ownTools.getByTestId('chief-msg-reply')).toHaveCount(0);
 
   await replyTo(page, 'm6');
@@ -192,29 +196,24 @@ test.describe('a staged or queued quote keeps its source', () => {
     await expect(page.getByTestId('chief-question')).toBeVisible();
     const home = page.getByTestId('home-c');
     const input = home.getByTestId('chief-composer-input');
-    const answerComposer = page.getByTestId('chief-question-primary');
     const chip = page.getByTestId('chief-question').getByTestId('chief-question-option-0-1');
-    const expectOneAnswerPath = async (owner: 'answer composer' | 'question chips') => {
-      await expect(chip).toBeEnabled();
-      if (owner === 'answer composer') await expect(answerComposer).toBeVisible();
-      else await expect(answerComposer).toHaveCount(0);
-    };
-    await expectOneAnswerPath('answer composer');
+    await expect(chip).toBeEnabled();
     await replyTo(page, 'm4');
-    await expectOneAnswerPath('question chips');
+    await expect(chip).toBeEnabled();
     await input.fill('先别合');
-    await expectOneAnswerPath('question chips');
+    await expect(chip).toBeEnabled();
     await input.fill('');
     await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
     await expect(input).toBeVisible();
-    await expectOneAnswerPath('question chips');
+    await expect(chip).toBeEnabled();
     await page.getByTestId('composer-reply-quote-remove').click();
-    await expectOneAnswerPath('answer composer');
+    await expect(page.getByTestId('composer-reply-quote')).toHaveCount(0);
+    await expect(chip).toBeEnabled();
     await replyTo(page, 'm4');
-    await expectOneAnswerPath('question chips');
     await input.fill('补充一句');
     await input.press('Enter');
     await expect.poll(() => sent.at(-1)).toBe(`${OWN_WIRE}\n\n补充一句`);
     expect(answered).toEqual([]);
+    await expect(page.getByTestId('chief-question')).toBeVisible();
   });
 });

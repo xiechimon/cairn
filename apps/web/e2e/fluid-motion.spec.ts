@@ -116,9 +116,9 @@ test.describe('fluid motion system', () => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('/app');
 
-    const reply = page.locator('[data-slot="reply-block"]').first();
-    await reply.hover();
-    const copyBtn = reply.getByTestId('chief-msg-copy');
+    const reply = page.getByTestId('chief-msg').filter({ hasText: '导出已经完成' });
+    await reply.locator('[data-slot="message-bubble"]').hover();
+    const copyBtn = reply.locator('[data-slot="message-meta"]').getByTestId('message-copy');
     await expect(copyBtn).toBeVisible();
     await copyBtn.hover();
     await expect(copyBtn).toHaveCSS('transition-duration', '0s');

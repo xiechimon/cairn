@@ -31,7 +31,7 @@ async function textUnder(toolbar: Locator, root: Locator): Promise<string[]> {
   return root.evaluate((rootEl, bar) => {
     if (!(bar instanceof Element)) return ['toolbar missing'];
     const parts = [
-      ...bar.querySelectorAll('button[data-tool], [data-slot="message-toolbar-meta"]'),
+      ...bar.querySelectorAll('button, [data-testid="msg-stamp"]'),
     ].map((el) => el.getBoundingClientRect());
     const covered: string[] = [];
     const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT);
@@ -58,7 +58,7 @@ async function textUnder(toolbar: Locator, root: Locator): Promise<string[]> {
 async function visibleCopies(page: Page): Promise<number> {
   return page.evaluate(
     () =>
-      [...document.querySelectorAll('[data-testid="chief-msg-copy"], [data-tool="copy"]')].filter(
+      [...document.querySelectorAll('[data-testid="message-copy"]')].filter(
         (el) => {
           const box = el.getBoundingClientRect();
           if (box.width === 0 || box.height === 0) return false;
@@ -111,57 +111,53 @@ async function boundaryInk(reply: Locator) {
   });
 }
 
+const metaOf = (stream: Locator, id: string) =>
+  stream
+    .locator(`[data-reply-source="${id}"]`)
+    .locator('xpath=ancestor::*[@data-slot="message"][1]')
+    .locator('[data-slot="message-meta"]');
+
 for (const scheme of ['light', 'dark'] as const) {
-  test(`consecutive Coordinator replies are split by a centred time line, never a bar or hairline, and each copy floats at its own top-right without covering text (${scheme}, 1440px)`, async ({
+  test(`consecutive Coordinator replies minutes apart are separate grey bubbles with no time line, never a bar or hairline, and each meta sits beside its own bubble without covering text (${scheme}, 1440px)`, async ({
     page,
   }) => {
     const stream = await openRun(page, 1440, scheme);
     await page.mouse.move(0, 0);
-    const dividers = stream.getByTestId('chief-time-divider');
-    await expect(dividers, 'one time line between each pair of replies').toHaveCount(
-      RUN.length - 1,
+    await expect(stream.getByTestId('chief-time-divider'), 'no time line under an hour').toHaveCount(0);
+    await expect(stream.locator('[data-slot="message-bubble"][data-side="coordinator"]')).toHaveCount(
+      RUN.length,
     );
 
     for (const [n, { id }] of RUN.entries()) {
       const reply = stream.locator(`[data-reply-source="${id}"]`);
       await reply.scrollIntoViewIfNeeded();
-      const tools = reply.getByTestId('chief-msg-foot');
-      await expect(tools, `${id}: hidden at rest`).toHaveCSS('opacity', '0');
-      await expect(tools).toHaveAttribute('data-placement', 'top-end-hover');
+      const meta = metaOf(stream, id);
+      await expect(meta, `${id}: hidden at rest`).toHaveCSS('opacity', '0');
       const rest = await boxOf(reply);
 
-      await reply.locator('[data-slot="reply-block"]').first().hover();
-      await expect(tools, `${id}: shown on hover`).toHaveCSS('opacity', '1');
+      await reply.hover();
+      await expect(meta, `${id}: shown on hover`).toHaveCSS('opacity', '1');
       expect(await boundaryInk(reply), `${id}: no left bar and no hairline`).toEqual({
         bar: 0,
         hairline: 0,
       });
       expect((await boxOf(reply)).y, `${id}: hover moves nothing`).toBe(rest.y);
       await expect.poll(() => visibleCopies(page), `${id}: only this reply shows a copy`).toBe(1);
-      await expect(
-        tools.locator('[data-slot="message-toolbar-meta"]'),
-        `${id}: the time lives in the divider, not the toolbar`,
-      ).toHaveCount(0);
-      expect(await textUnder(tools, stream), `${id}: its copy covers no text`).toEqual([]);
-      const pill = await boxOf(tools);
-      expect(Math.abs(pill.x + pill.width - (rest.x + rest.width)), `${id}: pinned right`).toBeLessThanOrEqual(1);
-      expect(Math.abs(pill.y - rest.y), `${id}: level with its first line`).toBeLessThanOrEqual(2);
-      expect(
-        await isHittableCopy(tools),
-        `${id}: the copy button is reachable`,
-      ).toBe(true);
-
-      if (n > 0) {
-        const divider = await boxOf(dividers.nth(n - 1));
-        const previous = await boxOf(stream.locator(`[data-reply-source="${RUN[n - 1]?.id}"]`));
-        expect(divider.y, `${id}: the time line sits below the previous reply`).toBeGreaterThan(
-          previous.y + previous.height,
+      await expect(meta.getByTestId('msg-stamp'), `${id}: the time lives in the meta row`).toHaveText(
+        /\d{1,2}:\d{2}/,
+      );
+      expect(await textUnder(meta, stream), `${id}: its meta row covers no text`).toEqual([]);
+      const row = await boxOf(meta);
+      expect(row.x, `${id}: meta sits right of the bubble`).toBeGreaterThanOrEqual(rest.x + rest.width);
+      expect(row.y + row.height, `${id}: meta sits on the bubble's last line`).toBeLessThanOrEqual(
+        rest.y + rest.height,
+      );
+      expect(await isHittableCopy(meta), `${id}: the copy button is reachable`).toBe(true);
+      if (n + 1 < RUN.length) {
+        const next = await boxOf(stream.locator(`[data-reply-source="${RUN[n + 1]?.id}"]`));
+        expect(row.y + row.height, `${id}: the meta ends above the next bubble`).toBeLessThanOrEqual(
+          next.y,
         );
-        expect(divider.y + divider.height, `${id}: and above this reply`).toBeLessThan(rest.y);
-        expect(pill.y, `${id}: the copy never reaches the time line`).toBeGreaterThan(
-          divider.y + divider.height,
-        );
-        await expect(dividers.nth(n - 1)).toHaveText(/^(今天|昨天) \d{1,2}:\d{2}$/);
       }
       if (id === MIDDLE) await evidenceShot(page, `chief-reply-run-hover-middle-${scheme}-1440.png`);
     }
@@ -179,7 +175,10 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(await visibleCopies(page), 'no reply copy button at 390px').toBe(0);
     for (const { id } of RUN) {
       await expect(
-        stream.locator(`[data-reply-source="${id}"]`).locator('[data-tool="copy"]'),
+        stream
+          .locator(`[data-reply-source="${id}"]`)
+          .locator('xpath=ancestor::*[@data-slot="message"][1]')
+          .getByTestId('message-copy'),
         `${id}: no copy control rendered at all`,
       ).toHaveCount(0);
       expect(await boundaryInk(stream.locator(`[data-reply-source="${id}"]`))).toEqual({
@@ -187,10 +186,11 @@ for (const scheme of ['light', 'dark'] as const) {
         hairline: 0,
       });
     }
-    await expect(stream.getByTestId('chief-time-divider')).toHaveCount(RUN.length - 1);
+    await expect(stream.getByTestId('chief-time-divider')).toHaveCount(0);
 
     await reply.locator('[data-slot="reply-block"]').first().click({ button: 'right' });
     const menu = page.getByRole('menu');
+    await expect(menu.getByTestId('msg-stamp'), 'the press menu opens with the time').toBeVisible();
     await expect(menu.getByRole('menuitem')).toHaveText(['复制', '选择文字']);
     await evidenceShot(page, `chief-reply-press-menu-${scheme}-390.png`);
     await menu.getByRole('menuitem', { name: '选择文字' }).click();
@@ -215,7 +215,9 @@ test.describe('touch', () => {
     const stream = await openRun(page, 390, 'light');
     const reply = stream.locator(`[data-reply-source="${MIDDLE}"]`);
     await reply.scrollIntoViewIfNeeded();
-    await expect(reply.locator('[data-tool="copy"]')).toHaveCount(0);
+    await expect(
+      reply.locator('xpath=ancestor::*[@data-slot="message"][1]').getByTestId('message-copy'),
+    ).toHaveCount(0);
     await reply.locator('[data-slot="reply-block"]').first().tap();
     await expect(page.getByRole('menu'), 'a tap opens nothing').toHaveCount(0);
     expect(await visibleCopies(page), 'a tap reveals no copy row').toBe(0);
@@ -239,7 +241,7 @@ test.describe('touch', () => {
 });
 
 async function isHittableCopy(tools: Locator): Promise<boolean> {
-  return tools.locator('[data-tool="copy"]').evaluate((el) => {
+  return tools.getByTestId('message-copy').evaluate((el) => {
     const box = el.getBoundingClientRect();
     const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
     return top !== null && el.contains(top);
@@ -252,15 +254,15 @@ test('a task transcript reply keeps its action row clear of the next row (1440px
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(REVIEW_TASK);
-  const rows = page.locator('.chat-row--agent[data-tools-root]');
+  const rows = page.locator('.chat-row--agent:has([data-slot="message-meta"])');
   await expect(rows.first()).toBeVisible();
   const transcript = page.locator('body');
   const count = await rows.count();
   for (let n = 0; n < count; n++) {
     const row = rows.nth(n);
     await row.scrollIntoViewIfNeeded();
-    await row.locator('[data-slot="reply-block"]').first().hover();
-    const tools = row.getByTestId('msg-tools');
+    await row.getByTestId('agent-text').first().hover();
+    const tools = row.locator('[data-slot="message-meta"]');
     await expect(tools).toHaveCSS('opacity', '1');
     expect(await textUnder(tools, transcript), `agent row ${n}: action row covers no text`).toEqual(
       [],

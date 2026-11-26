@@ -181,7 +181,6 @@ export const chiefAgentChip: FixtureSet = {
     threadTitle: '验证一下凭证链路…',
     agent: { id: R3_BUILDER.id, displayName: R3_BUILDER.displayName, avatarUrl: null },
     stream: [
-      { kind: 'note', text: '17:26' },
       { kind: 'user', text: '验证一下凭证链路，然后给我一份报告' },
       {
         kind: 'robot',

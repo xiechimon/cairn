@@ -115,7 +115,7 @@ for (const hit of hits) {
 }
 
 const NOTICE_MODULE = 'apps/web/src/components/chat/notice-line.tsx';
-const MESSAGE_BODY_MODULE = 'apps/web/src/components/chat/message-body.tsx';
+const MESSAGE_BODY_MODULE = 'apps/web/src/components/chat/message-bubble.tsx';
 const SHARED_NOTICE_MODULES = new Set([NOTICE_MODULE]);
 const SHARED_MESSAGE_MODULES = new Set([MESSAGE_BODY_MODULE]);
 const CONVERSATION_TERRITORY =
@@ -149,7 +149,7 @@ for (const path of files) {
   }
   if (!SHARED_MESSAGE_MODULES.has(file) && FORBIDDEN_MESSAGE_NAME.test(code)) {
     failures.push(
-      `[ui-consumer-shape-gate] C3 ${file}: role-specific message body is declared outside ${MESSAGE_BODY_MODULE}; use ChatMessageBody role variants instead.`,
+      `[ui-consumer-shape-gate] C3 ${file}: role-specific message body is declared outside ${MESSAGE_BODY_MODULE}; use MessageBubble with its side instead.`,
     );
   }
   if (
@@ -182,7 +182,7 @@ for (const path of files) {
   }
   if (!SHARED_MESSAGE_MODULES.has(file) && code.includes('data-slot="user-bubble"')) {
     failures.push(
-      `[ui-consumer-shape-gate] C3 ${file}: user message bubble is rendered outside ChatMessageBody.`,
+      `[ui-consumer-shape-gate] C3 ${file}: user message bubble is rendered outside MessageBubble.`,
     );
   }
   if (
@@ -192,7 +192,7 @@ for (const path of files) {
     )
   ) {
     failures.push(
-      `[ui-consumer-shape-gate] C3 ${file}: user bubble shape/fill pair is forked outside ChatMessageBody.`,
+      `[ui-consumer-shape-gate] C3 ${file}: user bubble shape/fill pair is forked outside MessageBubble.`,
     );
   }
 }

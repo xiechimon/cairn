@@ -2,8 +2,8 @@ import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, test } from 'vitest';
-import { DecisionDock } from '../src/chief/decision-dock.js';
 import { QuestionReceipt } from '../src/chief/question-answered-line.js';
+import { QuestionCard } from '../src/chief/question-card.js';
 import type { ChiefQuestionItem } from '../src/chief/question-item.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
@@ -38,19 +38,18 @@ function ask(over: Partial<ChiefQuestionItem['questions'][number]> = {}): ChiefQ
   };
 }
 
-const dock = (item: ChiefQuestionItem) =>
+const card = (item: ChiefQuestionItem) =>
   page(
-    createElement(DecisionDock, {
+    createElement(QuestionCard, {
       item,
       onAnswer: () => {},
       onCancel: () => {},
-      onMinimize: () => {},
     }),
   );
 
-describe('a docked question', () => {
+describe('a question card in the conversation', () => {
   test('shows every option with its description, the recommended one first and tagged, none picked', () => {
-    const html = dock(ask());
+    const html = card(ask());
     const first = html.lastIndexOf('<', html.indexOf('data-testid="chief-question-option-0-0"'));
     expect(text(html.slice(first))).toMatch(/^1Alphabetical推荐Easier to scan2Board orderSame as the columns on screen/);
     expect(html.match(/data-testid="chief-question-recommended"/g)).toHaveLength(1);
@@ -58,7 +57,7 @@ describe('a docked question', () => {
   });
 
   test('multi-select rows are checkboxes with a count, Skip and a disabled submit', () => {
-    const html = dock(ask({ multiSelect: true }));
+    const html = card(ask({ multiSelect: true }));
     expect(html.match(/data-slot="dock-check"/g)).toHaveLength(3);
     expect(html).not.toContain('aria-pressed="true"');
     expect(text(html)).toContain('已选 0 个');
@@ -66,11 +65,11 @@ describe('a docked question', () => {
     expect(html).toMatch(/data-testid="chief-question-submit"[^>]*disabled=""|disabled=""[^>]*data-testid="chief-question-submit"/);
   });
 
-  test('offers an Other input and Skip, and a minimize button', () => {
-    const html = dock(ask());
+  test('offers an Other input and Skip, and no collapse button', () => {
+    const html = card(ask());
     expect(html).toContain('data-testid="chief-question-other-0"');
     expect(html).toContain('data-testid="chief-question-skip"');
-    expect(html).toContain('data-testid="chief-question-minimize"');
+    expect(html).not.toContain('chief-question-minimize');
   });
 });
 

@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "8dd71508f0f0b0bd4e42f6c552789d0ad18098a3",
+    "sha": "88c6a552a7871f0c8419d1c0b0bfb08e8f74ef00",
     "date": "2026-11-26"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -78,7 +78,7 @@
       "upstreamItem": "context-menu",
       "status": "deviated",
       "reason": "Cut down to the four parts the Coordinator reply's press menu uses (Root, Trigger, Content, Item); same deviations as dropdown-menu.tsx: #733 single z ladder (z-(--z-dialog)), the paper menu face from menu.ts (MENU_SURFACE_CLS, MENU_ITEM_CLS with 44px rows under a coarse pointer) and the dropdown's open/close motion.",
-      "hash": "fb82eef51b67e5774cb229ad9c1a5dc69e2d2844d249b19864cb5ae28a2aab69"
+      "hash": "be9efd67dfd87b72c16981e32edd016db8f0b8e7c80882999e303230801bf973"
     },
     "dialog-shell.tsx": {
       "kind": "adapter",

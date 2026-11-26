@@ -158,6 +158,7 @@ for (const surface of SURFACES) {
           continue;
         }
         if (contentBoxes(row).length < 2) continue;
+        if (row.querySelector('[data-slot="message-meta"]') !== null) continue;
         const blank = Math.max(own.left, own.right);
         if (blank / own.box.width < 0.4) continue;
         const fullSibling = [...parent.children].some((sibling) => {

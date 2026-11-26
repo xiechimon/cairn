@@ -302,7 +302,7 @@ test('a task the reply names in its sentence adds no line, then or for its later
   await expect(stream.locator('a[data-slot="task-mention"]')).toHaveCount(2);
 });
 
-test('a split request the reply does not name gets one 已建任务 line with both task words; the code word says what it waits for', async ({
+test('a split request hangs both tasks on the trunk above the reply, in order; the code task says what it waits for', async ({
   page,
 }) => {
   const research = {
@@ -329,13 +329,19 @@ test('a split request the reply does not name gets one 已建任务 line with bo
     todos: [research, { ...TASK, phase: 'queued', blockedBy: [research.id] }],
   });
   await page.goto('/app');
-  const said = page.getByTestId('home-c').getByTestId('chief-task-started-said');
-  await expect(said).toHaveCount(1);
-  const words = said.locator('a[data-slot="task-mention"]');
-  await expect(words).toHaveText(['Research export formats', TASK.title]);
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await expect(stream.getByTestId('chief-task-started-said')).toHaveCount(0);
+  await expect(stream).not.toContainText('已建任务');
+  const trunk = stream.getByTestId('chief-task-trunk');
+  await expect(trunk).toHaveCount(1);
+  const refs = trunk.getByTestId('chief-task-ref');
+  await expect(refs).toHaveText([/Research export formats/, new RegExp(TASK.title)]);
   await expect(page.locator('[data-grow]')).toHaveCount(0);
-  await words.nth(1).hover();
-  await expect(page.getByTestId('task-mention-tip')).toContainText('等「Research export formats」');
+  const reply = stream.getByTestId('chief-reply').filter({ hasText: 'Split in two' });
+  expect((await trunk.boundingBox())!.y).toBeLessThan((await reply.boundingBox())!.y);
+  await expect(refs.nth(1)).toHaveAccessibleName(/等「Research export formats」/);
+  await refs.nth(1).hover();
+  await expect(page.getByTestId('chief-task-ref-hover')).toContainText('等「Research export formats」');
 });
 
 test('a research report is one card under its research row; hover shows a summary and a click opens the document', async ({
@@ -474,7 +480,7 @@ test('a research card in Made opens its report as a document; one with no report
   await expect(page.getByTestId('research-report-doc')).toHaveCount(0);
 });
 
-test('a task created with no reply after it stands as one 已建任务 line with its word', async ({ page }) => {
+test('a task created with no reply after it stands as one task row with its live state', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -485,11 +491,13 @@ test('a task created with no reply after it stands as one 已建任务 line with
   });
   await page.goto('/app');
   const started = page.getByTestId('home-c').getByTestId('chief-task-started');
-  await expect(started.getByTestId('chief-task-started-said')).toHaveText(/^已建任务\s*Create HELLO\.md$/);
-  await expect(started.locator('a[data-slot="task-mention"]')).toHaveAttribute('data-phase', 'building');
+  await expect(started).not.toContainText('已建任务');
+  const ref = started.getByTestId('chief-task-ref');
+  await expect(ref).toHaveText(/^Create HELLO\.md/);
+  await expect(ref).toHaveAttribute('data-phase', 'building');
 });
 
-test('an archived task keeps its word in the 已建任务 line', async ({ page }) => {
+test('an archived task keeps its word in its task row', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -502,10 +510,11 @@ test('an archived task keeps its word in the 已建任务 line', async ({ page }
   await page.goto('/app');
   const started = page.getByTestId('home-c').getByTestId('chief-task-started');
   await expect(started.locator('a[data-slot="task-mention"]')).toHaveText('Create HELLO.md');
+  await expect(started).not.toContainText('已建任务');
   await expect(page.getByTestId('chief-task-created')).toHaveCount(0);
 });
 
-test('a task archived in the same turn leaves no card and the next task gets the line under the reply', async ({
+test('a task archived in the same turn leaves no row and the next task hangs on the trunk above the reply', async ({
   page,
 }) => {
   const dropped = { ...TASK, id: 'todo-old', seqNum: 9, title: 'Draft the old brief' };
@@ -546,12 +555,13 @@ test('a task archived in the same turn leaves no card and the next task gets the
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   await expect(stream.getByTestId('chief-task-started')).toHaveCount(0);
   await expect(stream.getByTestId('chief-task-created')).toHaveCount(0);
-  const said = stream.getByTestId('chief-task-started-said');
-  await expect(said).toHaveCount(1);
-  await expect(said.locator('a[data-slot="task-mention"]')).toHaveText(['Draft the new brief']);
-  const line = await said.boundingBox();
-  const bubble = await stream.getByTestId('chief-reply-bubble').first().boundingBox();
-  expect(line?.y ?? 0).toBeGreaterThanOrEqual((bubble?.y ?? 0) + (bubble?.height ?? 0));
+  await expect(stream.getByTestId('chief-task-started-said')).toHaveCount(0);
+  const trunk = stream.getByTestId('chief-task-trunk');
+  await expect(trunk).toHaveCount(1);
+  await expect(trunk.getByTestId('chief-task-ref')).toHaveText([/Draft the new brief/]);
+  const line = await trunk.boundingBox();
+  const bubble = await stream.getByTestId('chief-reply').first().boundingBox();
+  expect((line?.y ?? 0) + (line?.height ?? 0)).toBeLessThanOrEqual(bubble?.y ?? 0);
 });
 
 test('C27: a research report copies as its Markdown source from the artifact panel toolbar', async ({ page }) => {

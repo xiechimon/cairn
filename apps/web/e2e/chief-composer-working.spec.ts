@@ -214,7 +214,7 @@ test('project channel renders reply footer parity and channel usage stats on des
   const bubble = page.getByTestId('chief-reply-bubble').first();
   await expect(bubble).toBeVisible();
   await bubble.hover();
-  await expect(page.getByTestId('chief-msg-foot').first()).toBeVisible();
+  await expect(page.locator('[data-slot="message-meta"]').first()).toHaveCSS('opacity', '1');
   await page.getByTestId('home-c').getByTestId('composer-context-meter').click();
   const stats = page.getByTestId('channel-usage-stats');
   await expect(stats).toBeVisible();

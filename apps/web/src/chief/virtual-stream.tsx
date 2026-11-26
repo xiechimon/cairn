@@ -5,14 +5,7 @@ import {
   useVirtualizer,
   type VirtualItem,
 } from '@tanstack/react-virtual';
-import {
-  type ReactNode,
-  type RefObject,
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { FOLLOW_THRESHOLD } from '../components/chat/jump-to-latest.js';
 import {
   useMessageScroller,
@@ -24,11 +17,14 @@ import { useReaderLeft } from './reader-follow.js';
 const ESTIMATED_ROW_HEIGHT = 120;
 const OVERSCAN = 4;
 
-function keepNewestRowMounted(range: Range): number[] {
-  const indexes = defaultRangeExtractor(range);
+const NO_PINS: readonly number[] = [];
+
+function keepMounted(range: Range, pinned: readonly number[]): number[] {
+  const kept = new Set(defaultRangeExtractor(range));
   const newest = range.count - 1;
-  if (newest >= 0 && indexes[indexes.length - 1] !== newest) indexes.push(newest);
-  return indexes;
+  if (newest >= 0) kept.add(newest);
+  for (const index of pinned) if (index >= 0 && index < range.count) kept.add(index);
+  return [...kept].sort((a, b) => a - b);
 }
 
 interface StreamSnapshot {
@@ -65,16 +61,19 @@ function saveSnapshot(cacheKey: string, snapshot: StreamSnapshot): void {
   }
 }
 
+const scrollViewportOf = (list: HTMLElement | null): HTMLElement | null =>
+  list?.closest<HTMLElement>('[data-slot="message-scroller-viewport"]') ?? null;
+
 export function VirtualStream({
   cacheKey,
   keys,
+  pinned = NO_PINS,
   renderRow,
-  viewportRef,
 }: {
   cacheKey: string;
   keys: readonly (string | number)[];
+  pinned?: readonly number[];
   renderRow: (index: number) => ReactNode;
-  viewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [restored] = useState(() => readSnapshot(cacheKey));
@@ -84,11 +83,11 @@ export function VirtualStream({
   const readerLeft = useReaderLeft();
   const virtualizer = useVirtualizer({
     count: keys.length,
-    getScrollElement: () => viewportRef.current,
+    getScrollElement: () => scrollViewportOf(listRef.current),
     estimateSize: () => ESTIMATED_ROW_HEIGHT,
     getItemKey: (index) => keys[index] ?? index,
     overscan: OVERSCAN,
-    rangeExtractor: keepNewestRowMounted,
+    rangeExtractor: useCallback((range: Range) => keepMounted(range, pinned), [pinned]),
     anchorTo: 'end',
     initialOffset: Number.MAX_SAFE_INTEGER,
     initialMeasurementsCache: restored?.items ?? [],
@@ -109,7 +108,7 @@ export function VirtualStream({
   });
   useLayoutEffect(() => {
     const list = listRef.current;
-    const viewport = viewportRef.current;
+    const viewport = scrollViewportOf(list);
     if (list === null || viewport === null) return;
     const top = Math.round(
       list.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop,
@@ -117,10 +116,8 @@ export function VirtualStream({
     if (top !== scrollMargin) setScrollMargin(top);
   });
   useLayoutEffect(() => {
-    const viewport = listRef.current?.closest<HTMLElement>(
-      '[data-slot="message-scroller-viewport"]',
-    );
-    if (viewport != null) viewport.scrollTop = viewport.scrollHeight;
+    const viewport = scrollViewportOf(listRef.current);
+    if (viewport !== null) viewport.scrollTop = viewport.scrollHeight;
   }, []);
   useLayoutEffect(
     () => () => {

@@ -233,14 +233,14 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(msgs).toHaveCount(3);
 
     const final = msgs.nth(1);
-    const finalFoot = final.getByTestId('chief-msg-foot');
-    await expect(finalFoot.getByTestId('chief-msg-copy')).toBeVisible();
+    const finalFoot = final.locator('[data-slot="message-meta"]');
+    await final.getByTestId('chief-reply').hover();
+    await expect(finalFoot.getByTestId('message-copy')).toBeVisible();
     await expect(finalFoot.getByTestId('chief-msg-reply')).toHaveCount(0);
-    await expect(finalFoot.getByTestId('chief-msg-more')).toHaveCount(0);
     await expect(finalFoot).not.toContainText('完成');
 
     const typing = msgs.nth(2);
-    await expect(typing.getByTestId('chief-msg-foot')).toHaveCount(0);
+    await expect(typing.locator('[data-slot="message-meta"]')).toHaveCount(0);
     await expect(typing.locator('strong')).toHaveText('relay 通道');
   });
 
@@ -250,7 +250,8 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(userRow.locator('img')).toHaveCount(0);
     await expect(userRow.locator('> svg')).toHaveCount(0);
     const bubble = userRow.getByTestId('chief-bubble');
-    await expect(bubble).toHaveAttribute('data-slot', 'user-bubble');
+    await expect(bubble).toHaveAttribute('data-slot', 'message-bubble');
+    await expect(bubble).toHaveAttribute('data-side', 'owner');
     await expect(bubble).toHaveCSS('background-image', 'none');
 
     const overflow = await page
@@ -275,10 +276,12 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(stream.getByTestId('chief-task-started-said')).toHaveCount(0);
     await expect(stream).not.toContainText('r5-scribe');
 
-    const tools = stream.getByTestId('chief-msg-tools');
-    await expect(tools.getByRole('button')).toHaveCount(2);
-    await expect(tools.getByTestId('chief-msg-copy')).toHaveCount(1);
-    await expect(tools.getByTestId('chief-msg-more')).toHaveCount(1);
+    const tools = stream
+      .getByTestId('chief-msg')
+      .filter({ has: page.getByTestId('chief-bubble') })
+      .locator('[data-slot="message-meta"]');
+    await expect(tools.getByRole('button')).toHaveCount(1);
+    await expect(tools.getByTestId('message-copy')).toHaveCount(1);
   });
 
   test('F-R15: a Coordinator reply carries no identity row (D122)', async ({ page }) => {
@@ -371,17 +374,17 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expect(children.getByTestId('md-code')).toContainText('pnpm migrate');
   });
 
-  test('F-R15: copy payload = markdown source (not rendered output); the tool row (copy/more) is unaffected', async ({
+  test('F-R15: copy payload = markdown source (not rendered output); the tool row (time and copy) is unaffected', async ({
     page,
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     const coordinator = await boot(page);
     const firstUser = coordinator.getByTestId('chief-msg').first();
-    const tools = firstUser.getByTestId('chief-msg-tools');
+    const tools = firstUser.locator('[data-slot="message-meta"]');
     await firstUser.getByTestId('chief-bubble').hover();
     await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
-    await expect(tools.getByTestId('chief-msg-more')).toBeVisible();
-    await tools.getByTestId('chief-msg-copy').click();
+    await expect(tools.getByRole('button')).toHaveCount(1);
+    await tools.getByTestId('message-copy').click();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
 
     expect(clip).toBe(MD_USER);

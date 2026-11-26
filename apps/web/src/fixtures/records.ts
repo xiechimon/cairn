@@ -649,6 +649,7 @@ export type ChiefStreamItem =
       answers: { header: string; choices?: string[]; text?: string }[] | null;
       cancelReason?: string;
       todoId?: string;
+      createdAt?: number;
     }
   | {
       kind: 'user';

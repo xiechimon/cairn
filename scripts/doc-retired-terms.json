@@ -41,6 +41,18 @@
       "pattern": "\\bspec[/ ]22 §\\s?5",
       "canary": "spec/22 §5",
       "reason": "section 5 of spec 22 was deleted; the component under apps/web/src/components/ui is the canon"
+    },
+    {
+      "id": "decision-dock",
+      "pattern": "\\bDecisionDock\\b|\\bdecision-dock\\b",
+      "canary": "apps/web/src/chief/decision-dock.tsx",
+      "reason": "pending questions and approvals are QuestionCard rows in the transcript; nothing docks above the composer"
+    },
+    {
+      "id": "restore-to-here",
+      "pattern": "恢复到此处",
+      "canary": "`恢复到此处` for owner messages",
+      "reason": "the owner removed restoring a conversation to a message on 2026-11-26; failed turns retry from the failure card"
     }
   ],
   "baseline": {
@@ -81,6 +93,8 @@
     "design-rules-file": {},
     "doc-drift-sweep": {},
     "chief-stop-waiting-to-retry": {},
-    "spec22-retirement-table": {}
+    "spec22-retirement-table": {},
+    "decision-dock": {},
+    "restore-to-here": {}
   }
 }

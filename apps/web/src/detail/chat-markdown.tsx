@@ -485,9 +485,9 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
   );
 }
 
-export const REPLY_TEXT_CLS =
-  'w-fit max-w-[min(100%,var(--container-reply))] rounded-sm font-reply text-reply font-normal text-pretty [&_ol]:leading-6 [&_ul]:leading-6 [overflow-wrap:anywhere] data-reply-highlight:bg-(--reply-bubble-highlight) data-reply-highlight:outline-8 data-reply-highlight:outline-solid data-reply-highlight:outline-(--reply-bubble-highlight)';
-export const REPLY_BLOCK_CLS = 'relative w-fit max-w-[min(100%,var(--container-reply))]';
+const REPLY_TEXT_CLS =
+  'w-fit max-w-full rounded-sm text-pretty [overflow-wrap:anywhere] data-reply-highlight:bg-(--reply-bubble-highlight) data-reply-highlight:outline-4 data-reply-highlight:outline-solid data-reply-highlight:outline-(--reply-bubble-highlight)';
+const REPLY_BLOCK_CLS = 'relative w-fit max-w-full';
 
 const isDiffFence = (group: ChatBubbleGroup) =>
   group.blocks.length === 1 &&

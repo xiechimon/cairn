@@ -17,7 +17,7 @@ function question(requestId: string, header: string, text: string, options: unkn
   };
 }
 
-test('two pending decisions are answered one at a time above the composer; the recommended option is first and answering it resumes the thread (#1784)', async ({
+test('two pending decisions are two cards in the conversation; the recommended option is first and answering one leaves the other waiting (#1784)', async ({
   page,
 }) => {
   const answered: { requestId: string; body: unknown }[] = [];
@@ -58,27 +58,34 @@ test('two pending decisions are answered one at a time above the composer; the r
   });
   await page.goto('/app');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-text')).toContainText('Which model?');
-  const panel = page.getByTestId('chief-question');
-  const card = panel;
-  await expect(panel).toHaveAccessibleName('待回答的提问');
+  const stream = page.getByTestId('chief-stream');
+  const card = stream.locator('[data-testid="chief-question"][data-request-id="ask-0000000a"]');
+  const other = stream.locator('[data-testid="chief-question"][data-request-id="ask-0000000b"]');
+  await expect(card.getByTestId('chief-question-text')).toContainText('Which model?');
+  await expect(other.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(card).toHaveAccessibleName('待回答的提问');
   await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Claude subscription');
   await expect(card.getByTestId('chief-question-option-0-0').getByTestId('chief-question-recommended')).toHaveText('推荐');
   await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Verified');
   await expect(card.getByTestId('chief-question-option-0-1')).toContainText('wokey');
   await expect(card.getByTestId('chief-question-other-0')).toBeVisible();
-  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
+  await expect(other.getByTestId('chief-question-other-0')).toBeVisible();
+  await expect(page.getByTestId('chief-composer-input')).not.toHaveAttribute(
+    'placeholder',
+    'relay-186 cannot run glm-5.3-flash. Which model?',
+  );
   await card.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({
     requestId: 'ask-0000000a',
     body: { answers: [{ header: 'Model · #74', choices: ['Claude subscription'] }] },
   });
+  await expect(card).toHaveCount(0);
   await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
-  await expect(panel.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(other.getByTestId('chief-question-text')).toContainText('Who merges it?');
 });
 
-test('own words: the composer text is the answer', async ({ page }) => {
+test('own words: the card text row is the answer', async ({ page }) => {
   const answered: unknown[] = [];
   await mockLive(
     page,
@@ -100,14 +107,14 @@ test('own words: the composer text is the answer', async ({ page }) => {
   await page.goto('/app');
   const card = page.getByTestId('chief-question');
   await expect(card).toBeVisible();
-  await page.getByTestId('chief-composer-input').fill('Use the metered key this once');
-  await page.getByTestId('chief-question-primary').click();
+  await card.getByTestId('chief-question-other-0').fill('Use the metered key this once');
+  await card.getByTestId('chief-question-submit').click();
   await expect
     .poll(() => answered)
     .toEqual([{ answers: [{ header: 'Model · #74', choices: ['Use the metered key this once'] }] }]);
 });
 
-test('pending questions show one at a time and the tasks panel rows move between them', async ({ page }) => {
+test('every pending question shows as its own card and the tasks panel rows bring each one into view', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -123,15 +130,18 @@ test('pending questions show one at a time and the tasks panel rows move between
     todos: [],
   });
   await page.goto('/app');
-  const dock = page.getByTestId('chief-question');
-  await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
-  await expect(dock.getByTestId('chief-question-text')).toHaveCount(1);
+  const stream = page.getByTestId('chief-stream');
+  const first = stream.locator('[data-testid="chief-question"][data-request-id="ask-0000000a"]');
+  const second = stream.locator('[data-testid="chief-question"][data-request-id="ask-0000000b"]');
+  await expect(first.getByTestId('chief-question-text')).toContainText('Which model?');
+  await expect(second.getByTestId('chief-question-text')).toContainText('Who merges it?');
   await page.getByTestId('home-c').getByRole('button', { name: /^任务/ }).first().click();
   const rows = page
     .getByRole('complementary', { name: '任务' })
     .locator('[data-section="needs_input"] [data-slot="task-row"]');
-  await rows.filter({ hasText: 'Merge · #2271' }).click();
-  await expect(dock.getByTestId('chief-question-text')).toContainText('Who merges it?');
   await rows.filter({ hasText: 'Model · #74' }).click();
-  await expect(dock.getByTestId('chief-question-text')).toContainText('Which model?');
+  await expect(first).toBeInViewport();
+  await rows.filter({ hasText: 'Merge · #2271' }).click();
+  await expect(second).toBeInViewport();
+  await expect(page.getByTestId('chief-composer-input')).toHaveValue('');
 });

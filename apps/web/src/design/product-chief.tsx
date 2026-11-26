@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
-import { DecisionDock } from '../chief/decision-dock.js';
 import { QuestionReceipt } from '../chief/question-answered-line.js';
+import { QuestionCard } from '../chief/question-card.js';
 import { ChatChartBlock, ChatChartSkeleton } from '../components/chat/chat-chart.js';
 import { DiffGlanceBlock, DiffGlanceSkeleton } from '../components/chat/diff-glance.js';
 import {
@@ -23,21 +23,19 @@ export function ProductChiefSection() {
       lede="The Coordinator's parts: questions it asks you, the home summary line, and outage banners."
     >
       <Specimen
-        id="decision-dock"
-        title="Decision dock"
+        id="question-card"
+        title="Question card"
         note={
           last ??
-          'DecisionDock: docked above the composer; numbered rows with descriptions, the first tagged recommended and never preselected, an Other input, Skip; answered or skipped, one receipt stays in the conversation'
+          'QuestionCard: a card in the conversation where the Coordinator asked; numbered rows with descriptions, the first tagged recommended and never preselected, an Other input, Skip; answered or skipped, one receipt stays in its place'
         }
         stage="canvas"
         className="flex-col"
       >
         <Labeled label="Pending, two steps, the second is multi-select">
           <div className="w-160">
-            <DecisionDock
+            <QuestionCard
               item={QUESTION_PENDING}
-              pager={null}
-              onMinimize={() => setLast('Minimized')}
               onAnswer={({ answers }) =>
                 setLast(
                   `Answered: ${answers.map((a) => a.choices?.join(' + ') ?? a.text).join(' / ')}`,

@@ -119,13 +119,6 @@ const TYPE = [
     weight: 400,
   },
   {
-    name: 'Reply',
-    cls: 'font-reply text-reply font-normal',
-    sample: 'The retry budget is only 3 seconds, so a cross-region blip times out.',
-    token: '--type-card-title',
-    weight: 400,
-  },
-  {
     name: 'Card title',
     cls: 'text-card-title font-semibold',
     sample: 'Wire weekly review packs into the digest job',

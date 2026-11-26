@@ -7,7 +7,6 @@ import { ChiefStreamRow } from '../src/chief/chief-message-rows.js';
 import {
   foldTaskCards,
   placeReportCards,
-  placeUnmentionedTasks,
   todoGlanceOf,
 } from '../src/chief/chief-task-refs.js';
 import { collapseThinkingRuns, groupThreadEvents } from '../src/chief/thread-activity.js';
@@ -117,10 +116,6 @@ describe('research a stuck retry opened', () => {
   ])[0]!;
   const rows = [{ item: reply, i: 0 }];
   const startedBy = new Map([[reply, ['code', 'stuck', 'legacy']]]);
-
-  test('adds no task line, while the code task and an old research task are named under the reply', () => {
-    expect(placeUnmentionedTasks(rows, startedBy, map).get(reply)).toEqual(['code', 'legacy']);
-  });
 
   test('adds no report line to the reply', () => {
     const reports = placeReportCards(rows, startedBy, map, new Set()).get(reply) ?? [];
@@ -297,9 +292,6 @@ describe('consecutive thinking collapse in a Coordinator turn', () => {
               children: createElement(MessageScroller, {
                 children: createElement(ChiefStreamRow, {
                   item,
-                  index: 0,
-                  onCopy: () => {},
-                  onRewindRequest: () => {},
                 }),
               }),
             }),

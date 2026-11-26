@@ -83,13 +83,13 @@ test('headings, inline styles, quote and a task list with the dashed-circle and 
   await expect(message).not.toContainText('~~');
 });
 
-test('C31: a Coordinator reply sits on the page in the reply serif; the owner keeps the sand bubble in the sans', async ({
+test('C31: a Coordinator reply sits in the grey reply bubble and the owner keeps the sand bubble, both in the one sans', async ({
   page,
 }) => {
   await page.goto('/app?scenario=chief-voice');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   const reply = stream.getByTestId('chief-msg').filter({ hasText: '压测结果整理好了' });
-  await expect(reply.getByTestId('chief-reply-bubble').first()).toBeVisible();
+  await expect(reply.getByTestId('chief-reply').first()).toBeVisible();
   const look = await page.evaluate(() => {
     const resolve = (prop: 'fontFamily' | 'backgroundColor', value: string) => {
       const probe = document.createElement('div');
@@ -102,25 +102,30 @@ test('C31: a Coordinator reply sits on the page in the reply serif; the owner ke
     const style = (el: Element | null) => {
       if (el === null) return null;
       const css = getComputedStyle(el);
-      return { background: css.backgroundColor, font: css.fontFamily };
+      return { background: css.backgroundColor, font: css.fontFamily, size: css.fontSize };
     };
     const coordinator = [
       ...document.querySelectorAll(
-        '[data-testid="chief-stream"] [data-testid="chief-reply-bubble"], [data-testid="chief-stream"] [data-testid="chief-handoff"]',
+        '[data-testid="chief-stream"] [data-slot="message-bubble"][data-side="coordinator"]',
       ),
     ].map(style);
     const owner = [
-      ...document.querySelectorAll('[data-testid="chief-stream"] [data-slot="user-bubble"]'),
+      ...document.querySelectorAll(
+        '[data-testid="chief-stream"] [data-slot="message-bubble"][data-side="owner"]',
+      ),
     ].map(style);
     const table = style(document.querySelector('[data-testid="chief-stream"] [data-testid="md-table"]'));
-    const para = document.querySelector('[data-testid="chief-stream"] [data-testid="chief-reply-bubble"] .chat-para');
-    const item = document.querySelector('[data-testid="chief-stream"] [data-testid="chief-reply-bubble"] li');
+    const para = document.querySelector('[data-testid="chief-stream"] [data-testid="chief-reply"] .chat-para');
+    const item = document.querySelector('[data-testid="chief-stream"] [data-testid="chief-reply"] li');
     const metrics = (el: Element | null) =>
-      el === null ? null : { size: getComputedStyle(el).fontSize, line: getComputedStyle(el).lineHeight };
+      el === null ? null : { size: getComputedStyle(el).fontSize, family: getComputedStyle(el).fontFamily };
     return {
-      serif: resolve('fontFamily', 'var(--font-songti-serif)'),
       sans: resolve('fontFamily', 'var(--font-sans)'),
       sand: resolve('backgroundColor', 'var(--bubble-fill)'),
+      grey: resolve('backgroundColor', 'var(--reply-bubble-fill)'),
+      serifLeft: [...document.querySelectorAll('[data-testid="chief-stream"] *')].filter((el) =>
+        getComputedStyle(el).fontFamily.includes('sourceSerif4'),
+      ).length,
       coordinator,
       owner,
       table,
@@ -130,18 +135,22 @@ test('C31: a Coordinator reply sits on the page in the reply serif; the owner ke
   });
   expect(look.coordinator.length).toBeGreaterThanOrEqual(3);
   for (const said of look.coordinator) {
-    expect(said?.background, 'C31: a Coordinator reply has no background').toBe('rgba(0, 0, 0, 0)');
-    expect(said?.font, 'C31: a Coordinator reply is set in the reply serif').toBe(look.serif);
+    expect(said?.background, 'C31: a Coordinator reply sits in the grey reply bubble').toBe(look.grey);
+    expect(said?.font, 'C31: a Coordinator reply is set in the sans').toBe(look.sans);
   }
-  expect(look.serif, 'C31: the reply serif token resolves').toMatch(/^"?sourceSerif4"?, "Songti SC"/);
+  expect(look.serifLeft, 'C31: no serif is left in the conversation').toBe(0);
   expect(look.owner.length).toBe(4);
   for (const own of look.owner) {
     expect(own?.background, 'C31: the owner keeps the sand bubble').toBe(look.sand);
-    expect(own?.font, 'C31: the owner bubble stays in the sans').toBe(look.sans);
+    expect(own?.font, 'C31: the owner bubble is set in the same sans').toBe(look.sans);
+    expect(own?.size, 'C31: both sides share one size').toBe(look.coordinator[0]?.size);
   }
   expect(look.table?.font, 'C31: a table stays in the sans').toBe(look.sans);
-  expect(look.para, 'C31: reply prose is 15/28').toEqual({ size: '15px', line: '28px' });
-  expect(look.item, 'C31: a list inside a reply keeps a 24px line').toEqual({ size: '15px', line: '24px' });
+  expect(look.para, 'C31: reply prose is the bubble size in the sans').toEqual({
+    size: look.coordinator[0]?.size,
+    family: look.sans,
+  });
+  expect(look.item?.size, 'C31: a list inside a reply keeps the bubble size').toBe(look.coordinator[0]?.size);
   await expect(stream.getByTestId('md-code-block')).toHaveCount(1);
   await expect(stream.getByTestId('chief-turn-error')).toHaveCount(1);
 });

@@ -35,7 +35,7 @@ const CARD = {
 
 test.use({ colorScheme: 'light', viewport: { width: 1440, height: 900 } });
 
-test('an outbound approval card says the action in one sentence, quotes the body and sends on click', async ({
+test('an outbound approval card in the conversation says the action in one sentence, quotes the body and sends on click, and never takes over the composer', async ({
   page,
 }) => {
   const answers: unknown[] = [];
@@ -56,7 +56,10 @@ test('an outbound approval card says the action in one sentence, quotes the body
     },
   );
   await page.goto('/app');
-  const card = page.getByTestId('chief-composer-block').getByTestId('approval-card');
+  const card = page.getByTestId('chief-stream').getByTestId('approval-card');
+  await expect(card).toBeVisible();
+  await expect(page.getByTestId('chief-composer-block').getByTestId('approval-card')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-input')).toBeEditable();
   await expect(card.getByTestId('approval-card-title')).toHaveText(
     '发送邮件给 lena.hoffmann@example.com',
   );

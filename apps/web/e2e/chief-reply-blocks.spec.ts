@@ -106,12 +106,12 @@ test('a diff fence the Coordinator writes uses the same glance, named by its +++
   await expect(block).toContainText('vite.config.ts');
   await expect(block.locator('[data-kind="del"]')).toHaveCount(1);
   await expect(page.getByTestId('md-code-block')).toHaveCount(0);
-  const column = await page.getByTestId('chief-reply').boundingBox();
+  const content = await page.getByTestId('chief-reply').evaluate((el) => {
+    const css = getComputedStyle(el);
+    return el.getBoundingClientRect().width - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
+  });
   const width = (await block.boundingBox())?.width ?? 0;
-  expect(width, 'a fenced diff spans the chat column like a show_diff block').toBeCloseTo(
-    column?.width ?? -1,
-    0,
-  );
+  expect(width, 'a fenced diff spans its reply bubble like a show_diff block').toBeCloseTo(content, 0);
 });
 
 test('a show_chart reply draws the chart, toggles a series and opens the same data as a table', async ({

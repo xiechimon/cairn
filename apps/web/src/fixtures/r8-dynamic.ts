@@ -154,7 +154,6 @@ function transcript12(stamp: string): TranscriptItem[] {
       ],
       footer: { seconds: 28 },
     },
-    { kind: 'note', text: '18:18' },
     { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
     {
       kind: 'fail',

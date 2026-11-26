@@ -205,18 +205,18 @@ test('back returns to the tasks list and close leaves the panel area empty', asy
   await expect(page.getByRole('complementary', { name: '任务' })).toHaveCount(0);
 });
 
-test('an unread thread shows a dot on the task named in the reply, and opening the thread clears it', async ({
+test('an unread thread shows a dot on the task row the reply started, and opening the thread clears it', async ({
   page,
 }) => {
   await page.goto('/app?scenario=home-c-unread');
   const stream = page.getByTestId('chief-stream');
-  const ref = stream.getByTestId('task-mention').filter({ hasText: 'Orb canary round 7' }).first();
+  const ref = stream.getByTestId('chief-task-ref').filter({ hasText: 'Orb canary round 7' }).first();
   await expect(ref).toBeVisible();
   await expect(ref.locator('[data-slot="task-mention-unread"]')).toBeVisible();
   await expect(ref.locator('[data-slot="task-mention-unread"]')).toHaveAccessibleName('有新动态');
   await expect(
     stream
-      .getByTestId('task-mention')
+      .locator('[data-testid="task-mention"], [data-testid="chief-task-ref"]')
       .filter({ hasText: 'Fold finished turns' })
       .locator('[data-slot="task-mention-unread"]'),
   ).toHaveCount(0);
@@ -381,7 +381,7 @@ test('the request shows once as the task text, and replies render as unframed pr
   );
   expect(new Set(fills)).toEqual(new Set(['rgba(0, 0, 0, 0)']));
   await expect(
-    page.getByTestId('transcript-col').locator('[data-slot="reply-block"]').first(),
+    page.getByTestId('transcript-col').getByTestId('agent-text').first(),
   ).toBeAttached();
 });
 

@@ -503,7 +503,6 @@ function demoFixtureOf(): FixtureSet {
   ];
 
   const DEMO_CHIEF_STREAM = [
-    { kind: 'note', text: '14:05' },
     { kind: 'note', text: '运行在 ', machineName: 'dev-mac' },
     {
       kind: 'user',

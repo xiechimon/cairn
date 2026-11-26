@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { foldTaskCards, mentionedTaskIds, placeUnmentionedTasks } from '../src/chief/chief-task-refs.js';
+import { foldTaskCards } from '../src/chief/chief-task-refs.js';
 import type { GroupedRow } from '../src/chief/thread-activity.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
 
@@ -7,45 +7,6 @@ const glances = new Map([
   ['a1', { phase: 'building' as const, seq: 7, title: 'Read the repo' }],
   ['b2', { phase: 'review' as const, seq: 8, title: 'Write docs' }],
 ]);
-
-describe('a settled reply names the tasks its turn started', () => {
-  const rows = (...items: ChiefStreamItem[]): GroupedRow[] => items.map((item, i) => ({ item, i }));
-  const replyOf = (markdown: string): ChiefStreamItem => ({ kind: 'robot', id: markdown, seconds: '', markdown });
-
-  test('a started task the reply names in its sentence gets no extra line', () => {
-    for (const markdown of ['Started [Read the repo](todo:a1).', 'Started #7 Read the repo.']) {
-      const reply = replyOf(markdown);
-      const placed = placeUnmentionedTasks(rows(reply), new Map([[reply, ['a1']]]), glances);
-      expect(placed.has(reply), markdown).toBe(false);
-    }
-  });
-
-  test('a started task the reply leaves out gets the one-line fallback, once', () => {
-    const reply = replyOf('Done, see [Write docs](todo:b2).');
-    const placed = placeUnmentionedTasks(rows(reply), new Map([[reply, ['a1', 'b2', 'a1']]]), glances);
-    expect(placed.get(reply)).toEqual(['a1']);
-  });
-
-  test('a turn still running shows no fallback until its reply settles', () => {
-    const typing: ChiefStreamItem = { kind: 'robot', seconds: '', markdown: 'Start', typing: true };
-    const live: ChiefStreamItem = { kind: 'streaming', label: '处理中...' };
-    const placed = placeUnmentionedTasks(
-      rows(typing, live),
-      new Map<ChiefStreamItem, string[]>([
-        [typing, ['a1']],
-        [live, ['b2']],
-      ]),
-      glances,
-    );
-    expect(placed.size).toBe(0);
-  });
-
-  test('mentionedTaskIds reads markdown links, numbered prose and legacy segments', () => {
-    expect([...mentionedTaskIds({ markdown: 'See [#8](todo:b2)' }, glances)]).toEqual(['b2']);
-    expect([...mentionedTaskIds({ paragraphs: [[{ text: '', todo: 7 }]] }, glances)]).toEqual(['a1']);
-    expect([...mentionedTaskIds({ markdown: 'plain' }, glances)]).toEqual([]);
-  });
-});
 
 describe('foldTaskCards', () => {
   const rows = (...items: ChiefStreamItem[]): GroupedRow[] => items.map((item, i) => ({ item, i }));

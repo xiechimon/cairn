@@ -3,11 +3,10 @@ import { cn } from 'cn';
 import { Copy, Table2, TriangleAlert } from 'lucide-react';
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { copyTextWithFeedback } from '../../lib/clipboard.js';
+import { useCopiedFlash } from '../copy-icon-button.js';
 import { SubtreeErrorBoundary } from '../subtree-error-boundary.js';
 import { Button } from '../ui/button.js';
 import { Skeleton } from '../ui/skeleton.js';
-import { toastError } from '../ui/toaster.js';
 
 const SLOT_FILL: Record<number, string> = {
   1: 'fill-(--chart-1)',
@@ -35,7 +34,6 @@ const LINE_DASHES = ['', '5 4', '1.5 3.5', '8 3 2 3', '2 2'];
 const PAD = { left: 40, right: 8, top: 8, bottom: 28 };
 const PLOT_HEIGHT = { bar: 232, line: 208 } as const;
 const MIN_WIDTH = 240;
-const COPIED_MS = 1500;
 
 const FIGURE_CLS = 'relative m-0 w-full max-w-[min(100%,var(--container-reply))] font-sans';
 const HEAD_CLS = 'flex items-baseline gap-2 text-ui font-medium text-(--foreground)';
@@ -407,13 +405,8 @@ function ChartView({ chart }: { chart: ChatChart }) {
   const [off, setOff] = useState<ReadonlySet<number>>(new Set());
   const [table, setTable] = useState(false);
   const [hover, setHover] = useState<number | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy: copyText } = useCopiedFlash();
   const [ref, width] = useWidth();
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
   const shown = all.filter((series) => !off.has(series.index));
   const n = chart.categories.length;
   const height = PLOT_HEIGHT[chart.type];
@@ -445,12 +438,7 @@ function ChartView({ chart }: { chart: ChatChart }) {
       else if (next.size < all.length - 1) next.add(index);
       return next;
     });
-  const copy = () =>
-    copyTextWithFeedback(
-      csvOf(chart),
-      () => setCopied(true),
-      (error) => toastError(t('未能复制，请重试'), error),
-    );
+  const copy = () => copyText(csvOf(chart));
   const label = chart.summary === undefined ? chart.title : `${chart.title}。${chart.summary}`;
   return (
     <figure ref={ref} className={FIGURE_CLS} data-testid="chat-chart" data-chart-type={chart.type}>

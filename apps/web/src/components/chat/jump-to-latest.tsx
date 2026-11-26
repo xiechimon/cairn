@@ -89,6 +89,7 @@ export function JumpToLatestButton({
             if (e.defaultPrevented) return;
             e.currentTarget.blur();
             followingRef.current = true;
+            setActive(false);
             scrollToEnd({ behavior: 'instant' });
           }}
         />

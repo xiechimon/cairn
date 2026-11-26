@@ -172,9 +172,6 @@ test('Stopped. No task was created. and stopped-with-task render with the same s
             children: createElement(MessageScroller, {
               children: createElement(ChiefStreamRow, {
                 item,
-                index: 0,
-                onCopy: () => {},
-                onRewindRequest: () => {},
               }),
             }),
           }),

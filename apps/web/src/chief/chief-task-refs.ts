@@ -1,7 +1,5 @@
 import { isInfoOutput, RESEARCH_STUCK_SOURCE_KIND } from '@cairn/shared';
-import { linkTaskNumbers, type TodoGlance } from '../detail/segments.js';
-import type { ChiefSegment } from '../fixtures/records.js';
-import { parseMentionSegments } from '../overlay/mention-token.js';
+import type { TodoGlance } from '../detail/segments.js';
 import type { GroupedRow } from './thread-activity.js';
 
 interface GlanceSource {
@@ -27,36 +25,6 @@ export function todoGlanceOf(todo: GlanceSource): TodoGlance {
     ...(todo.latestBuildId != null ? { buildId: todo.latestBuildId } : {}),
     ...(todo.projectId !== undefined ? { projectId: todo.projectId } : {}),
   };
-}
-
-interface MentionSource {
-  markdown?: string | undefined;
-  paragraphs?: ChiefSegment[][] | undefined;
-  bullets?: ChiefSegment[][] | undefined;
-}
-
-export function mentionedTaskIds(
-  source: MentionSource,
-  glances: ReadonlyMap<string, TodoGlance>,
-): ReadonlySet<string> {
-  const ids = new Set<string>();
-  if (source.markdown !== undefined) {
-    for (const part of parseMentionSegments(source.markdown)) {
-      if (part.kind === 'mention' && part.token.kind === 'todo') ids.add(part.token.id);
-    }
-    for (const segment of linkTaskNumbers(source.markdown, glances) ?? []) {
-      if (segment.mentionId !== undefined) ids.add(segment.mentionId);
-    }
-  }
-  const seqs = new Set(
-    [...(source.paragraphs ?? []), ...(source.bullets ?? [])]
-      .flat()
-      .flatMap((segment) => (segment.todo === undefined ? [] : [segment.todo])),
-  );
-  for (const [todoId, glance] of glances) {
-    if (glance.seq !== undefined && seqs.has(glance.seq)) ids.add(todoId);
-  }
-  return ids;
 }
 
 export interface FoldedTaskCards {
@@ -114,32 +82,6 @@ export function foldTaskCards(
     rows: kept,
     startedBy: new Map([...started].map(([reply, ids]) => [reply, stableList(reply, ids)])),
   };
-}
-
-const placedLists = new WeakMap<object, readonly string[]>();
-
-export function placeUnmentionedTasks(
-  rows: readonly GroupedRow[],
-  startedBy: ReadonlyMap<GroupedRow['item'], readonly string[]>,
-  glances: ReadonlyMap<string, TodoGlance>,
-): ReadonlyMap<GroupedRow['item'], readonly string[]> {
-  const placed = new Map<GroupedRow['item'], readonly string[]>();
-  for (const { item } of rows) {
-    if (item.kind !== 'robot' || isLiveRow(item)) continue;
-    const started = startedBy.get(item) ?? [];
-    if (started.length === 0) continue;
-    const mentioned = mentionedTaskIds(item, glances);
-    const ids = [...new Set(started)].filter(
-      (id) => !mentioned.has(id) && glances.get(id)?.internal !== true,
-    );
-    if (ids.length === 0) continue;
-    const previous = placedLists.get(item);
-    const stable =
-      previous !== undefined && previous.join('\n') === ids.join('\n') ? previous : ids;
-    placedLists.set(item, stable);
-    placed.set(item, stable);
-  }
-  return placed;
 }
 
 const placedReports = new WeakMap<object, readonly string[]>();

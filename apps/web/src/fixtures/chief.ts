@@ -56,7 +56,6 @@ export const chiefStreaming: FixtureSet = {
     threadTitle: '我想做一个能在浏览器里直…',
     running: true,
     stream: [
-      { kind: 'note', text: '17:19' },
       { kind: 'note', text: '运行在 ', machineName: MACHINE_NAME },
       { kind: 'user', text: CHIEF_DRAFT },
       {
@@ -96,7 +95,6 @@ export const chiefThread: FixtureSet = {
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '帮 r3-lifecycle 写一份…',
     stream: [
-      { kind: 'note', text: '17:26' },
       { kind: 'note', text: '运行在 ', machineName: MACHINE_NAME },
       {
         kind: 'user',
@@ -268,7 +266,6 @@ export const chiefMarkdown: FixtureSet = {
     threadTitle: '验证一下凭证链路…',
     running: true,
     stream: [
-      { kind: 'note', text: '17:26' },
       { kind: 'user', text: '验证一下凭证链路，然后给我一份报告' },
       {
         kind: 'robot',
@@ -619,7 +616,6 @@ export const chiefQuestion: FixtureSet = {
     modelSlot: 'claude-sonnet-5 · 默认',
     threadTitle: '给贪吃蛇小游戏定难度…',
     stream: [
-      { kind: 'note', text: '17:26' },
       { kind: 'user', text: '给贪吃蛇小游戏定一下难度曲线，拆好任务再开工。' },
       {
         kind: 'question',

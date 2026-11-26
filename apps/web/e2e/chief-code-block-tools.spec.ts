@@ -29,9 +29,9 @@ for (const scheme of ['light', 'dark'] as const) {
       for (const [n, name] of ['ends-with-code', 'code-in-middle'].entries()) {
         const code = codeBlocks.nth(n);
         await code.scrollIntoViewIfNeeded();
-        const block = code.locator('xpath=ancestor::*[@data-testid="chief-reply"][1]');
+        const block = code.locator('xpath=ancestor::*[@data-testid="chief-msg"][1]');
         await code.getByTestId('md-code').hover();
-        const tools = block.getByTestId('chief-msg-foot');
+        const tools = block.locator('[data-slot="message-meta"]');
         if (width === 390) {
           await expect(tools, `${name}: no reply toolbar at 390px`).toHaveCount(0);
           for (const own of [code.getByTestId('md-code-expand'), code.getByTestId('md-code-copy')])
@@ -58,9 +58,9 @@ for (const scheme of ['light', 'dark'] as const) {
           expect(await hits(page, own), `${name}: code button is reachable`).toBe(true);
         }
         await expect(
-          tools.locator('[data-slot="message-toolbar-meta"]'),
-          `${name}: the reply toolbar carries no time`,
-        ).toHaveCount(0);
+          tools.getByTestId('msg-stamp'),
+          `${name}: the meta row under the reply carries its time`,
+        ).toHaveCount(1);
         for (const tool of await toolButtons.all())
           expect(await hits(page, tool), `${name}: toolbar button is reachable`).toBe(true);
         const codeBox = await code.boundingBox();

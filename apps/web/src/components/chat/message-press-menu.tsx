@@ -1,33 +1,43 @@
-import { TextSelect } from 'lucide-react';
+import { TextSelect, Undo } from 'lucide-react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
-import { useMediaQuery } from '../board/use-narrow.js';
+import { useMediaQuery } from '../../board/use-narrow.js';
+import { useI18n } from '../../i18n/provider.js';
+import { Copy } from '../../icons/index.js';
+import { useCopyWithToast } from '../copy-icon-button.js';
 import {
   ContextMenu,
   ContextMenuContent,
+  ContextMenuGroup,
   ContextMenuItem,
+  ContextMenuLabel,
   ContextMenuTrigger,
-} from '../components/ui/context-menu.js';
-import { useI18n } from '../i18n/provider.js';
-import { Copy } from '../icons/index.js';
+} from '../ui/context-menu.js';
+import { MessageTime } from './message-time.js';
 
 const PRESS_MENU_QUERY = '(max-width: 640px), (pointer: coarse)';
 
-export function useReplyPressMenu(): boolean {
+export function useMessagePressMenu(): boolean {
   return useMediaQuery(PRESS_MENU_QUERY);
 }
 
-export function ReplyPressMenu({
-  text,
-  onCopy,
-  disabled,
+export interface MessageActions {
+  at?: number | null | undefined;
+  fallbackAt?: string | null | undefined;
+  text: string;
+  onWithdraw?: (() => void) | undefined;
+}
+
+export function MessagePressMenu({
+  actions,
+  disabled = false,
   children,
 }: {
-  text: string;
-  disabled: boolean;
-  onCopy: (text: string) => void;
+  actions: MessageActions;
+  disabled?: boolean;
   children: ReactElement;
 }) {
   const { t } = useI18n();
+  const copy = useCopyWithToast();
   const body = useRef<HTMLDivElement | null>(null);
   const [selecting, setSelecting] = useState(false);
   const selectAfterClose = useRef(false);
@@ -74,19 +84,30 @@ export function ReplyPressMenu({
               : '';
         }}
       />
-      <ContextMenuContent aria-label={t('回复操作')} data-testid="chief-reply-press-menu">
-        <ContextMenuItem onClick={() => onCopy(picked.current || text)}>
-          <Copy />
-          {t('复制')}
-        </ContextMenuItem>
-        <ContextMenuItem
-          onClick={() => {
-            selectAfterClose.current = true;
-          }}
-        >
-          <TextSelect />
-          {t('选择文字')}
-        </ContextMenuItem>
+      <ContextMenuContent aria-label={t('消息操作')} data-testid="message-press-menu">
+        <ContextMenuGroup>
+          <ContextMenuLabel>
+            <MessageTime at={actions.at} fallback={actions.fallbackAt} />
+          </ContextMenuLabel>
+          <ContextMenuItem onClick={() => copy(picked.current || actions.text)}>
+            <Copy />
+            {t('复制')}
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => {
+              selectAfterClose.current = true;
+            }}
+          >
+            <TextSelect />
+            {t('选择文字')}
+          </ContextMenuItem>
+          {actions.onWithdraw !== undefined && (
+            <ContextMenuItem data-testid="chief-steer-withdraw" onClick={actions.onWithdraw}>
+              <Undo />
+              {t('撤回')}
+            </ContextMenuItem>
+          )}
+        </ContextMenuGroup>
       </ContextMenuContent>
     </ContextMenu>
   );

@@ -12,9 +12,9 @@ import {
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
-import { MessageToolbar } from '../chief/message-toolbar.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { ChatMessageBody } from '../components/chat/message-body.js';
+import { MessageBubble } from '../components/chat/message-bubble.js';
+import { MessageMeta } from '../components/chat/message-meta.js';
 import { NoticeLine } from '../components/chat/notice-line.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -62,6 +62,10 @@ const LANGS = [
   { value: 'en', label: 'English' },
   { value: 'zh', label: 'Simplified Chinese' },
 ];
+
+const SPECIMEN_AT = Date.UTC(2026, 10, 26, 7, 42);
+const SPECIMEN_REPLY =
+  'The last commit bumped a version in package.json without updating the lockfile.\n\n- the frozen install fails\n- I will commit the lockfile\n\n> Hover the reply to copy it.';
 
 export function EmptySection() {
   const [loading, setLoading] = useState(false);
@@ -288,7 +292,7 @@ export function ConversationSection() {
       <Specimen
         id="turns"
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <ChatMessageBody speaker="user">…</ChatMessageBody>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><ChatMarkdown bubbles /><MessageToolbar placement="top-end-hover" … /></MessageContent></Message>\n<NoticeLine layout="plain">Plan approved</NoticeLine>\n<NoticeLine label="This step ended abnormally" detail={{ lines, raw }} />`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <MessageMeta side="owner" …>\n      <MessageBubble side="owner">…</MessageBubble>\n    </MessageMeta>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><MessageMeta side="coordinator" …><MessageBubble side="coordinator"><ChatMarkdown bubbles /></MessageBubble></MessageMeta></MessageContent></Message>\n<NoticeLine layout="plain">Plan approved</NoticeLine>\n<NoticeLine label="This step ended abnormally" detail={{ lines, raw }} />`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -296,27 +300,21 @@ export function ConversationSection() {
               className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
               data-testid="turn-user"
             >
-              <ChatMessageBody speaker="user" className="w-fit max-w-full">
-                Why does pnpm install fail in CI?
-              </ChatMessageBody>
+              <MessageMeta
+                side="owner"
+                actions={{ at: SPECIMEN_AT, text: 'Why does pnpm install fail in CI?' }}
+              >
+                <MessageBubble side="owner">Why does pnpm install fail in CI?</MessageBubble>
+              </MessageMeta>
             </MessageContent>
           </Message>
           <Message>
-            <MessageContent className="gap-0">
-              <div className="group/reply-block relative text-ui leading-5 [&_[data-slot=reply-blocks]>:first-child]:max-w-[min(100%_-_2.5rem,var(--container-reply))]">
-                <ChatMarkdown
-                  bubbles
-                  text={
-                    'The last commit bumped a version in package.json without updating the lockfile.\n\n- the frozen install fails\n- I will commit the lockfile\n\n> Hover the reply to copy it.'
-                  }
-                />
-                <MessageToolbar
-                  placement="top-end-hover"
-                  testId="turn-reply-tools"
-                  stamp={null}
-                  onCopy={() => {}}
-                />
-              </div>
+            <MessageContent className="max-w-[min(85%,42rem)] flex-none gap-0">
+              <MessageMeta side="coordinator" actions={{ at: SPECIMEN_AT, text: SPECIMEN_REPLY }}>
+                <MessageBubble side="coordinator">
+                  <ChatMarkdown bubbles text={SPECIMEN_REPLY} />
+                </MessageBubble>
+              </MessageMeta>
             </MessageContent>
           </Message>
           <Message>

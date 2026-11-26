@@ -46,7 +46,7 @@ export function isArtifactPanelEscape(event: KeyboardEvent): boolean {
     return false;
   return !(
     event.target instanceof HTMLElement &&
-    event.target.closest('[data-testid="decision-dock"], [role="status"][data-kind]') !== null
+    event.target.closest('[role="status"][data-kind]') !== null
   );
 }
 

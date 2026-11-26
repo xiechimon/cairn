@@ -292,7 +292,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### questions
 
-**Question cards** (shipped). Questions from the Coordinator or a thread appear as answerable cards above the composer, stay parked quietly, and keep per-question drafts.
+**Question cards** (shipped). Questions from the Coordinator or a thread appear as answerable cards in the conversation where they were asked, never block further messages, and keep per-question drafts.
 
 - Research: **gap**: the Codex CLI and t3code question patterns were never written up
 - Frontend design: [docs/design/qcard-variants/README.md](design/qcard-variants/README.md) (not on main), [docs/design/pilot-coordinator-chat-2026-11-06.md](design/pilot-coordinator-chat-2026-11-06.md) (not on main)

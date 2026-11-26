@@ -293,12 +293,11 @@ test('todo-phase `开始` fires orchestration directly — no start dialog (#640
 test('detail transcript message tools carry no restore action (#884)', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
   await expect(page.locator('.chat-col path[d^="M3 12a9"]')).toHaveCount(0);
-  const block = page.locator('.chat-row--user [data-slot="reply-block"]').first();
-  await block.hover();
-  const tools = block.getByTestId('msg-tools');
+  const row = page.locator('.chat-row--user').first();
+  await row.getByTestId('user-bubble').hover();
+  const tools = row.locator('[data-slot="message-meta"]');
   await expect(tools.getByRole('button')).toHaveCount(1);
-  await expect(tools.getByTestId('chief-msg-copy')).toHaveCount(1);
-  await expect(tools.getByTestId('chief-msg-more')).toHaveCount(0);
+  await expect(tools.getByTestId('message-copy')).toHaveCount(1);
 });
 
 test('fail marker `详情` expands the guidance and raw error inline, like the chat card (#1258)', async ({

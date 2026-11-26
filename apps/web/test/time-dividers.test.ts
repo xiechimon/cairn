@@ -4,7 +4,7 @@ import {
   needsTimeDivider,
   TIME_DIVIDER_GAP_MS,
   timeDividerLabel,
-} from '../src/chief/time-dividers.js';
+} from '../src/lib/message-time.js';
 import { EN } from '../src/i18n/en.js';
 import { type TFunc, translate } from '../src/i18n/translate.js';
 
@@ -17,9 +17,13 @@ describe('needsTimeDivider', () => {
   test('first message never gets a divider', () => {
     expect(needsTimeDivider(null, now)).toBe(false);
   });
-  test('only a gap above the threshold does', () => {
+  test('only a gap above an hour does', () => {
+    expect(TIME_DIVIDER_GAP_MS).toBe(60 * 60 * 1000);
     expect(needsTimeDivider(now - TIME_DIVIDER_GAP_MS, now)).toBe(false);
     expect(needsTimeDivider(now - TIME_DIVIDER_GAP_MS - 1, now)).toBe(true);
+  });
+  test('a day change does, however short the gap', () => {
+    expect(needsTimeDivider(at(2026, 11, 9, 23, 55), at(2026, 11, 10, 0, 2))).toBe(true);
   });
 });
 

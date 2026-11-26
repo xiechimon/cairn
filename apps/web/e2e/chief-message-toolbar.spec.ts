@@ -67,39 +67,37 @@ async function isHittable(target: Locator): Promise<boolean> {
   });
 }
 
-async function toolOrder(toolbar: Locator): Promise<string[]> {
-  return toolbar.locator('button[data-tool]').evaluateAll((els) =>
+const rowOf = (stream: Locator, text: string) =>
+  stream.getByTestId('chief-msg').filter({ hasText: text });
+
+const bubbleIn = (row: Locator) => row.locator('[data-slot="message-bubble"]');
+
+const metaIn = (row: Locator) => row.locator('[data-slot="message-meta"]');
+
+async function toolNames(meta: Locator): Promise<string[]> {
+  return meta.locator('button').evaluateAll((els) =>
     els
-      .map((el) => ({
-        tool: el.getAttribute('data-tool') ?? '',
-        x: el.getBoundingClientRect().x,
-      }))
+      .map((el) => ({ id: el.getAttribute('data-testid') ?? '', x: el.getBoundingClientRect().x }))
       .sort((a, b) => a.x - b.x)
-      .map((entry) => entry.tool),
+      .map((entry) => entry.id),
   );
 }
 
-async function sharedRowTools(toolbar: Locator): Promise<string[]> {
-  return (await toolOrder(toolbar)).filter((tool) => tool !== 'more');
-}
-
-async function assertPlainMeta(toolbar: Locator, label: string) {
-  const meta = toolbar.locator('[data-slot="message-toolbar-meta"]');
-  await expect(meta, `${label}: timestamp is visible`).toBeVisible();
-  await expect(meta, `${label}: timestamp renders HH:MM`).toHaveText(/\d{1,2}:\d{2}/);
+async function assertPlainTime(meta: Locator, label: string) {
+  const stamp = meta.getByTestId('msg-stamp');
+  await expect(stamp, `${label}: time renders HH:MM`).toHaveText(/\d{1,2}:\d{2}/);
   const style = await meta.evaluate((el) => {
     const cs = getComputedStyle(el);
-    const stamp = el.querySelector('[data-testid="chief-msg-stamp"]');
-    const stampCs = stamp ? getComputedStyle(stamp) : cs;
+    const time = el.querySelector('[data-testid="msg-stamp"]');
     return {
       bg: cs.backgroundColor,
       shadow: cs.boxShadow,
-      tabular: stampCs.fontVariantNumeric,
+      tabular: time ? getComputedStyle(time).fontVariantNumeric : '',
     };
   });
-  expect(style.bg, `${label}: timestamp has no popover backing`).toBe('rgba(0, 0, 0, 0)');
-  expect(style.shadow, `${label}: timestamp has no shadow`).toBe('none');
-  expect(style.tabular, `${label}: timestamp uses tabular figures (V27)`).toContain('tabular-nums');
+  expect(style.bg, `${label}: the meta row has no backing`).toBe('rgba(0, 0, 0, 0)');
+  expect(style.shadow, `${label}: the meta row has no shadow`).toBe('none');
+  expect(style.tabular, `${label}: time uses tabular figures (V27)`).toContain('tabular-nums');
 }
 
 async function dragSelectBubble(page: Page, bubble: Locator) {
@@ -112,42 +110,30 @@ async function dragSelectBubble(page: Page, bubble: Locator) {
 }
 
 for (const width of [1440, COMPACT_WIDTH, 390] as const) {
-  test(`user and assistant toolbars expose the same visible data-tool set with no reply button (${width}px)`, async ({
+  test(`owner and Coordinator meta rows carry the same time and copy and no reply button (${width}px)`, async ({
     page,
   }) => {
     const { stream } = await openConversation(page, width, 'light');
-    const userRow = stream.getByTestId('chief-msg').filter({ hasText: USER_MSG });
-    const assistantRow = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
-
-    const userBubble = userRow.getByTestId('chief-bubble');
-    const userTools = userRow.getByTestId('chief-msg-tools');
-    await userBubble.scrollIntoViewIfNeeded();
-    await userBubble.hover();
-    await expect(userTools).toHaveCSS('opacity', '1');
-    await expect(userTools.getByTestId('chief-msg-reply')).toHaveCount(0);
-    const userVisible = await sharedRowTools(userTools);
-
-    expect(userVisible, `${width}px: user visible tools`).toEqual(['copy']);
-    const assistantBubble = assistantRow.getByTestId('chief-reply-bubble');
-    const assistantTools = assistantRow.getByTestId('chief-msg-foot');
-    await assistantBubble.scrollIntoViewIfNeeded();
+    const userRow = rowOf(stream, USER_MSG);
+    const assistantRow = rowOf(stream, ASSISTANT_MSG);
+    await expect(stream.getByTestId('chief-msg-reply')).toHaveCount(0);
     if (width === 390) {
-      await assistantBubble.hover();
+      await bubbleIn(assistantRow).hover();
       await expect(
-        assistantRow.locator('[data-tool]'),
-        '390px: a reply has no toolbar; a press opens its menu instead',
+        stream.locator('[data-slot="message-meta"]'),
+        '390px: no hover meta row; a press opens the message menu instead',
       ).toHaveCount(0);
       return;
     }
-    await assistantBubble.hover();
-    await expect(assistantTools).toHaveCSS('opacity', '1');
-    await expect(assistantTools.getByTestId('chief-msg-reply')).toHaveCount(0);
-    const assistantVisible = await sharedRowTools(assistantTools);
-
-    expect(
-      assistantVisible,
-      `${width}px: assistant visible data-tool set and order match user`,
-    ).toEqual(userVisible);
+    const userMeta = metaIn(userRow);
+    await bubbleIn(userRow).scrollIntoViewIfNeeded();
+    await bubbleIn(userRow).hover();
+    await expect(userMeta).toHaveCSS('opacity', '1');
+    expect(await toolNames(userMeta), `${width}px: owner tools`).toEqual(['message-copy']);
+    const assistantMeta = metaIn(assistantRow);
+    await bubbleIn(assistantRow).hover();
+    await expect(assistantMeta).toHaveCSS('opacity', '1');
+    expect(await toolNames(assistantMeta), `${width}px: Coordinator tools`).toEqual(['message-copy']);
   });
 }
 
@@ -187,7 +173,7 @@ test('select-to-quote works on both user and Coordinator messages without a hove
   await expect(page.getByTestId('composer-reply-quote')).toContainText('跑完告诉我');
 });
 
-test('steering user row keeps the same visible toolbar and places withdraw inside the more menu', async ({
+test('steering owner row shows copy and a direct withdraw button beside it', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -207,213 +193,139 @@ test('steering user row keeps the same visible toolbar and places withdraw insid
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  const steerRow = stream.getByTestId('chief-msg').filter({ hasText: '顺便核对一下环境变量' });
-  const steerTools = steerRow.getByTestId('chief-msg-tools');
-  await steerRow.getByTestId('chief-bubble').hover();
-  await expect(steerTools).toHaveCSS('opacity', '1');
-  expect(await toolOrder(steerTools), 'steer row keeps the same top-level buttons').toEqual([
-    'copy',
-    'more',
+  const steerRow = rowOf(stream, '顺便核对一下环境变量');
+  const steerMeta = metaIn(steerRow);
+  await bubbleIn(steerRow).hover();
+  await expect(steerMeta).toHaveCSS('opacity', '1');
+  expect(await toolNames(steerMeta), 'steer row adds withdraw after copy').toEqual([
+    'message-copy',
+    'chief-steer-withdraw',
   ]);
-  await expect(steerTools.getByTestId('chief-msg-reply')).toHaveCount(0);
-  await expect(steerTools.getByTestId('chief-steer-withdraw')).toHaveCount(0);
-  await steerTools.getByTestId('chief-msg-more').click();
-  await expect(page.getByTestId('chief-steer-withdraw')).toBeVisible();
-  await expect(page.getByRole('menuitem', { name: '恢复到此处' })).toBeVisible();
+  await expect(steerMeta.getByTestId('chief-steer-withdraw')).toHaveAccessibleName('撤回');
+  await expect(page.getByRole('menu')).toHaveCount(0);
 });
 
 for (const scheme of ['light', 'dark'] as const) {
-  test(`1440px user toolbar stays beside the bubble on the left with unchanged geometry (${scheme})`, async ({
-    page,
-  }) => {
-    const { stream } = await openConversation(page, 1440, scheme);
-    const row = stream.getByTestId('chief-msg').filter({ hasText: USER_MSG });
-    const bubble = row.getByTestId('chief-bubble');
-    const tools = row.getByTestId('chief-msg-tools');
-    await bubble.scrollIntoViewIfNeeded();
-    const bubbleBefore = await boxOf(bubble, 'user bubble before hover');
-
-    await bubble.hover();
-    await expect(tools).toHaveCSS('opacity', '1');
-    await captureRowShot(page, `${PHASE}-user-1440-${scheme}.png`, stream, row);
-
-    await expect(tools).toHaveAttribute('data-placement', 'left');
-    await expect(tools).not.toHaveAttribute('data-clamped');
-    await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
-
-    const bubbleBox = await boxOf(bubble, 'user bubble');
-    const toolsBox = await boxOf(tools, 'user toolbar');
-    const moreBox = await boxOf(tools.getByTestId('chief-msg-more'), 'user more button');
-    const metaBox = await boxOf(tools.locator('[data-slot="message-toolbar-meta"]'), 'user meta');
-
-    expect(Math.round(bubbleBox.y), 'hover does not shift bubble').toBe(Math.round(bubbleBefore.y));
-    expect(overlaps(toolsBox, bubbleBox), 'toolbar does not intersect user bubble').toBe(false);
-    expect(Math.round(toolsBox.x + toolsBox.width), 'toolbar meets bubble left edge').toBe(
-      Math.round(bubbleBox.x),
-    );
-    expect(Math.round(bubbleBox.x - (moreBox.x + moreBox.width)), '12px gap beside bubble').toBe(12);
-    expect(
-      Math.abs(toolsBox.y + toolsBox.height / 2 - (bubbleBox.y + bubbleBox.height / 2)),
-      'toolbar vertically centred on bubble',
-    ).toBeLessThanOrEqual(1);
-    expect(Math.round(moreBox.height), 'desktop side button stays 32px').toBe(32);
-    expect(await toolOrder(tools)).toEqual(['copy', 'more']);
-    expect(metaBox.x + metaBox.width, 'meta sits left of tool buttons').toBeLessThan(moreBox.x);
-    await assertPlainMeta(tools, `1440 user ${scheme}`);
-    for (const btn of await tools.locator('button[data-tool]').all()) {
-      expect(await isHittable(btn), 'toolbar button is reachable').toBe(true);
-    }
-  });
-
-  test(`1440px assistant toolbar floats at the reply's top-right in its own gutter without shifting layout (${scheme})`, async ({
-    page,
-  }) => {
-    const { stream } = await openConversation(page, 1440, scheme);
-    await assertTopEndToolbar(page, stream, `1440 ${scheme}`, `${PHASE}-assistant-1440-${scheme}.png`);
-  });
-
-  for (const [label, width] of [
-    ['compact', COMPACT_WIDTH],
-    ['390', 390],
-  ] as const) {
-    test(`${label} (${width}px) user toolbar does not intersect the bubble (${scheme})`, async ({
-      page,
-    }) => {
-      const { stream } = await openConversation(page, width, scheme);
-      const row = stream.getByTestId('chief-msg').filter({ hasText: USER_MSG });
-      const nextRow = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
-      const bubble = row.getByTestId('chief-bubble');
-      const nextBubble = nextRow.getByTestId('chief-reply-bubble');
-      const tools = row.getByTestId('chief-msg-tools');
-      await bubble.scrollIntoViewIfNeeded();
-      const bubbleBefore = await boxOf(bubble, 'user bubble before hover');
-
-      await bubble.hover();
-      await expect(tools).toHaveCSS('opacity', '1');
-      await captureRowShot(page, `${PHASE}-user-${label}-${scheme}.png`, stream, row);
-
-      const streamBox = await boxOf(stream, 'stream');
-      const bubbleBox = await boxOf(bubble, 'user bubble');
-      const nextBubbleBox = await boxOf(nextBubble, 'next assistant bubble');
-      const toolsBox = await boxOf(tools, 'user toolbar');
-
-      expect(Math.round(bubbleBox.y), 'hover does not shift bubble').toBe(
-        Math.round(bubbleBefore.y),
-      );
-      expect(
-        overlaps(toolsBox, bubbleBox),
-        `${label} user: toolbar must not intersect bubble`,
-      ).toBe(false);
-      expect(
-        overlaps(toolsBox, nextBubbleBox),
-        `${label} user: toolbar must not intersect the next bubble`,
-      ).toBe(false);
-      expect(toolsBox.x, `${label} user: toolbar stays inside stream left`).toBeGreaterThanOrEqual(
-        streamBox.x,
-      );
-      expect(
-        toolsBox.x + toolsBox.width,
-        `${label} user: toolbar stays inside stream right`,
-      ).toBeLessThanOrEqual(streamBox.x + streamBox.width + 1);
-      expect(await toolOrder(tools)).toEqual(['copy', 'more']);
-      await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
-      await assertPlainMeta(tools, `${label} user ${scheme}`);
-      for (const btn of await tools.locator('button[data-tool]').all()) {
-        const btnBox = await boxOf(btn, 'user tool button');
-        expect(overlaps(btnBox, bubbleBox), `${label} user: button must not overlap bubble`).toBe(
-          false,
+  for (const width of [1440, COMPACT_WIDTH] as const) {
+    for (const [side, text, next] of [
+      ['owner', USER_MSG, ASSISTANT_MSG],
+      ['coordinator', ASSISTANT_MSG, SHORT_USER_MSG],
+    ] as const) {
+      test(`${width}px ${side} meta sits beside its bubble on the outer side, hidden at rest, without moving anything (${scheme})`, async ({
+        page,
+      }) => {
+        const { stream } = await openConversation(page, width, scheme);
+        const row = rowOf(stream, text);
+        const bubble = bubbleIn(row);
+        const meta = metaIn(row);
+        const nextBubble = bubbleIn(rowOf(stream, next));
+        await bubble.scrollIntoViewIfNeeded();
+        await page.mouse.move(0, 0);
+        await expect(meta, `C3 ${side} ${width} ${scheme}: meta row is hidden at rest`).toHaveCSS(
+          'opacity',
+          '0',
         );
-        expect(btnBox.width, 'A1: desktop hit target >= 24px').toBeGreaterThanOrEqual(24);
-        expect(btnBox.height, 'A1: desktop hit target >= 24px').toBeGreaterThanOrEqual(24);
-        expect(await isHittable(btn), `${label} user: button is reachable`).toBe(true);
-      }
-      await tools.getByTestId('chief-msg-more').click();
-      await expect(page.getByRole('menuitem', { name: '恢复到此处' })).toBeVisible();
-      if (width === 390) {
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
-        expect(overflow, 'R1: no horizontal scroll at 390px').toBeLessThanOrEqual(0);
-      }
-    });
+        const bubbleBefore = await boxOf(bubble, 'bubble before hover');
+        const nextBefore = await boxOf(nextBubble, 'next bubble before hover');
 
-    test(`${label} (${width}px) assistant toolbar does not intersect the bubble (${scheme})`, async ({
-      page,
-    }) => {
-      const { stream } = await openConversation(page, width, scheme);
-      if (width === 390) {
-        const row = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
-        await row.getByTestId('chief-reply-bubble').hover();
-        await expect(row.locator('[data-tool]'), '390px: no reply toolbar').toHaveCount(0);
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
-        expect(overflow, 'R1: no horizontal scroll at 390px').toBeLessThanOrEqual(0);
-        return;
-      }
-      await assertTopEndToolbar(page, stream, `${label} ${scheme}`, `${PHASE}-assistant-${label}-${scheme}.png`);
-    });
+        await bubble.hover();
+        await expect(meta).toHaveCSS('opacity', '1');
+        await captureRowShot(page, `${PHASE}-${side}-${width}-${scheme}.png`, stream, row);
+
+        const bubbleBox = await boxOf(bubble, 'bubble');
+        const metaBox = await boxOf(meta, 'meta row');
+        const streamBox = await boxOf(stream, 'stream');
+        expect(Math.round(bubbleBox.y), 'hover does not shift the bubble').toBe(
+          Math.round(bubbleBefore.y),
+        );
+        expect(
+          Math.round((await boxOf(nextBubble, 'next bubble')).y),
+          'hover does not shift the next message',
+        ).toBe(Math.round(nextBefore.y));
+        expect(overlaps(metaBox, bubbleBox), 'meta row does not intersect its bubble').toBe(false);
+        expect(overlaps(metaBox, nextBefore), 'meta row does not intersect the next bubble').toBe(false);
+        expect(
+          metaBox.y + metaBox.height,
+          'meta sits on the bubble\'s last line',
+        ).toBeLessThanOrEqual(bubbleBox.y + bubbleBox.height);
+        if (side === 'owner')
+          expect(
+            bubbleBox.x - (metaBox.x + metaBox.width),
+            'owner meta sits just left of the bubble',
+          ).toBeGreaterThanOrEqual(0);
+        else
+          expect(
+            metaBox.x - (bubbleBox.x + bubbleBox.width),
+            'reply meta sits just right of the bubble',
+          ).toBeGreaterThanOrEqual(0);
+        expect(metaBox.x, 'meta row stays inside the stream').toBeGreaterThanOrEqual(streamBox.x);
+        expect(metaBox.x + metaBox.width).toBeLessThanOrEqual(streamBox.x + streamBox.width + 1);
+        await assertPlainTime(meta, `${side} ${width} ${scheme}`);
+        for (const btn of await meta.locator('button').all()) {
+          const btnBox = await boxOf(btn, 'meta button');
+          expect(btnBox.width, 'A1: desktop hit target >= 24px').toBeGreaterThanOrEqual(24);
+          expect(btnBox.height, 'A1: desktop hit target >= 24px').toBeGreaterThanOrEqual(24);
+          expect(await isHittable(btn), 'meta button is reachable').toBe(true);
+        }
+      });
+    }
   }
 }
 
-test('wide user bubble never overlaps its toolbar even at 1440px, and unhovered spacing holds (C3)', async ({
-  page,
-}) => {
-  const { stream } = await openConversation(page, 1440, 'light');
-  const userRow = stream.getByTestId('chief-msg').filter({ hasText: USER_MSG });
-  const assistantRow = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
-  const gapBefore =
-    (await boxOf(assistantRow.getByTestId('chief-reply-bubble'), 'assistant')).y -
-    ((await boxOf(userRow.getByTestId('chief-bubble'), 'user')).y +
-      (await boxOf(userRow.getByTestId('chief-bubble'), 'user')).height);
-  expect(Math.round(gapBefore), 'C3: unhovered turn gap stays 24px').toBe(24);
-
-  const wideRow = stream.getByTestId('chief-msg').filter({ hasText: WIDE_USER_MSG });
-  const wideBubble = wideRow.getByTestId('chief-bubble');
-  const wideTools = wideRow.getByTestId('chief-msg-tools');
-  await wideBubble.scrollIntoViewIfNeeded();
-  await wideBubble.hover();
-  await expect(wideTools).toHaveCSS('opacity', '1');
-  const wideBox = await boxOf(wideBubble, 'wide user bubble');
-  const toolsBox = await boxOf(wideTools, 'wide user toolbar');
-  expect(overlaps(toolsBox, wideBox), 'wide user toolbar must not intersect bubble').toBe(false);
-  for (const btn of await wideTools.locator('button[data-tool]').all()) {
-    expect(await isHittable(btn), 'wide user toolbar button is reachable').toBe(true);
-  }
+test('390px: no horizontal scroll and no hover meta row on either side', async ({ page }) => {
+  const { stream } = await openConversation(page, 390, 'light');
+  await bubbleIn(rowOf(stream, USER_MSG)).hover();
+  await expect(stream.locator('[data-slot="message-meta"]')).toHaveCount(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  expect(overflow, 'R1: no horizontal scroll at 390px').toBeLessThanOrEqual(0);
 });
 
-test('latest assistant reply uses a hover-only overlay toolbar with no left bar and clears composer', async ({
+test('the meta sits beside its bubble and takes no line, so the turn gap is 24px (C3)', async ({
   page,
 }) => {
   const { stream } = await openConversation(page, 1440, 'light');
-  const latestRow = stream.getByTestId('chief-msg').filter({ hasText: SHORT_ASSISTANT_MSG });
-  const latestReply = latestRow.getByTestId('chief-reply');
-  const latestBubble = latestRow.getByTestId('chief-reply-bubble');
-  const latestTools = latestRow.getByTestId('chief-msg-foot');
-
-  await page.mouse.move(0, 0);
-  await expect(latestTools, 'latest reply toolbar is hidden at rest').toHaveCSS('opacity', '0');
-  await expect(latestTools).toHaveAttribute('data-placement', 'top-end-hover');
-  const replyHeightBefore = (await boxOf(latestReply, 'latest reply before hover')).height;
-  const bubbleHeightBefore = (await boxOf(latestBubble, 'latest bubble before hover')).height;
-  expect(Math.round(replyHeightBefore), 'toolbar adds 0px in-flow height').toBe(
-    Math.round(bubbleHeightBefore),
-  );
-
-  await latestBubble.hover();
-  await expect(latestTools).toHaveCSS('opacity', '1');
+  const userRow = rowOf(stream, USER_MSG);
+  const userBox = await boxOf(bubbleIn(userRow), 'owner bubble');
+  const replyBox = await boxOf(bubbleIn(rowOf(stream, ASSISTANT_MSG)), 'reply bubble');
+  const metaBox = await boxOf(metaIn(userRow), 'owner meta');
+  expect(metaBox.x + metaBox.width, 'C3: the owner meta sits left of its bubble').toBeLessThanOrEqual(userBox.x);
   expect(
-    await latestReply.evaluate((el) => getComputedStyle(el, '::before').content),
-    'no left ownership bar on hover',
-  ).toMatch(/^(none|normal)$/);
-  expect(Math.round((await boxOf(latestReply, 'latest reply hovered')).height)).toBe(
-    Math.round(replyHeightBefore),
+    Math.round(replyBox.y - (userBox.y + userBox.height)),
+    'C3: the turn gap holds no meta line',
+  ).toBe(24);
+
+  const wideRow = rowOf(stream, WIDE_USER_MSG);
+  await bubbleIn(wideRow).scrollIntoViewIfNeeded();
+  await bubbleIn(wideRow).hover();
+  await expect(metaIn(wideRow)).toHaveCSS('opacity', '1');
+  expect(
+    overlaps(await boxOf(metaIn(wideRow), 'wide meta'), await boxOf(bubbleIn(wideRow), 'wide bubble')),
+    'wide owner bubble never overlaps its meta',
+  ).toBe(false);
+});
+
+test('the latest reply shows its meta row on hover only and clears the composer', async ({ page }) => {
+  const { stream } = await openConversation(page, 1440, 'light');
+  const latestRow = rowOf(stream, SHORT_ASSISTANT_MSG);
+  const latestBubble = bubbleIn(latestRow);
+  const latestMeta = metaIn(latestRow);
+  await page.mouse.move(0, 0);
+  await expect(latestMeta, 'latest reply meta row is hidden at rest').toHaveCSS('opacity', '0');
+  const rowHeightBefore = (await boxOf(latestRow, 'latest row before hover')).height;
+  await latestBubble.hover();
+  await expect(latestMeta).toHaveCSS('opacity', '1');
+  expect(Math.round((await boxOf(latestRow, 'latest row hovered')).height)).toBe(
+    Math.round(rowHeightBefore),
   );
-  const toolsBox = await boxOf(latestTools, 'latest assistant toolbar');
+  const metaBox = await boxOf(latestMeta, 'latest meta row');
   const composerBox = await boxOf(page.getByTestId('home-c').locator('.chief-composer'), 'composer');
-  expect(toolsBox.y + toolsBox.height, 'latest toolbar stays above composer').toBeLessThanOrEqual(
+  expect(metaBox.y + metaBox.height, 'latest meta row stays above the composer').toBeLessThanOrEqual(
     composerBox.y,
   );
-  expect(await isHittable(latestTools.getByTestId('chief-msg-copy'))).toBe(true);
+  expect(await isHittable(latestMeta.getByTestId('message-copy'))).toBe(true);
 });
 
-test('consecutive assistant messages are split by a centred time line and the hovered toolbar never reaches it', async ({
+test('consecutive replies minutes apart are separate bubbles with no time line, and a hovered meta row never reaches the next', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -429,69 +341,13 @@ test('consecutive assistant messages are split by a centred time line and the ho
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   await expect(stream).toContainText('第二条连续回复。');
-
-  const first = stream.getByTestId('chief-msg').filter({ hasText: '第一条连续回复。' });
-  const second = stream.getByTestId('chief-msg').filter({ hasText: '第二条连续回复。' });
-  await expect(first.getByTestId('chief-msg-col')).toHaveCSS('border-top-width', '0px');
-  await expect(second.getByTestId('chief-msg-col')).toHaveCSS('border-top-width', '0px');
-  const divider = stream.getByTestId('chief-time-divider');
-  await expect(divider, 'one time line between the two replies').toHaveCount(1);
-  await expect(divider).toHaveCSS('text-align', 'center');
-
-  const firstBubbleBox = await boxOf(first.getByTestId('chief-reply-bubble'), 'first reply');
-  const secondBubbleBox = await boxOf(second.getByTestId('chief-reply-bubble'), 'second reply');
-  const dividerBox = await boxOf(divider, 'time line');
-  expect(dividerBox.y).toBeGreaterThan(firstBubbleBox.y + firstBubbleBox.height);
-  expect(dividerBox.y + dividerBox.height).toBeLessThan(secondBubbleBox.y);
-
-  for (const [row, label] of [
-    [first, 'first'],
-    [second, 'second'],
-  ] as const) {
-    await row.getByTestId('chief-reply-bubble').hover();
-    const tools = row.getByTestId('chief-msg-foot');
-    await expect(tools).toHaveCSS('opacity', '1');
-    const toolsBox = await boxOf(tools, `${label} toolbar`);
-    expect(overlaps(toolsBox, dividerBox), `${label} toolbar clears the time line`).toBe(false);
-    expect(overlaps(toolsBox, label === 'first' ? secondBubbleBox : firstBubbleBox)).toBe(false);
-  }
+  const first = rowOf(stream, '第一条连续回复。');
+  const second = rowOf(stream, '第二条连续回复。');
+  await expect(stream.getByTestId('chief-time-divider'), 'no time line under an hour').toHaveCount(0);
+  await expect(bubbleIn(first)).toHaveCount(1);
+  await expect(bubbleIn(second)).toHaveCount(1);
+  const secondBox = await boxOf(bubbleIn(second), 'second reply');
+  await bubbleIn(first).hover();
+  await expect(metaIn(first)).toHaveCSS('opacity', '1');
+  expect(overlaps(await boxOf(metaIn(first), 'first meta'), secondBox)).toBe(false);
 });
-
-async function assertTopEndToolbar(page: Page, stream: Locator, label: string, shot: string) {
-  const row = stream.getByTestId('chief-msg').filter({ hasText: ASSISTANT_MSG });
-  const prevRow = stream.getByTestId('chief-msg').filter({ hasText: USER_MSG });
-  const reply = row.getByTestId('chief-reply');
-  const bubble = row.getByTestId('chief-reply-bubble');
-  const tools = row.getByTestId('chief-msg-foot');
-  await bubble.scrollIntoViewIfNeeded();
-  await page.mouse.move(0, 0);
-  await expect(tools, `C3 ${label}: assistant toolbar is hidden at rest`).toHaveCSS('opacity', '0');
-  const bubbleBefore = await boxOf(bubble, 'assistant bubble before hover');
-
-  await bubble.hover();
-  await expect(tools).toHaveCSS('opacity', '1');
-  await captureRowShot(page, shot, stream, row);
-  await expect(tools).toHaveAttribute('data-placement', 'top-end-hover');
-  await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
-  await expect(tools.locator('[data-slot="message-toolbar-meta"]'), `${label}: no time in the toolbar`).toHaveCount(0);
-
-  const replyBox = await boxOf(reply, 'assistant reply');
-  const bubbleBox = await boxOf(bubble, 'assistant bubble');
-  const toolsBox = await boxOf(tools, 'assistant toolbar');
-  const prevBox = await boxOf(prevRow.getByTestId('chief-bubble'), 'previous user bubble');
-  const copyBox = await boxOf(tools.getByTestId('chief-msg-copy'), 'assistant copy button');
-
-  expect(Math.round(bubbleBox.y), `${label}: hover does not shift bubble`).toBe(Math.round(bubbleBefore.y));
-  expect(overlaps(toolsBox, bubbleBox), `${label}: toolbar sits in the gutter beside the text`).toBe(false);
-  expect(overlaps(toolsBox, prevBox), `${label}: toolbar clears the bubble above`).toBe(false);
-  expect(Math.abs(toolsBox.x + toolsBox.width - (replyBox.x + replyBox.width)), `${label}: pinned to the right edge`).toBeLessThanOrEqual(1);
-  expect(Math.abs(toolsBox.y - replyBox.y), `${label}: level with the first line`).toBeLessThanOrEqual(2);
-  expect(Math.round(copyBox.height), `${label}: compact assistant button is 28px`).toBe(28);
-  expect(await toolOrder(tools)).toEqual(['copy']);
-  const look = await tools.evaluate((el) => {
-    const cs = getComputedStyle(el);
-    return { border: cs.borderTopWidth, shadow: cs.boxShadow };
-  });
-  expect(look, `${label}: a bordered pill, no shadow (V21)`).toEqual({ border: '1px', shadow: 'none' });
-  expect(await isHittable(tools.getByTestId('chief-msg-copy'))).toBe(true);
-}

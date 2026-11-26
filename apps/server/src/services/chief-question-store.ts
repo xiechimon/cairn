@@ -2,8 +2,9 @@ import {
   ASK_USER_QUESTION_KIND,
   type AskUserQuestionContent,
   askUserQuestionContentSchema,
+  TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt, isNull, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, chiefThread, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -89,6 +90,22 @@ export function questionAskedAt(db: Db, threadId: string, requestId: string): nu
   );
 }
 
+export function ownerSpokeSince(db: Db, threadId: string, since: number): boolean {
+  return db
+    .select({ id: chiefMessage.id })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId),
+        eq(chiefMessage.role, 'user'),
+        gt(chiefMessage.createdAt, since),
+        or(isNull(chiefMessage.origin), eq(chiefMessage.origin, 'user')),
+      ),
+    )
+    .all()
+    .some((row) => !row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX));
+}
+
 export function parkedReply(content: AskUserQuestionContent): AskUserQuestionContent {
   return { ...content, status: 'cancelled', cancelReason: ASK_PARKED_REASON };
 }
@@ -149,6 +166,31 @@ export function cancelQuestion(
   };
   writeQuestion(deps.db, input.threadId, input.requestId, next, nowMs());
   publishQuestion(deps, input.threadId, input.requestId);
+}
+
+export function pendingPlainQuestionIds(
+  db: Db,
+  threadId: string,
+  projectId: string | null,
+): string[] {
+  return db
+    .select()
+    .from(chiefMessage)
+    .where(eq(chiefMessage.threadId, threadId))
+    .all()
+    .filter((row) => {
+      const content = askQuestionContentOf(row.content);
+      return (
+        content !== null &&
+        content.status === 'pending' &&
+        (projectId === null || row.projectId === projectId) &&
+        !row.id.startsWith(APPROVAL_CARD_ID_PREFIX) &&
+        proposalIdOfCard(content) === null &&
+        content.questions.length === 1 &&
+        content.questions[0]?.options.length === 0
+      );
+    })
+    .map((row) => row.id);
 }
 
 export function cancelPendingQuestions(deps: StoreDeps, threadId: string, reason: string): void {

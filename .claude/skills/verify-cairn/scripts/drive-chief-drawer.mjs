@@ -68,7 +68,6 @@ const MODEL_BTN = 'button[aria-label="总管主模型"]';
 const DIALOG = '[role="dialog"][aria-label="模型"]';
 const GEAR = 'button[aria-label="总管设置"]';
 const SETTINGS = 'h1:text-is("总管设置")';
-const REWIND_DIALOG = '[role="dialog"][aria-label="恢复到此处"]';
 
 const stamp = Date.now() % 100000;
 const prov = {
@@ -91,26 +90,6 @@ const context = await browser.newContext({
 });
 await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: WEB });
 const page = await context.newPage();
-
-function sqliteClearActiveRun(threadId) {
-  if (threadId == null) return false;
-  const require = createRequire(join(REPO, 'apps/server/package.json'));
-  const Database = require('better-sqlite3');
-  const db = new Database(join(stack.homeDir, 'server/server.db'));
-  db.prepare('update chief_thread set activeRun = null where id = ?').run(threadId);
-  db.close();
-  return true;
-}
-
-function sqliteStepCount(threadId) {
-  if (threadId == null) return -1;
-  const require = createRequire(join(REPO, 'apps/server/package.json'));
-  const Database = require('better-sqlite3');
-  const db = new Database(join(stack.homeDir, 'server/server.db'), { readonly: true });
-  const row = db.prepare('select count(*) as n from step where buildId = ?').get(threadId);
-  db.close();
-  return row ? row.n : -1;
-}
 
 function sqliteChiefModel() {
   const require = createRequire(join(REPO, 'apps/server/package.json'));
@@ -307,56 +286,6 @@ try {
   }
   await settled(page);
 
-  await page.locator('[data-testid="chief-composer-input"]').fill('第二句供 rewind。');
-  await page.keyboard.press('Enter');
-  await page
-    .waitForFunction(
-      () =>
-        document.querySelectorAll('[data-testid="chief-msg-tools"] button[aria-label="恢复到此处"]')
-          .length >= 2,
-      null,
-      { timeout: 8000 },
-    )
-    .catch(() => {});
-  const restoreBtns = page.locator(
-    DRAWER + ' [data-testid="chief-msg-tools"] button[aria-label="恢复到此处"]',
-  );
-  const nRestore = await restoreBtns.count();
-  const threadsPre = await getJson(SERVER + '/api/teams/' + teamId + '/chief/threads');
-  sqliteClearActiveRun(threadsPre?.[0]?.id ?? null);
-  if (nRestore >= 2) {
-    await restoreBtns.first().click();
-
-    await page.waitForSelector(REWIND_DIALOG, { state: 'visible', timeout: 8000 }).catch(() => {});
-    await page.locator(REWIND_DIALOG + ' button:has-text("恢复到此处")').click();
-    await page
-      .waitForFunction(
-        () =>
-          document.querySelectorAll('[data-testid="chief-msg-tools"] button[aria-label="恢复到此处"]')
-            .length === 1,
-        null,
-        { timeout: 8000 },
-      )
-      .catch(() => {});
-    const threads = await getJson(SERVER + '/api/teams/' + teamId + '/chief/threads');
-    const tid = threads?.[0]?.id ?? null;
-    let userMsgs = [];
-    if (tid != null) {
-      const conv = await getJson(SERVER + '/api/conversations/' + tid + '/messages');
-      userMsgs = (conv.messages ?? []).filter((m) => m.role === 'user');
-    }
-    const sqlSteps = sqliteStepCount(tid);
-    check(
-      'rewind-truncates-and-reenqueues',
-      userMsgs.length === 1 &&
-        userMsgs[0].content === '验证复制钮的一句话。' &&
-        sqlSteps === 3,
-      'user 消息=' + userMsgs.length + '（锚保留）；step 行=' + sqlSteps + '（A+B+rewind）',
-    );
-  } else {
-    check('rewind-truncates-and-reenqueues', false, '恢复钮数=' + nRestore + '（应 ≥2）');
-  }
-  await shot(page, '07-after-rewind.png');
 
   await settled(page);
   const bareTools = await page.locator(DRAWER + ' [data-testid="chief-msg-tools"] > svg').count();

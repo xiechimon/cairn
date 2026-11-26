@@ -339,13 +339,13 @@
     {
       "id": "questions",
       "name": "Question cards",
-      "summary": "Questions from the Coordinator or a thread appear as answerable cards above the composer, stay parked quietly, and keep per-question drafts.",
-      "states": "A question card sits above the composer with numbered options and a recommended one; it can be collapsed, answered later, or cancelled, and shows a line once answered.",
+      "summary": "Questions from the Coordinator or a thread appear as answerable cards in the conversation where they were asked, never block further messages, and keep per-question drafts.",
+      "states": "A question with options sits in the transcript as a card with numbered options, a recommended one and its own text row; messages sent meanwhile land below it, it can be answered later or skipped, and shows a receipt once answered. A question without options is a plain Coordinator message answered by the owner's next message.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/decision-dock.tsx",
+          "apps/web/src/chief/question-card.tsx",
           "apps/web/src/chief/chief-question.tsx",
           "apps/web/src/chief/question-lifecycle.ts"
         ],

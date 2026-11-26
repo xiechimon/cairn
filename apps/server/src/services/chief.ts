@@ -94,7 +94,7 @@ import {
   CHIEF_TURN_END_REASON,
   cancelPendingQuestions,
 } from './chief-question-store.js';
-import { answerQuestion } from './chief-questions.js';
+import { answerPlainQuestionsWith, answerQuestion } from './chief-questions.js';
 import { chiefRowOf, existingCoordinatorThread } from './chief-rows.js';
 import {
   addTurnOwnerMessage,
@@ -1254,6 +1254,8 @@ export function submitChiefMessage(
         .set({ updatedAt: now })
         .where(eq(chiefThread.id, threadRow.id))
         .run();
+      if (origin === 'user')
+        answerPlainQuestionsWith(deps, threadRow.id, message.projectId, body.content);
       enqueueChiefStep(deps, threadRow.id, {
         prompt: promptWithPickedProject(picked, `${directNote ?? ''}${body.content}`),
         trigger: 'user',
@@ -2278,7 +2280,7 @@ Ask only when the need itself is ambiguous, or when the user has to choose a dir
 </asking>
 
 <talking>
-Reply in the language of the user's latest message, which the turn notes record as Reply language — never the language of notes, tool results, task text or your earlier replies. Use plain short sentences, and say nothing when there is nothing new. Each paragraph shows as its own bubble, so keep one matter in one paragraph. Name a task inside your sentence with the link its tool result gives, never by number: the link shows as the task's title with its live state, so a task you just created or started reads as part of what you say ("I started [Fix the board count](todo:…) and queued the export after it.") rather than as a list after it. When several consecutive user messages arrive before your reply, read them together as one turn: if a later message corrects or replaces an earlier one, answer only the updated request without answering the withdrawn one; if they ask separate things, address each in one reply. To show an image or attachment inline in chat or notify_user, put its ![name](attachment:...) token on its own separate line (attachment returns that attachmentToken); when the user asks for an image from a repository or task, export or read the deliverable instead of saying chat cannot show images. To show what a task changed, call show_diff where the change belongs in your reply instead of pasting code; when numbers compare across categories or over time, call show_chart instead of writing a table.
+Reply in the language of the user's latest message, which the turn notes record as Reply language — never the language of notes, tool results, task text or your earlier replies. Use plain short sentences, and say nothing when there is nothing new. Keep one matter in one paragraph. Every task you create or start this turn already shows above your reply as a row with its live state, so do not list or repeat those tasks; when a sentence refers to a task, use the link its tool result gives, never its number. When several consecutive user messages arrive before your reply, read them together as one turn: if a later message corrects or replaces an earlier one, answer only the updated request without answering the withdrawn one; if they ask separate things, address each in one reply. To show an image or attachment inline in chat or notify_user, put its ![name](attachment:...) token on its own separate line (attachment returns that attachmentToken); when the user asks for an image from a repository or task, export or read the deliverable instead of saying chat cannot show images. To show what a task changed, call show_diff where the change belongs in your reply instead of pasting code; when numbers compare across categories or over time, call show_chart instead of writing a table.
 </talking>
 
 <events>

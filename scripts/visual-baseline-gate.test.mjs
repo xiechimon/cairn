@@ -43,7 +43,7 @@ test('new coverage is green, while deleting a registered surface baseline is red
 });
 
 test('a shared component is traced to every real page that renders it', () => {
-  const pages = pagesUsing('apps/web/src/components/chat/message-body.tsx', importGraph());
+  const pages = pagesUsing('apps/web/src/components/chat/message-bubble.tsx', importGraph());
   assert.deepEqual(pages, [
     'apps/web/src/board/side-chat.tsx',
     'apps/web/src/chief/chief-conversation.tsx',
@@ -51,7 +51,7 @@ test('a shared component is traced to every real page that renders it', () => {
 });
 
 test('a page that uses a shared component without a surface is red', () => {
-  const component = 'apps/web/src/components/chat/message-body.tsx';
+  const component = 'apps/web/src/components/chat/message-bubble.tsx';
   const errors = sharedComponentCoverageErrors({
     files: [component],
     surfaces: surfaces.filter((surface) => surface.id !== 'thread'),

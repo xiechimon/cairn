@@ -83,7 +83,6 @@ export interface ComposerSurfaceProps {
   mentionGroups?: MentionGroups | undefined;
   onPickProject?: ((project: { id: string }) => void) | undefined;
   stop?: { available: boolean; onStop: () => void } | undefined;
-  onAdvance?: (() => void) | undefined;
   send?: ComposerSend | undefined;
   active?: boolean;
   onFocusEnter?: (() => void) | undefined;
@@ -111,7 +110,6 @@ export function ComposerSurface({
   mentionGroups,
   onPickProject,
   stop,
-  onAdvance,
   send,
   active = true,
   onFocusEnter,
@@ -142,7 +140,6 @@ export function ComposerSurface({
     editable,
     draft: binding.draft,
     onDraftChange: binding.setDraft,
-    ...(binding.readDraft !== undefined ? { readDraft: binding.readDraft } : {}),
     onSend,
     onAttachment,
     ...(mentionGroups !== undefined ? { mentionGroups } : {}),
@@ -306,22 +303,11 @@ export function ComposerSurface({
               ref={attachComposer}
               data-testid={active ? (inputTestId ?? 'chief-composer-input') : undefined}
               data-compose-target=""
-              data-question-answer={active && onAdvance !== undefined ? '' : undefined}
               className={`h-7 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent px-0.5 py-1 font-sans text-ui leading-5 md:text-ui tabular-nums shadow-none field-sizing-fixed focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent ${MENTION_TEXTAREA_CLS} placeholder:text-(--text-tertiary) [&::placeholder]:whitespace-nowrap [&::placeholder]:opacity-0`}
               readOnly={!editable}
               value={wire.draft}
               onChange={wire.handleChange}
               onKeyDown={(event) => {
-                if (
-                  onAdvance !== undefined &&
-                  event.key === 'Enter' &&
-                  !event.shiftKey &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  if (!attaching) onAdvance();
-                  return;
-                }
                 if (
                   onCancelReply !== undefined &&
                   event.key === 'Escape' &&

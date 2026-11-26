@@ -103,7 +103,6 @@ const PROBE_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
 
 export const PROBE_BUILD_OPEN: TranscriptItem[] = [
   ...PROBE_CONFIRM_TRANSCRIPT,
-  { kind: 'note', text: '13:35' },
   { kind: 'user', text: '确认' },
 ];
 

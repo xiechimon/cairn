@@ -9,12 +9,11 @@ import {
   useState,
 } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { copyTextWithFeedback } from '../../lib/clipboard.js';
+import { useCopyWithToast } from '../copy-icon-button.js';
 import { Disclosure } from '../disclosure.js';
 import { Button } from '../ui/button.js';
 import { DialogShell } from '../ui/dialog-shell.js';
 import { Marker, MarkerContent, MarkerIcon } from '../ui/marker.js';
-import { toastError, toastSuccess } from '../ui/toaster.js';
 
 export interface NoticeDetail {
   lines: string[];
@@ -67,6 +66,7 @@ export function RawError({
   lines?: string[];
 }) {
   const { t } = useI18n();
+  const copy = useCopyWithToast();
   return (
     <span
       id={id}
@@ -85,13 +85,7 @@ export function RawError({
         className="absolute top-1 right-1 text-content-tertiary pointer-coarse:size-11"
         aria-label={t('复制原始错误')}
         title={t('复制原始错误')}
-        onClick={() =>
-          copyTextWithFeedback(
-            text,
-            () => toastSuccess(t('已复制')),
-            (error) => toastError(t('复制失败，请重试。'), error),
-          )
-        }
+        onClick={() => copy(text)}
       >
         <Copy className="size-4" />
       </Button>
@@ -239,6 +233,7 @@ export function RawTextDialog({
   testId: string;
 }) {
   const { t } = useI18n();
+  const copy = useCopyWithToast();
   return (
     <DialogShell
       title={title}
@@ -252,13 +247,7 @@ export function RawTextDialog({
           aria-label={t('复制')}
           title={t('复制')}
           className="text-content-tertiary pointer-coarse:size-11"
-          onClick={() =>
-            copyTextWithFeedback(
-              text,
-              () => toastSuccess(t('已复制')),
-              (error) => toastError(t('复制失败，请重试。'), error),
-            )
-          }
+          onClick={() => copy(text)}
         >
           <Copy />
         </Button>

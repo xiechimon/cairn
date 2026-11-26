@@ -9,7 +9,7 @@ import {
 import { cn } from 'cn';
 import { Link } from 'react-router';
 import { ReplyQuoteBlock } from '../chief/reply-quote-block.js';
-import { ChatMessageBody } from '../components/chat/message-body.js';
+import { MessageBubble } from '../components/chat/message-bubble.js';
 import { NoticeLine } from '../components/chat/notice-line.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { useI18n } from '../i18n/provider.js';
@@ -110,13 +110,10 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
               {row.role === 'coordinator' && (
                 <span className="text-meta text-content-tertiary">{t('Coordinator')}</span>
               )}
-              <ChatMessageBody
-                speaker={row.role === 'owner' ? 'user' : 'assistant'}
-                className={cn(
-                  row.role === 'owner'
-                    ? 'chat-bubble max-w-[min(85%,42rem)] break-words'
-                    : 'min-w-0 text-card-title break-words text-foreground voice-response w-full',
-                )}
+              <MessageBubble
+                side={row.role === 'owner' ? 'owner' : 'coordinator'}
+                tail={false}
+                className="max-w-[min(85%,42rem)] break-words"
               >
                 {reply !== null && (
                   <ReplyQuoteBlock
@@ -127,7 +124,7 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
                   />
                 )}
                 <ChatMarkdown text={reply?.body ?? text} />
-              </ChatMessageBody>
+              </MessageBubble>
             </MessageContent>
           </Message>
         );

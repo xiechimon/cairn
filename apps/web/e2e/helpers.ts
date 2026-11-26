@@ -128,17 +128,19 @@ export async function pressOpenCoordinator(page: Page): Promise<void> {
 }
 
 export async function expectNoReplySteps(page: Page, reply: Locator): Promise<void> {
-  await reply.locator('[data-slot="reply-bubble"], [data-testid="chief-bubble"]').first().hover();
-  const tools = reply
-    .locator('[data-testid="chief-msg-tools"], [data-testid="chief-msg-foot"]')
-    .first();
-  await expect(tools.getByTestId('chief-msg-copy')).toBeVisible();
+  await reply.locator('[data-slot="message-bubble"]').first().hover();
+  const meta = reply.locator('[data-slot="message-meta"]').first();
+  await expect(meta.getByTestId('message-copy')).toBeVisible();
   await expect(page.getByTestId('chief-msg-steps')).toHaveCount(0);
 }
 
 export async function copyFromRowTools(page: Page, block: Locator): Promise<void> {
   await block.hover();
-  await block.getByTestId('msg-tools').getByTestId('chief-msg-copy').click();
+  await block
+    .locator('xpath=ancestor::*[contains(@class,"group/message")][1]')
+    .locator('[data-slot="message-meta"]')
+    .getByTestId('message-copy')
+    .click();
 }
 
 export async function stubCoordinatorChief(page: Page, teamId: string, userId: string) {

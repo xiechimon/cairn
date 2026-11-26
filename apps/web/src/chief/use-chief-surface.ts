@@ -151,8 +151,8 @@ export function chiefActionErrorCopy(
   if (action === 'rewind' && /in flight|回合中/i.test(message)) {
     return {
       kind: 'specific',
-      title: 'Coordinator 正在运行，请停止后再恢复。',
-      inline: 'Coordinator 正在运行，请停止后再恢复。',
+      title: 'Coordinator 正在运行，请停止后再重试。',
+      inline: 'Coordinator 正在运行，请停止后再重试。',
     };
   }
   return null;
@@ -404,7 +404,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         if (activeThread === null) return;
         mutations.chiefRewind.mutate(
           { threadId: activeThread.id, messageId },
-          { onError: (e) => void reportChiefActionError(e, 'rewind', '恢复失败，请重试。') },
+          { onError: (e) => void reportChiefActionError(e, 'rewind', '重试失败，请稍后重试。') },
         );
       }
     : undefined;

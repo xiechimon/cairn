@@ -21,8 +21,6 @@ import { RouteDialogCloseProvider } from '../overlay/route-dialog.js';
 import { SETTINGS_HREF, settingsSectionOf } from '../settings/settings-href.js';
 import { useSettingsOverlay } from '../settings/use-settings-overlay.js';
 import { useDesktopActivityReport } from './desktop-activity.js';
-import { questionDockState } from './question-dock-state.js';
-import { questionDraftKey } from './question-drafts.js';
 import { type OriginChiefQuestion, originChiefQuestions } from './question-origin.js';
 import { type ChiefSurface, useChiefSurface } from './use-chief-surface.js';
 
@@ -137,18 +135,11 @@ export function ChiefRoot({
       }),
     [surface.chiefData.stream, surface.chiefData.threadId, surface.chiefData.threadTitle, teamId],
   );
-  const conversationId = surface.chiefData.threadId ?? 'chief';
-  const stream = surface.chiefData.stream;
-  useEffect(() => {
-    for (const item of stream ?? []) {
-      if (item.kind !== 'question' || item.status === 'pending') continue;
-      questionDockState.clearAnswers(
-        questionDraftKey({ teamId: teamId ?? 'local', conversationId, requestId: item.requestId }),
-      );
-    }
-  }, [stream, conversationId, teamId]);
   const api = useMemo<ChiefRootApi>(
-    () => ({ surface, pendingQuestions }),
+    () => ({
+      surface,
+      pendingQuestions,
+    }),
     [surface, pendingQuestions],
   );
   return (

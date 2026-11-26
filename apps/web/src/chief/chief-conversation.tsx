@@ -17,7 +17,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react';
 import { useConnected } from '../api/connection-state.js';
 import {
@@ -34,13 +33,10 @@ import { useUnreadThreadIds } from '../board/use-thread-unread.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
+import { TimeDivider } from '../components/chat/message-time.js';
 import { machineSecondary } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
-import {
-  DIALOG_PRIMARY_BUTTON,
-  DIALOG_TEXT_BUTTON,
-  DialogShell,
-} from '../components/ui/dialog-shell.js';
+import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import {
   MessageScroller,
   MessageScrollerContent,
@@ -49,17 +45,14 @@ import {
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { ThreadUnreadContext, type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
-import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
-import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useFileDrop } from '../overlay/file-drop.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
-import { AnswerComposer } from './answer-composer.js';
 import { type BubbleRun, bubbleRuns } from './bubble-runs.js';
 import { ChiefStreamRow, chiefStreamRowKey, chiefStreamRowKeys } from './chief-message-rows.js';
 import {
@@ -68,26 +61,12 @@ import {
   ChiefFallbackBanner,
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
-import {
-  ChiefQuestion,
-  QuestionRestoreButton,
-  useAnswerKey,
-  useMinimizedQuestion,
-  useQuestionPending,
-} from './chief-question.js';
-import { chiefRowRenders } from './chief-row-kinds.js';
-import {
-  foldTaskCards,
-  placeReportCards,
-  placeUnmentionedTasks,
-  todoGlanceOf,
-} from './chief-task-refs.js';
+import { QuestionArrivals, useQuestionPending } from './chief-question.js';
+import { foldTaskCards, placeReportCards, todoGlanceOf } from './chief-task-refs.js';
 import { serverDraftBinding } from './composer-binding.js';
-import { composerMode } from './composer-mode.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
 import type { UnsentSends } from './outbox.js';
 import { type LateArrival, withoutReturnedText } from './outbox.js';
-import { questionDockState } from './question-dock-state.js';
 import { awaitingStream } from './question-lifecycle.js';
 import { type QueuedMessage, QueueTabs } from './queue-tabs.js';
 import { QuickReplies } from './quick-replies.js';
@@ -101,7 +80,7 @@ import {
   groupThreadEvents,
   type StreamRow,
 } from './thread-activity.js';
-import { streamDividers, timeDividerLabel } from './time-dividers.js';
+import { streamDividers } from './time-dividers.js';
 import { CardFailureContext, QueueWaitCard, TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
 
@@ -109,14 +88,14 @@ const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
   'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 overflow-x-clip px-4 pt-8 in-data-[chat-top=under-header]:pt-20 [overflow-wrap:anywhere]';
 
-const THREAD_COMPOSER = 'thread';
 const VISIBLE_ITEM_STYLE: CSSProperties = { contentVisibility: 'visible' };
 
 interface StreamLayout {
   grouped: GroupedRow[];
   keys: (string | number)[];
+  pinned: number[];
   runs: BubbleRun[];
-  unmentioned: ReadonlyMap<GroupedRow['item'], readonly string[]>;
+  started: ReadonlyMap<GroupedRow['item'], readonly string[]>;
   reports: ReadonlyMap<GroupedRow['item'], readonly string[]>;
   dividers: (number | null)[];
   lastAt: number | null;
@@ -135,8 +114,11 @@ function layoutStream(
   return {
     grouped,
     keys: chiefStreamRowKeys(grouped),
+    pinned: grouped.flatMap(({ item }, n) =>
+      item.kind === 'question' && item.status === 'pending' ? [n] : [],
+    ),
     runs: bubbleRuns(grouped, previousAt),
-    unmentioned: placeUnmentionedTasks(grouped, startedBy, glances),
+    started: startedBy,
     reports: placeReportCards(grouped, startedBy, glances, reportSeen),
     dividers,
     lastAt,
@@ -265,8 +247,7 @@ export function ChiefConversation({
   pendingComments,
 }: ChiefConversationProps) {
   const questionPending = useQuestionPending();
-  const minimizedQuestion = useMinimizedQuestion();
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
   const [highlightedSource, setHighlightedSource] = useState<ReplyQuoteDraft | null>(null);
   const quickKey = (chief.quickReplies ?? []).join('\n');
@@ -276,25 +257,14 @@ export function ChiefConversation({
     previewReply ??
     (replyQuote !== null
       ? t('回复这条消息')
-      : minimizedQuestion?.placeholder != null
-        ? minimizedQuestion.placeholder
-        : chief.outage != null
-          ? t('可以继续说，恢复后按顺序处理')
-          : chief.waitingTurn !== undefined ||
-              (chief.running === true && chief.noRunningTurn === true)
-            ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
-            : chief.running === true
-              ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-              : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
-  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
-  const answerKey = useAnswerKey();
-  const [threadOverride, setThreadOverride] = useState(false);
-  const mode = composerMode({
-    questionPending: answerKey !== null,
-    threadClaimed: threadOverride,
-    quoteStaged: replyQuote !== null,
-  });
-  const answerActive = mode === 'answer';
+      : chief.outage != null
+        ? t('可以继续说，恢复后按顺序处理')
+        : chief.waitingTurn !== undefined ||
+            (chief.running === true && chief.noRunningTurn === true)
+          ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
+          : chief.running === true
+            ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+            : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const onAttachment =
@@ -312,26 +282,6 @@ export function ChiefConversation({
     reader.follow();
     scrollToEnd();
   }, [chief.threadTitle, scrollToEnd, reader]);
-  const [rewindConfirm, setRewindConfirm] = useState<{ index: number; id: string | null } | null>(
-    null,
-  );
-  const copyText = useCallback(
-    (text: string) =>
-      copyTextWithFeedback(
-        text,
-        () => toastSuccess(t('已复制')),
-        (error) => toastError(t('复制失败，请重试。'), error),
-      ),
-    [t],
-  );
-  const rewindDisabled = chief.running === true || questionPending;
-  const requestRewind = useCallback(
-    (index: number, id: string | null) => {
-      if (rewindDisabled) return;
-      setRewindConfirm({ index, id });
-    },
-    [rewindDisabled],
-  );
   const [typing, setTyping] = useState(false);
   const [liveDraft, setLiveDraft] = useServerDraft({
     teamId,
@@ -347,37 +297,14 @@ export function ChiefConversation({
   liveDraftRef.current = liveDraft;
   const stopTurnRef = useRef<(() => void) | undefined>(undefined);
   const surfaceRef = useRef<ComposerSurfaceHandle | null>(null);
-  const answerSurfaceRef = useRef<ComposerSurfaceHandle | null>(null);
-  const activeComposer = answerActive ? answerKey : THREAD_COMPOSER;
   const drop = useFileDrop(
     onAttachment === undefined || composerReplacement != null
       ? undefined
-      : (files) => (answerActive ? answerSurfaceRef : surfaceRef).current?.attach(files),
+      : (files) => surfaceRef.current?.attach(files),
   );
-  const focusedComposerRef = useRef<string | null>(null);
-  const leaveComposer = useCallback(() => {
-    focusedComposerRef.current = null;
-  }, []);
-  const shownComposerRef = useRef(activeComposer);
-  const threadFocusPendingRef = useRef(false);
-  useLayoutEffect(() => {
-    const previous = shownComposerRef.current;
-    shownComposerRef.current = activeComposer;
-    if (activeComposer === THREAD_COMPOSER && threadFocusPendingRef.current) {
-      threadFocusPendingRef.current = false;
-      surfaceRef.current?.focus({ preventScroll: true });
-      return;
-    }
-    if (previous === activeComposer || focusedComposerRef.current !== previous) return;
-    const incoming = activeComposer === THREAD_COMPOSER ? surfaceRef : answerSurfaceRef;
-    incoming.current?.focus({ preventScroll: true });
-  }, [activeComposer]);
   const restoreToThread = (update: (current: string) => string) => {
-    setThreadOverride(true);
     setLiveDraft(update);
-    if (shownComposerRef.current === THREAD_COMPOSER)
-      surfaceRef.current?.focus({ preventScroll: true });
-    else threadFocusPendingRef.current = true;
+    surfaceRef.current?.focus({ preventScroll: true });
   };
   const composerBinding = serverDraftBinding(
     onSend != null ? liveDraft : (chief.draft ?? ''),
@@ -385,7 +312,6 @@ export function ChiefConversation({
       ? (value: string) => {
           setLiveDraft(value);
           setTyping(value.trim() !== '');
-          if (value === '') setThreadOverride(false);
         }
       : undefined,
   );
@@ -408,10 +334,7 @@ export function ChiefConversation({
     sendQuoted === undefined ? undefined : (text: string) => sendQuoted(replyQuote, text);
   const stageReply = useCallback((draft: ReplyQuoteDraft) => {
     setReplyQuote(draft);
-    setThreadOverride(true);
-    if (shownComposerRef.current === THREAD_COMPOSER)
-      surfaceRef.current?.focus({ preventScroll: true });
-    else threadFocusPendingRef.current = true;
+    surfaceRef.current?.focus({ preventScroll: true });
   }, []);
   const prefillKey = prefill?.key;
   const prefillText = prefill?.text;
@@ -500,11 +423,11 @@ export function ChiefConversation({
   const canStop = stopTurn !== undefined && (waitingRerun || chief.running === true);
   const allRows = useMemo(
     () =>
-      awaitingStream(workingRowLast(chief.stream ?? []), questionPending).map((item, i) => ({
+      awaitingStream(workingRowLast(chief.stream ?? [])).map((item, i) => ({
         item,
         i,
       })),
-    [chief.stream, questionPending],
+    [chief.stream],
   );
   const rows = useMemo(
     () =>
@@ -625,7 +548,6 @@ export function ChiefConversation({
   const queueWait = waitNow !== null && waitNow.kind !== dismissedWait ? waitNow : null;
   const cardFailure =
     connected && chief.outage == null && queueWait === null ? (failure?.id ?? null) : null;
-  const clock = useMinuteClock();
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
     const reportSeen = new Set<string>();
@@ -649,20 +571,16 @@ export function ChiefConversation({
     item: GroupedRow['item'],
     i: number,
     run: BubbleRun | undefined,
-    unmentioned: readonly string[] | undefined,
+    started: readonly string[] | undefined,
     reports: readonly string[] | undefined,
   ) => (
     <ChiefStreamRow
       item={item}
-      index={i}
-      onCopy={copyText}
-      onRewindRequest={requestRewind}
-      rewindDisabled={rewindDisabled}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
       onWithdraw={onWithdraw != null ? withdrawSteer : undefined}
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}
-      {...(unmentioned !== undefined ? { unmentioned } : {})}
+      {...(started !== undefined ? { started } : {})}
       {...(reports !== undefined ? { reports } : {})}
     />
   );
@@ -673,7 +591,7 @@ export function ChiefConversation({
   const quickReplies = (
     <QuickReplies
       replies={chief.quickReplies}
-      hidden={questionPending || answerActive || typing}
+      hidden={questionPending || typing}
       onPreview={(text) => setPreview(text === null ? null : { key: quickKey, text })}
       onSend={
         onSend == null
@@ -694,21 +612,14 @@ export function ChiefConversation({
       <>
         {at != null && (
           <MessageScrollerItem style={VISIBLE_ITEM_STYLE}>
-            <div
-              data-testid="chief-time-divider"
-              className="mt-5 text-center text-caption tabular-nums text-(--text-tertiary)"
-            >
-              <time dateTime={new Date(at).toISOString()}>
-                {timeDividerLabel(at, clock, locale, t)}
-              </time>
-            </div>
+            <TimeDivider at={at} className="mt-5" />
           </MessageScrollerItem>
         )}
         {row(
           entry.item,
           entry.i,
           layout.runs[n],
-          layout.unmentioned.get(entry.item),
+          layout.started.get(entry.item),
           layout.reports.get(entry.item),
         )}
         {quickAfter !== undefined && entry.item === quickAfter && quickReplies}
@@ -729,7 +640,7 @@ export function ChiefConversation({
     </div>
   );
   return (
-    <>
+    <QuestionArrivals>
       {heroLayout ? (
         <div
           {...drop.bind}
@@ -763,8 +674,8 @@ export function ChiefConversation({
                           <VirtualStream
                             cacheKey={chief.threadId ?? ''}
                             keys={streamLayout.keys}
+                            pinned={streamLayout.pinned}
                             renderRow={(n) => streamEntry(streamLayout, n)}
-                            viewportRef={viewportRef}
                           />
                         ) : (
                           <>
@@ -834,130 +745,51 @@ export function ChiefConversation({
         className="group/composer flex max-h-[65%] min-h-0 flex-none flex-col"
       >
         {composerReplacement ?? (
-          <>
-            <ChiefQuestion key={chief.threadId ?? ''} />
-            <ComposerSurface
-              key="thread"
-              handleRef={surfaceRef}
-              binding={composerBinding}
-              editable={onSend != null}
-              onSend={sendFromComposer}
-              send={
-                pendingComments != null && pendingComments.count > 0
-                  ? {
-                      label: t('发送（含 {n} 条评论）', { n: pendingComments.count }),
-                      text: t('发送（含 {n} 条评论）', { n: pendingComments.count }),
-                      testId: 'chief-send-comments',
-                      enabled: onSend != null,
-                      ...(liveDraft.trim() === '' && sendFromComposer !== undefined
-                        ? {
-                            onClick: () => void sendFromComposer(pendingComments.emptyDraftText),
-                          }
-                        : {}),
-                    }
-                  : undefined
-              }
-              onAttachment={onAttachment}
-              mentionGroups={mentionGroups}
-              stop={{
-                available: canStop,
-                onStop: () => stopTurnRef.current?.(),
-              }}
-              active={!answerActive}
-              onFocusEnter={() => {
-                focusedComposerRef.current = THREAD_COMPOSER;
-              }}
-              onFocusLeave={leaveComposer}
-              onCancelReply={replyQuote === null ? undefined : () => setReplyQuote(null)}
-              placeholder={composerPlaceholder}
-              trailing={
-                minimizedQuestion === null ? undefined : (
-                  <QuestionRestoreButton onClick={minimizedQuestion.restore} />
-                )
-              }
-              composerRef={answerActive ? undefined : composerRef}
-              tab={answerActive ? null : queueTab}
-              above={
-                answerActive ? null : (
-                  <>
-                    {pendingComments?.chips}
-                    {capsules}
-                  </>
-                )
-              }
-              context={chief.context}
-              running={chief.running}
-              threadId={chief.threadId ?? null}
-              dropActive={drop.active}
-              seededFiles={live ? undefined : chief.composerFiles}
-            />
-            {answerKey !== null && (
-              <AnswerComposer
-                key={answerKey}
-                answerKey={answerKey}
-                handleRef={answerSurfaceRef}
-                active={answerActive}
-                onFocusEnter={() => {
-                  focusedComposerRef.current = answerKey;
-                }}
-                onFocusLeave={leaveComposer}
-                onAttachment={onAttachment}
-                composerRef={answerActive ? composerRef : undefined}
-                tab={answerActive ? queueTab : null}
-                above={answerActive ? capsules : null}
-                context={chief.context}
-                running={chief.running}
-                threadId={chief.threadId ?? null}
-                dropActive={drop.active}
-              />
-            )}
-          </>
+          <ComposerSurface
+            key="thread"
+            handleRef={surfaceRef}
+            binding={composerBinding}
+            editable={onSend != null}
+            onSend={sendFromComposer}
+            send={
+              pendingComments != null && pendingComments.count > 0
+                ? {
+                    label: t('发送（含 {n} 条评论）', { n: pendingComments.count }),
+                    text: t('发送（含 {n} 条评论）', { n: pendingComments.count }),
+                    testId: 'chief-send-comments',
+                    enabled: onSend != null,
+                    ...(liveDraft.trim() === '' && sendFromComposer !== undefined
+                      ? {
+                          onClick: () => void sendFromComposer(pendingComments.emptyDraftText),
+                        }
+                      : {}),
+                  }
+                : undefined
+            }
+            onAttachment={onAttachment}
+            mentionGroups={mentionGroups}
+            stop={{
+              available: canStop,
+              onStop: () => stopTurnRef.current?.(),
+            }}
+            onCancelReply={replyQuote === null ? undefined : () => setReplyQuote(null)}
+            placeholder={composerPlaceholder}
+            composerRef={composerRef}
+            tab={queueTab}
+            above={
+              <>
+                {pendingComments?.chips}
+                {capsules}
+              </>
+            }
+            context={chief.context}
+            running={chief.running}
+            threadId={chief.threadId ?? null}
+            dropActive={drop.active}
+            seededFiles={live ? undefined : chief.composerFiles}
+          />
         )}
       </div>
-      <DialogShell
-        title={t('恢复到此处')}
-        open={rewindConfirm !== null}
-        onClose={() => setRewindConfirm(null)}
-        size="s"
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              className={DIALOG_TEXT_BUTTON}
-              onClick={() => setRewindConfirm(null)}
-            >
-              {t('取消')}
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={rewindDisabled}
-              onClick={() => {
-                const anchor = rewindConfirm;
-                setRewindConfirm(null);
-                if (!rewindDisabled && anchor?.id != null) onRewind?.(anchor.id);
-              }}
-            >
-              {t('恢复到此处')}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-2">
-          <p className="m-0 text-ui text-foreground">
-            {t('恢复到此处？该条之后的 {n} 条消息会移除，Coordinator 从这条重发开新回合。', {
-              n:
-                rewindConfirm === null
-                  ? 0
-                  : [...earlierLayout.grouped, ...streamLayout.grouped].filter(
-                      (entry) => entry.i > rewindConfirm.index && chiefRowRenders(entry.item.kind),
-                    ).length,
-            })}
-          </p>
-          <p className="m-0 text-meta text-content-secondary">
-            {t('已创建的任务、代码改动和记忆会保留。')}
-          </p>
-        </div>
-      </DialogShell>
-    </>
+    </QuestionArrivals>
   );
 }
