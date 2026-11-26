@@ -1,24 +1,15 @@
-import { infoReportMessageSchema } from '@cairn/shared';
+import { infoReportMessageSchema, type TodoDeliverables } from '@cairn/shared';
 import { cn } from 'cn';
 import { FileText } from 'lucide-react';
-import {
-  type CSSProperties,
-  createContext,
-  type ReactNode,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type CSSProperties, createContext, useContext, useMemo, useState } from 'react';
 import { useConversationMessages } from '../api/hooks.js';
+import { artifactKey } from '../board/artifact/artifact-route.js';
+import { inlineArtifactKey, registerInlineArtifact } from '../board/artifact/inline-artifact.js';
+import { OpenFileContext } from '../board/file-pane.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
-import { CopyIconButton } from '../components/copy-icon-button.js';
 import { GrowText } from '../components/growth.js';
 import { Button } from '../components/ui/button.js';
-import { DialogTitle } from '../components/ui/dialog.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
-import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { TodoGlanceContext } from '../detail/segments.js';
 import { useI18n } from '../i18n/provider.js';
 import { messageStampLabel } from './time-dividers.js';
@@ -29,30 +20,62 @@ export interface ResearchReport {
   createdAt: number | undefined;
   final: boolean | null;
   label?: string;
+  attachmentId?: string;
+  todoId?: string;
+  deliverables?: TodoDeliverables;
+  inlineKey?: string;
 }
 
 export const ReportThreadContext = createContext<{ title: string; final: boolean } | null>(null);
 
 export const isFinalReportPhase = (phase: string) => phase === 'done' || phase === 'review';
 
+export function openResearchReportInPanel(
+  openFile: ((target: { name: string; key: string }) => void) | undefined,
+  report: ResearchReport,
+  meta: { stage: string | null; when: string | null; defaultLabel: string },
+): void {
+  if (openFile === undefined) return;
+  const key =
+    report.attachmentId !== undefined && report.attachmentId !== ''
+      ? artifactKey(report.attachmentId, 'report.md')
+      : inlineArtifactKey(report.inlineKey ?? report.title);
+  registerInlineArtifact(key, {
+    title: report.title,
+    label: report.label ?? meta.defaultLabel,
+    stage: meta.stage,
+    when: meta.when,
+    markdown: report.content,
+    ...(report.deliverables !== undefined ? { deliverables: report.deliverables } : {}),
+    ...(report.todoId !== undefined ? { todoId: report.todoId } : {}),
+    readOnly: report.final === null,
+  });
+  openFile({ name: report.title, key });
+}
+
 export function TranscriptReportCard({
   content,
   createdAt,
+  attachmentId,
 }: {
   content: string;
   createdAt: number | undefined;
+  attachmentId?: string | undefined;
 }) {
   const { t } = useI18n();
   const thread = useContext(ReportThreadContext);
   const heading = /^#{1,3}\s+(.+)$/m.exec(content)?.[1]?.trim();
+  const title = thread?.title ?? heading ?? t('调研报告');
   return (
     <ResearchReportCard
       className="mt-3"
       report={{
-        title: thread?.title ?? heading ?? t('调研报告'),
+        title,
         content,
         createdAt,
         final: thread?.final ?? true,
+        ...(attachmentId !== undefined ? { attachmentId } : {}),
+        inlineKey: `transcript-${title}-${createdAt ?? 0}`,
       }}
     />
   );
@@ -81,7 +104,7 @@ export function ResearchReportCard({
   grow?: boolean;
 }) {
   const { t, locale } = useI18n();
-  const [open, setOpen] = useState(false);
+  const openFile = useContext(OpenFileContext);
   const [hover, setHover] = useState(false);
   const summary = reportSummaryOf(report.content);
   const stage = report.final === null ? null : report.final ? t('定稿') : t('初稿');
@@ -90,171 +113,106 @@ export function ResearchReportCard({
     report.createdAt === undefined
       ? null
       : messageStampLabel(report.createdAt, Date.now(), locale, t);
+  const openInPanel = () => {
+    setHover(false);
+    openResearchReportInPanel(openFile, report, { stage, when, defaultLabel: t('调研报告') });
+  };
   return (
-    <>
-      <Popover open={hover && !open} onOpenChange={setHover}>
-        {inline ? (
-          <PopoverTrigger
-            openOnHover
-            delay={350}
-            data-testid="research-report-card"
-            data-variant="inline"
-            data-stage={stageAttr}
-            data-grow={grow ? '' : undefined}
-            onClick={() => setOpen(true)}
-            className={cn(
-              'flex max-w-full cursor-pointer items-center gap-1.5 bg-transparent p-0 text-left text-ui leading-5 text-foreground outline-none',
-              className,
-            )}
-          >
-            <FileText
-              aria-hidden="true"
-              className={cn('size-4 flex-none text-content-secondary', grow && 'grow-pop')}
-              style={grow ? ({ '--pop-at': '0ms' } as CSSProperties) : undefined}
-            />
-            <span
-              className={cn(
-                'min-w-0 truncate text-(--chat-link) underline decoration-(--chat-link)/40 underline-offset-3 hover:decoration-(--chat-link)',
-                grow && 'grow-decoration',
-              )}
-              style={
-                grow
-                  ? ({
-                      '--grow-delay': `${330 + Math.min(report.title.length, 40) * 18}ms`,
-                    } as CSSProperties)
-                  : undefined
-              }
-            >
-              {grow ? <GrowCharsFrom text={report.title} /> : report.title}
-            </span>
-          </PopoverTrigger>
-        ) : (
-          <PopoverTrigger
-            openOnHover
-            delay={350}
-            nativeButton={false}
-            render={<TraceCard className={cn('w-fit max-w-full', className)} />}
-          >
-            <Button
-              variant="ghost"
-              data-testid="research-report-card"
-              data-stage={stageAttr}
-              onClick={() => setOpen(true)}
-              className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
-            >
-              <FileText aria-hidden="true" className="size-5 flex-none text-content-secondary" />
-              <span className="flex-none">{t('调研报告已生成')}</span>
-              <span className="min-w-0 truncate text-content-secondary">{report.title}</span>
-              {stage !== null && (
-                <span
-                  data-slot="research-report-stage"
-                  className="flex-none rounded-sm bg-secondary px-1.5 text-meta text-content-secondary"
-                >
-                  {stage}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-        )}
-        <PopoverContent
-          side="top"
-          align="start"
-          data-testid="research-report-hover"
-          className="w-80 gap-1.5 p-3.5 duration-0 data-open:animate-none data-closed:animate-none"
-        >
-          <div className="flex items-center gap-2 text-meta text-content-tertiary">
-            <FileText aria-hidden="true" className="size-4 flex-none" />
-            <span>{stage ?? report.label}</span>
-            {when !== null && <span className="ml-auto tabular-nums">{when}</span>}
-          </div>
-          <p className="m-0 line-clamp-2 text-ui font-medium text-foreground">{report.title}</p>
-          {summary !== '' && (
-            <p className="m-0 line-clamp-3 text-ui text-content-secondary">{summary}</p>
-          )}
-        </PopoverContent>
-      </Popover>
-      <ResearchReportDialog report={report} open={open} onClose={() => setOpen(false)} />
-    </>
-  );
-}
-
-export function ResearchReportDialog({
-  report,
-  open,
-  onClose,
-  children,
-}: {
-  report: ResearchReport;
-  open: boolean;
-  onClose: () => void;
-  children?: ReactNode;
-}) {
-  const { t, locale } = useI18n();
-  const contentRef = useRef<HTMLElement>(null);
-  const when =
-    report.createdAt === undefined
-      ? null
-      : messageStampLabel(report.createdAt, Date.now(), locale, t);
-  return (
-    <DialogShell
-      open={open}
-      onClose={onClose}
-      initialFocus={contentRef}
-      width="var(--settings-w)"
-      className="h-(--settings-h)"
-      headerAction={
-        <CopyIconButton
-          text={report.content}
-          label={t('复制为 Markdown')}
-          copiedLabel={t('已复制')}
-          testId="copy-markdown"
-          className="text-content-tertiary hover:text-foreground pointer-coarse:size-11"
-        />
-      }
+    <Popover
+      open={hover}
+      onOpenChange={(next, details) => {
+        if (details.reason === 'trigger-press') {
+          setHover(false);
+          return;
+        }
+        setHover(next);
+      }}
     >
-      <article
-        ref={contentRef}
-        tabIndex={-1}
-        className="mx-auto max-w-180 px-2 pt-5 pb-16 outline-none sm:px-8"
-      >
-        <header className="border-b border-border pb-6">
-          <p
-            data-testid="research-report-meta"
-            className="m-0 flex items-center gap-1.5 text-meta text-content-tertiary"
-          >
-            <FileText aria-hidden="true" className="size-4 flex-none" />
-            <span>{report.label ?? t('调研报告')}</span>
-            {report.final !== null && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>{report.final ? t('定稿') : t('初稿')}</span>
-              </>
-            )}
-            {when !== null && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="tabular-nums">{when}</span>
-              </>
-            )}
-          </p>
-          <DialogTitle className="mt-3 voice-title text-page text-foreground">
-            {report.title}
-          </DialogTitle>
-          {children}
-        </header>
-        <div
-          data-testid="research-report-doc"
-          className="report-doc mt-7 font-sans break-words text-foreground"
+      {inline ? (
+        <PopoverTrigger
+          openOnHover
+          delay={350}
+          data-testid="research-report-card"
+          data-variant="inline"
+          data-stage={stageAttr}
+          data-grow={grow ? '' : undefined}
+          onClick={openInPanel}
+          className={cn(
+            'flex max-w-full cursor-pointer items-center gap-1.5 bg-transparent p-0 text-left text-ui leading-5 text-foreground outline-none',
+            className,
+          )}
         >
-          <ChatMarkdown text={report.content} />
+          <FileText
+            aria-hidden="true"
+            className={cn('size-4 flex-none text-content-secondary', grow && 'grow-pop')}
+            style={grow ? ({ '--pop-at': '0ms' } as CSSProperties) : undefined}
+          />
+          <span
+            className={cn(
+              'min-w-0 truncate text-(--chat-link) underline decoration-(--chat-link)/40 underline-offset-3 hover:decoration-(--chat-link)',
+              grow && 'grow-decoration',
+            )}
+            style={
+              grow
+                ? ({
+                    '--grow-delay': `${330 + Math.min(report.title.length, 40) * 18}ms`,
+                  } as CSSProperties)
+                : undefined
+            }
+          >
+            {grow ? <GrowCharsFrom text={report.title} /> : report.title}
+          </span>
+        </PopoverTrigger>
+      ) : (
+        <PopoverTrigger
+          openOnHover
+          delay={350}
+          nativeButton={false}
+          render={<TraceCard className={cn('w-fit max-w-full', className)} />}
+        >
+          <Button
+            variant="ghost"
+            data-testid="research-report-card"
+            data-stage={stageAttr}
+            onClick={openInPanel}
+            className="h-10 max-w-full justify-start gap-2 border-0 px-3 text-ui font-normal text-foreground hover:bg-(--menu-hover) pointer-coarse:h-11 dark:hover:bg-(--menu-hover)"
+          >
+            <FileText aria-hidden="true" className="size-5 flex-none text-content-secondary" />
+            <span className="flex-none">{t('调研报告已生成')}</span>
+            <span className="min-w-0 truncate text-content-secondary">{report.title}</span>
+            {stage !== null && (
+              <span
+                data-slot="research-report-stage"
+                className="flex-none rounded-sm bg-secondary px-1.5 text-meta text-content-secondary"
+              >
+                {stage}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+      )}
+      <PopoverContent
+        side="top"
+        align="start"
+        data-testid="research-report-hover"
+        className="w-80 gap-1.5 p-3.5 duration-0 data-open:animate-none data-closed:animate-none"
+      >
+        <div className="flex items-center gap-2 text-meta text-content-tertiary">
+          <FileText aria-hidden="true" className="size-4 flex-none" />
+          <span>{stage ?? report.label}</span>
+          {when !== null && <span className="ml-auto tabular-nums">{when}</span>}
         </div>
-      </article>
-    </DialogShell>
+        <p className="m-0 line-clamp-2 text-ui font-medium text-foreground">{report.title}</p>
+        {summary !== '' && (
+          <p className="m-0 line-clamp-3 text-ui text-content-secondary">{summary}</p>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
 export function useBuildReport(
-  thread: { buildId: string | null; title: string; phase: string } | null,
+  thread: { buildId: string | null; title: string; phase: string; id?: string } | null,
 ): { report: ResearchReport | null; settled: boolean } {
   const buildId = thread?.buildId ?? null;
   const { query, messages } = useConversationMessages(buildId, thread !== null);
@@ -275,6 +233,8 @@ export function useBuildReport(
       content: message.data.content,
       createdAt: row.createdAt,
       final: isFinalReportPhase(thread.phase),
+      attachmentId: message.data.attachmentId,
+      ...(thread.id !== undefined ? { todoId: thread.id } : {}),
     };
   }, [thread, buildId, messages]);
   return { report, settled: buildId === null || query.isSuccess || query.isError };
@@ -285,9 +245,14 @@ export function useResearchReport(todoId: string): ResearchReport | null {
   const thread = useMemo(
     () =>
       glance?.report === true
-        ? { buildId: glance.buildId ?? null, title: glance.title ?? '', phase: glance.phase }
+        ? {
+            id: todoId,
+            buildId: glance.buildId ?? null,
+            title: glance.title ?? '',
+            phase: glance.phase,
+          }
         : null,
-    [glance],
+    [todoId, glance],
   );
   return useBuildReport(thread).report;
 }

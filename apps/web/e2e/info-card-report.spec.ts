@@ -212,11 +212,16 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(hover).not.toContainText('31 条');
 
     await card.click();
-    const doc = page.getByTestId('research-report-doc');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const panel = page.getByTestId('artifact-panel');
+    await expect(panel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText(
+      '调研登录页 agent 轨迹',
+    );
+    const doc = panel.getByTestId('research-report-doc');
     await expect(doc.getByText('登录页轨迹调研')).toBeVisible();
     await expect(doc.getByText('登录页轨迹调研')).toBeInViewport();
-    await expect(page.getByTestId('research-report-meta')).toBeInViewport();
-    await expect(page.getByRole('heading', { name: '调研登录页 agent 轨迹' })).toBeInViewport();
+    await expect(panel.getByTestId('research-report-meta')).toBeInViewport();
+    await expect(panel.getByRole('heading', { name: '调研登录页 agent 轨迹' })).toBeInViewport();
     await expect(doc.getByText('4 条正常收口')).toBeVisible();
     await expect(doc).not.toContainText('info-report');
     await evidenceShot(page, `report-document-${theme}.png`);
@@ -226,6 +231,7 @@ for (const theme of ['light', 'dark'] as const) {
       '/api/attachments/evidence',
     );
     await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
     await expect(doc).toHaveCount(0);
 
     await evidenceShot(page, `transcript-report-${theme}.png`);

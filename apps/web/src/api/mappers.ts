@@ -876,6 +876,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
               kind: 'report',
               markdown: report.data.content,
               id: m.id,
+              attachmentId: report.data.attachmentId,
               createdAt: m.createdAt,
             },
           });

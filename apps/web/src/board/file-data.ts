@@ -6,6 +6,7 @@ import { attachmentIdFromKey } from '../detail/attachment-chip.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import type { DocumentPreview } from '../vendor-open-design/viewers/document-preview-viewer.js';
 import { type FileViewerKind, kindFor } from '../vendor-open-design/viewers/file-kind.js';
+import { isInlineArtifactKey } from './artifact/inline-artifact.js';
 import { attachmentUrl } from './file-pane.js';
 
 const DOCUMENT_UNAVAILABLE_STATUSES = new Set([413, 415, 422]);
@@ -14,10 +15,15 @@ const TILE_PREVIEW_LINES = 8;
 
 export class DocumentPreviewUnavailable extends Error {}
 
-async function fetchAttachmentText(url: string): Promise<string> {
-  const res = await fetchWithSession(url);
-  if (!res.ok) throw new Error(`attachment read failed: ${res.status}`);
-  return res.text();
+async function fetchAttachmentText(url: string, fallbackText?: string): Promise<string> {
+  try {
+    const res = await fetchWithSession(url);
+    if (!res.ok) throw new Error(`attachment read failed: ${res.status}`);
+    return res.text();
+  } catch (error) {
+    if (fallbackText !== undefined) return fallbackText;
+    throw error;
+  }
 }
 
 async function fetchDocumentPreview(url: string): Promise<DocumentPreview> {
@@ -49,10 +55,15 @@ export interface AttachmentFiles {
 
 export function useAttachmentFiles(
   key: string,
-  { size = false, tile = false }: { size?: boolean; tile?: boolean } = {},
+  {
+    size = false,
+    tile = false,
+    fallbackText,
+  }: { size?: boolean; tile?: boolean; fallbackText?: string } = {},
 ): AttachmentFiles & { size: number | undefined } {
   const { live } = useLiveData();
   const { search } = useLocation();
+  const inline = isInlineArtifactKey(key);
   const kind = kindFor(key);
   const fixture = live
     ? undefined
@@ -63,9 +74,17 @@ export function useAttachmentFiles(
     (kind === 'markdown' || kind === 'text' || (kind === 'svg' && !tile)) &&
     (!tile || live || fixtureText !== undefined);
   const text = useQuery({
-    queryKey: ['attachment-text', key, fixtureText ?? null],
-    queryFn: () =>
-      fixtureText !== undefined ? Promise.resolve(fixtureText) : fetchAttachmentText(url),
+    queryKey: ['attachment-text', key, fixtureText ?? null, inline ? (fallbackText ?? null) : null],
+    queryFn: () => {
+      if (fixtureText !== undefined) return Promise.resolve(fixtureText);
+      if (inline) {
+        return fallbackText !== undefined
+          ? Promise.resolve(fallbackText)
+          : Promise.reject(new Error('inline document unavailable'));
+      }
+      return fetchAttachmentText(url, fallbackText);
+    },
+    ...(fallbackText !== undefined ? { placeholderData: fallbackText } : {}),
     enabled: readsText,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
@@ -83,15 +102,18 @@ export function useAttachmentFiles(
   const sizeQ = useQuery({
     queryKey: ['attachment-size', key],
     queryFn: () => fetchAttachmentSize(url),
-    enabled: size && live,
+    enabled: size && live && !inline,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
+  const inlineText = fixtureText ?? (inline ? fallbackText : undefined);
   const downloadHref =
     fixture?.src ??
-    (fixtureText !== undefined
-      ? `data:text/plain;charset=utf-8,${encodeURIComponent(fixtureText)}`
-      : `${url}?download=1`);
+    (inlineText !== undefined
+      ? `data:text/plain;charset=utf-8,${encodeURIComponent(inlineText)}`
+      : inline
+        ? ''
+        : `${url}?download=1`);
   return {
     kind,
     live,

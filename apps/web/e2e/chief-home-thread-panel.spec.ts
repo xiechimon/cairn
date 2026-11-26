@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 const HOME = '/app?scenario=home-c';
 const panel = (page: Page) => page.getByTestId('side-chat');
 
-test('a review thread keeps its updates out of the conversation and in the plan dialog, and the head shows the update count', async ({
+test('a review thread keeps its updates out of the conversation and in the artifact panel, and the head shows the update count', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
@@ -12,11 +12,13 @@ test('a review thread keeps its updates out of the conversation and in the plan 
   await expect(page.getByTestId('side-chat-status')).toContainText('待你审阅·1 条更新');
   await panel(page).getByRole('button', { name: '更多操作…' }).click();
   await page.getByRole('menuitem', { name: '计划' }).click();
-  const plan = page.getByTestId('side-chat-plan');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const plan = page.getByTestId('artifact-panel');
+  await expect(plan).toBeVisible();
   await expect(plan.getByTestId('thread-updates')).toContainText('决定与更新');
   await expect(plan.getByTestId('thread-updates')).toContainText('r7 rebaseline probe');
   await expect(plan.getByTestId('thread-updates').locator('time')).toContainText('更新');
-  await expect(plan.getByTestId('doc-body')).toBeVisible();
+  await expect(plan.getByTestId('research-report-doc')).toBeVisible();
 });
 
 test('a working thread has no updates and no plan row in the more menu', async ({ page }) => {
@@ -108,7 +110,8 @@ test('a plan waiting for approval shows no plan card or plan update in the conve
   await expect(page.getByTestId('transcript-col')).not.toContainText('方案');
   await expect(page.getByRole('button', { name: '打开方案' })).toHaveCount(0);
   await page.getByTestId('side-chat-action').getByRole('button', { name: '查看计划' }).click();
-  await expect(page.getByTestId('side-chat-plan')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByTestId('artifact-panel')).toBeVisible();
 });
 
 test('a plan waiting for approval shows its chips like the suggested replies, 24px above the composer', async ({

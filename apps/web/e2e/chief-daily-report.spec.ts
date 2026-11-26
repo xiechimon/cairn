@@ -116,7 +116,8 @@ test.describe('read-only historical daily reports', () => {
     await expect(doc).not.toContainText('待你决定');
     await expect(doc).toContainText('这些来源太长，只读了后面的部分：#12 大线程。');
     await expect(doc.getByRole('button', { name: '建成线程' })).toHaveCount(0);
-    await evidencePanelShot(page, 'daily-report-document.png', page.getByRole('dialog'));
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await evidencePanelShot(page, 'daily-report-document.png', page.getByTestId('artifact-panel'));
     expect(decisions).toEqual([]);
   });
 
@@ -151,7 +152,7 @@ test.describe('read-only historical daily reports', () => {
     await expect(doc).toContainText('已建成任务');
     await expect(doc).not.toContainText('外部动态');
     await expect(doc.getByRole('link', { name: 'example.com' })).toHaveCount(0);
-    await evidencePanelShot(page, 'daily-report-retired-intake.png', page.getByRole('dialog'));
+    await evidencePanelShot(page, 'daily-report-retired-intake.png', page.getByTestId('artifact-panel'));
   });
 
   test('a failed run says so in the chat line and the document has the raw numbers only', async ({

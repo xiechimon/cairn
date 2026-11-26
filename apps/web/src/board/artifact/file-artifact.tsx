@@ -1,9 +1,10 @@
 import { type ArtifactOfAttachment, artifactKindOf, type DesignCommentRecord } from '@cairn/shared';
-import { Check, ChevronDown, Copy, Download, Globe, Pencil } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { Check, ChevronDown, Copy, Download, FileText, Globe, Pencil } from 'lucide-react';
+import { type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useDesignMutations } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
 import { CopyIconButton } from '../../components/copy-icon-button.js';
+import { EmptyState } from '../../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../../components/menu-keys.js';
 import { QueryBoundary } from '../../components/query-state.js';
 import { SegmentedTabs } from '../../components/segmented.js';
@@ -20,7 +21,9 @@ import { SvgViewer } from '../../vendor-open-design/viewers/svg-viewer.js';
 import { TextViewer } from '../../vendor-open-design/viewers/text-viewer.js';
 import { VideoViewer } from '../../vendor-open-design/viewers/video-viewer.js';
 import { DocumentPreviewUnavailable, useAttachmentFiles } from '../file-data.js';
-import { downloadFile, type FileTarget } from '../file-pane.js';
+import { downloadFile, type FileTarget, OpenFileContext } from '../file-pane.js';
+import { MadeFiles } from '../made-files.js';
+import { ThreadUpdatesBlock } from '../thread-updates-block.js';
 import { useArtifactEscape, useArtifactPanelControl } from './artifact-panel.js';
 import { artifactKey } from './artifact-route.js';
 import { ArtifactToolbar, OldVersionBar, TOOL_BUTTON, VersionHistory } from './artifact-toolbar.js';
@@ -30,6 +33,11 @@ import {
   RegionSurface,
   useFileComments,
 } from './file-comments.js';
+import {
+  type InlineArtifactMeta,
+  isInlineArtifactKey,
+  useInlineArtifact,
+} from './inline-artifact.js';
 import type { SendDesignComments } from './page-artifact.js';
 import { useArtifactVersions } from './use-artifact-versions.js';
 import { CodeComments } from './viewers/code-comments.js';
@@ -73,13 +81,29 @@ export function FileArtifact({
   readOnly: boolean;
   sendComments: SendDesignComments | undefined;
 }) {
-  if (artifact === null) return <FileView fileKey={target.key} name={target.name} />;
+  const { t } = useI18n();
+  const inlineMeta = useInlineArtifact(target.key);
+  if (artifact === null) {
+    if (isInlineArtifactKey(target.key) && inlineMeta === null) {
+      return (
+        <EmptyState
+          testId="artifact-inline-missing"
+          icon={FileText}
+          title={t('文档已关闭')}
+          description={t('请回到对话里重新打开这篇内容。')}
+          className="mt-[10vh]"
+        />
+      );
+    }
+    return <FileView fileKey={target.key} name={target.name} inlineMeta={inlineMeta} />;
+  }
   return (
     <VersionedFile
       target={target}
       artifact={artifact}
       readOnly={readOnly}
       sendComments={sendComments}
+      inlineMeta={inlineMeta}
     />
   );
 }
@@ -103,11 +127,13 @@ function VersionedFile({
   artifact,
   readOnly,
   sendComments,
+  inlineMeta,
 }: {
   target: FileTarget;
   artifact: ArtifactOfAttachment;
   readOnly: boolean;
   sendComments: SendDesignComments | undefined;
+  inlineMeta: InlineArtifactMeta | null;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -126,7 +152,7 @@ function VersionedFile({
     todoId: artifact.todoId,
     fileName: artifact.fileName,
     versionId: shown?.id,
-    enabled: live && COMMENT_KINDS.has(artifact.kind),
+    enabled: live && COMMENT_KINDS.has(artifact.kind) && inlineMeta?.readOnly !== true,
     readOnly: readOnly || versions.viewingOld,
     sendComments,
     onLocate: (comment) => locate(body, comment),
@@ -136,6 +162,7 @@ function VersionedFile({
       key={fileKey}
       fileKey={fileKey}
       name={artifact.fileName}
+      inlineMeta={versions.viewingOld ? null : inlineMeta}
       comments={comments}
       onBody={setBody}
       history={{ open: historyOpen, toggle: () => setHistoryOpen((open) => !open) }}
@@ -178,9 +205,51 @@ function VersionedFile({
   );
 }
 
+function ReportDocumentHeader({ meta }: { meta: InlineArtifactMeta }) {
+  const { t } = useI18n();
+  const openFile = useContext(OpenFileContext);
+  const stage = meta.stage ?? null;
+  const when = meta.when ?? null;
+  return (
+    <header className="mb-7 border-b border-border pb-6">
+      <p
+        data-testid="research-report-meta"
+        className="m-0 flex items-center gap-1.5 text-meta text-content-tertiary"
+      >
+        <FileText aria-hidden="true" className="size-4 flex-none" />
+        <span>{meta.label ?? t('调研报告')}</span>
+        {stage !== null && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>{stage}</span>
+          </>
+        )}
+        {when !== null && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">{when}</span>
+          </>
+        )}
+      </p>
+      <h2 className="mt-3 m-0 voice-title text-page text-foreground">{meta.title}</h2>
+      {meta.updates != null && <ThreadUpdatesBlock updates={meta.updates} />}
+      <MadeFiles
+        deliverables={meta.deliverables}
+        {...(openFile === undefined
+          ? {}
+          : {
+              onOpen: (item) =>
+                openFile({ name: item.name, key: artifactKey(item.attachmentId, item.name) }),
+            })}
+      />
+    </header>
+  );
+}
+
 function FileView({
   fileKey,
   name,
+  inlineMeta = null,
   history = null,
   save = null,
   banner = null,
@@ -190,6 +259,7 @@ function FileView({
 }: {
   fileKey: string;
   name: string;
+  inlineMeta?: InlineArtifactMeta | null;
   history?: { open: boolean; toggle: () => void } | null;
   save?: { busy: boolean; run: (content: string, done: () => void) => void } | null;
   banner?: ReactNode;
@@ -198,11 +268,26 @@ function FileView({
   onBody?: (body: HTMLElement | null) => void;
 }) {
   const { t } = useI18n();
-  const files = useAttachmentFiles(fileKey, { size: true });
+  const files = useAttachmentFiles(fileKey, {
+    size: true,
+    ...(inlineMeta !== null ? { fallbackText: inlineMeta.markdown } : {}),
+  });
   const { kind, src, downloadHref, readsText, readsDocument, size } = files;
   const textQ = files.text;
   const documentQ = files.document;
-  const download = () => downloadFile(downloadHref, name);
+  const downloadName =
+    inlineMeta === null
+      ? name
+      : name.toLowerCase().endsWith('.md')
+        ? name
+        : `${inlineMeta.title}.md`;
+  const toolbarName =
+    inlineMeta === null
+      ? name
+      : inlineMeta.title.toLowerCase().endsWith('.md')
+        ? inlineMeta.title
+        : `${inlineMeta.title}.md`;
+  const download = () => downloadFile(downloadHref, downloadName);
   const artifactKind = artifactKindOf(name);
   const { active: panelActive } = useArtifactPanelControl();
   const [mode, setMode] = useState<Mode>('preview');
@@ -282,7 +367,16 @@ function FileView({
     ) : artifactKind === 'code' && kind === 'text' ? (
       withText((value) => <CodeComments name={fileKey} text={value} />)
     ) : kind === 'markdown' && mode === 'preview' ? (
-      withText((value) => <MarkdownComments text={value} />)
+      withText((value) => (
+        <MarkdownComments
+          text={value}
+          header={inlineMeta !== null ? <ReportDocumentHeader meta={inlineMeta} /> : undefined}
+          docTestId={inlineMeta !== null ? 'research-report-doc' : undefined}
+          docClassName={
+            inlineMeta !== null ? 'report-doc font-sans break-words text-foreground' : undefined
+          }
+        />
+      ))
     ) : kind === 'pdf' ? (
       <PdfViewer src={src} zoom={zoom} onFitScale={setFitScale} onChange={setZoom} />
     ) : artifactKind === 'docx' ? (
@@ -411,13 +505,13 @@ function FileView({
   return (
     <>
       <ArtifactToolbar
-        name={name}
+        name={toolbarName}
         menu={
           <>
             <KeyedMenuItem
               shortcut="D"
               data-testid="artifact-download"
-              render={<a href={downloadHref} download={name} />}
+              render={<a href={downloadHref} download={downloadName} />}
             >
               <Download aria-hidden />
               {t('下载')}

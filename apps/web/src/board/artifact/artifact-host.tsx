@@ -6,6 +6,7 @@ import { useLiveData } from '../../api/provider.js';
 import { attachmentIdFromKey } from '../../detail/attachment-chip.js';
 import { type FileTarget, type OpenFile, OpenFileContext } from '../file-pane.js';
 import { useArtifactPanel } from './artifact-route.js';
+import { isInlineArtifactKey } from './inline-artifact.js';
 
 function sameArtifact(a: ArtifactOfAttachment | null | undefined, b: ArtifactOfAttachment | null) {
   return a != null && b !== null && a.todoId === b.todoId && a.fileName === b.fileName;
@@ -17,7 +18,7 @@ export function ArtifactHost({ children }: { children: ReactNode }) {
   const { open, tabs } = useArtifactPanel();
   const openFile = useCallback<OpenFile>(
     (target: FileTarget) => {
-      if (!live) {
+      if (!live || isInlineArtifactKey(target.key)) {
         open(target);
         return;
       }

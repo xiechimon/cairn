@@ -516,7 +516,7 @@ export type TranscriptItem =
       extractionError?: string;
       id?: string;
     }
-  | { kind: 'report'; markdown: string; id?: string; createdAt?: number }
+  | { kind: 'report'; markdown: string; id?: string; attachmentId?: string; createdAt?: number }
   | {
       kind: 'thinking';
       text: string;

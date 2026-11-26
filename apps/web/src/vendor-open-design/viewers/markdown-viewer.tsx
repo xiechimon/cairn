@@ -10,11 +10,17 @@ export function MarkdownViewer({
   text,
   mode,
   articleRef,
+  header,
+  docTestId,
+  docClassName,
   children,
 }: {
   text: string;
   mode: MarkdownViewerMode;
   articleRef?: Ref<HTMLElement>;
+  header?: ReactNode;
+  docTestId?: string;
+  docClassName?: string;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -28,7 +34,10 @@ export function MarkdownViewer({
         data-testid="file-preview-markdown"
         className="relative mx-auto w-full max-w-chat min-w-0 px-3 py-2 text-ui leading-5 text-foreground [overflow-wrap:anywhere]"
       >
-        <ChatMarkdown text={shown.join('\n')} />
+        {header}
+        <div data-slot="reply-blocks" data-testid={docTestId} className={docClassName}>
+          <ChatMarkdown text={shown.join('\n')} />
+        </div>
         {children}
       </article>
       {lines.length > shown.length && (

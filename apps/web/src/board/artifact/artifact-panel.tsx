@@ -15,6 +15,7 @@ import type { FileTarget } from '../file-pane.js';
 import { usePanelDocked } from '../use-narrow.js';
 import { type ArtifactPanelState, useArtifactPanel } from './artifact-route.js';
 import { FileArtifact } from './file-artifact.js';
+import { isInlineArtifactKey } from './inline-artifact.js';
 import { PageArtifact, type SendDesignComments } from './page-artifact.js';
 import { hasBlockingLayer } from './viewers/zoom.js';
 
@@ -317,11 +318,12 @@ function ArtifactTab({
   sendComments: SendDesignComments | undefined;
 }) {
   const { live } = useLiveData();
-  const artifactQ = useArtifactOf(attachmentIdFromKey(target.key), live);
-  const artifact = artifactQ.data ?? null;
+  const inline = isInlineArtifactKey(target.key);
+  const artifactQ = useArtifactOf(attachmentIdFromKey(target.key), live && !inline);
+  const artifact = inline ? null : (artifactQ.data ?? null);
   const todoQ = useTodo(artifact?.todoId ?? '', live && artifact !== null);
-  const readOnly = todoQ.data?.archivedAt != null;
-  if (live && artifactQ.isPending) {
+  const readOnly = inline || todoQ.data?.archivedAt != null;
+  if (live && !inline && artifactQ.isPending) {
     return (
       <div data-testid="artifact-loading" aria-busy="true" className="flex min-h-0 flex-1 flex-col">
         <div className="flex h-11 flex-none items-center border-b border-border px-4">

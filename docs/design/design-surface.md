@@ -27,7 +27,7 @@ Someone who installed Cairn today asks the Coordinator: `做一个定价页，�
 
 Measured in the code (verified, this worktree):
 
-- A page deliverable opens only inside `ResearchReportDialog` (`apps/web/src/chief/research-report.tsx`), where `MadeFiles` renders it in `PageFrame` at 380px (`apps/web/src/board/made-files.tsx`). `PageFrame` uses `sandbox=""` and a CSP without scripts, so a page with any script is not previewed.
+- A page deliverable attaches through `storeInfoReport` / `MadeFiles` and opens directly inside the right-hand `ArtifactPanel` (`apps/web/src/board/artifact/artifact-panel.tsx`), alongside the Coordinator chat; research reports, historical daily reports and task plans all open in `ArtifactPanel` as `document` tabs (and `MadeFiles` inside a report opens deliverable tabs inside the same panel).
 - A code task has no way to publish a page: `attach_file` stores a `.html` as a `text/plain` chat attachment (`apps/server/src/services/agent-attachments.ts`), and `/api/attachments/:id` serves every attachment with `content-security-policy: sandbox; default-src 'none'` (`apps/server/src/routes-uploads.ts`), so the agent starts a dev server and replies with its port.
 - An `.html` attachment opened from chat shows as source text (`TEXT_EXTS` in `apps/web/src/board/file-pane.ts`).
 - Images open in two places: `FilePreviewPanel` or the `AttachmentPreview` dialog capped at 384px (`apps/web/src/overlay/attachment-preview.tsx`). The owner calls the dialog the small window that looks bad.

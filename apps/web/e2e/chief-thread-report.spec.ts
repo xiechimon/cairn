@@ -376,10 +376,16 @@ test('a research report is one card under its research row; hover shows a summar
     ],
     todos: [{ ...TASK, phase: 'queued', blockedBy: [research.id] }, research],
   };
-  await mockLive(page, state, (path, _route, json) =>
+  await mockLive(page, state, (path, route, json) =>
     path === '/api/conversations/build-research/messages'
       ? json({ messages: [report], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null })
-      : undefined,
+      : path === '/api/attachments/att-r'
+        ? route.fulfill({
+            status: 200,
+            contentType: 'text/markdown; charset=utf-8',
+            body: '## Export formats\n\nParquet halves the file size of CSV.\n\n- Parquet keeps types\n- CSV opens anywhere',
+          })
+        : undefined,
   );
   await page.goto('/app');
   const reply = page.getByTestId('home-c').getByTestId('chief-msg').filter({ hasText: 'Started' });
@@ -395,10 +401,13 @@ test('a research report is one card under its research row; hover shows a summar
     'Parquet halves the file size of CSV.',
   );
   await card.click();
-  const doc = page.getByTestId('research-report-doc');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const panel = page.getByTestId('artifact-panel');
+  await expect(panel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Research export formats');
+  const doc = panel.getByTestId('research-report-doc');
   await expect(doc.getByText('Parquet keeps types')).toBeVisible();
   await expect(doc.getByRole('link', { name: 'report.md' })).toHaveCount(0);
-  await expect(page.getByRole('dialog', { name: 'Research export formats' })).toBeVisible();
+  await expect(panel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Research export formats');
 });
 
 test('a research card in Made opens its report as a document; one with no report opens its thread', async ({
@@ -434,24 +443,32 @@ test('a research card in Made opens its report as a document; one with no report
     }),
   };
   const page0 = { chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
-  await mockLive(page, { threads: [THREAD], messages: [], todos: [research, bare] }, (path, _route, json) =>
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [research, bare] }, (path, route, json) =>
     path === '/api/conversations/build-research/messages'
       ? json({ messages: [report], ...page0 })
       : path === '/api/conversations/build-bare/messages'
         ? json({ messages: [], ...page0 })
-        : undefined,
+        : path === '/api/attachments/att-r'
+          ? route.fulfill({
+              status: 200,
+              contentType: 'text/markdown; charset=utf-8',
+              body: '## Export formats\n\nParquet halves the file size of CSV.\n\n- Parquet keeps types',
+            })
+          : undefined,
   );
   await page.goto('/app?pane=made');
   const made = page.getByRole('complementary', { name: '成果' });
   await made.getByRole('button', { name: 'Research export formats' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Research export formats' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('定稿');
-  await expect(page.getByTestId('research-report-doc').getByText('Parquet keeps types')).toBeVisible();
-  await expect(dialog.getByRole('link', { name: 'report.md' })).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const panel = page.getByTestId('artifact-panel');
+  await expect(panel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Research export formats');
+  await expect(panel.getByTestId('research-report-meta')).toContainText('定稿');
+  await expect(panel.getByTestId('research-report-doc')).toContainText('Parquet keeps types');
+  await expect(panel.getByTestId('research-report-doc').getByRole('link', { name: 'report.md' })).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
 
+  await page.goto('/app?pane=made');
   await made.getByRole('button', { name: 'Research cache layers' }).click();
   await expect(page).toHaveURL(/todo-bare/);
   await expect(page.getByTestId('research-report-doc')).toHaveCount(0);
@@ -537,7 +554,7 @@ test('a task archived in the same turn leaves no card and the next task gets the
   expect(line?.y ?? 0).toBeGreaterThanOrEqual((bubble?.y ?? 0) + (bubble?.height ?? 0));
 });
 
-test('C27: a research report copies as its Markdown source from an icon button beside close', async ({ page }) => {
+test('C27: a research report copies as its Markdown source from the artifact panel toolbar', async ({ page }) => {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   const research = {
     ...TASK,
@@ -573,25 +590,21 @@ test('C27: a research report copies as its Markdown source from an icon button b
       content: source,
     }),
   };
-  await mockLive(page, { threads: [THREAD], messages: [], todos: [research] }, (path, _route, json) =>
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [research] }, (path, route, json) =>
     path === '/api/conversations/build-research/messages'
       ? json({ messages: [report], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null })
-      : undefined,
+      : path === '/api/attachments/att-r'
+        ? route.fulfill({ status: 200, contentType: 'text/markdown; charset=utf-8', body: source })
+        : undefined,
   );
   await page.goto('/app?pane=made');
   await page.getByRole('complementary', { name: '成果' }).getByRole('button', { name: 'Research export formats' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Research export formats' });
-  const copy = dialog.getByTestId('copy-markdown');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const panel = page.getByTestId('artifact-panel');
+  const copy = panel.getByTestId('artifact-copy');
   await expect(copy, 'C27: one copy action on the report').toHaveCount(1);
   await expect(copy, 'C27: the copy button names itself').toHaveAccessibleName('复制为 Markdown');
-  await expect(
-    dialog.locator('[data-slot="dialog-head-action"]').getByTestId('copy-markdown'),
-    'C27: the document action sits in the dialog head beside close',
-  ).toBeVisible();
   await expect(copy, 'C27: the document action is icon-only').toHaveText('');
-  const close = await dialog.getByRole('button', { name: '关闭', exact: true }).boundingBox();
-  const copyBox = await copy.boundingBox();
-  expect(Math.abs((copyBox?.y ?? 0) - (close?.y ?? 0)), 'C27: copy shares the close row').toBeLessThanOrEqual(4);
   await copy.hover();
   await expect(page.locator('[data-slot="tooltip-content"]'), 'C4: the icon button names itself').toHaveText('复制为 Markdown');
   await copy.click();

@@ -1,5 +1,5 @@
 import { DESIGN_LIMITS } from '@cairn/shared';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useState } from 'react';
 import { MarkdownViewer } from '../../../vendor-open-design/viewers/markdown-viewer.js';
 import { CommentPin } from '../../design/design-comment-list.js';
 import { useCommentLayer } from '../file-comments.js';
@@ -21,7 +21,17 @@ function blockText(element: Element): string {
   return (element.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
-export function MarkdownComments({ text }: { text: string }) {
+export function MarkdownComments({
+  text,
+  header,
+  docTestId,
+  docClassName,
+}: {
+  text: string;
+  header?: ReactNode;
+  docTestId?: string;
+  docClassName?: string;
+}) {
   const layer = useCommentLayer();
   const [article, setArticle] = useState<HTMLElement | null>(null);
   const [placed, setPlaced] = useState<Placed[]>([]);
@@ -78,7 +88,14 @@ export function MarkdownComments({ text }: { text: string }) {
       data-commenting={commenting || undefined}
       className="artifact-markdown flex min-h-0 flex-1 flex-col"
     >
-      <MarkdownViewer text={text} mode="preview" articleRef={setArticle}>
+      <MarkdownViewer
+        text={text}
+        mode="preview"
+        articleRef={setArticle}
+        header={header}
+        docTestId={docTestId}
+        docClassName={docClassName}
+      >
         {layer !== null &&
           placed.map((item) => (
             <span key={item.id} className="absolute right-0" style={{ top: item.top + 22 }}>

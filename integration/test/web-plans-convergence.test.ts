@@ -169,7 +169,12 @@ test('the plan converges via the team-stream phase event when the conv stream is
   expect(blocked).toBeGreaterThan(0);
   await pexpect(page.locator('.chat-plan-title')).toHaveCount(0);
   await page.getByRole('button', { name: '查看计划' }).click();
-  await pexpect(page.getByTestId('side-chat-plan')).toBeVisible();
+  await pexpect(page.getByTestId('artifact-panel').getByTestId('research-report-meta')).toHaveText(
+    '计划',
+  );
+  await pexpect(
+    page.getByTestId('artifact-panel').getByTestId('research-report-doc'),
+  ).toBeInViewport();
 });
 
 test('an autonomous project starts the work when the plan is delivered, with no approval step on screen', async () => {

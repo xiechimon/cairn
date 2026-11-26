@@ -323,7 +323,6 @@ checkPatternGuard({
   skip: (relPath) => relPath === 'components/ui/dialog-shell.tsx' || relPath.startsWith('design/'),
   allowlist: new Map([
     ['board/app-sidebar.tsx', 'full-height mobile drawer sheet over Dialog primitive'],
-    ['chief/research-report.tsx', 'DialogTitle helper beside DialogShell'],
     ['overlay/route-dialog.tsx', 'DialogClose/DialogTitle helpers beside DialogShell'],
   ]),
   message:

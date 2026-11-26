@@ -173,37 +173,41 @@ test('a page with no captured image falls back to the report lines on its card',
   await expect(made.locator('iframe')).toHaveCount(0);
 });
 
-test('the dialog lists each file with open and download above the report, explains skipped files, and opens a page in the artifact panel', async ({
+test('the panel lists each file with open and download above the report, explains skipped files, and opens a page in a sibling tab', async ({
   page,
 }) => {
   const { made, tracker } = await openMade(page);
 
   await made.getByRole('button', { name: 'Export benchmark page' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Export benchmark page' });
-  await expect(dialog.getByTestId('research-report-meta')).toHaveText(/^网页\s*·\s*定稿/);
-  const files = dialog.getByTestId('made-files');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const panel = page.getByTestId('artifact-panel');
+  await expect(panel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Export benchmark page');
+  await expect(panel.getByTestId('research-report-meta')).toHaveText(/^网页\s*·\s*定稿/);
+  const files = panel.getByTestId('made-files');
   await expect(files.getByTestId('made-file')).toHaveText([/^benchmark\.html网页 · 2 KB打开下载$/]);
   const download = files.getByRole('link', { name: '下载 benchmark.html' });
   await expect(download).toHaveAttribute('href', '/api/attachments/att-page?download=1');
   await expect(download).toHaveAttribute('download', 'benchmark.html');
   await expect(files.locator('iframe')).toHaveCount(0);
-  await expect(dialog.getByTestId('made-skipped')).toHaveText('未收录 1 个文件：demo.mp4（文件太大）');
+  await expect(panel.getByTestId('made-skipped')).toHaveText('未收录 1 个文件：demo.mp4（文件太大）');
   const filesBox = await files.boundingBox();
-  const docBox = await page.getByTestId('research-report-doc').boundingBox();
+  const docBox = await panel.getByTestId('research-report-doc').boundingBox();
   expect(filesBox!.y + filesBox!.height).toBeLessThan(docBox!.y);
   await files.getByRole('button', { name: '打开 benchmark.html' }).click();
-  await expect(dialog).toHaveCount(0);
   await expect(page).toHaveURL(/artifact=att-page\.html/);
   await expect(page).toHaveURL(/artifactName=benchmark\.html/);
   await expect(page.getByTestId('artifact-panel')).toBeVisible();
   await expect(page.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('benchmark.html');
-  await page.goBack();
+  await page.getByTestId('artifact-close').click();
   await expect(page.getByTestId('artifact-panel')).toHaveCount(0);
 
+  await page.goto('/app?pane=made');
   await page.getByRole('complementary', { name: '成果' }).getByRole('button', { name: 'Export review deck' }).click();
-  const deckDialog = page.getByRole('dialog', { name: 'Export review deck' });
-  await expect(deckDialog.getByTestId('research-report-meta')).toHaveText(/^PPT\s*·\s*定稿/);
-  const deck = deckDialog.getByTestId('made-files');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const deckPanel = page.getByTestId('artifact-panel');
+  await expect(deckPanel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Export review deck');
+  await expect(deckPanel.getByTestId('research-report-meta')).toHaveText(/^PPT\s*·\s*定稿/);
+  const deck = deckPanel.getByTestId('made-files');
   await expect(deck.getByTestId('made-file')).toHaveText([
     /^review\.pptxPPT · 3\.1 MB · 下载后打开下载$/,
     /^appendix\.html网页 · 2 KB打开下载$/,

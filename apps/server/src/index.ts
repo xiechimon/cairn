@@ -64,6 +64,7 @@ import { setImRuntime } from './services/im/runtime.js';
 import { createSlackAdapter } from './services/im/slack.js';
 import { createTelegramAdapter } from './services/im/telegram.js';
 import { createWechatAdapter } from './services/im/wechat.js';
+import { backfillInfoReportVersions } from './services/info-handoff.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { demoteMigratedLocalMachines, seedLocalMachine } from './services/machines.js';
 import { createMailConnector } from './services/mail-connector.js';
@@ -220,6 +221,11 @@ const workspacesDirOf = () =>
   );
 const attachmentsDir = attachmentsDirOf(config);
 mkdirSync(attachmentsDir, { recursive: true });
+const infoReportsBackfilled = runDataMigrationOnce(db, 'info-report-design-version-backfill', () =>
+  backfillInfoReportVersions(db, attachmentsDir),
+);
+if ((infoReportsBackfilled ?? 0) > 0)
+  logger.info({ versions: infoReportsBackfilled }, 'legacy info report versions backfilled');
 const githubFetch = refreshingGithubFetch(
   { db, box: secretBox, oauthClient: config.githubOauth },
   globalThis.fetch,

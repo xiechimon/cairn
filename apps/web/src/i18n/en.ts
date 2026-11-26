@@ -3226,7 +3226,6 @@ export const EN: Record<string, string> = {
   '已通知停止，执行端确认后这 {n} 个任务会标记为完成。':
     'Stop requested; {n#1 task|# tasks} will be marked done after runner confirmation.',
   '已停止，重新运行后才能完成': 'Stopped; rerun before marking complete',
-  '正在加载成果…': 'Loading deliverables…',
   跳到未回答的问题: 'Jump to unanswered question',
   '将保存 {secrets} 条机密，{envs} 条环境变量':
     'Will save {secrets#1 secret|# secrets} and {envs#1 env var|# env vars}',
@@ -3290,4 +3289,6 @@ export const EN: Record<string, string> = {
     'On a fresh launch, click Connect existing Cairn host, paste this URL, and restart; an existing setup can connect under Host connection and resident service at the bottom of the Runners page. After sign-in, that computer automatically joins team {team}, ready as a Runner.',
   '连接并登录后，这台电脑会自动注册为该主机的执行机。':
     'After connecting and signing in, this computer registers as a Runner on that host automatically.',
+  文档已关闭: 'Document closed',
+  '请回到对话里重新打开这篇内容。': 'Reopen this document from the conversation.',
 };

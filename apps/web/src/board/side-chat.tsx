@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import {
   type ReactNode,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -25,17 +26,15 @@ import { contextPercentOf } from '../chief/context-meter-ring.js';
 import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
 import { isFinalReportPhase, ReportThreadContext } from '../chief/research-report.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
-import { CopyIconButton } from '../components/copy-icon-button.js';
 import { RollNumber, useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
 import { SidePanel } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
 import { toastError } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { Composer } from '../detail/composer.js';
-import { DiffFileBody, DocPane } from '../detail/docpane.js';
+import { DiffFileBody } from '../detail/docpane.js';
 import { taskStatusInk } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
@@ -44,8 +43,10 @@ import { useI18n } from '../i18n/provider.js';
 import { baseName, dirName } from '../lib/path-name.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { MACHINES_HREF } from '../resources/hrefs.js';
+import { inlineArtifactKey, registerInlineArtifact } from './artifact/inline-artifact.js';
 import { type EngineRunView, engineTranscript, engineUsageSummary } from './engine-run.js';
 import { EngineQuestion, EngineRawView } from './engine-run-view.js';
+import { OpenFileContext } from './file-pane.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { isWaitingToRetry, todoRetryPhrase } from './retry-copy.js';
@@ -70,7 +71,6 @@ import {
   threadUpdates,
 } from './thread-panel-model.js';
 import { ThreadPrPanel } from './thread-pr-panel.js';
-import { ThreadUpdatesBlock } from './thread-updates-block.js';
 import {
   ThreadUsageDetails,
   ThreadUsageRing,
@@ -746,10 +746,23 @@ function ReadyThread({
   onCloseAll: () => void;
 }) {
   const { t } = useI18n();
-  const [planOpen, setPlanOpen] = useState(false);
+  const openFile = useContext(OpenFileContext);
   const updates = threadUpdates(todo, chat.transcript);
   const openPlan =
-    chat.planDoc !== undefined || updates !== null ? () => setPlanOpen(true) : undefined;
+    openFile !== undefined && (chat.planDoc !== undefined || updates !== null)
+      ? () => {
+          const key = inlineArtifactKey(`plan-${todo.id}`);
+          registerInlineArtifact(key, {
+            title: todo.title,
+            label: t('计划'),
+            stage: null,
+            markdown: chat.planMarkdown ?? '',
+            updates,
+            readOnly: true,
+          });
+          openFile({ name: `${t('计划')} · ${todo.title}`, key });
+        }
+      : undefined;
   const { live, teamId } = useLiveData();
   const liveActivity = useSyncExternalStore(activityStore.subscribe, () =>
     live && chat.running && chat.buildId != null ? activityStore.get(chat.buildId) : null,
@@ -848,33 +861,6 @@ function ReadyThread({
             : null
         }
       />
-      <DialogShell
-        open={planOpen}
-        onClose={() => setPlanOpen(false)}
-        size="l"
-        title={t('计划')}
-        subtitle={todo.title}
-        headerAction={
-          chat.planMarkdown !== null ? (
-            <CopyIconButton
-              text={chat.planMarkdown}
-              label={t('复制为 Markdown')}
-              copiedLabel={t('已复制')}
-              testId="plan-copy-markdown"
-              className="text-content-tertiary hover:text-foreground pointer-coarse:size-11"
-            />
-          ) : undefined
-        }
-      >
-        <div data-testid="side-chat-plan" className="flex h-[min(70vh,720px)] min-h-0 flex-col">
-          {updates !== null && (
-            <div className="flex-none border-b border-border px-3.5 pt-1 pb-4">
-              <ThreadUpdatesBlock updates={updates} />
-            </div>
-          )}
-          {chat.planDoc !== undefined && <DocPane doc={chat.planDoc} />}
-        </div>
-      </DialogShell>
     </>
   );
 }

@@ -135,6 +135,7 @@ export function ChiefReportMessage({ report }: { report: ChiefReportContent }) {
           createdAt: report.madeAt,
           final: null,
           label: t('历史日报'),
+          inlineKey: `daily-${report.day}`,
         }}
       />
     </>

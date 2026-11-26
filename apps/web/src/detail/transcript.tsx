@@ -344,7 +344,11 @@ function Row({
     case 'report':
       return (
         <div className={`${AGENT_ROW} ${margin}`} data-row="agent" data-testid="info-report">
-          <TranscriptReportCard content={item.markdown} createdAt={item.createdAt} />
+          <TranscriptReportCard
+            content={item.markdown}
+            createdAt={item.createdAt}
+            attachmentId={item.attachmentId}
+          />
         </div>
       );
     case 'thinking':

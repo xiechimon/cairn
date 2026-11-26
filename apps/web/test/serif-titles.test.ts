@@ -78,7 +78,8 @@ describe('the serif voice follows claude.ai (docs/design/surfaces/foundation.md 
     expect(rows).not.toContain('voice-response');
     const transcript = read('detail/transcript.tsx');
     expect(transcript).toMatch(/font-sans[^"]*"\s*data-testid="agent-text"/);
-    expect(read('chief/research-report.tsx')).toMatch(/data-testid="research-report-doc"\s*className="[^"]*font-sans/);
+    expect(read('board/artifact/file-artifact.tsx')).toMatch(/docTestId={inlineMeta !== null \? 'research-report-doc' : undefined}/);
+    expect(read('board/artifact/file-artifact.tsx')).toMatch(/inlineMeta !== null \? 'report-doc font-sans/);
     expect(transcript).not.toContain('voice-response');
   });
 });

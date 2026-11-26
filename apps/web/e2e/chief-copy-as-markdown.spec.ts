@@ -46,10 +46,12 @@ test('research report copies exact raw Markdown, confirms copied state, and work
       content: source,
     }),
   };
-  await mockLive(page, { threads: [THREAD], messages: [], todos: [research] }, (path, _route, json) =>
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [research] }, (path, route, json) =>
     path === '/api/conversations/build-research-copy/messages'
       ? json({ messages: [report], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null })
-      : undefined,
+      : path === '/api/attachments/att-research-copy'
+        ? route.fulfill({ status: 200, contentType: 'text/markdown; charset=utf-8', body: source })
+        : undefined,
   );
 
   await page.emulateMedia({ colorScheme: 'light' });
@@ -59,8 +61,9 @@ test('research report copies exact raw Markdown, confirms copied state, and work
     .getByRole('button', { name: 'Storage format comparison' })
     .click();
 
-  const dialog = page.getByRole('dialog', { name: 'Storage format comparison' });
-  const copy = dialog.getByTestId('copy-markdown');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const panel = page.getByTestId('artifact-panel');
+  const copy = panel.getByTestId('artifact-copy');
   await expect(copy).toHaveAccessibleName('复制为 Markdown');
   await saveShot(page, 'research-report-light.png');
 
@@ -173,16 +176,14 @@ test('task plan dialog copies exact raw Markdown from dialog head beside close',
   await page.goto('/app?pane=tasks&thread=todo-plan-copy');
   await page.getByRole('button', { name: '查看计划' }).click();
 
-  const dialog = page.getByRole('dialog', { name: '计划' });
-  await expect(dialog.getByTestId('side-chat-plan')).toBeVisible();
-  const copy = dialog.locator('[data-slot="dialog-head-action"]').getByTestId('plan-copy-markdown');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const panel = page.getByTestId('artifact-panel');
+  await expect(panel.getByTestId('research-report-meta')).toHaveText('计划');
+  await expect(panel.getByTestId('research-report-doc')).toContainText('Rollout Plan');
+  const copy = panel.getByTestId('artifact-copy');
   await expect(copy).toBeVisible();
   await expect(copy).toHaveText('');
   await expect(copy).toHaveAccessibleName('复制为 Markdown');
-
-  const closeBox = await dialog.getByRole('button', { name: '关闭', exact: true }).boundingBox();
-  const copyBox = await copy.boundingBox();
-  expect(Math.abs((copyBox?.y ?? 0) - (closeBox?.y ?? 0))).toBeLessThanOrEqual(4);
 
   await copy.hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('复制为 Markdown');
