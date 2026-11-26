@@ -155,3 +155,20 @@ for (const [name, thread, title, body] of [
     if (name !== 'a running turn') await expect(toast).not.toContainText('请刷新');
   });
 }
+
+test('a turn waiting to run again does not ask for another press', async ({ page }) => {
+  await open(
+    page,
+    { turnRunning: true, turnQueue: null },
+    [{ id: 'm1', role: 'user', content: '一句话', createdAt: 10 }],
+    {
+      status: 409,
+      body: { error: 'no chief turn in flight', reason: 'chief-turn-waiting-to-retry' },
+    },
+  );
+  await page.getByTestId('chief-composer-stop').click();
+  const toast = page.locator('[data-sonner-toast]');
+  await expect(toast).toContainText('停止失败。');
+  await expect(toast).toContainText('这一轮正在等待重新运行，这次没有停掉。');
+  await expect(toast).not.toContainText('请重试');
+});

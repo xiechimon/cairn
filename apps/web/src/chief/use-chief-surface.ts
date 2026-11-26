@@ -1,6 +1,7 @@
 import {
   type AskUserAnswer,
   CHIEF_MESSAGE_MERGED,
+  CHIEF_TURN_WAITING_TO_RETRY,
   NOTHING_TO_STOP,
   type TranscriptRow,
   transcriptRowSchema,
@@ -476,7 +477,12 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         if (activeThread === null) return;
         mutations.chiefStop.mutate(
           { threadId: activeThread.id },
-          { onError: (e) => toastError(t('停止失败，请重试。'), e) },
+          {
+            onError: (e) => {
+              const stopRemoved = e instanceof ApiError && e.reason === CHIEF_TURN_WAITING_TO_RETRY;
+              toastError(t(stopRemoved ? '停止失败。' : '停止失败，请重试。'), e);
+            },
+          },
         );
       }
     : undefined;

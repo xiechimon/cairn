@@ -22,7 +22,7 @@ A turn claimed or ended after the last read is corrected by the next thread refe
 | Press | Server state at arrival | Answer | What the owner sees |
 |---|---|---|---|
 | Stop a turn | no live turn has started, queued turns or none | 409 `nothing-to-stop`; queued turns are untouched | stopped; Stop then follows the table above |
-| Stop a turn | a turn that started now waits to run again (backup model, quota hold or wait) | 409 `chief-turn-waiting-to-retry`; nothing changes | Chinese failure line; the thread is read again and Stop follows the table above |
+| Stop a turn | a turn that started now waits to run again (backup model, quota hold or wait) | 409 `chief-turn-waiting-to-retry`; nothing changes | Chinese failure line under a title that does not ask for another press, since Stop is gone until the turn runs; the thread is read again and Stop follows the table above |
 | Withdraw a message | no live turn owns it | 409 `nothing-to-stop`; the message stays | stopped; the composer is not refilled |
 | Withdraw a message | a claimed turn owns it | 409 `chief-message-read` | Chinese line saying the Coordinator already read it; Stop now stops that turn |
 | Withdraw a message already removed | no such message | 404 | nothing |

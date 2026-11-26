@@ -1559,6 +1559,7 @@ export const EN: Record<string, string> = {
   '撤回失败，Coordinator 已经读到这条了。': 'Could not withdraw: the Coordinator already read it.',
   '插话失败，请重试。': 'Could not steer. Try again.',
   '停止失败，请重试。': 'Could not stop. Try again.',
+  '停止失败。': 'Could not stop.',
   '已停止，没有建任务。': 'Stopped. No task was created.',
   '已停止。停之前已经建了任务': 'Stopped. A task was already created before the stop:',
   '{name} 已恢复，{n} 个任务已开工。': '{name} is back. {n#1 task|# tasks} started.',
