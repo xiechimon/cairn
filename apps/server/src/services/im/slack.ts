@@ -2,8 +2,14 @@ import { fromMarkdown } from 'mdast-util-from-markdown';
 import { gfmFromMarkdown } from 'mdast-util-gfm';
 import { gfm } from 'micromark-extension-gfm';
 import { liveImEnv } from './env.js';
-import { asSendError, classifyHttpSendError, ImSendError, scrubSecrets } from './errors.js';
-import { chunkText } from './telegram.js';
+import {
+  abortWithTimeout,
+  asSendError,
+  classifyHttpSendError,
+  ImSendError,
+  scrubSecrets,
+  sleepAbortable,
+} from './errors.js';
 import type {
   ImAdapter,
   ImConnectionHandlers,
@@ -25,7 +31,20 @@ const BOT_TOKEN_PREFIX = 'xoxb-';
 const BUTTON_TEXT_MAX_CHARS = 75;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
-const AUTH_ERRORS = new Set(['invalid_auth', 'not_authed', 'token_revoked', 'account_inactive']);
+const REQUEST_TIMEOUT_MS = 15_000;
+const HELLO_TIMEOUT_MS = 15_000;
+const AUTH_ERRORS = new Set([
+  'invalid_auth',
+  'not_authed',
+  'token_revoked',
+  'token_expired',
+  'account_inactive',
+]);
+const FATAL_OPEN_ERRORS: readonly string[] = [
+  'missing_scope',
+  'not_allowed_token_type',
+  'invalid_app_token',
+];
 const PERMANENT_ERRORS = new Set(['channel_not_found', 'is_archived', 'msg_too_long', 'no_text']);
 
 interface SlackAuthTest {
@@ -112,6 +131,7 @@ async function slackApi<T>(
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<T> {
+  const timeout = abortWithTimeout(REQUEST_TIMEOUT_MS, signal);
   let res: Response;
   const query = method === 'users.info';
   const params = new URLSearchParams(
@@ -126,14 +146,19 @@ async function slackApi<T>(
         authorization: `Bearer ${token}`,
       },
       body: query ? undefined : JSON.stringify(body),
-      signal: signal ?? null,
+      signal: timeout.signal,
     });
   } catch (err) {
+    if (timeout.timedOut()) {
+      throw new SlackApiError(0, `slack ${method}: request timed out`);
+    }
     if (err instanceof Error && err.name === 'AbortError') throw err;
     throw new SlackApiError(
       0,
       `slack ${method}: network error: ${err instanceof Error ? err.message : String(err)}`,
     );
+  } finally {
+    timeout.clear();
   }
   if (res.status === 429) {
     const retryAfter = Number(res.headers.get('retry-after'));
@@ -164,6 +189,12 @@ function isAuthFailure(err: unknown): boolean {
     ((err.error !== undefined && AUTH_ERRORS.has(err.error)) ||
       err.status === 401 ||
       err.status === 403)
+  );
+}
+
+function isFatalOpenError(err: unknown): boolean {
+  return (
+    err instanceof SlackApiError && err.error !== undefined && FATAL_OPEN_ERRORS.includes(err.error)
   );
 }
 
@@ -418,9 +449,25 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
 
       const openSocket = (url: string) => {
         let helloSeen = false;
+        let settled = false;
         let settle: (end: Omit<SocketEnd, 'ready'>) => void = () => {};
+        let helloTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+          settle({ kind: 'closed', reason: 'hello timeout' });
+        }, HELLO_TIMEOUT_MS);
+        helloTimer.unref?.();
+        const clearHelloTimer = () => {
+          if (helloTimer !== null) {
+            clearTimeout(helloTimer);
+            helloTimer = null;
+          }
+        };
         const done = new Promise<SocketEnd>((resolve) => {
-          settle = (end) => resolve({ ...end, ready: helloSeen });
+          settle = (end) => {
+            if (settled) return;
+            settled = true;
+            clearHelloTimer();
+            resolve({ ...end, ready: helloSeen });
+          };
         });
         let sock: ImSocket | undefined;
         sock = env.connectSocket(url, {
@@ -438,6 +485,7 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               case 'hello':
                 helloSeen = true;
                 readyOnce = true;
+                clearHelloTimer();
                 handlers.onStatus('ready');
                 break;
               case 'events_api': {
@@ -486,8 +534,8 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
         return { sock, done };
       };
 
-      const degraded = (reason: string) =>
-        handlers.onStatus(readyOnce ? 'degraded' : 'connecting', reason);
+      const degraded = (reason: string, failures: number) =>
+        handlers.onStatus(readyOnce || failures >= 2 ? 'degraded' : 'connecting', reason);
 
       const run = async () => {
         let failures = 0;
@@ -521,11 +569,23 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               );
               return;
             }
+            if (isFatalOpenError(err)) {
+              handlers.onStatus(
+                'error',
+                scrubSecrets(err instanceof Error ? err.message : String(err), appToken, botToken),
+              );
+              return;
+            }
             failures += 1;
             degraded(
               scrubSecrets(err instanceof Error ? err.message : String(err), appToken, botToken),
+              failures,
             );
-            await env.sleep(Math.min(RECONNECT_BASE_MS * 2 ** (failures - 1), RECONNECT_MAX_MS));
+            await sleepAbortable(
+              env.sleep,
+              Math.min(RECONNECT_BASE_MS * 2 ** (failures - 1), RECONNECT_MAX_MS),
+              stopping.signal,
+            );
             continue;
           }
           if (stopped) return;
@@ -537,8 +597,13 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
             failures += 1;
             degraded(
               scrubSecrets(err instanceof Error ? err.message : String(err), appToken, botToken),
+              failures,
             );
-            await env.sleep(Math.min(RECONNECT_BASE_MS * 2 ** (failures - 1), RECONNECT_MAX_MS));
+            await sleepAbortable(
+              env.sleep,
+              Math.min(RECONNECT_BASE_MS * 2 ** (failures - 1), RECONNECT_MAX_MS),
+              stopping.signal,
+            );
             continue;
           }
           socket = session.sock;
@@ -551,8 +616,12 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
             return;
           }
           failures = end.ready ? 1 : failures + 1;
-          degraded(`slack socket ${end.kind}: ${end.reason}`);
-          await env.sleep(Math.min(RECONNECT_BASE_MS * 2 ** (failures - 1), RECONNECT_MAX_MS));
+          degraded(`slack socket ${end.kind}: ${end.reason}`, failures);
+          await sleepAbortable(
+            env.sleep,
+            Math.min(RECONNECT_BASE_MS * 2 ** (failures - 1), RECONNECT_MAX_MS),
+            stopping.signal,
+          );
         }
       };
 

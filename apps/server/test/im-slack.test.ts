@@ -1560,4 +1560,55 @@ describe('slack adapter', () => {
       opens,
     );
   });
+
+  test('persistent initial connection failures transition to degraded instead of staying connecting', async () => {
+    const statuses: string[] = [];
+    slack.queue('auth.test', AUTH_OK);
+    slack.queue('apps.connections.open', { __http: 500 });
+    slack.queue('apps.connections.open', { __http: 500 });
+    slack.queue('apps.connections.open', PARK);
+    const session = await adapter.connect(
+      { appToken: APP_TOKEN, botToken: BOT_TOKEN },
+      { onMessage: () => {}, onStatus: (status) => statuses.push(status) },
+      slack.env,
+    );
+    await vi.waitFor(() => expect(statuses).toContain('degraded'));
+    await session.stop();
+  });
+
+  test('missing_scope on apps.connections.open reports error and stops retrying', async () => {
+    const statuses: string[] = [];
+    slack.queue('auth.test', AUTH_OK);
+    slack.queue('apps.connections.open', { ok: false, error: 'missing_scope' });
+    const session = await adapter.connect(
+      { appToken: APP_TOKEN, botToken: BOT_TOKEN },
+      { onMessage: () => {}, onStatus: (status) => statuses.push(status) },
+      slack.env,
+    );
+    await vi.waitFor(() => expect(statuses).toContain('error'));
+    const opens = slack.calls.filter((call) => call.method === 'apps.connections.open').length;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(slack.calls.filter((call) => call.method === 'apps.connections.open')).toHaveLength(
+      opens,
+    );
+    await session.stop();
+  });
+
+  test('stop resolves immediately while sleeping in reconnect backoff', async () => {
+    slack.queue('auth.test', AUTH_OK);
+    slack.queue('apps.connections.open', { __http: 500 });
+    const envWithRealSleep: ImEnv = {
+      ...slack.env,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    };
+    const session = await adapter.connect(
+      { appToken: APP_TOKEN, botToken: BOT_TOKEN },
+      { onMessage: () => {}, onStatus: () => {} },
+      envWithRealSleep,
+    );
+    await vi.waitFor(() => expect(slack.calls.length).toBeGreaterThanOrEqual(2));
+    const startedStop = Date.now();
+    await session.stop();
+    expect(Date.now() - startedStop).toBeLessThan(500);
+  });
 });

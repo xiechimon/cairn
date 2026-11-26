@@ -267,4 +267,37 @@ describe('imessage bridge', () => {
     expect(afterDisconnect?.status).toBe('degraded');
     expect(afterDisconnect?.statusDetail).toContain('offline');
   });
+
+  test('multi-chunk send tracks and awaits every chunk ack in order', async () => {
+    const runner = await enrollConnectorRunner(s, 'mini', false);
+    const stream = collectStream(runner.machineId);
+    const connId = await connectImsg(runner.machineId);
+
+    const sending = bridge.send(connId, {
+      chatKey: 'iMessage;-;+15551234',
+      text: `${'a'.repeat(60_000)}${'b'.repeat(5)}`,
+    });
+    await new Promise((r) => setTimeout(r, 15));
+
+    const chunkSends = stream.events.filter(
+      (ev): ev is Extract<MachineStreamEvent, { type: 'im.send' }> => ev.type === 'im.send',
+    );
+    expect(chunkSends).toHaveLength(1);
+    expect(chunkSends[0]?.message.text).toHaveLength(60_000);
+
+    await postImEvent(connId, runner.token, {
+      kind: 'sent',
+      sendId: chunkSends[0]?.sendId ?? '',
+      ok: false,
+      errorKind: 'permanent',
+      error: 'chunk 1 failed',
+    });
+
+    await expect(sending).rejects.toMatchObject({ kind: 'permanent', message: 'chunk 1 failed' });
+    const allChunkSends = stream.events.filter(
+      (ev): ev is Extract<MachineStreamEvent, { type: 'im.send' }> => ev.type === 'im.send',
+    );
+    expect(allChunkSends).toHaveLength(1);
+    stream.release();
+  });
 });

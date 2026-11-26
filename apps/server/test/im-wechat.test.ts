@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { ImSendError } from '../src/services/im/errors.js';
 import type {
   ImConnectionHandlers,
   ImEnv,
@@ -391,5 +392,41 @@ describe('wechat adapter connect', () => {
     await stop();
     expect(statuses.map((s) => s.status)).toEqual(['connecting', 'expired']);
     expect(callsTo(calls, 'getupdates')).toHaveLength(0);
+  });
+
+  test('HTTP 401/403 on poll or send surfaces expired and throws ImSendError', async () => {
+    const { statuses, send, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [new Response('unauthorized', { status: 401 })],
+      sendmessage: [
+        new Response('unauthorized', { status: 401 }),
+        { ret: 5, errmsg: 'context token invalid' },
+      ],
+    });
+    await waitFor(() => statuses.some((s) => s.status === 'expired'));
+    await expect(send({ chatKey: 'u1', text: 'hi' })).rejects.toSatisfy(
+      (err) => err instanceof ImSendError && err.kind === 'permanent' && err.authExpired === true,
+    );
+    await expect(send({ chatKey: 'u1', text: 'hi' })).rejects.toSatisfy(
+      (err) => err instanceof ImSendError && err.kind === 'permanent' && err.authExpired === false,
+    );
+    await stop();
+  });
+
+  test('stop resolves immediately while sleeping between failed polls', async () => {
+    const { env, calls } = makeEnv(
+      sequence({
+        notifystart: [{}],
+        getupdates: [{ ret: 500 }],
+      }),
+    );
+    env.sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const { handlers, statuses } = makeHandlers();
+    const connection = await wechatAdapter.connect(FIELDS, handlers, env);
+    await waitFor(() => callsTo(calls, 'getupdates').length >= 1);
+    const startedStop = Date.now();
+    await connection.stop();
+    expect(Date.now() - startedStop).toBeLessThan(500);
+    expect(statuses.map((s) => s.status)).toContain('connecting');
   });
 });

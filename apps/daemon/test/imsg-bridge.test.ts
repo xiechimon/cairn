@@ -1,5 +1,5 @@
 import { ChildProcess, type spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { chmodSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { MachineImEventBody } from '@cairn/shared';
@@ -9,8 +9,13 @@ import { createImsgBridge } from '../src/imsg-bridge.js';
 
 interface FakeChild {
   child: ChildProcess;
-  respond: (id: number, result?: unknown, error?: { code: number; message?: string }) => void;
+  respond: (
+    id: number,
+    result?: unknown,
+    error?: { code: number; message?: string; data?: { detail?: string } },
+  ) => void;
   notify: (method: string, params: unknown) => void;
+  emitStderr: (text: string) => void;
   requests: { method: string; params: Record<string, unknown> }[];
   exit: () => void;
 }
@@ -34,6 +39,7 @@ function fakeSpawn(
     const child = new ChildProcess();
     const stdin = new PassThrough();
     const stdout = new PassThrough();
+    const stderr = new PassThrough();
     const fake: FakeChild = {
       child,
       requests: [],
@@ -43,11 +49,13 @@ function fakeSpawn(
         ),
       notify: (method, params) =>
         stdout.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`),
+      emitStderr: (text) => stderr.write(text),
       exit: () => child.emit('exit', 1),
     };
     Object.assign(child, {
       stdin,
       stdout,
+      stderr,
       kill: () => {
         queueMicrotask(() => child.emit('exit', null));
         return true;
@@ -360,6 +368,7 @@ describe('imsg bridge', () => {
       logger: { machine: () => {}, wake: () => {} },
       home: makeDir('imsg-home-'),
       env: {},
+      platform: 'darwin',
       spawnProc: fakeSpawn(),
       fetchImpl: (() => Promise.resolve(new Response('not-the-real-zip'))) as typeof fetch,
     });
@@ -505,6 +514,207 @@ describe('imsg bridge', () => {
       errorKind: 'retry',
       error: 'imsg bridge is not attached',
     });
+    bridge.stop();
+  });
+
+  test('non-darwin host refuses imsg download, reports error, and does not respawn', async () => {
+    let fetchCalls = 0;
+    const bridge = createImsgBridge({
+      api: {
+        imEvent: async (connId, body) => {
+          events.push({ connId, body });
+        },
+      },
+      logger: { machine: () => {}, wake: () => {} },
+      home: makeDir('imsg-home-'),
+      env: {},
+      platform: 'linux',
+      spawnProc: fakeSpawn(),
+      fetchImpl: (async () => {
+        fetchCalls += 1;
+        return new Response('nope');
+      }) as typeof fetch,
+    });
+    bridge.handle({ type: 'im.attach', connId: 'conn-1' });
+    await waitFor(() => bodies('status').some((b) => b.kind === 'status' && b.status === 'error'));
+    const err = bodies('status').find((b) => b.kind === 'status' && b.status === 'error');
+    if (err?.kind !== 'status') throw new Error('no error status');
+    expect(err.detail).toContain('macOS');
+    expect(fetchCalls).toBe(0);
+    expect(spawned).toHaveLength(0);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(
+      bodies('status').filter((b) => b.kind === 'status' && b.status === 'error'),
+    ).toHaveLength(1);
+    bridge.stop();
+  });
+
+  test('resolves executable imsg from PATH on darwin without downloading', async () => {
+    const binDir = makeDir('imsg-path-');
+    const binPath = join(binDir, 'imsg');
+    writeFileSync(binPath, '#!/bin/sh\n');
+    chmodSync(binPath, 0o755);
+    let fetchCalls = 0;
+    const spawnedBins: string[] = [];
+    const innerSpawn = fakeSpawn();
+    const trackingSpawn: typeof spawn = ((cmd: string, args: readonly string[], opts: unknown) => {
+      spawnedBins.push(cmd);
+      return innerSpawn(cmd, args as string[], opts as never);
+    }) as typeof spawn;
+
+    const bridge = createImsgBridge({
+      api: {
+        imEvent: async (connId, body) => {
+          events.push({ connId, body });
+        },
+      },
+      logger: { machine: () => {}, wake: () => {} },
+      home: makeDir('imsg-home-'),
+      env: { PATH: binDir },
+      platform: 'darwin',
+      spawnProc: trackingSpawn,
+      fetchImpl: (async () => {
+        fetchCalls += 1;
+        return new Response('nope');
+      }) as typeof fetch,
+    });
+    bridge.handle({ type: 'im.attach', connId: 'conn-1' });
+    await waitFor(() => bodies('status').some((b) => b.kind === 'status' && b.status === 'ready'));
+    expect(fetchCalls).toBe(0);
+    expect(spawnedBins).toEqual([binPath]);
+    bridge.stop();
+  });
+
+  test('outbound AppleScript -1743 surfaces degraded Automation guidance, captures stderr, and recovers on success', async () => {
+    let deny = true;
+    const bridge = makeBridge(
+      fakeSpawn((req, fake) => {
+        if (req.method === 'send' && deny) {
+          fake.emitStderr(
+            'osascript: execution error: Not authorized to send Apple events to Messages. (-1743)\n',
+          );
+          fake.respond(req.id, undefined, {
+            code: -32603,
+            message: 'AppleScript failed (-1743)',
+          });
+          return;
+        }
+        fake.respond(req.id, { ok: true, guid: 'GUID-RECOVERED' });
+      }),
+    );
+    bridge.handle({ type: 'im.attach', connId: 'conn-1' });
+    await waitFor(() => bodies('status').some((b) => b.kind === 'status' && b.status === 'ready'));
+
+    bridge.handle({
+      type: 'im.send',
+      connId: 'conn-1',
+      sendId: 'send-1743',
+      message: { chatKey: 'iMessage;-;+1', text: 'hi' },
+    });
+    await waitFor(() => bodies('sent').length === 1);
+    expect(bodies('sent')[0]).toMatchObject({
+      kind: 'sent',
+      sendId: 'send-1743',
+      ok: false,
+      errorKind: 'permanent',
+    });
+    const degraded = bodies('status').find((b) => b.kind === 'status' && b.status === 'degraded');
+    expect(degraded?.kind === 'status' ? degraded.detail : '').toContain('Automation');
+    expect(degraded?.kind === 'status' ? degraded.detail : '').toContain('-1743');
+    expect(spawned).toHaveLength(1);
+
+    deny = false;
+    bridge.handle({
+      type: 'im.send',
+      connId: 'conn-1',
+      sendId: 'send-ok',
+      message: { chatKey: 'iMessage;-;+1', text: 'recovered' },
+    });
+    await waitFor(() => bodies('sent').length === 2);
+    expect(
+      bodies('status').filter((b) => b.kind === 'status' && b.status === 'ready').length,
+    ).toBeGreaterThanOrEqual(2);
+    bridge.stop();
+  });
+
+  test('outbound AppleScript -1712 surfaces degraded timeout guidance as retry', async () => {
+    const bridge = makeBridge(
+      fakeSpawn((req, fake) => {
+        if (req.method === 'send') {
+          fake.respond(req.id, undefined, {
+            code: -32603,
+            message: 'AppleEvent timed out (-1712)',
+          });
+          return;
+        }
+        fake.respond(req.id, { ok: true });
+      }),
+    );
+    bridge.handle({ type: 'im.attach', connId: 'conn-1' });
+    await waitFor(() => bodies('status').some((b) => b.kind === 'status' && b.status === 'ready'));
+    bridge.handle({
+      type: 'im.send',
+      connId: 'conn-1',
+      sendId: 'send-1712',
+      message: { chatKey: 'iMessage;-;+1', text: 'hi' },
+    });
+    await waitFor(() => bodies('sent').length === 1);
+    expect(bodies('sent')[0]).toMatchObject({
+      kind: 'sent',
+      ok: false,
+      errorKind: 'retry',
+    });
+    const degraded = bodies('status').find((b) => b.kind === 'status' && b.status === 'degraded');
+    expect(degraded?.kind === 'status' ? degraded.detail : '').toContain('-1712');
+    bridge.stop();
+  });
+
+  test('respawn passes since_rowid and drops stale backlog messages older than 15 minutes', async () => {
+    const currentTime = 1_700_000_000_000;
+    const bridge = makeBridge(fakeSpawn(), () => currentTime);
+    bridge.handle({ type: 'im.attach', connId: 'conn-1' });
+    await waitFor(() => bodies('status').some((b) => b.kind === 'status' && b.status === 'ready'));
+
+    spawned[0]?.notify('message', {
+      subscription: 1,
+      message: {
+        id: 41,
+        chat_guid: 'iMessage;-;+15551234',
+        sender: '+15551234',
+        text: 'fresh msg',
+        created_at: new Date(currentTime - 10_000).toISOString(),
+        attachments: [],
+      },
+    });
+    await waitFor(() => bodies('message').length === 1);
+
+    spawned[0]?.notify('watch.overflow', {
+      subscription: 1,
+      resume_after_rowid: 45,
+      reason: 'buffer_limit_exceeded',
+    });
+    await waitFor(() => spawned.length >= 2, 400);
+    await waitFor(
+      () => bodies('status').filter((b) => b.kind === 'status' && b.status === 'ready').length >= 2,
+      400,
+    );
+
+    const resubscribe = spawned[1]?.requests.find((r) => r.method === 'watch.subscribe');
+    expect(resubscribe?.params).toEqual({ attachments: true, since_rowid: 45 });
+
+    spawned[1]?.notify('message', {
+      subscription: 1,
+      message: {
+        id: 46,
+        chat_guid: 'iMessage;-;+15551234',
+        sender: '+15551234',
+        text: 'stale backlog bomb',
+        created_at: new Date(currentTime - 20 * 60_000).toISOString(),
+        attachments: [],
+      },
+    });
+    await new Promise((r) => setTimeout(r, 40));
+    expect(bodies('message')).toHaveLength(1);
     bridge.stop();
   });
 });

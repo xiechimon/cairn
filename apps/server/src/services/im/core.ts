@@ -1084,6 +1084,7 @@ export function createImService(deps: ImServiceDeps): ImService {
         live.delete(connId);
         await session.stop().catch(() => {});
       }
+      sendErrors.delete(connId);
       markStatus(connId, 'connecting', null);
       await startConnection(row.id);
       const fresh = connRow(connId);

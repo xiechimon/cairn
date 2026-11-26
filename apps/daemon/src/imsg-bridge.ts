@@ -1,9 +1,9 @@
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
-import { chmod, lstat, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { constants, createWriteStream } from 'node:fs';
+import { access, chmod, lstat, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type {
   ImInboundActionBody,
@@ -21,14 +21,18 @@ const IMSG_RELEASE_SHA256 = '78fcd9b7770ca9ead71228acf186759279115078895d1ee1299
 const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 const OWN_SEND_WINDOW_MS = 60_000;
 const CARD_WINDOW_MS = 3_600_000;
+const STALE_BACKLOG_MAX_AGE_MS = 15 * 60_000;
 const RESPAWN_BASE_MS = 2_000;
 const RESPAWN_MAX_MS = 60_000;
+const STDERR_TAIL_LINES = 8;
+const STDERR_TAIL_CHARS = 512;
 
 export interface ImsgBridgeDeps {
   api: Pick<MachineApi, 'imEvent'>;
   logger: Pick<DaemonLogger, 'machine' | 'wake'>;
   home: string;
   env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
   spawnProc?: typeof spawn;
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -45,6 +49,7 @@ interface ImsgMessageRow {
   sender_name?: string;
   is_from_me?: boolean;
   text?: string | null;
+  created_at?: string;
   attachments?: {
     filename?: string;
     transfer_name?: string;
@@ -73,17 +78,49 @@ class ImsgRpc {
     { resolve(v: unknown): void; reject(e: RpcError & { name?: string }): void }
   >();
   private buf = '';
+  private stderrBuf = '';
+  private readonly stderrLines: string[] = [];
   private alive = true;
 
   constructor(
     private readonly child: ChildProcess,
     private readonly onNotify: (method: string, params: unknown) => void,
-    private readonly onExit: (code: number | null) => void,
+    private readonly onExit: (
+      code: number | null,
+      spawnError: NodeJS.ErrnoException | null,
+      stderrTail: string,
+    ) => void,
+    private readonly onStderrLine?: (line: string) => void,
   ) {
     child.stdout?.setEncoding('utf8');
     child.stdout?.on('data', (chunk: string) => this.feed(chunk));
-    child.on('exit', (code) => this.died(code));
-    child.on('error', () => this.died(null));
+    child.stderr?.setEncoding('utf8');
+    child.stderr?.on('data', (chunk: string) => this.feedStderr(chunk));
+    child.on('exit', (code) => this.died(code, null));
+    child.on('error', (err) => this.died(null, err as NodeJS.ErrnoException));
+  }
+
+  private feedStderr(chunk: string): void {
+    this.stderrBuf += chunk;
+    for (;;) {
+      const nl = this.stderrBuf.indexOf('\n');
+      if (nl < 0) break;
+      const line = this.stderrBuf.slice(0, nl).trim();
+      this.stderrBuf = this.stderrBuf.slice(nl + 1);
+      if (line === '') continue;
+      this.stderrLines.push(line);
+      if (this.stderrLines.length > STDERR_TAIL_LINES) {
+        this.stderrLines.shift();
+      }
+      this.onStderrLine?.(line);
+    }
+  }
+
+  stderrTail(): string {
+    const extra = this.stderrBuf.trim();
+    const lines = extra === '' ? this.stderrLines : [...this.stderrLines, extra];
+    const joined = lines.join(' | ');
+    return joined.length > STDERR_TAIL_CHARS ? joined.slice(-STDERR_TAIL_CHARS) : joined;
   }
 
   private feed(chunk: string): void {
@@ -120,14 +157,14 @@ class ImsgRpc {
     }
   }
 
-  private died(code: number | null): void {
+  private died(code: number | null, spawnError: NodeJS.ErrnoException | null): void {
     if (!this.alive) return;
     this.alive = false;
     for (const waiter of this.pending.values()) {
       waiter.reject({ code: -32004, message: 'imsg rpc exited' });
     }
     this.pending.clear();
-    this.onExit(code);
+    this.onExit(code, spawnError, this.stderrTail());
   }
 
   call(method: string, params?: Record<string, unknown>): Promise<unknown> {
@@ -160,9 +197,29 @@ interface Session {
   rpc: ImsgRpc | null;
   backoffMs: number;
   respawnTimer: ReturnType<typeof setTimeout> | null;
+  lastRowId: number | null;
+  outboundDegraded: boolean;
   recentOwn: { chatGuid: string; text: string; at: number }[];
   recentOwnGuids: { guid: string; at: number }[];
   cards: Map<string, { buttons: BridgeButton[]; at: number }>;
+}
+
+class PermanentImsgError extends Error {}
+
+async function findImsgOnPath(env: NodeJS.ProcessEnv): Promise<string | null> {
+  const raw = env.PATH ?? '';
+  for (const dir of raw.split(delimiter)) {
+    const trimmed = dir.trim();
+    if (trimmed === '') continue;
+    const candidate = join(trimmed, 'imsg');
+    try {
+      const info = await stat(candidate);
+      if (!info.isFile()) continue;
+      await access(candidate, constants.X_OK);
+      return candidate;
+    } catch {}
+  }
+  return null;
 }
 
 async function sha256Of(path: string): Promise<string> {
@@ -183,6 +240,10 @@ async function ensureImsgBin(deps: ImsgBridgeDeps): Promise<string> {
   const env = deps.env ?? process.env;
   const override = env.CAIRN_IMSG_BIN?.trim();
   if (override !== undefined && override !== '') return override;
+  const platform = deps.platform ?? process.platform;
+  if (platform !== 'darwin') {
+    throw new PermanentImsgError('imessage bridge requires macOS (darwin)');
+  }
   const managed = join(deps.home, 'imsg', 'imsg');
   const managedInfo = await lstat(managed).catch(() => null);
   if (managedInfo !== null) {
@@ -190,6 +251,8 @@ async function ensureImsgBin(deps: ImsgBridgeDeps): Promise<string> {
     deps.logger.machine(`imsg managed binary at ${managed} is not a regular file; reinstalling`);
     await rm(managed, { force: true });
   }
+  const onPath = await findImsgOnPath(env);
+  if (onPath !== null) return onPath;
   const fetchImpl = deps.fetchImpl ?? fetch;
   const dir = await mkdtemp(join(tmpdir(), 'cairn-imsg-'));
   try {
@@ -213,11 +276,44 @@ async function ensureImsgBin(deps: ImsgBridgeDeps): Promise<string> {
   }
 }
 
-function rpcErrorKind(err: RpcError): 'drop' | 'permanent' | 'retry' {
-  if (err.code === -32001) return 'drop';
-  if (err.code === -32002 || err.code === -32004) return 'retry';
-  if (err.code === -32602) return 'permanent';
-  return 'retry';
+function classifyOutboundFailure(
+  err: RpcError,
+  stderrTail: string,
+): {
+  kind: 'drop' | 'permanent' | 'retry';
+  error: string;
+  degradedDetail: string | null;
+} {
+  const rawMessage = err.message ?? `imsg send failed (${err.code})`;
+  const detailText = [rawMessage, err.data?.detail ?? '', stderrTail].filter(Boolean).join(' | ');
+  if (/-1743\b|not authorized to send apple events/i.test(detailText)) {
+    const error =
+      stderrTail !== '' && !rawMessage.includes(stderrTail)
+        ? `${rawMessage} (${stderrTail})`
+        : rawMessage;
+    return {
+      kind: 'permanent',
+      error,
+      degradedDetail: `imsg send denied (-1743; grant Automation -> Messages in System Settings): ${error}`,
+    };
+  }
+  if (/-1712\b|appleevent timed out/i.test(detailText)) {
+    const error =
+      stderrTail !== '' && !rawMessage.includes(stderrTail)
+        ? `${rawMessage} (${stderrTail})`
+        : rawMessage;
+    return {
+      kind: 'retry',
+      error,
+      degradedDetail: `imsg send timed out (-1712; check Messages.app or Automation permission): ${error}`,
+    };
+  }
+  if (err.code === -32001) return { kind: 'drop', error: rawMessage, degradedDetail: null };
+  if (err.code === -32002 || err.code === -32004) {
+    return { kind: 'retry', error: rawMessage, degradedDetail: null };
+  }
+  if (err.code === -32602) return { kind: 'permanent', error: rawMessage, degradedDetail: null };
+  return { kind: 'retry', error: rawMessage, degradedDetail: null };
 }
 
 function asInboundFile(
@@ -327,8 +423,22 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
     return true;
   };
 
+  const recordRowId = (session: Session, rawId: unknown): void => {
+    if (typeof rawId === 'number' && Number.isInteger(rawId) && rawId > 0) {
+      session.lastRowId = Math.max(session.lastRowId ?? 0, rawId);
+    }
+  };
+
+  const isStaleBacklog = (msg: ImsgMessageRow): boolean => {
+    if (typeof msg.created_at !== 'string' || msg.created_at === '') return false;
+    const createdAt = Date.parse(msg.created_at);
+    return Number.isFinite(createdAt) && now() - createdAt > STALE_BACKLOG_MAX_AGE_MS;
+  };
+
   const onMessage = async (session: Session, msg: ImsgMessageRow): Promise<void> => {
+    recordRowId(session, msg.id);
     if (msg.type !== undefined) return;
+    if (isStaleBacklog(msg)) return;
     const chatKey = msg.chat_guid ?? '';
     if (chatKey === '') return;
     if (isOwnEcho(session, chatKey, msg)) return;
@@ -383,15 +493,21 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
         status: 'error',
         detail: `imsg unavailable: ${err instanceof Error ? err.message : String(err)}`,
       });
-      scheduleRespawn(session);
+      if (!(err instanceof PermanentImsgError)) scheduleRespawn(session);
       return;
     }
     post(session.connId, { kind: 'status', status: 'connecting' });
-    const child = spawnProc(bin, ['rpc'], { stdio: ['pipe', 'pipe', 'inherit'] });
+    const child = spawnProc(bin, ['rpc'], { stdio: ['pipe', 'pipe', 'pipe'] });
     const rpc = new ImsgRpc(
       child,
       (method, params) => {
         if (method === 'watch.overflow' || method === 'error') {
+          if (method === 'watch.overflow') {
+            recordRowId(
+              session,
+              (params as { resume_after_rowid?: unknown } | undefined)?.resume_after_rowid,
+            );
+          }
           const detail =
             method === 'watch.overflow'
               ? `imsg watch overflow (${String((params as { reason?: unknown } | undefined)?.reason ?? 'buffer_limit_exceeded')})`
@@ -414,30 +530,48 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
           );
         });
       },
-      (code) => {
+      (code, spawnError, stderrTail) => {
         if (session.rpc === rpc) session.rpc = null;
         if (session.attached && !stopped) {
+          const suffix = stderrTail !== '' ? `: ${stderrTail}` : '';
+          if (spawnError?.code === 'ENOENT' || spawnError?.code === 'EACCES') {
+            post(session.connId, {
+              kind: 'status',
+              status: 'error',
+              detail: `imsg unavailable (${spawnError.code}: ${spawnError.message})${suffix}`,
+            });
+            return;
+          }
           post(session.connId, {
             kind: 'status',
             status: 'degraded',
-            detail: `imsg rpc exited (code ${code ?? 'null'})`,
+            detail: `imsg rpc exited (code ${code ?? 'null'})${suffix}`,
           });
           scheduleRespawn(session);
         }
       },
+      (line) => log(`imsg stderr conn=${session.connId}: ${line}`),
     );
     session.rpc = rpc;
     try {
       await rpc.call('initialize', { protocol_version: 1 });
-      await rpc.call('watch.subscribe', { attachments: true });
+      await rpc.call(
+        'watch.subscribe',
+        session.lastRowId !== null
+          ? { attachments: true, since_rowid: session.lastRowId }
+          : { attachments: true },
+      );
       session.backoffMs = RESPAWN_BASE_MS;
+      session.outboundDegraded = false;
       post(session.connId, { kind: 'status', status: 'ready' });
     } catch (err) {
       const rpcErr = err as RpcError;
+      const tail = rpc.stderrTail();
+      const suffix = tail !== '' ? ` (${tail})` : '';
       const detail =
         rpcErr.code === -32002
-          ? `imsg rpc init failed (grant Full Disk Access to Cairn/Terminal): ${rpcErr.message ?? 'database unavailable'}`
-          : `imsg rpc init failed: ${rpcErr.message ?? 'unknown error'}`;
+          ? `imsg rpc init failed (grant Full Disk Access to Cairn/Terminal): ${rpcErr.message ?? 'database unavailable'}${suffix}`
+          : `imsg rpc init failed: ${rpcErr.message ?? 'unknown error'}${suffix}`;
       post(session.connId, {
         kind: 'status',
         status: 'degraded',
@@ -464,7 +598,12 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
     let session = sessions.get(connId);
     if (session !== undefined) {
       session.attached = true;
-      if (session.rpc !== null || session.respawnTimer !== null) return;
+      if (session.rpc !== null) return;
+      if (session.respawnTimer !== null) {
+        clearTimeout(session.respawnTimer);
+        session.respawnTimer = null;
+        session.backoffMs = RESPAWN_BASE_MS;
+      }
       void runSession(session);
       return;
     }
@@ -474,6 +613,8 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
       rpc: null,
       backoffMs: RESPAWN_BASE_MS,
       respawnTimer: null,
+      lastRowId: null,
+      outboundDegraded: false,
       recentOwn: [],
       recentOwnGuids: [],
       cards: new Map(),
@@ -532,19 +673,31 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
           at: now(),
         });
       }
+      if (session.outboundDegraded && session.rpc === rpc) {
+        session.outboundDegraded = false;
+        post(connId, { kind: 'status', status: 'ready' });
+      }
       post(connId, { kind: 'sent', sendId, ok: true });
     } catch (err) {
       const rpcErr = err as RpcError;
       if (rpcErr.code !== -32001 && rpcErr.code !== -32004) {
         session.recentOwn = session.recentOwn.filter((r) => r !== ownEntry);
       }
-      const kind = rpcErrorKind(rpcErr);
+      const classified = classifyOutboundFailure(rpcErr, rpc.stderrTail());
+      if (classified.degradedDetail !== null && session.rpc === rpc) {
+        session.outboundDegraded = true;
+        post(connId, {
+          kind: 'status',
+          status: 'degraded',
+          detail: classified.degradedDetail,
+        });
+      }
       post(connId, {
         kind: 'sent',
         sendId,
         ok: false,
-        errorKind: kind,
-        error: rpcErr.message ?? `imsg send failed (${rpcErr.code})`,
+        errorKind: classified.kind,
+        error: classified.error,
       });
       if (rpcErr.code === -32002 || rpcErr.code === -32004) {
         rpc.kill();

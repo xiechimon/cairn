@@ -406,3 +406,59 @@ describe('chunkText', () => {
     expect([...(chunks[0] ?? '')].length).toBe(4096);
   });
 });
+
+describe('telegram adapter reconnect and timeout hardening', () => {
+  test('marks ready immediately from initial non-blocking probe without 50s wait', async () => {
+    const tg = fakeTelegramEnv();
+    tg.queue('getMe', BOT_ME);
+    tg.queue('getUpdates', { ok: true, result: [] });
+    tg.queue('getUpdates', PARK);
+    const statuses: string[] = [];
+    const session = await createTelegramAdapter().connect(
+      { botToken: TOKEN },
+      { onMessage: () => {}, onStatus: (status) => statuses.push(status) },
+      tg.env,
+    );
+    await vi.waitFor(() => expect(statuses).toContain('ready'));
+    const polls = tg.calls.filter((call) => call.method === 'getUpdates');
+    expect(polls[0]?.body.timeout).toBe(0);
+    expect(polls[1]?.body.timeout).toBe(50);
+    await session.stop();
+  });
+
+  test('reports expired and stops polling on HTTP 404', async () => {
+    const tg = fakeTelegramEnv();
+    tg.queue('getMe', BOT_ME);
+    tg.queue('getUpdates', { ok: false, error_code: 404, description: 'Not Found' });
+    const statuses: string[] = [];
+    const session = await createTelegramAdapter().connect(
+      { botToken: TOKEN },
+      { onMessage: () => {}, onStatus: (status) => statuses.push(status) },
+      tg.env,
+    );
+    await vi.waitFor(() => expect(statuses).toContain('expired'));
+    const polls = tg.calls.filter((call) => call.method === 'getUpdates').length;
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    expect(tg.calls.filter((call) => call.method === 'getUpdates').length).toBe(polls);
+    await session.stop();
+  });
+
+  test('stop resolves immediately even while sleeping in reconnect backoff', async () => {
+    const tg = fakeTelegramEnv();
+    tg.queue('getMe', { ok: false, error_code: 500, description: 'Internal error' });
+    const envWithRealSleep: ImEnv = {
+      ...tg.env,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    };
+    const statuses: string[] = [];
+    const session = await createTelegramAdapter().connect(
+      { botToken: TOKEN },
+      { onMessage: () => {}, onStatus: (status) => statuses.push(status) },
+      envWithRealSleep,
+    );
+    await vi.waitFor(() => expect(statuses).toContain('degraded'));
+    const startedStop = Date.now();
+    await session.stop();
+    expect(Date.now() - startedStop).toBeLessThan(500);
+  });
+});

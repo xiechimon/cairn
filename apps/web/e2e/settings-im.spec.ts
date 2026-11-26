@@ -104,3 +104,76 @@ test('IM: the Slack connect dialog opens with the App-Level Token field focused'
   }
   expect(linkBox.y).toBeGreaterThanOrEqual(instructionBox.y + instructionBox.height);
 });
+
+test('IM: degraded connections show Reconnect and expired WeChat shows Rescan', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
+  await page.route('**/api/**', (route, request) =>
+    request.method() === 'GET'
+      ? route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } })
+      : route.fallback(),
+  );
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({
+      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+    }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: 'Me', avatarUrl: null } }),
+  );
+  const connections = [
+    {
+      id: 'conn-imsg',
+      platform: 'imessage',
+      accountLabel: 'Mac mini',
+      status: 'degraded',
+      statusDetail: 'imsg send denied (-1743)',
+      pairedSenders: [],
+      lastSendError: null,
+      createdAt: 0,
+    },
+    {
+      id: 'conn-wx-deg',
+      platform: 'wechat',
+      accountLabel: 'WeChat bot',
+      status: 'degraded',
+      statusDetail: 'network error',
+      pairedSenders: [],
+      lastSendError: null,
+      createdAt: 1,
+    },
+    {
+      id: 'conn-wx-exp',
+      platform: 'wechat',
+      accountLabel: 'WeChat expired',
+      status: 'expired',
+      statusDetail: 'session expired',
+      pairedSenders: [],
+      lastSendError: null,
+      createdAt: 2,
+    },
+  ];
+  await page.route('**/api/teams/team-1/im/connections', (route) =>
+    route.fulfill({ json: { connections } }),
+  );
+  await page.route('**/api/teams/team-1/im/pairing-requests', (route) =>
+    route.fulfill({ json: { requests: [] } }),
+  );
+  const reconnects: string[] = [];
+  await page.route('**/api/teams/team-1/im/connections/*/reconnect', (route, request) => {
+    reconnects.push(request.url());
+    return route.fulfill({ json: { connection: { ...connections[0], status: 'connecting' } } });
+  });
+
+  await page.goto('/app/settings/im');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+
+  await expect(settings.getByTestId('im-reconnect-conn-imsg')).toBeVisible();
+  await expect(settings.getByTestId('im-reconnect-conn-wx-deg')).toBeVisible();
+  await expect(settings.getByTestId('im-rescan-conn-wx-exp')).toBeVisible();
+  await expect(settings.getByTestId('im-reconnect-conn-wx-exp')).toHaveCount(0);
+
+  await settings.getByTestId('im-reconnect-conn-imsg').click();
+  await expect.poll(() => reconnects.length).toBe(1);
+});

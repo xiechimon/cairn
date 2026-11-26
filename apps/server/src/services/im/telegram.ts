@@ -1,5 +1,11 @@
 import { liveImEnv } from './env.js';
-import { asSendError, classifyHttpSendError, ImSendError } from './errors.js';
+import {
+  abortWithTimeout,
+  asSendError,
+  classifyHttpSendError,
+  ImSendError,
+  sleepAbortable,
+} from './errors.js';
 import type {
   ImAdapter,
   ImConnectionHandlers,
@@ -15,6 +21,8 @@ function telegramApiBase(): string {
   return process.env.CAIRN_TELEGRAM_API ?? TELEGRAM_API;
 }
 const POLL_TIMEOUT_SECONDS = 50;
+const REQUEST_TIMEOUT_MS = 15_000;
+const POLL_REQUEST_TIMEOUT_MS = (POLL_TIMEOUT_SECONDS + 15) * 1000;
 const MESSAGE_MAX_CHARS = 4096;
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
 const TOKEN_PATTERN = /^\d+:[A-Za-z0-9_-]{20,}$/;
@@ -105,21 +113,28 @@ async function telegramApi<T>(
   method: string,
   body: Record<string, unknown>,
   signal?: AbortSignal,
+  timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
+  const timeout = abortWithTimeout(timeoutMs, signal);
   let res: Response;
   try {
     res = await env.fetch(`${telegramApiBase()}/bot${token}/${method}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
-      signal: signal ?? null,
+      signal: timeout.signal,
     });
   } catch (err) {
+    if (timeout.timedOut()) {
+      throw new TelegramApiError(0, `telegram ${method}: request timed out`);
+    }
     if (err instanceof Error && err.name === 'AbortError') throw err;
     throw new TelegramApiError(
       0,
       `network error: ${err instanceof Error ? err.message : String(err)}`,
     );
+  } finally {
+    timeout.clear();
   }
   let data: TelegramEnvelope;
   try {
@@ -319,24 +334,28 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
       handlers.onStatus('connecting');
       const loop = (async () => {
         let failures = 0;
+        let ready = false;
         while (!stopped) {
           try {
             if (botUsername === '') {
               const me = await telegramApi<TgUser>(env, token, 'getMe', {}, abort.signal);
               botUsername = (me.username ?? '').toLowerCase();
             }
+            const pollTimeoutSeconds = ready ? POLL_TIMEOUT_SECONDS : 0;
             const updates: TgUpdate[] = await telegramApi<TgUpdate[]>(
               env,
               token,
               'getUpdates',
               {
-                timeout: POLL_TIMEOUT_SECONDS,
+                timeout: pollTimeoutSeconds,
                 ...(offset !== null ? { offset } : {}),
                 allowed_updates: ['message', 'callback_query'],
               },
               abort.signal,
+              POLL_REQUEST_TIMEOUT_MS,
             );
             failures = 0;
+            ready = true;
             handlers.onStatus('ready');
             for (const update of updates) {
               if (update.message !== undefined) {
@@ -372,7 +391,10 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
             }
           } catch (err) {
             if (stopped || (err instanceof Error && err.name === 'AbortError')) break;
-            if (err instanceof TelegramApiError && (err.status === 401 || err.status === 403)) {
+            if (
+              err instanceof TelegramApiError &&
+              (err.status === 401 || err.status === 403 || err.status === 404)
+            ) {
               handlers.onStatus('expired', scrubToken(err.message, token));
               break;
             }
@@ -383,6 +405,7 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               );
               break;
             }
+            ready = false;
             failures += 1;
             handlers.onStatus(
               'degraded',
@@ -392,7 +415,7 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               err instanceof TelegramApiError && err.retryAfterMs !== undefined
                 ? err.retryAfterMs
                 : Math.min(5000 * 2 ** (failures - 1), 30000);
-            await env.sleep(waitMs);
+            await sleepAbortable(env.sleep, waitMs, abort.signal);
           }
         }
       })();

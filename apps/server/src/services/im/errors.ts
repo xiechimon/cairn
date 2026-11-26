@@ -56,3 +56,44 @@ export function classifyHttpSendError(input: {
   }
   return new ImSendError('drop', input.detail);
 }
+
+export function sleepAbortable(
+  sleep: (ms: number) => Promise<void>,
+  ms: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted === true) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const onAbort = () => resolve();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    void sleep(ms).then(
+      () => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      },
+      () => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      },
+    );
+  });
+}
+
+export function abortWithTimeout(
+  timeoutMs: number,
+  signal?: AbortSignal,
+): { signal: AbortSignal; timedOut: () => boolean; clear: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(new DOMException('The operation was timed out.', 'TimeoutError')),
+    timeoutMs,
+  );
+  timer.unref?.();
+  const combined =
+    signal === undefined ? controller.signal : AbortSignal.any([controller.signal, signal]);
+  return {
+    signal: combined,
+    timedOut: () => controller.signal.aborted && signal?.aborted !== true,
+    clear: () => clearTimeout(timer),
+  };
+}

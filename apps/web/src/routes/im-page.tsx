@@ -256,7 +256,10 @@ function ImessageConnectDialog({
 }) {
   const { t } = useI18n();
   const [machineId, setMachineId] = useState(machines[0]?.id ?? '');
-  const ready = machineId !== '';
+  const selectedMachineId = machines.some((m) => m.id === machineId)
+    ? machineId
+    : (machines[0]?.id ?? '');
+  const ready = selectedMachineId !== '';
   return (
     <DialogShell
       title={t('连接 iMessage')}
@@ -266,7 +269,7 @@ function ImessageConnectDialog({
         <Button
           className={DIALOG_PRIMARY_BUTTON}
           disabled={pending || !ready}
-          onClick={() => onSubmit(machineId)}
+          onClick={() => onSubmit(selectedMachineId)}
           data-testid="im-connect-submit"
         >
           {t('连接 iMessage')}
@@ -287,7 +290,7 @@ function ImessageConnectDialog({
             </p>
           ) : (
             <Select
-              value={machineId}
+              value={selectedMachineId}
               onValueChange={(next) => {
                 if (next !== null) setMachineId(next);
               }}
@@ -299,7 +302,7 @@ function ImessageConnectDialog({
                 data-testid="im-machine-select"
               >
                 <SelectValue>
-                  {machines.find((m) => m.id === machineId)?.name ?? t('选择执行机')}
+                  {machines.find((m) => m.id === selectedMachineId)?.name ?? t('选择执行机')}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>
@@ -497,7 +500,7 @@ export function ImConnectionsPage() {
       >
         {t('重新扫码')}
       </Button>
-    ) : conn.status === 'expired' || conn.status === 'error' ? (
+    ) : conn.status === 'degraded' || conn.status === 'expired' || conn.status === 'error' ? (
       <Button
         variant="outline"
         size="sm"
@@ -514,7 +517,8 @@ export function ImConnectionsPage() {
     ) : null;
 
   const connectionRow = (conn: ImConnectionRecord) => {
-    const failing = conn.status === 'expired' || conn.status === 'error';
+    const failing =
+      conn.status === 'degraded' || conn.status === 'expired' || conn.status === 'error';
     const detail = conn.statusDetail ?? conn.lastSendError;
     const name = connectionName(conn);
     return (

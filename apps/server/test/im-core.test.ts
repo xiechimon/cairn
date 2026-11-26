@@ -922,4 +922,16 @@ describe('wechat qr login', () => {
     expect(wechatSessions).toHaveLength(2);
     expect(wechatSessions[0]?.stopped).toBe(true);
   });
+
+  test('reconnect clears any prior lastSendError on the connection record', async () => {
+    await service.createConnection(s.team.id, 'telegram', { botToken: 'good-token' });
+    const session = sessions[0]!;
+    session.failWith = new ImSendError('permanent', 'chat gone');
+    session.handlers.onMessage(inbound('99', 'ping'));
+    await vi.waitFor(() =>
+      expect(service.listConnections(s.team.id)[0]?.lastSendError).toBe('chat gone'),
+    );
+    const reconnected = await service.reconnectConnection(s.team.id, connRow()!.id);
+    expect(reconnected.lastSendError).toBeNull();
+  });
 });

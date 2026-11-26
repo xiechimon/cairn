@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { asSendError, ImSendError, sleepAbortable } from './errors.js';
 import type {
   ImAdapter,
   ImConnectionHandlers,
@@ -173,7 +174,7 @@ async function request(
     });
   }
   if (response.status === 401 || response.status === 403) {
-    throw fail('WeChat refused the token', { permanent: true });
+    throw fail('WeChat refused the token', { permanent: true, expired: true });
   }
   if (!response.ok) throw fail(`WeChat answered ${response.status}`);
   if (json === undefined) {
@@ -181,6 +182,22 @@ async function request(
     return {};
   }
   return json;
+}
+
+function toWechatSendError(error: unknown): ImSendError {
+  if (error instanceof ImSendError) return error;
+  const failure = error as Failure;
+  const message = reasonOf(error);
+  if (failure.expired === true) {
+    return new ImSendError('permanent', message, { authExpired: true });
+  }
+  if (failure.permanent === true) {
+    return new ImSendError('permanent', message);
+  }
+  if (failure.retryAfter !== undefined && Number.isFinite(failure.retryAfter)) {
+    return new ImSendError('retry', message, { retryAfterMs: failure.retryAfter * 1000 });
+  }
+  return asSendError(error);
 }
 
 export function createWechatAdapter(): ImAdapter {
@@ -334,32 +351,37 @@ export function createWechatAdapter(): ImAdapter {
             if (stopped) return;
             const failure = error as Failure;
             if (failure.timeout === true) continue;
+            if (failure.expired === true) {
+              handlers.onStatus('expired', reasonOf(error));
+              return;
+            }
             if (failure.permanent === true) {
               handlers.onStatus('error', reasonOf(error));
               return;
             }
             degraded(reasonOf(error));
-            await env.sleep(3_000);
+            await sleepAbortable(env.sleep, 3_000, stopping.signal);
             continue;
           }
           if (stopped) return;
           const code = answer.ret ?? answer.errcode;
-          if (Number(code) === SESSION_EXPIRED) {
-            handlers.onStatus('expired', 'WeChat session expired; scan the QR code again');
+          if (Number(code) === SESSION_EXPIRED || Number(code) === 401 || Number(code) === 403) {
+            handlers.onStatus(
+              'expired',
+              Number(code) === SESSION_EXPIRED
+                ? 'WeChat session expired; scan the QR code again'
+                : `WeChat answered ${String(code)}`,
+            );
             return;
           }
-          if (answer.ret !== undefined && Number(answer.ret) !== 0) {
-            if (Number(answer.ret) === 401 || Number(answer.ret) === 403) {
-              handlers.onStatus('error', `WeChat answered ${String(answer.ret)}`);
-              return;
-            }
-            degraded(`WeChat answered ${String(answer.ret)}`);
-            await env.sleep(3_000);
+          if (code !== undefined && Number(code) !== 0) {
+            degraded(`WeChat answered ${String(code)}`);
+            await sleepAbortable(env.sleep, 3_000, stopping.signal);
             continue;
           }
           if (answer.ret === undefined && !isUpdatesAnswer(answer)) {
             degraded('WeChat answered an unreadable response');
-            await env.sleep(3_000);
+            await sleepAbortable(env.sleep, 3_000, stopping.signal);
             continue;
           }
           readyOnce = true;
@@ -398,9 +420,9 @@ export function createWechatAdapter(): ImAdapter {
                   shown = true;
                   degraded(reasonOf(error));
                 }
-                await env.sleep(3_000);
+                await sleepAbortable(env.sleep, 3_000, stopping.signal);
               } else {
-                await env.sleep(wait);
+                await sleepAbortable(env.sleep, wait, stopping.signal);
               }
             }
           }
@@ -415,29 +437,44 @@ export function createWechatAdapter(): ImAdapter {
 
       return {
         send: async (msg: ImOutboundMessage) => {
+          if (stopped) {
+            throw new ImSendError('permanent', 'WeChat connection is stopped');
+          }
           const contextToken = contextTokens.get(msg.chatKey);
           for (const text of chunk(msg.text, TEXT_LIMIT)) {
-            const answer = await call(
-              'sendmessage',
-              {
-                msg: {
-                  from_user_id: '',
-                  to_user_id: msg.chatKey,
-                  client_id: `cairn-${randomBytes(8).toString('hex')}`,
-                  message_type: 2,
-                  message_state: 2,
-                  item_list: [{ type: 1, text_item: { text } }],
-                  ...(contextToken !== undefined && contextToken !== ''
-                    ? { context_token: contextToken }
-                    : {}),
+            let answer: IlinkObject;
+            try {
+              answer = await call(
+                'sendmessage',
+                {
+                  msg: {
+                    from_user_id: '',
+                    to_user_id: msg.chatKey,
+                    client_id: `cairn-${randomBytes(8).toString('hex')}`,
+                    message_type: 2,
+                    message_state: 2,
+                    item_list: [{ type: 1, text_item: { text } }],
+                    ...(contextToken !== undefined && contextToken !== ''
+                      ? { context_token: contextToken }
+                      : {}),
+                  },
                 },
-              },
-              SEND_TIMEOUT_MS,
-            );
-            if (answer.ret !== undefined && Number(answer.ret) !== 0) {
-              throw fail(`WeChat refused the reply (${String(answer.errmsg ?? answer.ret)})`, {
-                permanent: true,
-              });
+                SEND_TIMEOUT_MS,
+              );
+            } catch (error) {
+              throw toWechatSendError(error);
+            }
+            const sendCode = answer.ret ?? answer.errcode;
+            if (sendCode !== undefined && Number(sendCode) !== 0) {
+              const expired =
+                Number(sendCode) === SESSION_EXPIRED ||
+                Number(sendCode) === 401 ||
+                Number(sendCode) === 403;
+              throw new ImSendError(
+                'permanent',
+                `WeChat refused the reply (${String(answer.errmsg ?? sendCode)})`,
+                { authExpired: expired },
+              );
             }
           }
         },

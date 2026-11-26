@@ -123,19 +123,16 @@ export function createImBridge(machineHub: MachineWakeHub): ImBridge {
         chunks.push(msg.text.slice(i, i + IM_SEND_TEXT_CHUNK));
       }
       if (chunks.length === 0) chunks.push('');
-      let trackedSent: Promise<void> | null = null;
       for (let index = 0; index < chunks.length; index++) {
         const last = index === chunks.length - 1;
         const sendId = randomBytes(9).toString('base64url');
-        if (last) {
-          trackedSent = new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(() => {
-              conn.pending.delete(sendId);
-              reject(new ImSendError('retry', 'imessage send timed out'));
-            }, IM_SEND_TIMEOUT_MS);
-            conn.pending.set(sendId, { resolve, reject, timer });
-          });
-        }
+        const trackedSent = new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            conn.pending.delete(sendId);
+            reject(new ImSendError('retry', 'imessage send timed out'));
+          }, IM_SEND_TIMEOUT_MS);
+          conn.pending.set(sendId, { resolve, reject, timer });
+        });
         const pushed = push(conn.machineId, {
           type: 'im.send',
           connId,
@@ -155,10 +152,11 @@ export function createImBridge(machineHub: MachineWakeHub): ImBridge {
             clearTimeout(pending.timer);
             conn.pending.delete(sendId);
           }
+          trackedSent.catch(() => {});
           throw new ImSendError('retry', 'imessage bridge machine is offline');
         }
+        await trackedSent;
       }
-      if (trackedSent !== null) await trackedSent;
     },
   };
 }
