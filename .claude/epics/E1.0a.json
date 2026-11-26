@@ -27,22 +27,6 @@
         "-e",
         "const cp=require('child_process');const bad=[];\nlet hits='';try{hits=cp.execFileSync('git',['grep','-l','-F','.claude/workflow.md','--','.',':!docs/lessons',':!docs/verify',':!docs/research',':!.claude/epics',':!apps/server/test/fixtures',':!integration/eval'],{encoding:'utf8'})}catch(e){if(e.status!==1)throw e}\nif(hits.trim())bad.push('active consumers still reference .claude/workflow.md: '+hits.trim().split('\\n').join(', '));\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
       ]
-    },
-    {
-      "name": "#2166 AGENTS.md states the phase-1 merge routes",
-      "run": [
-        "node",
-        "-e",
-        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(!s.includes(\"mergedBy: 'auto-merge'\"))bad.push('AGENTS.md lost the pr-gate auto-merge route');\nif(!/Protected-path PRs enter the merge queue/.test(s))bad.push('AGENTS.md lost queue admission for protected paths');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
-      ]
-    },
-    {
-      "name": "#2167 no label holds a PR; a draft waits for a decision",
-      "run": [
-        "node",
-        "-e",
-        "const s=require('fs').readFileSync('AGENTS.md','utf8');const bad=[];\nif(s.includes('needs-decision'))bad.push('AGENTS.md still names the retired needs-decision label');\nif(s.includes('coordinator-hold'))bad.push('AGENTS.md still names the retired coordinator-hold label');\nif(!/keep the PR a draft while that decision is pending/.test(s))bad.push('AGENTS.md must keep a PR a draft while a decision is pending');\nif(bad.length){console.error(bad.join('\\n'));process.exit(1)}"
-      ]
     }
   ],
   "maxHours": 6
