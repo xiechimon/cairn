@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "b748ab8fa4b768a15a1f7ff4ae7570bad03f5f4f",
+    "sha": "66546eb258aa89bb3f25607e1d17e1bdcecaf172",
     "date": "2026-11-26"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -225,8 +225,8 @@
     },
     "toaster.tsx": {
       "kind": "adapter",
-      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). Foundation C5: toastError maps errors through lib/error-copy.ts so raw server/network strings do not leak to users. The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer. Motion pick: the dormant loading icon is the shared RingSpinner (ring-spinner.tsx), not a lucide loader.",
-      "hash": "fb383ab6d80f85dcf7a07bf82cc4d821e070b27f8d8f5102b3c5ac6bad7e0ec0"
+      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). Foundation C5: toastError maps errors through lib/error-copy.ts so raw server/network strings do not leak to users. The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer. Motion pick: the dormant loading icon is the shared RingSpinner (ring-spinner.tsx), not a lucide loader. C13/C4: toastError marks mutation errors already surfaced so the QueryClient fallback does not duplicate them; the close button gets the close label as its native tooltip because sonner exposes aria text but no title hook.",
+      "hash": "7765cbecc1abdea474427a623d1039a477e3641660107f12517a4bbc1cb88c94"
     },
     "tooltip.tsx": {
       "kind": "registry",
