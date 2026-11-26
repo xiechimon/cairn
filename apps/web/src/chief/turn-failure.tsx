@@ -79,14 +79,19 @@ function NoticeCard({
     onDismiss();
   };
   return (
-    <div data-kind={kind} className={className}>
+    <div
+      role="status"
+      aria-live={tone === 'fail' ? 'assertive' : 'polite'}
+      data-testid={testId}
+      data-kind={kind}
+      onKeyDown={onKeyDown}
+      className={className}
+    >
       <NoticeLine
-        testId={testId}
         tone={tone === 'fail' ? 'danger' : 'waiting'}
         waiting={tone === 'wait'}
         detail={detail}
         detailTestId={detailTestId}
-        onKeyDown={onKeyDown}
         label={
           <>
             <b className="font-semibold text-foreground">{title}</b> <span>{why}</span>

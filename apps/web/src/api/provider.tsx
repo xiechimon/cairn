@@ -17,6 +17,7 @@ import { EN } from '../i18n/en.js';
 import { activeLocale } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { translate } from '../i18n/translate.js';
+import { errorWasSurfaced } from '../lib/mutation-error-report.js';
 import { ApiError } from './client.js';
 import { useMachines, useSession, useTeams } from './hooks.js';
 import { refreshQueriesOnGateClose } from './invalidate.js';
@@ -55,7 +56,10 @@ export function createProductQueryClient(): QueryClient {
     defaultOptions: {
       mutations: {
         onError: (error) => {
-          toastError(translate(activeLocale(), EN, '操作失败，请重试。'), error);
+          setTimeout(() => {
+            if (!errorWasSurfaced(error))
+              toastError(translate(activeLocale(), EN, '操作失败，请重试。'), error);
+          }, 0);
         },
       },
       queries: {

@@ -39,6 +39,7 @@ import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { chiefDefault } from '../fixtures/chief.js';
 import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import { ensureGestureKeys } from '../overlay/gesture-machine.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
@@ -357,10 +358,11 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   ): string => {
     const resolved = chiefActionErrorCopy(error, action, requestId);
     if (resolved?.kind === 'not-ready') {
-      toastCoordinatorNotReady(t(resolved.title), t(resolved.hint));
+      toastCoordinatorNotReady(t(resolved.title), t(resolved.hint), error);
       return t(resolved.inline);
     }
     if (resolved?.kind === 'specific') {
+      markErrorSurfaced(error);
       toast.error(t(resolved.title));
       return t(resolved.inline);
     }
@@ -411,11 +413,12 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
               const resolved = chiefActionErrorCopy(e, 'answer', input.requestId);
               if (resolved?.kind === 'not-ready') {
                 questionSubmitStore.patch(key, { submitting: false, error: t(resolved.inline) });
-                toastCoordinatorNotReady(t(resolved.title), t(resolved.hint));
+                toastCoordinatorNotReady(t(resolved.title), t(resolved.hint), e);
                 return;
               }
               if (resolved?.kind === 'specific') {
                 questionSubmitStore.patch(key, { submitting: false, error: t(resolved.inline) });
+                markErrorSurfaced(e);
                 toast.error(t(resolved.title));
                 return;
               }
@@ -483,7 +486,11 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         }),
         (error: unknown) => {
           if (isCoordinatorNotReady(error))
-            toastCoordinatorNotReady(t('Coordinator 还不能回答'), t('先接入模型来源，再发一次。'));
+            toastCoordinatorNotReady(
+              t('Coordinator 还不能回答'),
+              t('先接入模型来源，再发一次。'),
+              error,
+            );
           else toastError(t('发送失败，请重试。'), error);
           throw error;
         },

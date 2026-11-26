@@ -66,7 +66,7 @@ export function ChiefOutageBanner({
   return (
     <div className={className ?? NOTICE_WRAP_CLS}>
       <NoticeLine
-        tone="danger"
+        tone="waiting"
         live
         testId="chief-outage"
         label={
