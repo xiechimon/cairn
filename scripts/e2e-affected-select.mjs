@@ -245,6 +245,14 @@ export const SHARED_SURFACE_ONLY = [
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 export const FILE_RULES = new Map([
+  [
+    'apps/web/src/components/chat/notice-line.tsx',
+    ['notice-line-', 'chief-turn-error', 'quota-wait-board', 'chat-'],
+  ],
+  [
+    'apps/web/src/components/chat/message-body.tsx',
+    ['chat-code-highlight-', 'chief-reply-bubbles', 'chief-stream-markdown', 'chat-'],
+  ],
   ['apps/web/src/components/thread/pr-card.tsx', ['pr-card', 'thread-pr-panel']],
   ['apps/web/src/components/thread/pr-card-model.ts', ['pr-card', 'thread-pr-panel']],
   ['apps/web/src/components/thread/pr-link.tsx', ['thread-pr-panel']],

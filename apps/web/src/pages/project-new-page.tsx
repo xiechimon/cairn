@@ -44,6 +44,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
+import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import { DirBrowser } from './dir-browser.js';
 import { GithubConnectionDeviceDialog } from './github-connection-device-dialog.js';
@@ -193,6 +194,7 @@ export function ProjectNewPage() {
         if (data.path !== null) onLocalPathChange(data.path);
       },
       onError: (err) => {
+        markErrorSurfaced(err);
         const reason = err instanceof ApiError ? err.reason : undefined;
         setPickHint(
           reason !== undefined && reason in FS_PICK_ERROR_COPY

@@ -2,13 +2,15 @@
 
 import { Info, OctagonX, TriangleAlert, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
 import { useI18n } from '../../i18n/provider.js';
 import { describeErrorDefault } from '../../lib/error-copy.js';
+import { markErrorSurfaced } from '../../lib/mutation-error-report.js';
 import { RingSpinner } from './ring-spinner.js';
 
 export function toastError(title: string, error: unknown): void {
+  markErrorSurfaced(error);
   const reason = describeErrorDefault(error);
   toast.error(title, reason !== null && reason !== title ? { description: reason } : undefined);
 }
@@ -36,48 +38,67 @@ function useSonnerTheme(): ToasterProps['theme'] {
 function Toaster({ ...props }: ToasterProps) {
   const theme = useSonnerTheme();
   const { t } = useI18n();
-  return (
-    <Sonner
-      theme={theme}
-      closeButton
-      containerAriaLabel={t('通知')}
-      position="top-center"
-      offset={{ top: 16 }}
-      mobileOffset={{ top: 66, left: 16, right: 16 }}
-      className="group"
-      icons={{
-        success: <Info className="size-5 text-content-secondary" />,
-        info: <Info className="size-5 text-content-secondary" />,
-        warning: <TriangleAlert className="size-5 text-(--badge-attention)" />,
-        error: <OctagonX className="size-5 text-destructive" />,
-        loading: <RingSpinner className="size-5" />,
-        close: <X className="size-4" />,
-      }}
-      style={
-        {
-          '--normal-bg': 'var(--popover)',
-          '--normal-text': 'var(--popover-foreground)',
-          '--normal-border': 'var(--border)',
-          '--border-radius': 'var(--radius-popover)',
-        } as CSSProperties
+  const closeLabel = t('关闭');
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = rootRef.current;
+    if (root === null) return;
+    const stampTitles = () => {
+      for (const button of root.querySelectorAll<HTMLButtonElement>(
+        '[data-sonner-toast] [data-close-button]',
+      )) {
+        if (button.getAttribute('title') !== closeLabel) button.setAttribute('title', closeLabel);
       }
-      toastOptions={{
-        closeButtonAriaLabel: t('关闭'),
-        classNames: {
-          toast:
-            'grid! grid-cols-[auto_1fr_auto]! items-center! gap-x-2.5! gap-y-2! border-0! p-4! font-sans! shadow-(--shadow-popover)!',
-          icon: 'col-start-1 row-start-1 m-0!',
-          content: 'col-start-2 row-start-1',
-          title: 'text-ui font-medium! text-foreground!',
-          description: 'text-meta text-content-secondary',
-          actionButton:
-            'col-start-2 row-start-2 ms-0! h-7! justify-self-start rounded-lg! bg-secondary! px-2.5! text-ui! font-medium! text-foreground! hover:bg-muted!',
-          closeButton:
-            'static! col-start-3 row-start-1 size-7! transform-none! rounded-lg! border-0! bg-transparent! text-foreground! hover:bg-muted!',
-        },
-      }}
-      {...props}
-    />
+    };
+    stampTitles();
+    const observer = new MutationObserver(stampTitles);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [closeLabel]);
+  return (
+    <div ref={rootRef} className="contents">
+      <Sonner
+        theme={theme}
+        closeButton
+        containerAriaLabel={t('通知')}
+        position="top-center"
+        offset={{ top: 16 }}
+        mobileOffset={{ top: 66, left: 16, right: 16 }}
+        className="group"
+        icons={{
+          success: <Info className="size-5 text-content-secondary" />,
+          info: <Info className="size-5 text-content-secondary" />,
+          warning: <TriangleAlert className="size-5 text-(--badge-attention)" />,
+          error: <OctagonX className="size-5 text-destructive" />,
+          loading: <RingSpinner className="size-5" />,
+          close: <X className="size-4" />,
+        }}
+        style={
+          {
+            '--normal-bg': 'var(--popover)',
+            '--normal-text': 'var(--popover-foreground)',
+            '--normal-border': 'var(--border)',
+            '--border-radius': 'var(--radius-popover)',
+          } as CSSProperties
+        }
+        toastOptions={{
+          closeButtonAriaLabel: closeLabel,
+          classNames: {
+            toast:
+              'grid! grid-cols-[auto_1fr_auto]! items-center! gap-x-2.5! gap-y-2! border-0! p-4! font-sans! shadow-(--shadow-popover)!',
+            icon: 'col-start-1 row-start-1 m-0!',
+            content: 'col-start-2 row-start-1',
+            title: 'text-ui font-medium! text-foreground!',
+            description: 'text-meta text-content-secondary',
+            actionButton:
+              'col-start-2 row-start-2 ms-0! h-7! justify-self-start rounded-lg! bg-secondary! px-2.5! text-ui! font-medium! text-foreground! hover:bg-muted!',
+            closeButton:
+              'static! col-start-3 row-start-1 size-7! transform-none! rounded-lg! border-0! bg-transparent! text-foreground! hover:bg-muted!',
+          },
+        }}
+        {...props}
+      />
+    </div>
   );
 }
 

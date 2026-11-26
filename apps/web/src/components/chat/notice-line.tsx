@@ -97,7 +97,7 @@ export type NoticeTone = 'neutral' | 'waiting' | 'danger';
 
 const TONE_INK: Record<NoticeTone, string> = {
   neutral: 'text-content-tertiary',
-  waiting: 'text-content-tertiary',
+  waiting: 'text-(--card-button)',
   danger: 'text-destructive',
 };
 
