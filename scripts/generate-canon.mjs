@@ -94,7 +94,9 @@ for (const row of registry.rulings) {
   if (rows.has(row.id)) problems.push(`duplicate ruling id ${row.id}`);
   rows.set(row.id, row);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(row.date)) problems.push(`${name}: date must be YYYY-MM-DD`);
-  if (!existsSync(join(REPO_ROOT, row.spec ?? '')))
+  if (!String(row.spec).startsWith(`${SPEC_DIR}/`) || row.spec.includes('..'))
+    problems.push(`${name}: spec ${row.spec} must be under ${SPEC_DIR}/`);
+  else if (!existsSync(join(REPO_ROOT, row.spec)))
     problems.push(`${name}: spec ${row.spec} does not exist`);
 }
 if (problems.length > 0) fail(problems);

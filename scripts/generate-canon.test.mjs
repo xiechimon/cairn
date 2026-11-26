@@ -24,7 +24,11 @@ function sandbox(t) {
     spawnSync(process.execPath, [join(root, 'scripts', 'generate-canon.mjs'), ...args], {
       encoding: 'utf8',
     });
-  const put = ({ spec = goodSpec, rulings = [row], other } = {}) => {
+  const put = ({ spec = goodSpec, rulings = [row], other, research } = {}) => {
+    if (research) {
+      mkdirSync(join(root, 'docs', 'research'), { recursive: true });
+      writeFileSync(join(root, 'docs/research/x.md'), research);
+    }
     writeFileSync(join(root, SPEC), spec);
     if (other) writeFileSync(join(root, 'docs/spec/19-b.md'), other);
     writeFileSync(join(root, 'docs/canon/rulings.json'), JSON.stringify({ rulings }));
@@ -131,6 +135,11 @@ for (const [name, change, message] of [
     /repeats another ruling/,
   ],
   ['the id is marked twice', { spec: `${goodSpec}\n${goodSpec}` }, /marked twice/],
+  [
+    'a row points outside the spec folder',
+    { rulings: [{ ...row, spec: 'docs/research/x.md' }], research: goodSpec, spec: '# 18\n' },
+    /must be under docs\/spec\//,
+  ],
   ['the mark moved to another spec', { spec: '# 18\n', other: goodSpec }, /belongs in/],
 ]) {
   test(`--check is red when ${name}`, (t) => {
