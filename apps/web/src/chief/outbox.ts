@@ -28,6 +28,7 @@ export interface OutboxEntry {
   messageId: string | null;
   createdAt: number;
   unsaved?: true;
+  noticeDone?: true;
 }
 
 export interface StoredOutboxEntry {
@@ -70,6 +71,7 @@ export type LateArrival = (entry: OutboxEntry) => boolean;
 export interface UnsentSends {
   failed: readonly OutboxEntry[];
   discard: (outboxKey: string) => string | null;
+  acknowledge?: (outboxKey: string) => void;
   onArrivedLate: (listener: LateArrival) => () => void;
 }
 
@@ -90,6 +92,7 @@ export interface Outbox {
     options?: { awaitRefetch?: boolean; onFailed?: SendFailed },
   ): string;
   discard(key: string): OutboxEntry | null;
+  acknowledge(key: string): void;
   land(key: string, messageId: string): void;
   subscribeLateArrival(listener: LateArrival): () => void;
   markRefetched(key: string): void;
@@ -426,6 +429,13 @@ export function createOutbox({
       else void loading.then(start);
       return key;
     },
+    acknowledge(key) {
+      const entry = list.find((candidate) => candidate.key === key);
+      if (entry?.state !== 'failed' || entry.noticeDone === true) return;
+      replace(
+        list.map((other) => (other === entry ? { ...other, noticeDone: true as const } : other)),
+      );
+    },
     discard(key) {
       const entry = list.find((candidate) => candidate.key === key);
       if (entry?.state !== 'failed') return null;
@@ -528,7 +538,13 @@ export function createOutbox({
             await send(entry.key, lane, deliver, options?.onFailed);
           });
         }
-        if (unsent.length > 0) replace([...unsent, ...list]);
+        if (unsent.length > 0)
+          replace([
+            ...unsent.map((entry) =>
+              onRecord.has(entry.key) ? { ...entry, noticeDone: true as const } : entry,
+            ),
+            ...list,
+          ]);
         for (const entry of unsent)
           if (entry.state === 'failed')
             options?.onFailed?.(entry, restoredError(entry.failure), onRecord.has(entry.key));
@@ -565,7 +581,9 @@ export function hasPendingSend(entries: readonly OutboxEntry[]): boolean {
     (entry) =>
       entry.state === 'sending' ||
       (entry.state === 'failed' &&
-        (entry.task !== undefined || entry.scope === null || entry.unsaved === true)),
+        ((entry.task !== undefined && entry.noticeDone !== true) ||
+          entry.scope === null ||
+          entry.unsaved === true)),
   );
 }
 

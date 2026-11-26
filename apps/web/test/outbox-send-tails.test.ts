@@ -89,3 +89,45 @@ test.each(['open', 'closed'])(
     close();
   },
 );
+
+const savedRow = {
+  key: 'saved',
+  scope: 'u/team',
+  owner: 'a-closed-page',
+  threadId: 'build-1',
+  projectId: null,
+  text: 'say it once',
+  task: reply.task,
+  createdAt: Date.now(),
+};
+
+async function restoredFrom(row: typeof savedRow & { state: 'failed' | 'sending' }) {
+  const box = createOutbox({
+    store: {
+      put: async () => {},
+      putIfPresent: async () => {},
+      remove: async () => {},
+      load: async () => [row],
+    },
+  });
+  await box.resume('u/team', nothing);
+  return box;
+}
+
+test('a failed reply restored from an earlier page load does not hold back the app update', async () => {
+  const box = await restoredFrom({ ...savedRow, state: 'failed' });
+  expect(box.entries()).toHaveLength(1);
+  expect(hasPendingSend(box.entries())).toBe(false);
+});
+
+test('a reply that is first reported as failed after a reload holds back the app update', async () => {
+  const box = await restoredFrom({ ...savedRow, createdAt: 0, state: 'sending' });
+  expect(hasPendingSend(box.entries())).toBe(true);
+});
+
+test('a failed reply seen in a task that cannot take it back releases the app update', async () => {
+  const { box, key } = await failedWith(new Error('offline'));
+  box.acknowledge(key);
+  expect(box.entries()).toHaveLength(1);
+  expect(hasPendingSend(box.entries())).toBe(false);
+});

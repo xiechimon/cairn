@@ -406,6 +406,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         ? {
             failed: failedTaskOutbox(outbox, todoId),
             discard: discardTaskFailed,
+            acknowledge: taskOutbox.acknowledge,
             onArrivedLate: (listener) =>
               taskOutbox.subscribeLateArrival((entry) => {
                 if (entry.task?.todoId !== todoId) return false;

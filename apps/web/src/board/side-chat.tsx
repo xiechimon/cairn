@@ -474,6 +474,11 @@ function ThreadBody({
       }
     }
   }, [takesText, chat.unsent, setDraft]);
+  const refusesText = archived || todo.phase === 'closed';
+  useEffect(() => {
+    if (!refusesText) return;
+    for (const entry of chat.unsent?.failed ?? []) chat.unsent?.acknowledge?.(entry.key);
+  }, [refusesText, chat.unsent]);
   useEffect(
     () =>
       chat.unsent?.onArrivedLate((entry) => {
