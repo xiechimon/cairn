@@ -68,6 +68,8 @@ export const selfTests = [
   'scripts/test-changed.test.mjs',
   'scripts/design-rules-for.test.mjs',
   'scripts/dead-runtime-exports-gate.test.mjs',
+  'scripts/product-surface-gate.test.mjs',
+  'scripts/ui-debt-gate.test.mjs',
 ];
 
 const selfTest = ['node', '--test', ...selfTests];
@@ -176,6 +178,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', 'scripts/flake-ledger.mjs'],
     ['node', 'scripts/test-integrity-gate.mjs'],
     ['node', 'scripts/regression-test-ledger.mjs'],
+    ['node', 'scripts/product-surface-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['node', 'scripts/ui-page-style-gate.mjs'],
     ['node', 'scripts/test-tmp-ratchet-gate.mjs'],

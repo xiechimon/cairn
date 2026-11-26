@@ -110,6 +110,46 @@ const RADIUS_CANARY = [
   ['rounded-(--cds-radius-sm) rounded-[min(var(--radius-md),10px)] rounded-lg', 0],
 ];
 
+const HELPER_PROP_TAGS = {
+  SettingsRow: ['hint', 'info'],
+  SettingsSection: ['description', 'info'],
+  FormField: ['help'],
+  FormActions: ['hint'],
+  DialogShell: ['subtitle', 'info', 'hint'],
+  AlertDialogShell: ['subtitle', 'hint'],
+  DialogFootRow: ['hint'],
+};
+const HELPER_TAGS = [
+  'FieldDescription',
+  'FormDescription',
+  'DialogDescription',
+  'AlertDialogDescription',
+  'InfoTip',
+];
+
+const HELPER_CANARY = [
+  ['<SettingsRow hint="copy" info={tip} />', 2],
+  ['<SettingsRow hint={null} info={undefined} />', 0],
+  ['<SettingsSection description="copy" info={null} />', 1],
+  ['<FormField help={condition ? "copy" : undefined} />', 1],
+  ['<FormActions hint={<span>copy</span>} />', 1],
+  ['<DialogShell subtitle="copy" hint={false} />', 1],
+  ['<FieldDescription>copy</FieldDescription><InfoTip info={tip} />', 2],
+  ['<span className={cn(SETTINGS_HINT_CLS, extra)}>copy</span>', 1],
+  ['const sample = `<FormField help="inside a string" />`;', 0],
+];
+
+const DISABLED_CANARY = [
+  ['<Button disabled>Save</Button>', 1],
+  ['<DialogShell footer={<Button disabled>Save</Button>} />', 1],
+  ['<Button disabled={true}>Save</Button>', 1],
+  ['<Button disabled={busy}>Save</Button><Input disabled={busy || saving} />', 0],
+  ['const action = { disabled: true };', 1],
+  ['const action = { disabled: busy };', 0],
+  ['type Props = { disabled?: boolean }; const defaults = { disabled: false };', 0],
+  ['const sample = `<Button disabled>inside a string</Button>`;', 0],
+];
+
 function selfCheckMatcher() {
   const problems = [];
   for (const [sample, want] of RADIUS_CANARY) {
@@ -123,6 +163,20 @@ function selfCheckMatcher() {
     if (got.text !== text || got.spacing !== spacing) {
       problems.push(
         `matcher canary ${JSON.stringify(sample)}: expected text ${text} / spacing ${spacing}, got ${got.text} / ${got.spacing}`,
+      );
+    }
+  }
+  for (const [sample, want] of HELPER_CANARY) {
+    const got = countHelperText(sample);
+    if (got !== want) {
+      problems.push(`helper-text canary ${JSON.stringify(sample)}: expected ${want}, got ${got}`);
+    }
+  }
+  for (const [sample, want] of DISABLED_CANARY) {
+    const got = countPermanentlyDisabled(sample);
+    if (got !== want) {
+      problems.push(
+        `permanently-disabled canary ${JSON.stringify(sample)}: expected ${want}, got ${got}`,
       );
     }
   }
@@ -146,29 +200,185 @@ function countLines(text) {
   return n;
 }
 
+function openingTagEnd(source, start) {
+  let depth = 0;
+  let quote = null;
+  for (let j = start; j < source.length; j++) {
+    const c = source[j];
+    if (quote) {
+      if (c === '\\') j++;
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') quote = c;
+    else if (c === '{') depth++;
+    else if (c === '}') depth--;
+    else if (c === '>' && depth === 0) return j;
+  }
+  return source.length;
+}
+
 function tagsOf(source, tag) {
   const open = `<${tag}`;
   const found = [];
   for (let i = source.indexOf(open); i !== -1; i = source.indexOf(open, i + 1)) {
     const next = source[i + open.length];
     if (next !== undefined && /[A-Za-z0-9-]/.test(next)) continue;
-    let depth = 0;
-    let quote = null;
-    let j = i + open.length;
-    for (; j < source.length; j++) {
-      const c = source[j];
-      if (quote) {
-        if (c === quote) quote = null;
-        continue;
-      }
-      if (c === '"' || c === "'" || c === '`') quote = c;
-      else if (c === '{') depth++;
-      else if (c === '}') depth--;
-      else if (c === '>' && depth === 0) break;
-    }
-    found.push(source.slice(i, j));
+    found.push(source.slice(i, openingTagEnd(source, i + open.length)));
   }
   return found;
+}
+
+function maskNoise(source) {
+  const chars = [...source];
+  let state = null;
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i];
+    const next = chars[i + 1];
+    if (state === 'line') {
+      if (c === '\n') state = null;
+      else chars[i] = ' ';
+      continue;
+    }
+    if (state === 'block') {
+      if (c === '*' && next === '/') {
+        chars[i] = chars[i + 1] = ' ';
+        i++;
+        state = null;
+      } else if (c !== '\n') chars[i] = ' ';
+      continue;
+    }
+    if (state !== null) {
+      if (c === '\\') {
+        chars[i] = ' ';
+        if (next !== '\n' && next !== undefined) chars[i + 1] = ' ';
+        i++;
+      } else if (c === state) state = null;
+      else if (c !== '\n') chars[i] = ' ';
+      continue;
+    }
+    if (c === '/' && next === '/') {
+      chars[i] = chars[i + 1] = ' ';
+      i++;
+      state = 'line';
+    } else if (c === '/' && next === '*') {
+      chars[i] = chars[i + 1] = ' ';
+      i++;
+      state = 'block';
+    } else if (c === '"' || c === "'" || c === '`') {
+      state = c;
+    }
+  }
+  return chars.join('');
+}
+
+function curlyEnd(source, start) {
+  let depth = 0;
+  let quote = null;
+  for (let i = start; i < source.length; i++) {
+    const c = source[i];
+    if (quote) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') quote = c;
+    else if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return source.length;
+}
+
+function jsxAttributes(tagText) {
+  const attributes = [];
+  const tagName = /^<([A-Za-z][\w.]*)/.exec(tagText);
+  let i = tagName?.[0].length ?? 1;
+  while (i < tagText.length) {
+    const c = tagText[i];
+    if (!/[A-Za-z_$]/.test(c)) {
+      i++;
+      continue;
+    }
+    let end = i + 1;
+    while (end < tagText.length && /[\w$-]/.test(tagText[end])) end++;
+    const name = tagText.slice(i, end);
+    let j = end;
+    while (/\s/.test(tagText[j] ?? '')) j++;
+    let value = { kind: 'bare', expression: null };
+    if (tagText[j] === '=') {
+      j++;
+      while (/\s/.test(tagText[j] ?? '')) j++;
+      if (tagText[j] === '{') {
+        const close = curlyEnd(tagText, j);
+        value = { kind: 'expression', expression: tagText.slice(j + 1, close - 1).trim() };
+        j = close;
+      } else if (tagText[j] === '"' || tagText[j] === "'" || tagText[j] === '`') {
+        const quote = tagText[j];
+        j++;
+        while (j < tagText.length && tagText[j] !== quote) {
+          if (tagText[j] === '\\') j++;
+          j++;
+        }
+        value = { kind: 'literal', expression: null };
+        j++;
+      } else {
+        while (j < tagText.length && !/[\s>]/.test(tagText[j])) j++;
+        value = { kind: 'literal', expression: null };
+      }
+    }
+    attributes.push({ name, ...value });
+    i = Math.max(j, end + 1);
+  }
+  return attributes;
+}
+
+function countsAsHelper(attribute) {
+  if (attribute === undefined) return false;
+  if (attribute.kind !== 'expression') return true;
+  return !['null', 'undefined', 'false'].includes(attribute.expression);
+}
+
+function countHelperText(rawSource) {
+  const source = maskNoise(rawSource);
+  let total = 0;
+  for (const [tag, names] of Object.entries(HELPER_PROP_TAGS)) {
+    for (const opening of tagsOf(source, tag)) {
+      const attributes = jsxAttributes(opening);
+      for (const name of names) {
+        if (countsAsHelper(attributes.find((attribute) => attribute.name === name))) total++;
+      }
+    }
+  }
+  for (const tag of HELPER_TAGS) total += tagsOf(source, tag).length;
+  total += source.match(/className=\{[^}]*SETTINGS_HINT_CLS/g)?.length ?? 0;
+  return total;
+}
+
+function allJsxOpeningTags(source) {
+  const found = [];
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] !== '<' || !/[A-Za-z]/.test(source[i + 1] ?? '')) continue;
+    let end = i + 1;
+    while (end < source.length && /[\w.]/.test(source[end])) end++;
+    const close = openingTagEnd(source, end);
+    found.push({ tag: source.slice(i + 1, end), text: source.slice(i, close) });
+  }
+  return found;
+}
+
+function countPermanentlyDisabled(rawSource) {
+  const source = maskNoise(rawSource);
+  let total = 0;
+  for (const opening of allJsxOpeningTags(source)) {
+    const disabled = jsxAttributes(opening.text).find((attribute) => attribute.name === 'disabled');
+    if (disabled?.kind === 'bare') total++;
+    else if (disabled?.kind === 'expression' && disabled.expression === 'true') total++;
+  }
+  total += source.match(/(?<![\w$])disabled\s*:\s*true\b/g)?.length ?? 0;
+  return total;
 }
 
 function scanTree() {
@@ -211,6 +421,8 @@ function scanTree() {
   }
 
   const arbitrary = { textTotal: 0, spacingTotal: 0, files: {} };
+  const helperText = { total: 0, files: {} };
+  const permanentlyDisabledControls = { total: 0, files: {} };
   const radii = [];
   let arbitraryScanned = 0;
   for (const f of arbitraryFiles) {
@@ -223,6 +435,12 @@ function scanTree() {
     if (text + spacing > 0) arbitrary.files[r] = { text, spacing };
     arbitrary.textTotal += text;
     arbitrary.spacingTotal += spacing;
+    const helpers = countHelperText(source);
+    if (helpers > 0) helperText.files[r] = helpers;
+    helperText.total += helpers;
+    const disabled = countPermanentlyDisabled(source);
+    if (disabled > 0) permanentlyDisabledControls.files[r] = disabled;
+    permanentlyDisabledControls.total += disabled;
   }
 
   return {
@@ -230,6 +448,8 @@ function scanTree() {
     controlFiles,
     controlTotal,
     arbitrary,
+    helperText,
+    permanentlyDisabledControls,
     radii,
     cssCount: cssFiles.length,
     tsxCount: tsxFiles.length,
@@ -245,6 +465,29 @@ function sortedObject(obj) {
 
 function isNonNegativeInt(v) {
   return Number.isInteger(v) && v >= 0;
+}
+
+function validateCountLedger(value, label, name, { optional = false } = {}) {
+  if (value === undefined && optional) return [];
+  if (value === null || typeof value !== 'object')
+    return [`${label}: ${name} missing or not an object`];
+  const problems = [];
+  if (!isNonNegativeInt(value.total))
+    problems.push(`${label}: ${name}.total is not a non-negative integer`);
+  if (value.files === null || typeof value.files !== 'object') {
+    problems.push(`${label}: ${name}.files missing or not an object`);
+    return problems;
+  }
+  let sum = 0;
+  for (const [file, count] of Object.entries(value.files)) {
+    if (!isNonNegativeInt(count))
+      problems.push(`${label}: ${name}.files["${file}"] is not a non-negative integer`);
+    else sum += count;
+  }
+  if (problems.length === 0 && sum !== value.total) {
+    problems.push(`${label}: ${name}.files sums to ${sum} but ${name}.total is ${value.total}`);
+  }
+  return problems;
 }
 
 function validateArbitrary(av, label, { optional }) {
@@ -283,7 +526,7 @@ function validateArbitrary(av, label, { optional }) {
   return problems;
 }
 
-function validateBaseline(b, label, { arbitraryOptional = false } = {}) {
+function validateBaseline(b, label, { arbitraryOptional = false, clutterOptional = false } = {}) {
   const problems = [];
   if (b === null || typeof b !== 'object') return [`${label}: baseline is not an object`];
   if (b.perFaceCss === null || typeof b.perFaceCss !== 'object') {
@@ -317,6 +560,14 @@ function validateBaseline(b, label, { arbitraryOptional = false } = {}) {
     );
   }
   problems.push(...validateArbitrary(b.arbitraryValues, label, { optional: arbitraryOptional }));
+  problems.push(
+    ...validateCountLedger(b.helperText, label, 'helperText', { optional: clutterOptional }),
+  );
+  problems.push(
+    ...validateCountLedger(b.permanentlyDisabledControls, label, 'permanentlyDisabledControls', {
+      optional: clutterOptional,
+    }),
+  );
   return problems;
 }
 
@@ -374,6 +625,7 @@ function loadBaseBaseline(sha) {
   }
   const problems = validateBaseline(parsed, `base ${sha.slice(0, 12)}`, {
     arbitraryOptional: true,
+    clutterOptional: true,
   });
   if (problems.length > 0) {
     for (const p of problems) console.error(`[ui-debt-gate] D4 ${p}`);
@@ -417,6 +669,20 @@ function raisesOverBase(scan, base) {
       }
     }
   }
+  for (const [key, label] of [
+    ['helperText', 'helper text'],
+    ['permanentlyDisabledControls', 'permanently disabled controls'],
+  ]) {
+    if (!base[key]) continue;
+    const before = base[key].total;
+    const now = scan[key].total;
+    if (now > before) {
+      const grew = Object.entries(scan[key].files)
+        .filter(([file, count]) => count > (base[key].files?.[file] ?? 0))
+        .map(([file]) => file);
+      raises.push(`${label}: ${before} -> ${now} (${grew.join(', ')})`);
+    }
+  }
   return raises;
 }
 
@@ -443,7 +709,7 @@ function writeBaseline(scan, baseSha) {
   const doc = {
     frozenFrom: { sha: currentSha(), date: new Date().toISOString().slice(0, 10) },
     scope:
-      'apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files',
+      'apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files; helperText = helper-producing settings/form/dialog props, description/info-tip nodes and SETTINGS_HINT_CLS uses in the same scope; permanentlyDisabledControls = static disabled or disabled={true} JSX attributes plus disabled: true action config in the same scope',
     perFaceCss: sortedObject(scan.perFaceCss),
     rawControls: { total: scan.controlTotal, files: sortedObject(scan.controlFiles) },
     arbitraryValues: {
@@ -451,12 +717,17 @@ function writeBaseline(scan, baseSha) {
       spacingTotal: scan.arbitrary.spacingTotal,
       files: sortedObject(scan.arbitrary.files),
     },
+    helperText: { total: scan.helperText.total, files: sortedObject(scan.helperText.files) },
+    permanentlyDisabledControls: {
+      total: scan.permanentlyDisabledControls.total,
+      files: sortedObject(scan.permanentlyDisabledControls.files),
+    },
   };
   writeFileSync(BASELINE_PATH, `${JSON.stringify(doc, null, 2)}\n`);
 
   const cssTotal = Object.values(doc.perFaceCss).reduce((a, b) => a + b, 0);
   console.log(
-    `[ui-debt-gate] baseline frozen: ${Object.keys(doc.perFaceCss).length} per-face css files / ${cssTotal} lines; ${doc.rawControls.total} bare control(s) in ${Object.keys(doc.rawControls.files).length} file(s); arbitrary values ${doc.arbitraryValues.textTotal} text + ${doc.arbitraryValues.spacingTotal} spacing in ${Object.keys(doc.arbitraryValues.files).length} file(s). Written to ${BASELINE_REL}.`,
+    `[ui-debt-gate] baseline frozen: ${Object.keys(doc.perFaceCss).length} per-face css files / ${cssTotal} lines; ${doc.rawControls.total} bare control(s) in ${Object.keys(doc.rawControls.files).length} file(s); arbitrary values ${doc.arbitraryValues.textTotal} text + ${doc.arbitraryValues.spacingTotal} spacing in ${Object.keys(doc.arbitraryValues.files).length} file(s); helper text ${doc.helperText.total} in ${Object.keys(doc.helperText.files).length} file(s); permanently disabled controls ${doc.permanentlyDisabledControls.total} in ${Object.keys(doc.permanentlyDisabledControls.files).length} file(s). Written to ${BASELINE_REL}.`,
   );
   if (previous) {
     const notes = [];
@@ -481,6 +752,16 @@ function writeBaseline(scan, baseSha) {
       if (before === undefined) notes.push(`  arbitrary +new ${key}: ${now}`);
       else if (before !== now)
         notes.push(`  arbitrary ${now > before ? 'UP' : 'down'} ${key}: ${before} -> ${now}`);
+    }
+    for (const [key, label] of [
+      ['helperText', 'helper text'],
+      ['permanentlyDisabledControls', 'permanently disabled controls'],
+    ]) {
+      const before = previous[key]?.total;
+      const now = doc[key].total;
+      if (before === undefined) notes.push(`  ${label} +new total: ${now}`);
+      else if (before !== now)
+        notes.push(`  ${label} ${now > before ? 'UP' : 'down'} total: ${before} -> ${now}`);
     }
     if (notes.length > 0) {
       console.log('[ui-debt-gate] delta vs previous baseline:');
@@ -512,6 +793,11 @@ function check(baseSha) {
   let baseMode = 'in-tree only';
   let arbitraryCeiling = inTree.arbitraryValues;
   let arbitraryMode = '';
+  const clutterCeilings = {
+    helperText: inTree.helperText,
+    permanentlyDisabledControls: inTree.permanentlyDisabledControls,
+  };
+  const clutterBootstrap = [];
   if (baseSha) {
     const loaded = loadBaseBaseline(baseSha);
     if (loaded.mode === 'base') {
@@ -520,10 +806,18 @@ function check(baseSha) {
       if (effective.arbitraryValues) arbitraryCeiling = effective.arbitraryValues;
       else
         arbitraryMode = ' (arbitraryValues: bootstrap, base predates the ledger — in-tree numbers)';
+      for (const key of Object.keys(clutterCeilings)) {
+        if (effective[key]) clutterCeilings[key] = effective[key];
+        else clutterBootstrap.push(key);
+      }
     } else {
       baseMode = `bootstrap (base ${baseSha.slice(0, 12)} has no ${BASELINE_REL})`;
     }
   }
+  const clutterMode =
+    clutterBootstrap.length === 0
+      ? ''
+      : ` (${clutterBootstrap.join(', ')}: bootstrap, base predates the ledger — in-tree numbers)`;
 
   const failures = [];
   const shrunk = [];
@@ -574,6 +868,37 @@ function check(baseSha) {
     }
   }
 
+  for (const [key, label, code, advice] of [
+    [
+      'helperText',
+      'helper-text nodes',
+      'D7',
+      'remove explanatory copy or merge it into the control label; helper text may only shrink',
+    ],
+    [
+      'permanentlyDisabledControls',
+      'permanently disabled controls',
+      'D8',
+      'do not render controls the user can never use; show the state or make the action available',
+    ],
+  ]) {
+    const now = scan[key].total;
+    const ceiling = clutterCeilings[key];
+    const allowed = ceiling.total;
+    if (now > allowed) {
+      const grew = [];
+      for (const [file, count] of Object.entries(scan[key].files)) {
+        const before = ceiling.files?.[file] ?? 0;
+        if (count > before) grew.push(`${file} ${before}->${count}`);
+      }
+      failures.push(
+        `${code} ${label}: ${now} total > baseline ${allowed}${grew.length > 0 ? ` (grew at: ${grew.join(', ')})` : ''} — ${advice}`,
+      );
+    } else if (now < allowed) {
+      shrunk.push(`${label} total: ${allowed} -> ${now}`);
+    }
+  }
+
   for (const hit of scan.radii) {
     failures.push(
       `D6 ${hit}: arbitrary radius. Use a radius token (--cds-radius-xs..2xl, --radius-menu-item, --radius-popover, --radius-card) so nested corners stay concentric`,
@@ -605,12 +930,20 @@ function check(baseSha) {
         }
       }
     }
+    for (const key of ['helperText', 'permanentlyDisabledControls']) {
+      if (!effective[key]) continue;
+      const now = inTree[key].total;
+      const before = effective[key].total;
+      if (now > before) {
+        failures.push(`D3 ${BASELINE_REL} ${key}.total raised vs base: ${before} -> ${now}`);
+      }
+    }
   }
 
   if (failures.length > 0) {
     for (const f of failures) console.log(`[ui-debt-gate] ${f}`);
     console.log(
-      `[ui-debt-gate] FAIL: ${failures.length} violation(s). Build with components/ui/* + Tailwind theme keys; per-face css, bare controls and arbitrary values may only shrink. After removing debt, re-freeze: node scripts/ui-debt-gate.mjs --write`,
+      `[ui-debt-gate] FAIL: ${failures.length} violation(s). Build with components/ui/* + Tailwind theme keys; per-face css, bare controls, arbitrary values, helper text and permanently disabled controls may only shrink. After removing debt, re-freeze: node scripts/ui-debt-gate.mjs --write`,
     );
     process.exit(1);
   }
@@ -622,7 +955,7 @@ function check(baseSha) {
   }
   const cssTotal = Object.values(scan.perFaceCss).reduce((a, b) => a + b, 0);
   console.log(
-    `[ui-debt-gate] PASS: ${Object.keys(scan.perFaceCss).length} per-face css files / ${cssTotal} lines; ${scan.controlTotal} bare control(s) in ${Object.keys(scan.controlFiles).length} file(s); arbitrary values ${scan.arbitrary.textTotal} text + ${scan.arbitrary.spacingTotal} spacing in ${Object.keys(scan.arbitrary.files).length} file(s); ${scan.cssCount} css + ${scan.tsxCount} tsx + ${scan.arbitraryScanned} ts/tsx (arbitrary scope) scanned. Baseline: ${baseMode}${arbitraryMode}, frozen from ${(effective.frozenFrom?.sha ?? 'unknown').slice(0, 12)}.`,
+    `[ui-debt-gate] PASS: ${Object.keys(scan.perFaceCss).length} per-face css files / ${cssTotal} lines; ${scan.controlTotal} bare control(s) in ${Object.keys(scan.controlFiles).length} file(s); arbitrary values ${scan.arbitrary.textTotal} text + ${scan.arbitrary.spacingTotal} spacing in ${Object.keys(scan.arbitrary.files).length} file(s); helper text ${scan.helperText.total} in ${Object.keys(scan.helperText.files).length} file(s); permanently disabled controls ${scan.permanentlyDisabledControls.total} in ${Object.keys(scan.permanentlyDisabledControls.files).length} file(s); ${scan.cssCount} css + ${scan.tsxCount} tsx + ${scan.arbitraryScanned} ts/tsx (arbitrary/helper/disabled scope) scanned. Baseline: ${baseMode}${arbitraryMode}${clutterMode}, frozen from ${(effective.frozenFrom?.sha ?? 'unknown').slice(0, 12)}.`,
   );
   process.exit(0);
 }

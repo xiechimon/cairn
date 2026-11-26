@@ -23,9 +23,9 @@ function sandbox() {
   git('init', '-q', '-b', 'main');
   git('config', 'user.email', 'gate@test.invalid');
   git('config', 'user.name', 'gate test');
+  const writeView = (text) => writeFileSync(join(dir, 'apps/web/src/view.tsx'), text);
   const source = (sizes) =>
-    writeFileSync(
-      join(dir, 'apps/web/src/view.tsx'),
+    writeView(
       `export const V = () => <p className="${sizes.map((s) => `text-[${s}px]`).join(' ')}" />;\n`,
     );
   const gate = (args = [], env = {}) =>
@@ -41,7 +41,7 @@ function sandbox() {
     git('commit', '-q', '-m', 'state');
     git('update-ref', 'refs/remotes/origin/main', 'HEAD');
   };
-  return { dir, git, source, gate, baseline, commitAsMain };
+  return { dir, git, source, writeView, gate, baseline, commitAsMain };
 }
 
 test('--write refuses to raise the ledger above main and names the file that grew', () => {
@@ -94,4 +94,41 @@ test('without an origin/main ref the gate keeps the in-tree baseline', () => {
   const r = s.gate();
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /in-tree only/);
+});
+
+test('--write refuses to raise helper text and permanently disabled controls above main', () => {
+  const s = sandbox();
+  s.writeView(
+    `export const V = ({ busy }) => (\n  <>\n    <FormField help="Explains the field"><Input /></FormField>\n    <Button disabled={busy}>Save</Button>\n  </>\n);\n`,
+  );
+  assert.equal(s.gate(['--write']).status, 0);
+  assert.equal(s.baseline().helperText.total, 1);
+  assert.equal(s.baseline().permanentlyDisabledControls.total, 0);
+  s.commitAsMain();
+  s.git('switch', '-q', '-c', 'feature');
+  s.writeView(
+    `export const V = ({ busy }) => (\n  <>\n    <FormField help="Explains the field"><Input /></FormField>\n    <SettingsRow hint="Extra copy" info="More extra copy">\n      <Button disabled>Save</Button>\n    </SettingsRow>\n    <Button disabled={busy}>Save</Button>\n  </>\n);\n`,
+  );
+  const r = s.gate(['--write']);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout + r.stderr, /helper text/);
+  assert.match(r.stdout + r.stderr, /permanently disabled controls/);
+  assert.equal(s.baseline().helperText.total, 1);
+  assert.equal(s.baseline().permanentlyDisabledControls.total, 0);
+});
+
+test('conditional disabled controls pass while bare true attributes and true action config fail', () => {
+  const s = sandbox();
+  s.writeView(
+    `export const V = ({ busy }) => (\n  <>\n    <Button disabled={busy}>Save</Button>\n    <Input disabled={busy || undefined} />\n  </>\n);\n`,
+  );
+  assert.equal(s.gate(['--write']).status, 0);
+  const clean = s.gate();
+  assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+  s.writeView(
+    `export const V = ({ busy }) => (\n  <>\n    <Button disabled={busy}>Save</Button>\n    <Input disabled={true} />\n  </>\n);\nexport const action = { disabled: true };\n`,
+  );
+  const red = s.gate();
+  assert.equal(red.status, 1, red.stdout + red.stderr);
+  assert.match(red.stdout, /permanently disabled controls/);
 });

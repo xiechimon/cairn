@@ -1,9 +1,9 @@
 {
   "frozenFrom": {
-    "sha": "dc038b523f26379a9079382d17a95fea03070d8b",
-    "date": "2026-11-24"
+    "sha": "ad3084ec018d8dcc22105183efa844a3eaeede5d",
+    "date": "2026-11-26"
   },
-  "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
+  "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files; helperText = helper-producing settings/form/dialog props, description/info-tip nodes and SETTINGS_HINT_CLS uses in the same scope; permanentlyDisabledControls = static disabled or disabled={true} JSX attributes plus disabled: true action config in the same scope",
   "perFaceCss": {},
   "rawControls": {
     "total": 2,
@@ -36,6 +36,67 @@
         "text": 0,
         "spacing": 1
       }
+    }
+  },
+  "helperText": {
+    "total": 102,
+    "files": {
+      "board/route-override-dialog.tsx": 5,
+      "board/side-chat.tsx": 1,
+      "board/sidebar.tsx": 1,
+      "chief/memory-dialog.tsx": 1,
+      "chief/memory-panel.tsx": 1,
+      "components/feedback-dialog.tsx": 1,
+      "components/form-layout.tsx": 1,
+      "components/settings-list.tsx": 4,
+      "design/components-content.tsx": 1,
+      "design/components-controls.tsx": 2,
+      "design/components-overlays.tsx": 3,
+      "design/patterns.tsx": 4,
+      "pages/github-connection-device-dialog.tsx": 1,
+      "pages/project-new-page.tsx": 1,
+      "pages/project-settings-page.tsx": 2,
+      "resources/antigravity-subscriptions.tsx": 2,
+      "resources/claude-subscriptions.tsx": 1,
+      "resources/composio-section.tsx": 3,
+      "resources/connect-remote-host-dialog.tsx": 1,
+      "resources/create-machine-dialog.tsx": 2,
+      "resources/create-provider-dialog.tsx": 5,
+      "resources/devin-subscriptions.tsx": 1,
+      "resources/frequent-models-card.tsx": 1,
+      "resources/mail-connectors.tsx": 5,
+      "resources/mcp-connector-dialog.tsx": 10,
+      "resources/mcp-github-device-dialog.tsx": 1,
+      "resources/mcp-servers-page.tsx": 1,
+      "resources/parts.tsx": 1,
+      "resources/phones-panel.tsx": 1,
+      "resources/routing-settings-page.tsx": 5,
+      "resources/secret-dialog.tsx": 2,
+      "resources/secrets-page.tsx": 1,
+      "resources/skill-dialog.tsx": 2,
+      "resources/skill-import-dialog.tsx": 1,
+      "resources/upstream-model-picker.tsx": 1,
+      "resources/vault-page.tsx": 2,
+      "resources/vault-pair-dialog.tsx": 4,
+      "routes/account-page.tsx": 1,
+      "routes/api-key-create-dialog.tsx": 1,
+      "routes/api-key-reveal-dialog.tsx": 2,
+      "routes/im-page.tsx": 8,
+      "routes/remote-access-page.tsx": 3,
+      "schedules/schedule-fields.tsx": 3,
+      "schedules/schedule-popover.tsx": 2
+    }
+  },
+  "permanentlyDisabledControls": {
+    "total": 13,
+    "files": {
+      "board/thread-automations.tsx": 1,
+      "design/components-controls.tsx": 7,
+      "design/prototypes/pr-bar.tsx": 1,
+      "detail/chat-markdown.tsx": 1,
+      "pages/github-connection-device-dialog.tsx": 1,
+      "pages/project-new-page.tsx": 1,
+      "resources/mcp-github-device-dialog.tsx": 1
     }
   }
 }

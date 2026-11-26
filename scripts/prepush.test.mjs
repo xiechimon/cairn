@@ -662,6 +662,7 @@ test('local code checks retain fast checks and advisory dead-class', () => {
     'node scripts/english-only-gate.mjs',
     'node scripts/public-content-gate.mjs',
     'node scripts/ui-debt-gate.mjs',
+    'node scripts/product-surface-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',
     'node scripts/comment-discipline-gate.mjs',
@@ -710,6 +711,7 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['node', 'scripts/flake-ledger.mjs'],
         ['node', 'scripts/test-integrity-gate.mjs'],
         ['node', 'scripts/regression-test-ledger.mjs'],
+        ['node', 'scripts/product-surface-gate.mjs'],
         ['node', 'scripts/ui-drift-gate.mjs'],
         ['node', 'scripts/ui-page-style-gate.mjs'],
         ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
@@ -885,6 +887,7 @@ test('CI shares the plan and keeps full e2e in its own job', () => {
     'pnpm typecheck',
     'pnpm spec:parse',
     'node scripts/ui-debt-gate.mjs',
+    'node scripts/product-surface-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs',
   ]) {
