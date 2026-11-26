@@ -2,6 +2,12 @@
   "version": 1,
   "surfaces": [
     {
+      "type": "env",
+      "key": "CAIRN_HOST_TOOLS",
+      "scope": "product",
+      "userScenario": "Nothing to set: the Runner sets it on a task step whose agent runs under its own home folder, so git and gh there still use your sign-in."
+    },
+    {
       "type": "setting",
       "key": "chiefStopBodySchema.messageId",
       "userScenario": "Nothing to set: pressing Stop on your own message that has not started sends its id, so that turn is the one stopped."

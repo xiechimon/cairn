@@ -46,7 +46,7 @@ function lstatOrNull(path: string) {
   }
 }
 
-function realDirectory(home: string, relative: string): string {
+export function realDirectory(home: string, relative: string): string {
   const realRoot = realpathSync(home);
   let current = realRoot;
   for (const part of relative

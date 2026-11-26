@@ -122,10 +122,16 @@ describe('assembleStepEnv', () => {
           KEEP: '1',
         },
         runtimeId: 'devin',
+        agentConfig: { cairnHome: '/cairn-home', hostEnv: { COREPACK_HOME: '/host/corepack' } },
         devinHome: '/managed/devin/home',
       }),
     );
-    expect(env).toEqual({ HOME: '/managed/devin/home', KEEP: '1' });
+    expect(env).toEqual({
+      HOME: '/managed/devin/home',
+      KEEP: '1',
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
+      ...(process.platform === 'win32' ? {} : { COREPACK_HOME: '/host/corepack' }),
+    });
   });
 });
 

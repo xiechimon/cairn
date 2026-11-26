@@ -1,4 +1,5 @@
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { antigravityOAuthStepCredentialSchema, type BoundGitCredentials } from '@cairn/shared';
 import { acquireDeterministicCredentialProfile } from '@cairn/shared/credential-profile';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
@@ -9,6 +10,7 @@ import {
   prepareGeminiHome,
   writeAntigravityOAuthCredential,
 } from './agent-config.js';
+import { developerAccessEnv, HOST_TOOLS_DIR_VAR } from './developer-access.js';
 import { gitCredentialEnv } from './git.js';
 
 const NULL_DEVICE = process.platform === 'win32' ? 'NUL' : '/dev/null';
@@ -47,7 +49,7 @@ export interface StepEnvInput {
   git: BoundGitCredentials | null;
   readonlyGit: boolean;
   runtimeId: string | null;
-  agentConfig: { cairnHome: string; realHome?: string };
+  agentConfig: { cairnHome: string; realHome?: string; hostEnv?: NodeJS.ProcessEnv };
   claudeSubscriptionToken: string | undefined;
   claudeCodeCoordinator?: boolean;
   devinToken?: string;
@@ -77,6 +79,7 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
     ...(input.readonlyGit ? READONLY_GIT_ENV : {}),
   };
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  delete env[HOST_TOOLS_DIR_VAR];
   if (input.claudeCodeCoordinator === true) env.CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS = '100000';
   if (input.claudeSubscriptionToken !== undefined) {
     env.CLAUDE_CODE_OAUTH_TOKEN = input.claudeSubscriptionToken;
@@ -93,6 +96,7 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
   delete env.AGY_CLI_FORCE_FILE_TOKEN_STORAGE;
   delete env.AGY_ACP_FORCE_FILE_STORAGE;
   let cleanupProfile: (() => void) | undefined;
+  let isolatedHome: string | undefined;
   if (input.runtimeId === 'antigravity' && input.antigravityToken?.startsWith('{')) {
     let credential: ReturnType<typeof antigravityOAuthStepCredentialSchema.parse>;
     try {
@@ -114,6 +118,7 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
     try {
       writeAntigravityOAuthCredential(profile.home, credential, input.agentConfig.cairnHome);
       Object.assign(env, profile.env, antigravityFileStorageEnv(profile.home));
+      isolatedHome = profile.home;
       cleanupProfile = profile.cleanup;
     } catch (error) {
       profile.cleanup();
@@ -132,7 +137,30 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
         env.AGY_CLI_FORCE_FILE_TOKEN_STORAGE = '1';
       }
     }
-    Object.assign(env, isolatedConfigEnv(input));
+    const isolation = isolatedConfigEnv(input);
+    isolatedHome = isolation.HOME;
+    Object.assign(env, isolation);
+  }
+  if (isolatedHome !== undefined) {
+    const hostEnv = { ...(input.agentConfig.hostEnv ?? process.env), ...input.inherited };
+    const temporaryRoot = input.temporary.CAIRN_TEST_TEMP_ROOT;
+    try {
+      Object.assign(
+        env,
+        developerAccessEnv({
+          isolatedHome,
+          toolsDir: temporaryRoot === undefined ? undefined : join(temporaryRoot, 'host-tools'),
+          searchPath: env.PATH ?? hostEnv.PATH ?? '',
+          realHome: input.agentConfig.realHome ?? homedir(),
+          hostEnv,
+          stepEnv: env,
+          readonlyGit: input.readonlyGit,
+        }),
+      );
+    } catch (error) {
+      cleanupProfile?.();
+      throw error;
+    }
   }
   return {
     env,
