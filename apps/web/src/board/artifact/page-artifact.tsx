@@ -1,14 +1,21 @@
 import { type DesignViewport, designPagePath } from '@cairn/shared';
-import { Code, Download, FileWarning, Globe, RotateCw } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { Check, Code, Copy, Download, FileWarning, Globe, RotateCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../../api/client.js';
 import { useDesignComments, useDesignMutations, useDesignPageHtml } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
+import { CopyIconButton } from '../../components/copy-icon-button.js';
 import { EmptyState } from '../../components/empty-state.js';
 import { IconTooltip } from '../../components/icon-tooltip.js';
-import { KeyedMenuItem } from '../../components/menu-keys.js';
+import { KeyedMenuItem, KeyedMenuRadioItem } from '../../components/menu-keys.js';
 import { SegmentedTabs } from '../../components/segmented.js';
 import { Button } from '../../components/ui/button.js';
+import {
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuSeparator,
+} from '../../components/ui/dropdown-menu.js';
 import { Skeleton } from '../../components/ui/skeleton.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
@@ -25,7 +32,7 @@ import { bakeMarkPng, MarkError, markTarget } from '../design/design-markup.js';
 import { SharePopover } from '../design/design-share.js';
 import { designSrcdoc } from '../design/srcdoc.js';
 import { deliverableHref } from '../made-files.js';
-import { useArtifactPanelControl } from './artifact-panel.js';
+import { useArtifactEscape, useArtifactPanelControl } from './artifact-panel.js';
 import {
   ArtifactToolbar,
   OldVersionBar,
@@ -67,18 +74,29 @@ export function PageArtifact({
   const [source, setSource] = useState(false);
   const [zoom, setZoom] = useState<Zoom>('fit');
   const [fitScale, setFitScale] = useState(1);
-  useZoomShortcuts({
-    active: panelActive && !source && page !== undefined && shown !== undefined,
-    scale: zoom === 'fit' ? fitScale : zoom,
-    onChange: setZoom,
-  });
   const [reloads, setReloads] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const htmlQ = useDesignPageHtml(shown?.id ?? null);
+  const missing =
+    htmlQ.error instanceof ApiError && (htmlQ.error.status === 404 || htmlQ.error.status === 410);
+  const emptyHtml = htmlQ.data !== undefined && htmlQ.data.trim() === '';
   const srcdoc = useMemo(
     () => (htmlQ.data === undefined ? null : designSrcdoc(htmlQ.data)),
     [htmlQ.data],
   );
+  useZoomShortcuts({
+    active:
+      panelActive &&
+      !source &&
+      page !== undefined &&
+      shown !== undefined &&
+      !missing &&
+      !htmlQ.isError &&
+      !emptyHtml &&
+      srcdoc !== null,
+    scale: zoom === 'fit' ? fitScale : zoom,
+    onChange: setZoom,
+  });
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const { createComment, patchComment, deleteComment, saveMark, createShare, stopShare } =
     useDesignMutations(todoId, fileName);
@@ -86,18 +104,43 @@ export function PageArtifact({
   const [retargetId, setRetargetId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [listOpen, setListOpen] = useState(false);
-  const stopCommenting = useCallback(() => setCommenting(false), []);
+  const stopCommenting = useCallback(() => {
+    setCommenting(false);
+    setRetargetId(null);
+  }, []);
   const [marking, setMarking] = useState(false);
   const [markBusy, setMarkBusy] = useState(false);
   const stopMarking = useCallback(() => setMarking(false), []);
+  useEffect(() => {
+    if (!viewingOld) return;
+    setCommenting(false);
+    setMarking(false);
+    setRetargetId(null);
+  }, [viewingOld]);
+  const handleOverlayEscape = useCallback(() => {
+    if (historyOpen) setHistoryOpen(false);
+    else setListOpen(false);
+  }, [historyOpen]);
+  useArtifactEscape(
+    panelActive && !commenting && !marking && (historyOpen || listOpen),
+    handleOverlayEscape,
+  );
   const commentsQ = useDesignComments(todoId, fileName, live);
   const comments = commentsQ.data ?? [];
   const activeComments = comments.filter((comment) => comment.status !== 'resolved').length;
-  const canComment = !readOnly && live && !viewingOld && !source;
+  const canComment = !readOnly && live && !viewingOld && !source && !missing && !emptyHtml;
   const commentFailed = (message: string) => (error: unknown) => toastError(t(message), error);
   const actions: CommentActions = {
-    edit: (id, note) =>
-      patchComment.mutate({ id, patch: { note } }, { onError: commentFailed('评论未能修改') }),
+    edit: (id, note, onError) =>
+      patchComment.mutate(
+        { id, patch: { note } },
+        {
+          onError: (error) => {
+            commentFailed('评论未能修改')(error);
+            onError?.();
+          },
+        },
+      ),
     remove: (id) => deleteComment.mutate(id, { onError: commentFailed('评论未能删除') }),
     resolve: (id) =>
       patchComment.mutate(
@@ -135,10 +178,17 @@ export function PageArtifact({
         action={{ label: t('重试'), onClick: versions.retryPages }}
         className="mt-[12vh]"
       />
-    ) : (
+    ) : versions.pagesPending ? (
       <Skeleton
         data-testid="design-loading"
         className="m-6 min-h-0 flex-1 rounded-(--radius-tile)"
+      />
+    ) : (
+      <EmptyState
+        testId="design-missing"
+        icon={FileWarning}
+        title={t('这一版的文件已不存在')}
+        className="mt-[12vh]"
       />
     );
   }
@@ -216,7 +266,6 @@ export function PageArtifact({
             }),
   };
   const pageHref = designPagePath(shown.id);
-  const missing = htmlQ.error instanceof ApiError && htmlQ.error.status === 404;
   const commentOn = (commenting || marking) && canComment;
   return (
     <>
@@ -227,6 +276,7 @@ export function PageArtifact({
             <KeyedMenuItem
               shortcut="B"
               data-testid="design-open-browser"
+              disabled={missing}
               render={<a href={pageHref} target="_blank" rel="noopener noreferrer" />}
             >
               <Globe aria-hidden />
@@ -235,6 +285,7 @@ export function PageArtifact({
             <KeyedMenuItem
               shortcut="D"
               data-testid="design-download"
+              disabled={missing}
               render={<a href={deliverableHref(shown.attachmentId)} download={fileName} />}
             >
               <Download aria-hidden />
@@ -244,6 +295,27 @@ export function PageArtifact({
               <RotateCw aria-hidden />
               {t('重新加载')}
             </KeyedMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>{t('视口')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={viewport}
+                onValueChange={(next) => {
+                  setViewport(next as DesignViewport);
+                  setZoom('fit');
+                }}
+              >
+                {(['desktop', 'tablet', 'mobile'] as const).map((value) => (
+                  <KeyedMenuRadioItem
+                    key={value}
+                    value={value}
+                    data-testid={`design-viewport-menu-${value}`}
+                  >
+                    {t(VIEWPORT_LABEL[value])}
+                  </KeyedMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuGroup>
           </>
         }
         controls={
@@ -263,6 +335,22 @@ export function PageArtifact({
                 testId: `design-viewport-${value}`,
               }))}
             />
+            {source && htmlQ.data !== undefined && (
+              <CopyIconButton
+                text={htmlQ.data}
+                label={t('复制')}
+                copiedLabel={t('已复制')}
+                side="bottom"
+                size="icon-sm"
+                testId="artifact-copy"
+                replaceClassName
+                className={`${TOOL_BUTTON} w-7 px-0`}
+                icons={{
+                  copy: <Copy aria-hidden className="size-4" />,
+                  copied: <Check aria-hidden className="size-4" />,
+                }}
+              />
+            )}
             <IconTooltip
               label={source ? t('看预览') : t('看源码')}
               side="bottom"
@@ -273,7 +361,16 @@ export function PageArtifact({
                   data-testid="design-source-toggle"
                   aria-pressed={source}
                   className={`${TOOL_BUTTON} w-7 px-0`}
-                  onClick={() => setSource((v) => !v)}
+                  onClick={() =>
+                    setSource((v) => {
+                      if (!v) {
+                        setCommenting(false);
+                        setMarking(false);
+                        setRetargetId(null);
+                      }
+                      return !v;
+                    })
+                  }
                 />
               }
             >
@@ -290,6 +387,7 @@ export function PageArtifact({
                 toggle: () => {
                   const next = !(commentOn || listOpen);
                   setMarking(false);
+                  setRetargetId(null);
                   setCommenting(next && canComment);
                   setListOpen(next);
                 },
@@ -303,7 +401,7 @@ export function PageArtifact({
               fileName={fileName}
               html={htmlQ.data}
               frameRef={frameRef}
-              previewing={!source && srcdoc !== null}
+              previewing={!source && srcdoc !== null && !emptyHtml}
               printHref={`${pageHref}?print=1`}
             />
             {live && (
@@ -384,6 +482,13 @@ export function PageArtifact({
             <div data-testid="design-source" className="min-h-0 flex-1 overflow-auto">
               <TextViewer name={fileName} text={htmlQ.data} />
             </div>
+          ) : emptyHtml ? (
+            <EmptyState
+              testId="design-empty"
+              icon={FileWarning}
+              title={t('这个网页文件是空的')}
+              className="mt-[12vh]"
+            />
           ) : (
             <DesignCanvas
               key={`${shown.id}:${reloads}`}
@@ -395,7 +500,11 @@ export function PageArtifact({
               fitScale={fitScale}
               onFitScale={setFitScale}
               onZoomChange={setZoom}
-              onEscape={closePanel}
+              onEscape={() => {
+                if (historyOpen) setHistoryOpen(false);
+                else if (listOpen) setListOpen(false);
+                else closePanel();
+              }}
               commenting={commenting && canComment}
               onStopCommenting={stopCommenting}
               marking={marking && canComment}

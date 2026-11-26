@@ -210,7 +210,7 @@ export function ZoomControl({
   const { t } = useI18n();
   const scale = zoom === 'fit' ? fitScale : zoom;
   return (
-    <div data-testid="artifact-zoom" className="flex items-center gap-0.5">
+    <div data-testid="artifact-zoom" className="flex items-center gap-0.5 max-[640px]:hidden">
       <IconTooltip
         label={t('缩小')}
         side="bottom"

@@ -12,7 +12,12 @@ import {
   type Mark,
   useDrawing,
 } from '../../vendor-open-design/draw-overlay.js';
-import { stepZoom, type Zoom, zoomShortcutAction } from '../artifact/viewers/zoom.js';
+import {
+  hasBlockingLayer,
+  stepZoom,
+  type Zoom,
+  zoomShortcutAction,
+} from '../artifact/viewers/zoom.js';
 import {
   type PreviewKeyPayload,
   type PreviewWheelPayload,
@@ -141,6 +146,9 @@ export function DesignCanvas({
     if (!commenting) clearPicked();
   }, [commenting, clearPicked]);
   useEffect(() => {
+    clearPicked();
+  }, [viewport, clearPicked]);
+  useEffect(() => {
     if (picked === null || retarget === undefined) return;
     retarget(picked);
     clearPicked();
@@ -148,7 +156,16 @@ export function DesignCanvas({
   useEffect(() => {
     if (!commenting || picked !== null) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onStopCommenting();
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.keyCode === 229 ||
+        hasBlockingLayer()
+      )
+        return;
+      event.preventDefault();
+      onStopCommenting();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -229,25 +246,39 @@ export function DesignCanvas({
                     textLabel={t('标注文字')}
                   />
                 )}
-                {pins.map(({ comment, position }) => (
-                  <div
-                    key={comment.id}
-                    className="absolute"
-                    style={{
-                      left: position.x * transform.scale,
-                      top: position.y * transform.scale,
-                    }}
-                  >
-                    <CommentPin
-                      pin={comment.pin}
-                      status={comment.status}
-                      onClick={() => {
-                        setFocusedId(comment.id);
-                        onListOpen(true);
+                {pins.map(({ comment, position }) => {
+                  const left = position.x * transform.scale;
+                  const top = position.y * transform.scale;
+                  const maxW = transform.width * transform.scale;
+                  const maxH = transform.height * transform.scale;
+                  const inViewX =
+                    (position.x + position.width) * transform.scale > 0 && left <= maxW;
+                  const inViewY =
+                    (position.y + position.height) * transform.scale > 0 && top <= maxH;
+                  const pinLeft = inViewX
+                    ? Math.min(Math.max(11, left), Math.max(11, maxW - 11))
+                    : left;
+                  const pinTop = inViewY ? Math.min(Math.max(22, top), maxH) : top;
+                  return (
+                    <div
+                      key={comment.id}
+                      className="absolute"
+                      style={{
+                        left: pinLeft,
+                        top: pinTop,
                       }}
-                    />
-                  </div>
-                ))}
+                    >
+                      <CommentPin
+                        pin={comment.pin}
+                        status={comment.status}
+                        onClick={() => {
+                          setFocusedId(comment.id);
+                          onListOpen(true);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
                 {picked !== null && commenting && retarget === undefined && (
                   <CommentPopover
                     key={`${picked.selector}:${picked.position.x}:${picked.position.y}`}

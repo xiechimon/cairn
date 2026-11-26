@@ -367,7 +367,26 @@ test('share needs a relay; with one the link serves the current version until it
     expect(await page.text()).toContain('Shared v2');
     await req(s.app, 'DELETE', `/api/todos/${task.id}/design/index.html/share`);
     expect((await s.app.request(`/s/${created.token}`)).status).toBe(404);
+    s.db.update(todo).set({ archivedAt: 123 }).where(eq(todo.id, task.id)).run();
+    expect((await req(s.app, 'POST', `/api/todos/${task.id}/design/index.html/share`)).status).toBe(
+      409,
+    );
   } finally {
     delete process.env.CAIRN_RELAY_ORIGIN;
   }
+});
+
+test('a missing version file returns 410 instead of throwing 500', async () => {
+  const { s, attachHtml, pages } = await world();
+  await attachHtml('<h1>Gone</h1>');
+  const version = (await pages()).pages[0]?.current;
+  const row = s.db
+    .select()
+    .from(attachment)
+    .where(eq(attachment.id, version?.attachmentId ?? ''))
+    .get();
+  const { rmSync } = await import('node:fs');
+  rmSync(join(s.attachmentsDir, row?.storageKey ?? ''), { force: true });
+  const res = await req(s.app, 'GET', `/api/design/versions/${version?.id}/page`);
+  expect(res.status).toBe(410);
 });

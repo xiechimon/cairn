@@ -21,6 +21,8 @@ import { hasBlockingLayer } from './viewers/zoom.js';
 const ARTIFACT_ESCAPE_BLOCKERS = [
   '[data-testid="artifact-comment-strip"]',
   '[data-testid="design-mark-bar"]',
+  '[data-testid="artifact-history"]',
+  '[data-testid="design-comment-list"]',
   '[data-testid="artifact-whiteboard"][data-editing="true"]',
 ].join(', ');
 
@@ -29,6 +31,35 @@ function hasArtifactEscapeBlocker(): boolean {
   return [...document.querySelectorAll(ARTIFACT_ESCAPE_BLOCKERS)].some((el) =>
     el.checkVisibility(),
   );
+}
+
+export function isArtifactPanelEscape(event: KeyboardEvent): boolean {
+  if (
+    event.key !== 'Escape' ||
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.keyCode === 229 ||
+    isEditableTarget(event.target) ||
+    hasBlockingLayer()
+  )
+    return false;
+  return !(
+    event.target instanceof HTMLElement &&
+    event.target.closest('[data-testid="decision-dock"], [role="status"][data-kind]') !== null
+  );
+}
+
+export function useArtifactEscape(enabled: boolean, onEscape: () => void): void {
+  useEffect(() => {
+    if (!enabled) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isArtifactPanelEscape(event)) return;
+      event.preventDefault();
+      onEscape();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [enabled, onEscape]);
 }
 
 const ArtifactPanelControlContext = createContext<{
@@ -145,19 +176,7 @@ function ArtifactPanel({
   useEffect(() => {
     if (hidden) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.key !== 'Escape' ||
-        event.defaultPrevented ||
-        event.isComposing ||
-        event.keyCode === 229
-      )
-        return;
-      if (isEditableTarget(event.target) || hasArtifactEscapeBlocker()) return;
-      if (
-        event.target instanceof HTMLElement &&
-        event.target.closest('[data-testid="decision-dock"], [role="status"][data-kind]') !== null
-      )
-        return;
+      if (!isArtifactPanelEscape(event) || hasArtifactEscapeBlocker()) return;
       event.preventDefault();
       panel.closePanel();
     };

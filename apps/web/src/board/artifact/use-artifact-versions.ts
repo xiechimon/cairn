@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n/provider.js';
 export interface ArtifactVersions {
   page: DesignPageRecord | undefined;
   shareOrigin: string | null;
+  pagesPending: boolean;
   pagesFailed: boolean;
   retryPages: () => void;
   versions: readonly DesignVersionRecord[];
@@ -41,6 +42,7 @@ export function useArtifactVersions(
   return {
     page,
     shareOrigin: pagesQ.data?.shareOrigin ?? null,
+    pagesPending: pagesQ.isPending,
     pagesFailed: pagesQ.isError,
     retryPages: () => void pagesQ.refetch(),
     versions,

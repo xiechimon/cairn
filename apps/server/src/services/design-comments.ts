@@ -1,3 +1,5 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   anchorFitsKind,
   artifactKindOf,
@@ -146,24 +148,29 @@ export function saveDesignMark(
   const id = newRecordId();
   const storageKey = `${input.teamId}/${id}.png`;
   writeAttachmentFile(deps.attachmentsDir, storageKey, bytes);
-  deps.db
-    .insert(attachment)
-    .values({
-      id,
-      teamId: input.teamId,
-      todoId: input.todoId,
-      createdBy: input.userId,
-      fileName: 'mark.png',
-      mimeType: 'image/png',
-      sizeBytes: bytes.length,
-      storageKey,
-      grantId: newRecordId(),
-      scope: 'design',
-      status: 'ready',
-      createdAt: nowMs(),
-    })
-    .run();
-  return { attachmentId: id };
+  try {
+    deps.db
+      .insert(attachment)
+      .values({
+        id,
+        teamId: input.teamId,
+        todoId: input.todoId,
+        createdBy: input.userId,
+        fileName: 'mark.png',
+        mimeType: 'image/png',
+        sizeBytes: bytes.length,
+        storageKey,
+        grantId: newRecordId(),
+        scope: 'design',
+        status: 'ready',
+        createdAt: nowMs(),
+      })
+      .run();
+    return { attachmentId: id };
+  } catch (error) {
+    rmSync(join(deps.attachmentsDir, storageKey), { force: true });
+    throw error;
+  }
 }
 
 export function createDesignComment(

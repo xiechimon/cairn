@@ -390,7 +390,8 @@ export function createDesignShare(
 ): DesignShareRecord {
   const origin = relayOrigin();
   if (origin === null) throw new HttpError(409, 'a share link needs a relay', 'relay-missing');
-  requireTeamTodo(db, input.todoId, input.teamId);
+  const todoRow = requireTeamTodo(db, input.todoId, input.teamId);
+  if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   if (
     artifactKindOf(input.fileName) !== 'page' ||
     currentVersion(db, input.todoId, input.fileName) === undefined

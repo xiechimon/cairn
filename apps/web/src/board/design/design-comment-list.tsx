@@ -42,7 +42,7 @@ function markHref(attachmentId: string): string {
 }
 
 export interface CommentActions {
-  edit: (id: string, note: string) => void;
+  edit: (id: string, note: string, onError?: () => void) => void;
   remove: (id: string) => void;
   resolve: (id: string) => void;
   reopen: (id: string) => void;
@@ -130,7 +130,7 @@ function CommentRow({
                 data-testid="design-comment-edit-save"
                 disabled={trimmed === ''}
                 onClick={() => {
-                  actions.edit(comment.id, trimmed);
+                  actions.edit(comment.id, trimmed, () => setDraft(trimmed));
                   setDraft(null);
                 }}
               >

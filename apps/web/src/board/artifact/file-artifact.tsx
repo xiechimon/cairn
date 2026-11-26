@@ -21,7 +21,7 @@ import { TextViewer } from '../../vendor-open-design/viewers/text-viewer.js';
 import { VideoViewer } from '../../vendor-open-design/viewers/video-viewer.js';
 import { DocumentPreviewUnavailable, useAttachmentFiles } from '../file-data.js';
 import { downloadFile, type FileTarget } from '../file-pane.js';
-import { useArtifactPanelControl } from './artifact-panel.js';
+import { useArtifactEscape, useArtifactPanelControl } from './artifact-panel.js';
 import { artifactKey } from './artifact-route.js';
 import { ArtifactToolbar, OldVersionBar, TOOL_BUTTON, VersionHistory } from './artifact-toolbar.js';
 import {
@@ -111,8 +111,11 @@ function VersionedFile({
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
+  const { active: panelActive } = useArtifactPanelControl();
   const versions = useArtifactVersions(artifact.todoId, artifact.fileName, artifact.versionId);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const closeHistory = useCallback(() => setHistoryOpen(false), []);
+  useArtifactEscape(panelActive && historyOpen, closeHistory);
   const { shown, page } = versions;
   const { saveVersion } = useDesignMutations(artifact.todoId, artifact.fileName);
   const editable = live && !readOnly && !versions.viewingOld;

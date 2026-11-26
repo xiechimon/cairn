@@ -16,6 +16,7 @@ import {
   type useDrawing,
 } from '../../vendor-open-design/draw-overlay.js';
 import { requestPreviewSnapshot } from '../../vendor-open-design/snapshot-request.js';
+import { hasBlockingLayer } from '../artifact/viewers/zoom.js';
 
 const PNG_PREFIX = 'data:image/png;base64,';
 
@@ -90,7 +91,15 @@ export function MarkBar({
       const typing =
         event.target instanceof HTMLElement &&
         (event.target.isContentEditable || ['INPUT', 'TEXTAREA'].includes(event.target.tagName));
-      if (event.key === 'Escape' && !typing) {
+      if (
+        event.key === 'Escape' &&
+        !typing &&
+        !event.defaultPrevented &&
+        !event.isComposing &&
+        event.keyCode !== 229 &&
+        !hasBlockingLayer()
+      ) {
+        event.preventDefault();
         onCancel();
         return;
       }

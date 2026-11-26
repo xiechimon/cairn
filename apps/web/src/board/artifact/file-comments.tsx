@@ -14,7 +14,6 @@ import {
   type ReactNode,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -29,6 +28,7 @@ import {
   CommentPin,
   type CommentSend,
 } from '../design/design-comment-list.js';
+import { useArtifactEscape, useArtifactPanelControl } from './artifact-panel.js';
 import { CommentStrip } from './comment-strip.js';
 import type { SendDesignComments } from './page-artifact.js';
 
@@ -163,19 +163,22 @@ export function useFileComments({
   const [extent, setExtent] = useState<Extent>({});
   const canComment = enabled && !readOnly && versionId !== undefined;
   const failed = (message: string) => (error: unknown) => toastError(t(message), error);
+  const { active: panelActive } = useArtifactPanelControl();
   const stop = useCallback(() => {
     setCommenting(false);
     setDraft(null);
     setRetargetId(null);
   }, []);
-  useEffect(() => {
-    if (!commenting || draft !== null) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') stop();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [commenting, draft, stop]);
+  const handleEscape = useCallback(() => {
+    if (commenting) {
+      stop();
+      return;
+    }
+    if (!document.querySelector('[data-testid="artifact-history"]')?.checkVisibility()) {
+      setListOpen(false);
+    }
+  }, [commenting, stop]);
+  useArtifactEscape(panelActive && draft === null && (commenting || listOpen), handleEscape);
   const targetOf = (pick: AnchorPick): ElementTarget =>
     pick.element !== undefined
       ? { ...emptyTarget(pick.element.label), ...pick.element }
@@ -225,8 +228,16 @@ export function useFileComments({
     );
   };
   const actions: CommentActions = {
-    edit: (id, note) =>
-      patchComment.mutate({ id, patch: { note } }, { onError: failed('评论未能修改') }),
+    edit: (id, note, onError) =>
+      patchComment.mutate(
+        { id, patch: { note } },
+        {
+          onError: (error) => {
+            failed('评论未能修改')(error);
+            onError?.();
+          },
+        },
+      ),
     remove: (id) => deleteComment.mutate(id, { onError: failed('评论未能删除') }),
     resolve: (id) =>
       patchComment.mutate(

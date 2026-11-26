@@ -548,3 +548,155 @@ test('share with a relay creates a link, copies it and stops sharing', async ({ 
   await expect(popover.getByTestId('design-share-off')).toBeVisible();
   expect(state.shareCalls).toEqual(['POST', 'DELETE']);
 });
+
+test('missing version file (410) shows missing state, empty HTML shows empty state, and source mode copies HTML', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  HTML['ver-1'] = '';
+  const mock = { threads: [THREAD], messages: [] as unknown[], todos: [PAGE_TASK] };
+  await mockLive(page, mock, (path, route, json) => {
+    const base = `/api/todos/${PAGE_TASK.id}/design`;
+    if (path === '/api/attachments/att-2/artifact')
+      return json({
+        todoId: PAGE_TASK.id,
+        fileName: 'pricing.html',
+        kind: 'page',
+        versionId: 'ver-2',
+        versionSeq: 2,
+        versionCount: 2,
+        openComments: 0,
+      });
+    if (path === `/api/todos/${PAGE_TASK.id}`) return json(PAGE_TASK);
+    if (path === base)
+      return json({
+        pages: [
+          {
+            fileName: 'pricing.html',
+            kind: 'page',
+            current: version(2),
+            versionCount: 2,
+            openComments: 0,
+            shareToken: null,
+          },
+        ],
+        shareOrigin: null,
+      });
+    if (path === `${base}/pricing.html/versions`) return json([version(2), version(1)]);
+    if (path === `${base}/pricing.html/comments`) return json([]);
+    if (path === '/api/design/versions/ver-2/page')
+      return json({ error: 'design version file is gone' }, 410);
+    if (path === '/api/design/versions/ver-1/page')
+      return route.fulfill({ status: 200, contentType: 'text/html', body: '' });
+    return undefined;
+  });
+  await page.goto('/app?artifact=att-2.html&artifactName=pricing.html');
+  const pane = page.getByTestId('artifact-panel');
+  await expect(pane.getByTestId('design-missing')).toContainText('这一版的文件已不存在');
+  await expect(pane.getByTestId('design-error')).toHaveCount(0);
+
+  await pane.getByTestId('artifact-history-toggle').click();
+  await pane.locator('[data-seq="1"]').click();
+  await expect(pane.getByTestId('design-empty')).toBeVisible();
+  await pane.getByTestId('design-source-toggle').click();
+  await expect(pane.getByTestId('design-source')).toBeVisible();
+  await pane.getByTestId('design-source-toggle').click();
+
+  await pane.getByTestId('artifact-history-toggle').click();
+  HTML['ver-2'] = '<!doctype html><html><body><h1>Restored</h1></body></html>';
+  await page.route('**/api/design/versions/ver-2/page', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: HTML['ver-2'] }),
+  );
+  await pane.getByTestId('artifact-version-current').click();
+  await pane.getByTestId('design-source-toggle').click();
+  await pane.getByTestId('artifact-copy').click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(HTML['ver-2']);
+});
+
+test('at 390px the toolbar fits without horizontal overflow and viewport switching stays reachable in the menu', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openDesign(page);
+  const pane = page.getByTestId('artifact-panel');
+  await expect(pane.getByTestId('design-frame')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  const toolbarBox = await pane.getByTestId('artifact-toolbar').boundingBox();
+  expect((toolbarBox?.x ?? 0) + (toolbarBox?.width ?? 0)).toBeLessThanOrEqual(390);
+
+  await pane.getByTestId('artifact-name').click();
+  await page.getByTestId('design-viewport-menu-mobile').click();
+  await expect(pane.getByTestId('design-canvas')).toHaveAttribute('data-viewport', 'mobile');
+  const mobile = await pane.getByTestId('design-stage').boundingBox();
+  expect(Math.abs((mobile?.width ?? 0) / (mobile?.height ?? 1) - 390 / 844)).toBeLessThan(0.01);
+});
+
+test('comment edit failure keeps typed text, top-edge pins are not clipped, and Esc closes overlays without leaking retarget', async ({
+  page,
+}) => {
+  HTML['ver-2'] =
+    '<!doctype html><html><body style="margin:0"><h1 data-od-id="top" style="margin:0">Top</h1><button>升级到 Pro</button></body></html>';
+  const stale: Comment = { ...lostComment(), status: 'sent', handledSeq: 2 };
+  await openDesign(page, [stale]);
+  const pane = page.getByTestId('artifact-panel');
+  const frame = pane.getByTestId('design-frame').contentFrame();
+  await expect(frame.getByRole('heading', { name: 'Top' })).toBeVisible();
+
+  await pane.getByTestId('artifact-comment-toggle').click();
+  await frame.getByRole('heading', { name: 'Top' }).click();
+  await page.getByTestId('design-comment-note').fill('顶部标题改小');
+  await page.getByTestId('design-comment-save').click();
+  const topPin = pane.locator('[data-testid="design-pin"][data-pin="2"]');
+  await expect(topPin).toBeVisible();
+  const overlayBox = await pane.getByTestId('design-overlay').boundingBox();
+  const pinBox = await topPin.boundingBox();
+  expect(pinBox?.y ?? -1).toBeGreaterThanOrEqual((overlayBox?.y ?? 0) - 0.5);
+
+  await page.route(`**/api/todos/${PAGE_TASK.id}/design/comments/*`, (route) => {
+    if (route.request().method() === 'PATCH')
+      return route.fulfill({ status: 500, json: { error: 'boom' } });
+    return route.fallback();
+  });
+  const row2 = pane.locator('[data-testid="design-comment-row"][data-pin="2"]');
+  await row2.getByTestId('design-comment-edit').click();
+  await row2.getByTestId('design-comment-edit-note').fill('未保存的编辑草稿');
+  await row2.getByTestId('design-comment-edit-save').click();
+  await expect(page.locator('[data-sonner-toast]')).toContainText('评论未能修改');
+  await expect(row2.getByTestId('design-comment-edit-note')).toHaveValue('未保存的编辑草稿');
+  await row2.getByRole('button', { name: '取消' }).click();
+
+  await pane.getByTestId('design-export').click();
+  await expect(page.getByRole('menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(pane.getByTestId('artifact-comment-strip')).toBeVisible();
+
+  await pane.locator('[data-testid="design-comment-row"][data-pin="1"]').getByTestId('design-comment-retarget').click();
+  await expect(pane.getByTestId('artifact-comment-strip')).toContainText('指到新位置');
+  await page.keyboard.press('Escape');
+  await expect(pane.getByTestId('artifact-comment-strip')).toHaveCount(0);
+
+  await pane.getByTestId('artifact-comment-toggle').click();
+  await pane.getByTestId('artifact-comment-toggle').click();
+  await expect(pane.getByTestId('artifact-comment-strip')).toContainText('点一个元素加批注');
+  await frame.getByRole('button', { name: '升级到 Pro' }).click();
+  await expect(page.getByTestId('design-comment-popover')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('design-comment-popover')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(pane.getByTestId('artifact-comment-strip')).toHaveCount(0);
+
+  await pane.getByTestId('artifact-history-toggle').click();
+  await expect(pane.getByTestId('artifact-history')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(pane.getByTestId('artifact-history')).toHaveCount(0);
+  await expect(pane).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(pane.getByTestId('design-comment-list')).toHaveCount(0);
+  await expect(pane).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(pane).toHaveCount(0);
+});

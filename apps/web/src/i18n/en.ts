@@ -2857,6 +2857,7 @@ export const EN: Record<string, string> = {
   桌面: 'Desktop',
   平板: 'Tablet',
   网页未能加载: 'The page did not load',
+  这个网页文件是空的: 'This HTML file is empty',
   未能切回这个版本: 'Could not switch back to this version',
   重新加载: 'Reload',
   看预览: 'Show preview',

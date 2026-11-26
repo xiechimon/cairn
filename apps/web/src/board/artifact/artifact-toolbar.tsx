@@ -49,7 +49,7 @@ export function ArtifactToolbar({
   return (
     <div
       data-testid="artifact-toolbar"
-      className="flex h-11 flex-none items-center gap-1 border-b border-border pr-3 pl-4"
+      className="flex h-11 min-w-0 flex-none items-center gap-1 border-b border-border pr-3 pl-4"
     >
       <DropdownMenu>
         <DropdownMenuTrigger
