@@ -257,6 +257,9 @@ const settled = (page: Page) =>
       ),
   );
 
+const memoryDialog = (page: Page) =>
+  page.locator('[data-slot="dialog-content"][aria-label="记忆"]');
+
 const memoryRow = (page: Page, title: string) =>
   page.getByRole('button', { name: `打开记忆：${title}` });
 
@@ -407,7 +410,9 @@ test('a failed delete keeps the row and says so in the confirmation', async ({ p
   await expect(confirm.getByRole('alert')).toHaveText('没有删除成功，记忆保持原样，请重试。');
   await confirm.getByRole('button', { name: '取消' }).click();
   await expect(page.getByRole('dialog', { name: '代码风格' })).toBeVisible();
+  await expect(memoryDialog(page)).toHaveAttribute('data-nested-dialog-open', '');
   await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: '代码风格' })).toBeHidden();
   await expect(memoryRow(page, '代码风格')).toBeVisible();
 });
 

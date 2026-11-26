@@ -5,7 +5,7 @@ import type {
   ProjectRecord,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
 import {
   useApiMutations,
@@ -104,6 +104,12 @@ const updatedOn = (at: number, t: TFunc) => {
   });
 };
 
+function useCloseBeforeOpen<Layer>(layer: Layer | null): Layer | null {
+  const [committed, setCommitted] = useState(layer);
+  useLayoutEffect(() => setCommitted(() => layer), [layer]);
+  return committed === layer ? layer : null;
+}
+
 export function MemoryPanel({
   live,
   teamId,
@@ -157,6 +163,10 @@ export function MemoryPanel({
         : (openProjectName ?? t('项目'));
   const layerLabel = (memory: MemoryRecord) =>
     isAutoInjected(memory.layer) ? t('核心') : t('可检索 · 不自动注入');
+
+  const dialogLayer = useCloseBeforeOpen(
+    discardConfirm ? 'discard' : open === null ? null : confirming ? 'confirm' : 'detail',
+  );
 
   const startDelete = () => {
     deleting.reset();
@@ -414,7 +424,7 @@ export function MemoryPanel({
         />
       )}
       <DialogShell
-        open={open !== null && !confirming && !discardConfirm}
+        open={dialogLayer === 'detail'}
         title={open?.title ?? ''}
         subtitle={open === null ? undefined : `${scopeLabel} · ${layerLabel(open)}`}
         initialFocus={editing === null ? detailBodyRef : editContentRef}
@@ -529,7 +539,7 @@ export function MemoryPanel({
         )}
       </DialogShell>
       <AlertDialogShell
-        open={open !== null && confirming}
+        open={dialogLayer === 'confirm'}
         title={t('删除这条记忆？')}
         ariaLabel={t('删除这条记忆')}
         finalFocus={() => {
@@ -570,7 +580,7 @@ export function MemoryPanel({
         )}
       </AlertDialogShell>
       <AlertDialogShell
-        open={discardConfirm}
+        open={dialogLayer === 'discard'}
         title={t('放弃未保存的修改？')}
         ariaLabel={t('放弃修改')}
         onClose={() => setDiscardConfirm(false)}
