@@ -18,7 +18,7 @@
     {
       "id": "positioning.merge-gate-axis",
       "date": "2026-11-01",
-      "ruling": "The semantic axis is the machine-verified, evidence-bound merge gate (ADR 0026 / 0028); a verdict counts only for the patch digest it judged.",
+      "ruling": "The semantic axis is the machine-verified, evidence-bound merge gate; a verdict counts only for the patch digest it judged.",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
       "section": "§3.1"
     },

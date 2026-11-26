@@ -27,6 +27,6 @@ The change that retires a mechanism, path or rule updates or deletes every livin
 
 | Directory | Content | Discipline |
 |---|---|---|
-| `verify/<ticket>/` | Removed from `main` on 2026-11-12 | Verify evidence for tasks cairn runs is stored as attachments on the task, and PR screenshots live on `pr-assets/<pr-number>` side branches that never merge. Older documents still name `docs/verify/<ticket>/...` paths; read those files from history: `git log --diff-filter=D --format=%H -1 -- docs/verify/<ticket>` gives the commit that removed the folder, then `git show <sha>^:docs/verify/<ticket>/<file>` |
+| `verify/<ticket>/` | Removed from `main` on 2026-11-12 | Verify evidence for tasks cairn runs is stored as attachments on the task, and verification evidence is not committed. Older documents still name `docs/verify/<ticket>/...` paths; read those files from history: `git log --diff-filter=D --format=%H -1 -- docs/verify/<ticket>` gives the commit that removed the folder, then `git show <sha>^:docs/verify/<ticket>/<file>` |
 | `design/` | Dated design records; see `docs/design/README.md` for the living exceptions | Records. Do not read them as current behaviour |
 | `research/` | Research notes archived per ticket (`r*.md`, measurement records) | Archived once written. Cite them as historical material; do not read them as current specs |

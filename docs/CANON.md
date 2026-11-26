@@ -8,7 +8,7 @@ Lanes add an entry when they land or revise a ruling, keyed `area.topic`.
 
 - **positioning.runtime-axis** (2026-09-30, §3.2) — The runtime axis follows the Multica runtime model: runtime = one computer x one CLI tool, daemon as runtime, self-hosted single data root.
 - **positioning.shape** (2026-10-24, §3.5) — One chief; the entry is chosen by the user; output that is code passes the gates; whether a PR opens is only how the code lands.
-- **positioning.merge-gate-axis** (2026-11-01, §3.1) — The semantic axis is the machine-verified, evidence-bound merge gate (ADR 0026 / 0028); a verdict counts only for the patch digest it judged.
+- **positioning.merge-gate-axis** (2026-11-01, §3.1) — The semantic axis is the machine-verified, evidence-bound merge gate; a verdict counts only for the patch digest it judged.
 - **positioning.no-team** (2026-11-14, §4) — No team features: no shared channels, roles and permissions, or team billing; another person runs their own copy.
 - **positioning.second-person** (2026-11-14, §2) — Every trade-off first asks whether a second person can run it, then whether it differentiates; replaces self-use first.
 - **positioning.thesis** (2026-11-14, §1) — cairn is a self-hosted personal assistant for people who write code: code work and personal affairs in one loop, one person and not a team.
