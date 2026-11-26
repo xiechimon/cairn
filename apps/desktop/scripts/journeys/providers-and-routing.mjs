@@ -72,7 +72,7 @@ export default async function providersAndRouting({ window, mode, evidenceDir })
   });
 
   const sources = await apiJson(window, `/api/teams/${teamId}/model-sources`);
-  const customSource = sources.sources.find((source) => source.providerId === 'anthropic-ultra');
+  const customSource = sources.sources.find((source) => source.provider === 'anthropic-ultra');
   assert.ok(customSource, 'anthropic-ultra source missing from model-sources');
   const opus = customSource.models.find((model) => model.id === 'claude-opus-5-5');
   assert.deepEqual(opus?.thinkingLevels, ['low', 'medium', 'high', 'xhigh', 'max']);
