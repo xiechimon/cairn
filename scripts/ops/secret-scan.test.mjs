@@ -44,10 +44,10 @@ function fixture(t) {
       encoding: 'utf8',
       env: { ...process.env, ...env },
     });
-  const stubbed = ({ exit, log = '' }) => {
+  const stubbed = ({ exit, log = '', drain = 'cat > /dev/null' }) => {
     writeFileSync(
       join(bin, 'gitleaks'),
-      '#!/bin/sh\ncat > /dev/null\nprintf \'%s\\n\' "$@" >> "$STUB_ARGS"\nprintf \'%s\\n\' "$STUB_LOG" >&2\nexit "$STUB_EXIT"\n',
+      `#!/bin/sh\n${drain}\nprintf '%s\\n' "$@" >> "$STUB_ARGS"\nprintf '%s\\n' "$STUB_LOG" >&2\nexit "$STUB_EXIT"\n`,
     );
     chmodSync(join(bin, 'gitleaks'), 0o755);
     return scan({
@@ -60,11 +60,24 @@ function fixture(t) {
   return { repo, base, bin, argsFile, git, addCommit, scan, stubbed };
 }
 
-test('scans exactly the commits since origin/main, redacted, with inline allows ignored', (t) => {
-  const { repo, base, argsFile, git, addCommit, stubbed } = fixture(t);
-  addCommit('lane.txt', 'lane work\n');
+function addLongMessage({ repo, git }) {
   writeFileSync(join(repo, 'long-message'), 'a line of a long commit message\n'.repeat(20_000));
   git('commit', '-q', '--allow-empty', '-F', 'long-message');
+}
+
+test('a gitleaks that exits before reading a whole commit message is red', (t) => {
+  const fx = fixture(t);
+  addLongMessage(fx);
+  const run = fx.stubbed({ exit: 0, drain: ':' });
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /not fully scanned/);
+});
+
+test('scans exactly the commits since origin/main, redacted, with inline allows ignored', (t) => {
+  const fx = fixture(t);
+  const { base, argsFile, addCommit, stubbed } = fx;
+  addCommit('lane.txt', 'lane work\n');
+  addLongMessage(fx);
   const run = stubbed({ exit: 0, log: 'INF no leaks found' });
   assert.equal(run.status, 0, run.stderr);
   const args = readFileSync(argsFile, 'utf8').split('\n');
@@ -152,7 +165,7 @@ test('a missing gitleaks is red and says how to install it', (t) => {
   assert.match(run.stderr, /not installed.*brew install gitleaks/is);
 });
 
-const realGitleaks = { skip: !hasGitleaks && 'gitleaks is not installed' };
+const realGitleaks = { skip: !hasGitleaks && !process.env.CI && 'gitleaks is not installed' };
 
 const generatedKey = () =>
   `ghp_${randomBytes(48)

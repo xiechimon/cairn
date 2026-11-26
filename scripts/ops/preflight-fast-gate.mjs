@@ -52,6 +52,7 @@ const SKIPPED = {
   'pnpm db:generate': 'rewrites files',
 };
 const SKIPPED_INLINE = new Set([
+  'Install gitleaks for the secret scan self-test (sha256-verified)',
   'Aggregate check parts',
   'Aggregate the e2e tier',
   'Conflict markers',
