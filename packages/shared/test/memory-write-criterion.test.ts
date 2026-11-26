@@ -35,6 +35,13 @@ test('the shipped exclusions hold even when said, and a lasting request is never
   expect(MEMORY_WRITE_CRITERION).not.toContain('save something, save it');
 });
 
+test('the verify note tells the agent to check the repository before relying on memory', () => {
+  expect(MEMORY_VERIFY_NOTE).toContain(
+    'check what it says is in a repository against the repository before relying on it',
+  );
+  expect(MEMORY_VERIFY_NOTE.length).toBeLessThanOrEqual(260);
+});
+
 test('the verify note keeps what the user set above the repository files', () => {
   expect(MEMORY_VERIFY_NOTE).toContain(
     'preferences and decisions the user set still apply even where its files say otherwise',
