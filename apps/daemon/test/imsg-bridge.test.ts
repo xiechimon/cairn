@@ -386,4 +386,125 @@ describe('imsg bridge', () => {
     expect(bridge.sessionCount()).toBe(0);
     bridge.stop();
   });
+
+  test('watch.overflow notification marks degraded with reason and respawns imsg rpc', async () => {
+    const bridge = await attachAndReady(fakeSpawn());
+    expect(spawned).toHaveLength(1);
+
+    spawned[0]?.notify('watch.overflow', {
+      subscription: 1,
+      resume_after_rowid: 9000,
+      reason: 'buffer_limit_exceeded',
+      terminal: true,
+    });
+
+    await waitFor(() =>
+      bodies('status').some(
+        (b) => b.kind === 'status' && b.status === 'degraded' && b.detail?.includes('overflow'),
+      ),
+    );
+    await waitFor(() => spawned.length >= 2, 400);
+    await waitFor(
+      () => bodies('status').filter((b) => b.kind === 'status' && b.status === 'ready').length >= 2,
+      400,
+    );
+    bridge.stop();
+  });
+
+  test('own echo is suppressed by returned guid and after -32001 uncertain send failure', async () => {
+    const bridge = makeBridge(
+      fakeSpawn((req, fake) => {
+        if (req.method === 'send' && req.params.text === 'uncertain') {
+          fake.respond(req.id, undefined, { code: -32001, message: 'may_have_completed' });
+          return;
+        }
+        if (req.method === 'send') {
+          fake.respond(req.id, { ok: true, guid: 'GUID-OWN-1' });
+          return;
+        }
+        fake.respond(req.id, { ok: true });
+      }),
+    );
+    bridge.handle({ type: 'im.attach', connId: 'conn-1' });
+    await waitFor(() => bodies('status').some((b) => b.kind === 'status' && b.status === 'ready'));
+
+    bridge.handle({
+      type: 'im.send',
+      connId: 'conn-1',
+      sendId: 'send-guid',
+      message: { chatKey: 'iMessage;-;+15551234', text: 'hello guid' },
+    });
+    await waitFor(() => bodies('sent').length === 1);
+
+    spawned[0]?.notify('message', {
+      subscription: 1,
+      message: {
+        id: 50,
+        guid: 'GUID-OWN-1',
+        chat_guid: 'iMessage;-;+15551234',
+        sender: '',
+        is_from_me: true,
+        text: 'hello  guid (normalized)',
+        attachments: [],
+      },
+    });
+
+    bridge.handle({
+      type: 'im.send',
+      connId: 'conn-1',
+      sendId: 'send-uncertain',
+      message: { chatKey: 'iMessage;-;+15551234', text: 'uncertain' },
+    });
+    await waitFor(() => bodies('sent').length === 2);
+
+    spawned[0]?.notify('message', {
+      subscription: 1,
+      message: {
+        id: 51,
+        chat_guid: 'iMessage;-;+15551234',
+        sender: '',
+        is_from_me: true,
+        text: 'uncertain',
+        attachments: [],
+      },
+    });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(bodies('message')).toHaveLength(0);
+    bridge.stop();
+  });
+
+  test('watch.subscribe -32002 surfaces Full Disk Access guidance and clears dead rpc ref', async () => {
+    const bridge = makeBridge(
+      fakeSpawn((req, fake) => {
+        if (req.method === 'watch.subscribe') {
+          fake.respond(req.id, undefined, { code: -32002, message: 'chat.db unreadable' });
+          return;
+        }
+        fake.respond(req.id, { ok: true });
+      }),
+    );
+    bridge.handle({ type: 'im.attach', connId: 'conn-1' });
+    await waitFor(() =>
+      bodies('status').some((b) => b.kind === 'status' && b.status === 'degraded'),
+    );
+    const degraded = bodies('status').find((b) => b.kind === 'status' && b.status === 'degraded');
+    if (degraded?.kind !== 'status') throw new Error('missing degraded status');
+    expect(degraded.detail).toContain('Full Disk Access');
+
+    bridge.handle({
+      type: 'im.send',
+      connId: 'conn-1',
+      sendId: 'send-while-down',
+      message: { chatKey: 'iMessage;-;+1', text: 'hi' },
+    });
+    await waitFor(() => bodies('sent').length === 1);
+    expect(bodies('sent')[0]).toMatchObject({
+      kind: 'sent',
+      ok: false,
+      errorKind: 'retry',
+      error: 'imsg bridge is not attached',
+    });
+    bridge.stop();
+  });
 });

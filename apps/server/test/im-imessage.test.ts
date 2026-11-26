@@ -242,4 +242,29 @@ describe('imessage bridge', () => {
     expect(stream.events).toContainEqual({ type: 'im.detach', connId });
     stream.release();
   });
+
+  test('marks connection degraded when bound machine is offline at connect or disconnects later', async () => {
+    const runner = await enrollConnectorRunner(s, 'mini', false);
+    const connId = await connectImsg(runner.machineId);
+
+    const offlineConn = s.db.select().from(imConnection).where(eq(imConnection.id, connId)).get();
+    expect(offlineConn?.status).toBe('degraded');
+    expect(offlineConn?.statusDetail).toContain('offline');
+
+    const stream = collectStream(runner.machineId);
+    expect(stream.events).toContainEqual({ type: 'im.attach', connId });
+    await postImEvent(connId, runner.token, { kind: 'status', status: 'ready' });
+    expect(s.db.select().from(imConnection).where(eq(imConnection.id, connId)).get()?.status).toBe(
+      'ready',
+    );
+
+    stream.release();
+    const afterDisconnect = s.db
+      .select()
+      .from(imConnection)
+      .where(eq(imConnection.id, connId))
+      .get();
+    expect(afterDisconnect?.status).toBe('degraded');
+    expect(afterDisconnect?.statusDetail).toContain('offline');
+  });
 });

@@ -43,6 +43,14 @@ export function createImBridge(machineHub: MachineWakeHub): ImBridge {
     }
   });
 
+  machineHub.onDisconnect((machineId) => {
+    for (const conn of conns.values()) {
+      if (conn.machineId === machineId) {
+        conn.handlers.onStatus('degraded', 'imessage bridge machine is offline');
+      }
+    }
+  });
+
   const failPending = (conn: BridgeConn, err: ImSendError): void => {
     for (const pending of conn.pending.values()) {
       clearTimeout(pending.timer);
@@ -59,7 +67,9 @@ export function createImBridge(machineHub: MachineWakeHub): ImBridge {
         conns.delete(connId);
       }
       conns.set(connId, { connId, machineId, handlers, pending: new Map() });
-      push(machineId, { type: 'im.attach', connId });
+      if (!push(machineId, { type: 'im.attach', connId })) {
+        handlers.onStatus('degraded', 'imessage bridge machine is offline');
+      }
     },
 
     unregister(connId) {

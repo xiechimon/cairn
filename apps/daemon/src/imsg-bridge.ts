@@ -161,6 +161,7 @@ interface Session {
   backoffMs: number;
   respawnTimer: ReturnType<typeof setTimeout> | null;
   recentOwn: { chatGuid: string; text: string; at: number }[];
+  recentOwnGuids: { guid: string; at: number }[];
   cards: Map<string, { buttons: BridgeButton[]; at: number }>;
 }
 
@@ -307,21 +308,31 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
     };
   };
 
+  const isOwnEcho = (session: Session, chatKey: string, msg: ImsgMessageRow): boolean => {
+    if (msg.is_from_me !== true) return false;
+    const cutoff = now() - OWN_SEND_WINDOW_MS;
+    if (typeof msg.guid === 'string' && msg.guid !== '') {
+      const ownGuid = session.recentOwnGuids.find((r) => r.guid === msg.guid && r.at >= cutoff);
+      if (ownGuid !== undefined) {
+        session.recentOwnGuids = session.recentOwnGuids.filter((r) => r !== ownGuid);
+        return true;
+      }
+    }
+    const text = msg.text ?? '';
+    const own = session.recentOwn.find(
+      (r) => r.chatGuid === chatKey && r.text === text && r.at >= cutoff,
+    );
+    if (own === undefined) return false;
+    session.recentOwn = session.recentOwn.filter((r) => r !== own);
+    return true;
+  };
+
   const onMessage = async (session: Session, msg: ImsgMessageRow): Promise<void> => {
     if (msg.type !== undefined) return;
     const chatKey = msg.chat_guid ?? '';
     if (chatKey === '') return;
+    if (isOwnEcho(session, chatKey, msg)) return;
     const text = msg.text ?? '';
-    if (msg.is_from_me === true) {
-      const cutoff = now() - OWN_SEND_WINDOW_MS;
-      const own = session.recentOwn.find(
-        (r) => r.chatGuid === chatKey && r.text === text && r.at >= cutoff,
-      );
-      if (own !== undefined) {
-        session.recentOwn = session.recentOwn.filter((r) => r !== own);
-        return;
-      }
-    }
     const action = cardAction(session, msg);
     if (action !== null) {
       post(session.connId, { kind: 'action', action });
@@ -380,6 +391,20 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
     const rpc = new ImsgRpc(
       child,
       (method, params) => {
+        if (method === 'watch.overflow' || method === 'error') {
+          const detail =
+            method === 'watch.overflow'
+              ? `imsg watch overflow (${String((params as { reason?: unknown } | undefined)?.reason ?? 'buffer_limit_exceeded')})`
+              : `imsg watch error: ${String((params as { error?: { message?: unknown } } | undefined)?.error?.message ?? 'unknown error')}`;
+          log(`imsg bridge ${detail} conn=${session.connId}`);
+          if (session.rpc === rpc) session.rpc = null;
+          rpc.kill();
+          if (session.attached && !stopped) {
+            post(session.connId, { kind: 'status', status: 'degraded', detail });
+            scheduleRespawn(session);
+          }
+          return;
+        }
         if (method !== 'message') return;
         const row = (params as { message?: ImsgMessageRow } | undefined)?.message;
         if (row === undefined) return;
@@ -409,11 +434,16 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
       post(session.connId, { kind: 'status', status: 'ready' });
     } catch (err) {
       const rpcErr = err as RpcError;
+      const detail =
+        rpcErr.code === -32002
+          ? `imsg rpc init failed (grant Full Disk Access to Cairn/Terminal): ${rpcErr.message ?? 'database unavailable'}`
+          : `imsg rpc init failed: ${rpcErr.message ?? 'unknown error'}`;
       post(session.connId, {
         kind: 'status',
         status: 'degraded',
-        detail: `imsg rpc init failed: ${rpcErr.message ?? 'unknown error'}`,
+        detail,
       });
+      if (session.rpc === rpc) session.rpc = null;
       rpc.kill();
       scheduleRespawn(session);
     }
@@ -445,6 +475,7 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
       backoffMs: RESPAWN_BASE_MS,
       respawnTimer: null,
       recentOwn: [],
+      recentOwnGuids: [],
       cards: new Map(),
     };
     sessions.set(connId, session);
@@ -483,19 +514,30 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
       });
       return;
     }
+    const ownEntry = { chatGuid: message.chatKey, text: message.text, at: now() };
+    session.recentOwn.push(ownEntry);
+    session.recentOwn = session.recentOwn.slice(-32);
     try {
-      await rpc.call('send', { chat_guid: message.chatKey, text: message.text });
+      const res = (await rpc.call('send', {
+        chat_guid: message.chatKey,
+        text: message.text,
+      })) as { guid?: unknown } | undefined;
+      if (typeof res?.guid === 'string' && res.guid !== '') {
+        session.recentOwnGuids.push({ guid: res.guid, at: now() });
+        session.recentOwnGuids = session.recentOwnGuids.slice(-32);
+      }
       if (message.buttons !== undefined) {
         session.cards.set(message.chatKey, {
           buttons: message.buttons.flat(),
           at: now(),
         });
       }
-      session.recentOwn.push({ chatGuid: message.chatKey, text: message.text, at: now() });
-      session.recentOwn = session.recentOwn.slice(-32);
       post(connId, { kind: 'sent', sendId, ok: true });
     } catch (err) {
       const rpcErr = err as RpcError;
+      if (rpcErr.code !== -32001 && rpcErr.code !== -32004) {
+        session.recentOwn = session.recentOwn.filter((r) => r !== ownEntry);
+      }
       const kind = rpcErrorKind(rpcErr);
       post(connId, {
         kind: 'sent',
