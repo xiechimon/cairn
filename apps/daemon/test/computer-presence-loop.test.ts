@@ -180,6 +180,69 @@ describe('computer presence machine wiring', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  test('a runtime change reported while the server is unreachable is logged and the daemon keeps running', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
+    onTestFinished(() => fetchSpy.mockRestore());
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', record);
+    onTestFinished(() => {
+      process.off('unhandledRejection', record);
+    });
+    const home = makeTestTempDir('computer-presence-offline-');
+    const api = new FakeMachineApi();
+    const lines: string[] = [];
+    const logger = Object.fromEntries(
+      [
+        'raw',
+        'prefixed',
+        'supervisor',
+        'machine',
+        'step',
+        'workspace',
+        'recover',
+        'wake',
+        'mcp',
+        'skills',
+        'gate',
+        'trust',
+      ].map((key) => [key, vi.fn((line: string) => lines.push(line))]),
+    ) as unknown as DaemonLogger;
+    const config = loadDaemonConfig(
+      { home, serverUrl: 'http://server', apiKey: 'test', teamId: 'team-1' },
+      {},
+    );
+    const { geminiManaged: _defaultGemini, ...offline } = offlineDaemonRuntimeOpts();
+    const handle = await runMachine({
+      config,
+      paths: statePaths(home, config.workspacesDir),
+      logger,
+      client: api,
+      backend: fakeBackend([]).backend,
+      claudeCodeAuthProbe: async () => ({ state: 'unknown', reason: 'test' }),
+      capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
+      presenceIntervalMs: 60_000,
+      idleSleepPrevention: false,
+      proxyEnv: {},
+      capEnv: {},
+      ...offline,
+      otel: null,
+    });
+    try {
+      await waitFor(() => api.onStreamEvent !== null);
+      api.presence = async () => {
+        throw new TypeError('fetch failed');
+      };
+      api.onStreamEvent?.({ type: 'runtime.update', runtime: 'gemini' });
+      await waitFor(() => lines.includes('presence failed: fetch failed'));
+      expect(unhandled).toEqual([]);
+    } finally {
+      await handle.stop();
+      await handle.done;
+      expect(releaseTestTempDir(home)).toBe(true);
+    }
+  });
+
   test('deadline closes a real stalled HTTP presence request and keeps its bearer on the machine route', async () => {
     let disconnected = false;
     let received: { url?: string; authorization?: string; body: string } | undefined;

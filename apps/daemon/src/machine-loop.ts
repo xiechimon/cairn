@@ -363,7 +363,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let claudeLogin: ClaudeLogin | null = null;
   let loginProbe: Promise<ClaudeCodeAuthProbe> | null = null;
   const claudeHome = claudeConfigHome(paths.home);
-  let sendPresenceNow: (() => Promise<void>) | null = null;
+  let announcePresence: () => void = () => {};
   const installStop = new AbortController();
   const installFetch: typeof fetch = (url, init) =>
     fetch(url, {
@@ -398,7 +398,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(opts.updateCheckIntervalMs !== undefined
         ? { checkIntervalMs: opts.updateCheckIntervalMs }
         : {}),
-      onChange: () => void sendPresenceNow?.(),
+      onChange: () => announcePresence(),
       resolveSeed: () =>
         claudeSeed === null
           ? null
@@ -534,7 +534,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(opts.updateCheckIntervalMs !== undefined
         ? { checkIntervalMs: opts.updateCheckIntervalMs }
         : {}),
-      onChange: () => void sendPresenceNow?.(),
+      onChange: () => announcePresence(),
     });
   let devinInstalling = false;
   let devinEnsured = false;
@@ -562,7 +562,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(opts.updateCheckIntervalMs !== undefined
         ? { checkIntervalMs: opts.updateCheckIntervalMs }
         : {}),
-      onChange: () => void sendPresenceNow?.(),
+      onChange: () => announcePresence(),
     });
   const managedRuntimes: Record<ManagedUpdateRuntime, ManagedRuntime> = {
     'claude-code': claudeManaged,
@@ -582,12 +582,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const phones = createPhones({
     home: paths.home,
     log: (msg) => logger.machine(msg),
-    onStale: () => void sendPresenceNow?.(),
+    onStale: () => announcePresence(),
     adbPath: platform === 'darwin' ? undefined : null,
   });
   void trackInstall(antigravityManaged.ensure())
     .then((install) => {
-      if (install !== null && sendPresenceNow !== null) return sendPresenceNow();
+      if (install !== null) announcePresence();
     })
     .catch((error: unknown) => {
       logger.machine(
@@ -1006,7 +1006,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
               devinEnsured = install !== null;
               if (install !== null) {
                 devinEnsureRetryAt = 0;
-                if (sendPresenceNow !== null) return sendPresenceNow();
+                announcePresence();
               }
             },
             (error: unknown) => {
@@ -1041,7 +1041,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
     },
   });
-  sendPresenceNow = () => presenceReporter.send();
+  announcePresence = () => presenceReporter.notify();
   const probeHarnesses = async () => {
     const claudeBin = activeClaudeBin();
     logger.machine(
@@ -1459,7 +1459,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   };
   const MAX_CONCURRENT_ANTIGRAVITY_VERIFIES = 4;
   let activeAntigravityVerifies = 0;
-  let presenceQueuedAfterVerify = false;
   const runAntigravityVerify = async (checkId: string) => {
     if (
       stopping ||
@@ -1530,14 +1529,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             `antigravity verify report failed: ${reportErr instanceof Error ? reportErr.message : String(reportErr)}`,
           ),
         );
-      if (sendPresenceNow !== null && !presenceQueuedAfterVerify) {
-        presenceQueuedAfterVerify = true;
-        void sendPresenceNow()
-          .catch(() => {})
-          .finally(() => {
-            presenceQueuedAfterVerify = false;
-          });
-      }
+      announcePresence();
     } finally {
       activeAntigravityVerifies -= 1;
     }
@@ -1638,7 +1630,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             antigravityRetryAt = 0;
             antigravityUpdateCheckAt =
               Date.now() + (opts.antigravityUpdateCheckMs ?? ANTIGRAVITY_UPDATE_CHECK_MS);
-            if (sendPresenceNow !== null) return sendPresenceNow();
+            announcePresence();
           })
           .catch((error: unknown) => {
             logger.machine(
@@ -1652,8 +1644,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       antigravityReprobeAt = now + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
       void trackInstall(antigravityManaged.ensure())
         .then((install) => {
-          if (install !== null && install.version !== currentAg.version && sendPresenceNow !== null)
-            return sendPresenceNow();
+          if (install !== null && install.version !== currentAg.version) announcePresence();
         })
         .catch((error: unknown) => {
           logger.machine(
@@ -1668,13 +1659,13 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       void antigravityManaged
         .probe()
         .then((after) => {
-          if (stopping || sendPresenceNow === null) return;
+          if (stopping) return;
           const changed =
             after === null ||
             before.authenticated !== after.authenticated ||
             before.version !== after.version ||
             JSON.stringify(before.models) !== JSON.stringify(after.models);
-          if (changed) return sendPresenceNow();
+          if (changed) announcePresence();
         })
         .catch(() => {});
     }

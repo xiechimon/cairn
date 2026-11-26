@@ -33,9 +33,12 @@ export class ComputerPresenceReporter {
   private closed = false;
 
   constructor(private readonly options: ComputerPresenceReporterOptions) {
-    this.unsubscribe = options.source?.subscribe(() => {
-      void this.send().catch((error: unknown) => options.onError?.(error));
-    });
+    this.unsubscribe = options.source?.subscribe(() => this.notify());
+  }
+
+  notify(): void {
+    if (this.closed) return;
+    void this.send().catch((error: unknown) => this.options.onError?.(error));
   }
 
   send(): Promise<void> {

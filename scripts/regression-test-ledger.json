@@ -32,6 +32,14 @@
       "file": "apps/web/e2e/providers-subscription-relogin.spec.ts",
       "testTitle": "expired Antigravity card shows primary Sign in again, starts Google sign-in, and returns healthy without reload",
       "addedAt": "2026-11-25"
+    },
+    {
+      "id": "daemon-presence-notify-offline-crash",
+      "owner": "xiechimon",
+      "regression": "The Runner daemon exited when a runtime, phone or install change was reported while the server was unreachable.",
+      "file": "apps/daemon/test/computer-presence-loop.test.ts",
+      "testTitle": "a runtime change reported while the server is unreachable is logged and the daemon keeps running",
+      "addedAt": "2026-11-26"
     }
   ]
 }
