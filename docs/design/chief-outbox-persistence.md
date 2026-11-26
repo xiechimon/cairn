@@ -64,7 +64,7 @@ A page that missed both the queued event and a cancel made elsewhere still holds
 
 ## Waiting messages follow the task's run
 
-A queued row belongs to the task's latest run. A transaction that continues the task on another run moves the rows with it (`moveQueuedMessages`): a reply that continues elsewhere, and every restart of a failed run (Retry, a Coordinator restart, an automatic retry; a new run or a reopened PR run). Creation time and insert order are unchanged, so they are handed over one per turn in the order typed. Starting the task afresh does not move them.
+A queued row belongs to the task's latest run. Two transactions that continue the task on another run move the rows with it (`moveQueuedMessages`): a message `sendBuildSteer` delivers to another run, and every restart of a failed run (Retry, a Coordinator restart, an automatic retry; a new run or a reopened PR run). Creation time and insert order are unchanged, so they are handed over one per turn in the order typed. Runs begun through `startBuilds` do not move them: the Start action, and a reply to a stopped task that begins a new run.
 
 | Case | Result |
 |---|---|
