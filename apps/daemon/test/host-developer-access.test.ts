@@ -274,6 +274,10 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
     },
   );
 
+  test.runIf(process.env.CI === 'true')('CI has fish, so the fish login path is covered', () => {
+    expect(LOGIN_SHELLS.some((shell) => shell.endsWith('/fish'))).toBe(true);
+  });
+
   test('what an earlier step left in the home cannot block or redirect the next one', async () => {
     const host = fakeHost();
     const isolated = join(host.root, 'cairn', 'homes', 'antigravity');
