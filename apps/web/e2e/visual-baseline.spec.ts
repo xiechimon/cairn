@@ -24,7 +24,7 @@ for (const surface of registry.surfaces) {
       }, theme);
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.clock.setFixedTime(FIXED_NOW);
-      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: theme });
       await page.goto(surface.url);
       await expect(page.locator(surface.ready).first()).toBeVisible();
       for (const keyword of surface.highlightedKeywords ?? []) {
