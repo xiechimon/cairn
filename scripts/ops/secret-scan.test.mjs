@@ -46,7 +46,7 @@ function fixture(t) {
   const stubbed = ({ exit, log = '' }) => {
     writeFileSync(
       join(bin, 'gitleaks'),
-      '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$STUB_ARGS"\nprintf \'%s\\n\' "$STUB_LOG" >&2\nexit "$STUB_EXIT"\n',
+      '#!/bin/sh\nprintf \'%s\\n\' "$@" >> "$STUB_ARGS"\nprintf \'%s\\n\' "$STUB_LOG" >&2\nexit "$STUB_EXIT"\n',
     );
     chmodSync(join(bin, 'gitleaks'), 0o755);
     return scan({
@@ -64,8 +64,9 @@ test('scans exactly the commits since origin/main, redacted, with inline allows 
   const run = stubbed({ exit: 0, log: 'INF no leaks found' });
   assert.equal(run.status, 0, run.stderr);
   const args = readFileSync(argsFile, 'utf8').split('\n');
-  for (const expected of ['git', '--redact', '--ignore-gitleaks-allow', `--log-opts=${base}..HEAD`])
+  for (const expected of ['git', 'stdin', '--redact', '--ignore-gitleaks-allow'])
     assert.ok(args.includes(expected), expected);
+  assert.ok(args.some((arg) => arg.startsWith('--log-opts=') && arg.endsWith(` ${base}..HEAD`)));
 });
 
 test('a finding is red and says to rotate before removing it', (t) => {
@@ -103,21 +104,111 @@ test('a missing gitleaks is red and says how to install it', (t) => {
   assert.match(run.stderr, /not installed.*brew install gitleaks/is);
 });
 
-test('the installed gitleaks refuses a generated key without printing it, and passes clean commits', {
-  skip: !hasGitleaks && 'gitleaks is not installed',
-}, (t) => {
-  const { addCommit, scan } = fixture(t);
-  addCommit('clean.txt', 'nothing to find\n');
-  const clean = scan();
-  assert.equal(clean.status, 0, clean.stderr);
+const realGitleaks = { skip: !hasGitleaks && 'gitleaks is not installed' };
 
-  const token = `ghp_${randomBytes(48)
+const generatedKey = () =>
+  `ghp_${randomBytes(48)
     .toString('base64')
     .replace(/[^A-Za-z0-9]/g, '')
     .slice(0, 36)}`;
-  addCommit('key.txt', `token = "${token}" # gitleaks:allow\n`);
-  const refused = scan();
-  assert.equal(refused.status, 1, refused.stderr);
-  assert.match(refused.stdout, /key\.txt/);
-  assert.equal(`${refused.stdout}${refused.stderr}`.includes(token), false);
+
+function refusesWithoutPrinting(run, token) {
+  assert.equal(run.status, 1, `${run.stdout}${run.stderr}`);
+  assert.equal(`${run.stdout}${run.stderr}`.includes(token), false);
+}
+
+test(
+  'the installed gitleaks refuses a generated key without printing it, and passes clean commits',
+  realGitleaks,
+  (t) => {
+    const { addCommit, scan } = fixture(t);
+    addCommit('clean.txt', 'nothing to find\n');
+    const clean = scan();
+    assert.equal(clean.status, 0, clean.stderr);
+
+    const token = generatedKey();
+    addCommit('key.txt', `token = "${token}" # gitleaks:allow\n`);
+    const refused = scan();
+    refusesWithoutPrinting(refused, token);
+    assert.match(refused.stdout, /key\.txt/);
+  },
+);
+
+const hidingPlaces = {
+  'color.ui=always': ({ git, addCommit }, line) => {
+    git('config', 'color.ui', 'always');
+    addCommit('key.txt', line);
+  },
+  'a file git treats as binary': ({ addCommit }, line) => addCommit('key.txt', `\0${line}`),
+  'a -diff attribute': ({ addCommit }, line) => {
+    addCommit('.gitattributes', '*.txt -diff\n');
+    addCommit('key.txt', line);
+  },
+  'a textconv filter': ({ git, addCommit }, line) => {
+    git('config', 'diff.mask.textconv', 'echo masked #');
+    addCommit('.gitattributes', '*.txt diff=mask\n');
+    addCommit('key.txt', line);
+  },
+  'a replace ref': ({ repo, git, addCommit }, line) => {
+    addCommit('key.txt', line);
+    writeFileSync(join(repo, 'clean-blob'), 'nothing\n');
+    git('replace', git('rev-parse', 'HEAD:key.txt'), git('hash-object', '-w', 'clean-blob'));
+  },
+  'text added only by a merge commit': ({ repo, git, addCommit }, line) => {
+    git('checkout', '-qb', 'side');
+    addCommit('side.txt', 'side\n');
+    git('checkout', '-q', 'main');
+    addCommit('mine.txt', 'mine\n');
+    git('merge', '-q', '--no-ff', '--no-commit', 'side');
+    writeFileSync(join(repo, 'key.txt'), line);
+    git('add', '--', 'key.txt');
+    git('commit', '-qm', 'merge side');
+  },
+  'a commit message': ({ git }, line) => git('commit', '-q', '--allow-empty', '-m', line),
+};
+
+for (const [place, hide] of Object.entries(hidingPlaces))
+  test(`the installed gitleaks reads a key behind ${place}`, realGitleaks, (t) => {
+    const fx = fixture(t);
+    const token = generatedKey();
+    hide(fx, `token = "${token}"\n`);
+    refusesWithoutPrinting(fx.scan(), token);
+  });
+
+test('merging origin/main does not rescan what main already holds', realGitleaks, (t) => {
+  const { base, git, addCommit, scan } = fixture(t);
+  addCommit('already-on-main.txt', `token = "${generatedKey()}"\n`);
+  git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  git('checkout', '-qb', 'lane', base);
+  addCommit('lane.txt', 'lane work\n');
+  git('merge', '-q', '--no-ff', '-m', 'merge main', 'origin/main');
+  const run = scan();
+  assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
+});
+
+test('no gitleaks configuration can switch the rules off', realGitleaks, (t) => {
+  const { addCommit, scan } = fixture(t);
+  const token = generatedKey();
+  addCommit('key.txt', `token = "${token}"\n`);
+  const silent = "title = \"x\"\n[[rules]]\nid = \"never\"\nregex = '''never-matches-zzz'''\n";
+  refusesWithoutPrinting(scan({ GITLEAKS_CONFIG_TOML: silent }), token);
+
+  addCommit('.gitleaks.toml', silent);
+  const configured = scan();
+  assert.equal(configured.status, 2);
+  assert.match(configured.stderr, /\.gitleaks\.toml.*\.gitleaksignore/s);
+});
+
+test('a merge with more than two parents is red, because its own text is not shown', (t) => {
+  const { base, git, addCommit, stubbed } = fixture(t);
+  for (const branch of ['one', 'two']) {
+    git('checkout', '-qb', branch, base);
+    addCommit(`${branch}.txt`, `${branch}\n`);
+  }
+  git('checkout', '-q', 'main');
+  addCommit('mine.txt', 'mine\n');
+  git('merge', '-q', '--no-ff', '-m', 'octopus', 'one', 'two');
+  const run = stubbed({ exit: 0 });
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /more than two parents/);
 });
