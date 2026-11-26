@@ -1,5 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import * as gitModule from '../src/git.js';
@@ -10,6 +11,7 @@ const identity = { name: 'local-merge-test', email: 'merge@cairn.local' };
 const roots: string[] = [];
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   for (const root of roots.splice(0)) releaseTestTempDir(root);
 });
 
@@ -60,6 +62,73 @@ test('clean default checkout advances by exactly one squash commit', async () =>
   expect(await f.git(['status', '--porcelain'])).toBe('');
   expect(await f.git(['log', '-1', '--format=%B'])).toBe(f.command.message);
   expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual(result);
+});
+
+function useGitWithoutSymrefCommands() {
+  const bin = makeTestTempDir('local-merge-old-git-');
+  roots.push(bin);
+  const realGit = execFileSync('/bin/sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+  writeFileSync(
+    join(bin, 'git'),
+    [
+      '#!/bin/sh',
+      'case " $* " in',
+      '  *" update-ref "*" --stdin "*)',
+      '    IFS= read -r first',
+      '    IFS= read -r second',
+      '    case "$second" in',
+      '      symref-*) echo "fatal: unknown command: $second" >&2; exit 128 ;;',
+      '    esac',
+      `    { printf '%s\\n%s\\n' "$first" "$second"; exec cat; } | '${realGit}' "$@"`,
+      '    ;;',
+      `  *) exec '${realGit}' "$@" ;;`,
+      'esac',
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  vi.stubEnv('PATH', `${bin}${delimiter}${process.env.PATH}`);
+}
+
+test('a git without symref commands lands beside another checked-out branch', async () => {
+  const f = await fixture();
+  await f.git(['checkout', '-b', 'user']);
+  useGitWithoutSymrefCommands();
+  expect((await landLocalMerge(f.dir, f.command, async () => null)).outcome).toBe('merged');
+  expect(await f.git(['rev-parse', 'main^'])).toBe(f.base);
+  expect(await f.git(['branch', '--show-current'])).toBe('user');
+});
+
+test('the user cannot switch branches while the landing holds the ref transaction', async () => {
+  const f = await fixture();
+  await f.git(['branch', 'elsewhere']);
+  await f.git(['checkout', '-b', 'user']);
+  const original = gitModule.landGitSquash;
+  let switched: string | undefined;
+  vi.spyOn(gitModule, 'landGitSquash').mockImplementation(async (input) => {
+    const currentBranch = gitModule.gitPrim.currentBranch;
+    vi.spyOn(gitModule.gitPrim, 'currentBranch').mockImplementation(async (dir) => {
+      switched = await f.git(['checkout', 'elsewhere']).then(
+        () => 'switched',
+        () => 'refused',
+      );
+      return currentBranch(dir);
+    });
+    return original(input);
+  });
+  expect((await landLocalMerge(f.dir, f.command, async () => null)).outcome).toBe('merged');
+  expect(switched).toBe('refused');
+});
+
+test('a checked-out branch with no commit yet holds because HEAD cannot be pinned', async () => {
+  const f = await fixture();
+  await f.git(['checkout', '--orphan', 'fresh']);
+  await f.git(['rm', '-r', '-f', '--quiet', '.']);
+  expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual({
+    outcome: 'held',
+    reason: 'worktree-dirty',
+  });
+  expect(await f.git(['rev-parse', 'main'])).toBe(f.base);
 });
 
 test('another clean branch keeps its branch, index and files unchanged', async () => {

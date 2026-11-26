@@ -344,6 +344,15 @@ export async function landGitSquash(input: {
   receipt: string;
 }): Promise<'landed' | 'stale' | 'dirty'> {
   const { dir, branch, currentBranch, base, commit, receipt } = input;
+  let headPin = '';
+  if (currentBranch !== branch) {
+    const tip = await runGit(['rev-parse', '--verify', '--quiet', 'HEAD'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    if (tip.code !== 0) return 'dirty';
+    headPin = `verify HEAD ${tip.stdout.trim()}\n`;
+  }
   return new Promise((resolve, reject) => {
     const child = spawn('git', ['update-ref', '--no-deref', '--stdin'], {
       cwd: dir,
@@ -390,7 +399,7 @@ export async function landGitSquash(input: {
       })();
     });
     child.stdin.write(
-      `start\n${currentBranch === branch ? '' : `symref-verify HEAD refs/heads/${currentBranch}\n`}update refs/heads/${branch} ${commit} ${base}\nupdate ${receipt} ${commit}\nprepare\n`,
+      `start\n${headPin}update refs/heads/${branch} ${commit} ${base}\nupdate ${receipt} ${commit}\nprepare\n`,
     );
   });
 }
