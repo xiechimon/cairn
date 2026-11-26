@@ -1,6 +1,6 @@
 # Cairn
 
-> Cairn is an open-source, self-hosted personal assistant for people who write code. Agents run on your own machines using your model subscriptions or API keys. Each person runs their own copy; there is no hosted service.
+> Cairn is an open-source, self-hosted personal assistant for people who write code. Agents run on your own machines using your model subscriptions or API keys. Each person runs their own copy; today there is no hosted service. An official paid hosted service, Cairn Cloud, is planned and not available yet. Self-hosting stays free with full functionality.
 
 - License: Apache-2.0
 - Install: `npx @xiechimon/cairn` (Node.js 22 or 24; Linux or macOS server, Windows with a pairing step)

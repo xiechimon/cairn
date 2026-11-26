@@ -55,7 +55,7 @@ export const copy = {
       items: [
         {
           title: '用你自己的订阅',
-          body: 'Claude Code、Codex，或任何服务商的 API key（包括 Google 的 Gemini）。Cairn 不转售算力。',
+          body: 'Claude Code、Codex，或任何服务商的 API key（包括 Google 的 Gemini）。Cairn 目前不转售算力。',
         },
         {
           title: '你的机器，你的数据',
@@ -94,13 +94,13 @@ export const copy = {
         { text: '给团队共用的工具，有共享频道、角色和账单', alt: 'Amp Spaces', href: 'https://ampcode.com/docs/spaces' },
         { text: '只是更好用的界面，自己驱动 Claude Code 或 Codex', alt: 'T3 Code', href: 'https://github.com/pingdotgg/t3code' },
         { text: '把家安在聊天软件里的助理，比如 Telegram、WhatsApp', alt: 'OpenClaw', href: 'https://github.com/openclaw/openclaw' },
-        { text: '托管服务，什么都不用装、不用维护', alt: null, href: null },
+        { text: '现在就能用、不用安装也不用维护的托管服务', alt: null, href: null },
       ],
       altPrefix: '可以看看',
     },
     selling: {
       title: '“那你们卖什么？”',
-      body: '什么都不卖。全部代码 Apache-2.0，没有功能分级；只有评测任务集里一个私有、轮换的留出子集不公开。没有托管的控制面，也不转售算力：Cairn 跑在你的机器上，用你的订阅。',
+      body: '目前什么都不卖。全部代码 Apache-2.0，没有功能分级；只有评测任务集里一个私有、轮换的留出子集不公开。目前没有托管服务，也不转售算力：Cairn 跑在你的机器上，用你的订阅。方向：计划推出官方付费托管服务 Cairn Cloud，现在还不能用。自托管保持免费、功能完整。',
     },
     install: {
       title: '三步跑起来',
@@ -178,7 +178,7 @@ export const copy = {
       items: [
         {
           title: 'Your own subscriptions',
-          body: "Claude Code, Codex, or an API key from any provider, Google's Gemini included. Cairn never resells compute.",
+          body: "Claude Code, Codex, or an API key from any provider, Google's Gemini included. Today Cairn resells no compute.",
         },
         {
           title: 'Your machines, your data',
@@ -217,13 +217,13 @@ export const copy = {
         { text: 'a tool a team shares, with shared channels, roles and billing', alt: 'Amp Spaces', href: 'https://ampcode.com/docs/spaces' },
         { text: 'only a better interface for driving Claude Code or Codex yourself', alt: 'T3 Code', href: 'https://github.com/pingdotgg/t3code' },
         { text: 'an assistant whose home is a chat app, such as Telegram or WhatsApp', alt: 'OpenClaw', href: 'https://github.com/openclaw/openclaw' },
-        { text: 'a hosted service with nothing to install or keep running', alt: null, href: null },
+        { text: 'today, a hosted service with nothing to install or keep running', alt: null, href: null },
       ],
       altPrefix: 'Try',
     },
     selling: {
       title: '“Wait, what are you selling?”',
-      body: 'Nothing. All code is Apache-2.0 with no feature gating; only a private, rotating holdout subset of the eval task set stays unpublished. There is no hosted control plane and no resold compute: Cairn runs on your machines with your subscriptions.',
+      body: 'Today, nothing. All code is Apache-2.0 with no feature gating; only a private, rotating holdout subset of the eval task set stays unpublished. There is no hosted service and no resold compute: Cairn runs on your machines with your subscriptions. Direction: an official paid hosted service, Cairn Cloud, is planned and not available yet. Self-hosting stays free with full functionality.',
     },
     install: {
       title: 'Running in three steps',

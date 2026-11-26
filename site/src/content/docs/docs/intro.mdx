@@ -19,7 +19,7 @@ Cairn is for one person. You run your own copy; someone else who wants it runs t
 |---|---|---|
 | **Server** | The web app you open in a browser, the Coordinator and the database. One per person. | Any machine you browse from, or an always-on host. Data lives in `~/.cairn`. |
 | **Runner** | The `cairn` daemon that claims work and runs threads, each in its own git worktree. | Every machine where agents should work. The server's machine can be a Runner too. |
-| **Model source** | Your own subscription or API key: Claude Code, ChatGPT / Codex, or an API key from a provider. | Connect your ChatGPT subscription with Cairn's device login, or add a subscription token or API key under **Settings → Model**. ChatGPT/Codex tasks use bundled pi. Cairn never resells compute. |
+| **Model source** | Your own subscription or API key: Claude Code, ChatGPT / Codex, or an API key from a provider. | Connect your ChatGPT subscription with Cairn's device login, or add a subscription token or API key under **Settings → Model**. ChatGPT/Codex tasks use bundled pi. Today Cairn resells no compute. |
 
 You need all three before the Coordinator can answer. The pages below walk through them in order.
 
@@ -42,4 +42,4 @@ You need all three before the Coordinator can answer. The pages below walk throu
 - a tool a team shares, with shared channels, roles and billing ([Amp Spaces](https://ampcode.com/docs/spaces) or [Multica](https://github.com/multica-ai/multica));
 - only a better interface for driving Claude Code or Codex yourself ([T3 Code](https://github.com/pingdotgg/t3code));
 - an assistant that lives in your chat apps ([OpenClaw](https://github.com/openclaw/openclaw) or [Hermes Agent](https://github.com/NousResearch/hermes-agent));
-- a hosted service with nothing to install or keep running.
+- today, a hosted service with nothing to install or keep running.
