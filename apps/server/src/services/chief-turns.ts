@@ -569,12 +569,13 @@ export function stopChiefTurn(
   threadId: string,
 ): { delegated: boolean } {
   const thread = requireThread(deps.db, teamId, threadId);
-  const head = liveChiefSteps(deps.db, threadId).find((row) => row.status === 'claimed');
+  const live = liveChiefSteps(deps.db, threadId);
+  const head = live.find((row) => row.status === 'claimed');
   if (head === undefined) {
     throw new HttpError(
       409,
       'no chief turn in flight (Coordinator 当前没有在回复)',
-      NOTHING_TO_STOP,
+      live.length === 0 ? NOTHING_TO_STOP : undefined,
     );
   }
   return stopClaimedChiefStep(deps, thread, head, nowMs());

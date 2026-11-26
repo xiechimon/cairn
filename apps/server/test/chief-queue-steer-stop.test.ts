@@ -620,8 +620,18 @@ describe('stop (T5)', () => {
     await w.done(running!.step.id, { status: 'success' });
     const refused = await w.stop();
     expect(refused.status).toBe(409);
-    expect(await refused.json()).toMatchObject({ reason: 'nothing-to-stop' });
+    expect(await refused.json()).toStrictEqual({ error: expect.any(String) });
     expect(w.stepRow(queued)?.status).toBe('pending');
+  });
+
+  test('stop after the only turn ended says there is nothing to stop', async () => {
+    const w = await setupWorld();
+    await w.send('第一句');
+    const running = await w.claim();
+    await w.done(running!.step.id, { status: 'success' });
+    const refused = await w.stop();
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ reason: 'nothing-to-stop' });
   });
 
   test('stop on a turn whose machine went silent ends it right away', async () => {
