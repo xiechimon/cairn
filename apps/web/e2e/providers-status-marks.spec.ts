@@ -72,7 +72,9 @@ for (const width of [1440, 390]) {
       const list = page.getByTestId('provider-list');
       const row = (id: string) => list.locator(`[data-instance-id="${id}"]`);
       await row('provider:failed').getByRole('button').first().click();
-      await page.getByTestId('provider-editor').getByRole('button', { name: '测试 current-model' }).click();
+      const editor = page.getByTestId('provider-editor');
+      await expect(editor.getByRole('heading', { name: 'Team failed' })).toBeVisible();
+      await editor.getByRole('button', { name: '测试 current-model' }).click();
       await expect(page.getByTestId('model-test-result')).toHaveAttribute('data-phase', 'failed');
       await page.keyboard.press('Escape');
       await row('subscription:weekly').getByRole('button').first().click();
