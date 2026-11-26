@@ -76,6 +76,15 @@ export function realDirectory(home: string, relative: string): string {
   return current;
 }
 
+export function unlinkedAgentHome(home: string): string {
+  if (lstatOrNull(home)?.isSymbolicLink()) {
+    throw new Error(
+      `The agent home ${home} is a link. Remove the link so the agent gets its own folder.`,
+    );
+  }
+  return home;
+}
+
 function clearNonLink(path: string): void {
   const stat = lstatOrNull(path);
   if (stat !== null && !stat.isSymbolicLink()) rmSync(path, { recursive: true, force: true });
@@ -184,7 +193,9 @@ export function prepareAntigravityHome(input: {
   realHome: string;
   apiKey: boolean;
 }): string {
-  const home = agentHomeDir(input.cairnHome, input.apiKey ? 'antigravity-api-key' : 'antigravity');
+  const home = unlinkedAgentHome(
+    agentHomeDir(input.cairnHome, input.apiKey ? 'antigravity-api-key' : 'antigravity'),
+  );
   mkdirSync(home, { recursive: true, mode: 0o700 });
   linkCredentials(home, input.realHome, input.apiKey ? [] : ANTIGRAVITY_CREDENTIAL_FILES);
   if (!input.apiKey) materializeHostAntigravityOAuthTokens(home, input.realHome);
@@ -281,7 +292,7 @@ export function writeAntigravityAuthSettings(
 }
 
 export function prepareGeminiHome(input: { cairnHome: string; realHome: string }): string {
-  const home = agentHomeDir(input.cairnHome, 'gemini');
+  const home = unlinkedAgentHome(agentHomeDir(input.cairnHome, 'gemini'));
   mkdirSync(home, { recursive: true, mode: 0o700 });
   linkCredentials(home, input.realHome, GEMINI_CREDENTIAL_FILES);
   const settingsFile = '.gemini/settings.json';

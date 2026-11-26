@@ -9,7 +9,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { prepareStepEnv, type StepEnvInput } from '../src/step-env.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -249,6 +249,30 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
       expect(readFileSync(kept, 'utf8')).toBe('export CAIRN_HOST_PROFILE=1\n');
     });
   });
+
+  test.each([
+    ['antigravity', '.gemini/antigravity-cli/antigravity-oauth-token'],
+    ['gemini', '.gemini/oauth_creds.json'],
+    ['devin', '.credentials'],
+  ])(
+    'a %s home linked to the user home is refused and nothing is overwritten',
+    async (name, file) => {
+      const host = fakeHost();
+      const homes = join(host.root, 'cairn', 'homes');
+      mkdirSync(homes, { recursive: true });
+      symlinkSync(host.home, join(homes, name));
+      mkdirSync(dirname(join(host.home, file)), { recursive: true });
+      writeFileSync(join(host.home, file), '{"mine":true}');
+      writeFileSync(join(host.home, '.profile'), 'export MINE=1\n');
+      const patch = {
+        runtimeId: name,
+        ...(name === 'devin' ? { devinHome: join(homes, name) } : {}),
+      } as Partial<StepEnvInput>;
+      await expect(withStep(host, patch, () => {})).rejects.toThrow(/is a link/);
+      expect(readFileSync(join(host.home, file), 'utf8')).toBe('{"mine":true}');
+      expect(readFileSync(join(host.home, '.profile'), 'utf8')).toBe('export MINE=1\n');
+    },
+  );
 
   test('what an earlier step left in the home cannot block or redirect the next one', async () => {
     const host = fakeHost();

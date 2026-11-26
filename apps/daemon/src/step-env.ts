@@ -8,6 +8,7 @@ import {
   claudeConfigDir,
   prepareAntigravityHome,
   prepareGeminiHome,
+  unlinkedAgentHome,
   writeAntigravityOAuthCredential,
 } from './agent-config.js';
 import { developerAccessEnv, HOST_TOOLS_DIR_VAR } from './developer-access.js';
@@ -181,7 +182,7 @@ function isolatedConfigEnv(input: StepEnvInput): Record<string, string> {
     case 'claude-code':
       return { CLAUDE_CONFIG_DIR: claudeConfigDir(cairnHome) };
     case 'devin':
-      return input.devinHome === undefined ? {} : { HOME: input.devinHome };
+      return input.devinHome === undefined ? {} : { HOME: unlinkedAgentHome(input.devinHome) };
     case 'antigravity':
       return {
         HOME: prepareAntigravityHome({
