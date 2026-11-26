@@ -70,16 +70,41 @@ export interface Extent {
 function relocate(
   comment: DesignCommentRecord,
   versionId: string | undefined,
-  extent: Extent,
+  findText: Extent['findText'],
 ): DesignCommentRecord | null {
   const anchor = comment.anchor;
   if (anchor?.type !== 'region' || comment.text === '' || comment.versionId === versionId)
     return comment;
-  if (extent.findText === undefined) return comment;
-  const hit = extent.findText(comment.text);
+  if (findText === undefined) return comment;
+  const hit = findText(comment.text);
   return hit === null
     ? null
     : { ...comment, anchor: { ...anchor, page: hit.page, rect: hit.rect } };
+}
+
+function sameSet(a: ReadonlySet<string> | undefined, b: ReadonlySet<string> | undefined): boolean {
+  if (a === b) return true;
+  if (a === undefined || b === undefined || a.size !== b.size) return false;
+  for (const item of a) if (!b.has(item)) return false;
+  return true;
+}
+
+function mergeExtent(current: Extent, next: Extent): Extent {
+  let changed = false;
+  for (const key of Object.keys(next) as Array<keyof Extent>) {
+    if (key === 'lostElements') {
+      if (!sameSet(current.lostElements, next.lostElements)) {
+        changed = true;
+        break;
+      }
+      continue;
+    }
+    if (current[key] !== next[key]) {
+      changed = true;
+      break;
+    }
+  }
+  return changed ? { ...current, ...next } : current;
 }
 
 interface CommentLayer {
@@ -263,19 +288,20 @@ export function useFileComments({
           },
         };
   const report = useCallback(
-    (next: Extent) => setExtent((current) => ({ ...current, ...next })),
+    (next: Extent) => setExtent((current) => mergeExtent(current, next)),
     [],
   );
+  const findText = extent.findText;
   const placed = useMemo(() => {
     const lost = new Set<string>();
     const shown: DesignCommentRecord[] = [];
     for (const comment of active) {
-      const moved = relocate(comment, versionId, extent);
+      const moved = relocate(comment, versionId, findText);
       if (moved === null) lost.add(comment.id);
       else shown.push(moved);
     }
     return { shown, lost, byId: new Map(shown.map((comment) => [comment.id, comment])) };
-  }, [active, versionId, extent]);
+  }, [active, versionId, findText]);
   const resolved = useMemo<Extent>(
     () => ({
       ...extent,

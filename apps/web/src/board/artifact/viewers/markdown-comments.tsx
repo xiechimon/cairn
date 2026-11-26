@@ -21,6 +21,17 @@ function blockText(element: Element): string {
   return (element.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
+function samePlaced(a: readonly Placed[], b: readonly Placed[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every(
+    (item, index) =>
+      item.id === b[index]?.id &&
+      item.pin === b[index]?.pin &&
+      item.status === b[index]?.status &&
+      item.top === b[index]?.top,
+  );
+}
+
 export function MarkdownComments({
   text,
   header,
@@ -79,7 +90,7 @@ export function MarkdownComments({
       }
       next.push({ id: comment.id, pin: comment.pin, status: comment.status, top: block.offsetTop });
     }
-    setPlaced(next);
+    setPlaced((current) => (samePlaced(current, next) ? current : next));
     report?.({ lostElements: lost });
   }, [article, comments, report, text]);
   return (

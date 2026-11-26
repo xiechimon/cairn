@@ -114,6 +114,13 @@ const FILES: Record<string, FileSpec> = {
     type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     body: hostileDocx(),
   },
+  report: {
+    id: 'att-report',
+    fileName: 'report.md',
+    kind: 'document',
+    type: 'text/markdown',
+    body: '# 调研结论\n\n第一段用于核实简历条目。\n\n第二段列出修改建议。\n',
+  },
 };
 
 type Comment = Record<string, unknown> & { id: string; pin: number; status: string };
@@ -399,4 +406,57 @@ test('a Word file shows its text and links but runs nothing it carries', async (
   await expect(docx.locator('iframe')).toHaveCount(0);
   await expect(docx.locator('a[href^="javascript:"]')).toHaveCount(0);
   expect(await page.evaluate(() => Reflect.get(window, '__docxChunk'))).toBeUndefined();
+});
+
+test('a versioned markdown document opens without crashing, lists versions, and accepts block comments', async ({
+  page,
+}) => {
+  const staleMarkdownComment: Comment = {
+    id: 'cmt-md-1',
+    todoId: FILE_TASK.id,
+    fileName: 'report.md',
+    versionId: 'ver-1',
+    versionSeq: 1,
+    pin: 1,
+    viewport: 'desktop',
+    note: '补充更多量化指标',
+    markAttachmentId: null,
+    status: 'sent',
+    messageId: 'm1',
+    anchor: null,
+    sentAt: Date.now() - 120_000,
+    handledSeq: 2,
+    elementId: '',
+    selector: ':scope > :nth-child(9)',
+    label: 'p',
+    text: '已删除的旧段落',
+    htmlHint: '',
+    position: { x: 0, y: 0, width: 0, height: 0 },
+    style: null,
+    createdAt: Date.now() - 180_000,
+    updatedAt: Date.now() - 120_000,
+  };
+  const { panel, state } = await openFile(page, FILES.report as FileSpec, [staleMarkdownComment]);
+  const md = panel.getByTestId('artifact-markdown');
+  await expect(md).toContainText('第一段用于核实简历条目。');
+  await expect(page.getByTestId('error-boundary')).toHaveCount(0);
+  await panel.getByTestId('artifact-history-toggle').click();
+  const history = panel.getByTestId('artifact-history');
+  await expect(history).toContainText('第 2 版');
+  await expect(history).toContainText('第 1 版');
+  await history.getByTestId('artifact-history-close').click();
+  await expect(history).toHaveCount(0);
+
+  await panel.getByTestId('artifact-comment-toggle').click();
+  const staleRow = panel.locator('[data-testid="design-comment-row"][data-pin="1"]');
+  await expect(staleRow.getByTestId('design-comment-state')).toHaveText('已失效');
+
+  await md.getByText('第一段用于核实简历条目。').click();
+  const composer = panel.getByTestId('artifact-comment-composer');
+  await composer.getByTestId('artifact-comment-note').fill('保留这一段核心结论');
+  await composer.getByTestId('artifact-comment-save').click();
+  await expect(composer).toHaveCount(0);
+  expect(state.writes).toEqual(['create null']);
+  await expect(md.locator('[data-testid="design-pin"][data-pin="2"]')).toHaveCount(1);
+  await expect(panel.getByTestId('artifact-comment-count')).toHaveText('2');
 });
