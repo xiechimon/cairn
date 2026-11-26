@@ -1,6 +1,6 @@
 # docs/research/
 
-Research notes archived per ticket. Once written they are not maintained; cite them as history, not as current rules (the current rules are indexed in `docs/README.md`). ADR 0015 covers `docs/verify/` only, not this directory.
+> **Records, not current behaviour.** Each note was true on its date and is not maintained. Cite it as history; current rules are in the living documents listed in [`docs/README.md`](../README.md).
 
 The notes and captures from the early study of todos.dev (the r1 to r9 series and their `assets/r*/` folders) were removed from the working tree. They remain in git history at `e95b775`; read one with `git show e95b775:docs/research/<file>`.
 
