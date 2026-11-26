@@ -236,6 +236,20 @@ describe.skipIf(process.platform === 'win32')('developer access under an isolate
     },
   );
 
+  test('bash profiles an earlier step left behind do not hide the host sign-in', async () => {
+    const host = fakeHost();
+    const isolated = join(host.root, 'cairn', 'homes', 'antigravity');
+    mkdirSync(isolated, { recursive: true });
+    const kept = join(host.home, '.bash_profile');
+    writeFileSync(kept, 'export CAIRN_HOST_PROFILE=1\n');
+    symlinkSync(kept, join(isolated, '.bash_profile'));
+    writeFileSync(join(isolated, '.bash_login'), 'export CAIRN_LEFTOVER=1\n');
+    await withStep(host, { runtimeId: 'antigravity' }, (env) => {
+      expect(loginShellPassword(env, '/bin/bash')).toContain('password=host-secret');
+      expect(readFileSync(kept, 'utf8')).toBe('export CAIRN_HOST_PROFILE=1\n');
+    });
+  });
+
   test('what an earlier step left in the home cannot block or redirect the next one', async () => {
     const host = fakeHost();
     const isolated = join(host.root, 'cairn', 'homes', 'antigravity');

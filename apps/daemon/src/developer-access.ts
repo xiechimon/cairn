@@ -29,6 +29,7 @@ const LOGIN_PROFILES = [
   ['.zprofile', POSIX_PROFILE],
   ['.config/fish/config.fish', FISH_PROFILE],
 ] as const;
+const PROFILES_BASH_READS_FIRST = ['.bash_profile', '.bash_login'] as const;
 
 function shellQuoted(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
@@ -115,6 +116,9 @@ export function developerAccessEnv(input: {
     if (executable === undefined) continue;
     const script = hostToolScript(executable, stepValues, hostValues);
     replaceFile(join(toolsDir, name), script, 0o700);
+  }
+  for (const name of PROFILES_BASH_READS_FIRST) {
+    rmSync(join(input.isolatedHome, name), { recursive: true, force: true });
   }
   for (const [relative, content] of LOGIN_PROFILES) {
     writeLoginProfile(input.isolatedHome, relative, content);
