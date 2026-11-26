@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import {
   createWriteStream,
@@ -159,12 +159,18 @@ async function signInToRemote(window, token) {
     .waitFor({ state: 'detached', timeout: 30_000 });
 }
 
+function disposableCopy() {
+  const copy = join(mkdtempSync(join(tmpdir(), 'cairn-journey-app-')), 'Cairn.app');
+  execFileSync('/usr/bin/ditto', [appRoot, copy]);
+  return realpathSync(copy);
+}
+
 async function launch(userData) {
   const home = mkdtempSync(join(tmpdir(), 'cairn-journey-home-'));
   const env = { ...process.env, HOME: home, CAIRN_SMOKE_ISOLATED_SESSION: '1' };
   delete env.CAIRN_HOME;
   const app = await electron.launch({
-    executablePath: join(appRoot, 'Contents', 'MacOS', 'Cairn'),
+    executablePath: join(disposableCopy(), 'Contents', 'MacOS', 'Cairn'),
     args: [`--user-data-dir=${userData}`],
     timeout: 120_000,
     env,

@@ -15,6 +15,7 @@
 | A packaged-app workflow stops running the journeys | Red: `desktop-mac.yml` and `desktop-release.yml` must call `apps/desktop/scripts/packaged-journey.mjs`; the runner walks every registered journey in each of its modes, so no per-workflow case list can drift | registry validation |
 | The remote walk silently runs against the app's own server | The walk fails unless the window origin is the seeded remote server | packaged run |
 | The remote server asks the app to sign in | The runner gives the scratch server its own access token and enters it in the app's access-token form before the walk, then refuses the pairing request the sign-in screen itself created; without that the walk fails on the sign-in screen | packaged run |
+| The app under test installs the published release over itself (an unreleased build reports a lower version) | Each walk launches its own copy, and a workflow that walks the build output after `pnpm smoke` is red: `desktop-mac` walks first | `desktop-mac` run 45758615586 walked the published release and is red on a layout the build had fixed; `6f5c86d50` is red in the gate |
 | A journey touches the real user home | Both modes run with a scratch `HOME` and no inherited `CAIRN_HOME` | packaged run |
 | Several features are uncovered | All are reported at once; one journey covers several only when it drives each | gate output |
 | Escape hatch | None. A new feature, or one taken off the baseline, carries its walk in the same change | — |

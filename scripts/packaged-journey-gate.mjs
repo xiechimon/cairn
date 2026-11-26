@@ -12,6 +12,8 @@ const BASELINE = '.claude/skills/verify-cairn/packaged-journey-baseline.json';
 const MODES = ['local-server', 'remote-server'];
 const JOURNEY_DIR = 'apps/desktop/scripts/journeys';
 const RUNNER_CALL = 'scripts/packaged-journey.mjs';
+const BUILT_APP_WALK = `${RUNNER_CALL} release/mac-arm64/Cairn.app`;
+const LIVE_SMOKE_STEP = 'run: pnpm smoke';
 const PACKAGED_APP_WORKFLOWS = [
   '.github/workflows/desktop-mac.yml',
   '.github/workflows/desktop-release.yml',
@@ -103,8 +105,17 @@ function validateRegistry(registry, features, read) {
     }
   }
   for (const workflow of PACKAGED_APP_WORKFLOWS) {
-    if (!read(workflow)?.includes(RUNNER_CALL))
+    const text = read(workflow);
+    if (!text?.includes(RUNNER_CALL)) {
       errors.push(`${workflow} does not run ${RUNNER_CALL}, so registered journeys never walk`);
+      continue;
+    }
+    const smoke = text.indexOf(LIVE_SMOKE_STEP);
+    if (smoke !== -1 && text.indexOf(BUILT_APP_WALK) > smoke) {
+      errors.push(
+        `${workflow} walks the built app after pnpm smoke, which can install the published release over it`,
+      );
+    }
   }
   return { errors, coverage };
 }

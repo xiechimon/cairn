@@ -35,7 +35,14 @@ const REAL_WALK = `export default async ({ window }) => {
 };
 `;
 
-function run({ walk, claims = [], baseline, previousBaseline = null, features = FEATURES }) {
+function run({
+  walk,
+  claims = [],
+  baseline,
+  previousBaseline = null,
+  features = FEATURES,
+  desktopMac = RUNNER,
+}) {
   const journeys =
     walk === undefined
       ? {}
@@ -45,7 +52,7 @@ function run({ walk, claims = [], baseline, previousBaseline = null, features = 
     [REGISTRY]: JSON.stringify({ journeys }),
     [BASELINE]: JSON.stringify({ features: baseline }),
     [WALK]: walk ?? null,
-    '.github/workflows/desktop-mac.yml': RUNNER,
+    '.github/workflows/desktop-mac.yml': desktopMac,
     '.github/workflows/desktop-release.yml': RUNNER,
   };
   return evaluate({ read: (path) => files[path] ?? null, previousBaseline }).errors.join('\n');
@@ -101,4 +108,14 @@ test('a walk with no UI action and no assertion is refused', () => {
   const errors = run({ walk, claims: ['providers'], baseline: ['step-claim'] });
   assert.match(errors, /probe\.mjs performs no UI action/);
   assert.match(errors, /probe\.mjs asserts nothing/);
+});
+
+test('walking the built app after the live smoke launched it is red', () => {
+  const built = `${RUNNER} release/mac-arm64/Cairn.app`;
+  const baseline = ['providers', 'step-claim'];
+  assert.match(
+    run({ baseline, desktopMac: `run: pnpm smoke\n${built}` }),
+    /desktop-mac\.yml walks the built app after pnpm smoke/,
+  );
+  assert.equal(run({ baseline, desktopMac: `${built}\nrun: pnpm smoke` }), '');
 });

@@ -144,12 +144,6 @@ jobs:
           node scripts/check-runner-claude.mjs release/mac-arm64/Cairn.app/Contents/Resources/runner darwin arm64
           node scripts/check-virtual-store.mjs release/mac-arm64/Cairn.app/Contents/Resources/runner release/mac-arm64/Cairn.app/Contents/Resources/server
 
-      - name: Launch the packaged app and check the owner sign-in
-        working-directory: apps/desktop
-        env:
-          CAIRN_SMOKE_ISOLATED_SESSION: '1'
-        run: pnpm smoke
-
       - name: Run packaged feature journeys in local and remote server modes
         working-directory: apps/desktop
         env:
@@ -164,6 +158,12 @@ jobs:
           path: apps/desktop/release/packaged-journeys/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Launch the packaged app and check the owner sign-in
+        working-directory: apps/desktop
+        env:
+          CAIRN_SMOKE_ISOLATED_SESSION: '1'
+        run: pnpm smoke
 
       - name: Upload the DMG unzipped
         if: always()
