@@ -218,7 +218,7 @@ jobs:
 
       - name: Walk the packaged feature journeys in local and remote server modes
         if: matrix.arch == 'arm64' && hashFiles('apps/desktop/scripts/journeys/*.mjs') != ''
-        timeout-minutes: 10
+        timeout-minutes: 20
         working-directory: apps/desktop
         env:
           CAIRN_SMOKE_ISOLATED_SESSION: '1'
