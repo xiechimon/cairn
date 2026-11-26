@@ -2,7 +2,7 @@
 
 > Kept sections only. The header of the full volume said it was superseded in part (ADR 0012 / #980) and that §1.1 and §3 stay in effect. ADR 0012 is not in this tree, so those two sections are kept here as the contract an agent can read. The rest of the volume (the #912-era measurement tables, the geometry canon, the prototype callback list and the §5 retirement ledger) described work that has landed and is deleted; it stays in git history.
 
-<!-- ruling:tokens.canonical -->The canonical color and geometry token table lives here; UI code consumes tokens, not literals.<!-- /ruling -->
+<!-- ruling:tokens.canonical -->UI code consumes tokens, not literals; the token table is the frontmatter of `apps/web/DESIGN.md`, and the CSS variables behind it are defined in `apps/web/src/styles/shadcn.css`.<!-- /ruling -->
 
 ## 1.1 Slots unchanged, only values flip
 
