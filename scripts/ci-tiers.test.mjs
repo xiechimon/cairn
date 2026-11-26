@@ -130,11 +130,11 @@ function gatePasses(scenarios) {
   return statuses.map((status) => status === '0');
 }
 
-test('the full 6-shard e2e and 4-shard e2e-affected match classifier tiers unless draft overrides', () => {
+test('the full 6-shard e2e and 6-shard e2e-affected match classifier tiers unless draft overrides', () => {
   assert.ok(tierExpression);
   assert.match(job('e2e'), /shard: \[1, 2, 3, 4, 5, 6\]/);
   assert.match(job('e2e'), /run: pnpm prepush --e2e-shard \$\{\{ matrix.shard \}\}\/6/);
-  assert.match(job('e2e-affected'), /shard: \[1, 2, 3, 4\]/);
+  assert.match(job('e2e-affected'), /shard: \[1, 2, 3, 4, 5, 6\]/);
   assert.match(job('e2e-affected'), /run: pnpm --filter @cairn\/web e2e:affected --shard=/);
   assert.match(job('e2e-affected'), /fetch-depth: 0/);
   assert.match(

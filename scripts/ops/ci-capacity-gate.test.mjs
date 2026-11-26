@@ -17,7 +17,7 @@ test('ci capacity gate keeps the clean current shard shape inside the runner slo
     vitestLight: 6,
     vitestIntegration: 2,
     e2e: 6,
-    e2eAffected: 4,
+    e2eAffected: 6,
     e2ePeak: 6,
     total: 19,
   });
