@@ -129,6 +129,7 @@ const DETAIL = [
 ];
 const CHIEF = [
   'composer-tool-tips',
+  'run-trace',
   'chief-',
   'start-task-echo',
   'home-composer',
@@ -372,6 +373,7 @@ export const FILE_RULES = new Map([
 
 export const DIR_RULES = [
   { prefix: 'apps/web/src/usage/', specs: ['usage-page'] },
+  { prefix: 'apps/web/src/runs/', specs: ['run-trace'] },
   { prefix: 'apps/web/src/search/', specs: ['search-'] },
   {
     prefix: 'apps/web/src/board/artifact/',

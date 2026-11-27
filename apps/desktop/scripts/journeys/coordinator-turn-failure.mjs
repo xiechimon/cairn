@@ -26,6 +26,25 @@ async function assertFailureCard(window, provider) {
   await card.waitFor({ timeout: 60_000 });
 }
 
+async function openRunLog(window, mode, evidenceDir) {
+  const link = window.getByTestId('run-trace-link').first();
+  await link.waitFor({ timeout: 60_000 });
+  await link.click();
+  await window.waitForURL(/\/app\/runs\//, { timeout: 30_000 });
+  const failure = window.getByTestId('run-failure');
+  await failure.waitFor({ timeout: 30_000 });
+  assert.ok((await failure.innerText()).trim() !== '', 'the run log leads with the failure');
+  await window.screenshot({ path: join(evidenceDir, `${mode}-run-log.png`) });
+  await window.keyboard.press('Escape');
+  await window.getByTestId('run-page').waitFor({ state: 'detached', timeout: 30_000 });
+  await window.getByTestId('chief-status-mark-button').first().click();
+  const turn = window.getByTestId('run-turns').locator('a[data-run-turn]').first();
+  await turn.waitFor({ timeout: 30_000 });
+  await turn.click();
+  await window.getByTestId('run-page').waitFor({ timeout: 30_000 });
+  await window.keyboard.press('Escape');
+}
+
 export default async function coordinatorTurnFailure({ window, mode, evidenceDir }) {
   const message = `packaged ${mode} ${Date.now() % 100000}`;
   const provider = await startStubProvider(() => [{ error: { message: PROVIDER_ERROR } }]);
@@ -52,6 +71,7 @@ export default async function coordinatorTurnFailure({ window, mode, evidenceDir
     await window.reload();
     await window.getByText(message, { exact: true }).first().waitFor({ timeout: 30_000 });
     await window.screenshot({ path: join(evidenceDir, `${mode}-coordinator-turn-failure.png`) });
+    await openRunLog(window, mode, evidenceDir);
   } finally {
     provider.close();
   }

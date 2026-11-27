@@ -96,6 +96,14 @@
       ]
     },
     {
+      "id": "run-log",
+      "url": "/app/runs/turn-b?scenario=run-trace",
+      "ready": "[data-testid=\"run-failure\"]",
+      "sources": [
+        "apps/web/src/runs/run-page.tsx"
+      ]
+    },
+    {
       "id": "machine-authorize",
       "url": "/app/machines/authorize?scenario=06",
       "ready": "#root button",

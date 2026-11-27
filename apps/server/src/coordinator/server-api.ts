@@ -155,6 +155,7 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     stepId: string,
     row: Parameters<MachineApi['transcriptRow']>[1],
     entryId?: string,
+    lastOfEntry?: boolean,
   ) => {
     let owned: ReturnType<typeof ownedStepRow>;
     try {
@@ -171,7 +172,10 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         storeTranscriptRow(deps, owned, stepId, row);
       if (entryId !== undefined && isChiefConversation(owned.buildId)) {
         mapEntry(row.id, owned.buildId, entryId);
-        if (!coordinatorInputs(deps.db, owned.buildId).some((input) => input.stepId === stepId))
+        if (
+          lastOfEntry !== false &&
+          !coordinatorInputs(deps.db, owned.buildId).some((input) => input.stepId === stepId)
+        )
           deps.db
             .update(coordinatorConversation)
             .set({ lastMirroredEntryId: entryId, updatedAt: Date.now() })
@@ -399,8 +403,8 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         holdMs: ASK_HOLD_MS,
         ...(signal === undefined ? {} : { signal }),
       }),
-    transcriptRow: async (stepId, row, entryId) => {
-      applyTranscriptRow(stepId, row, entryId);
+    transcriptRow: async (stepId, row, entryId, lastOfEntry) => {
+      applyTranscriptRow(stepId, row, entryId, lastOfEntry);
     },
     mapUserEntry: async (stepId, entryId) => {
       applyMapUserEntry(stepId, entryId);
@@ -529,12 +533,12 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         });
         return result;
       },
-      transcriptRow: async (stepId, row, entryId) => {
+      transcriptRow: async (stepId, row, entryId, lastOfEntry) => {
         ensureStepId(stepId);
         deps.db.transaction(
           () => {
             assertClaimed(stepId, boundGeneration);
-            applyTranscriptRow(stepId, row, entryId);
+            applyTranscriptRow(stepId, row, entryId, lastOfEntry);
           },
           { behavior: 'immediate' },
         );

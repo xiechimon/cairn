@@ -9,6 +9,7 @@ import { openCoordinatorHarness } from '../../src/coordinator/runtime/harness.js
 import { createCoordinatorModels } from '../../src/coordinator/runtime/models.js';
 import {
   readThreadRows,
+  SEED_MAX_ROWS,
   SEED_ROW_MAX_CHARS,
   seedCoordinator,
   seedMessages,
@@ -63,6 +64,22 @@ describe('seeding the Coordinator store from thread rows', () => {
   it('reads only the thread rows after the summary, oldest first', () => {
     const rows = readThreadRows(serverDb(tempDir()), 't1', 10);
     expect(rows.map((r) => r.id)).toEqual(['u1', 'a1', 'c1', 'a2']);
+  });
+
+  it('stored thinking does not use up the row budget that carries the conversation', () => {
+    const path = serverDb(tempDir());
+    const db = new DatabaseSync(path);
+    const insert = db.prepare('insert into chief_message values (?, ?, ?, ?, ?, null)');
+    for (let i = 0; i < SEED_MAX_ROWS; i++)
+      insert.run(
+        `t${i}`,
+        't1',
+        'assistant',
+        JSON.stringify([{ type: 'thinking', thinking: 'hm' }]),
+        30 + i,
+      );
+    db.close();
+    expect(readThreadRows(path, 't1', 10).map((r) => r.id)).toEqual(['u1', 'a1', 'c1', 'a2']);
   });
 
   it('renders rows like C3: events tagged, tool calls without results, long rows cut with a read_history pointer', () => {

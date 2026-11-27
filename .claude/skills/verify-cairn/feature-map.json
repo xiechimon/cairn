@@ -1854,6 +1854,51 @@
       "batch": "B7"
     },
     {
+      "id": "run-log",
+      "name": "Run log",
+      "summary": "Every Coordinator turn and task run kept as a full trace: the run page (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls, previous/next turn and JSON export; reached from the Run log link on a failed or stopped turn, the Coordinator mark's turn list, or the task menu.",
+      "states": "Loading skeleton, not found, failed to load with retry, a done turn, a failed turn with a failing tool and a recovered tool error, a stopped turn, a task build, a long tool output shortened with the export holding the full text; the turn list with problems only (default) or all, grouped today, yesterday and earlier, empty, paging on scroll, failed page with retry; the one-time hint beside the mark; desktop and 390px, light and dark.",
+      "centrality": 2,
+      "status": "shipped",
+      "code": {
+        "web": [
+          "apps/web/src/runs",
+          "apps/web/src/chief/chief-status-mark.tsx"
+        ],
+        "server": [
+          "apps/server/src/services/run-trace.ts",
+          "apps/server/src/routes-runs.ts"
+        ]
+      },
+      "routes": {
+        "web": [
+          "/app/runs/:runId"
+        ],
+        "server": [
+          "/api/teams/:id/runs/:runId",
+          "/api/teams/:id/chief/threads/:tid/turns"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "click testid:chief-status-mark-button"
+      ],
+      "verify": [],
+      "research": [
+        "docs/research/dsh-sig-walk-2026-11.md"
+      ],
+      "frontendDesign": [
+        "docs/design/references/coordinator-chat"
+      ],
+      "backendDesign": [
+        "docs/design/run-trace.md"
+      ],
+      "evidence": [
+        "apps/web/e2e/run-trace.spec.ts",
+        "apps/server/test/run-trace.test.ts"
+      ]
+    },
+    {
       "id": "sidebar",
       "name": "Sidebar",
       "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, project settings, move to group, archive), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive) and the machine-status footer.",

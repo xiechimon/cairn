@@ -1,5 +1,6 @@
 import {
   coordinatorTextSourceId,
+  coordinatorThinkingSourceId,
   coordinatorToolSourceId,
   type TranscriptRow,
 } from '@cairn/shared';
@@ -20,9 +21,17 @@ function textBlocks(message: AssistantMessage): string {
     .trim();
 }
 
+function thinkingBlocks(message: AssistantMessage): string {
+  return message.content
+    .flatMap((block) => (block.type === 'thinking' ? [block.thinking] : []))
+    .join('\n')
+    .trim();
+}
+
 export interface EntryRow {
   row: TranscriptRow;
   entryId: string;
+  lastOfEntry: boolean;
 }
 
 export function entryRowSources(
@@ -38,7 +47,7 @@ export function entryRowSources(
       results.set(message.toolCallId, message);
     }
   }
-  const rows: EntryRow[] = [];
+  const rows: Omit<EntryRow, 'lastOfEntry'>[] = [];
   for (const entry of entries) {
     const message = entry.model?.[0];
     if (
@@ -47,6 +56,18 @@ export function entryRowSources(
       (message.stopReason === 'aborted' && entry.id !== stoppedEntry)
     ) {
       continue;
+    }
+    const thinking = thinkingBlocks(message);
+    if (thinking !== '') {
+      rows.push({
+        entryId: String(entry.id),
+        row: {
+          id: coordinatorThinkingSourceId(stepId, String(entry.id), storeId),
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking }],
+          createdAt: message.timestamp,
+        },
+      });
     }
     const text = textBlocks(message);
     if (text !== '') {
@@ -86,7 +107,10 @@ export function entryRowSources(
       });
     }
   }
-  return rows;
+  return rows.map((row, index) => ({
+    ...row,
+    lastOfEntry: rows[index + 1]?.entryId !== row.entryId,
+  }));
 }
 
 function liveStateOf(view: ConversationView): {
@@ -129,12 +153,21 @@ export function createTurnMirror(
   let activeView: Promise<void> = Promise.resolve();
   const post = async (entries: readonly EntryRecord[], stoppedEntry?: EntryId) => {
     let assistantTextTs: number | undefined;
-    for (const { row, entryId } of entryRowSources(stepId, entries, storeId, stoppedEntry)) {
+    for (const { row, entryId, lastOfEntry } of entryRowSources(
+      stepId,
+      entries,
+      storeId,
+      stoppedEntry,
+    )) {
       const body = JSON.stringify(row.content);
       if (posted.get(row.id) === body) continue;
-      await api.transcriptRow(stepId, row, entryId);
+      await api.transcriptRow(stepId, row, entryId, lastOfEntry);
       posted.set(row.id, body);
-      if (row.role === 'assistant' && Array.isArray(row.content)) {
+      if (
+        row.role === 'assistant' &&
+        Array.isArray(row.content) &&
+        row.content[0]?.type === 'text'
+      ) {
         assistantTextTs = row.createdAt;
       }
     }

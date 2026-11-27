@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 55 |
-| status shipped | 45 |
+| Features | 56 |
+| status shipped | 46 |
 | status partial | 8 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 29 |
+| research, frontend design and backend design all present or not applicable | 30 |
 | Research gaps | 12 |
 | Frontend design gaps | 13 |
 | Backend design gaps | 17 |
@@ -57,6 +57,7 @@
 | [Phone computers](#phones) | 2 | partial | yes | yes | yes |  |
 | [Model providers and subscriptions](#providers) | 2 | shipped | yes | yes | yes |  |
 | [Remote access over the tailnet](#remote-access) | 2 | partial | yes | gap | yes | B5 |
+| [Run log](#run-log) | 2 | shipped | yes | yes | yes |  |
 | [Login and tailnet device auth](#tailnet-login) | 2 | partial | yes (not on main) | gap | yes | B5 |
 | [Token usage](#token-usage) | 2 | shipped | gap | yes | yes | B7 |
 | [Account and team](#account-and-team) | 3 | shipped | yes | yes | gap | B10 |
@@ -417,6 +418,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: [docs/research/remote-access-tsnet.md](research/remote-access-tsnet.md), [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the remote access page, route list and pairing flow have no design
 - Backend design: [docs/research/remote-access-tsnet.md](research/remote-access-tsnet.md)
+
+### run-log
+
+**Run log** (shipped). Every Coordinator turn and task run kept as a full trace: the run page (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls, previous/next turn and JSON export; reached from the Run log link on a failed or stopped turn, the Coordinator mark's turn list, or the task menu.
+
+- Research: [docs/research/dsh-sig-walk-2026-11.md](research/dsh-sig-walk-2026-11.md)
+- Frontend design: [docs/design/references/coordinator-chat](design/references/coordinator-chat)
+- Backend design: [docs/design/run-trace.md](design/run-trace.md)
 
 ### tailnet-login
 

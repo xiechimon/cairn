@@ -6,6 +6,8 @@ import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { turnRunIdOf } from '../runs/run-trace-link.js';
+import { RunTurnsTrigger } from '../runs/run-turns-popover.js';
 import { useQuestionPending } from './chief-question.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import {
@@ -96,11 +98,13 @@ export function StatusMarkFloat({
   elapsed = null,
   large = false,
   className,
+  runs,
 }: {
   view: StatusMarkView;
   elapsed?: number | null;
   large?: boolean;
   className?: string;
+  runs?: { threadId: string; hintWanted: boolean };
 }) {
   const { t } = useI18n();
   const { id, label, announce } = view;
@@ -133,49 +137,78 @@ export function StatusMarkFloat({
       {announced === '' ? '' : t(announced)}
     </span>
   );
+  const name = label === '' ? t('Coordinator') : t(label);
+  const tooltip = elapsed == null ? name : `${name} · ${formatClock(elapsed)}`;
   if (large) {
-    const name = label === '' ? t('Coordinator') : t(label);
+    const glyph = <StatusMarkGlyph state={id} className="size-11" />;
     return (
       <div
         data-testid="chief-status-mark"
         data-state={id}
         className={cn('pointer-events-none flex flex-col items-center', className)}
       >
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <div
-                role="img"
-                aria-label={name}
-                data-slot="status-mark-glyph"
-                className="pointer-events-auto grid size-15.5 place-items-center"
-              />
-            }
+        {runs === undefined ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div
+                  role="img"
+                  aria-label={name}
+                  data-slot="status-mark-glyph"
+                  className="pointer-events-auto grid size-15.5 place-items-center"
+                />
+              }
+            >
+              {glyph}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" sideOffset={8}>
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <RunTurnsTrigger
+            threadId={runs.threadId}
+            state={name}
+            tooltip={tooltip}
+            hintWanted={runs.hintWanted}
+            hintBelow
+            className="grid size-15.5 place-items-center"
           >
-            <StatusMarkGlyph state={id} className="size-11" />
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={8}>
-            {elapsed == null ? name : `${name} · ${formatClock(elapsed)}`}
-          </TooltipContent>
-        </Tooltip>
+            {glyph}
+          </RunTurnsTrigger>
+        )}
         {live}
       </div>
     );
   }
+  const glyph = <StatusMarkGlyph state={id} className="size-10" />;
   return (
     <div
       data-testid="chief-status-mark"
       data-state={id}
       className={cn('pointer-events-none flex flex-col items-center', className)}
+      onPointerEnter={() => setHover(true)}
+      onPointerLeave={() => setHover(false)}
     >
-      <div
-        data-slot="status-mark-glyph"
-        className="pointer-events-auto grid size-11 place-items-center"
-        onPointerEnter={() => setHover(true)}
-        onPointerLeave={() => setHover(false)}
-      >
-        <StatusMarkGlyph state={id} className="size-10" />
-      </div>
+      {runs === undefined ? (
+        <div
+          data-slot="status-mark-glyph"
+          className="pointer-events-auto grid size-11 place-items-center"
+        >
+          {glyph}
+        </div>
+      ) : (
+        <RunTurnsTrigger
+          threadId={runs.threadId}
+          state={name}
+          tooltip={tooltip}
+          hintWanted={runs.hintWanted}
+          hintBelow={false}
+          className="grid size-11 place-items-center"
+        >
+          {glyph}
+        </RunTurnsTrigger>
+      )}
       <div
         aria-hidden="true"
         data-testid="chief-status-pill"
@@ -236,7 +269,25 @@ export function ChiefStatusMark({
   const elapsed = useLiveSeconds(live?.kind === 'streaming' ? live.startedAt : null);
   const view = done && base.id === 'idle' ? DONE_VIEW : base;
   if (hiddenWhenIdle && view.id === 'idle') return null;
-  return <StatusMarkFloat view={view} elapsed={elapsed} large={large} className={className} />;
+  const runs =
+    chief.threadId === undefined
+      ? undefined
+      : {
+          threadId: chief.threadId,
+          hintWanted: stream.some(
+            (item) =>
+              (item.kind === 'error' || item.kind === 'stopped') && turnRunIdOf(item.id) !== null,
+          ),
+        };
+  return (
+    <StatusMarkFloat
+      view={view}
+      elapsed={elapsed}
+      large={large}
+      className={className}
+      {...(runs === undefined ? {} : { runs })}
+    />
+  );
 }
 
 export function CoordinatorGlyph({ className = 'size-5' }: { className?: string }) {

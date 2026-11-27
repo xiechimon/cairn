@@ -139,6 +139,7 @@ import {
 import { readmeEn, readmeZh } from './readme.js';
 import type { FixtureSet } from './records.js';
 import { RESOURCES } from './resources.js';
+import { RUN_TRACE_SCENARIOS } from './run-trace.js';
 import { sidebarArchived } from './sidebar-archived.js';
 
 const ROUTING_SETTINGS: TeamRoutingSettings = {
@@ -479,6 +480,7 @@ const scenarios = {
   'fab-avatar': chiefFabAvatar,
   'fab-avatar-override': chiefFabAvatarOverride,
   ...CHIEF_MARK_SCENARIOS,
+  ...RUN_TRACE_SCENARIOS,
   ...CHIEF_FILES_SCENARIOS,
 } as Record<string, FixtureSet>;
 

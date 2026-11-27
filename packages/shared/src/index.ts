@@ -42,6 +42,7 @@ export * from './remote-access.js';
 export * from './reply-quote.js';
 export * from './repo-ref.js';
 export * from './review-findings.js';
+export * from './run-trace.js';
 export * from './scheduler.js';
 export * from './search-syntax.js';
 export * from './secret-box.js';

@@ -19,6 +19,7 @@ import { registerPhoneRoutes } from './routes-phones.js';
 import { registerProjectRoutes } from './routes-projects.js';
 import { registerPushRoutes } from './routes-push.js';
 import { registerResourceRoutes } from './routes-resources.js';
+import { registerRunRoutes } from './routes-runs.js';
 import { registerScheduleWebhookRoutes } from './routes-schedule-webhook.js';
 import { registerTodoRoutes } from './routes-todos.js';
 import { registerUploadRoutes } from './routes-uploads.js';
@@ -38,6 +39,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerDesignShareRoutes(app, ctx);
   registerDraftRoutes(app, ctx);
   registerChiefRoutes(app, ctx);
+  registerRunRoutes(app, ctx);
   registerMemoryRoutes(app, ctx);
   registerResourceRoutes(app, ctx);
   registerGitHostingRoutes(app, ctx);

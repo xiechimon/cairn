@@ -12232,6 +12232,24 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "GET",
+    "note": "RunTurnPage: the thread turns newest first, 20 a page, with a cursor; problems=1 keeps the turns that went wrong",
+    "path": "/api/teams/{id}/chief/threads/{tid}/turns",
+    "query": [
+      "limit",
+      "before",
+      "problems",
+    ],
+  },
+  {
+    "method": "GET",
+    "note": "RunTrace of one Coordinator turn or task build, redacted; the page caps long values, download=1 returns the whole run as a JSON file",
+    "path": "/api/teams/{id}/runs/{runId}",
+    "query": [
+      "download",
+    ],
+  },
+  {
+    "method": "GET",
     "note": "{corrections}: recorded user corrections, newest first, at most 200, each with the user words, the saved rule the agent pointed at, whether the turn memory index held it, and the turn",
     "path": "/api/teams/{id}/chief/memory-corrections",
   },

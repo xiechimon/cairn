@@ -23,6 +23,8 @@ import {
   type QuotaWait,
   type RouteOverride,
   type RunnerOfflineContent,
+  type RunTrace,
+  type RunTurnRow,
   type SecretListEntry,
   type StepPromptOrigin,
   type StepQueueBlocked,
@@ -284,6 +286,8 @@ export interface FixtureSet {
   chiefChannels?: Record<string, ChiefContent>;
   github?: GithubFixture;
   attachments?: Record<string, { text?: string; src?: string; document?: DocumentPreview }>;
+  runTurns?: RunTurnRow[];
+  runTraces?: Record<string, RunTrace>;
 }
 
 export interface GithubFixture {

@@ -152,9 +152,9 @@ export async function replayCoordinatorInputs(
     handled = Math.max(handled, Number(entry.id));
   }
   for (const [producer, group] of verified) {
-    for (const { row, entryId } of entryRowSources(producer, group, storeId)) {
+    for (const { row, entryId, lastOfEntry } of entryRowSources(producer, group, storeId)) {
       await channel.assertConversation(threadId, conversationKey);
-      await api.transcriptRow(producer, row, entryId);
+      await api.transcriptRow(producer, row, entryId, lastOfEntry);
     }
   }
   if (handled >= start) await channel.checkpoint(threadId, conversationKey, String(handled));

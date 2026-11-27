@@ -88,6 +88,7 @@ export function readThreadRows(dbPath: string, threadId: string, after: number):
         `select id, role, content, createdAt from chief_message
          where threadId = ? and role != 'system' and createdAt > ?
            and id not like 'chief-digest-%' and id not like 'chief-report-%'
+           and (case when json_valid(content) then json_extract(content, '$[0].type') end) is not 'thinking'
          order by createdAt desc, rowid desc limit ?`,
       )
       .all(threadId, after, SEED_MAX_ROWS) as unknown as SeedRow[];

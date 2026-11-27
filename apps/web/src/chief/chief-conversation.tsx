@@ -54,6 +54,7 @@ import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useFileDrop } from '../overlay/file-drop.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
+import { turnRunIdOf } from '../runs/run-trace-link.js';
 import { type BubbleRun, bubbleRuns } from './bubble-runs.js';
 import { ChiefStreamRow, chiefStreamRowKey, chiefStreamRowKeys } from './chief-message-rows.js';
 import {
@@ -844,6 +845,7 @@ export function ChiefConversation({
         <TurnFailureCard
           key={failure.key}
           error={failure.error}
+          runId={turnRunIdOf(failure.id)}
           className={BANNER_CLS}
           onRetry={failure.retry}
           onDismiss={() => setDismissedFailure(failure.key)}

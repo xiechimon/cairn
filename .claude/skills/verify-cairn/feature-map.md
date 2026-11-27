@@ -575,6 +575,25 @@ Reach:
 - Backend design: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md)
 - Evidence: `apps/server/test/tsnet-remote.test.ts`, `apps/server/test/remote-access.test.ts`, `apps/web/test/pairing-origin.test.ts`
 
+### run-log
+
+**Run log** (shipped, centrality 2). Every Coordinator turn and task run kept as a full trace: the run page (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls, previous/next turn and JSON export; reached from the Run log link on a failed or stopped turn, the Coordinator mark's turn list, or the task menu.
+
+States: Loading skeleton, not found, failed to load with retry, a done turn, a failed turn with a failing tool and a recovered tool error, a stopped turn, a task build, a long tool output shortened with the export holding the full text; the turn list with problems only (default) or all, grouped today, yesterday and earlier, empty, paging on scroll, failed page with retry; the one-time hint beside the mark; desktop and 390px, light and dark.
+
+Reach:
+
+1. `open /app`
+2. `click testid:chief-status-mark-button`
+
+- Web routes: `/app/runs/:runId`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `chief-status-live`, `chief-status-mark`, `chief-status-mark-button`, `chief-status-pill`, `run-error`, `run-export`, `run-failure`, `run-item-error`, `run-item-stopped`, `run-items`, `run-meta`, `run-missing`, `run-page`, `run-problems-only`, `run-trace-hint`, `run-trace-hint-close`, `run-trace-link`, `run-turns`, `run-turns-empty`, `run-turns-error`, `run-turns-popover`, `run-turns-problems`
+- Research: [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md)
+- Frontend design: [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat)
+- Backend design: [docs/design/run-trace.md](../../../docs/design/run-trace.md)
+- Evidence: `apps/web/e2e/run-trace.spec.ts`, `apps/server/test/run-trace.test.ts`
+
 ### tailnet-login
 
 **Login and tailnet device auth** (partial, centrality 2). The token gate today; next, the owner's own tailnet devices are signed in without a token.

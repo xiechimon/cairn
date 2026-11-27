@@ -72,7 +72,8 @@ for (const viewport of [
     }) => {
       await page.goto(HOME);
       await expect(page.getByTestId('tasks-toggle')).toHaveCount(1);
-      await expect(top(page).getByRole('button')).toHaveCount(2);
+      await expect(top(page).getByRole('button')).toHaveCount(3);
+      await expect(top(page).getByRole('button', { name: 'Coordinator 运行记录' })).toHaveCount(1);
       await expect(top(page).getByRole('button', { name: '账号' })).toHaveCount(0);
       await expect(top(page).locator('img')).toHaveCount(0);
       await expect(page.getByTestId('tasks-toggle')).toHaveAccessibleName('任务，3 件等你');
@@ -85,7 +86,9 @@ for (const viewport of [
       const mark = top(page).getByTestId('chief-status-mark');
       await expect(mark).toHaveAttribute('data-state', 'ask');
       await expect(page.getByTestId('chief-status-pill')).toHaveCount(0);
-      await expect(mark.getByRole('img', { name: '等你确认' })).toBeVisible();
+      await expect(mark.getByRole('button', { name: 'Coordinator 运行记录' })).toHaveAccessibleDescription(
+        '等你确认',
+      );
       const glyph = mark.locator('[data-slot="status-mark-glyph"]');
       await expect(glyph).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(glyph).toHaveCSS('box-shadow', 'none');

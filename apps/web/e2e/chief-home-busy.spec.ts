@@ -632,7 +632,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     });
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    await expect(home.getByTestId('chief-stopped')).toHaveText('已停止，没有建任务。');
+    await expect(home.getByTestId('chief-stopped')).toHaveText('已停止，没有建任务。运行记录');
     await expect(home.getByTestId('chief-stopped')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(home.getByRole('alert')).toHaveCount(0);
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();

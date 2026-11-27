@@ -24,6 +24,7 @@ import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
+import { useRunLinkTo } from '../runs/run-trace-api.js';
 import { toastArchived } from './archive-toast.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
 import { MoveToProjectSub } from './task-move-menu.js';
@@ -81,6 +82,7 @@ export function useThreadActions({
 }): ThreadActions {
   const { t } = useI18n();
   const navigate = useNavigate();
+  const runLinkTo = useRunLinkTo();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const { markDone, dialogs: markDoneDialogs } = useMarkDone(todo);
@@ -315,6 +317,14 @@ export function useThreadActions({
               onViewRaw: () => {
                 setMenuOpen(false);
                 engine.onViewRaw();
+              },
+            }
+          : {})}
+        {...(buildId != null
+          ? {
+              onViewRun: () => {
+                setMenuOpen(false);
+                navigate(runLinkTo(buildId));
               },
             }
           : {})}

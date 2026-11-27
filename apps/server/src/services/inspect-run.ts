@@ -15,19 +15,15 @@ import {
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  build,
   chiefMessage,
-  chiefThread,
   chiefTurnUsage,
   coordinatorTurnSnapshot,
   message,
   step,
   stepUsage,
-  todo,
   todoTransition,
   tokenUsage,
 } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import {
   type BuildOutcome,
@@ -35,6 +31,7 @@ import {
   failedStepResidualText,
 } from '../reliability-report.js';
 import { messageText } from './conversation-page.js';
+import { resolveRunTarget, type TeamBuild, type TeamThread } from './run-target.js';
 
 export const INSPECT_RUN_MAX_OUTPUT_BYTES = 24 * 1024;
 const LINE_MAX_CHARS = 400;
@@ -68,38 +65,6 @@ function traceExportConfigured(env: NodeJS.ProcessEnv): boolean {
   } catch {
     return false;
   }
-}
-
-function notFound(id: string): never {
-  throw new HttpError(404, `run ${id}`);
-}
-
-function teamBuild(db: Db, buildId: string, teamId: string) {
-  return db
-    .select({
-      id: build.id,
-      todoId: build.todoId,
-      seqNum: todo.seqNum,
-      title: todo.title,
-      createdAt: build.createdAt,
-      errorMessage: build.errorMessage,
-      failureCode: build.failureCode,
-      failureDetail: build.failureDetail,
-      prNumber: build.prNumber,
-      prUrl: build.prUrl,
-    })
-    .from(build)
-    .innerJoin(todo, eq(todo.id, build.todoId))
-    .where(and(eq(build.id, buildId), eq(todo.teamId, teamId)))
-    .get();
-}
-
-function teamThread(db: Db, threadId: string, teamId: string) {
-  return db
-    .select({ id: chiefThread.id, title: chiefThread.title })
-    .from(chiefThread)
-    .where(and(eq(chiefThread.id, threadId), eq(chiefThread.teamId, teamId)))
-    .get();
 }
 
 function redactedDetail(detail: StepFailureDetail | null): StepFailureDetail | null {
@@ -164,12 +129,7 @@ function toolCallOf(content: unknown) {
   };
 }
 
-function inspectBuild(
-  db: Db,
-  row: NonNullable<ReturnType<typeof teamBuild>>,
-  focusStepId: string | null,
-  env: NodeJS.ProcessEnv,
-) {
+function inspectBuild(db: Db, row: TeamBuild, focusStepId: string | null, env: NodeJS.ProcessEnv) {
   const now = nowMs();
   const steps = db
     .select()
@@ -351,7 +311,7 @@ function turnError(db: Db, stepId: string): string | null {
 
 function inspectTurns(
   db: Db,
-  thread: NonNullable<ReturnType<typeof teamThread>>,
+  thread: TeamThread,
   focusStepId: string | null,
   env: NodeJS.ProcessEnv,
 ) {
@@ -466,52 +426,20 @@ export function inspectRun(
   id: string,
   env: NodeJS.ProcessEnv = process.env,
 ) {
-  const thread = teamThread(db, id, teamId);
-  let result: Record<string, unknown> | undefined;
-  if (thread !== undefined) result = inspectTurns(db, thread, null, env);
-  if (result === undefined) {
-    const stepRow = db
-      .select({ id: step.id, buildId: step.buildId, kind: step.kind })
-      .from(step)
-      .where(eq(step.id, id))
-      .get();
-    if (stepRow !== undefined) {
-      if (stepRow.kind === 'chief') {
-        const owner = teamThread(db, stepRow.buildId, teamId);
-        if (owner === undefined) notFound(id);
-        result = inspectTurns(db, owner, stepRow.id, env);
-      } else {
-        const owner = teamBuild(db, stepRow.buildId, teamId);
-        if (owner === undefined) notFound(id);
-        result = inspectBuild(db, owner, stepRow.id, env);
-      }
-    }
-  }
-  if (result === undefined) {
-    const direct = teamBuild(db, id, teamId);
-    if (direct !== undefined) result = inspectBuild(db, direct, null, env);
-  }
-  if (result === undefined) {
-    const task = db
-      .select({ id: todo.id, latestBuildId: todo.latestBuildId })
-      .from(todo)
-      .where(and(eq(todo.id, id), eq(todo.teamId, teamId)))
-      .get();
-    if (task === undefined) notFound(id);
-    const buildId =
-      task.latestBuildId ??
-      db
-        .select({ id: build.id })
-        .from(build)
-        .where(eq(build.todoId, task.id))
-        .orderBy(desc(build.createdAt))
-        .get()?.id;
-    const latest = buildId === undefined ? undefined : teamBuild(db, buildId, teamId);
-    if (latest === undefined) {
-      return { kind: 'task', todoId: task.id, cause: 'not-started', trust: 'untrusted-run-record' };
-    }
-    result = inspectBuild(db, latest, null, env);
-  }
+  const target = resolveRunTarget(db, teamId, id);
+  if (target.kind === 'unstarted-task')
+    return {
+      kind: 'task',
+      todoId: target.todoId,
+      cause: 'not-started',
+      trust: 'untrusted-run-record',
+    };
+  const result: Record<string, unknown> =
+    target.kind === 'thread'
+      ? inspectTurns(db, target.thread, null, env)
+      : target.kind === 'turn'
+        ? inspectTurns(db, target.thread, target.stepId, env)
+        : inspectBuild(db, target.build, target.stepId, env);
   const redacted = redactSecrets({ ...result, trust: 'untrusted-run-record' }).value as Record<
     string,
     unknown

@@ -16,6 +16,7 @@ import type { QueueWait } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
+import { RunTraceLink } from '../runs/run-trace-link.js';
 import { settingsHref } from '../settings/settings-href.js';
 
 export const ON_MAC = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent);
@@ -132,11 +133,13 @@ function NoticeCard({
 
 export function TurnFailureCard({
   error,
+  runId,
   className,
   onRetry,
   onDismiss,
 }: {
   error: TurnErrorFacts;
+  runId: string | null;
   className: string;
   onRetry?: (() => void) | undefined;
   onDismiss: () => void;
@@ -189,6 +192,7 @@ export function TurnFailureCard({
             </Button>
           );
         })}
+        {runId !== null && <RunTraceLink runId={runId} />}
       </span>
     </NoticeCard>
   );

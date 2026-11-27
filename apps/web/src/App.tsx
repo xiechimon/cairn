@@ -25,6 +25,7 @@ import {
   MODEL_ROUTING_HREF,
   PROVIDERS_HREF,
   ROUTING_SETTINGS_HREF,
+  RUN_PATH,
   SECRETS_HREF,
   SKILLS_HREF,
   USAGE_PATH,
@@ -63,8 +64,13 @@ const MachineAuthorizePage = retryableLazy(() =>
   })),
 );
 
+const RunPage = retryableLazy(() =>
+  import('./runs/run-page.js').then((m) => ({ default: m.RunPage })),
+);
+
 const DIALOG_ROUTES = withBoundary([
   { path: USAGE_PATH, element: <UsagePage /> },
+  { path: RUN_PATH, element: <RunPage /> },
   { path: '/app/project/new', element: <ProjectNewPage /> },
   { path: '/app/project/:id/settings', element: <ProjectSettingsPage /> },
 ]);

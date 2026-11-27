@@ -130,6 +130,18 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   },
   {
     method: 'GET',
+    path: '/api/teams/{id}/chief/threads/{tid}/turns',
+    query: ['limit', 'before', 'problems'],
+    note: 'RunTurnPage: the thread turns newest first, 20 a page, with a cursor; problems=1 keeps the turns that went wrong',
+  },
+  {
+    method: 'GET',
+    path: '/api/teams/{id}/runs/{runId}',
+    query: ['download'],
+    note: 'RunTrace of one Coordinator turn or task build, redacted; the page caps long values, download=1 returns the whole run as a JSON file',
+  },
+  {
+    method: 'GET',
     path: '/api/teams/{id}/chief/memory-corrections',
     note: '{corrections}: recorded user corrections, newest first, at most 200, each with the user words, the saved rule the agent pointed at, whether the turn memory index held it, and the turn',
   },

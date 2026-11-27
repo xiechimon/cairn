@@ -33,6 +33,7 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
+import { RunTraceLink, turnRunIdOf } from '../runs/run-trace-link.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
 import { ChatBlockRow } from './chat-block-row.js';
@@ -292,13 +293,21 @@ interface ChiefStreamRowProps {
 const NO_TASKS: readonly string[] = [];
 const NO_REPORTS: readonly string[] = [];
 
-function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
+function StoppedRow({
+  id,
+  todos,
+}: {
+  id: string | undefined;
+  todos: { id: string; seq: number; title: string }[];
+}) {
+  const runId = turnRunIdOf(id);
+  const link = runId === null ? null : <RunTraceLink runId={runId} />;
   const { t } = useI18n();
   const stoppedLabel = t('已停止，没有建任务。');
   if (todos.length === 0) {
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
-        <NoticeLine label={stoppedLabel} testId="chief-stopped" icon={CircleAlert} />
+        <NoticeLine label={stoppedLabel} testId="chief-stopped" icon={CircleAlert} actions={link} />
       </MessageScrollerItem>
     );
   }
@@ -324,6 +333,7 @@ function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string
               <TaskChip todoId={todo.id} label={todo.title} />
             </span>
           ))}
+          {link !== null && <span className="ml-1 inline-flex align-middle">{link}</span>}
         </MarkerContent>
       </Marker>
     </MessageScrollerItem>
@@ -535,9 +545,10 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       ? { [REPLY_HIGHLIGHT_ATTR]: '' }
       : {};
   if (!chiefRowShows(item, cardFailure)) return null;
-  if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
+  if (item.kind === 'stopped') return <StoppedRow id={item.id} todos={item.todos} />;
   if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
-  if (item.kind === 'error')
+  if (item.kind === 'error') {
+    const runId = turnRunIdOf(item.id);
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
         <NoticeLine
@@ -550,9 +561,11 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               : turnErrorDetail(item.error, t)
           }
           detailTestId="chief-turn-error-raw"
+          actions={runId === null ? undefined : <RunTraceLink runId={runId} />}
         />
       </MessageScrollerItem>
     );
+  }
   if (item.kind === 'chat-block')
     return <ChatBlockRow item={item} joinsPrev={joinsPrev} joinsNext={joinsNext} />;
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;

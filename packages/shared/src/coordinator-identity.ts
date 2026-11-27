@@ -17,6 +17,14 @@ export function coordinatorTextSourceId(stepId: string, entryId: string, storeId
   return `${storeId === undefined ? '' : `native-${storeId}:`}${stepId}-e${entryId}`;
 }
 
+export function coordinatorThinkingSourceId(
+  stepId: string,
+  entryId: string,
+  storeId?: string,
+): string {
+  return `${storeId === undefined ? '' : `native-${storeId}:`}${stepId}-t${entryId}`;
+}
+
 export function parseCoordinatorTextSourceId(
   value: string,
 ): { stepId: string; entryId: string; storeId: string | null } | null {

@@ -4,6 +4,7 @@ import {
   CircleStop,
   ClipboardList,
   Copy,
+  History,
   MessageSquare,
   Pencil,
   Route,
@@ -33,6 +34,7 @@ interface MoreMenuProps {
   onRename?: () => void;
   onViewPlan?: () => void;
   onViewRaw?: () => void;
+  onViewRun?: () => void;
   moveSub?: ReactNode;
 }
 
@@ -53,6 +55,7 @@ export function MoreMenu({
   onRename,
   onViewPlan,
   onViewRaw,
+  onViewRun,
   moveSub,
 }: MoreMenuProps) {
   const { t } = useI18n();
@@ -109,6 +112,19 @@ export function MoreMenu({
             action: 'view-raw',
             disabled: false,
             onClick: onViewRaw,
+          },
+        ]
+      : []),
+    ...(onViewRun !== undefined
+      ? [
+          {
+            key: 'view-run',
+            shortcut: 'T',
+            label: t('运行记录'),
+            Icon: History,
+            action: 'view-run',
+            disabled: false,
+            onClick: onViewRun,
           },
         ]
       : []),

@@ -25,7 +25,7 @@
       "modes": ["local-server", "remote-server"]
     },
     "coordinator-turn-failure": {
-      "features": ["coordinator-chat"],
+      "features": ["coordinator-chat", "run-log"],
       "modes": ["local-server", "remote-server"]
     }
   }
