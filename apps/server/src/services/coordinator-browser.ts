@@ -29,9 +29,29 @@ export function teamMachines(db: Pick<Db, 'select'>, teamId: string): MachineRow
     .all();
 }
 
+export type StoredBrowserDriver = 'ownerChrome' | 'cairn' | 'unknown';
+
+export function storedBrowserDriver(params: Record<string, unknown>): StoredBrowserDriver {
+  const stored = params.browserDriver;
+  if (stored === 'ownerChrome' || stored === 'cairn') return stored;
+  if (params.stealth === true) return 'cairn';
+  const actions = params.actions;
+  if (
+    Array.isArray(actions) &&
+    actions.some(
+      (action) =>
+        typeof action === 'object' &&
+        action !== null &&
+        (action as { kind?: unknown }).kind === 'fill_secret',
+    )
+  )
+    return 'cairn';
+  return 'unknown';
+}
+
 export interface BrowserProducer {
   machineId: string;
-  ownerChrome: boolean;
+  ownerChrome: boolean | null;
 }
 
 export function lastBrowserProducer(
@@ -43,6 +63,7 @@ export function lastBrowserProducer(
       machineId: computerCall.machineId,
       computerId: computerCall.computerId,
       phoneId: computerCall.phoneId,
+      params: computerCall.params,
       kind: step.kind,
       buildId: step.buildId,
     })
@@ -62,9 +83,10 @@ export function lastBrowserProducer(
   for (const row of rows) {
     const producedIn = computerThreadOf(db, { kind: row.kind, buildId: row.buildId });
     if (producedIn === null || browserScopeFor(producedIn) !== wanted) continue;
+    const driver = storedBrowserDriver(row.params);
     return {
       machineId: row.machineId,
-      ownerChrome: row.computerId === null && row.phoneId === null,
+      ownerChrome: driver === 'unknown' ? null : driver === 'ownerChrome',
     };
   }
   return undefined;

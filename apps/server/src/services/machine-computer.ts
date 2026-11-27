@@ -107,7 +107,12 @@ import {
   computerThreadOf,
   NO_CARD_THREAD,
 } from './computer-thread.js';
-import { lastBrowserProducer, ownerChromeCandidates, teamMachines } from './coordinator-browser.js';
+import {
+  lastBrowserProducer,
+  ownerChromeCandidates,
+  storedBrowserDriver,
+  teamMachines,
+} from './coordinator-browser.js';
 import type { TeamStreamHub } from './events.js';
 import {
   HOST_SHELL_ESCALATION_ACTION,
@@ -1435,6 +1440,14 @@ export async function forwardComputerCall(
   const pageProducer = isComputerBrowserTool(tool) ? lastBrowserProducer(db, thread) : undefined;
   const followsCurrentPage = tool === 'browser_act' || tool === 'browser_snapshot';
   const mustUseOwnerChrome = followsCurrentPage && pageProducer?.ownerChrome === true;
+  if (followsCurrentPage && pageProducer?.ownerChrome === null) {
+    throw new HttpError(
+      409,
+      noBrowserRun(
+        'The last browser page in this conversation was recorded before Cairn stored which browser it used, so Cairn cannot safely act on it. Open the page again with browser_navigate.',
+      ),
+    );
+  }
   if (mustUseOwnerChrome && secretActions.length > 0) {
     throw new HttpError(
       409,
@@ -1533,9 +1546,17 @@ function namingBrowserResult(
   }
   const host = db.select().from(machine).where(eq(machine.id, row.machineId)).get();
   const name = host?.capabilities?.computerName ?? host?.name ?? row.machineId;
-  const ownerChrome =
-    row.params.browserDriver === 'ownerChrome' ||
-    (row.params.browserDriver === undefined && row.computerId === null && row.phoneId === null);
+  const driver = storedBrowserDriver(row.params);
+  if (driver === 'unknown') {
+    const prefix = `[Browser: the browser that ran this action on ${name} is unknown because this result was recorded before Cairn stored the browser identity; watch and takeover state is unknown.]`;
+    if (result.text.startsWith(prefix)) return result;
+    return {
+      ...result,
+      text: `${prefix}
+${result.text}`,
+    };
+  }
+  const ownerChrome = driver === 'ownerChrome';
   const access = ownerChrome
     ? 'the owner can watch it in Chrome, but there is no coordinated takeover handoff'
     : host?.capabilities?.screenHandoff === true

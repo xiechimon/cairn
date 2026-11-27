@@ -1711,7 +1711,7 @@ describe('browser calls on Macs', () => {
     expect(noBrowserOccurrences(message)).toBe(1);
   });
 
-  test('a replayed owner-Chrome row from before browserDriver was stored still names the owner’s Chrome', async () => {
+  test('a replayed owner-Chrome-shaped row from before browserDriver was stored says the browser is unknown', async () => {
     const { s, deps } = boot();
     addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
     s.db
@@ -1740,12 +1740,13 @@ describe('browser calls on Macs', () => {
       toolCallId: 'legacy-owner-chrome',
       params: { url: 'https://example.com' },
     });
-    expect(replayed.text).toContain("the owner's own Chrome on mini");
+    expect(replayed.text).toContain('the browser that ran this action on mini is unknown');
     expect(replayed.text).not.toContain("Cairn's own browser");
+    expect(replayed.text).not.toContain("owner's own Chrome");
     expect(replayed.text.match(/\[Browser:/g)).toHaveLength(1);
   });
 
-  test('a replayed Cairn-browser row from before browserDriver was stored still names Cairn’s browser', async () => {
+  test('a replayed Cairn-shaped row from before browserDriver was stored also says the browser is unknown', async () => {
     const { s, deps, chiefId } = boot();
     addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
     pin(s, chiefId, 'mini');
@@ -1775,9 +1776,47 @@ describe('browser calls on Macs', () => {
       toolCallId: 'legacy-cairn-browser',
       params: { url: 'https://example.com' },
     });
-    expect(replayed.text).toContain("Cairn's own browser on mini");
+    expect(replayed.text).toContain('the browser that ran this action on mini is unknown');
+    expect(replayed.text).not.toContain("Cairn's own browser on mini");
     expect(replayed.text).not.toContain("owner's own Chrome");
     expect(replayed.text.match(/\[Browser:/g)).toHaveLength(1);
+  });
+
+  test('a follow-up action after a legacy unknown-browser row refuses before any browser runs', async () => {
+    const { s, deps, chiefId } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    pin(s, chiefId, 'mini');
+    s.db
+      .insert(computerCallTable)
+      .values({
+        id: computerCallId('step-a', 'legacy-unknown-open'),
+        teamId: s.team.id,
+        stepId: 'step-a',
+        toolCallId: 'legacy-unknown-open',
+        machineId: 'mini',
+        computerId: 'pinned',
+        phoneId: null,
+        tool: 'browser_navigate',
+        replaySafe: false,
+        params: { url: 'https://example.com' },
+        state: 'done',
+        resultText: 'Example Domain',
+        deadlineAt: Date.now() + 60_000,
+        createdAt: Date.now(),
+        finishedAt: Date.now(),
+      })
+      .run();
+    const calls = connect(s, 'mini');
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'browser_act',
+        toolCallId: 'after-legacy-unknown',
+        params: { actions: [{ kind: 'press', text: 'Enter' }] },
+      }),
+    ).rejects.toThrow(/recorded before Cairn stored which browser it used/);
+    expect(calls).toHaveLength(0);
   });
 
   test('a browser action blocked by owner control says no browser ran', async () => {
