@@ -56,7 +56,14 @@ function fixture(t) {
     releaseTestTempDir(root);
   });
   mkdirSync(join(root, 'scripts'));
-  for (const dir of ['apps/server', 'apps/web', 'apps/daemon', 'apps/desktop', 'integration'])
+  for (const dir of [
+    'apps/server',
+    'apps/web',
+    'apps/daemon',
+    'apps/desktop',
+    'integration',
+    'eval',
+  ])
     mkdirSync(join(root, dir), { recursive: true });
   for (const name of [
     'heavy-slots.mjs',
@@ -265,6 +272,7 @@ for (const [dir, config] of [
   ['apps/daemon', 'vitest.config.ts'],
   ['apps/desktop', 'vitest.config.ts'],
   ['integration', 'vitest.config.ts'],
+  ['eval', 'vitest.config.ts'],
 ]) {
   test(`direct configuration admission: ${dir}/${config}`, async (t) => {
     const { root, start, writeOwner } = fixture(t);
@@ -450,6 +458,7 @@ test('every vitest project config and the Playwright config invoke the local hea
     'apps/web/vitest.config.ts',
     'integration/vitest.config.ts',
     'packages/shared/vitest.config.ts',
+    'eval/vitest.config.ts',
   ]) {
     assert.match(readFileSync(join(repo, file), 'utf8'), /assertLocalTestRunAllowed\('vitest'\)/);
   }

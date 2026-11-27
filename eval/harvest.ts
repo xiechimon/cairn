@@ -29,10 +29,18 @@ interface SnapshotRow {
   payload: string;
 }
 
-interface Claim {
-  request?: { text?: string };
-  projects?: { name?: string }[];
-  toolCalls?: { name?: string; arguments?: Record<string, unknown> }[];
+interface SnapshotPayload {
+  claim?: {
+    instruction?: string | null;
+    projects?: { name?: string | null }[] | null;
+  } | null;
+  toolViews?: {
+    callId?: string;
+    tool?: string;
+    params?: Record<string, unknown>;
+    preCallTodos?: unknown[];
+    result?: unknown;
+  }[];
 }
 
 function items(): { id: string; input: Record<string, unknown>; expectedOutput: unknown }[] {
@@ -47,14 +55,17 @@ function items(): { id: string; input: Record<string, unknown>; expectedOutput: 
     .all(LIMIT) as SnapshotRow[];
   const out = [];
   for (const row of rows) {
-    let claim: Claim;
+    let payload: SnapshotPayload;
     try {
-      claim = JSON.parse(row.payload) as Claim;
+      payload = JSON.parse(row.payload) as SnapshotPayload;
     } catch {
       continue;
     }
-    const rawRequest = claim.request?.text;
-    if (rawRequest === undefined || rawRequest.length < 8 || rawRequest.length > 4000) continue;
+    const claim = payload.claim;
+    if (claim === null || claim === undefined) continue;
+    const rawRequest = claim.instruction;
+    if (typeof rawRequest !== 'string' || rawRequest.length < 8 || rawRequest.length > 4000)
+      continue;
     const request = String(redactSecrets(rawRequest).value);
     const projects = (claim.projects ?? [])
       .map((p) => p.name)
@@ -64,7 +75,10 @@ function items(): { id: string; input: Record<string, unknown>; expectedOutput: 
     const script = [{ text: '(harvested: scripted responses must be reviewed before activation)' }];
     const candidate = {
       kind: 'runtime',
-      id: `harvest-${row.turnId.slice(0, 12)}`,
+      id: `harvest-${row.turnId
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-')
+        .slice(0, 24)}`,
       request,
       world: { projects },
       script,

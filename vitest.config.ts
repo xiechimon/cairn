@@ -15,6 +15,7 @@ const ALL_PROJECTS = [
   'apps/daemon',
   'apps/desktop',
   'integration',
+  'eval',
 ];
 const HEAVY_PROJECTS = ['integration'];
 const projectSet = process.env.VITEST_PROJECT_SET;
