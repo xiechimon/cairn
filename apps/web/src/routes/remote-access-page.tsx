@@ -144,7 +144,6 @@ export function RemoteAccessPage() {
   const mutations = useRemoteMutations();
   const setTailnet = useSetTailnetAccess();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
-  const [toggleFailed, setToggleFailed] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [loginCopied, setLoginCopied] = useState(false);
   const loginCopyTimerRef = useRef<number | null>(null);
@@ -162,7 +161,7 @@ export function RemoteAccessPage() {
   const tailnet = routesQ.data?.tailnet;
   const tailnetOn = tailnet?.enabled === true;
   const tailnetState = tailnetOn ? tailnet.state : 'off';
-  const tailnetFailed = tailnetOn && (tailnetState === 'failed' || toggleFailed);
+  const tailnetFailed = tailnetOn && tailnetState === 'failed';
   const loginUrl = tailnetOn && tailnetState === 'needs-login' ? tailnet.authUrl : null;
   const tailnetAddress =
     tailnetOn && tailnetState === 'ready' && tailnet.dnsName !== null
@@ -172,10 +171,7 @@ export function RemoteAccessPage() {
     if (routesFailed) {
       return <span data-testid="remote-routes-error">{t('远程访问状态加载失败，请重试')}</span>;
     }
-    if (!tailnetOn)
-      return toggleFailed
-        ? t('远程访问未能打开，请重试')
-        : t('打开后，手机和其他电脑能通过你的 Tailscale 网络连到这台电脑');
+    if (!tailnetOn) return t('打开后，手机和其他电脑能通过你的 Tailscale 网络连到这台电脑');
     if (tailnetFailed) {
       const kind = tailnet?.error;
       if (kind === 'missing-binary') return t('这个安装没有附带远程访问组件');
@@ -317,7 +313,8 @@ export function RemoteAccessPage() {
           <SettingsRow
             label={t('远程访问')}
             hint={tailnetHint}
-            hintClassName={tailnetFailed || routesFailed ? 'text-destructive' : undefined}
+            className="[&>span:first-child]:w-3/5 [&>span:first-child]:flex-none"
+            hintClassName={tailnetFailed || routesFailed ? 'min-h-10 text-destructive' : 'min-h-10'}
           >
             {routesFailed && (
               <Button
@@ -337,9 +334,10 @@ export function RemoteAccessPage() {
               aria-label={t('远程访问')}
               data-testid="remote-access-switch"
               onCheckedChange={(checked) => {
-                setToggleFailed(false);
                 setTailnet.reset();
-                setTailnet.mutate(checked, { onError: () => setToggleFailed(true) });
+                setTailnet.mutate(checked, {
+                  onError: (error) => toastError(t('远程访问未能打开，请重试'), error),
+                });
               }}
             />
           </SettingsRow>
@@ -386,7 +384,10 @@ export function RemoteAccessPage() {
         !awaitingTailnetLogin &&
         requestsQ.data !== undefined &&
         requests.length === 0 && (
-          <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
+          <p
+            className="m-0 mt-3 min-h-10 text-meta text-content-secondary"
+            data-testid="pairing-blocked"
+          >
             {tailnetOn
               ? t(
                   '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请用局域网或 Tailscale 地址打开本页。',

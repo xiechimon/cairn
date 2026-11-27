@@ -9,6 +9,7 @@ import {
 import { Ban, Mail, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { toast } from 'sonner';
 import { ApiError } from '../api/client.js';
 import {
   useApiMutations,
@@ -24,10 +25,12 @@ import { NoticeBanner } from '../components/notice-banner.js';
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import { PageShell } from '../pages/shell.js';
 import { useComposioRows } from './composio-section.js';
 import { MCP_HREF } from './hrefs.js';
@@ -225,10 +228,19 @@ export function McpServersPage() {
       variant="outline"
       size="sm"
       disabled={busy}
+      aria-busy={busy ? 'true' : undefined}
       onClick={onClick}
       aria-label={t('接入 {name}', { name: label })}
     >
-      {busy ? t('正在准备…') : t('接入')}
+      {busy ? (
+        <span className="relative inline-flex items-center justify-center">
+          <span className="invisible">{t('接入')}</span>
+          <RingSpinner className="absolute size-3.5" aria-hidden />
+          <span className="sr-only">{t('正在准备…')}</span>
+        </span>
+      ) : (
+        t('接入')
+      )}
     </Button>
   );
   const manageButton = (label: string, onClick: () => void) => (
@@ -281,9 +293,6 @@ export function McpServersPage() {
         icon: <McpConnectorIcon catalogId={entry.id} />,
         name: entry.name,
         description: t(entry.description),
-        ...(authorizing === entry.id
-          ? { status: <RowNote>{t('正在找到 {name} 的登录地址…', { name: entry.name })}</RowNote> }
-          : {}),
         action: connectButton(entry.name, () => connect(entry), authorizing === entry.id),
       }),
     ),
@@ -325,12 +334,20 @@ export function McpServersPage() {
       const host = entry !== undefined && !isLocalCatalogEntry(entry) ? hostOf(entry.url) : name;
       return setSignIn({ name, host, authorizationUrl: '#', attempt, ...withEntry });
     }
-    const failed = (body: string, retry: boolean) =>
-      setNotice({
-        title: t('未能连接 {name}', { name }),
-        body,
-        ...(retry ? { retry: attempt } : {}),
+    const failed = (body: string, retry: boolean, error?: unknown) => {
+      if (error !== undefined) markErrorSurfaced(error);
+      toast.error(t('未能连接 {name}', { name }), {
+        description: body,
+        ...(retry
+          ? {
+              action: {
+                label: t('重试'),
+                onClick: () => startSignIn(attempt),
+              },
+            }
+          : {}),
       });
+    };
     setAuthorizing(attemptKey(attempt));
     mutations.startMcpConnectorOAuth.mutate(attempt.body, {
       onSuccess: ({ authorizationUrl }) =>
@@ -345,7 +362,7 @@ export function McpServersPage() {
           : failed(t('未能开始登录，请稍后重试。'), true),
       onError: (error) => {
         const status = error instanceof ApiError ? error.status : null;
-        failed(signInError(t, status, name), status !== 400 && status !== 409);
+        failed(signInError(t, status, name), status !== 400 && status !== 409, error);
       },
       onSettled: () => setAuthorizing(null),
     });

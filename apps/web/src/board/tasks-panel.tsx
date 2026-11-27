@@ -10,7 +10,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import { TaskPrLine, TaskPrLineSkeleton } from '../components/thread/task-pr-line.js';
+import { TaskPrLine } from '../components/thread/task-pr-line.js';
 import { TaskRow } from '../components/thread/task-row.js';
 import { Button } from '../components/ui/button.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
@@ -249,7 +249,6 @@ function PanelTaskRow({
   place,
   prs,
   prsArrived,
-  prsPending,
   moved,
   selected,
   open: expanded,
@@ -265,7 +264,6 @@ function PanelTaskRow({
   place: { name: string; shown: boolean } | undefined;
   prs: readonly PrPanelRow[];
   prsArrived: ReadonlySet<string>;
-  prsPending: boolean;
   moved: boolean;
   now: number;
   onOpenThread: (id: string) => void;
@@ -311,13 +309,7 @@ function PanelTaskRow({
             : 'none'
         }
         menu={<TaskRowMenu todo={entry.todo} onOpen={open} onMarkDone={markDone} />}
-        below={
-          prs.length > 0 ? (
-            <TaskPrLine prs={prs} now={now} arrived={prsArrived} />
-          ) : prsPending && entry.todo.latestBuildId !== null ? (
-            <TaskPrLineSkeleton />
-          ) : null
-        }
+        below={prs.length > 0 ? <TaskPrLine prs={prs} now={now} arrived={prsArrived} /> : null}
         onOpen={open}
         open={expanded}
         onIntent={() => prefetch(entry.todo.id)}
@@ -446,7 +438,6 @@ export function TasksPanel({
       place={rowPlace(entry)}
       prs={prsOf.get(entry.todo.id) ?? []}
       prsArrived={prsArrived}
-      prsPending={connected && prsQuery.isPending}
       moved={moved.has(entry.todo.id)}
       selected={picked.has(entry.todo.id)}
       open={entry.todo.id === openThreadId}

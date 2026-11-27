@@ -46,6 +46,7 @@ import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dia
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
+import { Popover, PopoverContent } from '../components/ui/popover.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
@@ -156,9 +157,11 @@ export function ProjectSettingsPage() {
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [convRepo, setConvRepo] = useState('');
   const [convError, setConvError] = useState<string | null>(null);
+  const [convBtnEl, setConvBtnEl] = useState<HTMLButtonElement | null>(null);
   const [convConfirmRepo, setConvConfirmRepo] = useState<string | null>(null);
   const [repoDraft, setRepoDraft] = useState<string | null>(null);
   const [repoError, setRepoError] = useState<string | null>(null);
+  const [repoSaveEl, setRepoSaveEl] = useState<HTMLButtonElement | null>(null);
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const mutations = useApiMutations(teamId);
@@ -343,6 +346,7 @@ export function ProjectSettingsPage() {
                     }}
                   />
                   <Button
+                    ref={setRepoSaveEl}
                     className={DIALOG_PRIMARY_BUTTON}
                     aria-label={t('保存仓库')}
                     disabled={
@@ -373,10 +377,26 @@ export function ProjectSettingsPage() {
                   >
                     {t('保存')}
                   </Button>
-                  {repoError !== null && (
-                    <span role="alert" className="text-meta text-destructive">
-                      {repoError}
-                    </span>
+                  {repoSaveEl !== null && (
+                    <Popover
+                      open={repoError !== null}
+                      onOpenChange={(open) => {
+                        if (!open) setRepoError(null);
+                      }}
+                    >
+                      <PopoverContent
+                        anchor={repoSaveEl}
+                        align="end"
+                        sideOffset={6}
+                        initialFocus={false}
+                        finalFocus={false}
+                        className="w-auto max-w-80 p-2.5"
+                      >
+                        <p role="alert" className="m-0 text-meta text-destructive">
+                          {repoError}
+                        </p>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </SettingsRow>
               ) : (
@@ -425,6 +445,7 @@ export function ProjectSettingsPage() {
                   />
                   <div className="flex items-center gap-3">
                     <Button
+                      ref={setConvBtnEl}
                       className={DIALOG_PRIMARY_BUTTON}
                       disabled={mutations.patchProject.isPending || convRepo.trim() === ''}
                       onClick={() => {
@@ -487,10 +508,26 @@ export function ProjectSettingsPage() {
                         )}
                       </p>
                     </AlertDialogShell>
-                    {convError !== null && (
-                      <span role="alert" className="text-meta text-destructive">
-                        {convError}
-                      </span>
+                    {convBtnEl !== null && (
+                      <Popover
+                        open={convError !== null}
+                        onOpenChange={(open) => {
+                          if (!open) setConvError(null);
+                        }}
+                      >
+                        <PopoverContent
+                          anchor={convBtnEl}
+                          align="start"
+                          sideOffset={6}
+                          initialFocus={false}
+                          finalFocus={false}
+                          className="w-auto max-w-80 p-2.5"
+                        >
+                          <p role="alert" className="m-0 text-meta text-destructive">
+                            {convError}
+                          </p>
+                        </PopoverContent>
+                      </Popover>
                     )}
                   </div>
                 </div>

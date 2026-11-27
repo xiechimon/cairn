@@ -2374,7 +2374,6 @@ export const EN: Record<string, string> = {
   已接入: 'Connected',
   '管理 {name}': 'Manage {name}',
   可接入: 'Available',
-  '正在找到 {name} 的登录地址…': 'Finding the sign-in page for {name}…',
   '接入 {name}': 'Connect {name}',
   '正在准备…': 'Preparing…',
   接入: 'Connect',

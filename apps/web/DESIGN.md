@@ -79,3 +79,16 @@ The rows below are the process rules; the rows for a surface live in the `## Rul
 | Hover info bubble / divider | `components/ui/tooltip.tsx` / `components/ui/separator.tsx` | Do not use `<hr>` / `border-t` divs for a divider |
 | Shortcut hint chip | the `tooltip.tsx` + `kbd.tsx` composition assembled at the consumer (Kbd inside TooltipContent, the #1008/#983 ruling) | Do not hand-write absolute positioning + show/hide; the key caps in doc body text use `kbd.tsx` directly |
 | Toast / lightweight failure feedback | `toast.*` (imperative; `components/ui/toaster.tsx` is already mounted at the App root) | Do not silently swallow mutation errors; surfaces with an in-surface scoped red-line canon (XMON-80/P2) keep going in-surface and do not stack toast on top |
+
+## Performance
+
+Cairn adopts Google's [Core Web Vitals](https://web.dev/articles/vitals) as its single performance standard measured per surface on the fixture stack, keeps two stricter additions (`CLS = 0` on transient status/hints/validation/loading per the owner's rule so transient chrome never shifts content below, and zero main-thread long tasks over `50 ms` while typing as the INP diagnostic), and measures/reports supporting Web Vitals (`FCP`, `TTFB`) without gating.
+
+| Metric | Standard threshold | Cairn threshold | Spec |
+|---|---|---|---|
+| [LCP](https://web.dev/articles/lcp) | ≤ 2.5 s (good) | ≤ 2.5 s per surface & thread switch (`C37`) | `e2e/web-vitals-perf.spec.ts` |
+| [INP](https://web.dev/articles/inp) | ≤ 200 ms (good) | ≤ 200 ms p98; pending state paints ≤ 200 ms on 400 ms slow network (`C35`) | `e2e/web-vitals-perf.spec.ts` |
+| [CLS](https://web.dev/articles/cls) | ≤ 0.1 (good) | ≤ 0.1 per surface load (`C37`); `= 0` on transient hints/status (`C34`, owner rule) | `e2e/web-vitals-perf.spec.ts`, `e2e/no-layout-shift.spec.ts` |
+| [Long tasks](https://web.dev/articles/tbt) | > 50 ms (INP diagnostic, not CWV-gated) | 0 tasks `> 50 ms` while typing in Coordinator composer / add-task (`C36`, INP diagnostic) | `e2e/web-vitals-perf.spec.ts` |
+| [FCP](https://web.dev/articles/fcp) | ≤ 1.8 s (good, supporting) | Measured & reported per surface (not gated) | `e2e/web-vitals-perf.spec.ts` |
+| [TTFB](https://web.dev/articles/ttfb) | ≤ 0.8 s (good, supporting) | Measured & reported per surface (not gated) | `e2e/web-vitals-perf.spec.ts` |

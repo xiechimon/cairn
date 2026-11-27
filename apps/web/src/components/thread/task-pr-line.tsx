@@ -291,17 +291,3 @@ export function TaskPrLine({
     </div>
   );
 }
-
-export function TaskPrLineSkeleton() {
-  return (
-    <div
-      data-slot="task-pr-line-skeleton"
-      aria-hidden
-      className="relative -mt-1.5 flex items-center gap-2.5 pr-2.5 pb-2 pl-12 leading-6"
-    >
-      <span className="absolute -top-1 left-6 h-4 w-4 rounded-bl-md border-b border-l border-(--tree-line)" />
-      <span className="h-3.5 w-32 rounded-sm bg-muted" />
-      <span className="h-3.5 w-16 rounded-sm bg-muted" />
-    </div>
-  );
-}

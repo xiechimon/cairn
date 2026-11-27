@@ -44,6 +44,8 @@ const BOARD = [
   'task-send-dead-turn',
   'card-corner-clipping',
   'usage-popover-icons',
+  'no-layout-shift',
+  'web-vitals-perf',
 ];
 const SIDEBAR = [
   'usage-page',
@@ -122,6 +124,8 @@ const DETAIL = [
   'task-send-dead-turn',
   'card-corner-clipping',
   'usage-popover-icons',
+  'no-layout-shift',
+  'web-vitals-perf',
 ];
 const CHIEF = [
   'composer-tool-tips',
@@ -139,6 +143,8 @@ const CHIEF = [
   'task-panel',
   'card-corner-clipping',
   'usage-popover-icons',
+  'no-layout-shift',
+  'web-vitals-perf',
 ];
 const AGENT = [
   'menu-keys',
@@ -208,6 +214,8 @@ const PAGES = [
   'registry-focus-ring',
   'mobile-narrow',
   'task-panel',
+  'no-layout-shift',
+  'web-vitals-perf',
 ];
 const RESOURCES = [
   'menu-keys',
@@ -230,6 +238,8 @@ const RESOURCES = [
   'skill-import',
   'task-panel',
   'rapid-input-',
+  'no-layout-shift',
+  'web-vitals-perf',
 ];
 export const SHARED_SURFACE_ONLY = [
   'cds-motion',
@@ -288,7 +298,15 @@ export const FILE_RULES = new Map([
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
   [
     'apps/web/src/routes/account-page.tsx',
-    ['account-', 'team-attribution-', 'user-menu-', 'cds-density', 'push-device-switch'],
+    [
+      'account-',
+      'team-attribution-',
+      'user-menu-',
+      'cds-density',
+      'push-device-switch',
+      'no-layout-shift',
+      'web-vitals-perf',
+    ],
   ],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'api-key-']],
@@ -340,7 +358,10 @@ export const FILE_RULES = new Map([
     ['detail-composer-queue-stop', 'chief-home-busy'],
   ],
   ['apps/web/vitest.config.ts', []],
-  ['apps/web/DESIGN.md', ['texture-', 'a11y-axe', 'design-rules-']],
+  [
+    'apps/web/DESIGN.md',
+    ['texture-', 'a11y-axe', 'design-rules-', 'no-layout-shift', 'web-vitals-perf'],
+  ],
   ['apps/web/src/components/ui/INVENTORY.md', []],
   ['apps/web/e2e/chief-home-mock.ts', ['chief-home-']],
   ['apps/web/e2e/demo-server.ts', ['demo-mode']],
@@ -371,7 +392,10 @@ export const DIR_RULES = [
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
   { prefix: 'apps/web/src/pwa/', specs: ['notify-', 'push-device-switch'] },
   { prefix: 'apps/web/src/components/texture/', specs: ['texture-'] },
-  { prefix: 'docs/design/surfaces/', specs: ['design-rules-'] },
+  {
+    prefix: 'docs/design/surfaces/',
+    specs: ['design-rules-', 'no-layout-shift', 'web-vitals-perf'],
+  },
   { prefix: 'apps/web/src/design/', specs: ['texture-'] },
   { prefix: 'apps/web/test/', specs: [] },
 ];

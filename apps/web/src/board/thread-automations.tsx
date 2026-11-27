@@ -37,6 +37,7 @@ export function ThreadAutomations({ todo, now }: { todo: TodoRecord; now: number
           <Button
             variant="ghost"
             size="icon-xs"
+            className="-my-0.5"
             data-testid="automation-load-error"
             disabled={schedules.isFetching}
             onClick={() => void schedules.refetch()}
@@ -52,7 +53,13 @@ export function ThreadAutomations({ todo, now }: { todo: TodoRecord; now: number
       <IconTooltip
         label={t('定时加载中…')}
         trigger={
-          <Button variant="ghost" size="icon-xs" disabled data-testid="automation-loading" />
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="size-5"
+            disabled
+            data-testid="automation-loading"
+          />
         }
       >
         <Timer />

@@ -182,7 +182,7 @@ export function BackupSettingsSection() {
           <Button
             variant="outline"
             size="sm"
-            className="pointer-coarse:h-11"
+            className="min-w-28 pointer-coarse:h-11"
             disabled={busy}
             data-testid="backup-run-now"
             onClick={() =>

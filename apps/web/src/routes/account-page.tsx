@@ -238,19 +238,24 @@ export function AccountPage() {
             </SettingsRow>
           </SettingsCard>
         </SettingsSection>
-        {((live && !serverVersion.isPending) || showDesktopUpdate) && (
+        {(live || showDesktopUpdate) && (
           <SettingsSection title={t('关于')} testId="account-about">
             <SettingsCard>
-              {live && !serverVersion.isPending && (
+              {live && (
                 <SettingsRow label={t('当前版本')}>
                   <span
                     className="text-ui text-content-secondary tabular-nums"
                     data-testid="server-version"
+                    aria-busy={serverVersion.isPending ? 'true' : 'false'}
                   >
-                    {formatServerVersion(
-                      serverVersion.data?.version ?? null,
-                      serverVersion.data?.commit ?? null,
-                      t,
+                    {serverVersion.isPending ? (
+                      <span aria-hidden="true" className="inline-block h-5" />
+                    ) : (
+                      formatServerVersion(
+                        serverVersion.data?.version ?? null,
+                        serverVersion.data?.commit ?? null,
+                        t,
+                      )
                     )}
                   </span>
                 </SettingsRow>
