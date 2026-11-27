@@ -70,6 +70,8 @@
   "chief-selection-quote.spec.ts": 3100,
   "chief-send-retry.spec.ts": 17071,
   "chief-stream-markdown.spec.ts": 14394,
+  "chief-task-ref-grow.spec.ts": 3900,
+  "chief-task-trunk.spec.ts": 3200,
   "chief-thread-report.spec.ts": 12716,
   "chief-turn-error.spec.ts": 9255,
   "collapse-family.spec.ts": 2900,

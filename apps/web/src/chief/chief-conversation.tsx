@@ -357,6 +357,7 @@ export function ChiefConversation({
     if (archived.length === 0) return active;
     return new Map([...active, ...archived.map((td) => [td.id, todoGlanceOf(td)] as const)]);
   }, [todoGlances, todosQ.data, archivedQ.data]);
+  const glancesReady = !live || todoGlances !== undefined || todosQ.isSuccess || todosQ.isError;
   const unread = useUnreadThreadIds(glances);
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
@@ -582,6 +583,7 @@ export function ChiefConversation({
       joinsNext={run?.joinsNext === true}
       {...(started !== undefined ? { started } : {})}
       {...(reports !== undefined ? { reports } : {})}
+      glancesReady={glancesReady}
     />
   );
   const quickAfter =
