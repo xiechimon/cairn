@@ -19,6 +19,9 @@ export const MAX_SPECULATIVE_DEPTH = 4;
 const ENQUEUE_REF_RE = /^refs\/heads\/enqueue\/(\d+)-([0-9a-f]+)$/;
 const FAILED_JOB_CONCLUSIONS = new Set(['failure', 'timed_out']);
 const GREEN_CONCLUSIONS = new Set(['success', 'skipped']);
+const MAX_CANCELLED_RETRY_ATTEMPT = 2;
+const HTTP_STATUS_RE = /\(HTTP (\d{3})\)/;
+const RATE_LIMIT_RE = /rate limit/i;
 const COMMITTER_ENV = {
   GIT_COMMITTER_NAME: 'xiechimon',
   GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
@@ -62,7 +65,7 @@ export function latestCompletedCheckMap(checkRuns) {
   );
 }
 
-export function evaluateSpeculativeCandidate({ sha, ciRuns, checkRuns, jobs = [] }) {
+function selectQueueRun(ciRuns, sha) {
   const matchingRuns = ciRuns.filter(
     (run) =>
       run.name === 'ci' &&
@@ -70,9 +73,14 @@ export function evaluateSpeculativeCandidate({ sha, ciRuns, checkRuns, jobs = []
       typeof run.head_branch === 'string' &&
       (run.head_branch.startsWith('queue/') || run.head_branch.startsWith('refs/heads/queue/')),
   );
-  const run =
+  return (
     matchingRuns.find((item) => item.status === 'completed' && item.conclusion === 'success') ??
-    matchingRuns[0];
+    matchingRuns[0]
+  );
+}
+
+export function evaluateSpeculativeCandidate({ sha, ciRuns, checkRuns, jobs = [] }) {
+  const run = selectQueueRun(ciRuns, sha);
   if (run?.status !== 'completed') {
     return {
       state: 'pending',
@@ -119,6 +127,7 @@ export function planQueueStep({
   tryMap,
   verdicts,
   landedSet = new Set(),
+  held = new Set(),
   maxDepth = MAX_SPECULATIVE_DEPTH,
 }) {
   const prune = [];
@@ -164,6 +173,7 @@ export function planQueueStep({
   let furthestGreen = -1;
   let allGreenSoFar = true;
   for (let i = 0; i <= validPrefixEnd; i += 1) {
+    if (held.has(window[i].id)) break;
     const verdict = verdicts.get(tryMap.get(window[i].id).sha);
     if (verdict?.state === 'retry' || verdict?.state === 'red' || verdict?.retrying) break;
     if (verdict?.state !== 'green') allGreenSoFar = false;
@@ -419,20 +429,118 @@ function readTryVerdict(repo, sha) {
   const { workflow_runs: ciRuns } = gh([
     `repos/${repo}/actions/runs?head_sha=${sha}&event=push&per_page=30`,
   ]);
-  const checkRuns = ghPages(`repos/${repo}/commits/${sha}/check-runs?per_page=100`, 'check_runs');
-  const failed = ciRuns.find(
-    (run) =>
-      run.name === 'ci' &&
-      run.head_sha === sha &&
-      typeof run.head_branch === 'string' &&
-      (run.head_branch.startsWith('queue/') || run.head_branch.startsWith('refs/heads/queue/')) &&
-      run.status === 'completed' &&
-      run.conclusion === 'failure',
-  );
-  const jobs = failed
-    ? ghPages(`repos/${repo}/actions/runs/${failed.id}/jobs?filter=latest&per_page=100`, 'jobs')
+  const run = selectQueueRun(ciRuns, sha);
+  const checkRuns =
+    run?.status === 'completed' && run.conclusion === 'success'
+      ? ghPages(`repos/${repo}/commits/${sha}/check-runs?per_page=100`, 'check_runs')
+      : [];
+  const needsJobs =
+    run?.status === 'completed' &&
+    (FAILED_JOB_CONCLUSIONS.has(run.conclusion) ||
+      (run.conclusion === 'cancelled' && (run.run_attempt ?? 1) === MAX_CANCELLED_RETRY_ATTEMPT));
+  const jobs = needsJobs
+    ? ghPages(`repos/${repo}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`, 'jobs')
     : [];
   return evaluateSpeculativeCandidate({ sha, ciRuns, checkRuns, jobs });
+}
+
+function parseHttpStatus(error) {
+  const match = HTTP_STATUS_RE.exec(String(error?.stderr ?? error?.message ?? ''));
+  return match ? Number(match[1]) : null;
+}
+
+function isPermanentRerunRefusal(error) {
+  const status = parseHttpStatus(error);
+  if (status === null || status >= 500 || status === 401 || status === 429) return false;
+  if (status === 403 && RATE_LIMIT_RE.test(String(error?.stderr ?? error?.message ?? ''))) {
+    return false;
+  }
+  return status >= 400 && status < 500;
+}
+
+function rerunOnce(repo, retriedRuns, target) {
+  if (retriedRuns.has(target.runId)) return false;
+  execFileSync(
+    'gh',
+    ['api', '--method', 'POST', `repos/${repo}/actions/runs/${target.runId}/${target.rerun}`],
+    { encoding: 'utf8', stdio: ['ignore', 'inherit', 'pipe'] },
+  );
+  retriedRuns.add(target.runId);
+  console.log(`[speculative-queue] ${target.rerun} ${target.runUrl} once`);
+  return true;
+}
+
+function findUnsettledCommit({ repo, cwd, mainTip, entries, candidateOf }) {
+  const read = new Set();
+  for (const entry of entries) {
+    const history = runGit(cwd, ['rev-list', candidateOf(entry), entry.sha, `^${mainTip}`]);
+    for (const sha of history.split('\n').filter(Boolean)) {
+      if (read.has(sha)) continue;
+      read.add(sha);
+      const verdict = readTryVerdict(repo, sha);
+      const failedOnce = verdict.state === 'retry' && verdict.conclusion !== 'cancelled';
+      if (failedOnce || verdict.retrying || verdict.state === 'red') {
+        return { entry, sha, verdict };
+      }
+    }
+  }
+  return null;
+}
+
+function resolveCarriedUnsettled({ repo, retriedRuns, unsettled }) {
+  const { entry: carrier, sha: failedSha, verdict } = unsettled;
+  const retryWasCancelled = verdict.state === 'red' && verdict.conclusion === 'cancelled';
+  const canRerunCancelledRetry =
+    retryWasCancelled &&
+    verdict.runAttempt === MAX_CANCELLED_RETRY_ATTEMPT &&
+    (verdict.failedJobs?.length ?? 0) === 0;
+  if (verdict.state === 'retry' || canRerunCancelledRetry) {
+    const target = canRerunCancelledRetry ? { ...verdict, rerun: 'rerun' } : verdict;
+    try {
+      const sent = rerunOnce(repo, retriedRuns, target);
+      return { outcome: 'hold', sent };
+    } catch (error) {
+      const status = parseHttpStatus(error);
+      if (!isPermanentRerunRefusal(error)) {
+        console.log(
+          `::warning::could not rerun ${target.runUrl ?? target.runId} (${status ? `HTTP ${status}` : 'transient error'}); holding ${carrier.id}`,
+        );
+        return { outcome: 'hold', sent: false };
+      }
+      let fresh = null;
+      try {
+        fresh = readTryVerdict(repo, failedSha);
+      } catch {
+        fresh = null;
+      }
+      if (!fresh) {
+        console.log(
+          `::warning::could not re-read ${failedSha.slice(0, 9)} after rerun refusal; holding ${carrier.id}`,
+        );
+        return { outcome: 'hold', sent: false };
+      }
+      if (fresh.state === 'green') return { outcome: 'recheck', sent: false };
+      if (fresh.state === 'pending') {
+        console.log(
+          `[speculative-queue] holding ${carrier.id}: rerun of ${failedSha.slice(0, 9)} is already in progress`,
+        );
+        return { outcome: 'hold', sent: false };
+      }
+      return {
+        outcome: 'eject',
+        reason: `queue run failed and GitHub refused the rerun (HTTP ${status})`,
+      };
+    }
+  }
+  if (verdict.retrying) return { outcome: 'hold', sent: false };
+  if (retryWasCancelled) {
+    const reason =
+      (verdict.failedJobs?.length ?? 0) > 0
+        ? 'queue retry had failed jobs before being cancelled'
+        : 'replacement queue retry was cancelled again';
+    return { outcome: 'eject', reason };
+  }
+  return { outcome: 'eject', reason: 'queue run failed and did not pass its retry' };
 }
 
 function hasCommit(cwd, sha) {
@@ -482,6 +590,8 @@ function listRemoteQueueRefs(cwd) {
 
 export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
   const retriedRuns = new Set();
+  const held = new Set();
+  let rerunCarried = false;
   for (let pass = 0; pass < 8; pass += 1) {
     let { mainTip, enqueue, tryRaw } = listRemoteQueueRefs(cwd);
     if (!mainTip) throw new Error('could not resolve refs/heads/main on origin');
@@ -576,6 +686,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
       tryMap,
       verdicts,
       landedSet,
+      held,
       maxDepth: MAX_SPECULATIVE_DEPTH,
     });
 
@@ -610,6 +721,48 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
         `[speculative-queue] promoting batch of ${promotedEntries.length} (${promotedEntries.map((item) => item.id).join(', ')}) -> ${targetSha.slice(0, 9)}`,
       );
       if (enforce) {
+        const unsettled = findUnsettledCommit({
+          repo,
+          cwd,
+          mainTip,
+          entries: promotedEntries,
+          candidateOf: (item) => tryMap.get(item.id).sha,
+        });
+        if (unsettled) {
+          const { entry: carrier, sha: failedSha, verdict } = unsettled;
+          const resolution = resolveCarriedUnsettled({ repo, retriedRuns, unsettled });
+          if (resolution.sent) rerunCarried = true;
+          if (resolution.outcome === 'recheck') continue;
+          if (resolution.outcome === 'hold') {
+            console.log(
+              `[speculative-queue] holding ${carrier.id} until the retry of ${failedSha.slice(0, 9)} finishes`,
+            );
+            held.add(carrier.id);
+            continue;
+          }
+          console.log(
+            `[speculative-queue] ejecting ${carrier.id}: it carries failed commit ${failedSha.slice(0, 9)}`,
+          );
+          const refs = [
+            carrier.ref,
+            ...(tryRaw.has(carrier.id) ? [`${TRY_PREFIX}${carrier.id}`] : []),
+          ];
+          if (!deleteRemoteRefs(cwd, refs)) return { action: 'wait' };
+          commentOnCommit(
+            repo,
+            carrier.sha,
+            [
+              `Removed from merge queue: this change contains ${failedSha.slice(0, 9)}, whose ${resolution.reason}.`,
+              verdict.runUrl ? `Run: ${verdict.runUrl}` : null,
+              `Commit: ${carrier.sha.slice(0, 9)} ${carrier.subject}`,
+              carrier.owner ? `Owner: ${carrier.owner.label}` : null,
+              'Rebase onto latest origin/main, drop that commit or squash its fix into it, run `node scripts/ops/preflight.mjs --wait`, and re-queue with `node scripts/ops/push-queue.mjs`.',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          );
+          continue;
+        }
         const sleep = (seconds) =>
           Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
         let concurrentMainAdvance = false;
@@ -665,15 +818,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
     let didRetry = false;
     if (enforce && plan.retry.length > 0) {
       for (const target of plan.retry) {
-        if (retriedRuns.has(target.runId)) continue;
-        retriedRuns.add(target.runId);
-        execFileSync(
-          'gh',
-          ['api', '--method', 'POST', `repos/${repo}/actions/runs/${target.runId}/${target.rerun}`],
-          { stdio: 'inherit' },
-        );
-        console.log(`[speculative-queue] ${target.rerun} ${target.runUrl} once`);
-        didRetry = true;
+        if (rerunOnce(repo, retriedRuns, target)) didRetry = true;
       }
       if (didRetry && plan.rebuild.length === 0 && !plan.ejectRed) return { action: 'retry' };
     }
@@ -789,7 +934,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
       return { action: 'rebuilt' };
     }
 
-    if (didRetry) return { action: 'retry' };
+    if (didRetry || rerunCarried) return { action: 'retry' };
 
     console.log(`[speculative-queue] waiting on ${window.length} active try branch(es)`);
     return { action: 'wait' };

@@ -68,9 +68,30 @@ accepted and pushing an untested one is rejected.
 | Failed once and waiting for its retry, retry pending or running, or failed twice | waits | waits |
 
   A first attempt that is still running with a job already failed counts as
-  running. The wait lasts while the failed position is in the window: once a
-  twice-failed head is ejected, an entry that was pre-flighted on top of its
-  `try` commit still contains that commit and can land it in the same pass.
+  running.
+- **Carried commits.** The table only sees positions still in the window, so just
+  before `main` is pushed the promoter reads the `queue/*` run of every commit in
+  each landing entry's candidate and own history that is not on `main`. That
+  covers a commit whose own entry has left the queue: ejected, released, or
+  stacked on by another lane. The first commit with an unsettled failure decides
+  one action:
+
+| Its run | Action on the entry that brings the commit | What moves it next |
+|---|---|---|
+| First attempt failed | rerun it once and hold only the carrier | the retry finishes |
+| Retry pending or running | hold only the carrier | the retry finishes |
+| Attempt 2 was cancelled with no failed job | rerun it whole once (attempt 3) and hold only the carrier | that replacement rerun finishes |
+| Attempt 2 was cancelled with a failed job, or attempt 3+ was cancelled | eject only the carrier, naming the commit | the same pass plans without it |
+| Retry failed | eject only the carrier, naming the commit | the same pass plans without it |
+| Transient rerun error (5xx, 401, 429, rate limit, network) | hold only the carrier | the next pass tries again |
+| Permanent 4xx rerun refusal (after re-reading confirms no retry in flight or green completion) | eject only the carrier, naming the commit and HTTP status | the same pass plans without it |
+
+  Holding is not waiting for the whole queue: the same pass lands the entries
+  ahead of the held one and still builds, retries and ejects behind it. A first
+  attempt that was only cancelled is not a failure: the queue cancels superseded
+  runs itself. A commit that never had a queue run, such as the inner ones of a
+  multi-commit submission, has nothing to read. The owner of an ejected entry
+  drops the commit or squashes its fix into it.
 - **One retry.** A first-attempt run that did not succeed has its failed jobs
   rerun; a run with only cancelled jobs is rerun whole.
 - **Attribution.** Only the head entry is ever ejected for red CI, once a second

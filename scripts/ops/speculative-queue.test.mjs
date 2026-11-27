@@ -438,23 +438,34 @@ const IDENTITY = {
 };
 
 const FAKE_GH = `#!/usr/bin/env node
-const { readFileSync, appendFileSync } = require('node:fs');
+const { readFileSync, writeFileSync, appendFileSync } = require('node:fs');
 const state = JSON.parse(readFileSync(process.env.FAKE_GH_STATE, 'utf8'));
 const args = process.argv.slice(2);
 const path = args.find((arg) => arg.startsWith('repos/'));
 if (args.includes('POST')) {
+  if (state.rerunRefusal && path.includes('/rerun')) {
+    const refusal = typeof state.rerunRefusal === 'string' ? { error: state.rerunRefusal } : state.rerunRefusal;
+    if (refusal.patch) {
+      const id = Number(/runs\\/(\\d+)\\//.exec(path)?.[1]);
+      state.runs = state.runs.map((run) => (run.id === id ? { ...run, ...refusal.patch } : run));
+      writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(state));
+    }
+    console.error(refusal.error);
+    process.exit(1);
+  }
   appendFileSync(process.env.FAKE_GH_LOG, path + '\\n');
   console.log('{}');
 } else {
   const checks = /commits\\/([0-9a-f]+)\\/check-runs/.exec(path);
   const runs = /head_sha=([0-9a-f]+)/.exec(path);
+  const jobs = /runs\\/(\\d+)\\/jobs/.exec(path);
   let body = [];
   if (checks) {
     body = { check_runs: state.green.includes(checks[1]) ? ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({ name, status: 'completed', conclusion: 'success' })) : [] };
   } else if (runs) {
     body = { workflow_runs: state.runs.filter((run) => run.head_sha === runs[1]) };
-  } else if (path.includes('/jobs')) {
-    body = { jobs: [] };
+  } else if (jobs) {
+    body = { jobs: state.jobs?.[jobs[1]] ?? [] };
   }
   console.log(JSON.stringify(args.includes('--slurp') ? [body] : body));
 }
@@ -538,6 +549,7 @@ function queueHarness(prefix, scenario) {
       pass,
       remote,
       git: (args) => git(work, args),
+      posts: () => readFileSync(logFile, 'utf8').split('\n').filter(Boolean),
       cancelled: () =>
         [...readFileSync(logFile, 'utf8').matchAll(/runs\/(\d+)\/cancel/g)].map((m) =>
           Number(m[1]),
@@ -832,5 +844,209 @@ test('an entry that is the queue commit ahead of it never overrides that run ver
     q.run(aTry, 1, 'queue/try/a', FAILED_ONCE);
     assert.equal(q.pass().action, 'retry');
     assert.equal(q.remote('refs/heads/main'), main1);
+  });
+});
+
+function carriedCommit(q, extra = {}) {
+  const main1 = q.commit(q.base, 'x.txt', 'x\n');
+  q.push(main1, 'refs/heads/main');
+  const carried = q.commit(main1, 'a.txt', 'a\n');
+  const b = q.commit(carried, 'b.txt', 'b\n');
+  const idB = idAt(2, b);
+  q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+  q.state.green = [b];
+  const failed = (patch) => q.run(carried, 1, 'queue/try/gone', patch);
+  failed(extra);
+  return { main1, carried, b, idB, failed };
+}
+
+function batchWithCarried(q, carriedPatch = FAILED_ONCE) {
+  const main1 = q.commit(q.base, 'x.txt', 'x\n');
+  q.push(main1, 'refs/heads/main');
+  const a = q.commit(q.base, 'a.txt', 'a\n');
+  const aTry = q.commit(main1, 'a.txt', 'a\n');
+  const carried = q.commit(aTry, 'c.txt', 'c\n');
+  const b = q.commit(carried, 'b.txt', 'b\n');
+  const d = q.commit(q.base, 'd.txt', 'd\n');
+  const [idA, idB, idD] = [idAt(1, a), idAt(2, b), idAt(3, d)];
+  q.push(a, `${ENQUEUE_PREFIX}${idA}`);
+  q.push(aTry, `${TRY_PREFIX}${idA}`);
+  q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+  q.push(d, `${ENQUEUE_PREFIX}${idD}`);
+  q.state.green = [a, aTry, b, d];
+  q.run(aTry, 1, `queue/try/${idA}`, { status: 'completed', conclusion: 'success' });
+  q.run(carried, 7, 'queue/try/gone', carriedPatch);
+  return { main1, aTry, carried, b, d, idA, idB, idD };
+}
+
+const rerunPosts = (q) => q.posts().filter((path) => path.includes('/rerun'));
+
+test('a carried commit that failed once gets one retry, holds main while it runs and releases it green', () => {
+  queueHarness('queue-carried-flake-', (q) => {
+    const { main1, b, failed } = carriedCommit(q, FAILED_ONCE);
+    assert.equal(q.pass().action, 'retry');
+    assert.equal(q.remote('refs/heads/main'), main1, 'landed a commit whose run failed');
+    assert.deepEqual(rerunPosts(q), ['repos/xiechimon/cairn/actions/runs/1/rerun']);
+    failed(RETRY_RUNNING);
+    assert.equal(q.pass().action, 'wait');
+    assert.equal(q.remote('refs/heads/main'), main1, 'landed past a running retry');
+    assert.equal(rerunPosts(q).length, 1);
+    failed({ status: 'completed', conclusion: 'success', run_attempt: 2 });
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), b);
+  });
+});
+
+test('a carried commit that failed twice ejects the entry that brings it', () => {
+  queueHarness('queue-carried-red-', (q) => {
+    const { main1, idB } = carriedCommit(q, { ...FAILED_ONCE, run_attempt: 2 });
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), main1);
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), null);
+    assert.ok(q.posts().some((path) => /commits\/[0-9a-f]+\/comments$/.test(path)));
+    assert.equal(rerunPosts(q).length, 0);
+  });
+});
+
+test('a carried commit whose only run was cancelled does not hold the entry', () => {
+  queueHarness('queue-carried-cancelled-', (q) => {
+    const { b } = carriedCommit(q, { status: 'completed', conclusion: 'cancelled' });
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), b);
+    assert.equal(rerunPosts(q).length, 0);
+  });
+});
+
+test('a rebuilt entry whose own history holds a twice-failed commit is ejected though its rebuild is green', () => {
+  queueHarness('queue-carried-history-', (q) => {
+    const { main1, carried, b, idB } = carriedCommit(q, { ...FAILED_ONCE, run_attempt: 2 });
+    const moved = q.commit(main1, 'y.txt', 'y\n');
+    q.push(moved, 'refs/heads/main');
+    const rebuilt = q.commit(q.commit(moved, 'a.txt', 'a\n'), 'b.txt', 'b\n');
+    q.push(rebuilt, `${TRY_PREFIX}${idB}`);
+    q.run(rebuilt, 2, `queue/try/${idB}`, { status: 'completed', conclusion: 'success' });
+    q.state.green = [b, rebuilt];
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), moved);
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), null);
+    assert.notEqual(carried, rebuilt);
+  });
+});
+
+test('ejecting a twice-failed head does not let a follower stacked on its try commit land it', () => {
+  queueHarness('queue-carried-follower-', (q) => {
+    const { main1, idA, head } = failingHead(q, 'pre-flight only');
+    head({ ...FAILED_ONCE, run_attempt: 2 });
+    q.pass();
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idA}`), null);
+    assert.equal(q.remote('refs/heads/main'), main1, 'the failed try commit reached main');
+  });
+});
+
+test('a held carrier does not delay the entry ahead of it or the build of the entry behind it', () => {
+  queueHarness('queue-carried-batch-', (q) => {
+    const { aTry, b, idB, idD } = batchWithCarried(q);
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), aTry, 'the innocent entry ahead waited too');
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), b);
+    const dTry = q.remote(`${TRY_PREFIX}${idD}`);
+    assert.ok(dTry, 'the entry behind got no run while the carrier waited');
+    assert.equal(q.git(['rev-parse', `${dTry}^`]), b);
+    assert.equal(rerunPosts(q).length, 1);
+  });
+});
+
+test('a carried retry cancelled without failed jobs gets one replacement rerun then ejects at attempt 3', () => {
+  queueHarness('queue-carried-retry-cancelled-', (q) => {
+    const { main1, b, idB, failed } = carriedCommit(q, {
+      status: 'completed',
+      conclusion: 'cancelled',
+      run_attempt: 2,
+    });
+    assert.equal(q.pass().action, 'retry');
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), b);
+    assert.equal(q.remote('refs/heads/main'), main1);
+    assert.deepEqual(rerunPosts(q), ['repos/xiechimon/cairn/actions/runs/1/rerun']);
+
+    failed({ status: 'completed', conclusion: 'cancelled', run_attempt: 3 });
+    q.pass();
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), null);
+    assert.equal(q.remote('refs/heads/main'), main1);
+    assert.equal(rerunPosts(q).length, 1);
+    assert.ok(q.posts().some((path) => /commits\/[0-9a-f]+\/comments$/.test(path)));
+  });
+});
+
+test('a carried retry cancelled after a job failed ejects immediately without a third attempt', () => {
+  queueHarness('queue-carried-retry-cancelled-failed-job-', (q) => {
+    const { main1, idB } = carriedCommit(q, {
+      status: 'completed',
+      conclusion: 'cancelled',
+      run_attempt: 2,
+    });
+    q.state.jobs = { 1: [{ name: 'e2e (5)', conclusion: 'failure' }] };
+    q.pass();
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), null);
+    assert.equal(q.remote('refs/heads/main'), main1);
+    assert.equal(rerunPosts(q).length, 0);
+  });
+});
+
+test('a permanent rerun refusal ejects only the carrier and still lands ahead and rebuilds behind', () => {
+  for (const error of [
+    'gh: exceeded the maximum number of reruns (HTTP 403)',
+    'gh: Unable to retry this workflow run because it was created over a month ago (HTTP 403)',
+    'gh: Not Found (HTTP 404)',
+    'gh: Workflow run cannot be retried (HTTP 422)',
+  ]) {
+    queueHarness('queue-carried-perm-refusal-', (q) => {
+      const { aTry, idB, idD } = batchWithCarried(q);
+      q.state.rerunRefusal = error;
+      q.pass();
+      assert.equal(q.remote('refs/heads/main'), aTry, error);
+      assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), null, error);
+      assert.ok(
+        q.posts().some((path) => /commits\/[0-9a-f]+\/comments$/.test(path)),
+        error,
+      );
+      const dTry = q.remote(`${TRY_PREFIX}${idD}`);
+      assert.ok(dTry, error);
+      assert.equal(q.git(['rev-parse', `${dTry}^`]), aTry, error);
+    });
+  }
+});
+
+test('a transient rerun failure holds only the carrier without aborting the pass', () => {
+  for (const error of [
+    'gh: Server Error (HTTP 502)',
+    'gh: Too Many Requests (HTTP 429)',
+    'gh: secondary rate limit (HTTP 403)',
+    'Get "https://api.github.com/": EOF',
+  ]) {
+    queueHarness('queue-carried-transient-refusal-', (q) => {
+      const { aTry, b, idB, idD } = batchWithCarried(q);
+      q.state.rerunRefusal = error;
+      q.pass();
+      assert.equal(q.remote('refs/heads/main'), aTry, error);
+      assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), b, error);
+      const dTry = q.remote(`${TRY_PREFIX}${idD}`);
+      assert.ok(dTry, error);
+      assert.equal(q.git(['rev-parse', `${dTry}^`]), b, error);
+      assert.equal(q.posts().filter((p) => /comments$/.test(p)).length, 0, error);
+    });
+  }
+});
+
+test('a 4xx rerun refusal whose re-read shows an already running retry holds instead of ejecting', () => {
+  queueHarness('queue-carried-refusal-race-', (q) => {
+    const { aTry, b, idB } = batchWithCarried(q);
+    q.state.rerunRefusal = {
+      error: 'gh: Run is already running (HTTP 403)',
+      patch: { status: 'in_progress', conclusion: null, run_attempt: 2 },
+    };
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), aTry);
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idB}`), b);
+    assert.equal(q.posts().filter((p) => /comments$/.test(p)).length, 0);
   });
 });
