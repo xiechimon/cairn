@@ -2,8 +2,8 @@ import {
   orchestratedTodoIdOf,
   parseCoordinatorConversationKey,
   parseCoordinatorTextSourceId,
-  parseReplyQuote,
   renderAttachmentTokensToLabels,
+  replyQuoteSources,
   type TaskContextMessage,
   type TaskReplyContext,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -19,8 +19,8 @@ export function resolveTaskReplyContext(
   messageId: string,
   text: string,
 ): TaskReplyContext | undefined {
-  const reply = parseReplyQuote(text);
-  if (reply === null) return undefined;
+  const sources = replyQuoteSources(text);
+  if (sources.length === 0) return undefined;
   const messages: TaskContextMessage[] = [];
   const visiting = new Set([messageId]);
   const visited = new Set<string>();
@@ -51,8 +51,7 @@ export function resolveTaskReplyContext(
     }
     visiting.add(id);
     if (row.role === 'user') {
-      const nested = parseReplyQuote(body);
-      if (nested !== null) visit(nested.sourceMessageId);
+      for (const nested of replyQuoteSources(body)) visit(nested);
     } else {
       const sourceIdentity = parseCoordinatorTextSourceId(id);
       const producerId = sourceIdentity?.stepId;
@@ -161,6 +160,6 @@ export function resolveTaskReplyContext(
     visited.add(id);
   };
 
-  visit(reply.sourceMessageId);
+  for (const source of sources) visit(source);
   return { messages, incomplete };
 }

@@ -65,6 +65,7 @@ export interface ComposerWireOptions {
   growCap?: number;
   active?: boolean;
   onPickProject?: (project: { id: string; label: string }) => void;
+  sendEmpty?: boolean;
 }
 
 export interface ComposerWire {
@@ -122,6 +123,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     growCap,
     active = true,
     onPickProject,
+    sendEmpty = false,
   } = options;
 
   const [internalDraft, setInternalDraft] = useState('');
@@ -256,7 +258,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
       callback?.(text);
       return;
     }
-    if (text === '' || callback === undefined) return;
+    if ((text === '' && !sendEmpty) || callback === undefined) return;
     let result: ReturnType<typeof callback>;
     try {
       result = callback(text);

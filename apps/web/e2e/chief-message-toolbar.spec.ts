@@ -155,7 +155,7 @@ test('select-to-quote works on both user and Coordinator messages without a hove
   const quoteInput = page.getByTestId('selection-quote-input');
   await quoteInput.fill('明白');
   await quoteInput.press('Enter');
-  await expect(page.getByTestId('composer-reply-quote')).toContainText('有结果马上同步你');
+  await expect(page.getByTestId('composer-quote-text')).toContainText('有结果马上同步你');
   const composer = page.getByTestId('home-c').getByTestId('chief-composer-input');
   await composer.press('Enter');
   await expect.poll(() => sent.at(-1)).toMatch(/^<!-- reply source=a-short -->\n> .+\n\n明白$/);
@@ -170,7 +170,7 @@ test('select-to-quote works on both user and Coordinator messages without a hove
   await bar.getByTestId('selection-quote').click();
   await quoteInput.fill('再补一句');
   await quoteInput.press('Enter');
-  await expect(page.getByTestId('composer-reply-quote')).toContainText('跑完告诉我');
+  await expect(page.getByTestId('composer-quote-text')).toContainText('跑完告诉我');
 });
 
 test('steering owner row shows copy and a direct withdraw button beside it', async ({

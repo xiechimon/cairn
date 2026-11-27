@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -14,7 +15,7 @@ import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
-import { useQuoteMark } from './quote-mark.js';
+import { useQuoteMarks } from './quote-mark.js';
 import { REPLY_SOURCE_ATTR, type ReplyQuoteDraft } from './reply-source-highlight.js';
 import { barPosition, replyableText, SETTLE_MS, scrolledAway } from './selection-reply-model.js';
 
@@ -204,7 +205,9 @@ export function SelectionReply({
     };
   }, [target, boxOpen, containerRef]);
 
-  useQuoteMark(boxOpen ? target?.range : null);
+  const boxRange = boxOpen ? target?.range : undefined;
+  const marked = useMemo(() => (boxRange === undefined ? [] : [boxRange]), [boxRange]);
+  useQuoteMarks(marked);
 
   if (target === null) return null;
   const draft = {

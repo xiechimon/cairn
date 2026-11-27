@@ -391,6 +391,27 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     await expect(home.getByTestId('chief-composer-input')).toHaveValue('再顺便看下空列提示');
   });
 
+  test('withdrawing an unread quoted steer while a draft exists keeps the draft and brings the quote back as an item', async ({
+    page,
+  }) => {
+    const quoted = '<!-- reply source=m1 -->\n> 先看看列表\n\n再顺便看下空列提示';
+    const state = busyState();
+    state.messages = state.messages.map((row) =>
+      row.id === 'm4' ? { ...row, content: quoted } : row,
+    );
+    const calls = await mockLive(page, state);
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    const input = home.getByTestId('chief-composer-input');
+    await input.fill('还在写的草稿');
+    const row = home.getByTestId('chief-msg').filter({ hasText: '再顺便看下空列提示' });
+    await row.getByTestId('chief-bubble').hover();
+    await row.locator('[data-slot="message-meta"]').getByTestId('chief-steer-withdraw').click();
+    await expect.poll(() => calls).toContain('DELETE /messages/m4');
+    await expect(input).toHaveValue('还在写的草稿');
+    await expect(home.getByTestId('composer-quote-reply')).toHaveText('再顺便看下空列提示');
+  });
+
   test('Cmd+Enter and Enter during a running turn both send immediately with no queue mode', async ({
     page,
   }) => {
@@ -426,8 +447,34 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     await expect(home.getByTestId('chief-stream').getByText('只看 cairn 项目就行')).toHaveCount(0);
     await expect(home.getByTestId('chief-queue')).not.toContainText('这一轮后发出');
     await expect(rows.last().getByTestId('chief-queued-steer')).toHaveCount(0);
+    const input = home.getByTestId('chief-composer-input');
+    await input.fill('还在写的草稿');
     await rows.last().getByRole('button', { name: '删除' }).click();
     await expect.poll(() => calls).toContain('DELETE /messages/m4');
+    await expect(input).toHaveValue('还在写的草稿\n再顺便看下空列提示');
+  });
+
+  test('a queued message of quotes alone is listed by its quoted words', async ({ page }) => {
+    const state: State = {
+      ...busyState(),
+      pending: [{ messageId: 'm4', state: 'queued' }],
+      bodies: [],
+    };
+    state.messages = state.messages.map((row) =>
+      row.id === 'm4'
+        ? {
+            ...row,
+            content:
+              '<!-- reply source=m1 lines=0 -->\n> 先看看列表\n<!-- reply source=m3 lines=0 -->\n> 只看 cairn 项目就行',
+          }
+        : row,
+    );
+    await mockLive(page, state);
+    await page.goto('/app');
+    const row = page.getByTestId('home-c').getByTestId('chief-queued-message');
+    await expect(row).toContainText('先看看列表');
+    await expect(row).toContainText('只看 cairn 项目就行');
+    await expect(row).not.toContainText('<!--');
   });
 
   test('a busy Coordinator keeps the send button and never shows a stop square', async ({ page }) => {

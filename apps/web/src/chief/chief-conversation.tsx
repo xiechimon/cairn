@@ -2,9 +2,8 @@ import {
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_QUEUED,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
-  encodeReplyQuote,
-  parseReplyQuote,
-  replyQuoteText,
+  encodeReplyQuotes,
+  replySummary,
 } from '@cairn/shared';
 import { ArrowDown } from 'lucide-react';
 import {
@@ -70,10 +69,16 @@ import { type LateArrival, withoutReturnedText } from './outbox.js';
 import { awaitingStream } from './question-lifecycle.js';
 import { type QueuedMessage, QueueTabs } from './queue-tabs.js';
 import { QuickReplies } from './quick-replies.js';
-import { useQuoteMark } from './quote-mark.js';
+import { useQuoteMarks } from './quote-mark.js';
 import { ReaderFollowContext, useReaderFollow } from './reader-follow.js';
-import { ReplyingToBar } from './reply-quote-block.js';
-import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
+import { StagedQuotes } from './reply-quote-block.js';
+import {
+  draftFromSent,
+  type ReplyQuoteDraft,
+  ReplySourceHighlightContext,
+  type StagedQuote,
+  stagedQuote,
+} from './reply-source-highlight.js';
 import { SelectionReply } from './selection-reply.js';
 import {
   collapseThinkingRuns,
@@ -243,24 +248,27 @@ export function ChiefConversation({
 }: ChiefConversationProps) {
   const questionPending = useQuestionPending();
   const { t } = useI18n();
-  const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
-  const [highlightedSource, setHighlightedSource] = useState<ReplyQuoteDraft | null>(null);
-  useQuoteMark(replyQuote?.range);
+  const [replyQuotes, setReplyQuotes] = useState<readonly StagedQuote[]>([]);
+  const replyQuotesRef = useRef(replyQuotes);
+  replyQuotesRef.current = replyQuotes;
+  const [highlightedSource, setHighlightedSource] = useState<StagedQuote | null>(null);
+  const markedRanges = useMemo(
+    () => replyQuotes.flatMap((quote) => (quote.range === undefined ? [] : [quote.range])),
+    [replyQuotes],
+  );
+  useQuoteMarks(markedRanges);
   const quickKey = (chief.quickReplies ?? []).join('\n');
   const [preview, setPreview] = useState<{ key: string; text: string } | null>(null);
   const previewReply = preview !== null && preview.key === quickKey ? preview.text : null;
   const composerPlaceholder =
     previewReply ??
-    (replyQuote !== null
-      ? t('回复这条消息')
-      : chief.outage != null
-        ? t('可以继续说，恢复后按顺序处理')
-        : chief.waitingTurn !== undefined ||
-            (chief.running === true && chief.noRunningTurn === true)
-          ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
-          : chief.running === true
-            ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
-            : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
+    (chief.outage != null
+      ? t('可以继续说，恢复后按顺序处理')
+      : chief.waitingTurn !== undefined || (chief.running === true && chief.noRunningTurn === true)
+        ? t(CHIEF_INPUT_PLACEHOLDER_QUEUED)
+        : chief.running === true
+          ? t(CHIEF_INPUT_PLACEHOLDER_STEERING)
+          : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
   const { live, teamId } = useLiveData();
   const todosQ = useTodos(teamId, live);
   const onAttachment =
@@ -314,26 +322,27 @@ export function ChiefConversation({
   const sendQuoted =
     onSend == null
       ? undefined
-      : (quoted: ReplyQuoteDraft | null, text: string) => {
+      : (quoted: readonly StagedQuote[], text: string) => {
           followSentRef.current = true;
           userKeyAtSendRef.current = latestUserKeyRef.current;
-          const sent = onSend(quoted === null ? text : encodeReplyQuote(quoted, text));
+          const sent = onSend(quoted.length === 0 ? text : encodeReplyQuotes(quoted, text));
+          const clearSent = () =>
+            setReplyQuotes((current) => current.filter((quote) => !quoted.includes(quote)));
           if (sent instanceof Promise) {
-            Promise.resolve(sent).then(
-              () => setReplyQuote((current) => (current === quoted ? null : current)),
-              () => {
-                followSentRef.current = false;
-              },
-            );
+            Promise.resolve(sent).then(clearSent, () => {
+              followSentRef.current = false;
+            });
           } else {
-            setReplyQuote((current) => (current === quoted ? null : current));
+            clearSent();
           }
           return sent;
         };
   const sendFromComposer =
-    sendQuoted === undefined ? undefined : (text: string) => sendQuoted(replyQuote, text);
-  const stageReply = useCallback((draft: ReplyQuoteDraft) => {
-    setReplyQuote(draft);
+    sendQuoted === undefined
+      ? undefined
+      : (text: string) => sendQuoted(replyQuotesRef.current, text);
+  const stageQuote = useCallback((draft: ReplyQuoteDraft, reply: string) => {
+    setReplyQuotes((current) => [...current, stagedQuote(draft, reply)]);
     surfaceRef.current?.focus({ preventScroll: true });
   }, []);
   const prefillKey = prefill?.key;
@@ -364,13 +373,13 @@ export function ChiefConversation({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const connected = useConnected();
   const outage = useConnectionOutage();
-  const restoreSent = (text: string) => {
+  const restoredQuotesRef = useRef(new Map<string, readonly StagedQuote[]>());
+  const restoreSent = (text: string, outboxKey?: string) => {
     followSentRef.current = false;
-    const reply = parseReplyQuote(text);
-    const body = reply?.body ?? text;
-    if (reply !== null)
-      setReplyQuote({ sourceMessageId: reply.sourceMessageId ?? '', quote: reply.quote });
-    restoreToThread((cur) => (cur === '' ? body : `${cur}\n${body}`));
+    const { quotes, body } = draftFromSent(text);
+    if (outboxKey !== undefined) restoredQuotesRef.current.set(outboxKey, quotes);
+    if (quotes.length > 0) setReplyQuotes((current) => [...current, ...quotes]);
+    if (body !== '') restoreToThread((cur) => (cur === '' ? body : `${cur}\n${body}`));
   };
   const restoreSentRef = useRef(restoreSent);
   restoreSentRef.current = restoreSent;
@@ -384,7 +393,7 @@ export function ChiefConversation({
         continue;
       }
       const text = unsent?.discard(entry.key) ?? null;
-      if (text !== null) restoreSentRef.current(text);
+      if (text !== null) restoreSentRef.current(text, entry.key);
     }
   }, [unsent, activeThreadId, scopeProjectId]);
   const clearArrivedRef = useRef<LateArrival>(() => false);
@@ -394,11 +403,13 @@ export function ChiefConversation({
         ? entry.threadId === activeThreadId
         : entry.projectId === scopeProjectId;
     if (!here) return false;
-    const body = parseReplyQuote(entry.text)?.body ?? entry.text;
-    if (withoutReturnedText(liveDraft, body) !== liveDraft) {
+    const { body } = draftFromSent(entry.text);
+    if (body !== '' && withoutReturnedText(liveDraft, body) !== liveDraft)
       restoreToThread((cur) => withoutReturnedText(cur, body));
-      setReplyQuote(null);
-    }
+    const restored = restoredQuotesRef.current.get(entry.key) ?? [];
+    restoredQuotesRef.current.delete(entry.key);
+    if (restored.length > 0)
+      setReplyQuotes((current) => current.filter((quote) => !restored.includes(quote)));
     return true;
   };
   useEffect(() => unsent?.onArrivedLate((entry) => clearArrivedRef.current(entry)), [unsent]);
@@ -467,7 +478,7 @@ export function ChiefConversation({
       ? [
           {
             id: item.id ?? item.outboxKey ?? '',
-            text: replyQuoteText(item.text),
+            text: replySummary(item.text),
             held: item.pending === 'held',
             sending: item.id == null,
           },
@@ -478,11 +489,14 @@ export function ChiefConversation({
     const row = allRows.find(({ item }) => item.kind === 'user' && item.id === message.id);
     return row?.item.kind === 'user' ? row.item.text : message.text;
   };
-  const capsules = replyQuote !== null && (
-    <ReplyingToBar
-      quote={replyQuote.quote}
-      onRemove={() => setReplyQuote(null)}
-      onHighlight={(on) => setHighlightedSource(on ? replyQuote : null)}
+  const capsules = (
+    <StagedQuotes
+      quotes={replyQuotes}
+      onRemove={(removed) => {
+        setReplyQuotes((current) => current.filter((quote) => quote !== removed));
+        setHighlightedSource((current) => (current === removed ? null : current));
+      }}
+      onHighlight={setHighlightedSource}
     />
   );
   const queueTab = (
@@ -498,9 +512,7 @@ export function ChiefConversation({
                 return;
               }
               onWithdraw(message.id).then(
-                () => {
-                  if (liveDraftRef.current.trim() === '') restoreSent(raw);
-                },
+                () => restoreSent(raw),
                 () => {},
               );
             }
@@ -559,13 +571,6 @@ export function ChiefConversation({
       layoutStream(rows.slice(dayEarlier), glances, before.lastAt, reportSeen, cardFailure),
     ] as const;
   }, [rows, glances, dayEarlier, cardFailure]);
-  const addQuote = (draft: ReplyQuoteDraft, text: string) => {
-    stageReply(draft);
-    if (text !== '')
-      restoreToThread((current) =>
-        current.trim() === '' ? text : `${current.trimEnd()}\n${text}`,
-      );
-  };
   const lastRobotIndex = rows.findLastIndex(
     ({ item }) => item.kind === 'robot' && item.typing !== true,
   );
@@ -669,7 +674,11 @@ export function ChiefConversation({
                 <TodoGlanceContext.Provider value={glances}>
                   <ThreadUnreadContext.Provider value={unread}>
                     <ReplySourceHighlightContext.Provider
-                      value={highlightedSource === replyQuote ? highlightedSource : null}
+                      value={
+                        highlightedSource !== null && replyQuotes.includes(highlightedSource)
+                          ? highlightedSource
+                          : null
+                      }
                     >
                       <CardFailureContext.Provider value={cardFailure}>
                         {lead}
@@ -710,8 +719,13 @@ export function ChiefConversation({
           <SelectionReply
             containerRef={viewportRef}
             enabled={sendQuoted !== undefined && composerReplacement == null}
-            onAddQuote={addQuote}
-            onSendQuote={(draft, text) => void sendQuoted?.(draft, text)}
+            onAddQuote={stageQuote}
+            onSendQuote={(draft, text) => {
+              const item = stagedQuote(draft, text);
+              Promise.resolve(sendQuoted?.([item], '')).catch(() =>
+                setReplyQuotes((current) => [...current, item]),
+              );
+            }}
           />
         </>
       )}
@@ -778,7 +792,8 @@ export function ChiefConversation({
               available: canStop,
               onStop: () => stopTurnRef.current?.(),
             }}
-            onCancelReply={replyQuote === null ? undefined : () => setReplyQuote(null)}
+            onCancelReply={replyQuotes.length === 0 ? undefined : () => setReplyQuotes([])}
+            sendEmpty={replyQuotes.length > 0}
             placeholder={composerPlaceholder}
             composerRef={composerRef}
             tab={queueTab}

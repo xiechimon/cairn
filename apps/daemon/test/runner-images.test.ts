@@ -8,7 +8,7 @@ import type {
   TranscriptUpload,
 } from '@cairn/shared';
 import {
-  encodeReplyQuote,
+  encodeReplyQuotes,
   formatAttachmentToken,
   renderTaskText,
   type TaskRequest,
@@ -211,9 +211,9 @@ describe('runner image attachment wiring (#730)', () => {
             source: { kind: 'chat', threadId: 'chief', messageId: 'dispatch', span: 'whole' },
             author: 'owner',
             sourceRef: null,
-            text: encodeReplyQuote(
-              { sourceMessageId: 'ack', quote: 'Recorded.' },
-              'Please dispatch.',
+            text: encodeReplyQuotes(
+              [{ sourceMessageId: 'ack', quote: 'Recorded.', reply: 'Please dispatch.' }],
+              '',
             ),
             context: {
               incomplete: false,

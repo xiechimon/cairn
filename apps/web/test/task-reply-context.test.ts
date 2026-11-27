@@ -1,4 +1,4 @@
-import { encodeReplyQuote, renderTaskText, type TaskRequest, todoRecordSchema } from '@cairn/shared';
+import { encodeReplyQuotes, renderTaskText, type TaskRequest, todoRecordSchema } from '@cairn/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
@@ -7,7 +7,7 @@ import { toDisplayTodo } from '../src/api/mappers.js';
 import { SpecBlock } from '../src/detail/spec-block.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
-const reply = encodeReplyQuote({ sourceMessageId: 'ack', quote: 'The issue is recorded.' }, 'Please dispatch.');
+const reply = encodeReplyQuotes([{ sourceMessageId: 'ack', quote: 'The issue is recorded.', reply: 'Please dispatch.' }], '');
 const request: TaskRequest = {
   segments: [{
     source: { kind: 'chat', threadId: 'origin', messageId: 'dispatch', span: 'whole' },

@@ -1,6 +1,5 @@
 import {
   buildTaskPromptText,
-  encodeReplyQuote,
   machineAttachmentResponseSchema,
   machineEnrollResponseSchema,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -45,10 +44,11 @@ function sourceTurn(assistantText = 'The caret alignment issue is recorded.') {
       createdAt: 2,
     })
     .run();
-  const reply = encodeReplyQuote(
-    { sourceMessageId: assistantId, quote: assistantText },
-    'Please dispatch.',
-  );
+  const quoted = assistantText
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n');
+  const reply = `<!-- reply source=${assistantId} -->\n${quoted}\n\nPlease dispatch.`;
   return { ownerId, assistantId, reply };
 }
 
@@ -297,7 +297,7 @@ describe('quoted Coordinator context at dispatch', () => {
       .run();
     for (const sourceMessageId of ['missing-source', syntheticId, 'foreign-source']) {
       const task = dispatch(
-        encodeReplyQuote({ sourceMessageId, quote: 'Quoted context.' }, 'Please dispatch.'),
+        `<!-- reply source=${sourceMessageId} -->\n> Quoted context.\n\nPlease dispatch.`,
       );
       expect(task.request?.segments[0]).toMatchObject({
         context: { incomplete: true, messages: [] },
@@ -308,12 +308,40 @@ describe('quoted Coordinator context at dispatch', () => {
     }
   });
 
+  test('a message quoting two replies inherits the context of both', () => {
+    const first = sourceTurn('First reply.');
+    const second = sourceTurn('Second reply.');
+    const task = dispatch(
+      `<!-- reply source=${first.assistantId} lines=1 -->\n> First reply.\n\nAnswer one.\n<!-- reply source=${second.assistantId} lines=1 -->\n> Second reply.\n\nAnswer two.\n\nDispatch both.`,
+    );
+    const ids = task.request?.segments[0]?.context?.messages.map((message) => message.messageId);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        first.ownerId,
+        first.assistantId,
+        second.ownerId,
+        second.assistantId,
+      ]),
+    );
+    expect(task.userSpecAttachmentIds).toEqual(['caret']);
+    expect(task.request?.segments[0]?.context?.incomplete).toBe(false);
+    expect(task.spec).toContain('Answer two.');
+    expect(task.spec).not.toContain('<!-- ');
+  });
+
+  test('a missing source adds nothing and a source quoted twice is gathered once', () => {
+    const first = sourceTurn('First reply.');
+    const task = dispatch(
+      `<!-- reply source=${first.assistantId} lines=1 -->\n> First reply.\n\nOne.\n<!-- reply source=gone-message lines=0 -->\n> Lost.\n<!-- reply source=${first.assistantId} lines=1 -->\n> First reply.\n\nTwo.`,
+    );
+    const ids = task.request?.segments[0]?.context?.messages.map((message) => message.messageId);
+    expect(ids?.toSorted()).toEqual([first.ownerId, first.assistantId].toSorted());
+    expect(task.request?.segments[0]?.context?.incomplete).toBe(true);
+  });
+
   test('a self-referential reply is incomplete and finite', () => {
     const id = newRecordId();
-    const reply = encodeReplyQuote(
-      { sourceMessageId: id, quote: 'Quoted context.' },
-      'Please dispatch.',
-    );
+    const reply = `<!-- reply source=${id} -->\n> Quoted context.\n\nPlease dispatch.`;
     H.s.db
       .insert(chiefMessage)
       .values({ id, threadId: H.threadId, role: 'user', content: reply, createdAt: 1 })

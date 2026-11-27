@@ -1,5 +1,5 @@
 import {
-  parseReplyQuote,
+  parseReplyQuotes,
   renderAttachmentTokensToLabels,
   renderTaskText,
   segmentKey,
@@ -8,7 +8,7 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Link } from 'react-router';
-import { ReplyQuoteBlock } from '../chief/reply-quote-block.js';
+import { QuotedReplies } from '../chief/reply-quote-block.js';
 import { MessageBubble } from '../components/chat/message-bubble.js';
 import { NoticeLine } from '../components/chat/notice-line.js';
 import { Message, MessageContent } from '../components/ui/message.js';
@@ -24,7 +24,7 @@ interface SpecBlockProps {
 export function SpecBlock({ spec, className, request }: SpecBlockProps) {
   const { t } = useI18n();
   const inherited = request?.segments.some((segment) => segment.context !== undefined) ?? false;
-  const legacyReply = parseReplyQuote(spec);
+  const legacyReply = parseReplyQuotes(spec);
   if (!inherited)
     return (
       <section
@@ -33,8 +33,10 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
           className,
         )}
       >
-        {legacyReply !== null && <ReplyQuoteBlock quote={legacyReply.quote} />}
-        <ChatMarkdown text={legacyReply?.body ?? spec} />
+        {legacyReply !== null && <QuotedReplies quotes={legacyReply.quotes} />}
+        {(legacyReply === null || legacyReply.body !== '') && (
+          <ChatMarkdown text={legacyReply?.body ?? spec} />
+        )}
       </section>
     );
   const seen = new Set<string>();
@@ -93,11 +95,16 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
       {rows.map((row) => {
         const text =
           row.role === 'coordinator' ? renderAttachmentTokensToLabels(row.text) : row.text;
-        const reply = parseReplyQuote(text);
-        const source = rows.find(
-          (candidate) =>
-            candidate.messageId === reply?.sourceMessageId && candidate.threadId === row.threadId,
-        );
+        const reply = parseReplyQuotes(text);
+        const sourceHref = (sourceMessageId: string | null) => {
+          const source = rows.find(
+            (candidate) =>
+              candidate.messageId === sourceMessageId && candidate.threadId === row.threadId,
+          );
+          return source === undefined
+            ? undefined
+            : `#${encodeURIComponent(`request-context-${source.id}`)}`;
+        };
         return (
           <Message
             key={row.id}
@@ -115,15 +122,10 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
                 tail={false}
                 className="max-w-[min(85%,42rem)] break-words"
               >
-                {reply !== null && (
-                  <ReplyQuoteBlock
-                    quote={reply.quote}
-                    {...(source === undefined
-                      ? {}
-                      : { sourceHref: `#${encodeURIComponent(`request-context-${source.id}`)}` })}
-                  />
+                {reply !== null && <QuotedReplies quotes={reply.quotes} hrefFor={sourceHref} />}
+                {(reply === null || reply.body !== '') && (
+                  <ChatMarkdown text={reply?.body ?? text} />
                 )}
-                <ChatMarkdown text={reply?.body ?? text} />
               </MessageBubble>
             </MessageContent>
           </Message>

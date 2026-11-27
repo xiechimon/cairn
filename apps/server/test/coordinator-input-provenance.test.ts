@@ -1,4 +1,4 @@
-import { encodeReplyQuote } from '@cairn/shared';
+import { encodeReplyQuotes } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { chiefMessage, coordinatorEntry, coordinatorInput, step } from '../src/db/schema.js';
@@ -62,7 +62,10 @@ function source() {
       H.s.db,
       H.threadId,
       'new-message',
-      encodeReplyQuote({ sourceMessageId: answer, quote: 'I saw the image.' }, 'Dispatch it.'),
+      encodeReplyQuotes(
+        [{ sourceMessageId: answer, quote: 'I saw the image.', reply: 'Dispatch it.' }],
+        '',
+      ),
     );
   return { owner, answer, receipt, resolve };
 }
@@ -142,7 +145,10 @@ test.each([
       H.s.db,
       H.threadId,
       'new-message',
-      encodeReplyQuote({ sourceMessageId: nativeId, quote: 'Native answer.' }, 'Dispatch.'),
+      encodeReplyQuotes(
+        [{ sourceMessageId: nativeId, quote: 'Native answer.', reply: 'Dispatch.' }],
+        '',
+      ),
     );
     expect(context?.messages.map((message) => message.messageId)).toEqual(
       sourceStore === 'store_one' && hasLedger ? [s.owner, nativeId] : [nativeId],

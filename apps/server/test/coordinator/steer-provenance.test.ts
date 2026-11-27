@@ -1,5 +1,5 @@
 import {
-  encodeReplyQuote,
+  encodeReplyQuotes,
   machineAttachmentResponseSchema,
   machineEnrollResponseSchema,
 } from '@cairn/shared';
@@ -120,12 +120,9 @@ test('a quoted answer inherits an image consumed as a steer in the real Coordina
   const dispatchId = seedOwnerMessage(
     w.s.db,
     w.threadId,
-    encodeReplyQuote(
-      {
-        sourceMessageId: source!.id,
-        quote: 'The image is received.',
-      },
-      'Please dispatch.',
+    encodeReplyQuotes(
+      [{ sourceMessageId: source!.id, quote: 'The image is received.', reply: 'Please dispatch.' }],
+      '',
     ),
   );
   const task = createRequestTodo(

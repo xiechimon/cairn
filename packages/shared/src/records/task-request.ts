@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { renderAttachmentTokensToLabels } from '../attachment-token.js';
-import { parseReplyQuote } from '../reply-quote.js';
+import { parseReplyQuotes, replyQuoteSources } from '../reply-quote.js';
 import { fenceIssueText } from './prompts.js';
 import { topModelSchema } from './top-models.js';
 
@@ -103,10 +103,17 @@ const blockquote = (text: string) =>
     .join('\n');
 
 export function renderReplyText(text: string): string {
-  const reply = parseReplyQuote(text);
-  return reply === null
-    ? text
-    : `${blockquote(renderAttachmentTokensToLabels(reply.quote))}\n\n${reply.body}`.trimEnd();
+  const parsed = parseReplyQuotes(text);
+  if (parsed === null) return text;
+  return [
+    ...parsed.quotes.flatMap((quote) => [
+      blockquote(renderAttachmentTokensToLabels(quote.quote)),
+      quote.reply,
+    ]),
+    parsed.body,
+  ]
+    .filter((part) => part !== '')
+    .join('\n\n');
 }
 
 export function renderTaskText(request: Pick<TaskRequest, 'segments' | 'briefing'>): string {
@@ -211,16 +218,17 @@ export function quoteSegments(
     .sort((a, b) => a.index - b.index || a.at - b.at)
     .map(({ index, wanted }) => {
       const from = cited[index] as CitedSegment;
-      const reply = parseReplyQuote(wanted);
+      const sources = replyQuoteSources(wanted);
+      const citedSources = replyQuoteSources(from.segment.text);
       return {
         source: { ...from.quoteSource, span: 'quote' } as TaskSegmentSource,
         author: from.segment.author,
         sourceRef: from.segment.sourceRef,
         text: wanted,
         ...(from.segment.context !== undefined &&
-        reply !== null &&
-        reply.sourceMessageId !== null &&
-        reply.sourceMessageId === parseReplyQuote(from.segment.text)?.sourceMessageId
+        sources.length > 0 &&
+        sources.length === citedSources.length &&
+        sources.every((source, i) => source !== null && source === citedSources[i])
           ? { context: from.segment.context }
           : {}),
       };

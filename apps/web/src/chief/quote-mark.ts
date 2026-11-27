@@ -12,14 +12,14 @@ function quoteMarks(): Highlight | null {
   return created;
 }
 
-export function useQuoteMark(range: Range | null | undefined): void {
+export function useQuoteMarks(ranges: readonly Range[]): void {
   useEffect(() => {
-    if (range == null) return;
+    if (ranges.length === 0) return;
     const marks = quoteMarks();
     if (marks === null) return;
-    marks.add(range);
+    for (const range of ranges) marks.add(range);
     return () => {
-      marks.delete(range);
+      for (const range of ranges) marks.delete(range);
     };
-  }, [range]);
+  }, [ranges]);
 }

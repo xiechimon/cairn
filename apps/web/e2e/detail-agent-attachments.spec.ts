@@ -1,4 +1,4 @@
-import { chiefGetResponseSchema, encodeReplyQuote, renderTaskText, type TaskRequest } from '@cairn/shared';
+import { chiefGetResponseSchema, encodeReplyQuotes, renderTaskText, type TaskRequest } from '@cairn/shared';
 import { expect, test } from '@playwright/test';
 
 test('a final assistant reply renders two loaded screenshots and opens each in the artifact panel', async ({
@@ -10,7 +10,7 @@ test('a final assistant reply renders two loaded screenshots and opens each in t
     segments: [{
       source: { kind: 'chat', threadId: 'source-thread', messageId: 'dispatch', span: 'whole' },
       author: 'owner', sourceRef: null,
-      text: encodeReplyQuote({ sourceMessageId: 'ack', quote: 'The caret issue is recorded.' }, 'Please dispatch.'),
+      text: encodeReplyQuotes([{ sourceMessageId: 'ack', quote: 'The caret issue is recorded.', reply: 'Please dispatch.' }], ''),
       context: { incomplete: false, messages: [
         { threadId: 'source-thread', messageId: 'original', role: 'user', text: 'The caret is misaligned.\n![Original screenshot](attachment:team-1/caret.png)' },
         { threadId: 'source-thread', messageId: 'ack', role: 'assistant', text: 'The caret issue is recorded.' },

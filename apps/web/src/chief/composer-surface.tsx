@@ -88,6 +88,7 @@ export interface ComposerSurfaceProps {
   onFocusEnter?: (() => void) | undefined;
   onFocusLeave?: (() => void) | undefined;
   onCancelReply?: (() => void) | undefined;
+  sendEmpty?: boolean;
   placeholder: string;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   tab?: ReactNode;
@@ -115,6 +116,7 @@ export function ComposerSurface({
   onFocusEnter,
   onFocusLeave,
   onCancelReply,
+  sendEmpty = false,
   placeholder,
   composerRef,
   tab,
@@ -147,6 +149,7 @@ export function ComposerSurface({
     ...(stop !== undefined ? { stop } : {}),
     growCap: 120,
     active,
+    sendEmpty,
   });
   const {
     handlePaste,
@@ -193,7 +196,8 @@ export function ComposerSurface({
   const hasDraft =
     send !== undefined
       ? send.enabled
-      : wire.draft !== '' ||
+      : sendEmpty ||
+        wire.draft !== '' ||
         wire.tokens.length > 0 ||
         pendingAttachments.some((entry) => !entry.failed);
   const showMeter =

@@ -194,7 +194,7 @@
   --composer-fill: var(--reply-bubble-fill);
   --composer-ring: rgb(255 255 255 / 0.07);
   --composer-ring-focus: rgb(255 255 255 / 0.16);
-  --composer-drop: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 12px rgb(0 0 0 / 0.24);
+  --composer-drop: 0 0 8px rgb(0 0 0 / 0.22), 0 4px 14px rgb(0 0 0 / 0.22);
   --shadow-composer: var(--composer-drop), inset 0 0 0 1px var(--composer-ring);
   --shadow-composer-focus: var(--composer-drop), inset 0 0 0 1px var(--composer-ring-focus);
   --canvas: #1b1c1b;
@@ -356,7 +356,7 @@
   --composer-fill: var(--background);
   --composer-ring: rgb(0 0 0 / 0.13);
   --composer-ring-focus: rgb(0 0 0 / 0.24);
-  --composer-drop: 0 1px 2px rgb(0 0 0 / 0.04), 0 3px 10px rgb(0 0 0 / 0.05);
+  --composer-drop: 0 0 8px rgb(0 0 0 / 0.05), 0 3px 12px rgb(0 0 0 / 0.05);
   --prose-code-fill: rgb(0 0 0 / 0.05);
   --canvas: #e7e6e1;
   --background: #ecebe6;

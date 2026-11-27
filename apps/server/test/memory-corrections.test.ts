@@ -1,6 +1,6 @@
 import {
   ASK_USER_QUESTION_KIND,
-  encodeReplyQuote,
+  encodeReplyQuotes,
   type MachineDoneBody,
   type MemoryCorrectionsResponse,
   memoryCorrectionsResponseSchema,
@@ -1617,7 +1617,7 @@ test('a quoted reply keeps only what the user typed', async () => {
   seedIndex(RULE);
   const quote = 'ASSISTANT WROTE THIS. '.repeat(80);
   const current = await turn(
-    encodeReplyQuote({ sourceMessageId: 'm1', quote }, 'TYPED: conclusion first.'),
+    encodeReplyQuotes([{ sourceMessageId: 'm1', quote, reply: 'TYPED: conclusion first.' }], ''),
   );
   await reportRepeat(current);
   expect(rows()).toMatchObject([{ ownerWords: 'TYPED: conclusion first.' }]);

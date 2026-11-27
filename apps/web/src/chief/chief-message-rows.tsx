@@ -1,4 +1,4 @@
-import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
+import type { RunnerOfflineContent, StepQueueBlocked } from '@cairn/shared';
 import { CircleAlert, CircleStop } from 'lucide-react';
 import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
@@ -43,8 +43,9 @@ import { TaskTrunk } from './chief-task-trunk.js';
 import { isLiveNotice } from './live-notice.js';
 import { ApprovalAnswered, QuestionReceipt } from './question-answered-line.js';
 import { plainQuestionText } from './question-item.js';
-import { ReplyQuoteBlock } from './reply-quote-block.js';
+import { QuotedReplies } from './reply-quote-block.js';
 import {
+  parseSentReply,
   REPLY_HIGHLIGHT_ATTR,
   REPLY_SOURCE_ATTR,
   ReplySourceHighlightContext,
@@ -582,12 +583,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'user') {
-    const reply = parseReplyQuote(item.text);
+    const reply = parseSentReply(item.text);
     const shown = reply?.body ?? item.markdown;
     const split = splitDraft(shown ?? item.text);
     const sentFiles = parseAttachmentTokens(split.tokens.join('\n'));
     const bubbleText = sentFiles.length > 0 ? split.text.trim() : split.text;
-    const showBubble = bubbleText !== '' || reply != null || sentFiles.length === 0;
+    const showBubble = bubbleText !== '' || reply !== null || sentFiles.length === 0;
     const sending = item.delivery === 'sending';
     const steering = item.pending === 'steering';
     const actions: MessageActions = {
@@ -611,8 +612,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         {...(steering ? { 'data-steering': '' } : {})}
         className={shown != null ? BUBBLE_MD_CLS : undefined}
       >
-        {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
-        {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
+        {reply !== null && <QuotedReplies quotes={reply.quotes} />}
+        {shown != null ? bubbleText !== '' && <ChatMarkdown text={bubbleText} /> : bubbleText}
       </MessageBubble>
     );
     return (

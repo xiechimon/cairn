@@ -8,7 +8,6 @@ import {
   classifyDifficulty,
   coordinatorCreateTodoParamsSchema,
   coordinatorUpdateTodoParamsSchema,
-  encodeReplyQuote,
   ISSUE_FENCE_OPEN,
   parseAttachmentTokenLines,
   quoteSegments,
@@ -163,10 +162,7 @@ describe('renderTaskText', () => {
       'original',
       'The caret is misaligned.\n![caret.png](attachment:team/caret.png)',
     );
-    const reply = encodeReplyQuote(
-      { sourceMessageId: 'ack', quote: 'Recorded.' },
-      'Please dispatch.',
-    );
+    const reply = '<!-- reply source=ack -->\n> Recorded.\n\nPlease dispatch.';
     const dispatch = chat('dispatch', reply);
     dispatch.segment.context = {
       incomplete: false,
@@ -208,6 +204,33 @@ describe('renderTaskText', () => {
 
 describe('quoteSegments', () => {
   const owner = chat('m1', '你好。\n修一下登录页。\n再把 README 更新。');
+
+  it('inherits a quoted message context only while the quote keeps every one of its sources', () => {
+    const firstBlock = '<!-- reply source=a lines=1 -->\n> First.\n\nAnswer one.';
+    const text = `${firstBlock}\n<!-- reply source=b lines=1 -->\n> Second.\n\nAnswer two.`;
+    const both = chat('two', text);
+    both.segment.context = {
+      incomplete: false,
+      messages: [
+        {
+          threadId: 'chief-t',
+          messageId: 'o',
+          role: 'user',
+          text: 'See this.\n![shot.png](attachment:team/shot.png)',
+        },
+        { threadId: 'chief-t', messageId: 'a', role: 'assistant', text: 'First.' },
+        { threadId: 'chief-t', messageId: 'b', role: 'assistant', text: 'Second.' },
+      ],
+    };
+    const images = (quoted: string) =>
+      parseAttachmentTokenLines(renderTaskText(request(quoteSegments([both], [quoted])))).map(
+        (token) => token.attachmentId,
+      );
+    expect(quoteSegments([both], [text])[0]?.context).toEqual(both.segment.context);
+    expect(images(text)).toEqual(['shot']);
+    expect(quoteSegments([both], [firstBlock])[0]?.context).toBeUndefined();
+    expect(images(firstBlock)).toEqual([]);
+  });
 
   it('keeps the author of the segment each quote comes from, in source order', () => {
     const quotes = quoteSegments(

@@ -1,7 +1,11 @@
-import { Reply, X } from 'lucide-react';
+import type { ParsedReplyQuoteItem } from '@cairn/shared';
+import { X } from 'lucide-react';
+import { Fragment } from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
+import type { StagedQuote } from './reply-source-highlight.js';
 
 const QUOTE_CLS =
   'm-0 flex min-w-0 flex-1 border-l-2 border-border pl-3 text-meta leading-5 whitespace-pre-wrap text-content-secondary line-clamp-3';
@@ -27,61 +31,87 @@ export function ReplyQuoteBlock({ quote, sourceHref }: { quote: string; sourceHr
   );
 }
 
-function firstLine(quote: string): string {
-  return (
-    quote
-      .split('\n')
-      .find((line) => line.trim() !== '')
-      ?.trim() ?? ''
-  );
+export function QuotedReplies({
+  quotes,
+  hrefFor,
+}: {
+  quotes: readonly ParsedReplyQuoteItem[];
+  hrefFor?: (sourceMessageId: string | null) => string | undefined;
+}) {
+  return quotes.map((item, index) => {
+    const href = hrefFor?.(item.sourceMessageId);
+    return (
+      <Fragment key={`${index}:${item.sourceMessageId ?? ''}`}>
+        <ReplyQuoteBlock quote={item.quote} {...(href === undefined ? {} : { sourceHref: href })} />
+        {item.reply !== '' && (
+          <div data-testid="reply-quote-answer" className="mb-3">
+            <ChatMarkdown text={item.reply} />
+          </div>
+        )}
+      </Fragment>
+    );
+  });
 }
 
-export function ReplyingToBar({
-  quote,
+export function StagedQuotes({
+  quotes,
   onRemove,
   onHighlight,
 }: {
-  quote: string;
-  onRemove: () => void;
-  onHighlight: (on: boolean) => void;
+  quotes: readonly StagedQuote[];
+  onRemove: (quote: StagedQuote) => void;
+  onHighlight: (quote: StagedQuote | null) => void;
 }) {
   const { t } = useI18n();
+  if (quotes.length === 0) return null;
   return (
-    <fieldset
-      aria-label={t('回复这条消息')}
-      data-testid="composer-reply-bar"
-      className="m-0 mb-2 flex h-7 min-w-0 items-center gap-1 border-0 p-0"
-      onPointerEnter={() => onHighlight(true)}
-      onPointerLeave={() => onHighlight(false)}
-      onFocus={() => onHighlight(true)}
-      onBlur={() => onHighlight(false)}
+    <ul
+      aria-label={t('要发送的引用')}
+      data-testid="composer-quotes"
+      className="m-0 mb-2 flex max-h-40 list-none flex-col gap-2 overflow-y-auto border-b border-border p-0 pb-2"
     >
-      <Reply
-        aria-hidden="true"
-        width={22}
-        height={22}
-        className="flex-none text-content-secondary"
-      />
-      <p
-        data-testid="composer-reply-quote"
-        className="m-0 min-w-0 flex-1 truncate rounded-(--radius-control) bg-secondary px-3 py-1 text-meta leading-5 text-foreground"
-      >
-        {t('回复：{quote}', { quote: firstLine(quote) })}
-      </p>
-      <IconTooltip
-        label={t('移除引用')}
-        trigger={
-          <Button
-            variant="ghost"
-            size="icon"
-            data-testid="composer-reply-quote-remove"
-            className={REMOVE_CLS}
-            onClick={onRemove}
-          />
-        }
-      >
-        <X className="size-5.5" />
-      </IconTooltip>
-    </fieldset>
+      {quotes.map((quote) => (
+        <li
+          key={quote.id}
+          data-testid="composer-quote"
+          className="flex min-w-0 items-start gap-1"
+          onPointerEnter={() => onHighlight(quote)}
+          onPointerLeave={() => onHighlight(null)}
+          onFocus={() => onHighlight(quote)}
+          onBlur={() => onHighlight(null)}
+        >
+          <div className="min-w-0 flex-1 border-l-2 border-border pl-2.5">
+            <p
+              data-testid="composer-quote-text"
+              className="m-0 truncate text-meta leading-5 text-content-secondary"
+            >
+              {quote.quote}
+            </p>
+            {quote.reply !== '' && (
+              <p
+                data-testid="composer-quote-reply"
+                className="m-0 line-clamp-2 text-ui leading-5 whitespace-pre-wrap text-foreground"
+              >
+                {quote.reply}
+              </p>
+            )}
+          </div>
+          <IconTooltip
+            label={t('移除引用')}
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                data-testid="composer-quote-remove"
+                className={REMOVE_CLS}
+                onClick={() => onRemove(quote)}
+              />
+            }
+          >
+            <X className="size-5" />
+          </IconTooltip>
+        </li>
+      ))}
+    </ul>
   );
 }
