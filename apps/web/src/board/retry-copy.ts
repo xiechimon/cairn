@@ -125,6 +125,11 @@ export function parkedRetryCopy(retry: Extract<TodoRetryState, { state: 'parked'
             : { key: '内置运行环境版本过旧，已停止自动重试' },
         fix: { key: '更新 Cairn 后重新运行这个任务。' },
       };
+    case 'disk':
+      return {
+        title: { key: '执行机磁盘已满' },
+        fix: { key: 'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。' },
+      };
     case 'gate_rejection':
       return {
         title: { key: '未通过验收检查，已停止自动重试' },

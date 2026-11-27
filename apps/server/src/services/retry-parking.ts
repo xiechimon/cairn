@@ -132,6 +132,9 @@ function formatChiefParkNotice(input: {
   if (reasonCode === 'config') {
     return `${RETRY_PARKED_MARK}: configuration or request error. Fix the task or provider configuration, then retry. Open the task to see the error.`;
   }
+  if (reasonCode === 'disk') {
+    return `${RETRY_PARKED_MARK}: runner disk full. Free disk space on the Runner, then retry. Open the task to see the error.`;
+  }
   if (reasonCode === 'gate_rejection') {
     return `${RETRY_PARKED_MARK}: stopped at a verification gate. Review the feedback before retrying. Open the task to see the error.`;
   }
@@ -181,6 +184,9 @@ function formatParkedMessage(input: {
   }
   if (reasonCode === 'config') {
     return `${RETRY_PARKED_MARK}: configuration or request error. Fix the task or provider configuration, then retry. Last error: ${error}`;
+  }
+  if (reasonCode === 'disk') {
+    return `${RETRY_PARKED_MARK}: runner disk full. Free disk space on the Runner, then retry. Last error: ${error}`;
   }
   if (reasonCode === 'gate_rejection') {
     return error;

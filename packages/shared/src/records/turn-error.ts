@@ -1,5 +1,6 @@
 import {
   CONNECTION_FAILURE_RE,
+  isDiskFullFailure,
   isUnansweredFetch,
   RUNTIME_UPDATE_REQUIRED_RE,
 } from '../task-failure.js';
@@ -23,6 +24,7 @@ export const TURN_ERROR_KINDS = [
 export type TurnErrorKind = (typeof TURN_ERROR_KINDS)[number];
 
 const RULES: readonly [TurnErrorKind, Pick<RegExp, 'test'>][] = [
+  ['disk', { test: isDiskFullFailure }],
   ['no-model', /\bno_model\b|no keyed provider|has no model or chief context/i],
   [
     'interrupted',
@@ -30,7 +32,6 @@ const RULES: readonly [TurnErrorKind, Pick<RegExp, 'test'>][] = [
   ],
   ['turn-limit', /\bturn_limit\b/i],
   ['runtime-update', RUNTIME_UPDATE_REQUIRED_RE],
-  ['disk', /\bENOSPC\b|no space left on device|insufficient (?:free )?disk space|disk full/i],
   ['connect', new RegExp(`NECP|${CONNECTION_FAILURE_RE.source}`, 'i')],
   ['key', /\b401\b|(invalid|incorrect).{0,20}api key|unauthorized|authentication_error/i],
   [

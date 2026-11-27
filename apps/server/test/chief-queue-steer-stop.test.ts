@@ -1025,6 +1025,28 @@ describe('chief unavailable (T4)', () => {
     expect(await w.claim()).toBeNull();
   });
 
+  test.each(['429', '500', '503', '529'])(
+    'a disk-full runner failure with status-like process id %s finishes as a chief error, not a provider hold',
+    async (pid) => {
+      const w = await setupWorld();
+      await w.send('第一句');
+      const running = await w.claim();
+      expect(running).not.toBeNull();
+      const errorMessage = `Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.${pid}.0.tmp'`;
+      await w.done(running!.step.id, { status: 'failed', errorMessage });
+      const row = w.stepRow(running!.step.id);
+      expect(row?.status).toBe('failed');
+      expect(row?.quotaBlock ?? null).toBeNull();
+      const errorRow = w.messages().find((m) => m.id === `chief-err-${running!.step.id}`);
+      expect(errorRow).toBeDefined();
+      expect(JSON.parse(errorRow!.content as string)).toMatchObject({
+        kind: 'chief_turn_error',
+        message: errorMessage,
+      });
+      expect((await w.envelope()).outage ?? null).toBeNull();
+    },
+  );
+
   test('a held message can be withdrawn while the chief is down', async () => {
     const w = await setupWorld();
     await w.send('第一句');

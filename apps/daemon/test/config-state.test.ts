@@ -3,6 +3,7 @@ import {
   existsSync,
   lstatSync,
   readFileSync,
+  rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
@@ -183,6 +184,21 @@ describe('local state layout (02 §5.3)', () => {
       workspacesDir: config.workspacesDir,
     });
     expect(modeBits(state)).toBe(0o600);
+  });
+
+  test('workspace-root.json refuses a symlinked state file', () => {
+    const home = tmp();
+    const paths = statePaths(home);
+    ensureStateDirs(paths);
+    const state = join(home, 'workspace-root.json');
+    const elsewhere = join(home, 'elsewhere.json');
+    writeFileSync(elsewhere, 'original\n');
+    rmSync(state);
+    symlinkSync(elsewhere, state);
+
+    expect(() => ensureStateDirs(paths)).toThrow(/symbolic link/);
+    expect(lstatSync(state).isSymbolicLink()).toBe(true);
+    expect(readFileSync(elsewhere, 'utf8')).toBe('original\n');
   });
 
   test('ensureStateDirs creates home + outbox/chat-sessions/homes/pi/workspaces', () => {

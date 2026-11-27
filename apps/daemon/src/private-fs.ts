@@ -19,6 +19,7 @@ import { basename, dirname, join } from 'node:path';
 const PRIVATE_DIR_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_TEMP_FILE = /^\.(.+)\.(\d+)\.\d+(?:\.[0-9a-f]+)?\.tmp$/;
+const TEMP_OPEN_ATTEMPTS = 32;
 
 export function ensurePrivateDir(dir: string): void {
   mkdirSync(dir, { recursive: true, mode: PRIVATE_DIR_MODE });
@@ -93,16 +94,27 @@ function refuseSymlink(path: string): void {
 
 export function writePrivateFile(path: string, contents: string): void {
   refuseSymlink(path);
-  const suffix = randomBytes(6).toString('hex');
-  const temporary = join(
-    dirname(path),
-    `.${basename(path)}.${process.pid}.${writeSequence++}.${suffix}.tmp`,
-  );
-  const fd = openSync(
-    temporary,
-    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-    PRIVATE_FILE_MODE,
-  );
+  let temporary = '';
+  let fd: number | null = null;
+  for (let attempt = 0; attempt < TEMP_OPEN_ATTEMPTS; attempt += 1) {
+    const suffix = randomBytes(6).toString('hex');
+    temporary = join(
+      dirname(path),
+      `.${basename(path)}.${process.pid}.${writeSequence++}.${suffix}.tmp`,
+    );
+    try {
+      fd = openSync(
+        temporary,
+        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+        PRIVATE_FILE_MODE,
+      );
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || attempt === TEMP_OPEN_ATTEMPTS - 1)
+        throw error;
+    }
+  }
+  if (fd === null) throw new Error(`could not create temporary file for: ${path}`);
   let closed = false;
   try {
     const data = Buffer.from(contents, 'utf8');

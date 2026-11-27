@@ -172,6 +172,20 @@ describe('waiting-to-retry exact clock time and waiting visual treatment', () =>
       params: { tool: 'antigravity' },
     });
     expect(EN[missingTool.title.key]).toContain('{tool}');
+
+    const disk = parkedRetryCopy({
+      state: 'parked',
+      failureClass: 'permanent',
+      reasonCode: 'disk',
+      attemptsMade: 0,
+      detail: null,
+    });
+    expect(disk.title).toEqual({ key: '执行机磁盘已满' });
+    expect(disk.fix).toEqual({
+      key: 'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。',
+    });
+    expect(EN[disk.title.key]).toBe('The Runner disk is full');
+    expect(EN[disk.fix.key]).toContain('Free disk space');
   });
 
   test('structured and legacy automatic-retry system rows render through NoticeLine with optional detail', () => {

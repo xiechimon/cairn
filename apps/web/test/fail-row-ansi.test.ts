@@ -70,6 +70,48 @@ describe('mapTranscript failure row (#1262 fallback)', () => {
   });
 });
 
+describe('mapTranscript disk-full failure copy', () => {
+  test.each(['429', '500', '503', '529'])(
+    'a status-like process id in the temp path still produces disk guidance: %s',
+    (pid) => {
+      const errorMessage = `Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.${pid}.0.tmp'`;
+      const items = mapTranscript({
+        messages: [],
+        steps: [],
+        build: { ...POLLUTED_BUILD, errorMessage },
+        todo: FAILED_CARD,
+        machineName: null,
+        userName: 'Xmon Dai',
+        liveText: '',
+      });
+      const fail = items.find((i): i is Extract<typeof i, { kind: 'fail' }> => i.kind === 'fail');
+      expect(fail).toMatchObject({
+        label: '执行机磁盘已满',
+        body: 'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。',
+      });
+    },
+  );
+
+  test('a parked disk-full system message without todo.retry still maps to disk title and guidance', () => {
+    const content =
+      "Task parked: runner disk full. Free disk space on the Runner, then retry. Last error: Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.503.0.tmp'";
+    const items = mapTranscript({
+      messages: [{ id: 'retry-parked-build-ansi', role: 'system', content, createdAt: NOW }],
+      steps: [],
+      build: { ...POLLUTED_BUILD, errorMessage: content },
+      todo: FAILED_CARD,
+      machineName: null,
+      userName: 'Xmon Dai',
+      liveText: '',
+    });
+    const fail = items.find((i): i is Extract<typeof i, { kind: 'fail' }> => i.kind === 'fail');
+    expect(fail).toMatchObject({
+      label: '执行机磁盘已满',
+      body: 'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。',
+    });
+  });
+});
+
 describe('mapTranscript failure dedup', () => {
   const LEGACY_REPORT = (reason: string) =>
     [

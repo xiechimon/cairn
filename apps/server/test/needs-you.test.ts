@@ -38,6 +38,7 @@ import {
   parkFailedBuild,
   RETRY_PARKED_MARK,
 } from '../src/services/retry-parking.js';
+import { todoRetryStateOf } from '../src/services/retry-policy.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
   drainTaskMessageQueue,
@@ -890,5 +891,34 @@ describe('needs you (#1800)', () => {
         .where(eq(buildTable.id, restartedId ?? ''))
         .get()?.triggerSource,
     ).toBe('chief');
+  });
+
+  test('a disk-full failure parks immediately as disk without auto-retry and notifies Coordinator', async () => {
+    const w = openWorld();
+    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+    const errorMessage =
+      "Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.503.0.tmp'";
+    applyStepFailure(w.deps, row, errorMessage);
+    const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!;
+    expect(buildRow.retryParkReason).toBe('disk');
+    expect(buildRow.retryNextAt).toBeNull();
+    expect(buildRow.errorMessage).toMatch(/^Task parked: runner disk full\./);
+    expect(todoRetryStateOf(w.deps.db, { phase: 'failed', phaseAt: nowMs() }, buildRow)).toEqual({
+      state: 'parked',
+      failureClass: 'permanent',
+      reasonCode: 'disk',
+      attemptsMade: 0,
+      detail: null,
+    });
+    const builds = buildCount(w);
+    await sweepFailedRetries(w.deps);
+    expect(buildCount(w)).toBe(builds);
+    const notices = w.s.db
+      .select()
+      .from(chiefMessage)
+      .all()
+      .filter((notice) => notice.id.startsWith(`retry-parked-${w.buildId}-`));
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.content).toContain('runner disk full');
   });
 });

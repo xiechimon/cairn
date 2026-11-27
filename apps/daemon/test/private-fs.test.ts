@@ -12,7 +12,10 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { sweepStalePrivateTemps, writePrivateFile } from '../src/private-fs.js';
 import { testTempDir } from './test-temp-dir.js';
 
+type OpenSyncArgs = Parameters<typeof import('node:fs').openSync>;
+
 const fsHooks = vi.hoisted(() => ({
+  openOverride: null as ((...args: OpenSyncArgs) => number) | null,
   writeOverride: null as ((fd: number, data: ArrayBufferView) => number) | null,
   renameOverride: null as ((oldPath: string, newPath: string) => void) | null,
 }));
@@ -21,6 +24,10 @@ vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
+    openSync(...args: OpenSyncArgs) {
+      if (fsHooks.openOverride !== null) return fsHooks.openOverride(...args);
+      return actual.openSync(...args);
+    },
     renameSync(oldPath: string, newPath: string) {
       if (fsHooks.renameOverride !== null) {
         fsHooks.renameOverride(oldPath, newPath);
@@ -50,6 +57,7 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 afterEach(() => {
+  fsHooks.openOverride = null;
   fsHooks.writeOverride = null;
   fsHooks.renameOverride = null;
 });
@@ -150,6 +158,46 @@ describe('writePrivateFile', () => {
     expect(observedTempContents).toBe('{"state":"next"}\n');
     expect(readFileSync(target, 'utf8')).toBe('{"state":"claimed"}\n');
     expect(readdirSync(dir)).toEqual(['step.json']);
+  });
+
+  test('retries exclusive-create collisions with a fresh temporary name and still writes atomically', async () => {
+    const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const dir = testTempDir('cairn-private-fs-collision-');
+    const target = join(dir, 'machine.json');
+    let collisions = 0;
+    let createAttempts = 0;
+
+    fsHooks.openOverride = (...args) => {
+      if (String(args[0]).includes('.machine.json.')) {
+        createAttempts += 1;
+        if (collisions < 2) {
+          collisions += 1;
+          throw Object.assign(new Error('EEXIST: file already exists'), { code: 'EEXIST' });
+        }
+      }
+      return actual.openSync(...args);
+    };
+
+    writePrivateFile(target, '{"ok":true}\n');
+
+    expect(readFileSync(target, 'utf8')).toBe('{"ok":true}\n');
+    expect(collisions).toBe(2);
+    expect(createAttempts).toBe(3);
+    expect(readdirSync(dir)).toEqual(['machine.json']);
+  });
+
+  test('bounds exclusive-create collision retries instead of spinning forever', () => {
+    const dir = testTempDir('cairn-private-fs-collision-bound-');
+    const target = join(dir, 'machine.json');
+    let createAttempts = 0;
+    fsHooks.openOverride = () => {
+      createAttempts += 1;
+      throw Object.assign(new Error('EEXIST: file already exists'), { code: 'EEXIST' });
+    };
+
+    expect(() => writePrivateFile(target, '{"ok":true}\n')).toThrow('EEXIST');
+    expect(createAttempts).toBe(32);
+    expect(readdirSync(dir)).toEqual([]);
   });
 
   test('sweeps dead-writer and expired temp files while sparing fresh live-writer temps', () => {

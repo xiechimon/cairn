@@ -1323,6 +1323,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
 const RETRY_PARKED_ID_PREFIX = 'retry-parked-';
 
 const FAIL_KIND_LABELS: Partial<Record<ReturnType<typeof classifyStepFailure>, string>> = {
+  disk: '执行机磁盘已满',
   quota: '模型额度已用尽',
   capacity: '请求被限流',
   network: '连接服务商时中断',
@@ -1340,6 +1341,7 @@ function failLabel(raw: string): { label: string; labelVars?: Record<string, str
     if (hourly !== undefined)
       return { label: '一小时内失败 {n} 次，已暂停', labelVars: { n: hourly } };
     if (/model unavailable/i.test(raw)) return { label: '模型不可用，已暂停' };
+    if (classifyStepFailure(raw) === 'disk') return { label: '执行机磁盘已满' };
     return { label: '已暂停自动重试' };
   }
   return { label: FAIL_KIND_LABELS[classifyStepFailure(raw)] ?? '本步异常结束' };
@@ -1389,6 +1391,8 @@ export function plainFailureOf(raw: string): { key: string; vars: Record<string,
 function failGuidanceBody(raw: string): string {
   const kind = classifyStepFailure(raw);
   switch (kind) {
+    case 'disk':
+      return 'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。';
     case 'runtime_outdated':
       return '更新 Cairn 后重新运行这个任务。';
     case 'network':

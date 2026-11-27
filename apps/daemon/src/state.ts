@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type DaemonJson,
@@ -62,13 +62,10 @@ export function ensureStateDirs(paths: StatePaths): void {
     ensurePrivateDir(dir);
     sweepStalePrivateTemps(dir);
   }
-  const temporaryRoot = join(paths.home, `workspace-root-${randomBytes(16).toString('hex')}.tmp`);
-  try {
-    writePrivateFile(temporaryRoot, `${JSON.stringify({ workspacesDir: paths.workspacesDir })}\n`);
-    renameSync(temporaryRoot, join(paths.home, 'workspace-root.json'));
-  } finally {
-    rmSync(temporaryRoot, { force: true });
-  }
+  writePrivateFile(
+    join(paths.home, 'workspace-root.json'),
+    `${JSON.stringify({ workspacesDir: paths.workspacesDir })}\n`,
+  );
 }
 
 function readJsonOr(path: string): unknown | null {

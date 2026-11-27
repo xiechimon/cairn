@@ -5,6 +5,7 @@ import { trimEndChars, trimStartChars } from './linear-text.js';
 export const RETRY_PARKED_MARK = 'Task parked';
 
 export const STEP_FAILURE_KINDS = [
+  'disk',
   'quota',
   'capacity',
   'model_unavailable',
@@ -85,7 +86,7 @@ export function runtimeReportSatisfies(
 
 export function failureEndsStepNow(rawError: string): boolean {
   const kind = classifyStepFailure(rawError);
-  return kind === 'model_unavailable' || kind === 'runtime_outdated';
+  return kind === 'disk' || kind === 'model_unavailable' || kind === 'runtime_outdated';
 }
 
 export const CONNECTION_FAILURE_RE =
@@ -142,11 +143,19 @@ export function isConnectionFailure(text: string): boolean {
   return CONNECTION_FAILURE_RE.test(text) || isUnansweredFetch(text);
 }
 
+export const DISK_FULL_RE =
+  /\bENOSPC\b|no space left on device|insufficient (?:free )?disk space|disk full/i;
+
+export function isDiskFullFailure(text: string): boolean {
+  return DISK_FULL_RE.test(scanSlice(text));
+}
+
 export function classifyStepFailure(rawError: string): StepFailureKind {
   const trimmed = scanSlice(rawError).trim();
   if (trimmed === '') return 'other';
   const lower = trimmed.toLowerCase();
 
+  if (isDiskFullFailure(trimmed)) return 'disk';
   if (RUNTIME_UPDATE_REQUIRED_RE.test(trimmed)) return 'runtime_outdated';
 
   if (
@@ -263,6 +272,7 @@ const ACCOUNT_EXHAUSTION_PHRASES = [
 export function isProviderOutage(rawError: string): boolean {
   const lower = scanSlice(rawError).trim().toLowerCase();
   if (lower === '') return false;
+  if (isDiskFullFailure(lower)) return false;
   if (GIT_ERROR_PREFIX_RE.test(lower) || GIT_PROGRESS_RE.test(lower)) return false;
   if (containsAny(lower, ACCOUNT_EXHAUSTION_PHRASES)) return true;
   return PROVIDER_5XX_PATTERNS.some((re) => re.test(lower));
@@ -301,7 +311,13 @@ export function noVisionSignalOf(message: string): boolean {
   );
 }
 
-export const AGENT_FAILURE_KINDS = ['quota', 'capacity', 'provider_network', 'other'] as const;
+export const AGENT_FAILURE_KINDS = [
+  'disk',
+  'quota',
+  'capacity',
+  'provider_network',
+  'other',
+] as const;
 export type AgentFailureKind = (typeof AGENT_FAILURE_KINDS)[number];
 
 const QUOTA_PATTERN =
@@ -315,6 +331,7 @@ const NETWORK_PATTERN = /upstream\s+stream\s+disconnected|ETIMEDOUT|temporarily\
 export function classifyAgentFailure(message: string): AgentFailureKind {
   const text = scanSlice(message);
   if (text === '') return 'other';
+  if (isDiskFullFailure(text)) return 'disk';
   if (QUOTA_PATTERN.test(text)) return 'quota';
   if (CAPACITY_PATTERN.test(text)) return 'capacity';
   if (isConnectionFailure(text) || NETWORK_PATTERN.test(text)) return 'provider_network';
@@ -344,6 +361,7 @@ export const RETRY_REASON_CODES = [
   'parked',
   'network',
   'server_error',
+  'disk',
   'runner_disconnect',
   'runtime_exited',
   'runtime_startup_timeout',
@@ -729,6 +747,9 @@ export function classifyRetryFailure(
   if (trimmed === '') {
     return { failureClass: 'unknown', reasonCode: 'unknown', retryAfterMs: null, resetAt: null };
   }
+  if (isDiskFullFailure(trimmed)) {
+    return { failureClass: 'permanent', reasonCode: 'disk', retryAfterMs: null, resetAt: null };
+  }
   if (trimmed.startsWith(RETRY_PARKED_MARK)) {
     return {
       failureClass: 'permanent',
@@ -868,6 +889,9 @@ export function classifyRetryFailureWithCode(
   code: StepFailureCode | null | undefined,
   now = Date.now(),
 ): RetryFailureClassification {
+  if (isDiskFullFailure(rawError)) {
+    return { failureClass: 'permanent', reasonCode: 'disk', retryAfterMs: null, resetAt: null };
+  }
   if (code == null) return classifyRetryFailure(rawError, now);
   const failureClass = failureClassForCode(code);
   if (failureClass === 'rate_limit') {

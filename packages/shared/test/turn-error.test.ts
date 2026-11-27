@@ -42,11 +42,11 @@ describe('turnErrorKind names the failure from the stored raw text', () => {
       'runtime-update',
     ],
     [
-      "Runner error: ENOSPC: no space left on device, open '/Users/ian/.cairn/outbox/step-nhbLwXygr3-lP6fumcD36.json'",
+      "Runner error: ENOSPC: no space left on device, open '/Users/runner/.cairn/outbox/step-example.json'",
       'disk',
     ],
     [
-      "Runner error: ENOSPC: no space left on device, open '/Users/ian/.cairn/outbox/.step-nhbLwXygr3.json.404.500.tmp'",
+      "Runner error: ENOSPC: no space left on device, open '/Users/runner/.cairn/outbox/.step-example.json.404.500.tmp'",
       'disk',
     ],
     ['Coordinator turn ended: model_error "ENOSPC: no space left on device"', 'disk'],
@@ -54,6 +54,17 @@ describe('turnErrorKind names the failure from the stored raw text', () => {
   ])('%s', (message, kind) => {
     expect(turnErrorKind(message)).toBe(kind);
   });
+
+  test.each(['400', '401', '403', '404', '429', '500', '503', '529'])(
+    'a status-looking process id in an atomic temp path still means disk full: %s',
+    (pid) => {
+      expect(
+        turnErrorKind(
+          `Runner error: ENOSPC: no space left on device, open '/Users/runner/.cairn/outbox/.step-example.json.${pid}.0.tmp'`,
+        ),
+      ).toBe('disk');
+    },
+  );
 });
 
 describe('every failure classifier reads the same connection wording as a network failure', () => {

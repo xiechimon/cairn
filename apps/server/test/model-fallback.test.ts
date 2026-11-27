@@ -708,6 +708,33 @@ describe('model fallback chain (#1493)', () => {
     },
   );
 
+  test.each(['429', '503'])(
+    'a disk-full runner failure with status-like pid %s parks without fallback or provider outage',
+    async (pid) => {
+      const w = await setupWorld();
+      const buildId = await startBuild(w);
+      const first = await claim(w);
+      const errorMessage = `Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.${pid}.0.tmp'`;
+      await done(w, first.stepId, { status: 'failed', errorMessage });
+      const row = stepRow(w, first.stepId);
+      expect(row.status).toBe('failed');
+      expect(row.fallback).toBeNull();
+      expect(providerHealth.state(`${w.s.team.id}/relay-a`)).toBe('healthy');
+      const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
+      expect(buildRow.retryParkReason).toBe('disk');
+      expect(buildRow.retryNextAt).toBeNull();
+      expect(buildRow.errorMessage).toMatch(/^Task parked: runner disk full\./);
+      expect(buildRow.errorMessage).not.toContain('failed builds in one hour');
+      expect(
+        w.s.db
+          .select()
+          .from(notificationTable)
+          .where(eq(notificationTable.type, 'model_fallback'))
+          .all(),
+      ).toHaveLength(0);
+    },
+  );
+
   test.each(['concurrent request limit reached', 'no capacity available'])(
     'text-classified capacity (%s) with no quotaBlock and an exhausted chain waits for quota',
     async (errorMessage) => {

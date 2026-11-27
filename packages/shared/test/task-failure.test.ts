@@ -7,6 +7,7 @@ import {
   classifyRetryFailureWithCode,
   classifyStepFailure,
   failureClassForCode,
+  failureEndsStepNow,
   isMissingCommandHookNote,
   isProviderAuthFailure,
   isProviderOutage,
@@ -118,8 +119,34 @@ describe('classifyStepFailure (#1257 three-bucket classification)', () => {
     expect(classifyStepFailure('code=402 billing')).toBe('quota');
   });
 
+  test.each(['429', '500', '503', '529'])(
+    'disk-full wording wins over the status-like process id in an atomic temp path: %s',
+    (pid) => {
+      const error = `Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.${pid}.0.tmp'`;
+      expect(classifyStepFailure(error)).toBe('disk');
+    },
+  );
+
+  test('provider statuses keep their meaning when no disk-full wording exists', () => {
+    expect(classifyStepFailure('429 Too Many Requests')).toBe('capacity');
+    expect(classifyStepFailure('529 overloaded')).toBe('capacity');
+    expect(classifyStepFailure('500 internal error')).toBe('other');
+  });
+
+  test.each(['429', '500', '503', '529'])(
+    'failureEndsStepNow stops daemon retries immediately on disk-full wording with pid %s',
+    (pid) => {
+      expect(
+        failureEndsStepNow(
+          `Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.${pid}.0.tmp'`,
+        ),
+      ).toBe(true);
+    },
+  );
+
   test('vocabulary closed (enum single source)', () => {
     expect(STEP_FAILURE_KINDS).toEqual([
+      'disk',
       'quota',
       'capacity',
       'model_unavailable',
@@ -169,6 +196,11 @@ describe('isProviderOutage (#1786 provider 5xx and account exhaustion)', () => {
   test('errors outside the provider channel do not trigger fallback', () => {
     expect(isProviderOutage('')).toBe(false);
     expect(isProviderOutage('429 rate limited')).toBe(false);
+    expect(
+      isProviderOutage(
+        "Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.503.0.tmp'",
+      ),
+    ).toBe(false);
     expect(isProviderOutage('Context length exceeded: 200000 tokens')).toBe(false);
     expect(
       isProviderOutage(
@@ -235,8 +267,19 @@ describe('classifyAgentFailure (#1261 four buckets, F1-F4)', () => {
     expect(classifyAgentFailure('429 then 402: out of credit')).toBe('quota');
   });
 
+  test.each(['429', '500', '503', '529'])(
+    'disk-full wording wins over the status-like process id in an atomic temp path: %s',
+    (pid) => {
+      expect(
+        classifyAgentFailure(
+          `Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.session.jsonl.${pid}.0.tmp'`,
+        ),
+      ).toBe('disk');
+    },
+  );
+
   test('vocabulary closed (enum single source)', () => {
-    expect(AGENT_FAILURE_KINDS).toEqual(['quota', 'capacity', 'provider_network', 'other']);
+    expect(AGENT_FAILURE_KINDS).toEqual(['disk', 'quota', 'capacity', 'provider_network', 'other']);
   });
 });
 
@@ -387,6 +430,22 @@ describe('classifyRetryFailure & parseRetryDelayMs / parseQuotaResetAt', () => {
     });
   });
 
+  test.each(['429', '500', '503', '529'])(
+    'disk-full wording parks as disk before the status-like process id in an atomic temp path: %s',
+    (pid) => {
+      expect(
+        classifyRetryFailure(
+          `Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.${pid}.0.tmp'`,
+        ),
+      ).toEqual({
+        failureClass: 'permanent',
+        reasonCode: 'disk',
+        retryAfterMs: null,
+        resetAt: null,
+      });
+    },
+  );
+
   test('transient errors classify network, 5xx and runner disconnects', () => {
     expect(classifyRetryFailure('upstream error: HTTP 503 Service Unavailable')).toMatchObject({
       failureClass: 'transient',
@@ -502,6 +561,12 @@ describe('structured step failure codes and machineDoneBodySchema', () => {
       retryAfterMs: null,
       resetAt: null,
     });
+    expect(
+      classifyRetryFailureWithCode(
+        "Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.429.0.tmp'",
+        'rate_limit',
+      ),
+    ).toEqual({ failureClass: 'permanent', reasonCode: 'disk', retryAfterMs: null, resetAt: null });
     expect(classifyRetryFailureWithCode('ECONNRESET', 'missing_tool')).toEqual({
       failureClass: 'permanent',
       reasonCode: 'missing_tool',

@@ -179,6 +179,24 @@ describe('outbox step files follow the journal entry', () => {
     expect(files(dir, 's1')).toHaveLength(2);
   });
 
+  test.each([
+    '.step-s1.json.123.0.tmp',
+    '.step-s1.transcript.json.123.0.tmp',
+    '.step-s1.session.jsonl.123.0.tmp',
+  ])('sweep removes stale atomic-write residue %s even when its step journal exists', (name) => {
+    const dir = tmp();
+    const j = new StepJournal(dir);
+    claim(j, 's1');
+    const temp = join(dir, name);
+    writeFileSync(temp, '{"partial":');
+    const when = new Date(Date.now() - 10_000);
+    utimesSync(temp, when, when);
+
+    expect(j.sweepOrphanFiles({ now: Date.now(), ttlMs: 5_000 })).toEqual([name]);
+    expect(existsSync(temp)).toBe(false);
+    expect(existsSync(join(dir, 'step-s1.json'))).toBe(true);
+  });
+
   test('sweep removes old orphans, keeps fresh ones and ones with a journal entry', () => {
     const dir = tmp();
     const j = new StepJournal(dir);

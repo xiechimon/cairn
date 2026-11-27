@@ -6,7 +6,7 @@ test('a disk-full runner failure is explained as a machine problem with a retry'
     turnErrorCopy(
       {
         message:
-          'Runner error: ENOSPC: no space left on device, open \'/Users/ian/.cairn/outbox/step-nhbLwXygr3-lP6fumcD36.json\'',
+          'Runner error: ENOSPC: no space left on device, open \'/Users/runner/.cairn/outbox/step-example.json\'',
       },
       false,
     ),
