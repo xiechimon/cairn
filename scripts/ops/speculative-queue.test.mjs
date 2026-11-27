@@ -453,6 +453,13 @@ if (args.includes('POST')) {
     console.error(refusal.error);
     process.exit(1);
   }
+  if (path.includes('/cancel')) {
+    const id = Number(/runs\\/(\\d+)\\//.exec(path)?.[1]);
+    state.runs = state.runs.map((run) =>
+      run.id === id ? { ...run, status: 'completed', conclusion: 'cancelled' } : run,
+    );
+    writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(state));
+  }
   appendFileSync(process.env.FAKE_GH_LOG, path + '\\n');
   console.log('{}');
 } else {
@@ -1112,5 +1119,79 @@ test('no queue ref is pushed when a rebuild adds no changes to its parent, and a
     assert.equal(q.pass().action, 'wait');
     assert.equal(q.remote(`${TRY_PREFIX}${idTwin}`), null);
     assert.equal(q.remote(`${ENQUEUE_PREFIX}${idTwin}`), twin);
+  });
+});
+
+test('ejecting a red head leaves alone follower runs whose try refs stay valid on main', () => {
+  queueHarness('queue-keep-follower-', (q) => {
+    const main1 = q.commit(q.base, 'x.txt', 'x\n', 'chore: x');
+    q.push(main1, 'refs/heads/main');
+    const a = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const b = q.commit(a, 'b.txt', 'b\n', 'feat: b');
+    const c = q.commit(q.base, 'c.txt', 'c\n', 'feat: c');
+    const aTry = q.commit(main1, 'a.txt', 'a\n', 'feat: a');
+    const bTry = q.commit(aTry, 'b.txt', 'b\n', 'feat: b');
+    const cTry = q.commit(bTry, 'c.txt', 'c\n', 'feat: c');
+    const [idA, idB, idC] = [idAt(1, a), idAt(2, b), idAt(3, c)];
+    q.push(a, `${ENQUEUE_PREFIX}${idA}`);
+    q.push(aTry, `${TRY_PREFIX}${idA}`);
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.push(c, `${ENQUEUE_PREFIX}${idC}`);
+    q.push(cTry, `${TRY_PREFIX}${idC}`);
+    q.state.green = [a, b, c];
+    q.run(aTry, 1, `queue/try/${idA}`, { ...FAILED_ONCE, run_attempt: 2 });
+    q.run(bTry, 2, `queue/try/${idB}`, {});
+    q.run(cTry, 3, `queue/try/${idC}`, {});
+    q.pass();
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idA}`), null);
+    assert.deepEqual(q.cancelled(), []);
+  });
+});
+
+test('ejecting a red head cancels follower runs invalidated by its removal', () => {
+  queueHarness('queue-cancel-follower-', (q) => {
+    const { idA, aTry, bTry } = failingHead(q, 'own queue run');
+    const main1 = q.remote('refs/heads/main');
+    const bRef = q
+      .git(['ls-remote', 'origin', `${TRY_PREFIX}*`])
+      .split('\n')
+      .find((line) => !line.endsWith(idA))
+      .split(/\s+/)[1];
+    q.run(aTry, 1, `queue/try/${idA}`, { ...FAILED_ONCE, run_attempt: 2 });
+    q.run(bTry, 2, bRef.replace('refs/heads/', ''), {});
+    q.pass();
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idA}`), null);
+    assert.equal(q.remote('refs/heads/main'), main1);
+    assert.deepEqual(q.cancelled(), [2]);
+  });
+});
+
+test('ejecting a red head keeps valid followers behind an addsNothing twin', () => {
+  queueHarness('queue-keep-twin-follower-', (q) => {
+    const main1 = q.commit(q.base, 'x.txt', 'x\n', 'chore: x');
+    q.push(main1, 'refs/heads/main');
+    const a = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const b = q.commit(a, 'b.txt', 'b\n', 'feat: b');
+    const c = q.commit(main1, 'b.txt', 'b\n', 'feat: b twin');
+    const d = q.commit(q.base, 'd.txt', 'd\n', 'feat: d');
+    const aTry = q.commit(main1, 'a.txt', 'a\n', 'feat: a');
+    const bTry = q.commit(aTry, 'b.txt', 'b\n', 'feat: b');
+    const dTry = q.commit(bTry, 'd.txt', 'd\n', 'feat: d');
+    const [idA, idB, idC, idD] = [idAt(1, a), idAt(2, b), idAt(3, c), idAt(4, d)];
+    q.push(a, `${ENQUEUE_PREFIX}${idA}`);
+    q.push(aTry, `${TRY_PREFIX}${idA}`);
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.push(c, `${ENQUEUE_PREFIX}${idC}`);
+    q.push(d, `${ENQUEUE_PREFIX}${idD}`);
+    q.push(dTry, `${TRY_PREFIX}${idD}`);
+    q.state.green = [a, b, c, d];
+    q.run(aTry, 1, `queue/try/${idA}`, { ...FAILED_ONCE, run_attempt: 2 });
+    q.run(bTry, 2, `queue/try/${idB}`, {});
+    q.run(dTry, 3, `queue/try/${idD}`, {});
+    q.pass();
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idA}`), null);
+    assert.deepEqual(q.cancelled(), []);
   });
 });

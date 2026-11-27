@@ -840,12 +840,35 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
       console.log(
         `[speculative-queue] ejecting red head ${failedEntry.id} (${failedEntry.sha.slice(0, 9)})`,
       );
-      cancelRuns(repo, cancelRunIds);
       const refs = [
         failedEntry.ref,
         ...(tryRaw.has(failedEntry.id) ? [`${TRY_PREFIX}${failedEntry.id}`] : []),
       ];
       if (!deleteRemoteRefs(cwd, refs)) return { action: 'wait' };
+      const reusedRunIds = new Set();
+      let nextParent = mainTip;
+      for (const item of window.slice(1)) {
+        const trySha = tryRaw.get(item.id) ?? null;
+        const validTry =
+          trySha !== null &&
+          isTryValid({ cwd, expectedParent: nextParent, trySha, entrySha: item.sha });
+        const stacksUnchanged =
+          (!validTry || trySha === item.sha) && isAncestor(cwd, nextParent, item.sha);
+        const addsNothing =
+          nextParent !== mainTip && cherrySignatures(cwd, nextParent, item.sha).length === 0;
+        if (stacksUnchanged || addsNothing) {
+          nextParent = stacksUnchanged ? item.sha : nextParent;
+          continue;
+        }
+        if (!validTry) break;
+        const runId = verdicts.get(trySha)?.runId;
+        if (runId) reusedRunIds.add(runId);
+        nextParent = trySha;
+      }
+      cancelRuns(
+        repo,
+        cancelRunIds.filter((runId) => !reusedRunIds.has(runId)),
+      );
       const reason =
         verdict.failedJobs?.length > 0
           ? `ci failed again in ${verdict.failedJobs.join(', ')}`

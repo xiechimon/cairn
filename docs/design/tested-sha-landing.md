@@ -96,7 +96,8 @@ accepted and pushing an untested one is rejected.
   rerun; a run with only cancelled jobs is rerun whole.
 - **Attribution.** Only the head entry is ever ejected for red CI, once a second
   attempt is red: an entry behind it may be red because of what is ahead of it.
-  Obsolete downstream runs are cancelled and the rest are rebuilt on `main`.
+  Obsolete downstream runs are cancelled and the rest are rebuilt on `main`; a
+  follower run whose `try` ref stays valid on `main` is left running.
 - **Conflict.** An entry that does not rebase cleanly is ejected with the
   conflicting paths, and the tail is rebuilt on the last good parent.
 
