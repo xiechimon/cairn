@@ -171,6 +171,7 @@ describe('telegram adapter', () => {
       sender: { id: '42', name: 'Ian' },
       value: 'imcb:q-1:0',
       messageId: 'cq:cbq-9',
+      cardMessage: { chatKey: '777', messageRef: '7' },
     });
     await vi.waitFor(() =>
       expect(
@@ -529,5 +530,55 @@ describe('telegram adapter reconnect and timeout hardening', () => {
     await abortSession.stop();
     expect(partialOffsets).toEqual([]);
     expect(abortSession.offset?.()).toBeNull();
+  });
+
+  test('settleCard clears inline keyboard with editMessageReplyMarkup', async () => {
+    const tg = fakeTelegramEnv();
+    tg.queue('getMe', BOT_ME);
+    tg.queue('getUpdates', {
+      ok: true,
+      result: [
+        {
+          update_id: 401,
+          callback_query: {
+            id: 'cb-1',
+            from: { id: 42, is_bot: false, first_name: 'Ian' },
+            data: 'imcb:req-2:0',
+            message: {
+              message_id: 88,
+              chat: { id: 777, type: 'private' },
+              text: '请选择选项 A 或选项 B：',
+            },
+          },
+        },
+      ],
+    });
+    tg.queue('answerCallbackQuery', { ok: true, result: true });
+    tg.queue('getUpdates', PARK);
+    tg.queue('editMessageReplyMarkup', { ok: true, result: true });
+    const actions: ImInboundAction[] = [];
+    const session = await createTelegramAdapter().connect(
+      { botToken: TOKEN },
+      {
+        onMessage: () => {},
+        onAction: (action) => actions.push(action),
+        onStatus: () => {},
+      },
+      tg.env,
+    );
+    await vi.waitFor(() => expect(actions).toHaveLength(1));
+    expect(actions[0]?.cardMessage).toEqual({
+      chatKey: '777',
+      messageRef: '88',
+      text: '请选择选项 A 或选项 B：',
+    });
+    await session.settleCard?.(actions[0]!.cardMessage!, '已选择：选项 A');
+    const editCall = tg.calls.find((call) => call.method === 'editMessageReplyMarkup');
+    expect(editCall?.body).toEqual({
+      chat_id: 777,
+      message_id: 88,
+      reply_markup: { inline_keyboard: [] },
+    });
+    await session.stop();
   });
 });

@@ -17,7 +17,7 @@ import {
   SHOW_CHART_TOOL,
   SHOW_DIFF_TOOL,
 } from '@cairn/shared';
-import { and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
 import {
   attachment,
   chiefMessage,
@@ -62,6 +62,8 @@ import {
   publishQuestion,
   readQuestion,
 } from '../chief-question-store.js';
+import { steerWaitingChiefStep } from '../chief-turns.js';
+import { wakeCoordinator } from '../coordinator-context.js';
 import {
   cancelPendingEffects,
   drainEffects,
@@ -78,6 +80,7 @@ import type { ImRuntimeHooks, ImStepRow } from './runtime.js';
 import { slackCardBlocks } from './slack.js';
 import type {
   ImAdapter,
+  ImCardMessageRef,
   ImEnv,
   ImInboundAction,
   ImInboundFile,
@@ -89,6 +92,7 @@ type ConnectionRow = typeof imConnection.$inferSelect;
 
 interface LiveSession {
   send(msg: ImOutboundMessage): Promise<void>;
+  settleCard?(ref: ImCardMessageRef, summary: string): Promise<void>;
   stop(): Promise<void>;
   offset?(): string | number | null;
 }
@@ -125,7 +129,7 @@ export interface ImService {
 }
 
 const PAIRING_REQUESTED_TEXT =
-  '你的配对请求已记录：等 Cairn 主人在设置里批准之后，这里发的消息才会被处理。';
+  '你的配对请求已记录：请在 Cairn 应用弹窗或「设置 → 聊天应用」里批准后，再继续对话。';
 const PAIRING_APPROVED_TEXT = '已通过配对：现在可以直接在这里和 Cairn 对话。';
 const TURN_FAILED_TEXT = '本轮处理失败，请稍后重试。';
 const SEND_ATTEMPTS = 4;
@@ -794,11 +798,80 @@ export function createImService(deps: ImServiceDeps): ImService {
     }
     const chiefRow = ensureChief(deps, row.teamId);
     const threadRow = coordinatorThreadRow(deps, chiefRow);
+    const bodyText = inboundPrompt(row, msg, stored, dropped);
+    const coalescePending = () => {
+      const pendingRows = deps.db
+        .select()
+        .from(step)
+        .where(
+          and(
+            eq(step.buildId, threadRow.id),
+            eq(step.kind, 'chief'),
+            eq(step.status, 'pending'),
+            isNull(step.claimedAt),
+            isNull(step.holdReason),
+          ),
+        )
+        .orderBy(asc(step.createdAt), sql`rowid`)
+        .all();
+      for (const candidate of pendingRows) {
+        const origin = originOf(candidate.id);
+        if (
+          origin === undefined ||
+          origin.connId !== connId ||
+          origin.chatKey !== msg.chat.key ||
+          !turnIsImOnly(candidate.id)
+        ) {
+          continue;
+        }
+        const updatedPrompt = candidate.prompt
+          ? `${candidate.prompt}\n\n---\n\n${bodyText}`
+          : bodyText;
+        const updatedSaid =
+          msg.text === ''
+            ? candidate.ownerSaid
+            : candidate.ownerSaid
+              ? `${candidate.ownerSaid}\n${msg.text}`
+              : msg.text;
+        const res = deps.db
+          .update(step)
+          .set({ prompt: updatedPrompt, ownerSaid: updatedSaid })
+          .where(
+            and(
+              eq(step.id, candidate.id),
+              eq(step.status, 'pending'),
+              isNull(step.claimedAt),
+              isNull(step.holdReason),
+            ),
+          )
+          .run();
+        if (res.changes === 1) return true;
+      }
+      return false;
+    };
+    if (deps.db.transaction(() => coalescePending())) return;
+    const claimedSameOrigin = deps.db
+      .select()
+      .from(step)
+      .where(
+        and(eq(step.buildId, threadRow.id), eq(step.kind, 'chief'), eq(step.status, 'claimed')),
+      )
+      .all()
+      .find((candidate) => {
+        const origin = originOf(candidate.id);
+        return (
+          origin !== undefined &&
+          origin.connId === connId &&
+          origin.chatKey === msg.chat.key &&
+          turnIsImOnly(candidate.id)
+        );
+      });
     const stepId = enqueueChiefStep(deps, threadRow.id, {
-      prompt: inboundPrompt(row, msg, stored, dropped),
+      prompt: bodyText,
       trigger: 'wake',
       provenance: `im:${row.platform}:${connId}:${msg.chat.key}`,
       ownerMessageIds: [],
+      deferWake: claimedSameOrigin !== undefined,
     });
     if (msg.text !== '')
       deps.db.update(step).set({ ownerSaid: msg.text }).where(eq(step.id, stepId)).run();
@@ -814,6 +887,29 @@ export function createImService(deps: ImServiceDeps): ImService {
       })
       .onConflictDoNothing()
       .run();
+    if (claimedSameOrigin !== undefined) {
+      const waiting = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+      const liveRunning = deps.db
+        .select()
+        .from(step)
+        .where(and(eq(step.id, claimedSameOrigin.id), eq(step.status, 'claimed')))
+        .get();
+      const steered =
+        waiting !== undefined &&
+        liveRunning !== undefined &&
+        steerWaitingChiefStep(deps, {
+          teamId: row.teamId,
+          threadId: threadRow.id,
+          running: liveRunning,
+          waiting,
+          content: waiting.prompt ?? bodyText,
+          markSteered: false,
+        });
+      if (!steered) {
+        deps.machineHub?.wake(row.teamId);
+        wakeCoordinator(threadRow.id);
+      }
+    }
   };
 
   const onStatus = (connId: string, status: ImConnectionStatus, detail?: string): void => {
@@ -855,6 +951,21 @@ export function createImService(deps: ImServiceDeps): ImService {
         ? 'always'
         : 'refuse';
 
+  const settleCardUi = (connId: string, action: ImInboundAction, summary: string): void => {
+    if (action.cardMessage === undefined) return;
+    void live
+      .get(connId)
+      ?.settleCard?.(action.cardMessage, summary)
+      .catch(() => {});
+  };
+
+  const stepAlreadySentToIm = (stepId: string): boolean =>
+    deps.db
+      .select({ id: externalEffect.id })
+      .from(externalEffect)
+      .where(and(eq(externalEffect.kind, 'im-send'), eq(externalEffect.stepId, stepId)))
+      .get() !== undefined;
+
   const answerCard = (connId: string, row: ConnectionRow, action: ImInboundAction): void => {
     const parsed = imCallback(action.value);
     if (parsed === null) return;
@@ -879,6 +990,7 @@ export function createImService(deps: ImServiceDeps): ImService {
     const content = card === undefined ? null : askQuestionContentOf(card.content);
     if (card === undefined || content === null) return;
     if (content.status !== 'pending' || content.questions.length !== 1) {
+      settleCardUi(connId, action, '已处理');
       enqueueSend(
         connId,
         { chatKey: action.chat.key, text: '这条消息已经处理过了。' },
@@ -907,6 +1019,7 @@ export function createImService(deps: ImServiceDeps): ImService {
             interactive: 'im',
           },
         );
+        settleCardUi(connId, action, `已选择：${option.label}`);
         enqueueSend(
           connId,
           { ...chat, text: CARD_ENDINGS[result.status] || '已处理。' },
@@ -914,6 +1027,7 @@ export function createImService(deps: ImServiceDeps): ImService {
         );
       } catch (error) {
         if (error instanceof HttpError) {
+          settleCardUi(connId, action, '已处理');
           enqueueSend(
             connId,
             { ...chat, text: '这条审批已经处理过或失效了。' },
@@ -940,8 +1054,10 @@ export function createImService(deps: ImServiceDeps): ImService {
         requestId: parsed.requestId,
         answers: [{ header: content.questions[0]?.header ?? '', choices: [option.label] }],
       });
+      settleCardUi(connId, action, `已选择：${option.label}`);
     } catch (error) {
       if (error instanceof HttpError) {
+        settleCardUi(connId, action, '已处理');
         enqueueSend(
           connId,
           { ...chat, text: '这条消息已经处理过了。' },
@@ -1093,7 +1209,7 @@ export function createImService(deps: ImServiceDeps): ImService {
           sendToOrigin(origin, TURN_FAILED_TEXT, stepRow);
           return;
         }
-        const text = lastAssistantText(stepRow);
+        const text = stepAlreadySentToIm(stepRow.id) ? null : lastAssistantText(stepRow);
         const reply = [...blockFallbacks(stepRow), ...(text === null ? [] : [text])];
         if (reply.length > 0) sendToOrigin(origin, reply.join('\n\n'), stepRow);
       },

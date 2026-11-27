@@ -17,6 +17,7 @@ import {
   chiefMessage,
   chiefThread,
   coordinatorInput,
+  imTurnOrigin,
   steerPending,
   step,
   stopPending,
@@ -367,6 +368,77 @@ function rebuildMachineSteer(
     .run();
 }
 
+export function steerWaitingChiefStep(
+  deps: ChiefTurnDeps,
+  opts: {
+    teamId: string;
+    threadId: string;
+    running: StepRow;
+    waiting: StepRow;
+    content: string;
+    markSteered?: boolean;
+  },
+): boolean {
+  const { running, waiting, content } = opts;
+  if (running.status !== 'claimed') return false;
+  if (STEER_HOLDS.includes(waiting.holdReason ?? '')) return true;
+  const markSteered = () => {
+    if (opts.markSteered === false) return;
+    const owners = stepOwners(waiting);
+    if (owners.length === 0) return;
+    deps.db
+      .update(chiefMessage)
+      .set({ delivery: 'steer' })
+      .where(inArray(chiefMessage.id, owners))
+      .run();
+  };
+  if (running.machineId === null) {
+    deps.db.transaction(() => {
+      queueCoordinatorInput(deps.db, running, waiting, content);
+      deps.db.update(step).set({ holdUntil: null }).where(eq(step.id, waiting.id)).run();
+      markSteered();
+    });
+    deps.machineHub?.steerSignal(opts.teamId, running.id);
+    signalCoordinator(opts.threadId, 'steer');
+    publishStepRow(deps, waiting);
+    return true;
+  }
+  const now = nowMs();
+  const prior = deps.db
+    .select()
+    .from(steerPending)
+    .where(eq(steerPending.conversationId, opts.threadId))
+    .get();
+  const merged =
+    prior?.stepId === running.id && prior.sentAt === null
+      ? `${prior.content}\n\n${content}`
+      : content;
+  deps.db.transaction(() => {
+    deps.db
+      .insert(steerPending)
+      .values({
+        conversationId: opts.threadId,
+        stepId: running.id,
+        content: merged,
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: steerPending.conversationId,
+        set: { stepId: running.id, content: merged, createdAt: now, sentAt: null },
+      })
+      .run();
+    deps.db
+      .update(step)
+      .set({ holdReason: STEERED_HOLD, holdUntil: null })
+      .where(eq(step.id, waiting.id))
+      .run();
+    markSteered();
+  });
+  deps.machineHub?.steerSignal(opts.teamId, running.id);
+  publishStepRow(deps, waiting);
+  return true;
+}
+
 export function steerChiefMessage(
   deps: ChiefTurnDeps,
   teamId: string,
@@ -380,52 +452,15 @@ export function steerChiefMessage(
   if (running === undefined) return { steered: false };
   if (STEER_HOLDS.includes(waiting.holdReason ?? '')) return { steered: true };
   const content = steerContent(deps.db, thread, running, waiting);
-  const markSteered = () =>
-    deps.db
-      .update(chiefMessage)
-      .set({ delivery: 'steer' })
-      .where(inArray(chiefMessage.id, stepOwners(waiting)))
-      .run();
-  if (running.machineId === null) {
-    deps.db.transaction(() => {
-      queueCoordinatorInput(deps.db, running, waiting, content);
-      deps.db.update(step).set({ holdUntil: null }).where(eq(step.id, waiting.id)).run();
-      markSteered();
-    });
-    deps.machineHub?.steerSignal(thread.teamId, running.id);
-    signalCoordinator(threadId, 'steer');
-    publishStepRow(deps, waiting);
-    return { steered: true };
-  }
-  const now = nowMs();
-  const prior = deps.db
-    .select()
-    .from(steerPending)
-    .where(eq(steerPending.conversationId, threadId))
-    .get();
-  const merged =
-    prior?.stepId === running.id && prior.sentAt === null
-      ? `${prior.content}\n\n${content}`
-      : content;
-  deps.db.transaction(() => {
-    deps.db
-      .insert(steerPending)
-      .values({ conversationId: threadId, stepId: running.id, content: merged, createdAt: now })
-      .onConflictDoUpdate({
-        target: steerPending.conversationId,
-        set: { stepId: running.id, content: merged, createdAt: now, sentAt: null },
-      })
-      .run();
-    deps.db
-      .update(step)
-      .set({ holdReason: STEERED_HOLD, holdUntil: null })
-      .where(eq(step.id, waiting.id))
-      .run();
-    markSteered();
+  const steered = steerWaitingChiefStep(deps, {
+    teamId: thread.teamId,
+    threadId,
+    running,
+    waiting,
+    content,
+    markSteered: true,
   });
-  deps.machineHub?.steerSignal(thread.teamId, running.id);
-  publishStepRow(deps, waiting);
-  return { steered: true };
+  return { steered };
 }
 
 export function addTurnOwnerMessage(db: Db, threadId: string, messageId: string): void {
@@ -562,6 +597,7 @@ export function ackChiefSteer(
   for (const row of sent) {
     traceDeliveredSteer(deps.db, running.id, row);
     deps.db.delete(step).where(eq(step.id, row.id)).run();
+    deps.db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, row.id)).run();
     deps.db
       .update(chiefMessage)
       .set({

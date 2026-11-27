@@ -246,3 +246,85 @@ test('IM: ready connection menu triggers reconnect and maps lastSendError across
   await expect.poll(() => reconnects.length).toBe(1);
   expect(deletes).toEqual([]);
 });
+
+test('IM pairing banner pops up on /app, enforces arm delay, and fits 390px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
+  await page.route('**/api/**', (route, request) =>
+    request.method() === 'GET'
+      ? route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } })
+      : route.fallback(),
+  );
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({
+      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+    }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: 'Me', avatarUrl: null } }),
+  );
+  await page.route('**/api/remote/pairing-requests', (route) =>
+    route.fulfill({ json: { requests: [] } }),
+  );
+  let approved = false;
+  await page.route('**/api/teams/team-1/im/pairing-requests', (route) =>
+    route.fulfill({
+      json: {
+        requests: approved
+          ? []
+          : [
+              {
+                id: 'pair-im-1',
+                connId: 'conn-sl',
+                platform: 'slack',
+                senderId: 'U0TEST1',
+                senderName: 'Alex Rivera With An Unusually Long Workspace Display Name',
+                chatKey: 'D0CHAT1',
+                status: 'pending',
+                requestedAt: 1,
+                decidedAt: null,
+              },
+            ],
+      },
+    }),
+  );
+  const approvals: string[] = [];
+  await page.route('**/api/teams/team-1/im/pairing-requests/pair-im-1/approve', (route) => {
+    approvals.push('pair-im-1');
+    approved = true;
+    return route.fulfill({
+      json: {
+        request: {
+          id: 'pair-im-1',
+          connId: 'conn-sl',
+          platform: 'slack',
+          senderId: 'U0TEST1',
+          senderName: 'Alex Rivera With An Unusually Long Workspace Display Name',
+          chatKey: 'D0CHAT1',
+          status: 'approved',
+          requestedAt: 1,
+          decidedAt: 2,
+        },
+      },
+    });
+  });
+
+  await page.goto('/app');
+  const banner = page.getByTestId('im-pairing-request-banner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('New chat app pairing request');
+  await expect(banner).toContainText('Slack · Alex Rivera With An Unusually Long Workspace Display Name');
+
+  const approve = banner.getByTestId('im-pairing-banner-approve');
+  await expect(approve).toBeDisabled();
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth,
+  );
+  expect(overflow).toBe(false);
+
+  await expect(approve).toBeEnabled({ timeout: 3_000 });
+  await approve.click();
+  await expect.poll(() => approvals.length).toBe(1);
+  await expect(banner).toHaveCount(0);
+});

@@ -43,6 +43,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { SLACK_APP_CREATE_URL } from '../lib/slack-app-manifest.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { imPlatformLabel } from '../overlay/pairing-request-banner.js';
 import { PageShell } from '../pages/shell.js';
 import { IntegrationRow, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
 
@@ -87,15 +88,6 @@ const PLATFORM_COPY: Record<
     connect: '连接微信',
   },
 };
-
-const platformLabel = (platform: ImPlatform, t: (key: string) => string): string =>
-  platform === 'wechat'
-    ? t('微信')
-    : platform === 'slack'
-      ? 'Slack'
-      : platform === 'imessage'
-        ? 'iMessage'
-        : 'Telegram';
 
 function ConnectDialog({
   onClose,
@@ -467,7 +459,7 @@ export function ImConnectionsPage() {
       <RowText>
         <RowTitle>{request.senderName ?? request.senderId}</RowTitle>
         <RowDesc>
-          {t('请求配对 · {platform}', { platform: platformLabel(request.platform, t) })}
+          {t('请求配对 · {platform}', { platform: imPlatformLabel(request.platform, t) })}
         </RowDesc>
       </RowText>
       <span className="flex flex-none items-center gap-2">

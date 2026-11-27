@@ -15,11 +15,13 @@ import { nowMs } from '../src/lib/ids.js';
 import { CARD_ENDINGS, proposeAction } from '../src/services/action-proposals.js';
 import { askQuestionContentOf } from '../src/services/chief-question-store.js';
 import { announceQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
+import { coordinatorInputs, releaseCoordinatorInput } from '../src/services/coordinator-inputs.js';
 import { createImService, type ImService } from '../src/services/im/core.js';
 import { ImSendError } from '../src/services/im/errors.js';
 import { setImRuntime } from '../src/services/im/runtime.js';
 import type {
   ImAdapter,
+  ImCardMessageRef,
   ImConnectionHandlers,
   ImEnv,
   ImInboundMessage,
@@ -38,6 +40,7 @@ interface FakeSession {
   fields: Record<string, string>;
   handlers: ImConnectionHandlers;
   sent: ImOutboundMessage[];
+  settledCards: { ref: ImCardMessageRef; summary: string }[];
   sendCount: number;
   stopped: boolean;
   failWith: ImSendError | null;
@@ -57,6 +60,7 @@ const adapter: ImAdapter = {
       fields,
       handlers,
       sent: [],
+      settledCards: [],
       sendCount: 0,
       stopped: false,
       failWith: null,
@@ -71,6 +75,9 @@ const adapter: ImAdapter = {
         }
         if (session.failWith !== null) throw session.failWith;
         session.sent.push(msg);
+      },
+      settleCard: async (ref, summary) => {
+        session.settledCards.push({ ref, summary });
       },
       stop: async () => {
         session.stopped = true;
@@ -97,6 +104,7 @@ const wechatAdapterFake: ImAdapter = {
       fields,
       handlers,
       sent: [],
+      settledCards: [],
       sendCount: 0,
       stopped: false,
       failWith: null,
@@ -1353,5 +1361,223 @@ describe('text reply cards, cursor recovery, and stale session guards', () => {
 
     const reconnected = await service.reconnectConnection(s.team.id, id);
     expect(reconnected.pairedSenders.map((sender) => sender.id)).toEqual(['55']);
+  });
+});
+
+describe('Wave 4B UX fixes', () => {
+  test('suppresses lastAssistantText in turnFinished after notify_user or ask_user while preserving direct replies', async () => {
+    await connectAndPair('55');
+    const session = sessions[0]!;
+
+    session.handlers.onMessage(inbound('55', 'send notice only'));
+    const notifyStep = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, notifyStep.id))
+      .run();
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId: notifyStep.buildId,
+        message: 'actual reply for user',
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    upsertChiefRow(
+      { db: s.db },
+      {
+        id: 'asst-wake-summary-1',
+        threadId: notifyStep.buildId,
+        role: 'assistant',
+        content: '已通过 notify_user (provenance: im:telegram:c1:777) 回复。本轮结束。',
+        createdAt: nowMs() + 5,
+      },
+    );
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, notifyStep.id)).run();
+    service.runtime.turnFinished(stepById(notifyStep.id));
+    await vi.waitFor(() => expect(session.sent).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(session.sent).toHaveLength(1);
+    expect(session.sent[0]?.text).toBe('actual reply for user');
+
+    session.sent.splice(0);
+    session.handlers.onMessage(inbound('55', 'ask me options'));
+    const askStep = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() + 10 })
+      .where(eq(step.id, askStep.id))
+      .run();
+    createOrGetQuestion(
+      { db: s.db, convHub: s.convHub, hub: s.hub, user: s.user },
+      {
+        threadId: askStep.buildId,
+        requestId: 'ask-suppressed-1',
+        questions: [
+          {
+            header: 'Pick',
+            question: '选择哪一项',
+            options: [{ label: '选项 A' }, { label: '选项 B' }],
+          },
+        ],
+        askedFor: [],
+      },
+    );
+    await vi.waitFor(() => expect(session.sent).toHaveLength(1));
+    upsertChiefRow(
+      { db: s.db },
+      {
+        id: 'asst-wake-summary-2',
+        threadId: askStep.buildId,
+        role: 'assistant',
+        content: '已发送确认卡，正在等待用户回答，本轮结束。',
+        createdAt: nowMs() + 15,
+      },
+    );
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, askStep.id)).run();
+    service.runtime.turnFinished(stepById(askStep.id));
+    await vi.waitFor(() => expect(session.sent).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(session.sent).toHaveLength(1);
+    expect(session.sent[0]?.buttons?.[0]?.map((b) => b.label)).toEqual(['选项 A', '选项 B']);
+
+    session.sent.splice(0);
+    session.handlers.onMessage(inbound('55', 'direct ping'));
+    const directStep = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() + 20 })
+      .where(eq(step.id, directStep.id))
+      .run();
+    upsertChiefRow(
+      { db: s.db },
+      {
+        id: 'asst-direct-3',
+        threadId: directStep.buildId,
+        role: 'assistant',
+        content: 'direct pong',
+        createdAt: nowMs() + 25,
+      },
+    );
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, directStep.id)).run();
+    service.runtime.turnFinished(stepById(directStep.id));
+    await vi.waitFor(() => expect(session.sent).toHaveLength(1));
+    expect(session.sent[0]?.text).toBe('direct pong');
+  });
+
+  test('settleCard clears platform buttons on fresh and stale card clicks', async () => {
+    await connectAndPair('55');
+    const session = sessions[0]!;
+    session.handlers.onMessage(inbound('55', 'send card'));
+    const turn = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, turn.id))
+      .run();
+    createOrGetQuestion(
+      { db: s.db, convHub: s.convHub, hub: s.hub, user: s.user },
+      {
+        threadId: turn.buildId,
+        requestId: 'ask-settle-1',
+        questions: [
+          {
+            header: 'Confirm',
+            question: '继续吗',
+            options: [{ label: '同意' }, { label: '取消' }],
+          },
+        ],
+        askedFor: [],
+      },
+    );
+    await vi.waitFor(() => expect(session.sent).toHaveLength(1));
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, turn.id)).run();
+    service.runtime.turnFinished(stepById(turn.id));
+
+    const ref: ImCardMessageRef = { chatKey: '777', messageRef: 'm-1', text: '继续吗' };
+    session.handlers.onAction?.({
+      chat: { key: '777', kind: 'direct', title: null },
+      sender: { id: '55', name: 'Ian' },
+      value: 'imcb:ask-settle-1:1',
+      messageId: 'act-1',
+      cardMessage: ref,
+    });
+    session.handlers.onAction?.({
+      chat: { key: '777', kind: 'direct', title: null },
+      sender: { id: '55', name: 'Ian' },
+      value: 'imcb:ask-settle-1:0',
+      messageId: 'act-2',
+      cardMessage: ref,
+    });
+    await vi.waitFor(() => expect(session.settledCards).toHaveLength(2));
+    expect(session.settledCards).toEqual([
+      { ref, summary: '已选择：取消' },
+      { ref, summary: '已处理' },
+    ]);
+  });
+
+  test('coalesces unstarted same-origin turns, steers claimed native turns, preserves origin on unconsumed release, and isolates cross-origin turns', async () => {
+    await connectAndPair('55');
+    const conn = connRow()!;
+    const secondSender = { id: '66', name: 'Other', chatKey: '888', addedAt: nowMs() };
+    s.db
+      .update(imConnection)
+      .set({ pairedSenders: [...conn.pairedSenders, secondSender] })
+      .where(eq(imConnection.id, conn.id))
+      .run();
+
+    const session = sessions[0]!;
+    session.handlers.onMessage(inbound('55', 'first photo message', '777'));
+    session.handlers.onMessage(inbound('55', 'follow-up instruction', '777'));
+    const allPending = s.db.select().from(step).where(eq(step.kind, 'chief')).all();
+    expect(allPending).toHaveLength(1);
+    const mergedStep = allPending[0]!;
+    expect(mergedStep.prompt).toContain('first photo message');
+    expect(mergedStep.prompt).toContain('follow-up instruction');
+
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs(), holdReason: null })
+      .where(eq(step.id, mergedStep.id))
+      .run();
+    session.handlers.onMessage(inbound('55', 'steered while running', '777'));
+    const inputs = coordinatorInputs(s.db, mergedStep.buildId);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).toMatchObject({
+      stepId: mergedStep.id,
+      kind: 'steer',
+      state: 'pending',
+    });
+    expect(inputs[0]?.content).toContain('steered while running');
+    const steeredStep = stepById(inputs[0]!.id);
+    expect(steeredStep.holdReason).toBe('steer');
+    expect(
+      s.db.select().from(imTurnOrigin).where(eq(imTurnOrigin.stepId, steeredStep.id)).get(),
+    ).toMatchObject({
+      connId: conn.id,
+      chatKey: '777',
+    });
+
+    releaseCoordinatorInput(s.db, inputs[0]!.id, null);
+    const released = coordinatorInputs(s.db, mergedStep.buildId)[0]!;
+    expect(released.state).toBe('released');
+    expect(released.successorStepId).not.toBeNull();
+    const successor = stepById(released.successorStepId!);
+    expect(successor.status).toBe('pending');
+    expect(successor.freshSession).toBe(true);
+    expect(successor.prompt).toContain('steered while running');
+    expect(
+      s.db.select().from(imTurnOrigin).where(eq(imTurnOrigin.stepId, successor.id)).get(),
+    ).toMatchObject({ connId: conn.id, chatKey: '777' });
+    expect(
+      s.db.select().from(imTurnOrigin).where(eq(imTurnOrigin.stepId, steeredStep.id)).get(),
+    ).toBeUndefined();
+
+    session.handlers.onMessage(inbound('66', 'different chat turn', '888'));
+    expect(coordinatorInputs(s.db, mergedStep.buildId)).toHaveLength(1);
+    const otherStep = latestChiefStep();
+    expect(otherStep.holdReason).toBeNull();
+    expect(otherStep.prompt).toContain('different chat turn');
   });
 });

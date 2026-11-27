@@ -35,11 +35,18 @@ export interface ImInboundMessage {
   mentioned: boolean;
 }
 
+export interface ImCardMessageRef {
+  chatKey: string;
+  messageRef: string;
+  text?: string;
+}
+
 export interface ImInboundAction {
   chat: { key: string; kind: 'direct' | 'group'; title: string | null };
   sender: { id: string; name: string | null };
   value: string;
   messageId: string;
+  cardMessage?: ImCardMessageRef;
 }
 
 export interface ImOutboundMessage {
@@ -73,6 +80,7 @@ export interface ImAdapter {
     ctx?: { connId: string },
   ): Promise<{
     send(msg: ImOutboundMessage): Promise<void>;
+    settleCard?(ref: ImCardMessageRef, summary: string): Promise<void>;
     stop(): Promise<void>;
     offset?(): string | number | null;
   }>;

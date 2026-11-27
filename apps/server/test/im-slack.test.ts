@@ -1611,4 +1611,44 @@ describe('slack adapter', () => {
     await session.stop();
     expect(Date.now() - startedStop).toBeLessThan(500);
   });
+
+  test('settleCard removes action blocks with chat.update', async () => {
+    const actions: ImInboundAction[] = [];
+    const session = await readySession({
+      onMessage: () => {},
+      onAction: (action) => actions.push(action),
+      onStatus: () => {},
+    });
+    slack.sockets[0]?.receive({
+      envelope_id: 'e-btn',
+      type: 'interactive',
+      payload: {
+        type: 'block_actions',
+        user: { id: 'U42' },
+        channel: { id: 'D0DM' },
+        message: { ts: '1700000009.000100', text: '请选择同意或取消：\n\n1. 同意\n2. 取消' },
+        actions: [{ action_id: 'cairn-0-1', value: 'imcb:req-1:1' }],
+      },
+    });
+    await vi.waitFor(() => expect(actions).toHaveLength(1));
+    expect(actions[0]?.cardMessage).toEqual({
+      chatKey: 'D0DM',
+      messageRef: '1700000009.000100',
+      text: '请选择同意或取消：\n\n1. 同意\n2. 取消',
+    });
+    slack.queue('chat.update', { ok: true, ts: '1700000009.000100' });
+    await session.settleCard?.(actions[0]!.cardMessage!, '已选择：取消');
+    const update = slack.calls.find((call) => call.method === 'chat.update');
+    expect(update?.body).toMatchObject({
+      channel: 'D0DM',
+      ts: '1700000009.000100',
+    });
+    const blocks = update?.body.blocks as { type: string }[];
+    expect(blocks.some((block) => block.type === 'actions')).toBe(false);
+    expect(blocks.at(-1)).toEqual({
+      type: 'context',
+      elements: [{ type: 'plain_text', text: '已选择：取消' }],
+    });
+    await session.stop();
+  });
 });

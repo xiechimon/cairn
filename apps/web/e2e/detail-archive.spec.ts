@@ -110,6 +110,7 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       '/api/needs-you': { current: [], stale: [] },
       '/api/prs': [],
       '/api/remote/pairing-requests': [],
+      '/api/teams/team-archive/im/pairing-requests': { requests: [] },
       '/api/tasks': { entries: [] },
       '/api/builds/build-archive': build,
       '/api/builds/build-archive/gate': { state: null },

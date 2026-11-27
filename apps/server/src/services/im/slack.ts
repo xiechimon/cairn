@@ -12,6 +12,7 @@ import {
 } from './errors.js';
 import type {
   ImAdapter,
+  ImCardMessageRef,
   ImConnectionHandlers,
   ImEnv,
   ImOutboundMessage,
@@ -100,7 +101,8 @@ interface SlackFrame {
     type?: string;
     user?: { id?: string };
     channel?: { id?: string };
-    container?: { channel_id?: string };
+    container?: { channel_id?: string; message_ts?: string };
+    message?: { ts?: string; text?: string };
     actions?: SlackAction[];
   };
 }
@@ -498,9 +500,21 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
                 if (payload?.type !== 'block_actions') break;
                 const userId = payload.user?.id;
                 const channelId = payload.channel?.id ?? payload.container?.channel_id;
+                const messageTs = payload.message?.ts ?? payload.container?.message_ts;
+                const messageText = payload.message?.text;
                 const envelope = frame.envelope_id ?? 'none';
                 if (userId === undefined || channelId === undefined) break;
                 if (userId === botUserId) break;
+                const cardMessage =
+                  typeof messageTs === 'string' && messageTs !== ''
+                    ? {
+                        chatKey: channelId,
+                        messageRef: messageTs,
+                        ...(typeof messageText === 'string' && messageText !== ''
+                          ? { text: messageText }
+                          : {}),
+                      }
+                    : undefined;
                 for (const [index, action] of (payload.actions ?? []).entries()) {
                   if (typeof action.value !== 'string' || action.value === '') continue;
                   const chatKey = channelId;
@@ -509,6 +523,7 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
                     sender: { id: userId, name: null },
                     value: action.value,
                     messageId: `slack-ia:${envelope}:${action.action_id ?? index}`,
+                    ...(cardMessage !== undefined ? { cardMessage } : {}),
                   });
                 }
                 break;
@@ -689,6 +704,35 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               blocks: group.map(plainSection),
             });
           }
+        },
+        settleCard: async (ref: ImCardMessageRef, summary: string): Promise<void> => {
+          if (stopped) return;
+          const baseText = ref.text?.trim() ?? '';
+          const sections =
+            baseText === ''
+              ? []
+              : Array.from(plainPieces(baseText, SECTION_TEXT_MAX_CHARS))
+                  .slice(0, MESSAGE_MAX_BLOCKS - 1)
+                  .map(plainSection);
+          const blocks = [
+            ...sections,
+            { type: 'context', elements: [{ type: 'plain_text', text: summary }] },
+          ];
+          const text = baseText === '' ? summary : `${baseText}\n\n${summary}`;
+          try {
+            await slackApi(
+              env,
+              botToken,
+              'chat.update',
+              {
+                channel: ref.chatKey,
+                ts: ref.messageRef,
+                text: fallbackText(text),
+                blocks,
+              },
+              stopping.signal,
+            );
+          } catch {}
         },
         stop: async (): Promise<void> => {
           if (stopped) return;

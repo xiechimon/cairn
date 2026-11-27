@@ -3168,6 +3168,7 @@ export const EN: Record<string, string> = {
   '在主机终端运行 cairn token，或查看主机 ~/.cairn-server/token 获取令牌。':
     'Run cairn token on the host, or read ~/.cairn-server/token on the host.',
   有新设备请求配对: 'New device pairing request',
+  有新的聊天配对请求: 'New chat app pairing request',
   已批准配对: 'Device pairing approved',
   已拒绝配对: 'Device pairing denied',
   '处理配对请求失败，请重试。': 'Could not update pairing request. Try again.',

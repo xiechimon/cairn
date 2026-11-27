@@ -8,6 +8,7 @@ import {
 } from './errors.js';
 import type {
   ImAdapter,
+  ImCardMessageRef,
   ImConnectionHandlers,
   ImEnv,
   ImInboundFile,
@@ -375,6 +376,7 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               if (query !== undefined && query.message !== undefined && query.data !== undefined) {
                 const group =
                   query.message.chat.type === 'group' || query.message.chat.type === 'supergroup';
+                const cardText = query.message.text ?? query.message.caption;
                 handlers.onAction?.({
                   chat: {
                     key: String(query.message.chat.id),
@@ -384,6 +386,11 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
                   sender: { id: String(query.from.id), name: senderName(query.from) },
                   value: query.data,
                   messageId: `cq:${query.id}`,
+                  cardMessage: {
+                    chatKey: String(query.message.chat.id),
+                    messageRef: String(query.message.message_id),
+                    ...(typeof cardText === 'string' && cardText !== '' ? { text: cardText } : {}),
+                  },
                 });
               }
               if (query !== undefined) {
@@ -470,6 +477,21 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               }
             }
           }
+        },
+        settleCard: async (ref: ImCardMessageRef): Promise<void> => {
+          if (stopped) return;
+          const chatId = Number(ref.chatKey);
+          const messageId = Number(ref.messageRef);
+          if (!Number.isFinite(chatId) || !Number.isFinite(messageId)) return;
+          try {
+            await telegramApi(
+              env,
+              token,
+              'editMessageReplyMarkup',
+              { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } },
+              abort.signal,
+            );
+          } catch {}
         },
         stop: async (): Promise<void> => {
           stopped = true;

@@ -7,6 +7,7 @@ import {
   coordinatorConversation,
   coordinatorEntry,
   coordinatorInput,
+  imTurnOrigin,
   step,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -386,6 +387,9 @@ export function consumeCoordinatorInput(
       .where(and(eq(step.id, batch.id), inArray(step.status, ['pending', 'waiting_quota'])))
       .returning()
       .get();
+    if (retired !== undefined) {
+      db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, batch.id)).run();
+    }
     return { placed, retired };
   });
 }
@@ -406,8 +410,15 @@ export function releaseCoordinatorInput(
       const waiting = db.select().from(step).where(eq(step.id, batch.id)).get();
       const waitingForExecution =
         waiting?.status === 'pending' || waiting?.status === 'waiting_quota';
+      const imOrigin =
+        waiting === undefined
+          ? undefined
+          : db.select().from(imTurnOrigin).where(eq(imTurnOrigin.stepId, waiting.id)).get();
       if (waitingForExecution && waiting.holdReason === STEER_WITHDRAW_HOLD) {
         db.delete(step).where(eq(step.id, waiting.id)).run();
+        if (imOrigin !== undefined) {
+          db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, waiting.id)).run();
+        }
         if (batch.ownerMessageIds.length > 0)
           db.delete(chiefMessage)
             .where(
@@ -431,11 +442,14 @@ export function releaseCoordinatorInput(
             .where(and(eq(chiefMessage.id, id), eq(chiefMessage.threadId, batch.threadId)))
             .get() !== undefined,
       );
-      if (waitingForExecution && surviving.length > 0) {
-        db.update(chiefMessage)
-          .set({ delivery: 'steer_missed' })
-          .where(inArray(chiefMessage.id, surviving))
-          .run();
+      const keepImTurn = batch.ownerMessageIds.length === 0 && imOrigin !== undefined;
+      if (waitingForExecution && (surviving.length > 0 || keepImTurn)) {
+        if (surviving.length > 0) {
+          db.update(chiefMessage)
+            .set({ delivery: 'steer_missed' })
+            .where(inArray(chiefMessage.id, surviving))
+            .run();
+        }
         successorStepId = newRecordId();
         db.insert(step)
           .values({
@@ -446,10 +460,27 @@ export function releaseCoordinatorInput(
             quotaBlock: waiting.quotaBlock,
             prompt: batch.content,
             ownerMessageIds: surviving,
+            ownerSaid: waiting.ownerSaid,
+            freshSession: waiting.freshSession,
             scopeProjectId: waiting.scopeProjectId,
             createdAt: waiting.createdAt,
           })
           .run();
+        if (imOrigin !== undefined) {
+          db.insert(imTurnOrigin)
+            .values({
+              stepId: successorStepId,
+              connId: imOrigin.connId,
+              chatKey: imOrigin.chatKey,
+              senderId: imOrigin.senderId,
+              threadId: imOrigin.threadId,
+              createdAt: imOrigin.createdAt,
+            })
+            .run();
+          db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, waiting.id)).run();
+        }
+      } else if (waitingForExecution && imOrigin !== undefined) {
+        db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, waiting.id)).run();
       }
       if (waitingForExecution) db.delete(step).where(eq(step.id, waiting.id)).run();
     }
