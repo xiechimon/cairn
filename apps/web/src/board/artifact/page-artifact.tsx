@@ -41,7 +41,9 @@ import {
   versionLabel,
 } from './artifact-toolbar.js';
 import { CommentStrip } from './comment-strip.js';
+import { deckSrcdoc, isSlideDeck, SLIDE_SIZE, useSlideDeck } from './slide-deck.js';
 import { useArtifactVersions } from './use-artifact-versions.js';
+import { DECK_KEYS, DeckPager, useFullscreen } from './viewers/deck-pager.js';
 import { useZoomShortcuts, type Zoom, ZoomControl } from './viewers/zoom.js';
 
 const VIEWPORT_LABEL: Record<DesignViewport, string> = {
@@ -80,9 +82,15 @@ export function PageArtifact({
   const missing =
     htmlQ.error instanceof ApiError && (htmlQ.error.status === 404 || htmlQ.error.status === 410);
   const emptyHtml = htmlQ.data !== undefined && htmlQ.data.trim() === '';
+  const deckLike = useMemo(() => htmlQ.data !== undefined && isSlideDeck(htmlQ.data), [htmlQ.data]);
   const srcdoc = useMemo(
-    () => (htmlQ.data === undefined ? null : designSrcdoc(htmlQ.data)),
-    [htmlQ.data],
+    () =>
+      htmlQ.data === undefined
+        ? null
+        : deckLike
+          ? deckSrcdoc(htmlQ.data)
+          : designSrcdoc(htmlQ.data),
+    [htmlQ.data, deckLike],
   );
   useZoomShortcuts({
     active:
@@ -98,6 +106,31 @@ export function PageArtifact({
     onChange: setZoom,
   });
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const slides = useSlideDeck(frameRef, `${shown?.id ?? ''}:${reloads}`);
+  const { slide, step: stepSlide } = slides;
+  const deck = deckLike && slides.count !== 0;
+  const [deckShell, setDeckShell] = useState<HTMLDivElement | null>(null);
+  const presenting = useFullscreen(deckShell);
+  useEffect(() => {
+    if (!deck || deckShell === null) return;
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      const step = DECK_KEYS[event.key];
+      if (step === undefined || event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (
+        event.target instanceof HTMLElement &&
+        (event.target.isContentEditable || event.target.closest('input, textarea, select') !== null)
+      )
+        return;
+      event.preventDefault();
+      stepSlide(step);
+    };
+    deckShell.addEventListener('keydown', onKeyDown);
+    return () => deckShell.removeEventListener('keydown', onKeyDown);
+  }, [deck, deckShell, stepSlide]);
+  const frameViewport: DesignViewport = deck ? 'desktop' : viewport;
+  const slideAnchor =
+    deck && slides.shown !== null ? { type: 'slide' as const, slide: slides.shown + 1 } : null;
   const { createComment, patchComment, deleteComment, saveMark, createShare, stopShare } =
     useDesignMutations(todoId, fileName);
   const [commenting, setCommenting] = useState(false);
@@ -117,6 +150,13 @@ export function PageArtifact({
     setMarking(false);
     setRetargetId(null);
   }, [viewingOld]);
+  useEffect(() => {
+    if (!presenting) return;
+    setCommenting(false);
+    setMarking(false);
+    setRetargetId(null);
+    setListOpen(false);
+  }, [presenting]);
   const handleOverlayEscape = useCallback(() => {
     if (historyOpen) setHistoryOpen(false);
     else setListOpen(false);
@@ -198,7 +238,13 @@ export function PageArtifact({
     then: (id: string) => void,
   ) =>
     createComment.mutate(
-      { ...target, versionId: shown.id, viewport, note },
+      {
+        ...target,
+        versionId: shown.id,
+        viewport: frameViewport,
+        note,
+        ...(slideAnchor !== null ? { anchor: slideAnchor } : {}),
+      },
       { onSuccess: (row) => then(row.id), onError: commentFailed('评论未能保存') },
     );
   const retarget =
@@ -210,7 +256,14 @@ export function PageArtifact({
           patchComment.mutate(
             {
               id: retargetId,
-              patch: { retarget: { ...target, versionId: shown.id, viewport, anchor: null } },
+              patch: {
+                retarget: {
+                  ...target,
+                  versionId: shown.id,
+                  viewport: frameViewport,
+                  anchor: slideAnchor,
+                },
+              },
             },
             { onError: commentFailed('评论未能修改') },
           );
@@ -295,46 +348,50 @@ export function PageArtifact({
               <RotateCw aria-hidden />
               {t('重新加载')}
             </KeyedMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>{t('视口')}</DropdownMenuLabel>
-              <DropdownMenuRadioGroup
-                value={viewport}
-                onValueChange={(next) => {
-                  setViewport(next as DesignViewport);
-                  setZoom('fit');
-                }}
-              >
-                {(['desktop', 'tablet', 'mobile'] as const).map((value) => (
-                  <KeyedMenuRadioItem
-                    key={value}
-                    value={value}
-                    data-testid={`design-viewport-menu-${value}`}
-                  >
-                    {t(VIEWPORT_LABEL[value])}
-                  </KeyedMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
+            {!deck && <DropdownMenuSeparator />}
+            {!deck && (
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{t('视口')}</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={viewport}
+                  onValueChange={(next) => {
+                    setViewport(next as DesignViewport);
+                    setZoom('fit');
+                  }}
+                >
+                  {(['desktop', 'tablet', 'mobile'] as const).map((value) => (
+                    <KeyedMenuRadioItem
+                      key={value}
+                      value={value}
+                      data-testid={`design-viewport-menu-${value}`}
+                    >
+                      {t(VIEWPORT_LABEL[value])}
+                    </KeyedMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+            )}
           </>
         }
         controls={
           <>
             {!source && <ZoomControl zoom={zoom} fitScale={fitScale} onChange={setZoom} />}
-            <SegmentedTabs
-              value={viewport}
-              label={t('视口')}
-              className="max-[640px]:hidden"
-              onChange={(next) => {
-                setViewport(next);
-                setZoom('fit');
-              }}
-              options={(['desktop', 'tablet', 'mobile'] as const).map((value) => ({
-                value,
-                label: t(VIEWPORT_LABEL[value]),
-                testId: `design-viewport-${value}`,
-              }))}
-            />
+            {!deck && (
+              <SegmentedTabs
+                value={viewport}
+                label={t('视口')}
+                className="max-[640px]:hidden"
+                onChange={(next) => {
+                  setViewport(next);
+                  setZoom('fit');
+                }}
+                options={(['desktop', 'tablet', 'mobile'] as const).map((value) => ({
+                  value,
+                  label: t(VIEWPORT_LABEL[value]),
+                  testId: `design-viewport-${value}`,
+                }))}
+              />
+            )}
             {source && htmlQ.data !== undefined && (
               <CopyIconButton
                 text={htmlQ.data}
@@ -440,14 +497,18 @@ export function PageArtifact({
                 ? t('在页面上画出要改的地方，写一句说明')
                 : t('点一个元素加批注')
           }
-          tool={{
-            label: marking ? t('点选元素') : t('画标注'),
-            testId: 'design-mark-mode',
-            onClick: () => {
-              setCommenting(marking);
-              setMarking(!marking);
-            },
-          }}
+          {...(deck
+            ? {}
+            : {
+                tool: {
+                  label: marking ? t('点选元素') : t('画标注'),
+                  testId: 'design-mark-mode',
+                  onClick: () => {
+                    setCommenting(marking);
+                    setMarking(!marking);
+                  },
+                },
+              })}
           onExit={() => {
             setRetargetId(null);
             setCommenting(false);
@@ -490,35 +551,64 @@ export function PageArtifact({
               className="mt-[12vh]"
             />
           ) : (
-            <DesignCanvas
-              key={`${shown.id}:${reloads}`}
-              frameRef={frameRef}
-              srcdoc={srcdoc}
-              title={`${fileName} · ${versionLabel(shown, t)}`}
-              viewport={viewport}
-              zoom={zoom}
-              fitScale={fitScale}
-              onFitScale={setFitScale}
-              onZoomChange={setZoom}
-              onEscape={() => {
-                if (historyOpen) setHistoryOpen(false);
-                else if (listOpen) setListOpen(false);
-                else closePanel();
-              }}
-              commenting={commenting && canComment}
-              onStopCommenting={stopCommenting}
-              marking={marking && canComment}
-              onStopMarking={stopMarking}
-              mark={mark}
-              comments={comments}
-              listOpen={listOpen}
-              onListOpen={setListOpen}
-              readOnly={readOnly}
-              actions={actions}
-              draft={draft}
-              send={send}
-              retarget={retarget}
-            />
+            <div
+              ref={setDeckShell}
+              tabIndex={-1}
+              data-testid={deck ? 'artifact-slides' : undefined}
+              data-current={deck && slides.shown !== null ? slides.shown + 1 : undefined}
+              className="flex min-h-0 flex-1 flex-col bg-(--surface-1) outline-none"
+            >
+              <DesignCanvas
+                key={`${shown.id}:${reloads}`}
+                frameRef={frameRef}
+                srcdoc={srcdoc}
+                title={`${fileName} · ${versionLabel(shown, t)}`}
+                viewport={frameViewport}
+                size={deck ? SLIDE_SIZE : undefined}
+                slide={deck ? (slides.shown ?? -1) + 1 : undefined}
+                onPickComment={
+                  deck
+                    ? (comment) => {
+                        if (comment.anchor?.type === 'slide') slides.go(comment.anchor.slide - 1);
+                      }
+                    : undefined
+                }
+                floating={
+                  deck && slides.count !== null ? (
+                    <DeckPager
+                      current={slides.shown ?? slide}
+                      count={slides.count}
+                      presenting={presenting}
+                      shell={deckShell}
+                      onGo={slides.go}
+                    />
+                  ) : undefined
+                }
+                zoom={zoom}
+                fitScale={fitScale}
+                onFitScale={setFitScale}
+                onZoomChange={setZoom}
+                onEscape={() => {
+                  if (document.fullscreenElement !== null) return;
+                  if (historyOpen) setHistoryOpen(false);
+                  else if (listOpen) setListOpen(false);
+                  else closePanel();
+                }}
+                commenting={commenting && canComment}
+                onStopCommenting={stopCommenting}
+                marking={marking && canComment}
+                onStopMarking={stopMarking}
+                mark={mark}
+                comments={comments}
+                listOpen={listOpen}
+                onListOpen={setListOpen}
+                readOnly={readOnly}
+                actions={actions}
+                draft={draft}
+                send={send}
+                retarget={retarget}
+              />
+            </div>
           )}
         </div>
         {historyOpen && (

@@ -1,13 +1,13 @@
 import type { ArtifactRect } from '@cairn/shared';
-import { ChevronLeft, ChevronRight, FileWarning, Play } from 'lucide-react';
+import { FileWarning } from 'lucide-react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { EmptyState } from '../../../components/empty-state.js';
-import { IconTooltip } from '../../../components/icon-tooltip.js';
 import { Button } from '../../../components/ui/button.js';
 import { Skeleton } from '../../../components/ui/skeleton.js';
 import { useI18n } from '../../../i18n/provider.js';
 import { RegionSurface, useCommentLayer } from '../file-comments.js';
+import { DECK_KEYS, DeckPager, useFullscreen } from './deck-pager.js';
 import { useFileBytes } from './use-file-bytes.js';
 import { MIN_ZOOM, usePinchZoom, type Zoom } from './zoom.js';
 
@@ -16,14 +16,6 @@ type PdfJs = typeof import('pdfjs-dist');
 const CSS_UNITS = 96 / 72;
 const PAGE_GAP = 16;
 const MAX_PAGES = 300;
-const DECK_KEYS: Record<string, number> = {
-  ArrowRight: 1,
-  ArrowDown: 1,
-  PageDown: 1,
-  ArrowLeft: -1,
-  ArrowUp: -1,
-  PageUp: -1,
-};
 
 let pdfjsModule: Promise<PdfJs> | null = null;
 
@@ -252,16 +244,6 @@ function deckFitScale(size: PageSize, box: { width: number; height: number }): n
       (box.height - PAGE_GAP * 2) / (size.height * CSS_UNITS),
     ),
   );
-}
-
-function useFullscreen(element: HTMLElement | null): boolean {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    const sync = () => setOn(element !== null && document.fullscreenElement === element);
-    document.addEventListener('fullscreenchange', sync);
-    return () => document.removeEventListener('fullscreenchange', sync);
-  }, [element]);
-  return on;
 }
 
 export function pdfFitScale(sizes: readonly PageSize[], width: number): number {
@@ -511,7 +493,8 @@ function PdfDeck({
       </nav>
       <div
         ref={setDeckShell}
-        className={`relative flex min-h-0 min-w-0 flex-1 ${presenting ? 'bg-(--lightbox-scrim)' : ''}`}
+        tabIndex={-1}
+        className={`relative flex min-h-0 min-w-0 flex-1 outline-none ${presenting ? 'bg-(--lightbox-scrim)' : ''}`}
       >
         <div
           ref={stage.ref}
@@ -530,63 +513,13 @@ function PdfDeck({
             />
           </div>
         </div>
-        <div className="absolute right-3 bottom-3 flex items-center gap-0.5 rounded-(--radius-control) bg-popover p-0.5 shadow-(--e1)">
-          <IconTooltip
-            label={t('上一页')}
-            side="top"
-            trigger={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                data-testid="artifact-deck-prev"
-                disabled={current === 0}
-                onClick={() => go(current - 1)}
-              />
-            }
-          >
-            <ChevronLeft aria-hidden className="size-4" />
-          </IconTooltip>
-          <span
-            data-testid="artifact-deck-position"
-            className="min-w-10 text-center text-meta text-content-secondary tabular-nums"
-          >
-            {current + 1} / {count}
-          </span>
-          <IconTooltip
-            label={t('下一页')}
-            side="top"
-            trigger={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                data-testid="artifact-deck-next"
-                disabled={current === count - 1}
-                onClick={() => go(current + 1)}
-              />
-            }
-          >
-            <ChevronRight aria-hidden className="size-4" />
-          </IconTooltip>
-          {!presenting && (
-            <IconTooltip
-              label={t('放映')}
-              side="top"
-              trigger={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  data-testid="artifact-deck-present"
-                  onClick={() => {
-                    root?.querySelector<HTMLElement>('[data-testid="artifact-deck-next"]')?.focus();
-                    void deckShell?.requestFullscreen();
-                  }}
-                />
-              }
-            >
-              <Play aria-hidden className="size-4" />
-            </IconTooltip>
-          )}
-        </div>
+        <DeckPager
+          current={current}
+          count={count}
+          presenting={presenting}
+          shell={deckShell}
+          onGo={go}
+        />
       </div>
     </div>
   );

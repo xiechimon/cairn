@@ -4,7 +4,7 @@ import {
   type DesignViewport,
   type DesignTarget as ElementTarget,
 } from '@cairn/shared';
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import {
   DrawLayer,
@@ -56,6 +56,10 @@ export function DesignCanvas({
   srcdoc,
   title,
   viewport,
+  size,
+  slide,
+  floating,
+  onPickComment,
   zoom = 'fit',
   fitScale = 1,
   onFitScale,
@@ -79,6 +83,10 @@ export function DesignCanvas({
   srcdoc: string;
   title: string;
   viewport: DesignViewport;
+  size?: { width: number; height: number } | undefined;
+  slide?: number | undefined;
+  floating?: ReactNode;
+  onPickComment?: ((comment: DesignCommentRecord) => void) | undefined;
   zoom?: Zoom;
   fitScale?: number;
   onFitScale?: (scale: number) => void;
@@ -130,7 +138,8 @@ export function DesignCanvas({
     onPreviewKeyDown,
   });
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const { picked, clearPicked } = bridge;
+  const { clearPicked } = bridge;
+  const picked = slide === undefined || bridge.pickedSlide === slide ? bridge.picked : null;
   pickedRef.current = picked;
   const drawing = useDrawing();
   const { clear } = drawing;
@@ -147,7 +156,7 @@ export function DesignCanvas({
   }, [commenting, clearPicked]);
   useEffect(() => {
     clearPicked();
-  }, [viewport, clearPicked]);
+  }, [viewport, slide, clearPicked]);
   useEffect(() => {
     if (picked === null || retarget === undefined) return;
     retarget(picked);
@@ -171,6 +180,8 @@ export function DesignCanvas({
     return () => window.removeEventListener('keydown', onKey);
   }, [commenting, picked, onStopCommenting]);
   const pins = comments.flatMap((comment) => {
+    if (slide !== undefined && (comment.anchor?.type !== 'slide' || comment.anchor.slide !== slide))
+      return [];
     if (comment.markAttachmentId !== null)
       return comment.status !== 'resolved' ? [{ comment, position: comment.position }] : [];
     const where = bridge.located.get(comment.id);
@@ -199,12 +210,13 @@ export function DesignCanvas({
         />
       )}
       <div className="relative flex min-h-0 flex-1">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           <DesignFrame
             frameRef={frameRef}
             srcdoc={srcdoc}
             title={title}
             viewport={viewport}
+            size={size}
             zoom={zoom}
             {...(onFitScale !== undefined ? { onFitScale } : {})}
             {...(onZoomChange !== undefined ? { onZoomChange } : {})}
@@ -297,6 +309,7 @@ export function DesignCanvas({
               </div>
             )}
           />
+          {floating}
         </div>
         {listOpen && (
           <CommentList
@@ -312,6 +325,7 @@ export function DesignCanvas({
             located={bridge.located}
             readOnly={readOnly}
             focusedId={focusedId}
+            {...(onPickComment !== undefined ? { onPick: onPickComment } : {})}
             actions={actions}
             onClose={() => onListOpen(false)}
           />

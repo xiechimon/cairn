@@ -43,11 +43,10 @@ function useSize(node: HTMLElement | null): { width: number; height: number } | 
 }
 
 export function frameTransform(
-  viewport: DesignViewport,
+  preset: { width: number; height: number } | null,
   canvas: { width: number; height: number } | null,
 ): FrameTransform | null {
   if (canvas === null) return null;
-  const preset = VIEWPORT_SIZE[viewport];
   if (preset === null) return { scale: 1, width: canvas.width, height: canvas.height };
   const scale = Math.min(
     1,
@@ -64,6 +63,7 @@ export function DesignFrame({
   srcdoc,
   title,
   viewport,
+  size,
   zoom = 'fit',
   onFitScale,
   onZoomChange,
@@ -74,6 +74,7 @@ export function DesignFrame({
   srcdoc: string;
   title: string;
   viewport: DesignViewport;
+  size?: { width: number; height: number } | undefined;
   zoom?: Zoom;
   onFitScale?: (scale: number) => void;
   onZoomChange?: (next: Zoom) => void;
@@ -92,7 +93,8 @@ export function DesignFrame({
     },
     [frameRef],
   );
-  const base = frameTransform(viewport, useSize(canvas));
+  const preset = size ?? VIEWPORT_SIZE[viewport];
+  const base = frameTransform(preset, useSize(canvas));
   useEffect(() => {
     if (base !== null) onFitScale?.(base.scale);
   }, [base?.scale, onFitScale]);
@@ -123,7 +125,7 @@ export function DesignFrame({
       wheelBridgeRef.current = null;
     };
   }, [wheelBridgeRef, applyWheel]);
-  const fitted = VIEWPORT_SIZE[viewport] !== null;
+  const fitted = preset !== null;
   const scrollable = fitted || zoom !== 'fit';
   return (
     <div

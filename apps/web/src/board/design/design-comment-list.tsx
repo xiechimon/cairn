@@ -34,7 +34,8 @@ type Filter = 'all' | 'open' | 'done';
 export function commentWhere(comment: DesignCommentRecord): string {
   if (comment.anchor !== null && comment.anchor.type !== 'slide')
     return describeAnchor(comment.anchor);
-  return comment.text !== '' ? `${comment.label}「${comment.text}」` : comment.label;
+  const element = comment.text !== '' ? `${comment.label}「${comment.text}」` : comment.label;
+  return comment.anchor === null ? element : `${describeAnchor(comment.anchor)} · ${element}`;
 }
 
 function markHref(attachmentId: string): string {

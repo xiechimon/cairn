@@ -26,7 +26,7 @@ Kind follows the file name (`artifactKindOf` in `packages/shared/src/records/art
 |---|---|---|---|---|
 | document | md | rendered Markdown, mermaid fences drawn | preview / source | element (block with generated `data-cairn-id`) |
 | page | html | sandboxed frame (design-surface bridges) | preview / source, viewport | element (`data-od-id`, then selector) |
-| slides | html whose body holds `<section>` slides | rail + one slide, grid view, present | view menu, present | element inside the slide, plus slide index |
+| slides | html whose root is `<html data-slides>`, one `<section class="slide">` per slide (`apps/web/src/board/artifact/slide-deck.ts`) | one 1920×1080 slide, the shared deck pager, present ([`html-slides-viewer.md`](html-slides-viewer.md)) | pager, present | element inside the slide, plus slide index |
 | design | svg | fit, zoom | preview / source, zoom | element (svg `id` / `data-cairn-id`) or region |
 | diagram | mmd | mermaid render | preview / source | element (node id) |
 | whiteboard | excalidraw | Excalidraw (read-only until `编辑`) | edit toggle | shape ids, or region |

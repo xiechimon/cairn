@@ -130,7 +130,8 @@ export function buildCommentBridgeScript(): string {
     if (!target) return;
     ev.preventDefault();
     ev.stopPropagation();
-    window.parent.postMessage({ type: 'od:comment-target', target: target }, '*');
+    var slide = ev.target && ev.target.closest ? ev.target.closest('[data-cairn-slide]') : null;
+    window.parent.postMessage({ type: 'od:comment-target', target: target, slide: slide ? Number(slide.getAttribute('data-cairn-slide')) : null }, '*');
   }, true);
   function isEditable(el){
     return !!(el && el.nodeType === 1 && (el.isContentEditable || (el.closest && el.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))));

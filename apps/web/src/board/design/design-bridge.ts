@@ -57,6 +57,7 @@ export interface CommentBridge {
   unsupported: boolean;
   hover: ElementTarget | null;
   picked: ElementTarget | null;
+  pickedSlide: number | null;
   clearPicked: () => void;
   located: ReadonlyMap<string, Located>;
 }
@@ -78,6 +79,7 @@ export function useCommentBridge({
   const [waited, setWaited] = useState(false);
   const [hover, setHover] = useState<ElementTarget | null>(null);
   const [picked, setPicked] = useState<ElementTarget | null>(null);
+  const [pickedSlide, setPickedSlide] = useState<number | null>(null);
   const [located, setLocated] = useState<ReadonlyMap<string, Located>>(new Map());
   const requestRef = useRef('');
   const frameRequest = useRef<number | null>(null);
@@ -119,7 +121,9 @@ export function useCommentBridge({
           return;
         case COMMENT_BRIDGE_MESSAGES.target: {
           const target = targetOf(message.target);
-          if (target !== null) setPicked(target);
+          if (target === null) return;
+          setPicked(target);
+          setPickedSlide(typeof message.slide === 'number' ? message.slide : null);
           return;
         }
         case COMMENT_BRIDGE_MESSAGES.located: {
@@ -198,6 +202,7 @@ export function useCommentBridge({
     unsupported: commenting && !ready && waited,
     hover: commenting ? hover : null,
     picked,
+    pickedSlide,
     clearPicked: useCallback(() => setPicked(null), []),
     located,
   };

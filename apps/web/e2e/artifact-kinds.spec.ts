@@ -258,6 +258,11 @@ test('a landscape PDF opens as a deck with a slide rail, paging and arrow keys',
   await panel.getByTestId('artifact-deck-thumb').first().click();
   await expect(stage).toHaveAttribute('data-current', '1');
   await expect(panel.getByTestId('artifact-deck-thumb').first()).toHaveAttribute('aria-current', 'true');
+  await panel.getByTestId('artifact-deck-present').click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true);
+  await expect(panel.getByTestId('artifact-deck-present')).toHaveCount(0);
+  await page.keyboard.press('ArrowRight');
+  await expect(stage).toHaveAttribute('data-current', '2');
 });
 
 test('image preview supports ctrl+wheel cursor-centered pinch zoom, Cmd +/-/0 shortcuts, and Esc close', async ({

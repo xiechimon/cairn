@@ -187,15 +187,18 @@ type BlockComment = Pick<
   | 'anchor'
 >;
 
-function targetOf(c: BlockComment): string {
-  if (c.anchor !== null) {
-    const inSlide = c.anchor.type === 'slide' && c.elementId !== '';
-    const where = describeAnchor(c.anchor);
-    return inSlide ? `${where} · ${oneLine(c.label)}[data-od-id="${oneLine(c.elementId)}"]` : where;
-  }
+function elementOf(c: BlockComment): string {
   if (c.elementId !== '') return `${oneLine(c.label)}[data-od-id="${oneLine(c.elementId)}"]`;
   if (c.markAttachmentId !== null) return '页面标注（画在下面的标注图上）';
   return oneLine(c.selector);
+}
+
+function targetOf(c: BlockComment): string {
+  if (c.anchor === null) return elementOf(c);
+  const where = describeAnchor(c.anchor);
+  return c.anchor.type === 'slide' && (c.elementId !== '' || c.selector !== '')
+    ? `${where} · ${elementOf(c)}`
+    : where;
 }
 
 export function renderDesignCommentBlock(input: {

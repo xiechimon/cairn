@@ -3023,6 +3023,7 @@ export const EN: Record<string, string> = {
   '只显示前 {n} 行，下载查看全部': 'Showing rows 1 to {n}. Download for the full file',
   '白板文件已损坏，请下载查看': 'This whiteboard file is damaged. Download it to view.',
   放映: 'Present',
+  未能全屏放映: 'Could not present full screen',
   幻灯片: 'Slides',
   '第 {n} 页': 'Page {n}',
   '{n} 页': '{n## page|# pages}',
