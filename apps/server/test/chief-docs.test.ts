@@ -1,5 +1,5 @@
 import { chmodSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
@@ -16,6 +16,8 @@ import { readFile, readFiles } from '../src/services/git.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
 registerChiefHarness();
+
+const OWNED_PROCESS_PATH = resolve(import.meta.dirname, '../../../scripts/owned-process.mjs');
 
 type Docs = { files: { path: string; commit?: string; content?: string; error?: string }[] };
 
@@ -397,7 +399,7 @@ describe('Coordinator repository reads', () => {
 
   test('live legacy cache: no base branch and obsolete localPath read exact source after daemon backfill', async () => {
     const source = await bindRepo('github');
-    const content = readFileSync('scripts/owned-process.mjs', 'utf8');
+    const content = readFileSync(OWNED_PROCESS_PATH, 'utf8');
     writeFileSync(join(source, 'scripts/owned-process.mjs'), content);
     for (const args of [
       ['add', 'scripts/owned-process.mjs'],
@@ -881,10 +883,7 @@ describe('Coordinator repository reads', () => {
 
   test('reads the actual owned-process source through the Coordinator cache executor', async () => {
     const source = await bindRepo('github');
-    writeFileSync(
-      join(source, 'scripts/owned-process.mjs'),
-      readFileSync('scripts/owned-process.mjs'),
-    );
+    writeFileSync(join(source, 'scripts/owned-process.mjs'), readFileSync(OWNED_PROCESS_PATH));
     for (const args of [
       ['add', 'scripts/owned-process.mjs'],
       [
@@ -934,7 +933,7 @@ describe('Coordinator repository reads', () => {
     writeFileSync(join(source, 'scripts/owned-process.mjs'), 'uncommitted fixture replacement\n');
     await fetchFixture(cache, source, 'xiechimon/cairn');
     const result = await read();
-    expect(result.files[0]?.content).toBe(readFileSync('scripts/owned-process.mjs', 'utf8'));
+    expect(result.files[0]?.content).toBe(readFileSync(OWNED_PROCESS_PATH, 'utf8'));
     expect(result.files[0]?.commit).toBe(commit);
   });
 });
