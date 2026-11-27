@@ -16,6 +16,7 @@ import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { ShadowDiskFullError, ShadowManager } from '../src/shadow-repo.js';
 import { commitAndPushStep } from '../src/step-closing-git.js';
+import { prepareVerifyClone } from '../src/step-workspace.js';
 import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
 
@@ -835,5 +836,227 @@ describe('plain-folder workspace + shadow repo + CoW lifecycle', () => {
       action: 'undo',
     });
     expect(['disabled', 'snapshot-missing', 'no-changes']).toContain(act.outcome);
+  }, 30_000);
+
+  test('pins postCommit from merged tree without sweeping concurrent user saves during write-back', async () => {
+    const root = testTempDir('cairn-pf-rev1-root-');
+    const f1 = testTempDir('cairn-pf-rev1-');
+    writeFileSync(join(f1, 'base.txt'), 'base\n');
+    let injectedSave = false;
+    const ws1 = makeWorkspace({
+      shadowWriteFileImpl: (target, content, mode) => {
+        if (!injectedSave) {
+          injectedSave = true;
+          writeFileSync(join(f1, 'concurrent-user.txt'), 'user kept this\n');
+        }
+        writeFileSync(target, content, { mode });
+        chmodSync(target, mode);
+      },
+    });
+    const prep1 = await ws1.prepare({
+      projectId: 'p-rev1',
+      conversationId: 'conv-rev1',
+      cloneUrl: f1,
+      repoKind: 'local',
+      workspacesRoot: root,
+      credentials: null,
+    });
+    writeFileSync(join(prep1.cwd, 'task-new.txt'), 'task delivered\n');
+    await ws1.commitAll(prep1.cwd, 'task-new', IDENTITY);
+    await ws1.push(prep1.cwd, prep1.branch, null, { base: null, identity: null, stepId: 's-r1' });
+    expect(readFileSync(join(f1, 'concurrent-user.txt'), 'utf8')).toBe('user kept this\n');
+    const undo1 = await ws1.runPlainFolderAction({
+      workspacesRoot: root,
+      projectId: 'p-rev1',
+      buildId: 'conv-rev1',
+      stepId: 's-r1-undo',
+      realFolder: f1,
+      action: 'undo',
+    });
+    expect(undo1.outcome).toBe('undone');
+    expect(existsSync(join(f1, 'task-new.txt'))).toBe(false);
+    expect(readFileSync(join(f1, 'concurrent-user.txt'), 'utf8')).toBe('user kept this\n');
+  }, 30_000);
+
+  test('snapshots convDir after cloneCow so files entering convDir during copy are in base and not falsely delivered', async () => {
+    const root = testTempDir('cairn-pf-rev2-root-');
+    const f2 = testTempDir('cairn-pf-rev2-');
+    writeFileSync(join(f2, 'tracked.txt'), 'v1\n');
+    const ws2 = makeWorkspace({
+      shadowCopyImpl: async (src, dst) => {
+        writeFileSync(join(src, 'race-created.txt'), 'user pre-copy\n');
+        for (const name of ['tracked.txt', 'race-created.txt']) {
+          writeFileSync(join(dst, name), readFileSync(join(src, name)));
+        }
+      },
+    });
+    const prep2 = await ws2.prepare({
+      projectId: 'p-rev2',
+      conversationId: 'conv-rev2',
+      cloneUrl: f2,
+      repoKind: 'local',
+      workspacesRoot: root,
+      credentials: null,
+    });
+    await ws2.commitAll(prep2.cwd, 'noop after race copy', IDENTITY);
+    await ws2.push(prep2.cwd, prep2.branch, null, { base: null, identity: null, stepId: 's-r2' });
+    expect(ws2.plainFolderMeta(prep2.cwd)?.status).toBe('no-changes');
+    expect(ws2.plainFolderMeta(prep2.cwd)?.undoable).toBe(false);
+  }, 30_000);
+
+  test('preserves restrictive 0600 file permissions across merge-back, undo, and TOCTOU rollback', async () => {
+    const root = testTempDir('cairn-pf-rev3-root-');
+    const f3 = testTempDir('cairn-pf-rev3-');
+    writeFileSync(join(f3, 'secret.cfg'), 'k=1\n');
+    chmodSync(join(f3, 'secret.cfg'), 0o600);
+    writeFileSync(join(f3, 'z-last.txt'), 'orig\n');
+    const ws3 = makeWorkspace();
+    const prep3 = await ws3.prepare({
+      projectId: 'p-rev3',
+      conversationId: 'conv-rev3',
+      cloneUrl: f3,
+      repoKind: 'local',
+      workspacesRoot: root,
+      credentials: null,
+    });
+    writeFileSync(join(prep3.cwd, 'secret.cfg'), 'k=2\n');
+    await ws3.commitAll(prep3.cwd, 'edit 0600', IDENTITY);
+    await ws3.push(prep3.cwd, prep3.branch, null, { base: null, identity: null, stepId: 's-r3' });
+    expect(statSync(join(f3, 'secret.cfg')).mode & 0o777).toBe(0o600);
+    await ws3.runPlainFolderAction({
+      workspacesRoot: root,
+      projectId: 'p-rev3',
+      buildId: 'conv-rev3',
+      stepId: 's-r3-undo',
+      realFolder: f3,
+      action: 'undo',
+    });
+    expect(readFileSync(join(f3, 'secret.cfg'), 'utf8')).toBe('k=1\n');
+    expect(statSync(join(f3, 'secret.cfg')).mode & 0o777).toBe(0o600);
+
+    let failSecondWrite = false;
+    const ws3Rollback = makeWorkspace({
+      shadowWriteFileImpl: (target, content, mode) => {
+        if (target.endsWith('secret.cfg') && failSecondWrite) {
+          writeFileSync(join(f3, 'z-last.txt'), 'external race\n');
+        }
+        writeFileSync(target, content, { mode });
+        chmodSync(target, mode);
+      },
+    });
+    const prep3Rb = await ws3Rollback.prepare({
+      projectId: 'p-rev3-rb',
+      conversationId: 'conv-rev3-rb',
+      cloneUrl: f3,
+      repoKind: 'local',
+      workspacesRoot: root,
+      credentials: null,
+    });
+    writeFileSync(join(prep3Rb.cwd, 'secret.cfg'), 'k=3\n');
+    writeFileSync(join(prep3Rb.cwd, 'z-last.txt'), 'task-z\n');
+    await ws3Rollback.commitAll(prep3Rb.cwd, 'rb test', IDENTITY);
+    failSecondWrite = true;
+    await ws3Rollback.push(prep3Rb.cwd, prep3Rb.branch, null, {
+      base: null,
+      identity: null,
+      stepId: 's-r3-rb',
+    });
+    expect(readFileSync(join(f3, 'secret.cfg'), 'utf8')).toBe('k=1\n');
+    expect(statSync(join(f3, 'secret.cfg')).mode & 0o777).toBe(0o600);
+  }, 30_000);
+
+  test('blocks sibling task writes on cross-task partial-unknown journal and reconciles applied leg missing from task record', async () => {
+    const root = testTempDir('cairn-pf-rev4-root-');
+    const f4 = testTempDir('cairn-pf-rev4-');
+    writeFileSync(join(f4, 'a.txt'), 'v1\n');
+    const ws4A = makeWorkspace();
+    const prep4A = await ws4A.prepare({
+      projectId: 'p-rev4',
+      conversationId: 'conv-rev4a',
+      cloneUrl: f4,
+      repoKind: 'local',
+      workspacesRoot: root,
+      credentials: null,
+    });
+    const prep4B = await ws4A.prepare({
+      projectId: 'p-rev4',
+      conversationId: 'conv-rev4b',
+      cloneUrl: f4,
+      repoKind: 'local',
+      workspacesRoot: root,
+      credentials: null,
+    });
+    writeFileSync(
+      join(prep4A.baseRepoDir, 'journals', 'conv-rev4a.json'),
+      JSON.stringify({
+        buildId: 'conv-rev4a',
+        stepId: 's-4a',
+        action: 'merge',
+        state: 'partial-unknown',
+        preCommit: '0'.repeat(40),
+        targetTree: '1'.repeat(40),
+        updatedAt: Date.now(),
+      }),
+    );
+    writeFileSync(join(prep4B.cwd, 'b.txt'), 'from b\n');
+    await ws4A.commitAll(prep4B.cwd, 'task B', IDENTITY);
+    await ws4A.push(prep4B.cwd, prep4B.branch, null, {
+      base: null,
+      identity: null,
+      stepId: 's-4b',
+    });
+    expect(ws4A.plainFolderMeta(prep4B.cwd)?.status).toBe('partial-unknown');
+    expect(existsSync(join(f4, 'b.txt'))).toBe(false);
+  }, 30_000);
+
+  test('marks huge non-build plan step readonly and clones attachment verify workspace from shadowRepo', async () => {
+    const root = testTempDir('cairn-pf-rev5-root-');
+    const hugeDir = testTempDir('cairn-pf-rev5-huge-');
+    writeFileSync(join(hugeDir, 'big.txt'), 'x'.repeat(200));
+    const tinyWsMgr = makeWorkspace({ hugeFolderBytes: 50 });
+    const hugePlanWs = await tinyWsMgr.prepare({
+      projectId: 'p-huge-plan',
+      conversationId: 'conv-huge-plan',
+      cloneUrl: hugeDir,
+      repoKind: 'local',
+      workspacesRoot: root,
+      credentials: null,
+      stepKind: 'plan',
+    });
+    expect(hugePlanWs.readonly).toBe(true);
+    hugePlanWs.release?.();
+
+    const normalDir = testTempDir('cairn-pf-rev5-norm-');
+    writeFileSync(join(normalDir, 'init.txt'), 'init\n');
+    const wsMgr = makeWorkspace();
+    const verifyPrep = await wsMgr.prepare({
+      projectId: 'p-verify',
+      conversationId: 'conv-verify',
+      cloneUrl: normalDir,
+      repoKind: 'local',
+      workspacesRoot: root,
+      credentials: null,
+      stepKind: 'build',
+    });
+    writeFileSync(join(verifyPrep.cwd, 'verified.txt'), 'proof\n');
+    const committed = await wsMgr.commitAll(verifyPrep.cwd, 'verify target', IDENTITY);
+    const cleanups: (() => void | Promise<void>)[] = [];
+    const verifyClone = await prepareVerifyClone({
+      workspace: wsMgr,
+      ws: verifyPrep,
+      headAtStart: committed.head,
+      evidenceDirectory: '.cairn-verify/run_1/',
+      expectedHeadSha: committed.head ?? undefined,
+      cleanups,
+    });
+    try {
+      expect('error' in verifyClone).toBe(false);
+      if (!('error' in verifyClone)) {
+        expect(readFileSync(join(verifyClone.cwd, 'verified.txt'), 'utf8')).toBe('proof\n');
+        expect(verifyClone.ws.plainFolder).toBeUndefined();
+      }
+    } finally {
+      for (const cleanup of cleanups) await cleanup();
+    }
   }, 30_000);
 });

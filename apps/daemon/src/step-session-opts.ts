@@ -22,6 +22,7 @@ export interface StepSessionOptsInput {
   teamSkillsDir: string | null;
   isChief: boolean;
   isReview: boolean;
+  readOnly?: boolean;
   remoteToolsOnly: boolean;
   telemetry: SessionOpts['telemetry'];
   env: Record<string, string>;
@@ -53,7 +54,7 @@ export function composeStepSessionOpts(input: StepSessionOptsInput): SessionOpts
       : { injectedSkills: input.injectedSkills }),
     onSkillsResolved: input.onSkillsResolved,
     ...(input.teamSkillsDir !== null ? { teamSkillsDir: input.teamSkillsDir } : {}),
-    ...(isReview ? { readOnly: true } : {}),
+    ...(isReview || input.readOnly === true ? { readOnly: true } : {}),
     ...(isChief || isReview || input.remoteToolsOnly ? { lockedDown: true } : {}),
     ...(input.remoteToolsOnly ? { remoteToolsOnly: true } : {}),
     ...(input.telemetry !== undefined ? { telemetry: input.telemetry } : {}),

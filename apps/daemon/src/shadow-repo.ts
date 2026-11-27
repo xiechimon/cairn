@@ -589,6 +589,23 @@ export class ShadowManager {
     return this.runShadowGitOk(shadowDir, ['rev-parse', '--verify', `${commit}^{tree}`]);
   }
 
+  private async commitTreeToRef(
+    shadowDir: string,
+    tree: string,
+    parentSha: string | null,
+    refName: string,
+    label: string,
+  ): Promise<string> {
+    const commitArgs =
+      parentSha !== null && (await this.commitExists(shadowDir, parentSha))
+        ? ['commit-tree', tree, '-p', parentSha, '-m', label]
+        : ['commit-tree', tree, '-m', label];
+    const commit = await this.runShadowGitOk(shadowDir, commitArgs);
+    await this.runShadowGitOk(shadowDir, ['update-ref', refName, commit]);
+    await this.maybeCollectGc(shadowDir);
+    return commit;
+  }
+
   private async snapshotWorkTree(
     shadowDir: string,
     workTree: string,
@@ -611,13 +628,7 @@ export class ShadowManager {
           return { commit: parentSha, tree, changed: false };
         }
       }
-      const commitArgs =
-        parentSha !== null && (await this.commitExists(shadowDir, parentSha))
-          ? ['commit-tree', tree, '-p', parentSha, '-m', label]
-          : ['commit-tree', tree, '-m', label];
-      const commit = await this.runShadowGitOk(shadowDir, commitArgs);
-      await this.runShadowGitOk(shadowDir, ['update-ref', refName, commit]);
-      await this.maybeCollectGc(shadowDir);
+      const commit = await this.commitTreeToRef(shadowDir, tree, parentSha, refName, label);
       return { commit, tree, changed: true };
     } finally {
       rmSync(indexFile, { force: true });
@@ -906,7 +917,15 @@ export class ShadowManager {
         return false;
       }
     };
-    const applied: DeltaItem[] = [];
+    const applied: Array<{ item: DeltaItem; prevMode?: number }> = [];
+    const resolveTargetMode = (item: DeltaItem, prevMode: number | undefined): number => {
+      const newExec = (Number.parseInt(item.newMode, 8) & 0o111) !== 0;
+      if (prevMode === undefined) return newExec ? 0o755 : 0o644;
+      const oldExec = (Number.parseInt(item.oldMode, 8) & 0o111) !== 0;
+      if (oldExec === newExec) return prevMode;
+      if (newExec) return prevMode | ((prevMode & 0o444) >> 2);
+      return prevMode & ~0o111;
+    };
     const writeFile =
       this.writeFileImpl ??
       ((target: string, content: Buffer, mode: number) => {
@@ -928,17 +947,24 @@ export class ShadowManager {
             ? null
             : await this.runShadowGitBuffer(shadowDir, ['cat-file', 'blob', item.newSha]);
         const target = assertInsideRealRoot(canonicalRoot, item.path);
+        let prevMode: number | undefined;
         if (item.status === 'A') {
           if (existsSync(target) && !diskEntryMatchesSha(target, item.newSha, item.newMode)) {
             throw new ShadowConcurrentEditError([item.path]);
           }
-        } else if (!diskEntryMatchesSha(target, item.oldSha, item.oldMode)) {
-          throw new ShadowConcurrentEditError([item.path]);
+        } else {
+          if (!diskEntryMatchesSha(target, item.oldSha, item.oldMode)) {
+            throw new ShadowConcurrentEditError([item.path]);
+          }
+          try {
+            const st = lstatSync(target);
+            if (st.isFile()) prevMode = st.mode & 0o777;
+          } catch {}
         }
         if (item.status === 'D') {
           rmSync(target, { force: true });
           pruneEmptyParents(dirname(target), canonicalRoot);
-          applied.push(item);
+          applied.push({ item, ...(prevMode !== undefined ? { prevMode } : {}) });
           continue;
         }
         mkdirSync(dirname(target), { recursive: true });
@@ -953,14 +979,15 @@ export class ShadowManager {
             throw err;
           }
         } else {
-          const mode = (Number.parseInt(item.newMode, 8) & 0o111) !== 0 ? 0o755 : 0o644;
+          const mode = resolveTargetMode(item, prevMode);
           writeFile(target, body, mode);
         }
-        applied.push(item);
+        applied.push({ item, ...(prevMode !== undefined ? { prevMode } : {}) });
       }
     } catch (applyErr) {
       let rollbackFailed: string | null = null;
-      for (const prev of [...applied].reverse()) {
+      for (const entry of [...applied].reverse()) {
+        const prev = entry.item;
         try {
           const target = assertInsideRealRoot(canonicalRoot, prev.path);
           if (prev.status === 'A') {
@@ -983,7 +1010,9 @@ export class ShadowManager {
                 throw linkErr;
               }
             } else {
-              const mode = (Number.parseInt(prev.oldMode, 8) & 0o111) !== 0 ? 0o755 : 0o644;
+              const mode =
+                entry.prevMode ??
+                ((Number.parseInt(prev.oldMode, 8) & 0o111) !== 0 ? 0o755 : 0o644);
               const tmp = `${target}.cairn-rb-${randomUUID()}`;
               try {
                 writeFileSync(tmp, oldBuf, { mode });
@@ -1021,7 +1050,51 @@ export class ShadowManager {
     fresh: TaskShadowRecord,
   ): Promise<'clean' | 'applied' | 'partial-unknown'> {
     const journal = this.readJournal(fresh.shadowDir, fresh.convId);
-    if (journal === null || journal.state === 'applied') return 'clean';
+    if (journal === null) {
+      return fresh.status === 'partial-unknown' ? 'partial-unknown' : 'clean';
+    }
+    if (journal.state === 'applied') {
+      let changed = false;
+      if (journal.action === 'merge') {
+        const legStepId = journal.stepId ?? fresh.convId;
+        if (!fresh.deliveries.some((d) => d.stepId === legStepId)) {
+          const postCommit =
+            journal.postCommit ??
+            (await this.commitTreeToRef(
+              fresh.shadowDir,
+              journal.targetTree,
+              (await this.commitExists(fresh.shadowDir, journal.preCommit))
+                ? journal.preCommit
+                : null,
+              `refs/cairn/tasks/${fresh.convId}/deliveries/${legStepId}/post`,
+              `recover ${fresh.convId} ${legStepId}`,
+            ));
+          fresh.deliveries.push({
+            stepId: legStepId,
+            preCommit: journal.preCommit,
+            postCommit,
+          });
+          fresh.legBaseCommit = fresh.headCommit;
+          fresh.status = 'merged';
+          fresh.conflictFiles = [];
+          delete fresh.reason;
+          changed = true;
+        }
+      } else if (fresh.status !== 'undone') {
+        fresh.status = 'undone';
+        fresh.conflictFiles = [];
+        delete fresh.reason;
+        if (journal.stepId && fresh.lastActionReceipts[journal.stepId] === undefined) {
+          fresh.lastActionReceipts[journal.stepId] = {
+            outcome: 'undone',
+            ...(journal.postCommit !== undefined ? { commit: journal.postCommit } : {}),
+          };
+        }
+        changed = true;
+      }
+      if (changed) this.writeTaskRecord(fresh);
+      return 'clean';
+    }
     if (journal.state === 'partial-unknown') {
       fresh.status = 'partial-unknown';
       fresh.reason = '上次本地文件夹写回或撤销中断，目录状态未知，请先手动核对后再操作';
@@ -1037,19 +1110,24 @@ export class ShadowManager {
         `recover ${fresh.convId}`,
       );
       if (current.tree === journal.targetTree) {
-        this.writeJournal(fresh.shadowDir, {
-          ...journal,
-          state: 'applied',
-          postCommit: current.commit,
-          updatedAt: Date.now(),
-        });
+        const legStepId = journal.stepId ?? fresh.convId;
+        const postRef =
+          journal.action === 'merge'
+            ? `refs/cairn/tasks/${fresh.convId}/deliveries/${legStepId}/post`
+            : `refs/cairn/tasks/${fresh.convId}/post-undo`;
+        const postCommit = await this.commitTreeToRef(
+          fresh.shadowDir,
+          journal.targetTree,
+          (await this.commitExists(fresh.shadowDir, journal.preCommit)) ? journal.preCommit : null,
+          postRef,
+          `recover ${fresh.convId}`,
+        );
         if (journal.action === 'merge') {
-          const legStepId = journal.stepId ?? fresh.convId;
           if (!fresh.deliveries.some((d) => d.stepId === legStepId)) {
             fresh.deliveries.push({
               stepId: legStepId,
               preCommit: journal.preCommit,
-              postCommit: current.commit,
+              postCommit,
             });
           }
           fresh.legBaseCommit = fresh.headCommit;
@@ -1058,9 +1136,21 @@ export class ShadowManager {
         } else {
           fresh.status = 'undone';
           fresh.conflictFiles = [];
+          if (journal.stepId && fresh.lastActionReceipts[journal.stepId] === undefined) {
+            fresh.lastActionReceipts[journal.stepId] = {
+              outcome: 'undone',
+              commit: postCommit,
+            };
+          }
         }
         delete fresh.reason;
         this.writeTaskRecord(fresh);
+        this.writeJournal(fresh.shadowDir, {
+          ...journal,
+          state: 'applied',
+          postCommit,
+          updatedAt: Date.now(),
+        });
         return 'applied';
       }
       if (await this.commitExists(fresh.shadowDir, journal.preCommit)) {
@@ -1082,6 +1172,36 @@ export class ShadowManager {
     return 'partial-unknown';
   }
 
+  private async reconcileAllShadowJournalsUnlocked(
+    shadowDir: string,
+  ): Promise<'clean' | 'partial-unknown'> {
+    const jDir = join(shadowDir, 'journals');
+    if (existsSync(jDir)) {
+      for (const file of readdirSync(jDir)) {
+        if (!file.endsWith('.json')) continue;
+        const convId = file.slice(0, -'.json'.length);
+        const journal = this.readJournal(shadowDir, convId);
+        if (journal === null) continue;
+        const rec = this.readTaskRecord(shadowDir, journal.buildId);
+        if (rec === null) {
+          if (journal.state === 'applied') continue;
+          return 'partial-unknown';
+        }
+        const verdict = await this.reconcilePendingJournalUnlocked(rec);
+        if (verdict === 'partial-unknown') return 'partial-unknown';
+      }
+    }
+    const tDir = join(shadowDir, 'tasks');
+    if (existsSync(tDir)) {
+      for (const file of readdirSync(tDir)) {
+        if (!file.endsWith('.json')) continue;
+        const rec = this.readTaskRecord(shadowDir, file.slice(0, -'.json'.length));
+        if (rec?.status === 'partial-unknown') return 'partial-unknown';
+      }
+    }
+    return 'clean';
+  }
+
   async prepareIsolated(input: {
     workspacesRoot: string;
     projectId: string;
@@ -1099,6 +1219,12 @@ export class ShadowManager {
     const shadowDir = this.shadowDirFor(input.workspacesRoot, input.realFolder);
     const scan = this.measureFolder(input.realFolder);
     return this.withFolderWriteLock(canonical, async () => {
+      if (existsSync(shadowDir)) {
+        const shadowVerdict = await this.reconcileAllShadowJournalsUnlocked(shadowDir);
+        if (shadowVerdict === 'partial-unknown') {
+          throw new Error('上次写回在完成前中断，请手动检查本地目录改动');
+        }
+      }
       const existing = this.readTaskRecord(shadowDir, input.convId);
       if (
         existing !== null &&
@@ -1106,7 +1232,6 @@ export class ShadowManager {
         existing.canonicalFolder === canonical &&
         existsSync(input.convDir)
       ) {
-        await this.reconcilePendingJournalUnlocked(existing);
         this.workDirToTaskMeta.set(input.convDir, this.taskMetaPath(shadowDir, input.convId));
         return {
           shadowDir,
@@ -1116,6 +1241,7 @@ export class ShadowManager {
             existing.checkpointsDisabled === true || this.disabledShadows.has(shadowDir),
         };
       }
+      await this.cloneCow(canonical, input.convDir);
       let baseCommit: string | null = null;
       let checkpointsDisabled = this.disabledShadows.has(shadowDir);
       if (!checkpointsDisabled) {
@@ -1123,7 +1249,7 @@ export class ShadowManager {
           await this.ensureShadow(shadowDir, scan.cacheTagDirs);
           const snap = await this.snapshotWorkTree(
             shadowDir,
-            canonical,
+            input.convDir,
             `refs/cairn/tasks/${input.convId}/base`,
             null,
             `base ${input.convId}`,
@@ -1137,7 +1263,6 @@ export class ShadowManager {
           }
         }
       }
-      await this.cloneCow(canonical, input.convDir);
       writeFileSync(
         join(input.convDir, '.cairn-plain-folder.json'),
         `${JSON.stringify({ shadowDir, convId: input.convId })}\n`,
@@ -1186,10 +1311,13 @@ export class ShadowManager {
       return await this.withFolderWriteLock(
         canonical,
         async () => {
-          const existing = this.readTaskRecord(shadowDir, input.convId);
-          if (existing !== null) {
-            await this.reconcilePendingJournalUnlocked(existing);
+          if (existsSync(shadowDir)) {
+            const shadowVerdict = await this.reconcileAllShadowJournalsUnlocked(shadowDir);
+            if (shadowVerdict === 'partial-unknown') {
+              throw new Error('上次写回在完成前中断，请手动检查本地目录改动');
+            }
           }
+          const existing = this.readTaskRecord(shadowDir, input.convId);
           let baseCommit: string | null = null;
           let checkpointsDisabled = this.disabledShadows.has(shadowDir);
           if (!checkpointsDisabled) {
@@ -1353,6 +1481,11 @@ export class ShadowManager {
       record.canonicalFolder,
       async () => {
         const fresh = this.readTaskRecord(record.shadowDir, record.convId) ?? record;
+        if (
+          (await this.reconcileAllShadowJournalsUnlocked(fresh.shadowDir)) === 'partial-unknown'
+        ) {
+          throw new Error('上次写回在完成前中断，请手动检查本地目录改动');
+        }
         if (!(await this.commitExists(fresh.shadowDir, commit))) return;
         const current = await this.snapshotWorkTree(
           fresh.shadowDir,
@@ -1404,13 +1537,17 @@ export class ShadowManager {
     fresh: TaskShadowRecord,
     stepId: string,
   ): Promise<PlainFolderStepMeta> {
-    const recStatus = await this.reconcilePendingJournalUnlocked(fresh);
+    const recStatus = await this.reconcileAllShadowJournalsUnlocked(fresh.shadowDir);
     if (recStatus === 'partial-unknown') {
+      const updated = this.readTaskRecord(fresh.shadowDir, fresh.convId) ?? fresh;
+      updated.status = 'partial-unknown';
+      updated.reason ??= '上次本地文件夹写回或撤销中断，目录状态未知，请先手动核对后再操作';
+      this.writeTaskRecord(updated);
       return {
-        mode: fresh.mode,
+        mode: updated.mode,
         status: 'partial-unknown',
         undoable: false,
-        ...(fresh.reason !== undefined ? { reason: fresh.reason } : {}),
+        reason: updated.reason,
       };
     }
     if (fresh.checkpointsDisabled === true || this.disabledShadows.has(fresh.shadowDir)) {
@@ -1554,13 +1691,23 @@ export class ShadowManager {
         ours.commit,
         merged.tree,
       );
-      const post = await this.snapshotWorkTree(
+      const postCommit = await this.commitTreeToRef(
         fresh.shadowDir,
-        fresh.canonicalFolder,
-        `refs/cairn/tasks/${fresh.convId}/deliveries/${stepId}/post`,
+        merged.tree,
         ours.commit,
+        `refs/cairn/tasks/${fresh.convId}/deliveries/${stepId}/post`,
         `post-merge ${fresh.convId} ${stepId}`,
       );
+      fresh.deliveries.push({
+        stepId,
+        preCommit: ours.commit,
+        postCommit,
+      });
+      fresh.legBaseCommit = fresh.headCommit;
+      fresh.status = 'merged';
+      fresh.conflictFiles = [];
+      delete fresh.reason;
+      this.writeTaskRecord(fresh);
       this.writeJournal(fresh.shadowDir, {
         buildId: fresh.convId,
         stepId,
@@ -1568,19 +1715,9 @@ export class ShadowManager {
         state: 'applied',
         preCommit: ours.commit,
         targetTree: merged.tree,
-        postCommit: post.commit,
+        postCommit,
         updatedAt: Date.now(),
       });
-      fresh.deliveries.push({
-        stepId,
-        preCommit: ours.commit,
-        postCommit: post.commit,
-      });
-      fresh.legBaseCommit = fresh.headCommit;
-      fresh.status = 'merged';
-      fresh.conflictFiles = [];
-      delete fresh.reason;
-      this.writeTaskRecord(fresh);
       return { mode: 'isolated', status: 'merged', undoable: true };
     } catch (err) {
       if (err instanceof ShadowConcurrentEditError) {
@@ -1676,11 +1813,12 @@ export class ShadowManager {
         return result;
       };
 
-      const recStatus = await this.reconcilePendingJournalUnlocked(fresh);
+      const recStatus = await this.reconcileAllShadowJournalsUnlocked(fresh.shadowDir);
       if (recStatus === 'partial-unknown') {
+        const latest = this.readTaskRecord(shadowDir, input.buildId) ?? fresh;
         return finish({
           outcome: 'partial-unknown',
-          reason: fresh.reason ?? '上次本地文件夹写回中断，请先手动核对目录',
+          reason: latest.reason ?? '上次本地文件夹写回中断，请先手动核对目录',
         });
       }
 
@@ -1805,13 +1943,19 @@ export class ShadowManager {
           current.commit,
           finalTree,
         );
-        const reverted = await this.snapshotWorkTree(
+        const postUndoCommit = await this.commitTreeToRef(
           fresh.shadowDir,
-          fresh.canonicalFolder,
-          `refs/cairn/tasks/${fresh.convId}/post-undo`,
+          finalTree,
           current.commit,
+          `refs/cairn/tasks/${fresh.convId}/post-undo`,
           `post-undo ${fresh.convId}`,
         );
+        fresh.status = 'undone';
+        fresh.conflictFiles = [];
+        delete fresh.reason;
+        const result: LocalFolderActionResult = { outcome: 'undone', commit: postUndoCommit };
+        fresh.lastActionReceipts[input.stepId] = result;
+        this.writeTaskRecord(fresh);
         this.writeJournal(fresh.shadowDir, {
           buildId: fresh.convId,
           stepId: input.stepId,
@@ -1819,13 +1963,10 @@ export class ShadowManager {
           state: 'applied',
           preCommit: current.commit,
           targetTree: finalTree,
-          postCommit: reverted.commit,
+          postCommit: postUndoCommit,
           updatedAt: Date.now(),
         });
-        fresh.status = 'undone';
-        fresh.conflictFiles = [];
-        delete fresh.reason;
-        return finish({ outcome: 'undone', commit: reverted.commit });
+        return result;
       } catch (err) {
         if (err instanceof ShadowConcurrentEditError) {
           fresh.status = 'conflict';

@@ -19,6 +19,7 @@ import {
   type CommitIdentity,
   conversationBranch,
   type GitCredentialSource,
+  isBuildStepKind,
   isMissingCommandHookNote,
   LOCAL_ERROR_REASON_COPY,
   type LocalFolderActionResult,
@@ -362,6 +363,8 @@ export class WorkspaceManager implements WorktreeOps {
     convDir: string,
   ): Promise<PreparedWorkspace> {
     const scan = this.shadow.measureFolder(realFolder);
+    const nonBuildReadonly =
+      input.readonly === true || (input.stepKind !== undefined && !isBuildStepKind(input.stepKind));
     const readonlyDirect = (): PreparedWorkspace => ({
       cwd: realFolder,
       baseRepoDir: this.shadow.shadowDirFor(input.workspacesRoot, realFolder),
@@ -376,7 +379,7 @@ export class WorkspaceManager implements WorktreeOps {
         baseCommit: null,
       },
     });
-    if (scan.huge && input.readonly === true) {
+    if (scan.huge && nonBuildReadonly) {
       this.logger.workspace(`Plain huge folder prepared readonly directly (${realFolder})`);
       return readonlyDirect();
     }
@@ -420,7 +423,7 @@ export class WorkspaceManager implements WorktreeOps {
       });
     } catch (err) {
       if (err instanceof ShadowCowFallbackTooLargeError) {
-        if (input.readonly === true) return readonlyDirect();
+        if (nonBuildReadonly) return readonlyDirect();
         return runInPlace();
       }
       throw err;

@@ -2,6 +2,7 @@ import type { WorkspaceHookNoteData } from './protocol/executor.js';
 import type { LocalFolderActionResult, PlainFolderStepMeta } from './protocol/machine-wire.js';
 import type { CompareFile } from './records/merge-gate.js';
 import type { LocalErrorReason, ProjectRepoKind } from './records/project.js';
+import type { StepKind } from './records/step.js';
 import { RETRY_PARKED_MARK } from './task-failure.js';
 
 export interface GitTreeEntry {
@@ -90,6 +91,7 @@ export interface WorktreePrepareInput {
   refresh?: (() => Promise<BoundGitCredentials>) | undefined;
   baseBranch?: string | null;
   machineCredentialFallback?: boolean;
+  stepKind?: StepKind;
   readonly?: boolean;
   signal?: AbortSignal;
   env?: NodeJS.ProcessEnv;

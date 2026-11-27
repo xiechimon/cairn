@@ -5,6 +5,7 @@ import type {
   ClaimedStep,
   PreparedWorkspace,
   WorktreeOps,
+  WorktreePrepareInput,
 } from '@cairn/shared';
 import { LocalRepoUnreachableError } from '@cairn/shared';
 import { createVerificationClone } from './backend/verification-clone.js';
@@ -68,6 +69,8 @@ export async function prepareStepWorkspace(
             refreshed = true;
             return baseRefresh();
           };
+    const stepKind = (claimed.step as { kind?: WorktreePrepareInput['stepKind'] } | undefined)
+      ?.kind;
     const prepare = (cred: BoundGitCredentials | null) =>
       workspace.prepare({
         projectId: claimed.project?.id ?? '',
@@ -80,6 +83,7 @@ export async function prepareStepWorkspace(
         hookCredentials: input.hookCredentials,
         refresh: onceRefresh,
         machineCredentialFallback: repo.kind === 'github',
+        ...(stepKind !== undefined ? { stepKind } : {}),
         ...(input.signal !== undefined ? { signal: input.signal } : {}),
         env: input.env,
       });
@@ -128,7 +132,28 @@ export async function prepareVerifyClone(input: VerifyCloneInput): Promise<Verif
   ) {
     return { error: 'Verify evidence directory unavailable or invalid' };
   }
-  if (ws === null || ws.readonly === true || !workspace || headAtStart === null) {
+  if (ws === null || !workspace) {
+    return { error: 'Verify delivery commit unavailable' };
+  }
+  if (ws.plainFolder !== undefined) {
+    const targetCommit = input.expectedHeadSha ?? headAtStart;
+    if (targetCommit === null) {
+      return { error: 'Verify delivery commit unavailable' };
+    }
+    try {
+      const clone = await createVerificationClone(ws.baseRepoDir, targetCommit);
+      input.cleanups.push(clone.cleanup);
+      const { plainFolder: _pf, readonly: _ro, ...rest } = ws;
+      return {
+        ws: { ...rest, cwd: clone.cwd, reused: false },
+        cwd: clone.cwd,
+        headAtStart: await workspace.headCommit(clone.cwd),
+      };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  if (ws.readonly === true || headAtStart === null) {
     return { error: 'Verify delivery commit unavailable' };
   }
   try {

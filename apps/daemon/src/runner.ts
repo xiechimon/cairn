@@ -600,6 +600,7 @@ async function runClaimedStep(
     teamSkillsDir,
     isChief,
     isReview,
+    ...(ws?.readonly === true ? { readOnly: true } : {}),
     remoteToolsOnly: claimed.remoteToolsOnly === true,
     telemetry,
     env: stepEnv.env,

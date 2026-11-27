@@ -955,6 +955,9 @@ export const EN: Record<string, string> = {
   路径不存在: 'Path not found',
   '不是 git 仓库': 'Not a git repository',
   需要绝对路径: 'Absolute path required',
+  '不能选择根目录、主目录或桌面/文稿/下载等系统文件夹':
+    'Root, home, Desktop, Documents, and Downloads folders cannot be selected',
+  路径不是文件夹: 'Path is not a folder',
   浏览: 'Browse',
   '此部署形态不支持系统对话框，请直接输入路径':
     'System folder dialog is unavailable in this deployment — type the path directly',
