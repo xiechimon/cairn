@@ -75,7 +75,7 @@ test('AGENTS.md Ship requires post-landing production verification (done = verif
   assert.match(ship, /cairn-server.*cairn-runner/);
   assert.match(ship, /git merge-base --is-ancestor <landed-sha> <deployed-sha>/);
   assert.match(ship, /agent-passage\.mjs health --target prod --expect-sha <landed-sha>/);
-  assert.match(ship, /agent-passage\.mjs top-journeys --target prod/);
+  assert.match(ship, /agent-passage\.mjs top-journeys --target prod --live/);
   assert.match(ship, /http:\/\/127\.0\.0\.1:8787\/app/);
   assert.match(ship, /archive or delete any synthetic verification project, task, or comment/i);
   assert.match(ship, /keep the verification evidence/i);

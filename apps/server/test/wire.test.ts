@@ -156,6 +156,7 @@ const INFERRED_ROUTES = [
   'GET /api/remote/devices',
   'DELETE /api/remote/devices/{id}',
   'POST /api/teams/{id}/chief/threads',
+  'GET /api/teams/{id}/chief/diagnostics',
   'POST /api/conversations/{id}/messages',
   'POST /api/teams/{id}/chief/threads/{tid}/rewind',
   'POST /api/teams/{id}/chief/threads/{tid}/retry-greeting/{stepId}',

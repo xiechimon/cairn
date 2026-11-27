@@ -616,17 +616,41 @@ export function isProdLocalHost(env = process.env, host = hostname()) {
   return shortHost !== '' && shortHost === targetHost;
 }
 
+export function formatRemoteSshCommand(cmd, args) {
+  if (cmd === 'node' && args[0] === '-e' && typeof args[1] === 'string') {
+    const b64 = Buffer.from(args[1], 'utf8').toString('base64');
+    return `node -e "eval(Buffer.from('${b64}','base64').toString('utf8'))"`;
+  }
+  if (cmd === 'python3' && args[0] === '-c' && typeof args[1] === 'string') {
+    const b64 = Buffer.from(args[1], 'utf8').toString('base64');
+    return `python3 -c "import base64;exec(base64.b64decode('${b64}').decode('utf-8'))"`;
+  }
+  const quote = (part) => `'${String(part).replace(/'/g, "'\\''")}'`;
+  return [cmd, ...args].map(quote).join(' ');
+}
+
 function runProdCommand(cmd, args, stdinJson, { env = process.env, spawnFn = spawnSync } = {}) {
   const local = isProdLocalHost(env);
   const sshHost = env.AGENT_PASSAGE_SSH_HOST ?? DEFAULT_PROD_SSH_HOST;
   const input = stdinJson === undefined ? undefined : JSON.stringify(stdinJson);
   const res = local
     ? spawnFn(cmd, args, { input, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
-    : spawnFn('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', sshHost, cmd, ...args], {
-        input,
-        encoding: 'utf8',
-        maxBuffer: 16 * 1024 * 1024,
-      });
+    : spawnFn(
+        'ssh',
+        [
+          '-o',
+          'BatchMode=yes',
+          '-o',
+          'ConnectTimeout=10',
+          sshHost,
+          formatRemoteSshCommand(cmd, args),
+        ],
+        {
+          input,
+          encoding: 'utf8',
+          maxBuffer: 16 * 1024 * 1024,
+        },
+      );
   if (res.error) throw res.error;
   if (res.status !== 0) {
     throw new Error(
@@ -1302,6 +1326,7 @@ export async function runComputerRun(client, opts, { cleanup = true } = {}) {
       buildId,
       stepId: finishedStep.id,
       machineId: finishedStep.machineId,
+      stepFinishedAt: finishedStep.finishedAt ?? Date.now(),
       traceId,
       langfusePath: langfuseObservationsPath(traceId),
       dbBuild: buildDb.rows[0],
@@ -1357,7 +1382,11 @@ export async function runChatResult(client, opts) {
             return (
               (opts.todoId && raw.includes(opts.todoId)) ||
               (opts.buildId && raw.includes(opts.buildId)) ||
-              (opts.chiefMessageId && m.createdAt >= (opts.sinceCreatedAt ?? 0))
+              (opts.stepFinishedAt && m.createdAt >= opts.stepFinishedAt) ||
+              (!opts.todoId &&
+                !opts.buildId &&
+                opts.chiefMessageId &&
+                m.createdAt >= (opts.sinceCreatedAt ?? 0))
             );
           }) ?? null;
         if (matchedMessage) break;
@@ -1542,6 +1571,7 @@ export async function runTopJourneys(client, opts) {
     );
     stages.push({ stage: 'computer-run', ok: comp.ok, result: comp });
     context.buildId = comp.buildId ?? context.buildId;
+    context.stepFinishedAt = comp.stepFinishedAt ?? null;
 
     const chat = await runChatResult(client, {
       ...opts,
@@ -1550,6 +1580,7 @@ export async function runTopJourneys(client, opts) {
       threadId: context.threadId,
       chiefMessageId: context.chiefMessageId,
       sinceCreatedAt: context.sinceCreatedAt,
+      stepFinishedAt: context.stepFinishedAt,
     });
     stages.push({ stage: 'chat-result', ok: chat.ok, result: chat });
   } catch (err) {

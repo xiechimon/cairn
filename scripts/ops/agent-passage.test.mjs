@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import {
   createTargetClient,
   evaluateDeployAlignment,
   evaluateHealth,
+  formatRemoteSshCommand,
   isProdLocalHost,
   langfuseObservationsPath,
   otlpTraceIdOfBuild,
@@ -326,7 +328,7 @@ test('evaluateHealth detects Coordinator core tool drop and post-restart local M
   assert.match(enrolledOffline.errors.join('\n'), /Own computer not ready/);
 });
 
-test('createTargetClient prod mode invokes ssh BatchMode without exposing token in args or output', async () => {
+test('createTargetClient prod mode invokes ssh BatchMode with shell-safe remote scripts and zero token leakage', async () => {
   const sshCalls = [];
   const client = await createTargetClient(
     { target: 'prod' },
@@ -334,16 +336,20 @@ test('createTargetClient prod mode invokes ssh BatchMode without exposing token 
       env: {},
       spawnFn: (cmd, args, opts) => {
         sshCalls.push({ cmd, args, input: opts.input });
-        if (cmd === 'ssh' && args.includes('node') && opts.input) {
-          return {
-            status: 0,
-            stdout: JSON.stringify({
-              status: 200,
-              data: { id: 'u1', displayName: 'Owner' },
-              text: '{}',
-            }),
-            stderr: '',
-          };
+        if (cmd === 'ssh') {
+          const remoteCmd = args.at(-1) ?? '';
+          assert.equal(remoteCmd.includes('\n'), false);
+          if (remoteCmd.startsWith('node -e ')) {
+            return {
+              status: 0,
+              stdout: JSON.stringify({
+                status: 200,
+                data: { id: 'u1', displayName: 'Owner' },
+                text: '{}',
+              }),
+              stderr: '',
+            };
+          }
         }
         return { status: 0, stdout: JSON.stringify({ ok: true, rows: [] }), stderr: '' };
       },
@@ -355,8 +361,22 @@ test('createTargetClient prod mode invokes ssh BatchMode without exposing token 
   assert.equal(sshCalls[0].cmd, 'ssh');
   assert.equal(sshCalls[0].args.includes('BatchMode=yes'), true);
   assert.equal(sshCalls[0].args.includes('macmini'), true);
-  assert.equal(sshCalls[0].args.join(' ').includes('.cairn-server'), true);
   assert.equal(JSON.parse(sshCalls[0].input).token, undefined);
+
+  const roundTripNode = formatRemoteSshCommand('node', [
+    '-e',
+    'const fs = require("node:fs"); console.log(JSON.stringify({ ok: Boolean(fs) }));',
+  ]);
+  const nodeOut = execFileSync('/bin/sh', ['-c', roundTripNode], { encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(nodeOut), { ok: true });
+
+  const roundTripPy = formatRemoteSshCommand('python3', [
+    '-c',
+    'import json; print(json.dumps({"ok": True}))',
+  ]);
+  const pyOut = execFileSync('/bin/sh', ['-c', roundTripPy], { encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(pyOut), { ok: true });
+
   assert.equal(isProdLocalHost({ AGENT_PASSAGE_PROD_LOCAL: '1' }, 'laptop'), true);
   assert.equal(isProdLocalHost({}, 'macmini.local'), true);
   assert.equal(isProdLocalHost({}, 'MacBook-Pro.local'), false);
