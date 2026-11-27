@@ -36,7 +36,17 @@ export default async function coordinatorTurnFailure({ window, mode, evidenceDir
     const input = window.getByTestId('chief-composer-input').first();
     await input.click();
     await window.keyboard.type(message);
+    const persisted = window.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        /\/api\/(teams\/[^/]+\/chief\/threads|conversations\/[^/]+\/messages)$/.test(
+          new URL(response.url()).pathname,
+        ) &&
+        response.ok(),
+      { timeout: 30_000 },
+    );
     await window.keyboard.press('Enter');
+    await persisted;
     await window.getByText(message, { exact: true }).first().waitFor({ timeout: 30_000 });
     if (mode === 'local-server') await assertFailureCard(window, provider);
     await window.reload();

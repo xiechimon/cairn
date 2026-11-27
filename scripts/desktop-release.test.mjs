@@ -332,9 +332,10 @@ test('the decide step diffs shipped sources against the paginated stable-release
 });
 
 test('the migration smoke downloads the previous release through the same query', () => {
-  const step = workflow.jobs.package.steps.find(
+  const step = workflow.jobs['verify-arm64-post-install'].steps.find(
     (entry) => entry.name === 'Download the previous release for the migration smoke',
   );
+  assert.ok(step);
   assert.match(step.run, /scripts\/ops\/last-desktop-release\.mjs/);
   assert.doesNotMatch(step.run, /gh release list|--limit/);
 });
@@ -817,8 +818,8 @@ test('the publish step stages a draft by its numeric id, uploads the assets and 
   const createCall = lines.slice(create, uploads[0]).join('\n');
   assert.match(createCall, /--jq \.id/, 'the numeric REST id is read off the create response');
   assert.deepEqual(
-    uploads.map((index) => /name=(\S+)/.exec(lines[index])[1]),
-    ASSETS,
+    uploads.map((index) => /name=(\S+)/.exec(lines[index])[1]).sort(),
+    [...ASSETS].sort(),
     'every asset lands on the numeric release id',
   );
   assert.ok(
@@ -1234,6 +1235,26 @@ test('both architectures are packaged in parallel and published only after both 
     'package-win',
     'package-linux',
     'live-verify',
+    'verify-arm64-smoke',
+    'verify-arm64-journeys',
+    'verify-arm64-post-install',
+  ]);
+  for (const jobName of ['package', 'package-win', 'package-linux']) {
+    assert.deepEqual(workflow.jobs[jobName].needs, ['decide']);
+  }
+  for (const jobName of [
+    'verify-arm64-smoke',
+    'verify-arm64-journeys',
+    'verify-arm64-post-install',
+  ]) {
+    assert.deepEqual(workflow.jobs[jobName].needs, ['decide', 'package']);
+    assert.equal(workflow.jobs[jobName].environment, undefined);
+    assert.equal(workflow.jobs[jobName].permissions, undefined);
+    assert.equal(workflow.jobs[jobName].env?.VERSION, `\${{ needs.decide.outputs.version }}`);
+  }
+  assert.deepEqual(workflow.jobs['verify-arm64-journeys'].strategy.matrix.mode, [
+    'local-server',
+    'remote-server',
   ]);
   assert.equal(workflow.jobs.publish.permissions.contents, 'write');
   assert.equal(workflow.jobs.package.permissions, undefined);

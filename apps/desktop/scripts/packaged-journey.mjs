@@ -15,26 +15,54 @@ import {
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { _electron as electron } from '@playwright/test';
 import { mainWindow } from './main-window.mjs';
 
-const [appPath, evidenceRoot = join(process.cwd(), 'release', 'packaged-journeys')] =
-  process.argv.slice(2);
-if (appPath === undefined) {
-  console.error('usage: node scripts/packaged-journey.mjs <Cairn.app> [evidence-dir]');
-  process.exit(2);
+const VALID_MODES = ['local-server', 'remote-server'];
+
+export function parsePackagedJourneyArgs(argv, cwd = process.cwd()) {
+  const positionals = [];
+  let selectedMode = null;
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--mode') {
+      const value = argv[i + 1];
+      if (!value || !VALID_MODES.includes(value)) {
+        throw new Error(`unknown packaged journey mode: ${value ?? 'missing'}`);
+      }
+      selectedMode = value;
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith('--mode=')) {
+      const value = arg.slice('--mode='.length);
+      if (!VALID_MODES.includes(value)) {
+        throw new Error(`unknown packaged journey mode: ${value}`);
+      }
+      selectedMode = value;
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      throw new Error(`unknown option: ${arg}`);
+    }
+    positionals.push(arg);
+  }
+  const [appPath, evidenceRoot = join(cwd, 'release', 'packaged-journeys')] = positionals;
+  if (appPath === undefined) {
+    throw new Error(
+      'usage: node scripts/packaged-journey.mjs <Cairn.app> [evidence-dir] [--mode <local-server|remote-server>]',
+    );
+  }
+  return {
+    appPath,
+    evidenceRoot,
+    modes: selectedMode === null ? [...VALID_MODES] : [selectedMode],
+  };
 }
+
 const PAIRING_SETTLE_TIMEOUT_MS = 10_000;
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const { journeys } = JSON.parse(
-  readFileSync(join(REPO_ROOT, '.claude/skills/verify-cairn/packaged-journeys.json'), 'utf8'),
-);
-const appRoot = existsSync(appPath) ? realpathSync(resolve(appPath)) : resolve(appPath);
-if (appRoot.startsWith('/Applications/')) {
-  console.error(`refusing to run packaged journeys against an installed app: ${appRoot}`);
-  process.exit(2);
-}
-mkdirSync(evidenceRoot, { recursive: true });
 
 function freePort() {
   return new Promise((resolvePort, reject) => {
@@ -180,18 +208,18 @@ async function assertNoPairingRequestLeft(window) {
     .waitFor({ state: 'detached', timeout: PAIRING_SETTLE_TIMEOUT_MS });
 }
 
-function disposableCopy() {
+function disposableCopy(appRoot) {
   const copy = join(mkdtempSync(join(tmpdir(), 'cairn-journey-app-')), 'Cairn.app');
   execFileSync('/usr/bin/ditto', [appRoot, copy]);
   return realpathSync(copy);
 }
 
-async function launch(userData) {
+async function launch(userData, appRoot) {
   const home = mkdtempSync(join(tmpdir(), 'cairn-journey-home-'));
   const env = { ...process.env, HOME: home, CAIRN_SMOKE_ISOLATED_SESSION: '1' };
   delete env.CAIRN_HOME;
   const app = await electron.launch({
-    executablePath: join(disposableCopy(), 'Contents', 'MacOS', 'Cairn'),
+    executablePath: join(disposableCopy(appRoot), 'Contents', 'MacOS', 'Cairn'),
     args: [`--user-data-dir=${userData}`],
     timeout: 120_000,
     env,
@@ -220,38 +248,62 @@ async function close(app) {
   }
 }
 
-for (const mode of ['local-server', 'remote-server']) {
-  for (const [id, journey] of Object.entries(journeys)) {
-    if (!journey.modes.includes(mode)) continue;
-    const { default: walk } = await import(`./journeys/${id}.mjs`);
-    const evidenceDir = join(evidenceRoot, mode, id);
-    mkdirSync(evidenceDir, { recursive: true });
-    const remote =
-      mode === 'remote-server'
-        ? await startRemoteServer(
-            evidenceDir,
-            join(appRoot, 'Contents', 'Resources', 'server', 'web'),
-          )
-        : null;
-    const userData = mkdtempSync(join(tmpdir(), `cairn-packaged-${mode}-`));
-    if (remote !== null) seedRemoteConnection(userData, remote.url);
-    const running = await launch(userData);
-    try {
-      const { origin } = new URL(running.window.url());
-      if (remote !== null) {
-        assert.equal(origin, remote.url, 'the packaged app did not connect to the remote server');
-        await signInToRemote(running.window, remote.token);
+async function main(argv) {
+  let options;
+  try {
+    options = parsePackagedJourneyArgs(argv);
+  } catch (error) {
+    console.error(error.message);
+    process.exit(2);
+  }
+  const { appPath, evidenceRoot, modes } = options;
+  const { journeys } = JSON.parse(
+    readFileSync(join(REPO_ROOT, '.claude/skills/verify-cairn/packaged-journeys.json'), 'utf8'),
+  );
+  const appRoot = existsSync(appPath) ? realpathSync(resolve(appPath)) : resolve(appPath);
+  if (appRoot.startsWith('/Applications/')) {
+    console.error(`refusing to run packaged journeys against an installed app: ${appRoot}`);
+    process.exit(2);
+  }
+  mkdirSync(evidenceRoot, { recursive: true });
+
+  for (const mode of modes) {
+    for (const [id, journey] of Object.entries(journeys)) {
+      if (!journey.modes.includes(mode)) continue;
+      const { default: walk } = await import(`./journeys/${id}.mjs`);
+      const evidenceDir = join(evidenceRoot, mode, id);
+      mkdirSync(evidenceDir, { recursive: true });
+      const remote =
+        mode === 'remote-server'
+          ? await startRemoteServer(
+              evidenceDir,
+              join(appRoot, 'Contents', 'Resources', 'server', 'web'),
+            )
+          : null;
+      const userData = mkdtempSync(join(tmpdir(), `cairn-packaged-${mode}-`));
+      if (remote !== null) seedRemoteConnection(userData, remote.url);
+      const running = await launch(userData, appRoot);
+      try {
+        const { origin } = new URL(running.window.url());
+        if (remote !== null) {
+          assert.equal(origin, remote.url, 'the packaged app did not connect to the remote server');
+          await signInToRemote(running.window, remote.token);
+        }
+        await walk({ window: running.window, mode, evidenceDir });
+        console.log(`[packaged-journey] ${id} passed in ${mode} against ${origin}`);
+      } catch (error) {
+        await captureFailure(running.window, evidenceDir, mode, running.logs);
+        throw error;
+      } finally {
+        await close(running.app);
+        if (remote !== null) await stopServer(remote.child);
       }
-      await walk({ window: running.window, mode, evidenceDir });
-      console.log(`[packaged-journey] ${id} passed in ${mode} against ${origin}`);
-    } catch (error) {
-      await captureFailure(running.window, evidenceDir, mode, running.logs);
-      throw error;
-    } finally {
-      await close(running.app);
-      if (remote !== null) await stopServer(remote.child);
     }
   }
+
+  process.exit(0);
 }
 
-process.exit(0);
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  await main(process.argv.slice(2));
+}
