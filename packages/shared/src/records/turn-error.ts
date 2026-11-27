@@ -17,6 +17,7 @@ export const TURN_ERROR_KINDS = [
   'busy',
   'timeout',
   'provider',
+  'disk',
   'unknown',
 ] as const;
 export type TurnErrorKind = (typeof TURN_ERROR_KINDS)[number];
@@ -29,6 +30,7 @@ const RULES: readonly [TurnErrorKind, Pick<RegExp, 'test'>][] = [
   ],
   ['turn-limit', /\bturn_limit\b/i],
   ['runtime-update', RUNTIME_UPDATE_REQUIRED_RE],
+  ['disk', /\bENOSPC\b|no space left on device|insufficient (?:free )?disk space|disk full/i],
   ['connect', new RegExp(`NECP|${CONNECTION_FAILURE_RE.source}`, 'i')],
   ['key', /\b401\b|(invalid|incorrect).{0,20}api key|unauthorized|authentication_error/i],
   [

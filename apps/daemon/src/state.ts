@@ -12,7 +12,7 @@ import {
   modelSourceModelSchema,
 } from '@cairn/shared';
 import { z } from 'zod';
-import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
+import { ensurePrivateDir, sweepStalePrivateTemps, writePrivateFile } from './private-fs.js';
 
 export interface StatePaths {
   home: string;
@@ -60,6 +60,7 @@ export function ensureStateDirs(paths: StatePaths): void {
     paths.credsDir,
   ]) {
     ensurePrivateDir(dir);
+    sweepStalePrivateTemps(dir);
   }
   const temporaryRoot = join(paths.home, `workspace-root-${randomBytes(16).toString('hex')}.tmp`);
   try {

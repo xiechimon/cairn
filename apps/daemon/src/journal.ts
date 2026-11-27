@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep, MachineDoneBody, StepKind, TranscriptUpload } from '@cairn/shared';
-import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
+import { ensurePrivateDir, sweepStalePrivateTemps, writePrivateFile } from './private-fs.js';
 import type { StopRequest } from './step-stops.js';
 
 const STEP_OUTBOX_SUFFIXES = ['.transcript.json', '.session.jsonl'];
@@ -114,11 +114,12 @@ export class StepJournal {
     for (const suffix of STEP_OUTBOX_SUFFIXES)
       rmSync(join(this.dir, `step-${stepId}${suffix}`), { force: true });
     rmSync(join(this.dir, `step-${stepId}.deliverables`), { recursive: true, force: true });
+    sweepStalePrivateTemps(this.dir, { targetPrefix: `step-${stepId}.` });
   }
 
   sweepOrphanFiles(input: { now: number; ttlMs: number }): string[] {
     if (!existsSync(this.dir)) return [];
-    const removed: string[] = [];
+    const removed = sweepStalePrivateTemps(this.dir, { now: input.now, ttlMs: input.ttlMs });
     for (const name of readdirSync(this.dir)) {
       const match = STEP_OUTBOX_FILE.exec(name);
       const stepId = match?.[1];

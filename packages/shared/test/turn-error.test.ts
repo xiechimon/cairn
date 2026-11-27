@@ -41,6 +41,15 @@ describe('turnErrorKind names the failure from the stored raw text', () => {
       'API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required',
       'runtime-update',
     ],
+    [
+      "Runner error: ENOSPC: no space left on device, open '/Users/ian/.cairn/outbox/step-nhbLwXygr3-lP6fumcD36.json'",
+      'disk',
+    ],
+    [
+      "Runner error: ENOSPC: no space left on device, open '/Users/ian/.cairn/outbox/.step-nhbLwXygr3.json.404.500.tmp'",
+      'disk',
+    ],
+    ['Coordinator turn ended: model_error "ENOSPC: no space left on device"', 'disk'],
     ['Coordinator turn has no answer entry', 'unknown'],
   ])('%s', (message, kind) => {
     expect(turnErrorKind(message)).toBe(kind);

@@ -196,4 +196,24 @@ describe('outbox step files follow the journal entry', () => {
     expect(files(dir, 'journaled')).toHaveLength(2);
     expect(existsSync(join(dir, 'step-journaled.json'))).toBe(true);
   });
+
+  test('sweep reclaims fresh dead-writer temp files left by a killed daemon during recovery', () => {
+    const dir = tmp();
+    const j = new StepJournal(dir);
+    claim(j, 'recover-me');
+    seedFiles(dir, 'recover-me');
+    const deadPid = 999_999_999;
+    const crashedTemp = `.step-recover-me.transcript.json.${deadPid}.0.tmp`;
+    const liveTemp = `.step-recover-me.transcript.json.${process.pid}.1.tmp`;
+    writeFileSync(join(dir, crashedTemp), 'large truncated transcript');
+    writeFileSync(join(dir, liveTemp), 'active transcript write');
+
+    const removed = j.sweepOrphanFiles({ now: Date.now(), ttlMs: 60_000 });
+
+    expect(removed).toEqual([crashedTemp]);
+    expect(existsSync(join(dir, crashedTemp))).toBe(false);
+    expect(existsSync(join(dir, liveTemp))).toBe(true);
+    expect(existsSync(join(dir, 'step-recover-me.json'))).toBe(true);
+    expect(existsSync(join(dir, 'step-recover-me.transcript.json'))).toBe(true);
+  });
 });

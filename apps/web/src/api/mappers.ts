@@ -1827,6 +1827,14 @@ export function turnErrorCopy(error: TurnErrorFacts, onMac: boolean): TurnErrorC
         'Coordinator 连续执行了很多步仍未完成，已暂停。点击「继续」让它继续执行。',
         ['continue'],
       );
+    case 'disk':
+      return /^Runner error:/i.test(error.message)
+        ? copy('执行机磁盘已满', 'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。', [
+            'retry',
+          ])
+        : copy('磁盘空间不足', '运行环境磁盘空间不足，无法继续写入。清理对应设备空间后再重试。', [
+            'retry',
+          ]);
     case 'unknown':
       return copy(
         '这一轮没有完成',

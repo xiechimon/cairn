@@ -1478,6 +1478,12 @@ export const EN: Record<string, string> = {
   以后再说: 'Not now',
 
   '搜索记忆…': 'Search memories…',
+  执行机磁盘已满: 'The Runner disk is full',
+  'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。':
+    'Cairn could not write this turn’s local record. Free disk space on that Runner, then retry.',
+  磁盘空间不足: 'Not enough disk space',
+  '运行环境磁盘空间不足，无法继续写入。清理对应设备空间后再重试。':
+    'The execution environment ran out of disk space and could not write files. Free disk space there, then retry.',
   这一轮没有完成: 'This turn did not finish',
   '排队中：等电脑就绪': 'Queued: waiting for the computer',
   '排队中：等执行机上线': 'Queued: waiting for a Runner to come online',
