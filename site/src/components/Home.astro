@@ -1,4 +1,6 @@
 ---
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import '../styles/fonts.css';
 import '../styles/tokens.css';
 import Mark from './Mark.astro';
@@ -11,7 +13,14 @@ interface Props {
 const { lang } = Astro.props;
 const t = copy[lang];
 const site = 'https://cairn.xmon.me';
-const shot = (name: string, theme: 'light' | 'dark') => `/img/${name}-${lang}-${theme}.webp`;
+const hasPromoVideo =
+  existsSync(resolve(process.cwd(), 'public/media/promo.mp4')) ||
+  existsSync(resolve(process.cwd(), 'site/public/media/promo.mp4'));
+const heroShot = (theme: 'light' | 'dark') => `/img/placeholder-hero-${theme}.svg`;
+const stepShot = (name: string, theme: 'light' | 'dark') =>
+  name === 'ios-home'
+    ? `/img/placeholder-ios-home-${theme}.svg`
+    : `/img/placeholder-thread-${theme}.svg`;
 const stepSize: Record<string, [number, number]> = {
   'ios-home': [880, 1912],
   work: [780, 1520],
@@ -28,10 +37,10 @@ const jsonLd = {
       url: `${site}${t.home}`,
       inLanguage: t.htmlLang,
       applicationCategory: 'DeveloperApplication',
-      operatingSystem: 'Linux, macOS, Windows',
-      softwareRequirements: 'Node.js 22 or 24',
-      installUrl: `${site}${t.install}`,
-      downloadUrl: 'https://www.npmjs.com/package/@xiechimon/cairn',
+      operatingSystem: 'macOS, Windows, Linux',
+      softwareRequirements: 'macOS, Windows, or Linux (or Node.js 22/24 for headless self-hosting)',
+      installUrl: `${site}${t.installHref}`,
+      downloadUrl: links.releases,
       license: 'https://www.apache.org/licenses/LICENSE-2.0',
       isAccessibleForFree: true,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -98,6 +107,7 @@ const jsonLd = {
     </script>
   </head>
   <body>
+    <a class="skip-link" href="#main">{t.skipToContent}</a>
     <svg class="defs" width="0" height="0" aria-hidden="true">
       <filter id="ink-specks" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
         <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="1" seed="5" result="noise"></feTurbulence>
@@ -117,30 +127,38 @@ const jsonLd = {
         <Mark size={24} />
         <span>Cairn</span>
       </a>
-      <nav class="nav-links" aria-label="Cairn">
+      <nav class="nav-links" aria-label={t.navLabel}>
         <a href={t.docs}>{t.nav.docs}</a>
         <a href={links.repo} class="gh">{t.nav.github}</a>
         <a href={t.other.href} class="lang" data-lang={lang === 'zh' ? 'en' : 'zh'} hreflang={lang === 'zh' ? 'en' : 'zh-CN'} title={t.other.name}>{t.other.label}</a>
-        <button type="button" class="icon-btn" id="theme-toggle" aria-label={t.nav.theme} title={t.nav.theme}>
+        <button
+          type="button"
+          class="icon-btn"
+          id="theme-toggle"
+          aria-label={t.nav.theme}
+          title={t.nav.theme}
+          data-to-dark={t.nav.themeToDark}
+          data-to-light={t.nav.themeToLight}
+        >
           <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
           <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path></svg>
         </button>
       </nav>
     </header>
 
-    <main>
+    <main id="main">
       <section class="hero wrap">
         <div class="hero-text">
         <h1>{t.h1.map((line) => <span>{line}</span>)}</h1>
         <p class="lede">{t.lede}</p>
         <div class="actions">
-          <a class="btn primary" href={t.install}>
+          <a class="btn primary" href={links.releases}>
             {t.start}
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
           </a>
           <div class="cmd" data-copy="npx @xiechimon/cairn">
             <code><span class="prompt" aria-hidden="true">$</span>npx @xiechimon/cairn</code>
-            <button type="button" class="copy" aria-label={t.copy} data-label={t.copy} data-done={t.copied}>
+            <button type="button" class="copy" aria-label={t.copy} title={t.copy} data-label={t.copy} data-done={t.copied}>
               <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
               <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
             </button>
@@ -150,15 +168,15 @@ const jsonLd = {
         <div class="hero-spiral" aria-hidden="true">
           <svg viewBox="-105 -105 210 210">
             <g filter="url(#ink)">
-              <path class="spiral" pathLength="1" d="M-7 0 A7 7 0 0 1 7 0 A22 22 0 0 1 -37 0 A37 37 0 0 1 37 0 A52 52 0 0 1 -67 0 A67 67 0 0 1 67 0 A82 82 0 0 1 47.816 52.709"></path>
+              <path class="spiral" d="M-7 0 A7 7 0 0 1 7 0 A22 22 0 0 1 -37 0 A37 37 0 0 1 37 0 A52 52 0 0 1 -67 0 A67 67 0 0 1 67 0 A82 82 0 0 1 47.816 52.709"></path>
             </g>
           </svg>
         </div>
       </section>
 
       <figure class="hero-shot wrap" id="hero-shot">
-        <img class="for-light" src={shot('hero', 'light')} width="2400" height="1116" alt={t.heroAlt} fetchpriority="high" />
-        <img class="for-dark" src={shot('hero', 'dark')} width="2400" height="1116" alt={t.heroAlt} loading="lazy" />
+        <img class="for-light" src={heroShot('light')} width="2400" height="1116" alt={t.heroAlt} fetchpriority="high" />
+        <img class="for-dark" src={heroShot('dark')} width="2400" height="1116" alt={t.heroAlt} fetchpriority="high" />
       </figure>
 
       <section class="section wrap" aria-labelledby="how">
@@ -173,8 +191,8 @@ const jsonLd = {
               return (
                 <li>
                   <div class="phone">
-                    <img class="for-light" src={shot(step.img, 'light')} width={w} height={h} alt={step.alt} loading="lazy" />
-                    <img class="for-dark" src={shot(step.img, 'dark')} width={w} height={h} alt={step.alt} loading="lazy" />
+                    <img class="for-light" src={stepShot(step.img, 'light')} width={w} height={h} alt={step.alt} loading="lazy" decoding="async" />
+                    <img class="for-dark" src={stepShot(step.img, 'dark')} width={w} height={h} alt={step.alt} loading="lazy" decoding="async" />
                   </div>
                   <span class="num">{String(index + 1).padStart(2, '0')}</span>
                   <h3>{step.title}</h3>
@@ -235,9 +253,9 @@ const jsonLd = {
         </div>
       </section>
 
-      <section class="section wrap">
+      <section class="section wrap" aria-labelledby="selling">
         <div class="selling">
-          <h2>{t.selling.title}</h2>
+          <h2 id="selling">{t.selling.title}</h2>
           <p>{t.selling.body}</p>
         </div>
       </section>
@@ -257,7 +275,7 @@ const jsonLd = {
                 {step.code && (
                   <div class="block" data-copy={step.code}>
                     <pre><code>{step.code}</code></pre>
-                    <button type="button" class="copy" aria-label={t.copy} data-label={t.copy} data-done={t.copied}>
+                    <button type="button" class="copy" aria-label={t.copy} title={t.copy} data-label={t.copy} data-done={t.copied}>
                       <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
                       <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
                     </button>
@@ -268,11 +286,11 @@ const jsonLd = {
           }
         </ol>
         <div class="actions">
-          <a class="btn primary" href={t.install}>
+          <a class="btn primary" href={links.releases}>
             {t.install.more}
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
           </a>
-          <a class="btn ghost" href={t.firstTask}>{t.install.first}</a>
+          <a class="btn ghost" href={t.installHref}>{t.install.first}</a>
         </div>
       </section>
     </main>
@@ -285,7 +303,7 @@ const jsonLd = {
         </a>
         <p>{t.footer.tagline}</p>
       </div>
-      <nav class="foot-links" aria-label="Footer">
+      <nav class="foot-links" aria-label={t.footerNavLabel}>
         <a href={t.docs}>{t.footer.docs}</a>
         <a href={links.repo}>GitHub</a>
         <a href={links.discussions}>{t.footer.discussions}</a>
@@ -294,40 +312,83 @@ const jsonLd = {
         <a href={links.license}>{t.footer.license}</a>
       </nav>
     </footer>
+    <span class="sr-only" aria-live="polite" id="live-status"></span>
 
-    <script>
+    <script is:inline define:vars={{ hasPromoVideo }}>
       const root = document.documentElement;
-      document.getElementById('theme-toggle')?.addEventListener('click', () => {
+      const themeToggle = document.getElementById('theme-toggle');
+      const syncThemeLabel = () => {
+        if (!themeToggle) return;
+        const nextLabel =
+          root.dataset.theme === 'dark' ? themeToggle.dataset.toLight : themeToggle.dataset.toDark;
+        if (nextLabel) {
+          themeToggle.setAttribute('aria-label', nextLabel);
+          themeToggle.setAttribute('title', nextLabel);
+        }
+      };
+      syncThemeLabel();
+      themeToggle?.addEventListener('click', () => {
         const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
         root.dataset.theme = next;
+        syncThemeLabel();
         try {
           localStorage.setItem('starlight-theme', next);
         } catch {}
       });
-      document.querySelectorAll<HTMLAnchorElement>('a.lang').forEach((link) => {
+      document.querySelectorAll('a.lang').forEach((link) => {
         link.addEventListener('click', () => {
           try {
             localStorage.setItem('cairn-lang', link.dataset.lang ?? '');
           } catch {}
         });
       });
-      document.querySelectorAll<HTMLElement>('[data-copy]').forEach((box) => {
-        const button = box.querySelector<HTMLButtonElement>('button.copy');
+      const liveStatus = document.getElementById('live-status');
+      const writeClipboard = async (text) => {
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+          }
+        } catch {}
+        try {
+          const area = document.createElement('textarea');
+          area.value = text;
+          area.setAttribute('readonly', '');
+          area.style.position = 'fixed';
+          area.style.opacity = '0';
+          document.body.appendChild(area);
+          area.select();
+          const ok = document.execCommand('copy');
+          area.remove();
+          return ok;
+        } catch {
+          return false;
+        }
+      };
+      document.querySelectorAll('[data-copy]').forEach((box) => {
+        const button = box.querySelector('button.copy');
+        let resetTimer;
         button?.addEventListener('click', async () => {
-          await navigator.clipboard.writeText(box.dataset.copy ?? '');
+          const ok = await writeClipboard(box.dataset.copy ?? '');
+          if (!ok) return;
+          clearTimeout(resetTimer);
           button.classList.add('done');
-          button.setAttribute('aria-label', button.dataset.done ?? '');
-          setTimeout(() => {
+          const doneLabel = button.dataset.done ?? '';
+          button.setAttribute('aria-label', doneLabel);
+          button.setAttribute('title', doneLabel);
+          if (liveStatus) liveStatus.textContent = doneLabel;
+          resetTimer = setTimeout(() => {
             button.classList.remove('done');
-            button.setAttribute('aria-label', button.dataset.label ?? '');
+            const baseLabel = button.dataset.label ?? '';
+            button.setAttribute('aria-label', baseLabel);
+            button.setAttribute('title', baseLabel);
           }, 1600);
         });
       });
-      const figure = document.getElementById('hero-shot');
-      fetch('/media/promo.mp4', { method: 'HEAD' })
-        .then((response) => {
-          if (!figure || !response.ok || !(response.headers.get('content-type') ?? '').startsWith('video')) return;
-          const poster = figure.querySelector<HTMLImageElement>(`img.for-${root.dataset.theme}`);
+      if (hasPromoVideo) {
+        const figure = document.getElementById('hero-shot');
+        if (figure) {
+          const poster = figure.querySelector(`img.for-${root.dataset.theme}`);
           const video = document.createElement('video');
           video.src = '/media/promo.mp4';
           video.controls = true;
@@ -336,8 +397,24 @@ const jsonLd = {
           if (poster) video.poster = poster.currentSrc || poster.src;
           figure.prepend(video);
           figure.classList.add('has-video');
-        })
-        .catch(() => {});
+        }
+      }
+      const spiralPath = document.querySelector('.hero-spiral .spiral');
+      if (spiralPath instanceof SVGGeometryElement && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const len = Math.ceil(spiralPath.getTotalLength());
+        spiralPath.style.strokeDasharray = `${len} ${len}`;
+        const anim = spiralPath.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], {
+          duration: 1600,
+          easing: 'cubic-bezier(0.45, 0.05, 0.3, 1)',
+          fill: 'forwards',
+        });
+        anim.finished
+          .then(() => {
+            spiralPath.style.strokeDasharray = '';
+            anim.cancel();
+          })
+          .catch(() => {});
+      }
     </script>
   </body>
 </html>
@@ -363,6 +440,13 @@ const jsonLd = {
     font-size: 16px;
     line-height: 1.6;
   }
+  code,
+  pre {
+    font-family: var(--font-mono);
+  }
+  figure {
+    margin: 0;
+  }
   a {
     color: inherit;
   }
@@ -379,6 +463,33 @@ const jsonLd = {
     outline: 2.4px solid var(--accent);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .skip-link {
+    position: fixed;
+    top: -100px;
+    left: 16px;
+    z-index: 100;
+    padding: 8px 16px;
+    border-radius: var(--radius-control);
+    background: var(--primary);
+    color: var(--on-primary);
+    font-size: 14px;
+    font-weight: 400;
+    text-decoration: none;
+  }
+  .skip-link:focus-visible {
+    top: 16px;
   }
 </style>
 
@@ -400,10 +511,12 @@ const jsonLd = {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    min-height: 36px;
+    padding: 4px 0;
     text-decoration: none;
     color: var(--ink);
     font-family: var(--font-serif);
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 500;
     line-height: 1;
   }
@@ -413,6 +526,9 @@ const jsonLd = {
     gap: 4px;
   }
   .nav-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
     padding: 8px 12px;
     border-radius: var(--radius-control);
     color: var(--ink-2);
@@ -429,6 +545,7 @@ const jsonLd = {
     place-items: center;
     width: 36px;
     height: 36px;
+    padding: 0;
     border: 0;
     border-radius: var(--radius-control);
     background: none;
@@ -456,6 +573,9 @@ const jsonLd = {
     padding-top: 88px;
     text-align: center;
   }
+  .hero-text {
+    min-width: 0;
+  }
   h1 {
     max-width: 900px;
     margin: 0 auto;
@@ -473,7 +593,6 @@ const jsonLd = {
   }
   :lang(zh-CN) h1 {
     max-width: 820px;
-    font-size: clamp(2.25rem, 5.2vw, 3.75rem);
     font-weight: 500;
     line-height: 1.2;
   }
@@ -484,9 +603,7 @@ const jsonLd = {
     font-size: 18px;
     line-height: 1.65;
     text-wrap: pretty;
-  }
-  :lang(zh-CN) .lede {
-    word-break: keep-all;
+    overflow-wrap: break-word;
   }
   .actions {
     display: flex;
@@ -501,9 +618,9 @@ const jsonLd = {
     align-items: center;
     gap: 8px;
     height: 44px;
-    padding: 0 18px;
+    padding: 0 20px;
     border-radius: var(--radius-control);
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 500;
     text-decoration: none;
     white-space: nowrap;
@@ -515,8 +632,6 @@ const jsonLd = {
   .btn.primary {
     background: var(--primary);
     color: var(--on-primary);
-  }
-  .btn.primary {
     position: relative;
     isolation: isolate;
   }
@@ -543,8 +658,8 @@ const jsonLd = {
   .cmd {
     display: inline-flex;
     align-items: center;
-    height: 44px;
-    padding: 0 6px 0 16px;
+    min-height: 44px;
+    padding: 0 4px 0 16px;
     border-radius: var(--radius-control);
     background: var(--card);
     box-shadow: inset 0 0 0 1px var(--line);
@@ -555,7 +670,7 @@ const jsonLd = {
     color: var(--ink);
   }
   .prompt {
-    margin-right: 10px;
+    margin-right: 8px;
     color: var(--ink-4);
     user-select: none;
   }
@@ -564,6 +679,7 @@ const jsonLd = {
     place-items: center;
     width: 32px;
     height: 32px;
+    padding: 0;
     margin-left: 8px;
     border: 0;
     border-radius: 6px;
@@ -585,7 +701,7 @@ const jsonLd = {
   }
   .copy.done .i-check {
     display: block;
-    color: var(--running);
+    color: var(--running-ink);
   }
 
   .defs {
@@ -629,21 +745,6 @@ const jsonLd = {
   }
   .hero-spiral .spiral {
     stroke-width: 9;
-    stroke-dasharray: 1 1;
-    animation: spiral-draw 1.6s cubic-bezier(0.45, 0.05, 0.3, 1) both;
-  }
-  @keyframes spiral-draw {
-    from {
-      stroke-dashoffset: 1;
-    }
-    to {
-      stroke-dashoffset: 0;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .hero-spiral .spiral {
-      animation: none;
-    }
   }
 
   .hero-shot {
@@ -673,7 +774,7 @@ const jsonLd = {
   h2 {
     margin: 0;
     font-family: var(--font-serif);
-    font-size: clamp(1.875rem, 3.4vw, 2.5rem);
+    font-size: clamp(1.75rem, 3.4vw, 2.5rem);
     font-weight: 400;
     line-height: 1.15;
   }
@@ -681,13 +782,13 @@ const jsonLd = {
     font-weight: 500;
   }
   .section-head p {
-    margin: 14px 0 0;
+    margin: 16px 0 0;
     color: var(--ink-2);
-    font-size: 17px;
+    font-size: 18px;
   }
   h3 {
     margin: 0;
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 600;
     line-height: 1.4;
   }
@@ -697,6 +798,8 @@ const jsonLd = {
     color: var(--ink-3);
     font-family: var(--font-mono);
     font-size: 13px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
   }
 
   .steps {
@@ -706,6 +809,12 @@ const jsonLd = {
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+  .steps li,
+  .points li,
+  .fit > div,
+  .install li {
+    min-width: 0;
   }
   .phone {
     display: flex;
@@ -728,7 +837,7 @@ const jsonLd = {
   .install p {
     margin: 8px 0 0;
     color: var(--ink-2);
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.65;
   }
 
@@ -747,13 +856,14 @@ const jsonLd = {
   .tag {
     display: inline-block;
     margin-left: 8px;
-    padding: 1px 8px;
+    padding: 0 8px;
     border-radius: 999px;
     background: var(--secondary);
     color: var(--ink-2);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
-    vertical-align: 2px;
+    line-height: 20px;
+    vertical-align: 1px;
   }
 
   .fit {
@@ -771,17 +881,17 @@ const jsonLd = {
   }
   .marks li {
     position: relative;
-    padding: 14px 0 14px 32px;
+    padding: 16px 0 16px 32px;
     border-top: 1px solid var(--line);
     color: var(--ink-2);
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.6;
   }
   .marks li::before {
     content: "";
     position: absolute;
-    top: 18px;
-    left: 2px;
+    top: 20px;
+    left: 0;
     width: 16px;
     height: 16px;
     background: currentColor;
@@ -789,7 +899,7 @@ const jsonLd = {
     mask: var(--glyph) center / contain no-repeat;
   }
   .marks.yes li::before {
-    color: var(--running);
+    color: var(--running-ink);
     --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
   }
   .marks.no li::before {
@@ -798,12 +908,15 @@ const jsonLd = {
   }
   .alt {
     display: block;
-    margin-top: 2px;
+    margin-top: 4px;
     color: var(--ink-3);
     font-size: 14px;
   }
   .alt a {
-    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    color: var(--accent-ink);
     text-underline-offset: 0.2em;
   }
 
@@ -818,9 +931,9 @@ const jsonLd = {
   }
   .selling p {
     max-width: 620px;
-    margin: 18px auto 0;
+    margin: 16px auto 0;
     color: var(--ink-2);
-    font-size: 17px;
+    font-size: 18px;
     line-height: 1.7;
   }
 
@@ -840,6 +953,7 @@ const jsonLd = {
   }
   .block {
     position: relative;
+    min-width: 0;
     margin-top: 16px;
     border-radius: var(--radius-card);
     background: var(--card);
@@ -847,12 +961,15 @@ const jsonLd = {
   }
   .block pre {
     margin: 0;
-    padding: 14px 48px 14px 16px;
+    padding: 16px 48px 16px 16px;
     overflow-x: auto;
     font-family: var(--font-mono);
-    font-size: 13.5px;
+    font-size: 14px;
     line-height: 1.7;
     color: var(--ink);
+  }
+  .block code {
+    font-family: var(--font-mono);
   }
   .block .copy {
     position: absolute;
@@ -889,6 +1006,10 @@ const jsonLd = {
     font-size: 14px;
   }
   .foot-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 0;
     color: var(--ink-2);
     text-decoration: none;
   }
@@ -896,6 +1017,44 @@ const jsonLd = {
     color: var(--ink);
     text-decoration: underline;
     text-underline-offset: 0.2em;
+  }
+
+  @media (pointer: coarse) {
+    .brand {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .nav-links a {
+      min-width: 44px;
+      min-height: 44px;
+      justify-content: center;
+    }
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+    }
+    .cmd {
+      padding: 0 0 0 16px;
+    }
+    .copy {
+      width: 44px;
+      height: 44px;
+    }
+    .block pre {
+      padding: 16px 56px 16px 16px;
+    }
+    .block .copy {
+      top: 4px;
+      right: 4px;
+    }
+    .alt a {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .foot-links a {
+      min-width: 44px;
+      min-height: 44px;
+    }
   }
 
   @media (max-width: 900px) {
@@ -922,24 +1081,34 @@ const jsonLd = {
     .wrap {
       padding: 0 16px;
     }
+    .brand {
+      min-width: 44px;
+      min-height: 44px;
+    }
     .nav-links .gh {
       display: none;
     }
     .nav-links a {
-      padding: 8px 10px;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px 12px;
+      justify-content: center;
+    }
+    .icon-btn {
+      width: 44px;
+      height: 44px;
     }
     .hero {
       padding-top: 48px;
     }
-    .lede {
+    .lede,
+    .section-head p,
+    .selling p {
       font-size: 16px;
-    }
-    :lang(zh-CN) h1 {
-      font-size: 1.875rem;
     }
     h2,
     :lang(zh-CN) h2 {
-      font-size: 1.625rem;
+      font-size: 1.75rem;
     }
     .actions {
       flex-direction: column;
@@ -948,6 +1117,28 @@ const jsonLd = {
     .btn,
     .cmd {
       justify-content: center;
+    }
+    .cmd {
+      padding: 0 0 0 16px;
+    }
+    .copy {
+      width: 44px;
+      height: 44px;
+    }
+    .block pre {
+      padding: 16px 56px 16px 16px;
+    }
+    .block .copy {
+      top: 4px;
+      right: 4px;
+    }
+    .alt a {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .foot-links a {
+      min-width: 44px;
+      min-height: 44px;
     }
     .hero-shot {
       margin-top: 40px;

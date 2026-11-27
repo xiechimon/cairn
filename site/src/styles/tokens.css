@@ -3,7 +3,7 @@
     "instrumentSans", "instrumentSans Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   --font-serif:
-    "sourceSerif4", Georgia, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
+    "sourceSerif4", "sourceSerif4 Fallback", Georgia, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
   --font-mono: "jetbrainsMono", "jetbrainsMono Fallback", ui-monospace, Menlo, Monaco, Consolas, monospace;
 
   --radius-control: 8px;
@@ -14,7 +14,7 @@
   --sheet: #ecebe6;
   --card: #e5e4df;
   --secondary: #e0dfda;
-  --hover: rgb(0 0 0 / 0.05);
+  --hover: rgb(0 0 0 / 0.06);
   --line: rgb(0 0 0 / 0.1);
   --line-strong: rgb(0 0 0 / 0.16);
   --ink: #1c1d1b;
@@ -25,6 +25,7 @@
   --accent-soft: #f7ecd2;
   --accent-ink: #6e4900;
   --running: #5f8f4f;
+  --running-ink: #3f6c35;
   --danger: #9c3627;
   --danger-soft: #f5ddd6;
   --primary: #1c1d1b;
@@ -70,6 +71,7 @@
   --accent-soft: #33290f;
   --accent-ink: #f2cf86;
   --running: #82b46f;
+  --running-ink: #9cc78b;
   --danger: #f09a88;
   --danger-soft: #4a2a24;
   --primary: #ecebe6;
@@ -96,7 +98,7 @@
   --sl-color-accent: var(--accent);
   --sl-color-accent-high: var(--accent-ink);
   --sl-color-text: var(--ink);
-  --sl-color-text-accent: var(--accent);
+  --sl-color-text-accent: var(--accent-ink);
   --sl-color-text-invert: var(--on-primary);
   --sl-color-bg: var(--sheet);
   --sl-color-bg-nav: var(--sheet);
