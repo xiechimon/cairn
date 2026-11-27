@@ -76,6 +76,34 @@ describe('composeDoneBody', () => {
     });
   });
 
+  test('carries failureCode and failureDetail when present and omits when null', () => {
+    const withFailure = composeDoneBody(
+      {
+        ...outcome,
+        status: 'failed',
+        lastError: 'exited',
+        failureCode: 'runtime_exited',
+        failureDetail: { runtime: 'antigravity', exitCode: 1 },
+      },
+      source({}),
+    );
+    expect(withFailure.failureCode).toBe('runtime_exited');
+    expect(withFailure.failureDetail).toEqual({ runtime: 'antigravity', exitCode: 1 });
+
+    const withoutFailure = composeDoneBody(
+      {
+        ...outcome,
+        status: 'failed',
+        lastError: 'boom',
+        failureCode: null,
+        failureDetail: null,
+      },
+      source({}),
+    );
+    expect('failureCode' in withoutFailure).toBe(false);
+    expect('failureDetail' in withoutFailure).toBe(false);
+  });
+
   test('marks a successful step without assistant output', () => {
     expect(composeDoneBody(outcome, source({ messages: [] })).noOutput).toBe(true);
     expect(

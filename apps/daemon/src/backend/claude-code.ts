@@ -50,7 +50,7 @@ import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
 import { BackgroundTaskRows } from './claude-background-tasks.js';
 import { type ClaudeTelemetryCapture, captureClaudeTelemetry } from './claude-telemetry.js';
-import { SessionNotResumableError } from './errors.js';
+import { SessionNotResumableError, StepFailureError } from './errors.js';
 import { hostToolContent } from './host-tool-content.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { CLAUDE_TELEMETRY_PINS, claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
@@ -482,7 +482,13 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
       return [
         {
           type: 'error',
-          error: { message, retryable: !state.authFailed && isRetryableError(message) },
+          error: {
+            message,
+            retryable: !state.authFailed && isRetryableError(message),
+            ...(state.authFailed
+              ? { failureCode: 'auth' as const, failureDetail: { runtime: 'claude-code' } }
+              : {}),
+          },
         },
       ];
     }
@@ -806,7 +812,46 @@ class ClaudeSessionHandle implements AgentSessionHandle {
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
-      this.queue.push({ type: 'error', error: { message, retryable: false, processCrash: true } });
+      if (this.state.authFailed) {
+        this.queue.push({
+          type: 'error',
+          error: {
+            message: claudeCodeTeamSubscriptionAuthFailureMessage(message),
+            retryable: false,
+            failureCode: 'auth',
+            failureDetail: { runtime: 'claude-code' },
+          },
+        });
+      } else if (
+        (err as NodeJS.ErrnoException).code === 'ENOENT' ||
+        /spawn .*ENOENT|\bclaude\b.*not found/i.test(message)
+      ) {
+        this.queue.push({
+          type: 'error',
+          error: {
+            message,
+            retryable: false,
+            failureCode: 'missing_tool',
+            failureDetail: { runtime: 'claude-code', tool: 'claude' },
+          },
+        });
+      } else {
+        const exitMatch = /\bprocess exited with code (-?\d+)\b/i.exec(message);
+        const exitCode = exitMatch?.[1] !== undefined ? Number(exitMatch[1]) : undefined;
+        this.queue.push({
+          type: 'error',
+          error: {
+            message,
+            retryable: false,
+            processCrash: true,
+            failureCode: 'runtime_exited',
+            failureDetail: {
+              runtime: 'claude-code',
+              ...(exitCode !== undefined && Number.isSafeInteger(exitCode) ? { exitCode } : {}),
+            },
+          },
+        });
+      }
     } finally {
       this.endLoop();
       this.releaseHeldDone(
@@ -1599,7 +1644,11 @@ export class ClaudeCodeBackend implements AgentBackend {
     const resolvedExecutable =
       this.opts.resolveExecutable !== undefined ? this.opts.resolveExecutable() : null;
     if (this.opts.resolveExecutable !== undefined && resolvedExecutable === null) {
-      throw new Error('Claude Code managed binary is unavailable or failed integrity verification');
+      throw new StepFailureError(
+        'Claude Code managed binary is unavailable or failed integrity verification',
+        'missing_tool',
+        { runtime: 'claude-code', tool: 'claude' },
+      );
     }
     const releaseExecutable = resolvedExecutable?.release;
     let handoffLease = false;
@@ -1706,6 +1755,13 @@ export class ClaudeCodeBackend implements AgentBackend {
         q = query({ prompt: input.iterable(), options: sdkOptions });
       } catch (error) {
         await capture?.close();
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          throw new StepFailureError(
+            error instanceof Error ? error.message : String(error),
+            'missing_tool',
+            { runtime: 'claude-code', tool: 'claude' },
+          );
+        }
         throw error;
       }
       handoffLease = true;

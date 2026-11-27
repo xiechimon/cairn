@@ -6,7 +6,7 @@ import {
 } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import {
   type ContentBlock,
@@ -35,6 +35,8 @@ import type {
   ProviderConfig,
   SessionOpts,
   StepEvent,
+  StepFailureCode,
+  StepFailureDetail,
   ToolCallRecord,
 } from '@cairn/shared';
 import {
@@ -58,7 +60,7 @@ import {
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
 import { installAntigravityTurnHooks } from './antigravity-hooks.js';
 
-import { SessionNotResumableError } from './errors.js';
+import { SessionNotResumableError, StepFailureError, stepFailureOf } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { runtimeChildEnv } from './otel.js';
 
@@ -166,6 +168,26 @@ function selectOptionValues(option: SessionConfigOption): Set<string> {
     option.options.flatMap((entry) =>
       'options' in entry ? entry.options.map((item) => item.value) : [entry.value],
     ),
+  );
+}
+
+function boundedToolName(tool: string): string {
+  const base = basename(tool);
+  return (base !== '' ? base : tool).slice(0, 64);
+}
+
+interface AcpTerminalFailure {
+  code: StepFailureCode;
+  message: string;
+  detail?: StepFailureDetail;
+}
+
+function isGeminiAuthMessage(message: string): boolean {
+  return (
+    /^Gemini login failed:/.test(message) ||
+    /authenticate|required|not logged in|login|api key is missing|auth method|GEMINI_API_KEY/i.test(
+      message,
+    )
   );
 }
 
@@ -309,6 +331,7 @@ class AcpSession implements AgentSessionHandle {
     private readonly adapter?: AcpBackendOptions,
     private readonly modelId = 'unknown',
     private readonly compactAt?: number,
+    private readonly settleUnexpectedClose?: () => Promise<AcpTerminalFailure | null>,
   ) {
     this.sessionId = sessionId;
     this.normalizer = adapter?.createUpdateNormalizer?.();
@@ -447,14 +470,50 @@ class AcpSession implements AgentSessionHandle {
         break;
       }
     } catch (error) {
-      const message = this.adapter
-        ? error instanceof Error
-          ? error.message
-          : String(error)
-        : acpErrorMessage(error);
       if (this.cancelled) {
         this.push({ type: 'message_stop', message: { role: 'assistant', content: this.text } });
-      } else this.push({ type: 'error', error: { message, retryable: false } });
+      } else {
+        const rawMessage = error instanceof Error ? error.message : String(error);
+        const runtime = this.adapter?.harness ?? 'gemini';
+        const direct = stepFailureOf(error);
+        const recorded =
+          acpErrorCode(error) !== undefined
+            ? null
+            : ((await this.settleUnexpectedClose?.()) ?? null);
+        const baseMessage =
+          recorded !== null && !(error instanceof StepFailureError) && direct === null
+            ? recorded.message
+            : rawMessage;
+        const message = this.adapter ? baseMessage : acpErrorMessage(error);
+        const isAuth =
+          this.adapter?.harness === 'antigravity'
+            ? isAntigravityAuthError(error, rawMessage) ||
+              isAntigravityAuthError(error, baseMessage)
+            : !this.adapter && (isGeminiAuthMessage(rawMessage) || isGeminiAuthMessage(message));
+        const structured =
+          direct !== null && direct.failureCode !== 'runtime_exited'
+            ? direct
+            : recorded !== null && recorded.code !== 'runtime_exited'
+              ? { failureCode: recorded.code, failureDetail: recorded.detail }
+              : isAuth
+                ? { failureCode: 'auth' as const, failureDetail: { runtime } }
+                : (direct ??
+                  (recorded !== null
+                    ? { failureCode: recorded.code, failureDetail: recorded.detail }
+                    : null));
+        this.push({
+          type: 'error',
+          error: {
+            message,
+            retryable: false,
+            ...(structured?.failureCode === 'runtime_exited' ? { processCrash: true } : {}),
+            ...(structured !== null ? { failureCode: structured.failureCode } : {}),
+            ...(structured?.failureDetail !== undefined
+              ? { failureDetail: structured.failureDetail }
+              : {}),
+          },
+        });
+      }
     } finally {
       this.finish();
     }
@@ -604,6 +663,10 @@ class AcpSession implements AgentSessionHandle {
 
   get acceptingPermissions(): boolean {
     return this.promptStarted && !this.stopped && !this.cancelled;
+  }
+
+  get isStopping(): boolean {
+    return this.cancelled || this.stopped;
   }
 
   async steer(text: string, images: readonly DeliveredImage[] = []): Promise<void> {
@@ -783,19 +846,24 @@ class AcpBackend implements AgentBackend {
     const spawnProcess = this.options.spawnProcess ?? spawn;
     const resolver = adapter?.resolveLaunch ?? this.options.resolveLaunch;
     const resolvedLaunch = resolver !== undefined ? resolver() : null;
-    if (resolver !== undefined && resolvedLaunch === null) {
-      hostTools?.close();
-      throw new Error(
-        `${adapter?.harness ?? 'Gemini'} managed runtime binary is unavailable or failed integrity verification`,
-      );
-    }
+    const runtime = adapter?.harness ?? 'gemini';
     const releaseLaunch = resolvedLaunch?.release;
     const command = resolvedLaunch?.command ?? adapter?.command ?? this.options.executablePath;
+    if (resolver !== undefined && resolvedLaunch === null) {
+      hostTools?.close();
+      throw new StepFailureError(
+        `${runtime} managed runtime binary is unavailable or failed integrity verification`,
+        'missing_tool',
+        { runtime, tool: runtime },
+      );
+    }
     if (command === undefined) {
       releaseLaunch?.();
       hostTools?.close();
-      throw new Error(
+      throw new StepFailureError(
         'Gemini managed install is missing: the managed runtime setup did not complete',
+        'missing_tool',
+        { runtime, tool: runtime },
       );
     }
     const releaseRuntime = adapter?.acquireRuntime?.();
@@ -845,6 +913,13 @@ class AcpBackend implements AgentBackend {
       releaseRuntime?.();
       releaseLaunch?.();
       hostTools?.close();
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new StepFailureError(
+          error instanceof Error ? error.message : String(error),
+          'missing_tool',
+          { runtime, tool: boundedToolName(command) },
+        );
+      }
       throw error;
     }
     const groupPid = process.platform !== 'win32' ? child.pid : undefined;
@@ -896,6 +971,72 @@ class AcpBackend implements AgentBackend {
     );
     const connection = app.connect(stream);
     let interactiveAuthDetected = false;
+    let exited = false;
+    let cleanedUp = false;
+    let stdoutEnded = false;
+    let terminalFailure: AcpTerminalFailure | null = null;
+    child.stdout.once('end', () => {
+      stdoutEnded = true;
+    });
+    const recordTerminalFailure = (
+      code: StepFailureCode,
+      message: string,
+      detail?: StepFailureDetail,
+    ): AcpTerminalFailure => {
+      if (
+        terminalFailure === null ||
+        (terminalFailure.code === 'runtime_exited' && code !== 'runtime_exited')
+      ) {
+        terminalFailure = { code, message, ...(detail !== undefined ? { detail } : {}) };
+      }
+      return terminalFailure;
+    };
+    const captureChildExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      if (cleanedUp || session?.isStopping === true) return;
+      const exitLabel = signal !== null && code === null ? signal : String(code);
+      const detail: StepFailureDetail = {
+        runtime,
+        ...(code !== null ? { exitCode: code } : {}),
+        ...(signal !== null ? { signal: signal.slice(0, 24) } : {}),
+      };
+      const recorded = recordTerminalFailure(
+        'runtime_exited',
+        `${runtime} ACP exited (${exitLabel}): ${stderr}`,
+        detail,
+      );
+      connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
+    };
+    const settleUnexpectedClose = async (): Promise<AcpTerminalFailure | null> => {
+      if (terminalFailure !== null) return terminalFailure;
+      if (cleanedUp || session?.isStopping === true) return null;
+      const proc = child as { exitCode?: number | null; signalCode?: NodeJS.Signals | null };
+      if (
+        (proc.exitCode === undefined || proc.exitCode === null) &&
+        (proc.signalCode === undefined || proc.signalCode === null) &&
+        stdoutEnded
+      ) {
+        await new Promise<void>((resolve) => {
+          let settled = false;
+          const done = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+          };
+          const timer = setTimeout(done, 200);
+          timer.unref?.();
+          child.once('exit', done);
+        });
+      }
+      if (
+        terminalFailure === null &&
+        ((proc.exitCode !== undefined && proc.exitCode !== null) ||
+          (proc.signalCode !== undefined && proc.signalCode !== null))
+      ) {
+        captureChildExit(proc.exitCode ?? null, proc.signalCode ?? null);
+      }
+      return terminalFailure;
+    };
     child.stderr.on('data', (chunk: Buffer) => {
       if (interactiveAuthDetected) return;
       const text = chunk.toString();
@@ -904,23 +1045,28 @@ class AcpBackend implements AgentBackend {
         /Open the following link to authenticate/i.test(stderr + text)
       ) {
         interactiveAuthDetected = true;
-        connection.close(
-          new Error(
-            'Antigravity OAuth login expired or revoked; sign in again in Settings -> Model Routing',
-          ),
+        const recorded = recordTerminalFailure(
+          'auth',
+          'Antigravity OAuth login expired or revoked; sign in again in Settings -> Model Routing',
+          { runtime },
         );
+        connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
         return;
       }
       stderr = (stderr + text).slice(-8192);
     });
-    child.once('error', (error) => connection.close(error));
-    child.once('exit', (code) =>
-      connection.close(
-        new Error(`${adapter?.harness ?? 'Gemini'} ACP exited (${code}): ${stderr}`),
-      ),
-    );
-    let exited = false;
-    let cleanedUp = false;
+    child.once('error', (error) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        const recorded = recordTerminalFailure('missing_tool', error.message, {
+          runtime,
+          tool: boundedToolName(command),
+        });
+        connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
+        return;
+      }
+      connection.close(error);
+    });
+    child.once('exit', (code, signal) => captureChildExit(code, signal));
     let killTimer: ReturnType<typeof setTimeout> | undefined;
     let releaseTimer: ReturnType<typeof setTimeout> | undefined;
     const releaseOnce = () => {
@@ -961,11 +1107,16 @@ class AcpBackend implements AgentBackend {
         killTimer = setTimeout(() => terminate('SIGKILL'), 1_000);
       }
     };
+    const initializeTimeoutMs = adapter?.initializeTimeoutMs ?? 30_000;
     const initializeTimer = adapter
-      ? setTimeout(
-          () => connection.close(new Error('ACP initialization timed out')),
-          adapter.initializeTimeoutMs ?? 30_000,
-        )
+      ? setTimeout(() => {
+          const recorded = recordTerminalFailure(
+            'runtime_startup_timeout',
+            'ACP initialization timed out',
+            { runtime, timeoutMs: initializeTimeoutMs },
+          );
+          connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
+        }, initializeTimeoutMs)
       : undefined;
     initializeTimer?.unref();
     let agentVersion: number | string = 'unavailable';
@@ -1052,6 +1203,10 @@ class AcpBackend implements AgentBackend {
                   { ...request, sessionId: resumeId },
                 );
               } catch (error) {
+                const crash = await settleUnexpectedClose();
+                if (crash !== null) {
+                  throw new StepFailureError(crash.message, crash.code, crash.detail);
+                }
                 const detail = error instanceof Error ? error.message : String(error);
                 if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
                   throw error;
@@ -1068,6 +1223,10 @@ class AcpBackend implements AgentBackend {
                   { ...request, sessionId: resumeId },
                 );
               } catch (error) {
+                const crash = await settleUnexpectedClose();
+                if (crash !== null) {
+                  throw new StepFailureError(crash.message, crash.code, crash.detail);
+                }
                 const detail = error instanceof Error ? error.message : String(error);
                 if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
                   throw error;
@@ -1193,22 +1352,54 @@ class AcpBackend implements AgentBackend {
         adapter,
         opts.modelId,
         opts.compactAt,
+        settleUnexpectedClose,
       );
       return session;
     } catch (error) {
+      const recorded =
+        acpErrorCode(error) !== undefined || error instanceof SessionNotResumableError
+          ? null
+          : await settleUnexpectedClose();
       cleanup();
       if (error instanceof SessionNotResumableError) throw error;
-      const message = error instanceof Error ? error.message : String(error);
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      const message = recorded !== null ? recorded.message : rawMessage;
       const mapped = adapter
         ? adapter.harness === 'antigravity'
           ? antigravityAcpErrorMessage(error, message)
           : message
         : acpErrorMessage(error);
-      throw new Error(
-        mapped !== message
+      const finalMessage =
+        recorded !== null || mapped !== message
           ? mapped
-          : `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${agentVersion}): ${message}`,
-      );
+          : `ACP initialize failed (protocolVersion client=${PROTOCOL_VERSION}, agent=${agentVersion}): ${message}`;
+      const isMissingBinary =
+        /^Antigravity executable not found:|^Gemini executable not found:/.test(finalMessage) ||
+        /spawn .*ENOENT/i.test(message);
+      const isAuth =
+        adapter?.harness === 'antigravity'
+          ? isAntigravityAuthError(error, message) || isAntigravityAuthError(error, finalMessage)
+          : !adapter && isGeminiAuthMessage(finalMessage);
+      const direct = stepFailureOf(error);
+      if (recorded !== null && recorded.code !== 'runtime_exited') {
+        throw new StepFailureError(finalMessage, recorded.code, recorded.detail);
+      }
+      if (isMissingBinary) {
+        throw new StepFailureError(finalMessage, 'missing_tool', {
+          runtime,
+          tool: boundedToolName(command),
+        });
+      }
+      if (isAuth) {
+        throw new StepFailureError(finalMessage, 'auth', { runtime });
+      }
+      if (recorded !== null) {
+        throw new StepFailureError(finalMessage, recorded.code, recorded.detail);
+      }
+      if (direct !== null) {
+        throw new StepFailureError(finalMessage, direct.failureCode, direct.failureDetail);
+      }
+      throw new Error(finalMessage);
     } finally {
       clearTimeout(initializeTimer);
     }

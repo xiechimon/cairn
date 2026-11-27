@@ -4,6 +4,8 @@ import type {
   DeliveredImage,
   ProviderConfig,
   StepEvent,
+  StepFailureCode,
+  StepFailureDetail,
 } from '@cairn/shared';
 import {
   classifyAgentFailure,
@@ -30,6 +32,8 @@ export interface StepPassState {
   lastError: string | null;
   lastModelError: string | null;
   lastErrorWasProcessCrash: boolean;
+  failureCode: StepFailureCode | null;
+  failureDetail: StepFailureDetail | null;
   sawChangeTool: boolean;
   sawDone: boolean;
   sawProgress: boolean;
@@ -87,6 +91,8 @@ export function newStepPassState(): StepPassState {
     lastError: null,
     lastModelError: null,
     lastErrorWasProcessCrash: false,
+    failureCode: null,
+    failureDetail: null,
     sawChangeTool: false,
     sawDone: false,
     sawProgress: false,
@@ -100,6 +106,8 @@ export function resetStepPassForRetry(s: StepPassState): void {
   s.lastError = null;
   s.lastModelError = null;
   s.lastErrorWasProcessCrash = false;
+  s.failureCode = null;
+  s.failureDetail = null;
   s.sawDone = false;
   s.sawProgress = false;
   s.zeroProgressRetries = 0;
@@ -251,10 +259,24 @@ export async function consumeStepPassEvent(
       else await segments.endAssistantMessage(ev.message.content);
       break;
     }
-    case 'error':
-      s.lastError = ev.error.message;
-      s.lastModelError = ev.error.message;
-      s.lastErrorWasProcessCrash = ev.error.processCrash === true;
+    case 'error': {
+      const isTrailingExit =
+        (ev.error.processCrash === true || ev.error.failureCode === 'runtime_exited') &&
+        s.lastError !== null;
+      if (!isTrailingExit) {
+        s.lastError = ev.error.message;
+        s.lastModelError = ev.error.message;
+        s.lastErrorWasProcessCrash = ev.error.processCrash === true;
+      }
+      if (
+        ev.error.failureCode !== undefined &&
+        !isTrailingExit &&
+        (s.failureCode === null ||
+          (s.failureCode === 'runtime_exited' && ev.error.failureCode !== 'runtime_exited'))
+      ) {
+        s.failureCode = ev.error.failureCode;
+        s.failureDetail = ev.error.failureDetail ?? null;
+      }
       logger.step(`error: ${ev.error.message} (retryable=${ev.error.retryable})`);
       {
         const failureKind = s.lastErrorWasProcessCrash
@@ -286,6 +308,7 @@ export async function consumeStepPassEvent(
         }
       }
       break;
+    }
     case 'usage':
       activity.noteUsage(ev.usage);
       break;
@@ -301,6 +324,8 @@ export async function consumeStepPassEvent(
     }
     case 'auto_retry_start':
       s.lastError = null;
+      s.failureCode = null;
+      s.failureDetail = null;
       s.zeroProgressRetries += 1;
       if (s.zeroProgressRetries > retryStormMax) {
         s.retryStorm = true;

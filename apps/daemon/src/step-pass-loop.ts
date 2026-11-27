@@ -5,9 +5,12 @@ import {
   failureEndsStepNow,
   type ProviderConfig,
   type SessionOpts,
+  type StepFailureCode,
+  type StepFailureDetail,
   sleep,
 } from '@cairn/shared';
 import type { AskChannel } from './ask-channel.js';
+import { stepFailureOf } from './backend/errors.js';
 import { credentialSafeEvents } from './credential-output.js';
 import type { StepJournal } from './journal.js';
 import {
@@ -42,6 +45,8 @@ export interface StepPassLoopInput
 export interface StepPassLoopResult {
   provider: ProviderConfig;
   openError: string | null;
+  openFailureCode: StepFailureCode | null;
+  openFailureDetail: StepFailureDetail | null;
 }
 
 async function drainPass(
@@ -89,7 +94,21 @@ async function drainPass(
       if (failureEndsStepNow(passState.lastModelError ?? '')) break;
     }
   } catch (err) {
-    passState.lastError = err instanceof Error ? err.message : String(err);
+    const structured = stepFailureOf(err);
+    const isTrailingExit =
+      structured?.failureCode === 'runtime_exited' && passState.lastError !== null;
+    if (!isTrailingExit) {
+      passState.lastError = err instanceof Error ? err.message : String(err);
+    }
+    if (
+      structured !== null &&
+      !isTrailingExit &&
+      (passState.failureCode === null ||
+        (passState.failureCode === 'runtime_exited' && structured.failureCode !== 'runtime_exited'))
+    ) {
+      passState.failureCode = structured.failureCode;
+      passState.failureDetail = structured.failureDetail ?? null;
+    }
   }
   stop.detach();
   if (failureEndsStepNow(passState.lastModelError ?? ''))
@@ -126,7 +145,13 @@ export async function runStepPasses(input: StepPassLoopInput): Promise<StepPassL
       const message = err instanceof Error ? err.message : String(err);
       if (await retryWithoutImages(message)) continue;
       stream.flushDeltas();
-      return { openError: message, provider: input.provider };
+      const structured = stepFailureOf(err);
+      return {
+        openError: message,
+        openFailureCode: structured?.failureCode ?? null,
+        openFailureDetail: structured?.failureDetail ?? null,
+        provider: input.provider,
+      };
     }
     logger.raw(
       opener.continueId !== null
@@ -183,5 +208,10 @@ export async function runStepPasses(input: StepPassLoopInput): Promise<StepPassL
     if (await retryWithoutImages(retry.failureText)) continue;
     break;
   }
-  return { openError: null, provider: input.provider };
+  return {
+    openError: null,
+    openFailureCode: null,
+    openFailureDetail: null,
+    provider: input.provider,
+  };
 }

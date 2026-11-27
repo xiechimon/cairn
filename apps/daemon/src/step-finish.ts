@@ -17,7 +17,14 @@ import type { StreamWatchdog } from './stream-watchdog.js';
 export interface StepFinishInput
   extends Omit<
     StepDeliveryInput,
-    'session' | 'usage' | 'lastError' | 'stopped' | 'quotaBlock' | 'git'
+    | 'session'
+    | 'usage'
+    | 'lastError'
+    | 'failureCode'
+    | 'failureDetail'
+    | 'stopped'
+    | 'quotaBlock'
+    | 'git'
   > {
   passState: StepPassState;
   handle: AgentSessionHandle | null;
@@ -65,6 +72,7 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
   const outcome = resolveStepPassOutcome({
     pass: passState,
     timeoutText: watchdog.message(),
+    timeoutMs: watchdog.trippedTimeoutMs?.() ?? null,
     watchdogTripped: watchdog.trippedArm !== null,
     stopRequest: stopReq,
     provider: input.provider,
@@ -115,6 +123,9 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     logRaw: (message) => logger.raw(message),
   });
   const { lastError, ...git } = settledGit;
+  const gitOverwroteError = lastError !== outcome.lastError;
+  const failureCode = gitOverwroteError ? null : outcome.failureCode;
+  const failureDetail = gitOverwroteError ? null : outcome.failureDetail;
 
   await deliverStepOutcome({
     client: input.client,
@@ -136,6 +147,8 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     session: { sessionId: handle?.sessionId ?? input.continueId, sessionFile: handle?.sessionFile },
     usage,
     lastError,
+    failureCode,
+    failureDetail,
     stopped,
     isReview,
     attachmentVerify,

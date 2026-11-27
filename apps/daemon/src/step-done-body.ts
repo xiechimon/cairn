@@ -4,6 +4,8 @@ import {
   type MachineDoneBody,
   type QuotaBlock,
   type SkillInjectionFacts,
+  type StepFailureCode,
+  type StepFailureDetail,
   stripAnsiEscapes,
 } from '@cairn/shared';
 import type { TranscriptMessage } from './journal.js';
@@ -14,6 +16,8 @@ import { extractVerifyVerdict } from './verify-verdict.js';
 export interface StepDoneOutcome {
   status: MachineDoneBody['status'];
   lastError: string | null;
+  failureCode?: StepFailureCode | null;
+  failureDetail?: StepFailureDetail | null;
   sessionId: string | null;
   usage: AgentTokenUsage;
   hasChanges: boolean;
@@ -58,6 +62,8 @@ export function composeDoneBody(
   return {
     status: outcome.status,
     ...(outcome.lastError !== null ? { errorMessage: stripAnsiEscapes(outcome.lastError) } : {}),
+    ...(outcome.failureCode != null ? { failureCode: outcome.failureCode } : {}),
+    ...(outcome.failureDetail != null ? { failureDetail: outcome.failureDetail } : {}),
     ...(outcome.sessionId !== null ? { sessionId: outcome.sessionId } : {}),
     usage: [...outcome.usage],
     hasChanges: outcome.hasChanges,

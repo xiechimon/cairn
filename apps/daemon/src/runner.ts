@@ -11,8 +11,15 @@ import type {
   SkillInjectionFacts,
   WorktreeOps,
 } from '@cairn/shared';
-import { isBuildStepKind, mcpConnectorSecretValues, PLAN_FILE_NAME } from '@cairn/shared';
+import {
+  isBuildStepKind,
+  mcpConnectorSecretValues,
+  PLAN_FILE_NAME,
+  type StepFailureCode,
+  type StepFailureDetail,
+} from '@cairn/shared';
 import { AskChannel } from './ask-channel.js';
+import { stepFailureOf } from './backend/errors.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { createDaemonSubagentExecutor } from './backend/subagent.js';
@@ -717,7 +724,21 @@ async function runClaimedStep(
   await deps.settleSteers?.(stepId);
   if (passes.openError !== null) {
     clearCredentials(creds);
-    await failStep(deps, heartbeat, stepId, passes.openError, reapTree);
+    await failStep(
+      deps,
+      heartbeat,
+      stepId,
+      passes.openError,
+      reapTree,
+      passes.openFailureCode !== null
+        ? {
+            failureCode: passes.openFailureCode,
+            ...(passes.openFailureDetail !== null
+              ? { failureDetail: passes.openFailureDetail }
+              : {}),
+          }
+        : undefined,
+    );
     return;
   }
   await finishStepRun({
@@ -773,11 +794,13 @@ async function reportCrash(
 ): Promise<boolean> {
   const stepId = claimed.step.id;
   const message = error instanceof Error ? error.message : String(error);
+  const structured = stepFailureOf(error);
   deps.logger.step(`crashed after claim, reporting failure: ${message}`);
   try {
     await deps.client.done(stepId, {
       status: 'failed',
       errorMessage: `Runner error: ${message}`,
+      ...(structured !== null ? structured : {}),
       generation: claimed.step.generation,
     });
     deps.journal.remove(stepId);
@@ -796,6 +819,7 @@ async function failStep(
   stepId: string,
   message: string,
   reap?: () => Promise<void>,
+  failure?: { failureCode: StepFailureCode; failureDetail?: StepFailureDetail },
 ): Promise<void> {
   deps.sessionHandles?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
@@ -804,6 +828,7 @@ async function failStep(
     await deps.client.done(stepId, {
       status: 'failed',
       errorMessage: message,
+      ...(failure !== undefined ? failure : {}),
       generation: deps.journal.get(stepId)?.claimed?.step.generation,
     });
     deps.journal.remove(stepId);

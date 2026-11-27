@@ -118,7 +118,12 @@ describe('runStepPasses', () => {
   test('a completed pass runs once and records the running session', async () => {
     const h = harness([sessionHandle('sess-1', [done])]);
     const result = await runStepPasses(h.input);
-    expect(result).toEqual({ openError: null, provider: PROVIDER });
+    expect(result).toEqual({
+      openError: null,
+      openFailureCode: null,
+      openFailureDetail: null,
+      provider: PROVIDER,
+    });
     expect(h.opened).toEqual([null]);
     expect(h.journal).toEqual([{ state: 'running', sessionId: 'sess-1' }]);
     expect(h.input.session.current?.sessionId).toBe('sess-1');

@@ -1,4 +1,11 @@
-import type { PreparedWorkspace, ProviderConfig, QuotaBlock, WorktreeOps } from '@cairn/shared';
+import type {
+  PreparedWorkspace,
+  ProviderConfig,
+  QuotaBlock,
+  StepFailureCode,
+  StepFailureDetail,
+  WorktreeOps,
+} from '@cairn/shared';
 import type { TranscriptBuffer } from './journal.js';
 import type { StepPassState } from './step-pass-events.js';
 import { stepQuotaBlock } from './step-quota-block.js';
@@ -18,6 +25,8 @@ export interface StepPassOutcomeInput {
       | 'lastError'
       | 'lastModelError'
       | 'lastErrorWasProcessCrash'
+      | 'failureCode'
+      | 'failureDetail'
       | 'sawDone'
       | 'sawProgress'
       | 'retryStorm'
@@ -25,6 +34,7 @@ export interface StepPassOutcomeInput {
     >
   >;
   timeoutText: string | null;
+  timeoutMs?: number | null;
   watchdogTripped: boolean;
   stopRequest: StopRequest | null;
   provider: ProviderConfig | null;
@@ -35,6 +45,8 @@ export interface StepPassOutcome {
   lastError: string | null;
   stopped: boolean;
   quotaBlock: QuotaBlock | null;
+  failureCode: StepFailureCode | null;
+  failureDetail: StepFailureDetail | null;
 }
 
 export function resolveStepPassOutcome(input: StepPassOutcomeInput): StepPassOutcome {
@@ -55,17 +67,33 @@ export function resolveStepPassOutcome(input: StepPassOutcomeInput): StepPassOut
     failureText: pass.lastModelError ?? lastError,
   });
   if (quotaBlock !== null && lastError === null) lastError = quotaBlock.reason;
-  if (
-    !input.watchdogTripped &&
-    !stopped &&
-    !pass.sawProgress &&
-    !pass.sawDone &&
-    lastError === null
-  ) {
+  const silentNoOp =
+    !input.watchdogTripped && !stopped && !pass.sawProgress && !pass.sawDone && lastError === null;
+  if (silentNoOp) {
     lastError = SILENT_NO_OP_ROUND_ERROR;
     log('zero-event round: session stream exhausted without progress, done, or error');
   }
-  return { lastError, stopped, quotaBlock };
+  let failureCode: StepFailureCode | null = null;
+  let failureDetail: StepFailureDetail | null = null;
+  if (!stopped) {
+    if (pass.failureCode !== null) {
+      failureCode = pass.failureCode;
+      failureDetail = pass.failureDetail;
+    } else if (timeoutText !== null) {
+      if (pass.lastError === null && pass.lastModelError === null) {
+        failureCode = 'stream_timeout';
+        failureDetail =
+          input.timeoutMs !== undefined && input.timeoutMs !== null && input.timeoutMs > 0
+            ? { timeoutMs: input.timeoutMs }
+            : null;
+      }
+    } else if (silentNoOp) {
+      failureCode = 'silent_no_op';
+    } else if (quotaBlock !== null) {
+      failureCode = quotaBlock.kind === 'quota' ? 'quota' : 'rate_limit';
+    }
+  }
+  return { lastError, stopped, quotaBlock, failureCode, failureDetail };
 }
 
 export interface StepRewindInput {

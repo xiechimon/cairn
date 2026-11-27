@@ -11,6 +11,7 @@ import {
   providerCompatSchema,
   providerModelSchema,
 } from './records/provider.js';
+import { stepFailureCodeSchema, stepFailureDetailSchema } from './task-failure.js';
 
 export const toolCallRecordSchema = z.object({
   id: z.string(),
@@ -130,6 +131,8 @@ export const stepEventSchema = z.discriminatedUnion('type', [
       message: z.string(),
       retryable: z.boolean(),
       processCrash: z.boolean().optional(),
+      failureCode: stepFailureCodeSchema.optional(),
+      failureDetail: stepFailureDetailSchema.optional(),
     }),
   }),
 ]);

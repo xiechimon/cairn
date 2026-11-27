@@ -2,6 +2,7 @@ import { type Query, query, type SDKMessage } from '@anthropic-ai/claude-agent-s
 import type { StepEvent } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createClaudeCodeBackend } from '../src/backend/claude-code.js';
+import { StepFailureError } from '../src/backend/errors.js';
 
 vi.mock('@anthropic-ai/claude-agent-sdk', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@anthropic-ai/claude-agent-sdk')>()),
@@ -49,6 +50,8 @@ test('authentication_failed identifies the team subscription and keeps the CLI r
   expect(failure.error.message).toContain('Failed to authenticate: OAuth token revoked (timeout)');
   expect(failure.error.message).not.toContain(token);
   expect(failure.error.retryable).toBe(false);
+  expect(failure.error.failureCode).toBe('auth');
+  expect(failure.error.failureDetail).toEqual({ runtime: 'claude-code' });
   expect(failure.error.message).toContain('你的 Claude 订阅登录已失效');
   expect(failure.error.message).toContain('设置 → 模型路由');
   expect(failure.error.message).toContain('claude setup-token');
@@ -80,6 +83,96 @@ test('a crashed claude process is reported as a process crash, not a model error
 
   expect(events).toContainEqual({
     type: 'error',
-    error: expect.objectContaining({ retryable: false, processCrash: true }),
+    error: expect.objectContaining({
+      retryable: false,
+      processCrash: true,
+      failureCode: 'runtime_exited',
+      failureDetail: { runtime: 'claude-code', exitCode: 1 },
+    }),
+  });
+});
+
+test('unavailable managed claude executable throws StepFailureError with missing_tool', async () => {
+  const backend = createClaudeCodeBackend({ resolveExecutable: () => null });
+  let caught: unknown;
+  try {
+    await backend.createSession({
+      provider: { kind: 'http', providerId: 'fake-claude' },
+      modelId: 'fake-model',
+      cwd: '/tmp',
+      prompt: 'Begin the task.',
+    });
+  } catch (err) {
+    caught = err;
+  }
+  expect(caught).toBeInstanceOf(StepFailureError);
+  const failure = caught as StepFailureError;
+  expect(failure.failureCode).toBe('missing_tool');
+  expect(failure.failureDetail).toEqual({ runtime: 'claude-code', tool: 'claude' });
+});
+
+test('pump catch preserves authFailed over runtime_exited and classifies ENOENT as missing_tool', async () => {
+  vi.mocked(query).mockImplementationOnce(({ prompt }) => {
+    if (typeof prompt !== 'string')
+      void (async () => {
+        for await (const _ of prompt) break;
+      })();
+    const messages = (async function* () {
+      yield {
+        type: 'assistant',
+        error: 'authentication_failed',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Invalid API key' }] },
+      } as unknown as SDKMessage;
+      throw new Error('Claude Code process exited with code 1');
+    })();
+    return Object.assign(messages, { interrupt: vi.fn(async () => {}) }) as unknown as Query;
+  });
+  const authHandle = await createClaudeCodeBackend({}).createSession({
+    provider: { kind: 'http', providerId: 'fake-claude' },
+    modelId: 'fake-model',
+    cwd: '/tmp',
+    prompt: 'Begin the task.',
+  });
+  const authEvents: StepEvent[] = [];
+  for await (const event of authHandle.events) authEvents.push(event);
+  const authError = authEvents.find((event) => event.type === 'error');
+  expect(authError).toEqual({
+    type: 'error',
+    error: expect.objectContaining({
+      retryable: false,
+      failureCode: 'auth',
+      failureDetail: { runtime: 'claude-code' },
+    }),
+  });
+  if (authError?.type === 'error') {
+    expect(authError.error.processCrash).not.toBe(true);
+  }
+
+  vi.mocked(query).mockImplementationOnce(({ prompt }) => {
+    if (typeof prompt !== 'string')
+      void (async () => {
+        for await (const _ of prompt) break;
+      })();
+    const messages = (async function* () {
+      yield* [];
+      throw Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
+    })();
+    return Object.assign(messages, { interrupt: vi.fn(async () => {}) }) as unknown as Query;
+  });
+  const enoentHandle = await createClaudeCodeBackend({}).createSession({
+    provider: { kind: 'http', providerId: 'fake-claude' },
+    modelId: 'fake-model',
+    cwd: '/tmp',
+    prompt: 'Begin the task.',
+  });
+  const enoentEvents: StepEvent[] = [];
+  for await (const event of enoentHandle.events) enoentEvents.push(event);
+  expect(enoentEvents).toContainEqual({
+    type: 'error',
+    error: expect.objectContaining({
+      retryable: false,
+      failureCode: 'missing_tool',
+      failureDetail: { runtime: 'claude-code', tool: 'claude' },
+    }),
   });
 });

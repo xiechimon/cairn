@@ -149,6 +149,21 @@ export class StreamWatchdog {
     });
   }
 
+  trippedTimeoutMs(): number | null {
+    switch (this.tripped) {
+      case 'first':
+        return this.options.timeouts.first;
+      case 'idle':
+        return this.options.timeouts.idle;
+      case 'body':
+        return this.options.timeouts.body;
+      case 'duration':
+        return this.options.durationCapMs;
+      default:
+        return null;
+    }
+  }
+
   private trip(arm: StreamTimeoutArm): void {
     this.tripped = arm;
     this.options.onTrip(arm);

@@ -1,4 +1,5 @@
 import semver from 'semver';
+import { z } from 'zod';
 
 export const RETRY_PARKED_MARK = 'Task parked';
 
@@ -326,6 +327,17 @@ export const STEP_FAILURE_CODES = [
   'unknown',
 ] as const;
 export type StepFailureCode = (typeof STEP_FAILURE_CODES)[number];
+
+export const stepFailureCodeSchema = z.enum(STEP_FAILURE_CODES);
+
+export const stepFailureDetailSchema = z.object({
+  runtime: z.string().max(40).optional(),
+  exitCode: z.number().int().optional(),
+  signal: z.string().max(24).optional(),
+  tool: z.string().max(64).optional(),
+  timeoutMs: z.number().int().positive().optional(),
+});
+export type StepFailureDetail = z.infer<typeof stepFailureDetailSchema>;
 
 export const STEP_FAILURE_CLASS_BY_CODE: Readonly<Record<StepFailureCode, RetryFailureClass>> = {
   missing_tool: 'permanent',

@@ -5,6 +5,8 @@ import type {
   PreparedWorkspace,
   QuotaBlock,
   SkillInjectionFacts,
+  StepFailureCode,
+  StepFailureDetail,
   WorktreeOps,
 } from '@cairn/shared';
 import { prepareCredentialSessionUpload } from './credential-output.js';
@@ -39,6 +41,8 @@ export interface StepDeliveryInput {
   session: { sessionId: string | null; sessionFile: string | undefined };
   usage: AgentTokenUsage;
   lastError: string | null;
+  failureCode?: StepFailureCode | null;
+  failureDetail?: StepFailureDetail | null;
   stopped: boolean;
   isReview: boolean;
   attachmentVerify: boolean;
@@ -117,6 +121,8 @@ export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void
     {
       status,
       lastError,
+      ...(input.failureCode !== undefined ? { failureCode: input.failureCode } : {}),
+      ...(input.failureDetail !== undefined ? { failureDetail: input.failureDetail } : {}),
       sessionId: input.session.sessionId,
       usage: input.usage,
       hasChanges: git.hasChanges,
