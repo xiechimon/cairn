@@ -478,19 +478,6 @@ describe('#1453 other shapes of the same race', () => {
     expect(todoPhase(w)).toBe('closed');
   });
 
-  test('review step of a closed card reports success with blocking: report does not throw, no replan enqueued', async () => {
-    const w = makeWorld({ phase: 'review', stepStatus: 'claimed', stepKind: 'review' });
-    await move(w, 'closed');
-    const findings = {
-      conclusion: 'blocking',
-      findings: [{ id: '1', severity: 'blocking' as const, summary: 'x' }],
-    };
-    await expect(report(w, { status: 'success', findings })).resolves.toBeUndefined();
-    expect(todoPhase(w)).toBe('closed');
-    const steps = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all();
-    expect(steps.map((r) => r.status)).toEqual(['stopped']);
-  });
-
   test('build step of a done card reports success with zero changes: step done, not marked failed by the artifact gate', async () => {
     const w = makeWorld({ phase: 'building', stepStatus: 'claimed', stepKind: 'build' });
     await move(w, 'done');

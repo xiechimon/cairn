@@ -5,12 +5,6 @@ import { runAfterCommit } from '../db/commit-effects.js';
 import { build, message, plan as planTable, step, stopPending, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
-import { settleRetiredGateStep } from './build-gate-steps.js';
-import {
-  persistGateVerdict,
-  reportedVerdictHeads,
-  type VerdictReport,
-} from './build-gate-verdict.js';
 import {
   applyStoppedStep,
   releaseUnissuedMergeAdmission,
@@ -121,12 +115,10 @@ export function applyStepFailure(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   rawErrorMessage: string,
-  report?: VerdictReport,
   preservedCommits?: readonly string[],
   failure?: StepFailureMeta,
 ): void {
   const { db } = deps;
-  if (settleRetiredGateStep(deps, stepRow, { errorMessage: rawErrorMessage })) return;
   if (settleParkedStep(deps, stepRow, { status: 'failed', errorMessage: rawErrorMessage })) return;
   db.delete(stopPending).where(eq(stopPending.stepId, stepRow.id)).run();
   if (
@@ -188,17 +180,9 @@ export function applyStepFailure(
     });
   }
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
-  const failedStep = finished ?? stepRow;
   runAfterCommit(deps, 'emitRuntimeBuildSpan', () =>
     emitRuntimeBuildSpan(db, buildRow.id, 'failed'),
   );
-  persistGateVerdict(deps, failedStep, {
-    stepFailed: true,
-    extracted: false,
-    blocked: false,
-    report: report ?? reportedVerdictHeads(failedStep, { commit: failedStep.checkpointCommit }),
-  });
   scheduleOrParkFailedBuild(deps, buildRow.id);
   if (
     todoRow &&
@@ -216,7 +200,7 @@ export function failStepWithEvents(
   reason: string,
   failure?: StepFailureMeta,
 ): void {
-  applyStepFailure(deps, stepRow, reason, undefined, undefined, failure);
+  applyStepFailure(deps, stepRow, reason, undefined, failure);
   const failedBuild = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (failedBuild) publishBuild(deps, failedBuild);
   const failedStep = deps.db.select().from(step).where(eq(step.id, stepRow.id)).get();

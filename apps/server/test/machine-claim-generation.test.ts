@@ -17,7 +17,6 @@ import {
 } from '../src/db/schema.js';
 import * as runtimeOtel from '../src/runtime-otel.js';
 import type { BlockerHandoffDeps } from '../src/services/blocker-handoff.js';
-import { flushVerdictDigests } from '../src/services/build-gate-verdict.js';
 import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { issueStepGitCredential } from '../src/services/credentials.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -290,46 +289,6 @@ describe('claim generation is fenced and strictly increasing', () => {
       wake.mockRestore();
       telemetry.mockRestore();
     }
-  });
-
-  test('retired gate enrichment starts only after the outer settlement commits', async () => {
-    const github = vi.fn(async () => Response.json({ id: 42, full_name: 'octo/alpha' }));
-    const w = await githubWorld(github);
-    w.startBuild(false);
-    const claimed = await w.claim();
-    const head = 'a'.repeat(40);
-    w.s.db
-      .update(stepTable)
-      .set({
-        kind: 'review',
-        prompt: `${JSON.stringify({ kind: 'review', gate: 'review', agentId: 'fixture', expectedHeadSha: head })}\nReview`,
-      })
-      .where(eq(stepTable.id, claimed.step.id))
-      .run();
-    w.s.db
-      .update(buildTable)
-      .set({ prNumber: 1 })
-      .where(eq(buildTable.id, claimed.step.buildId))
-      .run();
-    github.mockClear();
-    w.s.db.run(
-      sql`CREATE TEMP TRIGGER abort_gate_report BEFORE INSERT ON message WHEN NEW.id LIKE 'retired-gate-report-%' BEGIN SELECT RAISE(ABORT, 'rollback gate report'); END`,
-    );
-    const res = await call(w.s.app, 'POST', `/api/machine/done/${claimed.step.id}`, {
-      cred: w.token,
-      body: {
-        status: 'success',
-        generation: claimed.step.generation,
-        commit: head,
-        findings: { conclusion: 'passed', findings: [] },
-      },
-    });
-    expect(res.status).toBe(500);
-    await flushVerdictDigests();
-    expect(github).not.toHaveBeenCalled();
-    expect(
-      w.s.db.select().from(stepTable).where(eq(stepTable.id, claimed.step.id)).get()?.status,
-    ).toBe('claimed');
   });
 
   test('a machine completion without a generation is rejected before it can settle the new claim', async () => {

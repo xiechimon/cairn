@@ -117,7 +117,7 @@ function failStep(
 ): void {
   const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
   if (row === undefined) throw new Error(`missing step ${stepId}`);
-  applyStepFailure(w.deps, row, error, undefined, undefined, failure);
+  applyStepFailure(w.deps, row, error, undefined, failure);
 }
 
 function pendingStep(w: World, buildId: string) {

@@ -277,44 +277,6 @@ describe('delivery checks (B-C11/B-C14): zero changes / fake completion -> compl
     }
   });
 
-  test('a retired review reporting no changes cannot erase the delivered changes or fail the task', async () => {
-    const w = await setupWorld();
-    try {
-      await w.startBuild(false);
-      const buildStep = await w.claim();
-      await w.done(buildStep.step.id, {
-        status: 'success',
-        hasChanges: true,
-        sessionId: 'pi-b5',
-      });
-      expect(w.todoRow().phase).toBe('done');
-      const reviewStepId = 'legacy-review';
-      w.s.db
-        .insert(stepTable)
-        .values({
-          id: reviewStepId,
-          buildId: buildStep.step.buildId,
-          kind: 'review',
-          status: 'claimed',
-          machineId: buildStep.step.machineId,
-          claimedAt: Date.now(),
-          createdAt: Date.now(),
-        })
-        .run();
-      await w.done(reviewStepId, {
-        status: 'success',
-        hasChanges: false,
-        sessionId: 'pi-r1',
-      });
-      expect(w.todoRow().phase).toBe('done');
-      expect(w.todoRow().hasChanges).toBe(true);
-      expect(w.stepRow(reviewStepId).status).toBe('stopped');
-      expect(w.buildRow(buildStep.step.buildId).errorMessage).toBeNull();
-    } finally {
-      w.s.dispose();
-    }
-  });
-
   test('failure mode 5 (source of truth): repo-less project with hasChanges=true completes -- delivery does not read the always-empty projection', async () => {
     const w = await setupWorld();
     try {

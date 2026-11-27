@@ -15,7 +15,6 @@ import {
   claimedGeneration,
   insertClaudeSubscription,
   postProject,
-  seedRoute,
   seedSessionRoute,
 } from './helpers.js';
 
@@ -569,48 +568,6 @@ describe('claude rate limit (#1852)', () => {
     const row = stepOfBuild(s, buildId);
     expect(row.status).toBe('waiting_quota');
     expect(row.quotaBlock?.probeAt).toBeGreaterThan(Date.now() + 31 * 60 * 1000);
-    s.dispose();
-  });
-
-  test('a late failure from a legacy pi reviewer stops it without changing the Claude quota wait', async () => {
-    const s = bootServer({ claimHoldMs: 50 });
-    insertClaudeSubscription(s);
-    const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
-    useSessionRoute(s, machine.machineId, 'claude-code');
-    seedRoute(s, 'review', {
-      provider: 'stub-gw',
-      modelId: 'stub-model',
-      machineId: machine.machineId,
-    });
-    const claudeBuild = await startBuild(s);
-    const piBuild = await startBuild(s);
-    s.db
-      .update(stepTable)
-      .set({
-        kind: 'review',
-        prompt: `${JSON.stringify({ kind: 'review', agentId: 'review-route', gate: 'review' })}\n请审核`,
-      })
-      .where(eq(stepTable.buildId, piBuild))
-      .run();
-    await report(s, machine.token, machine.machineId, {
-      status: 'rejected',
-      rateLimitType: 'five_hour',
-      resetsAt: Date.now() + 2 * HOUR,
-    });
-    expect(stepOfBuild(s, claudeBuild).status).toBe('waiting_quota');
-    const claimed = await claim(s, machine.token);
-    expect(claimed?.step.buildId).toBe(piBuild);
-    const done = await call(s.app, 'POST', `/api/machine/done/${claimed!.step.id}`, {
-      cred: machine.token,
-      body: {
-        status: 'failed',
-        errorMessage: 'disk full',
-        generation: claimedGeneration(s.db, claimed!.step.id),
-      },
-    });
-    expect(done.status).toBe(200);
-    expect(stepOfBuild(s, piBuild).status).toBe('stopped');
-    expect(stepOfBuild(s, claudeBuild).status).toBe('waiting_quota');
     s.dispose();
   });
 });

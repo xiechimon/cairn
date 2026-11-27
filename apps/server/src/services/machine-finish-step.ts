@@ -36,8 +36,6 @@ import { conflict, HttpError } from '../lib/errors.js';
 import { githubBranchPulls } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
-import { settleRetiredGateStep } from './build-gate-steps.js';
-import { reportedVerdictHeads } from './build-gate-verdict.js';
 import {
   applyStepFailure,
   applyStoppedStep,
@@ -316,52 +314,17 @@ function prepareStepReport(
         failUnpublishedDeliverables(db, stepId, found.claimedAt);
       }
       revokeStepGitCredential(deps, stepId);
-      if (!(found.machineId === machineId && settleRetiredGateStep(deps, found, body))) {
-        if (body.status === 'failed') {
-          noteDeliveredPlanResidual(
-            deps,
-            found,
-            body.errorMessage?.trim() ? body.errorMessage : 'no reason reported',
-          );
-        }
+      if (body.status === 'failed') {
+        noteDeliveredPlanResidual(
+          deps,
+          found,
+          body.errorMessage?.trim() ? body.errorMessage : 'no reason reported',
+        );
       }
       return { stepRow: found };
     }
   }
   const stepRow = ownedStep(deps, machineId, stepId);
-  if (
-    (stepRow.kind === 'review' || stepRow.kind === 'verify') &&
-    stepRow.archiveStop === null &&
-    db
-      .select({ stepId: stopPending.stepId })
-      .from(stopPending)
-      .where(eq(stopPending.stepId, stepRow.id))
-      .get() === undefined
-  ) {
-    const gateWorker = workerStepContext(deps, stepRow);
-    const plan = gateWorker?.agentRow
-      ? planModelFallback(deps, stepRow, gateWorker.agentRow, body)
-      : null;
-    if (plan !== null && gateWorker?.agentRow) {
-      recordStepUsage(deps, stepRow, body.usage ?? []);
-      recordReportedProviderOutcome(deps, stepRow, gateWorker.agentRow, body, false);
-      if (plan.trigger === 'model_unavailable') markReportedModelDead(deps, stepRow, plan.from);
-      requeueStep(deps, stepRow, plan.row, {
-        id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
-        content: plan.note,
-      });
-      notifyModelFallback(deps, gateWorker.todoRow, gateWorker.agentRow, plan.note);
-      revokeStepGitCredential(deps, stepId);
-      emitSettledStepSpan(deps, stepId);
-      return { stepRow };
-    }
-  }
-  if (settleRetiredGateStep(deps, stepRow, body)) {
-    recordStepUsage(deps, stepRow, body.usage ?? []);
-    revokeStepGitCredential(deps, stepId);
-    emitSettledStepSpan(deps, stepId);
-    return { stepRow };
-  }
   let changeFiles: DocumentDiffFile[] | undefined;
   if (body.changesDiff !== undefined && body.changesDiff.length <= CHANGES_DIFF_MAX_BYTES) {
     try {
@@ -604,13 +567,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     return;
   }
   if (outcome.status === 'failed' && outcome.errorMessage === WORKFLOW_PUSH_REFUSAL) {
-    applyStepFailure(
-      deps,
-      stepRow,
-      WORKFLOW_PUSH_REFUSAL,
-      reportedVerdictHeads(stepRow, body),
-      body.preservedCommits,
-    );
+    applyStepFailure(deps, stepRow, WORKFLOW_PUSH_REFUSAL, body.preservedCommits);
     publishStepStatus(deps, stepId);
     emitSettledStepSpan(deps, stepId);
     return;
@@ -640,7 +597,6 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       deps,
       stepRow,
       `${outcome.errorMessage ?? ''}\nModel ${ran?.modelId ?? 'unknown'} is unavailable.`,
-      reportedVerdictHeads(stepRow, { gateHeadSha: body.gateHeadSha, commit: body.commit }),
       undefined,
       { code: 'model_unavailable' },
     );
@@ -699,10 +655,6 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     finishCoordinatorTurn(deps, stepRow, outcome);
     return;
   }
-  const verdictReport = reportedVerdictHeads(stepRow, {
-    gateHeadSha: body.gateHeadSha,
-    commit: body.commit,
-  });
   if (zeroUsage) {
     if (!(stepRow.fallback?.zeroUsageRetried ?? false)) {
       requeueStep(
@@ -717,7 +669,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       );
       return;
     }
-    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport, undefined, {
+    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, undefined, {
       code: 'silent_no_op',
     });
     publishStepStatus(deps, stepId);
@@ -734,7 +686,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   ) {
     const rounds = countMarkedRounds(db, stepRow.buildId, CI_FIX_PROMPT_HEAD);
     if (rounds >= CI_FIX_ROUNDS_MAX) {
-      applyStepFailure(deps, stepRow, deadLoopMessage(rounds), verdictReport, undefined, {
+      applyStepFailure(deps, stepRow, deadLoopMessage(rounds), undefined, {
         code: 'gate_rejection',
       });
     } else {
@@ -772,16 +724,9 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
         ...(outcome.workBranchDrift !== undefined
           ? { workBranchDrift: outcome.workBranchDrift }
           : {}),
-        ...(outcome.findings !== undefined ? { findings: outcome.findings } : {}),
-        ...(outcome.findingsError !== undefined ? { findingsError: outcome.findingsError } : {}),
-        ...(outcome.verifyVerdict !== undefined ? { verifyVerdict: outcome.verifyVerdict } : {}),
-        ...(outcome.verifyVerdictError !== undefined
-          ? { verifyVerdictError: outcome.verifyVerdictError }
-          : {}),
         ...(outcome.unpushedCommits !== undefined
           ? { unpushedCommits: outcome.unpushedCommits }
           : {}),
-        verdictReport,
       });
     complete(deps);
     publishStepStatus(deps, stepId);
@@ -798,7 +743,6 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     deps,
     stepRow,
     outcome.errorMessage ?? `step ${outcome.status}`,
-    verdictReport,
     body.preservedCommits,
     { code: body.failureCode ?? null, detail: body.failureDetail ?? null },
   );

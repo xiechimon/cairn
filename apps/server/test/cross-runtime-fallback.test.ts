@@ -7,7 +7,6 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import {
   chiefThread,
-  gateVerdict,
   machine as machineTable,
   provider as providerTable,
   routingRule,
@@ -28,7 +27,6 @@ import {
 
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
 const HEAD = 'ab'.repeat(20);
-const PASS_FINDINGS = { conclusion: 'pass', findings: [] as [] };
 
 async function call(
   app: Hono,
@@ -385,41 +383,6 @@ describe('review and verify model fallback', () => {
     expect(retried?.step.id).toBe(claimed!.step.id);
     expect(retried?.agent?.provider).toBe('relay-b');
     expect(retried?.agent?.modelId).toBe('model-b');
-  });
-
-  test('a review verdict records the model that actually ran it', async () => {
-    const w = await gateWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
-    const buildId = await w.startBuild();
-    const first = await w.claim();
-    await w.done(first!.step.id, { status: 'success', hasChanges: true, commit: HEAD });
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: `legacy-review-${buildId}`,
-        buildId,
-        kind: 'review',
-        status: 'pending',
-        prompt: `${JSON.stringify({ kind: 'review', agentId: w.reviewerId, gate: 'review', expectedHeadSha: HEAD })}\n请审核`,
-        createdAt: Date.now(),
-      })
-      .run();
-    const review = await w.claim();
-    expect(review?.step.kind).toBe('review');
-    await w.done(review!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
-    const retried = await w.claim();
-    const res = await w.done(retried!.step.id, {
-      status: 'success',
-      findings: PASS_FINDINGS,
-    });
-    expect(res.status).toBe(200);
-    const verdict = w.s.db
-      .select()
-      .from(gateVerdict)
-      .where(eq(gateVerdict.stepId, retried!.step.id))
-      .get();
-    expect(verdict).toBeDefined();
-    expect(verdict?.outcome).toBe('pass');
-    expect(verdict?.ranModel).toEqual({ provider: 'relay-b', modelId: 'model-b' });
   });
 });
 

@@ -2,7 +2,6 @@ import { UNSTARTED_STEP_STATUSES } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, ne, or } from 'drizzle-orm';
 import { build, machine, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { retireMergeGateSteps } from './build-gate-steps.js';
 import { applyStoppedStep, stopStepKeepPhase } from './build-stop.js';
 import { applyStepFailure, type BuildDeps } from './builds.js';
 import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
@@ -10,7 +9,6 @@ import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-tim
 export const BUILD_ABANDONED_STEP_MS = 120_000;
 
 export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs()): void {
-  retireMergeGateSteps(deps);
   const exitedLeftovers = deps.db
     .select({ id: step.id })
     .from(step)
@@ -103,7 +101,6 @@ function releaseClaimedStep(
       deps,
       row,
       `crashed ${claims} times after being claimed without progress; quarantined`,
-      undefined,
       undefined,
       { code: 'runner_disconnect' },
     );

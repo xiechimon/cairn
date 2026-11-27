@@ -1,4 +1,3 @@
-import type { ReviewVerdict } from '@cairn/shared';
 import {
   type AcceptanceEvaluation,
   ANSWERS_CONTINUE_PROMPT,
@@ -13,7 +12,6 @@ import {
   isPlanContractRewritePrompt,
   type PlanContractCheck,
   type TodoOutputKind,
-  type VerifyVerdict,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { runAfterCommit, withCommitEffects } from '../db/commit-effects.js';
@@ -29,8 +27,6 @@ import {
 } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
-import { settleRetiredGateStep } from './build-gate-steps.js';
-import type { VerdictReport } from './build-gate-verdict.js';
 import {
   applyStoppedStep,
   hasLeftExecution,
@@ -131,12 +127,7 @@ function confirmDeliveredPlan(deps: BuildDeps, buildId: string): void {
 export interface CompleteStepOutcome {
   hasChanges?: boolean;
   workBranchDrift?: { expected: string; actual: string };
-  findings?: ReviewVerdict;
-  findingsError?: string;
-  verifyVerdict?: VerifyVerdict;
-  verifyVerdictError?: string;
   report?: string;
-  verdictReport?: VerdictReport;
   deliverables?: DeliverableManifest;
   unpushedCommits?: number | null;
 }
@@ -154,7 +145,6 @@ export function completeStep(
 function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteStepOutcome): void {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
-  if (settleRetiredGateStep(deps, stepRow, outcome)) return;
   deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
   if (stepRow.archiveStop !== null) {
     applyStoppedStep(deps, stepId);
@@ -319,7 +309,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     planContract,
   );
   if (gateFailure !== null) {
-    applyStepFailure(deps, stepRow, gateFailure, outcome.verdictReport, undefined, {
+    applyStepFailure(deps, stepRow, gateFailure, undefined, {
       code: 'gate_rejection',
     });
     return;

@@ -64,8 +64,6 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/apns.ts:sessions':
     'HTTP/2 connection pool keyed on APNs origin; a process network resource',
   'apps/server/src/services/blockers.ts:DEAD_ENDS': 'constant lookup table',
-  'apps/server/src/services/build-gate-verdict.ts:verdictDigestsInFlight':
-    'outstanding digest-write promises of the in-server gate; flushVerdictDigests only awaits them',
   'apps/server/src/services/chief-tools.ts:PROJECT_WRITE_TOOLS': 'constant lookup table',
   'apps/server/src/services/ci-check-verdict.ts:FIXABLE': 'constant lookup table',
   'apps/server/src/services/ci-check-verdict.ts:BLOCKING_UNREQUIRED': 'constant lookup table',

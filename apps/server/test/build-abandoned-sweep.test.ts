@@ -18,7 +18,6 @@ import { claimStep } from '../src/services/machines.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
   bootServer,
-  seedRoute,
   seedSessionRoute,
   subscriptionClaudeReport,
   type TestServer,
@@ -713,25 +712,6 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('retired review steps stop instead of waiting for a compatible runtime', () => {
-    const w = makeWorld({
-      status: 'pending',
-      kind: 'review',
-      createdAgo: 601_000,
-      machineOnline: true,
-      withRoute: true,
-      routeProvider: 'claude-code',
-      machineRuntimes: ['pi'],
-      pin: 'self',
-    });
-    seedRoute(w.s, 'review', { provider: 'claude-code', machineId: w.machineId });
-
-    sweepAbandonedBuildSteps(w.s.svc, w.base);
-
-    expect(stepRowOf(w).status).toBe('stopped');
-    expect(buildRowOf(w).errorMessage).toBeNull();
-  });
-
   test('steps with no session route do not enter this check (unrouted = another seam family nobody can claim, not a gate block)', () => {
     const w = makeWorld({
       status: 'pending',
@@ -744,99 +724,6 @@ describe('#881 home machine online but blocked by the runtime gate (#1257 suspen
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
     expect(stepRowOf(w).status).toBe('pending');
-  });
-});
-
-describe('retired verify step recovery', () => {
-  test('an abandoned verify step stops and publishes its final state without failing the task', () => {
-    const w = makeWorld({
-      status: 'claimed',
-      kind: 'verify',
-      createdAgo: 300_000,
-      heartbeatAgo: 300_000,
-    });
-    const { events } = tapConvStream(w.s, w.buildId);
-
-    sweepAbandonedBuildSteps(w.s.svc, w.base);
-
-    const row = stepRowOf(w);
-    expect(row.status).toBe('stopped');
-    expect(row.machineId).toBe(w.machineId);
-    expect(todoRowOf(w).phase).toBe('building');
-    expect(buildRowOf(w).errorMessage).toBeNull();
-    expect(stepEventOf(events, w.stepId).status).toBe('stopped');
-  });
-
-  test('an unstarted claimed verify step stops even if the machine is online', () => {
-    const w = makeWorld({
-      status: 'claimed',
-      kind: 'verify',
-      createdAgo: 300_000,
-      machineOnline: true,
-    });
-
-    sweepAbandonedBuildSteps(w.s.svc, w.base);
-
-    expect(stepRowOf(w).status).toBe('stopped');
-    expect(stepRowOf(w).machineId).toBe(w.machineId);
-    expect(todoRowOf(w).phase).toBe('building');
-    expect(buildRowOf(w).errorMessage).toBeNull();
-  });
-
-  test('counterexample: fresh-heartbeat claimed verify step untouched', () => {
-    const w = makeWorld({
-      status: 'claimed',
-      kind: 'verify',
-      createdAgo: 300_000,
-      heartbeatAgo: 10_000,
-      machineOnline: true,
-    });
-
-    sweepAbandonedBuildSteps(w.s.svc, w.base);
-
-    expect(stepRowOf(w).status).toBe('claimed');
-    expect(buildRowOf(w).errorMessage).toBeNull();
-  });
-
-  test('counterexample: done verify step untouched (terminal -- sweep only scans pending/claimed)', () => {
-    const w = makeWorld({
-      status: 'claimed',
-      kind: 'verify',
-      createdAgo: 300_000,
-      heartbeatAgo: 300_000,
-    });
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, w.stepId)).run();
-
-    sweepAbandonedBuildSteps(w.s.svc, w.base);
-
-    expect(stepRowOf(w).status).toBe('done');
-  });
-
-  test('counterexample: failed verify step untouched (terminal -- sweep only scans pending/claimed)', () => {
-    const w = makeWorld({
-      status: 'claimed',
-      kind: 'verify',
-      createdAgo: 300_000,
-      heartbeatAgo: 300_000,
-    });
-    w.s.db.update(stepTable).set({ status: 'failed' }).where(eq(stepTable.id, w.stepId)).run();
-
-    sweepAbandonedBuildSteps(w.s.svc, w.base);
-
-    expect(stepRowOf(w).status).toBe('failed');
-  });
-
-  test('a pending verify step stops without waiting for a machine', () => {
-    const w = makeWorld({
-      status: 'pending',
-      kind: 'verify',
-      createdAgo: 300_000,
-    });
-
-    sweepAbandonedBuildSteps(w.s.svc, w.base);
-
-    expect(stepRowOf(w).status).toBe('stopped');
-    expect(buildRowOf(w).errorMessage).toBeNull();
   });
 });
 
