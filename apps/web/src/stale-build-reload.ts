@@ -45,12 +45,12 @@ export function reloadOnStaleBuild({
   });
 }
 
-const MODULE_SCRIPT_TAG = /<script\b[^>]*>/g;
+const MODULE_SCRIPT_TAG = /<script\b[^>]*>/gi;
 
 export function entryScriptOf(html: string): string | null {
   for (const [tag] of html.matchAll(MODULE_SCRIPT_TAG)) {
-    if (!/\btype="module"/.test(tag)) continue;
-    const src = /\bsrc="(\/assets\/[^"]+\.js)"/.exec(tag)?.[1];
+    if (!/\btype="module"/i.test(tag)) continue;
+    const src = /\bsrc="(\/assets\/[^"]+\.js)"/i.exec(tag)?.[1];
     if (src !== undefined) return src;
   }
   return null;

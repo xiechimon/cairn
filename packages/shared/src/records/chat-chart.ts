@@ -47,7 +47,8 @@ export function chartSlots(chart: Pick<ChatChart, 'series'>): number[] {
   });
 }
 
-const cell = (text: string) => text.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+const cell = (text: string) =>
+  text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 export function chartTableMarkdown(chart: ChatChart): string {
   const unit = chart.unit === undefined ? '' : ` (${chart.unit})`;

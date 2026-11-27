@@ -251,5 +251,8 @@ test('the entry script is read from the served index page, not from other script
   const html =
     '<head><script src="/boot-skeleton.js"></script><link rel="modulepreload" href="/assets/index-AAA.js"><script type="module" crossorigin src="/assets/index-C2NJl_Vf.js"></script></head>';
   expect(entryScriptOf(html)).toBe('/assets/index-C2NJl_Vf.js');
+  expect(entryScriptOf('<SCRIPT TYPE="module" SRC="/assets/index-UPPER.js"></SCRIPT>')).toBe(
+    '/assets/index-UPPER.js',
+  );
   expect(entryScriptOf('<script type="module" src="/src/main.tsx"></script>')).toBeNull();
 });

@@ -6,6 +6,9 @@ on:
     branches: [main, 'queue/**', 'preflight/**']
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && format('ci-push-{0}-{1}', github.ref, github.sha) || format('ci-ref-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

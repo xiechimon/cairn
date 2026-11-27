@@ -11,14 +11,36 @@ const defaultPushHosts: ReadonlySet<string> = new Set([
   'updates.push.services.mozilla.com',
 ]);
 
-export function pushSubscriptionBodySchemaForHosts(hosts: ReadonlySet<string> = defaultPushHosts) {
-  const exactHosts = [...hosts].map((host) => host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const hostname = new RegExp(
-    `^(?:${exactHosts.join('|')}|.+\\.push\\.apple\\.com|.+\\.notify\\.windows\\.com)$`,
-    'i',
+const ALLOWED_PUSH_SUFFIXES = ['.push.apple.com', '.notify.windows.com'] as const;
+
+function isAllowedPushHost(hostname: string, hosts: ReadonlySet<string>): boolean {
+  const lower = hostname.toLowerCase();
+  for (const host of hosts) {
+    if (lower === host.toLowerCase()) return true;
+  }
+  return ALLOWED_PUSH_SUFFIXES.some(
+    (suffix) => lower.length > suffix.length && lower.endsWith(suffix),
   );
+}
+
+function isAllowedPushUrl(value: string, hosts: ReadonlySet<string>): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(value).hostname;
+  } catch {
+    return false;
+  }
+  return isAllowedPushHost(hostname, hosts);
+}
+
+export function pushSubscriptionBodySchemaForHosts(hosts: ReadonlySet<string> = defaultPushHosts) {
   return z.object({
-    endpoint: z.url({ protocol: /^https$/, hostname }).max(2048),
+    endpoint: z
+      .url({ protocol: /^https$/ })
+      .max(2048)
+      .refine((value) => isAllowedPushUrl(value, hosts), {
+        message: 'Unsupported push endpoint host',
+      }),
     keys: pushSubscriptionKeysSchema,
     expirationTime: z.number().int().nullable().optional(),
   });
