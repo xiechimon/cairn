@@ -82,6 +82,8 @@ export const selfTests = [
   'scripts/product-surface-gate.test.mjs',
   'scripts/ui-debt-gate.test.mjs',
   'scripts/ui-guidelines-gate.test.mjs',
+  'scripts/geo/quality-gate.test.mjs',
+  'scripts/geo/geo-loop.test.mjs',
 ];
 
 const selfTest = ['node', '--test', ...selfTests];
@@ -217,6 +219,9 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', '--test', 'scripts/probe-reach.test.mjs'],
     ['node', '--test', 'scripts/escape-trace.test.mjs'],
     ['node', '--test', 'scripts/review-escapes.test.mjs'],
+    ...(paths.some((path) => path.startsWith('site/') || path.startsWith('scripts/geo/'))
+      ? [['node', 'scripts/geo/quality-gate.mjs']]
+      : []),
     ...(docPaths.length ? [['node', 'scripts/doc-reader-tests.mjs', ...docPaths]] : []),
   ];
   const opsSelftests = paths.some((path) => OPS_SELFTEST_PATHS.test(path));
