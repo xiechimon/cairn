@@ -673,13 +673,9 @@ jobs:
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node scripts/ops/ci-failed-only.mjs node-test --key gates-real-smoke -- node --test scripts/ops/real-smoke.test.mjs scripts/smoke/post-install.test.mjs
 
-      - name: Host control script fixtures (#2380)
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-host -- node --test scripts/ops/host/brake.test.mjs scripts/ops/host/surface-stuck-rebase.test.mjs scripts/ops/host/lane-replaced.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/main-watch.test.mjs scripts/ops/host/identity-compat.test.mjs
-
       - name: Test temp guard fixtures (#1954)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-temp-guard -- node --test scripts/ops/host/test-temp-guard.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-temp-guard -- node --test scripts/test-temp-run.test.mjs scripts/temp-environment.test.mjs
 
       - name: Runner secret isolation fixtures (#2189)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
@@ -700,10 +696,6 @@ jobs:
           bash scripts/ci-retry.sh curl -fsSL --connect-timeout 15 --max-time 60 -o "$RUNNER_TEMP/rrsync" https://raw.githubusercontent.com/RsyncProject/rsync/v3.4.1/support/rrsync
           echo "0bb743f8155907ed2a337c12a4672c67269e372803939ec98dac497edc714c9b  $RUNNER_TEMP/rrsync" | sha256sum -c -
           RRSYNC="$RUNNER_TEMP/rrsync" node scripts/ops/ci-failed-only.mjs node-test --key gates-server-backup -- node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
-
-      - name: Self-deploy and deploy-lag watch fixtures (#2288)
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-self-deploy -- node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs
 
       - name: Save failed-only CI state
         if: ${{ !cancelled() && failure() }}

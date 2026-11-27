@@ -253,7 +253,6 @@ test('no merge rule keeps a rebase or single-commit route for bot-opened PRs', (
     'AGENTS.md',
     '.claude/skills/pr-cairn/SKILL.md',
     'docs/ops/agent-bot-identity.md',
-    'scripts/ops/host/README.md',
   ]) {
     const text = readFileSync(file, 'utf8');
     assert.doesNotMatch(text, /--rebase/, file);

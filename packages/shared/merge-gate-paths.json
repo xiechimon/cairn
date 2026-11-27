@@ -113,7 +113,6 @@
     "dataDestruction": [
       "**/drizzle/**",
       "apps/server/src/db/client.ts",
-      "scripts/ops/deploy-self.sh",
       "scripts/ops/restore-drill.sh"
     ],
     "releaseAndControlPlane": [

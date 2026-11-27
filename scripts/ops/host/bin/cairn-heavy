@@ -1,8 +1,0 @@
-#!/bin/bash
-set -eu
-[ $# -gt 0 ] || { echo "usage: cairn-heavy <command...>" >&2; exit 2; }
-export CAIRN_TEST_TEMP_ROOT="${CAIRN_TEST_TEMP_ROOT-$HOME/.cache/cairn-test-tmp}"
-mkdir -p -- "$CAIRN_TEST_TEMP_ROOT" || exit 1
-repo=$(git rev-parse --show-toplevel 2>/dev/null) || repo="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
-[ -f "$repo/scripts/heavy-slots.mjs" ] || repo="${CAIRN_CHECKOUT:-$HOME/Code/AgentProjects/cairn-exec}"
-exec node "$repo/scripts/heavy-slots.mjs" run -- "$@"

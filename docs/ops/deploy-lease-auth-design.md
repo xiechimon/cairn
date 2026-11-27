@@ -7,7 +7,7 @@ Extends [the drain design](deploy-drain-design.md). Read that first for the leas
 Measured on omarchy, 2026-11-12:
 
 - `GET http://127.0.0.1:8787/api/server/deploy/lease` without a credential answers `401 {"error":"Unauthorized"}`. With `Authorization: Bearer` holding the owner token from `~/.cairn/token` it answers `200` and the lease row.
-- `~/.local/state/cairn-deploy/last-attempt.log` repeats `refused: server lacks the deployment lease endpoint; bootstrap server-only first`. The endpoint exists; the preflight in `scripts/ops/deploy-self.sh` mapped every non-200 to that sentence.
+- `~/.local/state/cairn-deploy/last-attempt.log` repeats `refused: server lacks the deployment lease endpoint; bootstrap server-only first`. The endpoint exists; the preflight in the retired `deploy-self` runner mapped every non-200 to that sentence.
 - #3927 (`1d7f9397c`) removed loopback admission: a loopback request is the owner only with the owner token, an owner session cookie or a stream ticket. #3624 (`67a2a82c1`) wrote the lease client while loopback was still admitted, so it sends no credential.
 - Both commits are ancestors of `b8be60b28`, the last deployed revision. The server that approved that deploy still admitted loopback. The server it installed does not, so the first daemon-affecting target after it was refused, and every one since.
 
@@ -50,4 +50,4 @@ Token causes named after a 401 or 403: the health URL is not loopback, the token
 | The test fake requires the token on every lease request | The old fake answered 200 to anonymous calls, which is why the regression shipped green. | None. |
 | Refusals keep exit 2 | The watcher retries every tick either way; only the message was wrong. | n/a |
 
-Security surface: none. The change is `scripts/ops/deploy-self.sh` (`dataDestruction` and `releaseAndControlPlane` in `packages/shared/merge-gate-paths.json`), its test and docs. No path in `credentials`, `machineAndCommandBoundary` or `externalEntryAuth` changes.
+Security surface: none. The change covered the retired `deploy-self` runner (`dataDestruction` and `releaseAndControlPlane` in `packages/shared/merge-gate-paths.json`), its test and docs. No path in `credentials`, `machineAndCommandBoundary` or `externalEntryAuth` changes.

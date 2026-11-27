@@ -2622,8 +2622,7 @@
         "apps/server/test/backup-status.test.ts",
         "apps/server/test/deploy-status.test.ts",
         "apps/server/test/deploy-lease.test.ts",
-        "integration/test/deploy-server-restart.test.ts",
-        "scripts/ops/deploy-self.test.mjs"
+        "integration/test/deploy-server-restart.test.ts"
       ],
       "batch": "B11"
     },
