@@ -294,11 +294,64 @@ export const RETRY_REASON_CODES = [
   'network',
   'server_error',
   'runner_disconnect',
+  'runtime_exited',
+  'runtime_startup_timeout',
+  'stream_timeout',
+  'silent_no_op',
   'rate_limit',
   'quota',
   'unknown',
 ] as const;
 export type RetryReasonCode = (typeof RETRY_REASON_CODES)[number];
+
+export const STEP_FAILURE_CODES = [
+  'runtime_exited',
+  'runtime_startup_timeout',
+  'missing_tool',
+  'auth',
+  'rate_limit',
+  'quota',
+  'network',
+  'server_error',
+  'stream_timeout',
+  'silent_no_op',
+  'setup_hook',
+  'config',
+  'model_unavailable',
+  'runtime_outdated',
+  'gate_rejection',
+  'branch_divergence',
+  'spend_limit',
+  'runner_disconnect',
+  'unknown',
+] as const;
+export type StepFailureCode = (typeof STEP_FAILURE_CODES)[number];
+
+export const STEP_FAILURE_CLASS_BY_CODE: Readonly<Record<StepFailureCode, RetryFailureClass>> = {
+  missing_tool: 'permanent',
+  auth: 'permanent',
+  setup_hook: 'permanent',
+  config: 'permanent',
+  model_unavailable: 'permanent',
+  runtime_outdated: 'permanent',
+  gate_rejection: 'permanent',
+  branch_divergence: 'permanent',
+  spend_limit: 'permanent',
+  rate_limit: 'rate_limit',
+  quota: 'rate_limit',
+  runtime_exited: 'transient',
+  runtime_startup_timeout: 'transient',
+  network: 'transient',
+  server_error: 'transient',
+  stream_timeout: 'transient',
+  silent_no_op: 'transient',
+  runner_disconnect: 'transient',
+  unknown: 'unknown',
+};
+
+export function failureClassForCode(code: StepFailureCode): RetryFailureClass {
+  return STEP_FAILURE_CLASS_BY_CODE[code];
+}
 
 export interface RetryFailureClassification {
   failureClass: RetryFailureClass;
@@ -665,19 +718,10 @@ export function classifyRetryFailure(
   }
 
   if (isRateOrQuota) {
-    const parsedResetAt = parseQuotaResetAt(trimmed, now);
-    const parsedDelayMs = parseRetryDelayMs(trimmed, now);
-    const retryAfterMs =
-      parsedDelayMs ??
-      (parsedResetAt !== null
-        ? Math.max(1_000, Math.min(parsedResetAt - now, RETRY_AFTER_MAX_MS))
-        : null);
-    const resetAt = parsedResetAt ?? (retryAfterMs !== null ? now + retryAfterMs : null);
     return {
       failureClass: 'rate_limit',
       reasonCode: stepKind === 'quota' || agentKind === 'quota' ? 'quota' : 'rate_limit',
-      retryAfterMs,
-      resetAt,
+      ...rateLimitTiming(trimmed, now),
     };
   }
 
@@ -709,4 +753,33 @@ export function classifyRetryFailure(
   }
 
   return { failureClass: 'unknown', reasonCode: 'unknown', retryAfterMs: null, resetAt: null };
+}
+
+function rateLimitTiming(
+  text: string,
+  now: number,
+): Pick<RetryFailureClassification, 'retryAfterMs' | 'resetAt'> {
+  const parsedResetAt = parseQuotaResetAt(text, now);
+  const parsedDelayMs = parseRetryDelayMs(text, now);
+  const retryAfterMs =
+    parsedDelayMs ??
+    (parsedResetAt !== null
+      ? Math.max(1_000, Math.min(parsedResetAt - now, RETRY_AFTER_MAX_MS))
+      : null);
+  const resetAt = parsedResetAt ?? (retryAfterMs !== null ? now + retryAfterMs : null);
+  return { retryAfterMs, resetAt };
+}
+
+export function classifyRetryFailureWithCode(
+  rawError: string,
+  code: StepFailureCode | null | undefined,
+  now = Date.now(),
+): RetryFailureClassification {
+  if (code == null) return classifyRetryFailure(rawError, now);
+  const failureClass = failureClassForCode(code);
+  if (failureClass === 'rate_limit') {
+    const trimmed = scanSlice(rawError).trim();
+    return { failureClass, reasonCode: code, ...rateLimitTiming(trimmed, now) };
+  }
+  return { failureClass, reasonCode: code, retryAfterMs: null, resetAt: null };
 }

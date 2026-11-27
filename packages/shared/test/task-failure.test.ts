@@ -4,19 +4,24 @@ import {
   CLAUDE_CODE_AUTH_FAILURE_MARKER,
   classifyAgentFailure,
   classifyRetryFailure,
+  classifyRetryFailureWithCode,
   classifyStepFailure,
+  failureClassForCode,
   isMissingCommandHookNote,
   isProviderAuthFailure,
   isProviderOutage,
+  machineDoneBodySchema,
   missingSetupCommand,
   noVisionSignalOf,
   parseQuotaResetAt,
   parseRetryAfterMs,
   parseRetryDelayMs,
   RETRY_FAILURE_CLASSES,
+  RETRY_REASON_CODES,
   runtimeUpdateRequired,
+  STEP_FAILURE_CODES,
   STEP_FAILURE_KINDS,
-} from '../src/task-failure.js';
+} from '../src/index.js';
 
 describe('classifyStepFailure (#1257 three-bucket classification)', () => {
   test('failure mode 1: quota bucket', () => {
@@ -463,5 +468,91 @@ describe('missingSetupCommand and isMissingCommandHookNote', () => {
     ).toBe(true);
     expect(isMissingCommandHookNote({ status: 'failed', exitCode: 3, output: 'boom' })).toBe(false);
     expect(isMissingCommandHookNote({ status: 'timeout', exitCode: null, output: '' })).toBe(false);
+  });
+});
+
+describe('structured step failure codes and machineDoneBodySchema', () => {
+  test('every STEP_FAILURE_CODES entry is a RetryReasonCode with a defined failure class', () => {
+    const retryReasons = new Set<string>(RETRY_REASON_CODES);
+    for (const code of STEP_FAILURE_CODES) {
+      expect(retryReasons.has(code)).toBe(true);
+      expect(RETRY_FAILURE_CLASSES).toContain(failureClassForCode(code));
+    }
+    expect(failureClassForCode('runtime_exited')).toBe('transient');
+    expect(failureClassForCode('runtime_startup_timeout')).toBe('transient');
+    expect(failureClassForCode('stream_timeout')).toBe('transient');
+    expect(failureClassForCode('silent_no_op')).toBe('transient');
+    expect(failureClassForCode('auth')).toBe('permanent');
+    expect(failureClassForCode('missing_tool')).toBe('permanent');
+    expect(failureClassForCode('rate_limit')).toBe('rate_limit');
+    expect(failureClassForCode('quota')).toBe('rate_limit');
+    expect(failureClassForCode('unknown')).toBe('unknown');
+  });
+
+  test('classifyRetryFailureWithCode obeys explicit code over conflicting rawError text and falls back when absent', () => {
+    expect(classifyRetryFailureWithCode('ACP connection closed', 'auth')).toEqual({
+      failureClass: 'permanent',
+      reasonCode: 'auth',
+      retryAfterMs: null,
+      resetAt: null,
+    });
+    expect(classifyRetryFailureWithCode('429 rate limit in stderr', 'runtime_exited')).toEqual({
+      failureClass: 'transient',
+      reasonCode: 'runtime_exited',
+      retryAfterMs: null,
+      resetAt: null,
+    });
+    expect(classifyRetryFailureWithCode('ECONNRESET', 'missing_tool')).toEqual({
+      failureClass: 'permanent',
+      reasonCode: 'missing_tool',
+      retryAfterMs: null,
+      resetAt: null,
+    });
+
+    const now = Date.UTC(2026, 10, 27, 1, 0, 0);
+    expect(classifyRetryFailureWithCode('HTTP 429 Retry-After: 45s', 'rate_limit', now)).toEqual({
+      failureClass: 'rate_limit',
+      reasonCode: 'rate_limit',
+      retryAfterMs: 45_000,
+      resetAt: now + 45_000,
+    });
+
+    const legacyMsg = 'upstream error: HTTP 503 Service Unavailable';
+    expect(classifyRetryFailureWithCode(legacyMsg, null, now)).toEqual(
+      classifyRetryFailure(legacyMsg, now),
+    );
+    expect(classifyRetryFailureWithCode(legacyMsg, undefined, now)).toEqual(
+      classifyRetryFailure(legacyMsg, now),
+    );
+  });
+
+  test('machineDoneBodySchema accepts optional failureCode/failureDetail, preserves legacy payloads, and rejects invalid values', () => {
+    expect(
+      machineDoneBodySchema.safeParse({
+        status: 'failed',
+        errorMessage: 'agy exited',
+        failureCode: 'runtime_exited',
+        failureDetail: { runtime: 'antigravity', exitCode: 137, signal: 'SIGKILL' },
+      }).success,
+    ).toBe(true);
+    expect(
+      machineDoneBodySchema.safeParse({
+        status: 'failed',
+        errorMessage: 'legacy runner error',
+      }).success,
+    ).toBe(true);
+    expect(
+      machineDoneBodySchema.safeParse({
+        status: 'failed',
+        failureCode: 'not_a_real_code',
+      }).success,
+    ).toBe(false);
+    expect(
+      machineDoneBodySchema.safeParse({
+        status: 'failed',
+        failureCode: 'runtime_exited',
+        failureDetail: { runtime: 'x'.repeat(41) },
+      }).success,
+    ).toBe(false);
   });
 });
