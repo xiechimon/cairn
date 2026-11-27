@@ -48,6 +48,10 @@ A task that touches `apps/web/` gets its rule rows pasted into the brief, not a 
 node scripts/design-rules-for.mjs apps/web/src/chief/chief-conversation.tsx apps/web/src/components/chat/
 ```
 
+## Plan gate
+
+Follow `docs/ops/plan-gate.md`: small fixes need no plan; features, user-visible behavior changes, new mechanisms, persisted state, wire/step protocols, and concurrency require a fresh-context-reviewed `docs/design/<slug>.md` plan (`Verdict: PASS`, matching `Plan-SHA256`) before code and a `Plan: docs/design/<slug>.md` trailer on Tier 1 commits (`scripts/plan-gate.mjs`). Code review checks the diff row by row against the plan.
+
 ## Worker prompt
 
 Implement the task below and verify it according to the repository rules. Apply every item in the [Evidence limits checklist](#evidence-limits-checklist) and report the supported claims and unverified limits. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles and commit messages. When you make a mistake during the task and fix it, and the same kind of mistake could recur, add a safeguard in the code (type, lint rule, test or CI check) at the highest feasible level, use the real mistake as its negative control, and name the mistake in the commit message. Do not write files under `docs/lessons/`.

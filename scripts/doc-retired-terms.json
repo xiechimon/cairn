@@ -77,6 +77,12 @@
       "pattern": "`#`\\s+(?:mention\\s+|task\\s+)?picker|\\bhash[- ]task[- ]picker\\b",
       "canary": "the `#` picker and the `#n` it inserts",
       "reason": "owner decision 2026-11-22: the product never shows a # picker for choosing a task; the user names a task in words"
+    },
+    {
+      "id": "one-page-design",
+      "pattern": "\\bone-page design\\b",
+      "canary": "write a one-page design",
+      "reason": "replaced by the hash-verified plan gate in docs/ops/plan-gate.md and scripts/plan-gate.mjs"
     }
   ],
   "baseline": {
@@ -123,6 +129,7 @@
     "memory-candidate-table": {},
     "experience-candidate-module": {},
     "computer-image-rebuild": {},
-    "hash-task-picker": {}
+    "hash-task-picker": {},
+    "one-page-design": {}
   }
 }

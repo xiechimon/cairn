@@ -51,7 +51,9 @@ A lane verifies on GitHub before it enters the landing queue:
   `*.test.mts` under `apps/`, `packages/` or `integration/`, or
   `scripts/*.test.mjs`; a Playwright `*.spec.ts` or a deletion does not count)
   is red, no test is run, and CI still checks that the tests fail on the
-  parent. On a machine that refuses multi-file test runs
+  parent. `scripts/plan-gate.mjs` also runs in the cheap-checks step and
+  `check-core`, refusing Tier 1 commits without a hash-verified `PASS` plan
+  (`docs/ops/plan-gate.md`). On a machine that refuses multi-file test runs
   (no `CI`, `CAIRN_MINI_TEST` or `CAIRN_LOCAL_HEAVY`), `pnpm test:changed`
   runs a single related file, and with two or more it lists them, runs none and
   leaves them to the `ci` run. Setting `CAIRN_PREFLIGHT_GATE_WRAPPER`
