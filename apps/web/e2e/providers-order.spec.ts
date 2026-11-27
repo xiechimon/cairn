@@ -1,5 +1,5 @@
-import { expect, type Page, test } from '@playwright/test';
-import type { DevinSubscriptionListEntry } from '@cairn/shared';
+import { expect, type Locator, type Page, test } from '@playwright/test';
+import type { ClaudeSubscriptionListEntry, DevinSubscriptionListEntry } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const NOW = Date.now();
@@ -30,11 +30,20 @@ const names = (page: Page) =>
     rows.map((row) => row.getAttribute('data-instance-id')),
   );
 
-function mount(page: Page, saved: string[][], failSave = false) {
-  let order: string[] | null = null;
+function mount(
+  page: Page,
+  saved: string[][],
+  failSave = false,
+  options?: {
+    devin?: DevinSubscriptionListEntry[];
+    claude?: ClaudeSubscriptionListEntry[];
+    initialOrder?: string[] | null;
+  },
+) {
+  let order: string[] | null = options?.initialOrder ?? null;
   return mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
-    if (path === '/api/teams/t1/devin-subscriptions') return json([DEVIN]);
-    if (path === '/api/teams/t1/claude-subscriptions') return json([]);
+    if (path === '/api/teams/t1/devin-subscriptions') return json(options?.devin ?? [DEVIN]);
+    if (path === '/api/teams/t1/claude-subscriptions') return json(options?.claude ?? []);
     if (path === '/api/teams/t1/antigravity-subscriptions') return json([]);
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     if (path === '/api/teams/t1/providers')
@@ -172,4 +181,153 @@ test('A10: single-pointer move buttons reorder providers without dragging (WCAG 
 
   await page.reload();
   await expect.poll(() => names(page)).toEqual(toTop);
+});
+
+async function assertNoMoveButtonOverlap(row: Locator, label: string) {
+  const report = await row.evaluate((rowEl) => {
+    const rowRect = rowEl.getBoundingClientRect();
+    const up = rowEl.querySelector('[data-testid="sortable-move-up"]');
+    const down = rowEl.querySelector('[data-testid="sortable-move-down"]');
+    const quota = rowEl.querySelector('[data-testid="subscription-quota-mini"]');
+    const status = rowEl.querySelector('[data-testid="provider-status-mark"]');
+    const issues: string[] = [];
+    if (!(up instanceof HTMLElement) || !(down instanceof HTMLElement)) {
+      return { issues: ['missing move buttons'] };
+    }
+    if (!(quota instanceof HTMLElement) || !(status instanceof HTMLElement)) {
+      return { issues: ['missing quota or status element'] };
+    }
+    for (const [name, el] of [
+      ['quota', quota],
+      ['status', status],
+    ] as const) {
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      if (
+        rect.width <= 0 ||
+        rect.height <= 0 ||
+        style.visibility === 'hidden' ||
+        Number(style.opacity) === 0
+      ) {
+        issues.push(`${name} is not visible`);
+      }
+    }
+    const moveWrapper = up.parentElement;
+    const moveBtns = [
+      ['sortable-move-up', up],
+      ['sortable-move-down', down],
+    ] as const;
+    for (const [key, btn] of moveBtns) {
+      const rect = btn.getBoundingClientRect();
+      const style = getComputedStyle(btn);
+      if (style.pointerEvents !== 'auto') {
+        issues.push(`${key} pointer-events=${style.pointerEvents}`);
+      }
+      if (rect.width < 23.5 || rect.height < 23.5) {
+        issues.push(`${key} too small: ${Math.round(rect.width)}x${Math.round(rect.height)}`);
+      }
+      if (rect.left < rowRect.left - 0.5 || rect.right > rowRect.right + 0.5) {
+        issues.push(
+          `${key} out of row bounds (${Math.round(rect.left)}..${Math.round(rect.right)} vs ${Math.round(rowRect.left)}..${Math.round(rowRect.right)})`,
+        );
+      }
+    }
+    const contentBoxes: Array<{ label: string; rect: DOMRect }> = [];
+    const walker = document.createTreeWalker(rowEl, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node !== null) {
+      const text = node.textContent?.trim() ?? '';
+      if (text.length > 0 && (moveWrapper === null || !moveWrapper.contains(node))) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const rect of range.getClientRects()) {
+          if (rect.width > 0.5 && rect.height > 0.5) {
+            contentBoxes.push({ label: `text:${text}`, rect });
+          }
+        }
+      }
+      node = walker.nextNode();
+    }
+    for (const el of rowEl.querySelectorAll('svg, [role="img"]')) {
+      if (moveWrapper !== null && moveWrapper.contains(el)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0.5 && rect.height > 0.5) {
+        const name =
+          el.getAttribute('data-testid') ?? el.getAttribute('aria-label') ?? el.tagName.toLowerCase();
+        contentBoxes.push({ label: `icon:${name}`, rect });
+      }
+    }
+    for (const [key, btn] of moveBtns) {
+      const a = btn.getBoundingClientRect();
+      for (const item of contentBoxes) {
+        const b = item.rect;
+        if (
+          a.left < b.right - 0.5 &&
+          a.right > b.left + 0.5 &&
+          a.top < b.bottom - 0.5 &&
+          a.bottom > b.top + 0.5
+        ) {
+          issues.push(
+            `${key}(${Math.round(a.left)}..${Math.round(a.right)},${Math.round(a.top)}..${Math.round(a.bottom)}) overlaps ${item.label}(${Math.round(b.left)}..${Math.round(b.right)},${Math.round(b.top)}..${Math.round(b.bottom)})`,
+          );
+        }
+      }
+    }
+    if (rowEl.scrollWidth > rowEl.clientWidth + 1) {
+      issues.push(`row overflows horizontally (${rowEl.scrollWidth} > ${rowEl.clientWidth})`);
+    }
+    return { issues };
+  });
+  expect(report.issues, label).toEqual([]);
+}
+
+test('A10: hover and focus-revealed move buttons do not overlap quota text or status icons', async ({
+  page,
+}) => {
+  const saved: string[][] = [];
+  const claude: ClaudeSubscriptionListEntry = {
+    id: 'sub-claude',
+    kind: 'claude-subscription',
+    label: 'Claude 订阅',
+    expiresAt: null,
+    createdAt: NOW - 86_400_000,
+    windows: [{ name: 'billing_period', utilization: 0.3, resetsAt: null, observedAt: NOW }],
+    lastUsedAt: null,
+    stepsLast24h: 0,
+  };
+  await mount(page, saved, false, {
+    devin: [],
+    claude: [claude],
+    initialOrder: ['provider:p-a', 'subscription:sub-claude', 'provider:p-b'],
+  });
+  await page.goto('/app/settings/routing');
+
+  const row = page.locator('[data-instance-id="subscription:sub-claude"]');
+  await expect(row.getByTestId('subscription-quota-mini')).toHaveText('剩 70%');
+  await expect(row.getByTestId('provider-status-mark')).toBeVisible();
+
+  await row.hover();
+  await assertNoMoveButtonOverlap(row, 'unselected hover');
+
+  await page.mouse.move(0, 0);
+  await row.getByTestId('sortable-move-up').focus();
+  await assertNoMoveButtonOverlap(row, 'keyboard focus');
+
+  await row.getByRole('button').first().click();
+  await expect(row).toHaveAttribute('aria-current', 'true');
+  await row.hover();
+  await assertNoMoveButtonOverlap(row, 'selected hover');
+
+  await row.evaluate((el) => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && el.contains(active)) active.blur();
+  });
+  await page.mouse.move(0, 0);
+  await expect(row.getByTestId('sortable-move-up')).toHaveCSS('pointer-events', 'none');
+  const idleWrapperWidth = await row
+    .getByTestId('sortable-move-up')
+    .evaluate((btn) => btn.parentElement?.getBoundingClientRect().width ?? -1);
+  expect(idleWrapperWidth, 'C3: collapsed hover controls take 0px width at rest').toBeLessThanOrEqual(
+    0.5,
+  );
 });

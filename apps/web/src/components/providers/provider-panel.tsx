@@ -157,7 +157,7 @@ export function SortableMoveButtons({
       className={cn(
         'flex flex-none items-center gap-0.5',
         revealOnHover &&
-          'pointer-fine:pointer-events-none pointer-fine:absolute pointer-fine:top-1/2 pointer-fine:right-2 pointer-fine:z-10 pointer-fine:-translate-y-1/2 pointer-fine:rounded-md pointer-fine:bg-menu-hover pointer-fine:p-0.5 pointer-fine:opacity-0 pointer-fine:group-aria-[current=true]/row:bg-(--sidebar-active) pointer-fine:group-hover/row:pointer-events-auto pointer-fine:group-hover/row:opacity-100 pointer-fine:group-focus-within/row:pointer-events-auto pointer-fine:group-focus-within/row:opacity-100 pointer-coarse:gap-1',
+          'self-center pointer-fine:pointer-events-none pointer-fine:-ml-3 pointer-fine:h-0 pointer-fine:w-0 pointer-fine:justify-end pointer-fine:overflow-hidden pointer-fine:opacity-0 pointer-fine:group-hover/row:pointer-events-auto pointer-fine:group-hover/row:-ml-1 pointer-fine:group-hover/row:h-auto pointer-fine:group-hover/row:w-auto pointer-fine:group-hover/row:overflow-visible pointer-fine:group-hover/row:opacity-100 pointer-fine:group-focus-within/row:pointer-events-auto pointer-fine:group-focus-within/row:-ml-1 pointer-fine:group-focus-within/row:h-auto pointer-fine:group-focus-within/row:w-auto pointer-fine:group-focus-within/row:overflow-visible pointer-fine:group-focus-within/row:opacity-100 pointer-coarse:gap-1',
       )}
     >
       {actions.map(({ key, tip, handler, Icon, buttonRef }) => (
