@@ -23,8 +23,6 @@
     "apps/desktop/README.md|path|`apps/desktop/runner`",
     "apps/desktop/README.md|path|`apps/desktop/release`",
     "apps/web/.design-sync/NOTES.md|path|`../../public/fonts/`",
-    "docs/ops/incident-2271-integration-pass.md|path|`apps/web/src/detail/use-detail-composer.ts`",
-    "docs/ops/incident-2271-integration-pass.md|path|`apps/web/test/detail-confirm-request-changes.test.ts`",
     "docs/reliability/1996/README.md|path|`docs/verify/1996/`",
     "docs/reliability/effect-paths-audit.md|path|`apps/coordinator`",
     "docs/security/2000-prelaunch-review.md|path|`../sentinel.txt`",
