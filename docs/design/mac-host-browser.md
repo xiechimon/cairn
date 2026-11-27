@@ -4,6 +4,24 @@ Prior art and the reasons for the shape: `docs/research/mac-agent-browser-prior-
 The built-in Linux VM was the only browser a Mac had; when it was removed, every Mac stopped
 reporting `browser` and every `browser_*` call failed.
 
+## Owner decision, 2026-11-27
+
+The owner chose option 1:
+
+> Protect the browser parts this change adds, write down the remaining risk, then ship.
+> - Browser driver: the sandbox may not rewrite or directly exec it. The unzip tool is always the system one.
+> - Chrome: only the one in the system Applications folder that passes Google code-signature verification. Users with Chrome elsewhere download the ~100 MB Cairn browser component instead; they never install Chrome themselves. (This changes the earlier approved "prefer installed Chrome".)
+> - Screen stream: live view is out of scope, so switch it off after every launch. A short gap between launch and switch-off may remain; measure it.
+> - Click: goes only to the browser that opened the current page.
+> - Acceptance: write tests and design to this standard first, then code, then a new review. If it fails again, stop; no fourth version.
+> - Remaining risk: `npx`, and the risk accepted on 11-24, stay.
+
+The Mac host shell remains `(allow default)` with credential-focused denies. Commit `96c8470a5`
+records the accepted 2026-11-24 residual: host-shell write access to shell rc files and
+LaunchAgents is inherent to owner-approved credential-only confinement. This design adds narrow
+protections for the browser driver, the browser bundle and the browser's local control ports; it
+does not reopen that decision.
+
 ## What a newcomer meets
 
 They install Cairn today, open the Coordinator and write "open example.com". Nothing to set up,
@@ -24,9 +42,9 @@ no account, no key, no payment, no prompt to install anything.
 
 | Part | Where | Pinned by |
 | --- | --- | --- |
-| `agent-browser` binary | inside the Mac app (`Resources/agent-browser/`), staged by `stage-agent-browser`; the runner gets its path in `CAIRN_AGENT_BROWSER` | version, URL, size, SHA-256; the daemon never downloads it |
-| Google Chrome | `/Applications`, `~/Applications`, then Spotlight by bundle id `com.google.Chrome`; looked up again on every call | not pinned |
-| Headless shell | `<Cairn home>/tools/chrome-headless-shell/`, installed through the managed runtime (lock, staging folder, completion marker, hash check on every use) | version, URL, SHA-256 per architecture |
+| `agent-browser` binary | inside the Mac app (`Resources/agent-browser/`), staged by `stage-agent-browser`; the runner gets its path in `CAIRN_AGENT_BROWSER`; the host-shell sandbox cannot read, write or execute its directory | version, URL, size, SHA-256; the daemon never downloads it |
+| Google Chrome | only `/Applications/Google Chrome.app`, after `/usr/bin/codesign --verify -R=<designated requirement>` verifies the measured Google requirement; deep strict verification is not used because genuine Chrome carries resource-fork detritus, and the app is looked up again on every call | not pinned; the host-shell sandbox cannot write the bundle, whether it exists yet or not |
+| Headless shell | `<Cairn home>/tools/chrome-headless-shell/`, installed through the managed runtime (lock, staging folder, completion marker, hash check on every use, 256 MB download cap, 10 min fetch timeout) with `/usr/bin/unzip` | version, URL, SHA-256 per architecture |
 
 Chrome is skipped when `/Library/Managed Preferences/com.google.Chrome.plist` exists: an
 organisation policy can forbid headless or remote control. The two browsers keep separate profile
@@ -74,23 +92,30 @@ browser: it can read files the sandboxed host shell is denied and reach the Cair
   only when it picks the port itself. It is therefore pointed at `browser-launcher`, a script in
   the Cairn data folder (denied to the sandbox) that writes that file after `lsof` shows that its
   own process listens on the pinned port, then becomes the browser (`CAIRN_BROWSER_EXECUTABLE`).
-- When the stream port is taken, `agent-browser` silently picks a random one. Before each command
-  the daemon reads the session's `.stream` file and switches a stream outside the pool off. A
-  sandboxed command cannot cause this; another program on the Mac taking the port between the
-  check and the browser start can, and the stream is then open until the next command.
+- Live view is out of scope. After every `agent-browser` command completes, if the session daemon started or `<session>.stream` exists, the daemon synchronously runs `stream disable` with the same session and browser environment, then records the launch-to-shutdown gap in the daemon log. Running `stream disable` after the command returns avoids competing with `open` on the daemon's serialized socket and avoids killing slow launches. A fallback port outside the pool is treated the same way, because the disable is unconditional rather than triggered by the port number.
+- `AI_GATEWAY_*` is stripped from browser commands: Cairn never uses the stream server's model
+  endpoints, and the key must not be present while the short stream window exists.
 - An `escalate` command the owner approved runs outside the sandbox and is not limited by this.
 - Linux runners are unchanged by this design: their sandbox does not isolate loopback.
+
+Residual risks accepted here: Browser MCP starts unsandboxed through `npx -y
+@browsermcp/mcp@2.5.0`; the npm cache is shared and writable by host commands, so a compromised
+host command may influence a later Browser MCP start. The 2026-11-24 credential-only host-shell
+decision also leaves shell rc files and LaunchAgents writable. Linux loopback exposure is
+pre-existing and unchanged.
 
 ## Which machine runs a call
 
 1. **Owner's Chrome.** Taken when the tool is a browser tool, `stealth` is unset, there is no
    `fill_secret` and Browser MCP is on. Candidates are connected machines in this order: the one
-   that last answered, the server's own host, then the others by last contact. A candidate is the
-   server's own host reporting `browser` or `ownerChrome`, or, for the instance owner's threads
-   only, any machine reporting `ownerChrome`. These calls create no `computer` row and take no
-   lease; the daemon runs the calls for one tab one after another. `browser_act` is offered to the
-   first candidate only, because its element references belong to the page that machine showed;
-   when that machine is offline or has no extension, step 4 applies.
+   that last answered in this conversation, the server's own host, then the others by last
+   contact. A candidate is the server's own host reporting `browser` or `ownerChrome`, or, for the
+   instance owner's threads only, any machine reporting `ownerChrome`. These calls create no
+   `computer` row and take no lease; the daemon runs the calls for one tab one after another. The
+   server records which browser produced the conversation's current page. `browser_snapshot` and
+   `browser_act` never leave that browser: when it is Cairn's browser they skip step 1, and when
+   it is the owner's Chrome they are offered only to that machine. This also holds after a
+   stealth call or a `fill_secret` action switched the work into Cairn's browser.
 2. A candidate that cannot reach an extension (no `npx`, the server did not start, no browser
    connected) answers with the shared `OWNER_CHROME_UNAVAILABLE` prefix, and the server asks the
    next one under a new attempt id. It answers that way only when none of the call's commands ran.
@@ -133,7 +158,7 @@ close it.
 | `capabilities.stealthBrowser` | daemon presence report, Linux desktops only | `browserOfferFor` | absent: the stealth parameter and its text are not offered |
 | `ownerChrome` on a computer call | `machine-computer.ts` on the call sent to a daemon | `computer/dispatch.ts` | an old daemon strips it and treats the call as a call for its own browser |
 | the offered tool table | `browserOfferFor`, in the in-server runtime and in the Runner claim | the model | the in-server runtime reinstalls it when the offer changes; a Runner gets it with each claim |
-| finished owner's Chrome calls (`computer_call` rows with no computer and no phone) | the call store | `lastOwnerChromeMachine` (candidate order) | none yet: the server host goes first |
+| finished browser calls (`computer_call` rows joined to their step) | the call store | `lastBrowserProducer` (candidate order and the browser that owns the current page) | none yet: the server host goes first; rows from another conversation never affect this one |
 | `CAIRN_AGENT_BROWSER` | the Mac app, in its runner's environment | `bundledAgentBrowser` | unset or not executable: unsupported |
 | `<Cairn home>/tools/chrome-headless-shell/` | the managed runtime during a download | `mac-browser.ts` before every call that has no Chrome | an incomplete or tampered install is not used; the next call downloads again |
 | `<Cairn home>/mac-browser/profiles/` | the browser | the browser only | a missing folder is created empty, so the site asks for sign-in again; nothing in this change deletes it |
@@ -167,7 +192,7 @@ Without takeover, the `browser_*` descriptions say that nobody can take over and
 | Extension waiting for Allow or paused | the extension's own words | stop | until they act | server and daemon |
 | Browser MCP on, no extension anywhere | page from Cairn's browser with the note | step 4 | as above | server |
 | Extension drops after a click ran | the error | no replay | none | daemon |
-| `browser_act` after the machine that showed the page lost its extension | Cairn's browser with the note | no other Mac's Chrome | none | server |
+| `browser_act` after the machine that showed the page lost its extension | a not-connected error | no other browser, because the click belongs to the page's own browser | until that Mac or extension returns | server |
 | Two calls for one tab at once | both answer | one after the other | the second waits | daemon |
 | A sandboxed command probes the browser's ports or 9009 | connection refused | profile denies them | none | daemon, real sandbox on macOS |
 | 16 browsers running at once | "too many browsers are open" | no 17th | until one idles out (30 min) | |

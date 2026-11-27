@@ -120,8 +120,11 @@ interface HostShellPolicy {
   deniedFiles: string[];
   stagingRoot?: string;
   serverPort?: number;
-  agentDesktopDir?: string;
+  agentDesktopDirs?: string[];
+  agentBrowserDirs?: string[];
 }
+
+const SYSTEM_CHROME_APP = '/Applications/Google Chrome.app';
 
 function hostShellProfile(policy: HostShellPolicy): string {
   const deniedAncestors = [
@@ -136,13 +139,18 @@ function hostShellProfile(policy: HostShellPolicy): string {
       ...policy.deniedDirectories.map((path) => `(subpath ${quoted(path)})`),
       ...policy.deniedFiles.map((path) => `(literal ${quoted(path)})`),
     ]),
+    `(deny file-write* (literal ${quoted(SYSTEM_CHROME_APP)}) (subpath ${quoted(SYSTEM_CHROME_APP)}))`,
+    `(deny file-write-unlink (literal ${quoted(SYSTEM_CHROME_APP)}))`,
     ...ruleLines(
       'deny file-write-unlink',
       deniedAncestors.map((path) => `(literal ${quoted(path)})`),
     ),
   );
-  if (policy.agentDesktopDir !== undefined) {
-    lines.push(`(deny process-exec (subpath ${quoted(policy.agentDesktopDir)}))`);
+  for (const dir of new Set([
+    ...(policy.agentDesktopDirs ?? []),
+    ...(policy.agentBrowserDirs ?? []),
+  ])) {
+    lines.push(`(deny process-exec (subpath ${quoted(dir)}))`);
   }
   lines.push(...unixSocketDenies(policy.deniedDirectories, policy.deniedFiles));
   lines.push(...ESCAPE_DENIALS);

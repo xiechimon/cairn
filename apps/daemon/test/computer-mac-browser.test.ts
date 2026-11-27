@@ -10,19 +10,21 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { ComputerCall, ComputerFrame, MachineCapabilities } from '@cairn/shared';
 import { OWNER_CHROME_UNAVAILABLE_PREFIX } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
-import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MAC_SHELL_DENIED_PORTS } from '../src/backend/loopback-ports.js';
 import { createComputerDispatcher } from '../src/computer/dispatch.js';
 import {
   createMacBrowser,
+  findInstalledChrome,
   type MacBrowserOptions,
   NO_STEALTH_BROWSER_NOTE,
+  verifyGoogleChrome,
 } from '../src/computer/mac-browser.js';
 import { boot } from './machine-loop-harness.js';
+import { testTempDir } from './test-temp-dir.js';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -35,10 +37,24 @@ function executable(path: string, body: string): string {
 function fakeAgentBrowser(dir: string, log: string): string {
   return executable(
     join(dir, 'agent-browser'),
-    `printf '%s\\n' "ARGV $*" "EXE $AGENT_BROWSER_EXECUTABLE_PATH" "PROFILE $AGENT_BROWSER_PROFILE" "UA $AGENT_BROWSER_USER_AGENT" "ARGS $AGENT_BROWSER_ARGS" "REAL $CAIRN_BROWSER_EXECUTABLE" "STREAM $AGENT_BROWSER_STREAM_PORT" >> '${log}'
+    `printf '%s\\n' "ARGV $*" "EXE $AGENT_BROWSER_EXECUTABLE_PATH" "PROFILE $AGENT_BROWSER_PROFILE" "UA $AGENT_BROWSER_USER_AGENT" "ARGS $AGENT_BROWSER_ARGS" "REAL $CAIRN_BROWSER_EXECUTABLE" "STREAM $AGENT_BROWSER_STREAM_PORT" "AI $AI_GATEWAY_API_KEY" >> '${log}'
 case "$*" in
+  *" open "*)
+    sdir="$HOME/$AGENT_BROWSER_SOCKET_DIR"
+    mkdir -p "$sdir"
+    printf '%s' "$$" > "$sdir/$2.pid"
+    printf '%s' "$AGENT_BROWSER_STREAM_PORT" > "$sdir/$2.stream"
+    echo '✓ Example Domain' ;;
+  *"stream disable"*)
+    stream="$HOME/$AGENT_BROWSER_SOCKET_DIR/$2.stream"
+    if [ -e "$stream" ]; then
+      '${process.execPath}' -e 'require("fs").unlinkSync(process.argv[1])' "$stream"
+      echo 'Streaming disabled'
+    else
+      echo '✗ Streaming is not enabled for this session' >&2
+      exit 1
+    fi ;;
   *"tab list"*) echo '{"data":{"tabs":[{"active":true,"label":null,"targetId":"t1"}]}}' ;;
-  *" open "*) echo '✓ Example Domain' ;;
   *"get url"*) echo '{"data":{"url":"https://example.com/"}}' ;;
   *"snapshot"*) echo '- link "Learn more" [ref=e1]' ;;
   *eval*) echo '{"data":{"result":[]}}' ;;
@@ -61,7 +77,7 @@ function shellZip(dir: string): { path: string; sha256: string } {
 }
 
 function world(overrides: Partial<MacBrowserOptions> = {}) {
-  const dir = realpathSync(makeTestTempDir('mac-browser-'));
+  const dir = realpathSync(testTempDir('mac-browser-'));
   const log = join(dir, 'agent-browser.log');
   const agentBrowser = fakeAgentBrowser(dir, log);
   const chrome = executable(join(dir, 'chrome'), 'echo "Google Chrome 158.0.8127.89 "');
@@ -141,9 +157,68 @@ async function reportedCapabilities(env: NodeJS.ProcessEnv): Promise<MachineCapa
   return (booted.api.presenceBodies.at(-1) as { capabilities: MachineCapabilities }).capabilities;
 }
 
+function plantedChrome(root: string, applications = join(root, 'Applications')): string {
+  const binary = join(applications, 'Google Chrome.app', 'Contents', 'MacOS', 'Google Chrome');
+  mkdirSync(dirname(binary), { recursive: true });
+  executable(binary, 'echo "Google Chrome 158.0.0.0"');
+  return binary;
+}
+
+describe('choosing the installed Chrome', () => {
+  test('verification is the system codesign with Google’s designated requirement', async () => {
+    const seen: unknown[][] = [];
+    const runImpl = vi.fn(async (...args: unknown[]) => {
+      seen.push(args);
+      return { stdout: '', stderr: '' };
+    }) as unknown as Parameters<typeof verifyGoogleChrome>[1];
+    await expect(verifyGoogleChrome('/tmp/Google Chrome.app', runImpl)).resolves.toBe(true);
+    expect(seen[0]?.[0]).toBe('/usr/bin/codesign');
+    const args = seen[0]?.[1] as string[];
+    expect(args[0]).toBe('--verify');
+    expect(args[1]).toContain('identifier "com.google.Chrome"');
+    expect(args[1]).toContain('anchor apple generic');
+    expect(args[1]).toContain('certificate leaf[subject.OU] = "EQHXZ8M8AV"');
+    expect(args[2]).toBe('/tmp/Google Chrome.app');
+  });
+
+  test('a Chrome-shaped program in the user Applications folder is never used', async () => {
+    const dir = realpathSync(testTempDir('mac-chrome-lookup-'));
+    plantedChrome(join(dir, 'home'));
+    const systemApplications = join(dir, 'system-applications');
+    mkdirSync(systemApplications, { recursive: true });
+    await expect(
+      findInstalledChrome(join(dir, 'home'), { applications: systemApplications }),
+    ).resolves.toBeNull();
+  });
+
+  test('the system Chrome must pass the Google designated requirement before its path is used', async () => {
+    const dir = realpathSync(testTempDir('mac-chrome-verify-'));
+    const systemApplications = join(dir, 'system-applications');
+    const binary = plantedChrome(systemApplications, systemApplications);
+    const verify = vi.fn(async () => false);
+    await expect(
+      findInstalledChrome(join(dir, 'home'), { applications: systemApplications, verify }),
+    ).resolves.toBeNull();
+    expect(verify).toHaveBeenCalledWith(join(systemApplications, 'Google Chrome.app'));
+    verify.mockImplementation(async () => true);
+    await expect(
+      findInstalledChrome(join(dir, 'home'), { applications: systemApplications, verify }),
+    ).resolves.toBe(binary);
+  });
+
+  test.runIf(process.platform === 'darwin')(
+    'real codesign rejects an unsigned Chrome-shaped bundle',
+    async () => {
+      const dir = realpathSync(testTempDir('mac-chrome-real-codesign-'));
+      plantedChrome(dir, dir);
+      await expect(verifyGoogleChrome(join(dir, 'Google Chrome.app'))).resolves.toBe(false);
+    },
+  );
+});
+
 describe('what a Mac reports', () => {
   test('a Mac whose app bundles agent-browser reports a browser and no computer', async () => {
-    const dir = makeTestTempDir('mac-caps-');
+    const dir = testTempDir('mac-caps-');
     const capabilities = await reportedCapabilities({
       PATH: process.env.PATH,
       HOME: dir,
@@ -157,7 +232,7 @@ describe('what a Mac reports', () => {
   });
 
   test('a Mac without the bundled binary reports no browser but can still drive the owner’s Chrome', async () => {
-    const dir = makeTestTempDir('mac-caps-');
+    const dir = testTempDir('mac-caps-');
     const capabilities = await reportedCapabilities({ PATH: process.env.PATH, HOME: dir });
     expect(capabilities.browser).toBeUndefined();
     expect(capabilities.ownerChrome).toBe(true);
@@ -183,6 +258,19 @@ describe('a browser call on a Mac', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  test('browser commands do not inherit an AI gateway key', async () => {
+    const w = world();
+    const browser = createMacBrowser({
+      ...w.options,
+      env: { ...w.options.env, AI_GATEWAY_API_KEY: 'secret-key' },
+    });
+    const result = await dispatcherFor(browser).run();
+    expect(result.ok).toBe(true);
+    const seen = readFileSync(w.log, 'utf8');
+    expect(seen).toContain('AI ');
+    expect(seen).not.toContain('secret-key');
+  });
+
   test('without Chrome the first call downloads the headless shell, then works', async () => {
     const w = world({ chrome: async () => null });
     const browser = createMacBrowser({ ...w.options, fetchImpl: download(w.zip.path) });
@@ -194,6 +282,21 @@ describe('a browser call on a Mac', () => {
     );
     const again = await dispatcherFor(browser).run();
     expect(again.text).not.toContain('第一次使用浏览器');
+  });
+
+  test('the archive is unpacked by the system unzip even when PATH offers another one', async () => {
+    const w = world({ chrome: async () => null });
+    const bin = join(w.dir, 'path');
+    mkdirSync(bin, { recursive: true });
+    executable(join(bin, 'unzip'), 'echo planted-unzip >&2\nexit 42');
+    vi.stubEnv('PATH', bin);
+    try {
+      const browser = createMacBrowser({ ...w.options, fetchImpl: download(w.zip.path) });
+      const result = await dispatcherFor(browser).run();
+      expect(result.ok).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   test('a download slower than the wait answers with its progress and carries on', async () => {
@@ -250,6 +353,37 @@ describe('a browser call on a Mac', () => {
     expect(existsSync(w.log)).toBe(false);
     expect((await dispatcherFor(browser).run()).ok).toBe(true);
   });
+
+  test('an archive exceeding the size limit is rejected before hashing', async () => {
+    const w = world({
+      chrome: async () => null,
+      maxArchiveBytes: 1024,
+      fetchImpl: (async () =>
+        new Response(new Uint8Array(2048), {
+          headers: { 'content-length': '2048' },
+        })) as typeof fetch,
+    });
+    const failed = await dispatcherFor(w.browser).run();
+    expect(failed.ok).toBe(false);
+    expect(failed.text).toContain('超出限制');
+  });
+
+  test('killAll aborts an in-flight shell download', async () => {
+    let seenSignal: AbortSignal | null | undefined;
+    const w = world({
+      chrome: async () => null,
+      waitMs: 50,
+      fetchImpl: ((_url: string | URL | Request, init?: RequestInit) => {
+        seenSignal = init?.signal;
+        return new Promise<Response>(() => {});
+      }) as typeof fetch,
+    });
+    const first = await dispatcherFor(w.browser).run();
+    expect(first.ok).toBe(false);
+    expect(seenSignal?.aborted).toBe(false);
+    await w.browser.killAll();
+    expect(seenSignal?.aborted).toBe(true);
+  });
 });
 
 describe('the browser’s loopback ports', () => {
@@ -270,14 +404,26 @@ describe('the browser’s loopback ports', () => {
 });
 
 describe('the browser launcher', () => {
-  test('a stream that fell back to a port the sandbox leaves open is switched off', async () => {
+  test('every launch switches the live stream off and records the launch-to-shutdown gap', async () => {
+    const messages: string[] = [];
+    const w = world({ log: (message) => messages.push(message) });
+    const { run } = dispatcherFor(w.browser);
+    await run();
+    expect(readFileSync(w.log, 'utf8')).toContain('--session p_thread-1 stream disable');
+    expect(existsSync(join(w.options.root, '.agent-browser', 'p_thread-1.stream'))).toBe(false);
+    expect(messages.some((line) => /stream.*off after \d+ ms/.test(line))).toBe(true);
+  });
+
+  test('a stream that fell back to a port outside the pool is still switched off on the next command', async () => {
     const w = world();
     const { run } = dispatcherFor(w.browser);
     await run();
+    writeFileSync(w.log, '');
     mkdirSync(join(w.options.root, '.agent-browser'), { recursive: true });
     writeFileSync(join(w.options.root, '.agent-browser', 'p_thread-1.stream'), '53108');
     await run();
     expect(readFileSync(w.log, 'utf8')).toContain('--session p_thread-1 stream disable');
+    expect(existsSync(join(w.options.root, '.agent-browser', 'p_thread-1.stream'))).toBe(false);
   });
 
   test.skipIf(process.platform !== 'darwin')(
@@ -394,7 +540,7 @@ describe('Browser MCP on a Mac', () => {
   });
 
   test('it needs no Cairn browser, and an unreachable extension is reported for the server to try elsewhere', async () => {
-    vi.stubEnv('PATH', makeTestTempDir('no-npx-'));
+    vi.stubEnv('PATH', testTempDir('no-npx-'));
     const result = await dispatcherFor(undefined).run({ ownerChrome: 'browsermcp' });
     vi.unstubAllEnvs();
     expect(result.ok).toBe(false);

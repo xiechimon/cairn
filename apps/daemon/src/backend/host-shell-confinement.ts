@@ -38,6 +38,7 @@ export interface HostShellConfinementOptions {
   deniedRoots?: string[];
   serverPort?: number;
   agentDesktop?: string | null;
+  agentBrowser?: string | null;
   platform?: string;
   path?: string;
   xdgRuntimeDir?: string;
@@ -84,8 +85,9 @@ function denyVariants(paths: readonly string[]): string[] {
 }
 
 function agentDesktopDir(binary: string): string | undefined {
-  if (!isAbsolute(binary)) return undefined;
-  const parent = dirname(binary);
+  const trimmed = binary.trim();
+  if (!isAbsolute(trimmed)) return undefined;
+  const parent = dirname(trimmed);
   const grandparent = dirname(parent);
   return /^(arm64|x64)$/.test(basename(parent)) ? grandparent : parent;
 }
@@ -97,6 +99,8 @@ export function createHostShellConfinement(
   const home = options.home ?? homedir();
   const desktopDir =
     options.agentDesktop == null ? undefined : agentDesktopDir(options.agentDesktop);
+  const browserDir =
+    options.agentBrowser == null ? undefined : agentDesktopDir(options.agentBrowser);
   const xdgRuntimeDir = options.xdgRuntimeDir ?? process.env.XDG_RUNTIME_DIR;
   const runtimeDir =
     platform === 'linux'
@@ -130,6 +134,7 @@ export function createHostShellConfinement(
   const rawDeniedDirectories = [
     ...(options.deniedRoots ?? []),
     ...(desktopDir !== undefined ? [desktopDir] : []),
+    ...(browserDir !== undefined ? [browserDir] : []),
     ...runtimeDirectories,
     ...(platform === 'darwin'
       ? [...HOST_SHELL_CREDENTIAL_DIRECTORIES, ...MAC_HOST_SHELL_CREDENTIAL_DIRECTORIES].map(
@@ -150,6 +155,7 @@ export function createHostShellConfinement(
     denyVariants([
       ...(options.deniedRoots ?? []),
       ...(desktopDir !== undefined ? [desktopDir] : []),
+      ...(browserDir !== undefined ? [browserDir] : []),
     ]),
   );
   const deniedPaths = [...deniedDirectories, ...deniedFiles];
@@ -182,7 +188,8 @@ export function createHostShellConfinement(
             ? { stagingRoot: canonicalize(options.stagingRoot) }
             : {}),
           ...(options.serverPort !== undefined ? { serverPort: options.serverPort } : {}),
-          ...(desktopDir !== undefined ? { agentDesktopDir: desktopDir } : {}),
+          ...(desktopDir !== undefined ? { agentDesktopDirs: denyVariants([desktopDir]) } : {}),
+          ...(browserDir !== undefined ? { agentBrowserDirs: denyVariants([browserDir]) } : {}),
         },
         command,
         [...args],
@@ -389,6 +396,7 @@ export function runnerHostShellConfinement(runner: {
     deniedRoots: [runner.cairnHome, join(homedir(), '.cairn'), ...extraDeniedRoots],
     ...(serverPort !== null ? { serverPort } : {}),
     agentDesktop: runner.capabilityEnv.CAIRN_AGENT_DESKTOP ?? null,
+    agentBrowser: runner.capabilityEnv.CAIRN_AGENT_BROWSER ?? null,
     stagingRoot: runner.stagingRoot,
   });
 }

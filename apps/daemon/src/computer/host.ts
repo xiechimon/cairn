@@ -263,11 +263,16 @@ export class HostComputerProvider implements ComputerProvider {
     if (signal.aborted || Date.now() >= deadlineAt) return stoppedBeforeSpawn();
 
     const marker = randomBytes(12).toString('hex');
-    const env = {
+    const env: Record<string, string> = {
       ...hostCommandEnvironment(this.env, request.env),
       ...browserEnv,
       [COMPUTER_MARKER_ENV]: marker,
     };
+    if (requested === AGENT_BROWSER_BINARY) {
+      for (const name of Object.keys(env)) {
+        if (name.toUpperCase().startsWith('AI_GATEWAY_')) delete env[name];
+      }
+    }
     let child: ReturnType<typeof spawnContainedCommand>;
     try {
       const launched =

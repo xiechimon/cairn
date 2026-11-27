@@ -1,7 +1,8 @@
 import { COMPUTER_BROWSER_TOOLS } from '@cairn/shared';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { computerCall, machine } from '../db/schema.js';
+import { computerCall, machine, step } from '../db/schema.js';
+import { browserScopeFor, type ComputerThread, computerThreadOf } from './computer-thread.js';
 import { isOwner } from './instance-owner.js';
 import { localBrowserConnector } from './mcp-servers.js';
 
@@ -28,25 +29,61 @@ export function teamMachines(db: Pick<Db, 'select'>, teamId: string): MachineRow
     .all();
 }
 
-function lastOwnerChromeMachine(db: Pick<Db, 'select'>, teamId: string): string | undefined {
-  return db
-    .select({ machineId: computerCall.machineId })
+export interface BrowserProducer {
+  machineId: string;
+  ownerChrome: boolean;
+}
+
+export function lastBrowserProducer(
+  db: Pick<Db, 'select'>,
+  thread: ComputerThread,
+): BrowserProducer | undefined {
+  const rows = db
+    .select({
+      machineId: computerCall.machineId,
+      computerId: computerCall.computerId,
+      phoneId: computerCall.phoneId,
+      kind: step.kind,
+      buildId: step.buildId,
+    })
     .from(computerCall)
+    .innerJoin(step, eq(step.id, computerCall.stepId))
     .where(
       and(
-        eq(computerCall.teamId, teamId),
+        eq(computerCall.teamId, thread.teamId),
         eq(computerCall.state, 'done'),
-        isNull(computerCall.computerId),
-        isNull(computerCall.phoneId),
         inArray(computerCall.tool, [...COMPUTER_BROWSER_TOOLS]),
       ),
     )
-    .orderBy(desc(computerCall.createdAt))
-    .limit(1)
-    .get()?.machineId;
+    .orderBy(desc(sql`"computer_call"."rowid"`))
+    .limit(100)
+    .all();
+  const wanted = browserScopeFor(thread);
+  for (const row of rows) {
+    const producedIn = computerThreadOf(db, { kind: row.kind, buildId: row.buildId });
+    if (producedIn === null || browserScopeFor(producedIn) !== wanted) continue;
+    return {
+      machineId: row.machineId,
+      ownerChrome: row.computerId === null && row.phoneId === null,
+    };
+  }
+  return undefined;
 }
 
-export function ownerChromeCandidates(db: Db, audience: BrowserAudience): MachineRow[] {
+function lastOwnerChromeMachine(
+  db: Pick<Db, 'select'>,
+  thread: ComputerThread | undefined,
+): string | undefined {
+  if (thread === undefined) return undefined;
+  const producer = lastBrowserProducer(db, thread);
+  return producer?.ownerChrome === true ? producer.machineId : undefined;
+}
+
+export function ownerChromeCandidates(
+  db: Db,
+  audience: BrowserAudience,
+  thread?: ComputerThread,
+): MachineRow[] {
   if (localBrowserConnector(db, audience.teamId) === null) return [];
   const ownerThread = isOwner(db, audience.userId);
   const able = teamMachines(db, audience.teamId).filter((row) => {
@@ -54,7 +91,7 @@ export function ownerChromeCandidates(db: Db, audience: BrowserAudience): Machin
     if (row.kind === 'local') return drives || row.capabilities?.browser === true;
     return ownerThread && drives;
   });
-  const remembered = lastOwnerChromeMachine(db, audience.teamId);
+  const remembered = lastOwnerChromeMachine(db, thread);
   const rank = (row: MachineRow) => (row.id === remembered ? 0 : row.kind === 'local' ? 1 : 2);
   return able.sort((a, b) => rank(a) - rank(b));
 }

@@ -13,7 +13,10 @@ import { createServer as createUnixServer } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
-import { createHostShellConfinement } from '../src/backend/host-shell-confinement.js';
+import {
+  createHostShellConfinement,
+  runnerHostShellConfinement,
+} from '../src/backend/host-shell-confinement.js';
 import { executableOnPath } from '../src/computer/contained-spawn.js';
 import { HostComputerProvider, hostCommandEnvironment } from '../src/computer/host.js';
 import { ComputerRefusal } from '../src/computer/provider.js';
@@ -159,12 +162,13 @@ describe('host shell command environment', () => {
 });
 
 describe('createHostShellConfinement', () => {
-  test('denied() covers the server home, .ssh, denied files and the agent-desktop dir', () => {
+  test('denied() covers the server home, .ssh, denied files and the agent binary dirs', () => {
     const { home, serverHome, root } = layout();
     const conf = createHostShellConfinement({
       home,
       deniedRoots: [serverHome],
       agentDesktop: join(root, 'agent-desktop', 'agent-desktop'),
+      agentBrowser: join(root, 'agent-browser', 'arm64', 'agent-browser'),
       platform: 'darwin',
     });
     expect(conf.denied(join(serverHome, 'access-token'))).toBe(true);
@@ -175,6 +179,26 @@ describe('createHostShellConfinement', () => {
     expect(conf.denied(join(home, '.colima', 'default', 'docker.sock'))).toBe(true);
     expect(conf.denied(join(home, '.tmux', 'default'))).toBe(true);
     expect(conf.denied(join(root, 'agent-desktop', 'agent-desktop'))).toBe(true);
+    expect(conf.denied(join(root, 'agent-browser', 'arm64', 'agent-browser'))).toBe(true);
+    expect(conf.denied(join(root, 'agent-browser', 'x64', 'agent-browser'))).toBe(true);
+    expect(conf.denied(join(home, 'work', 'out.txt'))).toBe(false);
+  });
+
+  test('runnerHostShellConfinement wires CAIRN_AGENT_BROWSER (even whitespace-padded) into denied() and seatbelt', () => {
+    const { home, root } = layout();
+    const agentBrowser = join(root, 'agent-browser', 'arm64', 'agent-browser');
+    const conf = runnerHostShellConfinement({
+      cairnHome: join(root, 'runner-home'),
+      serverUrl: 'http://127.0.0.1:8787',
+      stagingRoot: join(root, 'staging'),
+      capabilityEnv: { CAIRN_AGENT_BROWSER: `  ${agentBrowser}  ` },
+    });
+    expect(conf.denied(agentBrowser)).toBe(true);
+    expect(conf.denied(join(root, 'agent-browser', 'x64', 'agent-browser'))).toBe(true);
+    if (process.platform === 'darwin' && existsSync('/usr/bin/sandbox-exec')) {
+      const profile = conf.wrap('true', []).args[1] as string;
+      expect(profile).toContain(`(deny process-exec (subpath "${join(root, 'agent-browser')}"))`);
+    }
     expect(conf.denied(join(home, 'work', 'out.txt'))).toBe(false);
   });
 
@@ -222,6 +246,7 @@ describe('createHostShellConfinement', () => {
       deniedRoots: [serverHome],
       serverPort: 8123,
       agentDesktop: join(root, 'agent-desktop', 'agent-desktop'),
+      agentBrowser: join(root, 'agent-browser', 'arm64', 'agent-browser'),
       platform: 'darwin',
     });
     if (!existsSync('/usr/bin/sandbox-exec')) {
@@ -238,6 +263,13 @@ describe('createHostShellConfinement', () => {
     expect(profile).toContain('(deny network-inbound (local tcp "*:8123"))');
     expect(profile).toContain('(deny network-bind (local tcp "*:8123"))');
     expect(profile).toContain(`(deny process-exec (subpath "${join(root, 'agent-desktop')}")`);
+    expect(profile).toContain(`(deny process-exec (subpath "${join(root, 'agent-browser')}")`);
+    expect(profile).toContain(
+      '(deny file-write* (literal "/Applications/Google Chrome.app") (subpath "/Applications/Google Chrome.app"))',
+    );
+    expect(profile).toContain(
+      '(deny file-write-unlink (literal "/Applications/Google Chrome.app"))',
+    );
     expect(profile).toContain('(deny network-outbound (remote unix-socket');
     expect(profile).toContain('(deny network-bind (local unix-socket');
     expect(profile).toContain('(deny file-write* (regex');
@@ -517,11 +549,16 @@ describe.runIf(process.platform === 'darwin')('host shell seatbelt probe', () =>
       mkdirSync(join(root, 'agent-desktop'), { recursive: true });
       writeFileSync(agentDesktop, '#!/bin/sh\necho ran\n');
       spawnSync('chmod', ['+x', agentDesktop]);
+      const agentBrowser = join(root, 'agent-browser', 'arm64', 'agent-browser');
+      mkdirSync(join(root, 'agent-browser', 'arm64'), { recursive: true });
+      writeFileSync(agentBrowser, '#!/bin/sh\necho ran\n');
+      spawnSync('chmod', ['+x', agentBrowser]);
       const conf = createHostShellConfinement({
         home,
         deniedRoots: [serverHome, socketDir],
         serverPort: port,
         agentDesktop,
+        agentBrowser,
       });
       const failures = [
         `/bin/cat '${join(serverHome, 'access-token')}'`,
@@ -530,6 +567,13 @@ describe.runIf(process.platform === 'darwin')('host shell seatbelt probe', () =>
         `/bin/cat '${agentDesktop}'`,
         `cp '${agentDesktop}' '${join(home, 'work', 'copy')}' && '${join(home, 'work', 'copy')}'`,
         `'${agentDesktop}'`,
+        `/bin/cat '${agentBrowser}'`,
+        `cp '${agentBrowser}' '${join(home, 'work', 'browser-copy')}' && '${join(home, 'work', 'browser-copy')}'`,
+        `'${agentBrowser}'`,
+        `echo rewritten > '${agentBrowser}'`,
+        `mv '${join(root, 'agent-browser')}' '${join(root, 'agent-browser-away')}'`,
+        `touch '/Applications/Google Chrome.app/.cairn-write-probe'`,
+        `mkdir '/Applications/Google Chrome.app/.cairn-dir-probe'`,
         `/usr/bin/nc -z -w 2 127.0.0.1 ${port}`,
         `/usr/bin/nc -l -w 1 127.0.0.1 ${port}`,
         `curl -s -m 3 http://127.0.0.1:${port}/api/auth/bootstrap`,
@@ -547,6 +591,7 @@ describe.runIf(process.platform === 'darwin')('host shell seatbelt probe', () =>
         expect(outcome.stdout, script).not.toContain('secret');
       }
       expect(received).toEqual([]);
+      expect(readFileSync(agentBrowser, 'utf8')).toBe('#!/bin/sh\necho ran\n');
       const work = conf.wrap('/bin/sh', ['-c', `echo built > '${join(home, 'work', 'out')}'`]);
       expect(spawnSync(work.command, work.args, { cwd: home }).status).toBe(0);
     } finally {

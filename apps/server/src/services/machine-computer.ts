@@ -106,7 +106,7 @@ import {
   computerThreadOf,
   NO_CARD_THREAD,
 } from './computer-thread.js';
-import { ownerChromeCandidates, teamMachines } from './coordinator-browser.js';
+import { lastBrowserProducer, ownerChromeCandidates, teamMachines } from './coordinator-browser.js';
 import type { TeamStreamHub } from './events.js';
 import {
   HOST_SHELL_ESCALATION_ACTION,
@@ -1241,7 +1241,12 @@ export async function forwardComputerCall(
   const safe = COMPUTER_REPLAY_SAFE_TOOLS.has(tool);
   const baseId = computerCallId(stepId, body.toolCallId);
   const chained = ownerChromeChains.get(baseId);
-  if (chained !== undefined) return chained;
+  if (chained !== undefined) {
+    if (chained.tool !== tool) {
+      throw new HttpError(409, `tool call ${body.toolCallId} was already used for ${chained.tool}`);
+    }
+    return chained.chain;
+  }
   const existing = latestComputerAttempt(db, stepId, body.toolCallId)?.row;
   const callId = existing ? existing.id : baseId;
   if (existing && existing.tool !== tool) {
@@ -1340,20 +1345,40 @@ export async function forwardComputerCall(
       browserRows: authorized.rows,
     }).then((sent) => namingBrowser(db, tool, target.machineId, false, sent.result));
   };
+  const pageProducer = isComputerBrowserTool(tool) ? lastBrowserProducer(db, thread) : undefined;
+  const followsCurrentPage = tool === 'browser_act' || tool === 'browser_snapshot';
+  const mustUseOwnerChrome = followsCurrentPage && pageProducer?.ownerChrome === true;
+  if (mustUseOwnerChrome && secretActions.length > 0) {
+    throw new HttpError(
+      409,
+      "This page is open in the owner's own Chrome; saved passwords are never sent through Browser MCP. Open the page in Cairn's browser or ask the owner to sign in.",
+    );
+  }
+  if (mustUseOwnerChrome && body.params.stealth === true) {
+    throw new HttpError(
+      409,
+      "This page is open in the owner's own Chrome; open it with browser_navigate and stealth: true to use Cairn's browser.",
+    );
+  }
   const mayUseOwnerChrome =
     own === null &&
     phoneTarget === null &&
     isComputerBrowserTool(tool) &&
     body.params.stealth !== true &&
-    secretActions.length === 0;
+    secretActions.length === 0 &&
+    !(followsCurrentPage && pageProducer?.ownerChrome === false);
   const candidates = mayUseOwnerChrome
-    ? ownerChromeCandidates(db, thread)
-        .slice(0, tool === 'browser_act' ? 1 : undefined)
+    ? ownerChromeCandidates(db, thread, thread)
+        .filter((row) => !mustUseOwnerChrome || row.id === pageProducer?.machineId)
+        .slice(0, followsCurrentPage ? 1 : undefined)
         .filter((row) => deps.machineHub.isConnected(row.id))
     : [];
-  if (candidates.length === 0) return onTarget();
-  const chain = throughOwnerChrome(deps, request, candidates, onTarget);
-  ownerChromeChains.set(baseId, chain);
+  if (candidates.length === 0) {
+    if (mustUseOwnerChrome) throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+    return onTarget();
+  }
+  const chain = throughOwnerChrome(deps, request, candidates, onTarget, !mustUseOwnerChrome);
+  ownerChromeChains.set(baseId, { tool, chain });
   try {
     return await chain;
   } finally {
@@ -1383,7 +1408,10 @@ interface DispatchRoute {
   browserRows?: BrowserSecretRow[];
 }
 
-const ownerChromeChains = new Map<string, Promise<ComputerRelayResult>>();
+const ownerChromeChains = new Map<
+  string,
+  { tool: ComputerTool; chain: Promise<ComputerRelayResult> }
+>();
 
 function namingBrowser(
   db: Db,
@@ -1406,6 +1434,7 @@ async function throughOwnerChrome(
   request: DispatchRequest,
   candidates: readonly (typeof machine.$inferSelect)[],
   onTarget: () => Promise<ComputerRelayResult>,
+  mayFallBack = true,
 ): Promise<ComputerRelayResult> {
   const unused: string[] = [];
   for (const candidate of candidates) {
@@ -1419,6 +1448,7 @@ async function throughOwnerChrome(
       });
     } catch (error) {
       if (!(error instanceof HttpError) || error.message !== COMPUTER_NOT_CONNECTED) throw error;
+      if (!mayFallBack) throw error;
       unused.push(`${candidate.name}: ${COMPUTER_NOT_CONNECTED}`);
       continue;
     }
@@ -1433,6 +1463,7 @@ async function throughOwnerChrome(
       return row?.state === 'done'
         ? namingBrowser(deps.db, request.tool, candidate.id, true, sent.result)
         : sent.result;
+    if (!mayFallBack) return sent.result;
     unused.push(`${candidate.name}: ${reason}`);
   }
   const reasons = unused.join(' ');

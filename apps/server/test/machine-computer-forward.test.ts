@@ -1352,6 +1352,41 @@ describe('browser calls on Macs', () => {
       .run();
   }
 
+  function addSecondThread(s: TestServer, chiefId: string) {
+    s.db
+      .insert(chiefThreadTable)
+      .values({
+        id: 'chief-thread-b',
+        chiefId,
+        userId: s.user.id,
+        teamId: s.team.id,
+        title: 'second',
+        createdAt: 1,
+        updatedAt: 1,
+        sessionRuntime: 'pi',
+        sessionId: '',
+        sessionOpenedAt: 1,
+        pendingSessionResumeAt: null,
+        toolDefHashes: {},
+        toolResultHashes: {},
+        activeRun: null,
+        archivedAt: 1,
+      })
+      .run();
+    s.db
+      .insert(stepTable)
+      .values({
+        id: 'step-b',
+        buildId: 'chief-thread-b',
+        kind: 'chief',
+        machineId: 'sidecar',
+        status: 'claimed',
+        prompt: 'work',
+        createdAt: 2,
+      })
+      .run();
+  }
+
   test('a Mac that reports a browser and no computer gets browser_navigate', async () => {
     const { s, deps } = boot();
     addMac(s, 'mac', { browser: true });
@@ -1404,6 +1439,33 @@ describe('browser calls on Macs', () => {
     expect(mini).toHaveLength(1);
   });
 
+  test('the machine remembered in one thread does not steer another thread', async () => {
+    const { s, deps, chiefId } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    addMac(s, 'air', { ownerChrome: true });
+    browserMcp(s);
+    addSecondThread(s, chiefId);
+    const mini = connect(s, 'mini');
+    const air = connect(s, 'air');
+    const first = navigate(deps, 'thread-a-failover');
+    first.catch(() => {});
+    fail(s, 'mini', await next(mini, 1), NO_EXTENSION);
+    answer(s, 'air', await next(air, 1), 'remote page');
+    await first;
+    const second = forwardComputerCall(deps, 'sidecar', 'step-b', {
+      computer: true,
+      name: 'browser_navigate',
+      toolCallId: 'thread-b-open',
+      params: { url: 'https://example.com' },
+    });
+    second.catch(() => {});
+    const local = await next(mini, 2);
+    expect(local.ownerChrome).toBe('browsermcp');
+    answer(s, 'mini', local, 'local page');
+    expect((await second).text).toBe(inOwnerChrome('mini', 'local page'));
+    expect(air).toHaveLength(1);
+  });
+
   test('an extension waiting for Allow ends the call on that Mac', async () => {
     const { s, deps } = boot();
     addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
@@ -1434,6 +1496,111 @@ describe('browser calls on Macs', () => {
     expect(text).toContain('instead of your own Chrome');
     expect(text).toContain('no Chrome is connected to Browser MCP');
     expect(text).toContain('Example Domain');
+  });
+
+  test('after a navigate fell back to Cairn’s browser, browser_act stays in that browser', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const opened = navigate(deps, 'fallback-then-act');
+    opened.catch(() => {});
+    fail(s, 'mini', await next(calls, 1), NO_EXTENSION);
+    answer(s, 'mini', await next(calls, 2), 'Example Domain');
+    await opened;
+    const acting = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_act',
+      toolCallId: 'click-in-cairn-browser',
+      params: { actions: [{ kind: 'press', text: 'Enter' }] },
+    });
+    acting.catch(() => {});
+    const act = await next(calls, 3);
+    expect(act.ownerChrome).toBeUndefined();
+    answer(s, 'mini', act, 'clicked');
+    expect((await acting).text).toBe('clicked');
+    expect(calls).toHaveLength(3);
+  });
+
+  test('after a stealth navigate, a plain browser_act stays in Cairn’s browser', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const opened = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_navigate',
+      toolCallId: 'stealth-open',
+      params: { url: 'https://example.com', stealth: true },
+    });
+    opened.catch(() => {});
+    answer(s, 'mini', await next(calls, 1), 'Example Domain');
+    await opened;
+    const acting = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_act',
+      toolCallId: 'plain-after-stealth',
+      params: { actions: [{ kind: 'press', text: 'Enter' }] },
+    });
+    acting.catch(() => {});
+    const act = await next(calls, 2);
+    expect(act.ownerChrome).toBeUndefined();
+    answer(s, 'mini', act, 'clicked');
+    expect((await acting).text).toBe('clicked');
+    expect(calls).toHaveLength(2);
+  });
+
+  test('a finished fill_secret action keeps later clicks in Cairn’s browser', async () => {
+    const { s, deps, chiefId } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    s.db
+      .insert(computerTable)
+      .values({
+        id: 'secret-browser-computer',
+        teamId: s.team.id,
+        scopeKey: `chief:${chiefId}`,
+        machineId: 'mini',
+        providerRef: computerMachineName(`chief:${chiefId}`),
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    s.db
+      .insert(computerCallTable)
+      .values({
+        id: 'finished-fill-secret',
+        teamId: s.team.id,
+        stepId: 'step-a',
+        toolCallId: 'fill-secret-before',
+        machineId: 'mini',
+        computerId: 'secret-browser-computer',
+        tool: 'browser_act',
+        replaySafe: false,
+        params: {
+          actions: [
+            { kind: 'fill_secret', ref: '@e1', secret: 'SITE', origin: 'https://example.com' },
+          ],
+        },
+        state: 'done',
+        deadlineAt: Date.now() + 1_000,
+        createdAt: Date.now(),
+        finishedAt: Date.now(),
+      })
+      .run();
+    const calls = connect(s, 'mini');
+    const acting = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_act',
+      toolCallId: 'after-fill-secret',
+      params: { actions: [{ kind: 'press', text: 'Enter' }] },
+    });
+    acting.catch(() => {});
+    const act = await next(calls, 1);
+    expect(act.ownerChrome).toBeUndefined();
+    answer(s, 'mini', act, 'clicked');
+    expect((await acting).text).toBe('clicked');
+    expect(calls).toHaveLength(1);
   });
 
   test('with no extension and no Cairn browser the answer says why and what to turn on', async () => {
@@ -1477,7 +1644,62 @@ describe('browser calls on Macs', () => {
     expect(calls).toEqual([]);
   });
 
-  test('browser_act never moves to another Mac’s Chrome, whose page nobody opened', async () => {
+  test('fill_secret on an owner-Chrome page refuses instead of switching to Cairn’s browser', async () => {
+    const { s, deps } = boot();
+    addMac(
+      s,
+      'mini',
+      { browser: true, ownerChrome: true, browserSecretFill: true },
+      { kind: 'local' },
+    );
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const opened = navigate(deps, 'owner-page-for-secret');
+    opened.catch(() => {});
+    answer(s, 'mini', await next(calls, 1), 'their page');
+    await opened;
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'browser_act',
+        toolCallId: 'secret-after-owner-open',
+        params: {
+          actions: [
+            { kind: 'fill_secret', ref: '@e1', secret: 'SITE', origin: 'https://example.com' },
+          ],
+        },
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining("owner's own Chrome"),
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  test('reusing an in-flight owner-Chrome toolCallId with a different tool is refused', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const first = navigate(deps, 'shared-call-id');
+    first.catch(() => {});
+    const dispatched = await next(calls, 1);
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'browser_snapshot',
+        toolCallId: 'shared-call-id',
+        params: {},
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('browser_navigate'),
+    });
+    answer(s, 'mini', dispatched, 'their page');
+    await first;
+  });
+
+  test('browser_act for an owner-Chrome page never moves to another browser', async () => {
     const { s, deps } = boot();
     addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
     addMac(s, 'air', { ownerChrome: true });
@@ -1496,10 +1718,8 @@ describe('browser calls on Macs', () => {
     });
     acting.catch(() => {});
     fail(s, 'mini', await next(mini, 2), NO_EXTENSION);
-    const own = await next(mini, 3);
-    expect(own.ownerChrome).toBeUndefined();
-    answer(s, 'mini', own, 'done');
-    expect((await acting).text).toContain('instead of your own Chrome');
+    expect((await acting).text).toContain('no Chrome is connected to Browser MCP');
+    expect(mini).toHaveLength(2);
     expect(air).toEqual([]);
   });
 
