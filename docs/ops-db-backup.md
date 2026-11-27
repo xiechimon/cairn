@@ -1,6 +1,6 @@
 # Server backup and recovery (#1151, #2163)
 
-The server's SQLite database is the source of truth for todos, threads and review records, the attachments directory holds the files those records point to, and `repos/` holds the only copy of every hosted project's git repository. The backup is an hourly off-site copy of all three (RPO 1 hour). This page is the runbook for that backup: the script `scripts/ops/backup-server-db.sh`, the live setup on omarchy, the receiver on dmit, and recovery.
+The server's SQLite database is the source of truth for todos, threads and review records, the attachments directory holds the files those records point to, and `repos/` holds the only copy of every hosted project's git repository. Built-in daily backups on Mac hosts are managed by `apps/server/src/services/backup-service.ts`, while `scripts/ops/backup-server-db.sh` remains the supported standalone CLI for off-site copies (RPO 1 hour). This page is the runbook for that CLI script, the receiver on dmit, recovery, and the reference Linux systemd setup from the former `omarchy` host (torn down 2026-11-18).
 
 What is not in the backup:
 
@@ -39,9 +39,11 @@ The self-test runs the script against a real rrsync receiver started through a f
 PATH=/opt/homebrew/opt/rsync/bin:$PATH node --test scripts/ops/backup-server-db.test.mjs
 ```
 
-## Live setup on omarchy
+## Reference Linux systemd setup (retired omarchy host)
 
-The server runs on omarchy as user `ian` with no `CAIRN_HOME`, so its data is in `~/.cairn/server` (`server.db`, `attachments/`, `coordinator/`, `repos/`, `secretbox.key`) and its skills are in `~/.cairn/skills`. The wrapper `~/.cairn/tools/backup/db-backup.sh` (mirrored in `scripts/ops/host/tools/backup/db-backup.sh`) derives both paths from `CAIRN_HOME` the way the server does. Local backups go to the HDD under `~/backups/cairn-server/` (mode 700): `db/`, `attachments/`, `coordinator/`, `skills/` and `repos/`. After changing the mirrored wrapper, copy it to `~/.cairn/tools/backup/db-backup.sh`. The wrapper takes `CAIRN_BACKUP_REMOTE` as an SSH host and appends `:db/`, `:repos/` and the other paths itself, so the value is `dmit-backup` with no trailing colon; `dmit-backup:` turns each destination into `dmit-backup::db/`, which rsync reads as daemon mode on port 873 and fails with `getaddrinfo: dmit-backup 873`.
+Status: the `omarchy` host this setup ran on was torn down on 2026-11-18; Mac hosts use the server's built-in backup service instead. Kept as reference for Linux systemd deployments.
+
+The server ran on omarchy as user `ian` with no `CAIRN_HOME`, so its data lived in `~/.cairn/server` (`server.db`, `attachments/`, `coordinator/`, `repos/`, `secretbox.key`) and its skills in `~/.cairn/skills`. The wrapper `~/.cairn/tools/backup/db-backup.sh` (mirrored in `scripts/ops/host/tools/backup/db-backup.sh`) derives both paths from `CAIRN_HOME` the way the server does. Local backups go to `~/backups/cairn-server/` (mode 700): `db/`, `attachments/`, `coordinator/`, `skills/` and `repos/`. After changing the mirrored wrapper, copy it to `~/.cairn/tools/backup/db-backup.sh`. The wrapper takes `CAIRN_BACKUP_REMOTE` as an SSH host and appends `:db/`, `:repos/` and the other paths itself, so the value is `dmit-backup` with no trailing colon; `dmit-backup:` turns each destination into `dmit-backup::db/`, which rsync reads as daemon mode on port 873 and fails with `getaddrinfo: dmit-backup 873`.
 
 `~/.config/systemd/user/cairn-db-backup.service`:
 
@@ -76,13 +78,13 @@ Persistent=true
 WantedBy=timers.target
 ```
 
-Enable with `systemctl --user daemon-reload && systemctl --user enable --now cairn-db-backup.timer`. `Persistent=true` runs a missed hour right after boot. Output goes to `~/.local/state/cairn-db-backup.log` instead of the journal, because the user journal on omarchy has recorded nothing since 2026-10-25.
+Enable with `systemctl --user daemon-reload && systemctl --user enable --now cairn-db-backup.timer`. `Persistent=true` runs a missed hour right after boot. Output goes to `~/.local/state/cairn-db-backup.log` instead of the journal on Linux hosts where the user journal stops recording.
 
 ### Path to dmit
 
-dmit does not answer direct TCP from either of ian's ISPs; the drop is on the network path, not in dmit's firewall. omarchy's sing-box TUN routes everything except exactly that address (`route_exclude_address`, so sing-box's own tunnel to dmit does not loop), so plain ssh from omarchy goes out directly and times out. The push therefore goes through sing-box's local mixed proxy on 127.0.0.1:7890, the same tunnel the Mac uses.
+When dmit does not answer direct TCP from an ISP, route the push through the host's local mixed proxy on 127.0.0.1:7890 (with `route_exclude_address` set on TUN so the proxy tunnel itself does not loop).
 
-`~/.ssh/config` on omarchy (mode 600):
+`~/.ssh/config` on the backup host (mode 600):
 
 ```
 Host dmit-backup
@@ -103,10 +105,10 @@ Host dmit-backup
 
 The receiver is the user `cairnbak`: password locked, shell `/bin/sh`, home mode 750. It needs rsync 3.4 or later, which ships `/usr/bin/rrsync` with `-no-overwrite`.
 
-`/home/cairnbak/.ssh/authorized_keys` is owned by root (mode 644), so cairnbak cannot change it, and holds one line with the omarchy push key:
+`/home/cairnbak/.ssh/authorized_keys` is owned by root (mode 644), so cairnbak cannot change it, and holds the push key:
 
 ```
-restrict,command="/usr/bin/rrsync -wo -no-del -no-overwrite -munge /home/cairnbak/cairn-backups" ssh-ed25519 AAAA... cairn-backup@omarchy
+restrict,command="/usr/bin/rrsync -wo -no-del -no-overwrite -munge /home/cairnbak/cairn-backups" ssh-ed25519 AAAA... cairn-backup
 ```
 
 With that line the key can only add new files under `/home/cairnbak/cairn-backups/`. rrsync refuses a shell (`SSH_ORIGINAL_COMMAND does not run rsync`), a pull (`reading from write-only server is not allowed`), `--delete` (`option --delete has been disabled`), paths with `..`, and it never overwrites an existing file. It also allows one transfer at a time: a second push while one runs fails with `Another instance of rrsync is already accessing this directory`.
@@ -123,9 +125,9 @@ Hosted repo snapshots need the same rotation, or full snapshots pile up every ho
 19 * * * * cd /home/cairnbak/cairn-backups/repos 2>/dev/null && ls -1d repos-*/ 2>/dev/null | sort -r | tail -n +49 | while IFS= read -r d; do rm -rf -- "$d"; done
 ```
 
-The receiver must keep at least as many DB copies and repo snapshots as `--keep`. A copy it deletes while omarchy still holds it is sent again on the next push, every hour. Attachments are never rotated on either side.
+The receiver must keep at least as many DB copies and repo snapshots as `--keep`. A copy it deletes while the sender still holds it is sent again on the next push, every hour. Attachments are never rotated on either side.
 
-Room, measured on 2026-10-29: a DB copy is about 34 MB, so 48 copies are about 1.7 GB on each side, plus attachments (159 MB off-site in total that day). dmit has 7.8 GB free on a 20 GB disk; omarchy's HDD has 1.7 TB free. The hourly push sends about 34 MB through the proxy, about 25 GB a month.
+Room, historical measurement on the retired `omarchy` host on 2026-10-29: a DB copy was about 34 MB, so 48 copies were about 1.7 GB on each side, plus attachments (159 MB off-site in total that day; about 25 GB a month over the proxy).
 
 ## Monitoring (#2162)
 
@@ -141,11 +143,11 @@ Add the line to the backup service from the "Scheduling" section:
 ExecStopPost=%h/cairn/scripts/ops/record-backup-status.sh --status %h/.cairn/server/backup-status.json
 ```
 
-Check: after the next run, `cat ~/.cairn/server/backup-status.json` shows `"lastRunResult":"success"`. On omarchy the script is installed as `~/.cairn/tools/backup/record-backup-status.sh`, next to the backup wrapper.
+Check: after the next run, `cat <server data dir>/backup-status.json` shows `"lastRunResult":"success"`. When using the Linux systemd setup, install `record-backup-status.sh` beside `~/.cairn/tools/backup/db-backup.sh`.
 
 ## Recovery
 
-The omarchy push key is write-only, so a restore never uses it. Take the newest copy from the omarchy HDD if it survived, otherwise from dmit as root (from the Mac: `scp dmit:/home/cairnbak/cairn-backups/db/<newest>.db.gz .`).
+The push key on the sender is write-only, so a restore never uses it. Take the newest local backup copy if it survived, otherwise from dmit as root (from the Mac: `scp dmit:/home/cairnbak/cairn-backups/db/<newest>.db.gz .`).
 
 1. Stop writes: `systemctl --user stop cairn-server.service` and `systemctl --user stop cairn-db-backup.timer`.
 2. `gunzip` the copy and check it: `sqlite3 server.db 'PRAGMA integrity_check;'` must print `ok`.
@@ -176,7 +178,7 @@ Drills always run on a copy, never on the running server: fetch a backup, `gunzi
 When a backup fails or does not run on time, look in this order:
 
 1. `tail -n 30 ~/.local/state/cairn-db-backup.log`. A good run ends with `backup done`; a failed run prints `FAIL <step>`.
-2. `systemctl --user status cairn-db-backup.service` for the last result and exit code, and `systemctl --user --failed` to see whether the unit is failed. `journalctl --user -u` is empty on omarchy; `journalctl _SYSTEMD_USER_UNIT=cairn-db-backup.service` still works.
+2. `systemctl --user status cairn-db-backup.service` for the last result and exit code, and `systemctl --user --failed` to see whether the unit is failed. If `journalctl --user -u` is empty on a Linux host, try `journalctl _SYSTEMD_USER_UNIT=cairn-db-backup.service`.
 3. If nothing ran, `systemctl --user list-timers cairn-db-backup.timer` shows whether the timer is enabled and when it fires next.
 
 For a failed push:

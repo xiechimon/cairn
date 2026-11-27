@@ -1,6 +1,8 @@
 # Runner secret isolation (#2189)
 
-This implements the tools for the omarchy UID boundary. Host acceptance remains pending: the owner must apply setup, move batch/lane launches to `cairn-runner`, and archive the host checks below. This commit references #2189 rather than closing it. Mac agent sandbox settings and their red/green host runs remain out of scope.
+Status: the `omarchy` host was torn down on 2026-11-18, and no current Mac host installs the Linux UID boundary (`setup-runner-user.sh`, `broker.mjs`). The Linux scripts and offline tests stay in-repo for Linux hosts; the Mac batch-session Seatbelt sandbox (`batch-sandbox.settings.json`) and `canary.mjs --profile mac` are active on macOS.
+
+This implements the tools for the Linux UID boundary and Mac batch-session sandbox. Mac agent sandbox settings and their host runs for interactive sessions remain out of scope (#2189).
 
 ## Threat model and failure modes
 
@@ -23,7 +25,7 @@ SECRET_REACH_PATHS='["/absolute/key","/absolute/database-copy"]' node scripts/op
 node scripts/ops/secret-reach/canary.mjs --pid "$SERVER_PID" --path /absolute/key --path /absolute/database-copy
 ```
 
-`SECRET_REACH_PROFILE` and `SECRET_REACH_SERVER_PID` supply the corresponding flags. Repeated `--path` replaces both the defaults and `SECRET_REACH_PATHS`. The default omarchy inventory is:
+`SECRET_REACH_PROFILE` and `SECRET_REACH_SERVER_PID` supply the corresponding flags. Repeated `--path` replaces both the defaults and `SECRET_REACH_PATHS`. The default Linux (`omarchy`) profile inventory is:
 
 - `/home/ian/.cairn/cairnwright.private-key.pem`
 - `/mnt/fast/cairn/server/secretbox.key`
@@ -41,7 +43,7 @@ Subprocesses emit counts only. For the subprocess-file round trip the child writ
 
 Exit `1` means at least one channel read bytes. Exit `0` means all attempted channels obtained zero bytes. Exit `2` means incomplete configuration/tooling/probe execution and must never count as green, even if some lines say `no`. A vanished or hidden process directory produces `2`; hosts already using `hidepid` need a separately verified process probe rather than interpreting that result as green. Missing/empty file targets also yield zero, so an owner negative control and a checked inventory are mandatory before interpreting green.
 
-## Owner setup on omarchy
+## Owner setup on Linux (reference; retired omarchy host)
 
 Before running either sudo command, verify this checkout matches the exact commit that received review. Run `git rev-parse HEAD` and compare its output with the reviewed commit ID; run `git status --porcelain` and require empty output. Stop if either check differs. Keep the checkout unchanged through setup. The script runs only the root-owned system Node at `/usr/bin/node`; a per-user Node from mise or fnm is not used. Install it first if missing (on Arch: `sudo pacman -S --needed nodejs`). Then:
 

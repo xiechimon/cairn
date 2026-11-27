@@ -16,7 +16,7 @@ The change that retires a mechanism, path or rule updates or deletes every livin
 | `configuration.md` | Every server and daemon environment variable |
 | `privacy.md` | What Cairn stores locally, how task session records are handled, and what configured integrations or optional services send |
 | `community/welcome.md` | Discussion categories, where bugs and security reports go, and how to post a first-PR write-up |
-| `ops-db-backup.md` | Server DB and attachments backup and recovery (script `scripts/ops/backup-server-db.sh`, the omarchy units, the rrsync receiver on dmit, and drill discipline) |
+| `ops-db-backup.md` | Server DB and attachments backup and recovery (script `scripts/ops/backup-server-db.sh`, reference Linux systemd units, the rrsync receiver on dmit, and drill discipline) |
 | `feature-map.md` | Feature coverage: every user-facing feature with its research, frontend design and backend design, the gaps grouped into batches, and eval coverage. Generated from `.claude/skills/verify-cairn/feature-map.json` by `scripts/generate-feature-map.mjs`; do not hand-edit |
 | `ops/feature-map-maintain.md` | How the feature registry and the verify-cairn `features/` recipes stay current: the CI check, the daily Actions loop and the live maintain routine |
 | `lessons/` | Frozen archive of past mistake notes. Do not add files; the `retro-cairn` skill records a safeguard in the code it concerns |

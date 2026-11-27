@@ -1,6 +1,8 @@
 # Scoped root runner for reviewed ops scripts (#2362)
 
-`cairn-ops-run` lets agents on omarchy run a fixed set of ops scripts as root without ian typing his password. It runs only code merged into `main` on GitHub.
+Status: the former `omarchy` host was torn down on 2026-11-18; no current Mac host installs `cairn-ops-run`. Kept in-repo with offline tests as the reference root runner for Linux hosts.
+
+`cairn-ops-run` lets agents on a Linux host run a fixed set of ops scripts as root without ian typing his password. It runs only code merged into `main` on GitHub.
 
 ## Trust statement
 
