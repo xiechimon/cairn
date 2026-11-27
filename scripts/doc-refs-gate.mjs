@@ -34,11 +34,25 @@ function git(args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 }
 
+function stripHtmlTags(text) {
+  let out = '';
+  const opens = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '<') {
+      opens.push(out.length);
+      out += ch;
+    } else if (ch === '>' && opens.length > 0) {
+      out = out.slice(0, opens.pop());
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
 export function slugify(heading) {
-  return heading
-    .trim()
-    .toLowerCase()
-    .replace(/<[^>]+>/g, '')
+  return stripHtmlTags(heading.trim().toLowerCase())
     .replace(/[^\p{L}\p{N} _-]/gu, '')
     .replace(/\s+/g, '-');
 }

@@ -6,9 +6,9 @@ What launch needs, split by who can do it. The left column a lane can ship; the 
 
 | # | Action | Why it blocks | Where it lands |
 |---|--------|---------------|----------------|
-| 1 | Apple Developer Program membership ($99/yr) + Developer ID certificate | Windows/Linux run unsigned; macOS already signs — the Windows cert question stays open without the account | `docs/ops/desktop-signing.md` |
+| 1 | ~~Apple Developer Program ($99/yr) + Developer ID certificate~~ DEFERRED (2026-11-27): macOS already signs; paid Apple/Windows certs skipped during pre-launch evaluation | Deferred by owner decision on 2026-11-27 | `docs/ops/desktop-signing.md` |
 | 2 | Back up the existing macOS signing certificate + notarization credentials off-machine | Losing them kills every future signed release | `docs/ops/desktop-signing.md` |
-| 3 | Windows code-signing certificate (EV or Azure Trusted Signing) | Windows installer shows SmartScreen without it | `desktop-release.yml` |
+| 3 | ~~Windows code-signing certificate (EV or Azure Trusted Signing)~~ DEFERRED (2026-11-27): paid Windows certs skipped for now | Deferred by owner decision on 2026-11-27 | `desktop-release.yml` |
 | 4 | npm publish access for `@xiechimon/cairn` on the release runner | The `npx` install path must keep working alongside desktop apps | `scripts/ops/` |
 | 5 | Telegram bot token via @BotFather | IM entry cannot pair without it | secrets UI once the adapter lands |
 | 6 | WeChat iLink bot registration + QR pairing on the owner's account | The WeChat adapter needs a live bot token; personal WeChat ≥ 8.0.69, one bot per account | `docs/design/im-connections.md` |
@@ -28,6 +28,10 @@ What launch needs, split by who can do it. The left column a lane can ship; the 
 
 ## Deferred by owner decision (do not start)
 
+- Paid Apple Developer ($99/yr) and paid Windows code-signing certificates until launch monetization justifies the cost (2026-11-27 owner decision).
+- Native iOS client catch-up after web settles: focus mobile reach on IM connectors (`Telegram`, `WeChat`, `Slack`) (2026-11-27 owner decision).
+- Projectless save-for-later todos (`todo.projectId` nullable): dropped; every todo belongs to a project (2026-11-27 owner decision).
+- Paid external API/cert spend deferred; Cairn Cloud Phase 1 uses Fly.io Machines + Volumes, BYOK Personal Cloud, and Creem as Merchant of Record, never Stripe (2026-11-27 owner decision).
 - Telemetry collection endpoint (Backlog — self-operated Cloudflare Worker is the researched template).
 - Payment-action registration (no payment surface exists).
 - Engine breadth beyond the shipped set (W1 order unchanged).

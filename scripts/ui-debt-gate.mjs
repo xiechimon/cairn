@@ -71,7 +71,7 @@ const INTERPOLATED = String.raw`[^\]\s]*\$\{[^\]]*`;
 const utilityAlternation = (names) =>
   [...names]
     .sort((a, b) => b.length - a.length)
-    .map((n) => n.replace(/-/g, '\\-'))
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&'))
     .join('|');
 const arbitraryPattern = (names) =>
   new RegExp(

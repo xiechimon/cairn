@@ -28,11 +28,21 @@ function blankRuntimeBlocks(text) {
   }
 }
 
+function stripHtmlComments(text) {
+  let current = text;
+  let searchFrom = 0;
+  for (;;) {
+    const start = current.indexOf('<!--', searchFrom);
+    if (start === -1) return current;
+    const end = current.indexOf('-->', start + 4);
+    if (end === -1) return current;
+    current = current.slice(0, start) + current.slice(end + 3);
+    searchFrom = Math.max(0, start - 3);
+  }
+}
+
 export function stripQuoted(text) {
-  return text
-    .replace(/```[\s\S]*?(```|$)/g, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/`[^`\n]*`/g, '');
+  return stripHtmlComments(text.replace(/```[\s\S]*?(```|$)/g, '')).replace(/`[^`\n]*`/g, '');
 }
 
 function proseViolations(lines) {

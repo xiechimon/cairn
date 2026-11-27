@@ -6,7 +6,8 @@ import { basename, join } from 'node:path';
 const AGENT_BINARIES = new Set(['codex', 'pi', 'grok']);
 
 export function mentionsTicket(text, ticket) {
-  return new RegExp(`(?<!\\d)${ticket}(?!\\d)`).test(text ?? '');
+  const escaped = String(ticket).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<!\\d)${escaped}(?!\\d)`).test(text ?? '');
 }
 
 export function findTicketConflicts({ ticket, selfCwd, selfPid, dirs, branches, prs, processes }) {

@@ -19,6 +19,8 @@ function fixture(files, docs) {
 test('slugify matches github heading anchors', () => {
   assert.equal(slugify('Debugging a turn or task'), 'debugging-a-turn-or-task');
   assert.equal(slugify('Evidence limits checklist'), 'evidence-limits-checklist');
+  assert.equal(slugify('Hello <span>x</span> World'), 'hello-x-world');
+  assert.equal(slugify('A <scr<script>ipt> B'), 'a-b');
   assert.equal(anchorsOf('# A\n# A\n## B!').has('a-1'), true);
 });
 

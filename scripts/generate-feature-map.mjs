@@ -475,6 +475,7 @@ function validate(registry, facts, base) {
 function cell(text) {
   return String(text)
     .replace(/\s*\n\s*/g, ' ')
+    .replace(/\\/g, '\\\\')
     .replace(/\|/g, '\\|')
     .trim();
 }

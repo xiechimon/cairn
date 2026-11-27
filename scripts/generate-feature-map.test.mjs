@@ -549,3 +549,11 @@ test('the real registry passes its own check', () => {
   );
   assert.equal(result.status, 0, result.stderr);
 });
+
+test('rendered table cells escape backslashes before pipes', () => {
+  const reg = baseRegistry();
+  reg.features[0].summary = String.raw`a\|b`;
+  const root = makeFixtureRepo(reg);
+  const doc = generated(root);
+  assert.ok(doc.includes(String.raw`a\\\|b`), doc);
+});

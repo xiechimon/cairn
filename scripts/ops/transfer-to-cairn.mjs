@@ -94,8 +94,9 @@ async function planTransfer(options, runner) {
     await runner(['api', `repos/${repo}/git/matching-refs/heads/lane/${issue}`]),
   );
   const escapedRepo = repo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapedIssue = String(issue).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const closing = new RegExp(
-    `\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s*:?\\s+(?:#${issue}|${escapedRepo}#${issue}|https://github\\.com/${escapedRepo}/issues/${issue})(?![\\d\\w])`,
+    `\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s*:?\\s+(?:#${escapedIssue}|${escapedRepo}#${escapedIssue}|https://github\\.com/${escapedRepo}/issues/${escapedIssue})(?![\\d\\w])`,
     'i',
   );
   const lanePr = pulls.find((p) => p.head.ref === `lane/${issue}`);

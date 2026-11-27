@@ -32,7 +32,7 @@ export function countRawAllocations(source) {
   const direct = new RegExp(`\\b${MKDTEMP}\\s*\\(`, 'g');
   let count = [...body.matchAll(direct)].length;
   for (const alias of aliasesOf(source)) {
-    const escaped = alias.replace(/\$/g, '\\$');
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     count += [...body.matchAll(new RegExp(`(?<![\\w$.])${escaped}\\s*\\(`, 'g'))].length;
   }
   return count;

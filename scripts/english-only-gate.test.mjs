@@ -28,6 +28,7 @@ test('prose flags Chinese outside code spans, fences and HTML comments', () => {
   assert.deepEqual(fileViolations('docs/a.md', doc), [1, 8]);
   assert.deepEqual(textViolations('## What 什么\n\nAll English.'), [1]);
   assert.deepEqual(textViolations('~~~\n```\n中文\n~~~\n中文'), [5]);
+  assert.deepEqual(textViolations('<!<!-- -->-- 中文 -->'), []);
 });
 
 test('code checks comments only; UI strings and exempt paths pass', () => {

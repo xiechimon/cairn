@@ -25,6 +25,8 @@ test('ticket numbers match only on digit boundaries', () => {
   assert.equal(mentionsTicket('/tmp/pm-15690-x', '1569'), false);
   assert.equal(mentionsTicket('/tmp/pm-21569', '1569'), false);
   assert.equal(mentionsTicket('fix #1569.', '1569'), true);
+  assert.equal(mentionsTicket('12X3', '12.3'), false);
+  assert.equal(mentionsTicket('12.3', '12.3'), true);
 });
 
 test('no sources hit means no conflicts', () => {
