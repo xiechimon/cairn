@@ -932,6 +932,7 @@ describe('leases', () => {
       params: {},
     });
     expect(obs.text).toContain('owner');
+    expect(obs.text).not.toContain('[Browser:');
     expect(calls).toHaveLength(1);
   });
 });

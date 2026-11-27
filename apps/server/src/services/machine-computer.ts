@@ -1377,7 +1377,8 @@ export async function forwardComputerCall(
     tool,
     nowMs(),
   );
-  if (refusal !== null) return { text: noBrowserRun(refusal) };
+  if (refusal !== null)
+    return { text: isComputerBrowserTool(tool) ? noBrowserRun(refusal) : refusal };
 
   const secretActions =
     tool === 'browser_act' && Array.isArray(body.params.actions)
