@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
@@ -1479,5 +1479,198 @@ test('withPreflightAdmission serializes callers FIFO, releases on throw, and hon
     assert.equal(seenOpts.env.CUSTOM_X, 'yes');
   } finally {
     releaseTestTempDir(dir);
+  }
+});
+
+test('two CLI preflight processes hold FIFO lock across stale-id and moved-head visibility delays', async () => {
+  const root = makeTestTempDir('preflight-cli-fifo-');
+  const bare = join(root, 'origin.git');
+  const wt1 = join(root, 'wt1');
+  const wt2 = join(root, 'wt2');
+  const bin = join(root, 'bin');
+  const home = join(root, 'home');
+  const slotsDir = join(root, 'slots');
+  const eventsFile = join(root, 'events.log');
+  const readyFile = join(root, 'run-visible');
+  try {
+    mkdirSync(bare, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    writeFileSync(eventsFile, '');
+    const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+    const baseEnv = {
+      ...process.env,
+      HOME: home,
+      PATH: `${bin}:${process.env.PATH}`,
+      GIT_AUTHOR_NAME: 'xiechimon',
+      GIT_AUTHOR_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      GIT_COMMITTER_NAME: 'xiechimon',
+      GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+      CAIRN_HEAVY_SLOTS_DIR: slotsDir,
+    };
+    const gitAt = (cwd, args) =>
+      execFileSync(realGit, args, { cwd, encoding: 'utf8', env: baseEnv }).trim();
+    execFileSync(realGit, ['init', '--bare', '-b', 'main', bare], { encoding: 'utf8' });
+    execFileSync(realGit, ['clone', bare, wt1], { encoding: 'utf8' });
+    mkdirSync(join(wt1, 'scripts/ops'), { recursive: true });
+    writeFileSync(join(wt1, 'scripts/ops/preflight-fast-gate.mjs'), '');
+    gitAt(wt1, ['add', 'scripts/ops/preflight-fast-gate.mjs']);
+    gitAt(wt1, ['commit', '-qm', 'chore: base']);
+    gitAt(wt1, ['push', '-qu', 'origin', 'main']);
+    execFileSync(realGit, ['clone', bare, wt2], { encoding: 'utf8' });
+
+    gitAt(wt1, ['checkout', '-qb', 'lane1']);
+    writeFileSync(join(wt1, 'f1.txt'), '1\n');
+    gitAt(wt1, ['add', 'f1.txt']);
+    gitAt(wt1, ['commit', '-qm', 'feat: wt1']);
+
+    gitAt(wt2, ['checkout', '-qb', 'lane2']);
+    writeFileSync(join(wt2, 'f2.txt'), '2\n');
+    gitAt(wt2, ['add', 'f2.txt']);
+    gitAt(wt2, ['commit', '-qm', 'feat: wt2']);
+
+    const scriptPath = fileURLToPath(new URL('./preflight.mjs', import.meta.url));
+    assert.equal(
+      spawnSync(process.execPath, [scriptPath, '--stamp-only'], {
+        cwd: wt1,
+        encoding: 'utf8',
+        env: baseEnv,
+      }).status,
+      0,
+    );
+    assert.equal(
+      spawnSync(process.execPath, [scriptPath, '--stamp-only'], {
+        cwd: wt2,
+        encoding: 'utf8',
+        env: baseEnv,
+      }).status,
+      0,
+    );
+    const sha1 = gitAt(wt1, ['rev-parse', 'HEAD']);
+    const sha2 = gitAt(wt2, ['rev-parse', 'HEAD']);
+    const id = readFileSync(join(home, '.config/cairn-dev/lane-machine-id'), 'utf8').trim();
+    const ref1 = `preflight/${id}/wt1`;
+    const ref2 = `preflight/${id}/wt2`;
+
+    writeFileSync(
+      join(bin, 'git'),
+      `#!/usr/bin/env node
+const { appendFileSync } = require('node:fs');
+const { spawnSync } = require('node:child_process');
+const args = process.argv.slice(2);
+const realGit = ${JSON.stringify(realGit)};
+const res = spawnSync(realGit, args, { stdio: 'inherit' });
+if (args[0] === 'push' && res.status === 0) {
+  const tag = args.some((a) => a.includes('wt1')) ? 'wt1' : 'wt2';
+  appendFileSync(${JSON.stringify(eventsFile)}, 'push:' + tag + '\\n');
+  if (tag === 'wt1' && process.env.STUB_MOVE_WT1 === '1') {
+    spawnSync(realGit, ['commit', '-q', '--allow-empty', '-m', 'moved after push'], { stdio: 'ignore' });
+  }
+}
+process.exit(res.status ?? 1);
+`,
+      { mode: 0o755 },
+    );
+
+    writeFileSync(
+      join(bin, 'gh'),
+      `#!/usr/bin/env node
+const { appendFileSync, existsSync } = require('node:fs');
+const args = process.argv.slice(2);
+const url = args.find((a) => a.startsWith('repos/')) || '';
+const sha1 = ${JSON.stringify(sha1)};
+const sha2 = ${JSON.stringify(sha2)};
+const ref1 = ${JSON.stringify(ref1)};
+const ref2 = ${JSON.stringify(ref2)};
+const staleRun = { id: 50, name: 'ci', head_sha: sha1, head_branch: ref1, status: 'completed', conclusion: 'failure', html_url: 'https://example/run/50' };
+const newRun1 = { id: 201, name: 'ci', head_sha: sha1, head_branch: ref1, status: 'in_progress', html_url: 'https://example/run/201' };
+const newRun2 = { id: 202, name: 'ci', head_sha: sha2, head_branch: ref2, status: 'in_progress', html_url: 'https://example/run/202' };
+const visible = existsSync(${JSON.stringify(readyFile)});
+if (url.includes('status=')) {
+  console.log(JSON.stringify({ workflow_runs: visible ? [newRun1] : [] }));
+} else if (url.includes('workflows/ci.yml/runs') && url.includes(encodeURIComponent(ref1))) {
+  console.log(JSON.stringify({ workflow_runs: [staleRun] }));
+} else if (url.includes('workflows/ci.yml/runs')) {
+  console.log(JSON.stringify({ workflow_runs: [] }));
+} else if (url.includes('head_sha=' + sha1)) {
+  if (!visible) {
+    appendFileSync(${JSON.stringify(eventsFile)}, 'miss:wt1\\n');
+    console.log(JSON.stringify({ workflow_runs: [staleRun] }));
+  } else {
+    appendFileSync(${JSON.stringify(eventsFile)}, 'visible:wt1\\n');
+    console.log(JSON.stringify({ workflow_runs: [staleRun, newRun1] }));
+  }
+} else if (url.includes('head_sha=' + sha2)) {
+  appendFileSync(${JSON.stringify(eventsFile)}, 'visible:wt2\\n');
+  console.log(JSON.stringify({ workflow_runs: [newRun2] }));
+} else {
+  console.log('{}');
+}
+`,
+      { mode: 0o755 },
+    );
+
+    const runSpawned = (cwd, extraEnv = {}) => {
+      const child = spawn(process.execPath, [scriptPath], {
+        cwd,
+        env: { ...baseEnv, ...extraEnv },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (d) => {
+        stdout += d.toString();
+      });
+      child.stderr.on('data', (d) => {
+        stderr += d.toString();
+      });
+      const done = new Promise((resolve) => {
+        child.on('close', (status) => resolve({ status, stdout, stderr }));
+      });
+      return { child, done };
+    };
+
+    const waitForEvent = async (needle) => {
+      const deadline = Date.now() + 10_000;
+      for (;;) {
+        const text = readFileSync(eventsFile, 'utf8');
+        if (text.includes(needle)) return text;
+        if (Date.now() > deadline) {
+          throw new Error(`timed out waiting for ${needle} in events:\n${text}`);
+        }
+        await delay(50);
+      }
+    };
+
+    const p1 = runSpawned(wt1, { STUB_MOVE_WT1: '1' });
+    await Promise.race([
+      waitForEvent('miss:wt1'),
+      p1.done.then((res) => {
+        throw new Error(
+          `wt1 exited early (${res.status}) before checking post-push run visibility:\n${res.stderr}`,
+        );
+      }),
+    ]);
+
+    const p2 = runSpawned(wt2);
+    await delay(500);
+    assert.doesNotMatch(
+      readFileSync(eventsFile, 'utf8'),
+      /push:wt2/,
+      'wt2 must wait in FIFO lock while wt1 run is invisible even when wt1 HEAD moved after push',
+    );
+    assert.equal(gitAt(wt2, ['ls-remote', 'origin', `refs/heads/${ref2}`]), '');
+
+    writeFileSync(readyFile, 'ok\n');
+    const [r1, r2] = await Promise.all([p1.done, p2.done]);
+    assert.equal(r1.status, 1);
+    assert.match(r1.stderr, /HEAD moved/);
+    assert.equal(r2.status, 0, r2.stderr);
+    const events = readFileSync(eventsFile, 'utf8').trim().split('\n');
+    assert.ok(events.indexOf('visible:wt1') !== -1);
+    assert.ok(events.indexOf('visible:wt1') < events.indexOf('push:wt2'));
+  } finally {
+    releaseTestTempDir(root);
   }
 });

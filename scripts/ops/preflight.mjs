@@ -103,9 +103,15 @@ export function preflightRef(lane) {
   return `refs/heads/preflight/${lane}`;
 }
 
-export function preflightRun(runs, sha, ref) {
+export function preflightRun(runs, sha, ref, { priorRunIds = null } = {}) {
   return (
-    runs.find((run) => run.name === 'ci' && run.head_sha === sha && run.head_branch === ref) ?? null
+    runs.find(
+      (run) =>
+        run.name === 'ci' &&
+        run.head_sha === sha &&
+        run.head_branch === ref &&
+        !priorRunIds?.has(run.id),
+    ) ?? null
   );
 }
 
@@ -426,12 +432,12 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     );
     writePreflightHistory(historyPath, current);
   };
-  const readRun = () => {
+  const readRun = (priorRunIds = null) => {
     const { workflow_runs: runs } = ghJson([
       'api',
       `repos/${repo}/actions/runs?head_sha=${sha}&per_page=20`,
     ]);
-    return preflightRun(runs, sha, ref);
+    return preflightRun(runs, sha, ref, { priorRunIds });
   };
   const bypassConcurrency = process.env.CAIRN_PREFLIGHT_CONCURRENCY_BYPASS === '1';
   const admission = await withPreflightAdmission({ bypass: bypassConcurrency }, async () => {
@@ -457,6 +463,25 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     }
     const prePushMoved = movedHeadError();
     if (prePushMoved) return { ok: false, exitCode: 1, error: prePushMoved };
+    let priorRunIds = new Set();
+    try {
+      const existing =
+        ghJson([
+          'api',
+          `repos/${repo}/actions/workflows/ci.yml/runs?branch=${encodeURIComponent(ref)}&per_page=100`,
+        ])?.workflow_runs ?? [];
+      priorRunIds = new Set(
+        existing
+          .filter(
+            (entry) =>
+              entry.name === 'ci' &&
+              entry.head_sha === sha &&
+              entry.head_branch === ref &&
+              entry.id !== undefined,
+          )
+          .map((entry) => entry.id),
+      );
+    } catch {}
     const push = spawnSync(
       'git',
       [
@@ -472,12 +497,10 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
     history[historyKey] = recordedEntries;
     writePreflightHistory(historyPath, history);
-    const postPushMoved = movedHeadError(`${sha.slice(0, 9)} was pushed`);
-    if (postPushMoved) return { ok: false, exitCode: 1, error: postPushMoved };
     let run = null;
     for (let attempt = 0; attempt < 12; attempt++) {
       try {
-        run = readRun();
+        run = readRun(priorRunIds);
       } catch {
         run = null;
       }
@@ -489,6 +512,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         ok: false,
         exitCode: 1,
         error:
+          movedHeadError(`${sha.slice(0, 9)} was pushed`) ??
           '[preflight] could not read the run: the ci run did not appear; check that the ci workflow is enabled',
       };
     }

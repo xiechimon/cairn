@@ -83,8 +83,10 @@ A lane verifies on GitHub before it enters the landing queue:
   in strict FIFO order through `withPreflightAdmission` (`PREFLIGHT_PUSH_POOL`,
   `preflight-queue` in `scripts/heavy-slots.mjs`). Only the head-of-line
   waiter polls GitHub every 10s, and it holds the local admission lock across
-  the `git push` and initial workflow-run appearance check (`readRun`) so
-  queued waiters cannot stampede past the two-run cap; local CPU saturation
+  the `git push` and initial workflow-run appearance check (`readRun`, waiting
+  for a new run ID beyond pre-push runs on the same SHA even if local `HEAD`
+  moves after the push) so queued waiters cannot stampede past the two-run
+  cap; local CPU saturation
   and `CAIRN_HEAVY_GATE_BYPASS` never block or skip this admission lock.
   `CAIRN_PREFLIGHT_CONCURRENCY_BYPASS=1` skips both the FIFO lock and the
   remote capacity wait (never the fast gate). If the GitHub run-count API is
