@@ -15,6 +15,7 @@ import { BLOCKED_BY_HOLD } from './blockers.js';
 import { type ChiefDeps, coordinatorThreadRow, ensureChief } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
+import { requiredGithubPushRepoForStep } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import {
   priorSessionOf,
@@ -107,7 +108,8 @@ function sessionStarted(db: Db, row: PendingRow): boolean {
 
 function canRunOn(db: Db, row: PendingRow, target: MachineRow, now: number): boolean {
   if (sessionStarted(db, row)) return false;
-  const localProject = projectOfTodo(db, row.todoRow)?.repoKind === 'local';
+  const projectRow = projectOfTodo(db, row.todoRow);
+  const localProject = projectRow?.repoKind === 'local';
   if (localProject) return false;
   const agentRow = profileForStep(db, row.todoRow, row.stepRow.kind, row.stepRow.id);
   if (agentRow === null || agentRow.modelId == null) return false;
@@ -116,6 +118,12 @@ function canRunOn(db: Db, row: PendingRow, target: MachineRow, now: number): boo
     model: effectiveModel(agentRow, row.stepRow),
     localProject,
     localMerge: parseLocalMergeInstruction(row.stepRow.prompt) !== null,
+    githubPushRepo: requiredGithubPushRepoForStep({
+      project: projectRow,
+      step: row.stepRow,
+      todo: row.todoRow,
+      agentTools: agentRow.tools,
+    }),
   };
   return !targetUnavailable(
     db,

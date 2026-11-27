@@ -67,8 +67,10 @@ import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { readDeployLease } from './deploy-lease.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import {
+  githubPushCapable,
   machineRunningCount,
   projectRunningCount,
+  requiredGithubPushRepoForStep,
   stepRuntimeFor,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
@@ -683,11 +685,18 @@ async function tryClaim(
         ? { provider: model.provider, modelId: model.modelId }
         : null;
     const now = nowMs();
+    const todoProject = projectOfTodo(db, cand.todoRow);
     const facts: WorkerStepFacts = {
       agentRow,
       model,
-      localProject: projectOfTodo(db, cand.todoRow)?.repoKind === 'local',
+      localProject: todoProject?.repoKind === 'local',
       localMerge: localMerge !== null,
+      githubPushRepo: requiredGithubPushRepoForStep({
+        project: todoProject,
+        step: cand.stepRow,
+        todo: cand.todoRow,
+        agentTools: agentRow.tools,
+      }),
     };
     if (workerIneligibility(db, machineRow, facts, catalog, now) !== null) continue;
     const fallbackActive =
@@ -807,6 +816,18 @@ async function tryClaim(
           return false;
         holdBlockedBuild(tx, cand.stepRow.buildId);
         claimProject = projectOfTodo(tx, latestTodo);
+        const freshMachine = tx.select().from(machine).where(eq(machine.id, machineId)).get();
+        const txGithubPushRepo = requiredGithubPushRepoForStep({
+          project: claimProject,
+          step: cand.stepRow,
+          todo: latestTodo,
+          agentTools: agentRow.tools,
+        });
+        if (
+          txGithubPushRepo !== null &&
+          !githubPushCapable(freshMachine?.capabilities, txGithubPushRepo, nowMs())
+        )
+          return false;
         const claimRepo = infoCard ? null : githubRepoOfProject(claimProject);
         if (
           (claimRepo === null) !== (claimRepoRef === null) ||

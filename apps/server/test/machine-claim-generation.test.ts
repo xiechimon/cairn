@@ -147,6 +147,22 @@ async function githubWorld(
     .set({ repoKind: 'github', githubRepo: 'octo/alpha' })
     .where(eq(projectTable.id, w.projectId))
     .run();
+  const checkedAt = Date.now();
+  first.db
+    .update(machineTable)
+    .set({
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        claimGeneration: true,
+        githubPush: {
+          login: 'ok',
+          checkedAt,
+          repos: [{ repo: 'octo/alpha', state: 'write', checkedAt }],
+        },
+      },
+    })
+    .run();
   upsertGithubConnection(
     { db: first.db, box: w.s.secretBox },
     {

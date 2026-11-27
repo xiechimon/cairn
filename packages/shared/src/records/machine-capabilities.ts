@@ -163,6 +163,39 @@ export const legacyConfinementReportSchema = z
   })
   .strict();
 
+export const GITHUB_PUSH_REPO_STATES = ['write', 'no-write', 'unauthenticated', 'unknown'] as const;
+export const githubPushRepoStateSchema = z.enum(GITHUB_PUSH_REPO_STATES);
+export type GithubPushRepoState = z.infer<typeof githubPushRepoStateSchema>;
+
+export const GITHUB_PUSH_LOGIN_STATES = ['ok', 'unauthenticated', 'unknown'] as const;
+export const githubPushLoginStateSchema = z.enum(GITHUB_PUSH_LOGIN_STATES);
+export type GithubPushLoginState = z.infer<typeof githubPushLoginStateSchema>;
+
+export const GITHUB_PUSH_MAX_REPOS = 200;
+export const GITHUB_PUSH_REPORT_MAX_AGE_MS = 15 * 60_000;
+
+export const githubPushRepoEntrySchema = z
+  .object({
+    repo: z
+      .string()
+      .min(3)
+      .max(200)
+      .regex(/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/),
+    state: githubPushRepoStateSchema,
+    checkedAt: z.number().int().nonnegative(),
+  })
+  .strict();
+export type GithubPushRepoEntry = z.infer<typeof githubPushRepoEntrySchema>;
+
+export const githubPushReportSchema = z
+  .object({
+    login: githubPushLoginStateSchema,
+    checkedAt: z.number().int().nonnegative(),
+    repos: z.array(githubPushRepoEntrySchema).max(GITHUB_PUSH_MAX_REPOS),
+  })
+  .strict();
+export type GithubPushReport = z.infer<typeof githubPushReportSchema>;
+
 export const machineCapabilitiesSchema = z.object({
   osPlatform: machineOsPlatformSchema.optional(),
   osDistribution: z
@@ -212,6 +245,7 @@ export const machineCapabilitiesSchema = z.object({
   phoneHost: z.literal(true).optional(),
   phones: z.array(machinePhoneReportSchema).optional(),
   confinement: legacyConfinementReportSchema.optional(),
+  githubPush: githubPushReportSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
 
@@ -245,6 +279,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     rec.runnerProtocolVersion,
   );
   const confinement = legacyConfinementReportSchema.safeParse(rec.confinement);
+  const githubPush = githubPushReportSchema.safeParse(rec.githubPush);
   return {
     ...base.data,
     ...(osPlatform.success ? { osPlatform: osPlatform.data } : {}),
@@ -287,6 +322,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.phoneHost === true ? { phoneHost: true as const } : {}),
     ...(phones.success && phones.data !== undefined ? { phones: phones.data } : {}),
     ...(confinement.success ? { confinement: confinement.data } : {}),
+    ...(githubPush.success ? { githubPush: githubPush.data } : {}),
   };
 }
 
@@ -361,6 +397,7 @@ export const stepQueueBlockedSchema = z.object({
     'coordinator-provider-no-key',
     'no-computer',
     'blocked-by',
+    'github-push-missing',
   ]),
   missing: z.array(z.string()),
   platform: runnerOsSchema.optional(),

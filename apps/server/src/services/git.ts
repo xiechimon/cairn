@@ -5,6 +5,7 @@ import {
   conversationBranch,
   type DiffFileContent,
   type DocumentDiffFile,
+  GITHUB_PUSH_MAX_REPOS,
   type GithubRepoRef,
   gitHostedRepoPath,
   normalizedRepoRef,
@@ -187,6 +188,26 @@ export function githubRepoOfProject(
 
 export function githubCloneUrl(ref: GithubRepoRef): string {
   return `https://github.com/${ref.owner}/${ref.repo}.git`;
+}
+
+export function activeTeamGithubRepos(db: Pick<Db, 'select'>, teamId: string): string[] {
+  const rows = db
+    .select({ githubRepo: project.githubRepo })
+    .from(project)
+    .where(
+      and(eq(project.teamId, teamId), eq(project.repoKind, 'github'), isNull(project.archivedAt)),
+    )
+    .all();
+  const deduped = new Map<string, string>();
+  for (const row of rows) {
+    if (row.githubRepo === null) continue;
+    const ref = parseGithubRepoRef(row.githubRepo);
+    if (ref === null) continue;
+    const slug = `${ref.owner}/${ref.repo}`;
+    const key = slug.toLowerCase();
+    if (!deduped.has(key)) deduped.set(key, slug);
+  }
+  return [...deduped.values()].sort().slice(0, GITHUB_PUSH_MAX_REPOS);
 }
 
 export function expandHomePath(rawPath: string, homeDir: string = homedir()): string {

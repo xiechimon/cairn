@@ -151,6 +151,8 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'coordinator-provider-missing': 'Coordinator 规则使用的服务商「{name}」尚未添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
   'no-computer': '排队中：信息卡要在执行机上运行，团队暂无在线的执行机',
+  'github-push-missing':
+    '排队中：{machine} 无法推送到该 GitHub 仓库——在 {machine} 上运行 gh auth login 登录 GitHub，或确认该账号有仓库写权限',
 };
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
@@ -167,6 +169,8 @@ const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], st
     '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到「设置 → 模型」',
   'antigravity-subscription':
     '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在「设置 → 模型」中添加 Antigravity 订阅',
+  'github-push-missing':
+    '排队中：没有在线执行机可推送到该 GitHub 仓库——在执行机上运行 gh auth login 登录 GitHub，或确认该账号有仓库写权限',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {

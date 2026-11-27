@@ -19,6 +19,7 @@ import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
   antigravityUsesHostLogin,
+  githubPushCapable,
   type MachineIneligibility,
   machineEligibility,
   machineRunningCount,
@@ -36,6 +37,7 @@ export interface WorkerStepFacts {
   model: Pick<RouteProfile, 'provider' | 'modelId'>;
   localProject: boolean;
   localMerge: boolean;
+  githubPushRepo: string | null;
 }
 
 export function workerIneligibility(
@@ -67,6 +69,9 @@ export function workerIneligibility(
       ),
     antigravityHostLogin:
       runtime === 'antigravity' && antigravityUsesHostLogin(db, machineRow.teamId),
+    githubPushMissing:
+      facts.githubPushRepo != null &&
+      !githubPushCapable(machineRow.capabilities, facts.githubPushRepo, now),
   });
   return ineligible;
 }

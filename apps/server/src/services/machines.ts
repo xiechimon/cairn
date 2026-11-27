@@ -935,16 +935,23 @@ export function markPresence(
   const antigravityChanged =
     merged !== undefined &&
     JSON.stringify(merged.antigravity) !== JSON.stringify(row.capabilities?.antigravity);
+  const githubPushChanged =
+    merged !== undefined &&
+    JSON.stringify(merged.githubPush) !== JSON.stringify(row.capabilities?.githubPush);
   if (
     becameOnline ||
     loginChanged ||
     computerChanged ||
     strainChanged ||
     antigravityChanged ||
-    runtimeUpdateChanged
+    runtimeUpdateChanged ||
+    githubPushChanged
   ) {
     const online = admitOnline || row.online;
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
+  }
+  if (githubPushChanged) {
+    deps.machineHub.wake(row.teamId);
   }
 }
 

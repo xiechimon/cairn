@@ -12,7 +12,7 @@ import { MACHINE_TOKEN_PATTERN } from '../brand.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { hostKeySchema, machineRecordSchema } from '../records/machine.js';
-import { antigravityModelSchema } from '../records/machine-capabilities.js';
+import { antigravityModelSchema, GITHUB_PUSH_MAX_REPOS } from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
   messageRoleSchema,
@@ -135,6 +135,7 @@ export type MachinePresencePhone = z.infer<typeof machinePresencePhoneSchema>;
 export const machinePresenceResponseSchema = machineOkResponseSchema.extend({
   installDevin: z.boolean().optional(),
   phones: z.array(machinePresencePhoneSchema).max(32).optional(),
+  githubRepos: z.array(z.string().min(3).max(200)).max(GITHUB_PUSH_MAX_REPOS).optional(),
 });
 export type MachinePresenceResponse = z.infer<typeof machinePresenceResponseSchema>;
 

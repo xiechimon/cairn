@@ -81,7 +81,23 @@ function makeWorld(opts: WorldOpts = {}) {
   ] as const) {
     s.db
       .insert(machineTable)
-      .values(readyMachine({ id, teamId: s.team.id, name, online: true }))
+      .values(
+        readyMachine({
+          id,
+          teamId: s.team.id,
+          name,
+          online: true,
+          capabilities: {
+            mcpServers: [],
+            skills: [],
+            githubPush: {
+              login: 'ok',
+              checkedAt: base,
+              repos: [{ repo: REPO, state: 'write', checkedAt: base }],
+            },
+          },
+        }),
+      )
       .run();
   }
   seedSessionRoute(s, {

@@ -70,6 +70,7 @@ import {
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
+import { activeTeamGithubRepos } from './services/git.js';
 import { localMergeRecheckAuthorization } from './services/local-merge.js';
 import { receiveAntigravityVerify } from './services/machine-antigravity-verify.js';
 import { scopeMachineClaim } from './services/machine-claim-scope.js';
@@ -499,10 +500,12 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
           if (body.claudeCode !== undefined) await resumeRuntimeHeldBuilds(deps, row.teamId);
         }
         const phones = phoneRowsForPresence(ctx.db, row.id);
+        const githubRepos = activeTeamGithubRepos(ctx.db, row.teamId);
         return c.json({
           ok: true as const,
           ...(hasActiveDevinSubscription(deps, row.teamId) ? { installDevin: true } : {}),
           ...(phones.length > 0 ? { phones } : {}),
+          ...(githubRepos.length > 0 ? { githubRepos } : {}),
         });
       },
     );

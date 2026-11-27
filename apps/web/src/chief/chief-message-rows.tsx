@@ -333,6 +333,7 @@ const COORDINATOR_FIXES: Partial<
   Record<StepQueueBlocked['kind'], { label: string; href: string }[]>
 > = {
   'runner-outdated': [{ label: '查看执行机', href: settingsHref('machines') }],
+  'github-push-missing': [{ label: '查看执行机', href: settingsHref('machines') }],
   'claude-logged-out': [{ label: '添加 Claude 订阅', href: settingsHref('routing') }],
   'devin-subscription': [{ label: '添加 Devin 订阅', href: settingsHref('routing') }],
   'antigravity-subscription': [{ label: '添加 Antigravity 订阅', href: settingsHref('routing') }],

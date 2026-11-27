@@ -3113,6 +3113,15 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "githubRepos": {
+      "items": {
+        "maxLength": 200,
+        "minLength": 3,
+        "type": "string",
+      },
+      "maxItems": 200,
+      "type": "array",
+    },
     "installDevin": {
       "type": "boolean",
     },
@@ -6288,6 +6297,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                         "coordinator-provider-no-key",
                         "no-computer",
                         "blocked-by",
+                        "github-push-missing",
                       ],
                       "type": "string",
                     },
@@ -8106,6 +8116,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                 "coordinator-provider-no-key",
                 "no-computer",
                 "blocked-by",
+                "github-push-missing",
               ],
               "type": "string",
             },
@@ -10471,6 +10482,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                                     "coordinator-provider-no-key",
                                     "no-computer",
                                     "blocked-by",
+                                    "github-push-missing",
                                   ],
                                   "type": "string",
                                 },
@@ -12948,6 +12960,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                     "coordinator-provider-no-key",
                     "no-computer",
                     "blocked-by",
+                    "github-push-missing",
                   ],
                   "type": "string",
                 },
@@ -13542,6 +13555,65 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               },
               "required": [
                 "installed",
+              ],
+              "type": "object",
+            },
+            "githubPush": {
+              "additionalProperties": false,
+              "properties": {
+                "checkedAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "login": {
+                  "enum": [
+                    "ok",
+                    "unauthenticated",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+                "repos": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "checkedAt": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "repo": {
+                        "maxLength": 200,
+                        "minLength": 3,
+                        "pattern": "^[A-Za-z0-9._-]+\\/[A-Za-z0-9._-]+$",
+                        "type": "string",
+                      },
+                      "state": {
+                        "enum": [
+                          "write",
+                          "no-write",
+                          "unauthenticated",
+                          "unknown",
+                        ],
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "repo",
+                      "state",
+                      "checkedAt",
+                    ],
+                    "type": "object",
+                  },
+                  "maxItems": 200,
+                  "type": "array",
+                },
+              },
+              "required": [
+                "login",
+                "checkedAt",
+                "repos",
               ],
               "type": "object",
             },

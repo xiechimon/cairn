@@ -261,6 +261,7 @@ describe('poolResolution when defaultMachineId is null', () => {
         model: { provider: 'stub-gw', modelId: 'stub-model' },
         localProject: false,
         localMerge: false,
+        githubPushRepo: null,
       },
       catalog: [],
       sessionMachineId: null,

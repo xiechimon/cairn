@@ -87,6 +87,7 @@ import { OutboundComputerScreens } from './computer/screen-channel.js';
 import { createComputerScreenProvider } from './computer/screen-provider.js';
 import { defaultStagingRoot, sweepStagedUploads } from './computer/staging.js';
 import type { DaemonConfig } from './config.js';
+import { GithubPushProbe } from './github-push-probe.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
 import { importAgentConfig } from './import-agent-config.js';
 import { createImsgBridge } from './imsg-bridge.js';
@@ -148,6 +149,7 @@ export interface MachineLoopOpts {
   hostIdentitySources?: HostIdentitySources;
   legacyRunnerHomes?: readonly string[];
   hostPermissionsProbe?: HostPermissionsProbe;
+  githubPushProbe?: GithubPushProbe;
   fetchImpl?: typeof fetch;
   client?: MachineApi;
   claimTimeoutMs?: number;
@@ -618,10 +620,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         `antigravity managed setup failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
+  const probeCtrl = new AbortController();
+  const githubPushProbe =
+    opts.githubPushProbe ??
+    new GithubPushProbe({
+      onChange: () => announcePresence(),
+      signal: probeCtrl.signal,
+    });
   const capabilitiesReport = (): MachineCapabilities => {
     const reach = agentReach.current();
     const scraper = scrapling.current();
     const hostPermissions = hostPermissionsProbe.current();
+    const githubPush = githubPushProbe.current();
     return {
       ...capabilitiesProbe(),
       osPlatform: osPlatformOf(platform),
@@ -704,6 +714,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(reach !== undefined ? { agentReach: reach } : {}),
       ...(scraper !== undefined ? { scrapling: scraper } : {}),
       ...(hostPermissions !== undefined ? { hostPermissions } : {}),
+      ...(githubPush !== undefined ? { githubPush } : {}),
     };
   };
 
@@ -1020,6 +1031,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     timeoutMs: opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS,
     send: async (body, signal) => {
       const response = await client.presence(body, signal);
+      githubPushProbe.setRepos(response.githubRepos ?? []);
       if (hostKey !== null && machineJson !== null && machineJson.hostKey === undefined) {
         machineJson = { ...machineJson, hostKey };
         saveMachineJson(paths, machineJson);
@@ -1752,6 +1764,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         .catch(() => {});
     }
     checkRuntimeUpdates();
+    void githubPushProbe.refresh().catch(() => {});
     void probeAuthAndRemember()
       .then(() => presenceReporter.send())
       .catch((err: unknown) => {
@@ -1897,7 +1910,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     clearInterval(desktopSweepTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
+    probeCtrl.abort();
     claimCtrl.abort();
+    await githubPushProbe.settled();
     imsgBridge.stop();
     installStop.abort();
     void screens.close();

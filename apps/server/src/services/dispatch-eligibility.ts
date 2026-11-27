@@ -1,12 +1,18 @@
 import {
+  AGENT_TOOL_PUSH,
   type ClaudeCodeReport,
   capabilityMissingLabels,
+  GITHUB_PUSH_REPORT_MAX_AGE_MS,
   isBackendRuntimeId,
+  isBuildStepKind,
+  isInfoOutput,
   MACHINE_RUNTIMES,
   type MachineCapabilities,
   type MachineRuntime,
   MIN_SUPPORTED_RUNNER_PROTOCOL,
   MODEL_SOURCE_RUNTIME_LABELS,
+  parseLocalMergeInstruction,
+  parseVerifyPromptMeta,
   type RequiredCapabilities,
   type RunnerOs,
   runnerOsOf,
@@ -17,10 +23,11 @@ import {
 import { and, eq, isNotNull, isNull, ne } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
-import { build, machine, provider, step, todo } from '../db/schema.js';
+import { build, machine, type project, provider, step, todo } from '../db/schema.js';
 import { activeAntigravitySource } from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
+import { githubRepoOfProject } from './git.js';
 
 export function stepRuntimeFor(
   agentProvider: string | null | undefined,
@@ -274,6 +281,51 @@ export interface EligibilityInput {
   devinSubscriptionMissing: boolean;
   antigravitySubscriptionMissing?: boolean;
   antigravityHostLogin?: boolean;
+  githubPushMissing?: boolean;
+}
+
+export function githubPushCapable(
+  capabilities: Pick<MachineCapabilities, 'githubPush'> | null | undefined,
+  repo: string,
+  now: number,
+): boolean {
+  const report = capabilities?.githubPush;
+  if (report === undefined || report.login !== 'ok') return false;
+  if (now - report.checkedAt > GITHUB_PUSH_REPORT_MAX_AGE_MS) return false;
+  const target = repo.toLowerCase();
+  const entry = report.repos.find((item) => item.repo.toLowerCase() === target);
+  return (
+    entry !== undefined &&
+    entry.state === 'write' &&
+    now - entry.checkedAt <= GITHUB_PUSH_REPORT_MAX_AGE_MS
+  );
+}
+
+export function requiredGithubPushRepoForStep(input: {
+  project: Pick<typeof project.$inferSelect, 'repoKind' | 'githubRepo'> | undefined;
+  step: Pick<typeof step.$inferSelect, 'kind' | 'prompt'>;
+  todo: Pick<typeof todo.$inferSelect, 'output'>;
+  agentTools: readonly string[];
+}): string | null {
+  if (isBuildStepKind(input.step.kind) && isInfoOutput(input.todo.output)) return null;
+  const repoRef = githubRepoOfProject(input.project);
+  if (repoRef === null) return null;
+  if (!input.agentTools.includes(AGENT_TOOL_PUSH)) return null;
+  const slug = `${repoRef.owner}/${repoRef.repo}`;
+  if (
+    input.step.kind === 'build' ||
+    input.step.kind === 'session' ||
+    (input.step.kind === 'merge' && parseLocalMergeInstruction(input.step.prompt) === null)
+  ) {
+    return slug;
+  }
+  if (
+    input.step.kind === 'verify' &&
+    parseVerifyPromptMeta(input.step.prompt)?.evidence !== 'attachments'
+  ) {
+    return slug;
+  }
+  return null;
 }
 
 export type MachineIneligibility =
@@ -285,7 +337,8 @@ export type MachineIneligibility =
         | 'claude-blocked'
         | 'claude-login'
         | 'devin-subscription'
-        | 'antigravity-subscription';
+        | 'antigravity-subscription'
+        | 'github-push';
     }
   | { kind: 'model'; reason: string }
   | { kind: 'capability'; missing: string[] };
@@ -319,6 +372,9 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   }
   if (runtime === 'antigravity' && input.antigravitySubscriptionMissing === true) {
     return { kind: 'antigravity-subscription' };
+  }
+  if (input.githubPushMissing === true) {
+    return { kind: 'github-push' };
   }
   return null;
 }

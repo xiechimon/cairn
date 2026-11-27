@@ -3,6 +3,7 @@ import {
   isBuildStepKind,
   isChiefSideThreadId,
   isInfoOutput,
+  isRegisteredMachine,
   type MachineQueuedThread,
   MODEL_SOURCE_RUNTIME_LABELS,
   parseLocalMergeInstruction,
@@ -21,7 +22,11 @@ import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordinator-route.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
-import { type MachineIneligibility, stepRuntimeFor } from './dispatch-eligibility.js';
+import {
+  type MachineIneligibility,
+  requiredGithubPushRepoForStep,
+  stepRuntimeFor,
+} from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import { infoCardPlan } from './info-card.js';
 import {
@@ -66,6 +71,8 @@ function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueu
       return { kind: 'devin-subscription', missing: [] };
     case 'antigravity-subscription':
       return { kind: 'antigravity-subscription', missing: [] };
+    case 'github-push':
+      return { kind: 'github-push-missing', missing: [] };
   }
 }
 
@@ -180,11 +187,18 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const agentRow = agentForRow(row);
     if (agentRow === null || agentRow.modelId == null) return null;
     const now = nowMs();
+    const projectRow = projectOfTodo(db, row.todoRow);
     const facts: WorkerStepFacts = {
       agentRow,
       model: effectiveModel(agentRow, row),
-      localProject: projectOfTodo(db, row.todoRow)?.repoKind === 'local',
+      localProject: projectRow?.repoKind === 'local',
       localMerge: parseLocalMergeInstruction(row.prompt) !== null,
+      githubPushRepo: requiredGithubPushRepoForStep({
+        project: projectRow,
+        step: row,
+        todo: row.todoRow,
+        agentTools: agentRow.tools,
+      }),
     };
     const unavailable = (id: string) =>
       targetUnavailable(db, machineRowOf(id), teamId, facts, catalog, now);
@@ -241,6 +255,22 @@ export function stepQueueProjector(db: Db, teamId: string) {
     }
     const platform = need === undefined ? {} : { platform: need };
     if (named === null) {
+      if (facts.githubPushRepo != null) {
+        const onlineRunners = teamMachines.filter(
+          (m) => m.retiredAt === null && isRegisteredMachine(m) && m.online,
+        );
+        if (
+          onlineRunners.some(
+            (m) => workerIneligibility(db, m, facts, catalog, now)?.kind === 'github-push',
+          )
+        ) {
+          return {
+            verdict,
+            blocked: { kind: 'github-push-missing', missing: [] },
+            ...extra,
+          };
+        }
+      }
       return {
         verdict,
         blocked:

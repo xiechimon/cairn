@@ -1080,6 +1080,10 @@ export const EN: Record<string, string> = {
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts',
   '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始':
     'Queued: the Claude account was switched and this step keeps the old account. Stop it, then continue, to start over on the new account',
+  '排队中：{machine} 无法推送到该 GitHub 仓库——在 {machine} 上运行 gh auth login 登录 GitHub，或确认该账号有仓库写权限':
+    'Queued: {machine} cannot push to this GitHub repository. Run gh auth login on {machine}, or make sure that account has write access to the repository',
+  '排队中：没有在线执行机可推送到该 GitHub 仓库——在执行机上运行 gh auth login 登录 GitHub，或确认该账号有仓库写权限':
+    'Queued: no online Runner can push to this GitHub repository. Run gh auth login on a Runner, or make sure that account has write access to the repository',
   'Coordinator 规则使用的服务商「{name}」尚未添加':
     'The Coordinator rule uses the provider "{name}", which has not been added',
   'Coordinator 规则用的服务商「{name}」没有 API key':
