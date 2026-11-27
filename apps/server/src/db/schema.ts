@@ -5,7 +5,6 @@ import type {
   AutonomyPauseMarker,
   AutonomyPauseSource,
   BlockerHandoffRecord,
-  BuildEvidence,
   BuildStop,
   ChiefMemoryTrace,
   ChiefMessageDelivery,
@@ -39,7 +38,6 @@ import type {
   McpConnectorStatus,
   McpConnectorTool,
   McpConnectorTransport,
-  MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
   NotificationType,
@@ -769,26 +767,6 @@ export const dataMigration = sqliteTable('data_migration', {
   doneAt: epochMs('doneAt').notNull(),
   detail: text('detail').notNull(),
 });
-
-export const memoryCandidate = sqliteTable(
-  'memory_candidate',
-  {
-    id: text('id').primaryKey(),
-    agentId: text('agentId').notNull(),
-    teamId: text('teamId').notNull(),
-    projectId: text('projectId').notNull(),
-    title: text('title').notNull(),
-    content: text('content').notNull(),
-    status: text('status').$type<MemoryCandidateStatus>().notNull().default('pending'),
-    buildIds: json<string[]>('buildIds').notNull(),
-    evidence: json<BuildEvidence[]>('evidence').notNull(),
-    conflictIds: json<string[]>('conflictIds').notNull().default(sql`'[]'`),
-    memoryId: text('memoryId'),
-    createdAt: epochMs('createdAt').notNull(),
-    updatedAt: epochMs('updatedAt').notNull(),
-  },
-  (t) => [index('memory_candidate_scope_idx').on(t.agentId, t.teamId, t.projectId)],
-);
 
 export type MemoryEditStatus =
   | 'working'

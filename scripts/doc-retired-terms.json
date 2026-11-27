@@ -53,6 +53,18 @@
       "pattern": "恢复到此处",
       "canary": "`恢复到此处` for owner messages",
       "reason": "the owner removed restoring a conversation to a message on 2026-11-26; failed turns retry from the failure card"
+    },
+    {
+      "id": "memory-candidate-table",
+      "pattern": "\\bmemory_candidate\\b|\\bmemoryCandidate\\b",
+      "canary": "memory_candidate",
+      "reason": "memory_candidate and experience-candidate were deleted; repeated corrections go through Coordinator check-task proposals"
+    },
+    {
+      "id": "experience-candidate-module",
+      "pattern": "\\bexperience-candidate\\b|\\bexperienceCandidate\\b|\\bexperienceProposalSchema\\b|\\bPROMOTION_MIN_BUILDS\\b",
+      "canary": "experience-candidate",
+      "reason": "experience-candidate was deleted; repeated corrections go through Coordinator check-task proposals"
     }
   ],
   "baseline": {
@@ -95,6 +107,8 @@
     "chief-stop-waiting-to-retry": {},
     "spec22-retirement-table": {},
     "decision-dock": {},
-    "restore-to-here": {}
+    "restore-to-here": {},
+    "memory-candidate-table": {},
+    "experience-candidate-module": {}
   }
 }

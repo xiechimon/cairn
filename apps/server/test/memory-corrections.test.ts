@@ -66,6 +66,7 @@ type Doc = { content: string; baseVersion: string; id: string };
 type Written = Doc & {
   pointedRule?: string;
   correction?: string;
+  next?: string;
 };
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 3));
@@ -2119,4 +2120,124 @@ test('a clean worker turn after an earlier typed-answer turn still records corre
   const written = workerRepeat(secondStep) as Written;
   expect(written.correction).toBeUndefined();
   expect(rows()).toMatchObject([{ ownerWords: 'CLEAN WORKER AFTER ANSWER: conclusion first.' }]);
+});
+
+test('the Coordinator is told how to handle a recurrence ladder next instruction', () => {
+  const section =
+    /<corrections>([\s\S]*?)<\/corrections>/.exec(COORDINATOR_SYSTEM_PROMPT)?.[1] ?? '';
+  expect(section).toContain('next');
+  expect(section).toContain('ask_user');
+  expect(section).toContain('create_todo');
+  expect(section).toContain('messageIds');
+});
+
+test('a Coordinator recurrence without a check pointer returns pointedRule and next', async () => {
+  seedIndex(RULE);
+  const current = await turn('Again: conclusion first.');
+  const written = await reportRepeat(current);
+  expect(written.pointedRule).toBe(RULE);
+  expect(written.next).toContain('ask_user');
+  expect(written.next).toContain('create_todo');
+  expect(written.next).toContain('update_memory');
+});
+
+test('an unclear Coordinator recurrence still returns pointedRule and next without recording words', async () => {
+  seedIndex(RULE);
+  const running = await turn('Write the summary.');
+  H.s.db.update(step).set({ machineId: 'runner-1' }).where(eq(step.id, running.stepId)).run();
+  steerAtRunningTurn();
+  const written = await reportRepeat(running);
+  expect(written.correction).toContain('not recorded');
+  expect(written.pointedRule).toBe(RULE);
+  expect(written.next).toContain('ask_user');
+  expect(rows()).toEqual([]);
+});
+
+test('a recurrence whose rule already carries a check pointer omits next', async () => {
+  const linked = `${RULE} (check: [Add lint](todo:todo-existing))`;
+  seedIndex(linked);
+  const current = await turn('Again: conclusion first.');
+  const written = await reportRepeat(current, linked);
+  expect(written.pointedRule).toBe(linked);
+  expect(written.next).toBeUndefined();
+});
+
+test('a worker recurrence returns pointedRule without Coordinator next instructions', async () => {
+  seedIndex(RULE);
+  await tick();
+  said('user', Date.now());
+  workStep('s-worker-repeat', Date.now());
+  const written = workerRepeat('s-worker-repeat') as Written;
+  expect(written.pointedRule).toBe(RULE);
+  expect(written.next).toBeUndefined();
+});
+
+test('accepting a recurrence check task cites both messages, links the rule, and stops proposing again', async () => {
+  seedIndex(RULE);
+  const second = await turn('Conclusion first again!');
+  const repeated = await reportRepeat(second);
+  expect(repeated.next).toContain('ask_user');
+
+  const questionId = 'ask-check-001';
+  writeQuestion(
+    H.s.db,
+    H.threadId,
+    questionId,
+    {
+      kind: ASK_USER_QUESTION_KIND,
+      requestId: questionId,
+      status: 'pending',
+      questions: [
+        {
+          header: '检查',
+          question: 'Create a task to add a repository check for this rule?',
+          options: [{ label: 'Create check task (Recommended)' }, { label: 'Keep as advice' }],
+        },
+      ],
+      answers: null,
+    },
+    Date.now(),
+  );
+  answerChiefQuestion(H.s.svc, H.teamId, {
+    threadId: H.threadId,
+    requestId: questionId,
+    answers: [{ header: '检查', choices: ['Create check task (Recommended)'] }],
+  });
+  const created = (await second.call('create_todo', {
+    projectId: H.projectId,
+    title: 'Add reply-order check',
+    messageIds: [second.messageId!, questionId],
+    start: false,
+  })) as unknown as { id: string; link: string; spec: string };
+  expect(created.spec).toContain('Conclusion first again!');
+  expect(created.spec).toContain('Create check task (Recommended)');
+
+  const pointed = `${RULE} (check: ${created.link})`;
+  await second.call('update_memory', {
+    scope: 'team',
+    file: 'MEMORY.md',
+    baseVersion: (await second.index()).baseVersion,
+    old_str: RULE,
+    new_str: pointed,
+  });
+  second.done();
+  await tick();
+
+  const third = await turn('Still not conclusion first!');
+  const again = await reportRepeat(third, pointed);
+  expect(again.pointedRule).toBe(pointed);
+  expect(again.next).toBeUndefined();
+});
+
+test('a searchable file recurrence that already carries a check pointer omits next', async () => {
+  executeMemoryDocumentTool(H.s.db, teamOwner(), 'save_memory', {
+    scope: 'team',
+    file: 'style.md',
+    content: `${RULE}\n(check: [Add check](todo:todo-file-1))`,
+  });
+  await tick();
+  const current = await turn('Again: conclusion first.');
+  const written = await reportRepeat(current, 'style.md');
+  expect(written.pointedRule).toBe('style.md');
+  expect(written.next).toBeUndefined();
 });

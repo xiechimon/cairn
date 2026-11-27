@@ -337,6 +337,7 @@ const COORDINATOR_UPDATE_MEMORY_DESCRIPTION = [
   '写陈述句。属于某个项目的事写进那个项目的记忆：scope 填项目 id；团队偏好里新写的一行提到项目名会被拒。',
   `偏好总长不能超过 ${TEAM_MEMORY_MAX_CHARS.toLocaleString('en-US')} 字；超了会写入失败，先合并或删掉旧条目。`,
   '用法：先用 memories 读 scope 的 MEMORY.md 拿到 baseVersion；传 content 整体替换，或传一段唯一的原文 old_str 和 new_str。restoreVersion 恢复保留的旧版本；记忆文件可以 renameTo 或 moveTo，MEMORY.md 不能。baseVersion 过期返回 409。',
+  '重复已有条目时传 correction: true 与 repeats，若返回 next 则按其提示向用户提议建检查任务或说明无法检查。',
 ].join('\n');
 
 export const COORDINATOR_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] =

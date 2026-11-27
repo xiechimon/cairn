@@ -55,6 +55,9 @@ type StepRow = typeof step.$inferSelect;
 
 const LISTED_MAX = 200;
 const NOT_RECORDED = 'correction not recorded. The memory write itself was applied.';
+const CHECK_POINTER_RE = /\(todo:[^)]+\)/i;
+const RECURRENCE_NEXT =
+  'This rule was repeated. If a repository check (regression test, lint rule, or CI gate) can stop it, call ask_user offering to create a task to add that check (recommended) or keep it as advice — never install a check unasked. On accept, call create_todo citing both the correction message and the answered question card in messageIds, then update_memory on this rule to add one pointer to the task link. On decline, leave the rule unmarked. If no check can enforce it, state so plainly and keep it as advice.';
 
 interface Entry {
   projectId: string | null;
@@ -443,6 +446,16 @@ function inAttachedIndex(tx: Tx, teamId: string, turn: StepRow, entry: Entry): b
     );
 }
 
+function hasCheckPointer(tx: Tx, owner: MemoryDocumentOwner, entry: Entry): boolean {
+  if (entry.file === MEMORY_INDEX_TITLE) return CHECK_POINTER_RE.test(entry.text);
+  try {
+    const doc = currentMemoryDocument(tx, owner, entry.projectId ?? 'team', entry.file);
+    return CHECK_POINTER_RE.test(memoryIndexText(doc));
+  } catch {
+    return false;
+  }
+}
+
 export function executeMemoryToolForStep(
   db: Db,
   owner: MemoryDocumentOwner,
@@ -464,12 +477,34 @@ export function executeMemoryToolForStep(
     const said = turn === undefined ? null : userWords(tx, turn);
     const named =
       input.repeats === undefined ? null : namedEntry(tx, owner, input.scope, input.repeats);
-    const output = executeMemoryDocumentTool(tx, owner, name, params) as { id: string };
-    if (turn === undefined || said === null) return { ...output, correction: NOT_RECORDED };
+    const savedByThen =
+      said !== null
+        ? said.savedByThen
+        : turn === undefined
+          ? undefined
+          : (turn.claimedAt ?? turn.createdAt);
     const old =
-      named !== null && savedBy(said.savedByThen, named, entryVersions(tx, owner, named))
+      named !== null &&
+      savedByThen !== undefined &&
+      savedBy(savedByThen, named, entryVersions(tx, owner, named))
         ? named
         : null;
+    const output = executeMemoryDocumentTool(tx, owner, name, params) as { id: string };
+    const next =
+      old !== null &&
+      turn !== undefined &&
+      turn.kind === 'chief' &&
+      !hasCheckPointer(tx, owner, old)
+        ? RECURRENCE_NEXT
+        : undefined;
+    if (turn === undefined || said === null) {
+      return {
+        ...output,
+        correction: NOT_RECORDED,
+        ...(old === null ? {} : { pointedRule: old.text }),
+        ...(next === undefined ? {} : { next }),
+      };
+    }
     const exchange = tx
       .select()
       .from(memoryCorrection)
@@ -509,7 +544,11 @@ export function executeMemoryToolForStep(
         })
         .run();
     }
-    return old === null ? output : { ...output, pointedRule: old.text };
+    return {
+      ...output,
+      ...(old === null ? {} : { pointedRule: old.text }),
+      ...(next === undefined ? {} : { next }),
+    };
   });
 }
 
