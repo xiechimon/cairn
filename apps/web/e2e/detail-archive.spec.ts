@@ -1,5 +1,9 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 async function setup(page: Page, phase = 'building', archivedAt: number | null = null) {
   let todo = {
     id: 'todo-archive',

@@ -1,6 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, THREAD } from './chief-home-mock';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const DELAY_MS = 5000;
 
 const CONCLUSIONS = [

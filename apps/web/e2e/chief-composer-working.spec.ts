@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { mockLive, PROJECT, THREAD } from './chief-home-mock.js';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 test('the ring under the composer stays still while a turn runs and reads in K', async ({ page }) => {
   await page.goto('/app?scenario=chief-draft');
   const line = page.getByTestId('home-c');

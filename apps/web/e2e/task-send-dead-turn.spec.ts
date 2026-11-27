@@ -4,6 +4,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { expect, type Page, test } from '@playwright/test';
 import { bootLiveServer, type LiveServer } from './live-server';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 let server: LiveServer;
 
 test.beforeAll(async () => {

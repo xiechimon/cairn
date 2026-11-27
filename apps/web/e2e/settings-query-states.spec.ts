@@ -1,6 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
 import type { ClaudeSubscriptionListEntry } from '@cairn/shared';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const PANES = [
   { section: 'machines', endpoint: 'machines', empty: '[data-testid="resource-empty"]', ok: [] },
   {

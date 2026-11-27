@@ -1,6 +1,10 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { mockLive, PROJECT, TASK, taskEntry, THREAD } from './chief-home-mock.js';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const INP_BUDGET_MS = 200;
 const LONG_TASK_BUDGET_MS = 50;
 const LCP_BUDGET_MS = 2500;

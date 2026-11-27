@@ -1,6 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
 import { composerInput, expectTypedInFull, PAGES } from './audit-pages.js';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const HOME = '/app?scenario=01&pane=tasks&tab=scheduled';
 
 const openHome = async (page: Page) => {

@@ -1,5 +1,9 @@
 import { expect, type Page, test } from '@playwright/test';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const NEW_PROJECT_LIVE = '/app/project/new';
 
 async function stubBoot(page: Page) {

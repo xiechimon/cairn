@@ -1,6 +1,10 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
 import { mockLive, THREAD } from './chief-home-mock';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 function question(requestId: string, header: string, text: string, options: unknown[]) {
   return {
     id: `row-${requestId}`,

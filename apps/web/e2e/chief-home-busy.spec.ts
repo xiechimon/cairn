@@ -2,6 +2,10 @@ import { expect, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence';
 import { verticalGap } from './helpers.js';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: 'ian', avatarUrl: null };
 const AGENT = {

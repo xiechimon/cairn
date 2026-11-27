@@ -2,6 +2,10 @@ import { chiefGetResponseSchema } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { installConversationStreams } from './tab-stream-fakes.js';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 'reject' | 'hold' = 'answer') {
   const chief = chiefGetResponseSchema.parse({
     chief: {

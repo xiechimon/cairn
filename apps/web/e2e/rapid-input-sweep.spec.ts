@@ -1,6 +1,10 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const SLOW_API_MS = 400;
 const PRESS_GAP_MS = 50;
 const HAND_DRIFT_PX = 6;

@@ -2,6 +2,10 @@ import type { DesktopProviderImportInput, DesktopProviderImportResult } from '@c
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, PROJECT } from './chief-home-mock';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 interface World {
   subscription?: boolean;
   claudeCodeFound?: boolean;

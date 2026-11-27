@@ -2,6 +2,10 @@ import { expect, type Page, test } from '@playwright/test';
 import type { AntigravitySubscriptionListEntry, AntigravitySubscriptionModel } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const NOW = Date.now();
 const DAY = 86_400_000;
 
