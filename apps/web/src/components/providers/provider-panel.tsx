@@ -100,10 +100,12 @@ export function SortableMoveButtons({
   label,
   onMoveUp,
   onMoveDown,
+  revealOnHover = false,
 }: {
   label: string;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  revealOnHover?: boolean;
 }) {
   const { t } = useI18n();
   const upRef = useRef<HTMLButtonElement | null>(null);
@@ -151,7 +153,13 @@ export function SortableMoveButtons({
     });
   }
   return (
-    <span className="flex flex-none items-center gap-0.5">
+    <span
+      className={cn(
+        'flex flex-none items-center gap-0.5',
+        revealOnHover &&
+          'pointer-fine:absolute pointer-fine:top-1/2 pointer-fine:right-2 pointer-fine:z-10 pointer-fine:-translate-y-1/2 pointer-fine:rounded-md pointer-fine:bg-menu-hover pointer-fine:p-0.5 pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:duration-150 pointer-fine:group-aria-[current=true]/row:bg-(--sidebar-active) pointer-fine:group-hover/row:opacity-100 pointer-fine:group-focus-within/row:opacity-100 pointer-coarse:gap-1',
+      )}
+    >
       {actions.map(({ key, tip, handler, Icon, buttonRef }) => (
         <IconTooltip
           key={key}
@@ -285,7 +293,12 @@ export function ProviderInstanceRow({
           </span>
         </span>
       </Button>
-      <SortableMoveButtons label={item.name} onMoveUp={onMoveUp} onMoveDown={onMoveDown} />
+      <SortableMoveButtons
+        revealOnHover
+        label={item.name}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
+      />
     </div>
   );
 }

@@ -92,7 +92,7 @@ for (const theme of ['light', 'dark'] as const) {
         listBox.width,
         'R1: exercise the fixed 17rem list, not the full-width narrow layout',
       ).toBeCloseTo(17 * rem, 0);
-      const column = row.getByRole('button').locator('span.flex-1.flex-col');
+      const column = row.getByRole('button').first().locator('span.flex-1.flex-col');
       const columnBox = await column.boundingBox();
       if (columnBox === null) throw new Error('R1: the text column must have measurable geometry');
       expect(
@@ -328,7 +328,7 @@ test('C1: the cooling fixture row button announces the same status as its detail
   await expect(row.locator('svg.lucide-clock-3')).toBeVisible();
   const subtitle = row.getByTestId('provider-subtitle');
   await expect(subtitle).toHaveText(/^订阅 · \d+ 个模型$/);
-  await expect(row.getByRole('button')).toHaveAccessibleName(
+  await expect(row.getByRole('button').first()).toHaveAccessibleName(
     `Work ${await subtitle.textContent()} ${await status.textContent()}`,
   );
 });
@@ -355,7 +355,7 @@ for (const { state, status, icon } of [
     });
     await page.goto('/app/settings/routing');
     const row = page.getByTestId('provider-instance');
-    await expect(row.getByRole('button')).toHaveAccessibleName(`Claude 订阅 · 0 个模型 ${status}`);
+    await expect(row.getByRole('button').first()).toHaveAccessibleName(`Claude 订阅 · 0 个模型 ${status}`);
     await expect(row.getByTestId('provider-subtitle')).toHaveText('订阅 · 0 个模型');
     await expect(page.getByTestId('subscription-status')).toHaveText(status);
     await expect(row.locator(`svg.lucide-${icon}`)).toBeVisible();
