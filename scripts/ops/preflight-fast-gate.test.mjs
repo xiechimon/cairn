@@ -11,6 +11,7 @@ import {
   extractFailedTestFiles,
   fastGatePlan,
   fastGateShellCommand,
+  parseFastGateArgs,
   parseGateWrapper,
   readLastFailedTests,
   runFastGate,
@@ -475,4 +476,106 @@ test('runFastGate fails if the worktree becomes dirty while checks are running',
   });
   assert.equal(result.ok, false);
   assert.match(result.error, /does not exactly match HEAD/);
+});
+
+test('parseFastGateArgs and fastGatePlan partition failed vitest, node:test, and linux-only playwright steps and pass them through wrapper', () => {
+  assert.deepEqual(
+    parseFastGateArgs([
+      '--last-failed',
+      'apps/server/test/a.test.ts',
+      '--last-failed=scripts/ops/b.test.mjs',
+      '--last-failed',
+      'apps/server/test/a.test.ts',
+    ]),
+    {
+      cheapChecks: false,
+      lastFailedTests: ['apps/server/test/a.test.ts', 'scripts/ops/b.test.mjs'],
+    },
+  );
+  assert.deepEqual(parseFastGateArgs(['--cheap-checks']), {
+    cheapChecks: true,
+    lastFailedTests: [],
+  });
+
+  const mixed = [
+    'scripts/ops/push-queue.test.mjs',
+    'apps/server/test/d121-owner-controls.test.ts',
+    'apps/web/e2e/chief-home-questions.spec.ts',
+    'apps/web/e2e/visual-baseline.spec.ts',
+  ];
+  const darwinPlan = fastGatePlan(['apps/web/src/App.tsx'], mixed, {
+    platform: 'darwin',
+    allowPlaywright: true,
+  });
+  assert.deepEqual(darwinPlan.slice(4, 7), [
+    ['node', '--test', 'scripts/ops/push-queue.test.mjs'],
+    ['pnpm', 'exec', 'vitest', 'run', 'apps/server/test/d121-owner-controls.test.ts'],
+    [
+      'pnpm',
+      '--filter',
+      '@cairn/web',
+      'exec',
+      'playwright',
+      'test',
+      '--reporter=list',
+      'e2e/chief-home-questions.spec.ts',
+    ],
+  ]);
+
+  const linuxPlan = fastGatePlan(['apps/web/src/App.tsx'], mixed, {
+    platform: 'linux',
+    allowPlaywright: true,
+  });
+  assert.deepEqual(linuxPlan.slice(4, 7), [
+    ['node', '--test', 'scripts/ops/push-queue.test.mjs'],
+    ['pnpm', 'exec', 'vitest', 'run', 'apps/server/test/d121-owner-controls.test.ts'],
+    [
+      'pnpm',
+      '--filter',
+      '@cairn/web',
+      'exec',
+      'playwright',
+      'test',
+      '--reporter=list',
+      'e2e/chief-home-questions.spec.ts',
+      'e2e/visual-baseline.spec.ts',
+    ],
+  ]);
+
+  const noPwPlan = fastGatePlan(['apps/web/src/App.tsx'], mixed, {
+    platform: 'darwin',
+    allowPlaywright: false,
+  });
+  assert.deepEqual(noPwPlan.slice(4, 6), [
+    ['node', '--test', 'scripts/ops/push-queue.test.mjs'],
+    ['pnpm', 'exec', 'vitest', 'run', 'apps/server/test/d121-owner-controls.test.ts'],
+  ]);
+  assert.ok(!noPwPlan.some((step) => step.includes('playwright')));
+
+  const root = makeTestTempDir('preflight-wrapper-failed-');
+  try {
+    mkdirSync(join(root, 'apps/server/test'), { recursive: true });
+    mkdirSync(join(root, 'apps/web/e2e'), { recursive: true });
+    writeFileSync(join(root, 'apps/server/test/a.test.ts'), 'export {};\n');
+    writeFileSync(join(root, 'apps/web/e2e/b.spec.ts'), 'export {};\n');
+    const calls = [];
+    const wrapped = runFastGate({
+      cwd: root,
+      wrapper: 'remote-runner --',
+      checkTree: () => null,
+      listPaths: () => ['apps/server/src/app.ts'],
+      lastFailedTests: ['apps/server/test/a.test.ts', 'apps/web/e2e/b.spec.ts'],
+      spawn: (command, args) => {
+        calls.push([command, ...args]);
+        return { status: 0 };
+      },
+      log: () => {},
+    });
+    assert.equal(wrapped.ok, true);
+    const shCmd = calls[0].at(-1);
+    assert.match(shCmd, /pnpm exec vitest run apps\/server\/test\/a\.test\.ts/);
+    assert.match(shCmd, /playwright test --reporter=list e2e\/b\.spec\.ts/);
+  } finally {
+    releaseTestTempDir(root);
+  }
 });

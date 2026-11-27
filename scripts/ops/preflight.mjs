@@ -115,11 +115,102 @@ export function preflightRun(runs, sha, ref, { priorRunIds = null } = {}) {
   );
 }
 
-export function fastGateInvocation({ env = process.env } = {}) {
+const WORKSPACE_PACKAGE_DIRS = {
+  '@cairn/shared': 'packages/shared',
+  '@xiechimon/cairn': 'apps/server',
+  '@cairn/web': 'apps/web',
+  '@xiechimon/cairn-cli': 'apps/daemon',
+  '@cairn/desktop': 'apps/desktop',
+  '@cairn/integration': 'integration',
+};
+const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+const GH_STEP_PREFIX = /^[^\t]*\t[^\t]*\t(?:\uFEFF?\d{4}-\d{2}-\d{2}T[\d:.]+Z\s?)?/;
+const TEST_FILE_CANDIDATE = /[\w./-]+\.(?:test|spec)\.[cm]?[jt]sx?/g;
+
+function normalizeExtractedTestPath(rawPath, pkg, cwd, exists) {
+  let rel = String(rawPath ?? '')
+    .trim()
+    .replace(/^file:\/\//, '')
+    .replace(
+      /^\/(?:home\/runner\/work\/cairn\/cairn|Users\/[^/]+\/(?:[^/]+\/)*cairn(?:\/\.herdr\/worktrees\/[^/]+\/[^/]+)?)\//,
+      '',
+    );
+  if (pkg && WORKSPACE_PACKAGE_DIRS[pkg]) rel = `${WORKSPACE_PACKAGE_DIRS[pkg]}/${rel}`;
+  if (/^e2e\/.+\.spec\.[cm]?[jt]sx?$/.test(rel)) rel = `apps/web/${rel}`;
+  rel = rel.replace(/\\/g, '/').replace(/^\.\//, '');
+  if (!rel || rel.startsWith('/') || rel.startsWith('..')) return null;
+  const full = resolve(cwd, rel);
+  const inside = full === resolve(cwd) || full.startsWith(`${resolve(cwd)}/`);
+  return inside && exists(full) ? rel : null;
+}
+
+export function extractCiFailedTestFiles(
+  logText,
+  { cwd = process.cwd(), exists = existsSync } = {},
+) {
+  const found = new Set();
+  const add = (rawPath, pkg = null) => {
+    const normalized = normalizeExtractedTestPath(rawPath, pkg, cwd, exists);
+    if (normalized) found.add(normalized);
+  };
+  let inPlaywrightSummary = false;
+  let inNodeFailingTests = false;
+  for (const rawLine of String(logText ?? '').split('\n')) {
+    const line = rawLine.replace(ANSI_ESCAPE, '').replace(GH_STEP_PREFIX, '');
+    if (/^\s*\d+\s+failed\s*$/.test(line)) {
+      inPlaywrightSummary = true;
+      continue;
+    }
+    if (inPlaywrightSummary) {
+      const summaryMatch = /^\s+(?:\[[^\]]+\]\s*›\s*)?(\S+\.spec\.[cm]?[jt]sx?):\d+:\d+/.exec(line);
+      if (summaryMatch) {
+        add(summaryMatch[1]);
+        continue;
+      }
+      if (line.trim() === '' || !/^\s/.test(line)) inPlaywrightSummary = false;
+    }
+    if (/^\s*failing tests:\s*$/.test(line)) {
+      inNodeFailingTests = true;
+      continue;
+    }
+    if (inNodeFailingTests) {
+      const nodeAtMatch =
+        /^\s*test at (?:file:\/\/\S+\/)?(\S+\.test\.[cm]js)(?::\d+:\d+)?\s*$/.exec(line);
+      if (nodeAtMatch) {
+        add(nodeAtMatch[1]);
+        continue;
+      }
+      if (line.trim() !== '' && !/^\s*(?:✖|test at |'|\w*Error:|\s+at )/.test(line)) {
+        inNodeFailingTests = false;
+      }
+    }
+    const vitestMatch =
+      /^\s*FAIL\s+(?:(@[\w-]+\/[\w-]+)\s+)?(\S+\.(?:test|spec)\.[cm]?[jt]sx?)(?:\s|>|$)/.exec(line);
+    if (vitestMatch) add(vitestMatch[2], vitestMatch[1] ?? null);
+    const pwMatch =
+      /^\s*(?:\d+\)|[✘×]\s+\d+)\s+(?:\[[^\]]+\]\s*›\s*)?(\S+\.spec\.[cm]?[jt]sx?):\d+:\d+/.exec(
+        line,
+      );
+    if (pwMatch) add(pwMatch[1]);
+    const nodeLineMatch = /^\s*✖\s+(?:file:\/\/\S+\/)?(\S+\.test\.[cm]js)(?:\s|$)/.exec(line);
+    if (nodeLineMatch) add(nodeLineMatch[1]);
+    if (line.includes('flake ledger:')) {
+      for (const match of line.matchAll(TEST_FILE_CANDIDATE)) add(match[0]);
+    }
+  }
+  return [...found].sort();
+}
+
+export function fastGateInvocation({ env = process.env, lastFailedFiles = [] } = {}) {
   const runner = env.CAIRN_PREFLIGHT_GATE_WRAPPER?.trim()
     ? 'CAIRN_PREFLIGHT_GATE_WRAPPER'
     : 'local exact tree';
-  return { command: process.execPath, args: ['scripts/ops/preflight-fast-gate.mjs'], runner };
+  const failedArgs = lastFailedFiles.flatMap((file) => ['--last-failed', file]);
+  return {
+    command: process.execPath,
+    args: ['scripts/ops/preflight-fast-gate.mjs', ...failedArgs],
+    runner,
+  };
 }
 
 export function runFastGateBeforePush({
@@ -357,7 +448,12 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   }
   const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
   let previousConclusion = lastEntry?.conclusion ?? null;
-  if (priorEntries.length >= 2 && lastEntry?.sha !== sha && !effectiveReason) {
+  let lastFailedRunId = lastEntry?.runId ?? null;
+  const cachedFailedFiles = Array.isArray(lastEntry?.failedFiles) ? lastEntry.failedFiles : null;
+  if (
+    lastEntry &&
+    (!previousConclusion || (previousConclusion === 'failure' && cachedFailedFiles === null))
+  ) {
     try {
       const runs =
         ghJson([
@@ -366,6 +462,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         ])?.workflow_runs ?? [];
       const matched = runs.find((entry) => entry.name === 'ci' && entry.head_sha === lastEntry.sha);
       if (matched?.conclusion) previousConclusion = matched.conclusion;
+      if (matched?.id !== undefined) lastFailedRunId = matched.id;
     } catch {}
   }
   const guard = evaluateGreenRerunGuard({
@@ -380,7 +477,46 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     console.error(guard.error);
     process.exit(1);
   }
-  const invocation = fastGateInvocation();
+  const readRunFailedFiles = (runId) => {
+    try {
+      const failedLog = execFileSync('gh', ['run', 'view', String(runId), '--log-failed'], {
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      return extractCiFailedTestFiles(failedLog, { cwd: root });
+    } catch {
+      return null;
+    }
+  };
+  let lastFailedFiles = [];
+  if (previousConclusion === 'failure') {
+    if (cachedFailedFiles !== null) {
+      lastFailedFiles = cachedFailedFiles.filter((file) => existsSync(resolve(root, file)));
+    } else if (lastFailedRunId !== null && lastFailedRunId !== undefined) {
+      const discovered = readRunFailedFiles(lastFailedRunId);
+      if (discovered !== null) {
+        lastFailedFiles = discovered;
+        history[historyKey] = priorEntries.map((entry, idx) =>
+          idx === priorEntries.length - 1
+            ? {
+                ...entry,
+                conclusion: 'failure',
+                runId: lastFailedRunId,
+                failedFiles: discovered,
+              }
+            : entry,
+        );
+        writePreflightHistory(historyPath, history);
+      }
+    }
+  }
+  if (lastFailedFiles.length > 0) {
+    console.log(
+      `[preflight] rerunning ${lastFailedFiles.length} previously failed test file(s) from run ${lastFailedRunId ?? lastEntry?.sha?.slice(0, 9)}: ${lastFailedFiles.join(', ')}`,
+    );
+  }
+  const invocation = fastGateInvocation({ lastFailedFiles });
   console.log(
     `[preflight] running the fast gate through ${invocation.runner}; nothing is pushed unless it passes`,
   );
@@ -422,13 +558,15 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           pushedAt: new Date().toISOString(),
           reason: effectiveReason ?? null,
           conclusion: null,
+          runId: null,
+          failedFiles: null,
         },
       ];
-  const saveConclusion = (conclusion) => {
+  const saveOutcome = (conclusion, runId, failedFiles = []) => {
     const current = readPreflightHistory(historyPath);
     const list = Array.isArray(current[historyKey]) ? current[historyKey] : recordedEntries;
     current[historyKey] = list.map((entry) =>
-      entry.sha === sha ? { ...entry, conclusion } : entry,
+      entry.sha === sha ? { ...entry, conclusion, runId, failedFiles } : entry,
     );
     writePreflightHistory(historyPath, current);
   };
@@ -563,10 +701,10 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     const outcome = watchVerdict(state?.status ?? null, state?.conclusion ?? null, watched.status);
     if (outcome.verdict !== 'unreadable') {
       if (outcome.verdict === 'green') {
-        saveConclusion('success');
+        saveOutcome('success', run.id, []);
         succeed('[preflight] green — push-queue will accept this head');
       }
-      saveConclusion(outcome.conclusion ?? 'failure');
+      saveOutcome(outcome.conclusion ?? 'failure', run.id, readRunFailedFiles(run.id) ?? []);
       console.error(
         `[preflight] the run went ${outcome.conclusion}: ${run.html_url}; fix the failing jobs and push again`,
       );
@@ -586,7 +724,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         },
       );
       if (again.status === 0) {
-        saveConclusion('success');
+        saveOutcome('success', run.id, []);
         succeed('[preflight] green — push-queue will accept this head');
       }
       state = currentStatus();

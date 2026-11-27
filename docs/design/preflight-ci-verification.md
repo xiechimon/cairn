@@ -32,9 +32,11 @@ A lane verifies on GitHub before it enters the landing queue:
   live queue candidate.
 - `scripts/ops/preflight.mjs` runs `scripts/ops/preflight-fast-gate.mjs` on
   the exact committed `HEAD` tree before pushing `refs/heads/preflight/<lane>`
-  (the secret scan, revert guard, CI's cheap checks, `pnpm lint`,
-  touched-package `typecheck`, and `pnpm test:changed`), and refuses to push if
-  it fails. The secret scan runs first, after the trailer stamping has fixed the
+  (any test files extracted from the branch's previous red preflight CI run
+  via `--last-failed`, including Vitest, `node --test`, and non-baseline
+  Playwright specs, then the secret scan, revert guard, CI's cheap checks,
+  `pnpm lint`, touched-package `typecheck`, and `pnpm test:changed`), and
+  refuses to push if any fail. The secret scan runs first, after the trailer stamping has fixed the
   SHAs: `scripts/ops/secret-scan.mjs` runs gitleaks, redacted, over the diffs
   and commit messages since `origin/main`, in a bare copy of the repository so
   local git configuration cannot hide text. It honours only committed

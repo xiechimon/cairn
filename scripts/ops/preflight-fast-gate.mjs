@@ -286,16 +286,100 @@ export function ciSchedulingGateSteps(paths) {
   return [['node', 'scripts/ops/ci-capacity-gate.mjs'], CI_SCHEDULING_TEST_STEP];
 }
 
-export function fastGatePlan(paths, lastFailedTests = []) {
+const NODE_TEST_FILE = /\.test\.[cm]js$/;
+const PW_SPEC_FILE = /^apps\/web\/e2e\/.+\.spec\.[cm]?[jt]sx?$/;
+const VISUAL_BASELINE_SPEC = 'apps/web/e2e/visual-baseline.spec.ts';
+const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+
+export function parseFastGateArgs(argv = []) {
+  let cheapChecks = false;
+  const lastFailedTests = [];
+  const seen = new Set();
+  const pushFile = (value) => {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    lastFailedTests.push(trimmed);
+  };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === CHEAP_CHECKS_FLAG) {
+      cheapChecks = true;
+      continue;
+    }
+    if (arg === '--last-failed' && i + 1 < argv.length) {
+      pushFile(argv[i + 1]);
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith('--last-failed=')) {
+      pushFile(arg.slice('--last-failed='.length));
+    }
+  }
+  return { cheapChecks, lastFailedTests };
+}
+
+export function rerunFailedTestSteps(
+  files = [],
+  {
+    platform = process.platform,
+    allowPlaywright = true,
+    allowMultiVitest = true,
+    log = console.log,
+  } = {},
+) {
+  const nodeFiles = [];
+  const playwrightFiles = [];
+  const vitestFiles = [];
+  for (const file of files) {
+    if (typeof file !== 'string' || !file) continue;
+    if (NODE_TEST_FILE.test(file)) nodeFiles.push(file);
+    else if (PW_SPEC_FILE.test(file)) {
+      if (file === VISUAL_BASELINE_SPEC && platform !== 'linux') {
+        log(
+          `[preflight-fast-gate] skipping ${file} on ${platform} (Linux pixel baselines; run node scripts/ops/render-visual-baselines.mjs instead)`,
+        );
+        continue;
+      }
+      playwrightFiles.push(file);
+    } else if (TEST_FILE_PATTERN.test(file)) {
+      vitestFiles.push(file);
+    }
+  }
+  const steps = [];
+  if (nodeFiles.length > 0) steps.push(['node', '--test', ...nodeFiles]);
+  if (vitestFiles.length > 0 && (allowMultiVitest || vitestFiles.length === 1)) {
+    steps.push(['pnpm', 'exec', 'vitest', 'run', ...vitestFiles]);
+  }
+  if (playwrightFiles.length > 0) {
+    if (allowPlaywright) {
+      steps.push([
+        'pnpm',
+        '--filter',
+        '@cairn/web',
+        'exec',
+        'playwright',
+        'test',
+        '--reporter=list',
+        ...playwrightFiles.map((file) => file.slice('apps/web/'.length)),
+      ]);
+    } else {
+      log(
+        `[preflight-fast-gate] skipping ${playwrightFiles.length} previously failed Playwright spec(s) without CAIRN_PREFLIGHT_GATE_WRAPPER or heavy authorization`,
+      );
+    }
+  }
+  return steps;
+}
+
+export function fastGatePlan(paths, lastFailedTests = [], options = {}) {
   const plan = [
+    ...rerunFailedTestSteps(lastFailedTests, options),
     ['pnpm', 'lint'],
     ...ciSchedulingGateSteps(paths),
     ...typecheckPackagesForPaths(paths).map((name) => ['pnpm', '--filter', name, 'typecheck']),
     ['pnpm', 'test:changed'],
   ];
-  if (lastFailedTests.length > 0) {
-    plan.unshift(['pnpm', 'exec', 'vitest', 'run', ...lastFailedTests]);
-  }
   return [SECRET_SCAN_STEP, REVERT_GUARD_STEP, CHEAP_CHECKS_STEP, STATIC_REGRESSION_STEP, ...plan];
 }
 
@@ -381,11 +465,22 @@ export function runFastGate({
 }) {
   const dirty = checkTree(cwd);
   if (dirty !== null) return { ok: false, error: dirty };
-  const cachedFailed =
-    lastFailedTests ?? (wrapper.trim() ? [] : readLastFailedTests(cachePath, cwd));
-  const resolvedFailed =
-    cachedFailed.length > 1 && !heavyRunAuthorized(gateEnv) ? [] : cachedFailed;
-  const plan = fastGatePlan(listPaths(cwd), resolvedFailed);
+  const hasWrapper = wrapper.trim().length > 0;
+  const explicitFailed = Array.isArray(lastFailedTests);
+  const cachedFailed = explicitFailed
+    ? lastFailedTests.filter(
+        (file) => typeof file === 'string' && file.length > 0 && existsSync(resolve(cwd, file)),
+      )
+    : hasWrapper
+      ? []
+      : readLastFailedTests(cachePath, cwd);
+  const authorized = hasWrapper || heavyRunAuthorized(gateEnv);
+  const plan = fastGatePlan(listPaths(cwd), cachedFailed, {
+    platform: process.platform,
+    allowPlaywright: authorized,
+    allowMultiVitest: authorized,
+    log,
+  });
   const wrapperTokens = parseGateWrapper(wrapper);
   if (wrapperTokens.length > 0) {
     const [wrapperCommand, ...wrapperArgs] = wrapperTokens;
@@ -443,10 +538,14 @@ export function runFastGate({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  if (process.argv[2] === CHEAP_CHECKS_FLAG) {
+  const parsed = parseFastGateArgs(process.argv.slice(2));
+  if (parsed.cheapChecks) {
     process.exitCode = await runCheapChecks({ cwd: process.cwd() });
   } else {
-    const result = runFastGate({ cwd: process.cwd() });
+    const result = runFastGate({
+      cwd: process.cwd(),
+      lastFailedTests: parsed.lastFailedTests.length > 0 ? parsed.lastFailedTests : undefined,
+    });
     if (!result.ok) {
       console.error(`[preflight-fast-gate] ${result.error}`);
       process.exit(result.status ?? 1);

@@ -18,6 +18,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import {
   cancelSupersededRuns,
   evaluateGreenRerunGuard,
+  extractCiFailedTestFiles,
   fastGateInvocation,
   isActivePreflightRun,
   MAX_CONCURRENT_PREFLIGHT_RUNS,
@@ -891,6 +892,7 @@ test('preflight --stamp-only stamps Lane trailer and exits 0 without running fas
     execFileSync('git', ['clone', bare, work], { encoding: 'utf8' });
     const gitEnv = {
       ...process.env,
+      NODE_TEST_CONTEXT: undefined,
       HOME: home,
       GIT_AUTHOR_NAME: 'xiechimon',
       GIT_AUTHOR_EMAIL: '157263579+xiechimon@users.noreply.github.com',
@@ -1062,6 +1064,7 @@ test('preflight CLI enforces --reason on 3rd green rerun for same lane+branch an
     execFileSync('git', ['clone', bare, work], { encoding: 'utf8' });
     const gitEnv = {
       ...process.env,
+      NODE_TEST_CONTEXT: undefined,
       HOME: home,
       PATH: `${bin}:${process.env.PATH}`,
       GIT_AUTHOR_NAME: 'xiechimon',
@@ -1224,6 +1227,7 @@ test('push-queue --wait --reason arms the post-reason SHA once while checks stay
     execFileSync('git', ['clone', bare, work], { encoding: 'utf8' });
     const gitEnv = {
       ...process.env,
+      NODE_TEST_CONTEXT: undefined,
       HOME: home,
       PATH: `${bin}:${process.env.PATH}`,
       GIT_AUTHOR_NAME: 'xiechimon',
@@ -1670,6 +1674,180 @@ if (url.includes('status=')) {
     const events = readFileSync(eventsFile, 'utf8').trim().split('\n');
     assert.ok(events.indexOf('visible:wt1') !== -1);
     assert.ok(events.indexOf('visible:wt1') < events.indexOf('push:wt2'));
+  } finally {
+    releaseTestTempDir(root);
+  }
+});
+
+test('extractCiFailedTestFiles extracts existing vitest, playwright, and node:test paths from CI logs', () => {
+  const root = makeTestTempDir('ci-failed-log-parse-');
+  try {
+    for (const rel of [
+      'apps/server/test/d121-owner-controls.test.ts',
+      'apps/web/e2e/chief-home-questions.spec.ts',
+      'apps/web/e2e/web-vitals-perf.spec.ts',
+      'apps/web/e2e/providers-order.spec.ts',
+      'scripts/ops/push-queue.test.mjs',
+      'apps/web/test/ok.test.ts',
+    ]) {
+      mkdirSync(dirname(join(root, rel)), { recursive: true });
+      writeFileSync(join(root, rel), 'export {};\n');
+    }
+    const sampleLog = [
+      'vitest-light (5)\tTest\t2026-11-27T12:07:39Z  ✓ @cairn/web test/ok.test.ts (3 tests) 10ms',
+      'vitest-light (5)\tTest\t2026-11-27T12:07:40Z \x1b[41m\x1b[1m FAIL \x1b[22m\x1b[49m @xiechimon/cairn test/d121-owner-controls.test.ts > no deadline',
+      'e2e (6)\tE2E\t2026-11-27T13:16:48Z   ✓  364 e2e/thread-pr-panel.spec.ts:303:1 › ok',
+      'e2e (6)\tE2E\t2026-11-27T13:16:50Z   1) e2e/chief-home-questions.spec.ts:347:1 › at 375px each card sits',
+      'e2e (2)\tE2E\t2026-11-27T13:06:50Z   1 failed',
+      'e2e (2)\tE2E\t2026-11-27T13:06:50Z     e2e/providers-order.spec.ts:146:1 › A10: hovering',
+      'e2e-affected (1)\tE2E\t2026-11-27T13:30:03Z flake ledger: unlisted Playwright spec file(s) went green on retry: apps/web/e2e/web-vitals-perf.spec.ts. Fix the flake',
+      'check\tnode\t✖ scripts/ops/push-queue.test.mjs (10ms)',
+      'check\tnode\t    at /home/runner/work/cairn/cairn/apps/server/test/nonexistent.test.ts:1:1',
+    ].join('\n');
+
+    assert.deepEqual(extractCiFailedTestFiles(sampleLog, { cwd: root }), [
+      'apps/server/test/d121-owner-controls.test.ts',
+      'apps/web/e2e/chief-home-questions.spec.ts',
+      'apps/web/e2e/providers-order.spec.ts',
+      'apps/web/e2e/web-vitals-perf.spec.ts',
+      'scripts/ops/push-queue.test.mjs',
+    ]);
+  } finally {
+    releaseTestTempDir(root);
+  }
+});
+
+test('preflight refuses to push when a test file from the branch previous red preflight still fails', () => {
+  const root = makeTestTempDir('preflight-rerun-failed-');
+  const bare = join(root, 'origin.git');
+  const work = join(root, 'work');
+  const bin = join(root, 'bin');
+  const home = join(root, 'home');
+  try {
+    mkdirSync(bare, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    execFileSync('git', ['init', '--bare', '-b', 'main', bare], { encoding: 'utf8' });
+    execFileSync('git', ['clone', bare, work], { encoding: 'utf8' });
+    const gitEnv = {
+      ...process.env,
+      NODE_TEST_CONTEXT: undefined,
+      HOME: home,
+      PATH: `${bin}:${process.env.PATH}`,
+      GIT_AUTHOR_NAME: 'xiechimon',
+      GIT_AUTHOR_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      GIT_COMMITTER_NAME: 'xiechimon',
+      GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+      CAIRN_HEAVY_SLOTS_DIR: join(root, 'slots'),
+    };
+    const git = (args) =>
+      execFileSync('git', args, { cwd: work, encoding: 'utf8', env: gitEnv }).trim();
+    mkdirSync(join(work, 'scripts/ops'), { recursive: true });
+    writeFileSync(
+      join(work, 'scripts/ops/preflight-fast-gate.mjs'),
+      `import { spawnSync } from 'node:child_process';
+const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i += 1) {
+  if (args[i] === '--last-failed' && args[i + 1]) {
+    const res = spawnSync(process.execPath, ['--test', args[i + 1]], { stdio: 'inherit' });
+    if (res.status !== 0) process.exit(res.status ?? 1);
+    i += 1;
+  }
+}
+`,
+    );
+    writeFileSync(join(work, 'scripts/demo-flag.txt'), 'ok\n');
+    writeFileSync(
+      join(work, 'scripts/demo-fail.test.mjs'),
+      `import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { test } from 'node:test';
+test('demo flag must be ok', () => {
+  assert.equal(readFileSync('scripts/demo-flag.txt', 'utf8').trim(), 'ok');
+});
+`,
+    );
+    git(['add', '.']);
+    git(['commit', '--quiet', '-m', 'chore: base']);
+    git(['push', '--quiet', '-u', 'origin', 'main']);
+
+    const runsFile = join(root, 'gh-runs.json');
+    writeFileSync(runsFile, '[]');
+    writeFileSync(
+      join(bin, 'gh'),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const idFile = process.env.HOME + '/.config/cairn-dev/lane-machine-id';
+const id = fs.existsSync(idFile) ? fs.readFileSync(idFile, 'utf8').trim() : 'uninitialized';
+const branch = 'preflight/' + id + '/work';
+const runsFile = ${JSON.stringify(runsFile)};
+const runs = JSON.parse(fs.readFileSync(runsFile, 'utf8'));
+const apiUrl = args.find((a) => a.startsWith('repos/')) || '';
+if (args[0] === 'run' && args[1] === 'view' && args.includes('--log-failed')) {
+  console.log('check\\tnode\\t✖ scripts/demo-fail.test.mjs (5ms)');
+} else if (apiUrl.includes('status=')) {
+  console.log(JSON.stringify({ workflow_runs: [] }));
+} else if (apiUrl.includes('head_sha=')) {
+  const sha = (apiUrl.match(/head_sha=([0-9a-f]+)/) || [])[1] || '';
+  let entry = runs.find((r) => r.head_sha === sha);
+  if (!entry) {
+    const conclusion = process.env.STUB_CONCLUSION || 'success';
+    entry = { id: 300 + runs.length, name: 'ci', head_sha: sha, head_branch: branch, status: 'completed', conclusion, html_url: 'https://example/run/' + (300 + runs.length) };
+    runs.unshift(entry);
+    fs.writeFileSync(runsFile, JSON.stringify(runs));
+  }
+  console.log(JSON.stringify({ workflow_runs: [entry] }));
+} else if (apiUrl.includes('workflows/ci.yml/runs')) {
+  console.log(JSON.stringify({ workflow_runs: runs }));
+} else {
+  console.log('{}');
+}
+`,
+      { mode: 0o755 },
+    );
+
+    const scriptPath = fileURLToPath(new URL('./preflight.mjs', import.meta.url));
+    const runCli = (extraArgs = [], extraEnv = {}) =>
+      spawnSync(process.execPath, [scriptPath, ...extraArgs], {
+        cwd: work,
+        encoding: 'utf8',
+        env: { ...gitEnv, ...extraEnv },
+      });
+
+    git(['checkout', '--quiet', '-b', 'feat-red']);
+    writeFileSync(join(work, 'scripts/demo-flag.txt'), 'broken\n');
+    git(['add', 'scripts/demo-flag.txt']);
+    git(['commit', '--quiet', '-m', 'fix: broken change']);
+    const r1 = runCli(['--wait'], { STUB_CONCLUSION: 'failure' });
+    assert.equal(r1.status, 1);
+    const id = readFileSync(join(home, '.config/cairn-dev/lane-machine-id'), 'utf8').trim();
+    const sha1 = git(['rev-parse', 'HEAD']);
+    assert.equal(git(['ls-remote', 'origin', preflightRef(`${id}/work`)]).split(/\s+/)[0], sha1);
+
+    writeFileSync(join(work, 'unrelated.txt'), 'noise\n');
+    git(['add', 'unrelated.txt']);
+    git(['commit', '--quiet', '-m', 'fix: unrelated commit without fixing flag']);
+    const r2 = runCli();
+    assert.notEqual(
+      r2.status,
+      0,
+      `preflight must block pushing while previously failed test still fails\nr1.out=${r1.stdout}\nr1.err=${r1.stderr}\nr2.out=${r2.stdout}\nr2.err=${r2.stderr}`,
+    );
+    assert.equal(
+      git(['ls-remote', 'origin', preflightRef(`${id}/work`)]).split(/\s+/)[0],
+      sha1,
+      'broken commit must not be pushed to preflight ref',
+    );
+
+    writeFileSync(join(work, 'scripts/demo-flag.txt'), 'ok\n');
+    git(['add', 'scripts/demo-flag.txt']);
+    git(['commit', '--quiet', '-m', 'fix: restore ok flag']);
+    const r3 = runCli();
+    assert.equal(r3.status, 0, r3.stderr);
+    const sha3 = git(['rev-parse', 'HEAD']);
+    assert.equal(git(['ls-remote', 'origin', preflightRef(`${id}/work`)]).split(/\s+/)[0], sha3);
   } finally {
     releaseTestTempDir(root);
   }
