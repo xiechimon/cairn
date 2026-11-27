@@ -3832,6 +3832,25 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     {
       "additionalProperties": false,
       "properties": {
+        "rotationId": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "const": "token.rotate",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "rotationId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
         "connId": {
           "maxLength": 128,
           "minLength": 1,
@@ -14414,6 +14433,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
     },
     "teamId": {
       "type": "string",
+    },
+    "tokenReauthRequired": {
+      "type": "boolean",
     },
   },
   "required": [

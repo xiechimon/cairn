@@ -1842,6 +1842,13 @@
       "when": 1795795787018,
       "tag": "0267_bouncy_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 268,
+      "version": "6",
+      "when": 1795830476239,
+      "tag": "0268_nappy_quentin_quire",
+      "breakpoints": true
     }
   ]
 }

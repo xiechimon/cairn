@@ -86,6 +86,7 @@ import type {
   ProviderRecord,
   PrPanelRow,
   RemoteRoutesResponse,
+  RotateMachineTokenResponse,
   RouteOverride,
   ScheduleRecord,
   SearchResponse,
@@ -1502,6 +1503,15 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['routing-settings', teamId] });
         void qc.invalidateQueries({ queryKey: ['model-routing', teamId] });
         void qc.invalidateQueries({ queryKey: ['teams'] });
+      },
+    }),
+    rotateMachineToken: useMutation({
+      mutationFn: (id: string) =>
+        api.post<RotateMachineTokenResponse>(
+          `/api/machines/${encodeURIComponent(id)}/rotate-token`,
+        ),
+      onSuccess: () => {
+        void qc.invalidateQueries({ queryKey: ['machines', teamId] });
       },
     }),
     switchChiefStepMachine: useMutation({

@@ -136,6 +136,7 @@ import { mintGithubWebhook, revokeGithubWebhook } from './services/github-webhoo
 import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import { revokeMachineToken } from './services/machine-revoke.js';
+import { rotateMachineToken } from './services/machine-rotate-token.js';
 import { machineRunningCount, toMachineRecord } from './services/machines.js';
 import {
   bindGithubConnector,
@@ -445,6 +446,21 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, row.teamId);
     revokeMachineToken(ctx, id);
     return c.body(null, 204);
+  });
+
+  app.post('/api/machines/:id/rotate-token', async (c) => {
+    requireOwnerSession(c, 'rotate runner tokens');
+    const id = c.req.param('id');
+    const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
+    if (!row || row.retiredAt !== null) throw notFound(`machine ${id}`);
+    requireTeam(ctx, row.teamId);
+    const result = await rotateMachineToken(
+      { db: ctx.db, hub: ctx.hub, machineHub: ctx.machineHub },
+      id,
+      ctx.tokenRotationTimeoutMs === undefined ? {} : { timeoutMs: ctx.tokenRotationTimeoutMs },
+    );
+    c.header('cache-control', 'no-store');
+    return c.json(result);
   });
 
   app.get('/api/capabilities', (c) => {

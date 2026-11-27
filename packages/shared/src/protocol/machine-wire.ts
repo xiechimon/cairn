@@ -493,6 +493,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
   z.object({ type: z.literal('runtime.update'), runtime: managedUpdateRuntimeSchema }),
+  z.object({ type: z.literal('token.rotate'), rotationId: z.string().min(1).max(64) }),
   z.object({ type: z.literal('im.attach'), connId: z.string().min(1).max(128) }),
   z.object({ type: z.literal('im.detach'), connId: z.string().min(1).max(128) }),
   z.object({
@@ -785,6 +786,23 @@ export const machineAttachmentResponseSchema = z.object({
 });
 export type MachineAttachmentResponse = z.infer<typeof machineAttachmentResponseSchema>;
 
+export const machineTokenRotateClaimBodySchema = z.object({
+  rotationId: z.string().min(1).max(64),
+  connectionId: z.string().min(1).max(64),
+  hostKey: hostKeySchema.optional(),
+});
+export type MachineTokenRotateClaimBody = z.infer<typeof machineTokenRotateClaimBodySchema>;
+
+export const machineTokenRotateClaimResponseSchema = z.object({
+  token: z.string().regex(MACHINE_TOKEN_PATTERN),
+});
+export type MachineTokenRotateClaimResponse = z.infer<typeof machineTokenRotateClaimResponseSchema>;
+
+export const machineTokenRotateAckBodySchema = z.object({
+  rotationId: z.string().min(1).max(64),
+});
+export type MachineTokenRotateAckBody = z.infer<typeof machineTokenRotateAckBodySchema>;
+
 export const MACHINE_WIRE_EXTENSIONS = [
   {
     method: 'POST',
@@ -897,6 +915,18 @@ export const MACHINE_WIRE_EXTENSIONS = [
     path: '/api/machine/im/{connId}/event',
     reason:
       '[design] iMessage bridge inbound events (im.attach/im.detach/im.send/im.action) from the machine owning the connection; see docs/design/im-bridge.md',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/token-rotate/claim',
+    reason:
+      '[design] Claim a staged replacement runner token on the active connection (docs/design/runner-token-rotation.md)',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/token-rotate/ack',
+    reason:
+      '[design] Acknowledge persisted replacement runner token authenticated with the new token (docs/design/runner-token-rotation.md)',
   },
 ] as const;
 

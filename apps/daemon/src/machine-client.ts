@@ -58,6 +58,7 @@ import {
   machineStopResponseSchema,
   machineStreamEventSchema,
   machineTokenResponseSchema,
+  machineTokenRotateClaimResponseSchema,
   machineUploadUrlsResponseSchema,
   REMOTE_TOOL_RETRY_DELAYS_MS,
   REMOTE_TOOL_TIMEOUT_MS,
@@ -215,6 +216,13 @@ export interface MachineApi {
     signal?: AbortSignal,
   ): Promise<{ id: string; key: string; token: string; sha256: string }>;
   imEvent?(connId: string, body: MachineImEventBody): Promise<void>;
+  claimTokenRotation?(
+    rotationId: string,
+    connectionId: string,
+    hostKey?: string,
+    signal?: AbortSignal,
+  ): Promise<string>;
+  ackTokenRotation?(rotationId: string, newToken: string, signal?: AbortSignal): Promise<void>;
   stream(
     signal: AbortSignal,
     onEvent: (ev: MachineStreamEvent) => void,
@@ -851,6 +859,37 @@ export class MachineClient implements MachineApi {
   async imEvent(connId: string, body: MachineImEventBody): Promise<void> {
     await this.request('POST', `/api/machine/im/${encodeURIComponent(connId)}/event`, {
       body,
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async claimTokenRotation(
+    rotationId: string,
+    connectionId: string,
+    hostKey?: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const res = await this.request('POST', '/api/machine/token-rotate/claim', {
+      body: {
+        rotationId,
+        connectionId,
+        ...(hostKey !== undefined ? { hostKey } : {}),
+      },
+      ...(signal ? { signal } : {}),
+      parse: (raw) => machineTokenRotateClaimResponseSchema.parse(raw),
+    });
+    return res.token;
+  }
+
+  async ackTokenRotation(
+    rotationId: string,
+    newToken: string,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.request('POST', '/api/machine/token-rotate/ack', {
+      bearer: newToken,
+      body: { rotationId },
+      ...(signal ? { signal } : {}),
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }

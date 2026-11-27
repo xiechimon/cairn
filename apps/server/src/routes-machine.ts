@@ -31,6 +31,8 @@ import {
   machinePresenceBodySchema,
   machineSteerAckBodySchema,
   machineThinkingDeltaBodySchema,
+  machineTokenRotateAckBodySchema,
+  machineTokenRotateClaimBodySchema,
   machineToolBodySchema,
   machineToolRelayBodySchema,
   machineTranscriptDeltaBodySchema,
@@ -86,6 +88,10 @@ import {
 } from './services/machine-computer.js';
 import { withFencedTransaction } from './services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
+import {
+  ackMachineTokenRotation,
+  claimMachineTokenRotation,
+} from './services/machine-rotate-token.js';
 import {
   createUploadUrls,
   getStepSession,
@@ -284,7 +290,9 @@ function originOf(c: Context, trustedProxies?: ReadonlySet<string>): string {
 export function registerMachineAuth(app: Hono, ctx: Pick<AppContext, 'db' | 'uploads'>): void {
   app.use('/api/machine/*', async (c, next) => {
     const path = new URL(c.req.url).pathname;
-    if (path.startsWith('/api/machine/enroll')) return next();
+    if (path.startsWith('/api/machine/enroll') || path === '/api/machine/token-rotate/ack') {
+      return next();
+    }
     const token = bearer(c);
     if (!token) throw unauthorized();
     const row = findMachineByToken(ctx.db, token);
@@ -1106,5 +1114,34 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         return c.json({ ok: true as const });
       },
     );
+  });
+
+  app.post('/api/machine/token-rotate/claim', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineTokenRotateClaimBodySchema, decoded, 'body');
+        const token = claimMachineTokenRotation(
+          deps,
+          row.id,
+          body.rotationId,
+          body.connectionId,
+          body.hostKey,
+        );
+        if (token === null) {
+          throw new HttpError(404, 'rotation not found');
+        }
+        c.header('cache-control', 'no-store');
+        return c.json({ token });
+      },
+    );
+  });
+
+  app.post('/api/machine/token-rotate/ack', async (c) => {
+    const token = bearer(c);
+    if (!token) throw unauthorized();
+    const body = parseWith(machineTokenRotateAckBodySchema, await jsonBody(c), 'body');
+    return c.json(ackMachineTokenRotation(deps, body.rotationId, token));
   });
 }

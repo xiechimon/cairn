@@ -98,6 +98,7 @@ export function bootServer(
     oauthFetch?: AppContext['oauthFetch'];
     providerTestTimeoutMs?: number;
     antigravityVerifyTimeoutMs?: number;
+    tokenRotationTimeoutMs?: number;
     authToken?: string | null;
     ownerChannel?: AppContext['ownerChannel'];
     accessVerifier?: AppContext['accessVerifier'];
@@ -216,6 +217,9 @@ export function bootServer(
       ...(opts.antigravityVerifyTimeoutMs === undefined
         ? {}
         : { antigravityVerifyTimeoutMs: opts.antigravityVerifyTimeoutMs }),
+      ...(opts.tokenRotationTimeoutMs === undefined
+        ? {}
+        : { tokenRotationTimeoutMs: opts.tokenRotationTimeoutMs }),
       githubFetch: opts.githubFetch ?? rejectingGithubFetch,
       ...(opts.githubBaseFetch !== undefined ? { githubBaseFetch: opts.githubBaseFetch } : {}),
       ...(opts.githubAppTokenSocket !== undefined

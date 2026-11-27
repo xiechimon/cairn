@@ -153,6 +153,25 @@ export class MachineWakeHub {
     return true;
   }
 
+  handoffConnection(machineId: string, connectionId: string, onExpire: () => void): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (entry?.connectionId !== connectionId) return false;
+    this.releaseMachine(machineId);
+    this.cancelGrace(machineId);
+    const timer = setTimeout(() => {
+      if (this.graces.get(machineId)?.connectionId !== connectionId) return;
+      if (this.streamsByMachine.has(machineId)) return;
+      this.graces.delete(machineId);
+      onExpire();
+    }, this.offlineGraceMs);
+    this.graces.set(machineId, { connectionId, timer, presenceSinceDrop: false });
+    entry.release();
+    try {
+      entry.close();
+    } catch {}
+    return true;
+  }
+
   endConnection(machineId: string, connectionId: string): boolean {
     const current = this.streamsByMachine.get(machineId)?.connectionId === connectionId;
     const grace = this.graces.get(machineId)?.connectionId === connectionId;
@@ -344,6 +363,17 @@ export class MachineWakeHub {
     if (!entry) return false;
     try {
       entry.send({ type: 'runtime.update', runtime });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  pushTokenRotate(machineId: string, rotationId: string): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'token.rotate', rotationId });
       return true;
     } catch {
       return false;

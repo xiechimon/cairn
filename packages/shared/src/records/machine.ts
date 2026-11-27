@@ -44,8 +44,15 @@ export const machineRecordSchema = z.object({
   strain: z.array(machineStrainReasonSchema).optional(),
   capabilities: machineCapabilitiesSchema.nullish(),
   claudeLogin: claudeLoginSchema.optional(),
+  tokenReauthRequired: z.boolean().optional(),
 });
 export type MachineRecord = z.infer<typeof machineRecordSchema>;
+
+export const rotateMachineTokenResponseSchema = z.object({
+  delivery: z.enum(['pushed', 'offline']),
+  machine: machineRecordSchema,
+});
+export type RotateMachineTokenResponse = z.infer<typeof rotateMachineTokenResponseSchema>;
 
 export function isRegisteredMachine(row: {
   kind: string;

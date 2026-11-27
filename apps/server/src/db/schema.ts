@@ -1070,6 +1070,7 @@ export const machine = sqliteTable(
     name: text('name').notNull(),
     online: bool('online').notNull().default(false),
     tokenHash: text('tokenHash'),
+    pendingTokenHash: text('pendingTokenHash'),
     apiKeyId: text('apiKeyId'),
     latestCliVersion: text('latestCliVersion'),
     kind: text('kind').notNull().default('remote'),
@@ -1079,6 +1080,7 @@ export const machine = sqliteTable(
     capabilities: json<MachineCapabilities | null>('capabilities'),
     hostKey: text('hostKey'),
     retiredAt: epochMs('retiredAt'),
+    tokenReauthRequired: bool('tokenReauthRequired').notNull().default(false),
   },
   (t) => [
     index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt),

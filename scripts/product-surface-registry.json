@@ -386,6 +386,16 @@
       "key": "CAIRN_SELF_UPDATE_WRITABLE",
       "scope": "dev-tooling",
       "userScenario": "Nothing to set: used only in automated tests and isolated verification to allow a standalone Runner script to self-update into its test slot."
+    },
+    {
+      "type": "runner-device-field",
+      "key": "machine.tokenReauthRequired",
+      "userScenario": "Nothing to set: set automatically when you rotate an offline Runner's token so its row in Settings -> Runners shows the one reconnect command until that computer reconnects."
+    },
+    {
+      "type": "runner-device-field",
+      "key": "machine.pendingTokenHash",
+      "userScenario": "Nothing to set: holds the hashed replacement Runner token in SQLite during an online token rotation so a server restart between claim and ack recovers cleanly without split-brain credentials."
     }
   ]
 }

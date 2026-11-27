@@ -10,7 +10,12 @@ export function revokeMachineToken(
 ): void {
   deps.db
     .update(machine)
-    .set({ tokenHash: null, retiredAt: nowMs() })
+    .set({
+      tokenHash: null,
+      pendingTokenHash: null,
+      tokenReauthRequired: false,
+      retiredAt: nowMs(),
+    })
     .where(eq(machine.id, machineId))
     .run();
   deps.db

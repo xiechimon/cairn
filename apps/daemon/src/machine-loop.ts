@@ -1716,6 +1716,87 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       activeAntigravityVerifies -= 1;
     }
   };
+  let rotationInFlight = false;
+  const handleTokenRotate = async (
+    rotationId: string,
+    currentConnId: string,
+    sessionCtrl: AbortController,
+    markRotated: () => void,
+  ): Promise<void> => {
+    if (rotationInFlight || streamCtrl.signal.aborted) return;
+    if (!client.claimTokenRotation || !client.ackTokenRotation) return;
+    const ackTokenRotation = client.ackTokenRotation.bind(client);
+    rotationInFlight = true;
+    try {
+      const newToken = await client.claimTokenRotation(
+        rotationId,
+        currentConnId,
+        hostKey ?? undefined,
+        streamCtrl.signal,
+      );
+      if (!machineJson || streamCtrl.signal.aborted) return;
+      const previousMachineJson = machineJson;
+      const previousToken = inMemoryToken;
+      const nextMachineJson = { ...previousMachineJson, token: newToken };
+      try {
+        saveMachineJson(paths, nextMachineJson);
+      } catch (err) {
+        logger.machine(
+          `token rotation skipped: failed to save machine.json (${err instanceof Error ? err.message : String(err)})`,
+        );
+        return;
+      }
+      machineJson = nextMachineJson;
+      inMemoryToken = newToken;
+
+      const rollback = () => {
+        machineJson = previousMachineJson;
+        inMemoryToken = previousToken;
+        try {
+          saveMachineJson(paths, previousMachineJson);
+        } catch (saveErr) {
+          logger.machine(
+            `token rotation rollback failed to save machine.json (${saveErr instanceof Error ? saveErr.message : String(saveErr)})`,
+          );
+        }
+        logger.machine('token rotation rejected by server; restored previous credentials');
+      };
+
+      const tryAck = async (): Promise<'ok' | 'rejected' | 'transient'> => {
+        try {
+          await ackTokenRotation(rotationId, newToken, streamCtrl.signal);
+          return 'ok';
+        } catch (err) {
+          if (err instanceof MachineApiError && (err.status === 401 || err.status === 404)) {
+            return 'rejected';
+          }
+          return 'transient';
+        }
+      };
+
+      let ackOutcome = await tryAck();
+      if (ackOutcome === 'transient' && !streamCtrl.signal.aborted) {
+        await sleep(100);
+        if (!streamCtrl.signal.aborted) {
+          ackOutcome = await tryAck();
+        }
+      }
+      if (ackOutcome === 'rejected') {
+        rollback();
+        return;
+      }
+      markRotated();
+      sessionCtrl.abort();
+    } catch (err) {
+      if (!streamCtrl.signal.aborted) {
+        logger.machine(
+          `token rotation failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    } finally {
+      rotationInFlight = false;
+    }
+  };
   void (async () => {
     let backoff = 1_000;
     let announced = false;
@@ -1723,15 +1804,21 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     while (!streamCtrl.signal.aborted) {
       const streamSession = new AbortController();
       const probeSignal = AbortSignal.any([streamCtrl.signal, streamSession.signal]);
+      let rotatedReconnect = false;
       try {
         await client.stream(
-          streamCtrl.signal,
+          probeSignal,
           (ev) => {
             if (ev.type === 'hello') connectionId = ev.connectionId;
             if (ev.type === 'shutdown') {
               void stop(
                 'the server told this Runner to stop: it was removed, revoked or enrolled again, or another process connected with the same credentials',
               );
+            }
+            if (ev.type === 'token.rotate' && connectionId !== null) {
+              void handleTokenRotate(ev.rotationId, connectionId, streamSession, () => {
+                rotatedReconnect = true;
+              });
             }
             if (ev.type === 'steer') void deliverSteer(ev.stepId);
             if (ev.type === 'stop') void deliverStop(ev.stepId);
@@ -1786,7 +1873,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         );
         backoff = 1_000;
       } catch (err) {
-        if (!reportedDown && !streamCtrl.signal.aborted) {
+        if (!rotatedReconnect && !reportedDown && !streamCtrl.signal.aborted) {
           reportedDown = true;
           announced = false;
           logger.wake(`push channel down: ${err instanceof Error ? err.message : String(err)}`);
@@ -1795,6 +1882,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         streamSession.abort();
       }
       if (streamCtrl.signal.aborted) return;
+      if (rotatedReconnect) {
+        backoff = 1_000;
+        continue;
+      }
       await sleep(backoff);
       backoff = nextBackoffMs(backoff);
     }
@@ -1969,6 +2060,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         continue;
       }
       let step: ClaimedStep | null = null;
+      const tokenBeforeClaim = inMemoryToken;
       try {
         claimInFlight = true;
         step = await client.claim(
@@ -1978,6 +2070,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         refusedAsOutdated = false;
       } catch (err) {
         if (stopping) break;
+        if (
+          err instanceof MachineApiError &&
+          err.status === 401 &&
+          inMemoryToken !== tokenBeforeClaim
+        ) {
+          backoff = backoffBase;
+          continue;
+        }
         if (err instanceof MachineApiError && err.status === 426) {
           if (!refusedAsOutdated) {
             logger.machine(

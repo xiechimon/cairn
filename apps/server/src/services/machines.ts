@@ -263,6 +263,7 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     latestCliVersion: row.latestCliVersion,
     kind: row.kind,
     enabledRuntimes: availableRuntimes(row),
+    ...(row.tokenReauthRequired ? { tokenReauthRequired: true } : {}),
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     capabilities: parseStoredCapabilities(row.capabilities),
     ...(login.success ? { claudeLogin: login.data } : {}),
@@ -542,6 +543,8 @@ export function enrollMachine(
       db.update(machine)
         .set({
           tokenHash: token.hash,
+          pendingTokenHash: null,
+          tokenReauthRequired: false,
           name: input.name,
           apiKeyId: input.keyId,
           retiredAt: null,
@@ -757,6 +760,8 @@ export function authorizeEnrollmentMachine(
       db.update(machine)
         .set({
           tokenHash: token.hash,
+          pendingTokenHash: null,
+          tokenReauthRequired: false,
           name: existing.kind === 'local' || isLocal ? hostname() : input.name,
           apiKeyId: null,
           retiredAt: null,
@@ -908,6 +913,7 @@ export function markPresence(
       .set({
         ...(admitOnline ? { online: true } : {}),
         ...(backfilledHostKey !== undefined ? { hostKey: backfilledHostKey } : {}),
+        tokenReauthRequired: false,
         lastSeenAt: nowMs(),
         ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
         ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
@@ -949,6 +955,7 @@ export function markPresence(
     JSON.stringify(merged.githubPush) !== JSON.stringify(row.capabilities?.githubPush);
   if (
     becameOnline ||
+    row.tokenReauthRequired ||
     loginChanged ||
     computerChanged ||
     strainChanged ||
@@ -1151,10 +1158,10 @@ export function markConnected(deps: Pick<MachineDeps, 'db' | 'hub'>, machineId: 
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!row) return;
   db.update(machine)
-    .set({ online: true, lastSeenAt: nowMs() })
+    .set({ online: true, lastSeenAt: nowMs(), pendingTokenHash: null, tokenReauthRequired: false })
     .where(eq(machine.id, machineId))
     .run();
-  if (!row.online) {
+  if (!row.online || row.tokenReauthRequired) {
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online: true }));
   }
 }

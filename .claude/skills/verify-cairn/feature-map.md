@@ -475,9 +475,9 @@ Reach:
 
 ### machines
 
-**Machines** (shipped, centrality 2). A compact machine list with names, default marker, system, online state and a menu for default and delete.
+**Machines** (shipped, centrality 2). A compact machine list with names, default marker, system, online state, reconnect guidance after offline token rotation, and a menu for default, token rotation and delete.
 
-States: Empty, loading and error states; online and offline rows; default machine; long names; row menu and confirmation dialogs. No expandable details or capability controls.
+States: Empty, loading and error states; online and offline rows; offline token-rotation reconnect status and command drawer; default machine; long names; row menu with in-menu token-rotation confirm and confirmation dialogs. No expandable capability controls.
 
 Reach:
 
@@ -486,13 +486,13 @@ Reach:
 
 - Web routes: `/app/resources/machines`, `/app/resources/machines/:id`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners)
-- Keyboard shortcuts in its code: none
-- Test ids in its code: `machine-list`, `machines-scroll`, `resource-empty`
+- Keyboard shortcuts in its code: `D`, `F`, `R`
+- Test ids in its code: `machine-default`, `machine-hostname`, `machine-item`, `machine-item-name`, `machine-item-status`, `machine-list`, `machine-menu`, `machine-menu-default`, `machine-menu-delete`, `machine-menu-rotate-token`, `machine-os`, `machine-token-reauth-drawer`, `machine-token-reauth-status`, `machines-scroll`, `resource-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/machines-local-row.md](features/machines-local-row.md)
-- Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](../../../docs/research/t3code-devices-and-scope-2026-11-06.md) (not on main)
-- Frontend design: [docs/design/references/settings](../../../docs/design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
-- Backend design: [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
-- Evidence: `apps/web/e2e/machine-detail.spec.ts`, `apps/web/e2e/machines-local.spec.ts`, `apps/server/test/machine-revoke.test.ts`
+- Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](../../../docs/research/t3code-devices-and-scope-2026-11-06.md) (not on main), [docs/research/runner-token-rotation-2026-11-27.md](../../../docs/research/runner-token-rotation-2026-11-27.md)
+- Frontend design: [docs/design/references/settings](../../../docs/design/references/settings), [docs/design/runner-token-rotation.md](../../../docs/design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
+- Backend design: [docs/design/runner-token-rotation.md](../../../docs/design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
+- Evidence: `apps/web/e2e/machine-detail.spec.ts`, `apps/web/e2e/machines-local.spec.ts`, `apps/web/e2e/machine-rotate-token.spec.ts`, `apps/server/test/machine-revoke.test.ts`, `apps/server/test/machine-rotate-token.test.ts`, `apps/daemon/test/machine-rotate-token.test.ts`
 
 ### mobile-web
 
