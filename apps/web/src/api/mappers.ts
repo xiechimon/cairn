@@ -2630,6 +2630,7 @@ export function mapOrchestrationFeedback(
   thread: ChiefThread | null,
   messages: readonly MessageRow[],
   outage: ChiefOutage | null = null,
+  onMac = false,
 ): TranscriptItem[] {
   if (thread === null || (todo.phase !== 'todo' && todo.phase !== 'failed')) return [];
   const start = messages.findLastIndex(
@@ -2665,7 +2666,7 @@ export function mapOrchestrationFeedback(
   for (const m of turn) {
     const error = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (error !== null) {
-      const copy = turnErrorCopy(error, false);
+      const copy = turnErrorCopy(error, onMac);
       items.push({
         kind: 'fail',
         label: copy.title,

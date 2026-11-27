@@ -104,3 +104,17 @@ test('a failed turn shows its error', () => {
   });
   expect(items).toHaveLength(2);
 });
+
+test('on a Mac the task-page failure detail keeps the local-network guidance', () => {
+  const error: MessageRow = {
+    id: 'chief-err-connect',
+    role: 'system',
+    createdAt: 160,
+    content: JSON.stringify({ kind: CHIEF_TURN_ERROR_KIND, message: 'Failed to fetch team settings' }),
+  };
+  const items = mapOrchestrationFeedback(todo, thread, [request('m1', 150), error], null, true);
+  expect(items.at(-1)).toMatchObject({
+    kind: 'fail',
+    body: expect.stringContaining('本地网络'),
+  });
+});

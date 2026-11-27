@@ -43,6 +43,7 @@ import { globalCoordinatorThread } from '../chief/coordinator-load.js';
 import { resolveCoordinatorOutage } from '../chief/coordinator-outage.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type { TaskSendMode, UnsentSends } from '../chief/outbox.js';
+import { ON_MAC } from '../chief/turn-failure.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import type { NamedMachine } from '../components/machine-label.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
@@ -333,7 +334,13 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     () =>
       wire == null
         ? []
-        : mapOrchestrationFeedback(wire, coordinator, coordinatorMessages, coordinatorOutage),
+        : mapOrchestrationFeedback(
+            wire,
+            coordinator,
+            coordinatorMessages,
+            coordinatorOutage,
+            ON_MAC,
+          ),
     [wire, coordinator, coordinatorMessages, coordinatorOutage],
   );
   const shownTranscript = useMemo(

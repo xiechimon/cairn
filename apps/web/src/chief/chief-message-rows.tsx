@@ -265,6 +265,7 @@ export function chiefStreamRowKey(item: GroupedRow['item'], index: number): stri
     case 'task-card':
     case 'runner-offline':
     case 'stopped':
+    case 'error':
     case 'note':
     case 'thread-report':
     case 'thread-message':

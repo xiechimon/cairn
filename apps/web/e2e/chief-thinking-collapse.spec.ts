@@ -238,7 +238,7 @@ test('Not finished and Stopped. No task was created. render with the same Failur
   const stream = page.getByTestId('chief-stream');
   const notFinished = stream.getByTestId('chief-turn-error');
   const stopped = stream.getByTestId('chief-stopped');
-  await expect(notFinished).toHaveText('未完成');
+  await expect(notFinished).toHaveText('未完成详情');
   await expect(stopped).toHaveText('已停止，没有建任务。');
 
   const metrics = await Promise.all(

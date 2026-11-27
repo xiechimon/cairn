@@ -86,6 +86,12 @@ describe('chief outbox', () => {
     expect(other && chiefStreamRowKey(other, 1)).toBe('m8');
   });
 
+  test('an error row keeps its message id as its key when older messages prepend', () => {
+    const row = { kind: 'error' as const, id: 'err-1', text: 'failed' };
+    expect(chiefStreamRowKey(row, 3)).toBe('err-1');
+    expect(chiefStreamRowKey(row, 8)).toBe('err-1');
+  });
+
   test('a message the stream reports stored lands before its send call answers and stays sent', async () => {
     const box = outbox();
     const { calls, deliver } = gate();
