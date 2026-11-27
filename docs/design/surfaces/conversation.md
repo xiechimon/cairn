@@ -21,6 +21,7 @@ Scope: `apps/web/src/chief/` `apps/web/src/detail/` `apps/web/src/components/cha
 | C31 | Both sides are one `MessageBubble` in the sans at the owner's size: the owner's message on the sand `--bubble-fill`, a Coordinator reply on the grey `--reply-bubble-fill`; no serif remains in the conversation; tables, code blocks, chips and cards inside a reply keep their own faces. | M `e2e/chief-reply-bubbles.spec.ts` (C31 test) |
 | C18 | After sending, the user's message and the reply's start are in the viewport; a jump-to-latest control appears after scrolling away. | M latest reply top is inside the viewport after send |
 | C32 | A failed, waiting-to-retry, parked or quota-held step or turn in any conversation (Coordinator chat, task transcript) is one `components/chat/notice-line.tsx` `NoticeLine` (a separator in transcripts, `plain` in the docked card): icon, a short plain reason (with the retry time), and `详情` opening the guidance and raw error; no file draws its own status row or typing dots. | G `test/notice-line-reuse.test.ts` |
+| C46 | A reply table sizes each cell to its text up to 16rem and wraps only past 16rem without breaking short words mid-word; a table wider than its bubble scrolls sideways inside the bubble, and the page does not. | M `e2e/chief-reply-bubbles.spec.ts` (C46 tests) |
 
 ## Shell and top bar
 

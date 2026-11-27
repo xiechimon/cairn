@@ -154,3 +154,240 @@ test('C31: a Coordinator reply sits in the grey reply bubble and the owner keeps
   await expect(stream.getByTestId('md-code-block')).toHaveCount(1);
   await expect(stream.getByTestId('chief-turn-error')).toHaveCount(1);
 });
+
+async function measureTable(table: ReturnType<Page['locator']>) {
+  return table.evaluate((wrapper) => {
+    const bubble = wrapper.closest('[data-slot="message-bubble"]') ?? wrapper;
+    const inside = wrapper.getBoundingClientRect();
+    const outside = bubble.getBoundingClientRect();
+    const beforeScroll = wrapper.scrollLeft;
+    wrapper.scrollLeft = wrapper.scrollWidth;
+    const reached = wrapper.scrollLeft;
+    const lastHead = wrapper.querySelector('thead th:last-child')?.getBoundingClientRect();
+    const cells = [...wrapper.querySelectorAll('th, td')].map((cell) => {
+      const box = cell.getBoundingClientRect();
+      const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+      const rects: DOMRect[] = [];
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        rects.push(...range.getClientRects());
+      }
+      rects.sort((a, b) => a.top - b.top);
+      let lines = 0;
+      let floor = Number.NEGATIVE_INFINITY;
+      for (const rect of rects) {
+        if ((rect.top + rect.bottom) / 2 <= floor) continue;
+        lines += 1;
+        floor = rect.bottom;
+      }
+      let textSpill = 0;
+      for (const rect of rects) {
+        if (rect.width === 0 || rect.height === 0) continue;
+        textSpill = Math.max(
+          textSpill,
+          Math.ceil(rect.right - box.right),
+          Math.ceil(box.left - rect.left),
+        );
+      }
+      return {
+        text: (cell.textContent ?? '').trim(),
+        width: Math.round(box.width),
+        lines,
+        textSpill,
+      };
+    });
+    wrapper.scrollLeft = beforeScroll;
+    return {
+      spill: Math.max(0, Math.round(inside.right - outside.right)),
+      overflows: wrapper.scrollWidth > wrapper.clientWidth,
+      reached,
+      lastShown: lastHead !== undefined && lastHead.right <= inside.right + 2,
+      pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+      cells,
+    };
+  });
+}
+
+for (const width of [1440, 390]) {
+  test(`C46: wide, medium, prose, and multi-column reply tables at ${width}px size cells up to 16rem, keep short words whole, and scroll inside the bubble`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+
+    await page.goto('/app?scenario=chief-wide-table');
+    const wideLoc = page.getByTestId('home-c').getByTestId('md-table');
+    const wide = await measureTable(wideLoc);
+    expect(wide.spill, 'wide table stays inside bubble').toBe(0);
+    expect(wide.overflows, 'wide table scrolls horizontally inside bubble').toBe(true);
+    expect(wide.reached, 'wide table horizontal scroll advances').toBeGreaterThan(0);
+    expect(wide.lastShown, 'wide table last column can scroll into view').toBe(true);
+    expect(wide.pageOverflow, 'page does not scroll sideways').toBeLessThanOrEqual(0);
+    await expect(wideLoc).toHaveAttribute('tabindex', '0');
+    await expect(wideLoc).toHaveAttribute('role', 'region');
+    await expect(wideLoc).toHaveAttribute('aria-label', '可横向滚动的表格');
+    await wideLoc.focus();
+    await expect(wideLoc).toBeFocused();
+    await expect
+      .poll(
+        async () => {
+          await page.keyboard.press('ArrowRight');
+          return wideLoc.evaluate((node) => {
+            const last = node.querySelector('thead th:last-child')?.getBoundingClientRect();
+            return {
+              scrollLeft: node.scrollLeft,
+              lastVisible: last !== undefined && last.right <= node.getBoundingClientRect().right + 2,
+            };
+          });
+        },
+        { timeout: 5_000, intervals: [50] },
+      )
+      .toMatchObject({ lastVisible: true });
+    const scrolledAfterKey = await wideLoc.evaluate((node) => node.scrollLeft);
+    expect(scrolledAfterKey, 'keyboard ArrowRight scrolls table').toBeGreaterThan(0);
+    for (const label of ['xiechimon', '欧阳小明', 'releasebot']) {
+      const cell = wide.cells.find((c) => c.text === label);
+      expect(cell?.lines, `short cell "${label}" stays on one line`).toBe(1);
+    }
+    const wideHeader = wide.cells.find((c) => c.text.startsWith('其他（'));
+    expect(wideHeader, 'wide header exists').toBeDefined();
+    if (!wideHeader) throw new Error('missing wide header');
+    expect(wideHeader.width, 'wide header caps around 16rem + padding').toBeLessThanOrEqual(286);
+    expect(wideHeader.lines, 'wide header wraps inside 16rem cell').toBeGreaterThanOrEqual(2);
+    expect(wideHeader.textSpill, 'wide header text stays inside cell bounds').toBeLessThanOrEqual(1);
+
+    await page.goto('/app?scenario=chief-medium-table');
+    const mediumTables = page.getByTestId('home-c').getByTestId('md-table');
+    await expect(mediumTables).toHaveCount(2);
+    const medium = await measureTable(mediumTables.nth(0));
+    expect(medium.spill).toBe(0);
+    expect(medium.pageOverflow).toBeLessThanOrEqual(0);
+    for (const label of [
+      '发送修复',
+      '11-26 23:58:16',
+      'macmini-runner',
+      'fix/reply-table',
+      'passed on retry',
+      'claude-sonnet-5',
+    ]) {
+      const cell = medium.cells.find((c) => c.text === label);
+      expect(cell?.lines, `medium table cell "${label}" stays on one line`).toBe(1);
+    }
+    const shortLoc = mediumTables.nth(1);
+    const shortTable = await measureTable(shortLoc);
+    expect(shortTable.spill).toBe(0);
+    expect(shortTable.pageOverflow).toBeLessThanOrEqual(0);
+    if (width === 1440) {
+      expect(shortTable.overflows, 'short table fits at 1440px without scrolling').toBe(false);
+      await expect(shortLoc).not.toHaveAttribute('tabindex');
+      await expect(shortLoc).not.toHaveAttribute('role');
+      await expect(shortLoc).not.toHaveAttribute('aria-label');
+
+      await shortLoc.evaluate((node) => {
+        const border = node.offsetWidth - node.clientWidth;
+        node.style.maxWidth = `${node.scrollWidth - 1 + border}px`;
+      });
+      await expect(shortLoc).toHaveAttribute('tabindex', '0');
+      await expect(shortLoc).toHaveAttribute('role', 'region');
+      await expect(shortLoc).toHaveAttribute('aria-label', '可横向滚动的表格');
+      const onePxOverflow = await shortLoc.evaluate((node) => node.scrollWidth - node.clientWidth);
+      expect(onePxOverflow, 'short table overflow is exactly 1 CSS px').toBe(1);
+
+      await shortLoc.evaluate((node) => {
+        node.style.maxWidth = '';
+      });
+      await expect(shortLoc).not.toHaveAttribute('tabindex');
+      await expect(shortLoc).not.toHaveAttribute('role');
+      await expect(shortLoc).not.toHaveAttribute('aria-label');
+
+      await page.setViewportSize({ width: 240, height: 900 });
+      await expect(shortLoc).toHaveAttribute('tabindex', '0');
+      await expect(shortLoc).toHaveAttribute('role', 'region');
+      await expect(shortLoc).toHaveAttribute('aria-label', '可横向滚动的表格');
+      await shortLoc.focus();
+      await expect(shortLoc).toBeFocused();
+      await expect
+        .poll(
+          async () => {
+            await page.keyboard.press('ArrowRight');
+            return shortLoc.evaluate((node) => {
+              const last = node.querySelector('thead th:last-child')?.getBoundingClientRect();
+              return {
+                scrolled: node.scrollLeft > 0,
+                lastVisible: last !== undefined && last.right <= node.getBoundingClientRect().right + 2,
+              };
+            });
+          },
+          { timeout: 5_000, intervals: [50] },
+        )
+        .toEqual({ scrolled: true, lastVisible: true });
+
+      await page.setViewportSize({ width, height: 900 });
+      await expect(shortLoc).not.toHaveAttribute('tabindex');
+      await expect(shortLoc).not.toHaveAttribute('role');
+      await expect(shortLoc).not.toHaveAttribute('aria-label');
+    }
+
+    await page.goto('/app?scenario=chief-prose-table');
+    const proseTables = page.getByTestId('home-c').getByTestId('md-table');
+    await expect(proseTables).toHaveCount(2);
+    const prose = await measureTable(proseTables.nth(0));
+    expect(prose.spill).toBe(0);
+    expect(prose.pageOverflow).toBeLessThanOrEqual(0);
+    for (const label of ['重试预算', '发送修复', '进行中', '已完成', 'mini']) {
+      const cell = prose.cells.find((c) => c.text === label);
+      expect(cell?.lines, `prose sibling short cell "${label}" stays on one line`).toBe(1);
+    }
+    const longPaths = await measureTable(proseTables.nth(1));
+    expect(longPaths.spill).toBe(0);
+    expect(longPaths.pageOverflow).toBeLessThanOrEqual(0);
+    for (const cell of longPaths.cells) {
+      expect(cell.width, `long path/url cell "${cell.text}" caps around 16rem`).toBeLessThanOrEqual(286);
+      expect(cell.textSpill, `long path/url cell "${cell.text}" stays inside cell bounds`).toBeLessThanOrEqual(1);
+    }
+    for (const prefix of ['pnpm ', 'apps/web/src/', 'https://example.com/']) {
+      const wrappedCell = longPaths.cells.find((c) => c.text.startsWith(prefix));
+      expect(wrappedCell, `long token cell "${prefix}" exists`).toBeDefined();
+      if (!wrappedCell) throw new Error(`missing long token cell ${prefix}`);
+      expect(wrappedCell.lines, `long token "${prefix}" wraps onto >=2 lines`).toBeGreaterThanOrEqual(2);
+      expect(wrappedCell.textSpill, `long token "${prefix}" stays inside cell bounds`).toBeLessThanOrEqual(1);
+    }
+
+    await page.goto('/app?scenario=chief-table-matrix');
+    const matrix = page.getByTestId('home-c').getByTestId('md-table');
+    await expect(matrix).toHaveCount(3);
+
+    const cjkMidWide = await measureTable(matrix.nth(0));
+    expect(cjkMidWide.spill).toBe(0);
+    expect(cjkMidWide.overflows).toBe(true);
+    expect(cjkMidWide.pageOverflow).toBeLessThanOrEqual(0);
+    for (const label of ['macmini-runner', 'fix/reply-table', 'claude-sonnet-5', '11-26 23:58:16']) {
+      const cell = cjkMidWide.cells.find((c) => c.text === label);
+      expect(cell?.lines, `cjkMidWide short cell "${label}" stays on one line`).toBe(1);
+    }
+    const cjkNote = cjkMidWide.cells.find((c) => c.text.includes('压测显示跨区链路超时最多'));
+    expect(cjkNote, 'cjkMidWide prose cell exists').toBeDefined();
+    if (!cjkNote) throw new Error('missing cjkNote cell');
+    expect(cjkNote.width, 'cjkMidWide prose cell is not crushed vertically').toBeGreaterThanOrEqual(160);
+    expect(cjkNote.width).toBeLessThanOrEqual(286);
+    expect(cjkNote.textSpill).toBeLessThanOrEqual(1);
+
+    const manyProseCjk = await measureTable(matrix.nth(1));
+    expect(manyProseCjk.spill).toBe(0);
+    expect(manyProseCjk.overflows).toBe(true);
+    expect(manyProseCjk.pageOverflow).toBeLessThanOrEqual(0);
+    for (const cell of manyProseCjk.cells.filter((c) => c.text.length >= 12)) {
+      expect(cell.width, `manyProseCjk cell "${cell.text}" stays readable >= 140px`).toBeGreaterThanOrEqual(140);
+      expect(cell.width).toBeLessThanOrEqual(286);
+    }
+
+    const manyProseEn = await measureTable(matrix.nth(2));
+    expect(manyProseEn.spill).toBe(0);
+    expect(manyProseEn.overflows).toBe(true);
+    expect(manyProseEn.pageOverflow).toBeLessThanOrEqual(0);
+    for (const cell of manyProseEn.cells.filter((c) => c.text.length >= 18)) {
+      expect(cell.width, `manyProseEn cell "${cell.text}" stays readable >= 140px`).toBeGreaterThanOrEqual(140);
+      expect(cell.width).toBeLessThanOrEqual(286);
+    }
+  });
+}

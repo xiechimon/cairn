@@ -5,6 +5,7 @@ import {
   Fragment,
   type ReactNode,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -161,21 +162,57 @@ function cellAlignClass(align: TableAlign | undefined): string {
   return align != null ? TABLE_ALIGN_CLS[align] : 'text-left';
 }
 
+const TABLE_CELL_INNER_CLS = 'max-w-64 whitespace-normal wrap-break-word';
+
 function MarkdownTable({ block }: { block: Extract<ChatBlock, { kind: 'table' }> }) {
+  const { t } = useI18n();
+  const scrollLabel = t('可横向滚动的表格');
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const table = tableRef.current;
+    if (scroller === null || table === null) return;
+    const syncFocusable = () => {
+      if (scroller.scrollWidth > scroller.clientWidth) {
+        scroller.setAttribute('tabindex', '0');
+        scroller.setAttribute('role', 'region');
+        scroller.setAttribute('aria-label', scrollLabel);
+      } else {
+        scroller.removeAttribute('tabindex');
+        scroller.removeAttribute('role');
+        scroller.removeAttribute('aria-label');
+      }
+    };
+    syncFocusable();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(syncFocusable);
+    observer.observe(scroller);
+    observer.observe(table);
+    return () => observer.disconnect();
+  }, [block, scrollLabel]);
+
   return (
     <div
-      className="w-fit max-w-full overflow-x-auto rounded-(--radius-control) border border-border bg-background"
+      ref={scrollerRef}
+      className="w-fit max-w-full overflow-x-auto overscroll-x-contain rounded-(--radius-control) border border-border bg-background focus-visible:outline-2 focus-visible:outline-(--focus-ring) focus-visible:outline-offset-0"
       data-testid="md-table"
     >
-      <table className="border-collapse text-ui text-(--foreground)">
+      <table ref={tableRef} className="w-max border-collapse text-ui text-(--foreground)">
         <thead className="bg-secondary">
           <tr className="border-b border-border">
             {block.header.map((cell, ci) => (
               <th
                 key={ci}
-                className={`px-3 py-1.5 font-semibold whitespace-nowrap ${cellAlignClass(block.align[ci])}`}
+                className={cn(
+                  'px-3 py-1.5 align-top font-semibold',
+                  cellAlignClass(block.align[ci]),
+                )}
               >
-                <Segments segments={cell} codeClassName="chat-code" />
+                <div className={TABLE_CELL_INNER_CLS}>
+                  <Segments segments={cell} codeClassName="chat-code" />
+                </div>
               </th>
             ))}
           </tr>
@@ -184,8 +221,13 @@ function MarkdownTable({ block }: { block: Extract<ChatBlock, { kind: 'table' }>
           {block.rows.map((row, ri) => (
             <tr key={ri} className="border-b border-border last:border-b-0">
               {row.map((cell, ci) => (
-                <td key={ci} className={`px-3 py-1.5 ${cellAlignClass(block.align[ci])}`}>
-                  <Segments segments={cell} codeClassName="chat-code" />
+                <td
+                  key={ci}
+                  className={cn('px-3 py-1.5 align-top', cellAlignClass(block.align[ci]))}
+                >
+                  <div className={TABLE_CELL_INNER_CLS}>
+                    <Segments segments={cell} codeClassName="chat-code" />
+                  </div>
                 </td>
               ))}
             </tr>

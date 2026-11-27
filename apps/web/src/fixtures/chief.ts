@@ -356,6 +356,188 @@ export const chiefMarkdownRef: FixtureSet = {
   },
 };
 
+const CHIEF_WIDE_TABLE_REPLY = [
+  '按标题前缀分组统计如下：',
+  '',
+  '| 作者 | fix | feat | docs | ops | 其他（web/test/ci/daemon/ui/server/coordinator） | 合计 |',
+  '| --- | ---: | ---: | ---: | ---: | ---: | ---: |',
+  '| xiechimon | 4 | 2 | 11 | 4 | 9 | 30 |',
+  '| 欧阳小明 | 2 | 0 | 3 | 3 | 7 | 15 |',
+  '| `releasebot` | 1 | 0 | 0 | 5 | 1 | 7 |',
+].join('\n');
+
+export const chiefWideTable: FixtureSet = {
+  todos: [],
+  now: r7(14, 52),
+  chief: {
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '按作者统计提交',
+    stream: [
+      { kind: 'user', id: 'wide-table-ask', text: '按作者统计最近的提交', createdAt: r7(14, 51) },
+      {
+        kind: 'robot',
+        id: 'wide-table-reply',
+        markdown: CHIEF_WIDE_TABLE_REPLY,
+        seconds: '9s',
+        createdAt: r7(14, 52),
+      },
+    ],
+  },
+};
+
+const CHIEF_PROSE_TABLE_REPLY = [
+  '三个任务的现状：',
+  '',
+  '| 任务 | 状态 | 执行机 | 说明 |',
+  '| --- | --- | --- | --- |',
+  '| 重试预算 | 进行中 | mini | 压测显示跨区链路超时最多，正在把预算放宽后重新跑一轮对照 |',
+  '| 发送修复 | 已完成 | mini | 停掉的任务重发排队消息会接着执行，归档任务给出中文原因 |',
+].join('\n');
+
+const CHIEF_PATH_TABLE_REPLY = [
+  '相关位置：',
+  '',
+  '| 项目 | 位置 |',
+  '| --- | --- |',
+  '| 命令 | `pnpm  --filter web exec playwright test` |',
+  '| 路径 | `apps/web/src/detail/components/conversation/markdown-table-renderer.tsx` |',
+  '| 链接 | https://example.com/reports/2026/11/relay-retry-budget-comparison-final |',
+].join('\n');
+
+const CHIEF_MEDIUM_TABLE_REPLY = [
+  '今晚的运行：',
+  '',
+  '| 任务 | 开始 | 执行机 | 分支 | 状态 | 模型 |',
+  '| --- | --- | --- | --- | --- | --- |',
+  '| 发送修复 | 11-26 23:58:16 | macmini-runner | fix/reply-table | passed on retry | claude-sonnet-5 |',
+].join('\n');
+
+const CHIEF_BUILD_TABLE_REPLY = [
+  '最近一次构建：',
+  '',
+  '| Name | Time | Result |',
+  '| --- | --- | --- |',
+  '| nightly build | 2026-11-26 23:58 | passed |',
+].join('\n');
+
+export const chiefMediumTable: FixtureSet = {
+  todos: [],
+  now: r7(14, 52),
+  chief: {
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '今晚的运行',
+    stream: [
+      { kind: 'user', id: 'medium-table-ask', text: '今晚跑得怎样', createdAt: r7(14, 50) },
+      {
+        kind: 'robot',
+        id: 'medium-table-reply',
+        markdown: CHIEF_MEDIUM_TABLE_REPLY,
+        seconds: '9s',
+        createdAt: r7(14, 51),
+      },
+      {
+        kind: 'robot',
+        id: 'build-table-reply',
+        markdown: CHIEF_BUILD_TABLE_REPLY,
+        seconds: '4s',
+        createdAt: r7(14, 52),
+      },
+    ],
+  },
+};
+
+export const chiefProseTable: FixtureSet = {
+  todos: [],
+  now: r7(14, 52),
+  chief: {
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '任务现状',
+    stream: [
+      { kind: 'user', id: 'prose-table-ask', text: '三个任务现在怎样了', createdAt: r7(14, 50) },
+      {
+        kind: 'robot',
+        id: 'prose-table-reply',
+        markdown: CHIEF_PROSE_TABLE_REPLY,
+        seconds: '9s',
+        createdAt: r7(14, 51),
+      },
+      {
+        kind: 'robot',
+        id: 'path-table-reply',
+        markdown: CHIEF_PATH_TABLE_REPLY,
+        seconds: '4s',
+        createdAt: r7(14, 52),
+      },
+    ],
+  },
+};
+
+const CHIEF_CJK_MID_WIDE_REPLY = [
+  '多列运行状态：',
+  '',
+  '| 任务 | 状态 | 执行机 | 分支 | 模型 | 开始时间 | 说明 | 下一步 |',
+  '| --- | --- | --- | --- | --- | --- | --- | --- |',
+  '| 重试预算 | 进行中 | macmini-runner | fix/reply-table | claude-sonnet-5 | 11-26 23:58:16 | 压测显示跨区链路超时最多，正在重跑对照 | 等对照跑完再决定是否放宽预算 |',
+].join('\n');
+
+const CHIEF_MANY_PROSE_CJK_REPLY = [
+  '调整前后对比：',
+  '',
+  '| 改动之前 | 改动之后 | 用户看到什么 | 决定 |',
+  '| --- | --- | --- | --- |',
+  '| 第一列被挤成三行，名字从中间断开，很难读清楚内容 | 短词保持完整，超出的部分在气泡里左右滑动查看即可 | 一眼就能读完整行，不需要在脑子里拼接被拆开的名字 | 继续保持单元格自然宽度并在超出约十六字符单位后换行 |',
+].join('\n');
+
+const CHIEF_MANY_PROSE_EN_REPLY = [
+  'Behavior before and after:',
+  '',
+  '| Before | After | User impact | Decision |',
+  '| --- | --- | --- | --- |',
+  '| wraps to three lines now when placed beside wider prose columns | stays on a single clean line inside short cells | every short status phrase reads intact without hyphenation or jagged breaks | cap column wrap at sixteen rem and scroll wider tables inside the bubble |',
+].join('\n');
+
+export const chiefTableMatrix: FixtureSet = {
+  todos: [],
+  now: r7(14, 55),
+  chief: {
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '表格渲染检查',
+    stream: [
+      {
+        kind: 'user',
+        id: 'matrix-table-ask',
+        text: '看一下多列与长文本表格',
+        createdAt: r7(14, 50),
+      },
+      {
+        kind: 'robot',
+        id: 'cjk-mid-wide-reply',
+        markdown: CHIEF_CJK_MID_WIDE_REPLY,
+        seconds: '6s',
+        createdAt: r7(14, 51),
+      },
+      {
+        kind: 'robot',
+        id: 'many-prose-cjk-reply',
+        markdown: CHIEF_MANY_PROSE_CJK_REPLY,
+        seconds: '5s',
+        createdAt: r7(14, 52),
+      },
+      {
+        kind: 'robot',
+        id: 'many-prose-en-reply',
+        markdown: CHIEF_MANY_PROSE_EN_REPLY,
+        seconds: '4s',
+        createdAt: r7(14, 53),
+      },
+    ],
+  },
+};
+
 const CHIEF_VOICE_REPLY = [
   '压测结果整理好了，重试预算是主要瓶颈：',
   '',
