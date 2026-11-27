@@ -25,7 +25,7 @@ export function FadeScrollerViewport({ className, reserveEnd, ref, ...props }: P
       ref={setRefs}
       className={[
         'scroll-fade',
-        'overflow-x-hidden overscroll-none',
+        'overflow-x-hidden pointer-fine:overscroll-none',
         reserveEnd && 'pb-(--chat-end-space)',
         FOCUS_RING_INSET,
         className,

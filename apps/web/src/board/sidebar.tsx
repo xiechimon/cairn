@@ -488,14 +488,14 @@ export function BoardSidebar({
           actions={
             archivedPage ? undefined : (
               <>
-                <ProjectFilterMenu filter={filter} onFilter={chooseFilter} />
+                <ProjectFilterMenu filter={filter} onFilter={chooseFilter} className="size-6" />
                 <SidebarTip label={t('记忆')}>
                   <Button
                     variant="ghost"
                     aria-label={t('记忆')}
                     data-testid="sidebar-coordinator-memory"
                     onClick={() => setMemoryOpen(true)}
-                    className={`grid place-items-center ${SIDEBAR_ROW_ACTION} ${FOCUS}`}
+                    className={cn('grid place-items-center', SIDEBAR_ROW_ACTION, 'size-6', FOCUS)}
                   >
                     <Brain strokeWidth={STROKE} />
                   </Button>
@@ -504,7 +504,7 @@ export function BoardSidebar({
                   <Link
                     to={newProjectTarget}
                     aria-label={t('新建项目')}
-                    className={`grid place-items-center ${SIDEBAR_ROW_ACTION} ${FOCUS}`}
+                    className={cn('grid place-items-center', SIDEBAR_ROW_ACTION, 'size-6', FOCUS)}
                   >
                     <Plus strokeWidth={STROKE} />
                   </Link>

@@ -273,6 +273,7 @@ export function TraceCommandBox({
 }) {
   return (
     <div
+      translate="no"
       className={cn(
         'rounded-lg bg-(--menu-hover) px-3 py-2 font-mono text-code leading-5 whitespace-pre-wrap text-(--foreground) [overflow-wrap:anywhere]',
         className,
@@ -288,6 +289,7 @@ export function TraceCommandBox({
 export function TraceOutput({ className, ...props }: ComponentProps<'pre'>) {
   return (
     <pre
+      translate="no"
       className={cn(
         'm-0 max-h-60 overflow-auto px-0.5 pt-2 text-left font-mono text-code leading-[18px] whitespace-pre-wrap text-(--text-tertiary) [overflow-wrap:anywhere]',
         className,

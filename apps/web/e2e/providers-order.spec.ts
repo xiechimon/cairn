@@ -133,3 +133,42 @@ test('a failed save puts the previous order back and says so', async ({ page }) 
   await expect.poll(() => names(page)).toEqual(DEFAULT);
   expect(saved).toHaveLength(1);
 });
+
+test('A10: single-pointer move buttons reorder providers without dragging (WCAG 2.5.7)', async ({
+  page,
+}) => {
+  const saved: string[][] = [];
+  await mount(page, saved);
+  await page.goto('/app/resources/providers');
+  await expect.poll(() => names(page)).toEqual(DEFAULT);
+
+  await page
+    .locator('[data-instance-id="subscription:sub-d1"]')
+    .getByTestId('sortable-move-down')
+    .click();
+  const movedDown = ['provider:p-a', 'subscription:sub-d1', 'provider:p-b'];
+  await expect.poll(() => names(page)).toEqual(movedDown);
+  expect(saved).toEqual([movedDown]);
+
+  await page
+    .locator('[data-instance-id="provider:p-b"]')
+    .getByTestId('sortable-move-up')
+    .click();
+  const movedUp = ['provider:p-a', 'provider:p-b', 'subscription:sub-d1'];
+  await expect.poll(() => names(page)).toEqual(movedUp);
+
+  const secondRowMoveUp = page
+    .locator('[data-instance-id="provider:p-b"]')
+    .getByTestId('sortable-move-up');
+  await secondRowMoveUp.focus();
+  await secondRowMoveUp.press('Enter');
+  const toTop = ['provider:p-b', 'provider:p-a', 'subscription:sub-d1'];
+  await expect.poll(() => names(page)).toEqual(toTop);
+  await expect(
+    page.locator('[data-instance-id="provider:p-b"]').getByTestId('sortable-move-down'),
+    'keyboard move to first row preserves focus on the row move control',
+  ).toBeFocused();
+
+  await page.reload();
+  await expect.poll(() => names(page)).toEqual(toTop);
+});

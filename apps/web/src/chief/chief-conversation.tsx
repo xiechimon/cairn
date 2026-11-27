@@ -84,7 +84,7 @@ import { streamDividers } from './time-dividers.js';
 import { CardFailureContext, QueueWaitCard, TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
 
-const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
+const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 pointer-fine:overscroll-none';
 const SCROLLER_CONTENT_CLS =
   'mx-auto flex w-full max-w-chat-gutter min-w-0 flex-col justify-end gap-0 overflow-x-clip px-4 pt-8 in-data-[chat-top=under-header]:pt-20 [overflow-wrap:anywhere]';
 
@@ -642,7 +642,7 @@ export function ChiefConversation({
         <div
           {...drop.bind}
           data-testid="chief-home-scroll"
-          className="min-h-0 min-w-0 flex-1 in-data-[chat-top=under-header]:pt-12 overflow-x-hidden overflow-y-auto overscroll-none pb-6"
+          className="min-h-0 min-w-0 flex-1 in-data-[chat-top=under-header]:pt-12 overflow-x-hidden overflow-y-auto pointer-fine:overscroll-none pb-6"
         >
           {hero}
           {intro}

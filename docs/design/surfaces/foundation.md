@@ -11,12 +11,12 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | Id | Rule | Check |
 |---|---|---|
 | C1 | One fact, one wording: a status comes from one selector and is not restated differently elsewhere on the page. | M text of one entity is identical across header, list and footer |
-| C2 | No capability, no placeholder: never render a block for a feature that is not available; one line says what is off and the action to enable it. | M no element text matching `^[\s—·-]+$`; no empty fixed-ratio block |
+| C2 | No capability, no placeholder: never render a block for a feature that is not available; one line says what is off and the action to enable it. | M `e2e/design-rules-guidelines.spec.ts`: no element text matching `^[\s—·-]+$`; no empty fixed-ratio block |
 | C3 | Hidden means no space: an element shown on hover or focus takes no layout when hidden. A message's hover meta sits beside its bubble on the outer side, covering no text and moving nothing; at 640px or narrower, or on touch, there is no hover meta and a press opens the time, `复制` and `选择文字`. | M `e2e/chief-message-toolbar.spec.ts` (C3), `e2e/chief-reply-actions-overlap.spec.ts` |
-| C4 | Every icon-only control has a visible tooltip and an accessible name. | M hover 600ms shows a tooltip; axe `button-name` |
+| C4 | Every icon-only control has a visible tooltip and an accessible name. | M `e2e/a11y-axe-sweep.spec.ts`: hover shows a tooltip and icon buttons carry an accessible name |
 | C5 | No raw error text reaches the user: map it to a plain sentence saying what to do next; raw text lives in a tooltip or details. | M `test/ui-guidelines-static.test.ts`: toast literals never match `\(.*\)$`, `Error:`, `\b[45]\d\d\b` |
 | C6 | Developer switches (feature flags, release buttons) never sit on a user page; they live behind the dev route or dev mode. | H |
-| C7 | A disabled control says why next to it. | M disabled composer has adjacent explanatory text |
+| C7 | A disabled control says why next to it. | M `e2e/design-rules-guidelines.spec.ts`: disabled composer send control sits beside explanatory prompt context |
 | C12 | An empty state is one sentence and at most one primary action. | G `ui-page-style-gate` |
 | C15 | A task is named by its title wherever a person reads it; no composer trigger, picker or inserted token names a task by its sequence number. | G `e2e/chief-thread-report.spec.ts`, `e2e/chief-stream-markdown.spec.ts`, `e2e/composer-inline-mention.spec.ts`, `e2e/chief-composer-tools.spec.ts`, `test/segments-mention-nav.test.ts` |
 | C19 | A user-data picker with more than 10 options filters as you type; build it from `components/filter-picker.tsx`. | G `e2e/picker-filter.spec.ts` |
@@ -42,13 +42,13 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | V9 | Icons are lucide from the project icon set; never invent an icon name. | G `pnpm typecheck` |
 | V10 | Pages compose existing pieces before building their own. | G `ui-page-style-gate`, `ui-drift-gate` |
 | V11 | A project carries no colour: its chosen icon or a name-derived neutral glyph; only a person's `SeededAvatar` may be a tinted letter. | M; G `test/anti-slop-foundations.test.ts`, `test/avatar-tint.test.ts`, `e2e/avatar-initial.spec.ts` |
-| V12 | At most 2 non-neutral hue families per screen beyond the V5 roles (decoded avatars, provider marks, user content and the V11 tint excluded). Syntax highlighting in code views is exempt: its muted `--code-token-*` palette is mixed from Cairn tokens toward the foreground. | M |
-| V13 | Type budget: sizes from the token steps, at most 6 per screen; at most 3 font weights; at most 9 size and weight pairs. | M |
+| V12 | At most 2 non-neutral hue families per screen beyond the V5 roles (decoded avatars, provider marks, user content and the V11 tint excluded). Syntax highlighting in code views is exempt: its muted `--code-token-*` palette is mixed from Cairn tokens toward the foreground. | M; `e2e/design-rules-guidelines.spec.ts` |
+| V13 | Type budget: sizes from the token steps, at most 6 per screen; at most 3 font weights; at most 9 size and weight pairs. | M; `e2e/design-rules-guidelines.spec.ts` |
 | V14 | Icon uniformity: lucide stroke 1.75, sizes 16, 20 or 22px by role. | M; G `test/icon-stroke.test.ts` |
-| V15 | Badge budget: at most 3 tinted short-text elements per screen (keycaps excluded); the task glyph tile and chip are not counted. | M |
+| V15 | Badge budget: at most 3 tinted short-text elements per screen (keycaps excluded); the task glyph tile and chip are not counted. | M; `e2e/design-rules-guidelines.spec.ts` |
 | V16 | No texture or gradient on surfaces; ink grain only on the brand spiral and the filled-button specks. | M; G `test/anti-slop-foundations.test.ts` |
-| V17 | A speaker is not repeated: consecutive messages from one speaker show at most one avatar per speaker change. | M |
-| V18 | Like rows fold: three or more sibling rows with the same status sit under one section heading. | M |
+| V17 | A speaker is not repeated: consecutive messages from one speaker show at most one avatar per speaker change. | M; `e2e/design-rules-guidelines.spec.ts` |
+| V18 | Like rows fold: three or more sibling rows with the same status sit under one section heading. | M; `e2e/design-rules-guidelines.spec.ts` |
 | V19 | A placeholder is not content: no text node consists only of `—`, `·` or `-`. | M; G `e2e/design-rules-measure.spec.ts` |
 | V20 | An object list is rows in one card, not a grid of identical cards; the results panel's preview row is the exception. | M; G `e2e/design-rules-measure.spec.ts`: no grid or stack of three or more outlined 12px-corner cards outside the results panel |
 | V21 | No hover shadows or elevation; a hover background covers the whole row or control. | G `ui-drift-gate` G8 |
@@ -79,6 +79,9 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | T6 | Rendered transcript `<pre>` and `<code>` elements set `translate="no"`; `transition-all` and `hover:font-*` weight shifts are banned. | M `test/ui-guidelines-static.test.ts` checks `src/detail/` and utility classes |
 | T7 | Chinese UI copy uses typographic `…`, single spaces around standalone numeric units like `10 MB`, and `text-autospace: normal`. | M `test/ui-guidelines-static.test.ts` scans CJK strings and `src/styles/app.css` |
 | V31 | UI chrome forbids light font weights below 400 (`font-thin`, `font-extralight`, `font-light`) and sets `-webkit-text-size-adjust: 100%`. | M `test/ui-guidelines-static.test.ts` scans weights and `src/styles/app.css` |
+| A8 | WCAG 2.2 target size minimum (SC 2.5.8): interactive controls outside inline prose links measure at least 24 by 24 CSS pixels on desktop and 44 by 44 on touch. | M `e2e/design-rules-guidelines.spec.ts` |
+| A9 | WCAG 2.2 focus not obscured (SC 2.4.11): tabbed controls are not covered by sticky headers, docked composers or overlays. | M `e2e/design-rules-guidelines.spec.ts` |
+| A10 | WCAG 2.2 dragging movements (SC 2.5.7): every drag-reorderable list offers single-pointer move up and down controls that persist order without dragging. | M `e2e/providers-order.spec.ts` |
 
 ## Direction
 

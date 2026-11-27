@@ -1246,7 +1246,7 @@ html:not(.light)
 
 .tray-pop {
   --tray-ink: rgb(0 0 0 / 0.85);
-  --tray-ink-2: rgb(0 0 0 / 0.5);
+  --tray-ink-2: rgb(0 0 0 / 0.62);
   --tray-line: rgb(0 0 0 / 0.1);
   --tray-fill: rgb(0 0 0 / 0.055);
   --tray-fill-hover: rgb(0 0 0 / 0.1);
@@ -1266,8 +1266,26 @@ html:not(.light)
   user-select: none;
 }
 
+:root[data-theme="dark"] .tray-pop {
+  --tray-ink: rgb(255 255 255 / 0.9);
+  --tray-ink-2: rgb(255 255 255 / 0.5);
+  --tray-line: rgb(255 255 255 / 0.12);
+  --tray-fill: rgb(255 255 255 / 0.09);
+  --tray-fill-hover: rgb(255 255 255 / 0.15);
+  --tray-fill-down: rgb(255 255 255 / 0.22);
+  --tray-warn: rgb(255 179 64);
+}
+
+.tray-pop-opaque {
+  background: rgb(246 246 246);
+}
+
+:root[data-theme="dark"] .tray-pop-opaque {
+  background: rgb(43 43 43);
+}
+
 @media (prefers-color-scheme: dark) {
-  .tray-pop {
+  :root:not([data-theme="light"]) .tray-pop {
     --tray-ink: rgb(255 255 255 / 0.9);
     --tray-ink-2: rgb(255 255 255 / 0.5);
     --tray-line: rgb(255 255 255 / 0.12);
@@ -1275,6 +1293,10 @@ html:not(.light)
     --tray-fill-hover: rgb(255 255 255 / 0.15);
     --tray-fill-down: rgb(255 255 255 / 0.22);
     --tray-warn: rgb(255 179 64);
+  }
+
+  :root:not([data-theme="light"]) .tray-pop-opaque {
+    background: rgb(43 43 43);
   }
 }
 

@@ -338,7 +338,7 @@ for (const theme of ['light', 'dark'] as const) {
     const violations = (
       await new AxeBuilder({ page })
         .include('[data-testid="channel-usage"]')
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
         .analyze()
     ).violations;
     expect(violations.map((v) => v.id)).toEqual([]);

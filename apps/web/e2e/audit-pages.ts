@@ -122,4 +122,39 @@ export const PAGES: AuditPage[] = [
   { name: 'mcp servers', url: '/app/resources/mcp-servers?scenario=07', ready: row },
   { name: 'api keys', url: '/app/api-keys?scenario=api-keys-created', ready: card },
   { name: 'account', url: '/app/account?scenario=13', ready: card },
+  {
+    name: 'usage',
+    url: '/app/usage?scenario=home-c',
+    ready: (p) => p.locator('[data-day]').first(),
+  },
+  {
+    name: 'settings routing',
+    url: '/app/settings/routing?scenario=model-routing',
+    ready: (p) => p.locator('[data-instance-id]').first(),
+  },
+  {
+    name: 'settings im',
+    url: '/app/settings/im?scenario=01',
+    ready: (p) => p.getByTestId('page-col'),
+  },
+  {
+    name: 'project new',
+    url: '/app/project/new?scenario=01',
+    ready: (p) => p.locator('#prj-new-repo'),
+  },
+  {
+    name: 'todo detail',
+    url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27',
+    ready: (p) => p.getByTestId('composer-card'),
+  },
+  {
+    name: 'machines authorize',
+    url: '/app/machines/authorize?scenario=06',
+    ready: (p) => p.getByRole('region', { name: '授权执行机' }),
+  },
+  {
+    name: 'tray',
+    url: '/tray?scenario=home-c',
+    ready: (p) => p.locator('body'),
+  },
 ];

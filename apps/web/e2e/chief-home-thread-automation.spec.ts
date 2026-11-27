@@ -243,7 +243,7 @@ for (const theme of ['light', 'dark'] as const) {
     await badge(page).click();
     await expect(popover(page)).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
-    const violations = (await new AxeBuilder({ page }).include('[data-testid="automation-popover"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations;
+    const violations = (await new AxeBuilder({ page }).include('[data-testid="automation-popover"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations;
     expect(violations.map((violation) => violation.id)).toEqual([]);
     await evidencePanelShot(page, `thread-automation-phone-${theme}.png`, page.locator('.side-panel'));
     await page.keyboard.press('Escape');

@@ -120,7 +120,7 @@ function useTrayData(onOpened: (refresh: () => void) => () => void): {
   };
 }
 
-function moveFocus(event: KeyboardEvent<HTMLDivElement>, hide: () => void) {
+function moveFocus(event: KeyboardEvent<HTMLElement>, hide: () => void) {
   if (event.key === 'Escape') {
     event.preventDefault();
     hide();
@@ -157,7 +157,6 @@ function TrayItem({
   return (
     <Button
       variant="ghost"
-      role="menuitem"
       data-testid={testId}
       title={tip}
       className={cn('tray-item', keepLabel && 'tray-item-keep')}
@@ -185,7 +184,7 @@ export function TrayPage() {
   const { groups: allGroups, usage, coordinatorBusy, now } = useTrayData(onOpened);
   const groups = useMemo(() => popoverGroups(allGroups), [allGroups]);
   const say = (text: TrayText) => t(text.key, text.vars);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (bridge === null) return;
@@ -231,9 +230,8 @@ export function TrayPage() {
   const accent = state?.accent == null ? {} : { '--tray-accent': state.accent };
 
   return (
-    <div
+    <section
       ref={rootRef}
-      role="menu"
       aria-label="Cairn"
       data-testid="tray-popover"
       className={cn('tray-pop', !ON_MAC && 'tray-pop-opaque')}
@@ -280,7 +278,7 @@ export function TrayPage() {
 
       {usage !== null && (
         <>
-          <div className="tray-rule" />
+          <div className="tray-rule" aria-hidden="true" />
           <div className="flex flex-col">
             <TrayItem
               testId="tray-usage"
@@ -335,7 +333,7 @@ export function TrayPage() {
         </Button>
       </div>
 
-      <div className="tray-rule" />
+      <div className="tray-rule" aria-hidden="true" />
       <div className="flex flex-col">
         <TrayItem
           glyph={
@@ -355,6 +353,6 @@ export function TrayPage() {
           onClick={() => bridge?.quit()}
         />
       </div>
-    </div>
+    </section>
   );
 }

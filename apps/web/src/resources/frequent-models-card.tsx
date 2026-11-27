@@ -7,9 +7,11 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { modelMarkFor } from '../components/model-identity.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import {
+  moveSortableItem,
   SortableGripButton,
   type SortableItemBind,
   SortableList,
+  SortableMoveButtons,
 } from '../components/providers/provider-panel.js';
 import { SETTINGS_ROW_CLS, SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -49,12 +51,16 @@ function FrequentModelRow({
   bind,
   onLevel,
   onRemove,
+  onMoveUp,
+  onMoveDown,
 }: {
   model: TopModel;
   option: ModelOption | undefined;
   bind?: SortableItemBind;
   onLevel: (level: ThinkingLevel | null) => void;
   onRemove: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
 }) {
   const { t } = useI18n();
   const name = option?.modelName ?? model.modelId;
@@ -113,6 +119,7 @@ function FrequentModelRow({
             className="frequent-model-level"
           />
         )}
+        <SortableMoveButtons label={name} onMoveUp={onMoveUp} onMoveDown={onMoveDown} />
         <IconTooltip
           label={t('删除 {model}', { model: name })}
           trigger={
@@ -238,23 +245,33 @@ export function FrequentModelsCard({
               onChange(reordered, 'reorder');
             }}
             className="flex flex-col divide-y divide-border"
-            renderItem={(model, bind) => (
-              <FrequentModelRow
-                model={model}
-                option={optionOf(model, options)}
-                bind={bind}
-                onLevel={(thinkingLevel) =>
-                  onChange(
-                    models.map((m) =>
-                      frequentKey(m) === frequentKey(model) ? { ...m, thinkingLevel } : m,
-                    ),
-                  )
-                }
-                onRemove={() =>
-                  onChange(models.filter((m) => frequentKey(m) !== frequentKey(model)))
-                }
-              />
-            )}
+            renderItem={(model, bind) => {
+              const key = frequentKey(model);
+              const index = models.findIndex((m) => frequentKey(m) === key);
+              return (
+                <FrequentModelRow
+                  model={model}
+                  option={optionOf(model, options)}
+                  bind={bind}
+                  onLevel={(thinkingLevel) =>
+                    onChange(
+                      models.map((m) => (frequentKey(m) === key ? { ...m, thinkingLevel } : m)),
+                    )
+                  }
+                  onRemove={() => onChange(models.filter((m) => frequentKey(m) !== key))}
+                  onMoveUp={
+                    index > 0
+                      ? () => onChange(moveSortableItem(models, index, index - 1), 'reorder')
+                      : undefined
+                  }
+                  onMoveDown={
+                    index >= 0 && index < models.length - 1
+                      ? () => onChange(moveSortableItem(models, index, index + 1), 'reorder')
+                      : undefined
+                  }
+                />
+              );
+            }}
           />
         )}
       </SettingsCard>

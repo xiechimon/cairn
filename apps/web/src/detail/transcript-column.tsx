@@ -23,7 +23,7 @@ import { useI18n } from '../i18n/provider.js';
 import { openingAnchor } from './scroll-anchor.js';
 import { Transcript } from './transcript.js';
 
-const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
+const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 pointer-fine:overscroll-none';
 const VIEWPORT_CLS = 'chat-col pt-3 pl-4 pr-[calc(1rem-var(--scrollbar-gutter,0px))]';
 const CONTENT_CLS =
   'mx-auto block w-full max-w-(--chat-max-w) min-w-0 gap-0 [overflow-wrap:anywhere]';

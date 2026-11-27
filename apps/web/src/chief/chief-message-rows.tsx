@@ -184,6 +184,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
           return (
             <code
               key={i}
+              translate="no"
               className="rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-meta"
             >
               {s.text}

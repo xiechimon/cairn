@@ -103,6 +103,8 @@ const NEGATIVE_CASES = [
   ['A2', { 'apps/web/src/page.tsx': '<button className="outline-none">Click</button>' }],
   ['A7', { 'apps/web/src/page.tsx': '<div onClick={run}>Go</div>' }],
   ['C5', { 'apps/web/src/page.ts': 'toast.error("Error: 500");' }],
+  ['C5', { 'apps/web/src/page.ts': 'toast.error(t("Error: 500"));' }],
+  ['C5', { 'apps/web/src/page.ts': 'toast.error(t("Failed"), { description: t("Error: 500") });' }],
   [
     'C38',
     {
@@ -112,6 +114,8 @@ const NEGATIVE_CASES = [
       ),
     },
   ],
+  ['C38', { 'apps/web/src/chat.tsx': '<div className="overflow-y-auto overscroll-none" />' }],
+  ['C38', { 'apps/web/src/chat.tsx': '<div className="overflow-y-auto md:overscroll-none" />' }],
   ['C39', { 'apps/web/src/page.tsx': '<img src="/a.png" />' }],
   [
     'C40',
@@ -138,6 +142,23 @@ const NEGATIVE_CASES = [
   ],
   ['C44', { 'apps/web/src/hotkeys.ts': "window.addEventListener('keydown', (e) => run(e.key));" }],
   [
+    'C44',
+    {
+      'apps/web/src/hotkeys.tsx': [
+        'const onKey = (e) => { run(e.key); };',
+        "window.addEventListener('keydown', onKey);",
+        'export const Box = () => <input />;',
+      ].join('\n'),
+    },
+  ],
+  [
+    'C44',
+    {
+      'apps/web/src/hotkeys-log.ts':
+        "window.addEventListener('keydown', (e) => { console.log(e.target.tagName); run(e.key); });",
+    },
+  ],
+  [
     'C45',
     {
       'apps/desktop/src/app-menu.ts':
@@ -152,6 +173,10 @@ const NEGATIVE_CASES = [
     },
   ],
   ['T6', { 'apps/web/src/detail/code.tsx': 'export const C = () => <pre>x</pre>;' }],
+  [
+    'T6',
+    { 'apps/web/src/components/chat/trace-parts.tsx': 'export const T = () => <pre>x</pre>;' },
+  ],
   [
     'T7',
     {
@@ -170,3 +195,30 @@ for (const [rule, overrides] of NEGATIVE_CASES) {
     );
   });
 }
+
+test('non-toast configuration description ending in parentheses does not trigger C5', () => {
+  assert.deepEqual(
+    rulesFor({
+      'apps/web/src/page.ts':
+        "export const ITEM = { title: 'Connect', description: 'Connect to work (optional)' };",
+    }),
+    [],
+  );
+});
+
+test('multiline CSS comment does not shift reported line numbers', () => {
+  const css = [
+    CLEAN_FIXTURES['apps/web/src/styles/app.css'].trimEnd(),
+    '/*',
+    ' * line 2 of comment',
+    ' * line 3 of comment',
+    ' */',
+    'button, a { user-select: none; }',
+  ].join('\n');
+  const expectedLine = css.split('\n').length;
+  const hit = checkUiGuidelines({
+    files: { ...CLEAN_FIXTURES, 'apps/web/src/styles/app.css': css },
+    isolated: true,
+  }).violations.find((v) => v.rule === 'C40');
+  assert.equal(hit?.line, expectedLine);
+});

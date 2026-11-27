@@ -100,7 +100,7 @@ Cairn adopts the published standards audited in [ui-guidelines-adoption-2026-11-
 | Standard | Surface scope | Enforcement |
 |---|---|---|
 | Vercel Web Interface Guidelines & Rauno `interfaces.rauno.me` | `foundation.md` (`C38`–`C42`, `C44`, `A7`, `T6`, `V31`) | `test/ui-guidelines-static.test.ts`, `e2e/design-rules-measure.spec.ts` |
-| W3C WCAG 2.2 AA (`target-size`, `focus`, dragging, `error`, `labels`) | `foundation.md`, `settings.md`, `conversation.md` | `e2e/a11y-axe.spec.ts` (`wcag22aa`), `e2e/design-rules-measure.spec.ts` |
+| W3C WCAG 2.2 AA (`target-size`, `focus`, dragging, `error`, `labels`) | `foundation.md` (`A3`, `A8`–`A10`), `settings.md` | `e2e/a11y-axe.spec.ts` (`wcag22aa`), `e2e/providers-order.spec.ts`, `e2e/design-rules-guidelines.spec.ts` |
 | Apple macOS HIG (window, menu, tray, notifications, offline) | `computers.md` (`V26`, `C45`) | `test/ui-guidelines-static.test.ts`, `apps/desktop/scripts/app-menu.test.mjs` |
 | W3C `clreq` & Chinese Copywriting Guidelines (`T1`, `T7`) | `foundation.md`, `apps/web/src/i18n/en.ts` | `test/ui-guidelines-static.test.ts`, `test/unslop-signs.test.ts` |
 | Emil Kowalski & Jakub Krehel craft skills | `motion.md` (`V24`), `apps/web/src/` | `e2e/design-rules-measure.spec.ts` |

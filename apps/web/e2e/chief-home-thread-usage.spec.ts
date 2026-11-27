@@ -339,7 +339,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(tokens(page)).toHaveText('2.5k');
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    const violations = (await new AxeBuilder({ page }).include('[data-testid="thread-usage"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations;
+    const violations = (await new AxeBuilder({ page }).include('[data-testid="thread-usage"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations;
     expect(violations.map((violation) => violation.id)).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
     const box = await usage(page).boundingBox();

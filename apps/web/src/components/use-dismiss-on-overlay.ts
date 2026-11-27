@@ -46,6 +46,7 @@ export function PopoverDismissEffect({ open, onClose }: { open: boolean; onClose
     if (!open) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
       if (
         (event.metaKey || event.ctrlKey) &&
         (event.key === ',' || event.key.toLowerCase() === 'k')

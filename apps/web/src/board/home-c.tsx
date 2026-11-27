@@ -524,7 +524,7 @@ export function HomeC({
         <div className="relative flex min-h-0 min-w-0 flex-1">
           <section
             data-testid="home-c"
-            className={`chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none ${designSplit?.sectionClass ?? ''}`}
+            className={`chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col pointer-fine:overscroll-none ${designSplit?.sectionClass ?? ''}`}
           >
             {designSplit?.chatBar}
             {paneButtons}
@@ -572,7 +572,7 @@ export function HomeC({
           data-testid="home-c"
           data-chat-top={!narrow && banner == null ? 'under-header' : undefined}
           aria-label={t('与 Coordinator 的对话')}
-          className={`chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none ${designSplit?.sectionClass ?? ''}`}
+          className={`chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col pointer-fine:overscroll-none ${designSplit?.sectionClass ?? ''}`}
         >
           {designSplit?.chatBar}
           {paneButtons}

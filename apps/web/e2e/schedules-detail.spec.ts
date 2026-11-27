@@ -336,7 +336,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await settleTransitions(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
-    const { violations } = await new AxeBuilder({ page }).include('[data-testid="schedule-popover"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+    const { violations } = await new AxeBuilder({ page }).include('[data-testid="schedule-popover"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
     expect(violations.map(({ id, nodes }) => ({ id, targets: nodes.map((node) => node.target) }))).toEqual([]);
     await scheduleShot(page, `schedule-editor-${width}-${theme}.png`, theme);
   });

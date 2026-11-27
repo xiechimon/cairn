@@ -213,7 +213,7 @@ for (const theme of ['light', 'dark'] as const) {
     await settleTransitions(page);
     const { violations } = await new AxeBuilder({ page })
       .include('.search-panel')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze();
     expect(violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(({ target, failureSummary }) => ({ target, failureSummary })) }))).toEqual([]);
     await evidencePanelShot(page, `palette-${theme}.png`, panel(page));

@@ -314,6 +314,6 @@ test('the panel passes axe in the failing state', async ({ page }) => {
   await setup(page, { rows: [prRow({ checks: { passed: 6, failed: 2, running: 1, total: 9, failedNames: ['lint', 'e2e (1)'] } })] }, 'dark');
   await page.goto('/app?thread=todo-1');
   await expect(panel(page)).toBeVisible();
-  const results = await new AxeBuilder({ page }).include('.side-panel').withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  const results = await new AxeBuilder({ page }).include('.side-panel').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   expect(results.violations).toEqual([]);
 });

@@ -159,6 +159,69 @@ function readJsxOpeningTag(text, startIndex) {
   return text.slice(startIndex);
 }
 
+function readBalanced(text, openIndex, openCh = '{', closeCh = '}') {
+  let depth = 0;
+  let quote = '';
+  for (let i = openIndex; i < text.length; i++) {
+    const ch = text[i];
+    if (quote !== '') {
+      if (ch === '\\') {
+        i += 1;
+        continue;
+      }
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+    } else if (ch === openCh) {
+      depth += 1;
+    } else if (ch === closeCh) {
+      depth -= 1;
+      if (depth === 0) return text.slice(openIndex, i + 1);
+    }
+  }
+  return text.slice(openIndex);
+}
+
+function extractKeydownHandlerBody(text, matchIndex, handlerToken) {
+  const argStart = text.indexOf(handlerToken, matchIndex);
+  if (/^(?:\(|function\b|[A-Za-z_$][\w$]*\s*=>)/.test(handlerToken)) {
+    const arrow = text.indexOf('=>', argStart);
+    const fnHead = arrow !== -1 && arrow - argStart < 120 ? arrow + 2 : argStart;
+    let cursor = fnHead;
+    while (cursor < text.length && /\s/.test(text[cursor])) cursor += 1;
+    if (text[cursor] === '{') return readBalanced(text, cursor, '{', '}');
+    return text.slice(
+      argStart,
+      text.indexOf('\n', argStart) === -1 ? text.length : text.indexOf('\n', argStart),
+    );
+  }
+  const identMatch = handlerToken.match(/^([A-Za-z_$][\w$]*)/);
+  if (identMatch === null) return '';
+  const name = identMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const before = text.slice(0, matchIndex);
+  const declRe = new RegExp(
+    `(?:(?:const|let|var)\\s+${name}\\s*=|function\\s+${name}\\s*\\()`,
+    'g',
+  );
+  let last = null;
+  for (const m of before.matchAll(declRe)) last = m;
+  if (last === null) return '';
+  const tail = text.slice(last.index);
+  const eqOrParen =
+    tail.indexOf('=>') !== -1 && tail.indexOf('=>') < 160
+      ? tail.indexOf('=>') + 2
+      : tail.indexOf(')');
+  const scanFrom = eqOrParen !== -1 ? last.index + eqOrParen : last.index;
+  const brace = text.indexOf('{', scanFrom);
+  if (brace === -1 || brace - scanFrom > 40) {
+    const eol = text.indexOf('\n', scanFrom);
+    return text.slice(scanFrom, eol === -1 ? text.length : eol);
+  }
+  return readBalanced(text, brace, '{', '}');
+}
+
 function createVfs(root, files, isolated) {
   const map = new Map(Object.entries(files ?? {}));
   return {
@@ -249,7 +312,7 @@ function checkCssRules(vfs, push) {
         push('C40', 'apps/web/src/styles/app.css', 1, `missing ${desc}`);
       }
     }
-    const strippedCss = appCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const strippedCss = appCss.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ''));
     let buttonTouchAction = false;
     for (const block of strippedCss.matchAll(/([^{}@]+)\{([^{}]+)\}/g)) {
       const selectorText = block[1].trim();
@@ -262,7 +325,7 @@ function checkCssRules(vfs, push) {
         push(
           'C40',
           'apps/web/src/styles/app.css',
-          lineNumberAt(strippedCss, block.index),
+          lineNumberAt(strippedCss, block.index + Math.max(0, block[1].search(/\S/))),
           'user-select: none must not apply to standalone inline links (a)',
         );
       }
@@ -345,29 +408,34 @@ function checkOutlineNone(rel, lines, push) {
   }
 }
 
-function checkKeydownGuards(rel, text, lines, push) {
-  for (let i = 0; i < lines.length; i++) {
-    if (!/(?:window|document)\.addEventListener\(\s*['"]keydown['"]/.test(lines[i])) continue;
-    if (
-      /(?:isEditable|isContentEditable|INPUT|TEXTAREA|SELECT|isComposing|Escape|shouldIgnoreKey)/i.test(
-        text,
-      )
-    ) {
-      continue;
-    }
-    push('C44', rel, i + 1, 'global keydown listener missing editable target or Escape guard');
+const KEYDOWN_GUARD_RE =
+  /\bif\s*\([^)]*(?:isEditable|isContentEditable|\bINPUT\b|\bTEXTAREA\b|\bSELECT\b|isComposing|Escape|shouldIgnoreKey|closest\()/;
+
+function checkKeydownGuards(rel, text, push) {
+  for (const match of text.matchAll(
+    /(?:window|document)\.addEventListener\(\s*['"]keydown['"]\s*,\s*([^,)]+)/g,
+  )) {
+    const body = extractKeydownHandlerBody(text, match.index, match[1].trim());
+    if (body !== '' && KEYDOWN_GUARD_RE.test(body)) continue;
+    push(
+      'C44',
+      rel,
+      lineNumberAt(text, match.index),
+      'global keydown listener missing editable target or Escape guard',
+    );
   }
 }
 
 function checkDetailCodeTags(rel, text, push) {
-  for (const match of text.matchAll(/<(?:pre|code)\b/g)) {
+  for (const match of text.matchAll(/<(pre|code)\b/g)) {
     const tag = readJsxOpeningTag(text, match.index);
+    if (match[1] === 'pre' && /font-\[inherit\]/.test(tag)) continue;
     if (!/\btranslate=["']no["']/.test(tag)) {
       push(
         'T6',
         rel,
         lineNumberAt(text, match.index),
-        'rendered <pre>/<code> in detail must set translate="no"',
+        'rendered <pre>/<code> in chat or detail must set translate="no"',
       );
     }
   }
@@ -384,7 +452,17 @@ function checkWebSources(vfs, push) {
 
     if (rel.endsWith('.ts') || rel.endsWith('.tsx')) {
       checkOutlineNone(rel, lines, push);
-      checkKeydownGuards(rel, text, lines, push);
+      checkKeydownGuards(rel, text, push);
+
+      for (const match of text.matchAll(/\b(?:[a-z0-9-]+:)*overscroll-none\b/g)) {
+        if (/(?:^|:)pointer-fine:/.test(match[0])) continue;
+        push(
+          'C38',
+          rel,
+          lineNumberAt(text, match.index),
+          'overscroll-none must be scoped under pointer-fine:overscroll-none',
+        );
+      }
 
       if (!sub.startsWith('components/ui/')) {
         for (const match of text.matchAll(/<(div|span)\b/g)) {
@@ -425,10 +503,23 @@ function checkWebSources(vfs, push) {
       for (const match of text.matchAll(/\bfont-(?:thin|extralight|light)\b/g)) {
         push('V31', rel, lineNumberAt(text, match.index), 'light font weights below 400 banned');
       }
-      for (const match of text.matchAll(/toast\.\w+\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)) {
-        const msg = match[2];
-        if (/\([^)]*\)$|Error:|\b[45]\d{2}\b/.test(msg)) {
-          push('C5', rel, lineNumberAt(text, match.index), 'raw error literal in toast call');
+      if (text.includes('toast.')) {
+        for (const call of text.matchAll(/\btoast\.\w+\(/g)) {
+          const openParen = call.index + call[0].length - 1;
+          const callBody = readBalanced(text, openParen, '(', ')');
+          for (const lit of callBody.matchAll(
+            /'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"|`([^`\\]*(?:\\.[^`\\]*)*)`/g,
+          )) {
+            const msg = lit[1] ?? lit[2] ?? lit[3] ?? '';
+            if (/\([^)]*\)$|Error:|\b[45]\d{2}\b/.test(msg)) {
+              push(
+                'C5',
+                rel,
+                lineNumberAt(text, call.index + lit.index),
+                'raw error literal in toast call',
+              );
+            }
+          }
         }
       }
       for (const match of text.matchAll(/<img\b/g)) {
@@ -453,7 +544,11 @@ function checkWebSources(vfs, push) {
           }
         }
       }
-      if (sub.startsWith('detail/')) {
+      if (
+        sub.startsWith('detail/') ||
+        sub.startsWith('components/chat/') ||
+        sub.startsWith('chief/')
+      ) {
         checkDetailCodeTags(rel, text, push);
       }
     }
@@ -487,10 +582,13 @@ function checkWebSources(vfs, push) {
       }
     } else if (rel.endsWith('.ts') || rel.endsWith('.tsx')) {
       for (let i = 0; i < lines.length; i++) {
-        for (const lit of lines[i].matchAll(
-          /(['"])((?:\\.|(?!\1).)*[\u4e00-\u9fff](?:\\.|(?!\1).)*)\1/g,
-        )) {
-          if (lit[2].includes('...')) {
+        const line = lines[i];
+        if (!/[\u4e00-\u9fff]/.test(line)) continue;
+        if (!line.includes('...') && !/\d(?:MB|GB|KB|TB)\b/.test(line)) continue;
+        for (const lit of line.matchAll(/'([^'\\]*(?:\\.[^'\\]*)*)'|"([^"\\]*(?:\\.[^"\\]*)*)"/g)) {
+          const val = lit[1] ?? lit[2] ?? '';
+          if (!/[\u4e00-\u9fff]/.test(val)) continue;
+          if (val.includes('...')) {
             push(
               'T7',
               rel,
@@ -498,7 +596,7 @@ function checkWebSources(vfs, push) {
               'use typographic ellipsis … instead of ASCII ... in Chinese string',
             );
           }
-          if (/\d(?:MB|GB|KB|TB)\b/.test(lit[2])) {
+          if (/\d(?:MB|GB|KB|TB)\b/.test(val)) {
             push('T7', rel, i + 1, 'add a space between number and unit in Chinese string');
           }
         }

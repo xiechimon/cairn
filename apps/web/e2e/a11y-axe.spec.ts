@@ -20,7 +20,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(p.ready(page)).toBeVisible();
       await settleTransitions(page);
       const { violations } = await new AxeBuilder({ page })
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         .analyze();
       const found = violations.map((v) => ({
         rule: v.id,

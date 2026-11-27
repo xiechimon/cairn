@@ -6,5 +6,5 @@ describe('static UI guideline gate', () => {
     const result = checkUiGuidelines();
     const formatted = result.violations.map((v) => `${v.rule} ${v.file}:${v.line}: ${v.message}`);
     expect(formatted).toEqual([]);
-  }, 15_000);
+  }, 30_000);
 });

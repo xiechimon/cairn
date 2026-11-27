@@ -8,13 +8,13 @@ Scope: `apps/web/src/board/sidebar` `apps/web/src/board/app-sidebar` `apps/web/s
 
 | Id | Rule | Check |
 |---|---|---|
-| L1 | At most 2 distinct hues in a list, the accent included, except the Tasks panel's PR line. | M distinct chromatic hue buckets in the container is <= 2 |
+| L1 | At most 2 distinct hues in a list, the accent included, except the Tasks panel's PR line. | M `e2e/design-rules-guidelines.spec.ts` |
 | L2 | Status in a row is a monochrome glyph or a muted text tag; only the state that needs the user may take the accent: a 6px dot, no number. | M `e2e/sidebar-visual.spec.ts`: every project-row glyph color is neutral, the only chromatic mark is the needs-you dot, a status row has `aria-description` |
-| L3 | No colored letter or tinted tile for a project or type in a list row; a person or agent may carry its `SeededAvatar`. | M no row descendant outside `[data-slot="avatar"]` has a chromatic background and a one-letter text; `.project-avatar` count is 0 |
-| L4 | The title gets the row: at least 80% of a task row's width, or 55% when the row carries meta or menu. | M `title.width / row.width` is >= 0.55 for every sidebar project row |
+| L3 | No colored letter or tinted tile for a project or type in a list row; a person or agent may carry its `SeededAvatar`. | M `e2e/design-rules-guidelines.spec.ts`: `.project-avatar` count is 0 |
+| L4 | The title gets the row: at least 80% of a task row's width, or 55% when the row carries meta or menu. | M `e2e/design-rules-guidelines.spec.ts`: `title.width / row.width` checked per sidebar row |
 | L5 | The sidebar is a tree under the Coordinator row: ungrouped projects, group folders, `新建项目`; pinned rows above the footer; archived projects on the flat page. | G `test/sidebar-projects.test.ts`, `test/tasks-sections.test.ts`, `e2e/sidebar-archived.spec.ts`; M header order in the DOM |
-| L6 | A sidebar row holds no time text; a task's age shows in the Tasks panel. | M no `aside` row text matches a duration |
-| L7 | The open row carries one subtle emphasis step, never a color change or a hue border. | M every row's border color is neutral |
+| L6 | A sidebar row holds no time text; a task's age shows in the Tasks panel. | M `e2e/design-rules-guidelines.spec.ts`: no `aside` row text matches a duration |
+| L7 | The open row carries one subtle emphasis step, never a color change or a hue border. | M `e2e/design-rules-guidelines.spec.ts`: every row's border color is neutral |
 | L8 | A child row carries a tree guide under the parent icon's centre; siblings share one trunk, the last child ends in the elbow. | M `e2e/sidebar-visual.spec.ts`: guide x 22, elbow at the icon centre, continuous trunk, none below the last child |
 | L9 | Row geometry copies the measured reference: 34px rows on a 36px pitch, 14px labels, 22px hover actions, no collapsed rail, a 56px footer. | M `e2e/sidebar-visual.spec.ts`, `e2e/paper-sidebar.spec.ts` |
 
