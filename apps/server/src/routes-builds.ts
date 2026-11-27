@@ -21,6 +21,7 @@ import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireProject, svcOf } from './routes-helpers.js';
+import { enqueueLocalFolderAction } from './services/build-merge-request.js';
 import { retryBuildNow } from './services/build-retry-now.js';
 import {
   applyBuildStepAction,
@@ -38,7 +39,6 @@ import { getChiefThread } from './services/chief.js';
 import { ClientMessageConflict, findClientMessage } from './services/client-message.js';
 import { createSerialConnection } from './services/events.js';
 import { readBuildChangeFile, readBuildChanges } from './services/git.js';
-import { enqueueLocalFolderAction } from './services/local-folder-action.js';
 import { isChiefConversation } from './services/machines.js';
 import { latestAgentTodo, newestMessagePage } from './services/message-page.js';
 import { deviceStreamsOf, pairedDeviceExists } from './services/paired-devices.js';

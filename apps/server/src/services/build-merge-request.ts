@@ -1,7 +1,13 @@
-import { ACTIVE_STEP_STATUSES, isInfoOutput, MERGE_ANNOUNCEMENT } from '@cairn/shared';
+import {
+  ACTIVE_STEP_STATUSES,
+  isInfoOutput,
+  localFolderActionCommandSchema,
+  MERGE_ANNOUNCEMENT,
+  parseLocalFolderActionInstruction,
+} from '@cairn/shared';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { build, step, todo } from '../db/schema.js';
-import { HttpError, taskArchived } from '../lib/errors.js';
+import { conflict, HttpError, taskArchived } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
 import { mergeThroughGithub } from './build-github-merge.js';
 import {
@@ -17,10 +23,58 @@ import {
 } from './builds.js';
 import { projectOfTodo, readBuildChanges, repoDirFor } from './git.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
-import { enqueueLocalFolderAction } from './local-folder-action.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import { assertPhaseTransition } from './phase.js';
 import { insertGateAnnouncement } from './transcript.js';
+
+export function enqueueLocalFolderAction(
+  deps: BuildDeps,
+  buildId: string,
+  action: 'undo' | 'merge',
+): { enqueued: true; stepId: string } {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  const todoRow = buildRow
+    ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
+    : undefined;
+  if (!buildRow || !todoRow) throw conflict('Local folder action requires a build and its todo');
+  if (todoRow.archivedAt !== null) throw conflict('Cannot act on an archived task');
+  if (todoRow.latestBuildId !== buildId) {
+    throw conflict('Only the current delivery can run this action');
+  }
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (projectRow?.repoKind !== 'local' || projectRow.localPath === null) {
+    throw conflict('Action requires a local folder project');
+  }
+  const command = localFolderActionCommandSchema.parse({
+    action,
+    projectId: todoRow.projectId,
+    buildId,
+  });
+  return deps.db.transaction(() => {
+    const active = deps.db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
+      .all();
+    for (const existing of active) {
+      const parsed = parseLocalFolderActionInstruction(existing.prompt);
+      if (parsed?.action === action) {
+        return { enqueued: true as const, stepId: existing.id };
+      }
+      throw conflict('Task has an active step running; wait for it to finish first');
+    }
+    const enqueued = enqueueStep(
+      deps,
+      buildId,
+      'merge',
+      todoRow.teamId,
+      JSON.stringify({ kind: 'local-folder-action', command }),
+      false,
+      true,
+    );
+    return { enqueued: true as const, stepId: enqueued.id };
+  });
+}
 
 function newestMergeStepId(deps: BuildDeps, buildId: string): string | null {
   return (
