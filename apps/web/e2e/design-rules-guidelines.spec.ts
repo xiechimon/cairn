@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive } from './chief-home-mock';
 
 const HOME = '/app?scenario=home-c';
 
@@ -53,24 +54,28 @@ test('C2: core surfaces render no placeholder dashes or empty fixed-ratio boxes'
   }
 });
 
-test('C7: disabled send control sits beside a clear state or empty prompt context', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=home-c');
-  const send = page.getByTestId('home-c').getByRole('button', { name: '发送' });
+test('C7: disabled controls sit beside clear explanatory context', async ({ page }) => {
+  await page.goto('/app/todo/r8-12?scenario=54');
+  const panel = page.getByTestId('side-chat-panel');
+  const send = panel.locator('.composer-send');
+  const textarea = panel.locator('textarea[data-compose-target]');
   await expect(send).toBeVisible();
-  if (await send.isDisabled()) {
-    const ok = await send.evaluate((el) => {
-      const form = el.closest('[data-testid="chief-composer-block"], form');
-      const label = (el.getAttribute('aria-label') ?? '').trim();
-      const input = form?.querySelector('textarea, input');
-      const placeholder = (input?.getAttribute('placeholder') ?? '').trim();
-      return label.length > 0 && (placeholder.length > 0 || (form?.textContent ?? '').trim().length > 0);
-    });
-    expect(ok, 'C7: disabled composer send button explains why or sits with composer prompt').toBe(
-      true,
-    );
-  }
+  await expect(send).toBeDisabled();
+  await expect(textarea).toHaveAttribute('placeholder', '回复这个任务');
+  await textarea.fill('ok');
+  await expect(send).toBeEnabled();
+
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/claude-subscriptions') return json([]);
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    return undefined;
+  });
+  await page.goto('/app/settings/routing');
+  await expect(page.getByTestId('frequent-models-add')).toBeDisabled();
+  await expect(page.getByTestId('frequent-models-empty')).toHaveText(
+    '暂无常用模型。先接入服务商，再返回添加。',
+  );
 });
 
 test('V12: chrome stays within 2 non-neutral hue families beyond semantic role colors', async ({

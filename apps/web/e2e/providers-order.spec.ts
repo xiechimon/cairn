@@ -142,18 +142,19 @@ test('A10: single-pointer move buttons reorder providers without dragging (WCAG 
   await page.goto('/app/resources/providers');
   await expect.poll(() => names(page)).toEqual(DEFAULT);
 
-  await page
-    .locator('[data-instance-id="subscription:sub-d1"]')
-    .getByTestId('sortable-move-down')
-    .click();
+  const firstRow = page.locator('[data-instance-id="subscription:sub-d1"]');
+  const firstRowDown = firstRow.getByTestId('sortable-move-down');
+  await expect(firstRowDown).toHaveCSS('pointer-events', 'none');
+  await firstRow.hover();
+  await expect(firstRowDown).toHaveCSS('pointer-events', 'auto');
+  await firstRowDown.click();
   const movedDown = ['provider:p-a', 'subscription:sub-d1', 'provider:p-b'];
   await expect.poll(() => names(page)).toEqual(movedDown);
   expect(saved).toEqual([movedDown]);
 
-  await page
-    .locator('[data-instance-id="provider:p-b"]')
-    .getByTestId('sortable-move-up')
-    .click();
+  const thirdRow = page.locator('[data-instance-id="provider:p-b"]');
+  await thirdRow.hover();
+  await thirdRow.getByTestId('sortable-move-up').click();
   const movedUp = ['provider:p-a', 'provider:p-b', 'subscription:sub-d1'];
   await expect.poll(() => names(page)).toEqual(movedUp);
 

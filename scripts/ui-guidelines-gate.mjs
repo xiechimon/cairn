@@ -409,7 +409,7 @@ function checkOutlineNone(rel, lines, push) {
 }
 
 const KEYDOWN_GUARD_RE =
-  /\bif\s*\([^)]*(?:isEditable|isContentEditable|\bINPUT\b|\bTEXTAREA\b|\bSELECT\b|isComposing|Escape|shouldIgnoreKey|closest\()/;
+  /\bif\s*\([^)]*(?:isEditable|isContentEditable|\bINPUT\b|\bTEXTAREA\b|\bSELECT\b|isComposing|Escape|shouldIgnoreKey)/;
 
 function checkKeydownGuards(rel, text, push) {
   for (const match of text.matchAll(

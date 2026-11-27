@@ -159,6 +159,13 @@ const NEGATIVE_CASES = [
     },
   ],
   [
+    'C44',
+    {
+      'apps/web/src/hotkeys-closest.ts':
+        "window.addEventListener('keydown', (e) => { if (e.target.closest('.panel')) run(e.key); });",
+    },
+  ],
+  [
     'C45',
     {
       'apps/desktop/src/app-menu.ts':
