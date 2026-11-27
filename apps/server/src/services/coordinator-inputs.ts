@@ -1,5 +1,5 @@
 import { coordinatorConversationKey, isMailWakeText } from '@cairn/shared';
-import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
 import type { StoppedTurn } from '../coordinator/runtime/stopped-turn.js';
 import type { Db } from '../db/client.js';
 import {
@@ -68,48 +68,46 @@ export function stoppedCoordinatorTurns(db: Db, threadId: string): StoppedTurn[]
   return ended
     .filter((row) => row.status === 'stopped' && (row.finishedAt ?? answeredSince) >= answeredSince)
     .map((row) => {
-      const started = typedRequest(db, threadId, row.id, row.ownerMessageIds);
+      const started = typedRequests(db, threadId, row.id, row.ownerMessageIds);
       const quotes = new Map([[row.id, started]]);
       for (const input of inputs.filter((candidate) => candidate.stepId === row.id)) {
-        const quote =
+        const typed =
           input.kind === 'steer'
-            ? typedRequest(db, threadId, input.id, input.ownerMessageIds)
+            ? typedRequests(db, threadId, input.id, input.ownerMessageIds)
             : started;
         for (const requestId of inputRequestIds(inputRequestId(input))) {
-          quotes.set(requestId, quote);
+          quotes.set(requestId, typed);
         }
       }
       return {
         stepId: row.id,
-        requests: [...quotes].map(([requestId, quote]) => ({ requestId, quote })),
+        requests: [...quotes].map(([requestId, typed]) => ({ requestId, quotes: typed })),
       };
     });
 }
 
-function typedRequest(
+function typedRequests(
   db: Db,
   threadId: string,
   requestId: string,
   ownerMessageIds: readonly string[] | null,
-): string | null {
-  const rows = db
+): (string | null)[] {
+  const typed = db
     .select()
     .from(chiefMessage)
     .where(
       and(
         eq(chiefMessage.threadId, threadId),
         eq(chiefMessage.role, 'user'),
+        or(isNull(chiefMessage.origin), eq(chiefMessage.origin, 'user')),
         inArray(chiefMessage.id, [requestId, ...(ownerMessageIds ?? [])]),
       ),
     )
     .orderBy(asc(chiefMessage.createdAt), sql`rowid`)
-    .all();
-  const own = rows.find((row) => row.id === requestId);
-  const words = (own === undefined ? rows : [own])
+    .all()
     .map((row) => row.content)
-    .filter((content) => typeof content === 'string')
-    .join('\n');
-  return words === '' ? null : words;
+    .filter((content) => typeof content === 'string');
+  return typed.length === 0 ? [null] : typed;
 }
 
 export function stoppedTurnRequests(db: Db, stepId: string): (string | null)[] {
@@ -128,8 +126,11 @@ export function stoppedTurnRequests(db: Db, stepId: string): (string | null)[] {
     .orderBy(asc(coordinatorInput.createdAt), sql`rowid`)
     .all();
   return [
-    typedRequest(db, stopped.buildId, stopped.id, stopped.ownerMessageIds),
-    ...steered.map((input) => typedRequest(db, stopped.buildId, input.id, input.ownerMessageIds)),
+    ...new Set(
+      [stopped, ...steered].flatMap((turn) =>
+        typedRequests(db, stopped.buildId, turn.id, turn.ownerMessageIds),
+      ),
+    ),
   ];
 }
 

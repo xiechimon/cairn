@@ -10,11 +10,10 @@ export const StoppedEntry = defineEntry('cairn.stopped');
 
 export interface StoppedTurn {
   stepId: string;
-  requests: { requestId: string; quote: string | null }[];
+  requests: { requestId: string; quotes: (string | null)[] }[];
 }
 
-const UNTYPED_REQUEST =
-  '(the last instruction above this note, which is not a message the user typed)';
+const UNTYPED_REQUEST = '(what started that turn, which is not a message the user typed)';
 
 function quoted(typed: string | null): string {
   const text = (typed ?? UNTYPED_REQUEST).replaceAll('<', '&lt;').trim();
@@ -61,12 +60,12 @@ export async function cancelStoppedRequests(
 ): Promise<void> {
   for (const turn of stopped) {
     const unfinished = new Set<string | null>();
-    for (const { requestId, quote } of turn.requests) {
+    for (const { requestId, quotes } of turn.requests) {
       const pending = await harness.commit(async (tx) => {
         const record = await tx.submissionByRequest(conversation.id, requestId);
         return record?.type === 'input' && record.status !== 'done' && record.entry !== undefined;
       }, context);
-      if (pending) unfinished.add(quote);
+      if (pending) for (const quote of quotes) unfinished.add(quote);
     }
     if (unfinished.size === 0) continue;
     await conversation.submit(

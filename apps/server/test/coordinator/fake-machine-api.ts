@@ -63,7 +63,7 @@ export function fakeMachineApi(apiKey = 'sk-test'): FakeMachineApi {
     stoppedTurns: async () =>
       [...api.stopRequested].map((id) => ({
         stepId: id,
-        requests: [{ requestId: id, quote: api.asked.get(id) ?? id }],
+        requests: [{ requestId: id, quotes: [api.asked.get(id) ?? id] }],
       })),
     askUser: async (stepId, body) => {
       api.asks.push({ stepId, body });

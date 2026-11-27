@@ -122,9 +122,9 @@ describe('which Coordinator requests a stop cancels', () => {
       {
         stepId: 'stopped-on-retry',
         requests: [
-          { requestId: 'stopped-on-retry', quote: asked },
-          { requestId: 'stopped-on-retry#2', quote: asked },
-          { requestId: expect.stringContaining('correction'), quote: 'and be brief' },
+          { requestId: 'stopped-on-retry', quotes: [asked] },
+          { requestId: 'stopped-on-retry#2', quotes: [asked] },
+          { requestId: expect.stringContaining('correction'), quotes: ['and be brief'] },
         ],
       },
     ]);
@@ -137,7 +137,20 @@ describe('which Coordinator requests a stop cancels', () => {
     expect(
       stoppedCoordinatorTurns(w.s.db, w.threadId).at(-1)?.requests,
       'text the user never typed is not quoted',
-    ).toEqual([{ requestId: 'woken', quote: null }]);
+    ).toEqual([{ requestId: 'woken', quotes: [null] }]);
+
+    typed('started-by-a-button', 'SERVER-WRITTEN: plan task 7 from this issue text');
+    w.s.db
+      .update(chiefMessage)
+      .set({ origin: 'synthetic' })
+      .where(eq(chiefMessage.id, 'started-by-a-button'))
+      .run();
+    turn('started-by-a-button', 'stopped', 600);
+    expect(
+      stoppedCoordinatorTurns(w.s.db, w.threadId).at(-1)?.requests,
+      'a prompt the server wrote for a button is not quoted',
+    ).toEqual([{ requestId: 'started-by-a-button', quotes: [null] }]);
+    expect(stoppedTurnRequests(w.s.db, 'started-by-a-button')).toEqual([null]);
   });
 });
 
@@ -215,6 +228,49 @@ describe('Coordinator stop', () => {
     },
     30_000,
   );
+
+  it('cancels every queued message that was merged into the stopped turn', async () => {
+    const w = await world('write a long article about cairns');
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 40,
+    });
+    const requests: Asked[][] = [];
+    faux.setResponses(
+      Array(4).fill((c: { messages: { role: string; content: unknown }[] }) => {
+        requests.push(conversation(c.messages));
+        return fauxAssistantMessage(
+          requests.length === 1 ? `article ${'stone '.repeat(400)}` : 'ok',
+        );
+      }),
+    );
+    const send = async (content: string) => {
+      const sent = await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+        content,
+      });
+      expect(sent.status).toBeLessThan(300);
+    };
+    await send('then delete every branch');
+    const coordinator = boot(w, faux);
+    coordinator.wake(w.threadId);
+    await until(() => requests.length === 1);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(w.s.db.select().from(step).all(), 'both messages became one turn').toHaveLength(1);
+    await req(w.s.app, 'POST', `/api/teams/${w.teamId}/chief/threads/${w.threadId}/stop`);
+    await until(() => w.s.db.select().from(step).get()?.status === 'stopped');
+    await coordinator.idle();
+    await send('what time is it');
+    coordinator.wake(w.threadId);
+    await until(() => requests.length === 2);
+    await coordinator.idle();
+
+    const note = requests.at(-1)?.find((m) => m.text.includes('[Stopped]'))?.text ?? '';
+    expect(note).toContain('write a long article about cairns');
+    expect(note, 'the second merged message is cancelled too').toContain(
+      'then delete every branch',
+    );
+  }, 30_000);
 
   it('cancels a stopped request whose executor went away before it could end the turn', async () => {
     const w = await world('delete every branch');
