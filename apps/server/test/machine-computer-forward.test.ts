@@ -1481,7 +1481,7 @@ describe('browser calls on Macs', () => {
     const act = await next(calls, 3);
     expect(act.ownerChrome).toBeUndefined();
     answer(s, 'mini', act, 'clicked');
-    expect((await acting).text).toBe('clicked');
+    expect((await acting).text).toBe(inCairnBrowser('mini', 'clicked'));
     expect(calls).toHaveLength(3);
   });
 
@@ -1509,7 +1509,7 @@ describe('browser calls on Macs', () => {
     const act = await next(calls, 2);
     expect(act.ownerChrome).toBeUndefined();
     answer(s, 'mini', act, 'clicked');
-    expect((await acting).text).toBe('clicked');
+    expect((await acting).text).toBe(inCairnBrowser('mini', 'clicked'));
     expect(calls).toHaveLength(2);
   });
 
@@ -1562,7 +1562,7 @@ describe('browser calls on Macs', () => {
     const act = await next(calls, 1);
     expect(act.ownerChrome).toBeUndefined();
     answer(s, 'mini', act, 'clicked');
-    expect((await acting).text).toBe('clicked');
+    expect((await acting).text).toBe(inCairnBrowser('mini', 'clicked'));
     expect(calls).toHaveLength(1);
   });
 
