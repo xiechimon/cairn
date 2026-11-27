@@ -237,6 +237,8 @@ const jsonLd = {
                         <th>{t.proof.table.case}</th>
                         <th>{t.proof.table.kind}</th>
                         <th>{t.proof.table.passed}</th>
+                        <th>{t.proof.table.failed}</th>
+                        <th>{t.proof.table.incomplete}</th>
                         <th>{t.proof.table.status}</th>
                         <th>{t.proof.table.model}</th>
                       </tr>
@@ -533,6 +535,13 @@ const jsonLd = {
       const validEvalData = (data) =>
         data &&
         data.version === 1 &&
+        typeof data.dataset === 'string' &&
+        data.dataset.length > 0 &&
+        Number.isInteger(data.suiteVersion) &&
+        data.suiteVersion >= 1 &&
+        typeof data.sha === 'string' &&
+        /^[0-9a-f]{7,64}$/i.test(data.sha) &&
+        ['ok', 'degraded', 'incomplete', 'failed'].includes(data.status) &&
         typeof data.date === 'string' &&
         !Number.isNaN(Date.parse(data.date)) &&
         Date.parse(data.date) <= Date.now() + 10 * 60 * 1000 &&
@@ -641,6 +650,8 @@ const jsonLd = {
           addCell(row.caseId);
           addCell(evalClientCopy.shortKinds[row.kind] ?? row.kind);
           addCell(`${row.passed}/${row.trials}`);
+          addCell(String(row.failed));
+          addCell(String(row.incomplete));
           const statusCell = document.createElement('td');
           const badge = document.createElement('span');
           badge.className = `eval-status eval-status-${row.status}`;
@@ -1118,18 +1129,18 @@ const jsonLd = {
     font-size: 13px;
     font-variant-numeric: tabular-nums;
   }
-  .eval-bar-label,
-  .eval-bar-count {
+  .proof-chart :global(.eval-bar-label),
+  .proof-chart :global(.eval-bar-count) {
     fill: var(--ink-3);
     stroke: none;
     font-family: var(--font-mono);
     font-size: 11px;
   }
-  .eval-bar-track {
+  .proof-chart :global(.eval-bar-track) {
     fill: var(--hover);
     stroke: none;
   }
-  .eval-bar-fill {
+  .proof-chart :global(.eval-bar-fill) {
     fill: var(--accent);
     stroke: none;
   }
@@ -1152,7 +1163,7 @@ const jsonLd = {
     font-size: 13px;
   }
   .proof-details th,
-  .proof-details td {
+  .proof-details :global(td) {
     padding: 6px 8px;
     border-bottom: 1px solid var(--line);
     text-align: left;
@@ -1162,7 +1173,7 @@ const jsonLd = {
     color: var(--ink-3);
     font-weight: 500;
   }
-  .eval-status {
+  .proof-details :global(.eval-status) {
     display: inline-block;
     padding: 1px 7px;
     border-radius: 999px;
@@ -1170,12 +1181,12 @@ const jsonLd = {
     color: var(--ink-2);
     font-size: 12px;
   }
-  .eval-status-pass {
+  .proof-details :global(.eval-status-pass) {
     background: var(--running-soft, var(--hover));
     color: var(--running-ink, var(--ink-2));
   }
-  .eval-status-fail,
-  .eval-status-incomplete {
+  .proof-details :global(.eval-status-fail),
+  .proof-details :global(.eval-status-incomplete) {
     background: var(--accent-soft);
     color: var(--accent-ink);
   }

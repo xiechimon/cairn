@@ -883,3 +883,34 @@ test('doc-retired-terms-gate rejects eval-weekly.yml in living docs', () => {
   });
   assert.ok(result.failures.some((f) => f.includes('eval-weekly-workflow')));
 });
+
+test('prunes expired files, broken symlinks, and public temp dirs without touching unrelated dirs', (t) => {
+  const dir = makeTempDir(t);
+  const state = join(dir, 'state');
+  const tmpDir = join(state, 'tmp');
+  const publicTmp = join(tmpDir, 'daily-1-public-abc');
+  const keepDir = join(tmpDir, 'keep-unrelated');
+  const expiredFile = join(tmpDir, 'expired.json');
+  const brokenLink = join(tmpDir, 'broken-link');
+  mkdirSync(publicTmp, { recursive: true });
+  mkdirSync(keepDir, { recursive: true });
+  writeFileSync(join(publicTmp, 'marker.txt'), 'temp\n');
+  writeFileSync(join(keepDir, 'keep.txt'), 'keep\n');
+  writeFileSync(expiredFile, 'old\n');
+  symlinkSync(join(dir, 'does-not-exist'), brokenLink);
+
+  const rec = summarizeRun({
+    runId: 'run-prune',
+    arm: 'daily-prune',
+    sha: 'abc0001',
+    startedAt: '2026-11-27T00:00:00Z',
+    evalExitCode: 0,
+    outJson: { items: [] },
+  });
+  updateHistory(state, rec, { nowMs: Date.now() + 25 * 3600 * 1000 });
+
+  assert.equal(existsSync(publicTmp), false);
+  assert.equal(existsSync(expiredFile), false);
+  assert.equal(existsSync(keepDir), true);
+  assert.throws(() => readFileSync(brokenLink), /ENOENT/);
+});

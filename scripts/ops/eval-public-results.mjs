@@ -373,6 +373,16 @@ export function publishPublicResults(
     tempDir = mkdtempSync(join(tmpRoot, `${safeRunId}-public-`));
     git(['init', '-q'], { cwd: tempDir, env });
     git(['remote', 'add', 'origin', remote], { cwd: tempDir, env });
+    const resolvedFetch = git(['remote', 'get-url', 'origin'], { cwd: tempDir, env });
+    const resolvedPush = git(['remote', 'get-url', '--push', 'origin'], { cwd: tempDir, env });
+    if (
+      enforceCanonicalRemote &&
+      (!isCanonicalRemote(resolvedFetch) || !isCanonicalRemote(resolvedPush))
+    ) {
+      throw new Error(
+        `origin is not the canonical public results remote: ${resolvedFetch} / ${resolvedPush}`,
+      );
+    }
     const remoteRefs = git(['ls-remote', '--heads', 'origin', PUBLIC_RESULTS_BRANCH], {
       cwd: tempDir,
       env,

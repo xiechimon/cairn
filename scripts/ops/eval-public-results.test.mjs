@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
@@ -295,14 +295,36 @@ test('handles unchanged stale remote and push failure', (t) => {
   const current = JSON.parse(git(dir, ['--git-dir', bare, 'show', 'eval-results:latest.json']));
   assert.equal(current.date, newer.finishedAt);
 
-  const missingRemote = join(dir, 'missing.git');
-  const failingRepo = createEvalRepo(join(dir, 'failing-fixture'), { remote: missingRemote });
+  const rejectBare = join(dir, 'reject-push.git');
+  git(dir, ['init', '-q', '--bare', rejectBare]);
+  const rejectSeed = join(dir, 'reject-seed');
+  mkdirSync(rejectSeed, { recursive: true });
+  git(rejectSeed, ['init', '-q']);
+  git(rejectSeed, ['config', 'user.email', 'eval@cairn.dev']);
+  git(rejectSeed, ['config', 'user.name', 'eval']);
+  writeFileSync(
+    join(rejectSeed, 'latest.json'),
+    `${JSON.stringify({ version: 1, date: '2026-11-26T00:00:00.000Z' })}\n`,
+  );
+  git(rejectSeed, ['add', 'latest.json']);
+  git(rejectSeed, ['commit', '-qm', 'seed reject remote']);
+  git(rejectSeed, ['remote', 'add', 'origin', rejectBare]);
+  git(rejectSeed, ['push', '-q', 'origin', 'HEAD:eval-results']);
+  const hookPath = join(rejectBare, 'hooks', 'pre-receive');
+  writeFileSync(hookPath, '#!/bin/sh\necho "push rejected by hook" >&2\nexit 1\n');
+  chmodSync(hookPath, 0o755);
+
+  const failingRepo = createEvalRepo(join(dir, 'failing-fixture'), { remote: rejectBare });
   const failed = publishPublicResults(
-    makeRecord(),
+    makeRecord({ date: '2026-11-27T07:00:00.000Z' }),
     publishOptions(failingRepo, join(dir, 'failed-state')),
   );
   assert.equal(failed.state, 'failed');
-  assert.notEqual(failed.reason, '');
+  assert.match(failed.reason, /push rejected/);
+  const afterRejected = JSON.parse(
+    git(dir, ['--git-dir', rejectBare, 'show', 'eval-results:latest.json']),
+  );
+  assert.equal(afterRejected.date, '2026-11-26T00:00:00.000Z');
 
   const forkRepo = createEvalRepo(join(dir, 'fork-fixture'), {
     remote: 'https://github.com/example/fork.git',
@@ -314,6 +336,21 @@ test('handles unchanged stale remote and push failure', (t) => {
   });
   assert.equal(disallowed.state, 'failed');
   assert.match(disallowed.reason, /canonical/);
+
+  const pushInsteadOfRepo = createEvalRepo(join(dir, 'push-instead-fixture'), {
+    remote: 'https://github.com/xiechimon/cairn.git',
+  });
+  const hijacked = publishPublicResults(makeRecord(), {
+    repoDir: pushInsteadOfRepo,
+    stateDir: join(dir, 'hijack-state'),
+    env: {
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'url.https://github.com/example/hijack.pushInsteadOf',
+      GIT_CONFIG_VALUE_0: 'https://github.com/xiechimon/cairn',
+    },
+  });
+  assert.equal(hijacked.state, 'failed');
+  assert.match(hijacked.reason, /canonical/);
 });
 
 test('skips partial and non-official runs', (t) => {

@@ -5,6 +5,7 @@ import {
   chmodSync,
   closeSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readdirSync,
@@ -602,9 +603,21 @@ export function updateHistory(
     if (existsSync(tmpDir)) {
       for (const name of readdirSync(tmpDir)) {
         const p = join(tmpDir, name);
-        if (fileAgeMs(p, nowMs) <= 24 * 3600 * 1000) continue;
-        if (statSync(p).isDirectory()) rmSync(p, { recursive: true, force: true });
-        else safeUnlink(p);
+        let entryStat = null;
+        try {
+          entryStat = lstatSync(p);
+        } catch (error) {
+          if (error?.code === 'ENOENT') continue;
+          throw error;
+        }
+        if (nowMs - entryStat.mtimeMs <= 24 * 3600 * 1000) continue;
+        if (entryStat.isDirectory()) {
+          if (/-public(?:-[A-Za-z0-9_-]+)?$/.test(name)) {
+            rmSync(p, { recursive: true, force: true });
+          }
+          continue;
+        }
+        safeUnlink(p);
       }
     }
   }

@@ -264,6 +264,20 @@ test.each([
         '112',
       );
       expect(await page.locator('[data-eval-bar-fill="canary"]').getAttribute('width')).toBe('0');
+      type StyledNode = {
+        ownerDocument: {
+          defaultView: { getComputedStyle(node: StyledNode): { fill: string } } | null;
+        };
+      };
+      const readFill = (node: StyledNode) =>
+        node.ownerDocument.defaultView?.getComputedStyle(node).fill ?? '';
+      const trackFill = await page.locator('[data-eval-bar="track"]').first().evaluate(readFill);
+      const barFill = await page.locator('[data-eval-bar-fill="lane"]').evaluate(readFill);
+      expect(trackFill).not.toBe('');
+      expect(barFill).not.toBe('');
+      expect(trackFill).not.toBe('rgb(0, 0, 0)');
+      expect(barFill).not.toBe('rgb(0, 0, 0)');
+      expect(barFill).not.toBe(trackFill);
       await page.locator('#eval-details summary').focus();
       await page.keyboard.press('Enter');
       await browserExpect(page.locator('#eval-details')).toBeVisible();
@@ -273,6 +287,12 @@ test.each([
       await browserExpect(rows.nth(0)).toContainText('fix-bug');
       await browserExpect(rows.nth(0)).toContainText(shortKind);
       await browserExpect(rows.nth(0)).toContainText('Devin CLI · model not recorded');
+      await browserExpect(rows.nth(1).locator('td').nth(2)).toHaveText('1/2');
+      await browserExpect(rows.nth(1).locator('td').nth(3)).toHaveText('1');
+      await browserExpect(rows.nth(1).locator('td').nth(4)).toHaveText('0');
+      await browserExpect(rows.nth(2).locator('td').nth(2)).toHaveText('0/1');
+      await browserExpect(rows.nth(2).locator('td').nth(3)).toHaveText('0');
+      await browserExpect(rows.nth(2).locator('td').nth(4)).toHaveText('1');
       await browserExpect(rows.nth(2)).toContainText(status);
     } finally {
       await context.close();
@@ -291,8 +311,18 @@ test('keeps neutral fallback when public results unavailable', async () => {
   if (!firstCase) throw new Error('expected first case');
   firstCase.passed = -1;
   firstCase.failed = 2;
+  const { sha: _omittedSha, ...missingMetadata } = publicEvalPayload();
   const emptyCases = { ...publicEvalPayload(), cases: [] };
   const scenarios = [
+    {
+      name: 'missing metadata',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(missingMetadata),
+        }),
+    },
     {
       name: 'http 404',
       respond: (route: import('@playwright/test').Route) =>
