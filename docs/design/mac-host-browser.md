@@ -109,13 +109,14 @@ pre-existing and unchanged.
 1. **Owner's Chrome.** Taken when the tool is a browser tool, `stealth` is unset, there is no
    `fill_secret` and Browser MCP is on. Candidates are connected machines in this order: the one
    that last answered in this conversation, the server's own host, then the others by last
-   contact. A candidate is the server's own host reporting `browser` or `ownerChrome`, or, for the
-   instance owner's threads only, any machine reporting `ownerChrome`. These calls create no
-   `computer` row and take no lease; the daemon runs the calls for one tab one after another. The
-   server records which browser produced the conversation's current page. `browser_snapshot` and
-   `browser_act` never leave that browser: when it is Cairn's browser they skip step 1, and when
-   it is the owner's Chrome they are offered only to that machine. This also holds after a
-   stealth call or a `fill_secret` action switched the work into Cairn's browser.
+   contact. For the instance owner's threads only, a candidate is any connected machine
+   reporting `ownerChrome`; other people's threads never use the owner's signed-in Chrome. These
+   calls create no `computer` row and take no lease; the daemon runs the calls for one tab one
+   after another. The server records which browser produced the conversation's current page.
+   `browser_snapshot` and `browser_act` never leave that browser: when it is Cairn's browser they
+   skip step 1, and when it is the owner's Chrome they are offered only to that machine. This
+   also holds after a stealth call or a `fill_secret` action switched the work into Cairn's
+   browser.
 2. A candidate that cannot reach an extension (no `npx`, the server did not start, no browser
    connected) answers with the shared `OWNER_CHROME_UNAVAILABLE` prefix, and the server asks the
    next one under a new attempt id. It answers that way only when none of the call's commands ran.
@@ -153,7 +154,7 @@ close it.
 | State | Written by | Read by | On failure or absence |
 | --- | --- | --- | --- |
 | `capabilities.browser`, `browserSecretFill` | daemon presence report (`machine-loop.ts`), recomputed each report; stored on the `machine` row | `machineAcceptsTool` (target choice), `browserOfferFor`, `ownerChromeCandidates` (server host), secret fill authorization in `machine-computer.ts` and `browser-passwords.ts` | absent: the machine is not picked, secret fills are refused before anything runs; the row keeps the last report while the machine is offline |
-| `capabilities.ownerChrome` | daemon presence report on every Mac | `ownerChromeCandidates` | an old daemon lacks it: only the server host with `browser` stays a candidate |
+| `capabilities.ownerChrome` | daemon presence report on every Mac | `ownerChromeCandidates` | an old daemon lacks it: that machine is not an owner's-Chrome candidate |
 | `capabilities.screenHandoff` | daemon presence report, Linux desktops only | `canHandOverScreen` (takeover, login challenge, handoff refusal), `browserOfferFor`, the screen viewer in `computer-screen.ts` | absent: no takeover is offered or opened |
 | `capabilities.stealthBrowser` | daemon presence report, Linux desktops only | `browserOfferFor` | absent: the stealth parameter and its text are not offered |
 | `ownerChrome` on a computer call | `machine-computer.ts` on the call sent to a daemon | `computer/dispatch.ts` | an old daemon strips it and treats the call as a call for its own browser |

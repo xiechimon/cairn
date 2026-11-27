@@ -1686,9 +1686,12 @@ describe('browser calls on Macs', () => {
     expect(air).toEqual([]);
   });
 
-  test('another person’s thread never reaches a remote Mac’s Chrome', async () => {
+  test.each([
+    ['remote', {}],
+    ['server-local', { kind: 'local' as const }],
+  ])('another person’s thread never reaches a %s Mac’s Chrome', async (_label, options) => {
     const { s, deps } = boot();
-    addMac(s, 'air', { ownerChrome: true });
+    addMac(s, 'air', { ownerChrome: true }, options);
     browserMcp(s);
     s.db.insert(userTable).values({ id: 'guest', displayName: 'Guest' }).run();
     s.db
