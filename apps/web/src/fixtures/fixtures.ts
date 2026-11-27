@@ -121,6 +121,7 @@ export {
   machinesDuplicateNames,
   machinesMasterDetail,
   ownComputerStates,
+  phoneNoSupport,
   phoneStates,
   providersEmpty,
   providersFleet,

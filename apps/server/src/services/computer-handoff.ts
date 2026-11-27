@@ -2,6 +2,7 @@ import { COMPUTER_HANDOFF_TIMEOUT_MS, type ComputerTool } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, lte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computer, computerCall, phone } from '../db/schema.js';
+import { settleComputerCall } from './computer-call-store.js';
 
 export const COMPUTER_HANDOFF_POLL_MS = 500;
 
@@ -114,13 +115,9 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
       .where(eq(phone.executionStepId, call.stepId))
       .run();
   }
-  db.update(computerCall)
-    .set({
-      state: 'error',
-      errorMessage: 'the server restarted before it finished',
-      errorDelivery: 'unknown',
-      finishedAt: now,
-    })
+  const expiredPhoneManage = db
+    .select({ id: computerCall.id, phoneId: computerCall.phoneId })
+    .from(computerCall)
     .where(
       and(
         eq(computerCall.tool, 'phone_manage'),
@@ -128,7 +125,25 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
         lte(computerCall.deadlineAt, now),
       ),
     )
-    .run();
+    .all();
+  for (const call of expiredPhoneManage) {
+    db.update(computerCall)
+      .set({
+        state: 'error',
+        errorMessage: 'the server restarted before it finished',
+        errorDelivery: 'unknown',
+        finishedAt: now,
+      })
+      .where(eq(computerCall.id, call.id))
+      .run();
+    if (call.phoneId !== null) {
+      db.update(phone)
+        .set({ lastError: 'the server restarted before it finished', updatedAt: now })
+        .where(eq(phone.id, call.phoneId))
+        .run();
+    }
+    settleComputerCall(db, call.id);
+  }
   db.update(computer)
     .set(HANDOFF_CLEARED)
     .where(

@@ -36,6 +36,7 @@ export interface ScreenCall {
   params: Record<string, unknown>;
   deadlineAt: number;
   signal: AbortSignal;
+  callId?: string;
 }
 
 export interface HostScreen {

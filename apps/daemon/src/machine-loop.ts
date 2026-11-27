@@ -80,6 +80,7 @@ import {
   HEADLESS_SHELL_RELEASES,
 } from './computer/mac-browser.js';
 import { closeOwnerChrome } from './computer/owner-chrome.js';
+import { createPhoneAdbBootstrap } from './computer/phone-bootstrap.js';
 import { createPhones } from './computer/phones.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
@@ -613,12 +614,50 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       });
     }
   };
+  let machineApi: MachineApi | null = null;
+  const phoneAdb =
+    platform === 'darwin'
+      ? createPhoneAdbBootstrap({
+          home: paths.home,
+          env: capEnv,
+          log: (msg) => logger.machine(msg),
+        })
+      : null;
   const phones = createPhones({
     home: paths.home,
     log: (msg) => logger.machine(msg),
     onStale: () => announcePresence(),
-    adbPath: platform === 'darwin' ? undefined : null,
+    adbPath: null,
+    expectAdb: platform === 'darwin',
+    checkConsent: async (phoneId, deviceId, callId) => {
+      if (machineApi?.phoneConsent === undefined) return false;
+      try {
+        return (
+          await machineApi.phoneConsent({
+            phoneId,
+            deviceId,
+            ...(callId !== undefined ? { callId } : {}),
+          })
+        ).consented;
+      } catch {
+        return false;
+      }
+    },
+    ...(phoneAdb !== null
+      ? {
+          prepareAdb: (signal?: AbortSignal) => trackInstall(phoneAdb.ensure(signal)),
+          onAdbReady: () => announcePresence(),
+        }
+      : {}),
   });
+  if (phoneAdb !== null) {
+    void phoneAdb
+      .detectExisting()
+      .then((detected) => {
+        if (detected !== null) phones.setAdbPath(detected);
+      })
+      .catch(() => {});
+  }
   void trackInstall(antigravityManaged.ensure())
     .then((install) => {
       if (install !== null) announcePresence();
@@ -944,6 +983,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       getToken: () => inMemoryToken,
       ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
     });
+  machineApi = client;
 
   let machineJson = loadMachineJson(paths);
   const loadedFromDisk = machineJson !== null;
@@ -1489,7 +1529,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     }
   };
   const deliveredStops = new Set<string>();
+  let cancelComputerStep: (stepId: string) => void = () => {};
   const deliverStop = async (stepId: string): Promise<void> => {
+    cancelComputerStep(stepId);
     const generation = journal.get(stepId)?.claimed?.step.generation;
     const client = bindMachineClaim(stepDeps().client, stepId, generation);
     await deliverStopRequest({
@@ -1514,6 +1556,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     cairnOrigins,
     stepTreeMarkers,
   });
+  cancelComputerStep = (stepId) => computerDispatcher.cancelStep(stepId);
   const imsgBridge = createImsgBridge({ api: client, logger, home: config.home });
   const deliverAntigravityModelProbe = async (
     requestId: string,

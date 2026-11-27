@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   COMPUTER_IMAGE_MAX_BASE64_CHARS,
   type ComputerImage,
+  isPrivateIpv4Endpoint,
   PHONE_ENDPOINT,
   PHONE_LOCKED,
   PHONE_PACKAGE,
@@ -13,7 +14,12 @@ import {
 import { z } from 'zod';
 import type { HostScreen, ScreenCall, ScreenOutcome } from './host-screen.js';
 import { fitPngUnderCap, pngSize } from './host-screen-png.js';
-import { type AdbRun, dumpsysLocked, parseMdnsServices } from './phone-probe.js';
+import {
+  type AdbRun,
+  dumpsysLocked,
+  normalizeAndroidId,
+  parseMdnsServices,
+} from './phone-probe.js';
 
 const UI_DUMP_PATH = '/data/local/tmp/cairn-ui.xml';
 const YADB_REMOTE = '/data/local/tmp/yadb';
@@ -98,6 +104,8 @@ const CAIRN_FOREGROUND =
 const PHONE_CAIRN_FOREGROUND =
   'The Cairn app is in the foreground on the phone; it belongs to the owner, so nothing ran.';
 const PHONE_DROPPED = 'This phone was removed from the consented list, so nothing ran.';
+const PHONE_TRANSPORT_STALE =
+  'This phone is not currently visible on the local network, so nothing ran.';
 
 export interface PhoneElement {
   bounds: { left: number; top: number; right: number; bottom: number };
@@ -187,6 +195,7 @@ export interface AndroidPhoneOptions {
   serial: string;
   adb: AdbRun;
   yadb?: (() => Promise<string | null>) | undefined;
+  consent?: ((callId?: string) => Promise<boolean>) | undefined;
   tmpDir?: string;
   now?: () => number;
 }
@@ -195,12 +204,17 @@ export class AndroidPhone implements HostScreen {
   private serial: string;
   private readonly adb: AdbRun;
   private readonly yadb: (() => Promise<string | null>) | undefined;
+  private consent: ((callId?: string) => Promise<boolean>) | undefined;
   private readonly tmpDir: string;
   private readonly now: () => number;
   private elements: PhoneElement[] = [];
   private shown: PhoneElement[] = [];
   private pushedYadb = false;
   private queue: Promise<unknown> = Promise.resolve();
+  private active = 0;
+  private pendingSerial: string | null = null;
+  private transportMissing = false;
+  private activeConsentCallId: string | undefined;
   private dead = false;
   private readonly abortCtl = new AbortController();
 
@@ -208,18 +222,69 @@ export class AndroidPhone implements HostScreen {
     return this.dead;
   }
 
+  get transportSerial(): string {
+    return this.serial;
+  }
+
   constructor(options: AndroidPhoneOptions) {
     this.serial = options.serial;
     this.adb = options.adb;
     this.yadb = options.yadb;
+    this.consent = options.consent;
     this.tmpDir = options.tmpDir ?? mkdtempSync(join(tmpdir(), 'cairn-phone-'));
     this.now = options.now ?? Date.now;
   }
 
-  private run(
+  setConsent(consent: ((callId?: string) => Promise<boolean>) | undefined): void {
+    this.consent = consent;
+  }
+
+  updateSerial(serial: string): void {
+    if (this.active > 0) {
+      this.pendingSerial = serial;
+      return;
+    }
+    this.transportMissing = false;
+    this.applySerial(serial);
+  }
+
+  markUnreachable(): void {
+    this.transportMissing = true;
+    this.pendingSerial = null;
+    this.elements = [];
+    this.shown = [];
+    this.pushedYadb = false;
+  }
+
+  private applySerial(serial: string): void {
+    if (serial === this.serial) return;
+    this.serial = serial;
+    this.elements = [];
+    this.shown = [];
+    this.pushedYadb = false;
+  }
+
+  private settleSerial(): void {
+    if (this.active !== 0 || this.pendingSerial === null) return;
+    const serial = this.pendingSerial;
+    this.pendingSerial = null;
+    this.transportMissing = false;
+    this.applySerial(serial);
+  }
+
+  private async assertConsent(requireTransport = true): Promise<void> {
+    if (this.dead) throw new Error(PHONE_DROPPED);
+    if (requireTransport && this.transportMissing) throw new Error(PHONE_TRANSPORT_STALE);
+    if (this.consent === undefined) return;
+    const consented = await this.consent(this.activeConsentCallId).catch(() => false);
+    if (!consented) throw new Error(PHONE_DROPPED);
+  }
+
+  private async run(
     args: readonly string[],
     opts: { timeoutMs?: number; signal?: AbortSignal; input?: Buffer } = {},
   ) {
+    await this.assertConsent();
     const sig =
       opts.signal !== undefined
         ? AbortSignal.any([opts.signal, this.abortCtl.signal])
@@ -231,11 +296,23 @@ export class AndroidPhone implements HostScreen {
     });
   }
 
-  private raw(args: readonly string[], opts: { timeoutMs?: number } = {}) {
+  private raw(args: readonly string[], opts: { timeoutMs?: number; signal?: AbortSignal } = {}) {
+    const signal =
+      opts.signal !== undefined
+        ? AbortSignal.any([opts.signal, this.abortCtl.signal])
+        : this.abortCtl.signal;
     return this.adb(args, {
       timeoutMs: opts.timeoutMs ?? ADB_CALL_TIMEOUT_MS,
-      signal: this.abortCtl.signal,
+      signal,
     });
+  }
+
+  private async pairingRaw(
+    args: readonly string[],
+    opts: { timeoutMs?: number; signal?: AbortSignal } = {},
+  ) {
+    await this.assertConsent(false);
+    return this.raw(args, opts);
   }
 
   private async uiXml(call: ScreenCall): Promise<string> {
@@ -273,7 +350,16 @@ export class AndroidPhone implements HostScreen {
   }
 
   private enqueue<T>(work: () => Promise<T>): Promise<T> {
-    const next = this.queue.then(work, work);
+    const runWork = async () => {
+      this.active += 1;
+      try {
+        return await work();
+      } finally {
+        this.active -= 1;
+        this.settleSerial();
+      }
+    };
+    const next = this.queue.then(runWork, runWork);
     this.queue = next;
     return next;
   }
@@ -289,7 +375,14 @@ export class AndroidPhone implements HostScreen {
   }
 
   observe(call: ScreenCall): Promise<ScreenOutcome> {
-    return this.enqueue(() => this.observeBody(call));
+    return this.enqueue(async () => {
+      this.activeConsentCallId = call.callId;
+      try {
+        return await this.observeBody(call);
+      } finally {
+        this.activeConsentCallId = undefined;
+      }
+    });
   }
 
   private async observeBody(call: ScreenCall): Promise<ScreenOutcome> {
@@ -353,9 +446,13 @@ export class AndroidPhone implements HostScreen {
         images,
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'the phone observation failed';
+      if (message === PHONE_DROPPED) return { kind: 'done', text: PHONE_DROPPED, images: [] };
+      if (message === PHONE_TRANSPORT_STALE)
+        return { kind: 'done', text: PHONE_TRANSPORT_STALE, images: [] };
       return {
         kind: 'error',
-        message: error instanceof Error ? error.message : 'the phone observation failed',
+        message,
         delivery: 'unknown',
       };
     }
@@ -421,7 +518,14 @@ export class AndroidPhone implements HostScreen {
   }
 
   act(call: ScreenCall): Promise<ScreenOutcome> {
-    return this.enqueue(() => this.actBody(call));
+    return this.enqueue(async () => {
+      this.activeConsentCallId = call.callId;
+      try {
+        return await this.actBody(call);
+      } finally {
+        this.activeConsentCallId = undefined;
+      }
+    });
   }
 
   private async actBody(call: ScreenCall): Promise<ScreenOutcome> {
@@ -597,9 +701,12 @@ export class AndroidPhone implements HostScreen {
         images,
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'the phone action failed';
+      if (message === PHONE_DROPPED) return guardRefusal(PHONE_DROPPED);
+      if (message === PHONE_TRANSPORT_STALE) return guardRefusal(PHONE_TRANSPORT_STALE);
       return {
         kind: 'error',
-        message: error instanceof Error ? error.message : 'the phone action failed',
+        message,
         delivery: 'unknown',
       };
     }
@@ -608,78 +715,126 @@ export class AndroidPhone implements HostScreen {
   pair(params: {
     code?: string;
     endpoint?: string;
+    signal?: AbortSignal;
+    callId?: string;
   }): Promise<{ outcome: 'paired'; deviceId: string; name: string }> {
-    return this.enqueue(() => this.pairBody(params));
+    return this.enqueue(async () => {
+      this.activeConsentCallId = params.callId;
+      try {
+        return await this.pairBody(params);
+      } finally {
+        this.activeConsentCallId = undefined;
+      }
+    });
   }
 
   private async pairBody(params: {
     code?: string;
     endpoint?: string;
+    signal?: AbortSignal;
+    callId?: string;
   }): Promise<{ outcome: 'paired'; deviceId: string; name: string }> {
     if (params.endpoint !== undefined && params.code !== undefined) {
-      if (!PHONE_ENDPOINT.test(params.endpoint))
-        throw new Error('the pair endpoint is not ip:port');
+      if (!PHONE_ENDPOINT.test(params.endpoint) || !isPrivateIpv4Endpoint(params.endpoint))
+        throw new Error('the pair endpoint is not a private-network ip:port');
       if (!/^\d{6}$/.test(params.code)) throw new Error('the pairing code is not 6 digits');
-      const pair = await this.raw(['pair', params.endpoint, params.code], {
+      const pair = await this.pairingRaw(['pair', params.endpoint, params.code], {
         timeoutMs: PAIR_TIMEOUT_MS,
+        ...(params.signal !== undefined ? { signal: params.signal } : {}),
       });
       if (pair.code !== 0)
         throw new Error(
           `adb pair failed: ${pair.stderr.toString('utf8').trim() || pair.stdout.toString('utf8').trim()}`,
         );
       const ip = params.endpoint.slice(0, params.endpoint.lastIndexOf(':'));
-      const connect = await this.connectAddress(ip);
-      const connected = await this.raw(['connect', connect]);
+      const connect = await this.connectAddress(ip, params.signal);
+      if (connect === null)
+        throw new Error('the paired phone did not advertise wireless adb on the local network');
+      const connected = await this.pairingRaw(['connect', connect], {
+        ...(params.signal !== undefined ? { signal: params.signal } : {}),
+      });
       const out = `${connected.stdout.toString('utf8')}${connected.stderr.toString('utf8')}`;
       if (connected.code !== 0 || /failed|cannot|refused/i.test(out))
         throw new Error(`adb connect ${connect} failed: ${out.trim()}`);
-      this.serial = connect;
-      const deviceId = connect;
-      const name = await this.deviceName();
+      this.applySerial(connect);
+      const deviceId = await this.stableDeviceId(params.signal);
+      const name = await this.deviceName(params.signal);
       return { outcome: 'paired', deviceId, name };
     }
-    const waited = await this.raw(['-s', this.serial, 'wait-for-device'], {
+    const waited = await this.pairingRaw(['-s', this.serial, 'wait-for-device'], {
       timeoutMs: PAIR_TIMEOUT_MS,
+      ...(params.signal !== undefined ? { signal: params.signal } : {}),
     });
     if (waited.code !== 0)
       throw new Error(
         `waiting for USB authorization failed: ${waited.stderr.toString('utf8').trim()}`,
       );
-    const state = await this.raw(['-s', this.serial, 'get-state']);
+    const state = await this.pairingRaw(['-s', this.serial, 'get-state'], {
+      ...(params.signal !== undefined ? { signal: params.signal } : {}),
+    });
     if (state.stdout.toString('utf8').trim() !== 'device')
       throw new Error('the phone did not authorize; tap Allow on the USB debugging prompt');
-    return { outcome: 'paired', deviceId: this.serial, name: await this.deviceName() };
+    return {
+      outcome: 'paired',
+      deviceId: await this.stableDeviceId(params.signal),
+      name: await this.deviceName(params.signal),
+    };
   }
 
-  private async connectAddress(ip: string): Promise<string> {
-    const mdns = await this.raw(['mdns', 'services']).catch(() => null);
-    if (mdns !== null) {
-      const services = parseMdnsServices(mdns.stdout.toString('utf8'));
-      const match =
-        services.find(
+  private async connectAddress(ip: string, signal?: AbortSignal): Promise<string | null> {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const mdns = await this.pairingRaw(['mdns', 'services'], {
+        ...(signal !== undefined ? { signal } : {}),
+      }).catch(() => null);
+      if (mdns !== null) {
+        const services = parseMdnsServices(mdns.stdout.toString('utf8'));
+        const match = services.find(
           (service) =>
-            service.address.startsWith(`${ip}:`) && !service.serviceType.includes('pairing'),
-        ) ?? services.find((service) => service.address.startsWith(`${ip}:`));
-      if (match !== undefined) return match.address;
+            service.address.startsWith(`${ip}:`) &&
+            service.serviceType.startsWith('_adb-tls-connect'),
+        );
+        if (match !== undefined) return match.address;
+      }
+      await sleep(
+        500,
+        signal !== undefined
+          ? AbortSignal.any([signal, this.abortCtl.signal])
+          : this.abortCtl.signal,
+      );
     }
-    return `${ip}:5555`;
+    return null;
   }
 
-  private async deviceName(): Promise<string> {
-    const out = await this.raw(['-s', this.serial, 'shell', 'getprop', 'ro.product.model']);
+  private async stableDeviceId(signal?: AbortSignal): Promise<string> {
+    const out = await this.pairingRaw(
+      ['-s', this.serial, 'shell', 'settings', 'get', 'secure', 'android_id'],
+      { ...(signal !== undefined ? { signal } : {}) },
+    );
+    const stable = normalizeAndroidId(out.stdout.toString('utf8'));
+    if (stable === null) throw new Error('the phone did not expose a stable Android id');
+    return stable;
+  }
+
+  private async deviceName(signal?: AbortSignal): Promise<string> {
+    const out = await this.pairingRaw(['-s', this.serial, 'shell', 'getprop', 'ro.product.model'], {
+      ...(signal !== undefined ? { signal } : {}),
+    });
     const name = out.stdout.toString('utf8').trim();
     return name === '' ? this.serial : name;
   }
 
   async forget(): Promise<{ outcome: 'forgotten' }> {
-    if (this.serial.includes(':')) await this.raw(['disconnect', this.serial]).catch(() => null);
+    this.dead = true;
+    this.abortCtl.abort();
+    if (this.serial.includes(':') || this.serial.includes('._adb-tls-connect'))
+      await this.adb(['disconnect', this.serial], { timeoutMs: 5_000 }).catch(() => null);
     return { outcome: 'forgotten' };
   }
 
   async killAll(): Promise<void> {
     this.dead = true;
     this.abortCtl.abort();
-    if (this.serial.includes(':'))
+    if (this.serial.includes(':') || this.serial.includes('._adb-tls-connect'))
       void this.adb(['disconnect', this.serial], { timeoutMs: 5_000 }).catch(() => {});
     rmSync(this.tmpDir, { recursive: true, force: true });
   }

@@ -13,6 +13,21 @@
       "userScenario": "Nothing to set: each Runner reports whether its GitHub sign-in can push to the team's GitHub repositories, so a task waits with a clear login hint instead of failing after an hour of work."
     },
     {
+      "type": "runner-device-field",
+      "key": "machine.capabilities.phoneHost",
+      "userScenario": "Nothing to set: a Mac Runner reports when its Android phone support is ready, so Settings can offer pairing without asking you to install platform-tools yourself."
+    },
+    {
+      "type": "runner-device-field",
+      "key": "machine.capabilities.phones",
+      "userScenario": "Nothing to set: a Runner reports the Android phones it can currently see, so Settings shows their real state and the Coordinator can use only a phone you paired."
+    },
+    {
+      "type": "setting",
+      "key": "settings.machines.phonePairing",
+      "userScenario": "Open Settings, Computers, and choose Add Android phone on a local Mac runner; with the phone and computer on the same Wi-Fi, enter the pairing endpoint and code the phone shows, consent once, and the phone becomes available to the Coordinator."
+    },
+    {
       "type": "setting",
       "key": "chiefStopBodySchema.messageId",
       "userScenario": "Nothing to set: pressing Stop on your own message that has not started sends its id, so that turn is the one stopped."

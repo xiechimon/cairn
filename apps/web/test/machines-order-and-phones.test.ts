@@ -80,20 +80,91 @@ describe('orderMachines', () => {
 describe('mergePhoneViews', () => {
   it('omits unpaired offline probes while keeping paired offline phones and live discoveries', () => {
     const reported: MachinePhoneReport[] = [
-      { deviceId: 'dev-ready', platform: 'android', name: 'Pixel 8a', link: 'ready' },
+      {
+        deviceId: 'android:aaaa1111bbbb2222',
+        platform: 'android',
+        name: 'Pixel 8a',
+        link: 'ready',
+      },
       { deviceId: 'dev-seen', platform: 'android', name: '新手机', link: 'seen' },
       { deviceId: 'dev-ghost', platform: 'android', name: '离线未配对手机', link: 'offline' },
-      { deviceId: 'dev-paired-off', platform: 'android', name: '旧手机', link: 'offline' },
+      {
+        deviceId: 'android:cccc3333dddd4444',
+        platform: 'android',
+        name: '旧手机',
+        link: 'offline',
+      },
     ];
     const rows: PhoneRow[] = [
-      phone('p1', 'dev-ready', 'Pixel 8a'),
-      phone('p2', 'dev-paired-off', '旧手机'),
+      phone('p1', 'android:aaaa1111bbbb2222', 'Pixel 8a'),
+      phone('p2', 'android:cccc3333dddd4444', '旧手机'),
     ];
     const views = mergePhoneViews(reported, rows);
     expect(views.map((view) => [view.deviceId, view.state])).toEqual([
-      ['dev-ready', 'ready'],
+      ['android:aaaa1111bbbb2222', 'ready'],
       ['dev-seen', 'not_paired'],
-      ['dev-paired-off', 'unreachable'],
+      ['android:cccc3333dddd4444', 'unreachable'],
     ]);
+  });
+
+  it('presents an endpoint-keyed paired row as needing explicit re-pairing', () => {
+    const rows: PhoneRow[] = [phone('p-legacy', '192.168.1.20:42155', '旧手机')];
+    const views = mergePhoneViews(
+      [
+        {
+          deviceId: '192.168.1.20:42155',
+          platform: 'android',
+          name: '旧手机',
+          link: 'ready',
+        },
+      ],
+      rows,
+    );
+    expect(views[0]?.state).toBe('re_pair');
+  });
+
+  it('uses one unambiguous unauthorized transport as the re-pair hint for the one missing paired row', () => {
+    const rows: PhoneRow[] = [phone('p1', 'android:abcdef1234567890', 'Pixel 8a')];
+    const views = mergePhoneViews(
+      [
+        {
+          deviceId: '192.168.1.20:42155',
+          platform: 'android',
+          name: 'Pixel 8a',
+          link: 'unauthorized',
+        },
+      ],
+      rows,
+    );
+    expect(views).toHaveLength(1);
+    expect(views[0]).toMatchObject({ deviceId: 'android:abcdef1234567890', state: 're_pair' });
+  });
+
+  it('does not present an unauthorized phone as pairing unless a pair call is running', () => {
+    const rows: PhoneRow[] = [phone('p1', 'android:abcdef1234567890', 'USB 手机')];
+    const unauthorized = mergePhoneViews(
+      [
+        {
+          deviceId: 'android:abcdef1234567890',
+          platform: 'android',
+          name: 'USB 手机',
+          link: 'unauthorized',
+        },
+      ],
+      rows,
+    );
+    expect(unauthorized[0]?.state).toBe('re_pair');
+    const pairing = mergePhoneViews(
+      [
+        {
+          deviceId: 'android:abcdef1234567890',
+          platform: 'android',
+          name: 'USB 手机',
+          link: 'unauthorized',
+        },
+      ],
+      [{ ...rows[0]!, pairing: true }],
+    );
+    expect(pairing[0]?.state).toBe('pairing');
   });
 });

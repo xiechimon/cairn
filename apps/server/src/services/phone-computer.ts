@@ -158,6 +158,7 @@ export function phoneComputerTarget(
   const resolved = resolveConsentedPhone(deps, thread.teamId, asked);
   if (resolved.kind === 'refused') return resolved;
   const { row, host } = resolved.joined;
+  if (!row.deviceId.startsWith('android:')) return { kind: 'refused', text: PHONE_NOT_PAIRED };
   if (row.handoffReason !== null) return { kind: 'refused', text: PHONE_HANDOFF };
   if (pairingInFlight(deps.db, row.id)) return { kind: 'refused', text: PHONE_PAIRING };
   const now = nowMs();
@@ -320,7 +321,18 @@ export function markPhoneHandoffIfNone(
     .run();
 }
 
-export function cancelPhoneCalls(db: Db, phoneId: string): void {
+export function cancelPhoneCalls(db: Pick<Db, 'select' | 'update'>, phoneId: string): string[] {
+  const open = db
+    .select({ id: computerCall.id })
+    .from(computerCall)
+    .where(
+      and(
+        eq(computerCall.phoneId, phoneId),
+        inArray(computerCall.state, ['dispatched', 'running']),
+        isNull(computerCall.finishedAt),
+      ),
+    )
+    .all();
   db.update(computerCall)
     .set({ state: 'cancelled', finishedAt: nowMs() })
     .where(
@@ -331,4 +343,5 @@ export function cancelPhoneCalls(db: Db, phoneId: string): void {
       ),
     )
     .run();
+  return open.map(({ id }) => id);
 }

@@ -32,11 +32,31 @@ export type PhoneStamp = z.infer<typeof phoneStampSchema>;
 
 export const PHONE_ENDPOINT = /^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/;
 
+export function isPrivateIpv4Endpoint(endpoint: string): boolean {
+  const match = PHONE_ENDPOINT.exec(endpoint);
+  if (match === null) return false;
+  const octets = match[1]!.split('.').map(Number);
+  const port = Number(match[2]);
+  if (octets.some((octet) => octet > 255) || port < 1 || port > 65535) return false;
+  const [a, b] = octets;
+  return (
+    a === 10 ||
+    (a === 172 && b !== undefined && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254)
+  );
+}
+
+const privatePhoneEndpointSchema = z
+  .string()
+  .regex(PHONE_ENDPOINT, 'the endpoint is the ip:port the phone shows')
+  .refine(isPrivateIpv4Endpoint, 'the phone and this computer must be on the same local network');
+
 export const phonePairBodySchema = z.strictObject({
   deviceId: z.string().min(1).max(256).optional(),
   name: z.string().trim().min(1).max(100).optional(),
   code: z.string().regex(/^\d{6}$/, 'the pairing code is the 6 digits the phone shows'),
-  endpoint: z.string().regex(PHONE_ENDPOINT, 'the endpoint is the ip:port the phone shows'),
+  endpoint: privatePhoneEndpointSchema,
   consent: z.literal(true),
 });
 export type PhonePairBody = z.infer<typeof phonePairBodySchema>;
@@ -60,7 +80,7 @@ export const phoneManageParamsSchema = z.discriminatedUnion('action', [
       .string()
       .regex(/^\d{6}$/)
       .optional(),
-    endpoint: z.string().regex(PHONE_ENDPOINT).optional(),
+    endpoint: privatePhoneEndpointSchema.optional(),
   }),
   z.strictObject({ action: z.literal('forget') }),
 ]);

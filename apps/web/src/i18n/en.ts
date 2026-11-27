@@ -2775,8 +2775,11 @@ export const EN: Record<string, string> = {
   '尚未勾选模型。从上游获取模型清单后勾选。':
     'No models picked. Fetch the upstream list and pick some.',
   手机: 'Phone',
+  安卓手机: 'Android phone',
+  添加安卓手机: 'Add Android phone',
   未配对: 'Not paired',
   配对中: 'Pairing',
+  需要重新配对: 'Pair again',
   就绪: 'Ready',
   配对: 'Pair',
   使用中: 'In use',
@@ -2785,14 +2788,14 @@ export const EN: Record<string, string> = {
   签名已过期: 'Signature expired',
   操作手机: 'Used the phone',
   配对手机: 'Pair a phone',
-  '在手机上：开发者选项 → 无线调试 → 使用配对码配对设备，把显示的 IP:端口 和 6 位配对码填到这里。{name} 会通过 adb 连接手机。':
-    'On the phone: Developer options → Wireless debugging → Pair device with pairing code, then enter the IP:port and 6-digit code it shows. {name} then connects to the phone over adb.',
+  '需要安卓 11 及以上。在手机上：开发者选项 → 无线调试 → 使用配对码配对设备，把显示的 IP:端口 和 6 位配对码填到这里。手机和这台电脑要在同一无线局域网内，{name} 会通过 adb 连接手机。':
+    'Requires Android 11 or later. On the phone: Developer options → Wireless debugging → Pair device with pairing code, then enter the IP:port and 6-digit code it shows. The phone and this computer must be on the same Wi-Fi network; {name} then connects to the phone over adb.',
   '手机名称（可选）': 'Phone name (optional)',
   '例如 Pixel 8a': 'e.g. Pixel 8a',
   'IP:端口': 'IP:port',
   '6 位配对码': '6-digit pairing code',
-  '我了解配对后 Coordinator 可以像使用电脑一样查看和操作这台手机：屏幕截图和元素文字会发送给服务商。发消息、付款、改设置前会先询问我。':
-    'I understand that once paired the Coordinator can see and use this phone like a computer: screenshots and element text go to the provider. It asks me before messaging, paying, or changing settings.',
+  '我了解配对后 Coordinator 可以像使用电脑一样查看和操作这台手机：屏幕截图和元素文字会发送给服务商，输入中文等文字时会在手机临时目录推送输入辅助工具。发消息、付款、改设置前会先询问我。':
+    'I understand that once paired the Coordinator can see and use this phone like a computer: screenshots and element text go to the provider, and typing non-ASCII text pushes a temporary input helper to /data/local/tmp. It asks me before messaging, paying, or changing settings.',
   '配对失败，请重试。': 'Pairing failed. Try again.',
   '移除手机失败，请重试。': 'Could not remove the phone. Try again.',
   '确定移除这台手机？Coordinator 会立刻失去对它的访问。':

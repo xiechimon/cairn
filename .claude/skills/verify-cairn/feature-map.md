@@ -516,7 +516,7 @@ Reach:
 
 **Phone computers** (partial, centrality 2). The owner pairs a real phone over adb in Settings, Machines; the Coordinator then sees and drives it with phone_observe and phone_act, with consent, takeover and lock handback.
 
-States: Each phone row shows not paired, pairing, ready, busy, locked, handoff or unreachable; pair failure keeps the row with its error and a retry.
+States: Each phone row shows not paired, pairing, ready, busy, locked, handoff, re-pair needed or unreachable; pair failure keeps the row with its error and a retry.
 
 Reach:
 
@@ -526,7 +526,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `phone-forget`, `phone-name`, `phone-pair`, `phone-pair-code`, `phone-pair-consent`, `phone-pair-dialog`, `phone-pair-endpoint`, `phone-pair-name`, `phone-pair-submit`, `phone-retry`, `phone-row`, `phone-state`
+- Test ids in its code: `phone-add`, `phone-forget`, `phone-name`, `phone-pair`, `phone-pair-code`, `phone-pair-consent`, `phone-pair-dialog`, `phone-pair-endpoint`, `phone-pair-name`, `phone-pair-submit`, `phone-retry`, `phone-row`, `phone-state`
 - Research: [docs/research/phone-agents-2026-11-20.md](../../../docs/research/phone-agents-2026-11-20.md)
 - Frontend design: [docs/design/phone-computer.md](../../../docs/design/phone-computer.md)
 - Backend design: [docs/design/phone-computer.md](../../../docs/design/phone-computer.md)

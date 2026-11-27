@@ -160,6 +160,19 @@ export const machineComputerFramesResponseSchema = z.object({
 });
 export type MachineComputerFramesResponse = z.infer<typeof machineComputerFramesResponseSchema>;
 
+export const machinePhoneConsentBodySchema = z.object({
+  phoneId: z.string().min(1).max(128),
+  deviceId: z.string().min(1).max(256),
+  callId: z.string().min(1).max(128).optional(),
+});
+export type MachinePhoneConsentBody = z.infer<typeof machinePhoneConsentBodySchema>;
+
+export const machinePhoneConsentResponseSchema = z.object({
+  ok: z.literal(true),
+  consented: z.boolean(),
+});
+export type MachinePhoneConsentResponse = z.infer<typeof machinePhoneConsentResponseSchema>;
+
 export const COMPUTER_CALL_STATES = [
   'dispatched',
   'running',

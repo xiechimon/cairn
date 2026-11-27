@@ -875,6 +875,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
       '[design] #5210 landing round-trip: after the local checks and before the ref write the daemon re-asks the claim-time authorization; a refusal or no answer stops the landing (docs/design/local-merge-landing-recheck.md)',
   },
   {
+    method: 'POST',
+    path: '/api/machine/phone-consent',
+    reason:
+      '[design] Live phone consent re-check during screen observe/act steps (docs/design/phone-computer.md)',
+  },
+  {
     method: 'GET',
     path: '/api/machine/computer/{callId}/attachment',
     reason:

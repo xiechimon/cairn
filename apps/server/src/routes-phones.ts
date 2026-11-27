@@ -24,8 +24,10 @@ const phoneCreateBodySchema = z.union([phonePairBodySchema, phoneUsbAuthorizeBod
 export function registerPhoneRoutes(app: Hono, ctx: AppContext): void {
   const pairLocks = new Map<string, Promise<unknown>>();
   const withPairLock = async <T>(machineId: string, work: () => Promise<T>): Promise<T> => {
-    const prior = pairLocks.get(machineId) ?? Promise.resolve();
-    const next = prior.then(work, work);
+    if (pairLocks.has(machineId)) {
+      throw new HttpError(409, 'a phone pairing is already running on this machine');
+    }
+    const next = work();
     pairLocks.set(machineId, next);
     try {
       return await next;
@@ -87,7 +89,8 @@ export function registerPhoneRoutes(app: Hono, ctx: AppContext): void {
         ? { action: 'pair', code: body.code, endpoint: body.endpoint }
         : { action: 'pair' },
     );
-    const settled = ctx.db.select().from(phone).where(eq(phone.id, row.id)).get();
+    const targetId = result.phoneId ?? row.id;
+    const settled = ctx.db.select().from(phone).where(eq(phone.id, targetId)).get();
     const record = phoneRecordOf(settled ?? row, ctx.db);
     if (result.outcome === 'failed') throw new HttpError(409, result.error ?? 'pairing failed');
     return { phone: record };

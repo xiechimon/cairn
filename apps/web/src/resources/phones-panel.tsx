@@ -1,3 +1,4 @@
+import { isPrivateIpv4Endpoint } from '@cairn/shared';
 import { Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { useApiMutations, usePhones } from '../api/hooks.js';
@@ -37,6 +38,8 @@ function stateText(view: PhoneView, t: TFunc): string {
       return t('签名已过期');
     case 'unreachable':
       return t('无法连接');
+    case 're_pair':
+      return t('需要重新配对');
   }
 }
 
@@ -61,19 +64,23 @@ export function PhonePairDialog({
   onClose: () => void;
 }) {
   const { t } = useI18n();
-  const { teamId } = useLiveData();
+  const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const [name, setName] = useState(prefillName);
   const [endpoint, setEndpoint] = useState(prefillEndpoint);
   const [code, setCode] = useState('');
   const [consent, setConsent] = useState(false);
-  const endpointOk = ENDPOINT_RE.test(endpoint.trim());
+  const endpointOk = isPrivateIpv4Endpoint(endpoint.trim());
   const codeOk = CODE_RE.test(code.trim());
   const ready = endpointOk && codeOk && consent;
   const pending = mutations.pairPhone.isPending || mutations.retryPairPhone.isPending;
 
   const submit = () => {
     if (!ready || pending) return;
+    if (!live) {
+      blockDemoWrite();
+      return;
+    }
     const body = {
       endpoint: endpoint.trim(),
       code: code.trim(),
@@ -93,15 +100,21 @@ export function PhonePairDialog({
       open={open}
       onClose={onClose}
       stacked
+      dismissible={!pending}
       size="m"
       title={t('配对手机')}
       subtitle={t(
-        '在手机上：开发者选项 → 无线调试 → 使用配对码配对设备，把显示的 IP:端口 和 6 位配对码填到这里。{name} 会通过 adb 连接手机。',
+        '需要安卓 11 及以上。在手机上：开发者选项 → 无线调试 → 使用配对码配对设备，把显示的 IP:端口 和 6 位配对码填到这里。手机和这台电脑要在同一无线局域网内，{name} 会通过 adb 连接手机。',
         { name: machineName },
       )}
       footer={
         <>
-          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
+          <Button
+            variant="ghost"
+            className={DIALOG_TEXT_BUTTON}
+            disabled={pending}
+            onClick={onClose}
+          >
             {t('取消')}
           </Button>
           <Button
@@ -166,7 +179,7 @@ export function PhonePairDialog({
             />
             <span>
               {t(
-                '我了解配对后 Coordinator 可以像使用电脑一样查看和操作这台手机：屏幕截图和元素文字会发送给服务商。发消息、付款、改设置前会先询问我。',
+                '我了解配对后 Coordinator 可以像使用电脑一样查看和操作这台手机：屏幕截图和元素文字会发送给服务商，输入中文等文字时会在手机临时目录推送输入辅助工具。发消息、付款、改设置前会先询问我。',
               )}
             </span>
           </label>
@@ -182,12 +195,15 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
   const mutations = useApiMutations(teamId);
   const machineId = machine.id ?? '';
   const machineName = machine.name ?? machineId;
-  const hostable =
+  const macHost =
     machine.id != null && machine.kind === 'local' && machine.capabilities?.osPlatform === 'darwin';
-  const phonesQ = usePhones(machine.id, live && hostable);
+  const hostable = macHost && machine.online !== false;
+  const phonesQ = usePhones(machine.id, live && macHost);
   const rows = live ? (phonesQ.data ?? []) : (machine.phonesFixture?.phones ?? []);
   const reported = machine.online === false ? [] : (machine.capabilities?.phones ?? []);
   const views = mergePhoneViews(reported, rows);
+  const pairingInFlight = views.some((view) => view.state === 'pairing');
+  const showAdd = hostable && !pairingInFlight;
   const [pairOpen, setPairOpen] = useState<{
     phoneId: string | null;
     endpoint: string;
@@ -243,10 +259,6 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
                 size="sm"
                 data-testid="phone-pair"
                 onClick={() => {
-                  if (!live) {
-                    blockDemoWrite();
-                    return;
-                  }
                   const prefill = ENDPOINT_RE.test(view.deviceId)
                     ? `${view.deviceId.slice(0, view.deviceId.lastIndexOf(':'))}:`
                     : '';
@@ -256,23 +268,21 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
                 {t('配对')}
               </Button>
             )}
-            {view.row !== null && view.row.lastError !== null && view.row.lastError !== '' && (
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid="phone-retry"
-                onClick={() => {
-                  if (!live) {
-                    blockDemoWrite();
-                    return;
-                  }
-                  if (view.row === null) return;
-                  setPairOpen({ phoneId: view.row.id, endpoint: '', name: view.name });
-                }}
-              >
-                {t('重试')}
-              </Button>
-            )}
+            {view.row !== null &&
+              (view.state === 're_pair' ||
+                (view.row.lastError !== null && view.row.lastError !== '')) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="phone-retry"
+                  onClick={() => {
+                    if (view.row === null) return;
+                    setPairOpen({ phoneId: view.row.id, endpoint: '', name: view.name });
+                  }}
+                >
+                  {t('重试')}
+                </Button>
+              )}
             {view.row !== null && (
               <Button
                 variant="ghost"
@@ -287,6 +297,28 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
           </span>
         </div>
       ))}
+      {showAdd && (
+        <div className="flex min-w-0 items-center gap-3 border-b border-border px-4 py-2 last:border-b-0 pointer-coarse:pb-3">
+          <Smartphone
+            aria-hidden
+            strokeWidth={1.75}
+            className="size-4 flex-none text-content-tertiary"
+          />
+          <span className="min-w-0 flex-1 truncate text-ui text-content-secondary">
+            {t('安卓手机')}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="phone-add"
+            onClick={() => {
+              setPairOpen({ phoneId: null, endpoint: '', name: '' });
+            }}
+          >
+            {t('添加安卓手机')}
+          </Button>
+        </div>
+      )}
       {pairOpen !== null && (
         <PhonePairDialog
           open

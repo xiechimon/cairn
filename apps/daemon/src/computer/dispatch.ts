@@ -149,6 +149,7 @@ export interface ComputerDispatcherOptions {
 export interface ComputerDispatcher {
   activeCount(): number;
   dispatch(call: ComputerCall): Promise<void>;
+  cancelStep(stepId: string): void;
   close(): Promise<void>;
 }
 
@@ -175,7 +176,10 @@ function listingText(entries: ComputerFileEntry[]): string {
 
 export function createComputerDispatcher(options: ComputerDispatcherOptions): ComputerDispatcher {
   const now = options.now ?? Date.now;
-  const inFlight = new Map<string, { controller: AbortController; settled: Promise<void> }>();
+  const inFlight = new Map<
+    string,
+    { controller: AbortController; settled: Promise<void>; stepId: string }
+  >();
   const finishedUnsafe = new Set<string>();
   let closing = false;
   const postingLifetime = new AbortController();
@@ -203,7 +207,12 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return;
     }
     const poster = posterFor(call, controller);
-    const request = { params: call.params, deadlineAt: call.deadlineAt, signal: controller.signal };
+    const request = {
+      params: call.params,
+      deadlineAt: call.deadlineAt,
+      signal: controller.signal,
+      callId: call.callId,
+    };
     let outcome: ScreenOutcome;
     try {
       outcome = await run(request);
@@ -646,13 +655,15 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, NO_PHONE_STAMP_MESSAGE);
       return;
     }
-    if (call.deadlineAt - now() <= 0) {
+    const remainingMs = call.deadlineAt - now();
+    if (remainingMs <= 0) {
       await refuse(call, 'The call deadline had already passed, so nothing ran');
       return;
     }
     const poster = posterFor(call, controller);
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(remainingMs)]);
     try {
-      const { text } = await phones.manage(call);
+      const { text } = await phones.manage(call, signal);
       await poster.finish({ kind: 'done', text });
     } catch (error) {
       await poster.finish({
@@ -882,8 +893,13 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
           );
         })
         .finally(() => inFlight.delete(call.callId));
-      inFlight.set(call.callId, { controller, settled });
+      inFlight.set(call.callId, { controller, settled, stepId: call.stepId });
       await settled;
+    },
+    cancelStep(stepId) {
+      for (const entry of inFlight.values()) {
+        if (entry.stepId === stepId) entry.controller.abort('cancelled');
+      }
     },
     async close() {
       closing = true;

@@ -43,14 +43,14 @@ export function MachinesPage() {
     );
     node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [targetMachineId, machines.length]);
-  const phoneHost =
-    machines.find(
-      (machine) =>
-        machine.kind === 'local' &&
-        machine.capabilities?.osPlatform === 'darwin' &&
-        machine.capabilities?.phoneHost === true &&
-        machine.id != null,
-    ) ?? null;
+  const hostablePhones = machines.filter(
+    (machine) =>
+      machine.kind === 'local' &&
+      machine.online !== false &&
+      machine.capabilities?.osPlatform === 'darwin' &&
+      machine.id != null,
+  );
+  const phoneHost = hostablePhones.length === 1 ? (hostablePhones[0] ?? null) : null;
 
   const noMachines = (
     <EmptyState

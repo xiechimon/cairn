@@ -1,4 +1,6 @@
 import { randomBytes } from 'node:crypto';
+import { chmodSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   type ComputerCall,
   type ComputerFrame,
@@ -24,6 +26,7 @@ import {
   probeAndroidPhones,
 } from '../src/computer/phone-probe.js';
 import { createPhones } from '../src/computer/phones.js';
+import { MachineClient } from '../src/machine-client.js';
 
 vi.setConfig({ testTimeout: 15_000 });
 const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20, cairnOrigins: [] };
@@ -90,9 +93,9 @@ describe('phone probe', () => {
   test('parses adb devices -l with model names and states', () => {
     const entries = parseAdbDevices(DEVICES);
     expect(entries).toEqual([
-      { serial: '39041FDJG00ABC', state: 'device', model: 'Pixel 8a' },
-      { serial: '192.168.1.20:42155', state: 'unauthorized', model: null },
-      { serial: 'emulator-5554', state: 'offline', model: null },
+      { serial: '39041FDJG00ABC', state: 'device', model: 'Pixel 8a', usb: '12345' },
+      { serial: '192.168.1.20:42155', state: 'unauthorized', model: null, usb: null },
+      { serial: 'emulator-5554', state: 'offline', model: null, usb: null },
     ]);
   });
 
@@ -128,20 +131,152 @@ describe('phone probe', () => {
     const { run } = fakeAdb([
       {
         match: (a) => a.join(' ') === 'devices -l',
-        out: ok('List of devices attached\nSERIAL1\tdevice\n'),
+        out: ok('List of devices attached\nSERIAL1\tdevice\tusb:1\n'),
       },
       { match: (a) => a.join(' ') === 'mdns services', out: ok('') },
+      {
+        match: (a) => a.join(' ') === '-s SERIAL1 shell settings get secure android_id',
+        out: ok('1111222233334444'),
+      },
       {
         match: (a) => a.slice(-2).join(' ') === 'dumpsys window',
         out: ok('mDreamingLockscreen=true'),
       },
     ]);
-    const reports = await probeAndroidPhones(run);
-    expect(reports).toEqual([
-      { deviceId: 'SERIAL1', platform: 'android', name: 'SERIAL1', link: 'locked' },
+    const probe = await probeAndroidPhones(run);
+    expect(probe.reports).toEqual([
+      {
+        deviceId: 'android:1111222233334444',
+        platform: 'android',
+        name: 'android:1111222233334444',
+        link: 'locked',
+      },
     ]);
     expect(dumpsysLocked('mShowingLockscreen=true')).toBe(true);
     expect(dumpsysLocked('mDreamingLockscreen=false\nmShowingLockscreen=false')).toBe(false);
+  });
+
+  test('the same android id over Wi-Fi and USB is one report and prefers USB transport', async () => {
+    const { run } = fakeAdb([
+      {
+        match: (a) => a.join(' ') === 'devices -l',
+        out: ok(
+          'List of devices attached\n192.168.1.52:45391\tdevice\nUSB1\tdevice\tusb:1 product:akita model:Pixel_8a device:akita\n',
+        ),
+      },
+      {
+        match: (a) => a.join(' ') === 'mdns services',
+        out: ok('adb-e33fb32c\t_adb-tls-connect._tcp\t192.168.1.52:45391\n'),
+      },
+      {
+        match: (a) => a.join(' ') === '-s 192.168.1.52:45391 shell settings get secure android_id',
+        out: ok('abcdef1234567890'),
+      },
+      {
+        match: (a) => a.join(' ') === '-s USB1 shell settings get secure android_id',
+        out: ok('abcdef1234567890'),
+      },
+      { match: (a) => a.includes('dumpsys'), out: ok('mShowingLockscreen=false') },
+    ]);
+    const probe = await probeAndroidPhones(run);
+    expect(probe.reports).toEqual([
+      {
+        deviceId: 'android:abcdef1234567890',
+        platform: 'android',
+        name: 'Pixel 8a',
+        link: 'ready',
+      },
+    ]);
+    expect(probe.serialByDeviceId.get('android:abcdef1234567890')).toBe('USB1');
+  });
+
+  test('an mDNS-named wireless adb serial without exact corroboration is not treated as USB', async () => {
+    const serviceSerial = 'adb-e33fb32c._adb-tls-connect._tcp';
+    const { run } = fakeAdb([
+      {
+        match: (a) => a.join(' ') === 'devices -l',
+        out: ok(`List of devices attached\n${serviceSerial}\tdevice\n`),
+      },
+      { match: (a) => a.join(' ') === 'mdns services', out: ok('') },
+      { match: () => true, out: ok('') },
+    ]);
+    const probe = await probeAndroidPhones(run);
+    expect(probe.reports).toEqual([]);
+    expect(probe.serialByDeviceId.size).toBe(0);
+  });
+
+  test('an mDNS-named wireless adb serial with exact mDNS corroboration is reported ready without duplicating seen', async () => {
+    const serviceSerial = 'adb-e33fb32c._adb-tls-connect._tcp';
+    const { run } = fakeAdb([
+      {
+        match: (a) => a.join(' ') === 'devices -l',
+        out: ok(`List of devices attached\n${serviceSerial}\tdevice\tmodel:Pixel_8a\n`),
+      },
+      {
+        match: (a) => a.join(' ') === 'mdns services',
+        out: ok('adb-e33fb32c\t_adb-tls-connect._tcp\t192.168.1.52:45391\n'),
+      },
+      {
+        match: (a) => a.join(' ') === `-s ${serviceSerial} shell settings get secure android_id`,
+        out: ok('abcdef1234567890'),
+      },
+      { match: (a) => a.includes('dumpsys'), out: ok('mShowingLockscreen=false') },
+    ]);
+    const probe = await probeAndroidPhones(run);
+    expect(probe.reports).toEqual([
+      {
+        deviceId: 'android:abcdef1234567890',
+        platform: 'android',
+        name: 'Pixel 8a',
+        link: 'ready',
+      },
+    ]);
+    expect(probe.serialByDeviceId.get('android:abcdef1234567890')).toBe(serviceSerial);
+  });
+
+  test('a wireless adb serial without exact mDNS corroboration is not reported or mapped', async () => {
+    const { run } = fakeAdb([
+      {
+        match: (a) => a.join(' ') === 'devices -l',
+        out: ok('List of devices attached\n192.168.1.52:45391\tdevice\n'),
+      },
+      { match: (a) => a.join(' ') === 'mdns services', out: ok('') },
+      { match: () => true, out: ok('') },
+    ]);
+    const probe = await probeAndroidPhones(run);
+    expect(probe.reports).toEqual([]);
+    expect(probe.serialByDeviceId.size).toBe(0);
+  });
+
+  test('reports connected phones by stable android id and keeps transport serials internal', async () => {
+    const { run } = fakeAdb([
+      {
+        match: (a) => a.join(' ') === 'devices -l',
+        out: ok('List of devices attached\n192.168.1.52:45391\tdevice\n'),
+      },
+      {
+        match: (a) => a.join(' ') === 'mdns services',
+        out: ok('adb-e33fb32c\t_adb-tls-connect._tcp\t192.168.1.52:45391\n'),
+      },
+      {
+        match: (a) => a.join(' ') === '-s 192.168.1.52:45391 shell settings get secure android_id',
+        out: ok('ABCDEF1234567890\n'),
+      },
+      {
+        match: (a) => a.slice(-2).join(' ') === 'dumpsys window',
+        out: ok('mDreamingLockscreen=false\nmShowingLockscreen=false'),
+      },
+    ]);
+    const probe = await probeAndroidPhones(run);
+    expect(probe.reports).toEqual([
+      {
+        deviceId: 'android:abcdef1234567890',
+        platform: 'android',
+        name: 'android:abcdef1234567890',
+        link: 'ready',
+      },
+    ]);
+    expect(probe.serialByDeviceId.get('android:abcdef1234567890')).toBe('192.168.1.52:45391');
   });
 });
 
@@ -160,24 +295,16 @@ function screenCall(params: Record<string, unknown>) {
 }
 
 describe('phone observe/act on fake adb', () => {
-  const routes = (calls: string[][]) => [
-    {
-      match: (a: readonly string[]) => a.includes('uiautomator'),
-      out: ok('UI hierchary dumped to: /data/local/tmp/cairn-ui.xml'),
-    },
-    {
-      match: (a: readonly string[]) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml',
-      out: ok(XML),
-    },
-    {
-      match: (a: readonly string[]) => a.includes('screencap'),
-      out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
-    },
-    { match: () => true, out: ok('') },
-  ];
-
   test('observe maps the tree to numbered rows and returns a screenshot', async () => {
-    const fake = fakeAdb(routes([]));
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
     const driver = new AndroidPhone({
       serial: 'S',
       adb: fake.run,
@@ -336,7 +463,72 @@ describe('phone observe/act on fake adb', () => {
     if (out.kind !== 'done') return;
     expect(out.text).toContain('removed');
     const taps = fake.calls.filter((a) => a.includes('tap'));
-    expect(taps).toHaveLength(2);
+    expect(taps).toHaveLength(1);
+  });
+
+  test('a false server consent answer mid-batch stops before the next adb command', async () => {
+    let consented = true;
+    let consentChecks = 0;
+    const fake = fakeAdb([
+      {
+        match: (a) => a.includes('tap') && a.includes('1'),
+        out: () => {
+          consented = false;
+          return ok('');
+        },
+      },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
+    const driver = new AndroidPhone({
+      serial: 'S',
+      adb: fake.run,
+      consent: async () => {
+        consentChecks += 1;
+        return consented;
+      },
+    });
+    const out = await driver.act(
+      screenCall({
+        actions: [
+          { kind: 'tap', x: 1, y: 2 },
+          { kind: 'tap', x: 3, y: 4 },
+        ],
+      }),
+    );
+    expect(out.kind).toBe('done');
+    if (out.kind !== 'done') return;
+    expect(out.text).toContain('tapped (1, 2)');
+    expect(out.text).toContain('removed');
+    expect(fake.calls.filter((a) => a.includes('tap'))).toHaveLength(1);
+    expect(consentChecks).toBeGreaterThan(1);
+  });
+
+  test('each consent check carries the screen call id', async () => {
+    const checked: Array<string | undefined> = [];
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
+    const driver = new AndroidPhone({
+      serial: 'S',
+      adb: fake.run,
+      consent: async (callId) => {
+        checked.push(callId);
+        return true;
+      },
+    });
+    await driver.observe({ ...screenCall({}), callId: 'cc-phone-observe' });
+    expect(checked.length).toBeGreaterThan(0);
+    expect(new Set(checked)).toEqual(new Set(['cc-phone-observe']));
   });
 
   test('a secure screen appearing mid-batch stops before the next input', async () => {
@@ -389,7 +581,15 @@ describe('phone observe/act on fake adb', () => {
   });
 
   test('tap by element resolves the bounds center into input tap argv', async () => {
-    const fake = fakeAdb(routes([]));
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
     const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
     await driver.observe(screenCall({}));
     const out = await driver.act(screenCall({ actions: [{ kind: 'tap', element: 1 }] }));
@@ -405,7 +605,15 @@ describe('phone observe/act on fake adb', () => {
   });
 
   test('tap by coordinates passes fixed x y argv', async () => {
-    const fake = fakeAdb(routes([]));
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
     const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
     const out = await driver.act(screenCall({ actions: [{ kind: 'tap', x: 10, y: 20 }] }));
     expect(out.kind).toBe('done');
@@ -414,7 +622,15 @@ describe('phone observe/act on fake adb', () => {
   });
 
   test('an element not in the latest observation is refused without running anything', async () => {
-    const fake = fakeAdb(routes([]));
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
     const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
     await driver.observe(screenCall({}));
     const out = await driver.act(screenCall({ actions: [{ kind: 'tap', element: 9 }] }));
@@ -479,7 +695,15 @@ describe('phone observe/act on fake adb', () => {
   });
 
   test('ascii text goes through input text as one argv element', async () => {
-    const fake = fakeAdb(routes([]));
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
     const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
     await driver.act(screenCall({ actions: [{ kind: 'type', text: 'hello123' }] }));
     const input = fake.calls.find(
@@ -525,7 +749,15 @@ describe('phone observe/act on fake adb', () => {
   });
 
   test('element numbers follow the filtered observation, not the raw tree', async () => {
-    const fake = fakeAdb(routes([]));
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
     const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
     await driver.observe(screenCall({ query: '输入框' }));
     const out = await driver.act(screenCall({ actions: [{ kind: 'tap', element: 1 }] }));
@@ -533,6 +765,26 @@ describe('phone observe/act on fake adb', () => {
     const tap = fake.calls.find((args) => args.includes('tap'));
     const idx = tap!.indexOf('tap');
     expect(tap!.slice(idx + 1)).toEqual(['540', '660']);
+  });
+
+  test('a transport serial change invalidates cached element numbers before acting', async () => {
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
+    const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
+    await driver.observe(screenCall({}));
+    driver.updateSerial('192.168.1.52:45391');
+    const out = await driver.act(screenCall({ actions: [{ kind: 'tap', element: 1 }] }));
+    expect(out.kind).toBe('error');
+    if (out.kind !== 'error') return;
+    expect(out.message).toContain('phone_observe');
+    expect(fake.calls.some((a) => a.includes('tap'))).toBe(false);
   });
 
   test('a secure observation clears the element list so stale numbers are refused', async () => {
@@ -614,7 +866,15 @@ describe('phone observe/act on fake adb', () => {
   });
 
   test('launching the Cairn app itself is refused', async () => {
-    const fake = fakeAdb(routes([]));
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
     const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
     const out = await driver.act(
       screenCall({ actions: [{ kind: 'launch', id: 'com.cairn.app' }] }),
@@ -625,7 +885,15 @@ describe('phone observe/act on fake adb', () => {
   });
 
   test('a launch id that is not a package name never reaches adb', async () => {
-    const fake = fakeAdb(routes([]));
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
     const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
     for (const id of [
       'x; id',
@@ -651,14 +919,35 @@ describe('phone pair and forget', () => {
       { match: (a) => a[0] === 'pair', out: ok('Successfully paired') },
       { match: (a) => a.join(' ') === 'mdns services', out: ok(MDNS) },
       { match: (a) => a[0] === 'connect', out: ok('connected to 192.168.1.20:42155') },
+      { match: (a) => a.includes('android_id'), out: ok('abcdef1234567890') },
       { match: (a) => a.includes('getprop'), out: ok('Pixel 8a') },
       { match: () => true, out: ok('') },
     ]);
     const driver = new AndroidPhone({ serial: 'S', adb: fake.run });
     const result = await driver.pair({ endpoint: '192.168.1.20:37001', code: '123456' });
-    expect(result).toEqual({ outcome: 'paired', deviceId: '192.168.1.20:42155', name: 'Pixel 8a' });
+    expect(result).toEqual({
+      outcome: 'paired',
+      deviceId: 'android:abcdef1234567890',
+      name: 'Pixel 8a',
+    });
     expect(fake.calls[0]).toEqual(['pair', '192.168.1.20:37001', '123456']);
     expect(fake.calls[2]).toEqual(['connect', '192.168.1.20:42155']);
+  });
+
+  test('wireless re-pair is not blocked by a stale cached transport', async () => {
+    const fake = fakeAdb([
+      { match: (a) => a[0] === 'pair', out: ok('Successfully paired') },
+      { match: (a) => a.join(' ') === 'mdns services', out: ok(MDNS) },
+      { match: (a) => a[0] === 'connect', out: ok('connected to 192.168.1.20:42155') },
+      { match: (a) => a.includes('android_id'), out: ok('abcdef1234567890') },
+      { match: (a) => a.includes('getprop'), out: ok('Pixel 8a') },
+      { match: () => true, out: ok('') },
+    ]);
+    const driver = new AndroidPhone({ serial: '192.168.1.20:30000', adb: fake.run });
+    driver.markUnreachable();
+    const result = await driver.pair({ endpoint: '192.168.1.20:37001', code: '123456' });
+    expect(result.deviceId).toBe('android:abcdef1234567890');
+    expect(fake.calls.filter((a) => a[0] === 'pair')).toHaveLength(1);
   });
 
   test('a wrong pairing code fails and keeps the row', async () => {
@@ -677,12 +966,13 @@ describe('phone pair and forget', () => {
     const fake = fakeAdb([
       { match: (a) => a.join(' ') === '-s USB1 wait-for-device', out: ok('') },
       { match: (a) => a.join(' ') === '-s USB1 get-state', out: ok('device') },
+      { match: (a) => a.includes('android_id'), out: ok('9999aaaabbbbcccc') },
       { match: (a) => a.includes('getprop'), out: ok('Pixel Fold') },
       { match: () => true, out: ok('') },
     ]);
     const driver = new AndroidPhone({ serial: 'USB1', adb: fake.run });
     const result = await driver.pair({});
-    expect(result.deviceId).toBe('USB1');
+    expect(result.deviceId).toBe('android:9999aaaabbbbcccc');
     expect(fake.calls[0]).toEqual(['-s', 'USB1', 'wait-for-device']);
   });
 
@@ -783,12 +1073,108 @@ describe('dispatcher phone routing', () => {
     expect(fake.calls.some((a) => a.includes('uiautomator'))).toBe(true);
   });
 
+  test('a consented phone remains addressable when adb is prepared lazily after a runner restart', async () => {
+    let preparations = 0;
+    const phones = createPhones({
+      home: tempDir('phone-home-'),
+      adbPath: null,
+      prepareAdb: async () => {
+        preparations += 1;
+        return '/managed/adb';
+      },
+    });
+    phones.setConsented([{ deviceId: 'android:abcdef1234567890', phoneId: 'ph1' }]);
+    const screen = phones.screen(
+      call({ phone: { phoneId: 'ph1', deviceId: 'android:abcdef1234567890' } }),
+    );
+    expect(screen).not.toBeNull();
+    await screen
+      ?.observe({
+        params: {},
+        deadlineAt: Date.now() + 1_000,
+        signal: new AbortController().signal,
+      })
+      .catch(() => undefined);
+    expect(preparations).toBe(1);
+    await phones.killAll();
+  });
+
+  test('a driver whose wireless transport loses mDNS corroboration cannot keep using the old serial', async () => {
+    let devicesOut = 'List of devices attached\n192.168.1.52:45391\tdevice\n';
+    let mdnsOut = 'adb-e33fb32c\t_adb-tls-connect._tcp\t192.168.1.52:45391\n';
+    const fake = fakeAdb([
+      { match: (a) => a.join(' ') === 'devices -l', out: () => ok(devicesOut) },
+      { match: (a) => a.join(' ') === 'mdns services', out: () => ok(mdnsOut) },
+      { match: (a) => a.includes('android_id'), out: ok('abcdef1234567890') },
+      { match: () => true, out: ok('') },
+    ]);
+    const phones = createPhones({
+      home: tempDir('phone-home-'),
+      adbPath: '/bin/adb',
+      run: fake.run,
+    });
+    phones.setConsented([{ deviceId: 'android:abcdef1234567890', phoneId: 'ph1' }]);
+    await phones.refresh();
+    const screen = phones.screen(
+      call({ phone: { phoneId: 'ph1', deviceId: 'android:abcdef1234567890' } }),
+    );
+    expect(screen).not.toBeNull();
+    devicesOut = 'List of devices attached\n';
+    mdnsOut = '';
+    await phones.refresh();
+    const before = fake.calls.length;
+    const out = await screen?.observe({
+      params: {},
+      deadlineAt: Date.now() + 1_000,
+      signal: new AbortController().signal,
+    });
+    expect(out?.kind).toBe('done');
+    expect(fake.calls.length).toBe(before);
+    await phones.killAll();
+  });
+
+  test('phone_manage pair prepares adb inside the pairing action and passes cancellation through', async () => {
+    const api = apiOf();
+    const fake = fakeAdb([
+      { match: (a) => a[0] === 'pair', out: ok('ok') },
+      { match: (a) => a.join(' ') === 'mdns services', out: ok(MDNS) },
+      { match: (a) => a[0] === 'connect', out: ok('connected') },
+      { match: (a) => a.includes('android_id'), out: ok('abcdef1234567890') },
+      { match: () => true, out: ok('') },
+    ]);
+    let preparations = 0;
+    let preparationSignal: AbortSignal | undefined;
+    const phones = createPhones({
+      home: tempDir('phone-home-'),
+      adbPath: null,
+      run: fake.run,
+      prepareAdb: async (signal) => {
+        preparations += 1;
+        preparationSignal = signal;
+        return '/managed/adb';
+      },
+    });
+    phones.setConsented([{ deviceId: 'S', phoneId: 'ph1' }]);
+    expect(preparations).toBe(0);
+    await createComputerDispatcher({ client: api.client, phones, ...FAST }).dispatch(
+      call({
+        tool: 'phone_manage',
+        params: { action: 'pair', endpoint: '192.168.1.20:37001', code: '123456' },
+        phone: { phoneId: 'ph1', deviceId: 'S' },
+      }),
+    );
+    expect(preparations).toBe(1);
+    expect(preparationSignal).toBeDefined();
+    expect(api.frames.at(-1)?.kind).toBe('done');
+  });
+
   test('phone_manage pair runs through the registry and posts the result', async () => {
     const api = apiOf();
     const fake = fakeAdb([
       { match: (a) => a[0] === 'pair', out: ok('ok') },
       { match: (a) => a.join(' ') === 'mdns services', out: ok(MDNS) },
       { match: (a) => a[0] === 'connect', out: ok('connected') },
+      { match: (a) => a.includes('android_id'), out: ok('abcdef1234567890') },
       { match: () => true, out: ok('') },
     ]);
     await createComputerDispatcher({
@@ -815,5 +1201,233 @@ describe('dispatcher phone routing', () => {
       delivery: 'not_delivered',
       message: NO_COMPUTER_PROVIDER_MESSAGE,
     });
+  });
+
+  test('setAdbPath announces readiness and triggers an immediate probe', async () => {
+    const tmp = tempDir('phone-set-adb-');
+    const fakeAdbPath = join(tmp, 'adb');
+    writeFileSync(
+      fakeAdbPath,
+      '#!/bin/sh\ncase "$*" in\n  *"devices -l"*) echo "List of devices attached"; echo "emulator-5554\tdevice" ;;\n  *"android_id"*) echo "0123456789abcdef" ;;\n  *) echo "" ;;\nesac\n',
+    );
+    chmodSync(fakeAdbPath, 0o755);
+    let readyCalls = 0;
+    const phones = createPhones({
+      home: tmp,
+      adbPath: null,
+      expectAdb: true,
+      onAdbReady: () => {
+        readyCalls += 1;
+      },
+    });
+    expect(phones.usable()).toBe(false);
+    phones.setAdbPath(fakeAdbPath);
+    expect(phones.usable()).toBe(true);
+    expect(readyCalls).toBe(1);
+    await phones.refresh();
+    expect(phones.reports()).toMatchObject([
+      { deviceId: 'android:0123456789abcdef', link: 'ready' },
+    ]);
+    await phones.killAll();
+  });
+
+  test('a stale pre-migration presence list right after pairing does not kill the migrated driver', async () => {
+    const fake = fakeAdb([
+      { match: (a) => a[0] === 'pair', out: ok('ok') },
+      { match: (a) => a.join(' ') === 'mdns services', out: ok(MDNS) },
+      { match: (a) => a[0] === 'connect', out: ok('connected') },
+      { match: (a) => a.includes('android_id'), out: ok('abcdef1234567890') },
+      { match: (a) => a.includes('getprop'), out: ok('Pixel 8a') },
+      {
+        match: (a) => a.join(' ') === 'devices -l',
+        out: ok('List of devices attached\n192.168.1.20:42155\tdevice\n'),
+      },
+      { match: () => true, out: ok('') },
+    ]);
+    const phones = createPhones({
+      home: tempDir('phone-race-'),
+      adbPath: '/bin/adb',
+      run: fake.run,
+    });
+    phones.setConsented([{ deviceId: '192.168.1.20:37001', phoneId: 'ph1' }]);
+    const out = await phones.manage(
+      call({
+        tool: 'phone_manage',
+        params: { action: 'pair', endpoint: '192.168.1.20:37001', code: '123456' },
+        phone: { phoneId: 'ph1', deviceId: '192.168.1.20:37001' },
+      }),
+    );
+    expect(JSON.parse(out.text)).toMatchObject({
+      outcome: 'paired',
+      deviceId: 'android:abcdef1234567890',
+    });
+    phones.setConsented([{ deviceId: '192.168.1.20:37001', phoneId: 'ph1' }]);
+    phones.setConsented([{ deviceId: 'android:abcdef1234567890', phoneId: 'ph1' }]);
+    expect(fake.calls.some((a) => a[0] === 'disconnect')).toBe(false);
+    const screen = phones.screen(
+      call({ phone: { phoneId: 'ph1', deviceId: 'android:abcdef1234567890' } }),
+    );
+    expect(screen).not.toBeNull();
+    expect((screen as AndroidPhone).dropped).toBe(false);
+    await phones.killAll();
+  });
+
+  test('forget aborts an in-flight adb call on the driver and disconnects the network serial', async () => {
+    let seenSignal: AbortSignal | undefined;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const disconnects: string[][] = [];
+    const adb: AdbRun = async (args, opts) => {
+      if (args[0] === 'disconnect') {
+        disconnects.push([...args]);
+        return ok('');
+      }
+      if (args.includes('uiautomator')) {
+        seenSignal = opts?.signal;
+        await gate;
+        return ok('');
+      }
+      return ok('');
+    };
+    const driver = new AndroidPhone({ serial: '192.168.1.20:42155', adb });
+    const pending = driver.observe(screenCall({}));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(seenSignal?.aborted).toBe(false);
+    const forgotten = await driver.forget();
+    expect(forgotten).toEqual({ outcome: 'forgotten' });
+    expect(seenSignal?.aborted).toBe(true);
+    expect(driver.dropped).toBe(true);
+    expect(disconnects).toEqual([['disconnect', '192.168.1.20:42155']]);
+    release();
+    const observed = await pending;
+    expect(observed).toMatchObject({
+      kind: 'done',
+      text: 'This phone was removed from the consented list, so nothing ran.',
+    });
+  });
+
+  test('a failing phone probe clears stale cached reports and marks drivers unreachable', async () => {
+    let failProbe = false;
+    const fake = fakeAdb([
+      {
+        match: (a) => a.join(' ') === 'devices -l',
+        out: () => {
+          if (failProbe) throw new Error('adb daemon crashed');
+          return ok('List of devices attached\n192.168.1.52:45391\tdevice\n');
+        },
+      },
+      {
+        match: (a) => a.join(' ') === 'mdns services',
+        out: ok('adb-e33fb32c\t_adb-tls-connect._tcp\t192.168.1.52:45391\n'),
+      },
+      { match: (a) => a.includes('android_id'), out: ok('abcdef1234567890') },
+      { match: () => true, out: ok('') },
+    ]);
+    const phones = createPhones({
+      home: tempDir('phone-probe-fail-'),
+      adbPath: '/bin/adb',
+      run: fake.run,
+    });
+    phones.setConsented([{ deviceId: 'android:abcdef1234567890', phoneId: 'ph1' }]);
+    await phones.refresh();
+    expect(phones.reports()).toHaveLength(1);
+    const screen = phones.screen(
+      call({ phone: { phoneId: 'ph1', deviceId: 'android:abcdef1234567890' } }),
+    );
+    expect(screen).not.toBeNull();
+    failProbe = true;
+    await phones.refresh();
+    expect(phones.reports()).toEqual([]);
+    const before = fake.calls.length;
+    const out = await screen?.observe({
+      params: {},
+      deadlineAt: Date.now() + 1_000,
+      signal: new AbortController().signal,
+    });
+    expect(out).toMatchObject({
+      kind: 'done',
+      text: 'This phone is not currently visible on the local network, so nothing ran.',
+    });
+    expect(fake.calls.length).toBe(before);
+    await phones.killAll();
+  });
+
+  test('MachineClient.phoneConsent preserves receiver binding through checkConsent and authorizes observe', async () => {
+    const seenUrls: string[] = [];
+    const client = new MachineClient({
+      serverUrl: 'http://127.0.0.1:8787',
+      getToken: () => 'tok',
+      fetchImpl: async (input) => {
+        seenUrls.push(String(input));
+        return new Response(JSON.stringify({ ok: true, consented: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      },
+    });
+    const fake = fakeAdb([
+      { match: (a) => a.includes('uiautomator'), out: ok('') },
+      { match: (a) => a.slice(-2).join(' ') === 'cat /data/local/tmp/cairn-ui.xml', out: ok(XML) },
+      {
+        match: (a) => a.includes('screencap'),
+        out: () => ({ code: 0, stdout: png(), stderr: Buffer.alloc(0) }),
+      },
+      { match: () => true, out: ok('') },
+    ]);
+    const phones = createPhones({
+      home: tempDir('phone-client-consent-'),
+      adbPath: '/bin/adb',
+      run: fake.run,
+      checkConsent: async (phoneId, deviceId, callId) => {
+        if (client.phoneConsent === undefined) return false;
+        return (
+          await client.phoneConsent({
+            phoneId,
+            deviceId,
+            ...(callId !== undefined ? { callId } : {}),
+          })
+        ).consented;
+      },
+    });
+    phones.setConsented([{ deviceId: 'S', phoneId: 'ph1' }]);
+    await phones.refresh();
+    const api = apiOf();
+    await createComputerDispatcher({ client: api.client, phones, ...FAST }).dispatch(
+      call({ phone: { phoneId: 'ph1', deviceId: 'S' } }),
+    );
+    expect(seenUrls.length).toBeGreaterThan(0);
+    expect(seenUrls[0]).toContain('/api/machine/phone-consent');
+    expect(api.frames.at(-1)?.kind).toBe('done');
+    await phones.killAll();
+  });
+
+  test('phone_manage aborts when call deadline expires mid-execution', async () => {
+    const api = apiOf();
+    let seenSignal: AbortSignal | undefined;
+    const phones = createPhones({
+      home: tempDir('phone-deadline-'),
+      adbPath: null,
+      prepareAdb: (signal) =>
+        new Promise((_resolve, reject) => {
+          seenSignal = signal;
+          signal?.addEventListener('abort', () => reject(new Error('aborted by deadline')), {
+            once: true,
+          });
+        }),
+    });
+    phones.setConsented([{ deviceId: 'S', phoneId: 'ph1' }]);
+    await createComputerDispatcher({ client: api.client, phones, ...FAST }).dispatch(
+      call({
+        tool: 'phone_manage',
+        deadlineAt: Date.now() + 30,
+        params: { action: 'pair', endpoint: '192.168.1.20:37001', code: '123456' },
+        phone: { phoneId: 'ph1', deviceId: 'S' },
+      }),
+    );
+    expect(seenSignal?.aborted).toBe(true);
+    expect(api.frames.at(-1)?.kind).toBe('error');
+    await phones.killAll();
   });
 });

@@ -25,9 +25,11 @@ import {
   step as stepTable,
   user as userTable,
 } from '../src/db/schema.js';
+import { sweepComputerHandoffs } from '../src/services/computer-handoff.js';
 import {
   dropComputerWaiters,
   forwardComputerCall,
+  machinePhoneConsented,
   receiveComputerFrames,
 } from '../src/services/machine-computer.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
@@ -39,7 +41,7 @@ import {
 } from '../src/services/phone-computer.js';
 import { bootServer, req, seedRoute, type TestServer } from './helpers.js';
 
-vi.setConfig({ testTimeout: 30_000 });
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 });
 
 const THREAD = 'chief-phone-thread';
 const MAC: MachineCapabilities = {
@@ -47,7 +49,9 @@ const MAC: MachineCapabilities = {
   mcpServers: [],
   skills: [],
   phoneHost: true,
-  phones: [{ deviceId: 'S', platform: 'android', name: 'Pixel 8a', link: 'ready' }],
+  phones: [
+    { deviceId: 'android:aaaa1111bbbb2222', platform: 'android', name: 'Pixel 8a', link: 'ready' },
+  ],
 };
 
 let server: TestServer | null = null;
@@ -123,7 +127,7 @@ function addPhone(s: TestServer, opts: Partial<typeof phoneTable.$inferSelect> &
       teamId: s.team.id,
       machineId: 'users-mac',
       platform: 'android',
-      deviceId: 'S',
+      deviceId: 'android:aaaa1111bbbb2222',
       name: 'Pixel 8a',
       consentAt: now,
       consentedBy: s.user.id,
@@ -183,7 +187,7 @@ describe('phone target resolution', () => {
     const pending = forward(w, call('phone_observe', { phone: 'Pixel 8a' }));
     const pushed = await until(() => w.pushed.at(-1));
     expect(pushed.tool).toBe('phone_observe');
-    expect(pushed.phone).toEqual({ phoneId: 'ph1', deviceId: 'S' });
+    expect(pushed.phone).toEqual({ phoneId: 'ph1', deviceId: 'android:aaaa1111bbbb2222' });
     receiveComputerFrames(w.s.db, w.s.hub, 'users-mac', pushed.callId, [
       { kind: 'done', seq: 1, text: '[1] Settings' },
     ]);
@@ -198,6 +202,90 @@ describe('phone target resolution', () => {
     expect(row?.machineId).toBe('users-mac');
   });
 
+  test('an endpoint-keyed row from the previous implementation is not operable', async () => {
+    const w = world({
+      ...MAC,
+      phones: [
+        {
+          deviceId: '192.168.1.20:42155',
+          platform: 'android',
+          name: 'Pixel 8a',
+          link: 'ready',
+        },
+      ],
+    });
+    addPhone(w.s, { id: 'ph-legacy', deviceId: '192.168.1.20:42155' });
+    const result = await forward(w, call('phone_observe', { phone: 'Pixel 8a' }));
+    expect(result.text).toBe(PHONE_NOT_PAIRED);
+    expect(w.pushed).toEqual([]);
+  });
+
+  test('phone consent checks bind the phone, machine, device id and live consent row', () => {
+    const w = world();
+    addPhone(w.s, { id: 'ph1' });
+    expect(
+      machinePhoneConsented(w.s.db, w.s.team.id, 'users-mac', 'ph1', 'android:aaaa1111bbbb2222'),
+    ).toBe(true);
+    expect(
+      machinePhoneConsented(w.s.db, w.s.team.id, 'users-mac', 'ph1', 'android:cccc3333dddd4444'),
+    ).toBe(false);
+    expect(
+      machinePhoneConsented(w.s.db, w.s.team.id, 'sidecar', 'ph1', 'android:aaaa1111bbbb2222'),
+    ).toBe(false);
+    w.s.db.update(phoneTable).set({ consentAt: null }).where(eq(phoneTable.id, 'ph1')).run();
+    expect(
+      machinePhoneConsented(w.s.db, w.s.team.id, 'users-mac', 'ph1', 'android:aaaa1111bbbb2222'),
+    ).toBe(false);
+  });
+
+  test('a call-scoped consent check refuses a cancelled computer call', () => {
+    const w = world();
+    addPhone(w.s, { id: 'ph1' });
+    const now = Date.now();
+    w.s.db
+      .insert(computerCallTable)
+      .values({
+        id: 'cc-phone-active',
+        teamId: w.s.team.id,
+        stepId: 'step-1',
+        toolCallId: 'tc-phone-active',
+        machineId: 'users-mac',
+        phoneId: 'ph1',
+        tool: 'phone_observe',
+        replaySafe: true,
+        params: {},
+        state: 'running',
+        deadlineAt: now + 60_000,
+        createdAt: now,
+      })
+      .run();
+    expect(
+      machinePhoneConsented(
+        w.s.db,
+        w.s.team.id,
+        'users-mac',
+        'ph1',
+        'android:aaaa1111bbbb2222',
+        'cc-phone-active',
+      ),
+    ).toBe(true);
+    w.s.db
+      .update(computerCallTable)
+      .set({ state: 'cancelled' })
+      .where(eq(computerCallTable.id, 'cc-phone-active'))
+      .run();
+    expect(
+      machinePhoneConsented(
+        w.s.db,
+        w.s.team.id,
+        'users-mac',
+        'ph1',
+        'android:aaaa1111bbbb2222',
+        'cc-phone-active',
+      ),
+    ).toBe(false);
+  });
+
   test('a phone name that matches nothing is refused without dispatch', async () => {
     const w = world();
     addPhone(w.s, { id: 'ph1' });
@@ -209,7 +297,7 @@ describe('phone target resolution', () => {
   test('two consented phones with no name asked is ambiguous', async () => {
     const w = world();
     addPhone(w.s, { id: 'ph1' });
-    addPhone(w.s, { id: 'ph2', deviceId: 'S2', name: 'Pixel 7' });
+    addPhone(w.s, { id: 'ph2', deviceId: 'android:cccc3333dddd4444', name: 'Pixel 7' });
     const result = await forward(w, call('phone_observe', {}));
     expect(result.text).toBe(PHONE_AMBIGUOUS(['Pixel 8a', 'Pixel 7']));
     expect(w.pushed).toEqual([]);
@@ -218,7 +306,14 @@ describe('phone target resolution', () => {
   test('a locked phone is handed back with a plain refusal', async () => {
     const w = world({
       ...MAC,
-      phones: [{ deviceId: 'S', platform: 'android', name: 'Pixel 8a', link: 'locked' }],
+      phones: [
+        {
+          deviceId: 'android:aaaa1111bbbb2222',
+          platform: 'android',
+          name: 'Pixel 8a',
+          link: 'locked',
+        },
+      ],
     });
     addPhone(w.s, { id: 'ph1' });
     const result = await forward(w, call('phone_observe', {}));
@@ -229,7 +324,14 @@ describe('phone target resolution', () => {
   test('an unreachable phone refuses without dispatch', async () => {
     const w = world({
       ...MAC,
-      phones: [{ deviceId: 'S', platform: 'android', name: 'Pixel 8a', link: 'offline' }],
+      phones: [
+        {
+          deviceId: 'android:aaaa1111bbbb2222',
+          platform: 'android',
+          name: 'Pixel 8a',
+          link: 'offline',
+        },
+      ],
     });
     addPhone(w.s, { id: 'ph1' });
     const result = await forward(w, call('phone_observe', {}));
@@ -354,7 +456,7 @@ describe('pair, forget and offer', () => {
         seq: 1,
         text: JSON.stringify({
           outcome: 'paired',
-          deviceId: '192.168.1.20:42155',
+          deviceId: 'android:eeee5555ffff6666',
           name: 'Pixel 8a',
         }),
       },
@@ -362,13 +464,223 @@ describe('pair, forget and offer', () => {
     const res = await resP;
     expect(res.status).toBe(201);
     const body = (await res.json()) as { phone: { deviceId: string; name: string } };
-    expect(body.phone.deviceId).toBe('192.168.1.20:42155');
+    expect(body.phone.deviceId).toBe('android:eeee5555ffff6666');
     const stored = w.s.db
       .select()
       .from(computerCallTable)
       .where(eq(computerCallTable.id, pushed.callId))
       .get();
     expect(stored?.params).not.toMatchObject({ code: '123456' });
+  });
+
+  test('public, tailnet and malformed pairing endpoints are rejected before dispatch', async () => {
+    const w = world();
+    for (const endpoint of ['8.8.8.8:37001', '100.64.1.2:37001', 'example.test:37001']) {
+      const res = await req(w.s.app, 'POST', '/api/machines/users-mac/phones', {
+        endpoint,
+        code: '123456',
+        consent: true,
+      });
+      expect(res.status).toBe(400);
+    }
+    const withoutConsent = await req(w.s.app, 'POST', '/api/machines/users-mac/phones', {
+      endpoint: '192.168.1.20:37001',
+      code: '123456',
+      consent: false,
+    });
+    expect(withoutConsent.status).toBe(400);
+    expect(w.pushed).toEqual([]);
+    expect(w.s.db.select().from(phoneTable).all()).toEqual([]);
+  });
+
+  test('a concurrent pairing submission receives 409 instead of queueing behind the first', async () => {
+    const w = world();
+    const body = { endpoint: '192.168.1.20:37001', code: '123456', consent: true };
+    const firstP = req(w.s.app, 'POST', '/api/machines/users-mac/phones', body);
+    const pushed = await until(() => w.pushed.at(-1));
+    const secondP = req(w.s.app, 'POST', '/api/machines/users-mac/phones', {
+      ...body,
+      endpoint: '192.168.1.21:37001',
+    });
+    const second = await Promise.race([
+      secondP,
+      new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 100)),
+    ]);
+    expect(second).not.toBe('pending');
+    if (second !== 'pending') expect(second.status).toBe(409);
+    receiveComputerFrames(w.s.db, w.s.hub, 'users-mac', pushed.callId, [
+      {
+        kind: 'done',
+        seq: 1,
+        text: JSON.stringify({
+          outcome: 'paired',
+          deviceId: 'android:eeee5555ffff6666',
+          name: 'Pixel 8a',
+        }),
+      },
+    ]);
+    expect((await firstP).status).toBe(201);
+    await secondP.catch(() => undefined);
+  });
+
+  test('forget while pairing settles the pending pairing request', async () => {
+    const w = world();
+    const pairP = req(w.s.app, 'POST', '/api/machines/users-mac/phones', {
+      endpoint: '192.168.1.20:37001',
+      code: '123456',
+      consent: true,
+    });
+    await until(() => w.pushed.at(-1));
+    const row = w.s.db.select().from(phoneTable).where(eq(phoneTable.machineId, 'users-mac')).get();
+    expect(row).toBeDefined();
+    const removed = await req(w.s.app, 'DELETE', `/api/machines/users-mac/phones/${row!.id}`);
+    expect(removed.status).toBe(200);
+    const settled = await Promise.race([
+      pairP.then((res) => res.status),
+      new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 200)),
+    ]);
+    expect(settled).toBe(409);
+    await pairP.catch(() => undefined);
+  });
+
+  test('an expired pairing attempt is reaped into a bounded phone row error', async () => {
+    const w = world();
+    const resP = req(w.s.app, 'POST', '/api/machines/users-mac/phones', {
+      endpoint: '192.168.1.20:37001',
+      code: '123456',
+      consent: true,
+    });
+    const pushed = await until(() => w.pushed.at(-1));
+    w.s.db
+      .update(computerCallTable)
+      .set({ deadlineAt: 1 })
+      .where(eq(computerCallTable.id, pushed.callId))
+      .run();
+    sweepComputerHandoffs(w.s.db, 2);
+    const res = await resP;
+    expect(res.status).toBe(409);
+    const row = w.s.db.select().from(phoneTable).where(eq(phoneTable.machineId, 'users-mac')).get();
+    expect(row?.lastError).toBe('the server restarted before it finished');
+    const callRow = w.s.db
+      .select()
+      .from(computerCallTable)
+      .where(eq(computerCallTable.id, pushed.callId))
+      .get();
+    expect(callRow?.state).toBe('error');
+    expect(() =>
+      receiveComputerFrames(w.s.db, w.s.hub, 'users-mac', pushed.callId, [
+        {
+          kind: 'done',
+          seq: 1,
+          text: JSON.stringify({
+            outcome: 'paired',
+            deviceId: 'android:eeee5555ffff6666',
+            name: 'Pixel 8a',
+          }),
+        },
+      ]),
+    ).toThrow(/already error/);
+    const afterRow = w.s.db.select().from(phoneTable).where(eq(phoneTable.id, row!.id)).get();
+    expect(afterRow?.deviceId).toBe('192.168.1.20:37001');
+  });
+
+  test('late pairing success frames after deadline expiration fail before reaper runs', async () => {
+    const w = world();
+    const resP = req(w.s.app, 'POST', '/api/machines/users-mac/phones', {
+      endpoint: '192.168.1.20:37001',
+      code: '123456',
+      consent: true,
+    });
+    const pushed = await until(() => w.pushed.at(-1));
+    w.s.db
+      .update(computerCallTable)
+      .set({ deadlineAt: 1 })
+      .where(eq(computerCallTable.id, pushed.callId))
+      .run();
+    expect(() =>
+      receiveComputerFrames(w.s.db, w.s.hub, 'users-mac', pushed.callId, [
+        {
+          kind: 'done',
+          seq: 1,
+          text: JSON.stringify({
+            outcome: 'paired',
+            deviceId: 'android:eeee5555ffff6666',
+            name: 'Pixel 8a',
+          }),
+        },
+      ]),
+    ).toThrow(/deadline expired/);
+    const res = await resP;
+    expect(res.status).toBe(409);
+    const row = w.s.db.select().from(phoneTable).where(eq(phoneTable.machineId, 'users-mac')).get();
+    expect(row?.deviceId).toBe('192.168.1.20:37001');
+    expect(row?.lastError).toBe('the pairing deadline expired');
+    const callRow = w.s.db
+      .select()
+      .from(computerCallTable)
+      .where(eq(computerCallTable.id, pushed.callId))
+      .get();
+    expect(callRow?.state).toBe('error');
+  });
+
+  test('pairing an already-paired android id via POST merges into the existing phone row and preserves activity history', async () => {
+    const w = world();
+    addPhone(w.s, { id: 'ph-existing', deviceId: 'android:eeee5555ffff6666', name: 'Old Pixel' });
+    const now = Date.now();
+    w.s.db
+      .insert(computerCallTable)
+      .values({
+        id: 'cc-history-1',
+        teamId: w.s.team.id,
+        stepId: 'step-1',
+        toolCallId: 'tc-history-1',
+        machineId: 'users-mac',
+        phoneId: 'ph-existing',
+        tool: 'phone_observe',
+        replaySafe: true,
+        params: {},
+        state: 'done',
+        deadlineAt: now + 60_000,
+        createdAt: now,
+        finishedAt: now,
+      })
+      .run();
+    const resP = req(w.s.app, 'POST', '/api/machines/users-mac/phones', {
+      endpoint: '192.168.1.20:37001',
+      code: '123456',
+      name: 'New Pixel Name',
+      consent: true,
+    });
+    const pushed = await until(() => w.pushed.at(-1));
+    receiveComputerFrames(w.s.db, w.s.hub, 'users-mac', pushed.callId, [
+      {
+        kind: 'done',
+        seq: 1,
+        text: JSON.stringify({
+          outcome: 'paired',
+          deviceId: 'android:eeee5555ffff6666',
+          name: 'Pixel 8a',
+        }),
+      },
+    ]);
+    const res = await resP;
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { phone: { id: string; deviceId: string; name: string } };
+    expect(body.phone.id).toBe('ph-existing');
+    expect(body.phone.deviceId).toBe('android:eeee5555ffff6666');
+    expect(body.phone.name).toBe('Pixel 8a');
+    const allRows = w.s.db
+      .select()
+      .from(phoneTable)
+      .where(eq(phoneTable.machineId, 'users-mac'))
+      .all();
+    expect(allRows).toHaveLength(1);
+    const calls = w.s.db
+      .select()
+      .from(computerCallTable)
+      .where(eq(computerCallTable.phoneId, 'ph-existing'))
+      .all();
+    expect(calls.map((c) => c.id)).toContain('cc-history-1');
   });
 
   test('a wrong pairing code fails the call, keeps the row and stores lastError', async () => {
@@ -391,6 +703,63 @@ describe('pair, forget and offer', () => {
       .get();
     expect(row).toBeDefined();
     expect(row?.lastError).toContain('wrong code');
+  });
+
+  test('a re-pair that lands on a different stable phone identity fails closed', async () => {
+    const w = world();
+    addPhone(w.s, { id: 'ph1' });
+    const resP = req(w.s.app, 'POST', '/api/machines/users-mac/phones/ph1/pair', {
+      endpoint: '192.168.1.20:37001',
+      code: '123456',
+      consent: true,
+    });
+    const pushed = await until(() => w.pushed.at(-1));
+    expect(pushed.tool).toBe('phone_manage');
+    expect(pushed.phone?.deviceId).toBe('android:aaaa1111bbbb2222');
+    receiveComputerFrames(w.s.db, w.s.hub, 'users-mac', pushed.callId, [
+      {
+        kind: 'done',
+        seq: 1,
+        text: JSON.stringify({
+          outcome: 'paired',
+          deviceId: 'android:eeee5555ffff6666',
+          name: 'Other Pixel',
+        }),
+      },
+    ]);
+    const res = await resP;
+    expect(res.status).toBe(409);
+    const row = w.s.db.select().from(phoneTable).where(eq(phoneTable.id, 'ph1')).get();
+    expect(row?.deviceId).toBe('android:aaaa1111bbbb2222');
+    expect(row?.name).toBe('Pixel 8a');
+    expect(row?.lastError).toContain('identity changed');
+  });
+
+  test('re-pairing an endpoint-keyed row migrates the same phone id to the stable id', async () => {
+    const w = world();
+    addPhone(w.s, { id: 'ph-legacy', deviceId: '192.168.1.20:42155', name: '旧手机' });
+    const resP = req(w.s.app, 'POST', '/api/machines/users-mac/phones/ph-legacy/pair', {
+      endpoint: '192.168.1.20:37001',
+      code: '123456',
+      consent: true,
+    });
+    const pushed = await until(() => w.pushed.at(-1));
+    receiveComputerFrames(w.s.db, w.s.hub, 'users-mac', pushed.callId, [
+      {
+        kind: 'done',
+        seq: 1,
+        text: JSON.stringify({
+          outcome: 'paired',
+          deviceId: 'android:eeee5555ffff6666',
+          name: 'Pixel 8a',
+        }),
+      },
+    ]);
+    const res = await resP;
+    expect(res.status).toBe(200);
+    const row = w.s.db.select().from(phoneTable).where(eq(phoneTable.id, 'ph-legacy')).get();
+    expect(row?.deviceId).toBe('android:eeee5555ffff6666');
+    expect(row?.name).toBe('Pixel 8a');
   });
 
   test('a paired device can pair a phone like the owner session', async () => {
@@ -419,10 +788,34 @@ describe('pair, forget and offer', () => {
       {
         kind: 'done',
         seq: 1,
-        text: JSON.stringify({ outcome: 'paired', deviceId: 'S', name: 'Pixel' }),
+        text: JSON.stringify({
+          outcome: 'paired',
+          deviceId: 'android:aaaa1111bbbb2222',
+          name: 'Pixel',
+        }),
       },
     ]);
     expect((await allowed).status).toBe(201);
+  });
+
+  test('forget cancels active phone work without stopping the rest of the step', async () => {
+    const w = world();
+    addPhone(w.s, { id: 'ph1' });
+    const active = forward(w, call('phone_observe', { phone: 'Pixel 8a' }));
+    const pushed = await until(() => w.pushed.at(-1));
+    const stopEvents: string[] = [];
+    const unsubscribe = w.s.machineHub.subscribe(w.s.team.id, (event) => {
+      if (event.type === 'stop') stopEvents.push(event.stepId);
+    });
+    const res = await req(w.s.app, 'DELETE', '/api/machines/users-mac/phones/ph1');
+    unsubscribe();
+    expect(res.status).toBe(200);
+    expect(stopEvents).toEqual([]);
+    expect(
+      w.s.db.select().from(computerCallTable).where(eq(computerCallTable.id, pushed.callId)).get()
+        ?.state,
+    ).toBe('cancelled');
+    await active;
   });
 
   test('forget pushes phone_manage forget and removes the row', async () => {
@@ -437,6 +830,22 @@ describe('pair, forget and offer', () => {
     ]);
     const res = await resP;
     expect(res.status).toBe(200);
+    expect(w.s.db.select().from(phoneTable).where(eq(phoneTable.id, 'ph1')).get()).toBeUndefined();
+  });
+
+  test('late computer frames after phone removal fail with 409 and never recreate consent', async () => {
+    const w = world();
+    addPhone(w.s, { id: 'ph1' });
+    const pending = forward(w, call('phone_observe', { phone: 'Pixel 8a' }));
+    const pushed = await until(() => w.pushed.at(-1));
+    const res = await req(w.s.app, 'DELETE', '/api/machines/users-mac/phones/ph1');
+    expect(res.status).toBe(200);
+    await pending;
+    expect(() =>
+      receiveComputerFrames(w.s.db, w.s.hub, 'users-mac', pushed.callId, [
+        { kind: 'done', seq: 1, text: '[1] Settings' },
+      ]),
+    ).toThrow(/already cancelled/);
     expect(w.s.db.select().from(phoneTable).where(eq(phoneTable.id, 'ph1')).get()).toBeUndefined();
   });
 

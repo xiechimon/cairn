@@ -832,9 +832,22 @@ export const phoneStates: FixtureSet = {
         {
           phonesFixture: {
             phones: [
-              phoneRow({ id: 'ph-ready', deviceId: '192.168.1.20:42155', name: 'Pixel 8a' }),
-              phoneRow({ id: 'ph-locked', deviceId: '192.168.1.21:42155', name: 'Pixel 7' }),
-              phoneRow({ id: 'ph-busy', deviceId: 'emulator-5554', name: '工作台机', busy: true }),
+              phoneRow({
+                id: 'ph-ready',
+                deviceId: 'android:aaaa1111bbbb2222',
+                name: 'Pixel 8a',
+              }),
+              phoneRow({
+                id: 'ph-locked',
+                deviceId: 'android:bbbb2222cccc3333',
+                name: 'Pixel 7',
+              }),
+              phoneRow({
+                id: 'ph-busy',
+                deviceId: 'android:cccc3333dddd4444',
+                name: '工作台机',
+                busy: true,
+              }),
               phoneRow({
                 id: 'ph-pairing',
                 deviceId: '39041FDJG00ABC',
@@ -847,7 +860,16 @@ export const phoneStates: FixtureSet = {
                 name: '旧手机',
                 lastError: 'adb pair failed: failed',
               }),
-              phoneRow({ id: 'ph-away', deviceId: '192.168.1.23:42155', name: '带走的手机' }),
+              phoneRow({
+                id: 'ph-unauth',
+                deviceId: 'android:ddddccccbbbbaaaa',
+                name: '未授权的手机',
+              }),
+              phoneRow({
+                id: 'ph-away',
+                deviceId: 'android:eeee5555ffff6666',
+                name: '带走的手机',
+              }),
             ],
           },
         },
@@ -855,18 +877,23 @@ export const phoneStates: FixtureSet = {
           phoneHost: true,
           phones: [
             {
-              deviceId: '192.168.1.20:42155',
+              deviceId: 'android:aaaa1111bbbb2222',
               platform: 'android',
               name: 'Pixel 8a',
               link: 'ready',
             },
             {
-              deviceId: '192.168.1.21:42155',
+              deviceId: 'android:bbbb2222cccc3333',
               platform: 'android',
               name: 'Pixel 7',
               link: 'locked',
             },
-            { deviceId: 'emulator-5554', platform: 'android', name: '工作台机', link: 'ready' },
+            {
+              deviceId: 'android:cccc3333dddd4444',
+              platform: 'android',
+              name: '工作台机',
+              link: 'ready',
+            },
             {
               deviceId: '39041FDJG00ABC',
               platform: 'android',
@@ -874,6 +901,12 @@ export const phoneStates: FixtureSet = {
               link: 'unauthorized',
             },
             { deviceId: '192.168.1.30:40001', platform: 'android', name: '新手机', link: 'seen' },
+            {
+              deviceId: 'android:ddddccccbbbbaaaa',
+              platform: 'android',
+              name: '未授权的手机',
+              link: 'unauthorized',
+            },
             {
               deviceId: '192.168.1.22:42155',
               platform: 'android',
@@ -897,17 +930,25 @@ export const phoneStates: FixtureSet = {
             phones: [
               phoneRow({
                 id: 'ph-gone',
-                deviceId: '192.168.1.50:42155',
+                deviceId: 'android:7777888899990000',
                 name: '离线的手机',
                 machineId: 'ph-noadb',
               }),
             ],
           },
         },
-        { phoneHost: true },
+        {},
       ),
       ownMac('ph-empty', 'empty-mac', {}, { phoneHost: true }),
     ],
+  },
+};
+
+export const phoneNoSupport: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    machines: [ownMac('ph-no-support', 'no-adb-mac', {}, {})],
   },
 };
 

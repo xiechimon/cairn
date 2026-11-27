@@ -24,6 +24,8 @@ import {
   type MachineLocalMergeRecheckResponse,
   type MachineOfflineBody,
   type MachineOfflineResponse,
+  type MachinePhoneConsentBody,
+  type MachinePhoneConsentResponse,
   type MachinePresenceBody,
   type MachinePresenceResponse,
   type MachineRecord,
@@ -47,6 +49,7 @@ import {
   machineLocalMergeRecheckResponseSchema,
   machineOfflineResponseSchema,
   machineOkResponseSchema,
+  machinePhoneConsentResponseSchema,
   machinePresenceResponseSchema,
   machineRecordSchema,
   machineRecoverResponseSchema,
@@ -201,6 +204,10 @@ export interface MachineApi {
     body: MachineComputerFramesBody,
     signal?: AbortSignal,
   ): Promise<MachineComputerFramesResponse>;
+  phoneConsent?(
+    body: MachinePhoneConsentBody,
+    signal?: AbortSignal,
+  ): Promise<MachinePhoneConsentResponse>;
   downloadComputerAttachment?(callId: string, signal?: AbortSignal): Promise<Buffer>;
   uploadComputerAttachment?(
     callId: string,
@@ -784,6 +791,17 @@ export class MachineClient implements MachineApi {
       body,
       signal,
       parse: (raw) => machineComputerFramesResponseSchema.parse(raw),
+    });
+  }
+
+  async phoneConsent(
+    body: MachinePhoneConsentBody,
+    signal?: AbortSignal,
+  ): Promise<MachinePhoneConsentResponse> {
+    return this.request('POST', '/api/machine/phone-consent', {
+      body,
+      signal,
+      parse: (raw) => machinePhoneConsentResponseSchema.parse(raw),
     });
   }
 

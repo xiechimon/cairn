@@ -535,6 +535,10 @@ const hostUpdateIdleWatch = setInterval(() => {
 }, 15_000);
 hostUpdateIdleWatch.unref();
 
+const computerHandoffWatch = setInterval(() => {
+  sweepComputerHandoffs(db, Date.now());
+}, 15_000);
+computerHandoffWatch.unref();
 const antigravityQuotaDeps = {
   db,
   box: secretBox,

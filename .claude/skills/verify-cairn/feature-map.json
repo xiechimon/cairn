@@ -1339,7 +1339,7 @@
       "id": "phones",
       "name": "Phone computers",
       "summary": "The owner pairs a real phone over adb in Settings, Machines; the Coordinator then sees and drives it with phone_observe and phone_act, with consent, takeover and lock handback.",
-      "states": "Each phone row shows not paired, pairing, ready, busy, locked, handoff or unreachable; pair failure keeps the row with its error and a retry.",
+      "states": "Each phone row shows not paired, pairing, ready, busy, locked, handoff, re-pair needed or unreachable; pair failure keeps the row with its error and a retry.",
       "centrality": 2,
       "status": "partial",
       "code": {
@@ -1348,11 +1348,13 @@
           "apps/server/src/services/phone-computer.ts"
         ],
         "daemon": [
+          "apps/daemon/src/computer/phone-bootstrap.ts",
           "apps/daemon/src/computer/phone-probe.ts",
           "apps/daemon/src/computer/phone-android.ts",
           "apps/daemon/src/computer/phones.ts"
         ],
         "web": [
+          "apps/web/src/resources/phone-views.ts",
           "apps/web/src/resources/phones-panel.tsx"
         ]
       },

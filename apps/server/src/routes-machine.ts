@@ -27,6 +27,7 @@ import {
   machineImEventBodySchema,
   machineLocalMergeRecheckBodySchema,
   machineOfflineBodySchema,
+  machinePhoneConsentBodySchema,
   machinePresenceBodySchema,
   machineSteerAckBodySchema,
   machineThinkingDeltaBodySchema,
@@ -80,6 +81,7 @@ import {
   computerCallDownloadAttachment,
   computerCallUploadAttachment,
   forwardComputerCall,
+  machinePhoneConsented,
   receiveComputerFrames,
 } from './services/machine-computer.js';
 import { withFencedTransaction } from './services/machine-deps.js';
@@ -1022,6 +1024,27 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         return c.json(
           receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames, ctx.secretBox),
         );
+      },
+    );
+  });
+
+  app.post('/api/machine/phone-consent', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machinePhoneConsentBodySchema, decoded, 'body');
+        return c.json({
+          ok: true as const,
+          consented: machinePhoneConsented(
+            ctx.db,
+            row.teamId,
+            row.id,
+            body.phoneId,
+            body.deviceId,
+            body.callId,
+          ),
+        });
       },
     );
   });

@@ -32,7 +32,7 @@ import {
   STAGE_ATTACHMENT_TIMEOUT_MS,
   TAKEOVER_HANDED_BACK,
 } from '@cairn/shared';
-import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { runAfterCommit } from '../db/commit-effects.js';
 import {
@@ -352,6 +352,32 @@ export function receiveComputerFrames(
     if (FINISHED_STATES.has(row.state) || (cancelled && row.finishedAt !== null)) {
       throw new HttpError(409, `computer call already ${row.state}`);
     }
+    const now = nowMs();
+    if (row.tool === 'phone_manage' && !cancelled && row.deadlineAt <= now) {
+      const expiredMessage = 'the pairing deadline expired';
+      tx.update(computerCall)
+        .set({
+          state: 'error',
+          errorMessage: expiredMessage,
+          errorDelivery: 'unknown',
+          finishedAt: now,
+        })
+        .where(eq(computerCall.id, callId))
+        .run();
+      if (row.phoneId !== null) {
+        tx.update(phone)
+          .set({ lastError: expiredMessage, updatedAt: now })
+          .where(eq(phone.id, row.phoneId))
+          .run();
+      }
+      return {
+        response: { ok: true as const, cancelled: false },
+        pending: null,
+        finished: true,
+        publishOutput: false,
+        expiredError: expiredMessage,
+      };
+    }
     const license = cloakLicenseCipher(tx, row.teamId);
     if (license !== null && box === undefined)
       throw new HttpError(503, 'browser redaction is unavailable');
@@ -414,6 +440,9 @@ export function receiveComputerFrames(
   else if (result.publishOutput) {
     const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
     if (row) publishComputerCallChanged(db, publishHub, row);
+  }
+  if ('expiredError' in result && result.expiredError !== undefined) {
+    throw new HttpError(409, result.expiredError);
   }
   return result.response;
 }
@@ -933,7 +962,51 @@ async function holdPhoneTakeover(
   };
 }
 
-export type ManagePhoneResult = { outcome: 'paired' | 'forgotten' | 'failed'; error?: string };
+export type ManagePhoneResult = {
+  outcome: 'paired' | 'forgotten' | 'failed';
+  error?: string;
+  phoneId?: string;
+};
+
+export function machinePhoneConsented(
+  db: Db,
+  teamId: string,
+  machineId: string,
+  phoneId: string,
+  deviceId: string,
+  callId?: string,
+): boolean {
+  const row = db
+    .select({ id: phone.id })
+    .from(phone)
+    .where(
+      and(
+        eq(phone.id, phoneId),
+        eq(phone.machineId, machineId),
+        eq(phone.teamId, teamId),
+        eq(phone.deviceId, deviceId),
+        isNotNull(phone.consentAt),
+      ),
+    )
+    .get();
+  if (row === undefined) return false;
+  if (callId === undefined) return true;
+  return (
+    db
+      .select({ id: computerCall.id })
+      .from(computerCall)
+      .where(
+        and(
+          eq(computerCall.id, callId),
+          eq(computerCall.phoneId, phoneId),
+          eq(computerCall.machineId, machineId),
+          eq(computerCall.teamId, teamId),
+          inArray(computerCall.state, ['dispatched', 'running']),
+        ),
+      )
+      .get() !== undefined
+  );
+}
 
 export async function managePhone(
   deps: PendingDeps,
@@ -950,12 +1023,50 @@ export async function managePhone(
     .get();
   if (row === undefined) throw new NotFoundError(`phone ${phoneId}`);
   if (params.action === 'forget') {
-    cancelPhoneCalls(db, row.id);
-    if (!deps.machineHub.isConnected(machineId)) {
-      db.delete(phone).where(eq(phone.id, row.id)).run();
-      return { outcome: 'forgotten' };
+    const cancelledCallIds = db.transaction((tx) => {
+      const ids = cancelPhoneCalls(tx, row.id);
+      tx.update(phone)
+        .set({ executionStepId: null, executionLeaseExpiresAt: null, updatedAt: nowMs() })
+        .where(eq(phone.id, row.id))
+        .run();
+      tx.delete(phone).where(eq(phone.id, row.id)).run();
+      return ids;
+    });
+    for (const callId of cancelledCallIds) settleComputerCall(db, callId);
+    if (deps.machineHub.isConnected(machineId)) {
+      const forgetStepId = newRecordId();
+      const forgetCallId = computerCallId(forgetStepId, 'owner-phone-forget');
+      const now = nowMs();
+      db.insert(computerCall)
+        .values({
+          id: forgetCallId,
+          teamId,
+          stepId: forgetStepId,
+          toolCallId: 'owner-phone-forget',
+          machineId,
+          computerId: null,
+          phoneId: null,
+          tool: 'phone_manage',
+          replaySafe: false,
+          params: { action: 'forget' },
+          state: 'dispatched',
+          deadlineAt: now + PHONE_MANAGE_TIMEOUT_MS,
+          createdAt: now,
+        })
+        .run();
+      const pushed = deps.machineHub.pushComputer(machineId, {
+        callId: forgetCallId,
+        stepId: forgetStepId,
+        tool: 'phone_manage',
+        params: { action: 'forget' },
+        deadlineAt: now + PHONE_MANAGE_TIMEOUT_MS,
+        phone: { phoneId: row.id, deviceId: row.deviceId },
+      });
+      if (!pushed) db.delete(computerCall).where(eq(computerCall.id, forgetCallId)).run();
     }
-  } else if (!deps.machineHub.isConnected(machineId)) {
+    return { outcome: 'forgotten' };
+  }
+  if (!deps.machineHub.isConnected(machineId)) {
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
   const stepId = newRecordId();
@@ -994,18 +1105,10 @@ export async function managePhone(
   };
   if (!deps.machineHub.pushComputer(machineId, call)) {
     db.delete(computerCall).where(eq(computerCall.id, callId)).run();
-    if (params.action === 'forget') {
-      db.delete(phone).where(eq(phone.id, row.id)).run();
-      return { outcome: 'forgotten' };
-    }
     throw new HttpError(409, COMPUTER_NOT_CONNECTED);
   }
   await openPending(deps, call).result;
   const finished = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
-  if (params.action === 'forget') {
-    db.delete(phone).where(eq(phone.id, row.id)).run();
-    return { outcome: 'forgotten' };
-  }
   let parsed: ReturnType<typeof phoneManageResultSchema.safeParse> | null = null;
   if (finished?.resultText !== null && finished?.resultText !== undefined) {
     try {
@@ -1016,30 +1119,61 @@ export async function managePhone(
   }
   if (finished?.state === 'done' && parsed?.success === true && parsed.data.outcome === 'paired') {
     const nextDeviceId = parsed.data.deviceId ?? row.deviceId;
-    if (nextDeviceId !== row.deviceId) {
-      db.delete(phone)
-        .where(
-          and(
-            eq(phone.machineId, row.machineId),
-            eq(phone.deviceId, nextDeviceId),
-            ne(phone.id, row.id),
-          ),
-        )
+    if (row.deviceId.startsWith('android:') && nextDeviceId !== row.deviceId) {
+      const error = 'the phone identity changed; remove it and pair it again';
+      db.update(phone)
+        .set({ lastError: error, updatedAt: nowMs() })
+        .where(eq(phone.id, row.id))
         .run();
+      return { outcome: 'failed', error };
     }
-    db.update(phone)
-      .set({
-        deviceId: nextDeviceId,
-        name:
-          parsed.data.name === undefined
-            ? row.name
-            : sanitizePhoneName(parsed.data.name) || row.name,
-        lastError: null,
-        updatedAt: nowMs(),
-      })
-      .where(eq(phone.id, row.id))
-      .run();
-    return { outcome: 'paired' };
+    const nextName =
+      parsed.data.name === undefined ? row.name : sanitizePhoneName(parsed.data.name) || row.name;
+    const now = nowMs();
+    const targetPhoneId = db.transaction((tx) => {
+      if (nextDeviceId !== row.deviceId) {
+        const existing = tx
+          .select()
+          .from(phone)
+          .where(
+            and(
+              eq(phone.machineId, row.machineId),
+              eq(phone.deviceId, nextDeviceId),
+              ne(phone.id, row.id),
+            ),
+          )
+          .get();
+        if (existing !== undefined) {
+          tx.update(phone)
+            .set({
+              name: nextName,
+              consentAt: row.consentAt ?? now,
+              consentedBy: row.consentedBy ?? existing.consentedBy,
+              lastError: null,
+              updatedAt: now,
+            })
+            .where(eq(phone.id, existing.id))
+            .run();
+          tx.update(computerCall)
+            .set({ phoneId: existing.id })
+            .where(eq(computerCall.phoneId, row.id))
+            .run();
+          tx.delete(phone).where(eq(phone.id, row.id)).run();
+          return existing.id;
+        }
+      }
+      tx.update(phone)
+        .set({
+          deviceId: nextDeviceId,
+          name: nextName,
+          lastError: null,
+          updatedAt: now,
+        })
+        .where(eq(phone.id, row.id))
+        .run();
+      return row.id;
+    });
+    return { outcome: 'paired', phoneId: targetPhoneId };
   }
   const error = finished?.errorMessage ?? 'the pairing did not finish';
   db.update(phone).set({ lastError: error, updatedAt: nowMs() }).where(eq(phone.id, row.id)).run();
