@@ -1603,7 +1603,9 @@ describe('browser calls on Macs', () => {
         ],
       },
     }).catch((error: Error) => error.message);
-    expect(await outcome).toBe('Save this workspace secret in Secrets settings first.');
+    expect(await outcome).toBe(
+      '[Browser: no browser ran; nothing opened or acted.]\nSave this workspace secret in Secrets settings first.',
+    );
     expect(calls).toEqual([]);
   });
 
