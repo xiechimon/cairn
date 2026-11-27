@@ -106,11 +106,9 @@ export { applyBuildStepAction } from './build-step-action.js';
 export { type CompleteStepOutcome, completeStep } from './build-step-complete.js';
 export {
   assertParkedBuildIdle,
-  dispatchHeadSha,
   hasActiveStep,
   lastPushedCheckpoint,
   mergingBuildsOf,
-  stepKindInFlight,
 } from './build-step-state.js';
 export { mergedPrElsewhere, planAutoApproveAt, planAwaitsAutoConfirm };
 

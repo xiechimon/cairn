@@ -4,7 +4,6 @@ import { and, desc, eq, inArray, isNotNull, notInArray, or, sql } from 'drizzle-
 import type { Db } from '../db/client.js';
 import { type build, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { isFullSha } from '../lib/github.js';
 import type { BuildDeps } from './builds.js';
 import { retryIsParked } from './retry-parking.js';
 
@@ -21,7 +20,7 @@ export function mergingBuildsOf(db: Db): Set<string> {
   return set;
 }
 
-export function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
+function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
   return (
     deps.db
       .select({ kind: step.kind })
@@ -82,29 +81,4 @@ export function lastPushedCheckpoint(
       )
       .get()?.commit ?? null
   );
-}
-
-export function dispatchHeadSha(deps: BuildDeps, buildId: string): string | null {
-  const rows = deps.db
-    .select({ commit: step.checkpointCommit })
-    .from(step)
-    .where(
-      and(
-        eq(step.buildId, buildId),
-        notInArray(step.kind, ['review', 'merge', 'verify']),
-        eq(step.status, 'done'),
-        isNotNull(step.checkpointCommit),
-      ),
-    )
-    .orderBy(
-      desc(
-        sql`coalesce(${step.finishedAt}, ${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`,
-      ),
-      desc(step.createdAt),
-    )
-    .all();
-  for (const row of rows) {
-    if (row.commit !== null && isFullSha(row.commit)) return row.commit;
-  }
-  return null;
 }

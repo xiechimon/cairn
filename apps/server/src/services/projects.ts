@@ -84,18 +84,6 @@ export interface ProjectPatchDeps {
   logger?: { info(obj: object, msg: string): void };
 }
 
-export function setProjectArchived(
-  db: Db,
-  id: string,
-  archived: boolean,
-): typeof project.$inferSelect | undefined {
-  const row = db.select().from(project).where(eq(project.id, id)).get();
-  if (row === undefined || (row.archivedAt !== null) === archived) return row;
-  const archivedAt = archived ? nowMs() : null;
-  db.update(project).set({ archivedAt }).where(eq(project.id, id)).run();
-  return { ...row, archivedAt };
-}
-
 type ProjectReader = Pick<Db, 'all'>;
 
 function projectRunningWork(db: ProjectReader, projectId: string): string[] {

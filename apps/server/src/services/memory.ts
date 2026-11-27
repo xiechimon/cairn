@@ -28,26 +28,6 @@ export function validateMemoryText(title: string, content: string): void {
   }
 }
 
-export function overlaps(left: string, right: string): boolean {
-  const normalize = (value: string) =>
-    value
-      .normalize('NFKC')
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]/gu, '');
-  const a = normalize(left);
-  const b = normalize(right);
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const grams = (value: string) => {
-    const chars = Array.from(value);
-    return new Set(chars.slice(1).map((char, index) => `${chars[index]}${char}`));
-  };
-  const aGrams = grams(a);
-  const bGrams = grams(b);
-  const shared = [...aGrams].filter((gram) => bGrams.has(gram)).length;
-  return shared >= 2 && shared / Math.min(aGrams.size, bGrams.size) >= 0.5;
-}
-
 type MemoryTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const stillValid = isNull(agentMemory.invalidAt);

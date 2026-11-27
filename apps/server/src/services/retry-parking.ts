@@ -46,22 +46,10 @@ export {
   FAILED_BUILDS_PER_HOUR_LIMIT,
   failureNeedsHuman,
   jitteredRetryDelayMs,
-  RATE_LIMIT_RETRY_BASE_MS,
-  RATE_LIMIT_RETRY_CAP_MS,
-  RATE_LIMIT_RETRY_MAX_ATTEMPTS,
-  RATE_LIMIT_RETRY_WINDOW_MS,
   RETRY_PARKED_MARK,
   type RetryBuildSlice,
   retryIsParked,
-  TRANSIENT_RETRY_BASE_MS,
-  TRANSIENT_RETRY_CAP_MS,
-  TRANSIENT_RETRY_MAX_ATTEMPTS,
-  TRANSIENT_RETRY_WINDOW_MS,
-  todoRetryStateOf,
-  UNKNOWN_RETRY_BASE_MS,
-  UNKNOWN_RETRY_CAP_MS,
   UNKNOWN_RETRY_LIMIT,
-  UNKNOWN_RETRY_WINDOW_MS,
 } from './retry-policy.js';
 
 function workflowPushRefused(error: string): boolean {
