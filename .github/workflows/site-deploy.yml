@@ -3,7 +3,7 @@ name: site-deploy
 on:
   push:
     branches: [main]
-    paths: ['site/**']
+    paths: ['site/**', 'eval/suite.json', 'eval/tasks/**']
   workflow_dispatch:
 
 concurrency:

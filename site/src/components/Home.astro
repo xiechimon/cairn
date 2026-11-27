@@ -1,6 +1,6 @@
 ---
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import '../styles/fonts.css';
 import '../styles/tokens.css';
 import Mark from './Mark.astro';
@@ -16,6 +16,20 @@ const site = 'https://cairn.xmon.me';
 const hasPromoVideo =
   existsSync(resolve(process.cwd(), 'public/media/promo.mp4')) ||
   existsSync(resolve(process.cwd(), 'site/public/media/promo.mp4'));
+const evalRoot = [resolve(process.cwd(), '../eval'), resolve(process.cwd(), 'eval')].find((dir) =>
+  existsSync(join(dir, 'suite.json')),
+);
+if (!evalRoot) throw new Error('The homepage eval card reads eval/suite.json from the repository; it was not found.');
+const suite: { repeats: Record<'runtime' | 'lane' | 'canary', number> } = JSON.parse(
+  readFileSync(join(evalRoot, 'suite.json'), 'utf8'),
+);
+const evalKinds = (['runtime', 'lane', 'canary'] as const).map((kind) => {
+  const entries = readdirSync(join(evalRoot, 'tasks', kind), { withFileTypes: true });
+  const count = entries.filter((entry) => (kind === 'lane' ? entry.isDirectory() : entry.name.endsWith('.json'))).length;
+  return { kind, count, trials: count * suite.repeats[kind] };
+});
+const evalCases = evalKinds.reduce((sum, row) => sum + row.count, 0);
+const evalTrials = evalKinds.reduce((sum, row) => sum + row.trials, 0);
 const heroShot = (theme: 'light' | 'dark') => `/img/placeholder-hero-${theme}.svg`;
 const stepShot = (name: string, theme: 'light' | 'dark') =>
   name === 'ios-home'
@@ -171,6 +185,36 @@ const jsonLd = {
               <path class="spiral" d="M-7 0 A7 7 0 0 1 7 0 A22 22 0 0 1 -37 0 A37 37 0 0 1 37 0 A52 52 0 0 1 -67 0 A67 67 0 0 1 67 0 A82 82 0 0 1 47.816 52.709"></path>
             </g>
           </svg>
+        </div>
+      </section>
+
+      <section class="proof wrap" aria-labelledby="proof-title">
+        <div class="proof-card">
+          <div class="proof-suite">
+            <h2 class="proof-label" id="proof-title">{t.proof.label}</h2>
+            <p class="proof-total"><span class="proof-n">{evalCases}</span> {t.proof.cases}</p>
+            <ul class="proof-kinds">
+              {
+                evalKinds.map((row) => (
+                  <li>
+                    <span class="proof-count">{row.count}</span>
+                    {t.proof.kinds[row.kind]}
+                  </li>
+                ))
+              }
+            </ul>
+            <p class="proof-meta">
+              {t.proof.trials(evalTrials)} · <a href={links.eval}>{t.proof.source}</a>
+            </p>
+          </div>
+          <figure class="proof-chart">
+            <figcaption>{t.proof.chart}</figcaption>
+            <svg viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true">
+              <path class="grid" d="M0 0.5H400M0 40.5H400M0 80.5H400"></path>
+              <path class="axis" d="M0 119.5H400"></path>
+            </svg>
+            <p class="proof-empty">{t.proof.empty}</p>
+          </figure>
         </div>
       </section>
 
@@ -745,6 +789,110 @@ const jsonLd = {
   }
   .hero-spiral .spiral {
     stroke-width: 9;
+  }
+
+  .proof {
+    margin-top: 56px;
+  }
+  .proof-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+    gap: 48px;
+    padding: 32px;
+    border-radius: var(--radius-panel);
+    background: var(--card);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  .proof .proof-label {
+    margin: 0;
+    color: var(--ink-3);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .proof-total {
+    margin: 8px 0 0;
+    color: var(--ink);
+    font-size: 18px;
+  }
+  .proof-n {
+    font-family: var(--font-serif);
+    font-size: 40px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .proof-kinds {
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+  .proof-kinds li {
+    padding: 4px 0;
+  }
+  .proof-count {
+    display: inline-block;
+    min-width: 32px;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .proof-meta {
+    margin: 16px 0 0;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+  .proof-meta a {
+    color: var(--accent-ink);
+    text-underline-offset: 0.2em;
+  }
+  .proof-chart {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .proof-chart figcaption {
+    color: var(--ink-3);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .proof-chart svg {
+    flex: 1;
+    width: 100%;
+    height: auto;
+    min-height: 120px;
+    margin-top: 16px;
+    stroke-width: 1;
+  }
+  .proof-chart .grid {
+    stroke: var(--line);
+    stroke-dasharray: 4 4;
+  }
+  .proof-chart .axis {
+    stroke: var(--ink-4);
+  }
+  .proof-empty {
+    position: absolute;
+    inset: 32px 0 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+  @media (max-width: 760px) {
+    .proof-card {
+      grid-template-columns: 1fr;
+      gap: 32px;
+      padding: 24px;
+    }
+    .proof-chart svg {
+      min-height: 96px;
+    }
   }
 
   .hero-shot {
