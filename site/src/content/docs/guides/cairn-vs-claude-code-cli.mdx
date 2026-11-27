@@ -1,0 +1,44 @@
+---
+title: Cairn vs Plain Claude Code CLI with Git Worktrees and tmux
+description: Compare managing claude --worktree and tmux panes by hand against Cairn's Mac desktop app, Coordinator decomposition, subscription sharing, and phone approvals.
+geo:
+  questionId: en-cmp-claude-cli
+  template: compare
+  cluster: comparisons
+  sources:
+    - README.md
+    - docs/getting-started.md
+    - docs/deploy/tailscale-mobile.md
+  competitorSources:
+    - url: https://code.claude.com/docs/en/overview
+      date: "2026-11-27"
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Cairn vs plain Claude Code CLI with git worktrees and tmux","acceptedAnswer":{"@type":"Answer","text":"Plain Claude Code CLI plus tmux gives direct terminal control with zero extra app layer. Cairn adds a Mac desktop UI, automated worktree lifecycle management, cross-task Coordinator memory, multi-provider routing (ChatGPT/Gemini/custom endpoints alongside Claude), and structured phone/IM approval cards."}}]}'
+---
+
+Using plain `claude --worktree` inside `tmux` works well if you enjoy babysitting terminal panes, whereas **Cairn** adds a resident Coordinator, automated worktree lifecycle, structured decision cards, and mobile/IM approvals on top of your existing Claude subscription. Both keep code and execution on your own hardware.
+
+## Side-by-side comparison (checked 2026-11-27)
+
+| Workflow step | Cairn Mac desktop app | Plain Claude Code CLI + tmux |
+|---|---|---|
+| **Worktree creation & cleanup** | Automatic per-task checkout under `workspaces/` | Manual `claude --worktree` or `git worktree add/remove` |
+| **Permission prompts** | Batched into **Needs your decision** / **Needs input** cards with push alerts | Interactive terminal `y/N` prompt blocks that pane until you notice |
+| **Multi-model flexibility** | Mix Claude Code, ChatGPT subscription (`pi`), Gemini, and custom relays | Anthropic / configured Claude CLI backend only |
+| **Phone monitoring** | Mobile web app over Tailscale Serve + Telegram / Slack / WeChat | Mobile SSH client (`ssh` + `tmux attach`) or `/remote-control` |
+| **Memory across runs** | Persistent `MEMORY.md` plus check-task proposals on repeated corrections | Per-repo `CLAUDE.md` and session history |
+
+## Where plain Claude Code CLI is better
+
+Plain Claude Code CLI is unbeatable when you are sitting right at your keyboard steering a single complex debugging session line by line, want instant raw terminal access to every slash command, or already have muscle memory around custom `tmux` scripts and zero interest in running a desktop GUI.
+
+## When Cairn saves real time
+
+Once you run three or more concurrent threads, switch between MacBook, Mac mini, and iPhone, or want ChatGPT/Gemini fallbacks alongside Claude without managing multiple CLI logins, Cairn removes the terminal bookkeeping ([Parallel Claude guide](/guides/run-parallel-claude-code-agents-mac/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

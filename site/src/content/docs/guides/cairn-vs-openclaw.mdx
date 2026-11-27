@@ -1,0 +1,44 @@
+---
+title: "Cairn vs OpenClaw: Code-First Workstation vs Chat-First Assistant"
+description: Compare OpenClaw's 20+ chat-platform gateway architecture with Cairn's git-worktree coding workflow, merge gates, and Mac desktop app.
+geo:
+  questionId: en-cmp-openclaw
+  template: compare
+  cluster: comparisons
+  sources:
+    - README.md
+    - docs/spec/18-positioning-and-differentiation.md
+    - docs/design/im-connections.md
+  competitorSources:
+    - url: https://github.com/openclaw/openclaw
+      date: "2026-11-27"
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Cairn vs OpenClaw: code-first worktree workstation vs chat-first assistant","acceptedAnswer":{"@type":"Answer","text":"OpenClaw lives inside 20+ messaging apps as a general personal or multiplayer assistant gateway. Cairn is a code-first Mac desktop app and web workstation where each task runs in an isolated git worktree with evidence-bound merge gates, treating Telegram, Slack, and WeChat strictly as optional entry points."}}]}'
+---
+
+Both **Cairn** and **OpenClaw** (`openclaw/openclaw`) are open-source, self-hosted AI assistants that keep state and credentials on your own hardware. The key architectural difference is where the product lives: **OpenClaw** makes chat apps its primary home across 20+ messaging platforms, whereas **Cairn** is a code-first Mac desktop app and web workstation that treats chat apps strictly as optional remote entry points.
+
+## Feature comparison (checked 2026-11-27)
+
+| Dimension | Cairn | OpenClaw |
+|---|---|---|
+| **Primary residence** | Mac desktop app & web app (`Coordinator`, Kanban board, task diffs) | Chat channels (Discord, WhatsApp, Telegram, Slack, iMessage, 20+ more) |
+| **Coding isolation** | Dedicated git worktree + task branch per build under `workspaces/` | Plugin/agent harness behind the OpenClaw Gateway |
+| **Merge & approval discipline** | Explicit confirm/review gates + non-defaulted approval cards | Policy-enforced gateway with personal or multiplayer claw modes |
+| **Non-code personal affairs** | Mail, calendar, and job search are **planned** (not shipped yet) | General life, automation, and messaging workflows active today |
+| **License & telemetry** | Apache-2.0, zero built-in update/usage telemetry | MIT, daily update check on by default (`update.checkOnStart: false` to disable) |
+
+## Where OpenClaw is better
+
+OpenClaw is the stronger choice if you want an assistant that lives completely inside WhatsApp, Discord, or iMessage, supports 20+ chat integrations and multiplayer claws out of the box, or focuses primarily on non-coding chat automation ([OpenClaw README](https://github.com/openclaw/openclaw)).
+
+## When Cairn fits better
+
+Pick Cairn when software engineering is your main workload—especially if you want visual task traces, isolated git worktrees per branch, zero background telemetry, and native ChatGPT/Claude subscription handling in a [Mac desktop app](/guides/install-cairn-mac-desktop-app/).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

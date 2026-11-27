@@ -1,0 +1,43 @@
+---
+title: How to Monitor Agents and Approve Merges from Your iPhone
+description: Check task progress, reply to Coordinator questions, and approve merges from your iPhone using Tailscale Serve or IM entry points like Telegram and WeChat.
+geo:
+  questionId: en-qa-approve-iphone
+  template: qa
+  cluster: mac-mini
+  sources:
+    - docs/deploy/tailscale-mobile.md
+    - docs/design/im-connections.md
+    - docs/configuration.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How can I monitor coding agents and approve merges from my iPhone?","acceptedAnswer":{"@type":"Answer","text":"Put Tailscale Serve in front of your Mac Cairn server for private HTTPS web access (supporting iOS Add to Home Screen and Web Push), or connect Telegram, Slack, or WeChat under Settings -> Chat apps to receive decision cards and reply remotely."}}]}'
+---
+
+You can monitor running tasks and approve merges from your iPhone either by opening the Cairn web app privately over **Tailscale Serve** or by receiving approval cards in **Telegram**, **Slack**, or **WeChat**. In both cases, your Mac or home server stays behind NAT with zero public ports exposed, and your phone interacts with the exact same Coordinator conversation.
+
+## Option 1: Full mobile web app over Tailscale Serve (recommended)
+
+Tailscale Serve gives your iPhone encrypted HTTPS access to `https://<machine>.<tailnet>.ts.net/app` without opening firewall ports:
+
+1. Enable MagicDNS and HTTPS certificates in the Tailscale admin console, then run `tailscale serve --bg http://127.0.0.1:8787` on your server host (never use Funnel, which exposes the service publicly).
+2. Generate a single-use pairing code in Cairn under **Settings -> Remote access**.
+3. Open the Serve HTTPS URL on your iPhone, enter the pairing code, and use Safari's **Add to Home Screen** if you want iOS Web Push alerts when a decision needs your approval.
+
+Follow the full checklist in [Setup Tailscale mobile access](/guides/setup-tailscale-mobile-access/).
+
+## Option 2: Chat notifications via Telegram, Slack, or WeChat
+
+If you prefer not to open a browser on the go, Cairn supports outbound-only chat adapters under **Settings -> Chat apps** ([IM notification guide](/guides/connect-telegram-slack-im-notifications/)):
+
+- **Telegram:** Long-polling Bot API with inline button approvals and numbered fallback replies.
+- **Slack:** Outbound Socket Mode with DM-only inbound messages and Block Kit action buttons.
+- **WeChat (iLink):** QR-paired personal bot supporting text and numbered replies (~1,800-character chunks).
+
+Note that approval-sensitive actions never default to "approved", and a lost paired browser or phone can be revoked immediately from the owner session under **Settings -> Remote access**.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

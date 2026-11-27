@@ -1,0 +1,36 @@
+---
+title: Mac mini 怎么当 24 小时 AI 编程工作站：桌面端自托管与防休眠配置
+description: 在 Mac mini 上运行 Cairn 桌面应用作为常驻工作站，配置系统防休眠、菜单栏常驻与 Tailscale 手机远程审批。
+geo:
+  questionId: zh-mac-mini-24x7
+  template: how-to
+  cluster: mac-mini
+  sources:
+    - README.zh.md
+    - apps/desktop/README.md
+    - docs/deploy/tailscale-mobile.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Mac mini 配置 24 小时 Cairn AI 编程工作站","step":[{"@type":"HowToStep","name":"安装 Cairn Mac 桌面端","text":"将 Cairn.app 放进 /Applications 并首次放行，桌面端会自动启动内置服务端与本地执行机。"},{"@type":"HowToStep","name":"关闭自动休眠","text":"在 macOS 系统设置里开启显示器关闭时不自动休眠，保证长任务和定时任务不中断。"},{"@type":"HowToStep","name":"配置手机远程访问","text":"用 Tailscale Serve 代理本地回环端口，或接入微信/Telegram 随时远程审批。"}]}'
+---
+
+用一台常开的 **Mac mini** 跑 **Cairn 桌面应用** 是最省心的 24 小时 AI 编程工作站方案：Mac 桌面端自带本地服务端、内置 pi 执行机和 owner 会话，关闭主窗口后它仍会在菜单栏后台持续运行，既不会占用主力笔记本电量，也能完整使用原生 macOS 编译环境。
+
+## 第一步：安装桌面端并保持后台运行
+
+从[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 `-mac-arm64.dmg` 拖入「应用程序」，参考[未公证首次打开指引](/zh-cn/guides/macos-shouci-dakali-weigonozheng-jiejue/)放行。点窗口关闭按钮只会隐藏界面，不会停止服务端和执行机；只有从菜单栏点击 **Quit Cairn** 才会真正退出。
+
+## 第二步：防止 Mac mini 自动休眠断任务
+
+1. 打开 macOS **系统设置 → 能源**，开启「显示器关闭时防止 Mac 自动进入睡眠」。
+2. 若在 Cairn 桌面端开启 **Keep the Screen On** 或配置了即将触发的定时任务，菜单栏图标会切换为带小茶杯的常亮样式，提示系统正在保持唤醒。
+
+## 第三步：出门后用手机远程跟进
+
+按照[手机 Tailscale 远程审批指南](/zh-cn/guides/shouji-tailscale-yuancheng-shenpi/)将本地回环地址映射为私有 HTTPS 地址，或按[微信与 Telegram 接入指南](/zh-cn/guides/wechat-telegram-jieru-agent-tongzhi/)接收决策通知，平时只需带手机出门，关键改动才需要你点击确认。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

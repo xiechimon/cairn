@@ -1,0 +1,44 @@
+---
+title: Cairn 对比 OpenClaw：代码工程工作站与聊天软件私人助理有什么区别？
+description: 对比开源项目 Cairn 与 OpenClaw 的定位差异：OpenClaw 主打住在 20+ 聊天软件里的全能助理，Cairn 主打代码优先的 git worktree 工程工作站。
+geo:
+  questionId: zh-cmp-openclaw
+  template: compare
+  cluster: comparisons
+  sources:
+    - README.zh.md
+    - docs/spec/18-positioning-and-differentiation.md
+    - docs/design/im-connections.md
+  competitorSources:
+    - url: https://github.com/openclaw/openclaw
+      date: "2026-11-27"
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Cairn 对比 OpenClaw：代码工程工作站与聊天软件私人助理有什么区别？","acceptedAnswer":{"@type":"Answer","text":"OpenClaw 以 Gateway 为核心直接住进 WhatsApp、Discord、Telegram 等 20 多种聊天软件；Cairn 则是以代码工程为核心的 Mac 桌面应用与 Web 工作站，每个任务跑在独立 git worktree 并受合并闸门保护，聊天软件只是它的远程入口。"}}]}'
+---
+
+**Cairn** 和 **OpenClaw** 都是运行在自己设备上的开源个人 AI 助理，但两者的核心战场不同：**OpenClaw** 把“家”直接安在各种聊天软件里，主打跨平台生活与自动化网关；**Cairn** 则是为写代码的人设计的 Mac 桌面端工程工作站，把微信、Telegram 和 Slack 只当成远程派活与审批的入口。
+
+## 关键架构差异（2026-11-27 实测核对）
+
+| 对比维度 | Cairn | OpenClaw |
+|---|---|---|
+| **主战场** | Mac 桌面应用与 Web 面板（任务看板、线程追踪、Diff 与记忆） | 聊天应用本身（Discord、WhatsApp、Telegram、Slack、iMessage 等 20+） |
+| **代码隔离与合并** | 每次任务独立 git worktree + 独立分支 + 不可逆动作审批 | Gateway 插件调度多种 Agent harness |
+| **非代码个人事务** | 邮件、日程、求职目前标注为**规划中（尚未上线）** | 现阶段已广泛用于热点抓取、内容发布等通用生活自动化 |
+| **使用人数边界** | 严格面向个人（单人一份实例） | 支持个人模式，也支持共享配置的多人模式（multiplayer claw） |
+| **协议与遥测** | Apache-2.0，默认零内置产品遥测 | MIT 开源，默认开启每日更新检查（可配置关闭） |
+
+## 什么时候 OpenClaw 更适合你
+
+如果你希望 AI 助理**完全生活在 Discord、WhatsApp 或飞书/微信群里**，侧重跨平台消息汇总、日常信息流自动化或团队共享机器人，[OpenClaw](https://github.com/openclaw/openclaw) 的 20+ 通道生态成熟度更高。
+
+## 什么时候 Cairn 更适合你
+
+如果你的核心需求是**写代码、改仓库、并发测试与严谨合并**，需要原生 Mac 桌面端体验、每个任务隔离 git worktree、以及不经过聊天平台后台的本地密钥存储，[Cairn](/zh-cn/docs/intro/) 是更专注的选择。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

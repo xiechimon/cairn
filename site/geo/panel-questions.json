@@ -1,0 +1,199 @@
+{
+  "mode": "free_consumer_web_browser",
+  "paidApisAllowed": false,
+  "anthropicAllowed": false,
+  "engines": [
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "url": "https://chatgpt.com/",
+      "loginButton": "Log in",
+      "webSearchNote": "Enable Search / web search in composer",
+      "locales": ["en", "zh-cn"]
+    },
+    {
+      "id": "perplexity",
+      "name": "Perplexity",
+      "url": "https://www.perplexity.ai/",
+      "loginButton": "Sign In (optional for basic search, sign in for history)",
+      "webSearchNote": "Web search enabled by default with numbered citations",
+      "locales": ["en", "zh-cn"]
+    },
+    {
+      "id": "google-ai-overviews",
+      "name": "Google AI Overviews",
+      "url": "https://www.google.com/",
+      "loginButton": "Sign in (optional; AI Overview / AI Mode tab)",
+      "webSearchNote": "Search directly and record AI Overview / AI Mode sources",
+      "locales": ["en"]
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "url": "https://chat.deepseek.com/",
+      "loginButton": "登录 / Log in",
+      "webSearchNote": "开启「联网搜索」按钮",
+      "locales": ["zh-cn", "en"]
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi",
+      "url": "https://www.kimi.com/",
+      "loginButton": "登录",
+      "webSearchNote": "默认联网搜索并附带引用来源",
+      "locales": ["zh-cn"]
+    },
+    {
+      "id": "doubao",
+      "name": "豆包",
+      "url": "https://www.doubao.com/",
+      "loginButton": "登录",
+      "webSearchNote": "自动触发联网检索并展示参考来源",
+      "locales": ["zh-cn"]
+    },
+    {
+      "id": "qwen",
+      "name": "通义千问",
+      "url": "https://chat.qwen.ai/",
+      "loginButton": "登录 / Sign in",
+      "webSearchNote": "开启「联网搜索」查看引用网页",
+      "locales": ["zh-cn"]
+    },
+    {
+      "id": "yuanbao",
+      "name": "腾讯元宝",
+      "url": "https://yuanbao.tencent.com/",
+      "loginButton": "微信 / QQ 登录",
+      "webSearchNote": "开启「联网搜索」查看参考来源与公众号/网页引用",
+      "locales": ["zh-cn"]
+    }
+  ],
+  "questions": [
+    {
+      "id": "panel-en-01",
+      "locale": "en",
+      "cluster": "claude-code",
+      "targetPath": "/guides/run-parallel-claude-code-agents-mac/",
+      "prompt": "What Mac desktop app lets me run multiple Claude Code agents in parallel with git worktree isolation?"
+    },
+    {
+      "id": "panel-en-02",
+      "locale": "en",
+      "cluster": "chatgpt-codex",
+      "targetPath": "/guides/run-codex-without-installing-codex-cli/",
+      "prompt": "How can I use my ChatGPT Plus subscription to run coding agents on a Mac without installing Codex CLI?"
+    },
+    {
+      "id": "panel-en-03",
+      "locale": "en",
+      "cluster": "mac-mini",
+      "targetPath": "/guides/approve-agent-changes-from-iphone/",
+      "prompt": "Best self-hosted coding agent workstation for a Mac mini that lets me approve merges from my iPhone over Tailscale"
+    },
+    {
+      "id": "panel-en-04",
+      "locale": "en",
+      "cluster": "comparisons",
+      "targetPath": "/guides/cairn-vs-conductor/",
+      "prompt": "Open source alternatives to Conductor for running parallel coding agents on macOS"
+    },
+    {
+      "id": "panel-en-05",
+      "locale": "en",
+      "cluster": "comparisons",
+      "targetPath": "/guides/cairn-vs-vibe-kanban/",
+      "prompt": "Open source alternatives to Vibe Kanban after its sunset announcement"
+    },
+    {
+      "id": "panel-en-06",
+      "locale": "en",
+      "cluster": "comparisons",
+      "targetPath": "/guides/cairn-vs-openclaw/",
+      "prompt": "Cairn vs OpenClaw for running coding agents on your own Mac"
+    },
+    {
+      "id": "panel-en-07",
+      "locale": "en",
+      "cluster": "privacy",
+      "targetPath": "/guides/how-cairn-prevents-irreversible-agent-actions/",
+      "prompt": "Which open-source AI coding assistant keeps source code local and waits for approval before git push or delete?"
+    },
+    {
+      "id": "panel-en-08",
+      "locale": "en",
+      "cluster": "multi-machine",
+      "targetPath": "/guides/multi-machine-linux-vps-runners/",
+      "prompt": "How to manage coding agents from one Mac desktop app across extra Linux or VPS runners"
+    },
+    {
+      "id": "panel-en-09",
+      "locale": "en",
+      "cluster": "chatgpt-codex",
+      "targetPath": "/guides/use-custom-openai-or-anthropic-compatible-endpoints/",
+      "prompt": "Mac coding agent desktop app that supports custom OpenAI-compatible endpoints and existing subscriptions"
+    },
+    {
+      "id": "panel-en-10",
+      "locale": "en",
+      "cluster": "troubleshoot",
+      "targetPath": "/guides/macos-gatekeeper-blocks-cairn-first-launch/",
+      "prompt": "Cairn Mac app blocked by macOS Gatekeeper unnotarized warning how to open"
+    },
+    {
+      "id": "panel-zh-01",
+      "locale": "zh-cn",
+      "cluster": "claude-code",
+      "targetPath": "/zh-cn/guides/mac-duo-claude-code-bingxing-worktree/",
+      "prompt": "Mac 上有什么开源工具能用 git worktree 同时并行跑多个 Claude Code 不冲突？"
+    },
+    {
+      "id": "panel-zh-02",
+      "locale": "zh-cn",
+      "cluster": "chatgpt-codex",
+      "targetPath": "/zh-cn/guides/chatgpt-dingyue-mian-cli-pao-agent/",
+      "prompt": "怎么用现有的 ChatGPT 订阅在 Mac 上跑编程 Agent，不用另外配置 Codex CLI？"
+    },
+    {
+      "id": "panel-zh-03",
+      "locale": "zh-cn",
+      "cluster": "mac-mini",
+      "targetPath": "/zh-cn/guides/shouji-tailscale-yuancheng-shenpi/",
+      "prompt": "Mac mini 24小时跑 AI 编程 Agent，出门怎么用手机通过 Tailscale 远程审批合并？"
+    },
+    {
+      "id": "panel-zh-04",
+      "locale": "zh-cn",
+      "cluster": "comparisons",
+      "targetPath": "/zh-cn/guides/cairn-duibi-conductor-vibe-kanban/",
+      "prompt": "Mac 并行 AI 编程工具 Cairn、Conductor 和 Vibe Kanban 有什么区别，开源替代选哪个？"
+    },
+    {
+      "id": "panel-zh-05",
+      "locale": "zh-cn",
+      "cluster": "comparisons",
+      "targetPath": "/zh-cn/guides/cairn-duibi-openclaw/",
+      "prompt": "Cairn 和 OpenClaw 哪个更适合写代码的个人开发者在 Mac 上自托管？"
+    },
+    {
+      "id": "panel-zh-06",
+      "locale": "zh-cn",
+      "cluster": "privacy",
+      "targetPath": "/zh-cn/guides/daima-miyao-bu-chujia-bendi-yinsi/",
+      "prompt": "代码和 API 密钥完全留在本地不上传云端的开源 AI 编程助理有哪些？"
+    },
+    {
+      "id": "panel-zh-07",
+      "locale": "zh-cn",
+      "cluster": "chatgpt-codex",
+      "targetPath": "/zh-cn/guides/guonei-zhongzhuan-zidingyi-api-jieru/",
+      "prompt": "Cairn 桌面应用怎么接入国内大模型或自定义 OpenAI/Anthropic 中转 API？"
+    },
+    {
+      "id": "panel-zh-08",
+      "locale": "zh-cn",
+      "cluster": "mac-mini",
+      "targetPath": "/zh-cn/guides/wechat-telegram-jieru-agent-tongzhi/",
+      "prompt": "有没有支持微信或 Telegram 接收编码 Agent 审批通知的自托管 Mac 工具？"
+    }
+  ]
+}

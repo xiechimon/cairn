@@ -1,0 +1,37 @@
+---
+title: Cairn 怎么接入自定义 OpenAI 与 Anthropic 中转端点或国内大模型 API？
+description: 在 Cairn 设置 -> 模型里选择自定义端点，支持 OpenAI Completions、OpenAI Responses 与 Anthropic Messages 三种协议，适配中转站与本地网关。
+geo:
+  questionId: zh-custom-relay
+  template: qa
+  cluster: chatgpt-codex
+  sources:
+    - site/src/content/docs/zh-cn/docs/models.mdx
+    - docs/privacy.md
+    - README.zh.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Cairn 怎么接入自定义 OpenAI / Anthropic 中转端点或国内大模型 API？","acceptedAnswer":{"@type":"Answer","text":"打开 Cairn Mac 桌面端进入设置 -> 模型 -> 添加服务商，选择自定义端点，填写名称、服务商 ID、Base URL、协议（OpenAI Completions、OpenAI Responses 或 Anthropic Messages）和模型 ID 后测试连接即可。"}}]}'
+---
+
+Cairn 原生支持接入第三方中转站、国内兼容接口以及本地大模型网关（如 vLLM / Ollama），在 **设置 → 模型 → 添加服务商** 中选择 **自定义端点（Custom endpoint）** 即可配置。协议支持 **OpenAI Completions**、**OpenAI Responses** 和 **Anthropic Messages**，无需修改底层代码或环境变量。
+
+## 填写自定义端点的关键字段
+
+| 字段 | 填写建议 | 说明 |
+|---|---|---|
+| **名称与服务商 ID** | 如 `deepseek-relay` 或 `local-gateway` | 用于在模型规则和路由列表里区分来源 |
+| **Base URL** | 中转站或本地网关提供的接口根地址 | 注意核对是否需要带 `/v1`，需与所选协议一致 |
+| **API 协议** | OpenAI Completions / Responses / Anthropic Messages | 必须与服务商实际提供的接口格式一致 |
+| **模型 ID 列表** | 服务端支持的准确模型名称 | 添加后即可在 Coordinator 与任务模型中选用 |
+| **API key** | 填入密钥，本地无鉴权网关可留空 | 留空时可关闭授权请求头；密钥会用 `secretbox.key` 加密存储 |
+
+## 保存前建议先点“测试连接”
+
+点击 **测试连接** 会真实发出一次探测请求确认端点与协议是否匹配（可能会消耗少量服务商额度）。接入完成后，记得在 **设置 → 模型** 确认 **Coordinator** 和任务的实际默认模型，避免把其他协议的默认模型名套到新接入的端点上（更多细节见[接入模型](/zh-cn/docs/models/)）。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

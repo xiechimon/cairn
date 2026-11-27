@@ -1,0 +1,45 @@
+---
+title: Privacy & Local-First Coding Agents with Cairn
+description: How Cairn keeps source code, SQLite state, encrypted credentials, and execution on your own machines with zero telemetry or compute resale.
+geo:
+  questionId: en-hub-privacy
+  template: hub
+  cluster: privacy
+  sources:
+    - docs/privacy.md
+    - docs/configuration.md
+    - docs/getting-started.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How does Cairn keep source code, API keys, and credentials strictly on your own hardware?","acceptedAnswer":{"@type":"Answer","text":"Cairn has no built-in product telemetry or cloud compute relay. Code executes inside isolated git worktrees on your own Runners, SQLite state stays on your disk, and API keys and subscription tokens are sealed with secretbox.key before storage."}}]}'
+---
+
+Cairn keeps your source code, API keys, and credentials strictly on your own hardware without passing through any Cairn-operated cloud server. When you install the Mac desktop app (or the advanced self-hosted server), SQLite storage stays on your disk, agents run inside local git worktrees on your machines, and model calls travel straight to the provider or custom endpoint you configured.
+
+## What stays strictly on your hardware
+
+- **Encrypted secrets (`secretbox.key`):** Model API keys, subscription tokens, team secrets, Vault entries, and integration credentials are sealed before storage in `server.db`.
+- **Isolated per-agent config homes:** Cairn maintains its own managed agent directories separate from your personal `~/.claude` or `~/.gemini` logins.
+- **macOS Seatbelt & Linux confinement:** Task harnesses run inside OS-level confinement rather than sharing unrestricted shell credentials across tasks, and team secrets are never exported into child shell environments.
+- **Secret redaction in transcripts:** Before saving a step record to your own server, the Runner replaces token-like patterns (`sk-`, `token=`, bearer headers) with `[REDACTED]`.
+
+## What leaves your machine (only when configured)
+
+Nothing leaves automatically at rest. Outbound requests only go to services you explicitly enable:
+
+1. Your chosen **model provider or custom endpoint** under **Settings -> Model**.
+2. **GitHub** when you attach a GitHub repository (choosing **Local folder** keeps Git entirely local).
+3. Optional integrations you configure (**MCP servers**, **Telegram / Slack / WeChat**, **Tailscale**, **Web Push / APNs**, or optional **OTLP/Langfuse** export via `CAIRN_OTEL_ENDPOINT`).
+
+## Related guides in this cluster
+
+- [Where source code, model tokens, and secrets live](/guides/keep-source-code-and-api-keys-local/)
+- [Does Cairn work without connecting GitHub?](/guides/does-cairn-work-without-github/)
+- [How Cairn prevents irreversible agent actions](/guides/how-cairn-prevents-irreversible-agent-actions/)
+- [Back up and migrate `server.db` and `secretbox.key`](/guides/backup-and-migrate-cairn-data/)
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

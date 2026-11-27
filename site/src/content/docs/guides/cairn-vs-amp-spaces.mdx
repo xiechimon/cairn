@@ -1,0 +1,44 @@
+---
+title: "Cairn vs Amp Spaces: Solo Self-Hosted Assistant vs Team Workspace"
+description: Compare Cairn's free single-person Mac app and self-hosted Runners against Amp Spaces' multiplayer team workspace, shared channels, and pooled billing.
+geo:
+  questionId: en-cmp-amp-spaces
+  template: compare
+  cluster: comparisons
+  sources:
+    - README.md
+    - docs/spec/18-positioning-and-differentiation.md
+    - site/src/content/docs/docs/faq.mdx
+  competitorSources:
+    - url: https://ampcode.com/docs/spaces
+      date: "2026-11-27"
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Cairn vs Amp Spaces: solo self-hosted personal assistant vs team workspace","acceptedAnswer":{"@type":"Answer","text":"Cairn is Apache-2.0 open source and designed strictly for one developer running on their own Mac or servers with their own AI subscriptions. Amp Spaces is built for teams collaborating in shared spaces, Slack channels, and pooled workspace billing."}}]}'
+---
+
+Cairn and **Amp Spaces** share a similar thread-card mental model—chatting in one place while background threads execute tasks in parallel—but they serve opposite audiences. **Cairn** is a free, Apache-2.0 personal assistant for **one developer** running on their own Mac and hardware; **Amp Spaces** is a multiplayer workspace built for **engineering teams**.
+
+## Feature comparison (checked 2026-11-27)
+
+| Dimension | Cairn | Amp Spaces |
+|---|---|---|
+| **Target audience** | One solo developer (each person runs their own copy) | Teams sharing spaces, threads, and goals ([Amp Spaces docs](https://ampcode.com/docs/spaces)) |
+| **Hosting & data** | Local Mac desktop app or self-hosted server (`server.db` + `secretbox.key`) | Hosted Amp workspace with cloud/orb threads |
+| **Billing & models** | $0 from Cairn; BYO ChatGPT, Claude Code, Gemini, or custom endpoints | Workspace billing and Amp model selection |
+| **Slack / IM integration** | Personal outbound Telegram, Slack DM Socket Mode, WeChat iLink | Team Slack channel `@Amp` integration inside shared Spaces |
+| **Code storage** | Local folders or GitHub repos on your own Runners | Amp project repositories & workspace threads |
+
+## Where Amp Spaces is better
+
+Amp Spaces is clearly the right choice when multiple teammates need to watch the same live thread cards, collaborate in shared `@Amp` Slack channels, share workspace-level instructions, and bill usage to a single team account without managing local Runners or Tailscale.
+
+## When Cairn fits better
+
+Choose Cairn when you are building solo, already pay for ChatGPT or Claude Code, and want full Apache-2.0 ownership with your code, SQLite state, and keys never leaving your own Mac or servers ([Cairn for solo developers](/guides/cairn-for-solo-developers-vs-teams/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

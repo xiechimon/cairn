@@ -1,0 +1,42 @@
+---
+title: Can I Run Multiple Claude Code Agents in Parallel on One Mac?
+description: Yes—Cairn runs each parallel Claude Code task in an isolated git worktree and branch on your Mac so concurrent agents never overwrite each other.
+geo:
+  questionId: en-qa-parallel-claude
+  template: qa
+  cluster: claude-code
+  sources:
+    - README.md
+    - CONTEXT.md
+    - docs/getting-started.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can I run multiple Claude Code agents in parallel on one Mac without file conflicts?","acceptedAnswer":{"@type":"Answer","text":"Yes. Cairn assigns every coding task its own isolated git worktree and branch under the Runner workspaces directory, so multiple Claude Code or pi tasks run concurrently on one Mac without clobbering uncommitted edits or dev server files."}}]}'
+---
+
+Yes—you can run multiple Claude Code agents in parallel on one Mac using the Cairn desktop app without file collisions or branch tangles. Every build opens its own isolated git worktree under the Runner's `workspaces/` directory on a dedicated branch, so concurrent tasks never touch your primary checkout or overwrite another thread's edits.
+
+## Why terminal tabs collide (and how Cairn fixes it)
+
+When you run two `claude` sessions in the same folder, both read and mutate the same working tree and `git status`. Even with manual `git worktree add`, you still have to clean up worktrees, watch each tab for `y/N` prompts, and remember which terminal maps to which branch.
+
+In Cairn, one **build = one conversation = one worktree + branch**:
+
+1. Tell the **Coordinator** two or three independent tasks in plain language (for example, fixing a bug in one module while adding tests in another).
+2. The Runner claims each task and provisions a separate worktree directory (`~/.cairn/workspaces/<conversationId>` on CLI Runners, or the desktop app's bundled runner folder).
+3. Each thread runs tests and commits to its own task branch—leaving your `main` branch untouched until you ask to merge.
+4. Any step needing a judgment call rises to **Needs your decision** instead of silently stalling an unseen terminal pane.
+
+## Setup requirements on macOS
+
+- Download the [Cairn Mac desktop app](/guides/install-cairn-mac-desktop-app/).
+- Install the `claude` CLI on your Mac and add a `claude setup-token` under **Settings -> Model** ([token guide](/guides/setup-claude-code-subscription-token/)).
+- Run `cairn doctor` (on CLI Runners) or inspect **Settings -> Runners** in the desktop app to confirm Claude Code is detected.
+
+If you prefer not to manage separate Claude Code CLI installs, the bundled **pi** engine can run parallel worktrees directly with your ChatGPT subscription or provider API keys. See [Cairn vs plain Claude Code CLI](/guides/cairn-vs-claude-code-cli/) for a full trade-off comparison.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

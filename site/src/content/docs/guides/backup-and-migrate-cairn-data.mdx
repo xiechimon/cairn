@@ -1,0 +1,40 @@
+---
+title: Back Up and Migrate Cairn Data and secretbox.key
+description: Safely back up or move Cairn across Macs or Linux servers by copying server.db, secretbox.key, vapid.json, and workspaces together.
+geo:
+  questionId: en-howto-backup
+  template: how-to
+  cluster: privacy
+  sources:
+    - docs/privacy.md
+    - docs/configuration.md
+    - site/src/content/docs/docs/install.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Back Up and Migrate Cairn Data","step":[{"@type":"HowToStep","name":"Quit Cairn cleanly","text":"Quit the Cairn Mac desktop app or stop the server and Runner so SQLite flushes all writes."},{"@type":"HowToStep","name":"Copy the entire data directory","text":"Copy the full Cairn data directory including both server.db and secretbox.key."},{"@type":"HowToStep","name":"Restore on the target host","text":"Place the copied folder in the destination app data or CAIRN_HOME path before starting Cairn."}]}'
+---
+
+To back up or migrate Cairn to a new Mac or Linux server, copy the **entire** Cairn data directory while Cairn is stopped—never copy `server.db` alone. Every model key, subscription token, team secret, and integration credential inside `server.db` is sealed with `secretbox.key`, so a database backup without `secretbox.key` cannot decrypt your credentials.
+
+## Step 1: Locate your Cairn data directory
+
+- **Mac desktop app:** `~/Library/Application Support/@cairn/desktop/`
+- **Linux desktop archive:** `$XDG_CONFIG_HOME/@cairn/desktop/` (usually `~/.config/@cairn/desktop/`)
+- **Advanced npm / CLI install:** `~/.cairn/` (or `$CAIRN_HOME` if customized)
+- **Advanced Docker install:** the `/data` volume mount
+
+Key files inside the server data folder include `server.db` (SQLite state), `secretbox.key` (encryption key), `vapid.json` (Web Push keypair), hosted bare repos, and attachments.
+
+## Step 2: Stop Cairn before copying
+
+Quit the Cairn Mac desktop app from the menu bar (or stop your `npx @xiechimon/cairn` process and `cairn stop` on CLI Runners) so SQLite closes cleanly without mid-transaction WAL drift.
+
+## Step 3: Copy and verify permissions
+
+Archive or copy the whole directory with permissions intact (`0600` on `token` and `secretbox.key`, `0700` on private directories). For Docker deployments, you can also enable continuous SQLite WAL replication to S3/R2/Tigris via `CAIRN_LITESTREAM_BUCKET`, while keeping `secretbox.key` backed up separately in your persistent volume snapshot.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

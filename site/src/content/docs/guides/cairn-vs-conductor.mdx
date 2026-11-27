@@ -1,0 +1,45 @@
+---
+title: "Cairn vs Conductor: Which Mac Coding-Agent Workspace to Choose?"
+description: Compare Cairn and Conductor for running parallel Claude Code and Codex tasks on macOS, open-source licensing, remote phone approvals, and multi-machine Runners.
+geo:
+  questionId: en-cmp-conductor
+  template: compare
+  cluster: comparisons
+  sources:
+    - README.md
+    - docs/spec/18-positioning-and-differentiation.md
+    - docs/deploy/tailscale-mobile.md
+  competitorSources:
+    - url: https://www.conductor.build/docs
+      date: "2026-11-27"
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Cairn vs Conductor: which Mac coding-agent workspace should you choose?","acceptedAnswer":{"@type":"Answer","text":"Choose Cairn if you want Apache-2.0 open-source code, a Coordinator that decomposes requests and remembers corrections across runs, remote phone approvals over Tailscale or IM, and extra Linux Runners. Choose Conductor if you prefer a polished commercial workspace with built-in Cursor and OpenCode orchestration and integrated PR/diff review UI."}}]}'
+---
+
+Cairn and Conductor both solve the same core macOS problem: running multiple AI coding agents in isolated workspaces without clobbering files. **Cairn** focuses on being an open-source (Apache-2.0) Mac desktop app and personal assistant with a resident Coordinator, cross-run memory, private phone approvals over Tailscale or IM, and optional extra Linux Runners; **Conductor** focuses on an integrated workspace UI for driving Claude Code, Codex, Cursor, and OpenCode side by side with inline diff review and PR checks.
+
+## Side-by-side feature matrix (checked 2026-11-27)
+
+| Dimension | Cairn | Conductor |
+|---|---|---|
+| **License & source** | Apache-2.0 open source on GitHub | Commercial product ([conductor.build](https://www.conductor.build/docs)) |
+| **Mac desktop app** | Native DMG (`arm64` / `x64`) + optional headless Linux server | Mac / cloud agent workspace |
+| **Orchestration model** | Resident Coordinator splits work, remembers corrections, proposes repo checks | Direct parallel workspaces with diff viewer, terminal, and checks |
+| **Supported runtimes** | Built-in pi (ChatGPT device login / API keys / Gemini / relays) + optional Claude Code & Devin | Claude Code, Codex, Cursor, and OpenCode |
+| **Remote mobile & IM** | Tailscale Serve HTTPS + iOS Web Push + Telegram / Slack / WeChat adapters | Desktop/cloud workspace model |
+| **Multi-machine execution** | Attach extra Linux/Mac/VPS Runners via `@xiechimon/cairn-cli` | Single workspace / cloud orchestration |
+
+## Where Conductor is better
+
+Conductor is a stronger pick if you already rely on **Cursor** or **OpenCode** alongside Claude Code and want a dedicated diff-review and workspace UI without self-hosting or managing extra Runners. Its built-in diff viewer and checks workflow are tailored specifically for interactive PR iteration inside one workspace.
+
+## When Cairn fits better
+
+Choose the [Cairn Mac desktop app](/guides/install-cairn-mac-desktop-app/) when you want Apache-2.0 transparency, want a Coordinator that remembers your project rules across tasks ([memory loop](/guides/how-cairn-learns-from-corrections-memory/)), or leave an always-on Mac mini running while approving merges from your iPhone over [Tailscale](/guides/setup-tailscale-mobile-access/) or [Telegram/WeChat](/guides/connect-telegram-slack-im-notifications/).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

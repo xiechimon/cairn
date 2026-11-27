@@ -25,7 +25,7 @@ export const copy = {
     footerNavLabel: '页脚导航',
     title: 'Cairn：从你身上学，也从自己的任务里学',
     description:
-      'Cairn 是开源（Apache-2.0）、自托管的个人开发助理：在一个对话里说清目标，agent 在你自己的电脑上用你现有的模型订阅独立查资料、改代码并验证，只在要拍板时找你。',
+      'Cairn 是开源（Apache-2.0）的 Mac 个人开发助理桌面应用，也支持服务端自托管进阶部署：在一个对话里说清目标，agent 在你自己的电脑上用你现有的模型订阅独立查资料、改代码并验证，只在要拍板时找你。',
     nav: {
       docs: '文档',
       github: 'GitHub',
@@ -165,7 +165,7 @@ export const copy = {
     footerNavLabel: 'Footer',
     title: 'Cairn: Learns from you, and from its own runs.',
     description:
-      'Cairn is an open-source (Apache-2.0), self-hosted personal assistant for people who write code. Describe what you want in one conversation; agents research, build, and verify on your own hardware with your own subscriptions.',
+      'Cairn is an open-source (Apache-2.0) Mac desktop app and personal coding assistant, with an advanced self-hosted server path. Describe what you want in one conversation; agents research, build, and verify on your own hardware with your own subscriptions.',
     nav: {
       docs: 'Docs',
       github: 'GitHub',

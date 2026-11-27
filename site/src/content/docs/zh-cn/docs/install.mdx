@@ -5,20 +5,20 @@ description: 启动 Cairn 服务端，打开网页应用。
 
 import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-服务端就是网页应用、Coordinator 和数据库。你只跑一份，放在你平时用浏览器的机器上，或者一台常开的主机上。光有服务端就能四处看看；要让 agent 真正干活，还要[连接一台 Runner](/zh-cn/docs/runner/) 并[接入模型](/zh-cn/docs/models/)。
+在 Mac 上推荐直接使用 Cairn 桌面应用：它内置了网页应用、Coordinator、SQLite 数据库和本地 pi 执行机，并自动完成 owner 登录。只有在需要独立常驻 Linux 服务端或挂载多台服务器时，才需要走下面的 `npx @xiechimon/cairn` 或 Docker 进阶自托管路线。
 
-## 桌面应用
+## 桌面应用（Mac 首选）
 
 macOS 从[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 DMG：Apple 芯片用 arm64，Intel 用 x64。拖进“应用程序”再打开。应用还没有公证；被拦时到“系统设置 → 隐私与安全性”点“仍要打开”（macOS 14 及更早：右键应用选“打开”）。它会启动服务端和 pi Runner，并以 owner 身份登录。不需要 Node.js、单独安装 pi 或 Codex CLI。接着看[接入模型](/zh-cn/docs/models/)。
 
 Linux x64 桌面端目前是 **本地源码构建**，没有公开下载包或自动更新。按[桌面构建和解压步骤](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive)操作，需要图形会话和 Git。应用自带服务端和 Runner，退出会停止两者。无图形界面的 Linux 服务端用下面的 npm 路线。
 
-## 需要什么
+## 进阶：独立服务端运行环境
 
 - **Node.js 22.19+（22 或 24 LTS）和 Git。** 这两条 LTS 线有预编译的 `better-sqlite3`；别的版本可能要从源码编译，得装编译工具链。
 - 服务端跑在 Linux 或 macOS 上。Windows 要多走下面的配对一步。
 
-## 启动服务端
+## 进阶：启动独立服务端
 
 <Steps>
 

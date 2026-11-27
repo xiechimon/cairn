@@ -1,0 +1,49 @@
+---
+title: Set Up Tailscale Serve for Private Mobile Access to Cairn
+description: Reach your Mac or Linux Cairn server privately over HTTPS from iPhone or Android using Tailscale Serve and one-time pairing codes.
+geo:
+  questionId: en-howto-tailscale
+  template: how-to
+  cluster: mac-mini
+  sources:
+    - docs/deploy/tailscale-mobile.md
+    - docs/configuration.md
+    - site/src/content/docs/docs/install.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Set Up Tailscale Serve for Cairn Mobile Access","step":[{"@type":"HowToStep","name":"Enable MagicDNS and HTTPS","text":"Enable MagicDNS and HTTPS certificates in the Tailscale admin console and confirm both Mac and phone are on the same tailnet."},{"@type":"HowToStep","name":"Expose loopback via Tailscale Serve","text":"Run tailscale serve --bg http://127.0.0.1:8787 (or your server port) on the Cairn host, avoiding Funnel."},{"@type":"HowToStep","name":"Pair your phone","text":"Create a one-time pairing code under Settings -> Remote access and enter it on https://<machine>.<tailnet>.ts.net/app."}]}'
+---
+
+Tailscale Serve lets you open your Mac or home-server Cairn instance from your iPhone or Android device over private HTTPS without exposing any port to the public internet. Tailscale handles encrypted tailnet transport while Cairn still enforces single-use device pairing codes and `HttpOnly` session cookies.
+
+## Step 1: Prepare your server host and Tailscale
+
+1. Install and sign in to Tailscale on both your Cairn host computer and your phone.
+2. In the Tailscale admin console, enable **MagicDNS** and **HTTPS certificates** under **DNS**.
+3. Confirm your Cairn server is running on loopback (port `8787` for `npx @xiechimon/cairn`, or check the server address shown in the Cairn Mac app menu bar icon).
+
+## Step 2: Start Tailscale Serve (never Funnel)
+
+On the host running Cairn:
+
+```sh
+tailscale status
+tailscale serve --bg http://127.0.0.1:8787
+tailscale serve status
+```
+
+If Serve prints an enablement URL, visit it once to enable Serve for your tailnet, then run the command again. Copy the printed HTTPS hostname, such as `https://<machine>.<tailnet>.ts.net`. Do **not** run `tailscale funnel`, which publishes your endpoint to the public internet, and avoid `tailscale serve reset` if you have other Serve routes.
+
+## Step 3: Pair your phone and enable Web Push
+
+1. On your Cairn desktop owner session, open **Settings -> Remote access** and mint a one-time pairing code.
+2. Open `https://<machine>.<tailnet>.ts.net/app` on your phone and enter the code.
+3. On iPhone, use Safari's **Add to Home Screen** before turning on push notifications so iOS Web Push can deliver approval alerts.
+
+Note: a lost paired phone can still approve Runners until revoked; remove it immediately from **Settings -> Remote access** on your owner machine if lost.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

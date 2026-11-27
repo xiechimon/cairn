@@ -1,0 +1,43 @@
+---
+title: Cairn 执行机在线，为什么任务一直停在“排队中（Queued）”？
+description: 排查任务一直处于 Queued 的三大常见原因：本地文件夹项目绑定了离线机器、在线执行机缺少 Claude Code 运行时或模型凭据过期。
+geo:
+  questionId: zh-queued
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - site/src/content/docs/zh-cn/docs/faq.mdx
+    - site/src/content/docs/zh-cn/docs/first-task.mdx
+    - CONTEXT.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Cairn 执行机在线，为什么任务一直停在“排队中（Queued）”？","acceptedAnswer":{"@type":"Answer","text":"任务停在 Queued 说明当前在线的 Runner 不满足该任务的硬约束：常见原因是本地文件夹项目绑定到了另一台离线机器、任务要求的 Claude Code 等运行时未装在当前在线机器上，或设置 -> 模型里所选服务商连接失效。"}}]}'
+---
+
+在 Cairn 里看到有执行机显示**在线**，但任务却一直停在 **排队中（Queued）**，通常不是系统卡死，而是没有一台**同时满足全部硬约束**的在线执行机。先看任务旁边显示的排队原因提示，再按下面三项逐一核对即可解决。
+
+## 常见卡住原因与排查表
+
+| 排队提示方向 | 真正原因 | 解决办法 |
+|---|---|---|
+| **本地路径不可达 / 绑定机器离线** | 「本地文件夹」项目只能在那台登记路径的机器上跑 | 把那台执行机重新上线；若需多机接力，改用 GitHub 仓库形式创建项目 |
+| **缺少目标运行时（如 Claude Code）** | 任务路由选了 Claude Code，但在线执行机未检测到 `claude` | 在执行机安装 `claude` 并确保在 `PATH` 中，重启执行机后去 **设置 → 执行机** 核对 |
+| **模型连接缺失或已过期** | 所选服务商令牌失效或尚未完成设备码登录 | 到 **设置 → 模型** 重新验证或更新订阅令牌 / API key |
+
+## 快速命令行诊断（独立 CLI Runner）
+
+如果任务派往独立的命令行执行机，可以登录那台机器查看状态和实时日志：
+
+```sh
+cairn status
+cairn doctor
+cairn logs -f
+```
+
+如果是 Mac 桌面端内置执行机，打开 **设置 → 执行机** 与 **设置 → 模型** 核对在线状态与连接状态（更多见[常见问题](/zh-cn/docs/faq/)与[第一个任务](/zh-cn/docs/first-task/)）。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

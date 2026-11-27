@@ -1,0 +1,42 @@
+---
+title: Does Cairn Charge Token Markups or Let Me Use Existing Subscriptions?
+description: Cairn charges zero token markups and lets you connect your existing ChatGPT/Codex subscription, Claude Code subscription, or provider API keys directly.
+geo:
+  questionId: en-qa-no-double-billing
+  template: qa
+  cluster: chatgpt-codex
+  sources:
+    - README.md
+    - site/src/content/docs/docs/faq.mdx
+    - site/src/content/docs/docs/models.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does Cairn charge per-token markups or let me use existing ChatGPT and Claude subscriptions?","acceptedAnswer":{"@type":"Answer","text":"Cairn is Apache-2.0 open source and charges zero markups or subscription fees. You authenticate your existing ChatGPT subscription, Claude Code subscription, or provider API keys directly on your own machines."}}]}'
+---
+
+Cairn is completely free (Apache-2.0) and never resells tokens or adds a cloud markup on top of your AI spend. You connect the ChatGPT subscription, Claude Code subscription, or provider API keys you already pay for, and model requests travel straight from your own machine to your chosen provider.
+
+## Supported ways to supply models
+
+| Connection type | How Cairn connects | Extra cost from Cairn |
+|---|---|---|
+| **ChatGPT / Codex subscription** | Browser device-code login inside Cairn (`pi` executes tasks) | $0 |
+| **Claude Code subscription** | `claude setup-token` (`sk-ant-oat01-…`) stored encrypted on your server | $0 |
+| **Provider API keys** | OpenAI, Anthropic, Google Gemini, xAI, or compatible relays | $0 (provider usage only) |
+| **Local / keyless endpoints** | Custom OpenAI or Anthropic-compatible URL with auth header disabled | $0 |
+
+## Why subscription billing stays separate from API billing
+
+Just as OpenAI separates ChatGPT Plus/Pro web limits from `platform.openai.com` prepaid API credits, Cairn respects whichever connection type you configure under **Settings -> Model**:
+
+- Using **ChatGPT subscription** routes through your ChatGPT plan without requiring an OpenAI API key.
+- Using **Claude (Subscription)** routes through your Claude subscription without needing Anthropic API credits, provided `claude` CLI is installed on the Runner.
+- Using **Test connection** in provider settings sends one live check request and may incur normal provider API charges when testing an API key.
+
+For full pricing and future Cairn Cloud scope, see [What does Cairn cost?](/guides/what-does-cairn-cost-open-source-license/) and [Connect a model](/docs/models/).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

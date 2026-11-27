@@ -1,0 +1,43 @@
+---
+title: How to Install the Cairn Mac Desktop App
+description: Download the signed Cairn macOS DMG for Apple Silicon or Intel, clear the first-launch Gatekeeper prompt, and start your bundled server and Runner.
+geo:
+  questionId: en-howto-install-mac
+  template: how-to
+  cluster: mac-mini
+  sources:
+    - README.md
+    - docs/getting-started.md
+    - apps/desktop/README.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Install the Cairn Mac Desktop App","step":[{"@type":"HowToStep","name":"Download DMG","text":"Download Cairn-<version>-mac-arm64.dmg (Apple Silicon) or -x64.dmg (Intel) from GitHub Releases."},{"@type":"HowToStep","name":"Drag to Applications and clear Gatekeeper","text":"Move Cairn.app into /Applications, open it, and click Open Anyway in System Settings -> Privacy & Security."},{"@type":"HowToStep","name":"Connect model and start","text":"Authorize ChatGPT subscription or add an API key in Connect models, confirm settings, and pick a local project."}]}'
+---
+
+Installing the Cairn Mac desktop app takes under three minutes and requires no Node.js, Homebrew, or terminal setup. Download the Apple Silicon (`-mac-arm64.dmg`) or Intel (`-mac-x64.dmg`) disk image from GitHub Releases, drag Cairn into `/Applications`, and launch it to start both the bundled server and local pi Runner with owner access already signed in.
+
+## Step 1: Download the right DMG for your Mac
+
+Open the [latest GitHub release](https://github.com/xiechimon/cairn/releases/latest) and choose:
+
+- **`Cairn-<version>-mac-arm64.dmg`** for M1, M2, M3, and M4 Macs.
+- **`Cairn-<version>-mac-x64.dmg`** for Intel Macs.
+
+Open the DMG and drag **Cairn.app** into `/Applications`. Keep Cairn inside a writable directory like `/Applications` so in-app updates (verified via `desktop-latest.json` SHA-256 and Cairn's signing certificate) can swap the bundle later; running directly from the DMG blocks updates.
+
+## Step 2: Allow the unnotarized app on first launch
+
+Cairn is signed with its own fixed self-signed certificate so macOS preserves permissions across updates, and is not Apple-notarized yet. On first launch:
+
+1. Double-click Cairn in `/Applications`; macOS shows a Gatekeeper warning.
+2. Open **System Settings -> Privacy & Security** and click **Open Anyway** next to Cairn (on macOS 14 and earlier, right-click Cairn in `/Applications` and click **Open**).
+
+## Step 3: Connect a model and run your first task
+
+Once the window opens, complete **Connect models** (ChatGPT device login or API key), verify the **Coordinator** choice in **Confirm settings**, confirm your local Runner is online under **Settings -> Runners**, and select a small local Git repository to test ([First task guide](/docs/first-task/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

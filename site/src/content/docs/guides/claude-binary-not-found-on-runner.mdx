@@ -1,0 +1,39 @@
+---
+title: "Fix 'claude binary: not found' on a Cairn Runner"
+description: Resolve claude binary not found in Cairn Runner logs by putting the claude CLI on the daemon PATH or setting CAIRN_CLAUDE_BIN, then verifying with cairn doctor.
+geo:
+  questionId: en-ts-claude-not-found
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - docs/getting-started.md
+    - apps/daemon/src/cli.ts
+    - site/src/content/docs/docs/models.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I fix claude binary: not found on a Cairn Runner?","acceptedAnswer":{"@type":"Answer","text":"Install the Claude Code CLI on the Runner host, verify its path is visible on the daemon PATH (or set CAIRN_CLAUDE_BIN), restart the Runner (or quit and reopen the Cairn Mac app), and confirm detection with cairn doctor or Settings -> Runners."}}]}'
+---
+
+When Cairn logs `claude binary: not found` or **Settings -> Runners** lists Claude Code as unavailable, the Runner cannot find an executable `claude` binary on its daemon `PATH`. Install the Claude Code CLI on that machine (or expose its install folder via `PATH` / `CAIRN_CLAUDE_BIN`), then restart the Runner so capabilities refresh.
+
+## Step-by-step fix
+
+1. **Check if `claude` is installed in your shell:**
+   ```sh
+   command -v claude
+   ```
+   If nothing prints, install Claude Code on that host first.
+2. **Fix non-interactive `PATH` mismatches:** Daemons launched from macOS Finder (`Cairn.app`) or Linux `systemd` do not always inherit shell additions in `.zshrc` or `.bashrc` (such as `~/.local/bin` or NVM paths). Either:
+   - Symlink or install `claude` into a standard path like `/usr/local/bin` or `~/.local/bin`, or
+   - Set `CAIRN_CLAUDE_BIN` to the exact binary path on CLI Runners, or ensure the systemd unit `Environment=PATH=...` includes the directory containing `claude`.
+3. **Restart and verify:**
+   - On Mac desktop: quit Cairn from the menu bar and reopen it, then check **Settings -> Runners**.
+   - On a CLI Runner: run `cairn restart && cairn doctor` and check `cairn logs -f` for `claude binary: <path>`.
+
+Remember that bundled **pi** runs ChatGPT and API-key tasks without `claude`; only Claude Code tasks require the `claude` CLI ([Claude token setup](/guides/setup-claude-code-subscription-token/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

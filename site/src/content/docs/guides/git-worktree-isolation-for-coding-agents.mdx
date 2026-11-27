@@ -1,0 +1,37 @@
+---
+title: How Cairn Isolates Each Coding Agent Task with Git Worktrees
+description: Every Cairn task runs in an isolated git worktree under workspaces/ on its own branch, keeping your main branch clean and preventing multi-agent conflicts.
+geo:
+  questionId: en-qa-worktree-isolation
+  template: qa
+  cluster: claude-code
+  sources:
+    - CONTEXT.md
+    - docs/privacy.md
+    - site/src/content/docs/docs/first-task.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How does Cairn isolate each coding agent task with git worktrees?","acceptedAnswer":{"@type":"Answer","text":"Each build claims a dedicated git worktree directory under workspaces/<conversationId> with its own branch on the executing Runner. Parallel agents never touch your working checkout or another thread worktree, and completed work waits on its task branch until you approve merging."}}]}'
+---
+
+Cairn isolates every coding task inside its own dedicated git worktree (`workspaces/<conversationId>`) and task branch on the Runner host, rather than letting agents edit your primary checkout directly. Because worktrees sit outside your active working directory, concurrent tasks cannot clobber uncommitted changes or pollute each other's `git status`.
+
+## Worktree isolation by repository type
+
+| Project repo form | Source of truth | Where the worktree lives | What happens if the Runner dies |
+|---|---|---|---|
+| **Local folder (`localPath`)** | The registered git folder on that specific Runner | `<CAIRN_HOME>/workspaces/<conversationId>` on that machine | Progress stays tied to that host until it comes back online |
+| **GitHub repo (`githubRepo`)** | Remote GitHub repository | Cloned worktree on whichever eligible Runner claims the step | Any other online Runner can clone and continue |
+| **Server-hosted bare repo (`hosted`)** | Bare Git repository inside Cairn server data | Cloned worktree on any eligible Runner | Another Runner can pick up work from the server |
+
+## Why external worktrees beat `.claude/worktrees/`
+
+Placing worktrees inside a hidden subfolder of the main repo often confuses file watchers, bundlers, and broad `find` or `rm` tool calls. Keeping Cairn's task checkouts under the Runner's own `workspaces/` directory keeps your main repository clean while allowing multiple agents to run `git diff`, build steps, and tests concurrently.
+
+When a task finishes (`Done`), its commits stay on its task branch. Say "merge it" in the conversation (or review the diff first) when you are ready for Cairn to land the branch.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

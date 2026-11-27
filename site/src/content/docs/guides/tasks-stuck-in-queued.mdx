@@ -1,0 +1,43 @@
+---
+title: Why Are Cairn Tasks Stuck in Queued Even When My Runner Is Online?
+description: Diagnose Cairn tasks stuck in Queued by checking the inline queue reason, local-folder Runner binding, Claude CLI presence, and model credentials.
+geo:
+  questionId: en-ts-queued
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - site/src/content/docs/docs/faq.mdx
+    - site/src/content/docs/docs/first-task.mdx
+    - CONTEXT.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why are Cairn tasks stuck in Queued even when my Runner is online?","acceptedAnswer":{"@type":"Answer","text":"Tasks stay Queued when no online Runner satisfies the task constraints: a local-folder project bound to a different offline machine, an optional runtime like Claude Code missing on the online Runner, or a missing/expired model connection under Settings -> Model."}}]}'
+---
+
+When a Cairn task remains in `Queued` despite a Runner showing **Online**, Cairn cannot match the task's hard constraints to any available Runner. Read the exact reason badge displayed beside `Queued`, then check whether a local-folder project is pinned to another machine, an optional CLI runtime is missing, or the selected model provider is expired.
+
+## Three most common causes and fixes
+
+| Queue blocker | Why it happens | How to unblock |
+|---|---|---|
+| **Local-folder project bound to another machine** | `localPath` projects can only execute on the specific Runner holding that directory | Bring that Runner back online, or switch the project to a GitHub repo so any Runner can clone it |
+| **Missing optional runtime (`claude`)** | Task targets Claude Code, but the online Runner does not detect `claude` on `PATH` | Install `claude` on that Runner, restart it, and verify in **Settings -> Runners** |
+| **Missing or expired model credential** | Selected provider token under **Settings -> Model** expired or was removed | Re-verify or reconnect the provider under **Settings -> Model** |
+
+## Inspect live Runner diagnostics
+
+On any standalone CLI Runner, check readiness and live logs:
+
+```sh
+cairn status
+cairn doctor
+cairn logs -f
+```
+
+If you are using the Mac desktop app, open **Settings -> Runners** to verify that the bundled local Runner is online and lists the runtimes your task requires ([First task guide](/docs/first-task/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

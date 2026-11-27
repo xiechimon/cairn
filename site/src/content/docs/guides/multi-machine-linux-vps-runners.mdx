@@ -1,0 +1,56 @@
+---
+title: Multi-Machine & Linux VPS Runners in Cairn
+description: Connect extra Linux, macOS, or cloud VPS Runners to one Cairn server, and learn when to use the advanced headless server path.
+geo:
+  questionId: en-hub-multi-machine
+  template: hub
+  cluster: multi-machine
+  sources:
+    - docs/getting-started.md
+    - docs/configuration.md
+    - site/src/content/docs/docs/runner.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do you connect a Mac desktop app with extra Linux or VPS Runners in Cairn?","acceptedAnswer":{"@type":"Answer","text":"Keep one Cairn server on your primary machine or an always-on host, then install @xiechimon/cairn-cli on each additional Linux or macOS machine and run cairn start --server <url> (or --api-key and --team for headless VPS boxes)."}}]}'
+---
+
+One Cairn server can coordinate multiple physical and virtual execution machines at once. While most solo developers start with the Mac desktop app—which automatically enrolls its own local Runner—you can attach extra Linux workstations, home servers, or cloud VPS boxes using `@xiechimon/cairn-cli`, or graduate to the advanced headless Linux server (`npx @xiechimon/cairn` or Docker) when you want a server that never sleeps.
+
+## Choosing your topology
+
+| Setup | Server location | Best for |
+|---|---|---|
+| **Mac desktop + extra Runners** | Cairn Mac app (over Tailscale or LAN) | Mac-first users who occasionally offload heavy Linux builds to a VPS |
+| **Headless Linux server + Mac/VPS Runners (advanced)** | `npx @xiechimon/cairn` or Docker | 24/7 control plane in a homelab or cloud VM with multiple enrolled machines |
+
+## Enrolling an extra Runner
+
+On any machine with Node.js 22.19+ (22 or 24 LTS) and Git:
+
+```sh
+npm install -g @xiechimon/cairn-cli@latest
+cairn start --server https://<your-server-url>
+```
+
+If the remote machine has no browser, generate an API key in **Settings -> API keys** and run:
+
+```sh
+cairn start --api-key <cairn_...> --team <teamId> --server https://<your-server-url>
+```
+
+## Important project-form boundary
+
+- **GitHub-connected projects** clone from GitHub, so any online Runner with the required runtime can pick up the next task.
+- **Local-folder projects** bind to an absolute path on one specific machine; if that Runner goes offline, tasks stay `Queued` until that host reconnects.
+
+## Related guides in this cluster
+
+- [Advanced: run a headless Cairn server on Linux with npm or Docker](/guides/run-cairn-headless-linux-server-docker/)
+- [Keep a Linux Runner online across reboots with systemd](/guides/keep-linux-runner-online-systemd/)
+- [Why the `cairn` command can run the wrong package](/guides/cairn-command-runs-wrong-package/)
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

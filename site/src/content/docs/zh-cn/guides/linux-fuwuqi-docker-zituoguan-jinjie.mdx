@@ -1,0 +1,56 @@
+---
+title: 进阶部署：怎么在无界面 Linux 服务器用 npx 或 Docker 自托管 Cairn 服务端？
+description: 当需要脱离 Mac 桌面端独立常驻运行 Cairn 服务端时，可用 npx @xiechimon/cairn 或 Docker 部署，并挂载独立的 systemd Linux Runner。
+geo:
+  questionId: zh-linux-docker
+  template: how-to
+  cluster: multi-machine
+  sources:
+    - docs/getting-started.md
+    - docs/configuration.md
+    - site/src/content/docs/zh-cn/docs/install.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"在无界面 Linux 服务器自托管 Cairn 服务端","step":[{"@type":"HowToStep","name":"启动服务端","text":"在 Linux 主机执行 npx @xiechimon/cairn，或使用官方 Dockerfile 搭配 CAIRN_TOKEN 与 /data 卷启动容器。"},{"@type":"HowToStep","name":"挂载独立 Runner","text":"在需要执行代码任务的机器上全局安装 @xiechimon/cairn-cli，并用 cairn start --api-key 和 --team 注册执行机。"},{"@type":"HowToStep","name":"配置持久化与备份","text":"在 Linux 执行机配置 systemd 用户单元保持常驻，并完整备份 /data 或 ~/.cairn 目录及 secretbox.key。"}]}'
+---
+
+大多数用户推荐直接从 [Cairn Mac 桌面应用](/zh-cn/docs/install/)起步；当你想把控制面独立部署在无图形界面的 Linux 家庭服务器或云端 VPS 上时，可以使用 `npx @xiechimon/cairn` 或 Docker 的进阶自托管路径。注意服务端只负责 Web 界面、Coordinator 与数据库，代码任务仍需至少连接一台 Runner 执行机。
+
+## 方式一：Node.js 22/24 LTS 直接启动
+
+确保安装 Node.js 22.19+（22 或 24 LTS，自带预编译 `better-sqlite3`）与 Git：
+
+```sh
+npx @xiechimon/cairn
+```
+
+服务端默认监听 `127.0.0.1:8787`，数据初始化在 `~/.cairn`。同机 Linux 浏览器可通过回环自动登录；若绑定非回环地址，必须同时配置 `HOST` 与 `CAIRN_TOKEN`。
+
+## 方式二：Docker 容器部署（推荐加 TLS 反代）
+
+在 Cairn 源码目录构建并运行容器（镜像开启 `CAIRN_REQUIRE_TOKEN=1`，未设置 `CAIRN_TOKEN` 会拒绝启动）：
+
+```sh
+docker build -t cairn .
+docker run -d --name cairn -v cairn-data:/data \
+  -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
+```
+
+容器内所有状态都存在 `/data` 卷中（还可通过 `CAIRN_LITESTREAM_BUCKET` 启用 SQLite WAL 连续复制，但仍需单独备份 `secretbox.key`）。在前端加上 Caddy、Nginx 或 Tailscale Serve 终止 TLS。
+
+## 挂载无界面 Runner 并保持常驻
+
+在执行代码任务的机器上全局安装 `@xiechimon/cairn-cli`（不要把 `@xiechimon/cairn` 也装成全局以免 `cairn` 命令冲突），在网页 **设置 → API 密钥** 生成密钥后执行：
+
+```sh
+npm install -g @xiechimon/cairn-cli@latest
+cairn start --api-key <cairn_...> --team <teamId> --server https://<你的服务端地址>
+```
+
+随后按[Runner 文档](/zh-cn/docs/runner/)配置 `systemd --user` 单元使用 `cairn start --foreground`，即可跨重启和 SSH 断开保持常驻在线。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

@@ -1,0 +1,32 @@
+---
+title: 用 AI 编程助理时，怎么保证源码、API 密钥和本地凭据不上传到第三方云端？
+description: 了解 Cairn 的本地加密存储（secretbox.key）、macOS Seatbelt 沙箱隔离、日志密钥脱敏与不经过第三方托管服务器的数据边界。
+geo:
+  questionId: zh-local-privacy
+  template: qa
+  cluster: privacy
+  sources:
+    - docs/privacy.md
+    - docs/configuration.md
+    - site/src/content/docs/zh-cn/docs/faq.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"用 AI 编程助理时，怎么保证源码、API 密钥和本地凭据不上传到第三方云端？","acceptedAnswer":{"@type":"Answer","text":"Cairn 没有中间托管云和内置遥测：项目源码留在你本地 Runner 的 git worktree 里，模型与团队密钥使用本机 secretbox.key 加密存进 server.db，且团队密钥不会直接暴露在任务子进程环境变量中，请求直连你配置的服务商。"}}]}'
+---
+
+在 Cairn 中，你的项目源码、历史对话和所有密钥默认完全留在你自己的电脑或服务器上，不经过任何 Cairn 官方中转云。只有当你主动配置模型服务商、GitHub 仓库或外部集成时，相应请求才会由你的机器直接发往你指定的目标服务。
+
+## 四道本地隐私与防泄漏机制
+
+1. **所有密钥用 `secretbox.key` 本地加密：** 模型 API key、订阅令牌、团队密钥和聊天集成凭据在写入 `server.db` 前都由本地 `secretbox.key` 密封。Mac 桌面端数据存放在 `~/Library/Application Support/@cairn/desktop/`（备份时务必连同 `secretbox.key` 一起备份）。
+2. **团队密钥不进子进程环境变量：** 授权给任务的团队密钥不会预先塞进 shell 环境变量里，而是通过受审计的检索通道按需获取，减少被误打印或扫描的风险。
+3. **macOS Seatbelt 与独立配置目录：** Mac 上的任务进程受 Cairn 自有 Seatbelt 策略约束，且 Cairn 为 agent 维护隔离的配置目录（不直接混用你本机的 `~/.claude` 或 `~/.gemini` 登录目录）。
+4. **日志与追踪脱敏：** Runner 上传步骤记录到你自己的服务端前，会把形如 `sk-`、Bearer、`token=` 的凭据替换为 `[REDACTED]`。
+
+如果连 GitHub 都不想接，建项目时选择 **本地文件夹**，代码甚至不会推送到任何外部 Git 托管平台（见[隐私说明](https://github.com/xiechimon/cairn/blob/main/docs/privacy.md)与[常见问题](/zh-cn/docs/faq/)）。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

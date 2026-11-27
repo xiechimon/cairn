@@ -5,20 +5,20 @@ description: Start the Cairn server and open the web app.
 
 import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-The server is the web app, the Coordinator and the database. You run one copy, on the machine you browse from or on an always-on host. It alone is enough to look around; agents start working once you [connect a Runner](/docs/runner/) and [a model](/docs/models/).
+The Mac desktop app is the recommended starting point: it bundles the web app, Coordinator, SQLite database, and local pi Runner with owner sign-in built in. Running a standalone server with `npx @xiechimon/cairn` or Docker on a headless host is the advanced path once you want to separate the server or attach extra machines.
 
-## Desktop app
+## Desktop app (recommended on Mac)
 
 On macOS, download the appropriate DMG from the [latest release](https://github.com/xiechimon/cairn/releases/latest): arm64 for Apple silicon, x64 for Intel. Drag Cairn to Applications and open it. It is not notarized: if macOS blocks it, use System Settings → Privacy & Security → Open Anyway (on macOS 14 and earlier, right-click the app and choose Open). The app starts its server and pi Runner and signs you in as the owner. Node.js, a separate pi installation and the Codex CLI are not required. Continue with [Connect a model](/docs/models/).
 
 Linux x64 desktop is currently a **local source build**, not a published download or automatic update. Follow the [desktop build and extraction commands](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive). It requires a graphical Linux session and Git. It starts its own server and Runner; quit the app to stop them. For a headless Linux server, use npm below.
 
-## Requirements
+## Advanced: self-hosted server requirements
 
 - **Node.js 22.19+ on the 22 or 24 LTS line, and Git.** These LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to compiling from source and need a build toolchain.
 - Linux or macOS for the server. Windows needs the pairing step below.
 
-## Start the server
+## Advanced: start the standalone server
 
 <Steps>
 

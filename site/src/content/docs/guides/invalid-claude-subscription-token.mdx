@@ -1,0 +1,42 @@
+---
+title: Fix Invalid or Rejected Claude Subscription Token in Cairn
+description: Why Cairn rejects non-sk-ant-oat01 tokens or local claude logins, and how to mint and verify a working setup token under Settings -> Model.
+geo:
+  questionId: en-ts-invalid-token
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - docs/getting-started.md
+    - site/src/content/docs/docs/models.mdx
+    - site/src/content/docs/docs/faq.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I fix an invalid or rejected Claude subscription token in Cairn?","acceptedAnswer":{"@type":"Answer","text":"Cairn Claude (Subscription) provider accepts only setup tokens beginning with sk-ant-oat01- generated via claude setup-token. Standard sk-ant-api API keys must be added as an Anthropic API key provider instead, and expired tokens must be regenerated and verified under Settings -> Model."}}]}'
+---
+
+Cairn rejects a Claude subscription credential when the pasted string is not an `sk-ant-oat01-…` subscription setup token, has been revoked or expired, or was confused with a standard Anthropic API key (`sk-ant-api…`). Mint a fresh token with `claude setup-token` and verify it directly in **Settings -> Model**.
+
+## Check which credential type you actually have
+
+| Credential prefix | Where it goes in Cairn | Requires `claude` CLI? |
+|---|---|---|
+| `sk-ant-oat01-…` (from `claude setup-token`) | **Settings -> Model -> Add provider -> Claude (Subscription)** | Yes, on Runners running Claude Code |
+| `sk-ant-api…` (from Anthropic Console) | **Settings -> Model -> Add provider -> Anthropic (API key)** | No (runs via bundled pi) |
+
+## Regenerate and re-verify a subscription token
+
+1. On a machine signed in to your active Claude subscription, run:
+   ```sh
+   claude setup-token
+   ```
+2. Copy the complete `sk-ant-oat01-…` line with no trailing whitespace or quotes.
+3. Under **Settings -> Model**, replace the connection token and click **Verify**.
+4. Cairn calls the Anthropic account API to confirm the token is active; if it reports an authentication failure, run `claude auth login` first to refresh your local Claude sign-in, then re-run `claude setup-token`.
+
+Note that running `claude` interactively in Terminal (or `cairn claude login`) alone does not replace the team subscription token inside Cairn ([Models guide](/docs/models/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

@@ -1,0 +1,47 @@
+---
+title: "Advanced: Self-Host Cairn on Linux with npm or Docker"
+description: Run Cairn on a headless Linux server using npx @xiechimon/cairn or the official Dockerfile with CAIRN_TOKEN, Litestream WAL backups, and a CLI Runner.
+geo:
+  questionId: en-howto-docker-linux
+  template: how-to
+  cluster: multi-machine
+  sources:
+    - docs/getting-started.md
+    - docs/configuration.md
+    - site/src/content/docs/docs/install.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Self-Host Cairn on Headless Linux","step":[{"@type":"HowToStep","name":"Start server via npx or Docker","text":"Run npx @xiechimon/cairn with Node.js 22/24 LTS, or build and run the Docker image with CAIRN_TOKEN and a /data volume."},{"@type":"HowToStep","name":"Enroll at least one Runner","text":"Install @xiechimon/cairn-cli globally on an execution machine and run cairn start --api-key <key> --team <teamId>."}]}'
+---
+
+While most users start with the Mac desktop app, Cairn also supports an advanced self-hosted server path on headless Linux machines via `npx @xiechimon/cairn` or Docker. Remember that the server only hosts the web UI, Coordinator, and SQLite database—you still enroll at least one `@xiechimon/cairn-cli` Runner so agents have a machine to execute code on.
+
+## Option A: Run directly with `npx @xiechimon/cairn`
+
+Requires Node.js 22.19+ (22 or 24 LTS so `better-sqlite3` loads prebuilt binaries) and Git:
+
+```sh
+npx @xiechimon/cairn
+```
+
+The server binds `127.0.0.1:8787`, initializes `~/.cairn`, and automatically signs in a local Linux browser on the same machine via loopback peer proof. To listen on another port, set `PORT=9000 npx @xiechimon/cairn`. To expose over LAN, set `HOST` and `CAIRN_TOKEN` together (non-loopback binds refuse to start without a token).
+
+## Option B: Run in Docker
+
+From a checkout of the Cairn repository:
+
+```sh
+docker build -t cairn .
+docker run -d --name cairn -v cairn-data:/data \
+  -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
+```
+
+The container sets `CAIRN_REQUIRE_TOKEN=1` and exits if `CAIRN_TOKEN` is missing. Place TLS termination (such as Caddy, Nginx, or Tailscale Serve) in front of port `8787` because bearer tokens travel in headers, and back up the full `/data` volume (or configure `CAIRN_LITESTREAM_BUCKET` + `secretbox.key` backup).
+
+Next, enroll a Runner by following [Keep a Linux Runner online with systemd](/guides/keep-linux-runner-online-systemd/).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

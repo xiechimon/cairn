@@ -1,0 +1,33 @@
+---
+title: How Cairn Remembers Corrections and Improves Across Tasks
+description: Corrections you give the Coordinator are saved into persistent memory, repeated mistakes trigger check-task proposals, and failed runs pass lessons to retries.
+geo:
+  questionId: en-qa-memory-learning
+  template: qa
+  cluster: claude-code
+  sources:
+    - site/src/components/copy.ts
+    - CONTEXT.md
+    - README.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How does Cairn remember user corrections and improve across future tasks?","acceptedAnswer":{"@type":"Answer","text":"Cairn persists corrections you give the Coordinator into project memory so later conversations carry them automatically. When the same mistake repeats, the Coordinator proposes adding an automated check to your repository, and failed runs pass structured failure context to retries."}}]}'
+---
+
+Cairn learns across three loops rather than treating every conversation as a blank slate: what you correct becomes persistent memory for future turns, repeated mistakes prompt the Coordinator to propose an automated check in your repo, and failed runs pass their failure lessons forward to retries.
+
+## The three self-improvement loops
+
+1. **Persistent Coordinator memory (`MEMORY.md`):** When you correct a convention or preference in conversation, the Coordinator saves an entry in memory that is automatically loaded into subsequent sessions. You can also inspect and edit memory entries directly inside the app.
+2. **From repeated correction to repo check:** If you catch yourself correcting the same class of error more than once, Cairn proposes creating a task to encode that rule into your repository (such as a lint rule, test assertion, or CI check) so future agents cannot repeat it.
+3. **Retry lesson handoff:** When a task build fails or stalls, Cairn preserves the structured failure context and trace so the next retry does not blindly repeat the identical broken command.
+
+## Measured against a public eval suite
+
+To verify that Coordinator behavior and coding runs actually get better rather than drifting, Cairn includes a public `eval/` suite in the repository combining Coordinator turn replays, real coding tasks, and canary checks.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

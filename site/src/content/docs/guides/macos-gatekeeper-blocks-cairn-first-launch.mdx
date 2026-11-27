@@ -1,0 +1,33 @@
+---
+title: Fix macOS Gatekeeper Blocking Cairn on First Launch
+description: Cairn.app is signed with Cairn's own certificate and not Apple-notarized yet; allow it once via System Settings -> Privacy & Security -> Open Anyway.
+geo:
+  questionId: en-ts-gatekeeper
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - README.md
+    - apps/desktop/README.md
+    - site/src/content/docs/docs/install.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I fix macOS Gatekeeper blocking Cairn on first launch?","acceptedAnswer":{"@type":"Answer","text":"Drag Cairn.app into /Applications first, attempt to open it once, then open System Settings -> Privacy & Security and click Open Anyway next to Cairn (on macOS 14 and earlier, right-click Cairn in /Applications and choose Open)."}}]}'
+---
+
+macOS blocks the first launch of `Cairn.app` because the desktop app is signed with Cairn's fixed self-signed certificate rather than Apple notarization yet. To open Cairn safely without stripping permissions on future updates, drag `Cairn.app` to `/Applications`, open **System Settings -> Privacy & Security**, and click **Open Anyway** next to Cairn.
+
+## Exact steps by macOS version
+
+1. **Move to `/Applications` first:** Do not launch directly from the mounted DMG volume or Downloads (running from a translocated path also disables in-app updates).
+2. **macOS 15 Sequoia and newer:** Double-click **Cairn** in `/Applications`, dismiss the Gatekeeper dialog, open **System Settings -> Privacy & Security**, scroll down to the Security section, and click **Open Anyway**.
+3. **macOS 14 Sonoma and earlier:** Right-click (Control-click) **Cairn.app** in `/Applications` and choose **Open** from the context menu, then confirm **Open** in the dialog.
+
+## Why Cairn uses a fixed self-signed certificate
+
+Instead of ad-hoc signing (`identity: '-'`), Cairn signs releases with a consistent certificate so macOS preserves your Accessibility and Screen Recording permissions across in-app auto-updates. When you click **Update to …** in the sidebar later, Cairn verifies the downloaded `.zip` SHA-256 and checks the certificate before swapping the bundle.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

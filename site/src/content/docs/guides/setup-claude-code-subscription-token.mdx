@@ -1,0 +1,46 @@
+---
+title: Connect a Claude Code Subscription Token to Cairn
+description: Generate a sk-ant-oat01- token with claude setup-token, add and verify it in Settings -> Model, and make sure claude is on your Runner PATH.
+geo:
+  questionId: en-howto-claude-token
+  template: how-to
+  cluster: claude-code
+  sources:
+    - docs/getting-started.md
+    - site/src/content/docs/docs/models.mdx
+    - apps/daemon/src/cli.ts
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Connect a Claude Code Subscription Token to Cairn","step":[{"@type":"HowToStep","name":"Install Claude Code CLI on Runners","text":"Install the claude CLI on every Runner host that should execute Claude Code tasks and confirm it is on PATH."},{"@type":"HowToStep","name":"Mint a setup token","text":"Run claude setup-token on a computer signed in to your Claude subscription and copy the sk-ant-oat01- token."},{"@type":"HowToStep","name":"Add and verify in Cairn","text":"Open Settings -> Model -> Add provider -> Claude (Subscription), paste the token, and press Verify."}]}'
+---
+
+To run Claude Code tasks through Cairn using your Claude Pro or Max subscription, generate a subscription token with `claude setup-token` and save it under **Settings -> Model -> Claude (Subscription)**. Simply running `claude` interactively on your machine does not register the subscription inside Cairn.
+
+## Step 1: Ensure `claude` is installed on every Claude Runner
+
+Claude Code is an optional separate runtime rather than part of pi. On each Mac or Linux Runner that will execute Claude Code threads, verify that `claude` is on `PATH` (or set `CAIRN_CLAUDE_BIN`). You can confirm detection with `cairn doctor` or inside **Settings -> Runners**.
+
+## Step 2: Generate the `sk-ant-oat01-…` subscription token
+
+On any computer signed in to your Claude subscription, run:
+
+```sh
+claude setup-token
+```
+
+Copy the entire `sk-ant-oat01-…` token printed by the CLI.
+
+## Step 3: Save and verify inside Cairn
+
+1. In Cairn, go to **Settings -> Model -> Add provider**.
+2. Pick **Claude** tagged **Subscription**, give the connection a name, paste the `sk-ant-oat01-…` token, and optionally record its expiry date.
+3. Click **Verify**. Cairn checks the token directly against the Anthropic account API and reports whether it is valid or revoked.
+4. Review **Settings -> Model** routing rules. When a valid Claude Code runtime and subscription exist without overriding rules, tasks default to `claude-sonnet-5-5`, while Coordinator keeps its own selection.
+
+If you ever need to sign in inside Cairn's managed Claude home separately, run `cairn claude login` on the CLI Runner ([Model docs](/docs/models/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

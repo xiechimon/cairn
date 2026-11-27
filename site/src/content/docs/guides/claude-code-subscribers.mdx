@@ -1,0 +1,45 @@
+---
+title: Cairn for Claude Code Subscribers
+description: Run multiple Claude Code tasks in parallel on macOS using your existing Claude subscription token and isolated git worktrees.
+geo:
+  questionId: en-hub-claude-code
+  template: hub
+  cluster: claude-code
+  sources:
+    - README.md
+    - docs/getting-started.md
+    - site/src/content/docs/docs/models.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do Claude Code subscribers run parallel background tasks with Cairn on Mac?","acceptedAnswer":{"@type":"Answer","text":"Install the Cairn Mac desktop app, generate a subscription token with claude setup-token, add it under Settings -> Model -> Claude (Subscription), and verify that claude is installed on each Runner. Cairn then dispatches parallel tasks into isolated git worktrees without extra token markups."}}]}'
+---
+
+Claude Code subscribers can use Cairn on macOS to dispatch multiple background coding tasks concurrently while keeping every change isolated in its own git worktree and task branch. You start with the Cairn Mac desktop app (`Cairn-<version>-mac-arm64.dmg` or `x64.dmg`), then add your `sk-ant-oat01-` subscription token once under **Settings -> Model** so every enrolled Runner can execute Claude Code tasks.
+
+## How Cairn differs from raw `claude` terminal tabs
+
+Running several `claude` sessions manually in terminal tabs forces you to track branches, approve permissions interactively, and watch for colliding file edits. Cairn inserts one Coordinator above those threads:
+
+- **One conversation, multiple worktrees:** The Coordinator splits requests into background tasks. Each Runner checks out a dedicated directory under `~/.cairn/workspaces/<conversationId>` on its own branch.
+- **No per-Runner re-login:** Instead of running `claude` interactive auth on every box, you paste one `claude setup-token` into **Settings -> Model** and verify it against the Anthropic account API.
+- **Mac-first, optional remote Runners:** The Mac desktop app bundles the server and local Runner. If you also attach a Linux server or second Mac via `@xiechimon/cairn-cli`, ensure `claude` is on `PATH` (or `CAIRN_CLAUDE_BIN`) there.
+
+## Quick setup path
+
+1. Download and open the [Cairn Mac desktop app](/guides/install-cairn-mac-desktop-app/).
+2. Run `claude setup-token` on a signed-in computer and add it in [Connect a model](/docs/models/).
+3. Verify `claude` detection with `cairn doctor` on any extra CLI Runner, or inspect **Settings -> Runners** in the desktop app.
+4. Keep your existing `~/.claude` hooks and skills separate, or copy them once into Cairn's managed home with `cairn agent-config import`.
+
+## Related guides in this cluster
+
+- [Can I run multiple Claude Code agents in parallel on one Mac?](/guides/run-parallel-claude-code-agents-mac/)
+- [How to set up a Claude Code subscription token in Cairn](/guides/setup-claude-code-subscription-token/)
+- [Cairn vs Conductor](/guides/cairn-vs-conductor/) and [Cairn vs plain Claude Code CLI](/guides/cairn-vs-claude-code-cli/)
+- Troubleshooting: [`claude binary: not found`](/guides/claude-binary-not-found-on-runner/) and [Invalid Claude subscription token](/guides/invalid-claude-subscription-token/)
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

@@ -1,0 +1,43 @@
+---
+title: Cairn on a Mac Mini as a 24/7 Coding Agent Runner
+description: Turn an always-on Mac mini into a personal coding agent workstation using the Cairn Mac desktop app and private Tailscale mobile approvals.
+geo:
+  questionId: en-hub-mac-mini
+  template: hub
+  cluster: mac-mini
+  sources:
+    - README.md
+    - apps/desktop/README.md
+    - docs/deploy/tailscale-mobile.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do you set up a Mac mini as an always-on Cairn coding agent workstation?","acceptedAnswer":{"@type":"Answer","text":"Install the Cairn Mac desktop app on the Mac mini so the server and local Runner stay active in the menu bar even when you close the window. Disable automatic sleep in macOS Energy settings or keep a schedule active, then put Tailscale Serve in front of loopback for private iPhone approvals."}}]}'
+---
+
+An always-on Mac mini is the ideal home for Cairn because the Mac desktop app bundles the server, local pi Runner, and owner session in one menu-bar process without draining your laptop battery. Closing the desktop window hides the UI while keeping the background server and Runner alive; quitting the app stops both cleanly.
+
+## Why developers pair a Mac mini with Cairn
+
+- **Native macOS toolchain:** Xcode, Apple Silicon builds, local databases, and macOS Seatbelt task confinement work natively without Linux container workarounds.
+- **Background work while you step away:** The Coordinator runs research, builds, and tests on the Mac mini while you travel with an iPhone or MacBook.
+- **No public ports:** Putting `tailscale serve` in front of Cairn's loopback port gives your phone private HTTPS access on your tailnet—with one-time device pairing codes still required—instead of exposing your server to the public internet.
+
+## Recommended Mac mini checklist
+
+1. Install `Cairn-<version>-mac-arm64.dmg` in `/Applications` and clear the unnotarized Gatekeeper prompt once ([Gatekeeper guide](/guides/macos-gatekeeper-blocks-cairn-first-launch/)).
+2. Enable **Prevent automatic sleeping when the display is off** in macOS Energy settings so long-running builds do not pause mid-step.
+3. Configure [Tailscale Serve](/guides/setup-tailscale-mobile-access/) for mobile web access, or connect [Telegram or Slack](/guides/connect-telegram-slack-im-notifications/) for instant approval cards in chat.
+4. Back up `~/Library/Application Support/@cairn/desktop/` (keeping both `server.db` and `secretbox.key` together).
+
+## Related guides in this cluster
+
+- [How to install the Cairn Mac desktop app](/guides/install-cairn-mac-desktop-app/)
+- [Approve agent changes from your iPhone](/guides/approve-agent-changes-from-iphone/)
+- [Schedule recurring agent tasks with cron](/guides/schedule-recurring-agent-tasks-cron/)
+- [Fix Runner going offline after sleep or logout](/guides/runner-offline-after-sleep-or-logout/)
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

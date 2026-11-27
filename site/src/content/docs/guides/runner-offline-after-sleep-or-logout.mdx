@@ -1,0 +1,39 @@
+---
+title: Fix a Cairn Runner Going Offline After Mac Sleep or SSH Logout
+description: Keep Mac desktop Runners awake on Mac mini, or install a persistent Linux systemd user unit so CLI Runners survive SSH logouts and reboots.
+geo:
+  questionId: en-ts-offline
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - site/src/content/docs/docs/faq.mdx
+    - site/src/content/docs/docs/runner.mdx
+    - apps/desktop/README.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I fix a Cairn Runner going offline after Mac sleep or SSH logout?","acceptedAnswer":{"@type":"Answer","text":"On a Mac, prevent automatic sleep in macOS Energy settings or keep the Cairn desktop app running in the menu bar without quitting. On Linux, plain background processes started by cairn start exit on logout; switch to a persistent systemd user unit running cairn start --foreground."}}]}'
+---
+
+A Cairn Runner goes **Offline** after Mac sleep or SSH logout because macOS suspends background execution when asleep, and on Linux a transient unit or background process spawned by `cairn start` exits when your login session ends. Because enrollment credentials stay saved in `machine.json`, you never have to re-approve the machine—you only need to keep the host awake or use a persistent service.
+
+## On macOS (Mac desktop app)
+
+- **Closing the window is safe; quitting stops the Runner:** Closing the Cairn window hides it while keeping the server and Runner alive in the menu bar. Only choosing **Quit Cairn** stops them.
+- **Prevent automatic sleep on a Mac mini:** In macOS **System Settings -> Energy** (or **Battery -> Options** on desktop-mode Macs), enable **Prevent automatic sleeping when the display is off**.
+- **Built-in wake support:** When **Keep the Screen On** is enabled or a scheduled run is imminent, the Mac desktop app keeps the display awake and swaps the menu bar icon to show the cup indicator.
+
+## On Linux (standalone CLI Runner)
+
+If a Linux Runner stops when your SSH session disconnects:
+
+```sh
+cairn start          # reconnects immediately using ~/.cairn/machine.json
+```
+
+To make it survive reboots and logouts permanently, follow [Keep a Linux Runner online with systemd](/guides/keep-linux-runner-online-systemd/) (`cairn start --foreground` inside `~/.config/systemd/user/cairn-daemon.service`).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

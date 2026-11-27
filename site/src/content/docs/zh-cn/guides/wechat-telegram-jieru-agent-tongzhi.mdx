@@ -1,0 +1,37 @@
+---
+title: 怎么把微信（iLink）、Telegram 或 Slack 接进 Cairn 接收审批和派发任务？
+description: Cairn 支持在设置 -> 聊天应用里接入个人微信（iLink 扫码）、Telegram Bot 与 Slack Socket Mode，全程主动外连无需公网域名。
+geo:
+  questionId: zh-wechat-telegram
+  template: how-to
+  cluster: mac-mini
+  sources:
+    - docs/design/im-connections.md
+    - docs/privacy.md
+    - docs/spec/18-positioning-and-differentiation.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"把微信或 Telegram 接进 Cairn","step":[{"@type":"HowToStep","name":"打开设置 -> 聊天应用","text":"在 Cairn Mac 桌面端或服务端打开设置 -> 聊天应用，选择微信、Telegram 或 Slack。"},{"@type":"HowToStep","name":"完成凭据配置或扫码","text":"Telegram 填入 BotFather 令牌，Slack 填入 App/Bot 令牌，个人微信直接扫码绑定 iLink。"},{"@type":"HowToStep","name":"核准发送者配对","text":"在聊天软件里给机器人发消息后，回到 Cairn 设置批准你的发送者配对请求。"}]}'
+---
+
+Cairn 把微信（iLink）、Telegram 和 Slack 作为连接 Coordinator 的轻量化入口：适配器全部采用**主动外连（长轮询或 Socket Mode）**，不需要你在路由器做端口映射或购买公网域名，就能在聊天软件里接收进展通知并回复数字或点击按钮完成审批。
+
+## 三种聊天入口对比
+
+| 平台 | 接入方式 | 交互形式 | 注意事项 |
+|---|---|---|---|
+| **个人微信（iLink）** | 微信扫码绑定（无需开发者认证） | 纯文本分段与数字编号回复 | 非官方公开稳定协议，会话过期需重新扫码；受单条约 1800 字与回复时间窗限制 |
+| **Telegram** | BotFather 获取 Bot Token | 内联按钮 + 数字编号回复兜底 | 长轮询外连，适合作为主力远程审批入口 |
+| **Slack** | App Token（`xapp-`）+ Bot Token（`xoxb-`） | Block Kit 按钮 + 仅私信（DM）触发 | 不接入群聊广播，安全边界清晰 |
+
+## 配置与安全提醒
+
+1. 在 **设置 → 聊天应用** 完成连接添加后，先发一条消息给机器人，再在 Cairn 设置中手动批准发送者配对——未配对的陌生账号发来的消息和按钮点击都会被忽略。
+2. 切勿直接在微信或 Telegram 聊天框里发送 API key 等敏感密钥，所有密钥都应在 Cairn 本地的设置页填写。
+3. 若需要看完整的任务 diff 和终端输出，建议同时配合[手机 Tailscale 远程访问](/zh-cn/guides/shouji-tailscale-yuancheng-shenpi/)。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

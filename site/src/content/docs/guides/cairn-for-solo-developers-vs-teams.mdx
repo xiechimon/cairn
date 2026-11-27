@@ -1,0 +1,35 @@
+---
+title: Is Cairn Built for Solo Developers or Multi-User Teams?
+description: Cairn is built strictly for one person—you run your own Mac app or server copy with no shared team channels, roles, or pooled billing.
+geo:
+  questionId: en-qa-solo-vs-teams
+  template: qa
+  cluster: privacy
+  sources:
+    - README.md
+    - docs/spec/18-positioning-and-differentiation.md
+    - site/src/content/docs/docs/faq.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is Cairn built for solo developers or multi-user teams?","acceptedAnswer":{"@type":"Answer","text":"Cairn is built for one person. Each developer runs their own Mac desktop app or self-hosted copy using their own subscriptions and machines. Cairn intentionally excludes shared team channels, role-based access control, and pooled team billing."}}]}'
+---
+
+Cairn is designed strictly for **one person**, not a multi-user engineering team. Each person who wants Cairn runs their own Mac desktop app (or self-hosted server), connects their own model subscriptions, and owns all data on their own hardware.
+
+## What Cairn intentionally leaves out
+
+Because Cairn focuses on the solo developer workflow—one Coordinator supervising background work across your own machines and phone—several multiplayer features are explicitly out of scope:
+
+- **No shared chat spaces or multi-user permissions:** Only the owner (and paired devices belonging to that owner) accesses the instance.
+- **No pooled team billing or shared subscription seats:** Every user supplies their own ChatGPT, Claude Code, or API credentials.
+- **No per-seat admin dashboards:** Settings like **Team secrets** in the UI refer to the single personal tenant boundary inside your own database, not a multi-user org.
+
+## When to pick a team tool instead
+
+If your primary requirement is a shared workspace where multiple engineers watch the same agent threads, manage role permissions, and share one company billing pool, use a multiplayer product such as [Amp Spaces](https://ampcode.com/docs/spaces) ([Cairn vs Amp Spaces](/guides/cairn-vs-amp-spaces/)). For solo developers who want full ownership on their Mac and personal devices, Cairn avoids multiplayer complexity completely.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

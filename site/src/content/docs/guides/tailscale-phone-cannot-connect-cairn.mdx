@@ -1,0 +1,36 @@
+---
+title: Fix Tailscale Serve Connection and Pairing Failures from iPhone
+description: Troubleshoot blank pages, MagicDNS hostname failures, VPN tunnel conflicts, and expired single-use pairing codes when opening Cairn on iPhone over Tailscale.
+geo:
+  questionId: en-ts-tailscale-connect
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - docs/deploy/tailscale-mobile.md
+    - docs/configuration.md
+    - site/src/content/docs/docs/faq.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I fix Tailscale Serve connection and pairing failures from iPhone to Cairn?","acceptedAnswer":{"@type":"Answer","text":"Verify both devices are connected to the same tailnet with MagicDNS and HTTPS enabled, check tailscale serve status points to Cairn loopback port, exclude 100.64.0.0/10 from conflicting VPNs on iOS, and mint a fresh single-use pairing code in Settings -> Remote access."}}]}'
+---
+
+When your iPhone cannot open Cairn or pairing fails over Tailscale, the culprit is almost always one of four settings: MagicDNS/HTTPS not enabled, `tailscale serve` pointing at the wrong loopback port, an iOS VPN conflict blocking `100.64.0.0/10`, or an expired/used pairing code.
+
+## Diagnostic checklist (in order)
+
+1. **Confirm `tailscale serve status` points to your active Cairn port:**
+   ```sh
+   tailscale serve status
+   ```
+   Remember that the Cairn Mac desktop app picks a free loopback port (shown in its menu bar menu), whereas `npx @xiechimon/cairn` defaults to `127.0.0.1:8787`. Make sure `tailscale serve` proxies the exact running port.
+2. **Use the HTTPS MagicDNS hostname, never a raw IP:** Open `https://<machine>.<tailnet>.ts.net/app` in Safari. Both MagicDNS and HTTPS certificates must be enabled in the Tailscale admin console.
+3. **Check iOS VPN conflicts:** iOS allows only one active VPN-class tunnel at a time. If you use a proxy or TUN-mode VPN alongside Tailscale, route `100.64.0.0/10` directly or disable the conflicting tunnel.
+4. **Mint a fresh pairing code:** Pairing codes are single-use and time-limited. Generate a new code from your desktop owner session under **Settings -> Remote access**.
+
+Also confirm your Mac did not go to sleep—if the server machine sleeps, the tailnet HTTPS page stops responding until it wakes ([Tailscale setup guide](/guides/setup-tailscale-mobile-access/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

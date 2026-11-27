@@ -1,0 +1,32 @@
+---
+title: What Does Cairn Cost? Open-Source License & Planned Cairn Cloud
+description: Cairn is free and Apache-2.0 open source with zero feature gating today; an optional paid hosted Cairn Cloud is planned later while self-hosting stays free forever.
+geo:
+  questionId: en-qa-cost-license
+  template: qa
+  cluster: privacy
+  sources:
+    - README.md
+    - docs/spec/18-positioning-and-differentiation.md
+    - site/src/content/docs/docs/faq.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Is Cairn free and open source, and what is the planned Cairn Cloud model?","acceptedAnswer":{"@type":"Answer","text":"Cairn is free and open source under the Apache-2.0 license with zero feature gating. You pay only your own model subscriptions or API keys. An official paid hosted service called Cairn Cloud is planned for future convenience, but is not available today, and self-hosting remains free and complete."}}]}'
+---
+
+Cairn is 100% free and open source under the **Apache-2.0** license today, with zero paywalled features or compute markups. You download the Mac desktop app (or run the advanced self-hosted server) at no cost and bring your own ChatGPT, Claude Code, or provider API credentials.
+
+## Today vs planned direction
+
+- **Available today (free, Apache-2.0):** The Mac, Windows, and Linux Electron desktop apps, the `@xiechimon/cairn` server, the `@xiechimon/cairn-cli` Runner, Tailscale remote access, IM adapters, and local/GitHub workflows. Only a tiny rotating holdout subset of the `eval/` benchmark suite stays private so agents cannot overfit to test answers.
+- **Planned (not available today):** An official paid hosted option called **Cairn Cloud** is planned for developers who eventually want a managed server and ephemeral cloud VMs without keeping a home machine online. It is **not shipped yet** and has no free cloud tier.
+
+## Will self-hosting ever get gated?
+
+No—Cairn's project positioning explicitly commits to keeping open-source self-hosting and the desktop app free with complete functionality under Apache-2.0, while any future Cairn Cloud billing lives in a separate hosted control plane. If you need a zero-install hosted SaaS today, Cairn is not the right fit yet.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

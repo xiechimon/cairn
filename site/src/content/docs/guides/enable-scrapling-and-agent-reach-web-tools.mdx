@@ -1,0 +1,50 @@
+---
+title: Enable Scrapling and Agent Reach Web Tools on a Cairn Runner
+description: Opt in to Scrapling HTTP extraction and Agent Reach channels on your Mac desktop bundled Runner or CLI Runner without touching global Python or browser cookies.
+geo:
+  questionId: en-howto-web-tools
+  template: how-to
+  cluster: claude-code
+  sources:
+    - docs/getting-started.md
+    - apps/daemon/src/cli.ts
+    - docs/privacy.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Enable Web Tools on a Cairn Runner","step":[{"@type":"HowToStep","name":"Install Scrapling HTTP tools","text":"Run cairn web-tools install (or invoke the bundled runner cli.mjs inside Cairn.app on Mac) to create the isolated web-tools environment."},{"@type":"HowToStep","name":"Opt in to Agent Reach","text":"Run cairn web-tools agent-reach --enable and restart the Runner."},{"@type":"HowToStep","name":"Inspect channel readiness","text":"Run cairn web-tools agent-reach doctor and add only the specific channels you need."}]}'
+---
+
+By default, Cairn Runners download no external web-scraping tools on first launch; agents use their built-in web fetch tools. When you want **Scrapling** markdown extraction or **Agent Reach** multi-platform channels, you can opt in explicitly per Runner without polluting your system Python or automatically importing browser cookies.
+
+## For the Cairn Mac desktop app (bundled Runner)
+
+Do not install a second global `cairn-cli` for the Mac app. Invoke the desktop app's bundled Runner CLI directly from Terminal:
+
+```sh
+CAIRN_HOME="$HOME/Library/Application Support/@cairn/desktop/runner" \
+ELECTRON_RUN_AS_NODE=1 /Applications/Cairn.app/Contents/MacOS/Cairn \
+  /Applications/Cairn.app/Contents/Resources/runner/dist/cli.mjs web-tools install
+```
+
+To enable Agent Reach on the Mac desktop app's Runner, replace `web-tools install` above with `web-tools agent-reach --enable`, then quit and reopen Cairn.
+
+## For standalone CLI Runners
+
+```sh
+cairn web-tools install
+cairn web-tools agent-reach --enable
+cairn restart
+cairn web-tools agent-reach doctor
+cairn web-tools agent-reach add <channel>
+```
+
+## Isolation details
+
+- Tools install into `${CAIRN_HOME}-web-tools` (for example `~/.cairn-web-tools`) using a private Python 3.12 and `uv`, keeping Runner credentials separate.
+- Enabling Agent Reach never logs in automatically, never reads browser cookies on its own, and can be disabled any time with `cairn web-tools agent-reach --disable` without deleting installed data.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

@@ -1,0 +1,36 @@
+---
+title: Use Your ChatGPT Subscription Without Installing Codex CLI
+description: Connect your ChatGPT Plus or Pro account inside the Cairn Mac app via browser device code and run tasks with the bundled pi engine—no Codex CLI needed.
+geo:
+  questionId: en-qa-codex-no-cli
+  template: qa
+  cluster: chatgpt-codex
+  sources:
+    - README.md
+    - site/src/content/docs/docs/models.mdx
+    - docs/getting-started.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can I use my ChatGPT subscription to run coding agents without installing the Codex CLI?","acceptedAnswer":{"@type":"Answer","text":"Yes. Cairn includes the pi execution engine in its Mac desktop app and CLI Runner. Selecting ChatGPT subscription in Connect models uses a browser device-login code to authenticate directly inside Cairn without installing the Codex CLI or running codex login."}}]}'
+---
+
+Yes—you can run coding agents with your ChatGPT Plus or Pro subscription directly inside the Cairn Mac desktop app without installing the Codex CLI or running `codex login`. Cairn bundles the **pi** execution engine inside its Runner, so completing Cairn's in-app browser device-code login lets both the Coordinator and background tasks run out of the box.
+
+## Step-by-step connection inside Cairn
+
+1. Open the [Cairn Mac desktop app](/guides/install-cairn-mac-desktop-app/) (no separate Node.js, pi, or Codex CLI install required).
+2. On the **Connect models** onboarding screen—or later under **Settings -> Model -> Add provider**—select **ChatGPT subscription**.
+3. Open the device-login URL shown by Cairn in your browser, sign in to your OpenAI account, and enter the one-time device code while keeping Cairn open.
+4. On **Confirm settings**, verify the **Coordinator** model (on a fresh ChatGPT-only setup it defaults to **GPT-6.1 Sol**, with tasks executing via bundled **pi**) and click **Confirm and start chatting**.
+
+## Common misconception to avoid
+
+Running `codex login` in your terminal does **not** supply credentials to Cairn's Runner, and installing the external Codex CLI is unnecessary for this route. Cairn stores its own encrypted OAuth subscription token on your server (`server.db` sealed with `secretbox.key`), so any extra Runners you enroll can share the connection without repeating interactive Codex logins on every machine.
+
+If you later want to add an OpenAI API key, Google Gemini key, or Claude Code subscription alongside ChatGPT, manage all connections and routing priorities under **Settings -> Model** ([Model connection docs](/docs/models/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

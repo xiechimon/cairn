@@ -1,0 +1,69 @@
+---
+title: Cairn Guides & Answers
+description: Real-world guides for running coding agents on macOS, connecting existing subscriptions, isolating tasks in git worktrees, and optional self-hosted setups.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+Start with the [Cairn Mac desktop app](/docs/install/) (`Cairn-<version>-mac-arm64.dmg` or `x64.dmg`), then use these guides to connect your subscriptions, run parallel tasks in isolated git worktrees, manage a 24/7 Mac mini, or attach headless Linux Runners. Each page answers one real developer question against the Cairn repository.
+
+## Workflow Hubs
+
+<CardGrid>
+  <LinkCard title="Cairn for Claude Code subscribers" description="Use claude setup-token across Runners with git worktree isolation." href="/guides/claude-code-subscribers/" />
+  <LinkCard title="Cairn for ChatGPT & Codex subscribers" description="Authorize via device login and run tasks with bundled pi—no Codex CLI install needed." href="/guides/chatgpt-codex-subscribers/" />
+  <LinkCard title="Mac mini as a 24/7 coding agent runner" description="Run the Mac desktop app around the clock and approve merges from your phone." href="/guides/mac-mini-always-on-runner/" />
+  <LinkCard title="Multi-machine & Linux VPS Runners" description="Pair your Mac desktop or advanced self-hosted server with remote Linux Runners." href="/guides/multi-machine-linux-vps-runners/" />
+  <LinkCard title="Privacy & local-first architecture" description="Keep repositories, server.db, secretbox.key, and worktrees on your own hardware." href="/guides/privacy-local-first-developers/" />
+</CardGrid>
+
+## Questions & Answers
+
+- [Run multiple Claude Code agents in parallel on Mac](/guides/run-parallel-claude-code-agents-mac/)
+- [Use ChatGPT subscription without installing Codex CLI](/guides/run-codex-without-installing-codex-cli/)
+- [Monitor agents and approve merges from iPhone](/guides/approve-agent-changes-from-iphone/)
+- [Where source code, tokens, and secrets live](/guides/keep-source-code-and-api-keys-local/)
+- [Subscriptions vs markups: how Cairn billing works](/guides/use-existing-ai-subscriptions-no-double-billing/)
+- [How git worktree isolation prevents file collisions](/guides/git-worktree-isolation-for-coding-agents/)
+- [Connect custom OpenAI or Anthropic-compatible endpoints](/guides/use-custom-openai-or-anthropic-compatible-endpoints/)
+- [Use Google Gemini API with Cairn coding agents](/guides/use-google-gemini-api-with-coding-agents/)
+- [Using Cairn with local Git repos without GitHub](/guides/does-cairn-work-without-github/)
+- [Cairn for solo developers vs multi-user teams](/guides/cairn-for-solo-developers-vs-teams/)
+- [Open-source license and planned Cairn Cloud](/guides/what-does-cairn-cost-open-source-license/)
+- [How Cairn blocks irreversible actions until approved](/guides/how-cairn-prevents-irreversible-agent-actions/)
+- [How Cairn remembers corrections across tasks](/guides/how-cairn-learns-from-corrections-memory/)
+- [Connect external MCP servers safely](/guides/connect-mcp-servers-to-coding-agents/)
+- [Schedule recurring agent tasks with cron](/guides/schedule-recurring-agent-tasks-cron/)
+
+## Step-by-Step How-Tos
+
+- [Install the Cairn Mac desktop app](/guides/install-cairn-mac-desktop-app/)
+- [Set up Tailscale Serve for private mobile access](/guides/setup-tailscale-mobile-access/)
+- [Connect a Claude Code subscription token](/guides/setup-claude-code-subscription-token/)
+- [Back up and migrate Cairn data and secretbox.key](/guides/backup-and-migrate-cairn-data/)
+- [Advanced: self-host Cairn on Linux with npm or Docker](/guides/run-cairn-headless-linux-server-docker/)
+- [Keep a Linux Runner online with systemd](/guides/keep-linux-runner-online-systemd/)
+- [Receive approval cards via Telegram or Slack](/guides/connect-telegram-slack-im-notifications/)
+- [Enable Scrapling and Agent Reach web tools](/guides/enable-scrapling-and-agent-reach-web-tools/)
+
+## Comparisons
+
+- [Cairn vs Conductor](/guides/cairn-vs-conductor/)
+- [Cairn vs Vibe Kanban](/guides/cairn-vs-vibe-kanban/)
+- [Cairn vs Crystal (Nimbalyst)](/guides/cairn-vs-crystal/)
+- [Cairn vs plain Claude Code CLI + tmux](/guides/cairn-vs-claude-code-cli/)
+- [Cairn vs T3 Code](/guides/cairn-vs-t3-code/)
+- [Cairn vs Amp Spaces](/guides/cairn-vs-amp-spaces/)
+- [Cairn vs OpenClaw](/guides/cairn-vs-openclaw/)
+- [Open-source Claude Code desktop alternatives on macOS](/guides/open-source-claude-code-desktop-alternatives/)
+
+## Troubleshooting
+
+- [Fix macOS Gatekeeper blocking first launch](/guides/macos-gatekeeper-blocks-cairn-first-launch/)
+- [Fix tasks stuck in Queued](/guides/tasks-stuck-in-queued/)
+- [Fix Runner going offline after sleep or logout](/guides/runner-offline-after-sleep-or-logout/)
+- [Fix claude binary not found on Runner](/guides/claude-binary-not-found-on-runner/)
+- [Fix invalid Claude subscription token](/guides/invalid-claude-subscription-token/)
+- [Fix Tailscale phone connection or pairing errors](/guides/tailscale-phone-cannot-connect-cairn/)
+- [Fix cairn CLI running the wrong binary](/guides/cairn-command-runs-wrong-package/)
+- [Why npm paired browsers cannot add providers on macOS](/guides/npm-browser-pairing-cannot-add-providers-macos/)

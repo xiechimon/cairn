@@ -1,0 +1,44 @@
+---
+title: "Cairn vs T3 Code: Coordinator Orchestration vs Direct CLI Control Plane"
+description: Both Cairn and T3 Code let you use your own subscriptions across desktop and phone; compare T3 Code's direct thread speed with Cairn's Coordinator and gating.
+geo:
+  questionId: en-cmp-t3-code
+  template: compare
+  cluster: comparisons
+  sources:
+    - README.md
+    - docs/spec/18-positioning-and-differentiation.md
+    - site/src/content/docs/docs/faq.mdx
+  competitorSources:
+    - url: https://github.com/pingdotgg/t3code
+      date: "2026-11-27"
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Cairn vs T3 Code: Coordinator orchestration vs direct CLI control plane","acceptedAnswer":{"@type":"Answer","text":"T3 Code is an MIT-licensed, ultra-fast control plane with native iOS/Android apps where you drive coding agents directly per thread. Cairn is an Apache-2.0 personal assistant with a Coordinator that researches, decomposes tasks, remembers corrections, enforces merge gates, and supports IM bots alongside Tailscale mobile access."}}]}'
+---
+
+Both **Cairn** and **T3 Code** (`pingdotgg/t3code`) let solo developers run coding agents on their own machines using their existing subscriptions without token markups. The core difference is workflow style: **T3 Code** is a fast, direct control plane for steering agent threads yourself across desktop and native mobile apps, while **Cairn** puts a resident **Coordinator** in front of background threads so you delegate goals and only step in for decisions.
+
+## Feature comparison (checked 2026-11-27)
+
+| Dimension | Cairn | T3 Code |
+|---|---|---|
+| **License** | Apache-2.0 | MIT |
+| **Control model** | Coordinator decomposes work, runs prior-art checks, surfaces at most 3 decisions | Direct thread interface where you switch models mid-thread and drive the CLI |
+| **Mobile experience** | Responsive web app over Tailscale Serve + iOS Web Push + Telegram/Slack/WeChat | Dedicated desktop, web, iOS, and Android apps + T3 Connect |
+| **Memory & self-checks** | Persistent Coordinator memory + check-task proposals + `eval/` suite | Thread-level workspace and diff/PR actions |
+| **Execution engines** | Built-in pi (no external Codex CLI needed) + optional Claude Code & Devin | Drives ACP / installed coding agent CLIs on your machine |
+
+## Where T3 Code is better
+
+T3 Code is a better fit if you want a **minimal-latency UI wrapper** to drive coding CLIs yourself, value native iOS and Android apps over a PWA/Tailscale flow, or want to switch models mid-thread inside a single manual session ([T3 Code README](https://github.com/pingdotgg/t3code)).
+
+## When Cairn fits better
+
+Choose Cairn when you want higher-level delegation—describing an outcome once, letting background threads research and verify in worktrees, enforcing confirm/review merge checks, and receiving approval cards in [Tailscale web or chat apps](/guides/approve-agent-changes-from-iphone/).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

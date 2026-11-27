@@ -1,0 +1,40 @@
+---
+title: Why Paired npm Browsers Cannot Add Model Providers on macOS
+description: On macOS and Windows, npx @xiechimon/cairn browser pairing yields a paired device session rather than owner access; use the Mac desktop app or the owner token.
+geo:
+  questionId: en-ts-npm-pairing-owner
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - docs/getting-started.md
+    - site/src/content/docs/docs/install.mdx
+    - apps/desktop/README.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why cannot a paired npm browser session add model providers or approve Runners on macOS?","acceptedAnswer":{"@type":"Answer","text":"Loopback peer-UID owner verification works on Linux but not on macOS or Windows, so browsers paired with a pairing code against npx @xiechimon/cairn lack owner privileges. On macOS, switch to the Cairn Mac desktop app (which signs you in as owner automatically) or authenticate owner writes with the token in ~/.cairn/token."}}]}'
+---
+
+If you started `npx @xiechimon/cairn` on macOS or Windows and signed into the browser with a pairing code, your session is a **paired device**, not an **owner** session—so adding model providers, managing secrets, or approving Runners is blocked. On macOS, the easiest fix is to use the **Cairn Mac desktop app**, which signs its window in as the owner automatically.
+
+## Why Linux behaves differently from macOS/Windows
+
+Linux lets the server verify the local browser process UID over loopback (`SO_PEERCRED`), automatically granting an owner session. macOS and Windows lack equivalent loopback peer-UID proof, so browser pairing intentionally scopes sessions below owner privileges until authenticated with the local owner token.
+
+## Two ways to fix it
+
+1. **Recommended on Mac — switch to the Cairn Mac desktop app:** Download `Cairn-<version>-mac-arm64.dmg` (or `x64.dmg`) from [GitHub Releases](https://github.com/xiechimon/cairn/releases/latest). The Electron main process reads `CAIRN_HOME/token`, injects owner bearer auth solely for its own window origin, and automatically enrolls the bundled local Runner ([Install Mac app](/guides/install-cairn-mac-desktop-app/)).
+2. **Advanced headless `npx` path — use the owner token from `~/.cairn/token`:**
+   ```sh
+   curl -s -X POST \
+     -H "Authorization: Bearer $(cairn token | head -1)" \
+     -H "Content-Type: application/json" \
+     -d '{"enrollId":"<enroll value>"}' \
+     http://127.0.0.1:8787/api/machine/enroll/confirm
+   ```
+   Remember that owner token curls apply only to standalone `npx`/Docker servers; the Mac desktop app handles owner writes internally.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

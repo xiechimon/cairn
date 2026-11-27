@@ -1,0 +1,70 @@
+---
+title: Keep a Cairn Linux Runner Online Across Reboots with systemd
+description: Enroll @xiechimon/cairn-cli once, then configure a persistent systemd user service running cairn start --foreground so Runners survive SSH logouts and reboots.
+geo:
+  questionId: en-howto-systemd-runner
+  template: how-to
+  cluster: multi-machine
+  sources:
+    - docs/getting-started.md
+    - site/src/content/docs/docs/runner.mdx
+    - apps/daemon/src/cli.ts
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Keep a Cairn Linux Runner Online with systemd","step":[{"@type":"HowToStep","name":"Enroll the Runner once","text":"Install @xiechimon/cairn-cli globally and run cairn start --server <url> (or --api-key and --team) to write ~/.cairn/machine.json."},{"@type":"HowToStep","name":"Stop transient daemon","text":"Run cairn stop before creating the persistent user unit."},{"@type":"HowToStep","name":"Install systemd user unit","text":"Create ~/.config/systemd/user/cairn-daemon.service executing cairn start --foreground and enable it with systemctl --user enable --now."}]}'
+---
+
+On Linux, `cairn start` launches a transient systemd user unit (`cairn-daemon-<id>.service`) or plain background process that exits when you log out or reboot. To keep a Linux Runner online 24/7 across reboots and SSH disconnects, enroll the machine once and install a persistent `systemd --user` unit running `cairn start --foreground`.
+
+## Step 1: Enroll the machine once
+
+```sh
+npm install -g @xiechimon/cairn-cli@latest
+cairn start --server http://127.0.0.1:8787
+```
+
+Approve the link in Cairn (or pass `--api-key <cairn_...> --team <teamId>` on a headless VPS). This saves credentials in `~/.cairn/machine.json`. Then stop the transient process:
+
+```sh
+cairn stop
+```
+
+## Step 2: Create the persistent systemd user service
+
+Find your binary paths with `command -v cairn` and `command -v node`, then write `~/.config/systemd/user/cairn-daemon.service`:
+
+```ini
+[Unit]
+Description=Cairn daemon
+
+[Service]
+Environment=PATH=/directory/of/node:/usr/local/bin:/usr/bin:/bin
+ExecStart=/path/to/cairn start --foreground
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+## Step 3: Enable, linger, and verify
+
+```sh
+systemctl --user daemon-reload
+systemctl --user enable --now cairn-daemon.service
+cairn status
+cairn doctor
+```
+
+If you want the unit to keep running even when no interactive SSH session is logged in, enable user lingering once on that Linux host:
+
+```sh
+loginctl enable-linger "$USER"
+```
+
+When debugging why a Runner dropped or missed an optional CLI binary like `claude`, inspect live daemon logs with `cairn logs -f` and verify the `Environment=PATH=...` line in your unit file includes both Node.js and any agent CLI directories. See [Runner setup](/docs/runner/) for additional remote flags.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

@@ -1,0 +1,38 @@
+---
+title: Connect External MCP Servers to Cairn Coding Agents Safely
+description: Add external MCP servers under Settings -> Apps, grant them selectively per work policy, and keep credentials encrypted on your server.
+geo:
+  questionId: en-qa-mcp-servers
+  template: qa
+  cluster: claude-code
+  sources:
+    - CONTEXT.md
+    - docs/privacy.md
+    - apps/daemon/src/cli.ts
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I connect external MCP servers to Cairn coding agents safely?","acceptedAnswer":{"@type":"Answer","text":"Register external MCP servers under Settings -> Apps in Cairn, or import existing Claude/Codex MCP configs once via cairn agent-config import. Cairn stores MCP credentials encrypted in server.db, scrubs tokens from logs, and grants MCP tools only to steps permitted by work policies."}}]}'
+---
+
+You can connect external Model Context Protocol (MCP) servers inside Cairn under **Settings -> Apps** without exposing their API tokens across unrelated projects or leaking credentials into agent transcripts. Cairn exposes approved MCP tools to task steps as `mcp__<identifier>__<tool>` and keeps credentials sealed inside your local server database.
+
+## Two ways to bring MCP servers into Cairn
+
+1. **Add in Settings -> Apps:** Register public or custom MCP servers directly in the Cairn Mac app UI, where connection secrets are encrypted with `secretbox.key`.
+2. **One-time import from local Claude/Codex configs:** On a Runner with existing `~/.claude` or Codex MCP setups, run:
+   ```sh
+   cairn agent-config import
+   ```
+   This copies skills and MCP servers into Cairn's isolated managed homes without mutating your personal CLI dotfiles. Pass `--force` only if you want to re-run an already completed import.
+
+## Why Cairn isolates MCP access
+
+- **Work-policy scoping:** Rather than giving every agent every tool globally, Cairn grants specific `mcpServers` per route work policy.
+- **Credential scrubbing:** Runner logs and OpenTelemetry spans redact secret values before storage so tool responses never persist plaintext bearer keys.
+- **Outbound exposure with API keys:** If you want external MCP clients (such as Claude Code or Codex outside Cairn) to query Cairn's Coordinator, mint a scoped `cairn_…` API key under **Settings -> API keys** with explicit read/write allowlists.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

@@ -1,0 +1,37 @@
+---
+title: Does Cairn Work with Local Git Repositories Without GitHub?
+description: Yes—create a Local folder project in Cairn pointing at any initialized Git repository on your Mac or Runner with zero GitHub connection required.
+geo:
+  questionId: en-qa-without-github
+  template: qa
+  cluster: privacy
+  sources:
+    - CONTEXT.md
+    - site/src/content/docs/docs/first-task.mdx
+    - docs/privacy.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does Cairn work with local Git repositories without connecting GitHub?","acceptedAnswer":{"@type":"Answer","text":"Yes. When creating a project in Cairn, choose Select repo -> Local folder and enter or browse to any initialized local Git repository on your Mac or Runner. No GitHub account or OAuth token is required, and completed task branches can be merged locally."}}]}'
+---
+
+Yes—Cairn works completely offline from GitHub when you bind a project to a **Local folder** (`localPath`) on your Mac or Runner. You do not need a GitHub account, OAuth app, or pull request workflow to run tasks, isolate worktrees, or merge finished branches locally.
+
+## How local-folder projects behave vs GitHub projects
+
+When you click **New project -> Select repo** in Cairn, you pick between two repository modes:
+
+- **Local folder:** Point Cairn at an absolute path to an initialized `.git` directory on the Runner's filesystem (for example `~/my-app`). No code leaves that machine for Git hosting, and finished tasks land directly on local branches you can merge locally.
+- **GitHub repo:** Connect GitHub or specify `owner/repo`. Progress is pushed to GitHub branches/PRs so any online Runner can pick up subsequent tasks.
+
+## Constraints of the local-folder mode
+
+1. **Must be an initialized Git repository:** Cairn checks that the path is absolute, exists, and is a valid Git repository with at least one commit before creating worktrees.
+2. **Bound to one Runner:** Because the source of truth lives on that machine's disk, tasks for a local-folder project stay `Queued` if that specific Runner is offline rather than failing over to another host.
+
+Try it safely in two minutes with a throwaway repository by following [Your first task](/docs/first-task/).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

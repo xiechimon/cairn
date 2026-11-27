@@ -1,0 +1,38 @@
+---
+title: Why Does the cairn CLI Command Run the Server Instead of the Runner?
+description: Both @xiechimon/cairn and @xiechimon/cairn-cli expose a cairn binary; fix binary shadowing by using the Mac desktop app or running the server via npx.
+geo:
+  questionId: en-ts-wrong-binary
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - docs/getting-started.md
+    - site/src/content/docs/docs/faq.mdx
+    - site/src/content/docs/docs/runner.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does the cairn CLI command run the server instead of the Runner?","acceptedAnswer":{"@type":"Answer","text":"Both @xiechimon/cairn (server) and @xiechimon/cairn-cli (Runner daemon) install a bin named cairn, so whichever package was installed globally last owns the name. Remove global @xiechimon/cairn, run the server with npx @xiechimon/cairn (or use the Mac desktop app), and install only @xiechimon/cairn-cli globally."}}]}'
+---
+
+If typing `cairn start` or `cairn doctor` launches the server or fails with unexpected server behavior, both `@xiechimon/cairn` (server) and `@xiechimon/cairn-cli` (Runner daemon) were installed globally on the same machine. Because both npm packages define a `cairn` binary, whichever package was installed last overwrote the `cairn` command on your `PATH`.
+
+## How to resolve the binary collision
+
+1. **Check which package currently owns `cairn`:**
+   ```sh
+   cairn version
+   command -v cairn
+   ```
+2. **Use the clean split for npm setups:** Uninstall any global `@xiechimon/cairn` package and keep **only** the Runner CLI installed globally:
+   ```sh
+   npm uninstall -g @xiechimon/cairn
+   npm install -g @xiechimon/cairn-cli@latest
+   ```
+   Run the standalone server via `npx @xiechimon/cairn` (or Docker) so it never claims the global `cairn` binary name.
+3. **Or use the Mac desktop app:** On macOS, the desktop app bundles both the server and the Runner without requiring any global npm binaries. If you need CLI subcommands on the Mac app's bundled Runner, invoke `cli.mjs` inside `Cairn.app` directly rather than installing a second global `cairn-cli` ([Web tools guide](/guides/enable-scrapling-and-agent-reach-web-tools/)).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

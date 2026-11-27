@@ -1,0 +1,32 @@
+---
+title: macOS 提示“无法验证开发者”打不开 Cairn 桌面应用怎么办？
+description: Cairn Mac 应用使用自有固定证书签名、暂未做 Apple 公证；先把应用拖入应用程序目录，再到系统设置 -> 隐私与安全性点“仍要打开”。
+geo:
+  questionId: zh-gatekeeper
+  template: troubleshoot
+  cluster: troubleshoot
+  sources:
+    - README.zh.md
+    - apps/desktop/README.md
+    - site/src/content/docs/zh-cn/docs/install.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"macOS 提示“无法验证开发者”打不开 Cairn 桌面应用怎么办？","acceptedAnswer":{"@type":"Answer","text":"先把 Cairn.app 拖进“应用程序”目录再尝试打开，然后进入 macOS 系统设置 -> 隐私与安全性，在 Cairn 旁点击“仍要打开”；macOS 14 及更早系统可在应用程序里右键 Cairn 选“打开”。"}}]}'
+---
+
+首次在 Mac 上打开 Cairn 时，macOS Gatekeeper 会弹出“无法验证开发者”或拦截提示。这是因为 Cairn 桌面应用目前采用固定自签名证书发布、尚未做 Apple 公证，只需按系统版本放行一次，以后应用内自动更新不会每次重复拦截。
+
+## 正确放行步骤（不要直接从 DMG 里启动）
+
+1. 打开下载的 `Cairn-<version>-mac-arm64.dmg`（Apple 芯片）或 `-x64.dmg`（Intel），先把 **Cairn.app** 拖入 **应用程序（/Applications）**。不要直接在挂载的 DMG 镜像或“下载”目录里运行，否则后续应用内自动更新会因路径只读或随机移位而无法覆盖安装。
+2. 在 **应用程序** 中双击打开 Cairn，遇到系统拦截弹窗后点完成/好。
+3. **macOS 15 Sequoia 及更新版本：** 打开 **系统设置 → 隐私与安全性**，向下滚动到安全性区域，在 Cairn 提示旁点击 **仍要打开** 并输入开机密码确认。
+4. **macOS 14 Sonoma 及更早版本：** 在 **应用程序** 文件夹里右键（或按住 Control 单击）**Cairn**，在弹出菜单里选 **打开**，再点确认即可。
+
+使用固定自签名证书的目的，是让 macOS 在你点击侧栏 **Update to …** 自动更新后，继续保留先前授予的辅助功能与屏幕录制权限（详见[桌面端文档](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md)与[安装页面](/zh-cn/docs/install/)）。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

@@ -1,0 +1,39 @@
+---
+title: Connect Custom OpenAI or Anthropic-Compatible Endpoints in Cairn
+description: Configure relays, self-hosted vLLM/Ollama gateways, and custom model IDs in Cairn using OpenAI Completions, OpenAI Responses, or Anthropic Messages protocols.
+geo:
+  questionId: en-qa-custom-endpoints
+  template: qa
+  cluster: chatgpt-codex
+  sources:
+    - site/src/content/docs/docs/models.mdx
+    - site/src/content/docs/zh-cn/docs/models.mdx
+    - docs/privacy.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can Cairn connect to custom OpenAI-compatible or Anthropic-compatible endpoints and local relays?","acceptedAnswer":{"@type":"Answer","text":"Yes. Under Settings -> Model -> Add provider, choose Custom endpoint, enter a name, provider ID, base URL, API protocol (OpenAI Completions, OpenAI Responses, or Anthropic Messages), and model IDs. Keyless local endpoints can leave the key blank and disable the authorization header."}}]}'
+---
+
+Yes—Cairn connects directly to custom OpenAI-compatible and Anthropic-compatible endpoints, including API relays and local model gateways. Inside the Cairn Mac desktop app, open **Settings -> Model -> Add provider -> Custom endpoint** and pick **OpenAI Completions**, **OpenAI Responses**, or **Anthropic Messages** as the API protocol.
+
+## Fields required for a custom endpoint
+
+| Field | What to enter | Notes |
+|---|---|---|
+| **Name & Provider ID** | Human label and slug (for example `local-vllm`) | Used in routing rules and model selectors |
+| **Base URL** | Root API URL of your relay or local gateway | Must match the selected protocol path expectations |
+| **API protocol** | OpenAI Completions, OpenAI Responses, or Anthropic Messages | Pick the exact wire format your gateway serves |
+| **Model IDs** | Exact model names exposed by the endpoint | Listed in Coordinator and task routing dropdowns |
+| **API key** | Optional key (encrypted via `secretbox.key`) | For keyless local servers, leave empty and disable the authorization header |
+
+## Verify before saving routing rules
+
+Click **Test connection** inside the provider form to verify that your base URL, protocol, and model ID respond cleanly (note that testing sends one live model request). After adding the endpoint, inspect **Settings -> Model** to confirm which provider is assigned to the **Coordinator** versus background task defaults, rather than assuming ChatGPT subscription defaults apply.
+
+All custom endpoint credentials remain encrypted inside your local Cairn database (`server.db` + `secretbox.key`) and never pass through a third-party Cairn cloud.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

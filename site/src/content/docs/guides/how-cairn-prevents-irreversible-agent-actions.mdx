@@ -1,0 +1,32 @@
+---
+title: How Cairn Prevents Coding Agents from Irreversible Actions
+description: Cairn pauses before merging, pushing, deleting data, sending messages, or changing secrets until your explicit confirmation, backed by OS confinement and merge gates.
+geo:
+  questionId: en-qa-irreversible-actions
+  template: qa
+  cluster: privacy
+  sources:
+    - README.md
+    - CONTEXT.md
+    - docs/spec/18-positioning-and-differentiation.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How does Cairn prevent coding agents from pushing, deleting, or spending without approval?","acceptedAnswer":{"@type":"Answer","text":"Cairn isolates code changes on separate git worktree branches, pauses before irreversible actions like deleting data, payments, credential changes, or public pushes, and enforces a server-side approval and merge gate that never defaults dangerous approvals to send or confirm."}}]}'
+---
+
+Cairn separates autonomous background work from irreversible side effects: agents write code, run tests, and commit inside isolated worktree branches on their own, while anything that cannot be undone—merging, pushing upstream, deleting data, payments, credential changes, or external sends—stops and waits for your explicit confirmation.
+
+## Four layers of protection
+
+1. **Branch and worktree isolation:** Every task commits to its own branch inside `workspaces/<conversationId>` and never edits your `main` branch directly.
+2. **Action-bound confirmation cards:** When a task needs an irreversible action, Cairn pins a decision card (**Needs your decision** / **Needs input**) rather than proceeding silently. Approval-sensitive cards do not pre-select or recommend destructive execution by default.
+3. **OS-level task confinement:** On macOS, Cairn confines task harnesses using a Seatbelt profile rather than exposing unrestricted access to your personal credentials, and team secrets are retrieved via an audited channel instead of leaking into child shell environment variables.
+4. **Evidence-bound merge checks:** Merge verdicts bind to the exact patch digest and head SHA so an outdated review cannot rubber-stamp newly pushed edits.
+
+This lets you step away from your desk—or go to sleep while your Mac mini works—without waking up to force-pushed branches or deleted files.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

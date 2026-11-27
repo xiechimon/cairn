@@ -1,31 +1,34 @@
 # Cairn
 
-> Cairn is an open-source, self-hosted personal assistant for people who write code. Agents run on your own machines using your model subscriptions or API keys. Each person runs their own copy; today there is no hosted service. An official paid hosted service, Cairn Cloud, is planned and not available yet. Self-hosting stays free with full functionality.
+> Cairn is an open-source personal assistant for people who write code. Start with the free Mac desktop app (`Cairn-<version>-mac-arm64.dmg` or `x64.dmg` in GitHub Releases), which bundles the server, local pi Runner, and owner sign-in. Self-hosting via `npx @xiechimon/cairn` or Docker on Linux and headless servers is the advanced path. Agents run on your own machines using your model subscriptions or API keys. Today there is no hosted service; an official paid hosted service, Cairn Cloud, is planned and not available yet. Self-hosting and the Mac desktop app stay free with full functionality.
 
 - License: Apache-2.0
-- Install: `npx @xiechimon/cairn` (Node.js 22 or 24; Linux or macOS server, Windows with a pairing step)
+- Primary install (Mac app first): https://github.com/xiechimon/cairn/releases/latest
+- Advanced self-hosted server: `npx @xiechimon/cairn` (Node.js 22 or 24; Linux, macOS, or Docker)
 - Source: https://github.com/xiechimon/cairn
 
-The server hosts the web app, Coordinator and database. Runners execute work on your machines. A model source is also required. Agents ask before irreversible actions such as deleting data, payments, changing credentials or publishing. Mail, calendar and job search are planned, not shipped.
+The Mac desktop app bundles the web app, Coordinator, SQLite database, and local pi Runner. Extra machines join via `@xiechimon/cairn-cli` Runners. A model source (ChatGPT/Codex subscription, Claude Code subscription, or provider API key) is required. Agents ask before irreversible actions such as deleting data, payments, changing credentials, or publishing. Mail, calendar, and job search are planned, not shipped.
 
 ## English documentation
 
 - [Overview](https://cairn.xmon.me/docs/intro/): What Cairn is, its three pieces, and who it is for.
-- [Install](https://cairn.xmon.me/docs/install/): Requirements, starting the server, backups and private phone access.
-- [Connect a model](https://cairn.xmon.me/docs/models/): Subscriptions, API keys and compatible endpoints.
-- [Connect a Runner](https://cairn.xmon.me/docs/runner/): Machine enrollment and keeping a Runner online.
+- [Install](https://cairn.xmon.me/docs/install/): Mac desktop app setup first, plus the advanced self-hosted server path.
+- [Connect a model](https://cairn.xmon.me/docs/models/): Subscriptions, API keys, and compatible endpoints.
+- [Connect a Runner](https://cairn.xmon.me/docs/runner/): Machine enrollment and keeping extra Runners online.
 - [Your first task](https://cairn.xmon.me/docs/first-task/): Create a project and follow a task to a result.
-- [FAQ](https://cairn.xmon.me/docs/faq/): Cost, privacy, limitations and troubleshooting.
+- [FAQ](https://cairn.xmon.me/docs/faq/): Cost, privacy, limitations, and troubleshooting.
+- [Guides](https://cairn.xmon.me/guides/): Workflow hubs, Q&A, comparisons, and troubleshooting guides.
 
 ## Chinese documentation
 
 - [Overview in Chinese](https://cairn.xmon.me/zh-cn/docs/intro/): Product scope and architecture.
-- [Install in Chinese](https://cairn.xmon.me/zh-cn/docs/install/): Installation and private access.
+- [Install in Chinese](https://cairn.xmon.me/zh-cn/docs/install/): Mac desktop app first, plus advanced self-hosted setup.
 - [Models in Chinese](https://cairn.xmon.me/zh-cn/docs/models/): Model source setup.
 - [Runners in Chinese](https://cairn.xmon.me/zh-cn/docs/runner/): Runner enrollment and operation.
 - [First task in Chinese](https://cairn.xmon.me/zh-cn/docs/first-task/): Getting started with a project.
 - [FAQ in Chinese](https://cairn.xmon.me/zh-cn/docs/faq/): Common questions and troubleshooting.
+- [Chinese guides](https://cairn.xmon.me/zh-cn/guides/): Chinese community-sourced Q&A, setups, and comparisons.
 
 ## Source
 
-- [GitHub repository](https://github.com/xiechimon/cairn): Source code, Apache-2.0 license and issue tracker.
+- [GitHub repository](https://github.com/xiechimon/cairn): Source code, Apache-2.0 license, and issue tracker.

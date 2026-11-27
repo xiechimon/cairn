@@ -1,0 +1,39 @@
+---
+title: Where Source Code, Model Tokens, and Secrets Live in Cairn
+description: Exact filesystem locations for Cairn server.db, secretbox.key, git worktrees, and isolated agent config homes on macOS, Linux, and Docker.
+geo:
+  questionId: en-qa-local-privacy
+  template: qa
+  cluster: privacy
+  sources:
+    - docs/privacy.md
+    - docs/configuration.md
+    - site/src/content/docs/docs/install.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Where do my source code, model tokens, and secrets live when using Cairn?","acceptedAnswer":{"@type":"Answer","text":"On macOS desktop, server.db and secretbox.key live under ~/Library/Application Support/@cairn/desktop. On npm/CLI setups, server data lives in ~/.cairn/server and Runner worktrees live in ~/.cairn/workspaces (or /data in Docker). Model keys are encrypted with secretbox.key and never sent to a Cairn cloud."}}]}'
+---
+
+All Cairn project data, SQLite databases, git worktrees, and encrypted credentials stay on your own disks—never on a Cairn-hosted server. Model prompts and code snippets only travel directly from your Runner or server to the model provider or custom endpoint you explicitly configured.
+
+## Exact storage paths by install method
+
+| Install mode | Server DB & encryption key | Runner state & git worktrees |
+|---|---|---|
+| **Mac desktop app** | `~/Library/Application Support/@cairn/desktop/` (`server.db`, `secretbox.key`, `vapid.json`) | Bundled `runner/` inside `@cairn/desktop` (`machine.json`, `daemon.log`, `workspaces/`) |
+| **Linux desktop archive** | `$XDG_CONFIG_HOME/@cairn/desktop/` (default `~/.config/@cairn/desktop/`) | Bundled `runner/` inside `@cairn/desktop` |
+| **Advanced: npm server / CLI Runner** | `~/.cairn/server/` (`CAIRN_HOME` overrides) | `~/.cairn/` (`machine.json`, `daemon.log`, `workspaces/`) |
+| **Advanced: Docker server** | `/data` volume (`CAIRN_HOME=/data`) | Separate Runner host `~/.cairn/` |
+
+## How credentials and agent logs are protected
+
+- **At-rest encryption:** Model API keys, subscription tokens, team secrets, Vault items, and integration credentials inside `server.db` are encrypted with `secretbox.key`. Always back up `secretbox.key` alongside `server.db` ([Backup guide](/guides/backup-and-migrate-cairn-data/)).
+- **No plaintext shell leaks:** Team secrets are retrieved explicitly through Cairn's audited retrieval channel instead of being exported into every child shell environment.
+- **Runner log redaction:** Before step transcripts are saved on your own server, the Runner scrubs token patterns (`sk-`, `token=`, bearer headers) with `[REDACTED]`, and skips upload if redaction cannot run.
+- **Browser profile separation:** On macOS, the Coordinator's browser keeps its own isolated profile directories under `mac-browser/profiles/` rather than reading your personal Chrome profile.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

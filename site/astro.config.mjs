@@ -14,7 +14,7 @@ export default defineConfig({
     starlight({
       title: 'Cairn',
       description:
-        'A self-hosted personal assistant for people who write code. Agents work on your own machines with your own subscriptions, and wait for your yes on anything that cannot be undone.',
+        'An open-source personal assistant for people who write code. Start with the Mac desktop app; self-host on Linux or headless servers as the advanced path. Agents work on your own hardware with your own subscriptions and wait for your yes on anything irreversible.',
       favicon: '/logo.svg',
       defaultLocale: 'root',
       locales: {
@@ -28,6 +28,18 @@ export default defineConfig({
           label: 'Start here',
           translations: { 'zh-CN': '开始' },
           items: [docs('intro'), docs('install'), docs('models'), docs('runner'), docs('first-task')],
+        },
+        {
+          label: 'Guides',
+          translations: { 'zh-CN': '专题指南' },
+          items: [
+            { slug: 'guides' },
+            { slug: 'guides/claude-code-subscribers' },
+            { slug: 'guides/chatgpt-codex-subscribers' },
+            { slug: 'guides/mac-mini-always-on-runner' },
+            { slug: 'guides/multi-machine-linux-vps-runners' },
+            { slug: 'guides/privacy-local-first-developers' },
+          ],
         },
         {
           label: 'Help',

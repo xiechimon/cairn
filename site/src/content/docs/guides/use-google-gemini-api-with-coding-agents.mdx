@@ -1,0 +1,36 @@
+---
+title: Use Google Gemini API Keys with Cairn Coding Agents
+description: Add a Google Gemini API key under Settings -> Model in the Cairn Mac app and assign Gemini models to your Coordinator or coding tasks via pi.
+geo:
+  questionId: en-qa-gemini-api
+  template: qa
+  cluster: chatgpt-codex
+  sources:
+    - README.md
+    - docs/privacy.md
+    - site/src/content/docs/docs/models.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I use a Google Gemini API key with Cairn coding agents?","acceptedAnswer":{"@type":"Answer","text":"Open Connect models or Settings -> Model in the Cairn Mac desktop app, select Google as the provider, paste your Gemini API key, click Test connection, and assign the desired Gemini model in your Coordinator or task routing settings."}}]}'
+---
+
+You can use Google Gemini models in Cairn by adding your Gemini API key under **Settings -> Model** (or during the **Connect models** onboarding wizard in the Mac desktop app). Tasks run directly through Cairn's bundled **pi** engine, so you do not need to install or configure a separate Gemini CLI on every Runner.
+
+## Setup steps in the Cairn Mac app
+
+1. Open Cairn and go to **Settings -> Model** (in the **Providers** section).
+2. Click **Add provider**, choose **Google**, and paste your Google Gemini API key.
+3. Click **Test connection** to confirm the key works (this sends one test request to Google's API).
+4. Review the **Coordinator** and task model rules under **Settings -> Model** so the Gemini model you want is selected where needed.
+
+## Pairing Gemini with other providers
+
+Many Cairn users mix providers intentionally—for example, using one model for the **Coordinator** conversation and another for heavy code-editing threads, or keeping a Gemini API key as a fallback alongside a ChatGPT or Claude Code subscription. Because Cairn seals API keys with `secretbox.key` on your server and transmits requests directly from your Runner to Google, there is zero per-token surcharge from Cairn.
+
+For custom gateways or Vertex/OpenAI-compatible proxies, see [Connect custom endpoints](/guides/use-custom-openai-or-anthropic-compatible-endpoints/).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

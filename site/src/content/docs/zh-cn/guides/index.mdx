@@ -1,0 +1,27 @@
+---
+title: Cairn 中文专题指南
+description: 围绕 Mac 桌面端优先、现有订阅复用、git worktree 并发隔离、Tailscale 手机审批与服务端进阶自托管的实战问答。
+---
+
+推荐从 [Cairn Mac 桌面应用](/zh-cn/docs/install/)（`-mac-arm64.dmg` / `-mac-x64.dmg`）开始：打开安装包即可使用内置服务端与本地执行机；只有在需要无图形界面的 Linux 常驻服务时，再使用 `npx @xiechimon/cairn` 或 Docker 进阶自托管路线。以下专题均源自真实中文开发者社区讨论与仓库实测文档。
+
+## 常见场景与问答
+
+- [Mac 上怎么同时开多个 Claude Code 并行改代码而不互相覆盖？](/zh-cn/guides/mac-duo-claude-code-bingxing-worktree/)
+- [已经有 ChatGPT 订阅，怎么免装 Codex CLI 直接跑编程 Agent？](/zh-cn/guides/chatgpt-dingyue-mian-cli-pao-agent/)
+- [Cairn 怎么接入自定义 OpenAI / Anthropic 中转端点或国内模型 API？](/zh-cn/guides/guonei-zhongzhuan-zidingyi-api-jieru/)
+- [怎么保证源码、API 密钥和本地凭据不上传到第三方云端？](/zh-cn/guides/daima-miyao-bu-chujia-bendi-yinsi/)
+
+## 配置与远程协同
+
+- [Mac mini 怎么当 24 小时 AI 编程工作站：桌面端自托管与防休眠配置](/zh-cn/guides/mac-mini-24-xiaoshi-tuoguan-agent/)
+- [出门在外怎么用手机通过 Tailscale 远程查看和审批 Mac 上的任务？](/zh-cn/guides/shouji-tailscale-yuancheng-shenpi/)
+- [怎么把微信（iLink）、Telegram 或 Slack 接进 Cairn 接收审批和派发任务？](/zh-cn/guides/wechat-telegram-jieru-agent-tongzhi/)
+- [进阶部署：在无界面 Linux 服务器用 npx 或 Docker 自托管 Cairn 服务端](/zh-cn/guides/linux-fuwuqi-docker-zituoguan-jinjie/)
+
+## 对比选型与排障
+
+- [Cairn 对比 Conductor 与 Vibe Kanban：Mac 并行 AI 编程工具怎么选？](/zh-cn/guides/cairn-duibi-conductor-vibe-kanban/)
+- [Cairn 对比 OpenClaw：代码工程工作站与聊天软件私人助理的区别](/zh-cn/guides/cairn-duibi-openclaw/)
+- [macOS 提示“无法验证开发者”打不开 Cairn 桌面应用怎么办？](/zh-cn/guides/macos-shouci-dakali-weigonozheng-jiejue/)
+- [Cairn 执行机在线，为什么任务一直停在“排队中（Queued）”？](/zh-cn/guides/renwu-yizhi-queued-paicha/)

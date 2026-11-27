@@ -1,0 +1,40 @@
+---
+title: Receive Cairn Approval Cards via Telegram, Slack, or WeChat
+description: Connect outbound-only Telegram, Slack Socket Mode, or WeChat iLink adapters under Settings -> Chat apps without exposing public webhook ports.
+geo:
+  questionId: en-howto-im-channels
+  template: how-to
+  cluster: mac-mini
+  sources:
+    - docs/design/im-connections.md
+    - docs/privacy.md
+    - docs/spec/18-positioning-and-differentiation.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Connect Telegram or Slack to Cairn","step":[{"@type":"HowToStep","name":"Open Settings -> Chat apps","text":"Choose Telegram, Slack, or WeChat inside Settings -> Chat apps on your Cairn desktop or server."},{"@type":"HowToStep","name":"Enter outbound credentials","text":"Supply a BotFather token for Telegram, Socket Mode tokens for Slack, or scan the QR code for WeChat iLink."},{"@type":"HowToStep","name":"Pair your chat sender","text":"Send a message to the bot and approve the pairing request in Cairn settings so only your account can steer the Coordinator."}]}'
+---
+
+Cairn treats chat apps as optional outbound entry points into your Coordinator—never requiring public webhooks, port forwarding, or third-party cloud relays. Under **Settings -> Chat apps**, you can connect **Telegram**, **Slack** (DM-only Socket Mode), or **WeChat (iLink)** to receive notifications and answer decision cards from your phone.
+
+## Comparing the supported chat adapters
+
+| Platform | Credentials needed | Transport | Reply format |
+|---|---|---|---|
+| **Telegram** | Bot token from BotFather | Outbound long polling | Inline buttons + numbered text fallback |
+| **Slack** | App token (`xapp-`, `connections:write`) + Bot token (`xoxb-`) | Outbound WebSocket (Socket Mode, DMs only) | Block Kit buttons + text replies |
+| **WeChat (iLink)** | QR scan in WeChat (no developer registration) | Outbound long polling | Text & numbered replies (~1,800-char chunks) |
+
+## Setup and pairing safety
+
+1. Open **Settings -> Chat apps** in Cairn and pick your adapter.
+2. Enter the token (or scan the WeChat QR code). Tokens are stored encrypted via `secretbox.key`.
+3. Send a test message to your bot. Unpaired senders are never trusted automatically; approve your own sender ID inside Cairn settings.
+4. Keep secret input inside Cairn settings rather than typing passwords or API keys into chat messages, so third-party chat servers never store your credentials.
+
+For full mobile diff viewing and browser-based Web Push, pair IM alerts with [Tailscale Serve mobile access](/guides/setup-tailscale-mobile-access/).
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

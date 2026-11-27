@@ -1,0 +1,47 @@
+---
+title: Cairn for ChatGPT & Codex Subscribers
+description: Authorize your ChatGPT Plus or Pro subscription with Cairn device login and run coding tasks through the bundled pi engine without installing Codex CLI.
+geo:
+  questionId: en-hub-chatgpt-codex
+  template: hub
+  cluster: chatgpt-codex
+  sources:
+    - README.md
+    - site/src/content/docs/docs/models.mdx
+    - site/src/content/docs/docs/first-task.mdx
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How can ChatGPT Plus or Pro subscribers run coding agents in Cairn without installing Codex CLI?","acceptedAnswer":{"@type":"Answer","text":"Open the Cairn Mac desktop app, select ChatGPT subscription during Connect models, complete the browser device-code login, and confirm settings. Cairn runs tasks directly through its bundled pi execution engine with no external Codex CLI or codex login required."}}]}'
+---
+
+ChatGPT Plus and Pro subscribers can run autonomous coding tasks in Cairn without installing the Codex CLI or running `codex login` on every machine. The Cairn Mac desktop app bundles the **pi** execution engine directly inside its local Runner, so completing the in-app device-code authorization connects your existing OpenAI subscription end to end.
+
+## What happens on a fresh ChatGPT-only setup
+
+When you open the Mac desktop app for the first time, the onboarding wizard walks through two screens:
+
+1. **Connect models:** Choose **ChatGPT subscription**, open the displayed device-login URL in your browser, sign in to your OpenAI account, and enter the code while keeping Cairn open.
+2. **Confirm settings:** On a fresh setup with only ChatGPT connected, **Coordinator** selects **GPT-6.1 Sol** and dispatches tasks through bundled **pi** (unless existing routing rules override it). Click **Confirm and start chatting**.
+
+## Mixing subscriptions, API keys, and custom endpoints
+
+You are not locked into one model source. Under **Settings -> Model**, you can combine:
+
+- **ChatGPT subscription** via device login (no Codex CLI required).
+- **Provider API keys** for OpenAI, Anthropic, or Google Gemini.
+- **Custom endpoints** speaking OpenAI Completions, OpenAI Responses, or Anthropic Messages—useful for local relays or self-hosted gateways, including keyless local endpoints with the authorization header disabled.
+
+Saved routing rules under **Settings -> Model** control which model runs the Coordinator versus background tasks.
+
+## Related guides in this cluster
+
+- [Run Codex without installing Codex CLI](/guides/run-codex-without-installing-codex-cli/)
+- [Subscriptions vs markups: how Cairn billing works](/guides/use-existing-ai-subscriptions-no-double-billing/)
+- [Use custom OpenAI or Anthropic-compatible endpoints](/guides/use-custom-openai-or-anthropic-compatible-endpoints/)
+- [Use Google Gemini API with Cairn](/guides/use-google-gemini-api-with-coding-agents/)
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.

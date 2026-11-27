@@ -1,0 +1,34 @@
+---
+title: 已经有 ChatGPT 订阅，怎么免装 Codex CLI 在 Mac 上直接跑编程 Agent？
+description: Cairn Mac 桌面应用内置 pi 执行引擎，在「接入模型」里用浏览器设备码登录 ChatGPT Plus 或 Pro 订阅即可直接运行编程任务。
+geo:
+  questionId: zh-chatgpt-no-cli
+  template: qa
+  cluster: chatgpt-codex
+  sources:
+    - README.zh.md
+    - site/src/content/docs/zh-cn/docs/models.mdx
+    - docs/getting-started.md
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"已经有 ChatGPT 订阅，怎么免装 Codex CLI 在 Mac 上直接跑编程 Agent？","acceptedAnswer":{"@type":"Answer","text":"下载并打开 Cairn Mac 桌面应用，在接入模型向导中选择 ChatGPT 订阅，按提示用浏览器完成设备码授权即可。Cairn 内置了 pi 执行引擎，无需单独安装 Codex CLI 或运行 codex login。"}}]}'
+---
+
+如果你已经开通了 ChatGPT Plus 或 Pro 订阅，不需要在本地单独安装 Codex CLI，也不用执行 `codex login`，就能在 **Cairn Mac 桌面应用** 里直接跑编程任务。Cairn 桌面端在本地执行机中直接内置了 **pi** 引擎，通过应用内的浏览器设备码授权即可复用你现有的 OpenAI 订阅额度。
+
+## 在 Cairn 桌面端接入 ChatGPT 订阅的步骤
+
+1. 从 [GitHub Releases](https://github.com/xiechimon/cairn/releases/latest) 下载 `Cairn-<version>-mac-arm64.dmg`（Apple 芯片）或 `-x64.dmg`（Intel），拖入「应用程序」并打开。
+2. 在首次引导的 **接入模型（Connect models）** 页面选择 **ChatGPT 订阅**（之后可在 **设置 → 模型 → 添加服务商** 管理）。
+3. 打开页面显示的设备登录链接，登录你的 OpenAI 账户并输入一次性设备码，授权完成前保持 Cairn 窗口打开。
+4. 进入 **确认设置（Confirm settings）**：在全新且只连接 ChatGPT 订阅的环境下，Coordinator 默认选中 **GPT-6.1 Sol**，后台任务通过内置 **pi** 执行，点击 **确认并开始对话** 即可。
+
+## 注意区分订阅额度与 API 余额
+
+OpenAI 的 ChatGPT 网页订阅与 `platform.openai.com` 的 API 预付费余额属于两套体系：在 Cairn 中选择 **ChatGPT 订阅** 走的是你的订阅授权；若要调用按量计费的 OpenAI API key 或中转接口，请在 **设置 → 模型** 中另行添加服务商（见[国内中转与自定义 API 接入](/zh-cn/guides/guonei-zhongzhuan-zidingyi-api-jieru/)）。
+
+由 AI 基于 Cairn 源码撰写，2026-11-27 对照 desktop-v0.1.790 核对。

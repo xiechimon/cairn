@@ -1,0 +1,37 @@
+---
+title: Schedule Recurring Agent Tasks with Cron in Cairn
+description: Run recurring repository maintenance, triage, or research tasks on a cron schedule in Cairn while keeping confirm and review gates enforced.
+geo:
+  questionId: en-qa-schedules
+  template: qa
+  cluster: mac-mini
+  sources:
+    - CONTEXT.md
+    - apps/desktop/README.md
+    - apps/server/src/services/schedules.ts
+  verifiedVersion: desktop-v0.1.790
+  verifiedDate: 2026-11-27
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: '{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can Cairn run recurring coding or maintenance tasks on a cron schedule?","acceptedAnswer":{"@type":"Answer","text":"Yes. Cairn supports recurring cron schedules and one-shot timers that create a fresh build per run on your Runner. On macOS, the Cairn desktop app keeps the display/machine awake ahead of scheduled runs and still pauses at confirm or irreversible approval gates."}}]}'
+---
+
+Yes—Cairn can automatically run recurring or one-shot tasks on a cron schedule, creating a fresh isolated build each time the schedule fires. Each scheduled round still respects Cairn's approval boundaries, pausing whenever an irreversible action or human review gate requires your sign-off.
+
+## How scheduled runs behave in the Mac desktop app
+
+- **Minimum interval:** Worker schedules require an interval of at least 15 minutes so overlapping loops do not pile up on a single Runner.
+- **Menu bar awake indicator:** When a scheduled run is about to start in the Mac desktop app (or when **Keep the Screen On** is active), the menu bar spiral switches to its awake cup icon so you know the Mac is staying ready for the job.
+- **Background execution:** Closing the Cairn window hides the UI without stopping scheduled runs; only quitting the Cairn app stops the bundled server and Runner.
+
+## Common recurring tasks suited for schedules
+
+- **Weekly dependency or doc audits:** Check for stale references or outdated screenshots and open a branch for review.
+- **Weekly GEO & metrics loops:** Snapshot repository traffic, check live pages, and draft candidate updates for your approval.
+- **Nightly test sweeps:** Run checks against a local or GitHub repository and summarize failures in a single morning report.
+
+If your scheduled task runs when you are away from your desk, pair it with [Tailscale mobile access](/guides/setup-tailscale-mobile-access/) or [Telegram/Slack notifications](/guides/connect-telegram-slack-im-notifications/) so you receive any decision cards on your phone.
+
+Written with AI assistance from the Cairn source, verified on 2026-11-27 against desktop-v0.1.790.
