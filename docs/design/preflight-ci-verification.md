@@ -32,8 +32,17 @@ A lane verifies on GitHub before it enters the landing queue:
   live queue candidate.
 - `scripts/ops/preflight.mjs` runs `scripts/ops/preflight-fast-gate.mjs` on
   the exact committed `HEAD` tree before pushing `refs/heads/preflight/<lane>`
-  (revert guard, CI's cheap checks, `pnpm lint`, touched-package `typecheck`,
-  and `pnpm test:changed`), and refuses to push if it fails. The revert guard
+  (the secret scan, revert guard, CI's cheap checks, `pnpm lint`,
+  touched-package `typecheck`, and `pnpm test:changed`), and refuses to push if
+  it fails. The secret scan runs first, after the trailer stamping has fixed the
+  SHAs: `scripts/ops/secret-scan.mjs` runs gitleaks, redacted, over the diffs
+  and commit messages since `origin/main`, in a bare copy of the repository so
+  local git configuration cannot hide text. It honours only committed
+  `.gitleaksignore` entries that name a commit, and is red when gitleaks is
+  missing (install with `node scripts/ops/install-gitleaks.mjs` for pinned
+  SHA-256 verification, shared with CI, or `brew install gitleaks`), logs an
+  error or has no merge-base. It runs where the gate runs, so that machine
+  needs gitleaks; the `ci` run does not repeat the scan. The revert guard
   (`scripts/ops/revert-guard.mjs`) checks every path changed against
   `merge-base(origin/main, HEAD)` and refuses heads whose resulting file blob
   or absence matches a pre-change state from the last 50 first-parent

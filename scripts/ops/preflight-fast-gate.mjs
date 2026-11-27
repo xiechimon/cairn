@@ -11,6 +11,7 @@ import { hasCode, needsGates, prepushPlan, testsRead } from '../prepush.mjs';
 import { scrubGitEnv } from '../scrub-git-env.mjs';
 import { heavyRunAuthorized } from '../test-admission.mjs';
 
+const SECRET_SCAN_STEP = ['node', 'scripts/ops/secret-scan.mjs'];
 const REVERT_GUARD_STEP = ['node', 'scripts/ops/revert-guard.mjs'];
 const CHEAP_CHECKS_FLAG = '--cheap-checks';
 const CHEAP_CHECKS_STEP = ['node', 'scripts/ops/preflight-fast-gate.mjs', CHEAP_CHECKS_FLAG];
@@ -35,6 +36,7 @@ const SKIPPED = {
   'scripts/doc-reader-tests.mjs': 'runs vitest',
   'scripts/prepush.mjs': 'classifies the diff',
   'scripts/ops/ci-reuse-verified.mjs': 'asks GitHub which run to reuse',
+  'scripts/ops/install-gitleaks.mjs': 'installs gitleaks',
   '.claude/skills/verify-cairn/scripts/vp-selftest.mjs': 'self-test, 48 s in CI',
   'eval/install-devin.mjs': 'model eval',
   'eval/run.ts': 'model eval',
@@ -53,7 +55,6 @@ const SKIPPED = {
   'pnpm db:generate': 'rewrites files',
 };
 const SKIPPED_INLINE = new Set([
-  'Install gitleaks for the secret scan self-test (sha256-verified)',
   'Aggregate check parts',
   'Aggregate the e2e tier',
   'Conflict markers',
@@ -295,7 +296,7 @@ export function fastGatePlan(paths, lastFailedTests = []) {
   if (lastFailedTests.length > 0) {
     plan.unshift(['pnpm', 'exec', 'vitest', 'run', ...lastFailedTests]);
   }
-  return [REVERT_GUARD_STEP, CHEAP_CHECKS_STEP, STATIC_REGRESSION_STEP, ...plan];
+  return [SECRET_SCAN_STEP, REVERT_GUARD_STEP, CHEAP_CHECKS_STEP, STATIC_REGRESSION_STEP, ...plan];
 }
 
 export function lastFailedCachePath(cwd, gitExec = git) {

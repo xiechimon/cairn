@@ -256,6 +256,7 @@ test('preflight and push-queue stamp unowned commits with the same machine lane'
     for (const file of [
       'ops/preflight-fast-gate.mjs',
       'ops/revert-guard.mjs',
+      'ops/secret-scan.mjs',
       'test-admission.mjs',
       'heavy-slots.mjs',
       'owned-process.mjs',
@@ -337,6 +338,12 @@ console.log(JSON.stringify(checkRunsSha ? [{ check_runs: checkRuns }] : { workfl
       '#!/bin/sh\nif [ "$STUB_COMMIT_DURING $1" = "gate lint" ]; then git commit -q --allow-empty -m "during gate"; fi\n',
     );
     chmodSync(pnpmStub, 0o755);
+    const gitleaksStub = join(bin, 'gitleaks');
+    writeFileSync(
+      gitleaksStub,
+      '#!/bin/sh\ncat > /dev/null\nif [ -n "$STUB_LEAKS" ]; then exit "$STUB_LEAKS"; fi\n',
+    );
+    chmodSync(gitleaksStub, 0o755);
     const home = join(root, 'home');
     mkdirSync(home, { recursive: true });
 
@@ -356,6 +363,10 @@ console.log(JSON.stringify(checkRunsSha ? [{ check_runs: checkRuns }] : { workfl
       });
     git(work, ['config', 'push.followTags', 'true']);
     git(work, ['tag', '-a', '-m', 'never gated', 'local-only', 'main']);
+    const leaking = preflight({ STUB_LEAKS: '1' });
+    assert.notEqual(leaking.status, 0);
+    assert.match(leaking.stderr, /rotate it first/);
+    assert.equal(git(work, ['ls-remote', 'origin', 'refs/heads/preflight/*']), '');
     const run = preflight({});
     assert.equal(run.status, 0, run.stderr);
     assert.equal(git(work, ['ls-remote', '--tags', 'origin']), '');
