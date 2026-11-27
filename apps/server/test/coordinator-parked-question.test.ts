@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, step as stepTable } from '../src/db/schema.js';
+import { proposeAction } from '../src/services/action-proposals.js';
 import { ASK_PARKED_REASON, cancelPendingQuestions } from '../src/services/chief-question-store.js';
 import {
   ASK_PARK_MS,
@@ -8,7 +9,8 @@ import {
   holdForQuestion,
 } from '../src/services/chief-questions.js';
 import { hasEarlierLiveChiefStep } from '../src/services/chief-turns.js';
-import { H, registerChiefHarness } from './chief-harness.js';
+import { finishCoordinatorTurn } from '../src/services/coordinator-steps.js';
+import { H, registerChiefHarness, toolDeps } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
 
 registerChiefHarness();
@@ -33,7 +35,7 @@ async function askFromProjectTurn(projectId: string, ageMs: number, questions = 
   const stepId = ((await res.json()) as { message: { id: string } }).message.id;
   H.s.db
     .update(stepTable)
-    .set({ status: 'claimed', claimedAt: Date.now() })
+    .set({ status: 'claimed', claimedAt: Date.now() - ageMs - 500 })
     .where(eq(stepTable.id, stepId))
     .run();
   createOrGetQuestion(
@@ -235,6 +237,85 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     });
   }
 
+  for (const [when, ageMs] of [
+    ['while its turn waits', 0],
+    ['after it was parked', ASK_PARK_MS + 1],
+  ] as const) {
+    test(`typing one option of a question card in the main composer answers it ${when}`, async () => {
+      await askFromProjectTurn(H.projectId, ageMs, CHOICE);
+      if (ageMs > 0)
+        await holdForQuestion(
+          { db: H.s.db },
+          { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 },
+        );
+      const sent = await req(H.s.app, 'POST', `/api/conversations/${H.threadId}/messages`, {
+        content: ' Settings ',
+      });
+      expect(sent.status).toBeLessThan(300);
+      expect(questionRow().content.status).toBe('answered');
+      expect(questionRow().content.answers).toEqual([{ header: 'scope', choices: ['settings'] }]);
+    });
+  }
+
+  test('a typed option that two open cards share answers neither', async () => {
+    const asker = await askFromProjectTurn(H.projectId, 0, CHOICE);
+    createOrGetQuestion(
+      { db: H.s.db },
+      { threadId: H.threadId, requestId: 'ask-q2', questions: CHOICE, askedFor: [asker] },
+    );
+    const sent = await req(H.s.app, 'POST', `/api/conversations/${H.threadId}/messages`, {
+      content: 'settings',
+    });
+    expect(sent.status).toBeLessThan(300);
+    expect(questionRow().content.status).toBe('pending');
+  });
+
+  const type = (content: string) =>
+    req(H.s.app, 'POST', `/api/conversations/${H.threadId}/messages`, { content });
+
+  test('a typed option no longer answers a card the owner has already written past', async () => {
+    await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1, CHOICE);
+    await type('meanwhile, check the deploy');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect((await type('settings')).status).toBeLessThan(300);
+    expect(questionRow().content.status).toBe('pending');
+  });
+
+  test('a typed option no longer answers a card once a later turn has started', async () => {
+    const asker = await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1, CHOICE);
+    await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 });
+    finishTurn(asker);
+    H.s.db
+      .insert(stepTable)
+      .values({
+        id: 'later-wake',
+        buildId: H.threadId,
+        kind: 'chief',
+        status: 'done',
+        claimedAt: Date.now() - 1000,
+        createdAt: Date.now() - 1000,
+      })
+      .run();
+    expect((await type('settings')).status).toBeLessThan(300);
+    expect(questionRow().content.status).toBe('pending');
+  });
+
+  for (const [card, requestId, askedFor] of [
+    ['an approval card', 'approval-p1', []],
+    ['a proposal card', 'ask-proposal', ['action-proposal:p1']],
+  ] as const) {
+    test(`typing a choice of ${card} in the main composer never answers it`, async () => {
+      const asker = await askFromProjectTurn(H.projectId, 0);
+      createOrGetQuestion(
+        { db: H.s.db },
+        { threadId: H.threadId, requestId, questions: CHOICE, askedFor: [asker, ...askedFor] },
+      );
+      expect((await type('settings')).status).toBeLessThan(300);
+      const row = H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, requestId)).get();
+      expect(JSON.parse(row?.content as string).status).toBe('pending');
+    });
+  }
+
   test('a rewind past a parked question is refused until it is answered or cancelled', async () => {
     const asker = await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1);
     await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 });
@@ -249,4 +330,109 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     expect(((await rewind.json()) as { error: string }).error).toContain('waiting for an answer');
     expect(questionRow().content.status).toBe('pending');
   });
+
+  async function seedParkedQuestionsAndApproval() {
+    const asker = await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1, [
+      { header: 'branches', question: 'Which branches should I delete?', options: [] },
+    ]);
+    await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 });
+    const choiceAsker = await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1, CHOICE);
+    H.s.db.delete(chiefMessage).where(eq(chiefMessage.id, 'ask-q')).run();
+    const questions: [string, AskedQuestion[], string[]][] = [
+      [
+        'ask-plain',
+        [{ header: 'branches', question: 'Which branches should I delete?', options: [] }],
+        [asker],
+      ],
+      ['ask-choice', CHOICE, [choiceAsker]],
+    ];
+    for (const [requestId, qs, askedFor] of questions) {
+      createOrGetQuestion(
+        { db: H.s.db },
+        { threadId: H.threadId, requestId, questions: qs, askedFor },
+      );
+      H.s.db
+        .update(chiefMessage)
+        .set({ createdAt: Date.now() - ASK_PARK_MS - 1 })
+        .where(eq(chiefMessage.id, requestId))
+        .run();
+      await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId, holdMs: 0 });
+    }
+    const approval = proposeAction(H.s.db, {
+      teamId: H.teamId,
+      actionId: 'todo.delete',
+      targetId: 't-1',
+      input: { todoIds: ['t-1'], versions: { 't-1': 1 } },
+      threadId: H.threadId,
+      scopeProjectId: H.projectId,
+      card: [
+        {
+          header: '审批',
+          question: '删除 1 个任务：t-1。',
+          options: [{ label: '批准执行' }, { label: '不执行' }],
+        },
+      ],
+    });
+    return { asker, choiceAsker, approval };
+  }
+
+  for (const mode of ['finishCoordinatorTurn', 'stopChiefTurn'] as const) {
+    test(`stopping a turn via ${mode} cancels parked ordinary and plain questions while keeping approval cards`, async () => {
+      const { asker, choiceAsker, approval } = await seedParkedQuestionsAndApproval();
+      if (mode === 'finishCoordinatorTurn') {
+        const stepRow = H.s.db.select().from(stepTable).where(eq(stepTable.id, choiceAsker)).get()!;
+        finishCoordinatorTurn({ ...toolDeps(), attachmentsDir: H.s.attachmentsDir }, stepRow, {
+          status: 'stopped',
+          sessionId: 'sess-1',
+        });
+      } else {
+        H.s.db
+          .update(stepTable)
+          .set({ status: 'done', finishedAt: Date.now() })
+          .where(eq(stepTable.id, asker))
+          .run();
+        H.s.db
+          .update(stepTable)
+          .set({ status: 'pending' })
+          .where(eq(stepTable.id, choiceAsker))
+          .run();
+        const stopRes = await req(
+          H.s.app,
+          'POST',
+          `/api/teams/${H.teamId}/chief/threads/${H.threadId}/stop`,
+          {},
+        );
+        expect(stopRes.status).toBe(200);
+        expect(await stopRes.json()).toEqual({ delegated: false });
+      }
+      const plainAfterStop = JSON.parse(
+        H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-plain')).get()!
+          .content as string,
+      ) as { status: string; answers: unknown };
+      const choiceAfterStop = JSON.parse(
+        H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-choice')).get()!
+          .content as string,
+      ) as { status: string };
+      const approvalAfterStop = JSON.parse(
+        H.s.db
+          .select()
+          .from(chiefMessage)
+          .where(eq(chiefMessage.id, `approval-${approval.proposalId}`))
+          .get()!.content as string,
+      ) as { status: string };
+      expect(plainAfterStop.status).toBe('cancelled');
+      expect(choiceAfterStop.status).toBe('cancelled');
+      expect(approvalAfterStop.status).toBe('pending');
+      const unrelated = await req(H.s.app, 'POST', `/api/conversations/${H.threadId}/messages`, {
+        content: 'what time is it',
+      });
+      expect(unrelated.status).toBeLessThan(300);
+      const plainAfterMessage = JSON.parse(
+        H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-plain')).get()!
+          .content as string,
+      ) as { status: string; answers: unknown };
+      expect(plainAfterMessage.status).toBe('cancelled');
+      expect(plainAfterMessage.answers).toBeNull();
+    });
+  }
 });

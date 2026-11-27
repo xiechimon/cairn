@@ -740,7 +740,7 @@ function endChiefStepAsStopped(
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);
   recordChiefStop(deps, head);
-  cancelPendingQuestions(deps, threadId, CHIEF_TURN_END_REASON);
+  cancelPendingQuestions(deps, threadId, CHIEF_TURN_END_REASON, { includeParked: true });
 }
 
 function createdTodoIdOf(content: unknown): string | null {

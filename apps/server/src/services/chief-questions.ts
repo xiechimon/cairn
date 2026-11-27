@@ -19,10 +19,10 @@ import { nowMs } from '../lib/ids.js';
 import {
   ownerSpokeSince,
   parkedReply,
-  pendingPlainQuestionIds,
   proposalIdOfCard,
   publishQuestion,
   questionAskedAt,
+  questionsAnsweredBy,
   readQuestion,
   writeQuestion,
 } from './chief-question-store.js';
@@ -241,17 +241,17 @@ export function answerQuestion(
   return next;
 }
 
-export function answerPlainQuestionsWith(
+export function answerQuestionsWith(
   deps: ChiefQuestionDeps,
   threadId: string,
   projectId: string | null,
-  text: string,
+  message: { id: string; content: string },
 ): void {
-  const answer = text.trim();
-  if (answer === '') return;
-  for (const requestId of pendingPlainQuestionIds(deps.db, threadId, projectId)) {
-    const header = readQuestion(deps.db, threadId, requestId)?.questions[0]?.header ?? '';
-    answerQuestion(deps, { threadId, requestId, answers: [{ header, text: answer }] });
+  const sent = message.content.trim();
+  if (sent === '') return;
+  const answered = questionsAnsweredBy(deps.db, threadId, projectId, sent, message.id);
+  for (const { requestId, answer } of answered) {
+    answerQuestion(deps, { threadId, requestId, answers: [answer] });
   }
 }
 

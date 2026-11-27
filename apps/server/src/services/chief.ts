@@ -94,7 +94,7 @@ import {
   CHIEF_TURN_END_REASON,
   cancelPendingQuestions,
 } from './chief-question-store.js';
-import { answerPlainQuestionsWith, answerQuestion } from './chief-questions.js';
+import { answerQuestion, answerQuestionsWith } from './chief-questions.js';
 import { chiefRowOf, existingCoordinatorThread } from './chief-rows.js';
 import {
   addTurnOwnerMessage,
@@ -1256,8 +1256,7 @@ export function submitChiefMessage(
         .set({ updatedAt: now })
         .where(eq(chiefThread.id, threadRow.id))
         .run();
-      if (origin === 'user')
-        answerPlainQuestionsWith(deps, threadRow.id, message.projectId, body.content);
+      if (origin === 'user') answerQuestionsWith(deps, threadRow.id, message.projectId, message);
       enqueueChiefStep(deps, threadRow.id, {
         prompt: promptWithPickedProject(picked, `${directNote ?? ''}${body.content}`),
         trigger: 'user',

@@ -1,6 +1,6 @@
 import type { ActionEntry } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { coordinatorToolsExtension, createStepGate } from '../src/coordinator/runtime/tools.js';
 import {
@@ -380,11 +380,18 @@ describe('action proposals', () => {
     const s = world();
     const proposed = propose(s, 'thread-a', 'project-a') as { proposalId: string };
     propose(s, 'thread-b', null);
-    expect(sweepExpiredActionProposals(s.db, Date.now())).toBe(0);
+    const published: { threadId: string; id: string }[] = [];
+    const origPublish = s.convHub.publishMessage.bind(s.convHub);
+    vi.spyOn(s.convHub, 'publishMessage').mockImplementation((threadId, msg) => {
+      published.push({ threadId, id: msg.id });
+      origPublish(threadId, msg);
+    });
+    expect(sweepExpiredActionProposals(s.db, Date.now(), s.convHub)).toBe(0);
     s.db.update(actionProposal).set({ expiresAt: 1 }).run();
-    expect(sweepExpiredActionProposals(s.db, Date.now())).toBe(1);
+    expect(sweepExpiredActionProposals(s.db, Date.now(), s.convHub)).toBe(1);
     expect(proposalById(s.db, proposed.proposalId)?.status).toBe('expired');
     expect(s.db.select().from(actionWakeOutbox).all()).toHaveLength(2);
+    expect(published).toEqual([{ threadId: 'thread-a', id: `approval-${proposed.proposalId}` }]);
     s.dispose();
   });
 

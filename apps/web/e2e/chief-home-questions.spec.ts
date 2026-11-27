@@ -955,3 +955,39 @@ test('a question that arrives while you watch rises into its card; a reload show
   await expect(page.getByTestId('chief-question-option-0-0')).toBeVisible();
   await expect(page.getByTestId('chief-question')).not.toHaveClass(/dock-enter/);
 });
+
+test('header leaves Waiting for you after the question is answered', async ({ page }) => {
+  const answered: { path: string; body: unknown }[] = [];
+  const state = structuredClone(ONE);
+  await mockLive(page, state, answerRoute(state, answered));
+  await page.goto('/app');
+  await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'ask');
+  await expect(page.getByTestId('chief-status-pill')).toHaveText('等你确认');
+  await cardA(page).getByTestId('chief-question-option-0-0').click();
+  await expect.poll(() => answered.length).toBe(1);
+  await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'idle');
+  await expect(page.getByTestId('chief-status-pill')).not.toHaveText('等你确认');
+});
+
+test('header leaves Waiting for you after the question is skipped', async ({ page }) => {
+  const cancelled: string[] = [];
+  const state = structuredClone(ONE);
+  await mockLive(page, state, (path, route, json) => {
+    if (!path.endsWith('/cancel') || route.request().method() !== 'POST') return undefined;
+    cancelled.push(path);
+    state.messages = state.messages.map((row) =>
+      row.id === 'row-ask-0000000a'
+        ? { ...row, content: JSON.stringify({ ...JSON.parse(row.content as string), status: 'cancelled' }) }
+        : row,
+    );
+    return json({});
+  });
+  await page.goto('/app');
+  await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'ask');
+  await cardA(page).getByTestId('chief-question-skip').click();
+  await expect(cardA(page)).toHaveCount(0);
+  await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'idle');
+  await expect.poll(() => cancelled.length, { timeout: 8000 }).toBe(1);
+  await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'idle');
+  await expect(page.getByTestId('chief-status-pill')).not.toHaveText('等你确认');
+});

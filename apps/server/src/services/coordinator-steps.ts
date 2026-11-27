@@ -521,7 +521,9 @@ export function finishCoordinatorTurn(
     .run();
   if (outcome.status === 'stopped') recordChiefStop(deps, stepRow);
   publishStepStatus(deps, stepRow.id);
-  cancelPendingQuestions(deps, stepRow.buildId, CHIEF_TURN_END_REASON);
+  cancelPendingQuestions(deps, stepRow.buildId, CHIEF_TURN_END_REASON, {
+    includeParked: outcome.status === 'stopped',
+  });
   finishChiefTurn(
     deps,
     stepRow.buildId,

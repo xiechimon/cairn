@@ -326,7 +326,7 @@ export function createScheduler(
   }
 
   function runTick(now: number): Promise<void> {
-    sweepExpiredActionProposals(deps.db, now);
+    sweepExpiredActionProposals(deps.db, now, deps.convHub);
     dispatchActionWakes(deps);
     if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir, now);
     const pending: Promise<void>[] = [];
@@ -570,7 +570,7 @@ export function createScheduler(
     start() {
       if (dueStarted) return;
       dueStarted = true;
-      sweepExpiredActionProposals(deps.db);
+      sweepExpiredActionProposals(deps.db, nowMs(), deps.convHub);
       dispatchActionWakes(deps);
       if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir);
       setScheduleClockListener(deps.db, () => dueRunner.arm());

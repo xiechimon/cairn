@@ -1,5 +1,7 @@
 import {
   ASK_USER_QUESTION_KIND,
+  type AskUserAnswer,
+  type AskUserQuestion,
   type AskUserQuestionContent,
   askUserQuestionContentSchema,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -90,7 +92,12 @@ export function questionAskedAt(db: Db, threadId: string, requestId: string): nu
   );
 }
 
-export function ownerSpokeSince(db: Db, threadId: string, since: number): boolean {
+export function ownerSpokeSince(
+  db: Db,
+  threadId: string,
+  since: number,
+  besidesMessageId?: string,
+): boolean {
   return db
     .select({ id: chiefMessage.id })
     .from(chiefMessage)
@@ -103,7 +110,9 @@ export function ownerSpokeSince(db: Db, threadId: string, since: number): boolea
       ),
     )
     .all()
-    .some((row) => !row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX));
+    .some(
+      (row) => row.id !== besidesMessageId && !row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX),
+    );
 }
 
 export function parkedReply(content: AskUserQuestionContent): AskUserQuestionContent {
@@ -168,39 +177,81 @@ export function cancelQuestion(
   publishQuestion(deps, input.threadId, input.requestId);
 }
 
-export function pendingPlainQuestionIds(
+function pendingSingleQuestions(
   db: Db,
   threadId: string,
   projectId: string | null,
-): string[] {
+): { requestId: string; question: AskUserQuestion; askedAt: number }[] {
   return db
     .select()
     .from(chiefMessage)
     .where(eq(chiefMessage.threadId, threadId))
     .all()
-    .filter((row) => {
+    .flatMap((row) => {
       const content = askQuestionContentOf(row.content);
-      return (
-        content !== null &&
+      const question = content?.questions[0];
+      return content !== null &&
+        question !== undefined &&
         content.status === 'pending' &&
         (projectId === null || row.projectId === projectId) &&
         !row.id.startsWith(APPROVAL_CARD_ID_PREFIX) &&
         proposalIdOfCard(content) === null &&
-        content.questions.length === 1 &&
-        content.questions[0]?.options.length === 0
-      );
-    })
-    .map((row) => row.id);
+        content.questions.length === 1
+        ? [{ requestId: row.id, question, askedAt: row.createdAt }]
+        : [];
+    });
 }
 
-export function cancelPendingQuestions(deps: StoreDeps, threadId: string, reason: string): void {
+function stillTheLastThingAsked(
+  db: Db,
+  threadId: string,
+  askedAt: number,
+  messageId: string,
+): boolean {
+  const laterTurn = db
+    .select({ id: step.id })
+    .from(step)
+    .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), gt(step.claimedAt, askedAt)))
+    .get();
+  return laterTurn === undefined && !ownerSpokeSince(db, threadId, askedAt, messageId);
+}
+
+export function questionsAnsweredBy(
+  db: Db,
+  threadId: string,
+  projectId: string | null,
+  text: string,
+  messageId: string,
+): { requestId: string; answer: AskUserAnswer }[] {
+  const pending = pendingSingleQuestions(db, threadId, projectId);
+  const plain = pending
+    .filter(({ question }) => question.options.length === 0)
+    .map(({ requestId, question }) => ({ requestId, answer: { header: question.header, text } }));
+  const picked = pending.flatMap(({ requestId, question, askedAt }) => {
+    const option =
+      question.multiSelect || !stillTheLastThingAsked(db, threadId, askedAt, messageId)
+        ? undefined
+        : question.options.find((o) => o.label.trim().toLowerCase() === text.toLowerCase());
+    return option === undefined
+      ? []
+      : [{ requestId, answer: { header: question.header, choices: [option.label] } }];
+  });
+  return picked.length === 1 ? [...plain, ...picked] : plain;
+}
+
+export function cancelPendingQuestions(
+  deps: StoreDeps,
+  threadId: string,
+  reason: string,
+  { includeParked = false }: { includeParked?: boolean } = {},
+): void {
   const rows = deps.db.select().from(chiefMessage).where(eq(chiefMessage.threadId, threadId)).all();
   for (const row of rows) {
     if (row.id.startsWith('user-') || row.id.startsWith('chief-err-')) continue;
     const content = askQuestionContentOf(row.content);
-    if (content === null || content.status !== 'pending' || content.parkedAt !== undefined) {
-      continue;
-    }
+    if (content === null || content.status !== 'pending') continue;
+    if (row.id.startsWith(APPROVAL_CARD_ID_PREFIX) || proposalIdOfCard(content) !== null) continue;
+    if (!includeParked && content.parkedAt !== undefined) continue;
     const next: AskUserQuestionContent = { ...content, status: 'cancelled', cancelReason: reason };
     writeQuestion(deps.db, threadId, row.id, next, nowMs());
     publishQuestion(deps, threadId, row.id);

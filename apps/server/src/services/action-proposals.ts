@@ -33,8 +33,9 @@ import {
   APPROVAL_CARD_ID_PREFIX,
   askQuestionContentOf,
   proposalIdOfCard,
+  publishQuestion,
 } from './chief-question-store.js';
-import type { TeamStreamHub } from './events.js';
+import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import {
   HOST_SHELL_ESCALATION_ACTION,
   hostShellEscalationWakePrompt,
@@ -291,10 +292,10 @@ function settleCard(
   status: ProposalStatus,
   decision: Decision | null,
   now: number,
-) {
+): { threadId: string; requestId: string } | null {
   const row = cardRow(tx, proposalId);
   const content = row === undefined ? null : askQuestionContentOf(row.content);
-  if (row === undefined || content === null || content.status !== 'pending') return;
+  if (row === undefined || content === null || content.status !== 'pending') return null;
   const next: AskUserQuestionContent =
     decision === null
       ? { ...content, status: 'cancelled', cancelReason: CARD_ENDINGS[status] }
@@ -314,6 +315,7 @@ function settleCard(
     .set({ content: JSON.stringify(next), createdAt })
     .where(eq(chiefMessage.id, row.id))
     .run();
+  return { threadId: row.threadId, requestId: row.id };
 }
 
 function insertCard(
@@ -373,8 +375,9 @@ function closeProposal(
     .set({ status, decision, decidedBy, decidedAt: now })
     .where(eq(actionProposal.id, row.id))
     .run();
-  settleCard(tx, row.id, row.actionId, status, decision, now);
+  const card = settleCard(tx, row.id, row.actionId, status, decision, now);
   writeWakes(tx, row.id, status);
+  return card;
 }
 
 export function settlePendingProposal(
@@ -597,16 +600,28 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
   return { status: outcome.status };
 }
 
-export function sweepExpiredActionProposals(db: Db, now = nowMs()): number {
-  return db.transaction((tx) => {
+export function sweepExpiredActionProposals(
+  db: Db,
+  now = nowMs(),
+  convHub?: ConversationStreamHub,
+): number {
+  const settled: { threadId: string; requestId: string }[] = [];
+  const count = db.transaction((tx) => {
     const due = tx
       .select()
       .from(actionProposal)
       .where(and(eq(actionProposal.status, 'pending'), lte(actionProposal.expiresAt, now)))
       .all();
-    for (const row of due) closeProposal(tx, row, 'expired', null, null, now);
+    for (const row of due) {
+      const card = closeProposal(tx, row, 'expired', null, null, now);
+      if (card !== null) settled.push(card);
+    }
     return due.length;
   });
+  for (const card of settled) {
+    publishQuestion({ db, convHub }, card.threadId, card.requestId);
+  }
+  return count;
 }
 
 function markWake(db: Db, id: string, state: 'delivered' | 'undeliverable') {

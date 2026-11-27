@@ -1636,7 +1636,7 @@ export function useApiMutations(teamId: string | undefined) {
           `/api/teams/${teamId}/chief/threads/${input.threadId}/questions/${input.requestId}/cancel`,
           {},
         ),
-      onSuccess: invalidateAll,
+      onSuccess: () => qc.invalidateQueries(),
     }),
     createProvider: useMutation({
       mutationFn: (body: CreateProviderBody) =>
