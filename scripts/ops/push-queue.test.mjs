@@ -1688,6 +1688,8 @@ test('extractCiFailedTestFiles extracts existing vitest, playwright, and node:te
       'apps/web/e2e/web-vitals-perf.spec.ts',
       'apps/web/e2e/providers-order.spec.ts',
       'scripts/ops/push-queue.test.mjs',
+      'scripts/ops/ci-capacity-gate.test.mjs',
+      'scripts/ops/speculative-queue.test.mjs',
       'apps/web/test/ok.test.ts',
     ]) {
       mkdirSync(dirname(join(root, rel)), { recursive: true });
@@ -1701,6 +1703,15 @@ test('extractCiFailedTestFiles extracts existing vitest, playwright, and node:te
       'e2e (2)\tE2E\t2026-11-27T13:06:50Z   1 failed',
       'e2e (2)\tE2E\t2026-11-27T13:06:50Z     e2e/providers-order.spec.ts:146:1 › A10: hovering',
       'e2e-affected (1)\tE2E\t2026-11-27T13:30:03Z flake ledger: unlisted Playwright spec file(s) went green on retry: apps/web/e2e/web-vitals-perf.spec.ts. Fix the flake',
+      'check\tnode\t✖ failing tests:',
+      'check\tnode\t',
+      'check\tnode\ttest at scripts/ops/ci-capacity-gate.test.mjs:1:76',
+      'check\tnode\t✖ broken assertion (1ms)',
+      'check\tnode\t  AssertionError [ERR_ASSERTION]: 1 !== 2',
+      'check\tnode\t  ',
+      'check\tnode\t  1 !== 2',
+      'check\tnode\t',
+      'check\tnode\ttest at scripts/ops/speculative-queue.test.mjs:5:12',
       'check\tnode\t✖ scripts/ops/push-queue.test.mjs (10ms)',
       'check\tnode\t    at /home/runner/work/cairn/cairn/apps/server/test/nonexistent.test.ts:1:1',
     ].join('\n');
@@ -1710,7 +1721,9 @@ test('extractCiFailedTestFiles extracts existing vitest, playwright, and node:te
       'apps/web/e2e/chief-home-questions.spec.ts',
       'apps/web/e2e/providers-order.spec.ts',
       'apps/web/e2e/web-vitals-perf.spec.ts',
+      'scripts/ops/ci-capacity-gate.test.mjs',
       'scripts/ops/push-queue.test.mjs',
+      'scripts/ops/speculative-queue.test.mjs',
     ]);
   } finally {
     releaseTestTempDir(root);
@@ -1773,7 +1786,9 @@ test('demo flag must be ok', () => {
     git(['push', '--quiet', '-u', 'origin', 'main']);
 
     const runsFile = join(root, 'gh-runs.json');
+    const logUnavailableFile = join(root, 'log-unavailable');
     writeFileSync(runsFile, '[]');
+    writeFileSync(logUnavailableFile, 'wait\n');
     writeFileSync(
       join(bin, 'gh'),
       `#!/usr/bin/env node
@@ -1786,7 +1801,11 @@ const runsFile = ${JSON.stringify(runsFile)};
 const runs = JSON.parse(fs.readFileSync(runsFile, 'utf8'));
 const apiUrl = args.find((a) => a.startsWith('repos/')) || '';
 if (args[0] === 'run' && args[1] === 'view' && args.includes('--log-failed')) {
-  console.log('check\\tnode\\t✖ scripts/demo-fail.test.mjs (5ms)');
+  if (fs.existsSync(${JSON.stringify(logUnavailableFile)})) {
+    fs.unlinkSync(${JSON.stringify(logUnavailableFile)});
+    process.exit(1);
+  }
+  console.log('check\\tnode\\t✖ failing tests:\\ncheck\\tnode\\t\\ncheck\\tnode\\ttest at scripts/demo-fail.test.mjs:5:3\\ncheck\\tnode\\t✖ demo flag must be ok (1ms)');
 } else if (apiUrl.includes('status=')) {
   console.log(JSON.stringify({ workflow_runs: [] }));
 } else if (apiUrl.includes('head_sha=')) {

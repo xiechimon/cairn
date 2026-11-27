@@ -169,18 +169,18 @@ export function extractCiFailedTestFiles(
       }
       if (line.trim() === '' || !/^\s/.test(line)) inPlaywrightSummary = false;
     }
-    if (/^\s*failing tests:\s*$/.test(line)) {
+    if (/^\s*(?:✖\s+)?failing tests:\s*$/.test(line)) {
       inNodeFailingTests = true;
       continue;
     }
     if (inNodeFailingTests) {
       const nodeAtMatch =
-        /^\s*test at (?:file:\/\/\S+\/)?(\S+\.test\.[cm]js)(?::\d+:\d+)?\s*$/.exec(line);
+        /^\s*test at (?:file:\/\/\S+\/)?(\S+\.test\.[cm]js)(?::\d+(?::\d+)?)?\s*$/.exec(line);
       if (nodeAtMatch) {
         add(nodeAtMatch[1]);
         continue;
       }
-      if (line.trim() !== '' && !/^\s*(?:✖|test at |'|\w*Error:|\s+at )/.test(line)) {
+      if (/^\s*ℹ\s+tests\b/.test(line) || /^##\[/.test(line)) {
         inNodeFailingTests = false;
       }
     }
@@ -704,7 +704,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         saveOutcome('success', run.id, []);
         succeed('[preflight] green — push-queue will accept this head');
       }
-      saveOutcome(outcome.conclusion ?? 'failure', run.id, readRunFailedFiles(run.id) ?? []);
+      saveOutcome(outcome.conclusion ?? 'failure', run.id, readRunFailedFiles(run.id));
       console.error(
         `[preflight] the run went ${outcome.conclusion}: ${run.html_url}; fix the failing jobs and push again`,
       );

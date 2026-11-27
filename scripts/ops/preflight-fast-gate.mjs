@@ -348,8 +348,9 @@ export function rerunFailedTestSteps(
   }
   const steps = [];
   if (nodeFiles.length > 0) steps.push(['node', '--test', ...nodeFiles]);
-  if (vitestFiles.length > 0 && (allowMultiVitest || vitestFiles.length === 1)) {
-    steps.push(['pnpm', 'exec', 'vitest', 'run', ...vitestFiles]);
+  if (vitestFiles.length > 0) {
+    if (allowMultiVitest) steps.push(['pnpm', 'exec', 'vitest', 'run', ...vitestFiles]);
+    else for (const file of vitestFiles) steps.push(['pnpm', 'exec', 'vitest', 'run', file]);
   }
   if (playwrightFiles.length > 0) {
     if (allowPlaywright) {
@@ -475,7 +476,9 @@ export function runFastGate({
       ? []
       : readLastFailedTests(cachePath, cwd);
   const authorized = hasWrapper || heavyRunAuthorized(gateEnv);
-  const plan = fastGatePlan(listPaths(cwd), cachedFailed, {
+  const resolvedFailed =
+    !explicitFailed && !authorized && cachedFailed.length > 1 ? [] : cachedFailed;
+  const plan = fastGatePlan(listPaths(cwd), resolvedFailed, {
     platform: process.platform,
     allowPlaywright: authorized,
     allowMultiVitest: authorized,

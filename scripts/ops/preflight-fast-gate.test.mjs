@@ -545,12 +545,23 @@ test('parseFastGateArgs and fastGatePlan partition failed vitest, node:test, and
   const noPwPlan = fastGatePlan(['apps/web/src/App.tsx'], mixed, {
     platform: 'darwin',
     allowPlaywright: false,
+    allowMultiVitest: false,
   });
   assert.deepEqual(noPwPlan.slice(4, 6), [
     ['node', '--test', 'scripts/ops/push-queue.test.mjs'],
     ['pnpm', 'exec', 'vitest', 'run', 'apps/server/test/d121-owner-controls.test.ts'],
   ]);
   assert.ok(!noPwPlan.some((step) => step.includes('playwright')));
+
+  const splitVitestPlan = fastGatePlan(
+    ['apps/web/src/App.tsx'],
+    ['apps/web/test/a.test.ts', 'apps/web/test/b.test.ts'],
+    { platform: 'darwin', allowPlaywright: false, allowMultiVitest: false },
+  );
+  assert.deepEqual(splitVitestPlan.slice(4, 6), [
+    ['pnpm', 'exec', 'vitest', 'run', 'apps/web/test/a.test.ts'],
+    ['pnpm', 'exec', 'vitest', 'run', 'apps/web/test/b.test.ts'],
+  ]);
 
   const root = makeTestTempDir('preflight-wrapper-failed-');
   try {
