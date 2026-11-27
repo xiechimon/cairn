@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync, symlinkSync } from 'node:fs';
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, parse } from 'node:path';
 import { eq } from 'drizzle-orm';
@@ -609,12 +609,13 @@ describe('project repository source authorization', () => {
   test('P-SEC11: repository read errors disclose the localPath to both paired devices and owner', async () => {
     const s = bootServer({ authToken: OWNER });
     const missing = join(makeRoot(), 'gone');
-    const notGit = makeRoot();
+    const notDir = join(makeRoot(), 'not-a-dir');
+    writeFileSync(notDir, 'file');
     s.db
       .insert(projectTable)
       .values([
         { id: 'proj-missing', name: 'm', teamId: s.team.id, repoKind: 'local', localPath: missing },
-        { id: 'proj-notgit', name: 'n', teamId: s.team.id, repoKind: 'local', localPath: notGit },
+        { id: 'proj-notdir', name: 'n', teamId: s.team.id, repoKind: 'local', localPath: notDir },
       ])
       .run();
     const errorOf = async (res: Response) => ((await res.json()) as { error?: string }).error ?? '';
@@ -625,11 +626,11 @@ describe('project repository source authorization', () => {
       });
       expect(deviceMissing.status).toBe(404);
       expect(await errorOf(deviceMissing)).toContain(missing);
-      const deviceNotGit = await call(s.app, 'GET', '/api/projects/proj-notgit/files', {
+      const deviceNotDir = await call(s.app, 'GET', '/api/projects/proj-notdir/files', {
         cred: token,
       });
-      expect(deviceNotGit.status).toBe(404);
-      expect(await errorOf(deviceNotGit)).toContain(notGit);
+      expect(deviceNotDir.status).toBe(404);
+      expect(await errorOf(deviceNotDir)).toContain(notDir);
       const deviceBranches = await call(s.app, 'GET', '/api/projects/proj-missing/branches', {
         cred: token,
       });
@@ -645,10 +646,10 @@ describe('project repository source authorization', () => {
         cred: OWNER,
       });
       expect(await errorOf(ownerMissing)).toContain(missing);
-      const ownerNotGit = await call(s.app, 'GET', '/api/projects/proj-notgit/files', {
+      const ownerNotDir = await call(s.app, 'GET', '/api/projects/proj-notdir/files', {
         cred: OWNER,
       });
-      expect(await errorOf(ownerNotGit)).toContain(notGit);
+      expect(await errorOf(ownerNotDir)).toContain(notDir);
       const ownerImport = await call(s.app, 'POST', `/api/teams/${s.team.id}/memory-imports`, {
         cred: OWNER,
         body: { projectId: 'proj-missing', file: 'CLAUDE.md' },

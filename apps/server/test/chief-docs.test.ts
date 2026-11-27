@@ -860,14 +860,24 @@ describe('Coordinator repository reads', () => {
       .where(eq(project.id, H.projectId))
       .run();
     expect((await docs(['source.ts'])).files[0]?.error).toBeDefined();
-    const dir = join(H.s.reposDir, 'not-git');
+    const notDir = join(H.s.reposDir, 'not-a-dir');
+    writeFileSync(notDir, 'x');
+    H.s.db
+      .update(project)
+      .set({ repoKind: 'local', githubRepo: null, localPath: notDir })
+      .where(eq(project.id, H.projectId))
+      .run();
+    expect((await docs(['source.ts'])).files[0]?.error).toContain('not a directory');
+    const dir = join(H.s.reposDir, 'plain-folder');
     mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'note.txt'), 'plain-ok\n');
     H.s.db
       .update(project)
       .set({ repoKind: 'local', githubRepo: null, localPath: dir })
       .where(eq(project.id, H.projectId))
       .run();
-    expect((await docs(['source.ts'])).files[0]?.error).toContain('not a git repository');
+    expect((await docs(['note.txt'])).files[0]?.content).toBe('plain-ok\n');
+    expect((await docs(['source.ts'])).files[0]?.error).toContain('not found');
   });
 
   test('another team cannot read a bound repository', async () => {
