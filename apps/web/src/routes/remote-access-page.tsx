@@ -171,7 +171,7 @@ export function RemoteAccessPage() {
     if (routesFailed) {
       return <span data-testid="remote-routes-error">{t('远程访问状态加载失败，请重试')}</span>;
     }
-    if (!tailnetOn) return t('打开后，手机和其他电脑能通过你的 Tailscale 网络连到这台电脑');
+    if (!tailnetOn) return null;
     if (tailnetFailed) {
       const kind = tailnet?.error;
       if (kind === 'missing-binary') return t('这个安装没有附带远程访问组件');
@@ -294,7 +294,7 @@ export function RemoteAccessPage() {
       ))}
       {live && clerkConfigQ.data?.enabled === true && (
         <SettingsCard className="mt-3" data-testid="clerk-account-card">
-          <SettingsRow label={t('账号登录')} hint={t('已通过账号验证登录此实例')}>
+          <SettingsRow label={t('账号登录')}>
             <Button
               size="sm"
               variant="ghost"
@@ -312,9 +312,9 @@ export function RemoteAccessPage() {
         <SettingsCard className="mt-3">
           <SettingsRow
             label={t('远程访问')}
-            hint={tailnetHint}
+            status={tailnetHint ?? ''}
             className="[&>span:first-child]:w-3/5 [&>span:first-child]:flex-none"
-            hintClassName={
+            statusClassName={
               tailnetFailed || routesFailed
                 ? 'min-h-16 sm:min-h-10 text-destructive'
                 : 'min-h-16 sm:min-h-10'
@@ -414,13 +414,7 @@ export function RemoteAccessPage() {
           className="mt-6"
           icon={Smartphone}
           title={t('手机尚无法连接这台电脑')}
-          description={
-            awaitingTailnetLogin
-              ? t('请先登录 Tailscale。')
-              : routesQ.data !== undefined && !tailnetOn
-                ? t('打开上方的开关，手机在外部网络也能连接这台电脑。')
-                : undefined
-          }
+          description={awaitingTailnetLogin ? t('请先登录 Tailscale。') : undefined}
         />
       ) : (
         <ResourceList>

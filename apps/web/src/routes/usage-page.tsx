@@ -684,7 +684,6 @@ export function UsagePage() {
           testId="usage-empty"
           icon={ChartColumn}
           title={t('暂无用量')}
-          description={t('和 Coordinator 说第一句话后，这里会按天显示用了多少 token。')}
           className="h-full"
         />
       ) : (

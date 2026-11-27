@@ -6,7 +6,7 @@ export function TasksEmpty({
   action,
 }: {
   title: string;
-  hint: string;
+  hint?: string;
   action: ReactNode;
 }) {
   return (
@@ -15,7 +15,9 @@ export function TasksEmpty({
       className="mt-16 flex flex-col items-center gap-3 px-6 text-center"
     >
       <p className="m-0 text-ui text-content-secondary">{title}</p>
-      <p className="m-0 max-w-80 text-meta text-balance text-content-secondary">{hint}</p>
+      {hint !== undefined && (
+        <p className="m-0 max-w-80 text-meta text-balance text-content-secondary">{hint}</p>
+      )}
       {action}
     </div>
   );

@@ -41,10 +41,6 @@ const PROJECT_GLYPHS_SHOWN = 3;
 
 const STORED_ONLY_USES: readonly RouteUse[] = ['compaction'];
 
-const USE_HINTS: Partial<Record<RouteUse, string>> = {
-  compaction: '上下文快满时压缩对话',
-};
-
 const EMPTY_SETTINGS: TeamRoutingSettings = { rules: [], policies: [] };
 
 const modelKey = (option: Pick<ModelOption, 'provider' | 'modelId'>) =>
@@ -224,7 +220,7 @@ export function ModelPicker({
 export function RuleRow({
   use,
   label,
-  hint,
+  status,
   rule,
   options,
   onSave,
@@ -233,7 +229,7 @@ export function RuleRow({
 }: {
   use: RouteUse;
   label: string;
-  hint: ReactNode;
+  status: ReactNode;
   rule: (RuleModel & Partial<Pick<RoutingRuleRecord, 'thinkingLevel'>>) | null;
   options: ModelOption[];
   onSave: (body: {
@@ -254,10 +250,10 @@ export function RuleRow({
     >
       <SettingsRow
         label={label}
-        hint={hint}
+        status={status}
         icon={<RouteUseGlyph use={use} className="size-5" />}
         className="flex-wrap gap-y-2 py-2.5 max-sm:[&>span:first-child]:max-w-none"
-        hintClassName="text-pretty break-keep"
+        statusClassName="text-pretty break-keep"
       >
         <div className="flex items-center justify-end gap-1.5 max-sm:w-full max-sm:justify-start">
           {rule !== null && picked !== undefined && (
@@ -361,7 +357,7 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
                 className="flex-wrap gap-y-2 py-2.5 max-sm:[&>span:first-child]:max-w-none"
                 labelClassName="truncate"
                 valueClassName="flex-none max-sm:w-full"
-                hint={
+                status={
                   <span className="inline-flex min-w-0 items-center gap-1.5">
                     <span>{`${t('Coordinator')} ·`}</span>
                     <ModelMark modelId={choice.modelId} provider={choice.provider} />
@@ -499,7 +495,7 @@ export function ModelRulesSection() {
               key={use}
               use={use}
               label={t(ROUTE_USE_LABELS[use])}
-              hint={
+              status={
                 use === 'coordinator' && ruleOf(use) === null ? (
                   settings.coordinatorDefault !== undefined ? (
                     <CoordinatorDefaultHint
@@ -515,9 +511,7 @@ export function ModelRulesSection() {
                       />
                     </>
                   )
-                ) : USE_HINTS[use] === undefined ? undefined : (
-                  t(USE_HINTS[use])
-                )
+                ) : undefined
               }
               rule={ruleOf(use)}
               options={options}

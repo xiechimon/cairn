@@ -179,29 +179,19 @@ export function AccountPage() {
           </SettingsRow>
           <SettingsRow
             label={t('推送通知')}
-            hint={
-              notifyBlocked ? (
-                t('浏览器已拒绝通知权限，需到站点设置重新允许')
-              ) : desktopShell ? (
-                t('任务需要你处理时，在系统通知中心提醒')
-              ) : (
-                <>
-                  <span className="block">{t('需要你处理时提醒，不急的邮件定时汇总')}</span>
-                  {offerLockScreen && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 text-foreground pointer-coarse:h-11 pointer-coarse:px-4"
-                      onClick={() => wantDevice(true)}
-                    >
-                      {t('开启锁屏推送')}
-                    </Button>
-                  )}
-                </>
-              )
-            }
-            hintClassName={notifyBlocked ? 'account-notify-blocked' : undefined}
+            status={notifyBlocked ? t('浏览器已拒绝通知权限，需到站点设置重新允许') : undefined}
+            statusClassName={notifyBlocked ? 'account-notify-blocked' : undefined}
           >
+            {!notifyBlocked && !desktopShell && offerLockScreen && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-foreground pointer-coarse:h-11 pointer-coarse:px-4"
+                onClick={() => wantDevice(true)}
+              >
+                {t('开启锁屏推送')}
+              </Button>
+            )}
             <ToggleSwitch
               aria-label={t('推送通知')}
               checked={notifyOn}

@@ -383,7 +383,7 @@ export function SidePanelTitle({
   return (
     <h2
       className={cn(
-        'm-0 flex min-w-0 flex-1 items-center gap-1.5 truncate text-heading font-normal text-foreground',
+        'm-0 flex min-w-0 flex-1 items-center gap-1.5 truncate text-heading font-title text-foreground',
         className,
       )}
     >

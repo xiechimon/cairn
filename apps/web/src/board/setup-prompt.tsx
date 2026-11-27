@@ -79,13 +79,13 @@ export function runnerStep(
   machines: readonly { name: string; online?: boolean; kind?: 'local' | 'remote' }[] | undefined,
   command: string,
   t: TFunc,
-): { label: string; hint: ReactNode; reconnect: boolean } {
+): { label: string; hint: ReactNode | null; reconnect: boolean } {
   const offline = (machines ?? []).filter((machine) => machine.online === false);
   const [only] = offline;
   if (only === undefined) {
     return {
       label: t('连接一台执行机'),
-      hint: withCode(t('在要执行任务的电脑上运行 `{command}`', { command })),
+      hint: null,
       reconnect: false,
     };
   }
@@ -113,9 +113,6 @@ export function runnerStep(
 function ModelsPrompt({ models, empty }: { models: ModelSides; empty: boolean }) {
   const { t } = useI18n();
   const href = settingsHref('routing');
-  const hint = models.tasks
-    ? t('添加一个 Coordinator 可用的服务商，或添加 Claude 订阅和已安装 Claude Code 的执行机')
-    : t('添加服务商，或添加 Claude 订阅');
   if (empty) {
     return (
       <div
@@ -138,7 +135,6 @@ function ModelsPrompt({ models, empty }: { models: ModelSides; empty: boolean })
           <Key className="size-5" />
           {t('接入模型来源')}
         </Button>
-        <p className="m-0 text-ui text-balance text-content-secondary">{hint}</p>
       </div>
     );
   }
@@ -190,9 +186,11 @@ function MachinePrompt() {
         <span data-testid="setup-prompt-label" className="text-foreground">
           {label}
         </span>
-        <span data-testid="setup-prompt-hint" className="min-w-0 break-words">
-          {hint}
-        </span>
+        {hint !== null && (
+          <span data-testid="setup-prompt-hint" className="min-w-0 break-words">
+            {hint}
+          </span>
+        )}
       </span>
       {reconnect ? (
         runnerCapability === 'allowed' && bridge !== null ? (

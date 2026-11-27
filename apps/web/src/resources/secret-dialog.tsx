@@ -124,11 +124,7 @@ export function SecretDialog({
           />
         </FormField>
         {projects.length > 0 && editing === null && (
-          <FormField
-            label={t('范围')}
-            htmlFor="dlg-secret-scope"
-            help={t('项目里的条目只发给该项目的对话，同名时优先于团队条目。')}
-          >
+          <FormField label={t('范围')} htmlFor="dlg-secret-scope">
             <Select
               items={[
                 { value: '', label: t('全团队') },

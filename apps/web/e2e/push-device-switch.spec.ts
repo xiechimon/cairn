@@ -238,7 +238,7 @@ test('behavior 5: the Mac desktop shell shows one switch for Cairn alerts with n
   const sw = pushSwitch(page);
   await expect(page.getByRole('switch')).toHaveCount(1);
   await expect(sw).toHaveAttribute('aria-checked', 'true');
-  await expect(page.getByText(DESKTOP_HINT)).toBeVisible();
+  await expect(page.getByText(DESKTOP_HINT)).toHaveCount(0);
   await expect(page.locator('.account-notify-blocked')).toHaveCount(0);
   await expect(page.getByRole('button', { name: LOCK_SCREEN })).toHaveCount(0);
 
@@ -277,14 +277,15 @@ test('behavior 5: a browser without Web Push shows the same single switch', asyn
   expect(await live.pref()).toBe('0');
 });
 
-test('behavior 6: the web row says when it alerts and that the rest arrives as an email digest', async ({
+test('behavior 6: the notifications row carries no helper line (C47)', async ({
   page,
 }) => {
   await stubPushManager(page, { subscribed: true });
   await stubNotification(page, 'granted', 'granted');
   await mockLive(page, { pref: '1' });
   await page.goto('/app/account');
-  await expect(page.getByText(WEB_HINT)).toBeVisible();
+  await expect(pushSwitch(page)).toBeVisible();
+  await expect(page.getByText(WEB_HINT)).toHaveCount(0);
   await expect(page.getByText(DESKTOP_HINT)).toHaveCount(0);
 });
 

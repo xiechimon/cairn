@@ -795,7 +795,7 @@ export function TeamProviderEditor({
       </div>
       <section data-testid="provider-models" className="flex min-w-0 flex-col gap-2.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-          <h3 className="m-0 text-ui font-semibold text-foreground">{t('模型')}</h3>
+          <h3 className="m-0 text-heading font-title text-foreground">{t('模型')}</h3>
           {summary !== null && (
             <span data-testid="provider-models-summary" className="text-meta text-content-tertiary">
               {summary}
@@ -859,7 +859,6 @@ export function TeamProviderEditor({
       <SettingsSection title={t('管理')}>
         <SettingsDangerZone
           label={t('移除服务商')}
-          description={t('移除后，使用它的模型不再可选。')}
           actionLabel={t('移除')}
           onAction={() => setConfirming(true)}
         />

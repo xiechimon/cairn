@@ -67,5 +67,4 @@ export const SKILL_DIR_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 export const SKILL_PAGE_COPY = {
   empty: '尚无技能',
-  hint: '用「导入」或「新建技能」添加。',
 } as const;

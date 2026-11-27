@@ -232,15 +232,11 @@ export function SettingsSection() {
                 </SelectContent>
               </Select>
             </SettingsRow>
-            <SettingsRow label="Sound" hint="Play a chime when a task needs you.">
+            <SettingsRow label="Sound">
               <ToggleSwitch checked={sound} onCheckedChange={setSound} aria-label="Sound" />
             </SettingsRow>
           </SettingsCard>
-          <SettingsDangerZone
-            label="Delete account"
-            description="Removes your tasks, keys and machines from this server."
-            actionLabel="Delete account"
-          />
+          <SettingsDangerZone label="Delete account" actionLabel="Delete account" />
         </div>
       </Specimen>
     </Section>

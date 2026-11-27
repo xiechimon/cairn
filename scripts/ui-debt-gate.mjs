@@ -111,7 +111,7 @@ const RADIUS_CANARY = [
 ];
 
 const HELPER_PROP_TAGS = {
-  SettingsRow: ['hint', 'info'],
+  SettingsRow: ['hint', 'status', 'info'],
   SettingsSection: ['description', 'info'],
   FormField: ['help'],
   FormActions: ['hint'],

@@ -146,7 +146,7 @@ function RoutingContent() {
       <div className="flex min-w-0 flex-col gap-8 pb-16">
         <ModelRulesSection />
         <section className="flex min-w-0 flex-col gap-3">
-          <h3 className="m-0 text-ui font-semibold text-foreground">{t('服务商')}</h3>
+          <h3 className="m-0 text-heading font-title text-foreground">{t('服务商')}</h3>
           <ProvidersSection />
         </section>
         <QueryBoundary

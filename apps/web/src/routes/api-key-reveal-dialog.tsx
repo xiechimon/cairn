@@ -23,11 +23,7 @@ export function ApiKeyRevealDialog({
       footer={<FormActions className="pt-0" primary={{ label: t('我已保存'), onClick: onDone }} />}
     >
       <FormStack className="max-w-none">
-        <FormField
-          label={t('新的 API 密钥')}
-          htmlFor="apikey-reveal-value"
-          help={t('以 cairn_ 开头，万一泄露，密钥扫描工具和你都能认出它。')}
-        >
+        <FormField label={t('新的 API 密钥')} htmlFor="apikey-reveal-value">
           <div className="flex items-start gap-1">
             <Textarea
               id="apikey-reveal-value"

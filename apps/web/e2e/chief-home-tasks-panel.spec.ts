@@ -479,7 +479,7 @@ test('every empty tab, with or without tasks elsewhere, is the same centred note
   await expect(empty.locator('svg')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveCount(0);
   const firstRun = await emptyShape(page);
-  expect(firstRun).toMatchObject({ align: 'center', centred: true, lines: 2, sameInk: true, buttons: 1 });
+  expect(firstRun).toMatchObject({ align: 'center', centred: true, lines: 1, sameInk: true, buttons: 1 });
   const shapes: Awaited<ReturnType<typeof emptyShape>>[] = [];
   await page.goto('/app?scenario=home-c-quiet&pane=tasks');
   await expect(empty).toContainText('现在没有进行中的任务');
@@ -491,7 +491,7 @@ test('every empty tab, with or without tasks elsewhere, is the same centred note
   shapes.push(await emptyShape(page));
   await panel(page).getByRole('tab', { name: '定时' }).click();
   await expect(empty).toContainText('暂无定时任务');
-  await expect(empty).toContainText('也可以告诉 Coordinator');
+  await expect(empty).not.toContainText('也可以告诉 Coordinator');
   await expect(empty.getByRole('button', { name: '新建定时' })).toBeVisible();
   shapes.push(await emptyShape(page));
   for (const shape of shapes) expect(shape).toEqual(firstRun);

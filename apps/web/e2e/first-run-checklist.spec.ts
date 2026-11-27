@@ -85,7 +85,7 @@ test('a fresh install puts one centered model-source prompt on the empty home in
   await expect(prompt(page)).toHaveAttribute('data-step', 'models');
   await expect(prompt(page)).toHaveAttribute('data-variant', 'empty');
   await expect(prompt(page)).toContainText('先接入一个模型来源，Coordinator 才能回复你');
-  await expect(prompt(page)).toContainText('Claude 订阅');
+  await expect(prompt(page)).not.toContainText('Claude 订阅');
   await expect(action(page)).toHaveText('接入模型来源');
   await expect(action(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
   await expect(page.getByTestId('chief-composer-placeholder')).toHaveText('接入模型来源后就能发消息');
@@ -106,7 +106,7 @@ test('with a conversation already there the model-source prompt is one notice li
   await expect(action(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
 });
 
-test('with models on both sides one notice line asks for a machine and shows the start command', async ({
+test('with models on both sides one notice line asks for a machine and carries no helper line', async ({
   page,
 }) => {
   await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], bound: true });
@@ -114,8 +114,7 @@ test('with models on both sides one notice line asks for a machine and shows the
   await expect(prompt(page)).toHaveAttribute('data-variant', 'line');
   await expect(label(page)).toHaveText('连接一台执行机');
   await expect(action(page)).toHaveAttribute('href', /\/app\/settings\/machines/);
-  await expect(hint(page).locator('code')).toHaveText(/ start$/);
-  await expect(hint(page)).toContainText('在要执行任务的电脑上运行');
+  await expect(hint(page)).toHaveCount(0);
 });
 
 test('a model source the Coordinator cannot use still asks for a provider', async ({ page }) => {
@@ -123,7 +122,7 @@ test('a model source the Coordinator cannot use still asks for a provider', asyn
   await expect(prompt(page)).toHaveAttribute('data-step', 'models');
   await expect(prompt(page)).toContainText('Coordinator 还缺模型');
   await expect(action(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
-  await expect(prompt(page)).toContainText('Coordinator 可用的服务商');
+  await expect(prompt(page)).not.toContainText('Coordinator 可用的服务商');
 });
 
 test('a machine coming back online clears the notice', async ({ page }) => {

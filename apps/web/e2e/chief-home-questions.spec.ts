@@ -589,7 +589,7 @@ test('a multi-question request sends nothing and starts no turn until its last q
       chips: el.querySelectorAll('button').length,
     };
   });
-  expect(look).toEqual({ question: '13px', answer: '14px', chips: 0 });
+  expect(look).toEqual({ question: '14px', answer: '14px', chips: 0 });
   await page.screenshot({ path: test.info().outputPath('answered-request.png') });
 });
 

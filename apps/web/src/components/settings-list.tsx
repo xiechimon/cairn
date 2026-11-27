@@ -18,7 +18,7 @@ const SETTINGS_CARD_CLS = cn(
 export const SETTINGS_ROW_CLS =
   'settings-row flex min-h-13 items-center justify-between gap-4 px-4 py-1.5';
 
-export const SETTINGS_HINT_CLS = 'text-meta text-balance text-content-tertiary';
+const SETTINGS_STATUS_CLS = 'text-meta text-balance text-content-tertiary';
 
 export const SETTINGS_SELECT_TRIGGER_CLS = FORM_CONTROL_CLS;
 
@@ -135,7 +135,7 @@ export function SettingsPanel({
 
 interface SettingsRowProps {
   label: string;
-  hint?: ReactNode;
+  status?: ReactNode;
   info?: string;
   testId?: string;
   dataStatus?: string;
@@ -143,7 +143,7 @@ interface SettingsRowProps {
   icon?: ReactNode;
   className?: string;
   labelClassName?: string;
-  hintClassName?: string;
+  statusClassName?: string;
   valueClassName?: string;
   children: ReactNode;
 }
@@ -162,7 +162,7 @@ export function SettingsSelectTrigger({
 
 export function SettingsRow({
   label,
-  hint,
+  status,
   info,
   testId,
   dataStatus,
@@ -170,11 +170,11 @@ export function SettingsRow({
   icon,
   className,
   labelClassName,
-  hintClassName,
+  statusClassName,
   valueClassName,
   children,
 }: SettingsRowProps) {
-  const withHint = hint != null;
+  const withStatus = status != null;
   const flat = useContext(SettingsFlatContext);
   const rows = useContext(SettingsRowsContext);
   const matchLabel = useContext(SettingsMatchContext);
@@ -188,7 +188,7 @@ export function SettingsRow({
     <span
       className={cn(
         'flex min-w-0 flex-col',
-        withHint && (icon == null ? 'max-w-3/5 flex-auto' : 'flex-auto'),
+        withStatus && (icon == null ? 'max-w-3/5 flex-auto' : 'flex-auto'),
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5">
@@ -205,7 +205,11 @@ export function SettingsRow({
         </span>
         {info !== undefined && <InfoTip info={info} />}
       </span>
-      {withHint && <span className={cn(SETTINGS_HINT_CLS, hintClassName)}>{hint}</span>}
+      {withStatus && (
+        <span data-settings-status="" className={cn(SETTINGS_STATUS_CLS, statusClassName)}>
+          {status}
+        </span>
+      )}
     </span>
   );
   return (
@@ -227,7 +231,7 @@ export function SettingsRow({
         labelColumn
       ) : (
         <span
-          className={cn('flex min-w-0 items-center gap-2.5', withHint && 'max-w-3/5 flex-auto')}
+          className={cn('flex min-w-0 items-center gap-2.5', withStatus && 'max-w-3/5 flex-auto')}
         >
           {icon}
           {labelColumn}
@@ -237,7 +241,7 @@ export function SettingsRow({
         <span
           className={cn(
             'flex items-center gap-3 text-ui text-foreground',
-            withHint && 'min-w-0 flex-auto justify-end',
+            withStatus && 'min-w-0 flex-auto justify-end',
             flat && valueClassName === undefined && SETTINGS_VALUE_COL_CLS,
             valueClassName,
           )}
@@ -251,7 +255,6 @@ export function SettingsRow({
 
 export function SettingsSection({
   title,
-  description,
   info,
   action,
   className,
@@ -259,7 +262,6 @@ export function SettingsSection({
   children,
 }: {
   title: string;
-  description?: ReactNode;
   info?: string;
   action?: ReactNode;
   className?: string;
@@ -274,14 +276,9 @@ export function SettingsSection({
       className={cn('flex flex-col', rows ? 'gap-3' : 'gap-2', className)}
     >
       <div className={cn('flex min-h-7 items-center justify-between gap-3', !flat && 'px-1')}>
-        <div className="flex min-w-0 flex-col">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <h2 className="m-0 truncate text-card-title font-semibold text-foreground">{title}</h2>
-            {info !== undefined && <InfoTip info={info} />}
-          </div>
-          {description != null && (
-            <p className="m-0 text-meta text-balance text-content-tertiary">{description}</p>
-          )}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h2 className="m-0 truncate text-heading font-title text-foreground">{title}</h2>
+          {info !== undefined && <InfoTip info={info} />}
         </div>
         {action}
       </div>
@@ -292,7 +289,6 @@ export function SettingsSection({
 
 interface SettingsDangerZoneProps {
   label: string;
-  description?: string;
   actionLabel: string;
   onAction?: () => void;
   disabled?: boolean;
@@ -301,7 +297,6 @@ interface SettingsDangerZoneProps {
 
 export function SettingsDangerZone({
   label,
-  description,
   actionLabel,
   onAction,
   disabled,
@@ -309,12 +304,7 @@ export function SettingsDangerZone({
 }: SettingsDangerZoneProps) {
   return (
     <SettingsCard className={className}>
-      <SettingsRow
-        label={label}
-        hint={description}
-        className="[&>span:first-child]:max-w-none"
-        hintClassName="break-keep text-balance"
-      >
+      <SettingsRow label={label} className="[&>span:first-child]:max-w-none">
         <Button
           variant="destructive"
           className={DIALOG_PRIMARY_BUTTON}

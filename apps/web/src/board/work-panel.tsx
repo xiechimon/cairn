@@ -183,7 +183,6 @@ export function WorkPanel({
           testId="made-empty"
           icon={PackageCheck}
           title={t('暂无已完成的文档')}
-          description={t('调研报告等文档完成后会出现在这里。')}
           className="mt-[10vh]"
         />
       )

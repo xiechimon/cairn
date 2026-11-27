@@ -96,12 +96,7 @@ export function ScheduleFields({
       </div>
       {isTriggerSchedule(value.trigger) ? (
         value.trigger === 'webhook' && maskedWebhookUrl !== null ? (
-          <FormField
-            label={t('Webhook 地址')}
-            htmlFor={`${id}-webhook`}
-            disabled={disabled}
-            help={t('外部 POST 请求打到它就运行一次。保存其他修改不会改变当前地址。')}
-          >
+          <FormField label={t('Webhook 地址')} htmlFor={`${id}-webhook`} disabled={disabled}>
             <div className="flex items-center gap-2 rounded-(--radius-control) bg-muted px-3 py-2">
               <code
                 id={`${id}-webhook`}
@@ -232,12 +227,7 @@ export function ScheduleFields({
         </>
       )}
       {value.trigger === 'custom' && lateHint}
-      <FormField
-        label={t('提示词')}
-        htmlFor={`${id}-prompt`}
-        help={t('留空就按任务描述运行。')}
-        disabled={disabled}
-      >
+      <FormField label={t('提示词')} htmlFor={`${id}-prompt`} disabled={disabled}>
         <Textarea
           id={`${id}-prompt`}
           value={value.prompt}

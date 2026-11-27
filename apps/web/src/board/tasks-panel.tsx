@@ -55,7 +55,7 @@ export type TaskAddOutcome = 'saved' | 'sent';
 
 export const PANEL_HEAD = 'gap-0.5 pr-4 pl-4';
 export const PANEL_HEAD_BUTTON = 'size-9 text-foreground pointer-coarse:size-11 [&_svg]:size-5.5';
-export const PANEL_TITLE = 'text-heading font-normal';
+export const PANEL_TITLE = 'text-heading font-title';
 const PANEL_TABS = 'h-7.5 gap-0.5 group-data-horizontal/tabs:h-7.5';
 const PANEL_TAB =
   'h-7.5 px-2.5 text-ui text-foreground data-active:font-normal dark:text-foreground';
@@ -480,7 +480,6 @@ export function TasksPanel({
       {t('添加任务')}
     </Button>
   );
-  const tellCoordinator = t('跟 Coordinator 说一件事，它会在这里出现。');
   const activeEmpty =
     groups.up_next.length > 0 ? (
       <TasksEmpty
@@ -495,7 +494,6 @@ export function TasksPanel({
     ) : (
       <TasksEmpty
         title={t(nothingAtAll ? '现在没有任务' : '现在没有进行中的任务')}
-        hint={tellCoordinator}
         action={addAction}
       />
     );
@@ -535,18 +533,8 @@ export function TasksPanel({
     tab === 'active'
       ? active
       : tab === 'next'
-        ? listOf(
-            'up_next',
-            <TasksEmpty title={t('接下来没有安排')} hint={tellCoordinator} action={addAction} />,
-          )
-        : listOf(
-            'resolved',
-            <TasksEmpty
-              title={t('暂无已完成的任务')}
-              hint={t('任务完成后会出现在这里。')}
-              action={null}
-            />,
-          );
+        ? listOf('up_next', <TasksEmpty title={t('接下来没有安排')} action={addAction} />)
+        : listOf('resolved', <TasksEmpty title={t('暂无已完成的任务')} action={null} />);
   return (
     <SidePanel label={t('任务')} onDismiss={onClose} phoneTab>
       <SidePanelHead

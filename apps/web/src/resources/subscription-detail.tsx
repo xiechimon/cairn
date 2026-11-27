@@ -984,7 +984,7 @@ export function SubscriptionDetail({
       />
       <section data-testid="subscription-models" className="flex min-w-0 flex-col gap-2.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-          <h3 className="m-0 text-ui font-semibold text-foreground">{t('模型')}</h3>
+          <h3 className="m-0 text-heading font-title text-foreground">{t('模型')}</h3>
           <span
             data-testid="subscription-models-summary"
             className="text-meta text-content-tertiary"

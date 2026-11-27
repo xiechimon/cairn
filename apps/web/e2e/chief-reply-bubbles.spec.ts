@@ -50,7 +50,7 @@ test('headings, inline styles, quote and a task list with the dashed-circle and 
   await page.goto(ROUTE);
   const message = reply(page);
   await expect(message.locator('h1.chat-md-head')).toHaveCSS('font-size', '18px');
-  await expect(message.locator('h2.chat-md-head')).toHaveCSS('font-size', '15px');
+  await expect(message.locator('h2.chat-md-head')).toHaveCSS('font-size', '16px');
   await expect(message.locator('em')).toHaveText('斜体');
   await expect(message.locator('del')).toHaveText('删除线');
   await expect(message.getByTestId('md-quote')).toHaveCSS('border-left-width', '3px');

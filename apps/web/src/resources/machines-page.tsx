@@ -58,7 +58,6 @@ export function MachinesPage() {
       className="mt-6"
       icon={Monitor}
       title={t('尚无执行机')}
-      description={t('在要执行任务的执行机上运行注册命令，它就会出现在这里。')}
       action={{ label: t('添加执行机'), onClick: () => setAddOpen(true) }}
     />
   );
@@ -85,7 +84,7 @@ export function MachinesPage() {
           <SettingsPanel
             header={
               <div className="flex w-full items-center justify-between gap-3">
-                <h2 className="m-0 text-card-title font-semibold text-foreground">
+                <h2 className="m-0 text-heading font-title text-foreground">
                   {t('已接入的执行机')}
                 </h2>
                 <Button

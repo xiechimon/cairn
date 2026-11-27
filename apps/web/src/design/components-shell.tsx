@@ -180,13 +180,12 @@ export function ProjectsSection() {
         title="Settings danger zone"
         note="The existing SettingsDangerZone row with the danger outline"
         stage="canvas"
-        code={`<SettingsDangerZone label="Delete project" description="…" actionLabel="Delete…" className="ring-danger-line" />`}
+        code={`<SettingsDangerZone label="Delete project" actionLabel="Delete…" className="ring-danger-line" />`}
       >
         <div className="flex w-full max-w-170 flex-col gap-3">
           <SettingsDangerZone
             className="ring-danger-line"
             label="Delete project"
-            description="Deletes threads, Library files and scheduled tasks. Merged PRs stay on GitHub."
             actionLabel="Delete…"
           />
         </div>

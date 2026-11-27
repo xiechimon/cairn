@@ -162,7 +162,6 @@ export function SecretsPage() {
             className="mt-6"
             icon={ShieldEllipsis}
             title={t('暂无密钥或环境变量')}
-            description={t('执行机运行任务时会获取它们。')}
             action={{ label: t('添加'), onClick: () => openDialog(null) }}
           />
         }

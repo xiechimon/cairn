@@ -263,7 +263,6 @@ function ImessageConnectDialog({
   return (
     <DialogShell
       title={t('连接 iMessage')}
-      subtitle={t('桥接运行在选中的 Mac 上，和已有的执行机共用一条通道，无需开放端口。')}
       onClose={onClose}
       footer={
         <Button

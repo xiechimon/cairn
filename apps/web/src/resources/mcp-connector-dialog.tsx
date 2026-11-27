@@ -242,7 +242,7 @@ function TokenField({
             ? t(entry.tokenHelp)
             : required
               ? t('加密保存在本机，保存后看不到原文。')
-              : t('不填也能用；填了额度更高。')}{' '}
+              : null}{' '}
           {entry.tokenHelpUrl !== undefined && (
             <a
               href={entry.tokenHelpUrl}
@@ -336,7 +336,6 @@ function CatalogConnectDialog({
     return (
       <DialogShell
         title={t('连接 {name}', { name: entry.name })}
-        subtitle={t(entry.description)}
         info={t(
           'Chrome 未打开、扩展未连接或被暂停时，Coordinator 会改用其他可用浏览器，并在结果里说明原因。',
         )}
@@ -362,7 +361,6 @@ function CatalogConnectDialog({
   return (
     <DialogShell
       title={t('连接 {name}', { name: entry.name })}
-      subtitle={t(entry.description)}
       size="s"
       onClose={onClose}
       footer={
@@ -866,7 +864,6 @@ export function McpSignInDialog({
   return (
     <DialogShell
       title={t('前往 {host} 登录', { host: signIn.host })}
-      subtitle={t('连接 {name}', { name: signIn.name })}
       size="s"
       onClose={onClose}
       footer={

@@ -34,7 +34,7 @@ test('the jump-to-latest button is 36px', async ({ page }) => {
   expect(box?.height).toBe(36);
 });
 
-test('reply headings are 15px and 600 like the body, not larger', async ({ page }) => {
+test('reply headings are 16px and 600 like the body, not larger', async ({ page }) => {
   await mockLive(page, { threads: [THREAD], messages: [] }, (path, route, json) => {
     if (path !== `/api/conversations/${THREAD.id}/messages`) return undefined;
     if (route.request().method() !== 'GET') return undefined;
@@ -55,6 +55,6 @@ test('reply headings are 15px and 600 like the body, not larger', async ({ page 
         const style = getComputedStyle(node);
         return { size: style.fontSize, weight: style.fontWeight };
       });
-    expect(face).toEqual({ size: '15px', weight: '600' });
+    expect(face).toEqual({ size: '16px', weight: '600' });
   }
 });

@@ -480,7 +480,6 @@ function ManageMailboxDialog({
   return (
     <DialogShell
       title={t(PROVIDER_CARD[provider].name)}
-      subtitle={t('回信前先问你')}
       info={t('Coordinator 回信前总会先给你看一张确认卡。')}
       onClose={onClose}
       footer={

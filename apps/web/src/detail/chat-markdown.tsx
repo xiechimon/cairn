@@ -41,7 +41,7 @@ export { attachmentIdFromKey, COMPOSER_CHIP_LABEL };
 
 const HEAD_SIZE: Record<number, string> = {
   1: 'text-md-h1',
-  2: 'text-heading',
+  2: 'text-card-title',
   3: 'text-card-title',
 };
 

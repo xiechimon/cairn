@@ -36,7 +36,6 @@ import {
   SettingsTabStrip,
 } from '../components/settings/settings-nav.js';
 import {
-  SETTINGS_HINT_CLS,
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
   SettingsRow,
@@ -71,7 +70,7 @@ const ROW_INPUT_CLS = `${FORM_CONTROL_CLS} w-72 min-w-0 max-sm:flex-1`;
 const NARROW_ROWS_CLS =
   'max-sm:[&_.settings-row]:flex-wrap max-sm:[&_.settings-row]:py-3 max-sm:[&_.settings-row>span]:w-full max-sm:[&_.settings-row>span]:max-w-full';
 
-const HEAD_CLS = 'm-0 text-ui font-normal text-foreground';
+const HEAD_CLS = 'm-0 text-heading font-title text-foreground';
 
 const EMPTY_ROUTING: TeamRoutingSettings = { rules: [], policies: [] };
 
@@ -131,7 +130,7 @@ function ProjectModels({
       <RuleRow
         use="coordinator"
         label="Coordinator"
-        hint={null}
+        status={null}
         testId="project-model-coordinator"
         rule={project?.modelOverrides?.coordinator ?? null}
         options={options}
@@ -421,19 +420,14 @@ export function ProjectSettingsPage() {
             {live && wireProject?.repoKind === 'local' && (
               <SettingsCard>
                 <div className="flex flex-col gap-3 py-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="flex items-center gap-1.5 text-ui text-foreground">
-                      {t('转换为 GitHub 形态')}
-                      <InfoTip
-                        info={t(
-                          '转换后以 GitHub 仓为唯一真值源，任务改从 GitHub 克隆执行，不再使用本机文件夹。',
-                        )}
-                      />
-                    </span>
-                    <span className={SETTINGS_HINT_CLS}>
-                      {t('转换后以 GitHub 仓库为准；有构建正在运行时不能转换')}
-                    </span>
-                  </div>
+                  <span className="flex items-center gap-1.5 text-ui text-foreground">
+                    {t('转换为 GitHub 形态')}
+                    <InfoTip
+                      info={t(
+                        '转换后以 GitHub 仓为唯一真值源，任务改从 GitHub 克隆执行，不再使用本机文件夹；有构建正在运行时不能转换。',
+                      )}
+                    />
+                  </span>
                   <Input
                     aria-label={t('GitHub 仓库（owner/repo）')}
                     className={`${ROW_INPUT_CLS} font-mono`}

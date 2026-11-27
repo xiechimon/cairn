@@ -128,9 +128,7 @@ export function DesktopHostPanel() {
     <SettingsPanel
       header={
         <div className="flex w-full items-center justify-between gap-3">
-          <h2 className="m-0 text-card-title font-semibold text-foreground">
-            {t('主机连接与常驻')}
-          </h2>
+          <h2 className="m-0 text-heading font-title text-foreground">{t('主机连接与常驻')}</h2>
           {isLocalActive && !adding && (
             <Button
               variant="ghost"

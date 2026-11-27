@@ -489,11 +489,7 @@ export function McpServersPage() {
             </SettingsSection>
           )}
           {local.length > 0 && (
-            <SettingsSection
-              title={t('本机配置')}
-              description={t('来自服务器所在电脑的本机配置文件，在那里修改。')}
-              testId="mcp-local"
-            >
+            <SettingsSection title={t('本机配置')} testId="mcp-local">
               <ResourceList className="mt-0">
                 {local.map((server) => (
                   <ResourceRow mcp key={server.name}>

@@ -214,3 +214,84 @@ test('tasks panel: a row checkbox keeps its 16px box and takes clicks across 24p
   );
   expect(misses, 'A1: a desktop click target is at least 24px').toEqual([]);
 });
+
+const INKS = {
+  light: { ink: 'rgb(24, 24, 24)', ink2: 'rgb(84, 84, 84)' },
+  dark: { ink: 'rgb(237, 237, 237)', ink2: 'rgb(176, 176, 176)' },
+} as const;
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [1440, 390]) {
+    test(`settings account ${theme} ${width}px: two type steps for titles and two text colours`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
+      await open(page, '/app/settings/account?scenario=01');
+      const label = page.locator('[data-settings-label]').first();
+      await expect(label).toBeVisible();
+      const measured = await page.evaluate(() => {
+        const style = (el: Element | null) => {
+          if (el === null) return null;
+          const s = getComputedStyle(el);
+          return { size: s.fontSize, weight: s.fontWeight, color: s.color };
+        };
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--destructive)';
+        document.body.append(probe);
+        const destructive = getComputedStyle(probe).color;
+        probe.remove();
+        const inks = new Set<string>();
+        const roots = document.querySelectorAll(
+          '[data-settings-label] span:has(> span > span[id]), [data-testid=settings-head], [data-testid=settings-panel] h2',
+        );
+        for (const root of roots) {
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+          while (walker.nextNode()) {
+            const el = walker.currentNode.parentElement;
+            if (el === null || (walker.currentNode.textContent ?? '').trim() === '') continue;
+            const box = el.getBoundingClientRect();
+            if (box.width === 0 || box.height === 0) continue;
+            const color = getComputedStyle(el).color;
+            if (color !== destructive) inks.add(color);
+          }
+        }
+        return {
+          title: style(document.querySelector('[data-testid=settings-head]')),
+          section: style(document.querySelector('[data-testid=account-appearance] h2')),
+          label: style(document.querySelector('[data-settings-label] span[id]')),
+          inks: [...inks].sort(),
+        };
+      });
+      expect(measured.title, 'V32: a page title is 18px at weight 600').toMatchObject({
+        size: '18px',
+        weight: '600',
+        color: INKS[theme].ink,
+      });
+      expect(measured.section, 'V32: a section title is 18px at weight 600 in the primary ink').toMatchObject({
+        size: '18px',
+        weight: '600',
+        color: INKS[theme].ink,
+      });
+      expect(measured.label, 'V32: a row label is 14px in the primary ink').toMatchObject({
+        size: '14px',
+        color: INKS[theme].ink,
+      });
+      await open(page, '/app/settings/routing?scenario=model-routing-empty');
+      const status = page.locator('[data-settings-status]').first();
+      await expect(status).toBeVisible();
+      const secondary = await status.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { size: s.fontSize, color: s.color };
+      });
+      expect(secondary, 'V32: a status line under a settings row is 14px in the secondary ink').toMatchObject({
+        size: '14px',
+        color: INKS[theme].ink2,
+      });
+      expect(
+        measured.inks.filter((color) => color !== INKS[theme].ink && color !== INKS[theme].ink2),
+        'V32: settings titles, labels and status lines use only the two inks (and the destructive role)',
+      ).toEqual([]);
+    });
+  }
+}

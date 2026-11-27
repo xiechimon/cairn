@@ -220,18 +220,13 @@ export function BackupSettingsSection() {
       <SettingsCard>
         <SettingsRow
           label={t('自动备份')}
-          hint={
+          status={
             <span className="flex flex-col gap-1">
               <span
                 className={statusLine.failed ? 'text-destructive tabular-nums' : 'tabular-nums'}
                 data-testid="backup-status-text"
               >
                 {statusLine.text}
-              </span>
-              <span>
-                {managed.storage === 'cloud'
-                  ? t('每天自动加密备份到独立存储空间，可随时恢复或下载全部数据')
-                  : t('每天自动备份，可随时恢复或下载全部数据')}
               </span>
               {statusLine.failed && statusLine.detail !== null && (
                 <span>
@@ -272,7 +267,7 @@ export function BackupSettingsSection() {
 
         <SettingsRow
           label={t('下载全部数据')}
-          hint={t('导出所有对话、任务、附件和配置到本地文件（不含密钥文件）')}
+          status={t('导出所有对话、任务、附件和配置到本地文件（不含密钥文件）')}
         >
           <Button
             variant="outline"
@@ -299,7 +294,7 @@ export function BackupSettingsSection() {
           </Button>
         </SettingsRow>
 
-        <SettingsRow label={t('历史备份')} hint={t('恢复前会自动保存当前状态，选错可一键撤回')}>
+        <SettingsRow label={t('历史备份')}>
           <Button
             variant="ghost"
             size="sm"

@@ -405,19 +405,14 @@ export const EN: Record<string, string> = {
     'For example: repository content is English; run pnpm lint after changes; never force push.',
   '项目说明保存失败，请重试。': 'Could not save the instructions. Try again.',
   暂无已完成的文档: 'No finished documents',
-  '调研报告等文档完成后会出现在这里。':
-    'Research reports and other documents show up here once they finish.',
   新建项目: 'New project',
   接入模型来源: 'Connect a model source',
-  '添加服务商，或添加 Claude 订阅': 'Add a provider, or add a Claude subscription',
   连接一台执行机: 'Connect a Runner',
   'Coordinator 还缺模型': 'The Coordinator needs a model',
   '先接入一个模型来源，Coordinator 才能回复你':
     'Connect a model source so the Coordinator can reply',
   'Coordinator 现在没有模型可用': 'The Coordinator has no model to use right now',
   接入模型来源后就能发消息: 'Connect a model source to send messages',
-  '添加一个 Coordinator 可用的服务商，或添加 Claude 订阅和已安装 Claude Code 的执行机':
-    'Add a provider the Coordinator can use, or a Claude subscription and a Runner with Claude Code',
   已保存: 'Saved',
   暂无可用的模型: 'No usable model',
   换一个: 'Change',
@@ -472,8 +467,6 @@ export const EN: Record<string, string> = {
   接入模型: 'Connect models',
   确认模型: 'Confirm models',
   去完成设置: 'Finish setup',
-  '在要执行任务的电脑上运行 `{command}`':
-    'Run `{command}` on the computer that should run the tasks',
   '{name} 离线': '{name} is offline',
   '在 {name} 上运行 `{command}` 让它重新上线': 'Run `{command}` on {name} to bring it back',
   'Cairn 会在这台电脑唤醒后自动重连': 'Cairn reconnects this computer by itself once it wakes',
@@ -633,8 +626,6 @@ export const EN: Record<string, string> = {
   深色: 'Dark',
 
   编辑名称: 'Edit name',
-  '任务需要你处理时，在系统通知中心提醒':
-    'Notify you in the system notification center when a task needs you',
 
   待回答: 'Needs input',
   '回答它的问题…': 'Answer its question…',
@@ -718,10 +709,7 @@ export const EN: Record<string, string> = {
   '轮换 Webhook 地址': 'Rotate webhook URL',
   '轮换后，当前 Webhook 地址会立即失效，已接入的外部调用需要改为新地址。':
     'Rotating invalidates the current webhook URL immediately. Update existing callers to use the new URL.',
-  '外部 POST 请求打到它就运行一次。保存其他修改不会改变当前地址。':
-    'An external POST to this URL runs the schedule once. Saving other changes keeps the current URL.',
   '保存 Webhook 地址': 'Save your webhook URL',
-  '外部 POST 请求打到它就运行一次。': 'An external POST to this URL runs the schedule once.',
   '示例数据（场景 {id}）': 'Sample data (scenario {id})',
   演示数据: 'Demo data',
   '只读演示，改动不会被保存。': 'Read-only demo — changes are not saved.',
@@ -729,15 +717,11 @@ export const EN: Record<string, string> = {
   闭环录像: 'Closed-loop video',
   '这是演示数据，改动不会保存': 'Demo data: changes are not saved',
   暂无定时任务: 'No schedules',
-  '也可以告诉 Coordinator 某个任务多久重新运行一次，它会替你写好规则':
-    'You can also tell the Coordinator how often a task should run again, and it will write the rule for you.',
 
   更换: 'Change',
   名称: 'Name',
   语言: 'Language',
   推送通知: 'Push notifications',
-  '需要你处理时提醒，不急的邮件定时汇总':
-    'Alerts you when something needs you; anything that can wait arrives in a scheduled email digest',
   开启锁屏推送: 'Turn on lock-screen push',
   '浏览器已拒绝通知权限，需到站点设置重新允许':
     'Notifications are blocked by the browser — re-allow them in site settings',
@@ -746,8 +730,6 @@ export const EN: Record<string, string> = {
   ' · 默认': ' · Default',
 
   '尚无 API 密钥': 'No API keys yet',
-  'API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。':
-    'API keys connect Runners from the command line and let MCP clients reach your workbench.',
   '新建 API 密钥': 'New API key',
   复制: 'Copy',
   选择文字: 'Select text',
@@ -777,8 +759,6 @@ export const EN: Record<string, string> = {
     'You cannot view it again after closing. Copy it now and keep it somewhere safe.',
   我已保存: 'I have saved it',
   '新的 API 密钥': 'New API key',
-  '以 cairn_ 开头，万一泄露，密钥扫描工具和你都能认出它。':
-    'It starts with cairn_, so secret scanners and you can recognize it if it leaks.',
   '删除后，用这个 API 密钥的 MCP 客户端、脚本和 Git 访问会立即失效，无法恢复':
     'Deleting this API key cuts off every MCP client, script and Git remote using it at once, and cannot be undone',
 
@@ -789,7 +769,6 @@ export const EN: Record<string, string> = {
   '排序：{option}': 'Sort: {option}',
   排序: 'Sort',
   尚无技能: 'No skills yet',
-  '用「导入」或「新建技能」添加。': 'Add skills with Import or New skill.',
   新建技能: 'New skill',
   编辑技能: 'Edit skill',
   'SKILL.md 正文': 'SKILL.md body',
@@ -831,7 +810,6 @@ export const EN: Record<string, string> = {
   '本机 ~/.agents/skills 和 ~/.claude/skills 里没有技能。':
     'No skills in ~/.agents/skills or ~/.claude/skills on this computer.',
   '没有匹配的技能。': 'No matching skills.',
-  '导入会复制一份，原目录不变。': 'Importing copies the skill; the original stays unchanged.',
   添加密钥: 'Add secret',
   较早: 'earlier',
   空值: 'Empty',
@@ -845,8 +823,6 @@ export const EN: Record<string, string> = {
   保存并转为机密: 'Save as secret',
   添加密钥或环境变量: 'Add secret or env var',
   '编辑 {name}': 'Edit {name}',
-  '项目里的条目只发给该项目的对话，同名时优先于团队条目。':
-    "Project entries go only to that project's conversations and override team entries with the same name.",
   '加密保存在 Cairn 服务器上。': 'Encrypted at rest on the Cairn server.',
   机密: 'Secret',
   '机密不能转回环境变量。': 'A secret cannot become an env var again.',
@@ -857,7 +833,6 @@ export const EN: Record<string, string> = {
   批量添加: 'Bulk add',
   项目里的同名条目优先于团队条目: 'Project entries override team entries with the same name',
   暂无密钥或环境变量: 'No secrets or environment variables',
-  '执行机运行任务时会获取它们。': 'Runners get them when they run tasks.',
   按名称筛选: 'Filter by name',
   最后更新: 'Last updated',
   '没有名称包含「{q}」的条目': 'No entries whose name contains “{q}”',
@@ -890,16 +865,11 @@ export const EN: Record<string, string> = {
   正在加载网站登录: 'Loading site logins',
   网站登录未能加载: 'Site logins could not be loaded',
   暂无保存的网站登录: 'No saved site logins',
-  '保存网站的用户名和密码后，Coordinator 可以在浏览器里代填。':
-    'Save a site username and password and the Coordinator can fill them in the browser.',
   网站: 'Site',
   登录: 'Login',
   用户名: 'Username',
   密码: 'Password',
   用户名和密码: 'Username and password',
-  '标记这条登录用在哪个网站，代填前仍会请你批准网站。':
-    'Marks which site this login is for; filling still asks for your approval first.',
-  'Coordinator 用这个名字找到这条登录。': 'The Coordinator finds this login by this name.',
   '原用户名已隐藏。留空保持不变，填写则替换。':
     'The saved username is hidden. Leave empty to keep it, or type to replace it.',
   '原密码已隐藏。留空保持不变，填写则替换。':
@@ -907,7 +877,6 @@ export const EN: Record<string, string> = {
   '加密保存，保存后不再显示，也不会进入对话。':
     'Stored encrypted. It is never shown again and never enters a conversation.',
   网站授权: 'Site authorizations',
-  批准过的网站在这台执行机上直接代填: 'Approved sites fill directly on this Runner',
   正在加载网站授权: 'Loading site authorizations',
   网站授权未能加载: 'Site authorizations could not be loaded',
   暂无已批准的网站: 'No approved sites',
@@ -940,7 +909,6 @@ export const EN: Record<string, string> = {
   '来源 issue': 'Source issue',
   与本地标题不一致: 'Differs from the local title',
   模型: 'Model',
-  接入执行机: 'Connect a Runner',
   在线: 'Online',
   状态: 'Status',
   删除执行机: 'Delete Runner',
@@ -1003,8 +971,8 @@ export const EN: Record<string, string> = {
   '{branch}（默认）': '{branch} (default)',
   默认分支: 'Default branch',
   读取失败: 'Could not load',
-  '转换后以 GitHub 仓为唯一真值源，任务改从 GitHub 克隆执行，不再使用本机文件夹。':
-    'After conversion the GitHub repo is the single source of truth; tasks run from a GitHub clone and the local folder is no longer used.',
+  '转换后以 GitHub 仓为唯一真值源，任务改从 GitHub 克隆执行，不再使用本机文件夹；有构建正在运行时不能转换。':
+    'After conversion the GitHub repo is the single source of truth; tasks run from a GitHub clone and the local folder is no longer used; a running build blocks it.',
   更换项目图标: 'Change project icon',
   搜索图标: 'Search icons',
   没有匹配的图标: 'No matching icons',
@@ -1015,8 +983,6 @@ export const EN: Record<string, string> = {
   冷却中: 'cooling down',
   '转换失败，请重试。': 'Conversion failed. Try again.',
   '转换为 GitHub 形态': 'Convert to GitHub form',
-  '转换后以 GitHub 仓库为准；有构建正在运行时不能转换':
-    'The GitHub repo becomes the source; not available while a build runs',
   'GitHub 仓库（owner/repo）': 'GitHub repository (owner/repo)',
   'GitHub 仓库格式应为 owner/repo。': 'GitHub repository must be in owner/repo form.',
   转换: 'Convert',
@@ -1093,7 +1059,6 @@ export const EN: Record<string, string> = {
   '填写 API key': 'Add the API key',
   '换 Coordinator 模型': 'Pick another Coordinator model',
   运行平台: 'Platform',
-  不限时用默认执行机: 'Any uses the default Runner',
   '需要 {platform}': 'needs {platform}',
   '暂无 {platform} 执行机': 'No {platform} Runner',
   '不限（默认执行机）': 'Any (default Runner)',
@@ -1342,10 +1307,6 @@ export const EN: Record<string, string> = {
   状态无法读取: 'Status unavailable',
   '最近备份：{time} · 正常': 'Last backup: {time} · Healthy',
   '最近备份：{time} · 失败': 'Last backup: {time} · Failed',
-  '每天自动加密备份到独立存储空间，可随时恢复或下载全部数据':
-    'Backed up daily with encryption to separate storage. Restore or download everything at any time.',
-  '每天自动备份，可随时恢复或下载全部数据':
-    'Backed up daily. Restore or download everything at any time.',
   查看原因: 'Show details',
   收起原因: 'Hide details',
   立即备份: 'Back up now',
@@ -1359,8 +1320,6 @@ export const EN: Record<string, string> = {
   已开始下载全部数据: 'Download started',
   '下载失败，请重试。': 'Download failed. Try again.',
   历史备份: 'Backup history',
-  '恢复前会自动保存当前状态，选错可一键撤回':
-    'Current state is saved before restoring so you can revert in one click.',
   暂无历史备份: 'No backups yet',
   收起历史备份: 'Hide history',
   '查看历史备份 ({count})': 'View backups ({count})',
@@ -1881,7 +1840,6 @@ export const EN: Record<string, string> = {
   '{model} · 默认': '{model} · default',
   '{use} 的模型': '{use} model',
   '{use} 的思考强度': '{use} thinking level',
-  上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
   '先给 Coordinator 选模型': 'Pick a model for the Coordinator',
   '这个订阅的登录有效。': 'This subscription’s sign-in is valid.',
   'Devin 接受了这个凭据。': 'Devin accepted these credentials.',
@@ -1918,8 +1876,6 @@ export const EN: Record<string, string> = {
   '{n} 个模型': '{n#1 model|# models}',
   '暂无执行机上报 {runtime} 模型': 'No Runner has reported models for {runtime}',
   范围: 'Scope',
-  '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
-    'Add an API key, subscription or custom endpoint and its models show up here.',
   '{online}/{total} 台执行机在线': '{online} of {total#1 Runner|# Runners} online',
   '{offline} 台离线（{names}）': '{offline#1 offline|# offline} ({names})',
   设置分区: 'Settings sections',
@@ -1947,7 +1903,6 @@ export const EN: Record<string, string> = {
   '修复失败，请重试。': 'Could not fix it. Try again.',
   '这条规则刚被修改，已重新读取，请再次确认。':
     'This rule was changed and has been reloaded. Review it again.',
-  不填则沿用规则的执行机: 'Leave empty to keep the rule Runner',
   首选执行机: 'Preferred Runner',
   不固定: 'Any Runner',
   '当前默认：{model} · {provider}': 'Current default: {model} · {provider}',
@@ -1957,9 +1912,7 @@ export const EN: Record<string, string> = {
   已是默认执行机: 'Default Runner',
   '设为默认执行机失败，请重试。': 'Could not change the default Runner. Try again.',
   路由覆盖: 'Route override',
-  路由规则开启后生效: 'Applies when routing rules are on',
   '要求的 MCP': 'Required MCP',
-  '派发时要求执行机已安装这些 MCP 服务器': 'Dispatch requires these MCP servers on the executor',
   路由覆盖已保存: 'Route override saved',
   '保存路由覆盖失败，请重试。': 'Could not save the route override. Try again.',
   会话: 'Session',
@@ -2086,7 +2039,6 @@ export const EN: Record<string, string> = {
   从哪天开始每周重复: 'Day to repeat each week',
   '整点运行可能会晚几分钟开始。': 'Runs on the hour may start a few minutes late.',
   提示词: 'Saved prompt',
-  '留空就按任务描述运行。': 'Leave empty to use the thread description.',
   '请选择这个时区里有效的日期和时间。': 'Choose a valid date and time in this timezone.',
   '单次定时要选一个将来的时间。': 'Choose a future time for a one-time schedule.',
   等待审核: 'Review pending',
@@ -2108,7 +2060,6 @@ export const EN: Record<string, string> = {
   登录已过期: 'Sign-in expired',
   已接入的执行机: 'Connected Runners',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
-  '移除后，使用它的模型不再可选。': 'Once removed, its models can no longer be picked.',
   '{n} 分钟后恢复': 'Back in {n#1 minute|# minutes}',
   '{n} 小时后恢复': 'Back in {n#1 hour|# hours}',
   '{n} 天后恢复': 'Back in {n#1 day|# days}',
@@ -2150,10 +2101,6 @@ export const EN: Record<string, string> = {
   '生成配对码失败，请重试。': 'Could not create a pairing code. Try again.',
   手机尚无法连接这台电脑: 'Your phone cannot connect to this computer yet',
   '请先登录 Tailscale。': 'Sign in to Tailscale first.',
-  '打开上方的开关，手机在外部网络也能连接这台电脑。':
-    'Turn on the switch above and your phone can connect to this computer from any network.',
-  '打开后，手机和其他电脑能通过你的 Tailscale 网络连到这台电脑':
-    'Turn it on and phones and other computers can reach this computer over your Tailscale network.',
   '远程访问未能打开，请重试': 'Remote access did not turn on. Try again',
   '远程访问状态加载失败，请重试': 'Could not load remote access status. Try again',
   这个安装没有附带远程访问组件: 'This install does not include the remote access component.',
@@ -2212,15 +2159,12 @@ export const EN: Record<string, string> = {
   在对话里回答: 'Answer in the conversation',
   尚未开始: 'Not started',
   现在没有任务: 'No tasks right now',
-  '跟 Coordinator 说一件事，它会在这里出现。':
-    'Tell the Coordinator about something and it shows up here.',
   '给 Coordinator 发消息': 'Message the Coordinator',
   接下来没有安排: 'Nothing is lined up next',
   现在没有进行中的任务: 'Nothing is in progress right now',
   暂无已完成的任务: 'No finished tasks',
   '接下来有 {n} 个任务在排队。': 'Up next has {n} waiting.',
   查看接下来: 'Show Up next',
-  '任务完成后会出现在这里。': 'Tasks show up here once they finish.',
   定时未能加载: 'Schedules could not be loaded',
   正在加载定时: 'Loading schedules',
   '添加任务…': 'Add a task…',
@@ -2326,7 +2270,6 @@ export const EN: Record<string, string> = {
   检查内容: 'What ran',
   令牌: 'Token',
   '{label}（可选）': '{label} (optional)',
-  '不填也能用；填了额度更高。': 'Works without one; a key raises your limits.',
   '去 {name} 创建': 'Create one on {name}',
   '连接 {name}': 'Connect {name}',
   '正在连接…': 'Connecting…',
@@ -2406,8 +2349,6 @@ export const EN: Record<string, string> = {
   '正在准备…': 'Preparing…',
   接入: 'Connect',
   本机配置: 'Local config',
-  '来自服务器所在电脑的本机配置文件，在那里修改。':
-    "From ~/.claude.json on the server's computer. Edit it there.",
   '仓库、议题、拉取请求与工作流': 'Repositories, issues, pull requests and workflows',
   '边缘函数、域名解析与对象存储': 'Edge functions, DNS and object storage',
   '议题、项目与迭代周期': 'Issues, projects and cycles',
@@ -2531,8 +2472,6 @@ export const EN: Record<string, string> = {
     "Cairn's folder is read-only, so it cannot update itself",
   没有用量: 'No usage',
   暂无用量: 'No usage',
-  '和 Coordinator 说第一句话后，这里会按天显示用了多少 token。':
-    'After your first message to the Coordinator, this shows how many tokens each day used.',
   过去一年: 'Past year',
   用了: 'Used',
   日均: 'Daily average',
@@ -2661,8 +2600,6 @@ export const EN: Record<string, string> = {
     'Send and receive iMessage through an always-on Mac. No open ports.',
   '回复数字或文字就能点卡片上的按钮。':
     'Reply with a number or the label text to tap a card button.',
-  '桥接运行在选中的 Mac 上，和已有的执行机共用一条通道，无需开放端口。':
-    'The bridge runs on the Mac you pick and shares the outbound channel your Runner already uses. No open ports needed.',
   '运行桥接的 Mac': 'Mac running the bridge',
   '选择一台始终开机的 Mac。这台 Mac 需要安装 imsg 并授予 iMessage 读取权限；首次连接时会自动安装受管版本。':
     'Pick an always-on Mac. It needs imsg installed with Messages read access; a managed copy installs automatically on first connect.',
@@ -2790,8 +2727,6 @@ export const EN: Record<string, string> = {
   '用你自己的 Composio 账号接入，需另注册': 'Through your own Composio account, separate sign-up',
   '用 Composio 接入更多应用': 'Connect more apps with Composio',
   'API key 已保存，不会再显示。': 'API key saved. It will not be shown again.',
-  '用你自己的 Composio 账号接入 Slack、Google 日历等应用':
-    'Connect Slack, Google Calendar and more through your own Composio account',
   '移除 API key': 'Remove API key',
   '更换 API key': 'Replace API key',
   保存并列出应用: 'Save and list apps',
@@ -2878,8 +2813,8 @@ export const EN: Record<string, string> = {
     'When a task runs on a Runner it takes granted entries on demand through the get_secret tool — every take is recorded and values are never preloaded into the shell environment. Process-level settings such as telemetry export do not come from here; they belong in the Runner or server environment variables.',
   '浏览器代填用的网站登录保存在这里。Coordinator 只在你批准的网站上填入用户名和密码，这两个值不会出现在页面或对话里。':
     'Site logins for browser fill live here. The Coordinator fills the username and password only on sites you approved, and neither value ever appears on a page or in a conversation.',
-  'Coordinator 第一次在某个网站代填时会请求批准；撤销后重新请求。':
-    'The Coordinator asks for approval the first time it fills on a site; revoking makes it ask again.',
+  '批准过的网站在这台执行机上直接代填。Coordinator 第一次在某个网站代填时会请求批准；撤销后重新请求。':
+    'Approved sites fill directly on this Runner. The Coordinator asks for approval the first time it fills on a site; revoking makes it ask again.',
   '按钮和回复都支持。': 'Buttons and replies are supported.',
   '在私聊里和 Coordinator 对话。': 'Talk to the Coordinator in DMs.',
   '在平时的聊天里和 Coordinator 对话，回复数字或文字就能点卡片上的按钮。':
@@ -2954,7 +2889,6 @@ export const EN: Record<string, string> = {
   返回账号登录: 'Back to account sign-in',
   '服务器地址 {host}': 'Server {host}',
   账号登录: 'Account sign-in',
-  已通过账号验证登录此实例: 'Signed in to this instance with your account',
   退出登录: 'Sign out',
   '正在退出…': 'Signing out…',
   '退出登录失败，请重试。': 'Could not sign out. Try again.',

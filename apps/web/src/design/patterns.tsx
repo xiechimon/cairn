@@ -90,7 +90,7 @@ export function ProvidersPattern() {
           ) : (
             <SettingsCard>
               {providers.map((p) => (
-                <SettingsRow key={p.id} label={p.label} hint={p.name}>
+                <SettingsRow key={p.id} label={p.label} status={p.name}>
                   <span className="flex items-center gap-1.5 text-meta text-running-text">
                     <Check width={12} height={12} />
                     Connected

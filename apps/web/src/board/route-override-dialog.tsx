@@ -13,7 +13,6 @@ import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { MachineName } from '../components/machine-label.js';
 import {
-  SETTINGS_HINT_CLS,
   SETTINGS_ROW_CLS,
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
@@ -143,7 +142,6 @@ export function RouteOverrideDialog({
   return (
     <DialogShell
       title={t('路由覆盖')}
-      subtitle={t('路由规则开启后生效')}
       info={t('本任务的执行机与执行要求')}
       open={open}
       onClose={onClose}
@@ -168,9 +166,7 @@ export function RouteOverrideDialog({
         <SettingsCard>
           <SettingsRow
             label={t('运行平台')}
-            hint={
-              platformLocked ? t('任务开始后不能改，换平台请新开任务') : t('不限时用默认执行机')
-            }
+            info={platformLocked ? t('任务开始后不能改，换平台请新开任务') : undefined}
           >
             <Select
               value={platform}
@@ -196,7 +192,7 @@ export function RouteOverrideDialog({
               </SelectContent>
             </Select>
           </SettingsRow>
-          <SettingsRow label={t('首选执行机')} hint={t('不填则沿用规则的执行机')}>
+          <SettingsRow label={t('首选执行机')}>
             <Select value={machineId} onValueChange={(next) => setMachineId(next)}>
               <SelectTrigger
                 aria-label={t('首选执行机')}
@@ -231,8 +227,7 @@ export function RouteOverrideDialog({
           </SettingsRow>
         </SettingsCard>
         <section className="flex flex-col gap-2">
-          <h3 className="m-0 text-card-title font-medium text-foreground">{t('要求的 MCP')}</h3>
-          <p className={SETTINGS_HINT_CLS}>{t('派发时要求执行机已安装这些 MCP 服务器')}</p>
+          <h3 className="m-0 text-heading font-title text-foreground">{t('要求的 MCP')}</h3>
           {mcpOptions.length === 0 ? (
             <SettingsCard>
               <div className={cn(SETTINGS_ROW_CLS, 'gap-2')}>

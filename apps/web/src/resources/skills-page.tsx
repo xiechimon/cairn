@@ -97,7 +97,6 @@ export function SkillsPage() {
             className="mt-6"
             icon={Puzzle}
             title={t(SKILL_PAGE_COPY.empty)}
-            description={t(SKILL_PAGE_COPY.hint)}
             action={{ label: t('新建技能'), onClick: openCreate }}
           />
         }

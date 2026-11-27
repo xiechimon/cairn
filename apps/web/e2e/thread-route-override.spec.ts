@@ -11,6 +11,8 @@ test('thread more menu opens the per-todo route override dialog', async ({ page 
 
   const dialog = page.getByRole('dialog', { name: '路由覆盖' });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('路由规则开启后生效')).toHaveCount(0);
+  await expect(dialog.getByText('派发时要求执行机已安装这些 MCP 服务器')).toHaveCount(0);
   await expect(dialog.getByTestId('route-override-machine')).toBeVisible();
   await dialog.getByTestId('route-override-machine').click();
   await expect(page.getByRole('option', { name: '不固定' })).toHaveCount(0);

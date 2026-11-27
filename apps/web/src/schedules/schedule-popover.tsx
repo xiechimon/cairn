@@ -77,11 +77,7 @@ export function WebhookUrlRevealDialog({
       }
     >
       <FormStack className="max-w-none">
-        <FormField
-          label={t('Webhook 地址')}
-          htmlFor={fieldId}
-          help={t('外部 POST 请求打到它就运行一次。')}
-        >
+        <FormField label={t('Webhook 地址')} htmlFor={fieldId}>
           <div className="flex items-start gap-1">
             <Textarea
               id={fieldId}

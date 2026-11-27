@@ -109,8 +109,8 @@ it.each([{ name: 'light', theme: light }, { name: 'dark', theme: dark }])('A3: $
 });
 
 it.each([
-  { name: 'light', theme: light, destructive: '#9c3627', tertiary: '#4b4d4a', waiting: '#7a5000' },
-  { name: 'dark', theme: dark, destructive: '#f09a88', tertiary: '#9c9b98', waiting: '#ebb550' },
+  { name: 'light', theme: light, destructive: '#9c3627', tertiary: '#545454', waiting: '#7a5000' },
+  { name: 'dark', theme: dark, destructive: '#f09a88', tertiary: '#b0b0b0', waiting: '#ebb550' },
 ])('$name global slots retain the owner-approved colors', ({ theme, destructive, tertiary, waiting }) => {
   expect(hex('--destructive', theme)).toBe(destructive);
   expect(hex('--text-tertiary', theme)).toBe(tertiary);

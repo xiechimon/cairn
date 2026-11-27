@@ -101,11 +101,7 @@ export function VaultPairDialog({
       }
     >
       <FormStack className="max-w-none">
-        <FormField
-          label={t('网站')}
-          htmlFor="dlg-pair-site"
-          help={t('标记这条登录用在哪个网站，代填前仍会请你批准网站。')}
-        >
+        <FormField label={t('网站')} htmlFor="dlg-pair-site">
           <Input
             id="dlg-pair-site"
             ref={siteRef}
@@ -122,11 +118,7 @@ export function VaultPairDialog({
             spellCheck={false}
           />
         </FormField>
-        <FormField
-          label={t('名称')}
-          htmlFor="dlg-pair-name"
-          help={t('Coordinator 用这个名字找到这条登录。')}
-        >
+        <FormField label={t('名称')} htmlFor="dlg-pair-name">
           <Input
             id="dlg-pair-name"
             data-testid="pair-name"

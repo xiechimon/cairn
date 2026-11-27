@@ -175,13 +175,7 @@ export function TasksScheduleList({
         isEmpty={rows.length === 0}
         loadingLabel={t('正在加载定时')}
         errorTitle={t('定时未能加载')}
-        empty={
-          <TasksEmpty
-            title={t('暂无定时任务')}
-            hint={t('也可以告诉 Coordinator 某个任务多久重新运行一次，它会替你写好规则')}
-            action={newSchedule(true)}
-          />
-        }
+        empty={<TasksEmpty title={t('暂无定时任务')} action={newSchedule(true)} />}
       >
         <div ref={listRef} className="flex flex-col">
           <section

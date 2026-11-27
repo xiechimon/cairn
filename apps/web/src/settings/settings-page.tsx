@@ -387,7 +387,7 @@ export function SettingsDialog({
               : 'flex h-11 flex-none items-center justify-between gap-2 border-b border-border pr-3 pl-4'
           }
         >
-          <h1 className="m-0 text-card-title font-semibold text-foreground">{t('设置')}</h1>
+          <h1 className="m-0 text-heading font-title text-foreground">{t('设置')}</h1>
           <IconTooltip
             label={t('关闭设置')}
             side="bottom"
@@ -441,7 +441,7 @@ export function SettingsDialog({
               <div className="flex flex-none items-center gap-3 px-4 pt-4 pb-3">
                 <h2
                   data-testid="settings-head"
-                  className="m-0 min-w-0 truncate text-card-title font-semibold text-foreground"
+                  className="m-0 min-w-0 truncate text-heading font-title text-foreground"
                 >
                   {t(shown.label)}
                 </h2>

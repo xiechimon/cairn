@@ -501,11 +501,7 @@ function ComposioKeyDialog({
               'Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。',
             )
       }
-      subtitle={
-        configured
-          ? t('API key 已保存，不会再显示。')
-          : t('用你自己的 Composio 账号接入 Slack、Google 日历等应用')
-      }
+      subtitle={configured ? t('API key 已保存，不会再显示。') : undefined}
       onClose={onClose}
       footer={
         <div className="flex w-full items-center gap-2">

@@ -1,22 +1,22 @@
 ---
 colors:
   canvas: '#e7e6e1'; sheet: '#ecebe6'; card: '#e5e4df'; popover: '#f8f7f3'; hover: 'rgb(0 0 0 / 0.06)'; line: 'rgb(0 0 0 / 0.1)'; rule: 'rgb(0 0 0 / 0.1)'; divider: 'rgb(0 0 0 / 0.1)'
-  ink: '#1c1d1b'; ink-2: '#343633'; ink-3: '#4b4d4a'; ink-4: '#5d5f5c'; icon: '#343633'; accent: '#9a6500'; primary: '#1c1d1b'; on-primary: '#ecebe6'
+  ink: '#181818'; ink-2: '#545454'; ink-3: '#545454'; ink-4: '#545454'; icon: '#545454'; accent: '#9a6500'; primary: '#181818'; on-primary: '#ecebe6'
   on-accent: '#ffffff'; count-badge: '#376dd6'; count-badge-ink: '#ffffff'; accent-hover: '#f7ecd2'; menu-hover: 'rgb(0 0 0 / 0.05)'; backdrop: 'rgb(0 0 0 / 0.4)'
   running: '#5f8f4f'; running-text: '#3f6c35'; running-bar: '#55833f'; running-track: '#d9d9d4'; danger-line: '#d98c7d'; pebble-waiting: '#d49a1c'; pebble-review: '#5379a0'
-  pebble-working: '#5f8f4f'; pebble-idle: '#5d5f5c'; pebble-resolved: '#b8b7b3'; tint-working: '#d2e4ff'; tint-working-soft: '#e6eefb'; tint-working-ink: '#2f55a8'
-  tint-wait: '#f3e6c8'; tint-wait-soft: '#f8efdc'; tint-wait-ink: '#6e4900'; tint-quiet: '#dad9d5'; tint-quiet-soft: '#e0dfda'; tint-quiet-ink: '#343633'; tint-fail: '#f5ddd6'; tint-fail-soft: '#f9e8e3'; tint-fail-ink: '#9c3627'
+  pebble-working: '#5f8f4f'; pebble-idle: '#545454'; pebble-resolved: '#b8b7b3'; tint-working: '#d2e4ff'; tint-working-soft: '#e6eefb'; tint-working-ink: '#2f55a8'
+  tint-wait: '#f3e6c8'; tint-wait-soft: '#f8efdc'; tint-wait-ink: '#6e4900'; tint-quiet: '#dad9d5'; tint-quiet-soft: '#e0dfda'; tint-quiet-ink: '#545454'; tint-fail: '#f5ddd6'; tint-fail-soft: '#f9e8e3'; tint-fail-ink: '#9c3627'
 colors-dark:
   canvas: '#1b1c1b'; sheet: '#151615'; card: '#1f201f'; popover: '#2c2d2c'; hover: 'rgb(255 255 255 / 0.075)'; line: 'rgb(255 255 255 / 0.1)'; rule: 'rgb(255 255 255 / 0.1)'; divider: 'rgb(255 255 255 / 0.1)'
-  ink: '#ecebe6'; ink-2: '#bbbab7'; ink-3: '#9c9b98'; ink-4: '#8c8b88'; icon: '#bbbab7'; accent: '#ebb550'; primary: '#ecebe6'; on-primary: '#151615'
+  ink: '#ededed'; ink-2: '#b0b0b0'; ink-3: '#b0b0b0'; ink-4: '#b0b0b0'; icon: '#b0b0b0'; accent: '#ebb550'; primary: '#ededed'; on-primary: '#151615'
   on-accent: '#1a1404'; count-badge: '#376dd6'; count-badge-ink: '#ffffff'; accent-hover: '#33290f'; menu-hover: 'rgb(255 255 255 / 0.075)'; backdrop: 'rgb(0 0 0 / 0.5)'
   running: '#82b46f'; running-text: '#9cc78b'; running-bar: '#6fa35c'; running-track: '#262726'; danger-line: '#8c4a3e'; pebble-waiting: '#e0a838'; pebble-review: '#7fa3cc'
-  pebble-working: '#82b46f'; pebble-idle: '#8c8b88'; pebble-resolved: '#434443'; tint-working: '#223a5e'; tint-working-soft: '#1d2d49'; tint-working-ink: '#9cbcf2'
-  tint-wait: '#3d3014'; tint-wait-soft: '#2e2510'; tint-wait-ink: '#f2cf86'; tint-quiet: '#2a2b2a'; tint-quiet-soft: '#222322'; tint-quiet-ink: '#bbbab7'; tint-fail: '#4a2a24'; tint-fail-soft: '#3a2420'; tint-fail-ink: '#f09a88'
+  pebble-working: '#82b46f'; pebble-idle: '#b0b0b0'; pebble-resolved: '#434443'; tint-working: '#223a5e'; tint-working-soft: '#1d2d49'; tint-working-ink: '#9cbcf2'
+  tint-wait: '#3d3014'; tint-wait-soft: '#2e2510'; tint-wait-ink: '#f2cf86'; tint-quiet: '#2a2b2a'; tint-quiet-soft: '#222322'; tint-quiet-ink: '#b0b0b0'; tint-fail: '#4a2a24'; tint-fail-soft: '#3a2420'; tint-fail-ink: '#f09a88'
 typography:
-  greeting: { fontFamily: serif, fontSize: 32px, fontWeight: '360' }; page-title: { fontFamily: serif, fontSize: 24px, fontWeight: '500' }; brand: { fontFamily: serif, fontSize: 18px, fontWeight: '500' }; response: { fontFamily: serif, fontSize: 15px, fontWeight: '400', lineHeight: '21px' }; reply: { fontFamily: reply, fontSize: 15px, fontWeight: '400', lineHeight: '28px' }
-  heading: { fontFamily: display, fontSize: 15px, fontWeight: '500' }; card-title: { fontFamily: sans, fontSize: 15px, fontWeight: '600', lineHeight: '21px' }; ui: { fontFamily: sans, fontSize: 14px, fontWeight: '400' }
-  meta: { fontFamily: sans, fontSize: 13px, fontWeight: '400' }; caption: { fontFamily: sans, fontSize: 12px, fontWeight: '500' }; code: { fontFamily: mono, fontSize: 13px, fontWeight: '400' }
+  greeting: { fontFamily: serif, fontSize: 32px, fontWeight: '360' }; page-title: { fontFamily: serif, fontSize: 18px, fontWeight: '600' }; brand: { fontFamily: serif, fontSize: 18px, fontWeight: '500' }; response: { fontFamily: serif, fontSize: 16px, fontWeight: '400', lineHeight: '22px' }; reply: { fontFamily: reply, fontSize: 16px, fontWeight: '400', lineHeight: '30px' }
+  heading: { fontFamily: display, fontSize: 18px, fontWeight: '600' }; card-title: { fontFamily: sans, fontSize: 16px, fontWeight: '600', lineHeight: '22px' }; ui: { fontFamily: sans, fontSize: 14px, fontWeight: '400' }
+  meta: { fontFamily: sans, fontSize: 14px, fontWeight: '400' }; caption: { fontFamily: sans, fontSize: 12px, fontWeight: '500' }; code: { fontFamily: mono, fontSize: 13px, fontWeight: '400' }
 fonts:
   serif: var(--font-source-serif); display: var(--font-display); sans: var(--font-sans); mono: var(--font-mono); reply: var(--font-songti-serif)
 rounded:
