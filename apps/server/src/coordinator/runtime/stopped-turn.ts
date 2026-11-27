@@ -3,39 +3,20 @@ import type { AssistantMessage } from '@earendil-works/pi-ai';
 import { defineEntry, type Harness } from '@earendil-works/pi-durable';
 import type { Conversation } from './conversations.js';
 
-const QUOTE_HEAD_CHARS = 150;
-const QUOTE_TAIL_CHARS = 250;
-
 export const StoppedEntry = defineEntry('cairn.stopped');
+
+export const STOPPED_NOTE =
+  '[Stopped] My turn was stopped before I finished. The latest instructions above this note that I had not finished are cancelled: I will not answer them or act on them, now or in a later reply, unless the user asks for one again or it appears again below this note. Answers already finished and work already done stay done. Nothing older than the stopped turn is affected.';
 
 export interface StoppedTurn {
   stepId: string;
-  requests: { requestId: string; quotes: (string | null)[] }[];
+  requestIds: string[];
 }
 
-const UNTYPED_REQUEST = '(what started that turn, which is not a message the user typed)';
-
-function quoted(typed: string | null): string {
-  const text = (typed ?? UNTYPED_REQUEST).replaceAll('<', '&lt;').trim();
-  const short =
-    text.length <= QUOTE_HEAD_CHARS + QUOTE_TAIL_CHARS
-      ? text
-      : `${text.slice(0, QUOTE_HEAD_CHARS)} … ${text.slice(-QUOTE_TAIL_CHARS)}`;
-  return `<stopped_request>\n${short}\n</stopped_request>`;
-}
-
-export function stoppedNote(requests: readonly (string | null)[]): string {
-  return [
-    '[Stopped] My turn was stopped while it was working on what is quoted below.',
-    ...requests.map(quoted),
-    'Whatever I had not finished for it is cancelled: I will not answer it or act on it, now or in a later reply, unless the user asks for it again. Answers already finished and work already done stay done. This stop covers no other request.',
-  ].join('\n');
-}
-
-function stoppedReply(text: string, timestamp: number): AssistantMessage {
+function stoppedReply(timestamp: number): AssistantMessage {
   return {
     role: 'assistant',
-    content: [{ type: 'text', text }],
+    content: [{ type: 'text', text: STOPPED_NOTE }],
     api: 'anthropic-messages',
     provider: 'cairn',
     model: 'stopped-note',
@@ -59,23 +40,20 @@ export async function cancelStoppedRequests(
   context: Context,
 ): Promise<void> {
   for (const turn of stopped) {
-    const unfinished = new Set<string | null>();
-    for (const { requestId, quotes } of turn.requests) {
-      const pending = await harness.commit(async (tx) => {
+    const unfinished = await harness.commit(async (tx) => {
+      for (const requestId of turn.requestIds) {
         const record = await tx.submissionByRequest(conversation.id, requestId);
-        return record?.type === 'input' && record.status !== 'done' && record.entry !== undefined;
-      }, context);
-      if (pending) for (const quote of quotes) unfinished.add(quote);
-    }
-    if (unfinished.size === 0) continue;
+        if (record?.type === 'input' && record.status !== 'done' && record.entry !== undefined)
+          return true;
+      }
+      return false;
+    }, context);
+    if (!unfinished) continue;
     await conversation.submit(
       {
         type: 'write',
         requestId: `${StoppedEntry.kind}:${turn.stepId}`,
-        entry: {
-          kind: StoppedEntry.kind,
-          model: [stoppedReply(stoppedNote([...unfinished]), Date.now())],
-        },
+        entry: { kind: StoppedEntry.kind, model: [stoppedReply(Date.now())] },
       },
       context,
     );

@@ -3,7 +3,7 @@ import { CHIEF_TURN_STOPPED_KIND, dropMailFence, shortEvent } from '@cairn/share
 import type { Context } from '@earendil-works/chord/context';
 import type { Message } from '@earendil-works/pi-ai';
 import { AssistantEntry, type Harness, UserEntry } from '@earendil-works/pi-durable';
-import { stoppedNote } from './stopped-turn.js';
+import { STOPPED_NOTE } from './stopped-turn.js';
 
 export const SEED_MAX_ROWS = 100;
 export const SEED_ROW_MAX_CHARS = 8_000;
@@ -14,7 +14,6 @@ export interface SeedRow {
   role: string;
   content: string;
   createdAt: number;
-  stoppedRequests?: readonly (string | null)[];
 }
 
 function blocksText(value: unknown): string {
@@ -46,10 +45,7 @@ export function seedMessageText(row: SeedRow): { role: 'user' | 'assistant'; tex
       kind?: unknown;
       call?: { name?: unknown; arguments?: unknown };
     };
-    if (kind === CHIEF_TURN_STOPPED_KIND)
-      return row.stoppedRequests?.length
-        ? { role: 'assistant', text: stoppedNote(row.stoppedRequests) }
-        : null;
+    if (kind === CHIEF_TURN_STOPPED_KIND) return { role: 'assistant', text: STOPPED_NOTE };
     if (kind !== 'toolcall' || typeof call?.name !== 'string') return null;
     role = 'assistant';
     text = `[called ${call.name} ${JSON.stringify(call.arguments ?? {}).slice(0, TOOL_ARGS_CHARS)}]`;

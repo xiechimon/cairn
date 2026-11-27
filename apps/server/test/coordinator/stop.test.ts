@@ -8,10 +8,7 @@ import {
   coordinatorInput,
   step,
 } from '../../src/db/schema.js';
-import {
-  stoppedCoordinatorTurns,
-  stoppedTurnRequests,
-} from '../../src/services/coordinator-inputs.js';
+import { stoppedCoordinatorTurns } from '../../src/services/coordinator-inputs.js';
 import { req } from '../helpers.js';
 import { boot, stub, world } from './runner-world.js';
 
@@ -54,21 +51,14 @@ function expectCancelledBetween(asked: Asked[], stopped: string, next: string): 
   const note = asked
     .slice(from + 1, to)
     .find((m) => m.role === 'assistant' && m.text.includes('[Stopped]'))?.text;
-  expect(
-    note,
-    'the model is told the stopped request is cancelled before it reads the next one',
-  ).toContain('is cancelled');
-  expect(note, 'the note names the request it cancels').toContain(stopped);
+  expect(note, 'the model is told about the stop before it reads the next request').toBeDefined();
+  expect(note, 'the note carries no text from the conversation').not.toContain(stopped);
+  expect(note).toContain('are cancelled');
 }
 
 describe('which Coordinator requests a stop cancels', () => {
   it('lists every attempt of the turns stopped since the last turn that succeeded', async () => {
     const w = await world('long job');
-    const typed = (id: string, content: string) =>
-      w.s.db
-        .insert(chiefMessage)
-        .values({ id, threadId: w.threadId, role: 'user', content, createdAt: 1 })
-        .run();
     const turn = (id: string, status: 'stopped' | 'done' | 'failed', finishedAt: number) =>
       w.s.db
         .insert(step)
@@ -77,13 +67,11 @@ describe('which Coordinator requests a stop cancels', () => {
           buildId: w.threadId,
           kind: 'chief',
           status,
-          prompt: `DELIVERED-EARLIER: add the export button\n\nasked in ${id}`,
+          prompt: `asked in ${id}`,
           createdAt: 1,
           finishedAt,
         })
         .run();
-    typed('stopped-on-retry', 'asked in stopped-on-retry');
-    typed('correction', 'and be brief');
     turn('stopped-long-ago', 'stopped', 100);
     turn('answered', 'done', 200);
     turn('failed-alone', 'failed', 300);
@@ -109,7 +97,7 @@ describe('which Coordinator requests a stop cancels', () => {
         stepId: 'stopped-on-retry',
         kind: 'steer',
         ownerMessageIds: [],
-        content: 'and be brief\n\n## Project instructions\nALWAYS-RUN-THE-RELEASE-CHECK',
+        content: 'and be brief',
         state: 'consumed',
         entryId: '7',
         attempt: 1,
@@ -117,40 +105,16 @@ describe('which Coordinator requests a stop cancels', () => {
       })
       .run();
 
-    const asked = 'asked in stopped-on-retry';
     expect(stoppedCoordinatorTurns(w.s.db, w.threadId)).toEqual([
       {
         stepId: 'stopped-on-retry',
-        requests: [
-          { requestId: 'stopped-on-retry', quotes: [asked] },
-          { requestId: 'stopped-on-retry#2', quotes: [asked] },
-          { requestId: expect.stringContaining('correction'), quotes: ['and be brief'] },
+        requestIds: [
+          'stopped-on-retry',
+          'stopped-on-retry#2',
+          expect.stringContaining('correction'),
         ],
       },
     ]);
-    expect(
-      stoppedTurnRequests(w.s.db, 'stopped-on-retry'),
-      'a rebuilt conversation quotes the same words',
-    ).toEqual([asked, 'and be brief']);
-
-    turn('woken', 'stopped', 500);
-    expect(
-      stoppedCoordinatorTurns(w.s.db, w.threadId).at(-1)?.requests,
-      'text the user never typed is not quoted',
-    ).toEqual([{ requestId: 'woken', quotes: [null] }]);
-
-    typed('started-by-a-button', 'SERVER-WRITTEN: plan task 7 from this issue text');
-    w.s.db
-      .update(chiefMessage)
-      .set({ origin: 'synthetic' })
-      .where(eq(chiefMessage.id, 'started-by-a-button'))
-      .run();
-    turn('started-by-a-button', 'stopped', 600);
-    expect(
-      stoppedCoordinatorTurns(w.s.db, w.threadId).at(-1)?.requests,
-      'a prompt the server wrote for a button is not quoted',
-    ).toEqual([{ requestId: 'started-by-a-button', quotes: [null] }]);
-    expect(stoppedTurnRequests(w.s.db, 'started-by-a-button')).toEqual([null]);
   });
 });
 
@@ -265,11 +229,9 @@ describe('Coordinator stop', () => {
     await until(() => requests.length === 2);
     await coordinator.idle();
 
-    const note = requests.at(-1)?.find((m) => m.text.includes('[Stopped]'))?.text ?? '';
-    expect(note).toContain('write a long article about cairns');
-    expect(note, 'the second merged message is cancelled too').toContain(
-      'then delete every branch',
-    );
+    for (const stopped of ['write a long article about cairns', 'then delete every branch']) {
+      expectCancelledBetween(requests.at(-1) ?? [], stopped, 'what time is it');
+    }
   }, 30_000);
 
   it('cancels a stopped request whose executor went away before it could end the turn', async () => {
