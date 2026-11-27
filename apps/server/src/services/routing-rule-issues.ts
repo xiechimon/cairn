@@ -13,8 +13,8 @@ import {
 import {
   defaultCoordinatorChoice,
   defaultSessionChoice,
+  isAutoRoutedSessionRule,
   keylessEndpoint,
-  ROUTED_PROVIDERS,
   resolveRuleProvider,
 } from './routing-rules.js';
 import { machineSatisfies } from './step-route.js';
@@ -42,7 +42,7 @@ function providerProblem(db: Pick<Db, 'select'>, rule: RoutingRuleRow): RuleProb
 }
 
 function capabilityRouted(rule: RoutingRuleRow): boolean {
-  return rule.use === 'session' && ROUTED_PROVIDERS.includes(rule.provider);
+  return isAutoRoutedSessionRule(rule);
 }
 
 function runsRule(m: MachineRow, rule: RoutingRuleRow, codexProvider: boolean): boolean {

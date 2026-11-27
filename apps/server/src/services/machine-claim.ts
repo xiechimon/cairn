@@ -5,6 +5,7 @@ import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
+  CHIEF_MODEL_FALLBACK_KIND,
   CORE_COORDINATOR_TOOLS,
   fencedTitle,
   isBuildStepKind,
@@ -32,6 +33,7 @@ import {
   chief,
   chiefThread,
   machine,
+  type StepFallbackRow,
   type StepRanModel,
   skillAudit,
   step,
@@ -81,6 +83,7 @@ import {
   type MachineDeps,
   profileForStep,
   publishStepStatus,
+  upsertChiefRow,
   upsertMessage,
   withFencedTransaction,
 } from './machine-deps.js';
@@ -101,7 +104,7 @@ import {
 } from './mcp-servers.js';
 import { injectMemoryDocuments } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
-import { effectiveModel } from './model-fallback.js';
+import { effectiveModel, modelKey } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import {
   coordinatorMemoryOwner,
@@ -304,6 +307,24 @@ async function buildChiefClaim(
     runtime === 'claude-code' || runtime === 'devin' || runtime === 'antigravity'
       ? { runtime, teamId: threadRow.teamId }
       : null;
+  const routeSwitch =
+    stepRow.fallback === null &&
+    agentRow.switchedFrom !== undefined &&
+    model.provider !== null &&
+    model.modelId !== null
+      ? agentRow.switchedFrom
+      : null;
+  const switchedFallback: StepFallbackRow | null =
+    routeSwitch === null || model.provider === null || model.modelId === null
+      ? null
+      : {
+          model: { provider: model.provider, modelId: model.modelId },
+          tried: [
+            modelKey(routeSwitch),
+            modelKey({ provider: model.provider, modelId: model.modelId }),
+          ],
+          zeroUsageRetried: false,
+        };
   const claimed = claimPendingChiefStep(deps.db, stepRow, {
     machineId,
     bind: bindSubscription,
@@ -313,8 +334,10 @@ async function buildChiefClaim(
         : {
             provider: model.provider,
             modelId: model.modelId,
-            thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
+            thinkingLevel:
+              stepRow.fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
           },
+    ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
     mcpGrant: stepMcpGrant(deps.db, freshMachine, chiefTurnLocked(stepRow)) ?? null,
     ...(failover !== undefined
       ? { routedFromMachineId: failover.fromMachineId, routedReason: failover.reason }
@@ -322,6 +345,27 @@ async function buildChiefClaim(
     stillAuthorized,
   });
   if (claimed === null) return null;
+  if (
+    switchedFallback !== null &&
+    routeSwitch !== null &&
+    model.provider !== null &&
+    model.modelId !== null
+  ) {
+    upsertChiefRow(deps, {
+      id: `chief-route-fallback-${claimed.id}`,
+      threadId: threadRow.id,
+      projectId: threadRow.projectId,
+      role: 'system',
+      content: JSON.stringify({
+        kind: CHIEF_MODEL_FALLBACK_KIND,
+        from: modelKey(routeSwitch),
+        to: modelKey({ provider: model.provider, modelId: model.modelId }),
+        stepId: claimed.id,
+        announced: true,
+      }),
+      createdAt: claimed.claimedAt ?? nowMs(),
+    });
+  }
   const stagedUploads =
     claimed.prompt !== null
       ? await stageTurnAttachments(deps, claimed, threadRow, claimed.prompt, signal).catch(
@@ -678,6 +722,18 @@ async function tryClaim(
       model.provider !== null && model.modelId !== null
         ? { provider: model.provider, modelId: model.modelId }
         : null;
+    const routeSwitch =
+      cand.stepRow.fallback === null && agentRow.switchedFrom !== undefined && pinnedModel !== null
+        ? agentRow.switchedFrom
+        : null;
+    const switchedFallback: StepFallbackRow | null =
+      routeSwitch === null || pinnedModel === null
+        ? null
+        : {
+            model: pinnedModel,
+            tried: [modelKey(routeSwitch), modelKey(pinnedModel)],
+            zeroUsageRetried: false,
+          };
     const now = nowMs();
     const todoProject = projectOfTodo(db, cand.todoRow);
     const facts: WorkerStepFacts = {
@@ -854,6 +910,7 @@ async function tryClaim(
             holdReason: null,
             holdUntil: null,
             ranModel: pinnedModel,
+            ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
             mcpGrant: workerMcp ?? null,
             ...(resolution.failover !== undefined
               ? {
@@ -865,8 +922,28 @@ async function tryClaim(
           .where(pendingClaim(cand.stepRow, claimedAt))
           .run();
         if (res.changes === 0) return false;
+        if (switchedFallback !== null && routeSwitch !== null && pinnedModel !== null) {
+          upsertMessage(settleDeps, {
+            id: `route-fallback-${cand.stepRow.id}`,
+            conversationId: cand.stepRow.buildId,
+            role: 'system',
+            content: `已换备用模型：${modelKey(routeSwitch)}（${routeSwitch.reason}），改用 ${modelKey(pinnedModel)} 运行。`,
+            createdAt: claimedAt,
+          });
+        }
         if (cand.stepRow.kind !== 'review') {
-          recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, agentRow);
+          recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, {
+            provider: model.provider,
+            modelId: model.modelId,
+            machineId: agentRow.machineId,
+            requiredCapabilities: agentRow.requiredCapabilities,
+            routed: agentRow.routed && !fallbackActive,
+            ...(routeSwitch !== null
+              ? { switchReason: routeSwitch.reason }
+              : cand.stepRow.fallback?.model != null
+                ? { switchReason: 'declared fallback' }
+                : {}),
+          });
         }
         if (skillInjection.hits.length > 0) {
           tx.insert(skillAudit)
@@ -1002,7 +1079,8 @@ async function tryClaim(
         description: agentRow.description,
         provider: model.provider,
         modelId: model.modelId,
-        thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
+        thinkingLevel:
+          cand.stepRow.fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
         memories: injectWorkerStepMemories(db, cand.stepRow.id, {
           agentId: memoryOwnerOf(db, teamId, cand.stepRow.kind),
           teamId,

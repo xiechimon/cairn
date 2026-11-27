@@ -48,6 +48,13 @@ const modelKey = (option: Pick<ModelOption, 'provider' | 'modelId'>) =>
 
 const FOLLOW_DEFAULT = 'follow-default';
 
+export function canSaveFrequentModels(
+  live: boolean,
+  query: { isPending: boolean; isError: boolean },
+): boolean {
+  return !live || (!query.isPending && !query.isError);
+}
+
 function CoordinatorDefaultHint({
   coordinatorDefault,
   options,
@@ -407,6 +414,7 @@ export function ModelRulesSection() {
   const [fixtureFrequent, setFixtureFrequent] = useState(fixture.resources?.topModels ?? []);
   const frequent = live ? (frequentQ.data?.models ?? []) : fixtureFrequent;
   const saveFrequent = (next: TopModel[], reason?: 'reorder') => {
+    if (!canSaveFrequentModels(live, frequentQ)) return;
     if (!live) {
       setFixtureFrequent(next);
       return;

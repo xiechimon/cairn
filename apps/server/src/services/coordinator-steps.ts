@@ -35,6 +35,7 @@ import {
   coordinatorInput,
   devinSubscription,
   provider,
+  type StepFallbackRow,
   type StepRanModel,
   schedule,
   step,
@@ -101,6 +102,7 @@ export function claimPendingChiefStep(
     machineId: string | null;
     bind?: ChiefSubscriptionBind | string | null;
     model?: StepRanModel | null;
+    fallback?: StepFallbackRow | null;
     mcpGrant?: string[] | null;
     routedFromMachineId?: string | null;
     routedReason?: 'offline' | 'busy' | 'manual-switch' | null;
@@ -150,6 +152,7 @@ export function claimPendingChiefStep(
         holdReason: null,
         holdUntil: null,
         ranModel: options.model ?? null,
+        ...(options.fallback !== undefined ? { fallback: options.fallback } : {}),
         mcpGrant: options.mcpGrant ?? null,
         ...(options.routedFromMachineId !== undefined
           ? { routedFromMachineId: options.routedFromMachineId }

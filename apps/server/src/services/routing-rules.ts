@@ -77,6 +77,7 @@ export interface RouteProfile {
   requiredCapabilities: RequiredCapabilities | null;
   fallbackModels: RoutingRuleRow['fallbackModels'];
   routed: boolean;
+  switchedFrom?: { provider: string; modelId: string; reason: string };
 }
 
 export interface RoutedTodo {
@@ -538,7 +539,17 @@ export function ruleProfileForStep(
     : { ...profile, machineId: null };
 }
 
-export const ROUTED_PROVIDERS = ['claude-code', CODEX_MODEL.provider];
+export function isAutoRoutedSessionRule(rule: {
+  use?: RouteUse;
+  provider: string | null;
+  modelId: string | null;
+}): boolean {
+  if (rule.use !== undefined && rule.use !== 'session') return false;
+  return (
+    (rule.provider === DEFAULT_SESSION_PROVIDER && rule.modelId === DEFAULT_SESSION_MODEL) ||
+    (rule.provider === CODEX_MODEL.provider && rule.modelId === CODEX_MODEL.modelId)
+  );
+}
 
 export function profileForStep(
   db: Pick<Db, 'select'>,
@@ -550,8 +561,8 @@ export function profileForStep(
   if (base === null) return null;
   const route = routeForStep(db, todoRow, kind);
   if (route?.use !== 'session') return base;
-  if (base.provider === null || !ROUTED_PROVIDERS.includes(base.provider)) return base;
   if (taskModelChoice(todoRow) !== null) return base;
+  if (!isAutoRoutedSessionRule({ provider: base.provider, modelId: base.modelId })) return base;
   const decision = decideStepRoute(db, todoRow, kind, stepId, {
     machineId: base.machineId,
     required: base.requiredCapabilities,
@@ -563,13 +574,50 @@ export function profileForStep(
       stockSeed && !claudeCodeUsable(db, todoRow.teamId)
         ? providerSessionChoice(db, todoRow.teamId)
         : null;
-    return choice === null ? base : { ...base, ...choice };
+    if (choice === null) return base;
+    return {
+      ...base,
+      ...choice,
+      ...(base.provider !== null &&
+      base.modelId !== null &&
+      (choice.provider !== base.provider || choice.modelId !== base.modelId)
+        ? {
+            switchedFrom: {
+              provider: base.provider,
+              modelId: base.modelId,
+              reason: 'Claude Code 不可用',
+            },
+          }
+        : {}),
+    };
   }
+  const switched =
+    decision.chosen.provider !== base.provider || decision.chosen.modelId !== base.modelId;
+  const rejectWhy = switched
+    ? decision.rejected.find((r) => r.modelId === base.modelId)?.why
+    : undefined;
+  const switchReason =
+    rejectWhy === 'quota'
+      ? '额度达到上限'
+      : rejectWhy === 'harness-missing'
+        ? '执行机未安装对应运行环境'
+        : rejectWhy === 'unavailable'
+          ? '模型不可用'
+          : decision.reason;
   return {
     ...base,
     provider: decision.chosen.provider,
     modelId: decision.chosen.modelId,
     routed: true,
+    ...(switched && base.provider !== null && base.modelId !== null
+      ? {
+          switchedFrom: {
+            provider: base.provider,
+            modelId: base.modelId,
+            reason: switchReason,
+          },
+        }
+      : {}),
   };
 }
 
@@ -612,7 +660,29 @@ export function coordinatorProfile(
   const route =
     ruleRow(db, teamId, 'coordinator') ??
     (coordinatorRunsOnPi() ? defaultCoordinatorRule(db, teamId) : null);
-  return route === null ? null : routeProfile(withProjectCoordinatorModel(db, route, projectId));
+  if (route === null) return null;
+  const resolved = withProjectCoordinatorModel(db, route, projectId);
+  const profile = routeProfile(resolved);
+  const override = projectModelChoice(db, teamId, projectId, 'coordinator');
+  if (
+    override !== null &&
+    resolved === route &&
+    stepRuntimeFor(override.provider) === 'pi' &&
+    override.provider !== route.provider
+  ) {
+    const refusal = providerRefusal(db, teamId, override.provider);
+    if (refusal !== null) {
+      return {
+        ...profile,
+        switchedFrom: {
+          provider: override.provider,
+          modelId: override.modelId,
+          reason: refusal === 'rule-provider-has-no-key' ? '未配置密钥' : '服务商不可用',
+        },
+      };
+    }
+  }
+  return profile;
 }
 
 export function coordinatorMemoryOwner(db: Pick<Db, 'select'>, teamId: string): string | undefined {

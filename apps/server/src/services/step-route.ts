@@ -206,6 +206,8 @@ export function recordStepRoute(
     modelId: string | null;
     machineId: string | null;
     requiredCapabilities: RequiredCapabilities | null;
+    routed?: boolean;
+    switchReason?: string;
   },
 ): StepRouteRow {
   const existing = storedStepRoute(db, stepRow.id);
@@ -216,11 +218,22 @@ export function recordStepRoute(
   ) {
     return existing;
   }
-  const decision = decideStepRoute(db, todoRow, stepRow.kind, null, {
-    machineId: effective.machineId,
-    required: effective.requiredCapabilities,
-  });
+  const decision =
+    effective.routed === false
+      ? null
+      : decideStepRoute(db, todoRow, stepRow.kind, null, {
+          machineId: effective.machineId,
+          required: effective.requiredCapabilities,
+        });
+  const difficulty =
+    decision?.difficulty ??
+    classifyDifficulty({
+      title: todoRow.title ?? '',
+      spec: todoRow.spec ?? null,
+      request: todoRow.request ?? null,
+    });
   const agrees =
+    decision !== null &&
     decision.chosen !== null &&
     decision.chosen.provider === effective.provider &&
     decision.chosen.modelId === effective.modelId;
@@ -228,23 +241,28 @@ export function recordStepRoute(
     stepId: stepRow.id,
     teamId: todoRow.teamId,
     kind: stepRow.kind,
-    difficulty: decision.difficulty,
+    difficulty,
     harness: harnessOf(effective.provider),
     provider: effective.provider,
     modelId: effective.modelId,
     machineId: claimingMachineId,
-    reason: agrees
-      ? decision.reason
-      : decision.chosen === null
-        ? `rule default (${decision.reason})`
-        : `availability changed during the claim: kept the accepted ${effective.modelId}`,
-    rejected: decision.rejected,
+    reason:
+      decision === null
+        ? effective.switchReason !== undefined
+          ? `fallback (${effective.switchReason})`
+          : 'configured model'
+        : agrees
+          ? decision.reason
+          : decision.chosen === null
+            ? `rule default (${decision.reason})`
+            : `availability changed during the claim: kept the accepted ${effective.modelId}`,
+    rejected: decision?.rejected ?? [],
     decidedAt: nowMs(),
   };
   if (existing === null) {
     db.insert(stepRoute).values(row).onConflictDoNothing().run();
   } else {
-    const rejection = decision.rejected.find(
+    const rejection = decision?.rejected.find(
       (candidate) =>
         candidate.modelId === existing.modelId && candidate.machineId === existing.machineId,
     );
