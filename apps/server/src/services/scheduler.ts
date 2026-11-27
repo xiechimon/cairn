@@ -526,7 +526,9 @@ export function createScheduler(
         if (row.nextRunAt > now) return { rescheduleAt: row.nextRunAt };
         await runSchedule(row, now);
         const after = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
-        if (!after?.enabled || after.nextRunAt === null) return { rescheduleAt: null };
+        if (!after?.enabled || after.nextRunAt === null || archivedProject(after.projectId)) {
+          return { rescheduleAt: null };
+        }
         if (after.retryNotBefore !== null && after.retryNotBefore > now) {
           return { rescheduleAt: Math.max(after.nextRunAt, after.retryNotBefore) };
         }

@@ -9,6 +9,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   build,
   buildFeedback,
+  dueEvent,
   machine,
   message,
   project,
@@ -17,6 +18,7 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { applyStepFailure, completeStep, messageTodo } from '../src/services/builds.js';
+import type { DueClock } from '../src/services/due-events.js';
 import { sweepFailedRetries } from '../src/services/needs-you.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
@@ -906,4 +908,95 @@ describe('worker cron minimum across the daily cycle', () => {
       }
     },
   );
+});
+
+class FakeClock implements DueClock {
+  time: number;
+  private queue: Array<{ at: number; cb: () => void | Promise<void> }> = [];
+
+  constructor(time: number) {
+    this.time = time;
+  }
+
+  now(): number {
+    return this.time;
+  }
+
+  setTimer(callback: () => void | Promise<void>, delayMs: number): unknown {
+    const timer = { at: this.time + delayMs, cb: callback };
+    this.queue.push(timer);
+    return timer;
+  }
+
+  clearTimer(handle: unknown): void {
+    this.queue = this.queue.filter((timer) => timer !== handle);
+  }
+
+  async advance(ms: number): Promise<void> {
+    const target = this.time + ms;
+    for (;;) {
+      const next = [...this.queue].sort((left, right) => left.at - right.at)[0];
+      if (!next || next.at > target) break;
+      this.queue = this.queue.filter((timer) => timer !== next);
+      this.time = next.at;
+      await next.cb();
+    }
+    this.time = target;
+  }
+}
+
+test('schedule_update changing cadence clears retryNotBefore, replaces due_event, and fires updated prompt before tickMs', async () => {
+  const s = await world();
+  await s.run('schedule_create', { cadence: 'in 120 minutes', prompt: 'Original' });
+  const created = s.stored();
+  const originalDue = created.nextRunAt!;
+  const clock = new FakeClock(Date.now());
+  const retryAt = clock.now() + 180 * 60_000;
+  s.db.update(schedule).set({ retryNotBefore: retryAt }).where(eq(schedule.id, created.id)).run();
+  const scheduler = createScheduler(s.svc, { tickMs: 7_200_000, clock });
+  scheduler.start();
+  try {
+    await clock.advance(0);
+    expect(
+      s.db
+        .select()
+        .from(dueEvent)
+        .where(eq(dueEvent.id, `schedule:${created.id}`))
+        .get()?.dueAt,
+    ).toBe(retryAt);
+
+    await s.run('schedule_update', { prompt: 'Updated copy only' });
+    const preserved = s.stored();
+    expect(preserved.prompt).toBe('Updated copy only');
+    expect(preserved.retryNotBefore).toBe(retryAt);
+    expect(
+      s.db
+        .select()
+        .from(dueEvent)
+        .where(eq(dueEvent.id, `schedule:${created.id}`))
+        .get()?.dueAt,
+    ).toBe(retryAt);
+
+    await s.run('schedule_update', { cadence: 'in 15 minutes', prompt: 'Updated prompt' });
+    const updated = s.stored();
+    expect(updated.retryNotBefore).toBeNull();
+    expect(updated.nextRunAt).toBeLessThan(originalDue);
+    expect(
+      s.db
+        .select()
+        .from(dueEvent)
+        .where(eq(dueEvent.id, `schedule:${created.id}`))
+        .get()?.dueAt,
+    ).toBe(updated.nextRunAt);
+
+    completeStep(s.svc, s.claimed.step.id);
+    setTodoPhase(s.svc, s.todoId, 'done');
+    const stepCountBefore = s.db.select().from(step).all().length;
+    await clock.advance(Math.max(0, updated.nextRunAt! - clock.now()));
+    const stepsAfter = s.db.select().from(step).all();
+    expect(stepsAfter).toHaveLength(stepCountBefore + 1);
+    expect(stepsAfter.at(-1)?.prompt).toContain('Updated prompt');
+  } finally {
+    scheduler.stop();
+  }
 });

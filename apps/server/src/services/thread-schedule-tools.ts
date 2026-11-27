@@ -5,11 +5,13 @@ import { HttpError, parseWith } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import {
   assertWorkerScheduleInterval,
+  clearScheduleDueEvent,
   computeNextRunAt,
   createSchedule,
   cronExpressionFor,
   isTriggerKind,
   isWorkerSchedule,
+  notifyScheduleClock,
   parseThreadCadence,
   pauseSchedule,
   type ScheduleDeps,
@@ -117,11 +119,28 @@ export function executeThreadScheduleTool(
             webhookDeliveries: null,
             webhookLastUsedAt: null,
           };
-    deps.db
-      .update(schedule)
-      .set({ ...timing, createdBy, ...(body.prompt === undefined ? {} : { prompt: body.prompt }) })
-      .where(where)
-      .run();
+    if (cadence === null) {
+      deps.db
+        .update(schedule)
+        .set({ createdBy, ...(body.prompt === undefined ? {} : { prompt: body.prompt }) })
+        .where(where)
+        .run();
+    } else {
+      deps.db.transaction(() => {
+        deps.db
+          .update(schedule)
+          .set({
+            ...timing,
+            retryNotBefore: null,
+            createdBy,
+            ...(body.prompt === undefined ? {} : { prompt: body.prompt }),
+          })
+          .where(where)
+          .run();
+        clearScheduleDueEvent(deps.db, row.id);
+      });
+      notifyScheduleClock(deps.db, deps);
+    }
   } else {
     const body =
       name === 'schedule_clear'

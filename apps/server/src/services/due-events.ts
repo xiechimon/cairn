@@ -52,8 +52,8 @@ export function createDueRunner(
   let timer: unknown = null;
   let armedTarget: number | null = null;
   let arming = false;
-  let delivering = false;
-  let activeHandlers = 0;
+  let ticking = false;
+  const inFlight = new Set<string>();
   let stopped = false;
 
   function rows(): DueEventRecord[] {
@@ -68,17 +68,15 @@ export function createDueRunner(
 
   function retarget(): void {
     const now = clock.now();
-    const upcoming = rows();
-    const nextAt =
-      activeHandlers > 0 ? upcoming.find((row) => row.dueAt > now)?.dueAt : upcoming[0]?.dueAt;
+    const upcoming = rows().filter((row) => row.dueAt > now || !inFlight.has(row.id));
+    const nextAt = upcoming[0]?.dueAt;
     if (nextAt === undefined) {
-      if (activeHandlers === 0) clearTimer();
+      if (inFlight.size === 0) clearTimer();
       return;
     }
     if (armedTarget !== null && timer !== null && nextAt >= armedTarget) return;
     clearTimer();
     const delay = Math.max(0, nextAt - now);
-    if (activeHandlers > 0 && delay === 0) return;
     armedTarget = now + delay;
     timer = clock.setTimer(() => deliver(clock.now()), delay);
   }
@@ -114,7 +112,7 @@ export function createDueRunner(
         },
       })
       .run();
-    if (!arming && !delivering) arm(false);
+    if (!arming && !ticking) arm(false);
   }
 
   function isThenable(value: unknown): value is Promise<unknown> {
@@ -200,27 +198,24 @@ export function createDueRunner(
   }
 
   async function deliver(now: number): Promise<void> {
-    if (delivering) {
-      clearTimer();
-      return;
-    }
-    delivering = true;
+    if (stopped || ticking) return;
+    ticking = true;
     clearTimer();
     let crashed = false;
     const background: Promise<void>[] = [];
     try {
-      const due = rows().filter((event) => event.dueAt <= now);
+      const due = rows().filter((event) => !inFlight.has(event.id) && event.dueAt <= now);
       for (const event of due) {
         const handler = handlers[event.kind];
         try {
           if (!handler) throw new Error(`no handler for ${event.kind}`);
           const value = handler(event, now);
           if (isThenable(value)) {
-            activeHandlers += 1;
+            inFlight.add(event.id);
             reserve(event, now);
             background.push(
               settleDetached(event, now, value).finally(() => {
-                activeHandlers -= 1;
+                inFlight.delete(event.id);
               }),
             );
           } else {
@@ -234,11 +229,12 @@ export function createDueRunner(
           recordFailure(event, now, error);
         }
       }
+      ticking = false;
       if (!crashed) arm(false);
       const settled = await Promise.allSettled(background);
       if (settled.some((result) => result.status === 'rejected')) crashed = true;
     } finally {
-      delivering = false;
+      ticking = false;
       if (!crashed) arm(false);
     }
   }

@@ -1,13 +1,56 @@
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
-import { project, schedule, step, todo } from '../src/db/schema.js';
+import { dueEvent, project, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
+import type { DueClock } from '../src/services/due-events.js';
 import { runScheduleNow } from '../src/services/schedule-run.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { createSchedule } from '../src/services/schedules.js';
+import {
+  createSchedule,
+  recordScheduleFailure,
+  updateSchedule,
+} from '../src/services/schedules.js';
 import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
 
-afterEach(() => vi.restoreAllMocks());
+class FakeClock implements DueClock {
+  time: number;
+  private queue: Array<{ at: number; cb: () => void | Promise<void> }> = [];
+
+  constructor(time: number) {
+    this.time = time;
+  }
+
+  now(): number {
+    return this.time;
+  }
+
+  setTimer(callback: () => void | Promise<void>, delayMs: number): unknown {
+    const timer = { at: this.time + delayMs, cb: callback };
+    this.queue.push(timer);
+    return timer;
+  }
+
+  clearTimer(handle: unknown): void {
+    this.queue = this.queue.filter((timer) => timer !== handle);
+  }
+
+  async advance(ms: number): Promise<void> {
+    const target = this.time + ms;
+    for (;;) {
+      const next = [...this.queue].sort((left, right) => left.at - right.at)[0];
+      if (!next || next.at > target) break;
+      this.queue = this.queue.filter((timer) => timer !== next);
+      this.time = next.at;
+      await next.cb();
+    }
+    this.time = target;
+  }
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 async function world(createdBy?: string) {
   const s = bootServer();
@@ -159,4 +202,190 @@ test('run now on a worker schedule still obeys the worker gate at the tick', asy
   expect((await s.run()).status).toBe(200);
   await s.scheduler.tick(Date.now() + 1);
   expect(s.steps()).toHaveLength(1);
+});
+
+test('run now fires immediately before tickMs even when a future due_event already exists', async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-24T10:00:00Z') });
+  const s = await world();
+  const clock = new FakeClock(Date.now());
+  const scheduler = createScheduler(s.svc, { tickMs: 60_000, clock });
+  scheduler.start();
+  try {
+    await clock.advance(0);
+    const armedEvent = s.db
+      .select()
+      .from(dueEvent)
+      .where(eq(dueEvent.id, `schedule:${s.saved.id}`))
+      .get();
+    expect(armedEvent?.dueAt).toBe(s.saved.nextRunAt);
+    expect(armedEvent?.dueAt).toBeGreaterThan(clock.now() + 60_000);
+
+    expect((await s.run()).status).toBe(200);
+    await clock.advance(100);
+    expect(s.steps()).toHaveLength(2);
+    expect(s.stored().nextRunAt).toBeGreaterThan(clock.now());
+    const nextEvent = s.db
+      .select()
+      .from(dueEvent)
+      .where(eq(dueEvent.id, `schedule:${s.saved.id}`))
+      .get();
+    expect(nextEvent?.dueAt).toBe(s.stored().nextRunAt);
+  } finally {
+    scheduler.stop();
+  }
+});
+
+test('run now during retry backoff clears retryNotBefore and fires immediately before tickMs', async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-24T10:00:00Z') });
+  const s = await world();
+  const now = Date.now();
+  s.db
+    .update(schedule)
+    .set({ nextRunAt: now - 1_000, retryNotBefore: now + 300_000 })
+    .where(eq(schedule.id, s.saved.id))
+    .run();
+  const clock = new FakeClock(now);
+  const scheduler = createScheduler(s.svc, { tickMs: 60_000, clock });
+  scheduler.start();
+  try {
+    await clock.advance(0);
+    expect((await s.run()).status).toBe(200);
+    await clock.advance(100);
+    expect(s.steps()).toHaveLength(2);
+    expect(s.stored().retryNotBefore).toBeNull();
+  } finally {
+    scheduler.stop();
+  }
+});
+
+test('transient schedule failure advances due_event to retryNotBefore immediately and retries before tickMs', async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-24T10:00:00Z') });
+  const s = await world();
+  const clock = new FakeClock(Date.now());
+  const scheduler = createScheduler(s.svc, { tickMs: 600_000, clock });
+  scheduler.start();
+  try {
+    await clock.advance(0);
+    s.db
+      .update(schedule)
+      .set({ nextRunAt: clock.now() - 1_000 })
+      .where(eq(schedule.id, s.saved.id))
+      .run();
+    const failedAt = clock.now();
+    recordScheduleFailure(s.svc, s.saved.id, 'connection reset', failedAt);
+    const retryAt = failedAt + 5 * 60_000;
+    const synced = s.db
+      .select()
+      .from(dueEvent)
+      .where(eq(dueEvent.id, `schedule:${s.saved.id}`))
+      .get();
+    expect(synced?.dueAt).toBe(retryAt);
+
+    await clock.advance(5 * 60_000 - 1);
+    expect(s.steps()).toHaveLength(1);
+    await clock.advance(1);
+    expect(s.steps()).toHaveLength(2);
+  } finally {
+    scheduler.stop();
+  }
+});
+
+test('updateSchedule moving deadline to now fires before tickMs while daily prompt-only update preserves retry backoff', async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-24T10:00:00Z') });
+  const s = await world();
+  const clock = new FakeClock(Date.now());
+  const dailyAt = Date.parse('2026-09-24T09:00:00Z');
+  const dailyRes = updateSchedule(s.svc, s.saved.id, {
+    teamId: s.team.id,
+    todoId: s.todoId,
+    projectId: s.projectId,
+    kind: 'daily',
+    at: dailyAt,
+    prompt: 'Daily original',
+    tz: 'UTC',
+    enabled: true,
+  });
+  expect(dailyRes?.record.cron).toBe('0 9 * * *');
+  const retryAt = clock.now() + 300_000;
+  s.db.update(schedule).set({ retryNotBefore: retryAt }).where(eq(schedule.id, s.saved.id)).run();
+  const scheduler = createScheduler(s.svc, { tickMs: 7_200_000, clock });
+  scheduler.start();
+  try {
+    await clock.advance(0);
+
+    const promptOnly = updateSchedule(s.svc, s.saved.id, {
+      teamId: s.team.id,
+      todoId: s.todoId,
+      projectId: s.projectId,
+      kind: 'daily',
+      at: dailyAt,
+      prompt: 'Prompt edit only',
+      tz: 'UTC',
+      enabled: true,
+    });
+    expect(promptOnly?.record.prompt).toBe('Prompt edit only');
+    expect(s.stored().retryNotBefore).toBe(retryAt);
+
+    const resched = updateSchedule(
+      s.svc,
+      s.saved.id,
+      {
+        teamId: s.team.id,
+        todoId: s.todoId,
+        projectId: s.projectId,
+        kind: 'once',
+        at: clock.now(),
+        prompt: 'Run now via edit',
+        tz: 'UTC',
+        enabled: true,
+      },
+      { allowAnyMinute: true },
+    );
+    expect(resched?.record.nextRunAt).toBe(clock.now());
+    expect(s.stored().retryNotBefore).toBeNull();
+    await clock.advance(100);
+    expect(s.steps()).toHaveLength(2);
+  } finally {
+    scheduler.stop();
+  }
+});
+
+test('run now fires immediately even while another due_event async handler is in flight', async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-09-24T10:00:00Z') });
+  const s = await world();
+  const clock = new FakeClock(Date.now());
+  let releasePoll: () => void = () => undefined;
+  const pollBlocker = new Promise<void>((resolve) => {
+    releasePoll = resolve;
+  });
+  const scheduler = createScheduler(s.svc, { tickMs: 600_000, clock }, undefined, {
+    ciPoller: {
+      sweep: () => pollBlocker,
+    },
+  });
+  s.db
+    .insert(dueEvent)
+    .values({
+      id: 'poll:ci',
+      kind: 'ci',
+      dueAt: clock.now(),
+      intervalMs: 600_000,
+      attempts: 0,
+      lastError: null,
+    })
+    .run();
+  scheduler.start();
+  try {
+    const firstTick = clock.advance(0);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect((await s.run()).status).toBe(200);
+    await clock.advance(100);
+    expect(s.steps()).toHaveLength(2);
+
+    releasePoll();
+    await firstTick;
+  } finally {
+    scheduler.stop();
+  }
 });

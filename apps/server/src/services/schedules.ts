@@ -17,7 +17,7 @@ import { and, desc, eq, inArray, isNotNull, isNull, like, lte, max, or } from 'd
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { databaseIdentity } from '../db/identity.js';
-import { build, message, project, schedule, step, todo } from '../db/schema.js';
+import { build, dueEvent, message, project, schedule, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { newWebhookToken, webhookSecretOf } from '../lib/webhook-token.js';
@@ -274,13 +274,22 @@ export function updateSchedule(
     isWebhook && (existing.kind !== 'webhook' || existing.webhookTokenHash === null || rotate);
   const issuedToken = needsFreshWebhook ? (options.webhookToken ?? newWebhookToken().token) : null;
   const webhook = issuedToken !== null ? webhookSecretOf(issuedToken) : null;
+  const timingChanged =
+    input.kind !== existing.kind ||
+    at !== existing.at ||
+    cron !== existing.cron ||
+    tz !== existing.tz ||
+    enabled !== existing.enabled ||
+    (isWebhook && input.rotateWebhook === true);
   const nextRunAt = !enabled
     ? null
-    : isTriggerKind(input.kind)
-      ? existing.kind === input.kind && !rotate
-        ? existing.nextRunAt
-        : null
-      : computeNextRunAt(input.kind, at, tz, now, cron);
+    : !timingChanged
+      ? existing.nextRunAt
+      : isTriggerKind(input.kind)
+        ? existing.kind === input.kind && !rotate
+          ? existing.nextRunAt
+          : null
+        : computeNextRunAt(input.kind, at, tz, now, cron);
   const webhookPatch = !isWebhook
     ? {
         webhookTokenHash: null,
@@ -296,27 +305,30 @@ export function updateSchedule(
           webhookLastUsedAt: null,
         }
       : {};
-  deps.db
-    .update(schedule)
-    .set({
-      kind: input.kind,
-      at,
-      cron,
-      prompt: input.prompt ?? existing.prompt,
-      enabled,
-      tz,
-      triggerSpec: input.kind === 'event' ? input.triggerSpec : null,
-      missedRunWindowMs:
-        input.missedRunWindowMs !== undefined
-          ? input.missedRunWindowMs
-          : existing.missedRunWindowMs,
-      nextRunAt,
-      pausedReason: enabled ? null : existing.pausedReason,
-      retryNotBefore: enabled ? null : existing.retryNotBefore,
-      ...webhookPatch,
-    })
-    .where(eq(schedule.id, id))
-    .run();
+  deps.db.transaction(() => {
+    deps.db
+      .update(schedule)
+      .set({
+        kind: input.kind,
+        at,
+        cron,
+        prompt: input.prompt ?? existing.prompt,
+        enabled,
+        tz,
+        triggerSpec: input.kind === 'event' ? input.triggerSpec : null,
+        missedRunWindowMs:
+          input.missedRunWindowMs !== undefined
+            ? input.missedRunWindowMs
+            : existing.missedRunWindowMs,
+        nextRunAt,
+        pausedReason: enabled ? null : existing.pausedReason,
+        retryNotBefore: timingChanged && enabled ? null : existing.retryNotBefore,
+        ...webhookPatch,
+      })
+      .where(eq(schedule.id, id))
+      .run();
+    if (timingChanged) clearScheduleDueEvent(deps.db, id);
+  });
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = row ? toScheduleRecord(deps, row) : null;
   if (!record) return null;
@@ -352,11 +364,14 @@ export function setScheduleEnabled(
         : isTriggerKind(row.kind)
           ? null
           : Math.max(row.at ?? now, now);
-      deps.db
-        .update(schedule)
-        .set({ enabled: true, nextRunAt, pausedReason: null, retryNotBefore: null })
-        .where(eq(schedule.id, id))
-        .run();
+      deps.db.transaction(() => {
+        deps.db
+          .update(schedule)
+          .set({ enabled: true, nextRunAt, pausedReason: null, retryNotBefore: null })
+          .where(eq(schedule.id, id))
+          .run();
+        clearScheduleDueEvent(deps.db, id);
+      });
     } else {
       deps.db
         .update(schedule)
@@ -399,6 +414,12 @@ export function notifyScheduleClock(db: Db, effects: CommitEffects = {}): void {
   runAfterCommit(effects, 'notifyScheduleClock', () =>
     scheduleClocks.get(databaseIdentity(db))?.(),
   );
+}
+
+export function clearScheduleDueEvent(db: Db, id: string): void {
+  db.delete(dueEvent)
+    .where(eq(dueEvent.id, `schedule:${id}`))
+    .run();
 }
 
 export function updateNextRunAt(deps: ScheduleDeps, id: string, nextRunAt: number | null): void {
@@ -600,6 +621,7 @@ export function recordScheduleFailure(
     .where(eq(schedule.id, id))
     .run();
   if (!scheduleFailureIsTransient(reason)) pauseSchedule(deps, id, reason);
+  else notifyScheduleClock(deps.db, deps);
 }
 
 export const MISSED_RUN_WINDOW_MS = 12 * 60 * 60_000;

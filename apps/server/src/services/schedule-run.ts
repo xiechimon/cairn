@@ -5,7 +5,7 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { hasActiveStep } from './builds.js';
-import { toScheduleRecord } from './schedules.js';
+import { clearScheduleDueEvent, notifyScheduleClock, toScheduleRecord } from './schedules.js';
 
 export function runScheduleNow(deps: BuildDeps, teamId: string, id: string): ScheduleRecord {
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
@@ -30,11 +30,15 @@ export function runScheduleNow(deps: BuildDeps, teamId: string, id: string): Sch
   if (row.nextRunAt !== null && row.nextRunAt <= now && row.retryNotBefore === null) {
     throw new HttpError(409, 'This schedule is already queued to run');
   }
-  deps.db
-    .update(schedule)
-    .set({ nextRunAt: now, retryNotBefore: null })
-    .where(eq(schedule.id, id))
-    .run();
+  deps.db.transaction(() => {
+    deps.db
+      .update(schedule)
+      .set({ nextRunAt: now, retryNotBefore: null })
+      .where(eq(schedule.id, id))
+      .run();
+    clearScheduleDueEvent(deps.db, id);
+  });
+  notifyScheduleClock(deps.db, deps);
   const current = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = current ? toScheduleRecord(deps, current) : null;
   if (!record) throw new HttpError(404, `schedule ${id} not found`);
