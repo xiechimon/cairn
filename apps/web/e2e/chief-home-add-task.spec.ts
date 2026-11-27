@@ -305,3 +305,54 @@ test('the empty list hides its own add button while the field is open', async ({
   await expect(field(page)).toHaveCount(0);
   await expect(upNext(page)).toHaveText(['Audit the relay probe retries']);
 });
+
+test.describe('A1: touch targets on the add-task row', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('machine chip, menu options and submit button are at least 44px under coarse pointer with no overflow or layout shift', async ({
+    page,
+  }) => {
+    const w = world({ machines: TWO_MACHINES });
+    await open(page, w);
+    await plus(page).click();
+    await expect(machineChip(page)).toBeVisible();
+
+    const chipBox = await machineChip(page).boundingBox();
+    const submitBox = await submit(page).boundingBox();
+    expect(chipBox).not.toBeNull();
+    expect(submitBox).not.toBeNull();
+    expect(chipBox!.height, 'A1: touch chip height >= 44px').toBeGreaterThanOrEqual(44);
+    expect(chipBox!.width, 'A1: touch chip width >= 44px').toBeGreaterThanOrEqual(44);
+    expect(submitBox!.height, 'A1: touch submit height >= 44px').toBeGreaterThanOrEqual(44);
+    expect(submitBox!.width, 'A1: touch submit width >= 44px').toBeGreaterThanOrEqual(44);
+
+    const firstRow = panel(page)
+      .locator('[data-section="working"] [data-slot="task-row-title"]')
+      .first();
+    const before = await firstRow.boundingBox();
+    expect(before).not.toBeNull();
+
+    await machineChip(page).click();
+    const options = page.getByRole('option');
+    await expect(options).toHaveCount(3);
+    await page
+      .locator('[data-slot="select-content"]')
+      .evaluate((el) =>
+        Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished)),
+      );
+    for (const option of await options.all()) {
+      const optionBox = await option.boundingBox();
+      expect(optionBox).not.toBeNull();
+      expect(optionBox!.height, 'A1: touch select option height >= 44px').toBeGreaterThanOrEqual(44);
+    }
+
+    await page.getByRole('option', { name: /办公室 Mac mini/ }).click();
+    await expect(machineChipValue(page)).toHaveText(/办公室 Mac mini/);
+    expect(await firstRow.boundingBox()).toEqual(before);
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(overflow, 'R1: no horizontal scroll at 390px').toBe(false);
+  });
+});

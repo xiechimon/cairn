@@ -648,13 +648,7 @@ export function createTodo(
   );
 }
 
-function assertCreatableRouteOverride(
-  db: Pick<Db, 'select'>,
-  teamId: string,
-  routeOverride: RouteOverride | undefined,
-): void {
-  const overrideMachineId = routeOverride?.machineId;
-  if (overrideMachineId === undefined) return;
+function assertUsableTeamMachine(db: Pick<Db, 'select'>, teamId: string, machineId: string) {
   const owned = db
     .select({
       id: machine.id,
@@ -665,13 +659,22 @@ function assertCreatableRouteOverride(
       capabilities: machine.capabilities,
     })
     .from(machine)
-    .where(
-      and(eq(machine.id, overrideMachineId), eq(machine.teamId, teamId), isNull(machine.retiredAt)),
-    )
+    .where(and(eq(machine.id, machineId), eq(machine.teamId, teamId), isNull(machine.retiredAt)))
     .get();
   if (owned === undefined || !isRegisteredMachine(owned)) {
-    throw notFound(`machine ${overrideMachineId}`);
+    throw notFound(`machine ${machineId}`);
   }
+  return owned;
+}
+
+function assertCreatableRouteOverride(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  routeOverride: RouteOverride | undefined,
+): void {
+  const overrideMachineId = routeOverride?.machineId;
+  if (overrideMachineId === undefined) return;
+  const owned = assertUsableTeamMachine(db, teamId, overrideMachineId);
   const requiredOs = routeOverride?.requiredCapabilities?.os;
   if (requiredOs !== undefined && runnerOsOf(owned.capabilities) !== requiredOs) {
     throw conflict(`machine ${owned.name} does not match platform ${requiredOs}`);
@@ -889,12 +892,7 @@ export function updateAutonomousTodo(
   if (patch.routeOverride !== undefined) {
     const machineId = patch.routeOverride?.machineId;
     if (machineId !== undefined) {
-      const owned = db
-        .select({ id: machine.id })
-        .from(machine)
-        .where(and(eq(machine.id, machineId), eq(machine.teamId, row.teamId)))
-        .get();
-      if (owned === undefined) throw notFound(`machine ${machineId}`);
+      assertUsableTeamMachine(db, row.teamId, machineId);
     }
     sets.routeOverride = patch.routeOverride;
   }

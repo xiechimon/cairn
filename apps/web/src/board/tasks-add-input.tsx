@@ -92,7 +92,7 @@ export function TasksAddInput({
     <form ref={formRef} onSubmit={submit} className="flex flex-none px-2">
       <div
         data-testid="tasks-add-field"
-        className="flex h-10.5 min-w-0 flex-1 items-center gap-4 rounded-(--radius-tile) border border-transparent bg-(--hover-1) pr-1.5 pl-2.5 focus-within:[outline:var(--focus-width)_solid_var(--focus-ring)]"
+        className="flex h-10.5 min-w-0 flex-1 items-center gap-4 rounded-(--radius-tile) border border-transparent bg-(--hover-1) pr-1.5 pl-2.5 focus-within:[outline:var(--focus-width)_solid_var(--focus-ring)] pointer-coarse:h-11 pointer-coarse:gap-2 pointer-coarse:pr-0"
       >
         <span className="flex size-7 flex-none items-center justify-center">
           <span
@@ -119,7 +119,7 @@ export function TasksAddInput({
               aria-label={t('执行机')}
               data-testid="tasks-add-machine"
               size="sm"
-              className="h-7 max-w-28 flex-none gap-1 rounded-md border-transparent bg-transparent px-1.5 py-0 text-meta text-content-secondary shadow-none hover:bg-(--hover-1) dark:bg-transparent dark:hover:bg-(--hover-1)"
+              className="h-7 max-w-28 flex-none gap-1 rounded-md border-transparent bg-transparent px-1.5 py-0 text-meta text-content-secondary shadow-none hover:bg-(--hover-1) pointer-coarse:min-h-11 pointer-coarse:min-w-11 dark:bg-transparent dark:hover:bg-(--hover-1)"
             >
               <SelectValue>
                 {picked === null ? (
@@ -141,7 +141,7 @@ export function TasksAddInput({
               alignItemWithTrigger={false}
               className="w-max min-w-44 max-w-72"
             >
-              <SelectItem value={null}>
+              <SelectItem value={null} className="pointer-coarse:min-h-11">
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
                   <Monitor aria-hidden className="size-4 flex-none" strokeWidth={1.75} />
                   <span className="min-w-0 flex-1 truncate">{t('自动')}</span>
@@ -154,7 +154,7 @@ export function TasksAddInput({
                   <SelectItem
                     key={machine.id}
                     value={machine.id}
-                    className="h-auto min-h-8 py-1 [&>:first-child]:min-w-0 [&>:first-child]:shrink [&>:first-child]:whitespace-normal [&>:first-child]:wrap-anywhere"
+                    className="h-auto min-h-8 py-1 pointer-coarse:min-h-11 [&>:first-child]:min-w-0 [&>:first-child]:shrink [&>:first-child]:whitespace-normal [&>:first-child]:wrap-anywhere"
                   >
                     <span className="flex min-w-0 flex-1 items-center gap-1.5">
                       <MachineIcon machine={machine} className="size-4 flex-none" />
@@ -185,7 +185,7 @@ export function TasksAddInput({
               size="icon"
               data-testid="tasks-add-submit"
               disabled={trimmed === '' || sending}
-              className="size-7 flex-none text-foreground disabled:text-content-tertiary disabled:opacity-100"
+              className="size-7 flex-none text-foreground disabled:text-content-tertiary disabled:opacity-100 pointer-coarse:size-11"
             />
           }
         >

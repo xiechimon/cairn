@@ -1,7 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { machine as machineTable, team as teamTable, todo as todoTable } from '../src/db/schema.js';
+import {
+  build as buildTable,
+  machine as machineTable,
+  team as teamTable,
+  todo as todoTable,
+} from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { bootServer, insertMachine, postProject, req } from './helpers.js';
 
@@ -73,6 +78,55 @@ describe('create todo with a chosen machine', () => {
       });
       expect(res.status).toBe(404);
       expect(s.db.select().from(todoTable).all()).toHaveLength(before);
+    }
+  });
+
+  test('PATCH /api/todos/:id and POST /api/projects/:id/builds refuse retired and unregistered local machines', async () => {
+    const s = bootServer();
+    const projectId = await postProject(s.app, 'machine-patch-start-refused');
+    const retiredId = insertMachine(s, { name: 'retired-patch' });
+    s.db
+      .update(machineTable)
+      .set({ retiredAt: nowMs() })
+      .where(eq(machineTable.id, retiredId))
+      .run();
+    s.db
+      .insert(machineTable)
+      .values(
+        readyMachine({
+          id: 'machine-unregistered-patch',
+          teamId: s.team.id,
+          name: 'unregistered-local',
+          kind: 'local',
+          online: false,
+          lastSeenAt: null,
+        }),
+      )
+      .run();
+
+    const createdRes = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+      title: 'patch target',
+      spec: '待修改的任务',
+    });
+    expect(createdRes.status).toBe(201);
+    const { id: todoId } = (await createdRes.json()) as { id: string };
+
+    for (const machineId of [retiredId, 'machine-unregistered-patch']) {
+      const patchRes = await req(s.app, 'PATCH', `/api/todos/${todoId}`, {
+        routeOverride: { machineId },
+      });
+      expect(patchRes.status).toBe(404);
+      expect(
+        s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.routeOverride ?? null,
+      ).toBeNull();
+
+      const buildsBefore = s.db.select().from(buildTable).all().length;
+      const startRes = await req(s.app, 'POST', `/api/projects/${projectId}/builds`, {
+        todoIds: [todoId],
+        routeOverride: { machineId },
+      });
+      expect(startRes.status).toBe(404);
+      expect(s.db.select().from(buildTable).all()).toHaveLength(buildsBefore);
     }
   });
 });

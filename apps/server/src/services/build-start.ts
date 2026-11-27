@@ -89,15 +89,26 @@ export function startBuilds(
       throw new NotFoundError(`project ${input.projectId}`);
     }
     const overrideMachine = input.routeOverride?.machineId;
-    if (
-      overrideMachine !== undefined &&
-      deps.db
-        .select({ id: machine.id })
+    if (overrideMachine !== undefined) {
+      const owned = deps.db
+        .select({
+          id: machine.id,
+          kind: machine.kind,
+          online: machine.online,
+          lastSeenAt: machine.lastSeenAt,
+        })
         .from(machine)
-        .where(and(eq(machine.id, overrideMachine), eq(machine.teamId, todoRecord.teamId)))
-        .get() === undefined
-    ) {
-      throw new NotFoundError(`machine ${overrideMachine}`);
+        .where(
+          and(
+            eq(machine.id, overrideMachine),
+            eq(machine.teamId, todoRecord.teamId),
+            isNull(machine.retiredAt),
+          ),
+        )
+        .get();
+      if (owned === undefined || !isRegisteredMachine(owned)) {
+        throw new NotFoundError(`machine ${overrideMachine}`);
+      }
     }
     const previous =
       todoRecord.latestBuildId === null
