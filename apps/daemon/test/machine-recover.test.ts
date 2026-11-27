@@ -7,6 +7,7 @@ import type { StepJournalEntry } from '../src/journal.js';
 import { StepJournal } from '../src/journal.js';
 import { MachineApiError } from '../src/machine-client.js';
 import type { StatePaths } from '../src/state.js';
+import { createTaskSleepPrevention } from '../src/task-sleep-prevention.js';
 import {
   boot,
   CLAIMED,
@@ -389,6 +390,123 @@ describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
     const { handle, lines } = await boot({ api, backend, heartbeatIntervalMs: 25 });
     await waitFor(() => lines.some((l) => l.includes('no longer exists or is no longer ours')));
     await waitFor(() => api.doneBodies.some((d) => d.stepId === 's1'));
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('prunes stale claimed and running journal rows absent from server recover without starting sleep prevention', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [];
+    let outboxDir = '';
+    const spawnedArgs: string[][] = [];
+    const sleepPrevention = createTaskSleepPrevention({
+      enabled: true,
+      platform: 'darwin',
+      pid: 4321,
+      hasPending: () =>
+        outboxDir === '' ? false : new StepJournal(outboxDir).pending().length > 0,
+      spawn: (_command, args) => {
+        spawnedArgs.push(args);
+        return {
+          kill() {},
+          once() {},
+        };
+      },
+    });
+    const { handle, lines, paths } = await boot({
+      api,
+      sleepPrevention,
+      seedJournal: (seeded) => {
+        outboxDir = seeded.outboxDir;
+        const journal = new StepJournal(seeded.outboxDir);
+        for (const [stepId, state] of [
+          ['s-stale-claimed', 'claimed'],
+          ['s-stale-running', 'running'],
+        ] as const) {
+          journal.claim({
+            stepId,
+            buildId: `conv-${stepId}`,
+            kind: 'plan',
+            conversationId: `conv-${stepId}`,
+            sessionAction: 'new',
+            sessionId: null,
+            prompt: 'stale',
+            claimed: CLAIMED,
+          });
+          journal.update(stepId, { state });
+        }
+        journal.claim({
+          stepId: 's-upload',
+          buildId: 'conv-upload',
+          kind: 'plan',
+          conversationId: 'conv-upload',
+          sessionAction: 'new',
+          sessionId: 'pi-sess-upload',
+          prompt: 'done',
+          claimed: CLAIMED,
+        });
+        journal.update('s-upload', {
+          state: 'awaiting-upload',
+          doneBody: { status: 'success', sessionId: 'pi-sess-upload' },
+        });
+      },
+    });
+    const journal = new StepJournal(paths.outboxDir);
+    expect(journal.get('s-stale-claimed')).toBeNull();
+    expect(journal.get('s-stale-running')).toBeNull();
+    expect(journal.get('s-upload')?.state).toBe('awaiting-upload');
+    expect(
+      lines.some((l) => l.includes('pruned stale local journal for step s-stale-claimed')),
+    ).toBe(true);
+    expect(
+      lines.some((l) => l.includes('pruned stale local journal for step s-stale-running')),
+    ).toBe(true);
+    expect(spawnedArgs).toEqual([['-i', '-w', '4321']]);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('an idle machine with only stale claimed and running journal rows spawns zero sleep blockers', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [];
+    let outboxDir = '';
+    const spawnedArgs: string[][] = [];
+    const sleepPrevention = createTaskSleepPrevention({
+      enabled: true,
+      platform: 'darwin',
+      pid: 9876,
+      hasPending: () =>
+        outboxDir === '' ? false : new StepJournal(outboxDir).pending().length > 0,
+      spawn: (_command, args) => {
+        spawnedArgs.push(args);
+        return {
+          kill() {},
+          once() {},
+        };
+      },
+    });
+    const { handle, paths } = await boot({
+      api,
+      sleepPrevention,
+      seedJournal: (seeded) => {
+        outboxDir = seeded.outboxDir;
+        const journal = new StepJournal(seeded.outboxDir);
+        journal.claim({
+          stepId: 's-orphan',
+          buildId: 'conv-orphan',
+          kind: 'plan',
+          conversationId: 'conv-orphan',
+          sessionAction: 'new',
+          sessionId: null,
+          prompt: 'orphan',
+          claimed: CLAIMED,
+        });
+        journal.update('s-orphan', { state: 'running' });
+      },
+    });
+    expect(new StepJournal(paths.outboxDir).pending()).toEqual([]);
+    expect(spawnedArgs).toEqual([]);
+    expect(sleepPrevention.isHolding()).toBe(false);
     await handle.stop();
     await handle.done;
   });

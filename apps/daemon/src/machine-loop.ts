@@ -1184,9 +1184,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(opts.keepAwakeFile !== undefined ? { modeFile: opts.keepAwakeFile } : {}),
       log: (line) => logger.machine(line),
     });
-  sleepPrevention.sync();
-  const sleepPreventionTimer = setInterval(() => sleepPrevention.sync(), 1_000);
-  sleepPreventionTimer.unref?.();
+  let sleepPreventionTimer: ReturnType<typeof setInterval> | undefined;
   const workspace = new WorkspaceManager({
     logger,
     ...(opts.orphanTtlMs !== undefined ? { orphanTtlMs: opts.orphanTtlMs } : {}),
@@ -1313,6 +1311,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     if (!recoveryPending) return;
     recoveryPending = false;
     const recovered = await client.recover();
+    const recoveredIds = new Set(recovered.steps.map((stepRecord) => stepRecord.id));
+    for (const entry of journal.pending()) {
+      if (
+        recoveredIds.has(entry.stepId) ||
+        inFlight.has(entry.stepId) ||
+        entry.state === 'awaiting-upload'
+      ) {
+        continue;
+      }
+      journal.remove(entry.stepId);
+      logger.recover(`pruned stale local journal for step ${entry.stepId} (state=${entry.state})`);
+    }
     if (recovered.steps.length === 0) {
       logger.recover('no pending steps found');
     } else {
@@ -1375,6 +1385,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     }
   };
   await recover();
+  sleepPrevention.sync();
+  sleepPreventionTimer = setInterval(() => sleepPrevention.sync(), 1_000);
+  sleepPreventionTimer.unref?.();
 
   const streamCtrl = new AbortController();
   const deliverSteer = async (stepId: string): Promise<void> => {
