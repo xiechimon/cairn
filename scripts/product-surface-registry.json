@@ -62,6 +62,246 @@
       "type": "setting",
       "key": "scheduleInputSchema.chiefThreadId",
       "userScenario": "Nothing to set: creating a schedule inside a Coordinator conversation records that thread id so recurring requests fire directly in chat instead of opening a separate task."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DATA_DIR",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_APP_ROOT",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_BACKUPS",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_BUILD_CHECKOUT",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_COORDINATOR_WAIT_SECONDS",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_COPY_DIR",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_KEEP_RELEASES",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_KEEP_SNAPSHOTS",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_LAG_ISSUES",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_LAG_LIMIT_SECONDS",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_LAUNCHD_LABEL",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_LAUNCHD_PLIST",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_MACHINE_NAME",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_OPS_DIR",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_RELEASES",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_RUNNER_CHECK_CMD",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_RUNNER_CHECKOUT",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_RUNNER_LAUNCHD_LABEL",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_RUNNER_LAUNCHD_PLIST",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_RUNNER_PROCESS_PATTERN",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_RUNNER_SYSTEMD_UNIT",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_RUNNING_COPY",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_SCAN_COMMITS",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_SCRATCH",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_SELF_LABEL",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_SERVICE_MANAGER",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_STATE",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_SYSTEMD_UNIT",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_TOKEN_FILE",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_WATCH_COPY",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DEPLOY_WATCH_COPY_DIR",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_GH_WRAPPER",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_GITHUB_API_BASE",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_GITHUB_TOKEN",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_HEALTH_INTERVAL",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_HEALTH_TRIES",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_HEALTH_URL",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_REQUIRED_CHECKS",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_RUNNER_HEALTH_INTERVAL",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_RUNNER_HEALTH_TRIES",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
     }
   ]
 }
