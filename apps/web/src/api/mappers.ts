@@ -1013,6 +1013,19 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
           createdAt: entry.at,
         });
       }
+    } else if (
+      entry.item.kind === 'fail' &&
+      isRetryParkedFail(entry.item) &&
+      items.at(-1)?.kind === 'fail' &&
+      !isRetryParkedFail(items.at(-1))
+    ) {
+      const previous = items.at(-1) as Extract<TranscriptItem, { kind: 'fail' }>;
+      items[items.length - 1] = {
+        ...previous,
+        ...entry.item,
+        raw: previous.raw !== '' ? previous.raw : entry.item.raw,
+        ...(previous.facts !== undefined ? { facts: previous.facts } : {}),
+      };
     } else items.push(entry.item);
   }
 
@@ -1322,6 +1335,13 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
 }
 
 const RETRY_PARKED_ID_PREFIX = 'retry-parked-';
+
+function isRetryParkedFail(item: TranscriptItem | undefined): boolean {
+  return (
+    item?.kind === 'fail' &&
+    (item.id?.startsWith(RETRY_PARKED_ID_PREFIX) === true || item.raw.startsWith(RETRY_PARKED_MARK))
+  );
+}
 
 const FAIL_KIND_LABELS: Partial<Record<ReturnType<typeof classifyStepFailure>, string>> = {
   disk: '执行机磁盘已满',

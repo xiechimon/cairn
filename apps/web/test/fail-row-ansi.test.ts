@@ -1,4 +1,4 @@
-import type { BuildRecord, TodoRecord as WireTodo } from '@cairn/shared';
+import { type BuildRecord, buildFailureRowContent, type TodoRecord as WireTodo } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapRunHistory, mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
@@ -109,6 +109,78 @@ describe('mapTranscript disk-full failure copy', () => {
       label: '执行机磁盘已满',
       body: 'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。',
     });
+  });
+
+  test('folds an adjacent retry-parked notice into the preceding step-failure row instead of rendering two fail rows', () => {
+    const rawError =
+      "Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.503.0.tmp'";
+    const stepFailContent = buildFailureRowContent({
+      reason: rawError,
+      commits: ['abcdef1234567'],
+      pr: null,
+    });
+    const parkedContent = `Task parked: runner disk full. Free disk space on the Runner, then retry. Last error: ${rawError}`;
+    const messages = [
+      { id: 'sys-step-fail', role: 'system' as const, content: stepFailContent, createdAt: NOW },
+      {
+        id: 'retry-parked-build-ansi',
+        role: 'system' as const,
+        content: parkedContent,
+        createdAt: NOW + 1,
+      },
+    ];
+    for (const todoRecord of [
+      FAILED_CARD,
+      {
+        ...FAILED_CARD,
+        retry: {
+          state: 'parked' as const,
+          failureClass: 'permanent' as const,
+          reasonCode: 'disk' as const,
+          attemptsMade: 0,
+          detail: null,
+        },
+      },
+    ]) {
+      const items = mapTranscript({
+        messages,
+        steps: [],
+        build: { ...POLLUTED_BUILD, errorMessage: parkedContent },
+        todo: todoRecord,
+        machineName: null,
+        userName: 'Xmon Dai',
+        liveText: '',
+      });
+      const fails = items.filter((i): i is Extract<typeof i, { kind: 'fail' }> => i.kind === 'fail');
+      expect(fails).toHaveLength(1);
+      expect(fails[0]).toMatchObject({
+        label: '执行机磁盘已满',
+        body: 'Cairn 无法写入本轮记录。请在这台执行机上腾出磁盘空间后重试。',
+        raw: rawError,
+        facts: { commits: ['abcdef123'] },
+      });
+    }
+  });
+
+  test('keeps two separate failed attempts separated by a user follow-up as two fail rows', () => {
+    const rawError =
+      "Runner error: ENOSPC: no space left on device, open '/runner/home/.cairn/outbox/.step-example.json.503.0.tmp'";
+    const stepFailContent = buildFailureRowContent({ reason: rawError, commits: [], pr: null });
+    const parkedContent = `Task parked: runner disk full. Free disk space on the Runner, then retry. Last error: ${rawError}`;
+    const items = mapTranscript({
+      messages: [
+        { id: 'sys-fail-1', role: 'system' as const, content: stepFailContent, createdAt: NOW },
+        { id: 'user-retry', role: 'user' as const, content: '已清理空间，再试一次', createdAt: NOW + 10 },
+        { id: 'retry-parked-build-ansi', role: 'system' as const, content: parkedContent, createdAt: NOW + 20 },
+      ],
+      steps: [],
+      build: { ...POLLUTED_BUILD, errorMessage: parkedContent },
+      todo: FAILED_CARD,
+      machineName: null,
+      userName: 'Xmon Dai',
+      liveText: '',
+    });
+    expect(items.filter((i) => i.kind === 'fail')).toHaveLength(2);
   });
 });
 
