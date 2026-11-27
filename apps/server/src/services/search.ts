@@ -1,16 +1,40 @@
 import {
+  CHIEF_NOTICE_KIND,
   type ParsedSearchFilter,
   parseSearchQuery,
   type SearchFilterResult,
   type SearchIsState,
+  type SearchMessageHit,
   type SearchResponse,
+  TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  visibleChiefMessageText,
   WAITING_PHASES,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, not, or, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  like,
+  not,
+  notLike,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';
-import { build, project, todo, tokenUsage, user } from '../db/schema.js';
+import { build, chiefMessage, chiefThread, project, todo, tokenUsage, user } from '../db/schema.js';
+import { foldSearchText, snippetAround } from './chief-history.js';
 import { listedProjects } from './personal-space.js';
+
+const SEARCH_THREAD_SCAN_CAP = 2000;
+const SEARCH_TOTAL_SCAN_CAP = 10_000;
+const SEARCH_MESSAGE_LIMIT = 20;
+const MESSAGE_SNIPPET_CHARS = 120;
+const MESSAGE_SNIPPET_LEAD_CHARS = 30;
 
 export interface SearchDeps {
   db: Db;
@@ -185,9 +209,129 @@ function searchWithSyntax(
   return { todos, projects: [], filters };
 }
 
+function formatMessageSnippet(text: string, foldedTerms: string[]): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= MESSAGE_SNIPPET_CHARS) return flat;
+  const rawSnippet = snippetAround(flat, foldSearchText(flat), foldedTerms, {
+    maxChars: MESSAGE_SNIPPET_CHARS,
+    leadChars: MESSAGE_SNIPPET_LEAD_CHARS,
+  });
+  const idx = flat.indexOf(rawSnippet);
+  const trimmedStart = idx > 0;
+  const trimmedEnd = idx >= 0 && idx + rawSnippet.length < flat.length;
+  return `${trimmedStart ? '…' : ''}${rawSnippet}${trimmedEnd ? '…' : ''}`;
+}
+
+function searchMessages(
+  deps: SearchDeps,
+  teamId: string,
+  userId: string | undefined,
+  q: string,
+): SearchMessageHit[] {
+  const terms = q.split(/\s+/).filter((term) => term !== '');
+  if (terms.length === 0) return [];
+  const foldedTerms = terms.map(foldSearchText);
+  const threads = deps.db
+    .select({
+      id: chiefThread.id,
+      projectId: chiefThread.projectId,
+      projectName: project.name,
+      personalOwnerId: project.personalOwnerId,
+      projectTeamId: project.teamId,
+    })
+    .from(chiefThread)
+    .leftJoin(project, eq(chiefThread.projectId, project.id))
+    .where(
+      and(
+        eq(chiefThread.teamId, teamId),
+        userId !== undefined ? eq(chiefThread.userId, userId) : undefined,
+        isNull(chiefThread.archivedAt),
+        notLike(chiefThread.id, 'chief-digest-%'),
+        notLike(chiefThread.id, 'chief-memory-%'),
+      ),
+    )
+    .orderBy(desc(chiefThread.updatedAt), desc(chiefThread.createdAt))
+    .all()
+    .filter(
+      (row) =>
+        row.projectId === null ||
+        (row.projectName !== null && row.projectTeamId === teamId && row.personalOwnerId === null),
+    );
+  const hits: (SearchMessageHit & { rowid: number })[] = [];
+  let remainingBudget = SEARCH_TOTAL_SCAN_CAP;
+  for (const thread of threads) {
+    const threadLimit = Math.min(SEARCH_THREAD_SCAN_CAP, remainingBudget);
+    if (threadLimit <= 0) break;
+    const recentRowids = deps.db
+      .select({ rowid: sql<number>`rowid` })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.threadId, thread.id))
+      .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+      .limit(threadLimit);
+    const scannedCount =
+      deps.db.select({ count: sql<number>`count(*)` }).from(recentRowids.as('recent')).get()
+        ?.count ?? 0;
+    if (scannedCount === 0) continue;
+    remainingBudget -= scannedCount;
+    const rows = deps.db
+      .select({
+        id: chiefMessage.id,
+        role: chiefMessage.role,
+        origin: chiefMessage.origin,
+        content: chiefMessage.content,
+        createdAt: chiefMessage.createdAt,
+        rowid: sql<number>`rowid`,
+      })
+      .from(chiefMessage)
+      .where(
+        and(
+          inArray(sql`rowid`, recentRowids),
+          or(
+            and(
+              eq(chiefMessage.role, 'user'),
+              or(isNull(chiefMessage.origin), eq(chiefMessage.origin, 'user')),
+              or(
+                eq(chiefMessage.origin, 'user'),
+                notLike(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`),
+              ),
+            ),
+            and(
+              eq(chiefMessage.role, 'assistant'),
+              sql`CASE WHEN json_valid(${chiefMessage.content}) THEN json_type(${chiefMessage.content}) != 'object' ELSE 1 END`,
+            ),
+            and(
+              eq(chiefMessage.role, 'system'),
+              like(chiefMessage.content, `%${CHIEF_NOTICE_KIND}%`),
+            ),
+          ),
+        ),
+      )
+      .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+      .all();
+    for (const row of rows) {
+      const visible = visibleChiefMessageText(row);
+      if (visible === null) continue;
+      const folded = foldSearchText(visible.text);
+      if (!foldedTerms.every((term) => folded.includes(term))) continue;
+      hits.push({
+        id: row.id,
+        threadId: thread.id,
+        projectId: thread.projectId,
+        projectName: thread.projectId === null ? null : thread.projectName,
+        role: visible.role,
+        snippet: formatMessageSnippet(visible.text, foldedTerms),
+        createdAt: row.createdAt,
+        rowid: row.rowid,
+      });
+    }
+  }
+  hits.sort((a, b) => b.createdAt - a.createdAt || b.rowid - a.rowid);
+  return hits.slice(0, SEARCH_MESSAGE_LIMIT).map(({ rowid: _rowid, ...hit }) => hit);
+}
+
 export function search(
   deps: SearchDeps,
-  input: { teamId: string; q: string | null; nowMs?: number },
+  input: { teamId: string; userId?: string; q: string | null; nowMs?: number },
 ): SearchResponse {
   const q = input.q?.trim();
   if (!q) return { todos: [], projects: [] };
@@ -219,5 +363,7 @@ export function search(
     .orderBy(asc(project.name))
     .all();
 
-  return { todos, projects };
+  const messages = searchMessages(deps, input.teamId, input.userId, q);
+
+  return { todos, projects, ...(messages.length > 0 ? { messages } : {}) };
 }

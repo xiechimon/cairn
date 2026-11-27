@@ -326,7 +326,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   );
 
   app.get('/api/search', (c) =>
-    c.json(search(svc, { teamId: ctx.team.id, q: c.req.query('q') ?? null })),
+    c.json(search(svc, { teamId: ctx.team.id, userId: ctx.user.id, q: c.req.query('q') ?? null })),
   );
 
   app.get('/api/teams/:id/machines', conditionalGet(), (c) => {

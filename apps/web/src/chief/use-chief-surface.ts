@@ -39,6 +39,7 @@ import { mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
+import { MESSAGE_PARAM } from '../board/message-jump.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -162,6 +163,7 @@ function placeOf(pathname: string, search: string): string {
   const params = new URLSearchParams(search);
   params.delete('chief');
   params.delete(THREAD_PARAM);
+  params.delete(MESSAGE_PARAM);
   return `${pathname}?${params.toString()}`;
 }
 
@@ -345,7 +347,11 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     void fetchNextPage();
   }, [fetchNextPage]);
   const earlier: EarlierPages | undefined = live
-    ? { loading: isFetchingNextPage, failed: isFetchNextPageError, onLoad: loadEarlier }
+    ? {
+        loading: isFetchingNextPage || newestPageOnly,
+        failed: isFetchNextPageError,
+        onLoad: loadEarlier,
+      }
     : undefined;
 
   const fixtureChief = chief ?? chiefDefault;

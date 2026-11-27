@@ -7509,6 +7509,57 @@ exports[`body/envelope schema snapshots > searchResponse > searchResponse.json 1
       },
       "type": "array",
     },
+    "messages": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "id": {
+            "type": "string",
+          },
+          "projectId": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "projectName": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
+          "role": {
+            "enum": [
+              "user",
+              "assistant",
+            ],
+            "type": "string",
+          },
+          "snippet": {
+            "type": "string",
+          },
+          "threadId": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "threadId",
+          "projectId",
+          "projectName",
+          "role",
+          "snippet",
+          "createdAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "projects": {
       "items": {
         "additionalProperties": false,

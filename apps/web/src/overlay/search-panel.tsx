@@ -1,9 +1,19 @@
-import { parseSearchQuery, type SearchResponse } from '@cairn/shared';
-import { CircleHelp, Clock, Kanban, Search, Settings, TriangleAlert, X } from 'lucide-react';
+import { parseSearchQuery, type SearchMessageHit, type SearchResponse } from '@cairn/shared';
+import {
+  CircleHelp,
+  Clock,
+  Kanban,
+  MessageSquare,
+  Search,
+  Settings,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { messageHitHref } from '../board/message-jump.js';
 import { coordinatorSearch } from '../board/open-composer.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
@@ -77,6 +87,7 @@ interface SearchPanelProps {
   open: boolean;
   onClose: () => void;
   server?: SearchResponse;
+  serverQueryText?: string;
   serverQuery?: Pick<QueryLike, 'isError' | 'isFetching' | 'refetch'>;
   context?: SearchContext;
 }
@@ -136,6 +147,50 @@ function TodoRow({
   );
 }
 
+function MessageRow({
+  message,
+  selected,
+  kbd,
+  index,
+  onActivate,
+}: {
+  message: SearchMessageHit;
+  selected: boolean;
+  kbd: boolean;
+  index: number;
+  onActivate: () => void;
+}) {
+  const projectMark = useProjectMark();
+  const { t } = useI18n();
+  return (
+    <Button
+      variant="ghost"
+      data-row-kind="message"
+      data-row-index={index}
+      data-selected={selected ? '' : undefined}
+      onClick={onActivate}
+      className={`${ROW_BASE} ${rowLitClasses(selected, kbd)}`}
+    >
+      <MessageSquare className="size-4" />
+      <span className="min-w-0 truncate">{message.snippet}</span>
+      <span className={ROW_END}>
+        {message.projectName !== null ? (
+          <>
+            <ProjectAvatar
+              name={message.projectName}
+              {...projectMark(message.projectId ?? message.projectName)}
+              bare
+            />
+            <span className="max-w-32 truncate">{message.projectName}</span>
+          </>
+        ) : (
+          <span>{t('Coordinator')}</span>
+        )}
+      </span>
+    </Button>
+  );
+}
+
 let openPanelCount = 0;
 function useSingleLitSurface(open: boolean) {
   useEffect(() => {
@@ -156,6 +211,7 @@ export function SearchPanel({
   open,
   onClose,
   server,
+  serverQueryText,
   serverQuery,
   context,
 }: SearchPanelProps) {
@@ -185,7 +241,13 @@ export function SearchPanel({
   const q = query.trim().toLowerCase();
   const { chips, text } = splitQuery(query, Date.now());
   const hasFilters = parseSearchQuery(query, Date.now()).filters.length > 0;
-  const useServer = server !== undefined && q !== '';
+  const searchFailed = q !== '' && serverQuery?.isError === true;
+  const serverFresh =
+    server !== undefined &&
+    q !== '' &&
+    !searchFailed &&
+    (serverQueryText === undefined || serverQueryText.trim().toLowerCase() === q);
+  const useServer = serverFresh;
   const localSearch =
     !useServer && hasFilters
       ? searchTodosLocally(
@@ -232,6 +294,7 @@ export function SearchPanel({
               },
             ]
           : [];
+  const messages: SearchMessageHit[] = serverFresh ? (server.messages ?? []) : [];
   const [contextOn, setContextOn] = useState(true);
   useEffect(() => {
     if (open) setContextOn(true);
@@ -251,7 +314,8 @@ export function SearchPanel({
       : NAV_ROWS.filter(
           (row) => row.label.toLowerCase().includes(q) || t(row.label).toLowerCase().includes(q),
         );
-  const hitCount = commands.length + navMatches.length + todos.length + projects.length;
+  const hitCount =
+    commands.length + navMatches.length + todos.length + projects.length + messages.length;
 
   const go = (pathname: string) => {
     const nextSearch =
@@ -273,6 +337,10 @@ export function SearchPanel({
     navigate(threadHrefFrom(id, search));
     onClose();
   };
+  const goMessage = (hit: SearchMessageHit) => {
+    navigate(messageHitHref(hit, search));
+    onClose();
+  };
   const runCommand = (command: SearchCommand) => {
     onClose();
     command.run();
@@ -284,6 +352,7 @@ export function SearchPanel({
       : [
           ...todos.map((todo) => () => goThread(todo.id)),
           ...projects.map((project) => () => go(`/app/project/${project.id}`)),
+          ...messages.map((message) => () => goMessage(message)),
           ...navMatches.map((row) => () => go(row.href)),
         ]),
   ];
@@ -292,7 +361,7 @@ export function SearchPanel({
 
   useEffect(() => {
     setCursor(null);
-  }, [query, open]);
+  }, [query, open, serverQueryText]);
 
   useEffect(() => {
     if (cursor == null) return;
@@ -302,7 +371,6 @@ export function SearchPanel({
   }, [cursor]);
 
   const kbd = cursor != null;
-  const searchFailed = q !== '' && serverQuery?.isError === true;
 
   return (
     <DialogShell
@@ -374,7 +442,7 @@ export function SearchPanel({
                 ? '输入命令或搜索…'
                 : chips.length > 0
                   ? '再加一个筛选或词'
-                  : '搜索任务、项目…',
+                  : '搜索任务、项目、消息…',
             )}
             onChange={(event) => onQuery(joinQuery(chips, event.target.value))}
             onKeyDown={(event) => {
@@ -544,11 +612,30 @@ export function SearchPanel({
                     })}
                   </>
                 )}
+                {messages.length > 0 && (
+                  <>
+                    <div className={GROUP_LABEL}>{t('消息')}</div>
+                    {messages.map((message, index) => {
+                      const rowIndex = base + todos.length + projects.length + index;
+                      return (
+                        <MessageRow
+                          key={message.id}
+                          message={message}
+                          selected={cursor === rowIndex}
+                          kbd={kbd}
+                          index={rowIndex}
+                          onActivate={() => goMessage(message)}
+                        />
+                      );
+                    })}
+                  </>
+                )}
                 {navMatches.length > 0 && (
                   <>
                     <div className={GROUP_LABEL}>{t('前往')}</div>
                     {navMatches.map(({ label, Icon, href }, index) => {
-                      const rowIndex = base + todos.length + projects.length + index;
+                      const rowIndex =
+                        base + todos.length + projects.length + messages.length + index;
                       return (
                         <Button
                           variant="ghost"

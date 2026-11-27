@@ -42,10 +42,12 @@ import {
   classifyStepFailure,
   DONE_ROW,
   derivePlaceholderTitle,
+  extractPlainMessageText,
   failureReasonKey,
   GATE_ANNOUNCEMENTS,
   GIT_CREDENTIAL_ROW_KIND,
   infoReportMessageSchema,
+  isChiefPromptEcho,
   isOwnComputerTool,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
@@ -74,8 +76,6 @@ import {
   type SystemRow,
   stripAgentTodoText,
   stripAnsiEscapes,
-  stripSkillRouteSection,
-  stripTurnContext,
   subagentLabelOf,
   subagentLiveProgressSchema,
   subagentToolResultSchema,
@@ -93,6 +93,7 @@ import {
   turnErrorKind,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
+  visibleChiefMessageText,
   WORKSPACE_HOOK_ROW_KIND,
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
@@ -395,24 +396,7 @@ export function clockTime(ms: number): string {
 }
 
 export function textOfContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((block) => {
-        if (typeof block === 'string') return block;
-        if (block !== null && typeof block === 'object') {
-          const b = block as { type?: string; text?: string };
-          if (b.type === 'text' && typeof b.text === 'string') return b.text;
-        }
-        return '';
-      })
-      .join('');
-  }
-  if (content !== null && typeof content === 'object') {
-    const b = content as { type?: string; text?: string };
-    if (b.type === 'text' && typeof b.text === 'string') return b.text;
-  }
-  return '';
+  return extractPlainMessageText(content);
 }
 
 export function thinkingOfContent(content: unknown): string | null {
@@ -1943,19 +1927,6 @@ export function askQuestionOfContent(content: unknown): {
 
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
-function isChiefPromptEcho(m: MessageRow): boolean {
-  if (m.origin === 'user') return false;
-  return (
-    m.origin === 'task-prompt' ||
-    m.origin === 'synthetic' ||
-    m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
-  );
-}
-
-function chiefUserText(raw: string): string {
-  return stripTurnContext(stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, ''))).trim();
-}
-
 function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
   const args = call.arguments as { reason?: unknown; phone?: unknown } | null;
   const reason = args?.reason;
@@ -2330,28 +2301,33 @@ function collectChiefStream(
       if (notice.success) {
         pendingTools = [];
         const update = notice.data.runtimeUpdate;
-        if (update === undefined && notice.data.provenance.startsWith('retry-parking:')) {
+        if (update === undefined) {
+          const visible = visibleChiefMessageText(m);
+          if (visible === null && notice.data.report === undefined) continue;
+          items.push({
+            kind: 'robot',
+            markdown: visible?.text ?? notice.data.message,
+            seconds: '',
+            id: m.id,
+            ...(notice.data.report !== undefined ? { report: notice.data.report } : {}),
+          });
           continue;
         }
         items.push({
           kind: 'robot',
           markdown: notice.data.message,
-          ...(update !== undefined
-            ? {
-                plain: {
-                  key:
-                    update.current === null
-                      ? '任务「{task}」已暂停：它的模型需要 {runtime} {required} 或更新的版本。更新 Cairn 后再重试。'
-                      : '任务「{task}」已暂停：Cairn 自带的 {runtime} {current} 太旧，它的模型需要 {required} 或更新的版本。更新 Cairn 后再重试。',
-                  vars: {
-                    task: update.task,
-                    runtime: update.runtime ?? 'Claude Code',
-                    current: update.current ?? '',
-                    required: update.required,
-                  },
-                },
-              }
-            : {}),
+          plain: {
+            key:
+              update.current === null
+                ? '任务「{task}」已暂停：它的模型需要 {runtime} {required} 或更新的版本。更新 Cairn 后再重试。'
+                : '任务「{task}」已暂停：Cairn 自带的 {runtime} {current} 太旧，它的模型需要 {required} 或更新的版本。更新 Cairn 后再重试。',
+            vars: {
+              task: update.task,
+              runtime: update.runtime ?? 'Claude Code',
+              current: update.current ?? '',
+              required: update.required,
+            },
+          },
           seconds: '',
           id: m.id,
           ...(notice.data.report !== undefined ? { report: notice.data.report } : {}),
@@ -2448,16 +2424,15 @@ function collectChiefStream(
       continue;
     }
     if (m.role === 'user') {
-      if (orchestratedTodoIdOf(rawText) !== null) continue;
-      const text = chiefUserText(rawText);
-      if (text === '') continue;
+      const visible = visibleChiefMessageText(m);
+      if (visible === null) continue;
       pendingTools = [];
       flushCards();
       items.push({
         kind: 'user',
-        text,
+        text: visible.text,
         id: m.id,
-        markdown: text,
+        markdown: visible.text,
         at: clockTime(m.createdAt),
         createdAt: m.createdAt,
         ...(m.clientMessageId != null ? { outboxKey: m.clientMessageId } : {}),
@@ -2471,9 +2446,11 @@ function collectChiefStream(
       items.push({ kind: 'error', text: rawText, id: m.id });
       continue;
     }
+    const visible = visibleChiefMessageText(m);
+    if (visible === null) continue;
     items.push({
       kind: 'robot',
-      markdown: rawText,
+      markdown: visible.text,
       seconds: '',
       id: m.id,
       createdAt: m.createdAt,

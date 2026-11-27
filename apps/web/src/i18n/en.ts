@@ -633,7 +633,7 @@ export const EN: Record<string, string> = {
   '你停下了它，发送消息即可重新开始。': 'You stopped it. Send a message to start it again.',
   '任务已归档。': 'The task is archived.',
 
-  '搜索任务、项目…': 'Search todos, projects…',
+  '搜索任务、项目、消息…': 'Search tasks, projects, messages…',
   最近: 'Recent',
   '{dir} 里的仓库': 'Repositories in {dir}',
   查找文件夹或粘贴路径: 'Find a folder or paste a path',
@@ -3269,4 +3269,5 @@ export const EN: Record<string, string> = {
   正在加载聊天应用: 'Loading chat apps',
   聊天应用未能加载: 'Could not load chat apps',
   可横向滚动的表格: 'Horizontally scrollable table',
+  未能定位到这条消息: 'Could not locate that message',
 };

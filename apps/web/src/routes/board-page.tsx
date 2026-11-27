@@ -33,6 +33,7 @@ import {
 } from '../board/first-run-setup.js';
 import { type HomeBannerKind, pickHomeBanners } from '../board/home-banners.js';
 import { HomeC } from '../board/home-c.js';
+import { MESSAGE_PARAM } from '../board/message-jump.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { ProjectNotFound, ProjectsFailed, ProjectsLoading } from '../board/project-not-found.js';
 import { type SuggestableProject, suggestProjects } from '../board/project-suggestions.js';
@@ -60,7 +61,7 @@ import { SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { SHEET_PANEL } from '../pages/shell.js';
 
 export function BoardPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
   const { t } = useI18n();
@@ -158,7 +159,7 @@ export function BoardPage() {
   }, [live, projectsQ.data, fixture, todos]);
 
   const search = useSearchState(fixture.ui?.searchOpen === true, fixture.ui?.searchQuery ?? '');
-  const searchResults = useSearchResults(search.query, live && search.open);
+  const searchResults = useSearchResults(search.query, live && search.open, teamId);
   const notifyBanner = useNotificationBanner(fixture.ui?.notificationBanner === true, live);
 
   const quotaInfos = quotaNoticeInfo(todos);
@@ -228,6 +229,13 @@ export function BoardPage() {
     if (before === homeProjectId || homeProjectId === null) return;
     if (openThreadProjectId !== null && openThreadProjectId !== homeProjectId) closeThread();
   }, [homeProjectId, openThreadProjectId, closeThread]);
+  useEffect(() => {
+    if (projectLookup !== 'unknown' || homeProjectId === null || !searchParams.has(MESSAGE_PARAM))
+      return;
+    const next = new URLSearchParams(searchParams);
+    next.delete(MESSAGE_PARAM);
+    setSearchParams(next, { replace: true });
+  }, [projectLookup, homeProjectId, searchParams, setSearchParams]);
   const homeShown =
     !showSetup &&
     projectLookup !== 'loading' &&
@@ -360,6 +368,7 @@ export function BoardPage() {
         onQuery={search.setQuery}
         onClose={() => search.setOpen(false)}
         server={live ? searchResults.data : undefined}
+        serverQueryText={live ? searchResults.settledQuery : undefined}
         serverQuery={live ? searchResults : undefined}
       />
     </div>

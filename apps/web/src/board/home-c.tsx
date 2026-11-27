@@ -21,6 +21,7 @@ import type { QueryLike } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { SubtreeErrorBoundary } from '../components/subtree-error-boundary.js';
 import { Button } from '../components/ui/button.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
@@ -35,6 +36,7 @@ import { ARTIFACT_NAME_PARAM, ARTIFACT_PARAM } from './file-pane.js';
 import { HomeSpiral, type SpiralProject } from './home-spiral.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
+import { MAX_MESSAGE_JUMP_PAGES, MESSAGE_PARAM, messageJumpStep } from './message-jump.js';
 import { NarrowTopControls, useNarrowChrome } from './narrow-chrome.js';
 import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
@@ -367,6 +369,58 @@ export function HomeC({
       setQuestionTarget(null);
     }
   }, [questionTarget, stepKind, focusId, loadEarlier]);
+
+  const jumpMessageId = searchParams.get(MESSAGE_PARAM);
+  const jumpRef = useRef<{ target: string | null; threadId: string | null; pagesLoaded: number }>({
+    target: null,
+    threadId: null,
+    pagesLoaded: 0,
+  });
+  const chiefThreadId = chiefData.threadId ?? null;
+  if (jumpRef.current.target !== jumpMessageId || jumpRef.current.threadId !== chiefThreadId) {
+    jumpRef.current = { target: jumpMessageId, threadId: chiefThreadId, pagesLoaded: 0 };
+  }
+  const jumpStep = messageJumpStep(jumpMessageId, {
+    loaded: loaded && (!live || chiefThreadId !== null),
+    stream: chiefData.stream ?? [],
+    hasEarlier: chiefData.hasEarlier === true,
+    loadingEarlier: surface.earlier?.loading === true,
+    failedEarlier: surface.earlier?.failed === true,
+    pagesLoaded: jumpRef.current.pagesLoaded,
+  });
+  const jumpKind = jumpStep.kind;
+  const jumpFocusId = jumpStep.kind === 'focus' ? jumpStep.messageId : '';
+  useEffect(() => {
+    if (jumpMessageId === null || jumpMessageId === '') return;
+    if (jumpKind === 'focus') {
+      const target = document.querySelector(
+        `[data-testid="chief-stream"] [data-message-id="${CSS.escape(jumpFocusId)}"]`,
+      );
+      if (target !== null) target.scrollIntoView({ block: 'center' });
+      else toastError(t('未能定位到这条消息'), null);
+      const next = new URLSearchParams(searchParams);
+      next.delete(MESSAGE_PARAM);
+      setSearchParams(next, { replace: true, state: location.state });
+    } else if (jumpKind === 'load-earlier') {
+      if (jumpRef.current.pagesLoaded >= MAX_MESSAGE_JUMP_PAGES) return;
+      jumpRef.current.pagesLoaded += 1;
+      loadEarlier?.();
+    } else if (jumpKind === 'missing') {
+      toastError(t('未能定位到这条消息'), null);
+      const next = new URLSearchParams(searchParams);
+      next.delete(MESSAGE_PARAM);
+      setSearchParams(next, { replace: true, state: location.state });
+    }
+  }, [
+    jumpMessageId,
+    jumpKind,
+    jumpFocusId,
+    loadEarlier,
+    searchParams,
+    setSearchParams,
+    location.state,
+    t,
+  ]);
 
   const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
   const paneButtons = narrow ? (

@@ -22,6 +22,17 @@ export const searchFilterResultSchema = z.object({
 });
 export type SearchFilterResult = z.infer<typeof searchFilterResultSchema>;
 
+export const searchMessageHitSchema = z.object({
+  id: recordId,
+  threadId: recordId,
+  projectId: recordId.nullable(),
+  projectName: z.string().nullable(),
+  role: z.enum(['user', 'assistant']),
+  snippet: z.string(),
+  createdAt: epochMs,
+});
+export type SearchMessageHit = z.infer<typeof searchMessageHitSchema>;
+
 export const searchResponseSchema = z.object({
   todos: z.array(
     z.object({
@@ -34,6 +45,7 @@ export const searchResponseSchema = z.object({
     }),
   ),
   projects: z.array(z.object({ id: recordId, name: z.string() })),
+  messages: z.array(searchMessageHitSchema).optional(),
   filters: z.array(searchFilterResultSchema).optional(),
 });
 export type SearchResponse = z.infer<typeof searchResponseSchema>;

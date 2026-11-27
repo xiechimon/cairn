@@ -39,7 +39,7 @@ function requireOwnThread(db: Db, scope: HistoryScope): void {
   if (!thread) throw new HttpError(404, `chief thread ${scope.threadId}`);
 }
 
-function fold(text: string): string {
+export function foldSearchText(text: string): string {
   return text.normalize('NFKC').toLowerCase();
 }
 
@@ -48,16 +48,23 @@ function originalOffset(text: string, foldedIndex: number): number {
   let high = text.length;
   while (low < high) {
     const mid = Math.floor((low + high) / 2);
-    if (fold(text.slice(0, mid)).length >= foldedIndex) high = mid;
+    if (foldSearchText(text.slice(0, mid)).length >= foldedIndex) high = mid;
     else low = mid + 1;
   }
   return low;
 }
 
-function snippetAround(text: string, folded: string, foldedTerms: string[]): string {
+export function snippetAround(
+  text: string,
+  folded: string,
+  foldedTerms: string[],
+  opts?: { maxChars?: number; leadChars?: number },
+): string {
+  const maxChars = opts?.maxChars ?? SNIPPET_CHARS;
+  const leadChars = opts?.leadChars ?? SNIPPET_LEAD_CHARS;
   const index = Math.min(...foldedTerms.map((term) => folded.indexOf(term)).filter((i) => i >= 0));
-  const start = Math.max(0, originalOffset(text, index) - SNIPPET_LEAD_CHARS);
-  return text.slice(start, start + SNIPPET_CHARS);
+  const start = Math.max(0, originalOffset(text, index) - leadChars);
+  return text.slice(start, start + maxChars);
 }
 
 export async function searchHistory(
@@ -93,7 +100,7 @@ export async function searchHistory(
           .get();
   if (input.before !== undefined && cursor === undefined)
     throw new HttpError(404, `chief message ${input.before}`);
-  const foldedTerms = terms.map(fold);
+  const foldedTerms = terms.map(foldSearchText);
   const hits: {
     id: string;
     role: string;
@@ -123,7 +130,7 @@ export async function searchHistory(
       .all();
     for (const row of batch) {
       const text = messageText(row.content);
-      const folded = fold(text);
+      const folded = foldSearchText(text);
       if (!foldedTerms.every((term) => folded.includes(term))) continue;
       if (hits.length === limit) {
         return {
