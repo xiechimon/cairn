@@ -1,8 +1,14 @@
 import { cn } from 'cn';
-import { createContext, Fragment, type ReactNode, useContext, useRef } from 'react';
+import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { OpenFileContext } from '../board/file-pane.js';
 import { useThreadHref } from '../board/thread-link.js';
+import {
+  echoTaskRef,
+  hoverTaskRef,
+  leaveTaskRef,
+  useTaskRefSignal,
+} from '../chief/task-ref-signal.js';
 import { MachineName } from '../components/machine-label.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -133,13 +139,14 @@ const TONE_TILE: Record<StatusTone, string> = {
   fail: 'bg-tint-fail',
 };
 
-export function TaskTile({ phase }: { phase: Phase }) {
+export function TaskTile({ phase, className }: { phase: Phase; className?: string | undefined }) {
   return (
     <span
       data-slot="task-tile"
       className={cn(
-        'grid size-5 flex-none place-items-center rounded-sm',
+        'grid size-5 flex-none place-items-center rounded-sm transition-colors duration-(--dur-fast)',
         TONE_TILE[PHASE_TONE[phase]],
+        className,
       )}
     >
       <TaskGlyph phase={phase} className={cn('size-3', taskStatusInk(phase))} />
@@ -220,6 +227,10 @@ function TaskWord({ todoId, label, href }: { todoId: string; label: string; href
   const phase = useContext(TodoGlanceContext)?.get(todoId)?.phase;
   const startsAfter = useStartsAfter(todoId, phase);
   const unread = useContext(ThreadUnreadContext)?.has(todoId) === true;
+  const signal = useTaskRefSignal(todoId);
+  useEffect(() => {
+    echoTaskRef(todoId);
+  }, [todoId]);
   const lines = [
     label,
     phase === undefined ? null : t(PHASE_UI[phase].chip),
@@ -234,8 +245,13 @@ function TaskWord({ todoId, label, href }: { todoId: string; label: string; href
             data-phase={phase}
             data-slot="task-mention"
             data-testid="task-mention"
+            data-hl={signal.hovered ? '' : undefined}
             aria-label={lines.join(t('，'))}
             className={TASK_WORD_CLS}
+            onPointerEnter={() => hoverTaskRef(todoId)}
+            onPointerLeave={() => leaveTaskRef(todoId)}
+            onFocus={() => hoverTaskRef(todoId)}
+            onBlur={() => leaveTaskRef(todoId)}
           />
         }
       >

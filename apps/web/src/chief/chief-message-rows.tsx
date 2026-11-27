@@ -77,7 +77,6 @@ function messageRowCls(joinsPrev: boolean): string {
   return joinsPrev ? 'mt-0.5' : 'mt-6';
 }
 const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
-const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
   return (
@@ -284,6 +283,7 @@ interface ChiefStreamRowProps {
   joinsNext?: boolean;
   started?: readonly string[];
   reports?: readonly string[];
+  glancesReady?: boolean;
 }
 
 const STEERING_BUBBLE_CLS =
@@ -523,6 +523,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   joinsNext = false,
   started = NO_TASKS,
   reports = NO_REPORTS,
+  glancesReady = true,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
@@ -670,8 +671,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
-          <MessageContent className={MSG_COL_LIVE_CLS}>
-            <TaskTrunk todoIds={started} />
+          <MessageContent className={BUBBLE_COL_CLS} data-testid="chief-msg-col">
+            {subagents.length > 0 && <SubagentProgressList items={subagents} />}
+            <TaskTrunk todoIds={started} live ready={glancesReady} />
             <LiveRow
               variant="chief"
               label={item.label}
@@ -680,7 +682,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               blocked={item.blocked === true}
               blockedActions={<CoordinatorFixLinks kind={item.blockedKind} />}
             />
-            {subagents.length > 0 && <SubagentProgressList items={subagents} />}
           </MessageContent>
         </Message>
       </MessageScrollerItem>
@@ -758,7 +759,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       >
         <MessageContent className={BUBBLE_COL_CLS} data-testid="chief-msg-col">
           {subagents.length > 0 && <SubagentProgressList items={subagents} />}
-          <TaskTrunk todoIds={started} />
+          <TaskTrunk todoIds={started} live={!settled} ready={glancesReady} />
           {hasBody && (
             <MessageMeta
               side="coordinator"

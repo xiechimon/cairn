@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import { foldTaskCards } from '../src/chief/chief-task-refs.js';
+import {
+  echoTaskRef,
+  growDelays,
+  hoverTaskRef,
+  leaveTaskRef,
+  markGrown,
+  readTaskRefSignal,
+} from '../src/chief/task-ref-signal.js';
 import type { GroupedRow } from '../src/chief/thread-activity.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
 
@@ -72,5 +80,38 @@ describe('foldTaskCards', () => {
     expect(foldTaskCards(list, glances).startedBy.get(reply)).toBe(
       foldTaskCards(list, glances).startedBy.get(reply),
     );
+  });
+});
+
+describe('task-ref-signal', () => {
+  test('only tasks new to a live turn grow, staggered 350ms apart, and never twice', () => {
+    expect([...growDelays(['g1', 'g2'], false)]).toEqual([]);
+    expect([...growDelays(['g1', 'g2'], true)]).toEqual([
+      ['g1', 0],
+      ['g2', 350],
+    ]);
+    markGrown('g1');
+    expect([...growDelays(['g1', 'g2', 'g3'], true)]).toEqual([
+      ['g2', 0],
+      ['g3', 350],
+    ]);
+  });
+
+  test('hoverTaskRef and leaveTaskRef only clear matching hovered task, and echoTaskRef requires markGrown', () => {
+    hoverTaskRef('h1');
+    expect(readTaskRefSignal('h1').hovered).toBe(true);
+    expect(readTaskRefSignal('h2').hovered).toBe(false);
+
+    leaveTaskRef('h2');
+    expect(readTaskRefSignal('h1').hovered).toBe(true);
+
+    leaveTaskRef('h1');
+    expect(readTaskRefSignal('h1').hovered).toBe(false);
+
+    echoTaskRef('u1');
+    expect(readTaskRefSignal('u1').echo).toBe(false);
+    markGrown('u1');
+    echoTaskRef('u1');
+    expect(readTaskRefSignal('u1').echo).toBe(true);
   });
 });
