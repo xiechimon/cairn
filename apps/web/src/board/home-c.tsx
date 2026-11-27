@@ -458,9 +458,9 @@ export function HomeC({
       onOpenThread={(id) => (docked && id === threadId ? closeThread() : openThread(id))}
       onOpenQuestion={openQuestion}
       addBlocked={archived === null ? null : t(ARCHIVED_PROJECT_WRITE_REASON)}
-      onAddTask={async (text) => {
+      onAddTask={async (text, machineId) => {
         if (live && saveProjectId !== null) {
-          await createTodo.mutateAsync({ projectId: saveProjectId, spec: text });
+          await createTodo.mutateAsync({ projectId: saveProjectId, spec: text, machineId });
           return 'saved';
         }
         if (surface.onSend == null) setPrefill({ text, key: Date.now() });
@@ -468,6 +468,7 @@ export function HomeC({
         if (narrow) showPane(null);
         return 'sent';
       }}
+      machines={live && saveProjectId !== null ? computers : []}
       query={tasksQuery}
     />
   ) : (

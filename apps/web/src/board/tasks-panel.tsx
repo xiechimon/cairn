@@ -17,6 +17,7 @@ import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
+import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { newTaskRequest } from './open-composer.js';
@@ -329,7 +330,8 @@ interface TasksPanelProps {
   openThreadId?: string | null;
   onOpenThread: (id: string) => void;
   onOpenQuestion: (question: QuestionTarget) => void;
-  onAddTask: (text: string) => Promise<TaskAddOutcome>;
+  onAddTask: (text: string, machineId: string | null) => Promise<TaskAddOutcome>;
+  machines: readonly MachineRow[];
   addBlocked?: string | null;
   query?: QueryLike;
 }
@@ -344,6 +346,7 @@ export function TasksPanel({
   onOpenThread,
   onOpenQuestion,
   onAddTask,
+  machines,
   addBlocked = null,
   query,
 }: TasksPanelProps) {
@@ -603,10 +606,11 @@ export function TasksPanel({
       </div>
       {adding && addBlocked === null && (
         <TasksAddInput
+          machines={machines}
           onClose={() => setAdding(false)}
-          onSubmit={async (text) => {
+          onSubmit={async (text, machineId) => {
             const choicesAtSubmit = tabChoices.current;
-            if ((await onAddTask(text)) !== 'saved') setAdding(false);
+            if ((await onAddTask(text, machineId)) !== 'saved') setAdding(false);
             else if (tabChoices.current === choicesAtSubmit) {
               setChosenTab('next');
               if (linkedToScheduled)

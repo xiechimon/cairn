@@ -189,5 +189,6 @@ export const createTodoBodySchema = z.object({
   title: z.string(),
   spec: z.string(),
   output: todoOutputSchema.optional(),
+  machineId: recordId.optional(),
 });
 export type CreateTodoBody = z.infer<typeof createTodoBodySchema>;

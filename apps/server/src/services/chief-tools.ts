@@ -886,7 +886,7 @@ export async function executeChiefTool(
       const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
       const untrustedTurn = turnForcesOutboundApproval(db, turnPrompt);
       const parked = untrustedTurn || body.start === false;
-      if (!parked) assertNamedMachineForNewTask(svc, ctx.teamId);
+      if (!parked && body.machine === undefined) assertNamedMachineForNewTask(svc, ctx.teamId);
       const record = db.transaction(() => {
         const projectRow =
           body.projectId === undefined
@@ -906,9 +906,6 @@ export async function executeChiefTool(
           },
         );
         db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, created.id)).run();
-        if (body.platform !== undefined) {
-          setTodoPlatform(db, requireTeamTodo(db, created.id, ctx.teamId), body.platform);
-        }
         if (!untrustedTurn)
           addChiefWatch(deps, {
             teamId: ctx.teamId,

@@ -106,6 +106,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       title: body.title,
       spec: body.spec,
       ...(body.output !== undefined ? { output: body.output } : {}),
+      ...(body.machineId !== undefined ? { routeOverride: { machineId: body.machineId } } : {}),
       createdBy: ctx.user.id,
       ownerId: ctx.user.id,
       userSpecAttachmentIds: attachmentIdsInUserText(body.spec, row.teamId),

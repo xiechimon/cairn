@@ -23,6 +23,11 @@
       "key": "CAIRN_BROWSER_EXECUTABLE",
       "scope": "product",
       "userScenario": "A new Mac user never sets or sees it: the runner tells its own browser launcher which browser to start for each page the Coordinator opens."
+    },
+    {
+      "type": "setting",
+      "key": "createTodoBodySchema.machineId",
+      "userScenario": "Nothing to set: when you have two or more computers, choosing one in the new-task row sends its id so the task waits for that computer."
     }
   ]
 }

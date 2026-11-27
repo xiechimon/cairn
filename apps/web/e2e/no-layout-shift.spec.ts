@@ -178,6 +178,78 @@ function registerC34Suite(mode: 'desktop' | 'mobile') {
     });
   });
 
+  test('new-task row: machine chip toggle, offline selection and slow submit keep task list steady', async ({
+    page,
+  }) => {
+    const machines = [
+      {
+        id: 'm-macbook',
+        teamId: 't1',
+        name: 'MacBook',
+        kind: 'remote',
+        online: true,
+        lastSeenAt: Date.now(),
+        latestCliVersion: '1.0.0',
+        enabledRuntimes: ['pi'],
+        capabilities: { mcpServers: [], skills: [], osPlatform: 'darwin' },
+      },
+      {
+        id: 'm-mini',
+        teamId: 't1',
+        name: '办公室 Mac mini',
+        kind: 'remote',
+        online: false,
+        lastSeenAt: Date.now() - 30 * 60_000,
+        latestCliVersion: '1.0.0',
+        enabledRuntimes: ['pi'],
+        capabilities: { mcpServers: [], skills: [], osPlatform: 'darwin' },
+      },
+    ];
+    await mockLive(
+      page,
+      {
+        threads: [THREAD],
+        messages: [],
+        todos: [TASK],
+        tasks: [taskEntry({ section: 'working', title: TASK.title })],
+        machines,
+      },
+      (path, route, json) => {
+        if (path === `/api/projects/${PROJECT.id}/todos` && route.request().method() === 'POST') {
+          return delay(450).then(() => json({ error: 'project is read only' }, 409));
+        }
+        return undefined;
+      },
+    );
+    await page.goto('/app?pane=tasks');
+    const panel = page.getByRole('complementary', { name: '任务' });
+    await expect(panel).toBeVisible();
+    await panel.getByTestId('tasks-new').click();
+    const chip = panel.getByTestId('tasks-add-machine');
+    const input = panel.getByTestId('tasks-add-input');
+    const below = panel.getByTestId('tasks-section').first();
+    await expect(chip).toBeVisible();
+    await expect(below).toBeVisible();
+
+    await expectNoLayoutShift(page, below, 'new-task machine chip open + pick offline', async () => {
+      await chip.click();
+      await page.getByRole('option', { name: /办公室 Mac mini/ }).click();
+      await expect(chip.locator('[data-slot="select-value"]')).toHaveText(/办公室 Mac mini/);
+    });
+
+    await expectNoLayoutShift(page, below, 'new-task offline machine slow submit + 409 error', async () => {
+      await input.fill('在离线电脑上整理发布脚本');
+      await input.press('Enter');
+      await expect(page.locator('[data-sonner-toast]').filter({ hasText: '任务没有添加上，请重试。' })).toBeVisible();
+    });
+
+    await expectNoLayoutShift(page, below, 'new-task machine chip return to automatic', async () => {
+      await chip.click();
+      await page.getByRole('option', { name: /自动/ }).click();
+      await expect(chip.locator('[data-slot="select-value"]')).toHaveText('自动');
+    });
+  });
+
   test('tasks panel: delayed PR query settling with no PRs does not shift sibling rows', async ({
     page,
   }) => {

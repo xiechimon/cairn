@@ -12,6 +12,7 @@ import {
   parseGithubIssueSourceRef,
   quoteSegments,
   RequestQuoteError,
+  type RouteOverride,
   renderTaskText,
   segmentKey,
   type TaskRequest,
@@ -497,6 +498,15 @@ export function createRequestTodo(
     ...(params.briefing !== undefined ? { briefing: params.briefing } : {}),
     ...(model !== undefined ? { model } : {}),
   };
+  const routeOverride: RouteOverride | undefined =
+    params.machine !== undefined || params.platform !== undefined
+      ? {
+          ...(params.machine !== undefined ? { machineId: params.machine } : {}),
+          ...(params.platform !== undefined
+            ? { requiredCapabilities: { os: params.platform } }
+            : {}),
+        }
+      : undefined;
   const record = createAutonomousTodo(deps, {
     teamId: ctx.teamId,
     projectId: params.projectId,
@@ -527,6 +537,7 @@ export function createRequestTodo(
       : {}),
     ...(params.priority === 'first' ? { orderFirst: true } : {}),
     ...(params.output !== undefined ? { output: params.output } : {}),
+    ...(routeOverride !== undefined ? { routeOverride } : {}),
   });
   for (const sibling of siblings) {
     if (sibling.request === null) continue;

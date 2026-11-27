@@ -7031,6 +7031,9 @@ exports[`body/envelope schema snapshots > createTodoBody > createTodoBody.json 1
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "machineId": {
+      "type": "string",
+    },
     "output": {
       "enum": [
         "code",

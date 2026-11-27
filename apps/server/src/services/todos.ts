@@ -22,11 +22,13 @@ import {
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
   isBackendRuntimeId,
+  isRegisteredMachine,
   missingSetupCommand,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
   renderTaskText,
+  runnerOsOf,
   systemRowOf,
   WORKSPACE_HOOK_ROW_KIND,
 } from '@cairn/shared';
@@ -63,7 +65,7 @@ import {
   todoTransition,
   tokenUsage,
 } from '../db/schema.js';
-import { HttpError, notFound } from '../lib/errors.js';
+import { conflict, HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubCreateIssue, githubListIssues, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
@@ -644,6 +646,36 @@ export function createTodo(
   );
 }
 
+function assertCreatableRouteOverride(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  routeOverride: RouteOverride | undefined,
+): void {
+  const overrideMachineId = routeOverride?.machineId;
+  if (overrideMachineId === undefined) return;
+  const owned = db
+    .select({
+      id: machine.id,
+      name: machine.name,
+      kind: machine.kind,
+      online: machine.online,
+      lastSeenAt: machine.lastSeenAt,
+      capabilities: machine.capabilities,
+    })
+    .from(machine)
+    .where(
+      and(eq(machine.id, overrideMachineId), eq(machine.teamId, teamId), isNull(machine.retiredAt)),
+    )
+    .get();
+  if (owned === undefined || !isRegisteredMachine(owned)) {
+    throw notFound(`machine ${overrideMachineId}`);
+  }
+  const requiredOs = routeOverride?.requiredCapabilities?.os;
+  if (requiredOs !== undefined && runnerOsOf(owned.capabilities) !== requiredOs) {
+    throw conflict(`machine ${owned.name} does not match platform ${requiredOs}`);
+  }
+}
+
 export function createAutonomousTodo(
   deps: TodoDeps,
   input: {
@@ -665,11 +697,13 @@ export function createAutonomousTodo(
     request?: TaskRequest;
     blockedBy?: string[];
     orderFirst?: boolean;
+    routeOverride?: RouteOverride;
   },
 ): TodoRecord {
   const { db, hub } = deps;
   const githubLabelIds = [...new Set(input.githubLabelIds ?? [])];
   assertGithubLabelsInProject(db, input.projectId, githubLabelIds);
+  assertCreatableRouteOverride(db, input.teamId, input.routeOverride);
   const seqRow = db
     .select({ n: max(todo.seqNum) })
     .from(todo)
@@ -735,6 +769,7 @@ export function createAutonomousTodo(
           : {}),
         ...(input.request !== undefined ? { request: input.request } : {}),
         ...(blockedBy !== undefined ? { blockedBy } : {}),
+        ...(input.routeOverride !== undefined ? { routeOverride: input.routeOverride } : {}),
       })
       .run();
     for (const labelId of githubLabelIds) {

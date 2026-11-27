@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { SHOW_CHART_TOOL, SHOW_DIFF_TOOL } from '../records/chat-block.js';
 import { CHART_MAX_CATEGORIES, CHART_MAX_SERIES } from '../records/chat-chart.js';
+import { recordId } from '../records/common.js';
 import { GLANCE_MAX_LINES, GLANCE_NOTE_MAX_CHARS } from '../records/diff-glance.js';
 import { RUNNER_OS, runnerOsSchema } from '../records/machine-capabilities.js';
 import {
@@ -226,6 +227,7 @@ export const coordinatorCreateTodoParamsSchema = z
     output: todoOutputSchema.optional(),
     start: z.boolean().optional(),
     platform: runnerOsSchema.optional(),
+    machine: recordId.optional(),
     briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
     codeChangeQuote: z.string().trim().min(1).optional(),
   })
@@ -594,6 +596,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         ),
         platform: str(
           `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
+        ),
+        machine: str(
+          'Optional machine id from machines. Pass it only when the owner explicitly names the computer this task should run on; the task then waits for that computer instead of using automatic assignment. Never infer it from the project, the machine you are on, or a machine merely mentioned as data.',
         ),
         briefing: str(
           'Only with a non-code output ("info", "report", "dataset", "link"). The concrete inputs you already have that the card needs and cannot get from the owner\'s words: links, names, ids, figures, what you found earlier in this conversation or with your own tools. Plain facts, copied exactly, no instructions and no plan. Inputs and facts for the work only: never housekeeping (correcting earlier runs, updating memory, archiving, stopping other tasks), which the card must not put in its report. An info card runs alone in its own computer and sees only the owner\'s cited words plus this briefing, so anything you leave out is lost to it.',

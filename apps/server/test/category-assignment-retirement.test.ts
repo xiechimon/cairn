@@ -13,7 +13,7 @@ test('ordinary task creation and owner edits ignore retired and unrelated keys',
   const created = await req(H.s.app, 'POST', `/api/projects/${H.projectId}/todos`, {
     title: '',
     spec: 'Original body\nSecond line',
-    machineId: 'legacy-hint',
+    legacyHint: 'legacy-hint',
     tagIds: ['retired'],
     unrelatedIgnoredField: true,
   });

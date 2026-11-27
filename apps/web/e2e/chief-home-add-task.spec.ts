@@ -24,6 +24,30 @@ function world(over: Partial<MockState> = {}): World {
   };
 }
 
+const MACHINE_MACBOOK = {
+  id: 'm-macbook',
+  teamId: 't1',
+  name: 'MacBook',
+  kind: 'remote',
+  online: true,
+  lastSeenAt: Date.now(),
+  latestCliVersion: '1.0.0',
+  enabledRuntimes: ['pi'],
+  capabilities: { mcpServers: [], skills: [], osPlatform: 'darwin' },
+};
+const MACHINE_MINI_OFFLINE = {
+  id: 'm-mini',
+  teamId: 't1',
+  name: '办公室 Mac mini',
+  kind: 'remote',
+  online: false,
+  lastSeenAt: Date.now() - 30 * 60_000,
+  latestCliVersion: '1.0.0',
+  enabledRuntimes: ['pi'],
+  capabilities: { mcpServers: [], skills: [], osPlatform: 'darwin' },
+};
+const TWO_MACHINES = [MACHINE_MACBOOK, MACHINE_MINI_OFFLINE];
+
 async function open(page: Page, w: World) {
   const sent = await mockLive(page, w.state, (path: string, route: Route, json: Json) => {
     const request = route.request();
@@ -57,6 +81,8 @@ const plus = (page: Page) => panel(page).getByTestId('tasks-new');
 const field = (page: Page) => panel(page).getByTestId('tasks-add-field');
 const input = (page: Page) => panel(page).getByTestId('tasks-add-input');
 const submit = (page: Page) => panel(page).getByTestId('tasks-add-submit');
+const machineChip = (page: Page) => panel(page).getByTestId('tasks-add-machine');
+const machineChipValue = (page: Page) => machineChip(page).locator('[data-slot="select-value"]');
 const upNext = (page: Page) => panel(page).locator('[data-section="up_next"] [data-slot="task-row-title"]');
 
 test('the plus button opens the add field under the tabs, with the reference metrics', async ({ page }) => {
@@ -149,6 +175,58 @@ for (const theme of ['light', 'dark'] as const) {
     await evidencePanelShot(page, `tasks-add-saved-${theme}.png`, panel(page));
   });
 }
+
+test('the machine chip sends the chosen computer with the task and returns to automatic', async ({
+  page,
+}) => {
+  const w = world({ machines: TWO_MACHINES });
+  await open(page, w);
+  await plus(page).click();
+  await expect(machineChipValue(page)).toHaveText('自动');
+  await machineChip(page).click();
+  await page.getByRole('option', { name: /办公室 Mac mini/ }).click();
+  await expect(machineChipValue(page)).toHaveText(/办公室 Mac mini/);
+  await input(page).fill('整理发布脚本');
+  await input(page).press('Enter');
+  await expect(upNext(page)).toHaveText(['整理发布脚本']);
+  expect(w.posts).toEqual([
+    {
+      path: `/api/projects/${PROJECT.id}/todos`,
+      body: { title: '', spec: '整理发布脚本', machineId: 'm-mini' },
+    },
+  ]);
+  await expect(machineChipValue(page)).toHaveText('自动');
+});
+
+test('C34: opening the machine chip and choosing an offline computer does not move the task list', async ({
+  page,
+}) => {
+  const w = world({ machines: TWO_MACHINES });
+  await open(page, w);
+  await plus(page).click();
+  const firstRow = panel(page)
+    .locator('[data-section="working"] [data-slot="task-row-title"]')
+    .first();
+  const rowBox = async () => {
+    const box = await firstRow.boundingBox();
+    expect(box).not.toBeNull();
+    return box!;
+  };
+  const before = await rowBox();
+  await machineChip(page).click();
+  expect(await rowBox()).toEqual(before);
+  await page.getByRole('option', { name: /办公室 Mac mini/ }).click();
+  await expect(machineChipValue(page)).toHaveText(/办公室 Mac mini/);
+  await page.mouse.move(8, 8);
+  expect(await rowBox()).toEqual(before);
+});
+
+test('the machine chip stays hidden when only one computer is registered', async ({ page }) => {
+  const w = world();
+  await open(page, w);
+  await plus(page).click();
+  await expect(machineChip(page)).toHaveCount(0);
+});
 
 test('an empty or blank field submits nothing', async ({ page }) => {
   const w = world();
