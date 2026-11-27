@@ -593,9 +593,118 @@ test('evaluateMaintenance enforces stale panel ignore, undated/incomplete GSC, t
       cliReport.pageActions.find((p) => p.url === '/guides/a/')?.action,
       'REFRESH_VERIFICATION',
     );
+
+    execFileSync(
+      process.execPath,
+      [
+        'scripts/geo/evaluate-maintenance.mjs',
+        '--questions',
+        qPath,
+        '--gsc-json',
+        gscPath,
+        '--manual-action',
+        '--state-file',
+        statePath,
+      ],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+    writeFileSync(
+      qPath,
+      `${[
+        JSON.stringify({
+          id: 'q-1',
+          slug: 'a',
+          locale: 'en',
+          cluster: 'c1',
+          publishedAt: '2026-10-01',
+        }),
+        JSON.stringify({
+          id: 'q-2',
+          slug: 'b',
+          locale: 'en',
+          cluster: 'c1',
+          publishedAt: '2026-10-01',
+        }),
+        JSON.stringify({
+          id: 'q-3',
+          slug: 'c',
+          locale: 'en',
+          cluster: 'c1',
+          publishedAt: '2026-11-27',
+        }),
+      ].join('\n')}\n`,
+    );
+    execFileSync(
+      process.execPath,
+      ['scripts/geo/evaluate-maintenance.mjs', '--questions', qPath, '--state-file', statePath],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+    const frozenAfterAppend = JSON.parse(readFileSync(statePath, 'utf8'));
+    assert.equal(frozenAfterAppend.growthBlocked, true);
+    assert.deepEqual(frozenAfterAppend.frozenQuestionIds, ['q-1', 'q-2']);
   } finally {
     releaseTestTempDir(dir);
   }
+
+  const halfIndexedHalfUnknown = evaluateMaintenance({
+    now,
+    gscExportDate: '2026-11-27',
+    pages: Array.from({ length: 10 }, (_, idx) => ({
+      url: `/guides/page-${idx + 1}/`,
+      locale: 'en',
+      cluster: 'c1',
+      publishedAt: '2026-10-01',
+      state: idx < 5 ? 'indexed' : 'unknown',
+    })),
+  });
+  assert.equal(halfIndexedHalfUnknown.growthDecision, 'HOLD');
+  assert.equal(halfIndexedHalfUnknown.verifiedOverallIndexedRatio, 0.5);
+
+  const holdNoExpand = evaluateMaintenance({
+    now,
+    gscExportDate: '2026-11-27',
+    pages: [
+      {
+        url: '/guides/h1/',
+        locale: 'en',
+        cluster: 'c1',
+        publishedAt: '2026-10-01',
+        state: 'indexed',
+      },
+      {
+        url: '/guides/h2/',
+        locale: 'en',
+        cluster: 'c1',
+        publishedAt: '2026-10-01',
+        state: 'indexed',
+      },
+      {
+        url: '/guides/h3/',
+        locale: 'en',
+        cluster: 'c1',
+        publishedAt: '2026-10-01',
+        state: 'indexed',
+      },
+      {
+        url: '/guides/h4/',
+        locale: 'en',
+        cluster: 'c1',
+        publishedAt: '2026-10-01',
+        state: 'crawled_not_indexed',
+      },
+    ],
+    gscRows: [{ url: '/guides/h1/', impressions: 100, clicks: 40, position: 2 }],
+    panelRows: [
+      {
+        engine: 'perplexity',
+        status: 'checked',
+        citedCairn: true,
+        citedUrls: ['https://cairn.xmon.me/guides/h1/'],
+      },
+    ],
+  });
+  assert.equal(holdNoExpand.growthDecision, 'HOLD');
+  assert.equal(holdNoExpand.pageActions.find((p) => p.url === '/guides/h1/')?.action, 'KEEP');
 
   const allNewUnknown = evaluateMaintenance({
     now,

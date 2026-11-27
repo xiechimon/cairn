@@ -159,6 +159,14 @@ export function evaluateMaintenance({
   const newIndexedCount = newBatchPages.filter((p) => p.state === 'indexed').length;
   const newIndexedRatio =
     newBatchPages.length === 0 ? overallIndexedRatio : newIndexedCount / newBatchPages.length;
+  const verifiedOverallIndexedRatio =
+    agedActivePages.length > 0
+      ? agedActivePages.filter((p) => p.state === 'indexed').length / agedActivePages.length
+      : overallIndexedRatio;
+  const verifiedNewIndexedRatio =
+    agedNewBatchPages.length > 0
+      ? agedNewBatchPages.filter((p) => p.state === 'indexed').length / agedNewBatchPages.length
+      : newIndexedRatio;
 
   let growthDecision = 'AWAITING_GSC_DATA';
   if (manualAction) {
@@ -172,8 +180,16 @@ export function evaluateMaintenance({
       (agedNewBatchPages.length > 0 && newBatchCoverageRatio < 0.5)
     ) {
       growthDecision = 'INCOMPLETE_GSC_DATA';
-    } else if (newIndexedRatio >= 0.8 && overallIndexedRatio >= 0.8) growthDecision = 'GROW';
-    else growthDecision = 'HOLD';
+    } else if (
+      newIndexedRatio >= 0.8 &&
+      overallIndexedRatio >= 0.8 &&
+      verifiedNewIndexedRatio >= 0.8 &&
+      verifiedOverallIndexedRatio >= 0.8
+    ) {
+      growthDecision = 'GROW';
+    } else {
+      growthDecision = 'HOLD';
+    }
   }
 
   if (
@@ -275,7 +291,7 @@ export function evaluateMaintenance({
         reason: 'growth frozen (FREEZE_AND_AUDIT); expansion suppressed until audit passes',
       };
     }
-    if (citedUrls.has(page.url) || (gsc && gsc.clicks >= 20)) {
+    if (growthDecision === 'GROW' && (citedUrls.has(page.url) || (gsc && gsc.clicks >= 20))) {
       return { url: page.url, action: 'EXPAND', reason: 'cited or top-performing clicks' };
     }
     const gap = competitorGapPrompts.find((g) => g.targetPath === page.url);
@@ -297,8 +313,10 @@ export function evaluateMaintenance({
     gscCoverageRatio,
     indexedCount: indexedAll,
     overallIndexedRatio,
+    verifiedOverallIndexedRatio,
     newBatchCount: newBatchPages.length,
     newIndexedRatio,
+    verifiedNewIndexedRatio,
     panelStale,
     gscStale,
     growthDecision,
@@ -394,14 +412,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     mkdirSync(dirname(outPath), { recursive: true });
     const tmpPath = `${outPath}.tmp.${process.pid}`;
     const frozenQuestionIds = report.growthBlocked
-      ? [
-          ...new Set([
-            ...(Array.isArray(previousState?.frozenQuestionIds)
-              ? previousState.frozenQuestionIds
-              : []),
-            ...questions.map((q) => q.id),
-          ]),
-        ]
+      ? previousState?.growthBlocked && Array.isArray(previousState.frozenQuestionIds)
+        ? [...previousState.frozenQuestionIds]
+        : questions.map((q) => q.id)
       : [];
     writeFileSync(
       tmpPath,

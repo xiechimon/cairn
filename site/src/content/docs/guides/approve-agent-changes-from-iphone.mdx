@@ -24,7 +24,7 @@ You can monitor running tasks and approve merges from your iPhone either by open
 
 Tailscale Serve gives your iPhone encrypted HTTPS access to `https://<machine>.<tailnet>.ts.net/app` without opening firewall ports:
 
-1. Enable MagicDNS and HTTPS certificates in the Tailscale admin console, then run `tailscale serve --bg http://127.0.0.1:8787` on your server host (never use Funnel, which exposes the service publicly).
+1. Check the local loopback port shown in the Cairn Mac desktop menu bar menu (the Mac app picks a free loopback port dynamically, while standalone `npx @xiechimon/cairn` defaults to `8787`), enable MagicDNS and HTTPS certificates in the Tailscale admin console, and run `tailscale serve --bg http://127.0.0.1:<port>` on your Mac or server host (never use Funnel, which exposes the service publicly).
 2. Generate a single-use pairing code in Cairn under **Settings -> Remote access**.
 3. Open the Serve HTTPS URL on your iPhone, enter the pairing code, and use Safari's **Add to Home Screen** if you want iOS Web Push alerts when a decision needs your approval.
 

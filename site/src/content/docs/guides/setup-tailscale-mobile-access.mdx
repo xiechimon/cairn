@@ -15,7 +15,7 @@ head:
   - tag: script
     attrs:
       type: application/ld+json
-    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Set Up Tailscale Serve for Cairn Mobile Access","step":[{"@type":"HowToStep","name":"Enable MagicDNS and HTTPS","text":"Enable MagicDNS and HTTPS certificates in the Tailscale admin console and confirm both Mac and phone are on the same tailnet."},{"@type":"HowToStep","name":"Expose loopback via Tailscale Serve","text":"Run tailscale serve --bg http://127.0.0.1:8787 (or your server port) on the Cairn host, avoiding Funnel."},{"@type":"HowToStep","name":"Pair your phone","text":"Create a one-time pairing code under Settings -> Remote access and enter it on https://<machine>.<tailnet>.ts.net/app."}]}'
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"Set Up Tailscale Serve for Cairn Mobile Access","step":[{"@type":"HowToStep","name":"Enable MagicDNS and HTTPS","text":"Enable MagicDNS and HTTPS certificates in the Tailscale admin console and confirm both Mac and phone are on the same tailnet."},{"@type":"HowToStep","name":"Expose loopback via Tailscale Serve","text":"Check the Mac desktop menu bar port (or 8787 for npx) and run tailscale serve --bg http://127.0.0.1:<port>, avoiding Funnel."},{"@type":"HowToStep","name":"Pair your phone","text":"Create a one-time pairing code under Settings -> Remote access and enter it on https://<machine>.<tailnet>.ts.net/app."}]}'
 ---
 
 Tailscale Serve lets you open your Mac or home-server Cairn instance from your iPhone or Android device over private HTTPS without exposing any port to the public internet. Tailscale handles encrypted tailnet transport while Cairn still enforces single-use device pairing codes and `HttpOnly` session cookies.
@@ -24,15 +24,15 @@ Tailscale Serve lets you open your Mac or home-server Cairn instance from your i
 
 1. Install and sign in to Tailscale on both your Cairn host computer and your phone.
 2. In the Tailscale admin console, enable **MagicDNS** and **HTTPS certificates** under **DNS**.
-3. Confirm your Cairn server is running on loopback (port `8787` for `npx @xiechimon/cairn`, or check the server address shown in the Cairn Mac app menu bar icon).
+3. Check the running loopback port (the Cairn Mac desktop app chooses a free port displayed in its menu bar menu; standalone `npx @xiechimon/cairn` defaults to `8787`).
 
 ## Step 2: Start Tailscale Serve (never Funnel)
 
-On the host running Cairn:
+On the host running Cairn (replace `<port>` with the menu bar port on Mac desktop or `8787` on `npx`):
 
 ```sh
 tailscale status
-tailscale serve --bg http://127.0.0.1:8787
+tailscale serve --bg http://127.0.0.1:<port>
 tailscale serve status
 ```
 

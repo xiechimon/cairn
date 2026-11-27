@@ -15,7 +15,7 @@ head:
   - tag: script
     attrs:
       type: application/ld+json
-    content: '{"@context":"https://schema.org","@type":"HowTo","name":"用手机通过 Tailscale 访问 Mac 上的 Cairn","step":[{"@type":"HowToStep","name":"开启 MagicDNS 与 HTTPS 证书","text":"在 Tailscale 控制台开启 MagicDNS 和 HTTPS certificates，并确保 Mac 与手机加入同一 tailnet。"},{"@type":"HowToStep","name":"启动 Tailscale Serve","text":"在运行 Cairn 的 Mac 上执行 tailscale serve --bg http://127.0.0.1:8787（桌面端请使用菜单栏显示的服务端口）。"},{"@type":"HowToStep","name":"手机端一次性配对登录","text":"在 Cairn 设置 -> 远程访问生成一次性配对码，在手机浏览器打开 HTTPS 地址完成配对。"}]}'
+    content: '{"@context":"https://schema.org","@type":"HowTo","name":"用手机通过 Tailscale 访问 Mac 上的 Cairn","step":[{"@type":"HowToStep","name":"开启 MagicDNS 与 HTTPS 证书","text":"在 Tailscale 控制台开启 MagicDNS 和 HTTPS certificates，并确保 Mac 与手机加入同一 tailnet。"},{"@type":"HowToStep","name":"启动 Tailscale Serve","text":"查看 Mac 桌面端菜单栏端口（独立 npx 服务端默认为 8787），执行 tailscale serve --bg http://127.0.0.1:<端口>，勿开 Funnel。"},{"@type":"HowToStep","name":"手机端一次性配对登录","text":"在 Cairn 设置 -> 远程访问生成一次性配对码，在手机浏览器打开 HTTPS 地址完成配对。"}]}'
 ---
 
 出门在外想用手机查看 Mac 上正在跑的编码任务并审批合并，只需在服务端前挂一层 **Tailscale Serve**。全程不暴露任何公网端口、不用配置路由器端口映射，Tailscale 负责私网 HTTPS 加密传输，Cairn 仍会校验一次性设备配对码与 `HttpOnly` 会话 Cookie。
@@ -24,19 +24,19 @@ head:
 
 1. 在电脑和手机上安装并登录同一个 Tailscale 账号。
 2. 登录 Tailscale 管理后台，在 **DNS** 页面开启 **MagicDNS** 与 **HTTPS certificates**。
-3. 查看当前 Cairn 服务端口（`npx @xiechimon/cairn` 默认是 `8787`；Mac 桌面应用会随机选空闲回环端口，可在菜单栏图标里查看）。
+3. 查看当前 Cairn 服务端口（Mac 桌面应用会随机选空闲回环端口并显示在菜单栏图标里；独立运行 `npx @xiechimon/cairn` 默认是 `8787`）。
 
 ## 第二步：配置 Tailscale Serve（不要开 Funnel）
 
-在运行 Cairn 的 Mac 上执行：
+在运行 Cairn 的 Mac 上执行（把 `<port>` 替换为菜单栏显示的实际端口，或 `npx` 默认的 `8787`）：
 
 ```sh
 tailscale status
-tailscale serve --bg http://127.0.0.1:8787
+tailscale serve --bg http://127.0.0.1:<port>
 tailscale serve status
 ```
 
-如果是 Mac 桌面应用，把命令里的 `8787` 换成菜单栏显示的服务端口即可。切勿使用 `tailscale funnel`（它会把地址公开到公网）。
+不要直接写死 `:8787` 而忽略菜单栏端口。切勿使用 `tailscale funnel`（它会把地址公开到公网）。
 
 ## 第三步：在手机配对并开启 Web 推送
 
