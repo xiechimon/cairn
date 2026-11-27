@@ -650,7 +650,7 @@ test('the whole run serializes on one workflow-level group so every tick judges 
   for (const [name, job] of Object.entries(parsed.jobs)) {
     assert.equal(job.concurrency, undefined, `${name} has no job-level group`);
   }
-  for (const name of ['live-verify', 'package']) {
+  for (const name of ['live-verify', 'package-arm64', 'package-x64']) {
     assert.equal(
       parsed.jobs[name].if,
       "needs.decide.outputs.release == 'true'",
@@ -662,7 +662,17 @@ test('the whole run serializes on one workflow-level group so every tick judges 
 test('every job builds, verifies and publishes the resolved release commit', () => {
   assert.equal(parsed.jobs.decide.outputs.sha, `\${{ steps.decision.outputs.sha }}`);
   const pinned = `\${{ needs.decide.outputs.sha }}`;
-  for (const name of ['live-verify', 'package', 'publish']) {
+  for (const name of [
+    'live-verify',
+    'package-arm64',
+    'package-x64',
+    'package-win',
+    'package-linux',
+    'verify-arm64-smoke',
+    'verify-arm64-journeys',
+    'verify-arm64-post-install',
+    'publish',
+  ]) {
     const checkouts = (parsed.jobs[name].steps ?? []).filter(
       (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'),
     );

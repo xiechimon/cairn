@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { gunzipSync } from 'node:zlib';
 import { parse } from 'yaml';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
@@ -1168,7 +1178,7 @@ test('the version is decided once in decide and stamped into both builds', () =>
   );
   const jobText = (name) =>
     new RegExp(`^ {2}${name}:\\n([\\s\\S]*?)(?=^ {2}\\w|$(?![\\s\\S]))`, 'm').exec(text)[1];
-  for (const name of ['package', 'publish']) {
+  for (const name of ['package-arm64', 'package-x64', 'publish']) {
     assert.equal(
       workflow.jobs[name].env?.VERSION,
       `\${{ needs.decide.outputs.version }}`,
@@ -1180,10 +1190,12 @@ test('the version is decided once in decide and stamped into both builds', () =>
       `${name} never reads tags after decide`,
     );
   }
-  const choose = workflow.jobs.package.steps.findIndex(
-    (step) => step.name === 'Choose the version one above the highest desktop tag',
-  );
-  assert.equal(choose, -1, 'no per-arch version choice remains');
+  for (const jobName of ['package-arm64', 'package-x64']) {
+    const choose = workflow.jobs[jobName].steps.findIndex(
+      (step) => step.name === 'Choose the version one above the highest desktop tag',
+    );
+    assert.equal(choose, -1, `no per-arch version choice remains in ${jobName}`);
+  }
 });
 
 test('publish refuses archives that disagree with the decided version', () => {
@@ -1222,16 +1234,30 @@ test('the next desktop version is one above the highest desktop-v tag', async ()
   assert.equal(calls[0], 'repos/o/r/git/matching-refs/tags/desktop-v');
 });
 
-test('both architectures are packaged in parallel and published only after both succeed', () => {
+test('both architectures are packaged in parallel and arm64 verify starts without waiting for x64', () => {
   const manifest = readFileSync(
     new URL('../apps/desktop/scripts/release-manifest.mjs', import.meta.url),
     'utf8',
   );
-  assert.deepEqual(workflow.jobs.package.strategy.matrix.arch, ['arm64', 'x64']);
+  assert.equal(workflow.jobs.package, undefined, 'matrix package job is split by arch');
   assert.match(manifest, /ARCHS = \['arm64', 'x64'\]/);
+  for (const [arch, jobName] of [
+    ['arm64', 'package-arm64'],
+    ['x64', 'package-x64'],
+  ]) {
+    const job = workflow.jobs[jobName];
+    assert.ok(job, `${jobName} exists`);
+    assert.deepEqual(job.needs, ['decide']);
+    assert.equal(job.strategy, undefined, `${jobName} has no shared fail-fast matrix`);
+    assert.equal(job.environment, 'desktop-release');
+    assert.equal(job.permissions, undefined);
+    assert.equal(job.env?.ARCH, arch);
+    assert.equal(job.env?.VERSION, `\${{ needs.decide.outputs.version }}`);
+  }
   assert.deepEqual(workflow.jobs.publish.needs, [
     'decide',
-    'package',
+    'package-arm64',
+    'package-x64',
     'package-win',
     'package-linux',
     'live-verify',
@@ -1239,7 +1265,7 @@ test('both architectures are packaged in parallel and published only after both 
     'verify-arm64-journeys',
     'verify-arm64-post-install',
   ]);
-  for (const jobName of ['package', 'package-win', 'package-linux']) {
+  for (const jobName of ['package-win', 'package-linux']) {
     assert.deepEqual(workflow.jobs[jobName].needs, ['decide']);
   }
   for (const jobName of [
@@ -1247,23 +1273,37 @@ test('both architectures are packaged in parallel and published only after both 
     'verify-arm64-journeys',
     'verify-arm64-post-install',
   ]) {
-    assert.deepEqual(workflow.jobs[jobName].needs, ['decide', 'package']);
+    assert.deepEqual(workflow.jobs[jobName].needs, ['decide', 'package-arm64']);
     assert.equal(workflow.jobs[jobName].environment, undefined);
     assert.equal(workflow.jobs[jobName].permissions, undefined);
     assert.equal(workflow.jobs[jobName].env?.VERSION, `\${{ needs.decide.outputs.version }}`);
+    const download = workflow.jobs[jobName].steps.find((step) =>
+      String(step.uses ?? '').startsWith('actions/download-artifact@'),
+    );
+    assert.ok(download, `${jobName} downloads the arm64 zip artifact`);
+    assert.equal(download.with?.name, 'desktop-arm64-zip');
   }
+  const publishDownload = workflow.jobs.publish.steps.find((step) =>
+    String(step.uses ?? '').startsWith('actions/download-artifact@'),
+  );
+  assert.equal(publishDownload?.with?.pattern, 'desktop-*');
+  assert.equal(publishDownload?.with?.['merge-multiple'], true);
   assert.deepEqual(workflow.jobs['verify-arm64-journeys'].strategy.matrix.mode, [
     'local-server',
     'remote-server',
   ]);
   assert.equal(workflow.jobs.publish.permissions.contents, 'write');
-  assert.equal(workflow.jobs.package.permissions, undefined);
   assert.equal(workflow.jobs['package-linux']['runs-on'], 'ubuntu-latest');
   assert.equal(workflow.jobs['package-linux'].permissions, undefined);
   const linuxPackageStep = workflow.jobs['package-linux'].steps.find(
     (step) => step.name === 'Package the Linux x64 archive',
   );
+  assert.match(linuxPackageStep.run, /set -o pipefail/);
+  assert.match(linuxPackageStep.run, /electron-builder --linux dir --x64/);
   assert.match(linuxPackageStep.run, /extraMetadata\.version="\$VERSION"/);
+  assert.match(linuxPackageStep.run, /command -v pigz/);
+  assert.match(linuxPackageStep.run, /--numeric-owner --owner=0 --group=0/);
+  assert.match(linuxPackageStep.run, /Cairn-\$VERSION-linux-x64/);
   const linuxUpload = workflow.jobs['package-linux'].steps.find(
     (step) => step.name === 'Keep the packaged Linux archive for the publish job',
   );
@@ -1300,12 +1340,278 @@ test('both architectures are packaged in parallel and published only after both 
 });
 
 test('the package upload overwrites so a rerun replaces only its own architecture', () => {
-  const upload = workflow.jobs.package.steps.find(
-    (entry) => entry.name === 'Keep the packaged files for the publish job',
+  const armZip = workflow.jobs['package-arm64'].steps.find(
+    (entry) => entry.name === 'Keep the arm64 zip for verification and publish',
   );
-  assert.ok(upload);
-  assert.equal(upload.with.name, `desktop-\${{ matrix.arch }}`);
-  assert.equal(upload.with.overwrite, true);
+  const armDmg = workflow.jobs['package-arm64'].steps.find(
+    (entry) => entry.name === 'Keep the arm64 dmg for the publish job',
+  );
+  const x64Upload = workflow.jobs['package-x64'].steps.find(
+    (entry) => entry.name === 'Keep the packaged x64 files for the publish job',
+  );
+  assert.ok(armZip);
+  assert.equal(armZip.with.name, 'desktop-arm64-zip');
+  assert.equal(armZip.with.overwrite, true);
+  assert.equal(armZip.with['if-no-files-found'], 'error');
+  assert.equal(armZip.with['retention-days'], 1);
+  assert.match(armZip.with.path, /mac-arm64\.zip/);
+  assert.ok(armDmg);
+  assert.equal(armDmg.with.name, 'desktop-arm64-dmg');
+  assert.equal(armDmg.with.overwrite, true);
+  assert.equal(armDmg.with['if-no-files-found'], 'error');
+  assert.equal(armDmg.with['retention-days'], 1);
+  assert.match(armDmg.with.path, /mac-arm64\.dmg/);
+  assert.ok(x64Upload);
+  assert.equal(x64Upload.with.name, 'desktop-x64');
+  assert.equal(x64Upload.with.overwrite, true);
+  assert.equal(x64Upload.with['if-no-files-found'], 'error');
+  assert.equal(x64Upload.with['retention-days'], 1);
+  assert.match(x64Upload.with.path, /mac-x64\.dmg/);
+  assert.match(x64Upload.with.path, /mac-x64\.zip/);
+});
+
+const assertPortableTarHeaders = (tgzPath) => {
+  const buf = gunzipSync(readFileSync(tgzPath));
+  let offset = 0;
+  let checked = 0;
+  while (offset + 512 <= buf.length) {
+    const hdr = buf.subarray(offset, offset + 512);
+    if (hdr.every((byte) => byte === 0)) break;
+    const name = hdr.subarray(0, 100).toString('ascii').replace(/\0.*$/, '');
+    const typeflag = String.fromCharCode(hdr[156]);
+    const sizeRaw = hdr.subarray(124, 136).toString('ascii').replace(/\0.*$/, '').trim();
+    const size = sizeRaw ? Number.parseInt(sizeRaw, 8) : 0;
+    if (typeflag === '0' || typeflag === '\0' || typeflag === '2' || typeflag === '5') {
+      const uid = Number.parseInt(
+        hdr.subarray(108, 116).toString('ascii').replace(/\0.*$/, '').trim(),
+        8,
+      );
+      const gid = Number.parseInt(
+        hdr.subarray(116, 124).toString('ascii').replace(/\0.*$/, '').trim(),
+        8,
+      );
+      const uname = hdr.subarray(265, 297).toString('ascii').replace(/\0.*$/, '');
+      const gname = hdr.subarray(297, 329).toString('ascii').replace(/\0.*$/, '');
+      assert.equal(uid, 0, `${name} tar header uid must be 0`);
+      assert.equal(gid, 0, `${name} tar header gid must be 0`);
+      assert.equal(uname, '', `${name} tar header uname must be empty`);
+      assert.equal(gname, '', `${name} tar header gname must be empty`);
+      checked += 1;
+    }
+    offset += 512 + Math.ceil(size / 512) * 512;
+  }
+  assert.ok(checked > 0, 'tar archive contained entries to check');
+};
+
+const setupLinuxArchiveFixture = (
+  prefix,
+  { withUnpacked = true, customTar = false, tarStatusFile = null } = {},
+) => {
+  const root = makeTestTempDir(prefix);
+  const bin = join(root, 'bin');
+  const releaseDir = join(root, 'release');
+  const extractDir = join(root, 'extracted');
+  mkdirSync(bin, { recursive: true });
+  mkdirSync(releaseDir, { recursive: true });
+  mkdirSync(extractDir, { recursive: true });
+  writeFileSync(join(root, 'build.mjs'), 'process.exit(0);\n');
+  writeFileSync(join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const tarBin = execFileSync('which', ['tar'], { encoding: 'utf8' }).trim();
+  const gzipBin = execFileSync('which', ['gzip'], { encoding: 'utf8' }).trim();
+  const rmBin = execFileSync('which', ['rm'], { encoding: 'utf8' }).trim();
+  const mvBin = execFileSync('which', ['mv'], { encoding: 'utf8' }).trim();
+  const isGnuTar = execFileSync(tarBin, ['--version'], { encoding: 'utf8' }).includes('GNU tar');
+  symlinkSync(process.execPath, join(bin, 'node'));
+  symlinkSync(rmBin, join(bin, 'rm'));
+  symlinkSync(mvBin, join(bin, 'mv'));
+  if (!customTar) {
+    if (isGnuTar && !tarStatusFile) {
+      symlinkSync(tarBin, join(bin, 'tar'));
+    } else {
+      const translate = isGnuTar
+        ? ''
+        : [
+            'seen_num=0; seen_own=0; seen_grp=0',
+            'for a in "$@"; do',
+            '  case "$a" in',
+            '    --numeric-owner) seen_num=1 ;;',
+            '    --owner=0) seen_own=1 ;;',
+            '    --group=0) seen_grp=1 ;;',
+            '  esac',
+            'done',
+            '[ "$seen_num" = 1 ] && [ "$seen_own" = 1 ] && [ "$seen_grp" = 1 ] || { echo "missing portable tar flags" >&2; exit 9; }',
+            'first=1',
+            'for a in "$@"; do',
+            '  if [ "$first" = 1 ]; then',
+            '    set -- --uid 0 --gid 0 --uname "" --gname ""',
+            '    first=0',
+            '  fi',
+            '  case "$a" in',
+            '    --numeric-owner|--owner=0|--group=0) ;;',
+            '    *) set -- "$@" "$a" ;;',
+            '  esac',
+            'done',
+          ].join('\n');
+      const runTar = tarStatusFile
+        ? `"${tarBin}" "$@"\nstatus=$?\nprintf '%s\\n' "$status" > "${tarStatusFile}"\nexit "$status"`
+        : `exec "${tarBin}" "$@"`;
+      writeFileSync(join(bin, 'tar'), `#!/bin/sh\n${translate}\n${runTar}\n`, { mode: 0o755 });
+    }
+  }
+  if (withUnpacked) {
+    const unpacked = join(releaseDir, 'linux-unpacked');
+    const resources = join(unpacked, 'resources', 'server');
+    mkdirSync(resources, { recursive: true });
+    writeFileSync(join(unpacked, 'cairn'), '#!/bin/sh\necho ok\n');
+    chmodSync(join(unpacked, 'cairn'), 0o755);
+    writeFileSync(join(resources, 'tsnet-sidecar-linux-amd64'), 'bin');
+    symlinkSync('tsnet-sidecar-linux-amd64', join(resources, 'sidecar-link'));
+  }
+  return { root, bin, releaseDir, extractDir, tarBin, gzipBin };
+};
+
+test('package-linux packs Cairn-$VERSION-linux-x64 with gzip fallback preserving permissions, symlinks, and portable root ownership', () => {
+  const step = workflow.jobs['package-linux'].steps.find(
+    (entry) => entry.name === 'Package the Linux x64 archive',
+  );
+  const fx = setupLinuxArchiveFixture('linux-tar-layout-');
+  try {
+    symlinkSync(fx.gzipBin, join(fx.bin, 'gzip'));
+    const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-e', '-c', step.run], {
+      cwd: fx.root,
+      encoding: 'utf8',
+      env: {
+        PATH: fx.bin,
+        VERSION: '0.1.999',
+      },
+    });
+    assert.equal(run.status, 0, run.error?.message || run.stderr || '');
+    const tgz = join(fx.releaseDir, 'Cairn-0.1.999-linux-x64.tar.gz');
+    assert.equal(existsSync(tgz), true);
+    assertPortableTarHeaders(tgz);
+    const listed = execFileSync(fx.tarBin, ['-tzf', tgz], { encoding: 'utf8' }).trim().split('\n');
+    assert.ok(listed.some((line) => line.startsWith('Cairn-0.1.999-linux-x64/')));
+    execFileSync(fx.tarBin, ['-xzf', tgz, '-C', fx.extractDir, '--strip-components=1']);
+    assert.equal(
+      lstatSync(join(fx.extractDir, 'resources', 'server', 'sidecar-link')).isSymbolicLink(),
+      true,
+    );
+    assert.equal(
+      readlinkSync(join(fx.extractDir, 'resources', 'server', 'sidecar-link')),
+      'tsnet-sidecar-linux-amd64',
+    );
+    assert.notEqual(lstatSync(join(fx.extractDir, 'cairn')).mode & 0o111, 0);
+  } finally {
+    releaseTestTempDir(fx.root);
+  }
+});
+
+test('package-linux fails the archive step when tar exits non-zero even if the compressor succeeds', () => {
+  const step = workflow.jobs['package-linux'].steps.find(
+    (entry) => entry.name === 'Package the Linux x64 archive',
+  );
+  const fx = setupLinuxArchiveFixture('linux-tar-pipefail-', { customTar: true });
+  try {
+    const catBin = execFileSync('which', ['cat'], { encoding: 'utf8' }).trim();
+    symlinkSync(catBin, join(fx.bin, 'cat'));
+    writeFileSync(join(fx.bin, 'tar'), '#!/bin/sh\nprintf "partial"\nexit 2\n', { mode: 0o755 });
+    writeFileSync(join(fx.bin, 'pigz'), '#!/bin/sh\ncat >/dev/null\nexit 0\n', { mode: 0o755 });
+    const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-e', '-c', step.run], {
+      cwd: fx.root,
+      encoding: 'utf8',
+      env: {
+        PATH: fx.bin,
+        VERSION: '0.1.999',
+      },
+    });
+    assert.equal(
+      run.status,
+      2,
+      run.error?.message || run.stderr || 'tar exit code 2 must fail the packaging step',
+    );
+    assert.match(step.run, /set -o pipefail/);
+  } finally {
+    releaseTestTempDir(fx.root);
+  }
+});
+
+test('package-linux uses pigz when present, enforces portable root headers, and fails on missing linux-unpacked or compressor errors', () => {
+  const step = workflow.jobs['package-linux'].steps.find(
+    (entry) => entry.name === 'Package the Linux x64 archive',
+  );
+
+  const pigzOk = setupLinuxArchiveFixture('linux-pigz-ok-');
+  try {
+    const staleDir = join(pigzOk.releaseDir, 'Cairn-0.1.999-linux-x64');
+    mkdirSync(staleDir, { recursive: true });
+    writeFileSync(join(staleDir, 'stale.txt'), 'old');
+    const marker = join(pigzOk.root, 'pigz-used');
+    writeFileSync(
+      join(pigzOk.bin, 'pigz'),
+      `#!/bin/sh\n: > "${marker}"\nexec "${pigzOk.gzipBin}" "$@"\n`,
+      { mode: 0o755 },
+    );
+    const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-e', '-c', step.run], {
+      cwd: pigzOk.root,
+      encoding: 'utf8',
+      env: { PATH: pigzOk.bin, VERSION: '0.1.999' },
+    });
+    assert.equal(run.status, 0, run.error?.message || run.stderr || '');
+    assert.equal(existsSync(marker), true);
+    const tgz = join(pigzOk.releaseDir, 'Cairn-0.1.999-linux-x64.tar.gz');
+    assertPortableTarHeaders(tgz);
+    const listed = execFileSync(pigzOk.tarBin, ['-tzf', tgz], { encoding: 'utf8' })
+      .trim()
+      .split('\n');
+    assert.equal(
+      listed.some((line) => line.includes('linux-unpacked')),
+      false,
+    );
+    execFileSync(pigzOk.tarBin, ['-xzf', tgz, '-C', pigzOk.extractDir, '--strip-components=1']);
+    assert.equal(existsSync(join(pigzOk.extractDir, 'stale.txt')), false);
+    assert.equal(
+      lstatSync(join(pigzOk.extractDir, 'resources', 'server', 'sidecar-link')).isSymbolicLink(),
+      true,
+    );
+    assert.notEqual(lstatSync(join(pigzOk.extractDir, 'cairn')).mode & 0o111, 0);
+  } finally {
+    releaseTestTempDir(pigzOk.root);
+  }
+
+  const tarStatus = join(makeTestTempDir('linux-tar-status-'), 'tar-status');
+  const pigzFail = setupLinuxArchiveFixture('linux-pigz-fail-', { tarStatusFile: tarStatus });
+  try {
+    const catBin = execFileSync('which', ['cat'], { encoding: 'utf8' }).trim();
+    symlinkSync(catBin, join(pigzFail.bin, 'cat'));
+    writeFileSync(join(pigzFail.bin, 'pigz'), '#!/bin/sh\ncat >/dev/null\nexit 3\n', {
+      mode: 0o755,
+    });
+    const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-e', '-c', step.run], {
+      cwd: pigzFail.root,
+      encoding: 'utf8',
+      env: { PATH: pigzFail.bin, VERSION: '0.1.999' },
+    });
+    assert.equal(readFileSync(tarStatus, 'utf8').trim(), '0');
+    assert.equal(run.status, 3, run.error?.message || run.stderr || '');
+  } finally {
+    releaseTestTempDir(pigzFail.root);
+    releaseTestTempDir(join(tarStatus, '..'));
+  }
+
+  const missingUnpacked = setupLinuxArchiveFixture('linux-missing-unpacked-', {
+    withUnpacked: false,
+  });
+  try {
+    const run = spawnSync('/bin/bash', ['--norc', '--noprofile', '-e', '-c', step.run], {
+      cwd: missingUnpacked.root,
+      encoding: 'utf8',
+      env: { PATH: missingUnpacked.bin, VERSION: '0.1.999' },
+    });
+    assert.notEqual(run.status, 0, 'missing release/linux-unpacked fails the packaging step');
+    assert.match(run.stderr, /linux-unpacked/);
+  } finally {
+    releaseTestTempDir(missingUnpacked.root);
+  }
 });
 
 test('publish never renames or re-versions the decided build', () => {
@@ -1319,12 +1625,16 @@ test('publish never renames or re-versions the decided build', () => {
     /\bmv\b|GITHUB_ENV/,
     'nothing in publish renames archives or overrides VERSION',
   );
-  const packageStep = workflow.jobs.package.steps.find((step) => step.name === 'Package the app');
-  assert.match(
-    packageStep.run,
-    /extraMetadata\.version="\$VERSION"/,
-    'the app inside the archives reports the decided version',
-  );
+  for (const jobName of ['package-arm64', 'package-x64']) {
+    const packageStep = workflow.jobs[jobName].steps.find(
+      (step) => step.name === 'Package the app',
+    );
+    assert.match(
+      packageStep.run,
+      /extraMetadata\.version="\$VERSION"/,
+      `the app inside ${jobName} archives reports the decided version`,
+    );
+  }
 });
 
 test('a leftover draft holding the decided name refuses the staging instead of a rename', (t) => {

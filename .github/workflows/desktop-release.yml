@@ -113,17 +113,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  package:
+  package-arm64:
     needs: [decide]
     if: needs.decide.outputs.release == 'true'
     runs-on: macos-latest
     environment: desktop-release
     timeout-minutes: 60
-    strategy:
-      matrix:
-        arch: [arm64, x64]
     env:
-      ARCH: ${{ matrix.arch }}
+      ARCH: arm64
       VERSION: ${{ needs.decide.outputs.version }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -141,7 +138,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Check that the host shell Seatbelt profile still reaches the network over TLS
-        if: matrix.arch == 'arm64'
         run: pnpm --filter @xiechimon/cairn-cli exec vitest run test/seatbelt-tls.test.ts
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -154,14 +150,14 @@ jobs:
         env:
           CGO_ENABLED: '0'
           GOOS: darwin
-          GOARCH: ${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }}
+          GOARCH: arm64
         run: |
           mkdir -p dist
           go build -trimpath -ldflags '-s -w' -o "dist/tsnet-sidecar-${GOOS}-${GOARCH}" .
 
       - name: Build the web UI, the server and the Runner
         env:
-          CAIRN_DESKTOP_ARCH: ${{ matrix.arch }}
+          CAIRN_DESKTOP_ARCH: arm64
         run: |
           pnpm --filter @cairn/web build
           pnpm --filter @xiechimon/cairn build
@@ -171,7 +167,7 @@ jobs:
           pnpm --filter @cairn/desktop stage-runner
           pnpm --filter @cairn/desktop stage-agent-desktop
           pnpm --filter @cairn/desktop stage-agent-browser
-          test -f "apps/desktop/server/tsnet-sidecar-darwin-${{ matrix.arch == 'x64' && 'amd64' || 'arm64' }}"
+          test -f "apps/desktop/server/tsnet-sidecar-darwin-arm64"
 
       - name: Import the release signing certificate
         env:
@@ -210,13 +206,129 @@ jobs:
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" \
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/server"
 
-      - name: Keep the packaged files for the publish job
+      - name: Keep the arm64 zip for verification and publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: desktop-${{ matrix.arch }}
+          name: desktop-arm64-zip
+          path: apps/desktop/release/Cairn-${{ env.VERSION }}-mac-arm64.zip
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+      - name: Keep the arm64 dmg for the publish job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-arm64-dmg
+          path: apps/desktop/release/Cairn-${{ env.VERSION }}-mac-arm64.dmg
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          keychain="$RUNNER_TEMP/cairn-signing.keychain-db"
+          if [ -e "$keychain" ]; then
+            security delete-keychain "$keychain"
+          fi
+
+  package-x64:
+    needs: [decide]
+    if: needs.decide.outputs.release == 'true'
+    runs-on: macos-latest
+    environment: desktop-release
+    timeout-minutes: 60
+    env:
+      ARCH: x64
+      VERSION: ${{ needs.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ needs.decide.outputs.sha }}
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: apps/tsnet-sidecar/go.mod
+          cache-dependency-path: apps/tsnet-sidecar/go.sum
+
+      - name: Build the tsnet sidecar for this arch
+        working-directory: apps/tsnet-sidecar
+        env:
+          CGO_ENABLED: '0'
+          GOOS: darwin
+          GOARCH: amd64
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags '-s -w' -o "dist/tsnet-sidecar-${GOOS}-${GOARCH}" .
+
+      - name: Build the web UI, the server and the Runner
+        env:
+          CAIRN_DESKTOP_ARCH: x64
+        run: |
+          pnpm --filter @cairn/web build
+          pnpm --filter @xiechimon/cairn build
+          pnpm --filter @xiechimon/cairn-cli build
+          node apps/server/scripts/stage-web.mjs
+          pnpm --filter @cairn/desktop stage-server
+          pnpm --filter @cairn/desktop stage-runner
+          pnpm --filter @cairn/desktop stage-agent-desktop
+          pnpm --filter @cairn/desktop stage-agent-browser
+          test -f "apps/desktop/server/tsnet-sidecar-darwin-amd64"
+
+      - name: Import the release signing certificate
+        env:
+          P12_BASE64: ${{ secrets.MAC_SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.MAC_SIGNING_P12_PASSWORD }}
+        run: |
+          umask 077
+          trap 'rm -f "$RUNNER_TEMP/signing.p12" "$RUNNER_TEMP/signing.password"' EXIT
+          printf '%s' "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          printf '%s' "$P12_PASSWORD" > "$RUNNER_TEMP/signing.password"
+          apps/desktop/scripts/import-signing-identity.sh "$RUNNER_TEMP/signing.p12" \
+            "$RUNNER_TEMP/signing.password" apps/desktop/signing/cairn-mac-self-signed.crt
+
+      - name: Package the app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        working-directory: apps/desktop
+        run: |
+          node build.mjs
+          pnpm exec electron-builder --mac dmg zip "--$ARCH" -c.extraMetadata.version="$VERSION"
+
+      - name: Check that the update zip holds an app signed by the release certificate
+        working-directory: apps/desktop
+        run: |
+          mkdir -p "$RUNNER_TEMP/unzipped"
+          ditto -x -k "release/Cairn-$VERSION-mac-$ARCH.zip" "$RUNNER_TEMP/unzipped"
+          node scripts/check-signature.mjs signing/cairn-mac-self-signed.crt \
+            "$RUNNER_TEMP/unzipped/Cairn.app"
+
+      - name: Check that the update zip's Runner resolves the Claude Code binary for its arch
+        working-directory: apps/desktop
+        run: |
+          node scripts/check-runner-claude.mjs \
+            "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" darwin "$ARCH"
+          node scripts/check-virtual-store.mjs \
+            "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" \
+            "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/server"
+
+      - name: Keep the packaged x64 files for the publish job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-x64
           path: |
-            apps/desktop/release/Cairn-${{ env.VERSION }}-mac-${{ matrix.arch }}.dmg
-            apps/desktop/release/Cairn-${{ env.VERSION }}-mac-${{ matrix.arch }}.zip
+            apps/desktop/release/Cairn-${{ env.VERSION }}-mac-x64.dmg
+            apps/desktop/release/Cairn-${{ env.VERSION }}-mac-x64.zip
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -356,8 +468,18 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
+          set -o pipefail
           node build.mjs
-          pnpm exec electron-builder --linux tar.gz --x64 -c.extraMetadata.version="$VERSION" --publish never
+          pnpm exec electron-builder --linux dir --x64 -c.extraMetadata.version="$VERSION" --publish never
+          prefix="Cairn-$VERSION-linux-x64"
+          rm -rf "release/$prefix"
+          mv release/linux-unpacked "release/$prefix"
+          if command -v pigz >/dev/null 2>&1; then
+            compress="pigz -6"
+          else
+            compress="gzip -6"
+          fi
+          tar --numeric-owner --owner=0 --group=0 -C release -cf - "$prefix" | $compress > "release/$prefix.tar.gz"
 
       - name: Check that the Linux archive holds the Runner and sidecar
         working-directory: apps/desktop
@@ -381,7 +503,7 @@ jobs:
           overwrite: true
 
   verify-arm64-smoke:
-    needs: [decide, package]
+    needs: [decide, package-arm64]
     if: needs.decide.outputs.release == 'true'
     runs-on: macos-latest
     timeout-minutes: 30
@@ -404,7 +526,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: desktop-arm64
+          name: desktop-arm64-zip
           path: apps/desktop/release
 
       - name: Unpack the arm64 app for smoke verification
@@ -420,7 +542,7 @@ jobs:
         run: node scripts/smoke-mac.mjs "$RUNNER_TEMP/unzipped/Cairn.app" "$RUNNER_TEMP/smoke.png"
 
   verify-arm64-journeys:
-    needs: [decide, package]
+    needs: [decide, package-arm64]
     if: needs.decide.outputs.release == 'true'
     runs-on: macos-latest
     timeout-minutes: 20
@@ -447,7 +569,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: desktop-arm64
+          name: desktop-arm64-zip
           path: apps/desktop/release
 
       - name: Unpack the arm64 app for journey verification
@@ -474,7 +596,7 @@ jobs:
           retention-days: 14
 
   verify-arm64-post-install:
-    needs: [decide, package]
+    needs: [decide, package-arm64]
     if: needs.decide.outputs.release == 'true'
     runs-on: macos-latest
     timeout-minutes: 15
@@ -497,7 +619,7 @@ jobs:
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: desktop-arm64
+          name: desktop-arm64-zip
           path: apps/desktop/release
 
       - name: Unpack the arm64 app for post-install verification
@@ -537,7 +659,8 @@ jobs:
   publish:
     needs:
       - decide
-      - package
+      - package-arm64
+      - package-x64
       - package-win
       - package-linux
       - live-verify
