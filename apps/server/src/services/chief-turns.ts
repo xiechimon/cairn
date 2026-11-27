@@ -39,7 +39,7 @@ import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
 import { coordinatorMemoryOwner } from './routing-rules.js';
-import { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
+import { settleScheduledStepOutcome } from './schedules.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -739,6 +739,9 @@ function endChiefStepAsStopped(
   settleChiefActiveRun(deps.db, threadId);
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);
+  if (stopped && stopped.scheduleId !== null) {
+    settleScheduledStepOutcome(deps.db, stopped, 'stopped');
+  }
   recordChiefStop(deps, head);
   cancelPendingQuestions(deps, threadId, CHIEF_TURN_END_REASON, { includeParked: true });
 }

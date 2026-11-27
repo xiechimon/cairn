@@ -27,6 +27,7 @@ import {
   scheduleBody,
   scheduleDraft,
   schedulePauseReason,
+  scheduleTitle,
   scheduleViewState,
   toWireSchedule,
 } from './schedule-model.js';
@@ -226,13 +227,29 @@ function ScheduleEditor({
   const [confirmRotate, setConfirmRotate] = useState(false);
   const target =
     schedule === null
-      ? candidates.find((candidate) => candidate.id === todoId)
-      : { id: schedule.todoId, title: schedule.todo.title, projectId: schedule.projectId };
+      ? (() => {
+          const candidate = candidates.find((c) => c.id === todoId);
+          return candidate === undefined
+            ? undefined
+            : {
+                todoId: candidate.id,
+                chiefThreadId: null,
+                title: candidate.title,
+                projectId: candidate.projectId,
+              };
+        })()
+      : {
+          todoId: schedule.todoId,
+          chiefThreadId: schedule.chiefThreadId ?? null,
+          title: scheduleTitle(schedule),
+          projectId: schedule.projectId,
+        };
   const busy = mutations.createSchedule.isPending || mutations.updateSchedule.isPending;
   const savable =
     !busy &&
     !deleted &&
     target !== undefined &&
+    (target.chiefThreadId === null || draft.prompt.trim() !== '') &&
     (draft.trigger !== 'custom' || cronHasFiveFields(draft.cron));
   const save = async () => {
     if (!savable || target === undefined) return;
@@ -246,7 +263,8 @@ function ScheduleEditor({
       const body = scheduleBody(
         draft,
         {
-          todoId: target.id,
+          todoId: target.todoId,
+          chiefThreadId: target.chiefThreadId,
           projectId: target.projectId,
           tz,
           enabled: record?.enabled ?? true,
@@ -284,7 +302,8 @@ function ScheduleEditor({
       const rotated = await mutations.updateSchedule.mutateAsync({
         id: schedule.id,
         body: {
-          todoId: target.id,
+          ...(target.todoId !== null ? { todoId: target.todoId } : {}),
+          ...(target.chiefThreadId !== null ? { chiefThreadId: target.chiefThreadId } : {}),
           projectId: target.projectId,
           tz,
           prompt: draft.prompt,
@@ -332,7 +351,10 @@ function ScheduleEditor({
         : draft.trigger === 'custom' && !cronHasFiveFields(draft.cron)
           ? t('Cron 表达式有误')
           : null;
-  const problem = record?.pausedReason ?? record?.lastRunError ?? null;
+  const pausedNotice =
+    record?.pausedReason != null ? schedulePauseReason(record.pausedReason, t) : null;
+  const errorNotice = pausedNotice === null ? (record?.lastRunError ?? null) : null;
+  const problem = pausedNotice ?? errorNotice;
   const bodyRef = useRef<HTMLDivElement>(null);
   useScrollFade(bodyRef);
   useEffect(() => {
@@ -347,7 +369,7 @@ function ScheduleEditor({
   return (
     <>
       <PopoverTitle className="shrink-0 truncate text-ui font-medium">
-        {schedule === null ? t('新建定时') : schedule.todo.title}
+        {schedule === null ? t('新建定时') : scheduleTitle(schedule)}
       </PopoverTitle>
       <div
         ref={bodyRef}
@@ -397,8 +419,11 @@ function ScheduleEditor({
               <dd className="m-0 text-foreground">{lastRun}</dd>
             </div>
             {problem !== null && (
-              <dd className="col-span-2 m-0 break-words text-content-secondary" title={problem}>
-                {schedulePauseReason(problem, t)}
+              <dd
+                className="col-span-2 m-0 break-words text-content-secondary"
+                title={record?.pausedReason ?? record?.lastRunError ?? problem}
+              >
+                {problem}
               </dd>
             )}
           </dl>
@@ -427,14 +452,23 @@ function ScheduleEditor({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2 pb-3">
-        {schedule !== null && (
+        {schedule !== null && (schedule.todoId !== null || schedule.chiefThreadId != null) && (
           <Button
             variant="ghost"
             size="sm"
             className="mr-auto -ml-2.5 text-content-secondary pointer-coarse:h-11"
-            render={<Link to={threadHref(schedule.todoId)} onClick={onDone} />}
+            render={
+              <Link
+                to={
+                  schedule.todoId !== null
+                    ? threadHref(schedule.todoId)
+                    : `/app?chief=${encodeURIComponent(schedule.chiefThreadId ?? '')}`
+                }
+                onClick={onDone}
+              />
+            }
           >
-            {t('打开任务')}
+            {schedule.todoId !== null ? t('打开任务') : t('打开对话')}
           </Button>
         )}
         {blocker !== null && (

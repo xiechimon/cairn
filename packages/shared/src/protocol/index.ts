@@ -7,7 +7,6 @@ export * from './computer-tools.js';
 export * from './executor.js';
 export * from './fs-list.js';
 export * from './fs-pick.js';
-export * from './info-card-tools.js';
 export * from './machine-api.js';
 export * from './machine-wire.js';
 export * from './mcp.js';

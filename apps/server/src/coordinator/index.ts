@@ -64,7 +64,6 @@ import { providerBinding } from './provider-binding.js';
 import { cacheTtlMsFor, isColdResume, resolveCacheRetentionTier } from './runtime/cold-slim.js';
 import { thrownErrorText } from './runtime/error-text.js';
 import { setFailureSink } from './runtime/failure-report.js';
-import { startInfoCardRunner } from './runtime/info-card-runner.js';
 import type { MachineApi } from './runtime/machine-api.js';
 import type { ReconcileFacts } from './runtime/reconcile.js';
 import type { SeedRow } from './runtime/seed.js';
@@ -718,16 +717,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       });
   };
 
-  const infoCards = startInfoCardRunner({
-    machine,
-    storageDir: options.storageDir,
-    logger,
-    ...(options.fixedProviders === undefined ? {} : { fixedProviders: options.fixedProviders }),
-    ...(options.heartbeatMs === undefined ? {} : { heartbeatMs: options.heartbeatMs }),
-    ...(options.tickMs === undefined ? {} : { tickMs: options.tickMs }),
-    ...(options.stopPollMs === undefined ? {} : { stopPollMs: options.stopPollMs }),
-  });
-
   const timer = setInterval(tick, options.tickMs ?? TICK_MS);
   timer.unref();
   tick();
@@ -740,13 +729,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     idle: async () => {
       await Promise.resolve();
       while (draining.size > 0) await Promise.allSettled([...draining.values()]);
-      await infoCards.idle();
     },
     close: async (): Promise<void> => {
       closing = true;
       clearInterval(timer);
       try {
-        await infoCards.close();
         await runtime.close();
         while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       } finally {

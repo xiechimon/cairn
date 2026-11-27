@@ -23,7 +23,7 @@ import {
   sweepZombieQueuedTodos,
   toBuildRecord,
 } from './builds.js';
-import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
+import { fireDueChiefWakes, scheduleChiefThreadTurn, sweepAbandonedChiefSteps } from './chief.js';
 import { sweepOverlongChiefTurns } from './chief-turns.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import { sweepIdleComposerDrafts } from './composer-drafts.js';
@@ -150,9 +150,44 @@ export function createScheduler(
     row: ReturnType<typeof dueSchedules>[number],
     now: number,
   ): Promise<void> {
+    let nextRunAt: number | null = row.nextRunAt;
+    if (isRecurring(row.kind)) {
+      try {
+        nextRunAt = computeNextRunAt(row.kind, row.at, row.tz, now, row.cron);
+      } catch (err) {
+        pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
+        return;
+      }
+    }
+    if (row.chiefThreadId !== null) {
+      scheduleChiefThreadTurn(deps, {
+        scheduleId: row.id,
+        teamId: row.teamId,
+        threadId: row.chiefThreadId,
+        prompt: row.prompt,
+        createdBy: row.createdBy,
+        now,
+        expectedNextRunAt: row.nextRunAt,
+        nextRunAt: isRecurring(row.kind) ? nextRunAt : null,
+        recurring: isRecurring(row.kind),
+      });
+      notifyScheduleClock(deps.db);
+      return;
+    }
+    if (row.todoId === null || row.projectId === null) {
+      deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
+      notifyScheduleClock(deps.db);
+      return;
+    }
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
     const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
-    if (!todoRow || todoRow.projectId !== row.projectId || !projectRow) {
+    if (
+      !todoRow ||
+      todoRow.teamId !== row.teamId ||
+      todoRow.projectId !== row.projectId ||
+      !projectRow ||
+      projectRow.teamId !== row.teamId
+    ) {
       deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
       return;
     }
@@ -194,15 +229,6 @@ export function createScheduler(
         return;
       }
     }
-    let nextRunAt: number | null = row.nextRunAt;
-    if (isRecurring(row.kind)) {
-      try {
-        nextRunAt = computeNextRunAt(row.kind, row.at, row.tz, now, row.cron);
-      } catch (err) {
-        pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
-        return;
-      }
-    }
     if (todoRow.latestBuildId !== null) {
       const active = deps.db
         .select({ id: step.id })
@@ -215,7 +241,7 @@ export function createScheduler(
         )
         .get();
       if (active) {
-        if (isRecurring(row.kind)) updateNextRunAt(deps, row.id, nextRunAt);
+        updateNextRunAt(deps, row.id, isRecurring(row.kind) ? nextRunAt : now);
         return;
       }
     }
@@ -264,9 +290,46 @@ export function createScheduler(
     notifyScheduleClock(deps.db);
   }
 
+  function targetIsBusy(row: ReturnType<typeof dueSchedules>[number]): boolean {
+    if (row.chiefThreadId !== null) {
+      return (
+        deps.db
+          .select({ id: step.id })
+          .from(step)
+          .where(
+            and(
+              eq(step.buildId, row.chiefThreadId),
+              eq(step.kind, 'chief'),
+              inArray(step.status, [...ACTIVE_STEP_STATUSES]),
+            ),
+          )
+          .get() !== undefined
+      );
+    }
+    if (row.todoId === null) return false;
+    const targetTodo = deps.db
+      .select({ latestBuildId: todo.latestBuildId })
+      .from(todo)
+      .where(eq(todo.id, row.todoId))
+      .get();
+    if (!targetTodo?.latestBuildId) return false;
+    return (
+      deps.db
+        .select({ id: step.id })
+        .from(step)
+        .where(
+          and(
+            eq(step.buildId, targetTodo.latestBuildId),
+            inArray(step.status, [...ACTIVE_STEP_STATUSES]),
+          ),
+        )
+        .get() !== undefined
+    );
+  }
+
   function runSchedule(row: ReturnType<typeof dueSchedules>[number], now: number): Promise<void> {
     if (firing.has(row.id)) return Promise.resolve();
-    if (applyMissedRunWindow(deps, row, now)) return Promise.resolve();
+    if (!targetIsBusy(row) && applyMissedRunWindow(deps, row, now)) return Promise.resolve();
     firing.add(row.id);
     return fireSchedule(row, now)
       .catch((err: unknown) => {
@@ -277,11 +340,10 @@ export function createScheduler(
           current.nextRunAt !== row.nextRunAt
         )
           return;
-        const task = deps.db
-          .select({ phase: todo.phase })
-          .from(todo)
-          .where(eq(todo.id, row.todoId))
-          .get();
+        const task =
+          row.todoId === null
+            ? undefined
+            : deps.db.select({ phase: todo.phase }).from(todo).where(eq(todo.id, row.todoId)).get();
         if (isWorkerSchedule(row.createdBy) && task && SCHEDULE_GATE_PHASES.has(task.phase)) {
           updateNextRunAt(
             deps,
@@ -453,7 +515,8 @@ export function createScheduler(
     return row.nextRunAt;
   }
 
-  function archivedProject(projectId: string): boolean {
+  function archivedProject(projectId: string | null): boolean {
+    if (projectId === null) return false;
     const projectRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
     return projectRow?.archivedAt != null;
   }

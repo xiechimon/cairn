@@ -37,7 +37,6 @@ import {
   transitionTodos,
 } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
-import { infoCardTodoOf } from './computer-thread.js';
 import { executeConnectorToolCall } from './connector-broker.js';
 import {
   capturePreCallWorld,
@@ -47,7 +46,6 @@ import {
 } from './coordinator-turn-capture.js';
 import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
-import { executeInfoCardTool } from './info-card-tools.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStepRow } from './machines.js';
 import { mcpConnectorDepsOf } from './mcp-servers.js';
@@ -181,9 +179,6 @@ export async function executeRelayToolCall(
   runnerTokenHash?: string | null,
 ): Promise<string> {
   const row = ownedStepRow(deps, machineId, stepId);
-  if (infoCardTodoOf(deps.db, row) !== null) {
-    return executeInfoCardTool(deps, machineId, row, name, params, toolCallId, signal);
-  }
   if (isCoordinatorComputerTool(name) && (name !== 'attach_file' || row.kind === 'chief')) {
     return (await relayComputerTool(deps, machineId, stepId, name, params, toolCallId, signal))
       .text;

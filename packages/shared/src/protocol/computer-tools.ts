@@ -191,11 +191,3 @@ export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
 export const COMPUTER_HANDOFF_TIMEOUT_MS = 15 * 60_000;
 export const TAKEOVER_HANDED_BACK =
   'The owner handed the computer back. Take a fresh browser_snapshot before acting.';
-
-export const SHELL_TOOL_PARAMETERS = obj(
-  {
-    command: str('Shell command.'),
-    cwd: str('Working directory inside the computer home; defaults to the computer home.'),
-  },
-  ['command'],
-);

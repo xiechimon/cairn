@@ -9,6 +9,7 @@ import type {
 import {
   ACTIVE_STEP_STATUSES,
   classifyStepFailure,
+  isChiefSideThreadId,
   isProviderOutage,
   SCHEDULE_MINUTE_STEPS,
 } from '@cairn/shared';
@@ -17,7 +18,16 @@ import { and, desc, eq, inArray, isNotNull, isNull, like, lte, max, or } from 'd
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { databaseIdentity } from '../db/identity.js';
-import { build, dueEvent, message, project, schedule, step, todo } from '../db/schema.js';
+import {
+  build,
+  chiefThread,
+  dueEvent,
+  message,
+  project,
+  schedule,
+  step,
+  todo,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { newWebhookToken, webhookSecretOf } from '../lib/webhook-token.js';
@@ -123,14 +133,68 @@ export function computeNextRunAt(
 }
 
 export function toScheduleRecord(deps: ScheduleDeps, row: ScheduleRow): ScheduleRecord | null {
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-  if (!todoRow) return null;
-  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (row.todoId !== null) {
+    const todoRow = deps.db
+      .select()
+      .from(todo)
+      .where(and(eq(todo.id, row.todoId), eq(todo.teamId, row.teamId)))
+      .get();
+    if (!todoRow) return null;
+    const projectRow = projectOfTodo(deps.db, todoRow);
+    return {
+      id: row.id,
+      teamId: row.teamId,
+      projectId: row.projectId,
+      todoId: row.todoId,
+      chiefThreadId: null,
+      kind: row.kind,
+      cron: row.cron,
+      prompt: row.prompt,
+      enabled: row.enabled,
+      at: row.at,
+      tz: row.tz,
+      nextRunAt: row.nextRunAt,
+      lastRunAt: row.lastRunAt,
+      lastRunStatus: row.lastRunStatus,
+      lastRunError: row.lastRunError,
+      pausedReason: row.pausedReason,
+      triggerSpec: row.triggerSpec,
+      webhookMasked: row.webhookMasked,
+      webhookLastUsedAt: row.webhookLastUsedAt,
+      missedRunWindowMs: row.missedRunWindowMs,
+      createdAt: row.createdAt,
+      createdBy: row.createdBy,
+      todo: {
+        seqNum: todoRow.seqNum,
+        title: todoRow.title,
+        phase: todoRow.phase,
+        projectName: projectRow?.name ?? '',
+        ownerId: todoRow.ownerId ?? todoRow.createdBy ?? '',
+      },
+      thread: null,
+    };
+  }
+  if (row.chiefThreadId === null) return null;
+  const threadRow = deps.db
+    .select()
+    .from(chiefThread)
+    .where(and(eq(chiefThread.id, row.chiefThreadId), eq(chiefThread.teamId, row.teamId)))
+    .get();
+  if (!threadRow) return null;
+  const projectRow =
+    threadRow.projectId !== null
+      ? deps.db
+          .select()
+          .from(project)
+          .where(and(eq(project.id, threadRow.projectId), eq(project.teamId, row.teamId)))
+          .get()
+      : undefined;
   return {
     id: row.id,
     teamId: row.teamId,
     projectId: row.projectId,
-    todoId: row.todoId,
+    todoId: null,
+    chiefThreadId: row.chiefThreadId,
     kind: row.kind,
     cron: row.cron,
     prompt: row.prompt,
@@ -148,12 +212,11 @@ export function toScheduleRecord(deps: ScheduleDeps, row: ScheduleRow): Schedule
     missedRunWindowMs: row.missedRunWindowMs,
     createdAt: row.createdAt,
     createdBy: row.createdBy,
-    todo: {
-      seqNum: todoRow.seqNum,
-      title: todoRow.title,
-      phase: todoRow.phase,
+    todo: null,
+    thread: {
+      id: threadRow.id,
+      title: threadRow.title || row.prompt.trim().slice(0, 60) || 'Coordinator',
       projectName: projectRow?.name ?? '',
-      ownerId: todoRow.ownerId ?? todoRow.createdBy ?? '',
     },
   };
 }
@@ -173,13 +236,50 @@ export function createSchedule(
   input: CreateScheduleBody & { teamId: string; createdBy: string },
   options: { allowAnyMinute?: boolean; webhookToken?: string } = {},
 ): ScheduleRecord {
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, input.todoId)).get();
-  if (!todoRow || todoRow.teamId !== input.teamId) {
-    throw new HttpError(404, `todo ${input.todoId} not found`);
+  const hasTodo = input.todoId !== undefined;
+  const hasThread = input.chiefThreadId !== undefined;
+  if (hasTodo === hasThread) {
+    throw new HttpError(400, 'schedule requires exactly one of todoId or chiefThreadId');
   }
-  const projectId = input.projectId ?? todoRow.projectId;
-  if (projectId !== todoRow.projectId) {
-    throw new HttpError(400, 'invalid projectId: todo belongs to another project');
+  let projectId: string | null = null;
+  let todoId: string | null = null;
+  let chiefThreadId: string | null = null;
+  if (input.todoId !== undefined) {
+    const todoRow = deps.db.select().from(todo).where(eq(todo.id, input.todoId)).get();
+    if (!todoRow || todoRow.teamId !== input.teamId) {
+      throw new HttpError(404, `todo ${input.todoId} not found`);
+    }
+    projectId = input.projectId ?? todoRow.projectId;
+    if (projectId !== todoRow.projectId) {
+      throw new HttpError(400, 'invalid projectId: todo belongs to another project');
+    }
+    todoId = todoRow.id;
+  } else if (input.chiefThreadId !== undefined) {
+    const threadRow = deps.db
+      .select()
+      .from(chiefThread)
+      .where(eq(chiefThread.id, input.chiefThreadId))
+      .get();
+    if (!threadRow || threadRow.teamId !== input.teamId || isChiefSideThreadId(threadRow.id)) {
+      throw new HttpError(404, `chief thread ${input.chiefThreadId} not found`);
+    }
+    if (input.kind === 'event') {
+      throw new HttpError(400, 'Coordinator-thread schedule cannot use event trigger');
+    }
+    if ((input.prompt?.trim() ?? '') === '') {
+      throw new HttpError(400, 'Coordinator-thread schedule requires non-empty prompt');
+    }
+    projectId = input.projectId !== undefined ? input.projectId : threadRow.projectId;
+    if (projectId !== threadRow.projectId) {
+      throw new HttpError(400, 'invalid projectId: thread belongs to another project');
+    }
+    if (projectId !== null) {
+      const projectRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
+      if (!projectRow || projectRow.teamId !== input.teamId) {
+        throw new HttpError(404, `project ${projectId} not found`);
+      }
+    }
+    chiefThreadId = threadRow.id;
   }
   const tz = input.tz ?? serverTimezone();
   try {
@@ -203,7 +303,8 @@ export function createSchedule(
     id,
     teamId: input.teamId,
     projectId,
-    todoId: input.todoId,
+    todoId,
+    chiefThreadId,
     kind: input.kind,
     at,
     cron,
@@ -226,11 +327,15 @@ export function createSchedule(
     pausedReason: null,
     createdBy: input.createdBy,
   };
-  deps.db
-    .insert(schedule)
-    .values(values)
-    .onConflictDoUpdate({ target: schedule.todoId, set: values })
-    .run();
+  if (todoId !== null) {
+    deps.db
+      .insert(schedule)
+      .values(values)
+      .onConflictDoUpdate({ target: schedule.todoId, set: values })
+      .run();
+  } else {
+    deps.db.insert(schedule).values(values).run();
+  }
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = row ? toScheduleRecord(deps, row) : null;
   if (!record) throw new Error('schedule missing after insert');
@@ -254,8 +359,18 @@ export function updateSchedule(
   if (input.todoId !== undefined && input.todoId !== existing.todoId) {
     throw new HttpError(400, 'invalid todoId: schedule belongs to another todo');
   }
+  if (input.chiefThreadId !== undefined && input.chiefThreadId !== existing.chiefThreadId) {
+    throw new HttpError(400, 'invalid chiefThreadId: schedule belongs to another thread');
+  }
   if (input.projectId !== undefined && input.projectId !== existing.projectId) {
-    throw new HttpError(400, 'invalid projectId: todo belongs to another project');
+    throw new HttpError(400, 'invalid projectId: target belongs to another project');
+  }
+  const nextPrompt = input.prompt ?? existing.prompt;
+  if (existing.chiefThreadId !== null && input.kind === 'event') {
+    throw new HttpError(400, 'Coordinator-thread schedule cannot use event trigger');
+  }
+  if (existing.chiefThreadId !== null && nextPrompt.trim() === '') {
+    throw new HttpError(400, 'Coordinator-thread schedule requires non-empty prompt');
   }
   const tz = input.tz ?? existing.tz;
   try {
@@ -446,11 +561,20 @@ export function updateNextRunAtIfUnmoved(
   notifyScheduleClock(deps.db, deps);
 }
 
-export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): void {
+export function pauseSchedule(
+  deps: ScheduleDeps,
+  id: string,
+  reason: string,
+  expectedStepId?: string,
+): void {
   deps.db
     .update(schedule)
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
-    .where(eq(schedule.id, id))
+    .where(
+      expectedStepId === undefined
+        ? eq(schedule.id, id)
+        : and(eq(schedule.id, id), eq(schedule.lastRunStepId, expectedStepId)),
+    )
     .run();
   notifyScheduleClock(deps.db, deps);
 }
@@ -610,17 +734,35 @@ export function recordScheduleFailure(
   id: string,
   reason: string,
   at = nowMs(),
+  expectedStepId?: string,
 ): void {
+  const existing = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
+  if (!existing) return;
+  if (expectedStepId !== undefined && existing.lastRunStepId !== expectedStepId) return;
+  const transient = scheduleFailureIsTransient(reason);
+  const retryNotBefore = transient ? at + 5 * 60_000 : null;
+  const guard =
+    expectedStepId === undefined
+      ? eq(schedule.id, id)
+      : and(eq(schedule.id, id), eq(schedule.lastRunStepId, expectedStepId));
   deps.db
     .update(schedule)
     .set({
       lastRunStatus: 'failed',
       lastRunError: reason,
-      retryNotBefore: scheduleFailureIsTransient(reason) ? at + 5 * 60_000 : null,
+      retryNotBefore,
+      ...(transient && existing.chiefThreadId !== null && existing.kind !== 'event'
+        ? {
+            nextRunAt:
+              existing.nextRunAt === null
+                ? retryNotBefore
+                : Math.min(existing.nextRunAt, retryNotBefore ?? existing.nextRunAt),
+          }
+        : {}),
     })
-    .where(eq(schedule.id, id))
+    .where(guard)
     .run();
-  if (!scheduleFailureIsTransient(reason)) pauseSchedule(deps, id, reason);
+  if (!transient) pauseSchedule(deps, id, reason, expectedStepId);
   else notifyScheduleClock(deps.db, deps);
 }
 
@@ -702,6 +844,24 @@ const FINISHED_RUN_STATUSES: ReadonlySet<string> = new Set([
   'stopped',
 ]);
 
+export function settleScheduledStepOutcome(
+  db: Db,
+  stepRow: typeof step.$inferSelect,
+  status: 'completed' | 'stopped',
+): void {
+  if (stepRow.scheduleId === null) return;
+  const row = db
+    .select()
+    .from(schedule)
+    .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
+    .get();
+  if (!row || FINISHED_RUN_STATUSES.has(row.lastRunStatus ?? '')) return;
+  db.update(schedule)
+    .set({ lastRunStatus: status, lastRunError: null, retryNotBefore: null })
+    .where(and(eq(schedule.id, row.id), eq(schedule.lastRunStepId, stepRow.id)))
+    .run();
+}
+
 export function finishScheduledStep(
   deps: ScheduleDeps & { user: UserRecord },
   stepRow: typeof step.$inferSelect,
@@ -709,7 +869,7 @@ export function finishScheduledStep(
     status: 'completed',
   },
 ): void {
-  dispatchEventScheduleClaims(deps, stepRow);
+  if (stepRow.kind !== 'chief') dispatchEventScheduleClaims(deps, stepRow);
   if (stepRow.scheduleId === null) return;
   const row = deps.db
     .select()
@@ -717,7 +877,7 @@ export function finishScheduledStep(
     .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
     .get();
   if (!row || FINISHED_RUN_STATUSES.has(row.lastRunStatus ?? '')) return;
-  if (outcome.status !== 'stopped') {
+  if (outcome.status !== 'stopped' && row.todoId !== null) {
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
     if (todoRow) {
       notifyScheduleRun(
@@ -728,12 +888,8 @@ export function finishScheduledStep(
     }
   }
   if (outcome.status === 'failed') {
-    recordScheduleFailure(deps, row.id, outcome.error);
+    recordScheduleFailure(deps, row.id, outcome.error, nowMs(), stepRow.id);
     return;
   }
-  deps.db
-    .update(schedule)
-    .set({ lastRunStatus: outcome.status, lastRunError: null, retryNotBefore: null })
-    .where(eq(schedule.id, row.id))
-    .run();
+  settleScheduledStepOutcome(deps.db, stepRow, outcome.status);
 }

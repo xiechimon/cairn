@@ -313,17 +313,6 @@ export const machineClaimResponseSchema = z.object({
 });
 export type MachineClaimResponse = z.infer<typeof machineClaimResponseSchema>;
 
-export const REPO_ARCHIVE_FILE_NAME = 'repo-archive.b64';
-export const REPO_ARCHIVE_FAILED_FILE_NAME = 'repo-archive-failed.txt';
-
-export const machineRepoArchiveCommandSchema = z.object({
-  stepId: recordId,
-  directory: z.string().min(1),
-  ref: z.string().min(1),
-  maxBytes: z.number().int().positive(),
-});
-export type MachineRepoArchiveCommand = z.infer<typeof machineRepoArchiveCommandSchema>;
-
 export const machineAntigravityModelProbeResultSchema = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('ok'),
@@ -405,7 +394,6 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
     stepId: recordId,
     taskId: backgroundTaskSchema.shape.taskId,
   }),
-  z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
   z.object({ type: z.literal('antigravity.models'), requestId: z.string().uuid() }),
   z.object({ type: z.literal('antigravity.usage'), requestId: z.string().uuid() }),
   z.object({ type: z.literal('antigravity.verify'), checkId: antigravityCheckIdSchema }),

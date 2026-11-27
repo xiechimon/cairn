@@ -5,18 +5,19 @@ import type { ScheduleRecord as DisplaySchedule } from '../src/fixtures/records.
 import { EN } from '../src/i18n/en.js';
 import { type TFunc, translate } from '../src/i18n/translate.js';
 import { scheduleSummary, scheduleUnnamedCron } from '../src/pages/schedule-summary.js';
-import { scheduleBody, scheduleDraft, scheduleEnded, schedulePauseReason, scheduleTime, scheduleViewState } from '../src/schedules/schedule-model.js';
+import { scheduleBody, scheduleDraft, scheduleEnded, schedulePauseReason, scheduleTime, scheduleTitle, scheduleViewState, toWireSchedule } from '../src/schedules/schedule-model.js';
 
 const NOW = Date.UTC(2026, 10, 4, 12);
 const t: TFunc = (source, vars) => translate('zh', {}, source, vars);
 const record: ScheduleRecord = {
-  id: 'schedule-1', teamId: 'team-1', projectId: 'project-1', todoId: 'todo-1', kind: 'daily',
+  id: 'schedule-1', teamId: 'team-1', projectId: 'project-1', todoId: 'todo-1', chiefThreadId: null, kind: 'daily',
   cron: '0 9 * * *', prompt: 'Review the release', enabled: true, at: Date.UTC(2026, 10, 4, 1),
   tz: 'Asia/Shanghai', nextRunAt: NOW + 86_400_000, lastRunAt: NOW - 86_400_000,
   lastRunStatus: 'completed', pausedReason: null, createdBy: 'user-1',
   triggerSpec: null, webhookMasked: null, webhookLastUsedAt: null, missedRunWindowMs: null,
   createdAt: NOW - 172_800_000,
   todo: { seqNum: 1, title: 'Release review', phase: 'done', projectName: 'cairn', ownerId: 'user-1' },
+  thread: null,
 };
 
 describe('schedule editor wire values', () => {
@@ -138,7 +139,7 @@ describe('schedule editor wire values', () => {
     expect(
       scheduleBody(
         draft,
-        { todoId: 'todo-1', projectId: 'project-1', tz: 'UTC', enabled: true },
+        { todoId: 'todo-1', chiefThreadId: null, projectId: 'project-1', tz: 'UTC', enabled: true },
         NOW,
       ),
     ).toEqual({
@@ -168,7 +169,7 @@ describe('schedule editor wire values', () => {
     expect(
       scheduleBody(
         draft,
-        { todoId: 'todo-1', projectId: 'project-1', tz: 'UTC', enabled: true },
+        { todoId: 'todo-1', chiefThreadId: null, projectId: 'project-1', tz: 'UTC', enabled: true },
         NOW,
       ),
     ).toEqual({
@@ -205,5 +206,39 @@ describe('schedule editor wire values', () => {
     expect(scheduleSummary(eventRow as DisplaySchedule, NOW, t)).toBe('事件触发 · 等待触发');
     expect(scheduleSummary(hookRow as DisplaySchedule, NOW, t)).toBe('Webhook 触发 · 等待触发');
     expect(scheduleSummary(eventRow as DisplaySchedule, NOW, t)).not.toContain('1月1日');
+  });
+
+  test('maps, displays, edits, and translates pause reasons for Coordinator-thread schedules without a todo', () => {
+    const wire = {
+      ...record,
+      projectId: null,
+      todoId: null,
+      chiefThreadId: 'chief-thread-1',
+      prompt: '每天早上 9 点总结竞品',
+      pausedReason: 'Thread archived',
+      todo: null,
+      thread: { id: 'chief-thread-1', title: 'Coordinator', projectName: '' },
+    } as ScheduleRecord;
+    const [mapped] = mapSchedules([wire]);
+    expect(mapped).toBeDefined();
+    expect(scheduleTitle(mapped!)).toBe('Coordinator');
+    expect(scheduleTitle({ ...mapped!, thread: null })).toBe('每天早上 9 点总结竞品');
+    expect(schedulePauseReason('Thread archived', t)).toBe('对话已归档，定时随之停用');
+    expect(toWireSchedule(mapped!).chiefThreadId).toBe('chief-thread-1');
+    const draft = scheduleDraft(toWireSchedule(mapped!), NOW);
+    const body = scheduleBody(
+      draft,
+      { todoId: null, chiefThreadId: 'chief-thread-1', projectId: null, tz: 'Asia/Shanghai', enabled: true },
+      NOW,
+    );
+    expect(body).toEqual({
+      chiefThreadId: 'chief-thread-1',
+      projectId: null,
+      tz: 'Asia/Shanghai',
+      prompt: '每天早上 9 点总结竞品',
+      enabled: true,
+      kind: 'daily',
+      at: expect.any(Number),
+    });
   });
 });

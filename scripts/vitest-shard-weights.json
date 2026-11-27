@@ -894,8 +894,6 @@
   "@xiechimon/cairn:test/im-slack.test.ts": 6174,
   "@xiechimon/cairn:test/im-telegram.test.ts": 352,
   "@xiechimon/cairn:test/im-wechat.test.ts": 77,
-  "@xiechimon/cairn:test/info-card-computer.test.ts": 2266,
-  "@xiechimon/cairn:test/info-export-deliverables.test.ts": 1096,
   "@xiechimon/cairn:test/info-export-prompt.test.ts": 650,
   "@xiechimon/cairn:test/info-fastlane.test.ts": 479,
   "@xiechimon/cairn:test/inspect-run.test.ts": 367,

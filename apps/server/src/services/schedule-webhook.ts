@@ -1,12 +1,13 @@
+import { isChiefSideThreadId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { schedule, todo } from '../db/schema.js';
+import { chiefThread, project, schedule, todo } from '../db/schema.js';
 import { sha256Hex } from '../lib/crypto.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { webhookTokenMatches } from '../lib/webhook-token.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
-import { updateNextRunAt } from './schedules.js';
+import { notifyScheduleClock } from './schedules.js';
 
 export interface ScheduleWebhookDeps {
   db: Db;
@@ -38,32 +39,61 @@ export function fireScheduleWebhook(
   }
   const deliveryId =
     deliveryIdHeader !== undefined && deliveryIdHeader !== '' ? deliveryIdHeader : newRecordId();
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-  const projectRow = todoRow !== undefined ? projectOfTodo(deps.db, todoRow) : undefined;
-  if (
-    row.kind !== 'webhook' ||
-    !row.enabled ||
-    todoRow === undefined ||
-    todoRow.archivedAt !== null ||
-    projectRow === undefined ||
-    projectRow.archivedAt !== null
-  ) {
+  let targetActive = false;
+  if (row.chiefThreadId !== null) {
+    const threadRow = deps.db
+      .select()
+      .from(chiefThread)
+      .where(eq(chiefThread.id, row.chiefThreadId))
+      .get();
+    const projectRow =
+      threadRow?.projectId != null
+        ? deps.db.select().from(project).where(eq(project.id, threadRow.projectId)).get()
+        : undefined;
+    targetActive =
+      threadRow !== undefined &&
+      !isChiefSideThreadId(threadRow.id) &&
+      threadRow.teamId === row.teamId &&
+      threadRow.archivedAt === null &&
+      (threadRow.projectId === null ||
+        (projectRow !== undefined &&
+          projectRow.teamId === row.teamId &&
+          projectRow.archivedAt === null));
+  } else if (row.todoId !== null) {
+    const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+    const projectRow = todoRow !== undefined ? projectOfTodo(deps.db, todoRow) : undefined;
+    targetActive =
+      todoRow !== undefined &&
+      todoRow.teamId === row.teamId &&
+      todoRow.archivedAt === null &&
+      projectRow !== undefined &&
+      projectRow.teamId === row.teamId &&
+      projectRow.archivedAt === null;
+  }
+  if (row.kind !== 'webhook' || !row.enabled || !targetActive) {
     return { result: 'ignored', deliveryId };
   }
-  const deliveries = row.webhookDeliveries ?? [];
-  if (deliveries.includes(deliveryId)) return { result: 'duplicate', deliveryId };
-  const now = nowMs();
-  deps.db.transaction(() => {
-    deps.db
-      .update(schedule)
-      .set({
-        webhookDeliveries: [...deliveries, deliveryId].slice(-DELIVERY_HISTORY_LIMIT),
-        webhookLastUsedAt: now,
-        nextRunAt: now,
-      })
-      .where(eq(schedule.id, row.id))
-      .run();
-    updateNextRunAt(deps, row.id, now);
-  });
-  return { result: 'fired', deliveryId };
+  const result = deps.db.transaction(
+    (tx) => {
+      const fresh = tx.select().from(schedule).where(eq(schedule.id, row.id)).get();
+      if (!fresh || fresh.kind !== 'webhook' || !fresh.enabled) {
+        return 'ignored' as const;
+      }
+      const deliveries = fresh.webhookDeliveries ?? [];
+      if (deliveries.includes(deliveryId)) return 'duplicate' as const;
+      const now = nowMs();
+      tx.update(schedule)
+        .set({
+          webhookDeliveries: [...deliveries, deliveryId].slice(-DELIVERY_HISTORY_LIMIT),
+          webhookLastUsedAt: now,
+          nextRunAt: now,
+        })
+        .where(eq(schedule.id, row.id))
+        .run();
+      return 'fired' as const;
+    },
+    { behavior: 'immediate' },
+  );
+  if (result === 'fired') notifyScheduleClock(deps.db);
+  return { result, deliveryId };
 }

@@ -18,6 +18,7 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  ACTIVE_STEP_STATUSES,
   CHIEF_WATCH_REASON_DISPATCH,
   COORDINATOR_NOT_READY,
   chiefDigestThreadId,
@@ -80,6 +81,7 @@ import {
   message,
   project,
   queuedMessage,
+  schedule,
   step,
   todo,
 } from '../db/schema.js';
@@ -1413,6 +1415,8 @@ export function enqueueChiefStep(
     scopeProjectId?: string | null;
     ownerMessageIds: string[];
     deferWake?: boolean;
+    scheduleId?: string | null;
+    scheduledBy?: string | null;
   } & ChiefStepTrigger,
 ): string {
   const threadRow = getChiefThread(deps, threadId);
@@ -1434,6 +1438,8 @@ export function enqueueChiefStep(
       scopeProjectId: threadRow.projectId ?? opts.scopeProjectId ?? null,
       ownerMessageIds: opts.ownerMessageIds,
       createdAt: nowMs(),
+      ...(opts.scheduleId !== undefined ? { scheduleId: opts.scheduleId } : {}),
+      ...(opts.scheduledBy !== undefined ? { scheduledBy: opts.scheduledBy } : {}),
       ...(opts.trigger !== 'user' &&
       (opts.provenance.startsWith('mail:') ||
         opts.provenance.startsWith('im:') ||
@@ -1453,6 +1459,157 @@ export function enqueueChiefStep(
     wakeCoordinator(threadId);
   }
   return id;
+}
+
+export interface ScheduleChiefTurnInput {
+  scheduleId: string;
+  teamId: string;
+  threadId: string;
+  prompt: string;
+  createdBy: string;
+  now: number;
+  expectedNextRunAt: number | null;
+  nextRunAt: number | null;
+  recurring: boolean;
+}
+
+export function scheduleChiefThreadTurn(
+  deps: ChiefDeps,
+  input: ScheduleChiefTurnInput,
+): 'fired' | 'busy-advanced' | 'busy-wait' | 'archived' | 'deleted' | 'skip' {
+  const outcome = deps.db.transaction(
+    (tx) => {
+      const txDeps: ChiefDeps = { ...deps, db: tx, machineHub: undefined };
+      const schedRow = tx.select().from(schedule).where(eq(schedule.id, input.scheduleId)).get();
+      if (
+        !schedRow ||
+        !schedRow.enabled ||
+        schedRow.teamId !== input.teamId ||
+        schedRow.chiefThreadId !== input.threadId ||
+        schedRow.nextRunAt !== input.expectedNextRunAt
+      ) {
+        return { kind: 'skip' as const };
+      }
+      const threadRow = getChiefThread(txDeps, input.threadId);
+      if (!threadRow || threadRow.teamId !== input.teamId || isChiefSideThreadId(threadRow.id)) {
+        tx.delete(schedule).where(eq(schedule.id, input.scheduleId)).run();
+        return { kind: 'deleted' as const };
+      }
+      if (threadRow.archivedAt !== null) {
+        tx.update(schedule)
+          .set({ enabled: false, nextRunAt: null, pausedReason: 'Thread archived' })
+          .where(eq(schedule.id, input.scheduleId))
+          .run();
+        return { kind: 'archived' as const };
+      }
+      const scopedProjectId = schedRow.projectId ?? threadRow.projectId;
+      if (scopedProjectId !== null) {
+        const proj = tx.select().from(project).where(eq(project.id, scopedProjectId)).get();
+        if (!proj || proj.teamId !== input.teamId) {
+          tx.delete(schedule).where(eq(schedule.id, input.scheduleId)).run();
+          return { kind: 'deleted' as const };
+        }
+        if (proj.archivedAt !== null) {
+          return { kind: 'skip' as const };
+        }
+      }
+      const activeStep = tx
+        .select({ id: step.id })
+        .from(step)
+        .where(
+          and(
+            eq(step.buildId, threadRow.id),
+            eq(step.kind, 'chief'),
+            inArray(step.status, [...ACTIVE_STEP_STATUSES]),
+          ),
+        )
+        .get();
+      if (activeStep !== undefined) {
+        tx.update(schedule)
+          .set({ nextRunAt: input.recurring ? input.nextRunAt : input.now })
+          .where(
+            and(
+              eq(schedule.id, input.scheduleId),
+              input.expectedNextRunAt === null
+                ? isNull(schedule.nextRunAt)
+                : eq(schedule.nextRunAt, input.expectedNextRunAt),
+            ),
+          )
+          .run();
+        return { kind: input.recurring ? ('busy-advanced' as const) : ('busy-wait' as const) };
+      }
+      const stepId = newRecordId();
+      const messageId = newRecordId();
+      const updated = tx
+        .update(schedule)
+        .set({
+          lastRunAt: input.now,
+          lastRunStatus: 'started',
+          lastRunError: null,
+          retryNotBefore: null,
+          lastRunStepId: stepId,
+          nextRunAt: input.recurring ? input.nextRunAt : null,
+        })
+        .where(
+          and(
+            eq(schedule.id, input.scheduleId),
+            eq(schedule.enabled, true),
+            input.expectedNextRunAt === null
+              ? isNull(schedule.nextRunAt)
+              : eq(schedule.nextRunAt, input.expectedNextRunAt),
+          ),
+        )
+        .run();
+      if (updated.changes === 0) return { kind: 'skip' as const };
+      tx.insert(chiefMessage)
+        .values({
+          id: messageId,
+          threadId: threadRow.id,
+          role: 'user',
+          content: input.prompt,
+          projectId: threadRow.projectId,
+          origin: 'user',
+          sentByAgent: null,
+          createdAt: input.now,
+        })
+        .run();
+      tx.update(chiefThread)
+        .set({ updatedAt: input.now })
+        .where(eq(chiefThread.id, threadRow.id))
+        .run();
+      enqueueChiefStep(txDeps, threadRow.id, {
+        id: stepId,
+        prompt: promptWithPickedProject(
+          pickedProjectOf(tx, input.teamId, threadRow.projectId),
+          input.prompt,
+        ),
+        trigger: 'user',
+        ownerMessageIds: [messageId],
+        scopeProjectId: threadRow.projectId,
+        deferWake: true,
+        scheduleId: input.scheduleId,
+        scheduledBy: input.createdBy,
+      });
+      return {
+        kind: 'fired' as const,
+        threadId: threadRow.id,
+        teamId: input.teamId,
+        message: {
+          id: messageId,
+          role: 'user' as const,
+          content: input.prompt,
+          createdAt: input.now,
+        },
+      };
+    },
+    { behavior: 'immediate' },
+  );
+  if (outcome.kind === 'fired') {
+    deps.convHub?.publishMessage(outcome.threadId, outcome.message);
+    deps.machineHub?.wake(outcome.teamId);
+    wakeCoordinator(outcome.threadId);
+  }
+  return outcome.kind;
 }
 
 function markStoreRewind(db: Db, threadId: string, anchorId: string, doomedIds: string[]): void {

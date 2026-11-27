@@ -7,7 +7,6 @@ import { expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
-import { infoComputerHosts } from '../src/services/info-card.js';
 import { teamOffersDesktop } from '../src/services/machine-computer.js';
 
 const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8')) as {
@@ -41,7 +40,6 @@ test('a machine whose owner had turned computer control off offers the browser a
     );
     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
     expect(teamOffersDesktop(db, 'team')).toBe(true);
-    expect(infoComputerHosts(db, 'team')).toHaveLength(1);
   } finally {
     sqlite.close();
     rmSync(directory, { recursive: true, force: true });

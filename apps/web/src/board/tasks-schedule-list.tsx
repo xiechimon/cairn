@@ -15,7 +15,7 @@ import {
   scheduleSummary,
   scheduleUnnamedCron,
 } from '../pages/schedule-summary.js';
-import { scheduleEnded, schedulePauseReason } from '../schedules/schedule-model.js';
+import { scheduleEnded, schedulePauseReason, scheduleTitle } from '../schedules/schedule-model.js';
 import {
   type ScheduleCandidate,
   SchedulePopover,
@@ -54,8 +54,10 @@ export function TasksScheduleList({
   const listed = withoutClosed(
     live ? (query.data ?? []) : withCreatedSchedules(fixture.schedules ?? []),
   ).filter((row) => projectId === null || row.projectId === projectId);
-  const scheduled = new Set(listed.map((row) => row.todoId));
-  const editingDeleted = editing !== null && !listed.some((row) => row.todoId === editing.todoId);
+  const scheduled = new Set(
+    listed.map((row) => row.todoId).filter((id): id is string => id !== null),
+  );
+  const editingDeleted = editing !== null && !listed.some((row) => row.id === editing.id);
   const rows = (editingDeleted ? [...listed, editing] : listed).sort(byNextRun);
   const free = candidates.filter((candidate) => !scheduled.has(candidate.id));
   const current = rows.filter((row) => !scheduleEnded(row));
@@ -90,7 +92,7 @@ export function TasksScheduleList({
     </SchedulePopover>
   );
   const row = (schedule: ScheduleRecord) => {
-    const deletedHere = editingDeleted && editing.todoId === schedule.todoId;
+    const deletedHere = editingDeleted && editing.id === schedule.id;
     const reason = schedule.enabled === false ? (schedule.pausedReason ?? null) : null;
     const cron = scheduleUnnamedCron(schedule, t);
     const cadence =
@@ -129,7 +131,7 @@ export function TasksScheduleList({
           deleted={deletedHere}
           anchor={listRef}
           now={now}
-          open={editing?.todoId === schedule.todoId}
+          open={editing?.id === schedule.id}
           onOpenChange={(open) => setEditing(open ? schedule : null)}
           onWebhookUrl={setRevealedWebhookUrl}
           trigger={
@@ -145,7 +147,7 @@ export function TasksScheduleList({
           </span>
           <span className="flex min-h-7 min-w-0 flex-1 flex-col justify-center">
             <span className="truncate text-ui leading-5 text-foreground">
-              {schedule.todo.title}
+              {scheduleTitle(schedule)}
             </span>
             <span
               className="truncate text-meta leading-4.5 text-content-tertiary"

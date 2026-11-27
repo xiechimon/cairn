@@ -95,6 +95,12 @@
       "pattern": "\\bCAIRN_COORDINATOR_IN_SERVER\\b",
       "canary": "CAIRN_COORDINATOR_IN_SERVER=0",
       "reason": "removed CAIRN_COORDINATOR_IN_SERVER env toggle; in-server Coordinator always starts when config loads"
+    },
+    {
+      "id": "info-card-pipeline",
+      "pattern": "\\b(?:info-card-runner|info-card-guard|info-card-tools|info-repo-snapshot|infoCardPlan|infoCardTodoOf|closeInfoCardTab|INFO_HOST_SUBMIT_REPORT_DEF)\\b",
+      "canary": "info-card-runner",
+      "reason": "the dedicated info-card execution pipeline was retired; scheduled work runs directly in Coordinator threads or ordinary tasks"
     }
   ],
   "baseline": {
@@ -144,6 +150,7 @@
     "hash-task-picker": {},
     "one-page-design": {},
     "eval-weekly-workflow": {},
-    "coordinator-in-server-env": {}
+    "coordinator-in-server-env": {},
+    "info-card-pipeline": {}
   }
 }

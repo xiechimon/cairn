@@ -679,6 +679,7 @@ export const EN: Record<string, string> = {
   周日: 'Sun',
   运行一次: 'Runs once',
   '任务已归档，定时随之停用': 'The task was archived, so the schedule stopped',
+  '对话已归档，定时随之停用': 'The thread was archived, so the schedule stopped',
   执行任务的步骤暂停了它: 'The step working on the task paused it',
   '连续 10 次定时运行均无人回复，已自动暂停':
     'Paused after 10 scheduled runs with no reply from a person',
@@ -3153,8 +3154,6 @@ export const EN: Record<string, string> = {
     'Removing this entry only deletes the saved connection; data on the remote host stays intact.',
   切回本机: 'Switch back to this computer',
   '正在切回本机…': 'Switching back to this computer…',
-  '排队中：信息卡要在执行机上运行，团队暂无在线的执行机':
-    'Queued: info cards run on a Runner, and the team has no online Runner',
   正在生成改动: 'Preparing the change',
   '图表画不出来，下面是同一份数据。': 'The chart could not be drawn. Here is the same data.',
   '降了 {n}%': 'Down {n}%',

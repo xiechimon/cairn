@@ -180,8 +180,9 @@ export type GithubDeviceFixtureStep =
 export interface ScheduleRecord {
   id: string;
   teamId: string;
-  projectId: string;
-  todoId: string;
+  projectId: string | null;
+  todoId: string | null;
+  chiefThreadId?: string | null;
   kind: 'hourly' | 'daily' | 'weekly' | 'once' | 'cron' | 'event' | 'webhook';
   at: number | null;
   tz: string;
@@ -205,7 +206,12 @@ export interface ScheduleRecord {
     phase: Phase;
     projectName: string;
     ownerId: string;
-  };
+  } | null;
+  thread?: {
+    id: string;
+    title: string;
+    projectName: string;
+  } | null;
 }
 
 export interface ProjectContent {

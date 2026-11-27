@@ -1,11 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-  infoCardBrief,
-  infoCardHostBrief,
-  SESSION_BRIEF,
-  SESSION_REWORK_BRIEF,
-  WORKER_ASK_USER_TOOL,
-} from '../src/index.js';
+import { SESSION_BRIEF, SESSION_REWORK_BRIEF, WORKER_ASK_USER_TOOL } from '../src/index.js';
 
 describe('task execution guidance prompts (Slice 1)', () => {
   test('SESSION_BRIEF removes the blanket no-approval rule and clarifies clear multi-file vs uncertain big tasks', () => {
@@ -39,20 +33,5 @@ describe('task execution guidance prompts (Slice 1)', () => {
     expect(WORKER_ASK_USER_TOOL.description).toMatch(/recommended/i);
     expect(WORKER_ASK_USER_TOOL.description).toMatch(/draft PR.*PR link/i);
     expect(WORKER_ASK_USER_TOOL.description).toMatch(/blocked|acceptance|push/i);
-  });
-
-  test('infoCardBrief and infoCardHostBrief require checking deliverables/content while permitting gap-marked external sources', () => {
-    expect(infoCardHostBrief(true)).toContain('真实验收（提交前必做）');
-    expect(infoCardHostBrief(true)).toMatch(/报告正文/);
-    expect(infoCardHostBrief(true)).toMatch(/无法核实的外部\/付费来源.*缺口/);
-    expect(infoCardHostBrief(true)).toContain('切勿对未读未查的报告或交付物');
-    expect(infoCardHostBrief(true)).toContain('submit_report');
-
-    const containerBrief = infoCardBrief('conv-1', true);
-    expect(containerBrief).toContain('真实验收（提交前必做）');
-    expect(containerBrief).toMatch(/生成或导出的交付产物/);
-    expect(containerBrief).toMatch(/无法核实的外部\/付费来源.*缺口/);
-    expect(containerBrief).toContain('切勿对已产出的交付物');
-    expect(containerBrief).toContain('submit_report');
   });
 });

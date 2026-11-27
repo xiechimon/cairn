@@ -15,7 +15,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { scheduleViewState, toWireSchedule } from '../schedules/schedule-model.js';
+import { scheduleTitle, scheduleViewState, toWireSchedule } from '../schedules/schedule-model.js';
 
 export function ScheduleRowMenu({
   schedule,
@@ -30,9 +30,11 @@ export function ScheduleRowMenu({
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const title = scheduleTitle(schedule);
   const state = scheduleViewState(toWireSchedule(schedule));
   const enabled = schedule.enabled ?? true;
-  const running = ['queued', 'planning', 'building'].includes(schedule.todo.phase);
+  const running =
+    schedule.todo !== null && ['queued', 'planning', 'building'].includes(schedule.todo.phase);
   const queued = enabled && schedule.nextRunAt != null && schedule.nextRunAt <= now;
   const guarded = (action: () => void) => () => {
     if (!live) {
@@ -77,7 +79,7 @@ export function ScheduleRowMenu({
                     size="icon-xs"
                     data-testid="schedule-row-menu-button"
                     className="size-6 text-content-tertiary pointer-coarse:size-11"
-                    aria-label={t('{title} 的定时菜单', { title: schedule.todo.title })}
+                    aria-label={t('{title} 的定时菜单', { title })}
                   />
                 }
               />
@@ -108,7 +110,7 @@ export function ScheduleRowMenu({
             <KeyedMenuItem
               shortcut="P"
               data-action="toggle"
-              disabled={!enabled && schedule.todo.phase === 'closed'}
+              disabled={!enabled && schedule.todo?.phase === 'closed'}
               onClick={setEnabled}
             >
               {enabled ? <Pause /> : <RotateCw />}
@@ -135,7 +137,7 @@ export function ScheduleRowMenu({
       <DeleteConfirm
         open={confirmingDelete}
         title={t('确定删除该定时？此操作不可撤销。')}
-        summary={schedule.todo.title}
+        summary={title}
         ariaLabel={t('删除定时')}
         onClose={() => setConfirmingDelete(false)}
         onConfirm={remove}

@@ -30,77 +30,123 @@ export const scheduleTodoEmbedSchema = z.object({
   ownerId: recordId,
 });
 
+export const scheduleThreadEmbedSchema = z.object({
+  id: recordId,
+  title: z.string(),
+  projectName: z.string(),
+});
+
 const scheduleInputSchema = z.object({
-  todoId: recordId,
-  projectId: recordId.optional(),
+  todoId: recordId.optional(),
+  chiefThreadId: recordId.optional(),
+  projectId: recordId.nullable().optional(),
   tz: z.string().optional(),
   prompt: z.string().optional(),
   enabled: z.boolean().optional(),
   missedRunWindowMs: z.number().int().positive().optional(),
 });
 
-export const createScheduleBodySchema = z.discriminatedUnion('kind', [
-  scheduleInputSchema.extend({
-    kind: scheduleKindSchema.exclude(['cron', 'event', 'webhook']),
-    at: epochMs,
-    cron: z.never().optional(),
-    triggerSpec: z.never().optional(),
-  }),
-  scheduleInputSchema.extend({
-    kind: z.literal('cron'),
-    cron: z.string().trim().min(1),
-    at: z.null().optional(),
-    triggerSpec: z.never().optional(),
-  }),
-  scheduleInputSchema.extend({
-    kind: z.literal('event'),
-    triggerSpec: scheduleTriggerSpecSchema,
-    at: z.null().optional(),
-    cron: z.never().optional(),
-  }),
-  scheduleInputSchema.extend({
-    kind: z.literal('webhook'),
-    triggerSpec: z.never().optional(),
-    at: z.null().optional(),
-    cron: z.never().optional(),
-  }),
-]);
+export const createScheduleBodySchema = z
+  .discriminatedUnion('kind', [
+    scheduleInputSchema.extend({
+      kind: scheduleKindSchema.exclude(['cron', 'event', 'webhook']),
+      at: epochMs,
+      cron: z.never().optional(),
+      triggerSpec: z.never().optional(),
+    }),
+    scheduleInputSchema.extend({
+      kind: z.literal('cron'),
+      cron: z.string().trim().min(1),
+      at: z.null().optional(),
+      triggerSpec: z.never().optional(),
+    }),
+    scheduleInputSchema.extend({
+      kind: z.literal('event'),
+      triggerSpec: scheduleTriggerSpecSchema,
+      at: z.null().optional(),
+      cron: z.never().optional(),
+    }),
+    scheduleInputSchema.extend({
+      kind: z.literal('webhook'),
+      triggerSpec: z.never().optional(),
+      at: z.null().optional(),
+      cron: z.never().optional(),
+    }),
+  ])
+  .superRefine((val, ctx) => {
+    const hasTodo = val.todoId !== undefined;
+    const hasThread = val.chiefThreadId !== undefined;
+    if (hasTodo === hasThread) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'schedule requires exactly one of todoId or chiefThreadId',
+      });
+    }
+    if (hasThread && val.kind === 'event') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Coordinator-thread schedule cannot use event trigger',
+        path: ['kind'],
+      });
+    }
+    if (hasThread && (val.prompt?.trim() ?? '') === '') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Coordinator-thread schedule requires non-empty prompt',
+        path: ['prompt'],
+      });
+    }
+  });
 export type CreateScheduleBody = z.infer<typeof createScheduleBodySchema>;
 
-const updateScheduleInputSchema = scheduleInputSchema.extend({
-  todoId: recordId.optional(),
-});
+const updateScheduleInputSchema = scheduleInputSchema;
 
-export const updateScheduleBodySchema = z.discriminatedUnion('kind', [
-  updateScheduleInputSchema.extend({
-    kind: scheduleKindSchema.exclude(['cron', 'event', 'webhook']),
-    at: epochMs,
-    cron: z.never().optional(),
-    triggerSpec: z.never().optional(),
-    rotateWebhook: z.never().optional(),
-  }),
-  updateScheduleInputSchema.extend({
-    kind: z.literal('cron'),
-    cron: z.string().trim().min(1),
-    at: z.null().optional(),
-    triggerSpec: z.never().optional(),
-    rotateWebhook: z.never().optional(),
-  }),
-  updateScheduleInputSchema.extend({
-    kind: z.literal('event'),
-    triggerSpec: scheduleTriggerSpecSchema,
-    at: z.null().optional(),
-    cron: z.never().optional(),
-    rotateWebhook: z.never().optional(),
-  }),
-  updateScheduleInputSchema.extend({
-    kind: z.literal('webhook'),
-    triggerSpec: z.never().optional(),
-    at: z.null().optional(),
-    cron: z.never().optional(),
-    rotateWebhook: z.boolean().optional(),
-  }),
-]);
+export const updateScheduleBodySchema = z
+  .discriminatedUnion('kind', [
+    updateScheduleInputSchema.extend({
+      kind: scheduleKindSchema.exclude(['cron', 'event', 'webhook']),
+      at: epochMs,
+      cron: z.never().optional(),
+      triggerSpec: z.never().optional(),
+      rotateWebhook: z.never().optional(),
+    }),
+    updateScheduleInputSchema.extend({
+      kind: z.literal('cron'),
+      cron: z.string().trim().min(1),
+      at: z.null().optional(),
+      triggerSpec: z.never().optional(),
+      rotateWebhook: z.never().optional(),
+    }),
+    updateScheduleInputSchema.extend({
+      kind: z.literal('event'),
+      triggerSpec: scheduleTriggerSpecSchema,
+      at: z.null().optional(),
+      cron: z.never().optional(),
+      rotateWebhook: z.never().optional(),
+    }),
+    updateScheduleInputSchema.extend({
+      kind: z.literal('webhook'),
+      triggerSpec: z.never().optional(),
+      at: z.null().optional(),
+      cron: z.never().optional(),
+      rotateWebhook: z.boolean().optional(),
+    }),
+  ])
+  .superRefine((val, ctx) => {
+    if (val.todoId !== undefined && val.chiefThreadId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'schedule cannot specify both todoId and chiefThreadId',
+      });
+    }
+    if (val.chiefThreadId !== undefined && val.kind === 'event') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Coordinator-thread schedule cannot use event trigger',
+        path: ['kind'],
+      });
+    }
+  });
 export type UpdateScheduleBody = z.infer<typeof updateScheduleBodySchema>;
 
 export const patchScheduleBodySchema = z.object({ enabled: z.boolean() }).strict();
@@ -109,8 +155,9 @@ export type PatchScheduleBody = z.infer<typeof patchScheduleBodySchema>;
 export const scheduleRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
-  projectId: recordId,
-  todoId: recordId,
+  projectId: recordId.nullable(),
+  todoId: recordId.nullable(),
+  chiefThreadId: recordId.nullable(),
   kind: scheduleKindSchema,
   cron: z.string().nullable(),
   prompt: z.string(),
@@ -128,6 +175,7 @@ export const scheduleRecordSchema = z.object({
   missedRunWindowMs: z.number().int().nullable(),
   createdAt: epochMs.nullable(),
   createdBy: recordId,
-  todo: scheduleTodoEmbedSchema,
+  todo: scheduleTodoEmbedSchema.nullable(),
+  thread: scheduleThreadEmbedSchema.nullable(),
 });
 export type ScheduleRecord = z.infer<typeof scheduleRecordSchema>;

@@ -63,6 +63,7 @@ test.each(['fresh', 'upgrade'])(
           teamId: 'team',
           projectId: 'project',
           todoId: 'todo',
+          chiefThreadId: null,
           kind: 'weekly',
           at: 3,
           tz: 'Asia/Shanghai',

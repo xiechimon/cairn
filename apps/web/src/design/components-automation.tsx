@@ -9,6 +9,7 @@ const ACTIVE: ScheduleRecord = {
   teamId: 'team-1',
   projectId: 'project-1',
   todoId: 'todo-1',
+  chiefThreadId: null,
   kind: 'cron',
   cron: '0 9 * * 1-5',
   prompt: 'Run the login suite and report failures.',
@@ -32,6 +33,7 @@ const ACTIVE: ScheduleRecord = {
     projectName: 'cairn',
     ownerId: 'user-1',
   },
+  thread: null,
 };
 
 function AutomationExample({ initial }: { initial: ScheduleRecord }) {

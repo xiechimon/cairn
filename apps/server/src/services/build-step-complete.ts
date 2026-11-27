@@ -94,11 +94,8 @@ function stepArtifactGate(
   }
   if (isBuildStepKind(stepRow.kind)) {
     if (blockingWorkerQuestions(deps.db, stepRow.buildId).length > 0) return null;
-    if (isInfoOutput(outcome.output)) {
-      if (outcome.report === undefined) return '信息卡未产出报告';
-      return outcome.deliverables !== undefined
-        ? deliverableManifestFailure(deps.db, stepRow.id, outcome.deliverables)
-        : null;
+    if (outcome.deliverables !== undefined) {
+      return deliverableManifestFailure(deps.db, stepRow.id, outcome.deliverables);
     }
   }
   return null;

@@ -1,8 +1,6 @@
 import {
   type ChiefThread,
-  isBuildStepKind,
   isChiefSideThreadId,
-  isInfoOutput,
   isRegisteredMachine,
   type MachineQueuedThread,
   MODEL_SOURCE_RUNTIME_LABELS,
@@ -28,7 +26,6 @@ import {
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
-import { infoCardPlan } from './info-card.js';
 import {
   chiefIneligibility,
   machineCanReturn,
@@ -388,19 +385,6 @@ export function stepQueueProjector(db: Db, teamId: string) {
           kind: 'blocked-by',
           missing: 'todoRow' in queueRow ? unmetBlockerTitles(db, queueRow.todoRow) : [],
         },
-      };
-    }
-    const infoPlan =
-      'todoRow' in queueRow &&
-      isBuildStepKind(queueRow.kind) &&
-      isInfoOutput(queueRow.todoRow.output)
-        ? infoCardPlan(db, queueRow.todoRow, queueRow)
-        : null;
-    if (infoPlan !== null && infoPlan.kind !== 'runner') {
-      return {
-        position,
-        waitingFor: null,
-        ...(infoPlan.kind === 'wait' ? { blocked: infoPlan.blocked } : {}),
       };
     }
     const routing =

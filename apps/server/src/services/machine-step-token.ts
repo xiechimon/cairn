@@ -9,8 +9,6 @@ import {
   GITHUB_ACCESS_TOKEN_USERNAME,
   GITHUB_REPOSITORY_RENAMED,
   isBackendRuntimeId,
-  isBuildStepKind,
-  isInfoOutput,
   parseGithubRepoRef,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -114,13 +112,8 @@ async function workerStepToken(
       ? null
       : parseGithubRepoRef(stepRow.claimedRepo);
   const pinnedRepoId = stepRow?.claimedRepoId ?? null;
-  const infoCard =
-    stepRow !== undefined && todoRow !== undefined
-      ? isBuildStepKind(stepRow.kind) && isInfoOutput(todoRow.output)
-      : false;
   let git: GitCredentials | null = null;
   if (
-    !infoCard &&
     pinnedRepo === null &&
     projectRow?.repoKind === 'hosted' &&
     todoRow &&
@@ -132,7 +125,6 @@ async function workerStepToken(
       claimedAt: owned.claimedAt,
     });
   } else if (
-    !infoCard &&
     (pinnedRepo !== null || projectRow?.repoKind === 'github') &&
     todoRow &&
     owned.status === 'claimed'

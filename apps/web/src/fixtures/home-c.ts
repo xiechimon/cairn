@@ -2,7 +2,7 @@ import type { TokenUsage } from '@cairn/shared';
 import { formatRetryClock } from '../board/retry-copy.js';
 import { boardDefault } from './board.js';
 import { chiefDefault } from './chief.js';
-import { at, PROJECT_ID, probeTodo, r7 } from './core.js';
+import { at, PROJECT_ID, PROJECT_NAME, probeTodo, r7 } from './core.js';
 import { detailBuilding, detailConfirm, detailReview } from './detail.js';
 import { ENGINE_THREADS } from './engine-run-player.js';
 import type { ChiefContent, FixtureSet, TodoRecord } from './records.js';
@@ -256,14 +256,26 @@ export const homeC: FixtureSet = {
       ...scheduleOnce,
       id: 'home-c-schedule-idle',
       todoId: 'home-c-idle',
-      todo: { ...scheduleOnce.todo, seqNum: 2240, title: 'Sidebar status groups', phase: 'todo' },
+      todo: {
+        seqNum: 2240,
+        title: 'Sidebar status groups',
+        phase: 'todo',
+        projectName: PROJECT_NAME,
+        ownerId: 'u-xmon-dai',
+      },
     },
     {
       ...scheduleOnce,
       id: 'home-c-schedule-running',
       projectId: HOME_C_CRED,
       todoId: 'home-c-working-c',
-      todo: { ...scheduleOnce.todo, seqNum: 75, title: 'Orb canary round 7', phase: 'building' },
+      todo: {
+        seqNum: 75,
+        title: 'Orb canary round 7',
+        phase: 'building',
+        projectName: PROJECT_NAME,
+        ownerId: 'u-xmon-dai',
+      },
     },
   ],
   now: r7(20, 30),

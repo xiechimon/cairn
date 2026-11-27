@@ -150,7 +150,7 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
     '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始',
   'coordinator-provider-missing': 'Coordinator 规则使用的服务商「{name}」尚未添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
-  'no-computer': '排队中：信息卡要在执行机上运行，团队暂无在线的执行机',
+  'no-computer': '排队中：团队暂无可用的在线执行机',
   'github-push-missing':
     '排队中：{machine} 无法推送到该 GitHub 仓库——在 {machine} 上运行 gh auth login 登录 GitHub，或确认该账号有仓库写权限',
 };
@@ -1575,10 +1575,16 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
     teamId: r.teamId,
     projectId: r.projectId,
     todoId: r.todoId,
+    chiefThreadId: r.chiefThreadId ?? null,
     kind: r.kind,
+    cron: r.cron,
+    prompt: r.prompt,
     at: r.at,
     tz: r.tz,
     nextRunAt: r.nextRunAt ?? 0,
+    lastRunAt: r.lastRunAt,
+    lastRunStatus: r.lastRunStatus,
+    lastRunError: r.lastRunError,
     triggerSpec: r.triggerSpec,
     webhookMasked: r.webhookMasked,
     webhookLastUsedAt: r.webhookLastUsedAt,
@@ -1588,6 +1594,7 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
     enabled: r.enabled,
     pausedReason: r.pausedReason,
     todo: r.todo,
+    thread: r.thread ?? null,
   }));
 }
 

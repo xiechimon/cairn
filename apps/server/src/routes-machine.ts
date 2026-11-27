@@ -36,8 +36,6 @@ import {
   machineUploadUrlsBodySchema,
   normalizeEnrollCode,
   PLAN_FILE_NAME,
-  REPO_ARCHIVE_FAILED_FILE_NAME,
-  REPO_ARCHIVE_FILE_NAME,
   runnerOutOfWindow,
   SESSION_FILE_NAME,
   transcriptUploadSchema,
@@ -82,7 +80,6 @@ import {
 } from './services/machine-computer.js';
 import { withFencedTransaction } from './services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
-import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machine-repo-archive.js';
 import {
   createUploadUrls,
   getStepSession,
@@ -912,20 +909,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         () => c.req.text(),
         (_row, body) => {
           receivePlanUpload(deps, upload, body);
-          return completeUpload();
-        },
-      );
-    }
-    if (upload.name === REPO_ARCHIVE_FILE_NAME || upload.name === REPO_ARCHIVE_FAILED_FILE_NAME) {
-      return executeMachineCommand(
-        c,
-        () => c.req.text(),
-        (_row, body) => {
-          if (upload.name === REPO_ARCHIVE_FILE_NAME) {
-            receiveRepoArchive(ctx.machineHub, upload.machineId, upload.stepId, body);
-          } else {
-            receiveRepoArchiveFailure(ctx.machineHub, upload.machineId, upload.stepId, body);
-          }
           return completeUpload();
         },
       );

@@ -104,7 +104,6 @@ import { enrollThroughBrowser, RetryableEnrollmentError } from './machine-enroll
 import { ensurePrivateDir } from './private-fs.js';
 import { STEP_TREE_ENV, StepReaper } from './process-tree.js';
 import { setupProxy } from './proxy.js';
-import { performRepoArchive } from './repo-archive.js';
 import { type RunStepOptions, runStep } from './runner.js';
 import {
   claudeConfigHome,
@@ -1653,9 +1652,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
                     `background task stop failed: ${err instanceof Error ? err.message : String(err)}`,
                   ),
                 );
-            }
-            if (ev.type === 'repo.archive') {
-              void performRepoArchive({ client, logger }, ev.archive);
             }
             if (ev.type === 'antigravity.models' && connectionId !== null) {
               void deliverAntigravityModelProbe(ev.requestId, connectionId, probeSignal);

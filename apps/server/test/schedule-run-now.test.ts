@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import { dueEvent, project, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
+import * as ciLoop from '../src/services/ci-loop.js';
 import type { DueClock } from '../src/services/due-events.js';
 import { runScheduleNow } from '../src/services/schedule-run.js';
 import { createScheduler } from '../src/services/scheduler.js';
@@ -358,10 +359,12 @@ test('run now fires immediately even while another due_event async handler is in
   const pollBlocker = new Promise<void>((resolve) => {
     releasePoll = resolve;
   });
+  vi.spyOn(ciLoop, 'createCiPoller').mockReturnValue({
+    sweep: () => pollBlocker,
+  });
   const scheduler = createScheduler(s.svc, { tickMs: 600_000, clock }, undefined, {
-    ciPoller: {
-      sweep: () => pollBlocker,
-    },
+    githubFetch: s.svc.githubFetch,
+    logger: { info: () => undefined },
   });
   s.db
     .insert(dueEvent)

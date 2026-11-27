@@ -1,8 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  REPO_ARCHIVE_FAILED_FILE_NAME,
-  REPO_ARCHIVE_FILE_NAME,
   SESSION_JSONL_MAX_BYTES,
   type TranscriptUpload,
   transcriptPromptRowId,
@@ -14,7 +12,6 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
 import { assertMachineClaim } from './machine-claim-scope.js';
 import { withFencedTransaction } from './machine-deps.js';
-import { authorizeRepoArchiveUpload } from './machine-repo-archive.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -42,15 +39,7 @@ export function createUploadUrls(
   uploads: Map<string, PendingUpload>,
   generation?: number,
 ): { uploads: { name: string; url: string; method: 'PUT'; headers: Record<string, string> }[] } {
-  const archiveNames = [REPO_ARCHIVE_FILE_NAME, REPO_ARCHIVE_FAILED_FILE_NAME];
-  if (files.some((f) => archiveNames.includes(f.name))) {
-    if (!files.every((f) => archiveNames.includes(f.name))) {
-      throw new HttpError(400, 'repository snapshot uploads cannot be mixed with other files');
-    }
-    authorizeRepoArchiveUpload(deps.machineHub, machineId, stepId);
-  } else {
-    assertMachineClaim(deps, { machineId, stepId, generation });
-  }
+  assertMachineClaim(deps, { machineId, stepId, generation });
   const out = files.map((f) => {
     const uploadId = newRecordId();
     uploads.set(uploadId, { stepId, name: f.name, machineId, generation });

@@ -118,13 +118,23 @@ export function cronHasFiveFields(cron: string): boolean {
   return cron.trim().split(/\s+/).length === 5;
 }
 
+export function scheduleTitle(
+  schedule: Pick<DisplaySchedule, 'todo' | 'thread' | 'prompt'>,
+): string {
+  if (schedule.todo !== null) return schedule.todo.title;
+  if (schedule.thread?.title) return schedule.thread.title;
+  const trimmed = schedule.prompt?.trim() ?? '';
+  return trimmed !== '' ? trimmed : 'Coordinator';
+}
+
 export function scheduleBody(
   draft: ScheduleDraft,
-  schedule: Pick<ScheduleRecord, 'todoId' | 'projectId' | 'tz' | 'enabled'>,
+  schedule: Pick<ScheduleRecord, 'todoId' | 'chiefThreadId' | 'projectId' | 'tz' | 'enabled'>,
   now: number,
 ): CreateScheduleBody {
   const base = {
-    todoId: schedule.todoId,
+    ...(schedule.todoId != null ? { todoId: schedule.todoId } : {}),
+    ...(schedule.chiefThreadId != null ? { chiefThreadId: schedule.chiefThreadId } : {}),
     projectId: schedule.projectId,
     tz: schedule.tz,
     prompt: draft.prompt,
@@ -163,6 +173,7 @@ export function scheduleViewState(
 
 const PAUSE_REASONS: Record<string, string> = {
   'Task archived': '任务已归档，定时随之停用',
+  'Thread archived': '对话已归档，定时随之停用',
   'Paused by worker': '执行任务的步骤暂停了它',
   'Paused after 10 consecutive scheduled runs without a human message':
     '连续 10 次定时运行均无人回复，已自动暂停',
@@ -186,6 +197,7 @@ export function scheduleEnded(schedule: {
 export function toWireSchedule(schedule: DisplaySchedule): ScheduleRecord {
   return {
     ...schedule,
+    chiefThreadId: schedule.chiefThreadId ?? null,
     cron: schedule.cron ?? null,
     prompt: schedule.prompt ?? '',
     enabled: schedule.enabled ?? true,
@@ -198,5 +210,6 @@ export function toWireSchedule(schedule: DisplaySchedule): ScheduleRecord {
     webhookLastUsedAt: schedule.webhookLastUsedAt ?? null,
     missedRunWindowMs: schedule.missedRunWindowMs ?? null,
     createdAt: schedule.createdAt ?? null,
+    thread: schedule.thread ?? null,
   };
 }

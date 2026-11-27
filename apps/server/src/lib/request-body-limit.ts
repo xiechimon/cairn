@@ -1,14 +1,7 @@
-import {
-  ATTACHMENT_MAX_BYTES,
-  REPO_ARCHIVE_FAILED_FILE_NAME,
-  REPO_ARCHIVE_FILE_NAME,
-  SESSION_FILE_NAME,
-  SESSION_JSONL_MAX_BYTES,
-} from '@cairn/shared';
+import { ATTACHMENT_MAX_BYTES, SESSION_FILE_NAME, SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
 import type { Context, MiddlewareHandler } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { routePath } from 'hono/route';
-import { INFO_SNAPSHOT_MAX_BYTES } from '../services/info-repo-snapshot.js';
 
 const KIB = 1024;
 const MIB = 1024 * KIB;
@@ -19,12 +12,8 @@ function budgetOf(c: Context): number {
   const upload = c.get('machineUpload');
   if (upload !== undefined) {
     switch (upload.name) {
-      case REPO_ARCHIVE_FILE_NAME:
-        return 4 * Math.ceil(INFO_SNAPSHOT_MAX_BYTES / 3);
       case SESSION_FILE_NAME:
         return SESSION_JSONL_MAX_BYTES;
-      case REPO_ARCHIVE_FAILED_FILE_NAME:
-        return DEFAULT_BODY_BYTES;
       default:
         return 32 * MIB;
     }

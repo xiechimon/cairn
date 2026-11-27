@@ -2,14 +2,12 @@ import { CORE_COORDINATOR_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { build, project, step, todo } from '../src/db/schema.js';
+import { project } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
-import { nowMs } from '../src/lib/ids.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { readBranches } from '../src/services/git.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { executeGithubReadTool } from '../src/services/github-reads.js';
-import { infoRepoSnapshot } from '../src/services/info-repo-snapshot.js';
 import { ctx, H, registerChiefHarness, toolDeps } from './chief-harness.js';
 import { githubAuthFake } from './fakes/github-auth.js';
 
@@ -250,137 +248,5 @@ describe('Coordinator and server GitHub reads through the Cairn GitHub connectio
     ) as { files: { content?: string }[] };
     expect(result.files[0]?.content).toBe('# Offer\n');
     expect(seenAuth.every((header) => header !== `Bearer ${stale}`)).toBe(true);
-  });
-
-  test('infoRepoSnapshot reads private GitHub tarballs through deps.githubFetch and names the GitHub App install on 404', async () => {
-    bindPrivateOfferProject();
-    const token = 'ghu_snapshot_token';
-    upsertGithubConnection(
-      { db: H.s.db, box: H.s.secretBox },
-      {
-        teamId: H.teamId,
-        login: 'xiechimon',
-        accessToken: token,
-        scope: '',
-        device: {
-          clientId: 'Iv23liW8YZ2D9i6DYMgp',
-          refreshTokenExpiresAt: Date.now() + 86_400_000,
-        },
-      },
-    );
-    const now = nowMs();
-    const todoRow = H.s.db
-      .insert(todo)
-      .values({
-        id: 'todo-snap',
-        teamId: H.teamId,
-        projectId: H.projectId,
-        title: 'inspect offer',
-        spec: '',
-        phase: 'building',
-        phaseAt: now,
-        seqNum: 1,
-      })
-      .returning()
-      .get()!;
-    const stepRow = H.s.db
-      .insert(step)
-      .values({
-        id: 'step-snap',
-        buildId: 'build-snap',
-        kind: 'build',
-        status: 'claimed',
-        createdAt: now,
-      })
-      .returning()
-      .get()!;
-
-    const tarBytes = Buffer.from('fake-tar-gz');
-    const seen: { url: string; auth: string | undefined }[] = [];
-    const okFetch: FetchLike = async (input, init) => {
-      seen.push({ url: String(input), auth: init?.headers?.authorization });
-      return new Response(tarBytes, { status: 200 });
-    };
-    const ok = await infoRepoSnapshot(
-      { ...toolDeps(), githubFetch: okFetch },
-      todoRow,
-      stepRow,
-      undefined,
-    );
-    expect(ok).toEqual({ tarGz: tarBytes });
-    expect(seen).toEqual([
-      {
-        url: `${API}/repos/xiechimon/offer/tarball/HEAD`,
-        auth: `Bearer ${token}`,
-      },
-    ]);
-
-    const deniedFetch: FetchLike = async () => new Response('Not Found', { status: 404 });
-    const denied = await infoRepoSnapshot(
-      { ...toolDeps(), githubFetch: deniedFetch },
-      todoRow,
-      stepRow,
-      undefined,
-    );
-    expect(denied).toMatchObject({ reason: expect.stringContaining(INSTALL_URL) });
-
-    const redirectCalls: { url: string; auth: string | undefined }[] = [];
-    const redirectFetch: FetchLike = async (input, init) => {
-      const url = String(input);
-      redirectCalls.push({ url, auth: init?.headers?.authorization });
-      if (url.startsWith(`${API}/repos/xiechimon/offer/tarball/`)) {
-        return new Response(null, {
-          status: 302,
-          headers: { location: 'https://codeload.github.com/xiechimon/offer/legacy.tar.gz/HEAD' },
-        });
-      }
-      return new Response(tarBytes, { status: 200 });
-    };
-    const redirected = await infoRepoSnapshot(
-      { ...toolDeps(), githubFetch: redirectFetch },
-      todoRow,
-      stepRow,
-      undefined,
-    );
-    expect(redirected).toEqual({ tarGz: tarBytes });
-    expect(redirectCalls).toEqual([
-      { url: `${API}/repos/xiechimon/offer/tarball/HEAD`, auth: `Bearer ${token}` },
-      { url: 'https://codeload.github.com/xiechimon/offer/legacy.tar.gz/HEAD', auth: undefined },
-    ]);
-
-    const badRedirectFetch: FetchLike = async () =>
-      new Response(null, {
-        status: 302,
-        headers: { location: 'https://evil.example/tarball.gz' },
-      });
-    const blocked = await infoRepoSnapshot(
-      { ...toolDeps(), githubFetch: badRedirectFetch },
-      todoRow,
-      stepRow,
-      undefined,
-    );
-    expect(blocked).toEqual({ reason: 'GitHub returned an untrusted snapshot redirect' });
-
-    let canceled = false;
-    let emitted = 0;
-    const chunkedStream = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        emitted += 1;
-        controller.enqueue(new Uint8Array(2 * 1024 * 1024));
-        if (emitted >= 10) controller.close();
-      },
-      cancel() {
-        canceled = true;
-      },
-    });
-    const oversized = await infoRepoSnapshot(
-      { ...toolDeps(), githubFetch: async () => new Response(chunkedStream, { status: 200 }) },
-      todoRow,
-      stepRow,
-      undefined,
-    );
-    expect(oversized).toMatchObject({ reason: expect.stringContaining('larger than') });
-    expect(canceled).toBe(true);
-    expect(emitted).toBeLessThan(10);
   });
 });

@@ -9,11 +9,14 @@ const NOW = Date.UTC(2026, 10, 4, 8);
 
 function schedule(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
   return {
-    id: 'schedule-1', teamId: 't1', projectId: 'proj-1', todoId: 'todo-1', kind: 'daily',
+    id: 'schedule-1', teamId: 't1', projectId: 'proj-1', todoId: 'todo-1', chiefThreadId: null, kind: 'daily',
     cron: '0 9 * * *', prompt: 'Run the login suite and report failures.', enabled: true,
     at: Date.UTC(2026, 10, 4, 1), tz: 'Asia/Shanghai', nextRunAt: NOW + 3_600_000,
-    lastRunAt: NOW - 86_400_000, lastRunStatus: 'completed', pausedReason: null, createdBy: 'u1',
+    lastRunAt: NOW - 86_400_000, lastRunStatus: 'completed', pausedReason: null,
+    triggerSpec: null, webhookMasked: null, webhookLastUsedAt: null, missedRunWindowMs: null,
+    createdAt: NOW - 172_800_000, createdBy: 'u1',
     todo: { seqNum: 9, title: TASK.title, phase: 'building', projectName: 'cairn', ownerId: 'u1' },
+    thread: null,
     ...overrides,
   };
 }

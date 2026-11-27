@@ -77,6 +77,7 @@ import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
 import { reportAnsweredIn, reportRefCurrent, reportRefOfPrompt } from './report-turn.js';
 import { coordinatorProfile } from './routing-rules.js';
+import { finishScheduledStep } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
 import { setTodoPhase } from './todos.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
@@ -566,6 +567,17 @@ export function finishCoordinatorTurn(
     { ...outcome, sessionId: reportedSessionId },
     stepRuntimeFor(stepRow.ranModel?.provider ?? null),
   );
+  if (stepRow.scheduleId !== null) {
+    finishScheduledStep(
+      { db: deps.db, hub: deps.hub, user: deps.user },
+      stepRow,
+      outcome.status === 'success'
+        ? { status: 'completed' }
+        : outcome.status === 'stopped'
+          ? { status: 'stopped' }
+          : { status: 'failed', error: outcome.errorMessage ?? 'Coordinator turn failed' },
+    );
+  }
   settleMemoryEditTurn(
     db,
     stepRow,

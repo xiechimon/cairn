@@ -7,10 +7,7 @@ import {
   buildTaskPromptText,
   CORE_COORDINATOR_TOOLS,
   fencedTitle,
-  infoCardBrief,
-  infoCardHostBrief,
   isBuildStepKind,
-  isInfoOutput,
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
@@ -80,11 +77,8 @@ import { githubRepoOfProject, projectOfTodo, projectRepoRef } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
-import { infoCardPlan, infoCardRemoteTools } from './info-card.js';
-import { infoRepoOffered } from './info-repo-snapshot.js';
 import { localMergeAuthorizationRefusal } from './local-merge.js';
 import { stageTurnAttachments, teamOffersDesktop } from './machine-computer.js';
-import { failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
   type MachineDeps,
   profileForStep,
@@ -680,9 +674,6 @@ async function tryClaim(
       );
       continue;
     }
-    const infoCard = isBuildStepKind(cand.stepRow.kind) && isInfoOutput(cand.todoRow.output);
-    const infoPlan = infoCard ? infoCardPlan(db, cand.todoRow, cand.stepRow) : null;
-    if (infoPlan !== null && infoPlan.kind !== 'runner') continue;
     const agentRow = profileForStep(deps, cand.todoRow, cand.stepRow.kind, cand.stepRow.id);
     if (agentRow === null) {
       withFencedTransaction(deps, (settleDeps) =>
@@ -767,8 +758,8 @@ async function tryClaim(
     if (!stillAuthorized()) return null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     if (!stillAuthorized()) return null;
-    const workerMcp = stepMcpGrant(db, machineRow, infoPlan !== null);
-    const claimRepoRef = infoCard ? null : githubRepoOfProject(projectOfTodo(db, cand.todoRow));
+    const workerMcp = stepMcpGrant(db, machineRow, false);
+    const claimRepoRef = githubRepoOfProject(projectOfTodo(db, cand.todoRow));
     const repoResolution =
       claimRepoRef === null
         ? { id: null, error: null }
@@ -840,7 +831,7 @@ async function tryClaim(
           !githubPushCapable(freshMachine?.capabilities, txGithubPushRepo, nowMs())
         )
           return false;
-        const claimRepo = infoCard ? null : githubRepoOfProject(claimProject);
+        const claimRepo = githubRepoOfProject(claimProject);
         if (
           (claimRepo === null) !== (claimRepoRef === null) ||
           (claimRepo !== null &&
@@ -883,7 +874,6 @@ async function tryClaim(
           .where(pendingClaim(cand.stepRow, claimedAt))
           .run();
         if (res.changes === 0) return false;
-        if (infoCard) failEarlierClaimDeliverables(tx, cand.stepRow.id);
         if (cand.stepRow.kind !== 'review') {
           recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, agentRow);
         }
@@ -937,7 +927,7 @@ async function tryClaim(
           ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
         };
     const projectRow = claimProject;
-    const repoRef = infoCard ? null : projectRepoRef(projectRow, origin);
+    const repoRef = projectRepoRef(projectRow, origin);
     const mergeTarget =
       cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
     const repo =
@@ -977,7 +967,6 @@ async function tryClaim(
           .map((answer) => answer.requestId)
           .filter((requestId) => decided.has(requestId))
       : [];
-    const infoHasComputer = infoPlan?.kind === 'runner' && infoPlan.hasComputer;
     return {
       step: {
         id: cand.stepRow.id,
@@ -1019,20 +1008,7 @@ async function tryClaim(
       agent: {
         id: agentRow.id,
         displayName: agentRow.displayName,
-        description: infoCard
-          ? [
-              agentRow.description,
-              infoHasComputer
-                ? infoCardBrief(
-                    cand.stepRow.buildId,
-                    infoRepoOffered(deps, cand.todoRow),
-                    infoPlan.relayOnly,
-                  )
-                : infoCardHostBrief(infoRepoOffered(deps, cand.todoRow)),
-            ]
-              .filter((part): part is string => part !== null && part !== '')
-              .join('\n\n')
-          : agentRow.description,
+        description: agentRow.description,
         provider: model.provider,
         modelId: model.modelId,
         thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
@@ -1048,11 +1024,8 @@ async function tryClaim(
         injectedSkills: skillInjection.hits.map((h) => h.id),
         tools: [...agentRow.tools],
       },
-      remoteTools: infoCard
-        ? infoCardRemoteTools(cand.stepRow.kind, infoHasComputer)
-        : workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
-      ...(infoPlan?.relayOnly === true ? { remoteToolsOnly: true as const } : {}),
-      localTools: infoCard && infoHasComputer ? [] : claimLocalTools(agentRow.tools),
+      remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
+      localTools: claimLocalTools(agentRow.tools),
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }

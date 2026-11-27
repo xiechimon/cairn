@@ -227,6 +227,7 @@ describe('schedule record (r3 §8.3 measured verbatim)', () => {
     teamId: 'BoZYfvqKSGanlxsXVbXSa',
     projectId: 'prj_r3',
     todoId: 'todo_01',
+    chiefThreadId: null,
     kind: 'once',
     cron: null,
     prompt: '',
@@ -250,6 +251,7 @@ describe('schedule record (r3 §8.3 measured verbatim)', () => {
       projectName: 'r3-lifecycle',
       ownerId: 'usr_mon',
     },
+    thread: null,
   };
 
   it('parses the observed once record', () => {

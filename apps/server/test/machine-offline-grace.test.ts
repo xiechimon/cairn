@@ -586,12 +586,7 @@ describe('Runner offline grace (docs/design/runner-offline-grace.md)', () => {
     expect(machineRow(s, m.machineId).online).toBe(true);
     expect(s.machineHub.isConnected(m.machineId)).toBe(false);
     expect(
-      s.machineHub.pushRepoArchive(m.machineId, {
-        stepId: 'step-1',
-        directory: '/tmp/x',
-        ref: 'main',
-        maxBytes: 1024,
-      }),
+      s.machineHub.pushAntigravityModelProbe(m.machineId, '00000000-0000-0000-0000-000000000001'),
     ).toBe(false);
   });
 });

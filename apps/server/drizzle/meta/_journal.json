@@ -1807,6 +1807,13 @@
       "when": 1795748699148,
       "tag": "0262_secret_overlord",
       "breakpoints": true
+    },
+    {
+      "idx": 263,
+      "version": "6",
+      "when": 1795768854821,
+      "tag": "0263_retire_info_card_schedules",
+      "breakpoints": true
     }
   ]
 }

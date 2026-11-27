@@ -2,7 +2,6 @@ import { randomBytes } from 'node:crypto';
 import type {
   ComputerCall,
   ComputerScreenRequest,
-  MachineRepoArchiveCommand,
   MachineStreamEvent,
   ManagedUpdateRuntime,
 } from '@cairn/shared';
@@ -210,17 +209,6 @@ export class MachineWakeHub {
     try {
       entry.close();
     } catch {}
-  }
-
-  pushRepoArchive(machineId: string, cmd: MachineRepoArchiveCommand): boolean {
-    const entry = this.streamsByMachine.get(machineId);
-    if (!entry) return false;
-    try {
-      entry.send({ type: 'repo.archive', archive: cmd });
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   pushAntigravityModelProbe(machineId: string, requestId: string): boolean {

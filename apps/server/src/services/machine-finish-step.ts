@@ -8,7 +8,6 @@ import {
   classifyStepFailure,
   conversationBranch,
   isBuildStepKind,
-  isInfoOutput,
   parseLocalMergeInstruction,
   parseRetryDelayMs,
   QUOTA_BLOCK_REASON_MAX_CHARS,
@@ -64,11 +63,10 @@ import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
-import { acceptedInfoReport } from './info-card.js';
 import { applyLocalMergeReport } from './local-merge.js';
 import { claimGenerationAccepted } from './machine-claim-scope.js';
-import { closeInfoCardTab, stopStepComputer } from './machine-computer.js';
-import { deliverableManifestOf, failUnpublishedDeliverables } from './machine-deliverables.js';
+import { stopStepComputer } from './machine-computer.js';
+import { failUnpublishedDeliverables } from './machine-deliverables.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -277,7 +275,6 @@ export async function finishStep(
     const row = settled.db.select().from(step).where(eq(step.id, stepId)).get();
     if (row === undefined || row.claimedAt !== prepared.stepRow.claimedAt) return null;
     stopStepComputer(settled, stepId);
-    if (row.status !== 'pending') closeInfoCardTab(settled, row);
     return row.kind !== 'review' && row.kind !== 'verify' && !isChiefConversation(row.buildId)
       ? row.buildId
       : null;
@@ -769,12 +766,6 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     return;
   }
   if (outcome.status === 'success') {
-    const manifest = isInfoOutput(worker?.todoRow.output)
-      ? deliverableManifestOf(db, stepRow)
-      : undefined;
-    const infoReport = isInfoOutput(worker?.todoRow.output)
-      ? acceptedInfoReport(deps, stepRow)
-      : undefined;
     const complete = (completeDeps: MachineDeps) =>
       completeStep(completeDeps, stepId, {
         hasChanges: outcome.hasChanges,
@@ -787,8 +778,6 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
         ...(outcome.verifyVerdictError !== undefined
           ? { verifyVerdictError: outcome.verifyVerdictError }
           : {}),
-        ...(infoReport !== undefined ? { report: infoReport } : {}),
-        ...(manifest !== undefined ? { deliverables: manifest } : {}),
         verdictReport,
       });
     complete(deps);

@@ -25,7 +25,6 @@ import {
   COMPUTER_SCREEN_DEADLINE_MS,
   COMPUTER_START_ALLOWANCE_MS,
   COMPUTER_USER_CONTROL,
-  closeInfoCardTab,
   computerCallId,
   computerDeadlineMs,
   computerMachineName,
@@ -38,14 +37,7 @@ import {
 import { type MachineDeps, withFencedTransaction } from '../src/services/machine-deps.js';
 import { executeRelayToolCall } from '../src/services/machine-relay.js';
 import { markPresence } from '../src/services/machines.js';
-import {
-  bootServer,
-  postProject,
-  req,
-  seedRoute,
-  startLegacyBuild,
-  type TestServer,
-} from './helpers.js';
+import { bootServer, seedRoute, type TestServer } from './helpers.js';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -778,43 +770,6 @@ describe('stop and finish', () => {
     ]);
     expect(answer).toEqual({ ok: true, cancelled: true });
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
-  });
-
-  test('info card tab cleanup sends only a committed call', async () => {
-    const { s, deps } = boot();
-    addMachine(s, 'omarchy', { computer: true, browser: true });
-    const calls = connect(s, 'omarchy');
-    const settled = forwardComputerCall(deps, 'sidecar', 'step-a', shell('ls'));
-    receiveComputerFrames(s.db, s.hub, 'omarchy', computerCallId('step-a', 'tc-1'), [done(1, '')]);
-    await settled;
-    const projectId = await postProject(s.app);
-    const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
-      title: 'Fixture info card',
-      spec: 'Fixture',
-      output: 'info',
-    });
-    const { id } = (await created.json()) as { id: string };
-    const buildId = startLegacyBuild(s, id, { withPlan: false });
-    const row = s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).get()!;
-    const callId = computerCallId(row.id, 'tab-close');
-
-    expect(() =>
-      withFencedTransaction(deps, (transactional) => {
-        closeInfoCardTab(transactional, row);
-        throw new Error('rollback tab close');
-      }),
-    ).toThrow('rollback tab close');
-    expect(calls).toHaveLength(1);
-    expect(
-      s.db.select().from(computerCallTable).where(eq(computerCallTable.id, callId)).get(),
-    ).toBeUndefined();
-
-    withFencedTransaction(deps, (transactional) => {
-      closeInfoCardTab(transactional, row);
-      expect(calls).toHaveLength(1);
-    });
-    expect(calls.at(-1)).toMatchObject({ callId, tool: 'browser_close_tab' });
-    expect(callRow(s, callId).state).toBe('dispatched');
   });
 
   test('rolling back a fenced stop leaves the live computer waiter and its lease in place', async () => {

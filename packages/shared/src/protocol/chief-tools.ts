@@ -556,14 +556,14 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'create_todo',
-    description: `Create a todo in a project, on the board right away and queued to run unless you park it (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages or from a source todo. Always pass title (at most 50 characters); there is no summary, description or body parameter. Pass start: false when the owner wants the task only recorded ("放到待办", "先记下来", "later"): it sits in 待开始 as not started until open_thread or the owner starts it. An info card (output 'info', 'report', 'dataset' or 'link') runs alone in its own computer and sees only the owner's cited words plus its briefing, so put every link, name, id and finding it needs into the briefing. A message already bound to a task returns 409: use that task or split it explicitly with quotes (the owner's exact sentences that todo covers), once per independently accepted outcome. When you already did part of the request yourself, pass quotes covering only the rest. Open a separate research todo only when the owner explicitly wants the report before any code changes, or when research and change are accepted separately; otherwise research is the thread's own first step. A vague request still gets a todo: its thread researches and proposes; ask_user only when the need itself is ambiguous. Order work with dependsOn or blockedBy; the thread wakes you when it needs someone, finishes or fails, so never wait or poll for it.\n\nBefore creating, search todos with query and check threads: when the same work is already running, pass the new words to it with message_thread instead. When the owner's message starts with ${PICKED_PROJECT_OPEN}…】 (the project they picked in the composer), every todo of this turn goes there without asking; otherwise use the project the owner names or the one the turn notes point to, and only when the evidence cannot decide, ask_user listing the remaining candidates plus a "none of these" option. One message about several projects becomes one todo per project. Research belonging to no project omits projectId with output "info"; its report comes back to this conversation.\n\nThe result carries link, a Markdown link to the task: write tasks that way in replies, never as #n. A queued task has not started running yet: a runner still has to pick it up and run workspace setup (which can fail), so tell the owner it is queued rather than started or running. Do not announce the new task; say where it went and what happens next.`,
+    description: `Create a todo in a project, on the board right away and queued to run unless you park it (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages or from a source todo. Always pass title (at most 50 characters); there is no summary, description or body parameter. Pass start: false when the owner wants the task only recorded ("放到待办", "先记下来", "later"): it sits in 待开始 as not started until open_thread or the owner starts it. A message already bound to a task returns 409: use that task or split it explicitly with quotes (the owner's exact sentences that todo covers), once per independently accepted outcome. When you already did part of the request yourself, pass quotes covering only the rest. For scheduled requests without a repo code task (e.g. daily summaries or web research), schedule directly in the Coordinator thread via schedule_todo omitting todoId rather than creating a todo. A vague request still gets a todo: its thread researches and proposes; ask_user only when the need itself is ambiguous. Order work with dependsOn or blockedBy; the thread wakes you when it needs someone, finishes or fails, so never wait or poll for it.\n\nBefore creating, search todos with query and check threads: when the same work is already running, pass the new words to it with message_thread instead. When the owner's message starts with ${PICKED_PROJECT_OPEN}…】 (the project they picked in the composer), every todo of this turn goes there without asking; otherwise use the project the owner names or the one the turn notes point to, and only when the evidence cannot decide, ask_user listing the remaining candidates plus a "none of these" option. One message about several projects becomes one todo per project.\n\nThe result carries link, a Markdown link to the task: write tasks that way in replies, never as #n. A queued task has not started running yet: a runner still has to pick it up and run workspace setup (which can fail), so tell the owner it is queued rather than started or running. Do not announce the new task; say where it went and what happens next.`,
     parameters: obj(
       {
         title: str(
           "The task's name (at most 50 characters, in the owner's language) naming the outcome, e.g. \"新建 HELLO.md 并提交\". It only names the task; the owner's words stay the task text.",
         ),
         projectId: str(
-          'Project id. Omit it only for output "info" research that belongs to no project: the todo goes to the research project and its report comes back to this conversation.',
+          'Project id (or omit when creating a projectless research task in the research project).',
         ),
         messageIds: idArr(
           'Unique ids of owner messages or owner-answered questions in this Coordinator thread. Omit it to cite the owner messages that started this turn; when the turn carries more than one owner message the call fails and lists them: pass the ids of the ones that state this task request, leaving out the rest. To also cite an earlier owner message, pass its id here. Required in event turns ([wake:…]). Already-bound messages return 409 unless quotes explicitly splits the request.',
@@ -584,7 +584,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Pick by what the task needs, for example a fast model for small edits and a stronger one for hard work. Any other model is refused. The list itself is owner-only — do not try to change it; if the model you want is not on it, ask the owner to add it in Settings > Model. Omit it and the task runs on the team task model, which follows the Coordinator model.",
         ),
         output: str(
-          'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or one of "info", "report", "dataset", "link" (info card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment; pick the kind that names the artifact).',
+          'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or "info"/"report"/"dataset"/"link" for non-code/research tasks (runs normally on any Runner without committing code). Never use create_todo for recurring requests — call schedule_todo on the current conversation instead.',
         ),
         start: {
           type: 'boolean',
@@ -592,7 +592,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
             'Optional. Pass false when the owner wants the task recorded without running it now: it is created in 待开始 as not started and starts later with open_thread or when the owner starts it. Omit it (default true) to queue the thread right away.',
         },
         blockedBy: idArr(
-          'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
+          'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done; a failed or closed blocker wakes you to decide.',
         ),
         platform: str(
           `Optional "macos", "windows" or "linux": the operating system the task needs. ${PLATFORM_DOC}`,
@@ -601,7 +601,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           'Optional machine id from machines. Pass it only when the owner explicitly names the computer this task should run on; the task then waits for that computer instead of using automatic assignment. Never infer it from the project, the machine you are on, or a machine merely mentioned as data.',
         ),
         briefing: str(
-          'Only with a non-code output ("info", "report", "dataset", "link"). The concrete inputs you already have that the card needs and cannot get from the owner\'s words: links, names, ids, figures, what you found earlier in this conversation or with your own tools. Plain facts, copied exactly, no instructions and no plan. Inputs and facts for the work only: never housekeeping (correcting earlier runs, updating memory, archiving, stopping other tasks), which the card must not put in its report. An info card runs alone in its own computer and sees only the owner\'s cited words plus this briefing, so anything you leave out is lost to it.',
+          'Only with a non-code output ("info", "report", "dataset", "link"). The concrete inputs you already have that the task needs and cannot get from the owner\'s words: links, names, ids, figures, what you found earlier in this conversation or with your own tools. Plain facts, copied exactly, no instructions and no plan. Inputs and facts for the work only: never housekeeping (correcting earlier runs, updating memory, archiving, stopping other tasks).',
         ),
         codeChangeQuote: str(
           "Only when sourceTodoId is an info card and output is not an info kind: the owner's exact words in this turn that explicitly ask for a code change. Without them the call is refused; research and report work stays an info card.",
@@ -760,24 +760,32 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'schedule_todo',
-    description: 'Schedule a todo to rerun (hourly/daily/weekly/once; minute steps 00/15/30/45).',
+    description:
+      'Schedule a message on this Coordinator thread (omit todoId and pass prompt) or schedule an existing todo to rerun (hourly/daily/weekly/once; minute steps 00/15/30/45). For recurring summaries, news/competitor monitoring, or reminders without a repo build, schedule directly on the current thread with the user request in prompt.',
     parameters: obj(
       {
-        todoId: str('Todo id.'),
+        todoId: str('Optional todo id. Omit to schedule on the current Coordinator thread.'),
         kind: str('once | hourly | daily | weekly.'),
         at: {
           type: 'number',
           description: 'Epoch ms anchor (required for once; time-of-day anchor for recurring).',
         },
-        machineId: str('Optional pinned machine id; null = automatic.'),
+        prompt: str('Message sent when firing. Required when todoId is omitted.'),
+        tz: str('Optional IANA timezone (defaults to Coordinator or server timezone).'),
       },
-      ['todoId', 'kind'],
+      ['kind', 'at'],
     ),
   },
   {
     name: 'unschedule_todo',
-    description: 'Remove the schedule of a todo.',
-    parameters: obj({ todoId: str('Todo id.') }, ['todoId']),
+    description: 'Remove a schedule by scheduleId or todoId.',
+    parameters: obj(
+      {
+        todoId: str('Todo id whose schedule should be removed.'),
+        scheduleId: str('Schedule id to remove (for Coordinator-thread schedules).'),
+      },
+      [],
+    ),
   },
   {
     name: 'cancel_builds',

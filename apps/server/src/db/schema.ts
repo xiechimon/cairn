@@ -568,8 +568,9 @@ export const schedule = sqliteTable(
     teamId: text('teamId')
       .notNull()
       .references(() => team.id),
-    projectId: text('projectId').notNull(),
-    todoId: text('todoId').notNull(),
+    projectId: text('projectId'),
+    todoId: text('todoId'),
+    chiefThreadId: text('chiefThreadId'),
     kind: text('kind').$type<ScheduleKind>().notNull(),
     cron: text('cron'),
     prompt: text('prompt').notNull().default(''),
@@ -595,7 +596,12 @@ export const schedule = sqliteTable(
   (t) => [
     index('schedule_nextRunAt_idx').on(t.nextRunAt),
     uniqueIndex('schedule_todoId_unique').on(t.todoId),
+    index('schedule_chiefThreadId_idx').on(t.chiefThreadId),
     uniqueIndex('schedule_webhookTokenHash_unique').on(t.webhookTokenHash),
+    check(
+      'schedule_target_xor',
+      sql`((${t.todoId} IS NOT NULL AND ${t.chiefThreadId} IS NULL) OR (${t.todoId} IS NULL AND ${t.chiefThreadId} IS NOT NULL))`,
+    ),
   ],
 );
 

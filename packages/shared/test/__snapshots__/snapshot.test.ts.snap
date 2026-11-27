@@ -3333,48 +3333,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     {
       "additionalProperties": false,
       "properties": {
-        "archive": {
-          "additionalProperties": false,
-          "properties": {
-            "directory": {
-              "minLength": 1,
-              "type": "string",
-            },
-            "maxBytes": {
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991,
-              "type": "integer",
-            },
-            "ref": {
-              "minLength": 1,
-              "type": "string",
-            },
-            "stepId": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "stepId",
-            "directory",
-            "ref",
-            "maxBytes",
-          ],
-          "type": "object",
-        },
-        "type": {
-          "const": "repo.archive",
-          "type": "string",
-        },
-      },
-      "required": [
-        "type",
-        "archive",
-      ],
-      "type": "object",
-    },
-    {
-      "additionalProperties": false,
-      "properties": {
         "requestId": {
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
@@ -6845,6 +6803,9 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
           "minimum": -9007199254740991,
           "type": "integer",
         },
+        "chiefThreadId": {
+          "type": "string",
+        },
         "cron": {
           "not": {},
         },
@@ -6866,7 +6827,10 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
           "type": "integer",
         },
         "projectId": {
-          "type": "string",
+          "type": [
+            "string",
+            "null",
+          ],
         },
         "prompt": {
           "type": "string",
@@ -6882,7 +6846,6 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
         },
       },
       "required": [
-        "todoId",
         "kind",
         "at",
       ],
@@ -6893,6 +6856,9 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
       "properties": {
         "at": {
           "type": "null",
+        },
+        "chiefThreadId": {
+          "type": "string",
         },
         "cron": {
           "minLength": 1,
@@ -6911,7 +6877,10 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
           "type": "integer",
         },
         "projectId": {
-          "type": "string",
+          "type": [
+            "string",
+            "null",
+          ],
         },
         "prompt": {
           "type": "string",
@@ -6927,7 +6896,6 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
         },
       },
       "required": [
-        "todoId",
         "kind",
         "cron",
       ],
@@ -6938,6 +6906,9 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
       "properties": {
         "at": {
           "type": "null",
+        },
+        "chiefThreadId": {
+          "type": "string",
         },
         "cron": {
           "not": {},
@@ -6955,7 +6926,10 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
           "type": "integer",
         },
         "projectId": {
-          "type": "string",
+          "type": [
+            "string",
+            "null",
+          ],
         },
         "prompt": {
           "type": "string",
@@ -6983,7 +6957,6 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
         },
       },
       "required": [
-        "todoId",
         "kind",
         "triggerSpec",
       ],
@@ -6994,6 +6967,9 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
       "properties": {
         "at": {
           "type": "null",
+        },
+        "chiefThreadId": {
+          "type": "string",
         },
         "cron": {
           "not": {},
@@ -7011,7 +6987,10 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
           "type": "integer",
         },
         "projectId": {
-          "type": "string",
+          "type": [
+            "string",
+            "null",
+          ],
         },
         "prompt": {
           "type": "string",
@@ -7027,7 +7006,6 @@ exports[`body/envelope schema snapshots > createScheduleBody > createScheduleBod
         },
       },
       "required": [
-        "todoId",
         "kind",
       ],
       "type": "object",
@@ -14660,6 +14638,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
         },
       ],
     },
+    "chiefThreadId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "createdAt": {
       "anyOf": [
         {
@@ -14754,7 +14738,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
       ],
     },
     "projectId": {
-      "type": "string",
+      "type": [
+        "string",
+        "null",
+      ],
     },
     "prompt": {
       "type": "string",
@@ -14762,51 +14749,88 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
     "teamId": {
       "type": "string",
     },
-    "todo": {
-      "additionalProperties": false,
-      "properties": {
-        "ownerId": {
-          "type": "string",
-        },
-        "phase": {
-          "enum": [
-            "todo",
-            "queued",
-            "planning",
-            "confirm",
-            "building",
-            "needs_input",
-            "review",
-            "done",
-            "failed",
-            "stopped",
-            "closed",
+    "thread": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+            },
+            "projectName": {
+              "type": "string",
+            },
+            "title": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "title",
+            "projectName",
           ],
-          "type": "string",
+          "type": "object",
         },
-        "projectName": {
-          "type": "string",
+        {
+          "type": "null",
         },
-        "seqNum": {
-          "maximum": 9007199254740991,
-          "minimum": -9007199254740991,
-          "type": "integer",
-        },
-        "title": {
-          "type": "string",
-        },
-      },
-      "required": [
-        "seqNum",
-        "title",
-        "phase",
-        "projectName",
-        "ownerId",
       ],
-      "type": "object",
+    },
+    "todo": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ownerId": {
+              "type": "string",
+            },
+            "phase": {
+              "enum": [
+                "todo",
+                "queued",
+                "planning",
+                "confirm",
+                "building",
+                "needs_input",
+                "review",
+                "done",
+                "failed",
+                "stopped",
+                "closed",
+              ],
+              "type": "string",
+            },
+            "projectName": {
+              "type": "string",
+            },
+            "seqNum": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "title": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "seqNum",
+            "title",
+            "phase",
+            "projectName",
+            "ownerId",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
     "todoId": {
-      "type": "string",
+      "type": [
+        "string",
+        "null",
+      ],
     },
     "triggerSpec": {
       "anyOf": [
@@ -14857,6 +14881,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
     "teamId",
     "projectId",
     "todoId",
+    "chiefThreadId",
     "kind",
     "cron",
     "prompt",
@@ -14874,6 +14899,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > sch
     "createdAt",
     "createdBy",
     "todo",
+    "thread",
   ],
   "type": "object",
 }

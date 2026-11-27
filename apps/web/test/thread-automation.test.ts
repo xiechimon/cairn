@@ -15,13 +15,14 @@ const t = (source: string, vars?: Record<string, string | number>) => translate(
 
 function schedule(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
   return {
-    id: 'schedule-1', teamId: 'team-1', projectId: 'project-1', todoId: 'todo-1',
+    id: 'schedule-1', teamId: 'team-1', projectId: 'project-1', todoId: 'todo-1', chiefThreadId: null,
     kind: 'daily', cron: '0 9 * * *', prompt: 'Run the tests', enabled: true,
     at: Date.UTC(2026, 10, 4, 1), tz: 'Asia/Shanghai', nextRunAt: NOW + 60_000,
     lastRunAt: NOW - 86_400_000, lastRunStatus: 'completed', pausedReason: null,
     triggerSpec: null, webhookMasked: null, webhookLastUsedAt: null, missedRunWindowMs: null,
     createdAt: NOW - 172_800_000, createdBy: 'user-1',
     todo: { seqNum: 9, title: 'Tests', phase: 'building', projectName: 'cairn', ownerId: 'user-1' },
+    thread: null,
     ...overrides,
   };
 }

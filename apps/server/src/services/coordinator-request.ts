@@ -4,7 +4,6 @@ import {
   type CoordinatorCreateTodoParams,
   type CoordinatorUpdateTodoParams,
   derivePlaceholderTitle,
-  isInfoOutput,
   isIssueSourcedTask,
   orchestratedTodoIdOf,
   type Phase,
@@ -40,43 +39,6 @@ export interface RequestCtx {
   teamId: string;
   threadId: string;
   turnMessageIds?: readonly string[];
-}
-
-export function refuseInfoCardReplacedByCode(
-  db: Db,
-  ctx: RequestCtx,
-  infoCandidateIds: readonly string[],
-  replacementOutput: string | null | undefined,
-  codeChangeQuote: string | undefined,
-): void {
-  if (isInfoOutput(replacementOutput ?? 'code') || infoCandidateIds.length === 0) return;
-  const infoCards = db
-    .select({ id: todo.id, output: todo.output })
-    .from(todo)
-    .where(and(eq(todo.teamId, ctx.teamId), inArray(todo.id, [...infoCandidateIds])))
-    .all()
-    .filter((row) => isInfoOutput(row.output));
-  if (infoCards.length === 0) return;
-  const turnWords = (ctx.turnMessageIds ?? []).length
-    ? db
-        .select()
-        .from(chiefMessage)
-        .where(
-          and(
-            eq(chiefMessage.threadId, ctx.threadId),
-            eq(chiefMessage.role, 'user'),
-            inArray(chiefMessage.id, [...(ctx.turnMessageIds ?? [])]),
-          ),
-        )
-        .all()
-        .flatMap((row) => (typeof row.content === 'string' ? [row.content.normalize('NFC')] : []))
-    : [];
-  const quote = codeChangeQuote?.normalize('NFC').trim();
-  if (quote && turnWords.some((words) => words.includes(quote))) return;
-  throw new HttpError(
-    409,
-    `Refused: info card ${infoCards.map((row) => row.id).join(', ')} cannot be replaced by a todo whose output is not info. Research, survey and report work stays an info card, even when a run failed or the card must reach a signed-in browser on another machine: a failed info card is retried with message_thread, or ask the owner with ask_user. A code task runs on the owner's own machine and cannot do the card's work. Nothing was changed. Only when the owner's own words in this turn explicitly ask for a code change, pass codeChangeQuote with those exact words.`,
-  );
 }
 
 const NO_OWNER_WORDS =
@@ -460,15 +422,6 @@ export function createRequestTodo(
   provenance: { createdBy: string | null; ownerId: string; withoutSelfIssue?: boolean },
 ): TodoRecord & { uncovered?: string[]; continued?: ContinuedRequest } {
   const { db } = deps;
-  if (params.sourceTodoId !== undefined) {
-    refuseInfoCardReplacedByCode(
-      db,
-      ctx,
-      [params.sourceTodoId],
-      params.output,
-      params.codeChangeQuote,
-    );
-  }
   const model =
     params.model === undefined ? undefined : frequentModelFor(db, ctx.teamId, params.model);
   const messageIds = params.messageIds ?? defaultQuoteIds(db, ctx);

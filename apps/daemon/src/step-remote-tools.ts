@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 import {
   COMPUTER_HANDOFF_TIMEOUT_MS,
   isComputerBrowserTool,
-  isInfoCardComputerTool,
   isOwnComputerTool,
   REQUEST_SECRET_TOOL,
   type RemoteToolDef,
@@ -63,11 +62,7 @@ export function stepRemoteToolExecutor(input: {
     const def = remoteTools.find((t) => t.name === name);
     const ownerWait = name === 'request_takeover' || name === REQUEST_SECRET_TOOL;
     const computerCall =
-      isComputerBrowserTool(name) ||
-      isInfoCardComputerTool(name) ||
-      isOwnComputerTool(name) ||
-      name === 'attach_file' ||
-      ownerWait;
+      isComputerBrowserTool(name) || isOwnComputerTool(name) || name === 'attach_file' || ownerWait;
     return client.relayTool(stepId, name, params, {
       ...(def?.replaySafe ? { replaySafe: true } : {}),
       ...(computerCall

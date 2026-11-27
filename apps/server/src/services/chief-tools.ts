@@ -81,11 +81,7 @@ import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
 import { showChart, showDiff } from './chief-show.js';
 import { readConversationPage } from './conversation-page.js';
-import {
-  createRequestTodo,
-  refuseInfoCardReplacedByCode,
-  updateRequestTodo,
-} from './coordinator-request.js';
+import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { effectDedupeKey } from './external-effects.js';
 import { isGithubRepoRef, PROJECT_FILES_MAX_LIMIT, readFile, readFiles } from './git.js';
@@ -115,7 +111,7 @@ import {
   turnForcesOutboundApproval,
 } from './report-turn.js';
 import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
-import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
+import { createSchedule, deleteSchedule, listSchedules, serverTimezone } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import {
   createLocalSkill,
@@ -959,16 +955,7 @@ export async function executeChiefTool(
     case 'archive_todos': {
       const supersededBy = optStr(params, 'supersededBy');
       const ids = strArr(params, 'todoIds');
-      if (supersededBy !== undefined) {
-        const replacement = requireTeamTodo(db, supersededBy, ctx.teamId);
-        refuseInfoCardReplacedByCode(
-          db,
-          { teamId: ctx.teamId, threadId: ctx.threadId, turnMessageIds: ctx.turnMessageIds },
-          ids,
-          replacement.output,
-          optStr(params, 'codeChangeQuote'),
-        );
-      }
+      if (supersededBy !== undefined) requireTeamTodo(db, supersededBy, ctx.teamId);
       const finished = new Set(
         db
           .select({ id: todo.id })
@@ -1186,29 +1173,73 @@ export async function executeChiefTool(
       return json({ deleted });
     }
     case 'schedule_todo': {
-      const todoId = str(params, 'todoId');
-      const row = requireTeamTodo(db, todoId, ctx.teamId);
+      const todoId = optStr(params, 'todoId');
       const kind = str(params, 'kind') as 'once' | 'hourly' | 'daily' | 'weekly';
       const at = num(params, 'at');
       if (at === undefined) throw new HttpError(400, 'invalid params.at: expected number');
+      const prompt = optStr(params, 'prompt');
+      const chiefTz = db
+        .select({ tz: chief.tz })
+        .from(chief)
+        .where(eq(chief.id, ctx.chiefId))
+        .get()?.tz;
+      const tz = optStr(params, 'tz') ?? chiefTz ?? serverTimezone();
+      if (todoId !== undefined) {
+        const row = requireTeamTodo(db, todoId, ctx.teamId);
+        const record = createSchedule(
+          { db, hub: deps.hub },
+          {
+            teamId: ctx.teamId,
+            projectId: row.projectId,
+            todoId,
+            kind,
+            at,
+            tz,
+            ...(prompt !== undefined ? { prompt } : {}),
+            createdBy: ctx.userId,
+          },
+        );
+        return json(record);
+      }
+      if (prompt === undefined || prompt.trim() === '') {
+        throw new HttpError(400, 'invalid params.prompt: required when todoId is omitted');
+      }
       const record = createSchedule(
         { db, hub: deps.hub },
         {
           teamId: ctx.teamId,
-          projectId: row.projectId,
-          todoId,
+          chiefThreadId: ctx.threadId,
           kind,
           at,
-          tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          tz,
+          prompt: prompt.trim(),
           createdBy: ctx.userId,
         },
       );
       return json(record);
     }
     case 'unschedule_todo': {
-      const todoId = str(params, 'todoId');
+      const todoId = optStr(params, 'todoId');
+      const scheduleId = optStr(params, 'scheduleId');
+      if ((todoId !== undefined) === (scheduleId !== undefined)) {
+        throw new HttpError(400, 'pass either todoId or scheduleId');
+      }
+      if (scheduleId !== undefined) {
+        const removed = deleteSchedule(
+          { db, hub: deps.hub, user: deps.user },
+          scheduleId,
+          ctx.teamId,
+        );
+        if (!removed) throw new HttpError(404, `schedule ${scheduleId} not found`);
+        return json({ scheduleId, removed: 1 });
+      }
+      if (todoId === undefined) throw new HttpError(400, 'pass either todoId or scheduleId');
       requireTeamTodo(db, todoId, ctx.teamId);
-      const rows = db.select().from(schedule).where(eq(schedule.todoId, todoId)).all();
+      const rows = db
+        .select()
+        .from(schedule)
+        .where(and(eq(schedule.todoId, todoId), eq(schedule.teamId, ctx.teamId)))
+        .all();
       for (const r of rows)
         deleteSchedule({ db, hub: deps.hub, user: deps.user }, r.id, ctx.teamId);
       return json({ todoId, removed: rows.length });

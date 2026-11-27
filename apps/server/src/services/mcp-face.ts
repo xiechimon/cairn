@@ -30,7 +30,7 @@ import {
 } from './mcp-threads.js';
 import { listedProjects } from './personal-space.js';
 import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
-import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
+import { createSchedule, deleteSchedule, listSchedules, serverTimezone } from './schedules.js';
 import { readSkillDocument, scanLocalSkills } from './skills.js';
 import { createAutonomousTodo, getTodo, listTodos, updateAutonomousTodo } from './todos.js';
 
@@ -71,11 +71,14 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   close_todos: { todoIds: sArr },
   reopen_todos: { todoIds: sArr },
   schedule_todo: {
-    todoId: s,
+    todoId: s.optional(),
+    chiefThreadId: s.optional(),
     kind: z.enum(['once', 'hourly', 'daily', 'weekly']),
     at: z.number(),
+    prompt: s.optional(),
+    tz: s.optional(),
   },
-  unschedule_todo: { todoId: s },
+  unschedule_todo: { todoId: s.optional(), scheduleId: s.optional() },
 };
 
 const CHIEF_DESCRIPTIONS = new Map(CHIEF_REMOTE_TOOLS.map((t) => [t.name, t.description]));
@@ -334,30 +337,86 @@ export async function executeMcpTool(
     case 'reopen_todos':
       return json(transitionTodos(deps, ctx.teamId, strArrOf(args, 'todoIds'), 'todo', mcpActor));
     case 'schedule_todo': {
-      const todoId = str(args, 'todoId');
-      const row = requireTeamTodo(db, todoId, ctx.teamId);
-      requireProjectRow(db, row.projectId, ctx.teamId);
+      const todoId = optStr(args, 'todoId');
+      const chiefThreadId = optStr(args, 'chiefThreadId');
+      if ((todoId !== undefined) === (chiefThreadId !== undefined)) {
+        throw new HttpError(400, 'schedule_todo requires either todoId or chiefThreadId');
+      }
       const at = args.at;
       if (typeof at !== 'number' || !Number.isFinite(at)) throw new HttpError(400, 'invalid at');
+      const prompt = optStr(args, 'prompt');
+      const tz = optStr(args, 'tz') ?? serverTimezone();
+      if (todoId !== undefined) {
+        const row = requireTeamTodo(db, todoId, ctx.teamId);
+        requireProjectRow(db, row.projectId, ctx.teamId);
+        return json(
+          createSchedule(
+            { db, hub: deps.hub },
+            {
+              teamId: ctx.teamId,
+              projectId: row.projectId,
+              todoId,
+              kind: args.kind as 'once' | 'hourly' | 'daily' | 'weekly',
+              at,
+              tz,
+              ...(prompt !== undefined ? { prompt } : {}),
+              createdBy: ctx.user.id,
+            },
+          ),
+        );
+      }
+      if (chiefThreadId === undefined) {
+        throw new HttpError(400, 'schedule_todo requires either todoId or chiefThreadId');
+      }
+      const threadRow = db
+        .select()
+        .from(chiefThread)
+        .where(and(eq(chiefThread.id, chiefThreadId), eq(chiefThread.teamId, ctx.teamId)))
+        .get();
+      if (!threadRow) throw new HttpError(404, `chief thread ${chiefThreadId}`);
+      if (threadRow.projectId !== null) requireProjectRow(db, threadRow.projectId, ctx.teamId);
+      if (prompt === undefined || prompt.trim() === '') {
+        throw new HttpError(400, 'Coordinator-thread schedule requires non-empty prompt');
+      }
       return json(
         createSchedule(
           { db, hub: deps.hub },
           {
             teamId: ctx.teamId,
-            projectId: row.projectId,
-            todoId,
+            projectId: threadRow.projectId,
+            chiefThreadId,
             kind: args.kind as 'once' | 'hourly' | 'daily' | 'weekly',
             at,
-            tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            tz,
+            prompt: prompt.trim(),
             createdBy: ctx.user.id,
           },
         ),
       );
     }
     case 'unschedule_todo': {
-      const todoId = str(args, 'todoId');
+      const todoId = optStr(args, 'todoId');
+      const scheduleId = optStr(args, 'scheduleId');
+      if ((todoId !== undefined) === (scheduleId !== undefined)) {
+        throw new HttpError(400, 'unschedule_todo requires either todoId or scheduleId');
+      }
+      if (scheduleId !== undefined) {
+        const removed = deleteSchedule(
+          { db, hub: deps.hub, user: deps.user },
+          scheduleId,
+          ctx.teamId,
+        );
+        if (!removed) throw new HttpError(404, `schedule ${scheduleId} not found`);
+        return json({ scheduleId, removed: 1 });
+      }
+      if (todoId === undefined)
+        throw new HttpError(400, 'unschedule_todo requires either todoId or scheduleId');
       requireTeamTodo(db, todoId, ctx.teamId);
-      const rows = db.select().from(schedule).where(eq(schedule.todoId, todoId)).all();
+      const rows = db
+        .select()
+        .from(schedule)
+        .where(and(eq(schedule.todoId, todoId), eq(schedule.teamId, ctx.teamId)))
+        .all();
       for (const r of rows)
         deleteSchedule({ db, hub: deps.hub, user: deps.user }, r.id, ctx.teamId);
       return json({ todoId, removed: rows.length });

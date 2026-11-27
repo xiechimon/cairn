@@ -57,6 +57,11 @@
       "key": "CAIRN_LITESTREAM_REGION",
       "scope": "product",
       "userScenario": "Optional bucket region for Litestream S3 replication; defaults to auto when CAIRN_LITESTREAM_ENDPOINT is set."
+    },
+    {
+      "type": "setting",
+      "key": "scheduleInputSchema.chiefThreadId",
+      "userScenario": "Nothing to set: creating a schedule inside a Coordinator conversation records that thread id so recurring requests fire directly in chat instead of opening a separate task."
     }
   ]
 }
