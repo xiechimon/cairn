@@ -2433,6 +2433,15 @@ export const EN: Record<string, string> = {
   '正在把远程主机更新到 {version}。': 'Updating the remote host to {version}.',
   '正在把远程主机更新到 {version}（{percent}%）。':
     'Updating the remote host to {version} ({percent}%).',
+  '远程主机 {failed} 未能启动，Cairn 已恢复到 {restored}。':
+    'Remote host {failed} could not start; Cairn restored {restored}.',
+  '正在自动更新到 {version}…': 'Updating to {version}…',
+  '正在自动更新…': 'Updating…',
+  '空闲后将自动更新到 {version}': 'Updates to {version} when idle',
+  空闲后将自动更新: 'Updates when idle',
+  '正在重启到 {version}…': 'Restarting to {version}…',
+  '{failed} 未能启动，已恢复到 {restored}': '{failed} failed to start; restored {restored}',
+  '自动更新失败，已恢复旧版本': 'Update failed to start; restored previous version',
   '远程主机正在重启。': 'The remote host is restarting.',
   '这台远程主机版本较旧，无法自动更新，请在该电脑上更新 Cairn。':
     'This remote host is too old to update automatically. Update Cairn on that computer.',

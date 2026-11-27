@@ -768,7 +768,12 @@ const ASSETS = [
   'Cairn-0.1.2-win-x64.exe',
   'Cairn-0.1.2-win-x64.zip',
   'Cairn-0.1.2-linux-x64.tar.gz',
+  'cairn-runner-0.1.2-darwin-arm64.tar.gz',
+  'cairn-runner-0.1.2-darwin-x64.tar.gz',
+  'cairn-runner-0.1.2-win-x64.zip',
+  'cairn-runner-0.1.2-linux-x64.tar.gz',
   'desktop-latest.json',
+  'runner-latest.json',
 ];
 
 test('the publish step never creates, pushes or adopts a tag', () => {
@@ -1681,4 +1686,41 @@ test('release-manifest labels macOS update zips with -mac- while keeping manifes
   assert.equal(manifest.files.arm64.name, 'Cairn-0.1.2-mac-arm64.zip');
   assert.equal(manifest.files.x64.name, 'Cairn-0.1.2-mac-x64.zip');
   assert.equal(manifest.files['win-x64'].name, 'Cairn-0.1.2-win-x64.exe');
+  assert.equal(existsSync(join(dir, 'runner-latest.json')), false);
+});
+
+test('release-manifest writes sibling runner-latest.json when runner archives exist without altering desktop-latest.json', (t) => {
+  const dir = makeTestTempDir('release-manifest-runner-');
+  t.after(() => releaseTestTempDir(dir));
+  for (const name of [
+    'Cairn-0.1.2-mac-arm64.zip',
+    'Cairn-0.1.2-mac-x64.zip',
+    'Cairn-0.1.2-win-x64.exe',
+    'cairn-runner-0.1.2-darwin-arm64.tar.gz',
+    'cairn-runner-0.1.2-darwin-x64.tar.gz',
+    'cairn-runner-0.1.2-linux-x64.tar.gz',
+    'cairn-runner-0.1.2-win-x64.zip',
+  ]) {
+    writeFileSync(join(dir, name), `payload-${name}`);
+  }
+  execFileSync(
+    process.execPath,
+    [resolve(repoRoot, 'apps/desktop/scripts/release-manifest.mjs'), '0.1.2', dir],
+    { encoding: 'utf8' },
+  );
+  const desktop = JSON.parse(readFileSync(join(dir, 'desktop-latest.json'), 'utf8'));
+  assert.deepEqual(Object.keys(desktop), ['version', 'files']);
+  assert.deepEqual(Object.keys(desktop.files), ['arm64', 'x64', 'win-x64']);
+
+  const runner = JSON.parse(readFileSync(join(dir, 'runner-latest.json'), 'utf8'));
+  assert.equal(runner.version, '0.1.2');
+  assert.deepEqual(Object.keys(runner.files), [
+    'darwin-arm64',
+    'darwin-x64',
+    'linux-x64',
+    'win-x64',
+  ]);
+  assert.equal(runner.files['darwin-arm64'].name, 'cairn-runner-0.1.2-darwin-arm64.tar.gz');
+  assert.equal(runner.files['linux-x64'].name, 'cairn-runner-0.1.2-linux-x64.tar.gz');
+  assert.equal(runner.files['win-x64'].name, 'cairn-runner-0.1.2-win-x64.zip');
 });

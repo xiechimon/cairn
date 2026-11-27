@@ -32,6 +32,13 @@ import { machineNameSuffix, pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { claudeConfigHome } from './runtime-homes.js';
+import {
+  classifyRunnerInstall,
+  readRunnerReleaseVersion,
+  readSelfUpdateState,
+  SELF_UPDATE_EXIT_CODE,
+} from './self-update.js';
+import { runSelfUpdateBootstrap } from './self-update-bootstrap.js';
 import { ensureDaemonShellEnv } from './shell-env.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import {
@@ -135,6 +142,9 @@ export async function runForeground(opts: StartOptions): Promise<void> {
       : watchParentProcess({ pid: parentPid, onDead: () => onSignal('parent') });
   try {
     await handle.done;
+    if (handle.exitCode === SELF_UPDATE_EXIT_CODE) {
+      process.exitCode = SELF_UPDATE_EXIT_CODE;
+    }
   } finally {
     stopParentWatch();
     await shutdownDaemonOtel();
@@ -417,7 +427,35 @@ export function buildProgram(): Command {
   return program;
 }
 
+function shouldLaunchSelfUpdateBootstrap(argv: readonly string[]): boolean {
+  if (process.env.CAIRN_SELF_UPDATE_CHILD === '1') return false;
+  const userArgs = argv.slice(2);
+  const sub = userArgs[0];
+  if (sub !== 'start') return false;
+  return userArgs.includes('-f') || userArgs.includes('--foreground');
+}
+
 export async function main(argv: string[] = process.argv): Promise<void> {
+  if (shouldLaunchSelfUpdateBootstrap(argv) && process.argv[1]) {
+    await ensureDaemonShellEnv();
+    const config = loadDaemonConfig({});
+    const install = classifyRunnerInstall({
+      cairnHome: config.home,
+      scriptPath: process.argv[1],
+      env: process.env,
+    });
+    const state = readSelfUpdateState(config.home);
+    if (install.supported || state.activeVersion !== null || state.pending !== null) {
+      process.exitCode = await runSelfUpdateBootstrap({
+        cairnHome: config.home,
+        baseEntryPath: process.argv[1],
+        baseReleaseVersion: readRunnerReleaseVersion(),
+        argv: argv.slice(2),
+        env: process.env,
+      });
+      return;
+    }
+  }
   await buildProgram().parseAsync(argv);
 }
 

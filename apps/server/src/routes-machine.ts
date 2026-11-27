@@ -4,6 +4,7 @@ import {
   claudeRateLimitReportSchema,
   computerCallIdSchema,
   enrollDisplayName,
+  isServerVersionNewer,
   MACHINE_ENROLL_TTL_MS,
   MIN_SUPPORTED_RUNNER_PROTOCOL,
   machineActivityBodySchema,
@@ -36,6 +37,9 @@ import {
   machineUploadUrlsBodySchema,
   normalizeEnrollCode,
   PLAN_FILE_NAME,
+  parseReportedCapabilities,
+  parseStoredCapabilities,
+  runnerNeedsVersionUpdate,
   runnerOutOfWindow,
   SESSION_FILE_NAME,
   transcriptUploadSchema,
@@ -120,6 +124,43 @@ import {
 } from './services/machines.js';
 import { phoneRowsForPresence } from './services/phone-computer.js';
 import { resumeRuntimeHeldBuilds } from './services/runtime-holds.js';
+import { readServerVersionInfo } from './services/server-version.js';
+
+function resolvePresenceTargetVersion(
+  latestRelease: string | null,
+  serverVersion: string | null,
+): string | null {
+  if (latestRelease !== null && serverVersion !== null) {
+    return isServerVersionNewer(latestRelease, serverVersion) ? latestRelease : serverVersion;
+  }
+  return latestRelease ?? serverVersion;
+}
+
+function presenceUpdateFor(
+  ctx: AppContext,
+  row: typeof machineTable.$inferSelect,
+  reportedCapabilities: unknown,
+): { targetVersion: string } | undefined {
+  const effectiveCaps =
+    (reportedCapabilities !== undefined
+      ? parseReportedCapabilities(reportedCapabilities)
+      : undefined) ?? parseStoredCapabilities(row.capabilities);
+  if (effectiveCaps == null) return undefined;
+  const autoUpdate = effectiveCaps.runnerAutoUpdate;
+  if (autoUpdate?.supported !== true || autoUpdate.state === 'unsupported') return undefined;
+  const serverVersion = readServerVersionInfo({ deployRecordPath: ctx.deployRecordPath }).version;
+  const targetVersion = resolvePresenceTargetVersion(
+    ctx.releaseWatcher?.latestRelease() ?? null,
+    serverVersion,
+  );
+  if (targetVersion === null) return undefined;
+  if (autoUpdate.state === 'rolled-back' && autoUpdate.failedVersion === targetVersion) {
+    return undefined;
+  }
+  if (effectiveCaps.runnerReleaseVersion === targetVersion) return undefined;
+  if (!runnerNeedsVersionUpdate(effectiveCaps, targetVersion)) return undefined;
+  return { targetVersion };
+}
 
 function isComputerRelayBody(raw: unknown): boolean {
   return raw !== null && typeof raw === 'object' && 'computer' in raw && raw.computer === true;
@@ -498,11 +539,13 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         }
         const phones = phoneRowsForPresence(ctx.db, row.id);
         const githubRepos = activeTeamGithubRepos(ctx.db, row.teamId);
+        const update = presenceUpdateFor(ctx, row, body.capabilities);
         return c.json({
           ok: true as const,
           ...(hasActiveDevinSubscription(deps, row.teamId) ? { installDevin: true } : {}),
           ...(phones.length > 0 ? { phones } : {}),
           ...(githubRepos.length > 0 ? { githubRepos } : {}),
+          ...(update !== undefined ? { update } : {}),
         });
       },
     );

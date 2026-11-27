@@ -302,6 +302,22 @@
       "key": "CAIRN_RUNNER_HEALTH_TRIES",
       "scope": "dev-tooling",
       "userScenario": "Nothing to set: read only by the self-hosted deploy scripts under scripts/ops on a server you run yourself; the Mac app and its users never see it."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_UPDATE_FEED_URL",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: used only in automated tests and isolated verification to point Cairn's updater at a local mock release server instead of public GitHub Releases."
+    },
+    {
+      "type": "runner-device-field",
+      "key": "machine.capabilities.runnerReleaseVersion",
+      "userScenario": "Nothing to set: each Runner reports its installed release version so the server only asks outdated Runners to update."
+    },
+    {
+      "type": "runner-device-field",
+      "key": "machine.capabilities.runnerAutoUpdate",
+      "userScenario": "Nothing to set: each Runner reports whether it can self-update and its single-line update or rollback status."
     }
   ]
 }

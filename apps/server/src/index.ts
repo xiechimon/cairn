@@ -81,6 +81,7 @@ import {
 import { seedOwnerCheckpoints } from './services/owner.js';
 import { capturePageOver, createPageThumbnails, parentPortOf } from './services/page-thumbnails.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
+import { createReleaseWatcher } from './services/release-watcher.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import { createScheduler } from './services/scheduler.js';
 import { maybeRetriggerIdleHostUpdate } from './services/server-version.js';
@@ -305,6 +306,15 @@ const backupService =
         logger,
       });
 
+const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined;
+const releaseWatcher = createReleaseWatcher({
+  db,
+  homeDir: config.homeDir,
+  deployRecordPath: deployRecordPathOf(config),
+  logger,
+  autoStart: !isTestMode,
+});
+
 const mcpOAuthState = newMcpOAuthState();
 const app = createApp(
   {
@@ -351,6 +361,7 @@ const app = createApp(
     backupStatusPath: backupStatusPathOf(config),
     backupService,
     deployRecordPath: deployRecordPathOf(config),
+    releaseWatcher,
     skillsDir: config.skillsDir,
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     homeDir: config.homeDir,
@@ -522,7 +533,6 @@ const hostUpdateIdleWatch = setInterval(() => {
 }, 15_000);
 hostUpdateIdleWatch.unref();
 
-const isTestMode = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined;
 const antigravityQuotaDeps = {
   db,
   box: secretBox,
@@ -554,6 +564,7 @@ let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  releaseWatcher.stop();
   clearInterval(hostUpdateIdleWatch);
   if (antigravityQuotaBootTimer !== null) clearTimeout(antigravityQuotaBootTimer);
   if (antigravityQuotaPollTimer !== null) clearInterval(antigravityQuotaPollTimer);

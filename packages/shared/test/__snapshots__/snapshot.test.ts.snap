@@ -3165,6 +3165,20 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "maxItems": 32,
       "type": "array",
     },
+    "update": {
+      "additionalProperties": false,
+      "properties": {
+        "targetVersion": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "targetVersion",
+      ],
+      "type": "object",
+    },
   },
   "required": [
     "ok",
@@ -13866,10 +13880,100 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               },
               "type": "array",
             },
+            "runnerAutoUpdate": {
+              "additionalProperties": false,
+              "properties": {
+                "failedVersion": {
+                  "anyOf": [
+                    {
+                      "maxLength": 64,
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+                "reason": {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "desktop-bundled",
+                        "homebrew",
+                        "docker",
+                        "development",
+                        "read-only",
+                        "no-asset",
+                        "offline",
+                        "checksum-mismatch",
+                        "smoke-failed",
+                        "blocked",
+                        "rollback-failed",
+                        "failed",
+                      ],
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+                "restoredVersion": {
+                  "anyOf": [
+                    {
+                      "maxLength": 64,
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+                "state": {
+                  "enum": [
+                    "idle",
+                    "downloading",
+                    "waiting-idle",
+                    "swapping",
+                    "rolled-back",
+                    "unsupported",
+                    "failed",
+                  ],
+                  "type": "string",
+                },
+                "supported": {
+                  "type": "boolean",
+                },
+                "targetVersion": {
+                  "anyOf": [
+                    {
+                      "maxLength": 64,
+                      "minLength": 1,
+                      "type": "string",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+              },
+              "required": [
+                "supported",
+                "state",
+              ],
+              "type": "object",
+            },
             "runnerProtocolVersion": {
               "maximum": 1000000,
               "minimum": 0,
               "type": "integer",
+            },
+            "runnerReleaseVersion": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string",
             },
             "scrapling": {
               "additionalProperties": false,

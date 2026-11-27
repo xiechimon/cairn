@@ -147,6 +147,7 @@ export interface ComputerDispatcherOptions {
 }
 
 export interface ComputerDispatcher {
+  activeCount(): number;
   dispatch(call: ComputerCall): Promise<void>;
   close(): Promise<void>;
 }
@@ -867,6 +868,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
   }
 
   return {
+    activeCount: () => inFlight.size,
     async dispatch(call) {
       if (closing || inFlight.has(call.callId) || finishedUnsafe.has(call.callId)) return;
       if (!COMPUTER_REPLAY_SAFE_TOOLS.has(call.tool)) remember(call.callId);

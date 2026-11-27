@@ -417,4 +417,280 @@ describe('the background updater registration', () => {
     } catch {}
     expect(existsSync(plistPath)).toBe(false);
   });
+
+  test('restores .cairn-previous/Cairn.app and preserves plist if a power drop removed Cairn.app mid-swap', () => {
+    const { bundle, root, userData } = mac('1.0.0');
+    const prevApp = join(dirname(bundle), '.cairn-previous', 'Cairn.app');
+    mkdirSync(join(prevApp, 'Contents', 'MacOS'), { recursive: true });
+    writeFileSync(
+      join(prevApp, 'Contents', 'Info.plist'),
+      '<plist><dict><key>CFBundleShortVersionString</key><string>1.0.0</string></dict></plist>',
+    );
+    const ranMarker = join(root, 'ran.txt');
+    writeFileSync(
+      join(prevApp, 'Contents', 'MacOS', 'Cairn'),
+      `#!/bin/sh\necho "$1" > "${ranMarker}"\n`,
+    );
+    chmodSync(join(prevApp, 'Contents', 'MacOS', 'Cairn'), 0o755);
+    rmSync(bundle, { recursive: true, force: true });
+
+    const plistPath = join(root, 'app.cairn.updater.plist');
+    const label = `test.cairn.updater.${process.pid}`;
+    writeFileSync(
+      plistPath,
+      buildUpdaterPlist({
+        executablePath: join(bundle, 'Contents', 'MacOS', 'Cairn'),
+        entry: 'ok',
+        userData,
+        plistPath,
+        label,
+      }),
+    );
+    const [program, ...args] = [
+      ...plistEntry(readFileSync(plistPath, 'utf8'), 'ProgramArguments').matchAll(
+        /<string>([^<]*)<\/string>/g,
+      ),
+    ].map((match) => unescapeXml(match[1] ?? ''));
+    execFileSync(program ?? '', args, { stdio: 'ignore' });
+    expect(existsSync(plistPath)).toBe(true);
+    expect(existsSync(join(bundle, 'Contents', 'MacOS', 'Cairn'))).toBe(true);
+    expect(readFileSync(ranMarker, 'utf8').trim()).toBe('ok');
+  });
+});
+
+describe('headless resident probation, lease drain, DB snapshot, and rollback', () => {
+  test('acquires deploy_lease before busy check, snapshots DB, confirms 30s health, and cleans up', async () => {
+    const { bundle, root, userData } = mac('1.0.0');
+    const events: string[] = [];
+    let currentTime = 1_000_000;
+    const snapshotFile = join(root, 'preupdate-1.0.0.db');
+    let leaseHeld = false;
+    let restarted = false;
+
+    const w = world(bundle, userData);
+    w.deps.acquireLease = async () => {
+      events.push('acquire-lease');
+      leaseHeld = true;
+      return true;
+    };
+    w.deps.releaseLease = async () => {
+      events.push('release-lease');
+      leaseHeld = false;
+    };
+    const origBusy = w.deps.residentBusy;
+    w.deps.residentBusy = async () => {
+      events.push(`busy-check(lease=${leaseHeld})`);
+      return origBusy();
+    };
+    w.deps.snapshotDb = async () => {
+      events.push('snapshot-db');
+      writeFileSync(snapshotFile, 'sqlite-snap');
+      return snapshotFile;
+    };
+    w.deps.restartResident = async () => {
+      events.push('restart');
+      restarted = true;
+    };
+    w.deps.probeHealth = async () => ({
+      ok: restarted,
+      version: restarted ? '1.1.0' : '1.0.0',
+      pid: restarted ? 222 : 111,
+      busy: false,
+    });
+    w.deps.now = () => currentTime;
+    w.deps.sleep = async (ms) => {
+      currentTime += ms;
+    };
+    w.deps.probationMs = 30_000;
+    w.deps.probeIntervalMs = 5_000;
+
+    const outcome = await (runBackgroundUpdate(w.deps) as Promise<string>);
+    expect(outcome).toBe('confirmed');
+    expect(leaseHeld).toBe(false);
+    expect(events.slice(0, 4)).toEqual([
+      'acquire-lease',
+      'busy-check(lease=true)',
+      'snapshot-db',
+      'restart',
+    ]);
+    expect(events.at(-1)).toBe('release-lease');
+    expect(existsSync(snapshotFile)).toBe(false);
+    const state = readUpdateState(updateStatePath(userData));
+    expect(state.installed).toBeNull();
+  });
+
+  test('fails closed on busy probe error and releases lease without swapping', async () => {
+    const { bundle, userData } = mac('1.0.0');
+    let leaseHeld = false;
+    const w = world(bundle, userData);
+    w.deps.acquireLease = async () => {
+      leaseHeld = true;
+      return true;
+    };
+    w.deps.releaseLease = async () => {
+      leaseHeld = false;
+    };
+    w.deps.residentBusy = async () => {
+      throw new Error('resident probe failed');
+    };
+    w.deps.probeHealth = async () => ({ ok: true, version: '1.0.0', pid: 111, busy: false });
+
+    const outcome = await (runBackgroundUpdate(w.deps) as Promise<string>);
+    expect(['resident-busy', 'failed']).toContain(outcome);
+    expect(leaseHeld).toBe(false);
+    expect(await readBundleVersion(bundle)).toBe('1.0.0');
+  });
+
+  test('rolls back app + untouched DB snapshot when new version fails 3 health probes', async () => {
+    const { bundle, root, userData } = mac('1.0.0');
+    const snapshotFile = join(root, 'preupdate-1.0.0.db');
+    let restoredDbCalled = false;
+    let leaseHeld = false;
+    let activeVersion = '1.0.0';
+    let currentTime = 1_000_000;
+
+    const w = world(bundle, userData);
+    w.deps.acquireLease = async () => {
+      leaseHeld = true;
+      return true;
+    };
+    w.deps.releaseLease = async () => {
+      leaseHeld = false;
+    };
+    w.deps.snapshotDb = async () => {
+      writeFileSync(snapshotFile, 'snap');
+      return snapshotFile;
+    };
+    w.deps.hasDomainWrites = async () => false;
+    w.deps.restoreDb = async (path) => {
+      expect(path).toBe(snapshotFile);
+      restoredDbCalled = true;
+    };
+    w.deps.restartResident = async () => {
+      const diskVersion = await readBundleVersion(bundle);
+      activeVersion = diskVersion ?? '1.0.0';
+    };
+    w.deps.probeHealth = async () =>
+      activeVersion === '1.1.0'
+        ? { ok: false, version: null, pid: null, busy: false }
+        : { ok: true, version: '1.0.0', pid: 333, busy: false };
+    w.deps.now = () => currentTime;
+    w.deps.sleep = async (ms) => {
+      currentTime += ms;
+    };
+    w.deps.probationMs = 30_000;
+    w.deps.probationDeadlineMs = 90_000;
+    w.deps.probeIntervalMs = 2_000;
+
+    const outcome = await (runBackgroundUpdate(w.deps) as Promise<string>);
+    expect(outcome).toBe('rolled-back');
+    expect(restoredDbCalled).toBe(true);
+    expect(leaseHeld).toBe(false);
+    expect(await readBundleVersion(bundle)).toBe('1.0.0');
+    const state = readUpdateState(updateStatePath(userData));
+    expect(state.installed).toBeNull();
+    expect(state.blocked?.version).toBe('1.1.0');
+    expect(state.notice?.failedVersion).toBe('1.1.0');
+    expect(state.notice?.restoredVersion).toBe('1.0.0');
+  });
+
+  test('preserves newer server.db and performs code-only rollback when domain writes landed after snapshot', async () => {
+    const { bundle, root, userData } = mac('1.0.0');
+    const snapshotFile = join(root, 'preupdate-1.0.0.db');
+    let restoredDbCalled = false;
+    let activeVersion = '1.0.0';
+    let currentTime = 1_000_000;
+
+    const w = world(bundle, userData);
+    w.deps.acquireLease = async () => true;
+    w.deps.releaseLease = async () => {};
+    w.deps.snapshotDb = async () => {
+      writeFileSync(snapshotFile, 'snap');
+      return snapshotFile;
+    };
+    w.deps.hasDomainWrites = async () => true;
+    w.deps.restoreDb = async () => {
+      restoredDbCalled = true;
+    };
+    w.deps.restartResident = async () => {
+      activeVersion = (await readBundleVersion(bundle)) ?? '1.0.0';
+    };
+    w.deps.probeHealth = async () =>
+      activeVersion === '1.1.0'
+        ? { ok: false, version: null, pid: null, busy: false }
+        : { ok: true, version: '1.0.0', pid: 333, busy: false };
+    w.deps.now = () => currentTime;
+    w.deps.sleep = async (ms) => {
+      currentTime += ms;
+    };
+    w.deps.probationMs = 30_000;
+    w.deps.probationDeadlineMs = 90_000;
+    w.deps.probeIntervalMs = 2_000;
+
+    const outcome = await (runBackgroundUpdate(w.deps) as Promise<string>);
+    expect(outcome).toBe('rolled-back-code');
+    expect(restoredDbCalled).toBe(false);
+    expect(await readBundleVersion(bundle)).toBe('1.0.0');
+    expect(readUpdateState(updateStatePath(userData)).blocked?.version).toBe('1.1.0');
+  });
+
+  test('reports rollback-failed without looping when restored old code also fails to boot', async () => {
+    const { bundle, root, userData } = mac('1.0.0');
+    const snapshotFile = join(root, 'preupdate-1.0.0.db');
+    let currentTime = 1_000_000;
+    const w = world(bundle, userData);
+    w.deps.acquireLease = async () => true;
+    w.deps.releaseLease = async () => {};
+    w.deps.snapshotDb = async () => {
+      writeFileSync(snapshotFile, 'snap');
+      return snapshotFile;
+    };
+    w.deps.hasDomainWrites = async () => true;
+    w.deps.restartResident = async () => {};
+    w.deps.probeHealth = async () => ({ ok: false, version: null, pid: null, busy: false });
+    w.deps.now = () => currentTime;
+    w.deps.sleep = async (ms) => {
+      currentTime += ms;
+    };
+    w.deps.probationDeadlineMs = 10_000;
+    w.deps.probeIntervalMs = 2_000;
+
+    const outcome = await (runBackgroundUpdate(w.deps) as Promise<string>);
+    expect(outcome).toBe('rollback-failed');
+    expect(readUpdateState(updateStatePath(userData)).blocked?.version).toBe('1.1.0');
+  });
+
+  test('yields to live desktop guardOwner, clears dead leftover installed state, and honors force=true', async () => {
+    const { bundle, userData } = mac('1.0.0');
+    writeUpdateState(updateStatePath(userData), {
+      ...emptyUpdateState(),
+      installed: {
+        version: '1.0.0',
+        previousVersion: '0.9.0',
+        previousApp: 'x',
+        at: 1,
+        guardOwner: 'desktop',
+        guardPid: process.pid,
+      },
+    });
+    const wLive = world(bundle, userData);
+    expect(await runBackgroundUpdate(wLive.deps)).toBe('unconfirmed');
+
+    writeUpdateState(updateStatePath(userData), {
+      ...emptyUpdateState(),
+      installed: {
+        version: '1.0.0',
+        previousVersion: '0.9.0',
+        previousApp: 'x',
+        at: 1,
+        guardOwner: 'background-agent',
+        guardPid: 999_999,
+      },
+      blocked: { version: '1.1.0', at: 1, reason: 'crashed', attempts: 1 },
+    });
+    const wDead = world(bundle, userData);
+    expect(await runBackgroundUpdate(wDead.deps)).toBe('blocked');
+    wDead.deps.force = true;
+    expect(await runBackgroundUpdate(wDead.deps)).toBe('installed');
+  });
 });

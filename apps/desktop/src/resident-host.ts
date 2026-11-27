@@ -1,5 +1,14 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -301,6 +310,221 @@ export async function residentWritingReply(
     }
   }
   return false;
+}
+
+export interface ResidentHealthProbe {
+  ok: boolean;
+  version: string | null;
+  pid: number | null;
+  busy: boolean;
+}
+
+export async function acquireDeployLease(
+  cairnHome: string,
+  token: string | null,
+  owner: string,
+  ttlMs: number,
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<boolean> {
+  const ownerRec = readServerOwner(cairnHome);
+  if (ownerRec === null || ownerRec.managedBy !== 'launchd' || !pidAlive(ownerRec.pid)) {
+    return true;
+  }
+  if (token === null || token === '') return false;
+  try {
+    const res = await fetchImpl(`${ownerRec.origin}/api/server/deploy/lease`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ owner, ttlMs }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function releaseDeployLease(
+  cairnHome: string,
+  token: string | null,
+  owner: string,
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<void> {
+  if (token === null || token === '') return;
+  const ownerRec = readServerOwner(cairnHome);
+  if (ownerRec === null || ownerRec.managedBy !== 'launchd' || !pidAlive(ownerRec.pid)) return;
+  try {
+    await fetchImpl(`${ownerRec.origin}/api/server/deploy/lease`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ owner }),
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
+}
+
+export async function probeResidentHealth(
+  cairnHome: string,
+  token: string | null,
+  fetchImpl: typeof fetch = globalThis.fetch,
+): Promise<ResidentHealthProbe> {
+  const record = readServerOwner(cairnHome);
+  if (record === null || record.managedBy !== 'launchd' || !pidAlive(record.pid)) {
+    return { ok: false, version: null, pid: null, busy: false };
+  }
+  if (token === null || token === '') {
+    try {
+      const desc = await fetchImpl(`${record.origin}/api/remote/descriptor`, {
+        signal: AbortSignal.timeout(2_500),
+      });
+      return { ok: desc.ok, version: null, pid: record.pid, busy: false };
+    } catch {
+      return { ok: false, version: null, pid: record.pid, busy: false };
+    }
+  }
+  try {
+    const res = await fetchImpl(`${record.origin}/api/server/version`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(2_500),
+    });
+    if (!res.ok) return { ok: false, version: null, pid: record.pid, busy: false };
+    const body = (await res.json()) as { version?: unknown; busy?: unknown };
+    const version = typeof body.version === 'string' && body.version !== '' ? body.version : null;
+    return {
+      ok: version !== null,
+      version,
+      pid: record.pid,
+      busy: body.busy === true,
+    };
+  } catch {
+    return { ok: false, version: null, pid: record.pid, busy: false };
+  }
+}
+
+const IGNORED_DOMAIN_TABLES = new Set([
+  'deploy_lease',
+  '__drizzle_migrations',
+  '_drizzle_migrations',
+]);
+
+async function sqliteQueryJson<T>(dbPath: string, sql: string): Promise<T[]> {
+  const { stdout } = await execFileAsync(
+    '/usr/bin/sqlite3',
+    ['-readonly', '-json', dbPath, '.timeout 5000', sql],
+    { maxBuffer: 8 * 1024 * 1024 },
+  );
+  const trimmed = stdout.trim();
+  if (trimmed === '') return [];
+  return JSON.parse(trimmed) as T[];
+}
+
+function quoteIdent(name: string): string {
+  return `"${name.replaceAll('"', '""')}"`;
+}
+
+async function readDomainWatermarks(dbPath: string): Promise<Map<string, string>> {
+  const tables = await sqliteQueryJson<{ name: string }>(
+    dbPath,
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;",
+  );
+  const watermarks = new Map<string, string>();
+  for (const { name } of tables) {
+    if (IGNORED_DOMAIN_TABLES.has(name)) continue;
+    const q = quoteIdent(name);
+    const cols = await sqliteQueryJson<{ name: string }>(dbPath, `PRAGMA table_info(${q});`);
+    const colNames = new Set(cols.map((col) => col.name));
+    const tsCol = ['updated_at', 'created_at', 'finished_at'].find((c) => colNames.has(c));
+    const tsExpr = tsCol === undefined ? '0' : `COALESCE(MAX(${quoteIdent(tsCol)}), 0)`;
+    const rows = await sqliteQueryJson<{ cnt: number; max_rid?: number | null; max_ts: unknown }>(
+      dbPath,
+      `SELECT COUNT(*) AS cnt, MAX(rowid) AS max_rid, ${tsExpr} AS max_ts FROM ${q};`,
+    ).catch(() =>
+      sqliteQueryJson<{ cnt: number; max_ts: unknown }>(
+        dbPath,
+        `SELECT COUNT(*) AS cnt, ${tsExpr} AS max_ts FROM ${q};`,
+      ),
+    );
+    const row = rows[0] ?? { cnt: 0, max_rid: 0, max_ts: 0 };
+    watermarks.set(
+      name,
+      `${row.cnt}:${'max_rid' in row ? (row.max_rid ?? 0) : 0}:${String(row.max_ts ?? 0)}`,
+    );
+  }
+  return watermarks;
+}
+
+export async function snapshotResidentDb(
+  cairnHome: string,
+  fromVersion: string,
+  now: number = Date.now(),
+): Promise<string | null> {
+  const serverDir = join(cairnHome, 'server');
+  const dbPath = join(serverDir, 'server.db');
+  if (!existsSync(dbPath)) return null;
+  const safeVersion = fromVersion.replace(/[^0-9A-Za-z.+-]/g, '_');
+  const snapPath = join(serverDir, `preupdate-${safeVersion}-${now}.db`);
+  await execFileAsync('/usr/bin/sqlite3', [
+    dbPath,
+    '.timeout 5000',
+    `.backup "${snapPath.replaceAll('"', '""')}"`,
+  ]);
+  return snapPath;
+}
+
+export async function hasDomainWritesSinceSnapshot(
+  cairnHome: string,
+  snapshotPath: string | null,
+): Promise<boolean> {
+  if (snapshotPath === null || !existsSync(snapshotPath)) return false;
+  const dbPath = join(cairnHome, 'server', 'server.db');
+  if (!existsSync(dbPath)) return false;
+  try {
+    const snap = await readDomainWatermarks(snapshotPath);
+    const curr = await readDomainWatermarks(dbPath);
+    for (const [table, sig] of curr) {
+      const prev = snap.get(table);
+      if (prev === undefined) {
+        const count = Number(sig.split(':')[0] ?? '0');
+        if (count > 0) return true;
+        continue;
+      }
+      if (prev !== sig) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export async function restoreResidentDb(
+  cairnHome: string,
+  snapshotPath: string | null,
+  failedVersion: string,
+  now: number = Date.now(),
+): Promise<string | null> {
+  if (snapshotPath === null || !existsSync(snapshotPath)) return null;
+  const serverDir = join(cairnHome, 'server');
+  const dbPath = join(serverDir, 'server.db');
+  const safeVersion = failedVersion.replace(/[^0-9A-Za-z.+-]/g, '_');
+  const failedDbPath = join(serverDir, `failed-${safeVersion}-${now}.db`);
+  if (existsSync(dbPath)) {
+    renameSync(dbPath, failedDbPath);
+  }
+  for (const suffix of ['-wal', '-shm']) {
+    const walPath = `${dbPath}${suffix}`;
+    if (existsSync(walPath)) renameSync(walPath, `${failedDbPath}${suffix}`);
+  }
+  copyFileSync(snapshotPath, dbPath);
+  rmSync(snapshotPath, { force: true });
+  return existsSync(failedDbPath) ? failedDbPath : null;
 }
 
 export async function kickstartResidentHost(opts: {

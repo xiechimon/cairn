@@ -1,11 +1,12 @@
 import {
+  type HostRollbackNotice,
   isRemoteServerOlder,
   isServerVersionNewer,
   type RemoteVersionState,
   type ServerUpdateReason,
-  type ServerVersionResponse,
+  type ServerVersionV2Response,
   serverUpdateResponseSchema,
-  serverVersionResponseSchema,
+  serverVersionV2ResponseSchema,
 } from '@cairn/shared';
 
 export const REMOTE_POLL_MS = 2_500;
@@ -22,6 +23,7 @@ export interface RemoteVersionControllerOptions {
   onState: (state: RemoteVersionState) => void;
   onAbout: (info: { version: string | null; commit: string | null }) => void;
   onReloadReady: () => void;
+  onNewerRelease?: (version: string) => void;
 }
 
 export interface RemoteVersionController {
@@ -61,6 +63,7 @@ export function createRemoteVersionController(
     updaterState: null,
     percent: null,
     reason: null,
+    rollbackNotice: null,
   };
   let stopped = false;
   let inFlight: Promise<void> | null = null;
@@ -95,11 +98,27 @@ export function createRemoteVersionController(
     if (!stopped) opts.onAbout({ version, commit });
   };
 
+  const newestVersionForLaptop = (body: ServerVersionV2Response): string | null => {
+    let best: string | null = isServerVersionNewer(body.version, opts.appVersion)
+      ? body.version
+      : null;
+    const latest = body.latestRelease ?? null;
+    if (latest !== null && isServerVersionNewer(latest, opts.appVersion)) {
+      if (best === null || isServerVersionNewer(latest, best)) best = latest;
+    }
+    return best;
+  };
+
   const applyVersionResponse = async (
-    body: ServerVersionResponse,
+    body: ServerVersionV2Response,
     forceTrigger: boolean,
   ): Promise<void> => {
+    const rollbackNotice: HostRollbackNotice | null = body.rollbackNotice ?? null;
     reportAbout(body.version, body.commit);
+    const newerRelease = newestVersionForLaptop(body);
+    if (newerRelease !== null && !stopped) {
+      opts.onNewerRelease?.(newerRelease);
+    }
     if (
       baselineVersion !== null &&
       (current.phase === 'updating' || current.phase === 'restarting') &&
@@ -117,6 +136,7 @@ export function createRemoteVersionController(
         updaterState: 'idle',
         percent: null,
         reason: null,
+        rollbackNotice,
       });
       if (!stopped) opts.onReloadReady();
       set({
@@ -128,6 +148,7 @@ export function createRemoteVersionController(
         updaterState: body.updater.state,
         percent: null,
         reason: null,
+        rollbackNotice,
       });
       return;
     }
@@ -145,6 +166,7 @@ export function createRemoteVersionController(
         updaterState: body.updater.state,
         percent: null,
         reason: null,
+        rollbackNotice,
       });
       return;
     }
@@ -163,6 +185,7 @@ export function createRemoteVersionController(
         updaterState: 'unsupported',
         percent: null,
         reason: body.updater.reason ?? 'no-updater',
+        rollbackNotice,
       });
       return;
     }
@@ -181,6 +204,7 @@ export function createRemoteVersionController(
         updaterState: body.updater.state,
         percent: body.updater.percent,
         reason: null,
+        rollbackNotice,
       });
       schedulePoll();
       return;
@@ -200,6 +224,7 @@ export function createRemoteVersionController(
         updaterState: body.updater.state,
         percent: null,
         reason,
+        rollbackNotice,
       });
       return;
     }
@@ -207,6 +232,8 @@ export function createRemoteVersionController(
     if (
       !forceTrigger &&
       (body.updater.state === 'failed' ||
+        body.updater.reason === 'blocked' ||
+        (rollbackNotice !== null && rollbackNotice.failedVersion === opts.appVersion) ||
         (body.updater.state === 'up-to-date' && body.updater.reason === 'no-release'))
     ) {
       attemptedKey = attemptKey;
@@ -222,6 +249,7 @@ export function createRemoteVersionController(
         percent: null,
         reason:
           body.updater.state === 'up-to-date' ? 'no-release' : (body.updater.reason ?? 'failed'),
+        rollbackNotice,
       });
       return;
     }
@@ -237,7 +265,10 @@ export function createRemoteVersionController(
           origin: opts.origin,
           'sec-fetch-site': 'same-origin',
         },
-        body: JSON.stringify({ targetVersion: opts.appVersion }),
+        body: JSON.stringify({
+          targetVersion: opts.appVersion,
+          ...(forceTrigger ? { force: true } : {}),
+        }),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (stopped) return;
@@ -389,7 +420,7 @@ export function createRemoteVersionController(
     }
     const task = (async () => {
       try {
-        const response = await fetchImpl(`${opts.origin}/api/server/version`, {
+        const response = await fetchImpl(`${opts.origin}/api/server/version?schema=2`, {
           cache: 'no-store',
           signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
@@ -414,6 +445,7 @@ export function createRemoteVersionController(
             updaterState: 'unsupported',
             percent: null,
             reason: 'no-updater',
+            rollbackNotice: null,
           });
           return;
         }
@@ -425,7 +457,7 @@ export function createRemoteVersionController(
           return;
         }
         if (!response.ok) return;
-        const parsed = serverVersionResponseSchema.safeParse(await response.json());
+        const parsed = serverVersionV2ResponseSchema.safeParse(await response.json());
         if (!parsed.success) {
           clearPoll();
           reportAbout(null, null);
@@ -438,6 +470,7 @@ export function createRemoteVersionController(
             updaterState: 'unsupported',
             percent: null,
             reason: 'no-updater',
+            rollbackNotice: null,
           });
           return;
         }

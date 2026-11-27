@@ -114,6 +114,7 @@ export function bootServer(
     backupService?: AppContext['backupService'];
     deployRecordPath?: string;
     hostUpdate?: AppContext['hostUpdate'];
+    releaseWatcher?: AppContext['releaseWatcher'];
     capturePage?: CapturePage;
     remote?: Partial<NonNullable<AppContext['remote']>>;
     im?: AppContext['im'];
@@ -235,6 +236,7 @@ export function bootServer(
       ...(opts.backupService !== undefined ? { backupService: opts.backupService } : {}),
       ...(opts.deployRecordPath !== undefined ? { deployRecordPath: opts.deployRecordPath } : {}),
       ...(opts.hostUpdate !== undefined ? { hostUpdate: opts.hostUpdate } : {}),
+      ...(opts.releaseWatcher !== undefined ? { releaseWatcher: opts.releaseWatcher } : {}),
       skillsDir,
       skillSourcesPath,
       homeDir,

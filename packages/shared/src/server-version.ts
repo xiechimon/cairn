@@ -43,6 +43,14 @@ export const serverUpdateStatusSchema = z.strictObject({
 });
 export type ServerUpdateStatus = z.infer<typeof serverUpdateStatusSchema>;
 
+export const hostRollbackNoticeSchema = z.strictObject({
+  failedVersion: z.string().min(1),
+  restoredVersion: z.string().min(1),
+  reason: z.string().min(1),
+  at: z.number().int().nonnegative(),
+});
+export type HostRollbackNotice = z.infer<typeof hostRollbackNoticeSchema>;
+
 export const serverVersionResponseSchema = z.strictObject({
   version: z.string().min(1).nullable(),
   commit: z.string().min(1).max(64).nullable(),
@@ -51,11 +59,18 @@ export const serverVersionResponseSchema = z.strictObject({
 });
 export type ServerVersionResponse = z.infer<typeof serverVersionResponseSchema>;
 
+export const serverVersionV2ResponseSchema = serverVersionResponseSchema.extend({
+  latestRelease: z.string().min(1).nullable().optional(),
+  rollbackNotice: hostRollbackNoticeSchema.nullable().optional(),
+});
+export type ServerVersionV2Response = z.infer<typeof serverVersionV2ResponseSchema>;
+
 export const serverUpdateRequestBodySchema = z.strictObject({
   targetVersion: z
     .string()
     .refine((value) => semver.valid(value) === value, 'not a semver version')
     .optional(),
+  force: z.boolean().optional(),
 });
 export type ServerUpdateRequestBody = z.infer<typeof serverUpdateRequestBodySchema>;
 
@@ -69,6 +84,7 @@ export const hostUpdateRequestSchema = z.strictObject({
   id: z.string().min(1).max(128),
   requestedVersion: z.string().min(1).nullable(),
   requestedAt: z.number().int().nonnegative(),
+  force: z.boolean().optional(),
 });
 export type HostUpdateRequest = z.infer<typeof hostUpdateRequestSchema>;
 
@@ -85,6 +101,7 @@ export const hostUpdateStatusSchema = z.strictObject({
   reason: serverUpdateReasonSchema.nullable(),
   handledRequestId: z.string().min(1).nullable(),
   updatedAt: z.number().int().nonnegative(),
+  rollback: hostRollbackNoticeSchema.nullable().optional(),
 });
 export type HostUpdateStatus = z.infer<typeof hostUpdateStatusSchema> & {
   blocker: DesktopUpdateBlocker | null;
@@ -113,6 +130,7 @@ export const remoteVersionStateSchema = z.strictObject({
   updaterState: serverUpdateStateSchema.nullable(),
   percent: z.number().min(0).max(100).nullable(),
   reason: serverUpdateReasonSchema.nullable(),
+  rollbackNotice: hostRollbackNoticeSchema.nullable().optional(),
 });
 export type RemoteVersionState = z.infer<typeof remoteVersionStateSchema>;
 

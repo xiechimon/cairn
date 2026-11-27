@@ -6,6 +6,7 @@ import {
   type HostUpdateStatus,
   serverUpdateResponseSchema,
   serverVersionResponseSchema,
+  serverVersionV2ResponseSchema,
 } from '@cairn/shared';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -14,7 +15,7 @@ import {
   maybeRetriggerIdleHostUpdate,
   readServerVersionInfo,
 } from '../src/services/server-version.js';
-import { bootServer, redeemTestPairing, req, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, redeemTestPairing, req, type TestServer } from './helpers.js';
 
 const TOKEN = 'cairn-remote-version-test-token-0123456789';
 const authHeaders = { authorization: `Bearer ${TOKEN}` };
@@ -431,5 +432,208 @@ describe('GET /api/server/version and POST /api/server/update', () => {
         },
       }),
     ).toBeNull();
+  });
+
+  test('preserves strict v1 GET /api/server/version while ?schema=2 returns latestRelease and rollbackNotice', async () => {
+    const homeDir = makeTestTempDir('cairn-ver-schema2-');
+    cleanupDirs.push(homeDir);
+    vi.stubEnv('CAIRN_SERVER_VERSION', '0.1.720');
+    const now = Date.now();
+    writeStatus(homeDir, {
+      pid: process.pid,
+      kind: 'background-agent',
+      supported: true,
+      blocker: null,
+      state: 'idle',
+      targetVersion: null,
+      percent: null,
+      reason: 'blocked',
+      handledRequestId: 'req-rollback',
+      updatedAt: now,
+      rollback: {
+        failedVersion: '0.1.721',
+        restoredVersion: '0.1.720',
+        reason: 'health check failed',
+        at: now,
+      },
+    });
+
+    const s = bootServer({
+      authToken: null,
+      homeDir,
+      releaseWatcher: {
+        checkNow: async () => '0.1.725',
+        latestRelease: () => '0.1.725',
+        stop: () => {},
+      },
+    });
+    servers.push(s);
+
+    const v1Raw = (await (await req(s.app, 'GET', '/api/server/version')).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(serverVersionResponseSchema.parse(v1Raw)).toBeTruthy();
+    expect('latestRelease' in v1Raw).toBe(false);
+    expect('rollbackNotice' in v1Raw).toBe(false);
+
+    const v2 = serverVersionV2ResponseSchema.parse(
+      await (await req(s.app, 'GET', '/api/server/version?schema=2')).json(),
+    );
+    expect(v2.latestRelease).toBe('0.1.725');
+    expect(v2.rollbackNotice).toMatchObject({
+      failedVersion: '0.1.721',
+      restoredVersion: '0.1.720',
+    });
+  });
+
+  test('POST /api/server/update requires force=true to retry a rolled-back version', async () => {
+    const homeDir = makeTestTempDir('cairn-ver-force-');
+    cleanupDirs.push(homeDir);
+    const plistPath = join(homeDir, 'app.cairn.updater.plist');
+    writeFileSync(plistPath, '<plist/>');
+    chmodSync(plistPath, 0o600);
+    vi.stubEnv('CAIRN_MANAGED_BY', 'launchd');
+    vi.stubEnv('CAIRN_UPDATER_PLIST', plistPath);
+    vi.stubEnv('CAIRN_SERVER_VERSION', '0.1.720');
+
+    const now = Date.now();
+    writeStatus(homeDir, {
+      pid: process.pid,
+      kind: 'background-agent',
+      supported: true,
+      blocker: null,
+      state: 'idle',
+      targetVersion: null,
+      percent: null,
+      reason: 'blocked',
+      handledRequestId: 'req-1',
+      updatedAt: now,
+      rollback: {
+        failedVersion: '0.1.721',
+        restoredVersion: '0.1.720',
+        reason: 'crashed',
+        at: now,
+      },
+    });
+
+    const triggers: Array<{ id: string; force?: boolean }> = [];
+    const s = bootServer({
+      authToken: null,
+      homeDir,
+      hostUpdate: {
+        trigger: async (request) => {
+          triggers.push({ id: request.id, force: request.force });
+        },
+      },
+    });
+    servers.push(s);
+
+    const blockedRes = await req(s.app, 'POST', '/api/server/update', {
+      targetVersion: '0.1.721',
+    });
+    expect(blockedRes.status).toBe(200);
+    expect(serverUpdateResponseSchema.parse(await blockedRes.json()).accepted).toBe(false);
+    expect(triggers).toHaveLength(0);
+
+    const forcedRes = await req(s.app, 'POST', '/api/server/update', {
+      targetVersion: '0.1.721',
+      force: true,
+    });
+    expect(forcedRes.status).toBe(202);
+    expect(serverUpdateResponseSchema.parse(await forcedRes.json()).accepted).toBe(true);
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]?.force).toBe(true);
+  });
+
+  test('POST /api/machine/presence returns update.targetVersion only for outdated auto-updatable runners', async () => {
+    vi.stubEnv('CAIRN_SERVER_VERSION', '0.1.725');
+    const s = bootServer({
+      authToken: null,
+      releaseWatcher: {
+        checkNow: async () => '0.1.726',
+        latestRelease: () => '0.1.726',
+        stop: () => {},
+      },
+    });
+    servers.push(s);
+
+    const apiKey = await issueApiKey(s);
+    const enrollRes = await reqWith(
+      s,
+      'POST',
+      '/api/machine/enroll',
+      { authorization: `Bearer ${apiKey}` },
+      {
+        teamId: s.team.id,
+        name: 'runner-box',
+        cliVersion: '0.2.3',
+      },
+    );
+    expect(enrollRes.status).toBe(200);
+    const enrolled = (await enrollRes.json()) as { machineId: string; token: string };
+    const mHeaders = { authorization: `Bearer ${enrolled.token}` };
+
+    const outdatedPresence = (await (
+      await reqWith(s, 'POST', '/api/machine/presence', mHeaders, {
+        cliVersion: '0.2.3',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          runnerProtocolVersion: 1,
+          runnerReleaseVersion: '0.1.720',
+          runnerAutoUpdate: { supported: true, state: 'idle' },
+        },
+      })
+    ).json()) as { update?: { targetVersion: string } };
+    expect(outdatedPresence.update).toEqual({ targetVersion: '0.1.726' });
+
+    const currentPresence = (await (
+      await reqWith(s, 'POST', '/api/machine/presence', mHeaders, {
+        cliVersion: '0.2.3',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          runnerProtocolVersion: 1,
+          runnerReleaseVersion: '0.1.726',
+          runnerAutoUpdate: { supported: true, state: 'idle' },
+        },
+      })
+    ).json()) as { update?: { targetVersion: string } };
+    expect(currentPresence.update).toBeUndefined();
+
+    const readOnlyPresence = (await (
+      await reqWith(s, 'POST', '/api/machine/presence', mHeaders, {
+        cliVersion: '0.2.3',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          runnerProtocolVersion: 1,
+          runnerReleaseVersion: '0.1.720',
+          runnerAutoUpdate: { supported: false, state: 'unsupported', reason: 'homebrew' },
+        },
+      })
+    ).json()) as { update?: { targetVersion: string } };
+    expect(readOnlyPresence.update).toBeUndefined();
+
+    const rolledBackPresence = (await (
+      await reqWith(s, 'POST', '/api/machine/presence', mHeaders, {
+        cliVersion: '0.2.3',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          runnerProtocolVersion: 1,
+          runnerReleaseVersion: '0.1.720',
+          runnerAutoUpdate: {
+            supported: true,
+            state: 'rolled-back',
+            reason: 'blocked',
+            failedVersion: '0.1.726',
+            restoredVersion: '0.1.720',
+          },
+        },
+      })
+    ).json()) as { update?: { targetVersion: string } };
+    expect(rolledBackPresence.update).toBeUndefined();
   });
 });

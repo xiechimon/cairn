@@ -112,6 +112,11 @@ import {
   toolInstallRoot,
 } from './runtime-homes.js';
 import {
+  createRunnerSelfUpdater,
+  isRunnerWorkIdle,
+  readRunnerReleaseVersion,
+} from './self-update.js';
+import {
   ensureStateDirs,
   loadDevinModels,
   loadMachineJson,
@@ -179,6 +184,7 @@ export interface MachineHandle {
   machineId: string;
   stop(cause?: string): Promise<void>;
   done: Promise<void>;
+  exitCode?: number | null;
 }
 
 const STRANDED_UPLOAD_REPLAY_MS = 30_000;
@@ -619,6 +625,33 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         `antigravity managed setup failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
+  const runnerReleaseVersion = readRunnerReleaseVersion(capEnv);
+  let claimsPaused = false;
+  let claimInFlight = false;
+  let swapExitCode: number | null = null;
+  let isIdleCheck = (): boolean => false;
+  let requestStopForSwap = (): void => {};
+  const selfUpdater = createRunnerSelfUpdater({
+    cairnHome: config.home,
+    currentVersion: runnerReleaseVersion,
+    scriptPath: process.argv[1] ?? '',
+    env: capEnv,
+    ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
+    isIdle: () => !claimInFlight && isIdleCheck(),
+    pauseClaims: () => {
+      claimsPaused = true;
+    },
+    resumeClaims: () => {
+      claimsPaused = false;
+    },
+    exitForSwap: (code) => {
+      swapExitCode = code;
+      requestStopForSwap();
+    },
+    onStateChange: () => announcePresence(),
+    log: (line) => logger.machine(line),
+  });
+
   const probeCtrl = new AbortController();
   const githubPushProbe =
     opts.githubPushProbe ??
@@ -699,6 +732,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConnectors: true,
       claimGeneration: true,
       runnerProtocolVersion: RUNNER_PROTOCOL_VERSION,
+      ...(runnerReleaseVersion !== null ? { runnerReleaseVersion } : {}),
+      runnerAutoUpdate: selfUpdater.report(),
       ...(orbComputer ? { computer: true as const } : {}),
       ...(hostDesktops?.offersBrowser() || macBrowser
         ? { browser: true as const, browserSecretFill: true as const }
@@ -1031,6 +1066,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     send: async (body, signal) => {
       const response = await client.presence(body, signal);
       githubPushProbe.setRepos(response.githubRepos ?? []);
+      if (response.update?.targetVersion !== undefined) {
+        void selfUpdater.notifyUpdateAvailable(response.update.targetVersion);
+      }
       if (hostKey !== null && machineJson !== null && machineJson.hostKey === undefined) {
         machineJson = { ...machineJson, hostKey };
         saveMachineJson(paths, machineJson);
@@ -1066,8 +1104,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     },
     onSuccess: () => {
       networkFailures = 0;
+      selfUpdater.recordPresenceResult(true);
     },
     onFailure: (err) => {
+      selfUpdater.recordPresenceResult(false);
       if (err instanceof MachineApiError) {
         networkFailures = 0;
       } else {
@@ -1102,6 +1142,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       try {
         await client.me();
         await presenceReporter.send();
+        selfUpdater.markBooted();
         break;
       } catch (error) {
         if (error instanceof MachineApiError && error.status === 401 && loadedFromDisk) {
@@ -1850,13 +1891,31 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     });
   }, opts.strandedUploadReplayMs ?? STRANDED_UPLOAD_REPLAY_MS);
   strandedTimer.unref?.();
+  isIdleCheck = () =>
+    isRunnerWorkIdle({
+      inFlightSteps: inFlight.size,
+      pendingUploads: journal.pending(),
+      strandedAttempts,
+      maxStrandedAttempts: STRANDED_UPLOAD_MAX_ATTEMPTS,
+      activeAntigravityVerifies,
+      activeComputerCalls: computerDispatcher.activeCount(),
+      activeScreens: screens.activeCount(),
+    });
+  requestStopForSwap = () => {
+    void stop('self-update swap');
+  };
   const done = (async () => {
     const backoffBase = opts.claimBackoffBaseMs ?? 1_000;
     let backoff = backoffBase;
     let refusedAsOutdated = false;
     while (!stopping) {
+      if (claimsPaused) {
+        await sleep(250);
+        continue;
+      }
       let step: ClaimedStep | null = null;
       try {
+        claimInFlight = true;
         step = await client.claim(
           AbortSignal.any([claimCtrl.signal, AbortSignal.timeout(claimTimeoutMs)]),
         );
@@ -1879,6 +1938,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         await sleep(backoff);
         backoff = Math.min(backoff * 2, CLAIM_BACKOFF_CAP_MS);
         continue;
+      } finally {
+        claimInFlight = false;
       }
       if (!step || stopping) continue;
       logger.raw(`claim step=${step.step.id}`);
@@ -1899,6 +1960,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   async function stop(cause?: string): Promise<void> {
     if (stopping) return;
     stopping = true;
+    selfUpdater.stop();
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
     clearInterval(strandedTimer);
@@ -1931,5 +1993,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     machineId,
     stop,
     done,
+    get exitCode() {
+      return swapExitCode;
+    },
   };
 }

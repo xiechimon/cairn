@@ -136,6 +136,7 @@ export const machinePresenceResponseSchema = machineOkResponseSchema.extend({
   installDevin: z.boolean().optional(),
   phones: z.array(machinePresencePhoneSchema).max(32).optional(),
   githubRepos: z.array(z.string().min(3).max(200)).max(GITHUB_PUSH_MAX_REPOS).optional(),
+  update: z.object({ targetVersion: z.string().min(1).max(64) }).optional(),
 });
 export type MachinePresenceResponse = z.infer<typeof machinePresenceResponseSchema>;
 

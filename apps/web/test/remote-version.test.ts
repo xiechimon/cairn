@@ -128,6 +128,26 @@ describe('remoteUpdatePresentation', () => {
     const reloading = remoteUpdatePresentation({ ...base, phase: 'reloading' }, en);
     expect(reloading?.tone).toBe('quiet');
     expect(reloading?.actionLabel).toBeNull();
+
+    const rolledBack = remoteUpdatePresentation(
+      {
+        ...base,
+        phase: 'failed',
+        serverVersion: '0.1.720',
+        reason: 'blocked',
+        rollbackNotice: {
+          failedVersion: '0.1.725',
+          restoredVersion: '0.1.720',
+          reason: 'health check failed',
+          at: 1000,
+        },
+      },
+      en,
+    );
+    expect(rolledBack?.tone).toBe('error');
+    expect(rolledBack?.actionLabel).toBe('Retry');
+    expect(rolledBack?.message).toContain('0.1.725');
+    expect(rolledBack?.message).toContain('0.1.720');
   });
 
   it('provides singular Version translation key and preserves DraftSync text on immediate flush', async () => {

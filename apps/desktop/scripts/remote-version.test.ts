@@ -591,3 +591,102 @@ describe('appMenuTemplate with remote state', () => {
     expect(appSubmenu[1]?.enabled).toBe(false);
   });
 });
+
+describe('bidirectional catch-up and rollback notice in remote-version', () => {
+  test('queries ?schema=2, notifies onNewerRelease, surfaces rollbackNotice, tolerates v1, and sends force on retry', async () => {
+    const seenUrls: string[] = [];
+    const postBodies: Array<Record<string, unknown>> = [];
+    const newerReleases: string[] = [];
+    const states: RemoteVersionState[] = [];
+
+    let mode: 'v2-newer' | 'v1-current' | 'v2-rollback' = 'v2-newer';
+    const controller = createRemoteVersionController({
+      origin: 'https://remote.example.test',
+      appVersion: '0.1.720',
+      fetchImpl: async (input, init) => {
+        const url = String(input);
+        seenUrls.push(url);
+        if (url.includes('/api/server/version')) {
+          if (mode === 'v2-newer') {
+            return new Response(
+              JSON.stringify({
+                ...versionPayload('0.1.725'),
+                latestRelease: '0.1.726',
+                rollbackNotice: null,
+              }),
+              { status: 200 },
+            );
+          }
+          if (mode === 'v1-current') {
+            return new Response(JSON.stringify(versionPayload('0.1.720')), { status: 200 });
+          }
+          return new Response(
+            JSON.stringify({
+              ...versionPayload('0.1.719', {
+                updater: {
+                  supported: true,
+                  state: 'idle',
+                  targetVersion: null,
+                  percent: null,
+                  reason: 'blocked',
+                  updatedAt: 1000,
+                },
+              }),
+              latestRelease: '0.1.720',
+              rollbackNotice: {
+                failedVersion: '0.1.720',
+                restoredVersion: '0.1.719',
+                reason: 'health check failed',
+                at: 1000,
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        if (url.endsWith('/api/server/update')) {
+          postBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+          return new Response(
+            JSON.stringify({
+              accepted: true,
+              updater: {
+                supported: true,
+                state: 'checking',
+                targetVersion: '0.1.720',
+                percent: null,
+                reason: null,
+                updatedAt: 2000,
+              },
+            }),
+            { status: 202 },
+          );
+        }
+        return new Response('not found', { status: 404 });
+      },
+      onState: (s) => states.push(s),
+      onAbout: vi.fn(),
+      onReloadReady: vi.fn(),
+      onNewerRelease: (version) => newerReleases.push(version),
+    } as Parameters<typeof createRemoteVersionController>[0] & {
+      onNewerRelease: (version: string) => void;
+    });
+
+    await controller.check();
+    expect(seenUrls[0]).toContain('/api/server/version?schema=2');
+    expect(newerReleases).toEqual(['0.1.726']);
+
+    mode = 'v1-current';
+    await controller.check();
+    expect(states.at(-1)?.phase).toBe('current');
+
+    mode = 'v2-rollback';
+    await controller.check();
+    expect(states.at(-1)?.rollbackNotice).toMatchObject({
+      failedVersion: '0.1.720',
+      restoredVersion: '0.1.719',
+    });
+
+    await controller.retry();
+    expect(postBodies.at(-1)).toEqual({ targetVersion: '0.1.720', force: true });
+    controller.stop();
+  });
+});

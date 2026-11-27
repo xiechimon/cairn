@@ -1,17 +1,33 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { readFileSync, readlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
+  type HostRollbackNotice,
   parseAccessTokenFile,
   type ServerUpdateReason,
   type ServerUpdateState,
 } from '@cairn/shared';
 import { parseBatteryLow, runBackgroundUpdate } from './background-update.js';
-import { readHostUpdateRequest, writeHostUpdateStatus } from './host-update.js';
-import { residentWritingReply, restartResidentHost } from './resident-host.js';
+import {
+  readHostRollbackNotice,
+  readHostUpdateRequest,
+  writeHostUpdateStatus,
+} from './host-update.js';
+import {
+  acquireDeployLease,
+  hasDomainWritesSinceSnapshot,
+  probeResidentHealth,
+  readServerOwner,
+  releaseDeployLease,
+  residentWritingReply,
+  restartResidentHost,
+  restoreResidentDb,
+  snapshotResidentDb,
+} from './resident-host.js';
 import { verifyCairnSignature } from './signature.js';
 import {
   fetchOfferedUpdate,
@@ -21,9 +37,9 @@ import {
   verifyStaged,
 } from './update-core.js';
 import { acquireUpdateLock, pidAlive, updateLockPath } from './update-lock.js';
-import { appendUpdateLog } from './update-log.js';
+import { appendUpdateLog, updateLogPath } from './update-log.js';
 import { canonicalPath } from './update-staging.js';
-import { readBundleVersion } from './update-swap.js';
+import { readBundleVersion, restorePrevious } from './update-swap.js';
 
 const run = promisify(execFile);
 
@@ -57,6 +73,10 @@ async function main(): Promise<void> {
   const log = (line: string): void => appendUpdateLog(userData, `background updater: ${line}`);
   const request = readHostUpdateRequest(cairnHome);
   const appWasRunning = appRunning(userData);
+  const leaseOwner = randomUUID();
+  const leaseTtlMs = 120_000;
+  let rollbackNotice: HostRollbackNotice | null | undefined =
+    request?.force === true ? null : (readHostRollbackNotice(cairnHome) ?? undefined);
   const writeStatus = (
     state: ServerUpdateState,
     targetVersion: string | null = null,
@@ -77,6 +97,7 @@ async function main(): Promise<void> {
         reason,
         handledRequestId: request?.id ?? null,
         updatedAt: Date.now(),
+        ...(rollbackNotice !== undefined ? { rollback: rollbackNotice } : {}),
       });
     } catch (error) {
       console.debug('cairn: recoverable operation failed', error);
@@ -86,6 +107,8 @@ async function main(): Promise<void> {
   const outcome = await runBackgroundUpdate({
     bundle,
     userData,
+    force: request?.force === true,
+    logPath: updateLogPath(userData),
     bundleVersion: async () =>
       bundle.endsWith('.app') && (await verifyCairnSignature(bundle)) === 'accepted'
         ? readBundleVersion(bundle)
@@ -105,12 +128,31 @@ async function main(): Promise<void> {
     verify: (staged) => verifyStaged(bundle, staged),
     swap: (staged, version) => swapInStaged(bundle, staged, version),
     lock: () => acquireUpdateLock(updateLockPath(userData), 'background-updater', 0),
+    acquireLease: () =>
+      acquireDeployLease(cairnHome, ownerToken(cairnHome), leaseOwner, leaseTtlMs),
+    releaseLease: () => releaseDeployLease(cairnHome, ownerToken(cairnHome), leaseOwner),
+    snapshotDb: (fromVersion) => snapshotResidentDb(cairnHome, fromVersion),
+    hasDomainWrites: (snapshotPath) => hasDomainWritesSinceSnapshot(cairnHome, snapshotPath),
+    restoreDb: (snapshotPath, failedVersion) =>
+      restoreResidentDb(cairnHome, snapshotPath, failedVersion),
+    probeHealth: () => probeResidentHealth(cairnHome, ownerToken(cairnHome)),
+    restoreBundle: (previousApp) => restorePrevious({ bundle, previousApp }),
+    onRollback: (notice) => {
+      rollbackNotice = notice;
+    },
     residentBusy: async () => {
       const token = ownerToken(cairnHome);
-      if (token === null) return false;
+      if (token === null) {
+        const owner = readServerOwner(cairnHome);
+        if (owner !== null && owner.managedBy === 'launchd' && pidAlive(owner.pid)) {
+          log('holding update: resident server is alive without a readable owner token');
+          return true;
+        }
+        return false;
+      }
       const busy = await residentWritingReply(cairnHome, token).catch((error: unknown) => {
         log(`could not ask the resident server about replies: ${String(error)}`);
-        return false;
+        return true;
       });
       if (busy) writeStatus('waiting-idle', request?.requestedVersion ?? null);
       return busy;
@@ -125,14 +167,21 @@ async function main(): Promise<void> {
     log,
   });
   if (outcome === 'installed') writeStatus('restarting', request?.requestedVersion ?? null, 100);
-  else if (outcome === 'current') {
+  else if (outcome === 'confirmed') {
+    rollbackNotice = null;
+    writeStatus('up-to-date', null, null, null);
+  } else if (outcome === 'rolled-back' || outcome === 'rolled-back-code') {
+    writeStatus('idle', null, null, 'blocked');
+  } else if (outcome === 'rollback-failed') {
+    writeStatus('failed', null, null, 'failed');
+  } else if (outcome === 'current') {
     writeStatus('up-to-date', null, null, request === null ? null : 'no-release');
   } else if (outcome === 'resident-busy') {
     writeStatus('waiting-idle', request?.requestedVersion ?? null);
   } else if (outcome === 'low-battery') {
     writeStatus('waiting-idle', request?.requestedVersion ?? null, null, 'low-battery');
   } else if (outcome === 'blocked') {
-    writeStatus('failed', request?.requestedVersion ?? null, null, 'blocked');
+    writeStatus('idle', request?.requestedVersion ?? null, null, 'blocked');
   } else if (outcome === 'failed') {
     writeStatus('failed', request?.requestedVersion ?? null, null, 'failed');
   } else if (outcome === 'read-only') {

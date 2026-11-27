@@ -4,6 +4,7 @@ import {
   type DesktopUpdateState,
   HOST_UPDATE_REQUEST_FILE,
   HOST_UPDATE_STATUS_FILE,
+  type HostRollbackNotice,
   type HostUpdateRequest,
   type HostUpdateStatus,
   hostUpdateRequestSchema,
@@ -48,6 +49,17 @@ export function shouldHandleHostUpdateRequest(
   return true;
 }
 
+export function readHostRollbackNotice(cairnHome: string): HostRollbackNotice | null {
+  const path = join(cairnHome, HOST_UPDATE_STATUS_FILE);
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = hostUpdateStatusSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')));
+    return parsed.success ? (parsed.data.rollback ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function writeHostUpdateStatus(cairnHome: string, status: HostUpdateStatus): void {
   const path = join(cairnHome, HOST_UPDATE_STATUS_FILE);
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
@@ -61,6 +73,7 @@ export function desktopStateToHostStatus(
   opts: {
     pid?: number;
     handledRequestId: string | null;
+    rollback?: HostRollbackNotice | null;
     now?: number;
   },
 ): HostUpdateStatus {
@@ -69,6 +82,7 @@ export function desktopStateToHostStatus(
     kind: 'desktop' as const,
     handledRequestId: opts.handledRequestId,
     updatedAt: opts.now ?? Date.now(),
+    ...(opts.rollback !== undefined ? { rollback: opts.rollback } : {}),
   };
   switch (state.status) {
     case 'unsupported':

@@ -11,11 +11,17 @@ export interface StagedUpdate {
   at: number;
 }
 
+export type UpdateGuardOwner = 'desktop' | 'background-agent';
+
 export interface InstalledUpdate {
   version: string;
   previousVersion: string;
   previousApp: string;
   at: number;
+  guardOwner?: UpdateGuardOwner | null;
+  guardPid?: number | null;
+  attemptId?: string | null;
+  dbSnapshot?: string | null;
 }
 
 export interface BlockedUpdate {
@@ -82,13 +88,33 @@ export function parseUpdateState(text: string): UpdateState {
         }
       : null,
   );
-  const installed = field(rows.installed, (row) =>
+  const installed = field<InstalledUpdate>(rows.installed, (row): InstalledUpdate | null =>
     isText(row.version) && isText(row.previousVersion) && isText(row.previousApp) && isTime(row.at)
       ? {
           version: row.version,
           previousVersion: row.previousVersion,
           previousApp: row.previousApp,
           at: row.at,
+          ...(row.guardOwner === 'desktop' || row.guardOwner === 'background-agent'
+            ? { guardOwner: row.guardOwner as UpdateGuardOwner }
+            : row.guardOwner === null
+              ? { guardOwner: null }
+              : {}),
+          ...(typeof row.guardPid === 'number' && Number.isInteger(row.guardPid) && row.guardPid > 0
+            ? { guardPid: row.guardPid }
+            : row.guardPid === null
+              ? { guardPid: null }
+              : {}),
+          ...(isText(row.attemptId)
+            ? { attemptId: row.attemptId }
+            : row.attemptId === null
+              ? { attemptId: null }
+              : {}),
+          ...(isText(row.dbSnapshot)
+            ? { dbSnapshot: row.dbSnapshot }
+            : row.dbSnapshot === null
+              ? { dbSnapshot: null }
+              : {}),
         }
       : null,
   );

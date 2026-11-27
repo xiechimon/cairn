@@ -1,3 +1,4 @@
+import semver from 'semver';
 import { z } from 'zod';
 import { THINKING_LEVELS, thinkingLevelSchema } from '../thinking-levels.js';
 import { reportedModelSchema, runtimeUpdateStatusSchema } from './model-source.js';
@@ -196,6 +197,47 @@ export const githubPushReportSchema = z
   .strict();
 export type GithubPushReport = z.infer<typeof githubPushReportSchema>;
 
+export const RUNNER_AUTO_UPDATE_STATES = [
+  'idle',
+  'downloading',
+  'waiting-idle',
+  'swapping',
+  'rolled-back',
+  'unsupported',
+  'failed',
+] as const;
+export const runnerAutoUpdateStateSchema = z.enum(RUNNER_AUTO_UPDATE_STATES);
+export type RunnerAutoUpdateState = z.infer<typeof runnerAutoUpdateStateSchema>;
+
+export const RUNNER_AUTO_UPDATE_REASONS = [
+  'desktop-bundled',
+  'homebrew',
+  'docker',
+  'development',
+  'read-only',
+  'no-asset',
+  'offline',
+  'checksum-mismatch',
+  'smoke-failed',
+  'blocked',
+  'rollback-failed',
+  'failed',
+] as const;
+export const runnerAutoUpdateReasonSchema = z.enum(RUNNER_AUTO_UPDATE_REASONS);
+export type RunnerAutoUpdateReason = z.infer<typeof runnerAutoUpdateReasonSchema>;
+
+export const runnerAutoUpdateReportSchema = z
+  .object({
+    supported: z.boolean(),
+    state: runnerAutoUpdateStateSchema,
+    targetVersion: z.string().min(1).max(64).nullable().optional(),
+    reason: runnerAutoUpdateReasonSchema.nullable().optional(),
+    failedVersion: z.string().min(1).max(64).nullable().optional(),
+    restoredVersion: z.string().min(1).max(64).nullable().optional(),
+  })
+  .strict();
+export type RunnerAutoUpdateReport = z.infer<typeof runnerAutoUpdateReportSchema>;
+
 export const machineCapabilitiesSchema = z.object({
   osPlatform: machineOsPlatformSchema.optional(),
   osDistribution: z
@@ -232,6 +274,8 @@ export const machineCapabilitiesSchema = z.object({
   mcpConnectors: z.literal(true).optional(),
   claimGeneration: z.literal(true).optional(),
   runnerProtocolVersion: z.number().int().nonnegative().max(1_000_000).optional(),
+  runnerReleaseVersion: z.string().min(1).max(64).optional(),
+  runnerAutoUpdate: runnerAutoUpdateReportSchema.optional(),
   codexLogin: codexLoginSchema.optional(),
   devin: devinReportSchema.optional(),
   gemini: geminiReportSchema.optional(),
@@ -278,6 +322,10 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const runnerProtocolVersion = machineCapabilitiesSchema.shape.runnerProtocolVersion.safeParse(
     rec.runnerProtocolVersion,
   );
+  const runnerReleaseVersion = machineCapabilitiesSchema.shape.runnerReleaseVersion.safeParse(
+    rec.runnerReleaseVersion,
+  );
+  const runnerAutoUpdate = runnerAutoUpdateReportSchema.safeParse(rec.runnerAutoUpdate);
   const confinement = legacyConfinementReportSchema.safeParse(rec.confinement);
   const githubPush = githubPushReportSchema.safeParse(rec.githubPush);
   return {
@@ -319,6 +367,10 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(runnerProtocolVersion.success && runnerProtocolVersion.data !== undefined
       ? { runnerProtocolVersion: runnerProtocolVersion.data }
       : {}),
+    ...(runnerReleaseVersion.success && runnerReleaseVersion.data !== undefined
+      ? { runnerReleaseVersion: runnerReleaseVersion.data }
+      : {}),
+    ...(runnerAutoUpdate.success ? { runnerAutoUpdate: runnerAutoUpdate.data } : {}),
     ...(rec.phoneHost === true ? { phoneHost: true as const } : {}),
     ...(phones.success && phones.data !== undefined ? { phones: phones.data } : {}),
     ...(confinement.success ? { confinement: confinement.data } : {}),
@@ -329,7 +381,9 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
 export const RUNNER_PROTOCOL_VERSION = 1;
 export const MIN_SUPPORTED_RUNNER_PROTOCOL = 0;
 
-export function runnerProtocolOf(capabilities: MachineCapabilities | null | undefined): number {
+export function runnerProtocolOf(
+  capabilities: Pick<MachineCapabilities, 'runnerProtocolVersion'> | null | undefined,
+): number {
   return capabilities?.runnerProtocolVersion ?? 0;
 }
 
@@ -342,6 +396,25 @@ export function runnerOutOfWindow(
 
 export function runnerNeedsUpdate(capabilities: MachineCapabilities | null | undefined): boolean {
   return capabilities != null && runnerProtocolOf(capabilities) < RUNNER_PROTOCOL_VERSION;
+}
+
+export function runnerNeedsVersionUpdate(
+  capabilities:
+    | Pick<MachineCapabilities, 'runnerProtocolVersion' | 'runnerReleaseVersion'>
+    | null
+    | undefined,
+  targetVersion: string | null | undefined,
+): boolean {
+  if (capabilities == null) return false;
+  if (runnerProtocolOf(capabilities) < RUNNER_PROTOCOL_VERSION) return true;
+  if (targetVersion == null) return false;
+  const parsedTarget = semver.valid(targetVersion);
+  if (parsedTarget === null || parsedTarget === '0.0.0') return false;
+  const current = capabilities.runnerReleaseVersion;
+  if (current === undefined) return false;
+  const parsedCurrent = semver.valid(current);
+  if (parsedCurrent === null || parsedCurrent === '0.0.0') return false;
+  return semver.lt(parsedCurrent, parsedTarget);
 }
 
 export function runsLegacyMacSandbox(

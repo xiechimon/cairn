@@ -22,6 +22,7 @@ import type { GithubAppRegistration, McpOAuthState } from './services/mcp-server
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
 import type { PageThumbnails } from './services/page-thumbnails.js';
 import type { VapidKeys } from './services/push.js';
+import type { ReleaseWatcher } from './services/release-watcher.js';
 import type { HostUpdateContext } from './services/server-version.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 import type { TailscaleServe } from './services/tailscale-serve.js';
@@ -88,6 +89,7 @@ export interface AppContext {
   backupService?: BackupService;
   deployRecordPath?: string;
   hostUpdate?: HostUpdateContext;
+  releaseWatcher?: ReleaseWatcher;
   skillsDir: string;
   skillSourcesPath: string;
   homeDir: string;

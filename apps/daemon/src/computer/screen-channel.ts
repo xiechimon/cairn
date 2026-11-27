@@ -51,6 +51,10 @@ export class OutboundComputerScreens {
     );
   }
 
+  activeCount(): number {
+    return this.calls.size;
+  }
+
   dispatch(request: ComputerScreenRequest): Promise<void> {
     if (this.closing) return Promise.resolve();
     const existing = this.calls.get(request.id);

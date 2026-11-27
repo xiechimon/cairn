@@ -1,4 +1,9 @@
-import { MIN_SUPPORTED_RUNNER_PROTOCOL, runnerNeedsUpdate, runnerOutOfWindow } from '@cairn/shared';
+import {
+  type MachineCapabilities,
+  MIN_SUPPORTED_RUNNER_PROTOCOL,
+  runnerNeedsUpdate,
+  runnerOutOfWindow,
+} from '@cairn/shared';
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import { useState } from 'react';
@@ -14,8 +19,73 @@ import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { useOwnComputerRow } from './own-computer-panel.js';
+
+export interface RunnerUpdateSummary {
+  text: string;
+  tone: 'quiet' | 'error';
+  testId: string;
+  outOfWindow?: boolean;
+}
+
+export function runnerUpdateSummary(
+  capabilities: MachineCapabilities | null | undefined,
+  online: boolean,
+  t: TFunc,
+): RunnerUpdateSummary | null {
+  if (!online) return null;
+  const auto = capabilities?.runnerAutoUpdate;
+  if (auto?.state === 'downloading') {
+    return {
+      text: auto.targetVersion
+        ? t('正在自动更新到 {version}…', { version: auto.targetVersion })
+        : t('正在自动更新…'),
+      tone: 'quiet',
+      testId: 'machine-auto-update',
+    };
+  }
+  if (auto?.state === 'waiting-idle') {
+    return {
+      text: auto.targetVersion
+        ? t('空闲后将自动更新到 {version}', { version: auto.targetVersion })
+        : t('空闲后将自动更新'),
+      tone: 'quiet',
+      testId: 'machine-auto-update',
+    };
+  }
+  if (auto?.state === 'swapping') {
+    return {
+      text: auto.targetVersion
+        ? t('正在重启到 {version}…', { version: auto.targetVersion })
+        : t('正在重启…'),
+      tone: 'quiet',
+      testId: 'machine-auto-update',
+    };
+  }
+  if (auto?.state === 'rolled-back') {
+    return {
+      text:
+        auto.failedVersion && auto.restoredVersion
+          ? t('{failed} 未能启动，已恢复到 {restored}', {
+              failed: auto.failedVersion,
+              restored: auto.restoredVersion,
+            })
+          : t('自动更新失败，已恢复旧版本'),
+      tone: 'error',
+      testId: 'machine-auto-update',
+    };
+  }
+  if (!runnerNeedsUpdate(capabilities)) return null;
+  const outOfWindow = runnerOutOfWindow(capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL);
+  return {
+    text: outOfWindow ? t('更新 Cairn 后才能接新任务') : t('需要更新 Cairn'),
+    tone: 'quiet',
+    testId: 'machine-needs-update',
+    ...(outOfWindow ? { outOfWindow: true } : {}),
+  };
+}
 
 export function MachineRowView({
   machine,
@@ -33,9 +103,7 @@ export function MachineRowView({
   const mutations = useApiMutations(teamId);
   const machineId = machine.id ?? '';
   const online = machine.online !== false;
-  const needsUpdate = online && runnerNeedsUpdate(machine.capabilities);
-  const outOfWindow =
-    needsUpdate && runnerOutOfWindow(machine.capabilities, MIN_SUPPORTED_RUNNER_PROTOCOL);
+  const updateSummary = runnerUpdateSummary(machine.capabilities, online, t);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -124,17 +192,22 @@ export function MachineRowView({
             >
               {online ? t('在线') : t('离线')}
             </span>
-            {needsUpdate && (
+            {updateSummary !== null && (
               <>
                 <span aria-hidden className="text-content-dim">
                   ·
                 </span>
                 <span
-                  data-testid="machine-needs-update"
-                  data-out-of-window={outOfWindow || undefined}
-                  className="whitespace-nowrap text-content-secondary"
+                  data-testid={updateSummary.testId}
+                  data-out-of-window={updateSummary.outOfWindow || undefined}
+                  className={cn(
+                    'whitespace-nowrap',
+                    updateSummary.tone === 'error'
+                      ? 'text-tint-fail-ink'
+                      : 'text-content-secondary',
+                  )}
                 >
-                  {outOfWindow ? t('更新 Cairn 后才能接新任务') : t('需要更新 Cairn')}
+                  {updateSummary.text}
                 </span>
               </>
             )}

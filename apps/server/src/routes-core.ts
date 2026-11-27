@@ -405,12 +405,15 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/server/deploy', (c) => c.json(readDeployStatus(ctx.deployRecordPath)));
   app.get('/api/server/version', (c) => {
     c.header('cache-control', 'no-store');
+    const schemaVersion = c.req.query('schema') === '2' ? 2 : 1;
     return c.json(
       buildServerVersionResponse({
         db: ctx.db,
         homeDir: ctx.homeDir,
         deployRecordPath: ctx.deployRecordPath,
         now: ctx.hostUpdate?.now?.(),
+        schemaVersion,
+        latestRelease: ctx.releaseWatcher?.latestRelease() ?? null,
       }),
     );
   });
@@ -421,6 +424,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const result = await requestHostUpdate({
       homeDir: ctx.homeDir,
       targetVersion: body.targetVersion,
+      force: body.force,
       hostUpdate: ctx.hostUpdate,
     });
     return c.json(result, result.accepted ? 202 : 200);

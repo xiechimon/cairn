@@ -10,7 +10,7 @@ export const UPDATER_LABEL = 'app.cairn.updater';
 export const UPDATER_ENTRY = 'background-updater.mjs';
 export const BUNDLE_ID = 'io.github.xiechimon.cairn';
 const RUN_OR_REMOVE =
-  'if [ -x "$1" ]; then exec "$1" "$2"; fi; /bin/rm -f "$3"; exec /bin/launchctl bootout "gui/$(/usr/bin/id -u)/$4"';
+  'if [ -x "$1" ]; then exec "$1" "$2"; fi; app=$(/usr/bin/dirname "$(/usr/bin/dirname "$(/usr/bin/dirname "$1")")"); prev="$(/usr/bin/dirname "$app")/.cairn-previous/$(/usr/bin/basename "$app")"; if [ -x "$prev/Contents/MacOS/Cairn" ] && /bin/mv "$prev" "$app" && [ -x "$1" ]; then exec "$1" "$2"; fi; /bin/rm -f "$3"; exec /bin/launchctl bootout "gui/$(/usr/bin/id -u)/$4"';
 
 export interface UpdaterAgentPaths {
   executablePath: string;

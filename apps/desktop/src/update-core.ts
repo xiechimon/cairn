@@ -5,10 +5,10 @@ import { access, mkdtemp } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import {
-  DESKTOP_MANIFEST_URL,
   type DesktopUpdate,
   desktopReleaseManifestSchema,
   desktopUpdateFrom,
+  resolveUpdateFeedBase,
 } from '@cairn/shared';
 import { verifyCairnSignature } from './signature.js';
 import { isStagedBundleFor, removeFolder, STAGING_PREFIX } from './update-staging.js';
@@ -45,7 +45,8 @@ export async function fetchOfferedUpdate(
   arch: string = process.arch,
   platform: NodeJS.Platform = process.platform,
 ): Promise<DesktopUpdate | null> {
-  const response = await fetch(DESKTOP_MANIFEST_URL, { headers: REQUEST_HEADERS });
+  const { releasesBase, desktopManifestUrl } = resolveUpdateFeedBase(process.env);
+  const response = await fetch(desktopManifestUrl, { headers: REQUEST_HEADERS });
   if (response.status === NO_MANIFEST) return null;
   if (!response.ok) throw new Error(`GitHub answered HTTP ${response.status}`);
   return desktopUpdateFrom(
@@ -53,6 +54,7 @@ export async function fetchOfferedUpdate(
     runningVersion,
     arch,
     platform,
+    releasesBase,
   );
 }
 

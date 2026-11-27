@@ -206,11 +206,26 @@ jobs:
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" \
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/server"
 
+      - name: Package the standalone Runner archive
+        working-directory: apps/desktop
+        run: |
+          mkdir -p release
+          tar --numeric-owner --owner=0 --group=0 -C runner -czf "release/cairn-runner-$VERSION-darwin-$ARCH.tar.gz" .
+
       - name: Keep the arm64 zip for verification and publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: desktop-arm64-zip
           path: apps/desktop/release/Cairn-${{ env.VERSION }}-mac-arm64.zip
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+      - name: Keep the arm64 runner archive for publish
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-runner-darwin-arm64
+          path: apps/desktop/release/cairn-runner-${{ env.VERSION }}-darwin-arm64.tar.gz
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -322,6 +337,12 @@ jobs:
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" \
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/server"
 
+      - name: Package the standalone Runner archive
+        working-directory: apps/desktop
+        run: |
+          mkdir -p release
+          tar --numeric-owner --owner=0 --group=0 -C runner -czf "release/cairn-runner-$VERSION-darwin-$ARCH.tar.gz" .
+
       - name: Keep the packaged x64 files for the publish job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -329,6 +350,7 @@ jobs:
           path: |
             apps/desktop/release/Cairn-${{ env.VERSION }}-mac-x64.dmg
             apps/desktop/release/Cairn-${{ env.VERSION }}-mac-x64.zip
+            apps/desktop/release/cairn-runner-${{ env.VERSION }}-darwin-x64.tar.gz
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -400,6 +422,7 @@ jobs:
         run: |
           node build.mjs
           pnpm exec electron-builder --win nsis zip --x64 "-c.extraMetadata.version=$env:VERSION" --publish never
+          Compress-Archive -Path runner/* -DestinationPath "release/cairn-runner-$env:VERSION-win-x64.zip" -Force
 
       - name: Keep the packaged Windows files for the publish job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -408,6 +431,7 @@ jobs:
           path: |
             apps/desktop/release/Cairn-${{ env.VERSION }}-win-x64.exe
             apps/desktop/release/Cairn-${{ env.VERSION }}-win-x64.zip
+            apps/desktop/release/cairn-runner-${{ env.VERSION }}-win-x64.zip
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -481,6 +505,17 @@ jobs:
           fi
           tar --numeric-owner --owner=0 --group=0 -C release -cf - "$prefix" | $compress > "release/$prefix.tar.gz"
 
+      - name: Package the Linux Runner archive
+        working-directory: apps/desktop
+        run: |
+          set -o pipefail
+          if command -v pigz >/dev/null 2>&1; then
+            compress="pigz -6"
+          else
+            compress="gzip -6"
+          fi
+          tar --numeric-owner --owner=0 --group=0 -C runner -cf - . | $compress > "release/cairn-runner-$VERSION-linux-x64.tar.gz"
+
       - name: Check that the Linux archive holds the Runner and sidecar
         working-directory: apps/desktop
         run: |
@@ -497,7 +532,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: desktop-linux-x64
-          path: apps/desktop/release/Cairn-${{ env.VERSION }}-linux-x64.tar.gz
+          path: |
+            apps/desktop/release/Cairn-${{ env.VERSION }}-linux-x64.tar.gz
+            apps/desktop/release/cairn-runner-${{ env.VERSION }}-linux-x64.tar.gz
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -749,7 +786,7 @@ jobs:
               bail "the tag $tag could not be read: $probe"
           }
           require_free_tag
-          body=$(cat <<'EOF'
+          IFS= read -r -d '' body <<'EOF' || true
           Built from __RELEASE_SHA__.
 
           | Platform | Download |
@@ -764,7 +801,6 @@ jobs:
 
           macOS builds are signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open.
           EOF
-          )
           body="${body//__RELEASE_SHA__/$RELEASE_SHA}"
           body="${body//__VERSION__/$VERSION}"
           release_id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
@@ -784,7 +820,12 @@ jobs:
             Cairn-"$VERSION"-mac-arm64.zip Cairn-"$VERSION"-mac-x64.zip \
             Cairn-"$VERSION"-win-x64.exe Cairn-"$VERSION"-win-x64.zip \
             Cairn-"$VERSION"-linux-x64.tar.gz \
-            desktop-latest.json
+            cairn-runner-"$VERSION"-darwin-arm64.tar.gz \
+            cairn-runner-"$VERSION"-darwin-x64.tar.gz \
+            cairn-runner-"$VERSION"-win-x64.zip \
+            cairn-runner-"$VERSION"-linux-x64.tar.gz \
+            desktop-latest.json \
+            runner-latest.json
           do
             gh api -X POST \
               "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$asset" \

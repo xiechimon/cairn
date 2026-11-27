@@ -271,7 +271,14 @@ export function createUpdater(
       if (release === null) throw new Error('another Cairn update is being installed');
       try {
         const installed = await swapInStaged(bundle, staged, app.getVersion());
-        writeUpdateState(statePath(), afterSwap(readUpdateState(statePath()), installed));
+        writeUpdateState(
+          statePath(),
+          afterSwap(readUpdateState(statePath()), {
+            ...installed,
+            guardOwner: 'desktop',
+            guardPid: process.pid,
+          }),
+        );
       } finally {
         release();
       }

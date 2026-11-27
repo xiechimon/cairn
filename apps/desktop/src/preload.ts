@@ -51,6 +51,15 @@ function remoteFallbackCopy(state: RemoteVersionState, zh: boolean): RemoteFallb
       quiet: true,
     };
   }
+  if (state.rollbackNotice != null) {
+    return {
+      message: zh
+        ? `远程主机 ${state.rollbackNotice.failedVersion} 未能启动，Cairn 已恢复到 ${state.rollbackNotice.restoredVersion}。`
+        : `Remote host ${state.rollbackNotice.failedVersion} could not start; Cairn restored ${state.rollbackNotice.restoredVersion}.`,
+      action: zh ? '重试' : 'Retry',
+      quiet: false,
+    };
+  }
   if (state.phase === 'old-server') {
     return {
       message: zh

@@ -48,8 +48,27 @@ export function createDesktopShellDescriptor({
 }
 export const DESKTOP_RELEASE_TAG_PREFIX = 'desktop-v';
 export const DESKTOP_RELEASE_MANIFEST = 'desktop-latest.json';
+export const RUNNER_RELEASE_MANIFEST = 'runner-latest.json';
 export const DESKTOP_RELEASES_BASE = 'https://github.com/xiechimon/cairn/releases';
 export const DESKTOP_MANIFEST_URL = `${DESKTOP_RELEASES_BASE}/latest/download/${DESKTOP_RELEASE_MANIFEST}`;
+export const RUNNER_MANIFEST_URL = `${DESKTOP_RELEASES_BASE}/latest/download/${RUNNER_RELEASE_MANIFEST}`;
+
+export function resolveUpdateFeedBase(env: NodeJS.ProcessEnv = process.env): {
+  releasesBase: string;
+  desktopManifestUrl: string;
+  runnerManifestUrl: string;
+} {
+  const raw = env.CAIRN_UPDATE_FEED_URL?.trim();
+  const base =
+    raw !== undefined && raw !== '' && /^https?:\/\//i.test(raw)
+      ? raw.replace(/\/+$/, '')
+      : DESKTOP_RELEASES_BASE;
+  return {
+    releasesBase: base,
+    desktopManifestUrl: `${base}/latest/download/${DESKTOP_RELEASE_MANIFEST}`,
+    runnerManifestUrl: `${base}/latest/download/${RUNNER_RELEASE_MANIFEST}`,
+  };
+}
 
 const DESKTOP_MENU_COMMANDS = ['settings', 'new-task', 'search'] as const;
 
@@ -265,6 +284,7 @@ export function desktopUpdateFrom(
   currentVersion: string,
   arch: string,
   platform: string = 'darwin',
+  releasesBase: string = DESKTOP_RELEASES_BASE,
 ): DesktopUpdate | null {
   if (!semver.gt(manifest.version, currentVersion)) return null;
   const key = platform === 'win32' ? `win-${arch}` : arch;
@@ -272,8 +292,56 @@ export function desktopUpdateFrom(
   if (file === undefined) return null;
   return {
     version: manifest.version,
-    url: `${DESKTOP_RELEASES_BASE}/download/${DESKTOP_RELEASE_TAG_PREFIX}${manifest.version}/${file.name}`,
+    url: `${releasesBase}/download/${DESKTOP_RELEASE_TAG_PREFIX}${manifest.version}/${file.name}`,
     size: file.size,
     sha256: file.sha256,
+  };
+}
+
+export interface RunnerUpdate {
+  version: string;
+  url: string;
+  size: number;
+  sha256: string;
+  name: string;
+}
+
+const runnerReleaseFileSchema = z.strictObject({
+  name: z.string().regex(/^cairn-runner-[0-9A-Za-z.+-]+\.(tar\.gz|zip)$/),
+  size: z.number().int().positive(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
+export const runnerReleaseManifestSchema = z.strictObject({
+  version: z.string().refine((value) => semver.valid(value) === value, 'not a semver version'),
+  files: z.record(z.string(), runnerReleaseFileSchema),
+});
+
+export type RunnerReleaseManifest = z.infer<typeof runnerReleaseManifestSchema>;
+
+export function runnerPlatformKey(platform: string, arch: string): string {
+  const os = platform === 'win32' ? 'win' : platform;
+  return `${os}-${arch}`;
+}
+
+export function runnerUpdateFrom(
+  manifest: RunnerReleaseManifest,
+  currentVersion: string | null,
+  arch: string,
+  platform: string = process.platform,
+  releasesBase: string = DESKTOP_RELEASES_BASE,
+): RunnerUpdate | null {
+  if (currentVersion !== null && currentVersion !== '0.0.0') {
+    const parsedCurrent = semver.valid(currentVersion);
+    if (parsedCurrent === null || !semver.gt(manifest.version, parsedCurrent)) return null;
+  }
+  const file = manifest.files[runnerPlatformKey(platform, arch)];
+  if (file === undefined) return null;
+  return {
+    version: manifest.version,
+    url: `${releasesBase}/download/${DESKTOP_RELEASE_TAG_PREFIX}${manifest.version}/${file.name}`,
+    size: file.size,
+    sha256: file.sha256,
+    name: file.name,
   };
 }

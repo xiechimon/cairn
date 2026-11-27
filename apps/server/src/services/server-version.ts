@@ -9,6 +9,7 @@ import {
   HOST_UPDATE_REQUEST_FILE,
   HOST_UPDATE_REQUEST_MESSAGE,
   HOST_UPDATE_STATUS_FILE,
+  type HostRollbackNotice,
   type HostUpdateRequest,
   type HostUpdateStatus,
   hostUpdateRequestSchema,
@@ -17,6 +18,7 @@ import {
   type ServerUpdateState,
   type ServerUpdateStatus,
   type ServerVersionResponse,
+  type ServerVersionV2Response,
 } from '@cairn/shared';
 import { pidAlive } from '@cairn/shared/parent-watch';
 import { eq, isNotNull } from 'drizzle-orm';
@@ -147,6 +149,10 @@ function readRawHostUpdateStatus(homeDir: string): HostUpdateStatus | null {
   }
 }
 
+export function readHostRollbackNotice(homeDir: string): HostRollbackNotice | null {
+  return readRawHostUpdateStatus(homeDir)?.rollback ?? null;
+}
+
 export function readHostUpdateRequest(homeDir: string): HostUpdateRequest | null {
   const path = join(homeDir, HOST_UPDATE_REQUEST_FILE);
   if (!existsSync(path)) return null;
@@ -259,16 +265,24 @@ export function buildServerVersionResponse(opts: {
   deployRecordPath?: string;
   env?: NodeJS.ProcessEnv;
   now?: number;
-}): ServerVersionResponse {
+  schemaVersion?: 1 | 2;
+  latestRelease?: string | null;
+}): ServerVersionResponse | ServerVersionV2Response {
   const { version, commit } = readServerVersionInfo({
     env: opts.env,
     deployRecordPath: opts.deployRecordPath,
   });
-  return {
+  const base: ServerVersionResponse = {
     version,
     commit,
     busy: isServerBusy(opts.db),
     updater: readHostUpdateStatus(opts.homeDir, opts.env, opts.now),
+  };
+  if (opts.schemaVersion !== 2) return base;
+  return {
+    ...base,
+    latestRelease: opts.latestRelease ?? null,
+    rollbackNotice: readHostRollbackNotice(opts.homeDir),
   };
 }
 
@@ -282,6 +296,7 @@ async function defaultTriggerHostUpdate(
       type: HOST_UPDATE_REQUEST_MESSAGE,
       id: request.id,
       requestedVersion: request.requestedVersion,
+      ...(request.force === true ? { force: true } : {}),
     });
     return;
   }
@@ -294,6 +309,7 @@ async function defaultTriggerHostUpdate(
 export async function requestHostUpdate(opts: {
   homeDir: string;
   targetVersion?: string;
+  force?: boolean;
   env?: NodeJS.ProcessEnv;
   hostUpdate?: HostUpdateContext;
 }): Promise<ServerUpdateResponse> {
@@ -303,15 +319,28 @@ export async function requestHostUpdate(opts: {
   if (!updater.supported) {
     return { accepted: false, updater };
   }
+  if (opts.force !== true) {
+    const rollback = readHostRollbackNotice(opts.homeDir);
+    if (
+      rollback !== null &&
+      (opts.targetVersion === undefined || opts.targetVersion === rollback.failedVersion)
+    ) {
+      return { accepted: false, updater };
+    }
+  }
   if (ACTIVE_UPDATE_STATES.has(updater.state)) {
     return { accepted: true, updater };
   }
   const existingRequest = readHostUpdateRequest(opts.homeDir);
+  const requestedTarget = opts.targetVersion ?? null;
   if (
+    opts.force !== true &&
     existingRequest !== null &&
+    existingRequest.requestedVersion === requestedTarget &&
     now - existingRequest.requestedAt < HOST_UPDATE_COOLDOWN_MS &&
     updater.state !== 'failed' &&
-    updater.state !== 'up-to-date'
+    updater.state !== 'up-to-date' &&
+    updater.reason !== 'blocked'
   ) {
     return { accepted: true, updater };
   }
@@ -319,6 +348,7 @@ export async function requestHostUpdate(opts: {
     id: randomUUID(),
     requestedVersion: opts.targetVersion ?? null,
     requestedAt: now,
+    ...(opts.force === true ? { force: true } : {}),
   };
   writeHostUpdateRequest(opts.homeDir, request);
   const trigger =

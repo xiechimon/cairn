@@ -56,6 +56,16 @@ export function remoteUpdatePresentation(
   if (state.phase === 'restarting' || state.phase === 'reloading') {
     return { message: t('远程主机正在重启。'), tone: 'quiet', actionLabel: null };
   }
+  if (state.rollbackNotice != null) {
+    return {
+      message: t('远程主机 {failed} 未能启动，Cairn 已恢复到 {restored}。', {
+        failed: state.rollbackNotice.failedVersion,
+        restored: state.rollbackNotice.restoredVersion,
+      }),
+      tone: 'error',
+      actionLabel: t('重试'),
+    };
+  }
   if (state.phase === 'old-server') {
     return {
       message: t('这台远程主机版本较旧，无法自动更新，请在该电脑上更新 Cairn。'),

@@ -88,6 +88,7 @@ import { canInvokeHostIpc, canSwitchHost, probeRemoteReachable } from './host-li
 import {
   desktopStateToHostStatus,
   initialHandledHostRequestId,
+  readHostRollbackNotice,
   readHostUpdateRequest,
   shouldHandleHostUpdateRequest,
   writeHostUpdateStatus,
@@ -196,7 +197,7 @@ import {
   guardStep,
 } from './update-guard.js';
 import { installDesktopUpdate } from './update-ipc.js';
-import { acquireUpdateLock, updateLockPath } from './update-lock.js';
+import { acquireUpdateLock, pidAlive, updateLockPath } from './update-lock.js';
 import { appendUpdateLog, updateLogPath } from './update-log.js';
 import { removeFolder, removeFolderAfterExit } from './update-staging.js';
 import {
@@ -1489,11 +1490,19 @@ function serveUpdates(
       ),
     );
   let handledHostRequestId = initialHandledHostRequestId(cairnHome());
+  let forcedRetryActive = false;
   const writeHostStatus = (state: DesktopUpdateState): void => {
     try {
+      const rollback =
+        forcedRetryActive || state.status === 'installing' || state.status === 'restarting'
+          ? null
+          : (readHostRollbackNotice(cairnHome()) ?? undefined);
       writeHostUpdateStatus(
         cairnHome(),
-        desktopStateToHostStatus(state, { handledRequestId: handledHostRequestId }),
+        desktopStateToHostStatus(state, {
+          handledRequestId: handledHostRequestId,
+          ...(rollback !== undefined ? { rollback } : {}),
+        }),
       );
     } catch (error) {
       console.error('could not write the host update status:', messageOf(error));
@@ -1508,6 +1517,7 @@ function serveUpdates(
       state.status === 'unsupported'
     ) {
       hostIdleState.remoteRequested = false;
+      forcedRetryActive = false;
     }
     showMenu(state);
     for (const window of BrowserWindow.getAllWindows()) {
@@ -1537,6 +1547,7 @@ function serveUpdates(
     }
     handledHostRequestId = request.id;
     hostIdleState.remoteRequested = true;
+    if (request.force === true) forcedRetryActive = true;
     writeHostStatus(created.state());
     if (allowLocalCredentials) {
       void probeLocalServerVersion(origin, ownerToken);
@@ -1760,12 +1771,14 @@ function serveUpdates(
       return;
     }
     void check();
+    void remoteVersion?.check();
   };
   setTimeout(periodicCheck, UPDATE_FIRST_CHECK_MS);
   setInterval(periodicCheck, UPDATE_CHECK_EVERY_MS);
   app.on('browser-window-focus', () => {
     if (lastCheckedAt !== 0 && Date.now() - lastCheckedAt >= UPDATE_CHECK_ON_FOCUS_AFTER_MS) {
       void check();
+      void remoteVersion?.check();
     }
   });
 }
@@ -1796,6 +1809,14 @@ function armVersionGuard(userData: string): VersionGuard | null {
   const state = readUpdateState(statePath);
   const installed = state.installed;
   const bundle = runningBundle();
+  if (
+    installed !== null &&
+    installed.guardOwner === 'background-agent' &&
+    installed.guardPid != null &&
+    pidAlive(installed.guardPid)
+  ) {
+    return null;
+  }
   if (installed === null || installed.version !== app.getVersion()) {
     if (installed !== null) writeUpdateState(statePath, { ...state, installed: null });
     void removeFolder(previousAppPath(bundle)).catch((error) => {
@@ -1803,6 +1824,14 @@ function armVersionGuard(userData: string): VersionGuard | null {
     });
     return null;
   }
+  writeUpdateState(statePath, {
+    ...state,
+    installed: {
+      ...installed,
+      guardOwner: 'desktop',
+      guardPid: process.pid,
+    },
+  });
   const attempts =
     state.blocked !== null && state.blocked.version === installed.version
       ? state.blocked.attempts
@@ -2086,6 +2115,9 @@ async function boot(): Promise<void> {
         },
         onAbout: (info) => setAboutServerVersion(info.version, info.commit),
         onReloadReady: reloadMainWindowPreserveDrafts,
+        onNewerRelease: () => {
+          void updater?.check();
+        },
       });
       remoteVersionState = remoteVersion.state();
       void remoteVersion.check();
