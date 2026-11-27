@@ -1,30 +1,48 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { isAbsolute, join, sep } from 'node:path';
 import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { isAbsolute, join, relative, sep } from 'node:path';
+import {
+  ACTIVE_STEP_STATUSES,
+  type BuildChangesPlainFolderState,
   conversationBranch,
   type DiffFileContent,
   type DocumentDiffFile,
   GITHUB_PUSH_MAX_REPOS,
   type GithubRepoRef,
   gitHostedRepoPath,
+  isPlainFolderExcluded,
+  type LocalFolderActionResult,
   normalizedRepoRef,
+  type PlainFolderStepMeta,
   type ProjectBranchesResponse,
   type ProjectFileResponse,
   type ProjectFilesResponse,
   type ProjectRecord,
   parseGithubRepoRef,
+  parseLocalFolderActionInstruction,
   projectMergeConfigSchema,
   type SecretBox,
 } from '@cairn/shared';
+import { protectedFolderReason } from '@cairn/shared/plain-folder-path';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { parsePatch } from 'diff';
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build as buildTable,
   hostedCleanupOutbox,
+  message as messageTable,
   project,
+  step as stepTable,
   todo as todoTable,
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
@@ -41,6 +59,7 @@ import {
   assertSourceOutsideCairnDirs,
   type CairnSourceRoots,
   requireRealpath,
+  samePathOrInside,
 } from '../lib/local-source.js';
 import type { OAuthClientConfig } from '../lib/oauth-client.js';
 import { githubAppRegistration } from './github-app-registration.js';
@@ -235,6 +254,10 @@ export async function validateLocalRepoPath(
       'not_absolute',
     );
   }
+  const protExpanded = protectedFolderReason(expanded);
+  if (protExpanded !== null) {
+    throw new HttpError(400, `invalid body at localPath: ${protExpanded}`, 'protected_folder');
+  }
   let real: string;
   try {
     real = requireRealpath(expanded);
@@ -243,6 +266,17 @@ export async function validateLocalRepoPath(
       throw new HttpError(400, `invalid body at localPath: ${error.message}`, error.reason);
     }
     throw error;
+  }
+  const protReal = protectedFolderReason(real);
+  if (protReal !== null) {
+    throw new HttpError(400, `invalid body at localPath: ${protReal}`, 'protected_folder');
+  }
+  if (!statSync(real).isDirectory()) {
+    throw new HttpError(
+      400,
+      `invalid body at localPath: ${raw} is not a directory`,
+      'not_directory',
+    );
   }
   assertSourceOutsideCairnDirs(real, `invalid body at localPath: ${raw}`, roots);
   return real;
@@ -425,6 +459,122 @@ async function githubRepoReader(ctx: RepoReadCtx, row: ProjectRow): Promise<Gith
   };
 }
 
+async function resolveLocalReadSource(
+  ctx: RepoReadCtx,
+  row: ProjectRow,
+): Promise<{ kind: 'git' | 'plain'; dir: string }> {
+  if (row.localPath === null) {
+    throw notFound(`local repo for project ${row.id}`);
+  }
+  const disclose = ctx.discloseLocalPath !== false;
+  if (!existsSync(row.localPath)) {
+    throw new HttpError(
+      404,
+      disclose ? `local repo path not found: ${row.localPath}` : 'local repo path not found',
+      'not_found',
+    );
+  }
+  if (!statSync(row.localPath).isDirectory()) {
+    throw new HttpError(
+      404,
+      disclose
+        ? `local repo path is not a directory: ${row.localPath}`
+        : 'local repo path is not a directory',
+      'not_directory',
+    );
+  }
+  if (await systemGitOps.isGitRepo(row.localPath)) {
+    return { kind: 'git', dir: row.localPath };
+  }
+  return { kind: 'plain', dir: row.localPath };
+}
+
+function listPlainFolderFiles(
+  rootDir: string,
+  limit: number,
+): {
+  files: ProjectFilesResponse['files'];
+  truncated: boolean;
+} {
+  const realRoot = realpathSync(rootDir);
+  const files: ProjectFilesResponse['files'] = [];
+  const stack: string[] = [realRoot];
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    if (dir === undefined) break;
+    let names: string[];
+    try {
+      names = readdirSync(dir).sort();
+    } catch {
+      continue;
+    }
+    const relDir = relative(realRoot, dir).split(sep).join('/');
+    for (const name of names) {
+      const full = join(dir, name);
+      let lst: ReturnType<typeof lstatSync>;
+      try {
+        lst = lstatSync(full);
+      } catch {
+        continue;
+      }
+      if (lst.isSymbolicLink()) continue;
+      const rel = relDir === '' ? name : `${relDir}/${name}`;
+      if (lst.isDirectory()) {
+        if (isPlainFolderExcluded(rel, true)) continue;
+        files.push({ path: rel, type: 'tree', size: null });
+        if (files.length > limit) {
+          return { files: files.slice(0, limit), truncated: true };
+        }
+        stack.push(full);
+      } else if (lst.isFile()) {
+        if (isPlainFolderExcluded(rel, false)) continue;
+        files.push({ path: rel, type: 'blob', size: lst.size });
+        if (files.length > limit) {
+          return { files: files.slice(0, limit), truncated: true };
+        }
+      }
+    }
+  }
+  files.sort((a, b) => a.path.localeCompare(b.path));
+  return { files, truncated: false };
+}
+
+function readPlainFolderFile(
+  rootDir: string,
+  relPath: string,
+  ref: string,
+  options: { maxBytes?: number } = {},
+): ProjectFileResponse {
+  if (!isSafeRepoPath(relPath) || isPlainFolderExcluded(relPath, false)) {
+    throw notFound(`file ${relPath} at ref ${ref}`);
+  }
+  const realRoot = realpathSync(rootDir);
+  const full = join(realRoot, ...relPath.split('/'));
+  if (!existsSync(full)) throw notFound(`file ${relPath} at ref ${ref}`);
+  const realTarget = realpathSync(full);
+  if (!samePathOrInside(realTarget, realRoot) || realTarget === realRoot) {
+    throw notFound(`file ${relPath} at ref ${ref}`);
+  }
+  const st = statSync(realTarget);
+  if (!st.isFile()) throw notFound(`file ${relPath} at ref ${ref}`);
+  if (options.maxBytes !== undefined && st.size > options.maxBytes) {
+    throw new HttpError(
+      413,
+      `repository document too large: ${st.size} bytes exceeds limit ${options.maxBytes}`,
+    );
+  }
+  const content = readFileSync(realTarget);
+  const binary = looksBinary(content);
+  return {
+    ref,
+    commit: 'workspace',
+    path: relPath,
+    size: content.byteLength,
+    encoding: binary ? 'base64' : 'utf-8',
+    content: binary ? content.toString('base64') : new TextDecoder().decode(content),
+  };
+}
+
 export async function requireRepoReadDir(ctx: RepoReadCtx, projectId: string): Promise<string> {
   const row = projectRowOf(ctx, projectId);
   if (row.repoKind === 'hosted' && row.repoName !== null) {
@@ -436,27 +586,18 @@ export async function requireRepoReadDir(ctx: RepoReadCtx, projectId: string): P
     throw new HttpError(404, 'github repository cache unavailable on this server');
   }
   if (row.repoKind === 'local') {
-    if (row.localPath === null) {
-      throw notFound(`local repo for project ${projectId}`);
-    }
-    const disclose = ctx.discloseLocalPath !== false;
-    if (!existsSync(row.localPath)) {
-      throw new HttpError(
-        404,
-        disclose ? `local repo path not found: ${row.localPath}` : 'local repo path not found',
-        'not_found',
-      );
-    }
-    if (!(await systemGitOps.isGitRepo(row.localPath))) {
+    const source = await resolveLocalReadSource(ctx, row);
+    if (source.kind === 'plain') {
+      const disclose = ctx.discloseLocalPath !== false;
       throw new HttpError(
         404,
         disclose
-          ? `local repo path is not a git repository: ${row.localPath}`
+          ? `local repo path is not a git repository: ${source.dir}`
           : 'local repo path is not a git repository',
         'not_git',
       );
     }
-    return row.localPath;
+    return source.dir;
   }
   throw notFound(`repository binding for project ${projectId}`);
 }
@@ -638,6 +779,13 @@ export async function readFiles(
     }
     return listGithubProjectFiles(await githubRepoReader(ctx, row), refParam, limit);
   }
+  if (row.repoKind === 'local') {
+    const local = await resolveLocalReadSource(ctx, row);
+    if (local.kind === 'plain') {
+      const listed = listPlainFolderFiles(local.dir, limit);
+      return { ref, commit: 'workspace', truncated: listed.truncated, files: listed.files };
+    }
+  }
   const dir = await requireRepoReadDir(ctx, projectId);
   const commit = await resolveCommitOr404(ctx, projectId, { dir, kind: 'dir' }, ref);
   const all = await lsFilesRecursive(dir, commit);
@@ -717,6 +865,12 @@ export async function readFile(
       refParam ?? row.baseBranch ?? undefined,
       options,
     );
+  }
+  if (row.repoKind === 'local') {
+    const local = await resolveLocalReadSource(ctx, row);
+    if (local.kind === 'plain') {
+      return readPlainFolderFile(local.dir, path, refParam ?? 'HEAD', options);
+    }
   }
   const dir = await requireRepoReadDir(ctx, projectId);
   let ref = refParam ?? 'HEAD';
@@ -846,6 +1000,27 @@ export async function readProjectReadme(
         });
       }
     } else {
+      if (row.repoKind === 'local') {
+        const local = await resolveLocalReadSource(ctx, row);
+        if (local.kind === 'plain') {
+          for (const candidate of README_CANDIDATES) {
+            if (budget.aborted) throw budget.reason;
+            try {
+              const file = readPlainFolderFile(local.dir, candidate, 'HEAD', {
+                maxBytes: README_READ_MAX_BYTES,
+              });
+              if (file.encoding === 'utf-8') {
+                found = file;
+                break;
+              }
+            } catch (error) {
+              if (error instanceof HttpError && error.status === 404) continue;
+              throw error;
+            }
+          }
+          return found === null ? { status: 'missing', repo } : toReadmeOk(repo, found);
+        }
+      }
       const dir = await requireRepoReadDir(ctx, projectId);
       const ref = refParam ?? 'HEAD';
       const commit = await resolveCommitOr404(ctx, projectId, { dir, kind: 'dir' }, ref);
@@ -879,6 +1054,11 @@ export async function readBranches(
       installUrl: repoGithubInstallUrl(ctx),
     });
   }
+  if (row?.repoKind === 'local') {
+    const local = await resolveLocalReadSource(ctx, row);
+    if (local.kind === 'plain') return { defaultBranch: null, branches: [] };
+    return systemGitOps.listBranches(local.dir);
+  }
   const dir = await requireRepoReadDir(ctx, projectId);
   return systemGitOps.listBranches(dir);
 }
@@ -910,22 +1090,162 @@ export function diffTextNamesAFile(text: string): boolean {
   return false;
 }
 
+function readPlainFolderBuildState(
+  db: Db,
+  buildId: string,
+): BuildChangesPlainFolderState | undefined {
+  const sysMessages = db
+    .select({ content: messageTable.content })
+    .from(messageTable)
+    .where(and(eq(messageTable.conversationId, buildId), eq(messageTable.role, 'system')))
+    .orderBy(asc(messageTable.createdAt), asc(sql`rowid`))
+    .all();
+  let state: BuildChangesPlainFolderState | undefined;
+  for (const row of sysMessages) {
+    if (typeof row.content !== 'string' || !row.content.startsWith('{')) continue;
+    let parsed: Record<string, unknown> | null = null;
+    try {
+      parsed = JSON.parse(row.content) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (parsed === null || typeof parsed !== 'object') continue;
+    if (parsed.kind === 'plain-folder-state') {
+      const meta = parsed as unknown as PlainFolderStepMeta;
+      state = {
+        mode: meta.mode,
+        status: meta.status,
+        undoable: meta.undoable,
+        undoPending: false,
+        ...(meta.conflictFiles !== undefined ? { conflictFiles: meta.conflictFiles } : {}),
+        ...(meta.reason !== undefined ? { error: meta.reason } : {}),
+      };
+      continue;
+    }
+    if (parsed.kind === 'local-folder-action-result' && state !== undefined) {
+      const report = parsed as unknown as {
+        command?: { action?: 'undo' | 'merge' };
+        result?: LocalFolderActionResult;
+      };
+      const result = report.result;
+      const action = report.command?.action;
+      if (result === undefined || action === undefined) continue;
+      if (action === 'undo') {
+        if (result.outcome === 'undone' || result.outcome === 'already-undone') {
+          state = {
+            mode: state.mode,
+            status: 'undone',
+            undoable: false,
+            undoPending: false,
+          };
+        } else if (result.outcome === 'no-changes') {
+          state = {
+            mode: state.mode,
+            status: 'no-changes',
+            undoable: false,
+            undoPending: false,
+          };
+        } else if (result.outcome === 'conflict') {
+          state = {
+            ...state,
+            status: 'conflict',
+            undoPending: false,
+            ...(result.conflictFiles !== undefined ? { conflictFiles: result.conflictFiles } : {}),
+            ...(result.reason !== undefined ? { error: result.reason } : {}),
+          };
+        } else if (result.outcome === 'failed') {
+          state = {
+            ...state,
+            undoPending: false,
+            error: result.reason ?? '撤销失败',
+          };
+        } else if (result.outcome !== 'merged' && result.outcome !== 'already-merged') {
+          state = {
+            ...state,
+            status: result.outcome,
+            undoable:
+              result.outcome !== 'snapshot-missing' &&
+              result.outcome !== 'partial-unknown' &&
+              result.outcome !== 'disabled',
+            undoPending: false,
+            ...(result.reason !== undefined ? { error: result.reason } : {}),
+          };
+        }
+      } else if (action === 'merge') {
+        if (result.outcome === 'merged' || result.outcome === 'already-merged') {
+          state = {
+            mode: state.mode,
+            status: 'merged',
+            undoable: true,
+            undoPending: false,
+          };
+        } else if (result.outcome === 'conflict') {
+          state = {
+            ...state,
+            status: 'conflict',
+            undoPending: false,
+            ...(result.conflictFiles !== undefined ? { conflictFiles: result.conflictFiles } : {}),
+            ...(result.reason !== undefined ? { error: result.reason } : {}),
+          };
+        } else if (result.reason !== undefined) {
+          state = { ...state, error: result.reason };
+        }
+      }
+    }
+  }
+  if (state === undefined) return undefined;
+  const activeSteps = db
+    .select({ prompt: stepTable.prompt })
+    .from(stepTable)
+    .where(
+      and(eq(stepTable.buildId, buildId), inArray(stepTable.status, [...ACTIVE_STEP_STATUSES])),
+    )
+    .all();
+  const undoPending = activeSteps.some(
+    (s) => parseLocalFolderActionInstruction(s.prompt)?.action === 'undo',
+  );
+  return { ...state, undoPending };
+}
+
 export async function readBuildChanges(
   ctx: RepoCtx,
   buildId: string,
-): Promise<{ files: DocumentDiffFile[]; reported: boolean; changed?: boolean }> {
+): Promise<{
+  files: DocumentDiffFile[];
+  reported: boolean;
+  changed?: boolean;
+  plainFolder?: BuildChangesPlainFolderState;
+}> {
   const buildRow = ctx.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get();
   if (!buildRow) throw notFound(`build ${buildId}`);
   const todoRow = ctx.db.select().from(todoTable).where(eq(todoTable.id, buildRow.todoId)).get();
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
   const projRow = projectOfTodo(ctx.db, todoRow);
   if (projRow?.repoKind !== 'hosted' || projRow.repoName === null) {
+    const plainFolder =
+      projRow?.repoKind === 'local' ? readPlainFolderBuildState(ctx.db, buildId) : undefined;
     const stored = buildRow.changes;
-    if (stored == null) return { files: [], reported: false };
-    if (Array.isArray(stored)) {
-      return { files: stored, reported: true, changed: stored.length > 0 };
+    if (stored == null) {
+      return {
+        files: [],
+        reported: plainFolder !== undefined,
+        ...(plainFolder !== undefined ? { plainFolder } : {}),
+      };
     }
-    return { files: stored.files, reported: true, changed: true };
+    if (Array.isArray(stored)) {
+      return {
+        files: stored,
+        reported: true,
+        changed: stored.length > 0,
+        ...(plainFolder !== undefined ? { plainFolder } : {}),
+      };
+    }
+    return {
+      files: stored.files,
+      reported: true,
+      changed: true,
+      ...(plainFolder !== undefined ? { plainFolder } : {}),
+    };
   }
   const dir = repoDirFor(ctx.reposDir, projRow.teamId, projRow.repoName);
   const { defaultBranch } = await systemGitOps.listBranches(dir);
@@ -955,6 +1275,17 @@ export async function readBuildChangeFile(
   const todoRow = ctx.db.select().from(todoTable).where(eq(todoTable.id, buildRow.todoId)).get();
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
   const projRow = projectOfTodo(ctx.db, todoRow);
+  if (projRow?.repoKind === 'local' && projRow.localPath !== null) {
+    if (
+      existsSync(projRow.localPath) &&
+      statSync(projRow.localPath).isDirectory() &&
+      !(await systemGitOps.isGitRepo(projRow.localPath))
+    ) {
+      return readPlainFolderFile(projRow.localPath, path, 'HEAD', {
+        maxBytes: DIFF_FILE_MAX_BYTES,
+      });
+    }
+  }
   if (projRow?.repoKind !== 'hosted' || projRow.repoName === null) {
     throw notFound(`hosted repo for build ${buildId}`);
   }

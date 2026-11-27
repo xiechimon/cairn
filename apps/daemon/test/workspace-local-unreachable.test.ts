@@ -76,17 +76,29 @@ describe('local-shape execution surface fail-loud (#1210 C fallback)', () => {
     expect(existsSync(join(root, PROJECT_ID, 'repo'))).toBe(false);
   });
 
-  test('L2 path exists but is not a git repo → LocalRepoUnreachableError(not_git)', async () => {
+  test('L2 path exists but is a plain folder (not a git repo) → prepares isolated shadow workspace without .git', async () => {
     const plain = testTempDir('cairn-lu-plain-');
     writeFileSync(join(plain, 'notes.txt'), 'not a repo\n');
-    const err = await ws.prepare(localPrepareInput(plain, true)).catch((e: unknown) => e);
+    const prepared = await ws.prepare(localPrepareInput(plain, true));
+    expect(prepared.reused).toBe(false);
+    expect(prepared.plainFolder?.mode).toBe('isolated');
+    expect(existsSync(join(plain, '.git'))).toBe(false);
+    expect(existsSync(join(prepared.cwd, 'notes.txt'))).toBe(true);
+    rmSync(plain, { recursive: true, force: true });
+  }, 30_000);
+
+  test('L2b path points at a regular file → LocalRepoUnreachableError(not_directory)', async () => {
+    const dir = testTempDir('cairn-lu-file-');
+    const file = join(dir, 'plain.txt');
+    writeFileSync(file, 'not a dir\n');
+    const err = await ws.prepare(localPrepareInput(file, true)).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(LocalRepoUnreachableError);
     expect(err).toMatchObject({
       name: 'LocalRepoUnreachableError',
-      repoPath: plain,
-      reason: 'not_git',
+      repoPath: file,
+      reason: 'not_directory',
     });
-    rmSync(plain, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
   }, 30_000);
 
   test('L3 healthy worktree repo → prepare succeeds as usual (zero drift on the machine hosting the repo)', async () => {

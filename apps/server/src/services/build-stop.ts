@@ -150,7 +150,10 @@ function landStopPhase(deps: BuildDeps, todoRow: typeof todo.$inferSelect, build
 
 export function releaseUnissuedMergeAdmission(db: Db, row: typeof step.$inferSelect): void {
   if (row.kind !== 'merge') return;
-  if (row.prompt?.includes('"local-merge"') && (row.status === 'claimed' || row.claimedAt !== null))
+  if (
+    (row.prompt?.includes('"local-merge"') || row.prompt?.includes('"local-folder-action"')) &&
+    (row.status === 'claimed' || row.claimedAt !== null)
+  )
     return;
   settleAutonomousMerge(db, row.buildId, 'refused');
 }

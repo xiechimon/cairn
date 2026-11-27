@@ -12,6 +12,7 @@ import {
   LOCAL_TOOL_CREATE_TAG,
   MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
+  parseLocalFolderActionInstruction,
   parseLocalMergeInstruction,
   parseVerifyPromptMeta,
   type RemoteToolDef,
@@ -77,6 +78,7 @@ import { githubRepoOfProject, projectOfTodo, projectRepoRef } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
+import { localFolderActionAuthorizationRefusal } from './local-folder-action.js';
 import { localMergeAuthorizationRefusal } from './local-merge.js';
 import { stageTurnAttachments } from './machine-computer.js';
 import {
@@ -721,6 +723,20 @@ async function tryClaim(
       );
       continue;
     }
+    const localFolderAction = parseLocalFolderActionInstruction(cand.stepRow.prompt);
+    if (
+      localFolderAction !== null &&
+      localFolderActionAuthorizationRefusal(db, localFolderAction, cand.todoRow) !== null
+    ) {
+      withFencedTransaction(deps, (settleDeps) =>
+        failPendingClaim(
+          settleDeps,
+          cand.stepRow,
+          'Local folder action authorization changed; try again from the task panel',
+        ),
+      );
+      continue;
+    }
     const agentRow = profileForStep(deps, cand.todoRow, cand.stepRow.kind, cand.stepRow.id);
     if (agentRow === null) {
       withFencedTransaction(deps, (settleDeps) =>
@@ -752,7 +768,7 @@ async function tryClaim(
       agentRow,
       model,
       localProject: todoProject?.repoKind === 'local',
-      localMerge: localMerge !== null,
+      localMerge: localMerge !== null || localFolderAction !== null,
       githubPushRepo: requiredGithubPushRepoForStep({
         project: todoProject,
         step: cand.stepRow,
@@ -868,12 +884,18 @@ async function tryClaim(
           (latestTodo.latestBuildId !== cand.buildRow.id ||
             latestTodo.archivedAt !== null ||
             latestTodo.projectId !== cand.todoRow.projectId ||
-            !['done', 'review', 'failed'].includes(latestTodo.phase))
+            (localFolderAction?.action !== 'undo' &&
+              !['done', 'review', 'failed'].includes(latestTodo.phase)))
         )
           return false;
         if (
           localMerge !== null &&
           localMergeAuthorizationRefusal(db, localMerge, latestTodo) !== null
+        )
+          return false;
+        if (
+          localFolderAction !== null &&
+          localFolderActionAuthorizationRefusal(tx, localFolderAction, latestTodo) !== null
         )
           return false;
         holdBlockedBuild(tx, cand.stepRow.buildId);
@@ -1058,6 +1080,7 @@ async function tryClaim(
       },
       conversationId: cand.stepRow.buildId,
       ...(localMerge !== null ? { localMerge } : {}),
+      ...(localFolderAction !== null ? { localFolderAction } : {}),
       session,
       ...(instruction !== null ? { instruction } : {}),
       ...(answerIds.length > 0 ? { answerIds } : {}),

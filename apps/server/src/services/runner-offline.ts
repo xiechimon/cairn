@@ -1,4 +1,5 @@
 import {
+  parseLocalFolderActionInstruction,
   parseLocalMergeInstruction,
   type RouteOverride,
   RUNNER_OFFLINE_KIND,
@@ -117,7 +118,9 @@ function canRunOn(db: Db, row: PendingRow, target: MachineRow, now: number): boo
     agentRow,
     model: effectiveModel(agentRow, row.stepRow),
     localProject,
-    localMerge: parseLocalMergeInstruction(row.stepRow.prompt) !== null,
+    localMerge:
+      parseLocalMergeInstruction(row.stepRow.prompt) !== null ||
+      parseLocalFolderActionInstruction(row.stepRow.prompt) !== null,
     githubPushRepo: requiredGithubPushRepoForStep({
       project: projectRow,
       step: row.stepRow,

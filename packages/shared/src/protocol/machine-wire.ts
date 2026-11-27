@@ -217,6 +217,97 @@ export type MachineLocalMergeRecheckResponse = z.infer<
   typeof machineLocalMergeRecheckResponseSchema
 >;
 
+export const plainFolderStatusSchema = z.enum([
+  'merged',
+  'conflict',
+  'undone',
+  'no-changes',
+  'disabled',
+  'missing-folder',
+  'folder-replaced',
+  'disk-full',
+  'snapshot-missing',
+  'partial-unknown',
+]);
+export type PlainFolderStatus = z.infer<typeof plainFolderStatusSchema>;
+
+export const plainFolderStepMetaSchema = z.object({
+  mode: z.enum(['isolated', 'in-place']),
+  status: plainFolderStatusSchema,
+  undoable: z.boolean(),
+  conflictFiles: z.array(z.string()).optional(),
+  reason: z.string().optional(),
+});
+export type PlainFolderStepMeta = z.infer<typeof plainFolderStepMetaSchema>;
+
+export const buildChangesPlainFolderStateSchema = z.object({
+  mode: z.enum(['isolated', 'in-place']),
+  status: plainFolderStatusSchema,
+  undoable: z.boolean(),
+  undoPending: z.boolean(),
+  conflictFiles: z.array(z.string()).optional(),
+  error: z.string().optional(),
+});
+export type BuildChangesPlainFolderState = z.infer<typeof buildChangesPlainFolderStateSchema>;
+
+export const localFolderActionCommandSchema = z.object({
+  action: z.enum(['undo', 'merge']),
+  projectId: recordId,
+  buildId: recordId,
+});
+export type LocalFolderActionCommand = z.infer<typeof localFolderActionCommandSchema>;
+
+export const localFolderActionInstructionSchema = z.object({
+  kind: z.literal('local-folder-action'),
+  command: localFolderActionCommandSchema,
+});
+
+export function parseLocalFolderActionInstruction(
+  prompt: string | null | undefined,
+): LocalFolderActionCommand | null {
+  if (prompt == null || !prompt.startsWith('{')) return null;
+  try {
+    const parsed = localFolderActionInstructionSchema.safeParse(JSON.parse(prompt));
+    return parsed.success ? parsed.data.command : null;
+  } catch {
+    return null;
+  }
+}
+
+export const localFolderActionOutcomeSchema = z.enum([
+  'undone',
+  'merged',
+  'already-undone',
+  'already-merged',
+  'no-changes',
+  'conflict',
+  'missing-folder',
+  'folder-replaced',
+  'disabled',
+  'disk-full',
+  'snapshot-missing',
+  'partial-unknown',
+  'failed',
+]);
+export type LocalFolderActionOutcome = z.infer<typeof localFolderActionOutcomeSchema>;
+
+export const localFolderActionResultSchema = z.object({
+  outcome: localFolderActionOutcomeSchema,
+  commit: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .optional(),
+  conflictFiles: z.array(z.string()).optional(),
+  reason: z.string().optional(),
+});
+export type LocalFolderActionResult = z.infer<typeof localFolderActionResultSchema>;
+
+export const localFolderActionReportSchema = z.object({
+  command: localFolderActionCommandSchema,
+  result: localFolderActionResultSchema,
+});
+export type LocalFolderActionReport = z.infer<typeof localFolderActionReportSchema>;
+
 const MIB = 1024 * 1024;
 
 export { type DeliverableKind, deliverableKindSchema } from '../records/report.js';
@@ -234,6 +325,7 @@ export const DELIVERABLE_LIMITS = {
 
 export const claimedStepSchema = z.object({
   localMerge: localMergeCommandSchema.optional(),
+  localFolderAction: localFolderActionCommandSchema.optional(),
   step: stepRecordSchema,
   conversationId: recordId,
   session: z.object({
@@ -633,6 +725,8 @@ export { type StepFailureDetail, stepFailureCodeSchema, stepFailureDetailSchema 
 
 export const machineDoneBodySchema = z.object({
   localMerge: localMergeReportSchema.optional(),
+  localFolderAction: localFolderActionReportSchema.optional(),
+  plainFolder: plainFolderStepMetaSchema.optional(),
   status: z.enum(['success', 'failed', 'stopped']),
   errorMessage: z.string().optional(),
   failureCode: stepFailureCodeSchema.optional(),

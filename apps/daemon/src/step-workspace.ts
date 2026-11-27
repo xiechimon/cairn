@@ -27,6 +27,7 @@ export interface StepWorkspaceInput {
   hookCredentials?: BoundGitCredentials | null;
   refresh: GitCredentialFallbackOpts['refresh'];
   machineName: string;
+  signal?: AbortSignal;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -79,6 +80,7 @@ export async function prepareStepWorkspace(
         hookCredentials: input.hookCredentials,
         refresh: onceRefresh,
         machineCredentialFallback: repo.kind === 'github',
+        ...(input.signal !== undefined ? { signal: input.signal } : {}),
         env: input.env,
       });
     const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };
@@ -154,6 +156,7 @@ export interface StepWorkspaceSetupInput {
   attachmentVerify: boolean;
   evidenceDirectory: string | undefined;
   expectedHeadSha: string | undefined;
+  signal?: AbortSignal;
   env?: NodeJS.ProcessEnv;
   cleanups: (() => void | Promise<void>)[];
 }
@@ -183,10 +186,15 @@ export async function setUpStepWorkspace(
       hookCredentials: input.hookCredentials,
       refresh: input.refresh,
       machineName: input.machineName,
+      ...(input.signal !== undefined ? { signal: input.signal } : {}),
       env: input.env,
     });
     if ('error' in prepared) return prepared;
     ws = prepared.ws;
+    if (ws?.release !== undefined) {
+      const release = ws.release;
+      input.cleanups.push(() => release());
+    }
   }
   let cwd = ws?.cwd ?? join(input.workspacesRoot, input.claimed.conversationId);
   if (!ws) mkdirSync(cwd, { recursive: true });

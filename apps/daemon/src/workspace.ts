@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
   lstatSync,
@@ -21,10 +21,13 @@ import {
   type GitCredentialSource,
   isMissingCommandHookNote,
   LOCAL_ERROR_REASON_COPY,
+  type LocalFolderActionResult,
   LocalRepoUnreachableError,
   missingSetupCommand,
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
+  type PlainFolderActionInput,
+  type PlainFolderStepMeta,
   type PreparedWorkspace,
   type PushPublication,
   READONLY_EXPORT_MARKER,
@@ -36,6 +39,7 @@ import {
   type WorktreeOps,
   type WorktreePrepareInput,
 } from '@cairn/shared';
+import { protectedFolderReason } from '@cairn/shared/plain-folder-path';
 import {
   GIT_NET_RETRY_DELAYS_MS,
   gitPrim,
@@ -45,6 +49,12 @@ import {
   withGitNetRetries,
 } from './git.js';
 import type { DaemonLogger } from './log.js';
+import {
+  type ShadowCopyImpl,
+  ShadowCowFallbackTooLargeError,
+  ShadowManager,
+  type ShadowWriteFileImpl,
+} from './shadow-repo.js';
 import { attributeStepCommits } from './step-attribution.js';
 import {
   runWorkspaceHook,
@@ -108,6 +118,10 @@ export interface WorkspaceManagerOpts {
   logger: DaemonLogger;
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
+  hugeFolderBytes?: number;
+  shadowGitTimeoutMs?: number;
+  shadowCopyImpl?: ShadowCopyImpl;
+  shadowWriteFileImpl?: ShadowWriteFileImpl;
 }
 
 export class WorkspaceManager implements WorktreeOps {
@@ -115,11 +129,21 @@ export class WorkspaceManager implements WorktreeOps {
   private readonly logger: DaemonLogger;
   private readonly orphanTtlMs: number;
   private readonly hookTimeoutMs: number;
+  private readonly shadow: ShadowManager;
 
   constructor(opts: WorkspaceManagerOpts) {
     this.logger = opts.logger;
     this.orphanTtlMs = opts.orphanTtlMs ?? ORPHAN_WORKTREE_TTL_MS;
     this.hookTimeoutMs = opts.hookTimeoutMs ?? WORKSPACE_HOOK_TIMEOUT_MS;
+    this.shadow = new ShadowManager({
+      logger: opts.logger,
+      ...(opts.hugeFolderBytes !== undefined ? { hugeFolderBytes: opts.hugeFolderBytes } : {}),
+      ...(opts.shadowGitTimeoutMs !== undefined ? { gitTimeoutMs: opts.shadowGitTimeoutMs } : {}),
+      ...(opts.shadowCopyImpl !== undefined ? { copyImpl: opts.shadowCopyImpl } : {}),
+      ...(opts.shadowWriteFileImpl !== undefined
+        ? { writeFileImpl: opts.shadowWriteFileImpl }
+        : {}),
+    });
   }
 
   private async withProjectLock<T>(projectId: string, fn: () => Promise<T>): Promise<T> {
@@ -138,20 +162,27 @@ export class WorkspaceManager implements WorktreeOps {
   }
 
   async prepare(input: WorktreePrepareInput): Promise<PreparedWorkspace> {
-    return this.withProjectLock(input.projectId, async () => {
-      const cloneUrl = input.cloneUrl;
-      const branch = conversationBranch(input.conversationId);
-      const baseRepoDir = join(input.workspacesRoot, input.projectId, 'repo');
-      const convDir = join(input.workspacesRoot, input.conversationId);
+    const cloneUrl = input.cloneUrl;
+    const branch = conversationBranch(input.conversationId);
+    const convDir = join(input.workspacesRoot, input.conversationId);
 
-      if (input.repoKind === 'local') {
-        if (!existsSync(cloneUrl)) {
-          throw new LocalRepoUnreachableError(cloneUrl, 'not_found');
-        }
-        if (!(await gitPrim.isGitDir(cloneUrl))) {
-          throw new LocalRepoUnreachableError(cloneUrl, 'not_git');
-        }
+    if (input.repoKind === 'local') {
+      if (!existsSync(cloneUrl)) {
+        throw new LocalRepoUnreachableError(cloneUrl, 'not_found');
       }
+      if (!statSync(cloneUrl).isDirectory()) {
+        throw new LocalRepoUnreachableError(cloneUrl, 'not_directory');
+      }
+      if (protectedFolderReason(cloneUrl) !== null) {
+        throw new LocalRepoUnreachableError(cloneUrl, 'protected_folder');
+      }
+      if (!(await gitPrim.isGitDir(cloneUrl))) {
+        return this.preparePlainFolder(input, cloneUrl, branch, convDir);
+      }
+    }
+
+    return this.withProjectLock(input.projectId, async () => {
+      const baseRepoDir = join(input.workspacesRoot, input.projectId, 'repo');
 
       const credFallback = input.machineCredentialFallback === true;
       let credentialSource: GitCredentialSource = 'integration';
@@ -324,6 +355,101 @@ export class WorkspaceManager implements WorktreeOps {
     });
   }
 
+  private async preparePlainFolder(
+    input: WorktreePrepareInput,
+    realFolder: string,
+    branch: string,
+    convDir: string,
+  ): Promise<PreparedWorkspace> {
+    const scan = this.shadow.measureFolder(realFolder);
+    const readonlyDirect = (): PreparedWorkspace => ({
+      cwd: realFolder,
+      baseRepoDir: this.shadow.shadowDirFor(input.workspacesRoot, realFolder),
+      branch,
+      defaultBranch: 'main',
+      reused: false,
+      readonly: true,
+      hooks: [],
+      plainFolder: {
+        mode: 'in-place',
+        realFolder,
+        baseCommit: null,
+      },
+    });
+    if (scan.huge && input.readonly === true) {
+      this.logger.workspace(`Plain huge folder prepared readonly directly (${realFolder})`);
+      return readonlyDirect();
+    }
+    const runInPlace = async (): Promise<PreparedWorkspace> => {
+      const res = await this.shadow.prepareInPlace({
+        workspacesRoot: input.workspacesRoot,
+        projectId: input.projectId,
+        convId: input.conversationId,
+        realFolder,
+        cacheTagDirs: scan.cacheTagDirs,
+        ...(input.signal !== undefined ? { signal: input.signal } : {}),
+      });
+      this.logger.workspace(`Plain huge folder prepared in place (${realFolder})`);
+      return {
+        cwd: realFolder,
+        baseRepoDir: res.shadowDir,
+        branch,
+        defaultBranch: 'main',
+        reused: false,
+        hooks: [],
+        plainFolder: {
+          mode: 'in-place',
+          realFolder,
+          baseCommit: res.baseCommit,
+          ...(res.checkpointsDisabled ? { checkpointsDisabled: true } : {}),
+        },
+        release: res.release,
+      };
+    };
+    if (scan.huge) {
+      return runInPlace();
+    }
+    let res: Awaited<ReturnType<ShadowManager['prepareIsolated']>>;
+    try {
+      res = await this.shadow.prepareIsolated({
+        workspacesRoot: input.workspacesRoot,
+        projectId: input.projectId,
+        convId: input.conversationId,
+        realFolder,
+        convDir,
+      });
+    } catch (err) {
+      if (err instanceof ShadowCowFallbackTooLargeError) {
+        if (input.readonly === true) return readonlyDirect();
+        return runInPlace();
+      }
+      throw err;
+    }
+    if (input.readonly === true) {
+      writeFileSync(join(convDir, READONLY_EXPORT_MARKER), 'readonly export of plain folder\n');
+    } else {
+      rmSync(join(convDir, READONLY_EXPORT_MARKER), { force: true });
+    }
+    this.logger.workspace(
+      `Plain folder ${res.reused ? 'reused' : 'cloned'} (${convDir} <- ${realFolder})`,
+    );
+    return {
+      cwd: convDir,
+      baseRepoDir: res.shadowDir,
+      branch,
+      defaultBranch: 'main',
+      reused: res.reused,
+      ...(input.readonly === true ? { readonly: true } : {}),
+      hooks: [],
+      plainFolder: {
+        mode: 'isolated',
+        realFolder,
+        baseCommit: res.baseCommit,
+        ...(res.checkpointsDisabled ? { checkpointsDisabled: true } : {}),
+      },
+    };
+  }
+
   private async materializeReadonlyExport(
     baseRepoDir: string,
     convDir: string,
@@ -420,6 +546,10 @@ export class WorkspaceManager implements WorktreeOps {
     identity: CommitIdentity,
   ): Promise<{ committed: boolean; head: string | null; setupDrift: string[] }> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
+    if (this.shadow.isPlainFolderWorkspace(cwd)) {
+      const snap = await this.shadow.snapshotTask(cwd, message);
+      return { committed: snap.committed, head: snap.head, setupDrift: [] };
+    }
     const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
     const drift = readSetupDrift(driftFile);
     const dirty = await gitPrim.dirtyPaths(cwd);
@@ -466,6 +596,10 @@ export class WorkspaceManager implements WorktreeOps {
     publication: PushPublication,
   ): Promise<void> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
+    if (this.shadow.isPlainFolderWorkspace(cwd)) {
+      await this.shadow.mergeTaskBack(cwd, publication.stepId ?? randomUUID());
+      return;
+    }
     await attributeStepCommits({ ...publication, dir: cwd, branch, credential: credentials });
     await withGitNetRetries(() =>
       gitPrim.push(
@@ -520,18 +654,25 @@ export class WorkspaceManager implements WorktreeOps {
   }
 
   async headCommit(cwd: string): Promise<string | null> {
+    if (this.shadow.isPlainFolderWorkspace(cwd)) return this.shadow.currentHead(cwd);
     return gitPrim.head(cwd);
   }
 
   async countAhead(cwd: string, defaultBranch: string): Promise<number> {
+    if (this.shadow.isPlainFolderWorkspace(cwd)) return this.shadow.countAhead(cwd);
     return gitPrim.countAhead(cwd, defaultBranch);
   }
 
   async commitsAhead(cwd: string, defaultBranch: string): Promise<string[]> {
+    if (this.shadow.isPlainFolderWorkspace(cwd)) {
+      const head = await this.shadow.currentHead(cwd);
+      return head !== null && (await this.shadow.countAhead(cwd)) > 0 ? [head] : [];
+    }
     return gitPrim.commitsAhead(cwd, defaultBranch);
   }
 
   async currentBranch(cwd: string): Promise<string | null> {
+    if (this.shadow.isPlainFolderWorkspace(cwd)) return null;
     return gitPrim.currentBranch(cwd);
   }
 
@@ -556,13 +697,27 @@ export class WorkspaceManager implements WorktreeOps {
   }
 
   async diffAgainstDefault(cwd: string, defaultBranch: string): Promise<string> {
+    if (this.shadow.isPlainFolderWorkspace(cwd)) return this.shadow.diffTask(cwd);
     return gitPrim.diffAgainstRemoteDefault(cwd, defaultBranch);
   }
 
   async restoreCheckpoint(cwd: string, commit: string): Promise<void> {
+    if (this.shadow.isPlainFolderWorkspace(cwd)) {
+      await this.shadow.restoreTask(cwd, commit);
+      this.logger.workspace('Plain-folder workspace restored');
+      return;
+    }
     await gitPrim.resetHard(cwd, commit);
     await gitPrim.cleanFd(cwd);
     this.logger.workspace('Worktree restored');
+  }
+
+  plainFolderMeta(cwd: string): PlainFolderStepMeta | null {
+    return this.shadow.plainFolderMeta(cwd);
+  }
+
+  async runPlainFolderAction(input: PlainFolderActionInput): Promise<LocalFolderActionResult> {
+    return this.shadow.runAction(input);
   }
 
   async cleanupOrphans(input: OrphanCleanupInput): Promise<string[]> {
@@ -618,6 +773,10 @@ export class WorkspaceManager implements WorktreeOps {
   }
 
   async removeStale(convDir: string): Promise<void> {
+    if (this.shadow.isPlainFolderWorkspace(convDir)) {
+      this.shadow.removeIsolatedWorkspace(convDir);
+      return;
+    }
     const branch = await gitPrim.currentBranch(convDir);
     const commonDir = await gitPrim.commonGitDir(convDir);
     if (commonDir !== null) {

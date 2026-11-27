@@ -152,6 +152,30 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "null",
       ],
     },
+    "localFolderAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "undo",
+            "merge",
+          ],
+          "type": "string",
+        },
+        "buildId": {
+          "type": "string",
+        },
+        "projectId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "action",
+        "projectId",
+        "buildId",
+      ],
+      "type": "object",
+    },
     "localMerge": {
       "additionalProperties": false,
       "properties": {
@@ -1172,6 +1196,30 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "null",
               ],
             },
+            "localFolderAction": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "undo",
+                    "merge",
+                  ],
+                  "type": "string",
+                },
+                "buildId": {
+                  "type": "string",
+                },
+                "projectId": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "action",
+                "projectId",
+                "buildId",
+              ],
+              "type": "object",
+            },
             "localMerge": {
               "additionalProperties": false,
               "properties": {
@@ -2146,6 +2194,80 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "hasChanges": {
       "type": "boolean",
     },
+    "localFolderAction": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "enum": [
+                "undo",
+                "merge",
+              ],
+              "type": "string",
+            },
+            "buildId": {
+              "type": "string",
+            },
+            "projectId": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "action",
+            "projectId",
+            "buildId",
+          ],
+          "type": "object",
+        },
+        "result": {
+          "additionalProperties": false,
+          "properties": {
+            "commit": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string",
+            },
+            "conflictFiles": {
+              "items": {
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "outcome": {
+              "enum": [
+                "undone",
+                "merged",
+                "already-undone",
+                "already-merged",
+                "no-changes",
+                "conflict",
+                "missing-folder",
+                "folder-replaced",
+                "disabled",
+                "disk-full",
+                "snapshot-missing",
+                "partial-unknown",
+                "failed",
+              ],
+              "type": "string",
+            },
+            "reason": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "outcome",
+          ],
+          "type": "object",
+        },
+      },
+      "required": [
+        "command",
+        "result",
+      ],
+      "type": "object",
+    },
     "localMerge": {
       "additionalProperties": false,
       "properties": {
@@ -2276,6 +2398,51 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "noOutput": {
       "const": true,
       "type": "boolean",
+    },
+    "plainFolder": {
+      "additionalProperties": false,
+      "properties": {
+        "conflictFiles": {
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "mode": {
+          "enum": [
+            "isolated",
+            "in-place",
+          ],
+          "type": "string",
+        },
+        "reason": {
+          "type": "string",
+        },
+        "status": {
+          "enum": [
+            "merged",
+            "conflict",
+            "undone",
+            "no-changes",
+            "disabled",
+            "missing-folder",
+            "folder-replaced",
+            "disk-full",
+            "snapshot-missing",
+            "partial-unknown",
+          ],
+          "type": "string",
+        },
+        "undoable": {
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "mode",
+        "status",
+        "undoable",
+      ],
+      "type": "object",
     },
     "prNumber": {
       "maximum": 9007199254740991,
@@ -12279,6 +12446,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "POST",
     "note": "→ 202 {delegated:true}（r3 §3.6）",
     "path": "/api/builds/{id}/merge",
+  },
+  {
+    "method": "POST",
+    "note": "enqueues local-folder-action undo for a plain local folder build -> 202 {delegated:true}",
+    "path": "/api/builds/{id}/undo",
   },
   {
     "method": "POST",

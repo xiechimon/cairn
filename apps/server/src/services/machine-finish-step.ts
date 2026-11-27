@@ -8,6 +8,7 @@ import {
   classifyStepFailure,
   conversationBranch,
   isBuildStepKind,
+  parseLocalFolderActionInstruction,
   parseLocalMergeInstruction,
   parseRetryDelayMs,
   QUOTA_BLOCK_REASON_MAX_CHARS,
@@ -62,6 +63,7 @@ import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import { diffTextNamesAFile, githubRepoOfProject, parseUnifiedDiff, projectOfTodo } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
+import { applyLocalFolderActionReport } from './local-folder-action.js';
 import { applyLocalMergeReport } from './local-merge.js';
 import { claimGenerationAccepted } from './machine-claim-scope.js';
 import { stopStepComputer } from './machine-computer.js';
@@ -446,6 +448,18 @@ async function finishStepReport(
   }
   if (body.status === 'success' && parseLocalMergeInstruction(stepRow.prompt) !== null)
     throw conflict('Local merge command reported no landing result');
+  if (body.localFolderAction !== undefined) {
+    if (body.status !== 'success')
+      throw conflict('Local folder action results require a successful command report');
+    const localFolderAction = body.localFolderAction;
+    withFencedTransaction(deps, (settleDeps) => {
+      assertCurrentStepClaim(settleDeps, stepRow);
+      applyLocalFolderActionReport(settleDeps, stepRow, localFolderAction);
+    });
+    return;
+  }
+  if (body.status === 'success' && parseLocalFolderActionInstruction(stepRow.prompt) !== null)
+    throw conflict('Local folder action command reported no result');
   assertCurrentStepClaim(deps, stepRow);
   const mergeSuccess = stepRow.kind === 'merge' && body.status === 'success';
   let landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
@@ -511,6 +525,15 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       conversationId: stepRow.buildId,
       role: 'system',
       content: spaceNote,
+      createdAt: nowMs(),
+    });
+  }
+  if (body.plainFolder !== undefined) {
+    upsertMessage(deps, {
+      id: `plain-folder-state-${stepId}`,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content: JSON.stringify({ kind: 'plain-folder-state', ...body.plainFolder }),
       createdAt: nowMs(),
     });
   }

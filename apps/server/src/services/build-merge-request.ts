@@ -15,8 +15,9 @@ import {
   NotFoundError,
   restoreFailedReview,
 } from './builds.js';
-import { projectOfTodo, repoDirFor } from './git.js';
+import { projectOfTodo, readBuildChanges, repoDirFor } from './git.js';
 import { buildHostedMergeInstruction } from './hosted-merge-instruction.js';
+import { enqueueLocalFolderAction } from './local-folder-action.js';
 import { enqueueLocalMerge } from './local-merge.js';
 import { assertPhaseTransition } from './phase.js';
 import { insertGateAnnouncement } from './transcript.js';
@@ -62,6 +63,24 @@ export async function requestMerge(
     const localPath = projectRow.localPath;
     if (localPath === null) {
       throw new HttpError(409, '本地项目没有仓库路径，拒绝走未受控合并');
+    }
+    if (!(await git.isGitRepo(localPath))) {
+      const current = await readBuildChanges(
+        { db: deps.db, reposDir: deps.reposDir ?? '' },
+        buildId,
+      );
+      if (current.plainFolder?.mode === 'in-place') {
+        throw new HttpError(409, '原地运行的大目录任务直接作用于原目录，无需单独合并');
+      }
+      if (current.plainFolder?.status === 'merged') {
+        throw new HttpError(409, '本次本地目录改动已合并，无需重复合并');
+      }
+      if (current.plainFolder?.status === 'undone') {
+        throw new HttpError(409, '本次本地目录改动已撤销，如需再次改动请新建或重跑任务');
+      }
+      const res = enqueueLocalFolderAction(deps, buildId, 'merge');
+      insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
+      return { state: 'requested', stepId: res.stepId };
     }
     const listing = await git.listBranches(localPath).catch(() => null);
     if (listing === null || listing.defaultBranch === null) {

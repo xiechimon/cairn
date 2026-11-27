@@ -40,6 +40,7 @@ import { GitHubAppTokenUnavailableError } from './step-app-credential.js';
 import { prepareStepEnv, READONLY_GIT_ENV } from './step-env.js';
 import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
 import { finishStepRun } from './step-finish.js';
+import { runLocalFolderActionStep } from './step-local-folder-action.js';
 import { runLocalMergeStep } from './step-local-merge.js';
 import { createStepPassControls } from './step-pass-controls.js';
 import { newStepPassState } from './step-pass-events.js';
@@ -301,6 +302,15 @@ async function runClaimedStep(
     return;
   }
 
+  if (claimed.localFolderAction !== undefined) {
+    await runLocalFolderActionStep(deps, claimed, claimed.localFolderAction, claimedEntry, {
+      stopRequested: () => stop.request !== null,
+      now,
+      running,
+    });
+    return;
+  }
+
   const fetchStepToken = async (refresh = false) => {
     try {
       return await client.token(stepId, claimed.step.generation, refresh ? { refresh } : undefined);
@@ -422,11 +432,31 @@ async function runClaimedStep(
     attachmentVerify,
     evidenceDirectory: verifyEvidenceDirectory,
     expectedHeadSha: verifyMeta?.expectedHeadSha,
+    signal: stop.signal,
     env: attachmentVerify ? { ...treeEnv, ...READONLY_GIT_ENV } : treeEnv,
     cleanups: stepCleanups,
   });
   if ('error' in setup) {
     clearCredentials(creds);
+    if (stop.request !== null) {
+      deps.sessionHandles?.delete(stepId);
+      deps.logger.step('stopped while waiting for workspace');
+      await reapTree();
+      try {
+        await deps.client.done(stepId, {
+          status: 'stopped',
+          generation: claimed.step.generation,
+        });
+        deps.journal.remove(stepId);
+      } catch (err) {
+        deps.logger.step(
+          `done(stopped) report unreachable: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      } finally {
+        clearInterval(heartbeat);
+      }
+      return;
+    }
     await failStep(deps, heartbeat, stepId, setup.error, reapTree);
     return;
   }

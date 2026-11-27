@@ -33,6 +33,7 @@ export * from './local-providers.js';
 export * from './mail.js';
 export * from './model-routing.js';
 export * from './phase.js';
+export * from './plain-folder.js';
 export * from './protocol/index.js';
 export * from './provider-order.js';
 export * from './public-url.js';

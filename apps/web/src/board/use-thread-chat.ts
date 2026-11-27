@@ -94,6 +94,8 @@ export interface ThreadChat {
   planDoc: DocBlock[] | undefined;
   planMarkdown: string | null;
   changes: ThreadChanges;
+  undoSubmitting?: boolean;
+  undoChanges?: () => void;
   engineRun?: EngineRun;
   engineStage?: EngineRunStage;
   retryChanges: () => void;
@@ -468,6 +470,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         }
       : undefined;
 
+  const [undoSubmitting, setUndoSubmitting] = useState(false);
   const changes = deriveThreadChanges({
     live,
     buildId,
@@ -475,6 +478,25 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     fixture: fixtureDetail?.changes,
     expanded: true,
   });
+  const undoServerPending = changes.plainFolder?.undoPending === true;
+  useEffect(() => {
+    if (!undoServerPending && undoSubmitting && !mutations.undoBuildChanges.isPending) {
+      setUndoSubmitting(false);
+    }
+  }, [undoServerPending, undoSubmitting, mutations.undoBuildChanges.isPending]);
+  const undoChanges =
+    writable && live && buildId != null
+      ? () => {
+          if (undoSubmitting || undoServerPending) return;
+          setUndoSubmitting(true);
+          mutations.undoBuildChanges.mutate(buildId, {
+            onError: (error) => {
+              setUndoSubmitting(false);
+              toastError(t('撤销失败，请重试。'), error);
+            },
+          });
+        }
+      : undefined;
 
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = messagesQ;
   const loadEarlier = useCallback(() => {
@@ -510,6 +532,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         ? docBlocksToMarkdown(fixtureDetail.doc)
         : null,
     changes,
+    undoSubmitting,
+    ...(undoChanges !== undefined ? { undoChanges } : {}),
     ...(live
       ? { ...(liveRun !== null ? { engineRun: liveRun } : {}) }
       : fixtureDetail?.engineRun !== undefined

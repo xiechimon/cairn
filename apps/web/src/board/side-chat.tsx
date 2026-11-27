@@ -316,18 +316,22 @@ function toggled(set: ReadonlySet<string>, key: string): ReadonlySet<string> {
   return next;
 }
 
-function ChangesCard({
+export function ChangesCard({
   changes,
   buildId,
   open,
   onOpenChange,
   onRetry,
+  undoSubmitting = false,
+  onUndo,
 }: {
   changes: ThreadChanges;
   buildId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRetry: () => void;
+  undoSubmitting?: boolean;
+  onUndo?: () => void;
 }) {
   const { t } = useI18n();
   const [openFiles, setOpenFiles] = useState<ReadonlySet<string>>(new Set());
@@ -357,6 +361,20 @@ function ChangesCard({
   const files = changes.content?.files ?? [];
   const single = files.length === 1 ? files[0] : undefined;
   const allOpen = files.every((file) => openFiles.has(file.path));
+  const plainFolder = changes.plainFolder;
+  const undoBusy = undoSubmitting || plainFolder?.undoPending === true;
+  const showUndoDone = plainFolder?.status === 'undone';
+  const showUndoButton =
+    plainFolder !== undefined &&
+    !showUndoDone &&
+    (plainFolder.undoable || undoBusy) &&
+    onUndo !== undefined;
+  const plainAlertText =
+    plainFolder !== undefined &&
+    !showUndoDone &&
+    (plainFolder.status === 'conflict' || plainFolder.error !== undefined)
+      ? (plainFolder.error ?? plainFolder.conflictFiles?.join(', ') ?? '')
+      : null;
   return (
     <TraceCard className="mt-5" data-testid="side-chat-changes" data-state={changes.status}>
       <div className={CHANGES_ROW}>
@@ -372,13 +390,39 @@ function ChangesCard({
             className={cn('size-4 flex-none text-content-tertiary', open && 'rotate-90')}
           />
           <span className="min-w-0 truncate">
-            {single !== undefined
-              ? t('改动 {name}', { name: baseName(single.path) })
-              : t('改动 {n} 个文件', { n: changes.fileCount })}
+            {files.length === 0 && plainFolder !== undefined
+              ? t('本地文件夹改动')
+              : single !== undefined
+                ? t('改动 {name}', { name: baseName(single.path) })
+                : t('改动 {n} 个文件', { n: changes.fileCount })}
           </span>
-          <ChangeCounts added={changes.added} removed={changes.removed} />
+          {(files.length > 0 || plainFolder === undefined) && (
+            <ChangeCounts added={changes.added} removed={changes.removed} />
+          )}
         </Button>
+        {showUndoDone ? (
+          <span
+            data-testid="undo-task-changes-done"
+            className="mr-2 flex-none text-meta text-content-tertiary"
+          >
+            {t('已撤销改动')}
+          </span>
+        ) : (
+          showUndoButton && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={undoBusy}
+              data-testid="undo-task-changes"
+              onClick={onUndo}
+              className="mr-1.5 flex-none text-meta pointer-coarse:h-11"
+            >
+              {undoBusy ? t('正在撤销…') : t('撤销这次任务的改动')}
+            </Button>
+          )
+        )}
         {open &&
+          files.length > 0 &&
           (single !== undefined ? (
             <FullFileToggle
               on={fullFiles.has(single.path)}
@@ -397,7 +441,17 @@ function ChangesCard({
             </Button>
           ))}
       </div>
-      {open && (
+      {plainAlertText !== null && plainAlertText !== '' && (
+        <div
+          role="alert"
+          data-testid="plain-folder-conflict"
+          className="flex items-start gap-2 border-t border-(--border) px-3 py-2 text-ui text-destructive"
+        >
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 flex-none" />
+          <span className="min-w-0 flex-1 break-words">{plainAlertText}</span>
+        </div>
+      )}
+      {open && files.length > 0 && (
         <div data-testid="side-chat-changes-body">
           {single !== undefined ? (
             <DiffFileBody
@@ -572,6 +626,8 @@ function ThreadBody({
                       open={changesOpen}
                       onOpenChange={onChangesOpen}
                       onRetry={chat.retryChanges}
+                      undoSubmitting={chat.undoSubmitting === true}
+                      {...(chat.undoChanges !== undefined ? { onUndo: chat.undoChanges } : {})}
                     />
                   )}
                 </>

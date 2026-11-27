@@ -93,13 +93,13 @@ describe('POST /api/projects kind=local -- the localPath three-state validation 
     expect(r.body.localPath).toBe(realpathSync(plain));
   });
 
-  test('loosened gate three: pointing at a plain file -> 201 (a non-directory shape still passes, reachability belongs to the daemon)', async () => {
+  test('pointing at a plain file -> 400 + reason=not_directory', async () => {
     const dir = tempDir('cairn-local-file-');
     const file = join(dir, 'not-a-repo.txt');
     writeFileSync(file, 'x');
     const r = await postCreate({ name: 'p-file', kind: 'local', localPath: file });
-    expect(r.status).toBe(201);
-    expect(r.body.localPath).toBe(realpathSync(file));
+    expect(r.status).toBe(400);
+    expect(r.body.reason).toBe<LocalErrorReason>('not_directory');
   });
 
   test('a relative path -> 400 + reason=not_absolute (judged after `~` expansion)', async () => {
@@ -241,16 +241,16 @@ describe('retained local file mentions, branches and Coordinator document reads'
     expect(body.reason).toBe<LocalErrorReason>('not_found');
   });
 
-  test('F3 the directory replaced by non-git content -> 404 + reason=not_git', async () => {
+  test('F3 the directory replaced by non-git content -> 200 plain folder files', async () => {
     const repo = await makeLocalRepo();
     const id = await createLocalProject(repo);
     rmSync(repo, { recursive: true, force: true });
     mkdirSync(repo, { recursive: true });
+    writeFileSync(join(repo, 'notes.txt'), 'plain');
     const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
-    expect(res.status).toBe(404);
-    expect(((await res.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(
-      'not_git',
-    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { files: Array<{ path: string }> };
+    expect(body.files.map((f) => f.path)).toContain('notes.txt');
   });
 
   test('F3b a foreign repo bound through the environment does not change the verdict', async () => {
@@ -258,31 +258,32 @@ describe('retained local file mentions, branches and Coordinator document reads'
     const id = await createLocalProject(repo);
     rmSync(repo, { recursive: true, force: true });
     mkdirSync(repo, { recursive: true });
+    writeFileSync(join(repo, 'plain.md'), '# plain');
     const foreign = tempDir('cairn-foreign-repo-');
     expect((await runGit(['init', foreign], { env: READ_GIT_ENV })).code).toBe(0);
     vi.stubEnv('GIT_DIR', join(foreign, '.git'));
     try {
       const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
-      expect(res.status).toBe(404);
-      expect(((await res.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(
-        'not_git',
-      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { files: Array<{ path: string }> };
+      expect(body.files.map((f) => f.path)).toContain('plain.md');
     } finally {
       vi.unstubAllEnvs();
     }
   });
 
-  test('F3c a directory that only sits inside another worktree -> 404 + reason=not_git', async () => {
+  test('F3c a directory that only sits inside another worktree -> 200 plain folder files without outer files', async () => {
     const outer = tempDir('cairn-outer-worktree-');
     expect((await runGit(['init', outer], { env: READ_GIT_ENV })).code).toBe(0);
+    writeFileSync(join(outer, 'outer.txt'), 'outer');
     const inner = join(outer, 'replaced');
     mkdirSync(inner);
+    writeFileSync(join(inner, 'inner.txt'), 'inner');
     const id = await createLocalProject(inner);
     const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
-    expect(res.status).toBe(404);
-    expect(((await res.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(
-      'not_git',
-    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { files: Array<{ path: string }> };
+    expect(body.files.map((f) => f.path)).toEqual(['inner.txt']);
   });
 
   test('F4 repoKind=local with an empty localPath column -> an explicit 404 red (no reason)', async () => {
@@ -298,12 +299,14 @@ describe('retained local file mentions, branches and Coordinator document reads'
 });
 
 describe('the local 400 reason vocabulary (#386: the single-source contract the web translates from)', () => {
-  test('the vocabulary = not_found / not_git / not_absolute (the value domain pinned, the web translates by it)', () => {
-    expect(PROJECT_LOCAL_ERROR_REASONS).toHaveLength(3);
+  test('the vocabulary = not_found / not_git / not_absolute / protected_folder / not_directory', () => {
+    expect(PROJECT_LOCAL_ERROR_REASONS).toHaveLength(5);
     expect([...PROJECT_LOCAL_ERROR_REASONS].sort()).toEqual([
       'not_absolute',
+      'not_directory',
       'not_found',
       'not_git',
+      'protected_folder',
     ]);
   });
 });

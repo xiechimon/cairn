@@ -283,6 +283,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     note: 'clears readAt; creates the row for an existing todo',
   },
   { method: 'POST', path: '/api/builds/{id}/merge', note: '→ 202 {delegated:true}（r3 §3.6）' },
+  {
+    method: 'POST',
+    path: '/api/builds/{id}/undo',
+    note: 'enqueues local-folder-action undo for a plain local folder build -> 202 {delegated:true}',
+  },
   { method: 'POST', path: '/api/builds/{id}/steps', note: '确认/驳回回路（02 §4.2/r5 §4）' },
   { method: 'POST', path: '/api/teams/{id}/providers' },
   { method: 'POST', path: '/api/teams/{id}/mcp-servers' },

@@ -58,6 +58,7 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
         gitOps.push(workspace.cwd, workspace.branch, credential, {
           base: input.headAtStart,
           identity: input.appIdentity,
+          stepId: input.stepId,
         }),
       );
     } catch (error) {

@@ -539,6 +539,7 @@
           "/api/todos/:id/unarchive",
           "/api/todos/:id/stop-and-done",
           "/api/builds/:id/merge",
+          "/api/builds/:id/undo",
           "/api/projects/:id/todos",
           "/api/teams/:id/progress",
           "/api/tasks"

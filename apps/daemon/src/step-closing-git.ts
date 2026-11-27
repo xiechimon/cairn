@@ -6,7 +6,7 @@ import type {
   PreparedWorkspace,
   WorktreeOps,
 } from '@cairn/shared';
-import { AGENT_TOOL_PUSH, BRAND, gitCredentialRowContent } from '@cairn/shared';
+import { AGENT_TOOL_PUSH, BRAND, gitCredentialRowContent, isBuildStepKind } from '@cairn/shared';
 
 export interface ClosingGitInput {
   git: WorktreeOps;
@@ -172,11 +172,15 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       );
     }
     const pushDenied =
-      claimed.agent?.tools !== undefined && !claimed.agent.tools.includes(AGENT_TOOL_PUSH);
+      ws.plainFolder === undefined &&
+      claimed.agent?.tools !== undefined &&
+      !claimed.agent.tools.includes(AGENT_TOOL_PUSH);
     const pushWarranted =
-      committed.committed ||
-      claimed.step.kind === 'merge' ||
-      (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0;
+      ws.plainFolder !== undefined
+        ? isBuildStepKind(claimed.step.kind)
+        : committed.committed ||
+          claimed.step.kind === 'merge' ||
+          (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0;
     if (pushWarranted && pushDenied) {
       note(
         `push-skip-${stepId}`,
@@ -187,21 +191,46 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       duringPush = true;
       const pushSource = await input.push();
       duringPush = false;
-      if (pushSource === 'machine' && repoKind === 'github') {
-        note(`git-credential-${stepId}`, gitCredentialRowContent('machine'));
-      }
-      input.logRaw(`pushed ${ws.branch}`);
-      try {
-        const leaked = (await git.briefMarkerInRef?.(ws.cwd, ws.branch)) ?? [];
-        if (leaked.length > 0) {
-          log(`brief marker found in the pushed branch: ${leaked.join(', ')}`);
+      if (ws.plainFolder !== undefined) {
+        const plainMeta = git.plainFolderMeta?.(ws.cwd) ?? null;
+        if (plainMeta?.status === 'conflict') {
+          const list = plainMeta.conflictFiles?.join('、') ?? '';
           note(
-            `brief-in-history-${stepId}`,
-            `分支 ${ws.branch} 的历史里带着运行简报的标记块（${leaked.join('、')}）——agent 在步内自行提交时 daemon 拦不住。合并前请确认这些文件不该进交付物`,
+            `plain-folder-conflict-${stepId}`,
+            `以下文件在你的本地文件夹里也有冲突改动，未自动覆盖原文件夹：${list}。任务改动已保留在本次任务记录中。`,
+          );
+        } else if (plainMeta?.status === 'disabled') {
+          note(
+            `plain-folder-disabled-${stepId}`,
+            '本地文件夹快照超时，本轮已停用保护快照（未中断任务运行）。',
+          );
+        } else if (
+          plainMeta !== null &&
+          plainMeta.status !== 'merged' &&
+          plainMeta.status !== 'no-changes'
+        ) {
+          note(
+            `plain-folder-status-${stepId}`,
+            plainMeta.reason ?? `本地文件夹写回未完成（${plainMeta.status}）。`,
           );
         }
-      } catch (err) {
-        log(`brief marker scan failed: ${err instanceof Error ? err.message : String(err)}`);
+      } else {
+        if (pushSource === 'machine' && repoKind === 'github') {
+          note(`git-credential-${stepId}`, gitCredentialRowContent('machine'));
+        }
+        input.logRaw(`pushed ${ws.branch}`);
+        try {
+          const leaked = (await git.briefMarkerInRef?.(ws.cwd, ws.branch)) ?? [];
+          if (leaked.length > 0) {
+            log(`brief marker found in the pushed branch: ${leaked.join(', ')}`);
+            note(
+              `brief-in-history-${stepId}`,
+              `分支 ${ws.branch} 的历史里带着运行简报的标记块（${leaked.join('、')}）——agent 在步内自行提交时 daemon 拦不住。合并前请确认这些文件不该进交付物`,
+            );
+          }
+        } catch (err) {
+          log(`brief marker scan failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
     }
     outcome.headCommit = await git.headCommit(ws.cwd);
@@ -241,7 +270,7 @@ export async function preserveFailedBuild(input: {
   logRaw: (message: string) => void;
 }): Promise<PreservedBuild | null> {
   const { git, ws, claimed } = input;
-  if (claimed.project?.repo?.kind === 'github') return null;
+  if (claimed.project?.repo?.kind === 'github' || ws.plainFolder !== undefined) return null;
   try {
     const currentBranch = await git.currentBranch?.(ws.cwd);
     const pushAllowed =

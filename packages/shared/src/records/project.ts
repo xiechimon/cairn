@@ -388,13 +388,21 @@ export const patchProjectBodySchema = z
   .strict();
 export type PatchProjectBody = z.infer<typeof patchProjectBodySchema>;
 
-export const PROJECT_LOCAL_ERROR_REASONS = ['not_found', 'not_git', 'not_absolute'] as const;
+export const PROJECT_LOCAL_ERROR_REASONS = [
+  'not_found',
+  'not_git',
+  'not_absolute',
+  'protected_folder',
+  'not_directory',
+] as const;
 export type LocalErrorReason = (typeof PROJECT_LOCAL_ERROR_REASONS)[number];
 
 export const LOCAL_ERROR_REASON_COPY: LocalErrorReasonMap<string> = {
   not_found: '路径不存在',
   not_git: '不是 git 仓库',
   not_absolute: '需要绝对路径',
+  protected_folder: '不能选择根目录、主目录或桌面/文稿/下载等系统文件夹',
+  not_directory: '路径不是文件夹',
 };
 
 export type LocalErrorBody = { error: string; reason?: LocalErrorReason };

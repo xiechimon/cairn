@@ -8,6 +8,7 @@ export interface StopRequest {
 export class RunStop {
   private current: StopRequest | null = null;
   private session: AgentSessionHandle | null = null;
+  private readonly controller = new AbortController();
 
   constructor(
     private readonly persist: (req: StopRequest | null) => void,
@@ -18,9 +19,14 @@ export class RunStop {
     return this.current;
   }
 
+  get signal(): AbortSignal {
+    return this.controller.signal;
+  }
+
   accept(req: StopRequest): void {
     this.current = req;
     this.persist(req);
+    this.controller.abort();
   }
 
   async deliver(req: StopRequest): Promise<void> {

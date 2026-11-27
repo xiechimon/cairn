@@ -4,6 +4,7 @@ import type {
   AskUserAnswer,
   AskUserQuestionContent,
   BrowserPasswordGrantsResponse,
+  BuildChangesPlainFolderState,
   BuildRecord,
   CapabilitiesResponse,
   ChiefGetResponse,
@@ -389,10 +390,12 @@ export const useBuildChanges = (buildId: string | null | undefined, enabled: boo
   useQuery({
     queryKey: ['changes', buildId],
     queryFn: ({ signal }) =>
-      api.get<{ files: DocumentDiffFile[]; reported?: boolean; changed?: boolean }>(
-        `/api/builds/${buildId}/changes`,
-        signal,
-      ),
+      api.get<{
+        files: DocumentDiffFile[];
+        reported?: boolean;
+        changed?: boolean;
+        plainFolder?: BuildChangesPlainFolderState;
+      }>(`/api/builds/${buildId}/changes`, signal),
     enabled: enabled && buildId != null,
   });
 
@@ -2097,6 +2100,16 @@ export function useApiMutations(teamId: string | undefined) {
           moveQueueToReplacement(qc, input.conversationId, result.conversationId);
         void qc.invalidateQueries({ queryKey: ['messages'] });
         void qc.invalidateQueries({ queryKey: ['steps', result.conversationId] });
+        void qc.invalidateQueries({ queryKey: ['todo'] });
+        void qc.invalidateQueries({ queryKey: ['todos', teamId] });
+      },
+    }),
+    undoBuildChanges: useMutation({
+      mutationFn: (buildId: string) =>
+        api.post<{ delegated: true }>(`/api/builds/${encodeURIComponent(buildId)}/undo`, {}),
+      onSuccess: (_data, buildId) => {
+        void qc.invalidateQueries({ queryKey: ['changes', buildId] });
+        void qc.invalidateQueries({ queryKey: ['steps', buildId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });
         void qc.invalidateQueries({ queryKey: ['todos', teamId] });
       },

@@ -2,6 +2,7 @@ import {
   type AgentTokenUsage,
   type ClaimedStep,
   type MachineDoneBody,
+  type PlainFolderStepMeta,
   type QuotaBlock,
   type SkillInjectionFacts,
   type StepFailureCode,
@@ -31,6 +32,7 @@ export interface StepDoneOutcome {
   skillInjectionFacts: SkillInjectionFacts | null;
   generation?: number;
   unpushedCommits?: number | null;
+  plainFolder?: PlainFolderStepMeta;
 }
 
 export interface StepVerdictSource {
@@ -83,6 +85,7 @@ export function composeDoneBody(
       : {}),
     ...(outcome.generation !== undefined ? { generation: outcome.generation } : {}),
     ...(outcome.unpushedCommits !== undefined ? { unpushedCommits: outcome.unpushedCommits } : {}),
+    ...(outcome.plainFolder !== undefined ? { plainFolder: outcome.plainFolder } : {}),
     ...(outcome.status === 'success' && !source.messages.some((m) => m.role === 'assistant')
       ? { noOutput: true as const }
       : {}),

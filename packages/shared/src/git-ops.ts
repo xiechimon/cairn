@@ -1,4 +1,5 @@
 import type { WorkspaceHookNoteData } from './protocol/executor.js';
+import type { LocalFolderActionResult, PlainFolderStepMeta } from './protocol/machine-wire.js';
 import type { CompareFile } from './records/merge-gate.js';
 import type { LocalErrorReason, ProjectRepoKind } from './records/project.js';
 import { RETRY_PARKED_MARK } from './task-failure.js';
@@ -75,6 +76,7 @@ export interface CommitIdentity {
 export interface PushPublication {
   base: string | null;
   identity: CommitIdentity | null;
+  stepId?: string;
 }
 
 export interface WorktreePrepareInput {
@@ -89,6 +91,7 @@ export interface WorktreePrepareInput {
   baseBranch?: string | null;
   machineCredentialFallback?: boolean;
   readonly?: boolean;
+  signal?: AbortSignal;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -101,6 +104,13 @@ export interface PreparedWorkspace {
   hooks?: WorkspaceHookNoteData[];
   credentialSource?: GitCredentialSource;
   readonly?: boolean;
+  plainFolder?: {
+    mode: 'isolated' | 'in-place';
+    realFolder: string;
+    baseCommit: string | null;
+    checkpointsDisabled?: boolean;
+  };
+  release?: () => void;
 }
 
 export interface OrphanCleanupInput {
@@ -108,6 +118,15 @@ export interface OrphanCleanupInput {
   ttlMs: number;
   now: number;
   activeConversationIds: Iterable<string>;
+}
+
+export interface PlainFolderActionInput {
+  workspacesRoot: string;
+  projectId: string;
+  buildId: string;
+  stepId: string;
+  realFolder: string;
+  action: 'undo' | 'merge';
 }
 
 export interface WorktreeOps {
@@ -142,6 +161,8 @@ export interface WorktreeOps {
   restoreCheckpoint(cwd: string, commit: string): Promise<void>;
   cleanupOrphans(input: OrphanCleanupInput): Promise<string[]>;
   briefMarkerInRef?(cwd: string, ref: string): Promise<string[]>;
+  plainFolderMeta?(cwd: string): PlainFolderStepMeta | null;
+  runPlainFolderAction?(input: PlainFolderActionInput): Promise<LocalFolderActionResult>;
 }
 
 export const REMOTE_BRANCH_DIVERGED = 'remote branch diverged';
@@ -155,7 +176,10 @@ export class RemoteBranchDivergedError extends Error {
   }
 }
 
-export type LocalRepoUnreachableReason = Extract<LocalErrorReason, 'not_found' | 'not_git'>;
+export type LocalRepoUnreachableReason = Extract<
+  LocalErrorReason,
+  'not_found' | 'not_git' | 'protected_folder' | 'not_directory'
+>;
 
 export class LocalRepoUnreachableError extends Error {
   constructor(

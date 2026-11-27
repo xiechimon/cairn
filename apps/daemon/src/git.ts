@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -557,11 +557,18 @@ export const gitPrim = {
   },
 
   async isGitDir(dir: string): Promise<boolean> {
-    const r = await runGit(['rev-parse', '--git-dir'], {
-      cwd: dir,
-      timeoutMs: META_TIMEOUT_MS,
-    });
-    return r.code === 0;
+    try {
+      const r = await runGit(['rev-parse', '--show-toplevel'], {
+        cwd: dir,
+        env: { GIT_DIR: undefined, GIT_WORK_TREE: undefined, GIT_COMMON_DIR: undefined },
+        timeoutMs: META_TIMEOUT_MS,
+      });
+      if (r.code !== 0) return false;
+      const toplevel = r.stdout.trim();
+      return toplevel !== '' && realpathSync(toplevel) === realpathSync(dir);
+    } catch {
+      return false;
+    }
   },
 
   async setRemoteUrl(repoDir: string, url: string): Promise<void> {

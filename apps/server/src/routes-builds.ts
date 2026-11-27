@@ -38,6 +38,7 @@ import { getChiefThread } from './services/chief.js';
 import { ClientMessageConflict, findClientMessage } from './services/client-message.js';
 import { createSerialConnection } from './services/events.js';
 import { readBuildChangeFile, readBuildChanges } from './services/git.js';
+import { enqueueLocalFolderAction } from './services/local-folder-action.js';
 import { isChiefConversation } from './services/machines.js';
 import { latestAgentTodo, newestMessagePage } from './services/message-page.js';
 import { deviceStreamsOf, pairedDeviceExists } from './services/paired-devices.js';
@@ -205,6 +206,11 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;
     }
+  });
+
+  app.post('/api/builds/:id/undo', (c) => {
+    enqueueLocalFolderAction(svc, c.req.param('id'), 'undo');
+    return c.json({ delegated: true }, 202);
   });
 
   app.post('/api/builds/:id/steps', async (c) => {

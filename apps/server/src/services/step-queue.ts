@@ -4,6 +4,7 @@ import {
   isRegisteredMachine,
   type MachineQueuedThread,
   MODEL_SOURCE_RUNTIME_LABELS,
+  parseLocalFolderActionInstruction,
   parseLocalMergeInstruction,
   RUNNER_OS_LABELS,
   type StepQueueBlocked,
@@ -189,7 +190,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
       agentRow,
       model: effectiveModel(agentRow, row),
       localProject: projectRow?.repoKind === 'local',
-      localMerge: parseLocalMergeInstruction(row.prompt) !== null,
+      localMerge:
+        parseLocalMergeInstruction(row.prompt) !== null ||
+        parseLocalFolderActionInstruction(row.prompt) !== null,
       githubPushRepo: requiredGithubPushRepoForStep({
         project: projectRow,
         step: row,

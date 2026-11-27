@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import type {
   AgentTokenUsage,
   ClaimedStep,
+  PlainFolderStepMeta,
   PreparedWorkspace,
   QuotaBlock,
   SkillInjectionFacts,
@@ -9,6 +10,7 @@ import type {
   StepFailureDetail,
   WorktreeOps,
 } from '@cairn/shared';
+import { isBuildStepKind } from '@cairn/shared';
 import { prepareCredentialSessionUpload } from './credential-output.js';
 import { clearCredentials, type StepCredentials } from './credentials.js';
 import type { StepJournal, TranscriptBuffer } from './journal.js';
@@ -113,6 +115,17 @@ export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void
       ? await probeStepChanges(input, ws, repo)
       : { prProbe: null, changesDiff: null };
 
+  const plainFolder: PlainFolderStepMeta | null =
+    ws !== null &&
+    ws.readonly !== true &&
+    ws.plainFolder !== undefined &&
+    isBuildStepKind(input.claimed.step.kind) &&
+    !stopped &&
+    !input.isReview &&
+    !input.attachmentVerify
+      ? (input.workspace?.plainFolderMeta?.(ws.cwd) ?? null)
+      : null;
+
   const messages = input.transcript.messages();
   const planContent =
     input.claimed.step.kind === 'plan' && !stopped
@@ -137,6 +150,7 @@ export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void
       skillInjectionFacts: input.skillInjectionFacts,
       generation: input.claimed.step.generation,
       ...(git.unpushedCommits !== undefined ? { unpushedCommits: git.unpushedCommits } : {}),
+      ...(plainFolder !== null ? { plainFolder } : {}),
     },
     {
       kind: input.claimed.step.kind,
