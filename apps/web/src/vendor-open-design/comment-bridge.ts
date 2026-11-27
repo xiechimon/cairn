@@ -119,10 +119,14 @@ export function buildCommentBridgeScript(): string {
       window.parent.postMessage({ type: 'od:comment-located', requestId: data.requestId, results: results }, '*');
     }
   });
+  function slideOf(el){
+    var slide = el && el.closest ? el.closest('[data-cairn-slide]') : null;
+    return slide ? Number(slide.getAttribute('data-cairn-slide')) : null;
+  }
   document.addEventListener('mousemove', function(ev){
     if (!commentEnabled) return;
     var target = targetFrom(pickable(ev.target));
-    window.parent.postMessage({ type: 'od:comment-hover', target: target }, '*');
+    window.parent.postMessage({ type: 'od:comment-hover', target: target, slide: slideOf(ev.target) }, '*');
   }, true);
   document.addEventListener('click', function(ev){
     if (!commentEnabled) return;
@@ -130,8 +134,7 @@ export function buildCommentBridgeScript(): string {
     if (!target) return;
     ev.preventDefault();
     ev.stopPropagation();
-    var slide = ev.target && ev.target.closest ? ev.target.closest('[data-cairn-slide]') : null;
-    window.parent.postMessage({ type: 'od:comment-target', target: target, slide: slide ? Number(slide.getAttribute('data-cairn-slide')) : null }, '*');
+    window.parent.postMessage({ type: 'od:comment-target', target: target, slide: slideOf(ev.target) }, '*');
   }, true);
   function isEditable(el){
     return !!(el && el.nodeType === 1 && (el.isContentEditable || (el.closest && el.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))));

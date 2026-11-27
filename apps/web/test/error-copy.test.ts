@@ -30,4 +30,11 @@ describe('describeError', () => {
     expect(describeError(new TypeError('Failed to fetch'), t)).toBe('网络连接异常，请检查网络后重试。');
     expect(describeError(new Error('raw internal stack message'), t)).toBeNull();
   });
+
+  test('a browser refusal or a script fault is not called a network failure', () => {
+    expect(describeError(new TypeError('Load failed'), t)).toBe('网络连接异常，请检查网络后重试。');
+    expect(describeError(new TypeError('Network unavailable'), t)).toBe('网络连接异常，请检查网络后重试。');
+    expect(describeError(new TypeError('Permissions check failed'), t)).toBeNull();
+    expect(describeError(new TypeError('crypto.randomUUID is not a function'), t)).toBeNull();
+  });
 });

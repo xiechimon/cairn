@@ -184,6 +184,12 @@ test('a comment on a slide saves the slide, pins only on that slide and the list
   await panel.getByTestId('artifact-comment-toggle').click();
   await expect(panel.getByTestId('artifact-comment-strip')).toBeVisible();
   await expect(panel.getByTestId('design-mark-mode')).toHaveCount(0);
+  await frame.getByRole('heading', { name: '收入' }).hover();
+  await expect(panel.getByTestId('design-hover-outline')).toBeVisible();
+  await panel.getByTestId('artifact-deck-prev').click();
+  await expect(panel.getByTestId('artifact-deck-position')).toHaveText('2 / 3');
+  await expect(panel.getByTestId('design-hover-outline')).toHaveCount(0);
+  await panel.getByTestId('artifact-deck-next').click();
   await frame.getByRole('heading', { name: '收入' }).click();
   const popover = page.getByTestId('design-comment-popover');
   await expect(popover).toBeVisible();
@@ -217,7 +223,9 @@ test('a refused full screen keeps the slide and the comment list in the panel an
   await panel.getByTestId('artifact-comment-toggle').click();
   await expect(panel.getByTestId('design-comment-list')).toBeVisible();
   await panel.getByTestId('artifact-deck-present').click();
-  await expect(page.getByText('未能全屏放映')).toBeVisible();
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: '未能全屏放映' });
+  await expect(toast).toBeVisible();
+  await expect(toast).not.toContainText('网络');
   await expect(panel.getByTestId('design-comment-list')).toBeVisible();
   await expect(panel.getByTestId('artifact-deck-position')).toHaveText('1 / 3');
 });

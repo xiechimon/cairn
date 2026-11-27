@@ -140,6 +140,7 @@ export function DesignCanvas({
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const { clearPicked } = bridge;
   const picked = slide === undefined || bridge.pickedSlide === slide ? bridge.picked : null;
+  const hover = slide === undefined || bridge.hoverSlide === slide ? bridge.hover : null;
   pickedRef.current = picked;
   const drawing = useDrawing();
   const { clear } = drawing;
@@ -227,15 +228,15 @@ export function DesignCanvas({
                 data-commenting={commenting || undefined}
                 className="pointer-events-none absolute inset-0 overflow-hidden"
               >
-                {bridge.hover !== null && picked === null && (
+                {hover !== null && picked === null && (
                   <div
                     data-testid="design-hover-outline"
                     className="absolute rounded-xs border border-(--background) outline-2 outline-(--focus-ring)"
                     style={{
-                      left: bridge.hover.position.x * transform.scale,
-                      top: bridge.hover.position.y * transform.scale,
-                      width: bridge.hover.position.width * transform.scale,
-                      height: bridge.hover.position.height * transform.scale,
+                      left: hover.position.x * transform.scale,
+                      top: hover.position.y * transform.scale,
+                      width: hover.position.width * transform.scale,
+                      height: hover.position.height * transform.scale,
                     }}
                   />
                 )}

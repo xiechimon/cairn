@@ -39,7 +39,7 @@ const REASON_COPY: Record<string, string> = {
   [TASK_COMPUTER_OFFLINE]: '运行这个任务的电脑当前未连接，等它上线后再停止。',
 };
 
-const NETWORK_ERROR_RE = /failed to fetch|networkerror|load failed|network request failed/i;
+const NETWORK_ERROR_RE = /failed to fetch|network|load failed/i;
 const STACK_FRAME_RE = /\bat\s+\S+\s*\(/;
 const HTML_BODY_RE = /<(?:!doctype|html|head|body)\b/i;
 const RAW_NOISE_RE =
@@ -71,7 +71,6 @@ function isSafeServerMessage(message: string): boolean {
 }
 
 function isNetworkFailure(error: unknown): boolean {
-  if (error instanceof TypeError) return true;
   return error instanceof Error && NETWORK_ERROR_RE.test(error.message);
 }
 
