@@ -1,0 +1,436 @@
+{
+  "version": 1,
+  "dataset": "cairn-eval-suite",
+  "suiteVersion": 1,
+  "date": "2026-11-27T16:56:20.442Z",
+  "sha": "8d111af0e59545a4c9dd7f20deb3c9a224283875",
+  "status": "incomplete",
+  "summary": {
+    "total": 96,
+    "passed": 86,
+    "failed": 0,
+    "incomplete": 10,
+    "byKind": {
+      "lane": {
+        "total": 10,
+        "passed": 0,
+        "failed": 0,
+        "incomplete": 10
+      },
+      "runtime": {
+        "total": 84,
+        "passed": 84,
+        "failed": 0,
+        "incomplete": 0
+      },
+      "canary": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "incomplete": 0
+      }
+    }
+  },
+  "cases": [
+    {
+      "caseId": "add-config",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "add-fn",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "add-test",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "bump-version",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "comment",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "fix-bug",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "fix-typo",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "gitignore",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "rename-var",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "write-doc",
+      "kind": "lane",
+      "status": "incomplete",
+      "passed": 0,
+      "failed": 0,
+      "incomplete": 1,
+      "trials": 1,
+      "model": "Devin CLI · model not recorded"
+    },
+    {
+      "caseId": "answer-read-01",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "answer-read-02",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "answer-read-03",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "answer-read-04",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "ask-ambiguous-01",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "ask-ambiguous-02",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "ask-ambiguous-03",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "ask-ambiguous-04",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "contract-bad-call-01",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "contract-repair-01",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "event-failed",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "event-review",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "event-settle",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "prompt-contract-01",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "prompt-contract-02",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "prompt-contract-03",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-deps-01",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-deps-02",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-deps-03",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-single-01",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-single-02",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-single-03",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-single-04",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-single-05",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-split-01",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-split-02",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-split-03",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "route-split-04",
+      "kind": "runtime",
+      "status": "pass",
+      "passed": 3,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 3,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "canary-answer",
+      "kind": "canary",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "fauxProvider replay"
+    },
+    {
+      "caseId": "canary-route",
+      "kind": "canary",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "fauxProvider replay"
+    }
+  ]
+}
