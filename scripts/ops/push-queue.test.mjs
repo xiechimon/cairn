@@ -15,13 +15,16 @@ import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import {
   cancelSupersededRuns,
+  evaluateGreenRerunGuard,
   fastGateInvocation,
   isActivePreflightRun,
   MAX_CONCURRENT_PREFLIGHT_RUNS,
+  parsePreflightArgs,
   preflightCapacityDecision,
   preflightRef,
   preflightRun,
   runFastGateBeforePush,
+  upsertPreflightReason,
   waitForPreflightCapacity,
   watchVerdict,
 } from './preflight.mjs';
@@ -396,8 +399,8 @@ console.log(JSON.stringify(checkRunsSha ? [{ check_runs: checkRuns }] : { workfl
     }
 
     for (const [moment, args] of [
-      ['lookup', []],
-      ['watch', ['--wait']],
+      ['lookup', ['--reason', 'test moved head at lookup']],
+      ['watch', ['--wait', '--reason', 'test moved head at watch']],
     ]) {
       const moved = preflight({ STUB_COMMIT_DURING: moment }, args);
       assert.equal(moved.status, 1, `${moment}: ${moved.stdout}${moved.stderr}`);
@@ -412,14 +415,22 @@ console.log(JSON.stringify(checkRunsSha ? [{ check_runs: checkRuns }] : { workfl
       `#!/bin/sh\nif [ "$STUB_COMMIT_DURING $1" = "push push" ]; then '${realGit}' commit -q --allow-empty -m "during push"; fi\nexec '${realGit}' "$@"\n`,
     );
     chmodSync(gitStub, 0o755);
-    const movedAtPush = preflight({ STUB_COMMIT_DURING: 'push' });
+    const movedAtPush = preflight({ STUB_COMMIT_DURING: 'push' }, [
+      '--reason',
+      'test moved head at push',
+    ]);
     assert.equal(movedAtPush.status, 1, movedAtPush.stderr);
     assert.equal(git(work, ['log', '-1', '--format=%s', 'HEAD']), 'during push');
     assert.equal(remotePreflight(), git(work, ['rev-parse', 'HEAD~1']));
 
     const waited = spawnSync(
       process.execPath,
-      [join(dirname(fileURLToPath(import.meta.url)), 'push-queue.mjs'), '--wait'],
+      [
+        join(dirname(fileURLToPath(import.meta.url)), 'push-queue.mjs'),
+        '--wait',
+        '--reason',
+        're-preflight queued head',
+      ],
       {
         cwd: work,
         encoding: 'utf8',
@@ -442,7 +453,7 @@ console.log(JSON.stringify(checkRunsSha ? [{ check_runs: checkRuns }] : { workfl
     const beforeRevert = remotePreflight();
     git(work, ['rm', '-q', 'scripts/stub-gate.mjs']);
     git(work, ['commit', '-qm', 'accidentally drop stub gate']);
-    const reverted = preflight({});
+    const reverted = preflight({}, ['--reason', 'test revert guard']);
     assert.notEqual(reverted.status, 0);
     assert.match(reverted.stderr, /undeclared revert/);
     assert.equal(remotePreflight(), beforeRevert);
@@ -897,6 +908,379 @@ test('preflight --stamp-only stamps Lane trailer and exits 0 without running fas
     const body = git(['log', '-1', '--format=%B']);
     assert.match(body, /^Lane: m-[0-9a-f]{8}\/work$/m);
     assert.equal(git(['ls-remote', 'origin', 'refs/heads/preflight/*']), '');
+  } finally {
+    releaseTestTempDir(root);
+  }
+});
+
+test('parsePreflightArgs parses --wait, --stamp-only, and validates --reason values', () => {
+  assert.deepEqual(parsePreflightArgs(['--wait', '--reason', '  fix\nreview  items ']), {
+    ok: true,
+    wait: true,
+    stampOnly: false,
+    reason: 'fix review items',
+  });
+  assert.deepEqual(parsePreflightArgs(['--stamp-only', '--reason=batch findings']), {
+    ok: true,
+    wait: false,
+    stampOnly: true,
+    reason: 'batch findings',
+  });
+  assert.equal(parsePreflightArgs(['--reason']).ok, false);
+  assert.equal(parsePreflightArgs(['--reason', '']).ok, false);
+  assert.equal(parsePreflightArgs(['--reason', '--wait']).ok, false);
+});
+
+test('evaluateGreenRerunGuard blocks round 3+ after a green run unless --reason is provided', () => {
+  const twoGreens = [
+    { sha: '111', conclusion: 'success' },
+    { sha: '222', conclusion: 'success' },
+  ];
+  assert.equal(
+    evaluateGreenRerunGuard({
+      priorEntries: [],
+      sha: '111',
+      reason: null,
+      lane: 'm-1/wt',
+      taskBranch: 'feat',
+      previousConclusion: null,
+    }).ok,
+    true,
+  );
+  assert.equal(
+    evaluateGreenRerunGuard({
+      priorEntries: [{ sha: '111', conclusion: 'success' }],
+      sha: '222',
+      reason: null,
+      lane: 'm-1/wt',
+      taskBranch: 'feat',
+      previousConclusion: 'success',
+    }).ok,
+    true,
+  );
+  assert.equal(
+    evaluateGreenRerunGuard({
+      priorEntries: twoGreens,
+      sha: '222',
+      reason: null,
+      lane: 'm-1/wt',
+      taskBranch: 'feat',
+      previousConclusion: 'success',
+    }).sameSha,
+    true,
+  );
+  assert.equal(
+    evaluateGreenRerunGuard({
+      priorEntries: [
+        { sha: '111', conclusion: 'success' },
+        { sha: '222', conclusion: 'failure' },
+      ],
+      sha: '333',
+      reason: null,
+      lane: 'm-1/wt',
+      taskBranch: 'feat',
+      previousConclusion: 'failure',
+    }).ok,
+    true,
+  );
+  const blocked = evaluateGreenRerunGuard({
+    priorEntries: twoGreens,
+    sha: '333',
+    reason: null,
+    lane: 'm-1/wt',
+    taskBranch: 'feat',
+    previousConclusion: 'success',
+  });
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.round, 3);
+  assert.match(blocked.error, /先把评审发现批量改完/);
+  assert.match(blocked.error, /--reason/);
+  const allowed = evaluateGreenRerunGuard({
+    priorEntries: twoGreens,
+    sha: '333',
+    reason: 'batch review fixes',
+    lane: 'm-1/wt',
+    taskBranch: 'feat',
+    previousConclusion: 'success',
+  });
+  assert.equal(allowed.ok, true);
+  assert.equal(allowed.round, 3);
+});
+
+test('upsertPreflightReason sets and updates Preflight-Reason trailer cleanly', () => {
+  const first = upsertPreflightReason('fix(a): one\n\nLane: m-1/wt\n', 'batch review fixes');
+  assert.equal(first, 'fix(a): one\n\nLane: m-1/wt\nPreflight-Reason: batch review fixes\n');
+  const updated = upsertPreflightReason(first, 're-run after final batch');
+  assert.equal(
+    updated,
+    'fix(a): one\n\nLane: m-1/wt\nPreflight-Reason: re-run after final batch\n',
+  );
+  const noTrailers = upsertPreflightReason('fix(a): bare subject\n', 'first reason');
+  assert.equal(noTrailers, 'fix(a): bare subject\n\nPreflight-Reason: first reason\n');
+});
+
+test('ci workflow exposes Preflight-Reason in run-name for preflight pushes without renaming workflow', () => {
+  const ci = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../../.github/workflows/ci.yml'),
+    'utf8',
+  );
+  assert.match(ci, /^name: ci$/m);
+  assert.match(
+    ci,
+    /^run-name: \$\{\{[\s\S]*refs\/heads\/preflight\/[\s\S]*Preflight-Reason:[\s\S]*\|\| '' \}\}$/m,
+  );
+});
+
+test('preflight CLI enforces --reason on 3rd green rerun for same lane+branch and resets per branch', () => {
+  const root = makeTestTempDir('preflight-reason-cli-');
+  const bare = join(root, 'origin.git');
+  const work = join(root, 'work');
+  const bin = join(root, 'bin');
+  const home = join(root, 'home');
+  const gateLog = join(root, 'gate-runs');
+  try {
+    mkdirSync(bare, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    execFileSync('git', ['init', '--bare', '-b', 'main', bare], { encoding: 'utf8' });
+    execFileSync('git', ['clone', bare, work], { encoding: 'utf8' });
+    const gitEnv = {
+      ...process.env,
+      HOME: home,
+      PATH: `${bin}:${process.env.PATH}`,
+      GIT_AUTHOR_NAME: 'xiechimon',
+      GIT_AUTHOR_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      GIT_COMMITTER_NAME: 'xiechimon',
+      GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+    };
+    const git = (args) =>
+      execFileSync('git', args, { cwd: work, encoding: 'utf8', env: gitEnv }).trim();
+    mkdirSync(join(work, 'scripts/ops'), { recursive: true });
+    writeFileSync(
+      join(work, 'scripts/ops/preflight-fast-gate.mjs'),
+      `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(gateLog)}, '1\\n');\n`,
+    );
+    git(['add', 'scripts/ops/preflight-fast-gate.mjs']);
+    git(['commit', '--quiet', '-m', 'chore: base']);
+    git(['push', '--quiet', '-u', 'origin', 'main']);
+
+    const runsFile = join(root, 'gh-runs.json');
+    writeFileSync(runsFile, '[]');
+    const ghStub = join(bin, 'gh');
+    writeFileSync(
+      ghStub,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const idFile = process.env.HOME + '/.config/cairn-dev/lane-machine-id';
+const id = fs.existsSync(idFile) ? fs.readFileSync(idFile, 'utf8').trim() : 'uninitialized';
+const branch = 'preflight/' + id + '/work';
+const runsFile = ${JSON.stringify(runsFile)};
+const runs = JSON.parse(fs.readFileSync(runsFile, 'utf8'));
+const apiUrl = args.find((a) => a.startsWith('repos/')) || '';
+if (apiUrl.includes('status=')) {
+  console.log(JSON.stringify({ workflow_runs: [] }));
+} else if (apiUrl.includes('head_sha=')) {
+  const sha = (apiUrl.match(/head_sha=([0-9a-f]+)/) || [])[1] || '';
+  const conclusion = process.env.STUB_CONCLUSION || 'success';
+  const entry = { id: 100 + runs.length, name: 'ci', head_sha: sha, head_branch: branch, status: 'completed', conclusion, html_url: 'https://example/run/' + (100 + runs.length) };
+  runs.unshift(entry);
+  fs.writeFileSync(runsFile, JSON.stringify(runs));
+  console.log(JSON.stringify({ workflow_runs: [entry] }));
+} else if (apiUrl.includes('workflows/ci.yml/runs')) {
+  console.log(JSON.stringify({ workflow_runs: runs }));
+} else {
+  console.log('{}');
+}
+`,
+      { mode: 0o755 },
+    );
+
+    const scriptPath = fileURLToPath(new URL('./preflight.mjs', import.meta.url));
+    const runCli = (extraArgs = [], extraEnv = {}) =>
+      spawnSync(process.execPath, [scriptPath, ...extraArgs], {
+        cwd: work,
+        encoding: 'utf8',
+        env: { ...gitEnv, ...extraEnv },
+      });
+
+    git(['checkout', '--quiet', '-b', 'task-1']);
+    writeFileSync(join(work, 'f1.txt'), '1\n');
+    git(['add', 'f1.txt']);
+    git(['commit', '--quiet', '-m', 'fix: round 1']);
+    const r1 = runCli();
+    assert.equal(r1.status, 0, r1.stderr);
+
+    writeFileSync(join(work, 'f2.txt'), '2\n');
+    git(['add', 'f2.txt']);
+    git(['commit', '--quiet', '-m', 'fix: round 2']);
+    const r2 = runCli();
+    assert.equal(r2.status, 0, r2.stderr);
+
+    writeFileSync(join(work, 'f3.txt'), '3\n');
+    git(['add', 'f3.txt']);
+    git(['commit', '--quiet', '-m', 'fix: round 3']);
+    const sha3Before = git(['rev-parse', 'HEAD']);
+    const gateCountBefore = readFileSync(gateLog, 'utf8').trim().split('\n').length;
+    const r3Blocked = runCli();
+    assert.notEqual(r3Blocked.status, 0, '3rd green rerun without --reason must refuse');
+    assert.match(r3Blocked.stderr, /先把评审发现批量改完/);
+    assert.equal(readFileSync(gateLog, 'utf8').trim().split('\n').length, gateCountBefore);
+    const id = readFileSync(join(home, '.config/cairn-dev/lane-machine-id'), 'utf8').trim();
+    assert.notEqual(
+      git(['ls-remote', 'origin', preflightRef(`${id}/work`)]).split(/\s+/)[0],
+      sha3Before,
+    );
+
+    const r3Allowed = runCli(['--reason', '修评审发现的归档属主']);
+    assert.equal(r3Allowed.status, 0, r3Allowed.stderr);
+    const sha3After = git(['rev-parse', 'HEAD']);
+    assert.equal(
+      git(['ls-remote', 'origin', preflightRef(`${id}/work`)]).split(/\s+/)[0],
+      sha3After,
+    );
+    assert.match(git(['log', '-1', '--format=%B']), /^Preflight-Reason: 修评审发现的归档属主$/m);
+
+    const r3RestampSame = runCli(['--stamp-only', '--reason', '修评审发现的归档属主']);
+    assert.equal(r3RestampSame.status, 0, r3RestampSame.stderr);
+    assert.equal(
+      git(['rev-parse', 'HEAD']),
+      sha3After,
+      'restamping the same --reason must not change the reviewed HEAD SHA',
+    );
+
+    git(['checkout', '--quiet', '-b', 'task-2', 'origin/main']);
+    writeFileSync(join(work, 't2.txt'), 't2\n');
+    git(['add', 't2.txt']);
+    git(['commit', '--quiet', '-m', 'fix: new task branch']);
+    const rOtherBranch = runCli();
+    assert.equal(rOtherBranch.status, 0, rOtherBranch.stderr);
+
+    writeFileSync(join(work, 't2b.txt'), 't2b\n');
+    git(['add', 't2b.txt']);
+    git(['commit', '--quiet', '-m', 'fix: branch red round 2']);
+    const rBranchRed = runCli([], { STUB_CONCLUSION: 'failure' });
+    assert.equal(rBranchRed.status, 0, rBranchRed.stderr);
+
+    const redSha = git(['rev-parse', 'HEAD']);
+    const currentRuns = JSON.parse(readFileSync(runsFile, 'utf8')).filter(
+      (entry) => entry.head_sha !== redSha,
+    );
+    currentRuns.unshift({
+      id: 999,
+      name: 'ci',
+      head_sha: '0'.repeat(40),
+      head_branch: `preflight/${id}/work`,
+      status: 'completed',
+      conclusion: 'success',
+      html_url: 'https://example/run/999',
+    });
+    writeFileSync(runsFile, JSON.stringify(currentRuns));
+    writeFileSync(join(work, 't2c.txt'), 't2c\n');
+    git(['add', 't2c.txt']);
+    git(['commit', '--quiet', '-m', 'fix: retry red without reason']);
+    const rAfterRed = runCli();
+    assert.equal(
+      rAfterRed.status,
+      0,
+      `other-branch green run must not block red-predecessor retry: ${rAfterRed.stderr}`,
+    );
+  } finally {
+    releaseTestTempDir(root);
+  }
+});
+
+test('push-queue --wait --reason arms the post-reason SHA once while checks stay pending', () => {
+  const root = makeTestTempDir('push-queue-reason-wait-');
+  const bare = join(root, 'origin.git');
+  const work = join(root, 'work');
+  const bin = join(root, 'bin');
+  const home = join(root, 'home');
+  const gateLog = join(root, 'gate-runs');
+  const checkCalls = join(root, 'check-calls');
+  try {
+    mkdirSync(bare, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    execFileSync('git', ['init', '--bare', '-b', 'main', bare], { encoding: 'utf8' });
+    execFileSync('git', ['clone', bare, work], { encoding: 'utf8' });
+    const gitEnv = {
+      ...process.env,
+      HOME: home,
+      PATH: `${bin}:${process.env.PATH}`,
+      GIT_AUTHOR_NAME: 'xiechimon',
+      GIT_AUTHOR_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      GIT_COMMITTER_NAME: 'xiechimon',
+      GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+      PUSH_QUEUE_POLL_SECONDS: '0.05',
+      PUSH_QUEUE_WAIT_MINUTES: '2',
+    };
+    const git = (args) =>
+      execFileSync('git', args, { cwd: work, encoding: 'utf8', env: gitEnv }).trim();
+    mkdirSync(join(work, 'scripts/ops'), { recursive: true });
+    writeFileSync(
+      join(work, 'scripts/ops/preflight-fast-gate.mjs'),
+      `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(gateLog)}, '1\\n');\n`,
+    );
+    git(['add', 'scripts/ops/preflight-fast-gate.mjs']);
+    git(['commit', '--quiet', '-m', 'chore: base']);
+    git(['push', '--quiet', '-u', 'origin', 'main']);
+
+    writeFileSync(checkCalls, '0');
+    writeFileSync(
+      join(bin, 'gh'),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const idFile = process.env.HOME + '/.config/cairn-dev/lane-machine-id';
+const id = fs.existsSync(idFile) ? fs.readFileSync(idFile, 'utf8').trim() : 'uninitialized';
+const branch = 'preflight/' + id + '/work';
+const apiUrl = args.find((a) => a.startsWith('repos/')) || '';
+const gitOut = (...a) => require('node:child_process').execFileSync('git', a, { encoding: 'utf8' }).trim();
+if (apiUrl.includes('status=')) {
+  console.log(JSON.stringify({ workflow_runs: [] }));
+} else if (apiUrl.includes('/check-runs')) {
+  const n = Number(fs.readFileSync(${JSON.stringify(checkCalls)}, 'utf8').trim()) + 1;
+  fs.writeFileSync(${JSON.stringify(checkCalls)}, String(n));
+  const sha = apiUrl.match(/commits\\/([0-9a-f]+)/)?.[1] || '';
+  const pushed = gitOut('ls-remote', 'origin', 'refs/heads/' + branch).split(/\\s+/)[0];
+  const ready = sha && pushed === sha && n >= 3;
+  const check_runs = ready
+    ? ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({ name, conclusion: 'success' }))
+    : [{ name: 'check', conclusion: null }];
+  console.log(JSON.stringify([{ check_runs }]));
+} else if (apiUrl.includes('head_sha=')) {
+  const sha = (apiUrl.match(/head_sha=([0-9a-f]+)/) || [])[1] || '';
+  console.log(JSON.stringify({ workflow_runs: [{ id: 101, name: 'ci', head_sha: sha, head_branch: branch, status: 'completed', conclusion: 'success', html_url: 'https://example/run/101' }] }));
+} else if (apiUrl.endsWith('/dispatches')) {
+  gitOut('push', '-q', '--no-follow-tags', 'origin', 'HEAD:refs/heads/main');
+  console.log('{}');
+} else {
+  console.log('{}');
+}
+`,
+      { mode: 0o755 },
+    );
+
+    git(['checkout', '--quiet', '-b', 'feat']);
+    writeFileSync(join(work, 'a.txt'), 'a\n');
+    git(['add', 'a.txt']);
+    git(['commit', '--quiet', '-m', 'fix: pending arm check']);
+
+    const pqPath = fileURLToPath(new URL('./push-queue.mjs', import.meta.url));
+    const waited = spawnSync(
+      process.execPath,
+      [pqPath, '--wait', '--reason', 'batch pending check'],
+      { cwd: work, encoding: 'utf8', env: gitEnv },
+    );
+    assert.equal(waited.status, 0, `${waited.stdout}\n${waited.stderr}`);
+    assert.equal(
+      readFileSync(gateLog, 'utf8').trim().split('\n').length,
+      1,
+      'push-queue --wait --reason must arm child preflight once and wait instead of re-arming',
+    );
   } finally {
     releaseTestTempDir(root);
   }

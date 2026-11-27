@@ -8,6 +8,7 @@ import {
   fileViolations,
   RUNTIME_BLOCK_BEGIN,
   RUNTIME_BLOCK_END,
+  stripPreflightReasonTrailers,
   textViolations,
 } from './english-only-gate.mjs';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
@@ -173,5 +174,61 @@ test('--text checks a PR body file', () => {
     assert.equal(green.status, 0, green.stderr);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('diff mode allows Chinese Preflight-Reason trailers while still blocking other Chinese commit text', () => {
+  assert.equal(
+    stripPreflightReasonTrailers('fix: batch review\n\nLane: m-1/wt\nPreflight-Reason: 修评审发现'),
+    'fix: batch review\n\nLane: m-1/wt',
+  );
+  assert.equal(
+    stripPreflightReasonTrailers('Preflight-Reason: 中文主题\n\nBody text'),
+    'Preflight-Reason: 中文主题\n\nBody text',
+  );
+  assert.equal(
+    stripPreflightReasonTrailers('fix: bug\n\nPreflight-Reason: 正文假冒\n\nLane: m-1/wt'),
+    'fix: bug\n\nPreflight-Reason: 正文假冒\n\nLane: m-1/wt',
+  );
+  const cwd = makeTestTempDir('english-gate-reason-');
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'user.email=t@example.com', '-c', 'user.name=T', ...args], {
+      cwd,
+      stdio: 'pipe',
+    });
+  const run = () =>
+    spawnSync(process.execPath, [script], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, ENGLISH_ONLY_BASE_SHA: '', PREPUSH_BASE_SHA: '' },
+    });
+  try {
+    git('init');
+    writeFileSync(join(cwd, 'a.txt'), 'init\n');
+    git('add', 'a.txt');
+    git('commit', '-m', 'chore: base');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+
+    git(
+      'commit',
+      '--allow-empty',
+      '-m',
+      'fix: batch fixes\n\nPreflight-Reason: 修评审发现的归档属主',
+    );
+    assert.equal(run().status, 0);
+
+    git('commit', '--allow-empty', '-m', 'Preflight-Reason: 中文标题');
+    assert.equal(run().status, 1, 'subject starting with Preflight-Reason must still fail');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+
+    git(
+      'commit',
+      '--allow-empty',
+      '-m',
+      'fix: more\n\nPreflight-Reason: 正文里的中文\n\nLane: m-1/wt',
+    );
+    assert.equal(run().status, 1, 'body line starting with Preflight-Reason must still fail');
+  } finally {
+    releaseTestTempDir(cwd);
   }
 });

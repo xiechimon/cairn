@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyExtraPreflightRound, summarizeRework } from './preflight-rework.mjs';
+import {
+  classifyExtraPreflightRound,
+  extractPreflightReason,
+  subjectsMatch,
+  summarizeRework,
+} from './preflight-rework.mjs';
 
 test('classifyExtraPreflightRound distinguishes red, rebase-only, and review-fix reruns', () => {
   assert.equal(
@@ -77,4 +82,12 @@ test('summarizeRework aggregates per-landing round percentiles and extra-round b
   });
   assert.equal(summary.topLanes[0].lane, 'm-1/lane-a');
   assert.equal(summary.topLanes[0].totalRuns, 4);
+});
+
+test('subjectsMatch and extractPreflightReason handle flattened Preflight-Reason run titles', () => {
+  const title = 'fix(a): one Lane: m-1/wt Preflight-Reason: batch review';
+  assert.equal(subjectsMatch('fix(a): one', title), true);
+  assert.equal(subjectsMatch('fix(b): two', title), false);
+  assert.equal(extractPreflightReason(title), 'batch review');
+  assert.equal(extractPreflightReason('fix(a): plain title'), null);
 });

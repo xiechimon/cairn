@@ -92,9 +92,18 @@ export function summarizeRework(landings) {
   };
 }
 
+export function extractPreflightReason(runTitle) {
+  if (!runTitle) return null;
+  const match = /\bPreflight-Reason:\s*(.+)$/.exec(runTitle);
+  return match ? match[1].trim() : null;
+}
+
 export function subjectsMatch(commitSubject, runTitle) {
   if (!commitSubject || !runTitle) return false;
   if (commitSubject === runTitle) return true;
+  if (runTitle.includes('Preflight-Reason:') && runTitle.startsWith(`${commitSubject} `)) {
+    return true;
+  }
   if (runTitle.endsWith('…')) {
     return commitSubject.startsWith(runTitle.slice(0, -1));
   }

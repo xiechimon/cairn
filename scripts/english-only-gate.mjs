@@ -88,6 +88,26 @@ export function fileViolations(path, content) {
   return found;
 }
 
+export function stripPreflightReasonTrailers(text) {
+  const lines = String(text ?? '')
+    .replace(/\r\n/g, '\n')
+    .split('\n');
+  while (lines.length > 0 && lines.at(-1).trim() === '') lines.pop();
+  const lastBlank = lines.lastIndexOf('');
+  if (lastBlank <= 0) return lines.join('\n');
+  const tailLines = lines.slice(lastBlank + 1);
+  const isTrailerParagraph =
+    tailLines.length > 0 &&
+    tailLines.every((line) => /^(?:[A-Za-z][A-Za-z0-9-]*:\s|(?:Closes|Part of)\s+#\d+)/.test(line));
+  if (!isTrailerParagraph) return lines.join('\n');
+  const strippedTail = tailLines.filter((line) => !/^Preflight-Reason:\s/i.test(line));
+  const kept = [
+    ...lines.slice(0, lastBlank),
+    ...(strippedTail.length > 0 ? ['', ...strippedTail] : []),
+  ];
+  return kept.join('\n');
+}
+
 export function textViolations(content) {
   return proseViolations(content.split('\n'));
 }
@@ -148,7 +168,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
       for (const sha of git('rev-list', '--no-merges', `${base}..HEAD`).split('\n').filter(Boolean))
         violations += report(
           `commit ${sha.slice(0, 10)}`,
-          textViolations(git('log', '-1', '--format=%B', sha)),
+          textViolations(stripPreflightReasonTrailers(git('log', '-1', '--format=%B', sha))),
         );
     }
     console.log(`english-only-gate: ${violations} line(s) with Chinese text`);

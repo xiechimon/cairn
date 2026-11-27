@@ -1,9 +1,102 @@
 #!/usr/bin/env node
 
 import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { MAX_CONCURRENT_PREFLIGHT_RUNS } from './ci-capacity-gate.mjs';
-import { localLane, stampUnownedCommits } from './push-queue.mjs';
+import { localLane, parsePreflightArgs, stampUnownedCommits } from './push-queue.mjs';
 import { ENQUEUE_PREFIX, TRY_PREFIX } from './speculative-queue.mjs';
+
+export { parsePreflightArgs };
+
+const REASON_TRAILER = 'Preflight-Reason';
+
+export function extractCommitReason(message) {
+  const match = /^Preflight-Reason:\s*(.+)$/im.exec(message ?? '');
+  return match ? match[1].trim() : null;
+}
+
+export function upsertPreflightReason(message, reason) {
+  const lines = String(message ?? '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .filter((line) => !/^Preflight-Reason:\s/i.test(line));
+  while (lines.length > 0 && lines.at(-1).trim() === '') lines.pop();
+  const lastBlank = lines.lastIndexOf('');
+  const tailLines = lastBlank === -1 ? [] : lines.slice(lastBlank + 1);
+  const endsWithTrailers =
+    tailLines.length > 0 &&
+    tailLines.every((line) => /^(?:[A-Za-z][A-Za-z0-9-]*:\s|(?:Closes|Part of)\s+#\d+)/.test(line));
+  if (lines.length > 0 && !endsWithTrailers) lines.push('');
+  lines.push(`${REASON_TRAILER}: ${reason}`);
+  return `${lines.join('\n')}\n`;
+}
+
+export function readPreflightHistory(historyPath) {
+  try {
+    if (!existsSync(historyPath)) return {};
+    const parsed = JSON.parse(readFileSync(historyPath, 'utf8'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writePreflightHistory(historyPath, history) {
+  mkdirSync(dirname(historyPath), { recursive: true });
+  writeFileSync(historyPath, `${JSON.stringify(history, null, 2)}\n`);
+}
+
+export function pruneLandedEntries(entries, isAncestorOfMain) {
+  const list = Array.isArray(entries) ? entries : [];
+  let lastLanded = -1;
+  for (let i = 0; i < list.length; i += 1) {
+    if (list[i]?.sha && isAncestorOfMain(list[i].sha)) lastLanded = i;
+  }
+  return lastLanded === -1 ? list : list.slice(lastLanded + 1);
+}
+
+export function evaluateGreenRerunGuard({
+  priorEntries,
+  sha,
+  reason,
+  lane,
+  taskBranch,
+  previousConclusion,
+}) {
+  const prior = Array.isArray(priorEntries) ? priorEntries : [];
+  const last = prior.at(-1) ?? null;
+  if (last && last.sha === sha) {
+    return { ok: true, sameSha: true, round: prior.length };
+  }
+  const round = prior.length + 1;
+  if (round < 3) {
+    return { ok: true, sameSha: false, round };
+  }
+  const prevConclusion = previousConclusion ?? last?.conclusion ?? null;
+  if (prevConclusion !== 'success' || reason) {
+    return { ok: true, sameSha: false, round };
+  }
+  return {
+    ok: false,
+    sameSha: false,
+    round,
+    error: `[preflight] 第 ${round} 次预检（${lane} @ ${taskBranch}）上一次已绿，先把评审发现批量改完再推；确实需重跑请加 --reason "<原因>"`,
+  };
+}
+
+export function stampPreflightReason({ reason, cwd } = {}) {
+  const execOpts = cwd ? { encoding: 'utf8', cwd } : { encoding: 'utf8' };
+  const body = execFileSync('git', ['log', '-1', '--format=%B', 'HEAD'], execOpts);
+  const nextBody = upsertPreflightReason(body, reason);
+  if (nextBody.trimEnd() !== body.trimEnd()) {
+    execFileSync('git', ['commit', '--amend', '--only', '--allow-empty', '-q', '-F', '-'], {
+      ...execOpts,
+      input: nextBody,
+    });
+  }
+  return execFileSync('git', ['rev-parse', 'HEAD'], execOpts).trim();
+}
 
 export function preflightRef(lane) {
   return `refs/heads/preflight/${lane}`;
@@ -192,11 +285,18 @@ export function watchVerdict(status, conclusion, watchStatus) {
 }
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
-  const wait = process.argv.includes('--wait');
-  const stampOnly = process.argv.includes('--stamp-only');
+  const parsed = parsePreflightArgs(process.argv.slice(2));
+  if (!parsed.ok) {
+    console.error(parsed.error);
+    process.exit(1);
+  }
+  const { wait, stampOnly } = parsed;
   const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
-  const lane = localLane(git(['rev-parse', '--show-toplevel']));
+  const root = git(['rev-parse', '--show-toplevel']);
+  const gitDir = resolve(root, git(['rev-parse', '--git-dir']));
+  const taskBranch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+  const lane = localLane(root);
   const ref = `preflight/${lane}`;
   const stamped = stampUnownedCommits({ lane, prefix: '[preflight]' });
   if (!stamped.ok) {
@@ -205,12 +305,51 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     );
     process.exit(1);
   }
-  const sha = stamped.sha;
+  const historyPath = join(gitDir, 'cairn-preflight-history.json');
+  const historyKey = `${lane}::${taskBranch}`;
+  const history = readPreflightHistory(historyPath);
+  const isAncestorOfMain = (candidateSha) =>
+    spawnSync('git', ['merge-base', '--is-ancestor', candidateSha, 'origin/main']).status === 0;
+  const priorEntries = pruneLandedEntries(history[historyKey], isAncestorOfMain);
+  const headReason = extractCommitReason(git(['log', '-1', '--format=%B', 'HEAD']));
+  const lastEntry = priorEntries.at(-1) ?? null;
+  const effectiveReason =
+    parsed.reason ??
+    (headReason && (!lastEntry || lastEntry.sha === stamped.sha || lastEntry.reason !== headReason)
+      ? headReason
+      : null);
+  const sha = parsed.reason
+    ? stampPreflightReason({ reason: parsed.reason, cwd: root })
+    : stamped.sha;
   if (stampOnly) {
     console.log(`[preflight] stamped ${sha}`);
     process.exit(0);
   }
-  const root = git(['rev-parse', '--show-toplevel']);
+  const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
+  let previousConclusion = lastEntry?.conclusion ?? null;
+  if (priorEntries.length >= 2 && lastEntry?.sha !== sha && !effectiveReason) {
+    try {
+      const runs =
+        ghJson([
+          'api',
+          `repos/${repo}/actions/workflows/ci.yml/runs?branch=${encodeURIComponent(ref)}&per_page=20`,
+        ])?.workflow_runs ?? [];
+      const matched = runs.find((entry) => entry.name === 'ci' && entry.head_sha === lastEntry.sha);
+      if (matched?.conclusion) previousConclusion = matched.conclusion;
+    } catch {}
+  }
+  const guard = evaluateGreenRerunGuard({
+    priorEntries,
+    sha,
+    reason: effectiveReason,
+    lane,
+    taskBranch,
+    previousConclusion,
+  });
+  if (!guard.ok) {
+    console.error(guard.error);
+    process.exit(1);
+  }
   const invocation = fastGateInvocation();
   console.log(
     `[preflight] running the fast gate through ${invocation.runner}; nothing is pushed unless it passes`,
@@ -233,7 +372,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     process.exit(0);
   };
   refuseMovedHead();
-  const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
   const sleep = (seconds) => spawnSync('sleep', [String(seconds)]);
   const readQueuedShas = () =>
     new Set(
@@ -276,6 +414,27 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   if (push.status !== 0) process.exit(push.status ?? 1);
   console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
   refuseMovedHead(`${sha.slice(0, 9)} was pushed`);
+  const recordedEntries = guard.sameSha
+    ? priorEntries
+    : [
+        ...priorEntries,
+        {
+          sha,
+          pushedAt: new Date().toISOString(),
+          reason: effectiveReason ?? null,
+          conclusion: null,
+        },
+      ];
+  history[historyKey] = recordedEntries;
+  writePreflightHistory(historyPath, history);
+  const saveConclusion = (conclusion) => {
+    const current = readPreflightHistory(historyPath);
+    const list = Array.isArray(current[historyKey]) ? current[historyKey] : recordedEntries;
+    current[historyKey] = list.map((entry) =>
+      entry.sha === sha ? { ...entry, conclusion } : entry,
+    );
+    writePreflightHistory(historyPath, current);
+  };
   const readRun = () => {
     const { workflow_runs: runs } = ghJson([
       'api',
@@ -338,8 +497,11 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   for (let attempt = 0; attempt < WATCH_RETRIES; attempt++) {
     const outcome = watchVerdict(state?.status ?? null, state?.conclusion ?? null, watched.status);
     if (outcome.verdict !== 'unreadable') {
-      if (outcome.verdict === 'green')
+      if (outcome.verdict === 'green') {
+        saveConclusion('success');
         succeed('[preflight] green — push-queue will accept this head');
+      }
+      saveConclusion(outcome.conclusion ?? 'failure');
       console.error(
         `[preflight] the run went ${outcome.conclusion}: ${run.html_url}; fix the failing jobs and push again`,
       );
@@ -358,7 +520,10 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           stdio: 'inherit',
         },
       );
-      if (again.status === 0) succeed('[preflight] green — push-queue will accept this head');
+      if (again.status === 0) {
+        saveConclusion('success');
+        succeed('[preflight] green — push-queue will accept this head');
+      }
       state = currentStatus();
       if (state && state.status === 'completed') continue;
     }

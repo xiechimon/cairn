@@ -10,6 +10,47 @@ import { isCleanRebaseOf, rebaseOwnerLane } from './rebase-equivalence.mjs';
 import { ENQUEUE_PREFIX, makeEnqueueId, sortEnqueueEntries } from './speculative-queue.mjs';
 
 export const DEFAULT_POLL_SECONDS = 15;
+const MAX_REASON_LENGTH = 120;
+
+export function parsePreflightArgs(argv) {
+  let wait = false;
+  let stampOnly = false;
+  let reason = null;
+  const normalize = (value) => value.replace(/\s+/g, ' ').trim().slice(0, MAX_REASON_LENGTH);
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--wait') {
+      wait = true;
+    } else if (arg === '--stamp-only') {
+      stampOnly = true;
+    } else if (arg === '--reason') {
+      const next = argv[i + 1];
+      if (!next || next.startsWith('--')) {
+        return {
+          ok: false,
+          error: '[preflight] --reason requires a non-empty explanation',
+        };
+      }
+      i += 1;
+      reason = normalize(next);
+      if (!reason) {
+        return {
+          ok: false,
+          error: '[preflight] --reason requires a non-empty explanation',
+        };
+      }
+    } else if (arg.startsWith('--reason=')) {
+      reason = normalize(arg.slice('--reason='.length));
+      if (!reason) {
+        return {
+          ok: false,
+          error: '[preflight] --reason requires a non-empty explanation',
+        };
+      }
+    }
+  }
+  return { ok: true, wait, stampOnly, reason };
+}
 
 export function commitCommentsApiArgs(repo, sha) {
   return ['api', `repos/${repo}/commits/${sha}/comments?per_page=20`];
@@ -206,9 +247,14 @@ export function stampUnownedCommits({
 }
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
+  const parsed = parsePreflightArgs(process.argv.slice(2));
+  if (!parsed.ok) {
+    console.error(parsed.error.replace('[preflight]', '[push-queue]'));
+    process.exit(1);
+  }
   const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
-  const wait = process.argv.includes('--wait');
+  const { wait, reason } = parsed;
   const POLL_SECONDS = Number(process.env.PUSH_QUEUE_POLL_SECONDS ?? DEFAULT_POLL_SECONDS);
   const waitMinutes = Number(process.env.PUSH_QUEUE_WAIT_MINUTES ?? 120);
   const deadline = Date.now() + waitMinutes * 60_000;
@@ -338,7 +384,9 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           );
           process.exit(1);
         }
-        const pushed = spawnSync(process.execPath, [join(import.meta.dirname, 'preflight.mjs')], {
+        const preflightArgs = [join(import.meta.dirname, 'preflight.mjs')];
+        if (reason) preflightArgs.push('--reason', reason);
+        const pushed = spawnSync(process.execPath, preflightArgs, {
           stdio: 'inherit',
         });
         if (pushed.status !== 0) {
@@ -349,7 +397,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           console.error('[push-queue] could not push the preflight ref; fix that and run again.');
           process.exit(1);
         }
-        armedSha = stamped.sha;
+        armedSha = git(['rev-parse', 'HEAD']);
         continue;
       }
       sleep(POLL_SECONDS);
