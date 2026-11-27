@@ -41,3 +41,5 @@ What this gate does not prove: the check is static. It shows that a walk reaches
 | Escape hatch | `Visual-Surfaces: all` is the only broad declaration, for global token or theme changes | — |
 
 What this gate does not prove: each surface compares one default state of a page at 1440x900; dialogs, menus, hover states and narrow windows are compared only when they get their own surface.
+
+Refreshing baselines without a full preflight: commit your web changes first, then run `node scripts/ops/render-visual-baselines.mjs [--surfaces <ids>]` to push `HEAD` to a unique temporary `refs/heads/baselines/<lane>/<token>` ref, run the single-runner `visual-baselines.yml` Linux workflow, download and apply the rendered PNGs, print the `Visual-Surfaces:` trailer, and delete the temporary ref.

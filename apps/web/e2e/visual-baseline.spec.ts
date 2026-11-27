@@ -11,12 +11,25 @@ interface Surface {
 const registry = JSON.parse(readFileSync(new URL('./visual-surfaces.json', import.meta.url), 'utf8')) as {
   surfaces: Surface[];
 };
+const requestedSurfaces = (process.env.VISUAL_SURFACES ?? '')
+  .split(/[\s,]+/)
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+const knownSurfaceIds = new Set(registry.surfaces.map((surface) => surface.id));
+const unknownSurfaces = requestedSurfaces.filter((id) => !knownSurfaceIds.has(id));
+if (unknownSurfaces.length > 0) {
+  throw new Error(`Unknown VISUAL_SURFACES id(s): ${unknownSurfaces.join(', ')}`);
+}
+const selectedSurfaces =
+  requestedSurfaces.length > 0
+    ? registry.surfaces.filter((surface) => requestedSurfaces.includes(surface.id))
+    : registry.surfaces;
 const FIXED_NOW = new Date('2026-11-25T04:00:00Z');
 
 test.use({ timezoneId: 'UTC' });
 test.describe.configure({ mode: 'parallel' });
 
-for (const surface of registry.surfaces) {
+for (const surface of selectedSurfaces) {
   for (const theme of ['light', 'dark'] as const) {
     test(`${surface.id} ${theme} pixels stay on baseline`, async ({ page }) => {
       await page.addInitScript((wanted) => {
