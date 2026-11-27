@@ -35,7 +35,7 @@ function takeoverAdvice({ takeover }: ComputerBrowserOffer): string {
 }
 
 function browserFactsAdvice(): string {
-  return ' When a result includes a [Browser: ...] line, include its machine, browser and whether the owner can watch or take over when you tell the owner what opened or what you did there.';
+  return ' When a result includes a [Browser: ...] line, include its machine, browser and whether the owner can watch or take over when you tell the owner what opened or what you did there; if it says no browser ran, say plainly that nothing opened or acted.';
 }
 
 export function computerRemoteTools(

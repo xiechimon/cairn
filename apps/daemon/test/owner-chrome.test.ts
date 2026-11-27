@@ -274,6 +274,42 @@ describe('the owner’s Chrome through browser tools', () => {
 });
 
 describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
+  test('a validation refusal after read-only probes still means the action did not run', async () => {
+    const { call, seen } = recording((commands) => {
+      if (commands[0]?.includes('document.title'))
+        return JSON.stringify({ title: 'Shop', url: 'https://shop.example.com/' });
+      return '✓';
+    });
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'click' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('not_delivered');
+    expect(seen.flat().some((line) => line.startsWith('click'))).toBe(false);
+  });
+
+  test('an abandoned navigate timeout may still commit and is unsafe to repeat', async () => {
+    const { call } = recording(() => ({
+      text: '✗ step 1: goto "https://slow.example" — Timed out after 45 s; the step was abandoned',
+      isError: true,
+    }));
+    const outcome = await runOwnerChromeTool(
+      'browser_navigate',
+      { url: 'https://slow.example' },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('unknown');
+  });
+
   test('an extension that drops after a click ran is never reported as safe to repeat', async () => {
     const { call } = recording((commands) =>
       commands[0] === 'click e2'

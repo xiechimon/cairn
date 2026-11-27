@@ -25,6 +25,7 @@ const OWNER_CHROME_OPEN_TIMEOUT_MS = 300_000;
 const PAIRING_MARKER = "Click Allow in the Browser MCP extension's popup";
 const NO_EXTENSION_MARKER = 'No browser is connected';
 const PAUSED_MARKER = 'The user paused Browser MCP';
+const MUTATING_COMMAND = /^(goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/;
 
 const PAGE_TEXT_TRUNCATED =
   '\n[page text truncated here; the rest of the page is not shown. Call browser_snapshot with selector (a CSS selector or an @ref) to read one section in full]';
@@ -163,8 +164,15 @@ async function runCommands(
     throw new ComputerRefusal(
       `${answer.text}. Ask the owner to click Resume in the Browser MCP extension's popup; nothing was opened in another browser.`,
     );
-  if (kind === 'failed')
-    throw new ComputerRefusal(answer.text === '' ? 'Browser MCP refused this step' : answer.text);
+  if (kind === 'failed') {
+    const abandonedMutation =
+      commands.some((command) => MUTATING_COMMAND.test(command)) &&
+      /timed out|abandoned/i.test(answer.text);
+    throw new ComputerRefusal(
+      answer.text === '' ? 'Browser MCP refused this step' : answer.text,
+      abandonedMutation ? 'unknown' : 'not_delivered',
+    );
+  }
   return answer.text;
 }
 
@@ -379,7 +387,7 @@ async function runInOwnerTab(
   let ran = 0;
   const call: OwnerChromeCaller = async (...request) => {
     const answer = await reach(...request);
-    if (!answer.isError) ran += 1;
+    if (!answer.isError && request[1].some((command) => MUTATING_COMMAND.test(command))) ran += 1;
     return answer;
   };
   try {

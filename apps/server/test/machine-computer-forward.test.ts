@@ -1609,6 +1609,36 @@ describe('browser calls on Macs', () => {
     },
   );
 
+  test('an in-flight duplicate browser call also reports not-delivered as no browser ran', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true });
+    const calls = connect(s, 'mini');
+    const first = navigate(deps, 'duplicate-in-flight');
+    first.catch(() => {});
+    const dispatched = await next(calls, 1);
+    const duplicate = navigate(deps, 'duplicate-in-flight');
+    duplicate.catch(() => {});
+    fail(s, 'mini', dispatched, 'browser_navigate only accepts well-formed http(s) URLs');
+    for (const result of await Promise.all([first, duplicate])) {
+      expect(result.text).toContain('[Browser: no browser ran; nothing opened or acted.]');
+      expect(result.text).not.toContain("Cairn's own browser on mini");
+    }
+  });
+
+  test('a failed fallback that never delivered does not claim Cairn’s browser ran', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const pending = navigate(deps, 'failed-fallback');
+    pending.catch(() => {});
+    fail(s, 'mini', await next(calls, 1), NO_EXTENSION);
+    fail(s, 'mini', await next(calls, 2), 'browser_navigate only accepts well-formed http(s) URLs');
+    const text = (await pending).text;
+    expect(text).toContain('[Browser: no browser ran; nothing opened or acted.]');
+    expect(text).not.toContain("[Ran in Cairn's browser instead");
+  });
+
   test('a browser action blocked by owner control says no browser ran', async () => {
     const { s, deps } = boot();
     addMac(s, 'mac', { browser: true });

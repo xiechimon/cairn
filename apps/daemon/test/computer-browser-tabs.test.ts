@@ -69,6 +69,14 @@ const run = (tabScope: string) => ({
 });
 
 describe('one browser tab per scope', () => {
+  test('an invalid navigation is refused before the scoped tab is created', async () => {
+    const { provider, tabs } = sharedBrowser();
+    await expect(
+      runBrowserTool(provider, 'browser_navigate', { url: 'file:///etc/passwd' }, run('secret')),
+    ).rejects.toMatchObject({ delivery: 'not_delivered' });
+    expect(tabs).toHaveLength(1);
+  });
+
   test('two scopes navigating in turn keep their own page, and a card tab closes with its step', async () => {
     const { provider, tabs } = sharedBrowser();
     await runBrowserTool(

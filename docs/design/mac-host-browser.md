@@ -125,8 +125,10 @@ pre-existing and unchanged.
 4. **Cairn's browser.** With no candidate left, the call goes to the pinned machine. When step 1
    tried anyone, the result starts with the note that the owner's Chrome was not used and why.
 
-Every `browser_navigate` answer opens with one line naming the browser (the owner's own Chrome
-or Cairn's) and the machine, so the Coordinator can say where a page was opened.
+Every completed browser answer opens with one line naming the browser (the owner's own Chrome
+or Cairn's) and the machine, so the Coordinator can say where a page was opened. When the daemon
+reports that the action was not delivered, the answer opens instead with the no-browser line saying
+that nothing opened or acted.
 
 ## The `computer` row (the chief scope's pin)
 

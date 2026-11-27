@@ -1333,7 +1333,10 @@ export async function forwardComputerCall(
     const result = waitForCall(deps, live, stepId, opts.signal);
     return waitingRow === undefined
       ? result
-      : result.then((settled) => namingBrowserResult(db, waitingRow, settled));
+      : result.then((settled) => {
+          const finished = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+          return namingBrowserResult(db, finished ?? waitingRow, settled);
+        });
   }
 
   if (existing && existing.tool === 'request_takeover' && existing.state === 'running') {
@@ -1462,7 +1465,7 @@ export async function forwardComputerCall(
         .filter((row) => deps.machineHub.isConnected(row.id))
     : [];
   if (candidates.length === 0) {
-    if (mustUseOwnerChrome) throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+    if (mustUseOwnerChrome) throw new HttpError(409, noBrowserRun(COMPUTER_NOT_CONNECTED));
     return onTarget();
   }
   const chain = throughOwnerChrome(deps, request, candidates, onTarget, !mustUseOwnerChrome);
@@ -1570,6 +1573,7 @@ async function throughOwnerChrome(
   const reasons = unused.join(' ');
   try {
     const result = await onTarget();
+    if (result.text.startsWith(NO_BROWSER_RUN_PREFIX)) return result;
     return {
       ...result,
       text: `[Ran in Cairn's browser instead of your own Chrome. ${reasons}]\n${result.text}`,

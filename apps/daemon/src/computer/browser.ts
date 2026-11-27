@@ -781,24 +781,7 @@ export async function runBrowserTool(
       refuse(`${tool} refused: this task's browser tab could not be selected`, started);
     }
   };
-  if (options.tabScope !== undefined) await selectScopeTab(options.tabScope);
-  await blockCairn(tool);
-  const boundTab = cairnOrigins.length === 0 ? null : await activeTab();
-  if (cairnOrigins.length > 0 && boundTab === null) {
-    refuse(`${tool} refused: the active tab could not be read`, started);
-  }
-  const refuseOffBoundTab = async (what: string): Promise<void> => {
-    if (cairnOrigins.length === 0) return;
-    await blockCairn(what);
-    if ((await activeTab()) !== boundTab) {
-      refuse(
-        `${what} refused: another tab became active during this call; call again to act on it`,
-        started,
-      );
-    }
-    await refuseOnCairn(what);
-  };
-
+  let validatedNavigateUrl: string | null = null;
   if (tool === 'browser_navigate') {
     const parsed = navigateParams.safeParse(params);
     if (!parsed.success) {
@@ -819,10 +802,32 @@ export async function runBrowserTool(
         started,
       );
     }
-    const url = address.href;
-    if (await cairnPage(url, cairnOrigins)) {
-      refuse(`browser_navigate refused: ${url} ${CAIRN_PAGE_REFUSAL}`, started);
+    if (await cairnPage(address.href, cairnOrigins)) {
+      refuse(`browser_navigate refused: ${address.href} ${CAIRN_PAGE_REFUSAL}`, started);
     }
+    validatedNavigateUrl = address.href;
+  }
+  if (options.tabScope !== undefined) await selectScopeTab(options.tabScope);
+  await blockCairn(tool);
+  const boundTab = cairnOrigins.length === 0 ? null : await activeTab();
+  if (cairnOrigins.length > 0 && boundTab === null) {
+    refuse(`${tool} refused: the active tab could not be read`, started);
+  }
+  const refuseOffBoundTab = async (what: string): Promise<void> => {
+    if (cairnOrigins.length === 0) return;
+    await blockCairn(what);
+    if ((await activeTab()) !== boundTab) {
+      refuse(
+        `${what} refused: another tab became active during this call; call again to act on it`,
+        started,
+      );
+    }
+    await refuseOnCairn(what);
+  };
+
+  if (tool === 'browser_navigate') {
+    const url = validatedNavigateUrl;
+    if (url === null) throw new Error('browser_navigate URL was not validated');
     const result =
       (headless ? null : await navigateByAddressBar(url)) ??
       (await execute([...prefix, 'open', url]));
