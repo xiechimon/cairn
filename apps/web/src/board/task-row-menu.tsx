@@ -25,6 +25,7 @@ import { toastArchived } from './archive-toast.js';
 import { canRetryNow } from './retry-copy.js';
 import { MoveToProjectSub } from './task-move-menu.js';
 import { canMarkDone } from './use-mark-done.js';
+import { useRetryBuildNow } from './use-retry-now.js';
 
 const RENAME_FORM = 'task-rename-form';
 
@@ -102,6 +103,7 @@ export function TaskRowMenu({
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
+  const retryBuild = useRetryBuildNow(teamId, todo);
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
   const archive = () => {
     if (!live) {
@@ -135,10 +137,7 @@ export function TaskRowMenu({
       return;
     }
     if (todo.latestBuildId == null) return;
-    mutations.retryBuildNow.mutate(
-      { buildId: todo.latestBuildId },
-      { onError: (error) => toastError(t('立即重试失败，请重试。'), error) },
-    );
+    retryBuild.retryNow(todo.latestBuildId);
   };
   return (
     <>
@@ -176,7 +175,12 @@ export function TaskRowMenu({
             {t('打开任务')}
           </KeyedMenuItem>
           {canRetryNow(todo) && todo.latestBuildId != null && (
-            <KeyedMenuItem shortcut="T" data-action="retry-now" onClick={retryNow}>
+            <KeyedMenuItem
+              shortcut="T"
+              data-action="retry-now"
+              disabled={retryBuild.pending}
+              onClick={retryNow}
+            >
               <RotateCw />
               {t('立即重试')}
             </KeyedMenuItem>

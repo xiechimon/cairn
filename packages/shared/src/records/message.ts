@@ -542,7 +542,7 @@ export const STOP_MESSAGE = '已取消';
 
 export const buildSteerBodySchema = z
   .object({
-    content: z.string().min(1),
+    content: z.string().trim().min(1),
     mode: z.literal('queue').optional(),
     deliverAfterStop: z.boolean().optional(),
     cancelQueued: z.boolean().optional(),

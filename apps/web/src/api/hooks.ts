@@ -138,6 +138,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { acknowledgeTaskFailed } from '../board/task-outbox.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { isServerUnreachable } from '../lib/error-copy.js';
 import { markErrorSurfaced } from '../lib/mutation-error-report.js';
@@ -1355,7 +1356,10 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     deleteTodo: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/todos/${id}`),
-      onSuccess: invalidateAll,
+      onSuccess: (_data, id) => {
+        acknowledgeTaskFailed(id);
+        invalidateAll();
+      },
     }),
     setThreadRead: useMutation({
       mutationFn: (input: { id: string; read: boolean }) =>

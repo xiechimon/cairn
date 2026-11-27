@@ -29,6 +29,7 @@ import { RouteOverrideDialog } from './route-override-dialog.js';
 import { MoveToProjectSub } from './task-move-menu.js';
 import { RenameDialog } from './task-row-menu.js';
 import { canMarkDone, useMarkDone } from './use-mark-done.js';
+import { useRetryBuildNow } from './use-retry-now.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
 export type ThreadActionKind = 'start' | 'approve' | 'retry' | 'unarchive';
@@ -84,6 +85,7 @@ export function useThreadActions({
   const mutations = useApiMutations(teamId);
   const { markDone, dialogs: markDoneDialogs } = useMarkDone(todo);
   const orchestrateStart = useOrchestrateStart();
+  const retryBuild = useRetryBuildNow(teamId, todo);
   const chiefQ = useChief(teamId, live);
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -105,10 +107,7 @@ export function useThreadActions({
       orchestrateStart.orchestrate(todo, { inThread: true });
       return;
     }
-    mutations.retryBuildNow.mutate(
-      { buildId },
-      { onError: (error) => toastError(t('立即重试失败，请重试。'), error) },
-    );
+    retryBuild.retryNow(buildId);
   });
   const approve = guard(() => {
     if (buildId == null) return;
@@ -173,7 +172,7 @@ export function useThreadActions({
   const pending =
     orchestrateStart.pendingId === todo.id ||
     mutations.stepAction.isPending ||
-    mutations.retryBuildNow.isPending ||
+    retryBuild.pending ||
     mutations.setTodoArchived.isPending;
   const runPrimary: Record<ThreadActionKind, () => void> = {
     start: orchestrate,

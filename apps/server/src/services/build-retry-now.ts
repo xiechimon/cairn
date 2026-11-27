@@ -18,16 +18,16 @@ export async function retryBuildNow(
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRecord.archivedAt != null) throw taskArchived();
   if (todoRecord.latestBuildId !== buildId) {
-    throw new HttpError(409, 'This run is no longer the latest build');
+    throw new HttpError(409, 'This run is no longer the latest build', 'conflict');
   }
   if (
     todoRecord.phase === 'done' ||
     todoRecord.phase === 'closed' ||
     todoRecord.phase === 'stopped'
   ) {
-    throw new HttpError(409, 'Task is not waiting to retry');
+    throw new HttpError(409, 'Task is not waiting to retry', 'conflict');
   }
-  if (retryQuotaWaitNow(deps, buildId)) {
+  if (retryQuotaWaitNow(deps, buildId, clientMessageId)) {
     return { mode: 'quota_resumed' };
   }
   if (todoRecord.phase === 'failed') {
@@ -40,5 +40,5 @@ export async function retryBuildNow(
     );
     return { mode: 'restarted' };
   }
-  throw new HttpError(409, 'Task is not waiting to retry');
+  throw new HttpError(409, 'Task is not waiting to retry', 'conflict');
 }

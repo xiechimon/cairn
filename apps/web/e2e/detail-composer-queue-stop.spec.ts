@@ -68,6 +68,9 @@ async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 're
   ];
   const sent: { content: string; clientMessageId?: string; mode?: string; queuedMessageId?: string; deliverAfterStop?: boolean; cancelQueued?: boolean }[] = [];
   const stops: { discard: boolean }[] = [];
+  const retryNowCalls: { buildId: string; clientMessageId?: string }[] = [];
+  let todoStatus = 200;
+  let todoReadDelay = 0;
   const queuedMessages: { id: string; content: string; createdAt: number; error?: string; deliverAfterStop?: boolean }[] = [];
   const steerPending: string[] = [];
   let turns = 0;
@@ -118,8 +121,26 @@ async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 're
       return route.fulfill({
         json: [{ id: task.projectId, teamId: task.teamId, name: 'cairn', repoKind: 'hosted' }],
       });
-    if (path === '/api/todos') return route.fulfill({ json: [task] });
-    if (path === `/api/todos/${task.id}`) return route.fulfill({ json: task });
+    if (path === '/api/todos') return route.fulfill({ json: todoStatus === 404 ? [] : [task] });
+    if (path === `/api/todos/${task.id}`) {
+      if (todoReadDelay > 0) await new Promise((resolve) => setTimeout(resolve, todoReadDelay));
+      if (todoStatus !== 200) return route.fulfill({ status: todoStatus, json: { error: todoStatus === 404 ? 'not found' : 'todo read failed' } });
+      return route.fulfill({ json: task });
+    }
+    if (path.startsWith('/api/builds/') && path.endsWith('/retry-now') && request.method() === 'POST') {
+      const requestedBuild = path.split('/')[3]!;
+      const body = (request.postDataJSON() ?? {}) as { clientMessageId?: string };
+      const replayed = body.clientMessageId !== undefined && retryNowCalls.some((c) => c.buildId === requestedBuild && c.clientMessageId === body.clientMessageId);
+      retryNowCalls.push({ buildId: requestedBuild, clientMessageId: body.clientMessageId });
+      if (replayed) return route.fulfill({ status: 202, json: { delegated: true, mode: 'restarted' } });
+      if (requestedBuild !== build.id) return route.fulfill({ status: 409, json: { error: 'This run is no longer the latest build' } });
+      build.id = 'retried-build';
+      task.latestBuildId = build.id;
+      task.phase = 'building';
+      task.v += 1;
+      steps[0] = { ...steps[0]!, buildId: build.id, status: 'pending' };
+      return route.fulfill({ status: 202, json: { delegated: true, mode: 'restarted' } });
+    }
     if (path === `/api/builds/${build.id}`) return route.fulfill({ json: build });
     if (path === `/api/builds/${build.id}/gate`) return route.fulfill({ json: { state: null } });
     if (path === `/api/builds/${build.id}/changes`) return route.fulfill({ json: { files: [{ path: 'src/kept.ts', status: 'modified', additions: 1, deletions: 0, hunks: [] }] } });
@@ -220,7 +241,27 @@ async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 're
   const archive = () => {
     Object.assign(task, { archivedAt: 5, v: task.v + 1 });
   };
-  return { input, sent, stops, steerPending, queuedMessages, finish, rollover, archive, setPhase: (phase: string) => { task.phase = phase; }, turns: () => turns };
+  return {
+    input,
+    sent,
+    stops,
+    steerPending,
+    retryNowCalls,
+    queuedMessages,
+    finish,
+    rollover,
+    archive,
+    setPhase: (phase: string) => { task.phase = phase; },
+    setTodoState: (status: number, delayMs = 0) => {
+      todoStatus = status;
+      todoReadDelay = delayMs;
+    },
+    failTurn: () => {
+      steps[0]!.status = 'failed';
+      task.phase = 'failed';
+    },
+    turns: () => turns,
+  };
 }
 
 test('a confirmed queue capsule is visible before a slow transcript read without becoming a delivered bubble', async ({ page }) => {
@@ -544,5 +585,48 @@ for (const shut of ['archived', 'closed'] as const)
   await page.reload();
   await expect(page.getByTestId('side-chat-unsent-text')).toHaveText('Keep these words readable');
   await page.waitForTimeout(1000);
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+});
+
+test('a saved failed reply stays visible when the task turns missing or unavailable mid-send', async ({ page }) => {
+  const task = await runningTask(page);
+  let posts = 0;
+  await page.route('**/api/conversations/completed-build/messages', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    posts += 1;
+    if (posts === 1) return new Promise<void>(() => {});
+    return route.fulfill({ status: 500, json: { error: 'Send blew up' } });
+  });
+  await task.input.fill('Keep failed reply visible across unavailable states');
+  await task.input.press('Control+Enter');
+  await expect.poll(() => page.getByTestId('user-bubble').filter({ hasText: 'Keep failed reply visible across unavailable states' }).count()).toBe(1);
+  await expect.poll(() => posts).toBe(1);
+
+  task.setTodoState(500);
+  await page.reload();
+  await expect(page.getByTestId('side-chat-unavailable')).toHaveAttribute('data-state', 'error');
+  await expect(page.getByTestId('side-chat-unsent-text')).toHaveText('Keep failed reply visible across unavailable states');
+  await expect(page.getByTestId('side-chat-send-error')).toBeVisible();
+
+  task.setTodoState(404);
+  await page.getByTestId('side-chat-unavailable').getByRole('button', { name: '重试' }).click();
+  await expect(page.getByTestId('side-chat-unavailable')).toHaveAttribute('data-state', 'missing');
+  await expect(page.getByTestId('side-chat-unsent-text')).toHaveText('Keep failed reply visible across unavailable states');
+});
+
+test('double-clicking 立即重试 does not raise a false retry failure toast', async ({ page }) => {
+  const task = await runningTask(page);
+  task.failTurn();
+  task.setTodoState(200, 350);
+  await page.reload();
+  const retryButton = page.getByTestId('side-chat-action').getByRole('button', { name: '立即重试' });
+  await expect(retryButton).toBeVisible();
+  await retryButton.click();
+  await page.waitForTimeout(80);
+  if (await retryButton.isVisible() && (await retryButton.isEnabled())) {
+    await retryButton.click();
+  }
+  await expect.poll(() => task.retryNowCalls.length).toBe(1);
+  await page.waitForTimeout(300);
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
 });

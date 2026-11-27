@@ -3,7 +3,7 @@ import { ApiError } from '../src/api/client.js';
 import { createProductQueryClient } from '../src/api/provider.js';
 import { createOutbox, hasPendingSend } from '../src/chief/outbox.js';
 import { liveTaskDelivery } from '../src/board/task-delivery.js';
-import { watchTask } from '../src/board/task-outbox.js';
+import { acknowledgeTaskFailed, taskOutbox, watchTask } from '../src/board/task-outbox.js';
 import { translate } from '../src/i18n/translate.js';
 import { EN } from '../src/i18n/en.js';
 import { describeError } from '../src/lib/error-copy.js';
@@ -130,4 +130,23 @@ test('a failed reply seen in a task that cannot take it back releases the app up
   box.acknowledge(key);
   expect(box.entries()).toHaveLength(1);
   expect(hasPendingSend(box.entries())).toBe(false);
+});
+
+test('acknowledgeTaskFailed releases the app update for a deleted task while keeping its failed text readable', async () => {
+  taskOutbox.enqueue(
+    {
+      scope: null,
+      globalThreadId: null,
+      threadId: 'build-del',
+      projectId: null,
+      text: 'keep after task deletion',
+      task: { todoId: 'todo-deleted', mode: 'reply' },
+    },
+    () => Promise.reject(new Error('offline')),
+  );
+  await wait();
+  expect(hasPendingSend(taskOutbox.entries())).toBe(true);
+  acknowledgeTaskFailed('todo-deleted');
+  expect(hasPendingSend(taskOutbox.entries())).toBe(false);
+  expect(taskOutbox.entries().some((entry) => entry.task?.todoId === 'todo-deleted')).toBe(true);
 });

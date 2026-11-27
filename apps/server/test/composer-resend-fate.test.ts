@@ -574,3 +574,27 @@ test('a Coordinator answer never restarts a task the user stopped', async () => 
   expect(copies(w)).toEqual([]);
   expect(stepStatuses(w)).toEqual(['stopped']);
 });
+
+test('queue and thread message routes trim whitespace identically so resend replaces a stranded queued row', async () => {
+  const w = await runningTask();
+  const padded = `  ${TEXT}  `;
+  const blank = await req(w.s.app, 'POST', `/api/conversations/${latestBuild(w)}/messages`, {
+    content: '   ',
+    mode: 'queue',
+    clientMessageId: 'blank-queued',
+  });
+  expect(blank.status).toBe(400);
+  const queued = await req(w.s.app, 'POST', `/api/conversations/${latestBuild(w)}/messages`, {
+    content: padded,
+    mode: 'queue',
+    clientMessageId: KEY,
+  });
+  expect(queued.status).toBe(201);
+  expect((await w.finish('failed')).status).toBe(200);
+  const resend = await req(w.s.app, 'POST', '/api/todos/task/messages', {
+    content: padded,
+    clientMessageId: KEY,
+  });
+  expect(resend.status).toBe(201);
+  expect(copies(w)).toEqual([latestBuild(w)]);
+});

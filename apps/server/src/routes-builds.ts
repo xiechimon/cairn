@@ -49,6 +49,19 @@ const buildRetryNowBodySchema = z.object({
   clientMessageId: z.string().min(1).max(128).optional(),
 });
 
+function retryNowReplayResponse(stored: unknown): {
+  delegated: true;
+  mode: 'quota_resumed' | 'restarted';
+} {
+  const mode =
+    typeof stored === 'object' &&
+    stored !== null &&
+    (stored as { mode?: unknown }).mode === 'quota_resumed'
+      ? 'quota_resumed'
+      : 'restarted';
+  return { delegated: true, mode };
+}
+
 export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
 
@@ -220,7 +233,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     const body = parseWith(buildRetryNowBodySchema, raw ?? {}, 'body');
     if (body.clientMessageId !== undefined) {
       const stored = findClientMessage(svc.db, buildId, body.clientMessageId);
-      if (stored !== undefined) return c.json({ delegated: true, mode: 'restarted' }, 202);
+      if (stored !== undefined) return c.json(retryNowReplayResponse(stored), 202);
     }
     try {
       const result = await retryBuildNow(svc, buildId, body.clientMessageId);
@@ -228,9 +241,9 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     } catch (err) {
       if (err instanceof ClientMessageConflict && body.clientMessageId !== undefined) {
         const raced = findClientMessage(svc.db, buildId, body.clientMessageId);
-        if (raced !== undefined) return c.json({ delegated: true, mode: 'restarted' }, 202);
+        if (raced !== undefined) return c.json(retryNowReplayResponse(raced), 202);
       }
-      if (err instanceof PhaseTransitionError) throw conflict(err.message);
+      if (err instanceof PhaseTransitionError) throw new HttpError(409, err.message, 'conflict');
       throw err;
     }
   });

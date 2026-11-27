@@ -52,6 +52,7 @@ import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { isWaitingToRetry, todoRetryPhrase } from './retry-copy.js';
 import { STATUS_WORDS } from './status-words.js';
+import { acknowledgeTaskFailed } from './task-outbox.js';
 import { isWaiting, SECTION_LABEL } from './tasks-sections.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
@@ -169,30 +170,68 @@ function StatusLine({
   );
 }
 
-function Unavailable({ chat }: { chat: ThreadChat }) {
+function UnsentSendNotice({ chat, showText }: { chat: ThreadChat; showText: boolean }) {
+  return (
+    <>
+      {chat.sendError != null && (
+        <p
+          data-testid="side-chat-send-error"
+          className="m-0 mx-4 mb-2 text-center text-meta text-destructive"
+        >
+          {chat.sendError}
+        </p>
+      )}
+      {showText &&
+        chat.unsent?.failed.map((entry) => (
+          <p
+            key={entry.key}
+            data-testid="side-chat-unsent-text"
+            className="m-0 mx-4 mb-2 max-h-40 select-text overflow-y-auto whitespace-pre-wrap wrap-anywhere text-center text-meta text-foreground"
+          >
+            {entry.text}
+          </p>
+        ))}
+    </>
+  );
+}
+
+function Unavailable({ todoId, chat }: { todoId: string; chat: ThreadChat }) {
   const { t } = useI18n();
+  const failedCount = chat.unsent?.failed.length ?? 0;
+  useEffect(() => {
+    if (chat.load === 'missing' && failedCount > 0) {
+      acknowledgeTaskFailed(todoId);
+    }
+  }, [chat.load, failedCount, todoId]);
   return (
     <div
       data-testid="side-chat-unavailable"
       data-state={chat.load}
-      className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center"
+      className="flex flex-1 flex-col"
     >
-      <p
-        className={cn(
-          'm-0 text-ui',
-          chat.load === 'loading' ? 'text-content-tertiary' : 'text-foreground',
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+        <p
+          className={cn(
+            'm-0 text-ui',
+            chat.load === 'loading' ? 'text-content-tertiary' : 'text-foreground',
+          )}
+        >
+          {chat.load === 'loading'
+            ? t('加载中…')
+            : chat.load === 'error'
+              ? t('任务加载失败')
+              : t('任务不存在或已被删除')}
+        </p>
+        {chat.load === 'error' && (
+          <Button size="sm" onClick={chat.retry}>
+            {t('重试')}
+          </Button>
         )}
-      >
-        {chat.load === 'loading'
-          ? t('加载中…')
-          : chat.load === 'error'
-            ? t('任务加载失败')
-            : t('任务不存在或已被删除')}
-      </p>
-      {chat.load === 'error' && (
-        <Button size="sm" onClick={chat.retry}>
-          {t('重试')}
-        </Button>
+      </div>
+      {(chat.sendError != null || failedCount > 0) && (
+        <div className="flex-none pb-4">
+          <UnsentSendNotice chat={chat} showText />
+        </div>
       )}
     </div>
   );
@@ -545,24 +584,7 @@ function ThreadBody({
           />
         </ReportThreadContext.Provider>
       )}
-      {chat.sendError != null && (
-        <p
-          data-testid="side-chat-send-error"
-          className="m-0 mx-4 mb-2 text-center text-meta text-destructive"
-        >
-          {chat.sendError}
-        </p>
-      )}
-      {!takesText &&
-        chat.unsent?.failed.map((entry) => (
-          <p
-            key={entry.key}
-            data-testid="side-chat-unsent-text"
-            className="m-0 mx-4 mb-2 max-h-40 select-text overflow-y-auto whitespace-pre-wrap wrap-anywhere text-center text-meta text-foreground"
-          >
-            {entry.text}
-          </p>
-        ))}
+      <UnsentSendNotice chat={chat} showText={!takesText} />
       {actions.card}
       {chat.send === undefined && (chat.queuedMessages?.length ?? 0) > 0 && (
         <div
@@ -740,7 +762,7 @@ export function SideChat({
             onClose={closeAll}
             {...(docked ? { onCollapse: onClose } : {})}
           />
-          <Unavailable chat={chat} />
+          <Unavailable todoId={todoId} chat={chat} />
         </>
       )}
     </SidePanel>

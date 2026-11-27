@@ -234,7 +234,7 @@ export async function replacingStrandedSend<T>(
     const row = db.select().from(queuedMessage).where(queuedRow).get();
     if (receipt?.message.id !== found.messageId || row === undefined)
       throw new HttpError(409, 'Queued message was already delivered');
-    if (row.content === content) {
+    if (row.content.trim() === content.trim()) {
       db.delete(queuedMessage).where(queuedRow).run();
       noteReplaced(db, row.id);
     }

@@ -1,6 +1,7 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
+import { ApiError } from '../api/client.js';
 import { type ApiMutations, useApiMutations, useSession } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { announceUnsent, dismissUnsent, reportedByOutbox } from '../chief/announce-unsent.js';
@@ -73,6 +74,9 @@ export function liveTaskDelivery(deliver: Deliver): Deliver {
 export function liveTaskSendFailed(t: TFunc): SendFailed {
   return (entry, error, repeat) => {
     taskSendFailed(t)(entry, error);
+    if (error instanceof ApiError && error.status === 404) {
+      taskOutbox.acknowledge(entry.key);
+    }
     if (repeat !== true && entry.task !== undefined && !taskIsWatched(entry.task.todoId))
       announceTaskFailure?.(entry, error);
   };

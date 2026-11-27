@@ -9,6 +9,7 @@ import type { Db } from '../db/client.js';
 import { build, chiefThread, type QuotaWaitRow, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { holdBlockedBuild } from './blockers.js';
+import { claimClientMessage } from './client-message.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyQuotaWait } from './notifications.js';
@@ -142,7 +143,11 @@ export function sweepQuotaWaitSteps(deps: QuotaWaitDeps, now: number = nowMs()):
   return released;
 }
 
-export function retryQuotaWaitNow(deps: QuotaWaitDeps, buildId: string): boolean {
+export function retryQuotaWaitNow(
+  deps: QuotaWaitDeps,
+  buildId: string,
+  clientMessageId?: string,
+): boolean {
   const releasedIds = deps.db.transaction(() => {
     const held = deps.db
       .select({ id: step.id })
@@ -158,6 +163,10 @@ export function retryQuotaWaitNow(deps: QuotaWaitDeps, buildId: string): boolean
       )
       .all();
     if (held.length === 0) return [];
+    claimClientMessage(deps.db, buildId, clientMessageId, {
+      delegated: true,
+      mode: 'quota_resumed',
+    });
     const updated: string[] = [];
     for (const row of held) {
       const res = deps.db

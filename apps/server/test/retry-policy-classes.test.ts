@@ -388,6 +388,38 @@ describe('classified retry policy (permanent / transient / rate_limit / unknown)
       .run();
     const staleRes = await req(stale.s.app, 'POST', `/api/builds/${oldBuildId}/retry-now`, {});
     expect(staleRes.status).toBe(409);
+    expect(await staleRes.json()).toMatchObject({ reason: 'conflict' });
+
+    const quotaReplay = openWorld();
+    const quotaStepRow = quotaReplay.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.id, quotaReplay.stepId))
+      .get()!;
+    quotaReplay.s.db
+      .update(stepTable)
+      .set({
+        status: 'waiting_quota',
+        holdReason: 'quota',
+        holdUntil: nowMs() + 120_000,
+        quotaBlock: quotaStepRow.quotaBlock,
+      })
+      .where(eq(stepTable.id, quotaReplay.stepId))
+      .run();
+    expect(
+      (
+        await req(quotaReplay.s.app, 'POST', `/api/builds/${quotaReplay.buildId}/retry-now`, {
+          clientMessageId: 'idem-quota-1',
+        })
+      ).status,
+    ).toBe(202);
+    expect(
+      (
+        await req(quotaReplay.s.app, 'POST', `/api/builds/${quotaReplay.buildId}/retry-now`, {
+          clientMessageId: 'idem-quota-1',
+        })
+      ).status,
+    ).toBe(202);
 
     const blocked = openWorld();
     const blockerId = newUuidv7();

@@ -104,6 +104,12 @@ export function failedTaskOutbox(entries: readonly OutboxEntry[], todoId: string
   return entries.filter((entry) => entry.task?.todoId === todoId && entry.state === 'failed');
 }
 
+export function acknowledgeTaskFailed(todoId: string): void {
+  for (const entry of failedTaskOutbox(taskOutbox.entries(), todoId)) {
+    taskOutbox.acknowledge(entry.key);
+  }
+}
+
 function retireClearedTaskError(todoId: string, retire: () => void): void {
   const hadFailed = failedTaskOutbox(taskOutbox.entries(), todoId).length > 0;
   retire();
