@@ -2,8 +2,8 @@
   "version": 1,
   "dataset": "cairn-eval-suite",
   "suiteVersion": 1,
-  "date": "2026-11-27T17:19:14.471Z",
-  "sha": "c5d8b6b6481005502aa668dab6fff14bd3bd6f73",
+  "date": "2026-11-27T21:16:40.527Z",
+  "sha": "60a4b7339bcdbcec551b68ba65f164a3ddfcd58d",
   "status": "ok",
   "summary": {
     "total": 96,
