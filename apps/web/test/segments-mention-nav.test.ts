@@ -6,6 +6,7 @@ import { ChatMarkdown } from '../src/detail/chat-markdown.js';
 import { Segments, type TodoGlance, TodoGlanceContext } from '../src/detail/segments.js';
 import type { DocSegment } from '../src/fixtures/records.js';
 import { I18nProvider } from '../src/i18n/provider.js';
+import { stripHtmlTags } from './strip-html-tags.js';
 
 function page(children: ReactNode, glances: ReadonlyMap<string, TodoGlance> | null = null): string {
   return renderToStaticMarkup(
@@ -23,7 +24,7 @@ function render(segments: DocSegment[]): string {
 }
 
 function plain(markup: string): string {
-  return markup.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  return stripHtmlTags(markup).replace(/\s+/g, ' ').trim();
 }
 
 function mention(

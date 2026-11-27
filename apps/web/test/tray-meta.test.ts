@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { TrayHeadMeta } from '../src/tray/tray-meta.js';
 import type { TrayGroup } from '../src/tray/tray-groups.js';
+import { stripHtmlTags } from './strip-html-tags.js';
 
 const TIP = '内存压力 65%；CPU 3%；剩余磁盘 178 GB';
 
@@ -27,12 +28,12 @@ test('the machine meta is one icon and a single percentage, with the details onl
   expect(html).toContain('data-level="full"');
   expect(html).toContain('aria-hidden="true"');
   expect(html).toContain(`title="${TIP}"`);
-  const text = html.replace(/<[^>]+>/g, '');
+  const text = stripHtmlTags(html);
   expect(text).toBe('94%');
 });
 
 test.each(['normal', 'high'] as const)('level %s renders the same bare percentage', (level) => {
   const html = render(meta({ percent: 61, level, warn: level !== 'normal' }));
   expect(html).toContain(`data-level="${level}"`);
-  expect(html.replace(/<[^>]+>/g, '')).toBe('61%');
+  expect(stripHtmlTags(html)).toBe('61%');
 });

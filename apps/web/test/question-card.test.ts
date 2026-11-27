@@ -6,6 +6,7 @@ import { QuestionReceipt } from '../src/chief/question-answered-line.js';
 import { QuestionCard } from '../src/chief/question-card.js';
 import type { ChiefQuestionItem } from '../src/chief/question-item.js';
 import { I18nProvider } from '../src/i18n/provider.js';
+import { stripHtmlTags } from './strip-html-tags.js';
 
 function page(children: ReactNode): string {
   return renderToStaticMarkup(
@@ -15,7 +16,7 @@ function page(children: ReactNode): string {
   );
 }
 
-const text = (html: string) => html.replace(/<[^>]+>/g, '');
+const text = (html: string) => stripHtmlTags(html);
 
 function ask(over: Partial<ChiefQuestionItem['questions'][number]> = {}): ChiefQuestionItem {
   return {

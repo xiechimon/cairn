@@ -5,6 +5,7 @@ import { ApprovalAnswered } from '../src/chief/question-answered-line.js';
 import { QuestionCard } from '../src/chief/question-card.js';
 import type { ChiefQuestionItem } from '../src/chief/question-item.js';
 import { I18nProvider } from '../src/i18n/provider.js';
+import { stripHtmlTags } from './strip-html-tags.js';
 
 const MAIL_CARD = [
   '对外发送：cairn-mail send',
@@ -53,8 +54,7 @@ const render = (item: ChiefQuestionItem, locale: 'zh' | 'en' = 'zh') =>
   inI18n(createElement(QuestionCard, { item, onAnswer: () => {}, onCancel: () => {} }), locale);
 
 const textOf = (html: string) =>
-  html
-    .replace(/<[^>]+>/g, '')
+  stripHtmlTags(html)
     .replaceAll('&gt;', '>')
     .replaceAll('&lt;', '<')
     .replaceAll('&amp;', '&');

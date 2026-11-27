@@ -6,6 +6,7 @@ import { QuestionReceipt } from '../src/chief/question-answered-line.js';
 import { QuestionCard } from '../src/chief/question-card.js';
 import type { ChiefQuestionItem } from '../src/chief/question-item.js';
 import { I18nProvider } from '../src/i18n/provider.js';
+import { stripHtmlTags } from './strip-html-tags.js';
 
 const MARKDOWN_QUESTION =
   '[Fix the flaky test](todo:8gDHUh7VXyUcxh_ZgX29a) can read the repository, but editing `/tmp/dogfood-scratch-repo/test/cli.test.js` fails with EPERM. Can you make it writable?';
@@ -30,7 +31,7 @@ function page(children: ReactNode): string {
 }
 
 function plain(markup: string): string {
-  return markup.replace(/<[^>]+>/g, '');
+  return stripHtmlTags(markup);
 }
 
 describe('question markdown rendering (dogfood)', () => {

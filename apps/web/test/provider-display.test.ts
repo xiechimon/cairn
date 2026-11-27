@@ -15,6 +15,7 @@ import { resolveScenario } from '../src/fixtures/scenario.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 import { ProvidersSection } from '../src/resources/providers-page.js';
 import { providerRowStatus, teamProviderStatusView } from '../src/resources/subscription-detail.js';
+import { stripHtmlTags } from './strip-html-tags.js';
 
 vi.mock('../src/fixtures/scenario.js', { spy: true });
 afterEach(() => vi.restoreAllMocks());
@@ -319,7 +320,7 @@ it.each([
     )?.[1];
     expect(badge).toBe(remaining);
     expect(remaining).toBe(`剩 ${percent}`);
-    expect(row.replace(/<[^>]*>/g, '')).toBe(`${CLAUDE.label}订阅 · ${models.length} 个模型${badge}`);
+    expect(stripHtmlTags(row)).toBe(`${CLAUDE.label}订阅 · ${models.length} 个模型${badge}`);
     expect(row).not.toMatch(/>5h \d+%/);
     expect(row).toContain('data-window="seven_day"');
     expect(row).toContain(`aria-label="每周 剩 ${percent}"`);
@@ -440,7 +441,7 @@ it.each((['claude', 'antigravity', 'devin'] as const).flatMap((vendor) => [
       models,
     );
     expect(row).toMatch(new RegExp(`<svg(?=[^>]*aria-hidden="true")[^>]*class="[^"]*lucide-${icon}[^"]*"`));
-    expect(row.replace(/<[^>]*>/g, '')).toBe(`${CLAUDE.label}订阅 · ${models.length} 个模型`);
+    expect(stripHtmlTags(row)).toBe(`${CLAUDE.label}订阅 · ${models.length} 个模型`);
   }
 });
 
@@ -555,7 +556,7 @@ it.each((['claude', 'antigravity', 'devin'] as const).flatMap((vendor) => [
   const { row } = renderAccount({ ...CLAUDE, vendor, state, label: 'Claude' });
   const label = row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1];
   expect(label).toBe(`Claude 订阅 · 0 个模型${status}`);
-  expect(row.replace(/<[^>]*>/g, '')).toBe('Claude订阅 · 0 个模型');
+  expect(stripHtmlTags(row)).toBe('Claude订阅 · 0 个模型');
 });
 
 it.each(['claude', 'antigravity', 'devin'] as const)(
@@ -568,7 +569,7 @@ it.each(['claude', 'antigravity', 'devin'] as const)(
     expect(name).toBe(`Work subscription 订阅 · 0 个模型 ${status}`);
     expect(name?.match(/0 个模型/g)).toHaveLength(1);
     expect(row).toContain('data-status="warn"');
-    expect(row.replace(/<[^>]*>/g, '')).toBe('Work subscription订阅 · 0 个模型');
+    expect(stripHtmlTags(row)).toBe('Work subscription订阅 · 0 个模型');
   },
 );
 
@@ -611,7 +612,7 @@ it('keeps the visible version in the accessible row name without adding status t
     onSelect: () => undefined,
   });
   expect(row).toContain('aria-label="Versioned provider v1.2.3 API key · 1 model Available"');
-  expect(row.replace(/<[^>]*>/g, '')).toBe('Versioned providerv1.2.3API key · 1 model');
+  expect(stripHtmlTags(row)).toBe('Versioned providerv1.2.3API key · 1 model');
 });
 
 it.each([false, true])('keeps off row text at full opacity when selected=%s', (selected) => {

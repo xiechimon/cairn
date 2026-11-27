@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { QuotaNotice } from '../src/board/quota-notice.js';
 import { I18nProvider } from '../src/i18n/provider.js';
+import { stripHtmlTags } from './strip-html-tags.js';
 
 describe('QuotaNotice', () => {
   test('sums counts across multiple groups instead of reporting group count', () => {
@@ -31,6 +32,6 @@ describe('QuotaNotice', () => {
         }),
       }),
     );
-    expect(html.replace(/<[^>]+>/g, '')).toContain('5 个任务因额度/限流挂起');
+    expect(stripHtmlTags(html)).toContain('5 个任务因额度/限流挂起');
   });
 });
