@@ -251,6 +251,7 @@ test('preflight and push-queue stamp unowned commits with the same machine lane'
     mkdirSync(join(work, 'scripts/ops'), { recursive: true });
     for (const file of [
       'ops/preflight-fast-gate.mjs',
+      'ops/revert-guard.mjs',
       'test-admission.mjs',
       'heavy-slots.mjs',
       'owned-process.mjs',
@@ -307,16 +308,18 @@ console.log(JSON.stringify(isCheckRuns ? [{ check_runs: [] }] : { workflow_runs:
     mkdirSync(home, { recursive: true });
 
     const preflightScript = join(dirname(fileURLToPath(import.meta.url)), 'preflight.mjs');
-    const run = spawnSync(process.execPath, [preflightScript], {
-      cwd: work,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        PATH: `${bin}:${process.env.PATH}`,
-        HOME: home,
-        CAIRN_PREFLIGHT_GATE_WRAPPER: '',
-      },
-    });
+    const preflightRun = () =>
+      spawnSync(process.execPath, [preflightScript], {
+        cwd: work,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          HOME: home,
+          CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+        },
+      });
+    const run = preflightRun();
     assert.equal(run.status, 0, run.stderr);
     const body = git(work, ['log', '-1', '--format=%B', 'HEAD']);
     const id = readFileSync(join(home, '.config/cairn-dev/lane-machine-id'), 'utf8').trim();
@@ -345,6 +348,13 @@ console.log(JSON.stringify(isCheckRuns ? [{ check_runs: [] }] : { workflow_runs:
       new RegExp(`^Lane: ${lane}$`, 'm'),
     );
     assert.equal(git(work, ['ls-remote', 'origin', 'refs/heads/enqueue/*']), '');
+
+    git(work, ['rm', '-q', 'scripts/stub-gate.mjs']);
+    git(work, ['commit', '-qm', 'accidentally drop stub gate']);
+    const reverted = preflightRun();
+    assert.notEqual(reverted.status, 0);
+    assert.match(reverted.stderr, /undeclared revert/);
+    assert.equal(git(work, ['ls-remote', 'origin', preflightRef(lane)]).split(/\s+/)[0], headSha);
   } finally {
     releaseTestTempDir(root);
   }

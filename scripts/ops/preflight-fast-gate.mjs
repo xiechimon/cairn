@@ -11,6 +11,7 @@ import { hasCode, needsGates, prepushPlan, testsRead } from '../prepush.mjs';
 import { scrubGitEnv } from '../scrub-git-env.mjs';
 import { heavyRunAuthorized } from '../test-admission.mjs';
 
+const REVERT_GUARD_STEP = ['node', 'scripts/ops/revert-guard.mjs'];
 const CHEAP_CHECKS_FLAG = '--cheap-checks';
 const CHEAP_CHECKS_STEP = ['node', 'scripts/ops/preflight-fast-gate.mjs', CHEAP_CHECKS_FLAG];
 const COULD_NOT_RUN = 2;
@@ -294,7 +295,7 @@ export function fastGatePlan(paths, lastFailedTests = []) {
   if (lastFailedTests.length > 0) {
     plan.unshift(['pnpm', 'exec', 'vitest', 'run', ...lastFailedTests]);
   }
-  return [CHEAP_CHECKS_STEP, STATIC_REGRESSION_STEP, ...plan];
+  return [REVERT_GUARD_STEP, CHEAP_CHECKS_STEP, STATIC_REGRESSION_STEP, ...plan];
 }
 
 export function lastFailedCachePath(cwd, gitExec = git) {

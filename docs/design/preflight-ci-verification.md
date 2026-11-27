@@ -27,8 +27,15 @@ A lane verifies on GitHub before it enters the landing queue:
   live queue candidate.
 - `scripts/ops/preflight.mjs` runs `scripts/ops/preflight-fast-gate.mjs` on
   the exact committed `HEAD` tree before pushing `refs/heads/preflight/<lane>`
-  (CI's cheap checks, `pnpm lint`, touched-package `typecheck`, and
-  `pnpm test:changed`), and refuses to push if it fails. The cheap checks and
+  (revert guard, CI's cheap checks, `pnpm lint`, touched-package `typecheck`,
+  and `pnpm test:changed`), and refuses to push if it fails. The revert guard
+  (`scripts/ops/revert-guard.mjs`) checks every path changed against
+  `merge-base(origin/main, HEAD)` and refuses heads whose resulting file blob
+  or absence matches a pre-change state from the last 50 first-parent
+  `origin/main` commits unless declared by `git revert <sha>`
+  (`This reverts commit <sha>`) or a `Revert-landed: <path> - <reason>` commit
+  trailer (non-hollow multi-word reason, no wildcards); missing `origin/main`
+  or unreadable history exits `2`. The cheap checks and
   their conditions are read from `.github/workflows/ci.yml` at that `HEAD`,
   with `pnpm prepush --ci` expanded to its own plan: a node script named
   `*-gate` or `*-ledger`, or run with `--check`, is run unless CI marks the step

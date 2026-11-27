@@ -46,8 +46,9 @@ test('typecheck package selection follows package blast radius', () => {
   ]);
 });
 
-test('fast gate plan is biome, touched package typechecks, then changed tests', () => {
+test('fast gate plan is revert guard, cheap checks, static regression, biome, touched package typechecks, then changed tests', () => {
   assert.deepEqual(fastGatePlan(['apps/web/src/App.tsx', 'apps/server/src/index.ts']), [
+    REVERT_GUARD_STEP,
     CHEAP_STEP,
     ['node', 'scripts/regression-inversion-gate.mjs', '--mode', 'static'],
     ['pnpm', 'lint'],
@@ -153,7 +154,7 @@ test('CAIRN_PREFLIGHT_GATE_WRAPPER runs the full fast-gate plan in one sh -c cal
       '--',
       'sh',
       '-c',
-      'node scripts/ops/preflight-fast-gate.mjs --cheap-checks && node scripts/regression-inversion-gate.mjs --mode static && pnpm lint && pnpm --filter @cairn/web typecheck && pnpm test:changed',
+      'node scripts/ops/revert-guard.mjs && node scripts/ops/preflight-fast-gate.mjs --cheap-checks && node scripts/regression-inversion-gate.mjs --mode static && pnpm lint && pnpm --filter @cairn/web typecheck && pnpm test:changed',
     ],
     options: { cwd: '/wt', stdio: 'inherit' },
   });
@@ -173,6 +174,7 @@ test('CAIRN_PREFLIGHT_GATE_WRAPPER runs the full fast-gate plan in one sh -c cal
 
 test('fastGatePlan puts previously failed vitest files first and runFastGate clears cache on pass', () => {
   assert.deepEqual(fastGatePlan(['apps/web/src/App.tsx'], ['apps/web/test/remote-host.test.ts']), [
+    REVERT_GUARD_STEP,
     CHEAP_STEP,
     ['node', 'scripts/regression-inversion-gate.mjs', '--mode', 'static'],
     ['pnpm', 'exec', 'vitest', 'run', 'apps/web/test/remote-host.test.ts'],
@@ -209,6 +211,7 @@ test('fastGatePlan puts previously failed vitest files first and runFastGate cle
     });
     assert.equal(failFirst.ok, false);
     assert.deepEqual(calls, [
+      REVERT_GUARD_STEP.join(' '),
       CHEAP_STEP.join(' '),
       'node scripts/regression-inversion-gate.mjs --mode static',
       `pnpm exec vitest run ${testRel}`,
@@ -272,6 +275,7 @@ test('cached failures that this machine refuses to run together do not block the
   }
 });
 
+const REVERT_GUARD_STEP = ['node', 'scripts/ops/revert-guard.mjs'];
 const CHEAP_STEP = ['node', 'scripts/ops/preflight-fast-gate.mjs', '--cheap-checks'];
 const CI_TEXT = readFileSync(join(import.meta.dirname, '../../.github/workflows/ci.yml'), 'utf8');
 const selected = (paths, workflow = CI_TEXT) =>
