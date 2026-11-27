@@ -23,6 +23,7 @@ import {
 
 export const COMPACTION_RESERVE_TOKENS = 16_384;
 export const KEEP_RECENT_TOKENS = 8_000;
+export const MIN_COMPACTION_MARGIN_TOKENS = 32_768;
 const TOOL_ARGS_CHARS = 200;
 const SUMMARY_MEMO = 'cairn-c2-summary';
 const FLUSH_MEMO = 'cairn-c4-memory-flush';
@@ -49,7 +50,10 @@ export function compactionWindow(contextWindow: number): CompactionWindow {
   const blockingAt = contextWindow - COMPACTION_RESERVE_TOKENS;
   return {
     blockingAt,
-    backgroundAt: Math.min(COORDINATOR_COMPACT_AT, Math.floor(blockingAt / 2)),
+    backgroundAt: Math.min(
+      COORDINATOR_COMPACT_AT,
+      Math.max(blockingAt - MIN_COMPACTION_MARGIN_TOKENS, Math.floor(blockingAt / 2)),
+    ),
   };
 }
 

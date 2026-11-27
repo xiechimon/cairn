@@ -4,6 +4,7 @@ import {
   type AgentSessionEventLike,
   mapPiSessionEvent,
   newMapState,
+  noteSessionRuntime,
   PI_CAPABILITIES,
 } from '../src/backend/pi.js';
 
@@ -414,6 +415,107 @@ describe('mapPiSessionEvent (AgentSessionEvent → StepEvent projection)', () =>
   test('toolResult role projected to the message vocabulary (system/user/assistant, r5 §3.6)', () => {
     const out = map({ type: 'message_end', message: { role: 'toolResult', content: 'r' } });
     expect((out[0] as { message: { role: string } }).message.role).toBe('system');
+  });
+});
+
+describe('session model window on the usage rows', () => {
+  const note = (
+    state: ReturnType<typeof newMapState>,
+    provider: string,
+    id: string,
+    contextWindow: number,
+  ) => noteSessionRuntime(state, { provider, id, contextWindow }, { reserveTokens: 16_384 });
+
+  const endFor = (model: string, usage: Record<string, number>): AgentSessionEventLike => ({
+    type: 'message_end',
+    message: {
+      role: 'assistant',
+      provider: 'gw',
+      model,
+      stopReason: 'stop',
+      usage,
+    },
+  });
+
+  test('the running model window and compact point ride the matching usage row, re-read at each recording', () => {
+    const state = newMapState();
+    note(state, 'gw', 'stub-model', 128_000);
+    map(endFor('stub-model', { input: 12, output: 980, cacheRead: 100, cacheWrite: 50 }), state);
+    const done = map({ type: 'agent_settled' }, state);
+    expect(done).toEqual([
+      {
+        type: 'done',
+        usage: [
+          {
+            model: 'gw/stub-model',
+            input: 12,
+            output: 980,
+            cacheRead: 100,
+            cacheWrite: 50,
+            contextTokens: 1_142,
+            contextWindow: 128_000,
+            compactAt: 111_616,
+          },
+        ],
+      },
+    ]);
+    note(state, 'gw', 'switched-model', 200_000);
+    map(endFor('switched-model', { input: 5, output: 1, cacheRead: 0, cacheWrite: 0 }), state);
+    const switched = map({ type: 'agent_settled' }, state);
+    expect(switched).toEqual([
+      {
+        type: 'done',
+        usage: [
+          {
+            model: 'gw/stub-model',
+            input: 12,
+            output: 980,
+            cacheRead: 100,
+            cacheWrite: 50,
+            contextWindow: 128_000,
+            compactAt: 111_616,
+          },
+          {
+            model: 'gw/switched-model',
+            input: 5,
+            output: 1,
+            cacheRead: 0,
+            cacheWrite: 0,
+            contextTokens: 6,
+            contextWindow: 200_000,
+            compactAt: 183_616,
+          },
+        ],
+      },
+    ]);
+  });
+
+  test('a runtime for another model or an unregistered one stays off the row', () => {
+    const state = newMapState();
+    note(state, 'gw', 'm1', 200_000);
+    map(endFor('other', { input: 5, output: 1, cacheRead: 0, cacheWrite: 0 }), state);
+    const done = map({ type: 'agent_settled' }, state);
+    expect(done[0]).toMatchObject({ type: 'done' });
+    expect((done[0] as { usage: { contextWindow?: number }[] }).usage[0]).not.toHaveProperty(
+      'contextWindow',
+    );
+    expect((done[0] as { usage: { compactAt?: number }[] }).usage[0]).not.toHaveProperty(
+      'compactAt',
+    );
+  });
+
+  test('a non-positive window records nothing, and a window at or below the reserve carries no compact point', () => {
+    const state = newMapState();
+    note(state, 'gw', 'zero', 0);
+    note(state, 'gw', 'tiny', 16_000);
+    map(endFor('tiny', { input: 5, output: 1, cacheRead: 0, cacheWrite: 0 }), state);
+    const done = map({ type: 'agent_settled' }, state);
+    expect((done[0] as { usage: { contextWindow?: number }[] }).usage[0]).toMatchObject({
+      contextWindow: 16_000,
+    });
+    expect((done[0] as { usage: { compactAt?: number }[] }).usage[0]).not.toHaveProperty(
+      'compactAt',
+    );
   });
 });
 

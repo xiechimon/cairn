@@ -562,6 +562,7 @@ export interface MapState {
   promptSentAt?: number;
   firstToken?: { model: string; ms: number };
   lastContext?: { model: string; tokens: number };
+  runtimes: Map<string, { contextWindow: number; compactAt?: number }>;
 }
 
 export const FIRST_TOKEN_EVENTS: ReadonlySet<string> = new Set([
@@ -609,8 +610,23 @@ export function newMapState(opts?: {
     usage: new Map(),
     calls: new Map(),
     now: opts?.now ?? (() => performance.now()),
+    runtimes: new Map(),
     ...(opts?.diagnose !== undefined ? { diagnose: opts.diagnose } : {}),
   };
+}
+
+export function noteSessionRuntime(
+  state: MapState,
+  model: { provider: string; id: string; contextWindow: number },
+  compaction?: { reserveTokens: number },
+): void {
+  if (model.contextWindow <= 0) return;
+  const compactAt =
+    compaction === undefined ? undefined : model.contextWindow - compaction.reserveTokens;
+  state.runtimes.set(`${model.provider}/${model.id}`, {
+    contextWindow: model.contextWindow,
+    ...(compactAt !== undefined && compactAt > 0 ? { compactAt } : {}),
+  });
 }
 
 function toMessageRecord(msg: PiMessageLike): {
@@ -775,12 +791,19 @@ function contextTokensOf(msg: PiMessageLike): number {
 
 function settledUsage(state: MapState): ModelUsage[] {
   const first = state.firstToken;
-  const context = state.lastContext;
   return [...state.usage.values()].map((u) => ({
     ...u,
     ...(first !== undefined && u.model === first.model ? { ttftMs: first.ms } : {}),
-    ...(context !== undefined && u.model === context.model
-      ? { contextTokens: context.tokens }
+    ...(state.lastContext !== undefined && u.model === state.lastContext.model
+      ? { contextTokens: state.lastContext.tokens }
+      : {}),
+    ...(state.runtimes.get(u.model) !== undefined
+      ? {
+          contextWindow: state.runtimes.get(u.model)?.contextWindow,
+          ...(state.runtimes.get(u.model)?.compactAt !== undefined
+            ? { compactAt: state.runtimes.get(u.model)?.compactAt }
+            : {}),
+        }
       : {}),
   }));
 }
@@ -828,6 +851,21 @@ export class PiSessionHandle implements AgentSessionHandle {
         this.onCompactionLog?.(`compaction failed: ${raw.errorMessage}`);
       }
       if (this.spans !== undefined) recordPiSpanEvent(this.spans, raw);
+      if (
+        raw.type === 'message_end' &&
+        raw.message?.role === 'assistant' &&
+        raw.message.usage !== undefined &&
+        raw.message.provider !== undefined &&
+        raw.message.model !== undefined
+      ) {
+        const current = this.session.model;
+        if (current !== undefined)
+          noteSessionRuntime(
+            this.state,
+            current,
+            this.session.settingsManager.getCompactionSettings(current),
+          );
+      }
       for (const mapped of mapPiSessionEvent(raw, this.state)) {
         if (this.stopping && mapped.type === 'done') continue;
         this.queue.push(mapped);

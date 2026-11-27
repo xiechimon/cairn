@@ -34,10 +34,19 @@ afterEach(() => {
 const user = (text: string): Message => ({ role: 'user', content: text, timestamp: 1 });
 
 describe('compaction policy', () => {
-  it('starts background folds at 150k and leaves blocking at the edge of the window', () => {
+  it('starts background folds at 150k whenever it fits below blocking, the half value only when it wins the max', () => {
     expect(compactionWindow(1_000_000)).toEqual({ blockingAt: 983_616, backgroundAt: 150_000 });
-    expect(compactionWindow(200_000)).toEqual({ blockingAt: 183_616, backgroundAt: 91_808 });
+    expect(compactionWindow(200_000)).toEqual({ blockingAt: 183_616, backgroundAt: 150_000 });
+    expect(compactionWindow(199_152)).toEqual({ blockingAt: 182_768, backgroundAt: 150_000 });
+    expect(compactionWindow(180_000)).toEqual({ blockingAt: 163_616, backgroundAt: 130_848 });
+    expect(compactionWindow(65_536)).toEqual({ blockingAt: 49_152, backgroundAt: 24_576 });
     expect(compactionWindow(32_000)).toEqual({ blockingAt: 15_616, backgroundAt: 7_808 });
+    for (const window of [32_000, 65_536, 80_000, 150_000, 165_000, 180_000, 200_000]) {
+      const { blockingAt, backgroundAt } = compactionWindow(window);
+      expect(backgroundAt).toBeLessThan(blockingAt);
+      expect(backgroundAt).toBeLessThanOrEqual(150_000);
+      expect(backgroundAt).toBeGreaterThan(0);
+    }
     const settings = coordinatorCompactionSettings([
       { provider: 'anthropic', id: 'claude-haiku-5-5', contextWindow: 1_000_000 },
     ]);
