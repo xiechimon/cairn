@@ -5,6 +5,7 @@ import {
   chief,
   chiefMessage,
   chiefThread,
+  machine,
   project as projectTable,
   schedule,
   step,
@@ -12,8 +13,10 @@ import {
 } from '../src/db/schema.js';
 import { coordinatorThreadRow, ensureChief } from '../src/services/chief.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
-import { finishCoordinatorTurn } from '../src/services/coordinator-steps.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
+import { chiefTurnContext, finishCoordinatorTurn } from '../src/services/coordinator-steps.js';
 import type { DueClock } from '../src/services/due-events.js';
+import { claimStep } from '../src/services/machine-claim.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
 import { runScheduleNow } from '../src/services/schedule-run.js';
 import { fireScheduleWebhook } from '../src/services/schedule-webhook.js';
@@ -607,5 +610,79 @@ describe('Coordinator-thread scheduling', () => {
     s.db.update(schedule).set({ nextRunAt: clock.now() }).where(eq(schedule.id, doomed.id)).run();
     await scheduler.tick(clock.now());
     expect(s.db.select().from(schedule).where(eq(schedule.id, doomed.id)).get()).toBeUndefined();
+  });
+
+  test('scheduled turn uses schedule timezone instead of server timezone, with fallback on missing or invalid tz', async () => {
+    const start = Date.UTC(2026, 10, 27, 0, 50, 0);
+    const { s, deps, clock, scheduler, threadRow } = setupWorld(start);
+    setCoordinatorInServer(false);
+    scheduler.start();
+
+    const shanghai = createSchedule(s.svc, {
+      teamId: s.team.id,
+      chiefThreadId: threadRow.id,
+      kind: 'daily',
+      at: Date.UTC(2026, 10, 27, 1, 0, 0),
+      tz: 'Asia/Shanghai',
+      prompt: '汇报上海时间',
+      createdBy: s.user.id,
+    });
+    const la = createSchedule(s.svc, {
+      teamId: s.team.id,
+      chiefThreadId: threadRow.id,
+      kind: 'daily',
+      at: Date.UTC(2026, 10, 27, 1, 0, 0),
+      tz: 'America/Los_Angeles',
+      prompt: 'Report LA time',
+      createdBy: s.user.id,
+    });
+
+    await clock.advance(10 * 60_000);
+    const steps = s.db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, threadRow.id), eq(step.kind, 'chief')))
+      .all();
+    expect(steps).toHaveLength(1);
+    const stepRow = steps[0]!;
+    const machineRow = s.db.select().from(machine).where(eq(machine.teamId, s.team.id)).get()!;
+
+    const shanghaiCtx = chiefTurnContext(
+      deps,
+      { ...stepRow, scheduleId: shanghai.id },
+      threadRow,
+      null,
+    );
+    expect(shanghaiCtx.instruction).toContain('Now: 2026-11-27 09:00, Friday (Asia/Shanghai)');
+
+    const laCtx = chiefTurnContext(deps, { ...stepRow, scheduleId: la.id }, threadRow, null);
+    expect(laCtx.instruction).toContain('Now: 2026-11-26 17:00, Thursday (America/Los_Angeles)');
+
+    const unscheduledCtx = chiefTurnContext(
+      deps,
+      { ...stepRow, scheduleId: null },
+      threadRow,
+      null,
+    );
+    expect(unscheduledCtx.instruction).toContain(`(${serverTimezone()})`);
+
+    const missingCtx = chiefTurnContext(
+      deps,
+      { ...stepRow, scheduleId: 'missing-schedule-id' },
+      threadRow,
+      null,
+    );
+    expect(missingCtx.instruction).toContain(`(${serverTimezone()})`);
+
+    s.db.update(schedule).set({ tz: 'Invalid/Timezone' }).where(eq(schedule.id, la.id)).run();
+    const invalidCtx = chiefTurnContext(deps, { ...stepRow, scheduleId: la.id }, threadRow, null);
+    expect(invalidCtx.instruction).toContain(`(${serverTimezone()})`);
+
+    const claimed = await claimStep(deps, machineRow.id, s.team.id, 10, 'http://localhost');
+    expect(claimed?.instruction).toContain(
+      stepRow.scheduleId === shanghai.id
+        ? 'Now: 2026-11-27 09:00, Friday (Asia/Shanghai)'
+        : `(${serverTimezone()})`,
+    );
   });
 });

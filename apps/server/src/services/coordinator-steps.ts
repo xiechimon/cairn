@@ -36,6 +36,7 @@ import {
   devinSubscription,
   provider,
   type StepRanModel,
+  schedule,
   step,
   stepUsage,
   todo,
@@ -77,7 +78,7 @@ import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
 import { reportAnsweredIn, reportRefCurrent, reportRefOfPrompt } from './report-turn.js';
 import { coordinatorProfile } from './routing-rules.js';
-import { finishScheduledStep } from './schedules.js';
+import { finishScheduledStep, isValidTimezone, serverTimezone } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
 import { setTodoPhase } from './todos.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
@@ -210,6 +211,7 @@ function foldQueuedChiefSteps(db: MachineDeps['db'], head: StepRow, now: number)
     const foldable =
       row.status === 'pending' &&
       row.prompt !== null &&
+      row.scheduleId === null &&
       (row.ownerMessageIds ?? []).length > 0 &&
       row.holdReason === null &&
       (row.holdUntil === null || row.holdUntil <= now) &&
@@ -239,18 +241,33 @@ function foldQueuedChiefSteps(db: MachineDeps['db'], head: StepRow, now: number)
     .run();
 }
 
-function nowNote(at: number): string {
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+function scheduleTimeZoneOfStep(db: Db, scheduleId: string | null): string {
+  const fallback = serverTimezone();
+  if (scheduleId === null) return fallback;
+  const tz = db
+    .select({ tz: schedule.tz })
+    .from(schedule)
+    .where(eq(schedule.id, scheduleId))
+    .get()?.tz;
+  return tz !== undefined && isValidTimezone(tz) ? tz : fallback;
+}
+
+function nowNote(at: number, timeZone: string): string {
   const date = new Date(at);
   const stamp = date.toLocaleString('sv-SE', { timeZone, dateStyle: 'short', timeStyle: 'short' });
   const weekday = date.toLocaleDateString('en-US', { timeZone, weekday: 'long' });
   return `Now: ${stamp}, ${weekday} (${timeZone})`;
 }
 
-function turnStateSection(deps: MachineDeps, threadRow: ThreadRow, at: number): string {
+function turnStateSection(
+  deps: MachineDeps,
+  stepRow: StepRow,
+  threadRow: ThreadRow,
+  at: number,
+): string {
   return [
     TURN_STATE_OPEN,
-    nowNote(at),
+    nowNote(at, scheduleTimeZoneOfStep(deps.db, stepRow.scheduleId)),
     coordinatorTurnState(deps, threadRow.teamId, threadRow.projectId),
     '</turn_state>',
   ].join('\n');
@@ -455,7 +472,7 @@ export function chiefTurnContext(
           ],
         )
       : null;
-  const state = ctx ? turnStateSection(deps, threadRow, nowMs()) : '';
+  const state = ctx ? turnStateSection(deps, stepRow, threadRow, nowMs()) : '';
   const replyLanguage = ctx
     ? replyLanguageOf(replyLanguageWords(deps.db, stepRow, threadRow))
     : null;

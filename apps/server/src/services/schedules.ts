@@ -53,6 +53,19 @@ export function serverTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+export function isValidTimezone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function assertValidTimezone(tz: string): void {
+  if (!isValidTimezone(tz)) throw new HttpError(400, 'invalid schedule timezone');
+}
+
 export function wallClockParts(
   atMs: number,
   tz: string,
@@ -282,11 +295,7 @@ export function createSchedule(
     chiefThreadId = threadRow.id;
   }
   const tz = input.tz ?? serverTimezone();
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz }).format();
-  } catch {
-    throw new HttpError(400, 'invalid schedule timezone');
-  }
+  assertValidTimezone(tz);
   if (input.kind === 'once' && !options.allowAnyMinute) assertMinuteStep(input.at, tz);
   const now = nowMs();
   const id = newRecordId();
@@ -373,11 +382,7 @@ export function updateSchedule(
     throw new HttpError(400, 'Coordinator-thread schedule requires non-empty prompt');
   }
   const tz = input.tz ?? existing.tz;
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz }).format();
-  } catch {
-    throw new HttpError(400, 'invalid schedule timezone');
-  }
+  assertValidTimezone(tz);
   if (input.kind === 'once' && !options.allowAnyMinute) assertMinuteStep(input.at, tz);
   const now = nowMs();
   const at = input.at ?? null;
