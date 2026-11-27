@@ -298,31 +298,59 @@ const apiArg = args.find((a) => a.includes('head_sha=')) || '';
 const sha = (apiArg.match(/head_sha=([0-9a-f]+)/) || [])[1] || '';
 const id = require('node:fs').readFileSync(process.env.HOME + '/.config/cairn-dev/lane-machine-id', 'utf8').trim();
 const branch = 'preflight/' + id + '/wt';
-const isCheckRuns = args.some((a) => a.includes('/check-runs'));
-console.log(JSON.stringify(isCheckRuns ? [{ check_runs: [] }] : { workflow_runs: [{ name: 'ci', head_sha: sha, head_branch: branch, html_url: 'https://example/run/1' }] }));
+const checkRunsSha = args.join(' ').match(/commits\\/([0-9a-f]+)\\/check-runs/)?.[1];
+const git = (...a) => require('node:child_process').execFileSync('git', a, { encoding: 'utf8' }).trim();
+const during = process.env.STUB_COMMIT_DURING;
+const queries = { wait: 'status=queued', lookup: 'head_sha=', watch: 'watch' };
+if (queries[during] && args.some((a) => a.includes(queries[during]))) {
+  if (git('log', '-1', '--format=%s') !== 'during ' + during) git('commit', '-q', '--allow-empty', '-m', 'during ' + during);
+}
+if (during === 'gate' && args.some((a) => a.includes('status=queued'))) {
+  console.error('asked for a CI slot for a HEAD that had already moved');
+}
+let checkRuns = [];
+if (process.env.STUB_QUEUE && checkRunsSha && git('ls-remote', 'origin', 'refs/heads/preflight/*').startsWith(checkRunsSha)) {
+  if (git('log', '-1', '--format=%s', checkRunsSha) === 'reworded after arming') {
+    checkRuns = ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({ name, conclusion: 'success' }));
+  } else if (git('log', '-1', '--format=%s') !== 'reworded after arming') {
+    git('commit', '-q', '--allow-empty', '-m', 'reworded after arming');
+  }
+}
+if (process.env.STUB_QUEUE && args.some((a) => a.endsWith('/dispatches'))) {
+  git('push', '-q', '--no-follow-tags', 'origin', 'HEAD:refs/heads/main');
+}
+console.log(JSON.stringify(checkRunsSha ? [{ check_runs: checkRuns }] : { workflow_runs: [{ id: 1, name: 'ci', head_sha: sha, head_branch: branch, html_url: 'https://example/run/1', status: 'completed', conclusion: 'success' }] }));
 `,
     );
     chmodSync(ghStub, 0o755);
     const pnpmStub = join(bin, 'pnpm');
-    writeFileSync(pnpmStub, '#!/bin/sh\nexit 0\n');
+    writeFileSync(
+      pnpmStub,
+      '#!/bin/sh\nif [ "$STUB_COMMIT_DURING $1" = "gate lint" ]; then git commit -q --allow-empty -m "during gate"; fi\n',
+    );
     chmodSync(pnpmStub, 0o755);
     const home = join(root, 'home');
     mkdirSync(home, { recursive: true });
 
     const preflightScript = join(dirname(fileURLToPath(import.meta.url)), 'preflight.mjs');
-    const preflightRun = () =>
-      spawnSync(process.execPath, [preflightScript], {
+    const stubbedEnv = (extraEnv) => ({
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      HOME: home,
+      CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+      ...extraEnv,
+    });
+    const preflight = (extraEnv, args = []) =>
+      spawnSync(process.execPath, [preflightScript, ...args], {
         cwd: work,
         encoding: 'utf8',
-        env: {
-          ...process.env,
-          PATH: `${bin}:${process.env.PATH}`,
-          HOME: home,
-          CAIRN_PREFLIGHT_GATE_WRAPPER: '',
-        },
+        env: stubbedEnv(extraEnv),
       });
-    const run = preflightRun();
+    git(work, ['config', 'push.followTags', 'true']);
+    git(work, ['tag', '-a', '-m', 'never gated', 'local-only', 'main']);
+    const run = preflight({});
     assert.equal(run.status, 0, run.stderr);
+    assert.equal(git(work, ['ls-remote', '--tags', 'origin']), '');
     const body = git(work, ['log', '-1', '--format=%B', 'HEAD']);
     const id = readFileSync(join(home, '.config/cairn-dev/lane-machine-id'), 'utf8').trim();
     const lane = `${id}/wt`;
@@ -351,12 +379,68 @@ console.log(JSON.stringify(isCheckRuns ? [{ check_runs: [] }] : { workflow_runs:
     );
     assert.equal(git(work, ['ls-remote', 'origin', 'refs/heads/enqueue/*']), '');
 
+    const remotePreflight = () =>
+      git(work, ['ls-remote', 'origin', preflightRef(lane)]).split(/\s+/)[0];
+    for (const moment of ['gate', 'wait']) {
+      const moved = preflight({ STUB_COMMIT_DURING: moment });
+      assert.equal(moved.status, 1, `${moment}: ${moved.stderr}`);
+      assert.match(moved.stderr, /HEAD moved/);
+      assert.doesNotMatch(moved.stderr, /already moved/);
+      assert.equal(git(work, ['log', '-1', '--format=%s', 'HEAD']), `during ${moment}`);
+      assert.equal(remotePreflight(), headSha);
+    }
+
+    for (const [moment, args] of [
+      ['lookup', []],
+      ['watch', ['--wait']],
+    ]) {
+      const moved = preflight({ STUB_COMMIT_DURING: moment }, args);
+      assert.equal(moved.status, 1, `${moment}: ${moved.stdout}${moved.stderr}`);
+      assert.match(moved.stderr, /HEAD moved/);
+      assert.doesNotMatch(moved.stdout, /push-queue will accept|rerun with --wait/);
+    }
+
+    const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+    const gitStub = join(bin, 'git');
+    writeFileSync(
+      gitStub,
+      `#!/bin/sh\nif [ "$STUB_COMMIT_DURING $1" = "push push" ]; then '${realGit}' commit -q --allow-empty -m "during push"; fi\nexec '${realGit}' "$@"\n`,
+    );
+    chmodSync(gitStub, 0o755);
+    const movedAtPush = preflight({ STUB_COMMIT_DURING: 'push' });
+    assert.equal(movedAtPush.status, 1, movedAtPush.stderr);
+    assert.equal(git(work, ['log', '-1', '--format=%s', 'HEAD']), 'during push');
+    assert.equal(remotePreflight(), git(work, ['rev-parse', 'HEAD~1']));
+
+    const waited = spawnSync(
+      process.execPath,
+      [join(dirname(fileURLToPath(import.meta.url)), 'push-queue.mjs'), '--wait'],
+      {
+        cwd: work,
+        encoding: 'utf8',
+        env: stubbedEnv({
+          STUB_QUEUE: '1',
+          PUSH_QUEUE_POLL_SECONDS: '0.1',
+          PUSH_QUEUE_WAIT_MINUTES: '3',
+        }),
+      },
+    );
+    const reworded = git(work, ['rev-parse', 'HEAD']);
+    assert.equal(waited.status, 0, `${waited.stdout}${waited.stderr}`);
+    assert.equal(git(work, ['log', '-1', '--format=%s', reworded]), 'reworded after arming');
+    assert.match(
+      git(work, ['ls-remote', 'origin', 'refs/heads/enqueue/*']),
+      new RegExp(`^${reworded}\\s`),
+    );
+    assert.equal(git(work, ['ls-remote', '--tags', 'origin']), '');
+
+    const beforeRevert = remotePreflight();
     git(work, ['rm', '-q', 'scripts/stub-gate.mjs']);
     git(work, ['commit', '-qm', 'accidentally drop stub gate']);
-    const reverted = preflightRun();
+    const reverted = preflight({});
     assert.notEqual(reverted.status, 0);
     assert.match(reverted.stderr, /undeclared revert/);
-    assert.equal(git(work, ['ls-remote', 'origin', preflightRef(lane)]).split(/\s+/)[0], headSha);
+    assert.equal(remotePreflight(), beforeRevert);
   } finally {
     releaseTestTempDir(root);
   }

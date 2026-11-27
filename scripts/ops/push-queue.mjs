@@ -288,7 +288,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
 
   let cachedRebase = { head: null, result: { ok: false } };
   if (wait) {
-    let armedTree = null;
+    let armedSha = null;
     for (;;) {
       if (Date.now() > deadline) {
         console.error(
@@ -327,7 +327,17 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         rebaseOk = cachedRebase.result.ok;
       }
       if (ev.ok || rebaseOk) break;
-      if (headTree !== armedTree) {
+      if (head !== armedSha) {
+        const stamped = stampUnownedCommits({
+          lane: localLane(git(['rev-parse', '--show-toplevel'])),
+          prefix: '[push-queue]',
+        });
+        if (!stamped.ok) {
+          console.error(
+            '[push-queue] could not stamp the owner trailer (a dirty tree or a conflict); fix that and run it again. Nothing was pushed.',
+          );
+          process.exit(1);
+        }
         const pushed = spawnSync(process.execPath, [join(import.meta.dirname, 'preflight.mjs')], {
           stdio: 'inherit',
         });
@@ -335,7 +345,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           console.error('[push-queue] could not push the preflight ref; fix that and run again.');
           process.exit(1);
         }
-        armedTree = headTree;
+        armedSha = stamped.sha;
         continue;
       }
       sleep(POLL_SECONDS);
@@ -409,9 +419,11 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const already = refreshed.entries.find((item) => item.sha === pushedSha);
   const enqueueRef = already?.ref ?? `${ENQUEUE_PREFIX}${makeEnqueueId(pushedSha)}`;
   if (!already) {
-    const pushEnq = spawnSync('git', ['push', 'origin', `${pushedSha}:${enqueueRef}`], {
-      stdio: 'inherit',
-    });
+    const pushEnq = spawnSync(
+      'git',
+      ['push', '--no-follow-tags', 'origin', `${pushedSha}:${enqueueRef}`],
+      { stdio: 'inherit' },
+    );
     if (pushEnq.status !== 0) {
       console.error(`[push-queue] failed to push ${enqueueRef}`);
       process.exit(pushEnq.status ?? 1);

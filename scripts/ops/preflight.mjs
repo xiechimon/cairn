@@ -194,6 +194,19 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     console.error('[preflight] fast gate failed on the exact HEAD tree; nothing was pushed.');
     process.exit(gate.status ?? 1);
   }
+  const refuseMovedHead = (outcome = 'Nothing was pushed') => {
+    if (git(['rev-parse', 'HEAD']) === sha) return;
+    console.error(
+      `[preflight] HEAD moved from ${sha.slice(0, 9)} while pre-flight was running, so this run does not cover the new HEAD; run it again. ${outcome}.`,
+    );
+    process.exit(1);
+  };
+  const succeed = (message) => {
+    refuseMovedHead(`${sha.slice(0, 9)} was pushed`);
+    console.log(message);
+    process.exit(0);
+  };
+  refuseMovedHead();
   const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
   const sleep = (seconds) => spawnSync('sleep', [String(seconds)]);
   const readQueuedShas = () =>
@@ -222,9 +235,16 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     console.error(`[preflight] ${capacity.error}`);
     process.exit(1);
   }
+  refuseMovedHead();
   const push = spawnSync(
     'git',
-    ['push', `--force-with-lease=${preflightRef(lane)}`, 'origin', `HEAD:${preflightRef(lane)}`],
+    [
+      'push',
+      '--no-follow-tags',
+      `--force-with-lease=${preflightRef(lane)}`,
+      'origin',
+      `${sha}:${preflightRef(lane)}`,
+    ],
     { stdio: 'inherit' },
   );
   if (push.status !== 0) process.exit(push.status ?? 1);
@@ -265,10 +285,9 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   }
   console.log(`[preflight] ci run: ${run.html_url}`);
   if (!wait) {
-    console.log(
+    succeed(
       '[preflight] rerun with --wait to block until it finishes, then node scripts/ops/push-queue.mjs',
     );
-    process.exit(0);
   }
   const currentStatus = () => {
     try {
@@ -290,10 +309,8 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   for (let attempt = 0; attempt < WATCH_RETRIES; attempt++) {
     const outcome = watchVerdict(state?.status ?? null, state?.conclusion ?? null, watched.status);
     if (outcome.verdict !== 'unreadable') {
-      if (outcome.verdict === 'green') {
-        console.log('[preflight] green — push-queue will accept this head');
-        process.exit(0);
-      }
+      if (outcome.verdict === 'green')
+        succeed('[preflight] green — push-queue will accept this head');
       console.error(
         `[preflight] the run went ${outcome.conclusion}: ${run.html_url}; fix the failing jobs and push again`,
       );
@@ -312,10 +329,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           stdio: 'inherit',
         },
       );
-      if (again.status === 0) {
-        console.log('[preflight] green — push-queue will accept this head');
-        process.exit(0);
-      }
+      if (again.status === 0) succeed('[preflight] green — push-queue will accept this head');
       state = currentStatus();
       if (state && state.status === 'completed') continue;
     }

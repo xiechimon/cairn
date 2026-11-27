@@ -14,8 +14,13 @@ A lane verifies on GitHub before it enters the landing queue:
   trailers: a random per-machine id kept in
   `~/.config/cairn-dev/lane-machine-id`, then the worktree name; it carries no
   host name). `node scripts/ops/preflight.mjs` stamps any unowned commits in
-  `origin/main..HEAD` with `Lane: <lane>` first, then pushes `HEAD` there with
-  `--force-with-lease` and, with `--wait`, follows the `ci` run to a conclusion.
+  `origin/main..HEAD` with `Lane: <lane>` first, then pushes that `HEAD` SHA
+  there with `--force-with-lease` and, with `--wait`, follows the `ci` run to a
+  conclusion. It pushes the SHA it handed to the fast gate and no tags, and its
+  exit 0 covers the current `HEAD`: a `HEAD` found to have moved after the gate
+  or after the wait for a CI slot pushes nothing, and one found to have moved
+  when pre-flight is about to report success makes it exit 1. The lane runs it
+  again.
 - `ci.yml` triggers on `preflight/**` pushes and the `changes` job classifies
   them like queue pushes: base is `git merge-base origin/main HEAD` on every
   push, never `github.event.before` (which would make a second push to the
@@ -114,7 +119,8 @@ To overlap CI wait with landing review, lanes may run
 
 - **No pre-flight run for `S`**: push refused with the `preflight.mjs`
   command to run. Nothing is enqueued. With `--wait`, `push-queue.mjs` pushes the
-  pre-flight ref itself.
+  pre-flight ref itself, and again each time `HEAD` becomes another SHA, even
+  with the same tree.
 - **Run still in progress**: without `--wait`, the same refusal.
 - **Run red**: the failed jobs are the ones to fix. The lane fixes, re-pushes
   its preflight ref and waits again.
