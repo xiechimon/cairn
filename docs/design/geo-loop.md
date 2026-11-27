@@ -1,0 +1,66 @@
+# Cairn GEO Loop & Phase 1 Launch — plan, 2026-11-27
+
+## User scenario
+
+A developer who installed Cairn today — or asks ChatGPT, Perplexity, Google AI Overviews, DeepSeek, Kimi, Doubao (`` `豆包` ``), Qwen (`` `通义千问` ``), or Yuanbao (`` `腾讯元宝` ``) a real question about running coding agents on a Mac — lands on `/guides/<slug>/` or `/zh-cn/guides/<slug>/` at `https://cairn.xmon.me`.
+
+**Baseline & demand evidence (measured `2026-11-27`):** `6` GitHub stars, `339` views (`50` uniques) over 14 days, `1` search referrer (`search.brave.com`), `203` raw `.dmg` / `71` estimated net `.dmg` downloads above the Linux `tar.gz` floor, `0` configured search consoles/CF tokens, and `0` recorded AI citations. Per owner decisions (`docs/research/geo-2026-11-27.md` §7), Phase 1 selects `56` distinct canonical questions mined directly from real issues and community threads (`xiechimon/cairn`, `anthropics/claude-code`, `openai/codex`, `BloopAI/vibe-kanban` sunsetting notice, `stravu/crystal` deprecation, Hacker News, and V2EX): `5` persona hubs, `15` EN Q&A, `8` EN how-to, `8` EN comparison, `8` EN troubleshooting, and `12` native Chinese guides (plus `/guides/` and `/zh-cn/guides/` hubs), inside the 50–100 Phase 1 cap. Success is judged by verified indexing share (`>=80%` on new pages to expand), browser citations across the 8 free engines (`>0` non-brand citations without paid APIs or Anthropic), and estimated net `.dmg` installs above baseline; new-page indexing below `50%` freezes expansion immediately.
+
+**Delivery boundary & operator setup:** **This change** ships the static Phase 1 guides, deterministic pre-publish quality gate, and standalone CLI tools + runbook (`docs/ops/geo-weekly-loop.md`). **Only** recurring automated weekly schedule execution (`later: phase-2-live-schedule`) awaits the owner's one-time external checklist (8 free AI web logins via `browsermcp`/Cairn browser tools — agent runtime drives the browser while `citation-panel.mjs` owns ledger storage & login checklists — plus GSC DNS TXT, Bing Webmaster import, and optional runtime `CF_ANALYTICS_TOKEN` + `CF_SITE_TAG` env vars never stored in git). Greenfield proving tests verify parent-source failure on `origin/main` through `scripts/regression-inversion-gate.mjs`, alongside `site/package.json` and `scripts/prepush.mjs` wiring tests that inspect committed repo files directly.
+
+## State and data flow
+
+| Artifact | Schema & purpose | Writers | Readers | Staleness & recovery |
+|---|---|---|---|---|
+| `site/geo/questions.jsonl` | Canonical question ledger (`id, slug, locale, template, cluster, question, persona, intent, source_urls[], publishedAt, status`) | Pain-point intake (maintainer / schedule) | `scripts/geo/quality-gate.mjs`, `scripts/geo/evaluate-maintenance.mjs` | Missing/invalid `publishedAt` emits `INVALID_DATE`; duplicate IDs fail gate; merged pages carry `status: "merged_301"` |
+| `site/geo/panel-questions.json` | Fixed 8-engine free consumer web config + prompts (`paidApisAllowed: false`, `anthropicAllowed: false`) | Maintainer | `scripts/geo/citation-panel.mjs` | Throws on Anthropic/Claude or paid API mode |
+| `site/geo/panel-results/<YYYY-MM-DD>.jsonl` | Dated browser citation observations (`engine, questionId, status, citedCairn, citedUrls, competitorDomains`) | Browser panel (`citation-panel.mjs --init-blocked` when disconnected; preserves same-day `checked` engines) | `citation-panel.mjs`, `snapshot-metrics.mjs`, `evaluate-maintenance.mjs` | Stale after `14` days (`stale: true`); stale panel rows are ignored for `EXPAND`; malformed lines throw with line numbers |
+| `site/geo/maintenance-state.json` | Freeze & growth gate state (`growthDecision, growthBlocked, frozenQuestionIds[], updatedAt`) | `evaluate-maintenance.mjs` (auto-written atomically via `.tmp` + rename unless `--dry-run`; CLI reads `.mdx` `geo.verifiedDate` too) | `scripts/geo/quality-gate.mjs` | Sticky freeze: existing `growthBlocked: true` stays locked across empty/stale/incomplete GSC runs until fresh `>=50%` new+overall indexing clears it |
+| `site/vercel.json` (`redirects`), IndexNow cache, & snapshot JSONL | Permanent `301` redirect list (`source` -> same-locale `destination`), 24h IndexNow dedup hash cache, & metrics JSONL (`--out`) | Maintainer after `MERGE_WITH_301`; `indexnow-submit.mjs`; `snapshot-metrics.mjs` | `evaluate-maintenance.mjs` (`ALREADY_MERGED_301` skips loops); `indexnow-submit.mjs` | Missing CF/GSC/Bing creds populate `missingOwnerActions[]`; GitHub partial 403s degrade to `partial_error`; IndexNow verifies live `200` key/route before POSTing |
+
+## Scope
+
+1. **Positioning & operations alignment:** Update `site/astro.config.mjs`, `site/public/llms.txt`, `site/src/components/copy.ts`, `site/src/components/Home.astro`, `site/OPERATIONS.md`, and core docs under `site/src/content/docs/docs/` and `site/src/content/docs/zh-cn/docs/` so every page leads with the Mac desktop app (`Cairn-<version>-mac-arm64.dmg` / `x64.dmg`) and frames `npx @xiechimon/cairn` / Docker as the advanced self-hosted path. Reword `site/OPERATIONS.md` to: each page answers one real question with a real answer; no bulk keyword variants; never auto-delete unindexed pages.
+2. **Real pain-point intake & free citation panel config:** Populate `site/geo/questions.jsonl` with 56 real-sourced questions and `site/geo/panel-questions.json` + `scripts/geo/citation-panel.mjs` for the 8 free engines (ChatGPT, Perplexity, Google AI Overviews, DeepSeek, Kimi, Doubao (`` `豆包` ``), Qwen (`` `通义千问` ``), Yuanbao (`` `腾讯元宝` ``)), rejecting paid APIs and Anthropic/Claude.
+3. **Starlight schema & Phase 1 content (56 guide pages + 2 index hubs):** Extend `site/src/content.config.ts` with optional `geo` metadata and publish 44 English guides under `site/src/content/docs/guides/` + 12 native Chinese guides under `site/src/content/docs/zh-cn/guides/`, plus `/guides/` and `/zh-cn/guides/` hubs and compact `Guides` sidebar links in `site/astro.config.mjs`.
+4. **Pre-publish quality gate:** Implement `scripts/geo/quality-gate.mjs`, wire it into `site/package.json` (`build`) and `scripts/prepush.mjs` (`selfTests` + conditional gate on `site/` and `scripts/geo/` changes), validating repo source-content evidence overlap (`>=2` supporting terms), CLI allowlist, internal links, template/cluster + opening-sentence topic alignment, prose-matching JSON-LD, uniqueness, Mac-first positioning, comparison concessions, distinct CN community sourcing, `verifiedVersion` format, and `FREEZE_AND_AUDIT` enforcement.
+5. **Measurement, IndexNow & maintenance CLI loop:** Implement `scripts/geo/snapshot-metrics.mjs` (raw `.dmg` + Linux `tar.gz` floor + `netDmgDownloadsEstimated`, partial GitHub 403/rate-limit resilience, CF HTTP 200 GraphQL error checks), `scripts/geo/evaluate-maintenance.mjs` (auto-written `maintenance-state.json` unless `--dry-run`, `panelStale` suppression, undated/stale/`<50%` aged GSC coverage guards, topical/hub same-locale `MERGE_WITH_301` + `ALREADY_MERGED_301` idempotency, `>90d` `REFRESH_VERIFICATION`, never auto-deleting), `scripts/geo/indexnow-submit.mjs` (`verifyLiveDeployment` before POST + 24h dedup cache) + `site/public/cairn-xmon-me-indexnow-2026.txt`, and `docs/ops/geo-weekly-loop.md`.
+6. **Unchanged site invariants:** Preserve `site/src/components/Home.astro` visual layout/CSS, keep Cloudflare Web Analytics as the single beacon (zero Vercel Analytics), keep `site/public/robots.txt` (`Allow: /` + sitemap), and never auto-delete unindexed pages.
+
+## Edge cases
+
+| Edge case | What the user sees | Proving test | Slice/Status |
+|---|---|---|---|
+| Near-duplicate or keyword-variant page added in same locale | Quality gate fails build/prepush naming both slugs and similarity score | `scripts/geo/quality-gate.test.mjs` | this change |
+| Guide cites missing repo file, unrelated non-supporting source file, dead internal route, or unknown `cairn` CLI subcommand | Quality gate fails naming missing path, lacking supporting evidence terms, route, or command | `scripts/geo/quality-gate.test.mjs` | this change |
+| Valid slug binds wrong template/cluster, drifts off topic in title/opening sentence, or has mismatched JSON-LD | Quality gate fails catching off-topic or ungrounded structured data before deploy | `scripts/geo/quality-gate.test.mjs` | this change |
+| Page contradicts Mac-first positioning, claims planned features shipped, uses invalid `verifiedVersion`, or ages `>90d` | Quality gate rejects mispositioned/malformed pages; maintenance emits `REFRESH_VERIFICATION` after 90d | `scripts/geo/quality-gate.test.mjs` + `scripts/geo/geo-loop.test.mjs` | this change |
+| Comparison page lacks dated `competitorSources` or concession heading | Quality gate fails preventing one-sided or unsourced comparisons | `scripts/geo/quality-gate.test.mjs` | this change |
+| Genuine same-slug EN/ZH localization vs cross-slug duplicate copy or distinct ZH page reusing EN `source_urls` | Same-slug CN page with CN/Han GitHub source passes; copy or copied EN sources fail | `scripts/geo/quality-gate.test.mjs` | this change |
+| Thin page below floor, stuffed title, missing build/prepush wiring, duplicate beacon, broken robots, or missing EN/ZH sidebar link | Quality gate or site invariant test fails before build or push | `scripts/geo/quality-gate.test.mjs` | this change |
+| Citation panel includes Anthropic/Claude or paid API mode | Panel validator throws immediately; paid APIs and Anthropic are blocked | `scripts/geo/geo-loop.test.mjs` | this change |
+| Browser disconnected (`--init-blocked`), partial same-day recovery, `>14d` `panelStale` ignoring `EXPAND`, or malformed JSONL | `--init-blocked` writes honest `blocked` state preserving today's checked engines; stale panel never triggers `EXPAND` | `scripts/geo/geo-loop.test.mjs` | this change |
+| Freeze precedence (`--manual-action` > `<50%`), auto-persisted `maintenance-state.json` (unless `--dry-run`), unfreeze, and gate block | Default CLI run persists freeze automatically; `--dry-run` skips writing; `quality-gate.mjs` blocks new `questionId` | `scripts/geo/geo-loop.test.mjs` + `scripts/geo/quality-gate.test.mjs` | this change |
+| Empty GSC, undated/stale GSC (`>14d`), `<50%` aged coverage, invalid `publishedAt`, and absolute/relative URL mismatch | Emits `AWAITING_GSC_DATA` / `STALE_GSC_DATA` / `INCOMPLETE_GSC_DATA` / `WAIT_FOR_GSC` / `INVALID_DATE` | `scripts/geo/geo-loop.test.mjs` | this change |
+| Page `crawled_not_indexed` `>=42d` with topical/hub peer vs unrelated page, plus repeat 301 run | Same-locale topical/hub peer gets `MERGE_WITH_301`; unrelated peer stays `REWRITE_OR_MANUAL_REVIEW`; repeat emits `ALREADY_MERGED_301` | `scripts/geo/geo-loop.test.mjs` | this change |
+| CLI `snapshot-metrics.mjs` without `gh`/creds, partial GitHub 403, Linux noise floor, or CF HTTP 200 GraphQL errors | Keeps partial data/degrades `githubStatus`, separates raw + estimated net `.dmg`, populates `missingOwnerActions[]` | `scripts/geo/geo-loop.test.mjs` | this change |
+| IndexNow missing sitemap or failed live key/route check, off-site URL, 24h duplicate hash, HTTP `429`, or timeout | CLI aborts cleanly before POST on missing sitemap, failed deploy, or bad host; skips duplicate within 24h; surfaces `429`/timeout | `scripts/geo/geo-loop.test.mjs` | this change |
+| Recurring automated Cairn weekly schedule & live external GSC/Bing/8-engine runs after owner completes login/DNS checklist | Live panel & indexing data feed weekly loop once owner credentials are active | `scripts/geo/geo-loop.test.mjs` | later: phase-2-live-schedule |
+
+## Out of scope
+
+- Paid citation APIs (OpenAI Responses web search, Perplexity Sonar, Anthropic Messages) and any Claude/Anthropic citation checks.
+- Cross-lingual neural/embedding semantic equivalence scoring or LLM-based runtime factual verification inside the static build gate (static gate uses deterministic source-content evidence overlap, CLI allowlist, same-locale shingling, JSON-LD prose matching, and distinct `source_urls` enforcement).
+- Adding Vercel Analytics or a second analytics beacon alongside Cloudflare Web Analytics.
+- Automated posting or commenting on third-party sites (Reddit, HN, V2EX, Zhihu).
+- A custom `/download` redirect attribution service (requires separate design approval).
+- Auto-deleting unindexed pages or expanding Phase 2 beyond 100 pages before `>=80%` new-page indexing is measured.
+
+## Review
+
+- Verdict: PASS
+- Plan-SHA256: 66e8acfdd75d83db496de7b5c434d43b7251d3f95c819c0cdad4e851958cd04c
+- Author-Model: gemini-4-neon
+- Reviewer: codex-exec
+- Reviewer-Model: openai-codex/gpt-6.1-sol
+- Findings: Initial 8 review findings (`/tmp/geo-plan-review.txt`) were resolved across plan, scripts, and tests: added demand baseline and 56-page Phase 1 success metrics, CLI entrypoint/error-degradation tests, auto-persisted sticky freeze state in `maintenance-state.json`, 14d panel and GSC export staleness guards, aged new-batch coverage and topical/hub same-locale 301 matching, repo source-content evidence overlap + `.mdx` `verifiedDate` checks, distinct ZH sourcing + same-slug localization tests, live deploy + 24h dedup IndexNow checks, and `Home.astro`/beacon/robots invariants; final confirm-only pass (`/tmp/geo-plan-confirm-final.txt`) returned `Verdict: PASS`.
