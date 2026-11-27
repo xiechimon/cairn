@@ -90,7 +90,7 @@ export default async function providersAndRouting({ window, mode, evidenceDir })
     .first();
   await row.waitFor({ timeout: 15_000 });
   const targetId = await row.getAttribute('data-instance-id');
-  await row.getByTestId('provider-status-mark').click();
+  await row.getByTestId('provider-subtitle').click();
   await window
     .locator(
       `[data-testid="provider-instance"][data-instance-id="${targetId}"][aria-current="true"]`,
