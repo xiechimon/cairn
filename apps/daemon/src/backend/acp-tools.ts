@@ -46,6 +46,7 @@ export interface AcpStdioBridge {
   token: string;
   toolNames: readonly string[];
   systemPromptAppendix?: string;
+  hasListedTools: () => boolean;
   close: () => void;
 }
 
@@ -83,19 +84,27 @@ async function openStdioMcpListener(
     authTimer.unref();
 
     const onData = (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > MAX_AUTH_HEADER_BYTES) {
+      const nlInChunk = chunk.indexOf(0x0a);
+      if (nlInChunk === -1) {
+        size += chunk.length;
+        if (size > MAX_AUTH_HEADER_BYTES) {
+          cleanupAuth();
+          socket.destroy();
+          return;
+        }
+        chunks.push(chunk);
+        return;
+      }
+      if (size + nlInChunk > MAX_AUTH_HEADER_BYTES) {
         cleanupAuth();
         socket.destroy();
         return;
       }
-      chunks.push(chunk);
-      const joined = chunks.length === 1 ? (chunks[0] ?? Buffer.alloc(0)) : Buffer.concat(chunks);
-      const nl = joined.indexOf(0x0a);
-      if (nl === -1) return;
 
       cleanupAuth();
-      const supplied = joined.subarray(0, nl);
+      const headerPart = chunk.subarray(0, nlInChunk);
+      const supplied = chunks.length === 0 ? headerPart : Buffer.concat([...chunks, headerPart]);
+      chunks.length = 0;
       if (!tokensMatch(supplied, expectedToken)) {
         socket.end(
           `${JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'Unauthorized' } })}\n`,
@@ -106,7 +115,7 @@ async function openStdioMcpListener(
 
       authenticated = true;
       const input = new PassThrough();
-      const rest = joined.subarray(nl + 1);
+      const rest = chunk.subarray(nlInChunk + 1);
       if (rest.length > 0) input.write(rest);
       socket.pipe(input);
 
@@ -166,6 +175,7 @@ async function openStdioMcpListener(
     port: address.port,
     token,
     toolNames,
+    hasListedTools: () => false,
     close: () => {
       if (closed) return;
       closed = true;
@@ -523,8 +533,12 @@ export async function openAcpTools(
           .join('\n\n')}`
       : undefined;
 
+  let listedTools = false;
   const bridge = await openStdioMcpListener('cairn', names, (server) => {
-    server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: definitions }));
+    server.setRequestHandler(ListToolsRequestSchema, () => {
+      listedTools = true;
+      return { tools: definitions };
+    });
     server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       const args =
         typeof params.arguments === 'object' &&
@@ -592,6 +606,7 @@ export async function openAcpTools(
 
   return {
     ...bridge,
+    hasListedTools: () => listedTools,
     ...(systemPromptAppendix !== undefined ? { systemPromptAppendix } : {}),
   };
 }
@@ -623,13 +638,16 @@ export async function bridgeHttpMcpToStdio(endpoint: McpEndpoint): Promise<AcpSt
     return pendingClient;
   };
 
-  return openStdioMcpListener(
+  let listedTools = false;
+  const bridge = await openStdioMcpListener(
     endpoint.slug,
     [],
     (server) => {
       server.setRequestHandler(ListToolsRequestSchema, async ({ params }) => {
         const client = await getClient();
-        return client.listTools(params);
+        const result = await client.listTools(params);
+        listedTools = true;
+        return result;
       });
       server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
         const client = await getClient();
@@ -645,4 +663,8 @@ export async function bridgeHttpMcpToStdio(endpoint: McpEndpoint): Promise<AcpSt
       pendingClient = null;
     },
   );
+  return {
+    ...bridge,
+    hasListedTools: () => listedTools,
+  };
 }

@@ -55,6 +55,7 @@ import {
   acpTurnPolicy,
   claudeAcpSessionMeta,
   decideAcpPermission,
+  isHostToolCall,
   restrictiveAcpMode,
 } from './acp-permission-gate.js';
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
@@ -303,6 +304,22 @@ interface AcpPromptResponse {
   usage?: AcpPromptUsage;
 }
 
+interface AcpHostToolsCheck {
+  toolNames: readonly string[];
+  hasListedTools: () => boolean;
+  runtime: string;
+}
+
+function toolResultText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(toolResultText).filter(Boolean).join('\n');
+  if (typeof value !== 'object' || value === null) return '';
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.text === 'string') return rec.text;
+  if ('content' in rec) return toolResultText(rec.content);
+  return JSON.stringify(value);
+}
+
 class AcpSession implements AgentSessionHandle {
   readonly sessionId: string;
   readonly events: AsyncIterable<StepEvent>;
@@ -314,6 +331,7 @@ class AcpSession implements AgentSessionHandle {
   private cancelled = false;
   private text = '';
   private rejectedCount = 0;
+  private missingHostToolsError: string | null = null;
   private readonly calls = new Map<string, ToolCallRecord>();
   private readonly toolOutputs = new Map<string, unknown>();
   private readonly rawCalls = new Map<string, AcpToolCall>();
@@ -332,6 +350,7 @@ class AcpSession implements AgentSessionHandle {
     private readonly modelId = 'unknown',
     private readonly compactAt?: number,
     private readonly settleUnexpectedClose?: () => Promise<AcpTerminalFailure | null>,
+    private readonly hostToolsCheck?: AcpHostToolsCheck,
   ) {
     this.sessionId = sessionId;
     this.normalizer = adapter?.createUpdateNormalizer?.();
@@ -423,6 +442,7 @@ class AcpSession implements AgentSessionHandle {
             });
             this.text = '';
           }
+          this.missingHostToolsError = null;
           wait = this.midTurnPrompt;
           this.midTurnPrompt = null;
           continue;
@@ -456,6 +476,13 @@ class AcpSession implements AgentSessionHandle {
         } else if (result.stopReason === 'end_turn') {
           if (this.adapter && [...this.calls.values()].some((call) => call.result === undefined)) {
             throw new Error('ACP prompt completed with unfinished tool calls');
+          }
+          if (this.missingHostToolsError !== null && !this.hostToolsCheck?.hasListedTools()) {
+            this.push({
+              type: 'error',
+              error: { message: this.missingHostToolsError, retryable: false },
+            });
+            break;
           }
           this.recordPromptUsage(result.usage);
           this.push({ type: 'done', usage: this.usageRows });
@@ -557,6 +584,46 @@ class AcpSession implements AgentSessionHandle {
     this.push({ type: 'toolcall_end', call });
   }
 
+  private checkMissingHostTools(
+    call: ToolCallRecord,
+    rawOutput?: unknown,
+    previousIsError?: boolean,
+  ): void {
+    if (this.hostToolsCheck === undefined) return;
+    if (this.hostToolsCheck.hasListedTools()) {
+      this.missingHostToolsError = null;
+      return;
+    }
+    const raw = this.rawCalls.get(call.id);
+    const toolCall: AcpToolCall =
+      raw !== undefined
+        ? {
+            ...raw,
+            ...(raw.name === undefined ? { name: call.name } : {}),
+            ...(raw.rawInput === undefined ? { rawInput: call.arguments } : {}),
+          }
+        : {
+            toolCallId: call.id,
+            name: call.name,
+            title: call.name,
+            rawInput: call.arguments,
+          };
+    const matched = isHostToolCall(toolCall, this.hostToolsCheck.toolNames);
+    if (!matched) return;
+    const isError = call.isError ?? previousIsError;
+    if (isError === false) {
+      this.missingHostToolsError = null;
+      return;
+    }
+    if (this.missingHostToolsError !== null || isError !== true) return;
+    const output = [toolResultText(rawOutput), toolResultText(call.result)]
+      .filter((part) => part.length > 0)
+      .join('\n');
+    if (/unknown tool|tool .* not found|no such tool/i.test(output)) {
+      this.missingHostToolsError = `Cairn host tools did not attach to this ${this.hostToolsCheck.runtime} ACP session (MCP server did not connect). Start a new session or retry.`;
+    }
+  }
+
   onAcpUpdate(raw: SessionUpdate): void {
     if (raw.sessionUpdate === 'tool_call' || raw.sessionUpdate === 'tool_call_update') {
       const kept: Record<string, unknown> = { ...this.rawCalls.get(raw.toolCallId) };
@@ -615,20 +682,24 @@ class AcpSession implements AgentSessionHandle {
           ? { parent: parent ?? previous?.parent }
           : {}),
       };
+      if (update.rawOutput != null) this.toolOutputs.set(call.id, update.rawOutput);
+      else if (update.content != null && !this.toolOutputs.has(call.id)) {
+        this.toolOutputs.set(call.id, update.content);
+      }
+      const cachedOutput = update.rawOutput ?? this.toolOutputs.get(call.id);
       if (this.adapter) {
-        if (update.rawOutput != null) this.toolOutputs.set(call.id, update.rawOutput);
-        else if (update.content != null) this.toolOutputs.set(call.id, update.content);
         const terminal =
           update.status === 'completed' ||
           update.status === 'failed' ||
           previous?.isError !== undefined;
         if (terminal) {
-          call.result = this.toolOutputs.get(call.id) ?? previous?.result ?? '';
+          call.result = cachedOutput ?? previous?.result ?? '';
           call.isError =
             update.status === 'failed' ||
             (update.status !== 'completed' && previous?.isError === true);
         } else delete call.result;
         this.calls.set(call.id, call);
+        this.checkMissingHostTools(call, cachedOutput, previous?.isError);
         if (
           JSON.stringify(call) !== JSON.stringify(previous) &&
           (!previous ||
@@ -641,6 +712,7 @@ class AcpSession implements AgentSessionHandle {
         }
       } else {
         this.calls.set(call.id, call);
+        this.checkMissingHostTools(call, cachedOutput, previous?.isError);
         this.push({ type: 'toolcall_end', call });
       }
     } else if (update.sessionUpdate === 'plan') {
@@ -1359,6 +1431,9 @@ class AcpBackend implements AgentBackend {
         opts.modelId,
         opts.compactAt,
         settleUnexpectedClose,
+        resumeId && hostTools
+          ? { toolNames: hostToolNames, hasListedTools: hostTools.hasListedTools, runtime }
+          : undefined,
       );
       return session;
     } catch (error) {

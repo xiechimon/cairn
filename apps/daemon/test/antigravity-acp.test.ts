@@ -1168,4 +1168,272 @@ describe('antigravity ACP runtime and credentials', () => {
     expect(p2.metaPrompt).toBeNull();
     expect(p2.promptText).toBe('Turn 2 follow-up');
   });
+
+  test('resumed session after agent process restart keeps host tools callable when MCP client pipelines >256B discover with auth token', async () => {
+    const dir = tempDir('ag-resume-mcp-coalesced-');
+    const agent = join(dir, 'agy-resume-mcp.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { spawn } from 'node:child_process';",
+          "import { createConnection } from 'node:net';",
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'let cairnServer = null;',
+          'let openedVia = "";',
+          'let activeSid = "ag-mcp-sess-1";',
+          'async function callTodosViaCoalescedTcp(server) {',
+          '  const [portStr, token] = server.args.slice(-2);',
+          '  const discover = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/clientCapabilities": { elicitation: { form: {}, url: {} }, roots: { listChanged: true } }, "io.modelcontextprotocol/clientInfo": { name: "antigravity-client", version: "v1.0.0" }, "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } });',
+          '  const init = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "antigravity-client", version: "v1.0.0" } } });',
+          '  const list = JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} });',
+          '  const call = JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "todos", arguments: {} } });',
+          '  return new Promise((resolve, reject) => {',
+          '    const sock = createConnection(Number(portStr), "127.0.0.1", () => {',
+          '      sock.write(token + "\\n" + discover + "\\n" + init + "\\n" + list + "\\n" + call + "\\n");',
+          '    });',
+          '    const replies = [];',
+          '    createInterface({ input: sock }).on("line", (line) => {',
+          '      if (!line.trim()) return;',
+          '      replies.push(JSON.parse(line));',
+          '      if (replies.length === 4) { sock.destroy(); resolve(replies); }',
+          '    });',
+          '    sock.on("error", reject);',
+          '    sock.on("close", () => { if (replies.length < 4) reject(new Error("MCP socket closed early")); });',
+          '  });',
+          '}',
+          'async function callTodosViaRelay(server) {',
+          '  const child = spawn(server.command, server.args, { stdio: ["pipe", "pipe", "pipe"] });',
+          '  const waiters = new Map();',
+          '  createInterface({ input: child.stdout }).on("line", (line) => {',
+          '    if (!line.trim()) return;',
+          '    const msg = JSON.parse(line);',
+          '    const w = waiters.get(msg.id);',
+          '    if (w) { waiters.delete(msg.id); w(msg); }',
+          '  });',
+          '  let nextId = 1;',
+          '  const rpc = (method, params = {}) => new Promise((resolve) => {',
+          '    const id = nextId++;',
+          '    waiters.set(id, resolve);',
+          '    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\\n");',
+          '  });',
+          '  try {',
+          '    await rpc("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "mock", version: "1" } });',
+          '    const list = await rpc("tools/list");',
+          '    const call = await rpc("tools/call", { name: "todos", arguments: {} });',
+          '    return { listed: list.result.tools.map((t) => t.name), text: call.result.content[0].text };',
+          '  } finally {',
+          '    child.stdin.end();',
+          '    child.kill("SIGTERM");',
+          '  }',
+          '}',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } } });',
+          '  } else if (msg.method === "session/new" || msg.method === "session/resume") {',
+          '    openedVia = msg.method;',
+          '    activeSid = msg.params.sessionId ?? activeSid;',
+          '    cairnServer = (msg.params.mcpServers ?? []).find((s) => s.name === "cairn") ?? null;',
+          '    if (msg.method === "session/resume" && cairnServer) {',
+          '      try {',
+          '        const replies = await callTodosViaCoalescedTcp(cairnServer);',
+          '        globalThis.__resumeMcp = { listed: replies.find((r) => r.id === 3).result.tools.map((t) => t.name), text: replies.find((r) => r.id === 4).result.content[0].text };',
+          '      } catch (e) {',
+          '        globalThis.__resumeMcp = { error: e.message };',
+          '      }',
+          '    }',
+          '    send({ id: msg.id, result: { sessionId: activeSid, modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    const report = openedVia === "session/resume" ? globalThis.__resumeMcp : await callTodosViaRelay(cairnServer);',
+          '    send({ method: "session/update", params: { sessionId: activeSid, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify({ openedVia, report }) } } } });',
+          '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const executed: string[] = [];
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+    });
+    const baseOpts: SessionOpts = {
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      remoteToolsOnly: true,
+      lockedDown: true,
+      executeRemoteTool: async (name) => {
+        executed.push(name);
+        return `ok:${executed.length}`;
+      },
+    };
+
+    const s1 = await backend.createSession({ ...baseOpts, prompt: 'turn 1' });
+    const ev1 = await collect(s1.events);
+    const m1 = ev1.find((e) => e.type === 'message_end');
+    expect(JSON.parse(m1?.type === 'message_end' ? String(m1.message.content) : '{}')).toEqual({
+      openedVia: 'session/new',
+      report: { listed: ['todos'], text: 'ok:1' },
+    });
+
+    const s2 = await backend.continueSession(s1.sessionId, { ...baseOpts, prompt: 'turn 2' });
+    const ev2 = await collect(s2.events);
+    const m2 = ev2.find((e) => e.type === 'message_end');
+    expect(JSON.parse(m2?.type === 'message_end' ? String(m2.message.content) : '{}')).toEqual({
+      openedVia: 'session/resume',
+      report: { listed: ['todos'], text: 'ok:2' },
+    });
+    expect(executed).toEqual(['todos', 'todos']);
+  });
+
+  test('resumed Antigravity session keeps resume when MCP tools attach lazily during session/prompt', async () => {
+    const dir = tempDir('ag-resume-lazy-mcp-');
+    const agent = join(dir, 'agy-lazy-resume.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { createConnection } from 'node:net';",
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'let cairnServer = null;',
+          'const openedMethods = [];',
+          'async function callTodosViaCoalescedTcp(server) {',
+          '  const [portStr, token] = server.args.slice(-2);',
+          '  const discover = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "server/discover", params: { _meta: { "io.modelcontextprotocol/clientCapabilities": {}, "io.modelcontextprotocol/clientInfo": { name: "antigravity-client", version: "v1.0.0" }, "io.modelcontextprotocol/protocolVersion": "2026-07-28" } } });',
+          '  const init = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "antigravity-client", version: "v1.0.0" } } });',
+          '  const list = JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list", params: {} });',
+          '  const call = JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "todos", arguments: {} } });',
+          '  return new Promise((resolve, reject) => {',
+          '    const sock = createConnection(Number(portStr), "127.0.0.1", () => {',
+          '      sock.write(token + "\\n" + discover + "\\n" + init + "\\n" + list + "\\n" + call + "\\n");',
+          '    });',
+          '    const replies = [];',
+          '    createInterface({ input: sock }).on("line", (line) => {',
+          '      if (!line.trim()) return;',
+          '      replies.push(JSON.parse(line));',
+          '      if (replies.length === 4) { sock.destroy(); resolve(replies); }',
+          '    });',
+          '    sock.on("error", reject);',
+          '    sock.on("close", () => { if (replies.length < 4) reject(new Error("MCP socket closed early")); });',
+          '  });',
+          '}',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } } });',
+          '  } else if (msg.method === "session/resume" || msg.method === "session/load") {',
+          '    openedMethods.push(msg.method);',
+          '    cairnServer = (msg.params.mcpServers ?? []).find((s) => s.name === "cairn") ?? null;',
+          '    send({ id: msg.id, result: { sessionId: msg.params.sessionId, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    const replies = await callTodosViaCoalescedTcp(cairnServer);',
+          '    const payload = { openedMethods, listed: replies.find((r) => r.id === 3).result.tools.map((t) => t.name), text: replies.find((r) => r.id === 4).result.content[0].text };',
+          '    send({ method: "session/update", params: { sessionId: msg.params.sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify(payload) } } } });',
+          '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+    });
+    const session = await backend.continueSession('lazy-sess-1', {
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      prompt: '列出我的待办',
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      remoteToolsOnly: true,
+      lockedDown: true,
+      executeRemoteTool: async () => 'lazy-todo-ok',
+    });
+    const events = await collect(session.events);
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+    expect(events).toContainEqual({ type: 'done', usage: [] });
+    const msg = events.find((e) => e.type === 'message_end');
+    expect(JSON.parse(msg?.type === 'message_end' ? String(msg.message.content) : '{}')).toEqual({
+      openedMethods: ['session/resume'],
+      listed: ['todos'],
+      text: 'lazy-todo-ok',
+    });
+  });
+
+  test('resumed Antigravity session surfaces clear error when host tools never attach and call fails with unknown tool', async () => {
+    const dir = tempDir('ag-resume-nomcp-err-');
+    const agent = join(dir, 'agy-nomcp-resume.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } } });',
+          '  } else if (msg.method === "session/resume") {',
+          '    send({ id: msg.id, result: { sessionId: msg.params.sessionId, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    send({ method: "session/update", params: { sessionId: msg.params.sessionId, update: { sessionUpdate: "tool_call", toolCallId: "tc-1", title: "mcp_cairn_todos", kind: "other", rawInput: {}, status: "pending" } } });',
+          '    send({ method: "session/update", params: { sessionId: msg.params.sessionId, update: { sessionUpdate: "tool_call_update", toolCallId: "tc-1", status: "failed", rawOutput: "unknown tool: \\"mcp_cairn_todos\\" — check spelling" } } });',
+          '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+    });
+    const session = await backend.continueSession('old-sess', {
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      prompt: '列出我的待办',
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      remoteToolsOnly: true,
+      lockedDown: true,
+      executeRemoteTool: async () => '[]',
+    });
+    const events = await collect(session.events);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    expect(events).toContainEqual({
+      type: 'error',
+      error: {
+        message: expect.stringContaining(
+          'Cairn host tools did not attach to this antigravity ACP session',
+        ),
+        retryable: false,
+      },
+    });
+  });
 });

@@ -577,4 +577,168 @@ describe('ACP stdio host tools lifecycle', () => {
     expect(Buffer.byteLength(appendix, 'utf8')).toBeLessThan(12_000);
     bridge.close();
   });
+
+  test('accepts auth token coalesced in one TCP chunk with a large first MCP message while enforcing header bounds', async () => {
+    const executeRemoteTool = vi.fn(async () => 'todo-1');
+    const bridge = await openAcpTools({
+      ...opts,
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      executeRemoteTool,
+    });
+    expect(bridge).not.toBeNull();
+    if (!bridge) throw new Error('Missing bridge');
+
+    const discoverFrame = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'server/discover',
+      params: {
+        _meta: {
+          'io.modelcontextprotocol/clientCapabilities': {
+            elicitation: { form: {}, url: {} },
+            roots: { listChanged: true },
+          },
+          'io.modelcontextprotocol/clientInfo': { name: 'antigravity-client', version: 'v1.0.0' },
+          'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+        },
+      },
+    });
+    const initFrame = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'antigravity-client', version: 'v1.0.0' },
+      },
+    });
+    const listFrame = JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} });
+    const callFrame = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
+      params: { name: 'todos', arguments: {} },
+    });
+    const coalescedPayload = `${bridge.token}\n${discoverFrame}\n${initFrame}\n${listFrame}\n${callFrame}\n`;
+    expect(Buffer.byteLength(discoverFrame, 'utf8')).toBeGreaterThan(256);
+
+    const runCoalesced = (port: number, payload: string) =>
+      new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
+        const sock = createConnection(port, '127.0.0.1', () => {
+          sock.write(payload);
+        });
+        const replies: Array<Record<string, unknown>> = [];
+        createInterface({ input: sock }).on('line', (line) => {
+          if (!line.trim()) return;
+          replies.push(JSON.parse(line) as Record<string, unknown>);
+          if (replies.length === 4) {
+            sock.destroy();
+            resolve(replies);
+          }
+        });
+        sock.on('error', reject);
+        sock.on('close', () => {
+          if (replies.length < 4)
+            reject(new Error(`Socket closed after ${replies.length} replies`));
+        });
+      });
+
+    const expectRejected = (port: number, payload: string, expectedMessage?: string) =>
+      new Promise<void>((resolve, reject) => {
+        const sock = createConnection(port, '127.0.0.1', () => {
+          sock.write(payload);
+        });
+        let raw = '';
+        sock.on('data', (chunk) => {
+          raw += chunk.toString('utf8');
+        });
+        sock.on('close', () => {
+          try {
+            if (expectedMessage === undefined) {
+              expect(raw).toBe('');
+            } else {
+              expect(JSON.parse(raw.trim())).toMatchObject({
+                error: { code: -32001, message: expectedMessage },
+              });
+            }
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        });
+        sock.on('error', reject);
+      });
+
+    try {
+      const replies = await runCoalesced(bridge.port, coalescedPayload);
+      expect(replies.find((r) => r.id === 1)).toMatchObject({ error: { code: -32601 } });
+      expect(replies.find((r) => r.id === 2)).toMatchObject({
+        result: { serverInfo: { name: 'cairn' } },
+      });
+      expect(replies.find((r) => r.id === 3)).toMatchObject({
+        result: { tools: [expect.objectContaining({ name: 'todos' })] },
+      });
+      expect(replies.find((r) => r.id === 4)).toMatchObject({
+        result: { content: [{ type: 'text', text: 'todo-1' }] },
+      });
+      expect(executeRemoteTool).toHaveBeenCalledWith('todos', {});
+
+      await expectRejected(bridge.port, 'x'.repeat(300));
+      await expectRejected(bridge.port, `${'x'.repeat(260)}\n${initFrame}\n`);
+      await expectRejected(bridge.port, `${'0'.repeat(64)}\n${discoverFrame}\n`, 'Unauthorized');
+    } finally {
+      bridge.close();
+    }
+
+    const upstream = createHttpServer(async (req, res) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req)
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const body =
+        chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined;
+      const server = new Server({ name: 'ext', version: '1.0.0' }, { capabilities: { tools: {} } });
+      server.setRequestHandler(ListToolsRequestSchema, () => ({
+        tools: [{ name: 'ext_ping', description: 'Ping', inputSchema: { type: 'object' } }],
+      }));
+      server.setRequestHandler(CallToolRequestSchema, async ({ params }) => ({
+        content: [{ type: 'text', text: `${params.name} output` }],
+      }));
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+      res.once('close', () => void server.close().catch(() => {}));
+      await server.connect(transport);
+      await transport.handleRequest(req, res, body);
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+    const upstreamAddr = upstream.address() as { port: number };
+    const httpBridge = await bridgeHttpMcpToStdio({
+      slug: 'ext',
+      transport: 'http',
+      url: `http://127.0.0.1:${upstreamAddr.port}/mcp`,
+    });
+    try {
+      const httpReplies = await runCoalesced(
+        httpBridge.port,
+        `${httpBridge.token}\n${discoverFrame}\n${initFrame}\n${listFrame}\n${JSON.stringify({
+          jsonrpc: '2.0',
+          id: 4,
+          method: 'tools/call',
+          params: { name: 'ext_ping', arguments: {} },
+        })}\n`,
+      );
+      expect(httpReplies.find((r) => r.id === 3)).toMatchObject({
+        result: { tools: [expect.objectContaining({ name: 'ext_ping' })] },
+      });
+      expect(httpReplies.find((r) => r.id === 4)).toMatchObject({
+        result: { content: [{ type: 'text', text: 'ext_ping output' }] },
+      });
+    } finally {
+      httpBridge.close();
+      upstream.close();
+      upstream.closeAllConnections();
+    }
+  });
 });

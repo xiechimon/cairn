@@ -574,4 +574,421 @@ describe('ACP spike with a real scripted stdio child', () => {
       }),
     ).rejects.toThrow('relay');
   });
+
+  test.each(['antigravity', 'devin', 'claude-code', 'gemini'] as const)(
+    '%s: continues a session with host tools callable via coalesced stdio MCP after restart',
+    async (harness) => {
+      const remote = vi.fn(async () => 'todo-from-resumed');
+      const fakeScript = `
+import { createConnection } from 'node:net';
+import { createInterface } from 'node:readline';
+const send = (v) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...v }) + '\\n');
+let host = null;
+let preloaded = null;
+for await (const line of createInterface({ input: process.stdin })) {
+  const { id, method, params } = JSON.parse(line);
+  if (method === 'initialize') {
+    send({ id, result: { protocolVersion: params.protocolVersion, agentCapabilities: { loadSession: true } } });
+  } else if (method === 'session/load') {
+    host = (params.mcpServers ?? []).find((s) => s.name === 'cairn') ?? null;
+    const [portStr, token] = host.args.slice(-2);
+    const discover = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'server/discover', params: { padding: 'x'.repeat(280) } });
+    const init = JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'agent', version: '1' } } });
+    const list = JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} });
+    const call = JSON.stringify({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'todos', arguments: {} } });
+    preloaded = await new Promise((resolve, reject) => {
+      const sock = createConnection(Number(portStr), '127.0.0.1', () => {
+        sock.write(token + '\\n' + discover + '\\n' + init + '\\n' + list + '\\n' + call + '\\n');
+      });
+      const replies = [];
+      createInterface({ input: sock }).on('line', (l) => {
+        if (!l.trim()) return;
+        replies.push(JSON.parse(l));
+        if (replies.length === 4) { sock.destroy(); resolve(replies); }
+      });
+      sock.on('error', reject);
+      sock.on('close', () => { if (replies.length < 4) reject(new Error('MCP closed early')); });
+    });
+    send({ id, result: { sessionId: params.sessionId, modes: { currentModeId: 'bypass', availableModes: [{ id: 'bypass', name: 'Bypass' }] }, configOptions: [{ id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'stub-model', options: [{ value: 'stub-model', name: 'Stub' }] }] } });
+  } else if (method === 'session/set_mode') {
+    send({ id, result: {} });
+  } else if (method === 'session/set_config_option') {
+    send({ id, result: { configOptions: [] } });
+  } else if (method === 'session/prompt') {
+    send({ method: 'session/update', params: { sessionId: 's-1', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: preloaded.find((r) => r.id === 4).result.content[0].text } } } });
+    send({ id, result: { stopReason: 'end_turn' } });
+  }
+}
+`;
+      const backend =
+        harness === 'gemini'
+          ? createGeminiBackend({
+              executablePath: process.execPath,
+              spawnProcess: (_cmd, _args, spawnOpts) =>
+                spawn(process.execPath, ['--input-type=module', '-e', fakeScript], spawnOpts),
+            })
+          : createAcpBackend({
+              harness,
+              command: process.execPath,
+              args: ['--input-type=module', '-e', fakeScript],
+              allowHostMcp: true,
+              sessionResume: true,
+            });
+      const session = await backend.continueSession('s-1', {
+        ...opts,
+        remoteTools: [{ name: 'todos', description: 'List todos' }],
+        executeRemoteTool: remote,
+      });
+      const events = await collect(session.events);
+      expect(events).toContainEqual({
+        type: 'message_end',
+        message: { role: 'assistant', content: 'todo-from-resumed' },
+      });
+      expect(events).toContainEqual({ type: 'done', usage: [] });
+      expect(remote).toHaveBeenCalledWith('todos', {});
+    },
+  );
+
+  test.each(['antigravity', 'devin', 'claude-code', 'gemini'] as const)(
+    '%s: flags an unattached Cairn MCP session when a declared host tool fails with unknown tool, but stays silent once tools/list ran',
+    async (harness) => {
+      const makeAgent = async (attachMcp: boolean) => {
+        const fakeScript = `
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+const send = (v) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...v }) + '\\n');
+let host = null;
+for await (const line of createInterface({ input: process.stdin })) {
+  const { id, method, params } = JSON.parse(line);
+  if (method === 'initialize') {
+    send({ id, result: { protocolVersion: params.protocolVersion, agentCapabilities: { loadSession: true } } });
+  } else if (method === 'session/new' || method === 'session/load') {
+    host = (params.mcpServers ?? []).find((s) => s.name === 'cairn') ?? null;
+    if (${JSON.stringify(attachMcp)} && host) {
+      const child = spawn(host.command, host.args, { stdio: ['pipe', 'pipe', 'pipe'] });
+      const waiters = new Map();
+      createInterface({ input: child.stdout }).on('line', (l) => {
+        if (!l.trim()) return;
+        const m = JSON.parse(l);
+        const w = waiters.get(m.id);
+        if (w) { waiters.delete(m.id); w(m); }
+      });
+      let nid = 1;
+      const rpc = (m, p) => new Promise((res) => { const rid = nid++; waiters.set(rid, res); child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: rid, method: m, params: p }) + '\\n'); });
+      await rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'x', version: '1' } });
+      await rpc('tools/list', {});
+      child.stdin.end();
+      child.kill('SIGTERM');
+    }
+    send({ id, result: { sessionId: 's-1', modes: { currentModeId: 'bypass', availableModes: [{ id: 'bypass', name: 'Bypass' }] }, configOptions: [{ id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'stub-model', options: [{ value: 'stub-model', name: 'Stub' }] }] } });
+  } else if (method === 'session/set_mode') {
+    send({ id, result: {} });
+  } else if (method === 'session/set_config_option') {
+    send({ id, result: { configOptions: [] } });
+  } else if (method === 'session/prompt') {
+    send({ method: 'session/update', params: { sessionId: 's-1', update: { sessionUpdate: 'tool_call', toolCallId: 'tc-1', title: 'mcp_cairn_todos', kind: 'other', rawInput: {}, status: 'pending' } } });
+    send({ method: 'session/update', params: { sessionId: 's-1', update: { sessionUpdate: 'tool_call_update', toolCallId: 'tc-1', status: 'failed', rawOutput: 'unknown tool: "mcp_cairn_todos" — check spelling' } } });
+    send({ id, result: { stopReason: 'end_turn' } });
+  }
+}
+`;
+        const backend =
+          harness === 'gemini'
+            ? createGeminiBackend({
+                executablePath: process.execPath,
+                spawnProcess: (_cmd, _args, spawnOpts) =>
+                  spawn(process.execPath, ['--input-type=module', '-e', fakeScript], spawnOpts),
+              })
+            : createAcpBackend({
+                harness,
+                command: process.execPath,
+                args: ['--input-type=module', '-e', fakeScript],
+                allowHostMcp: true,
+                sessionResume: true,
+              });
+        const sessionOpts = {
+          ...opts,
+          remoteTools: [{ name: 'todos', description: 'List todos' }],
+          executeRemoteTool: async () => '[]',
+        };
+        const session = await backend.continueSession('s-1', sessionOpts);
+        return collect(session.events);
+      };
+
+      const unattached = await makeAgent(false);
+      expect(unattached.some((e) => e.type === 'done')).toBe(false);
+      expect(unattached).toContainEqual({
+        type: 'error',
+        error: {
+          message: expect.stringContaining('Cairn host tools did not attach'),
+          retryable: false,
+        },
+      });
+
+      const attached = await makeAgent(true);
+      expect(attached).toContainEqual({ type: 'done', usage: [] });
+      expect(attached.some((e) => e.type === 'error')).toBe(false);
+    },
+  );
+
+  test('detects missing host tools via _meta toolName even when title is a display string', async () => {
+    const fakeScript = `
+import { createInterface } from 'node:readline';
+const send = (v) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...v }) + '\\n');
+for await (const line of createInterface({ input: process.stdin })) {
+  const { id, method, params } = JSON.parse(line);
+  if (method === 'initialize') {
+    send({ id, result: { protocolVersion: params.protocolVersion, agentCapabilities: { loadSession: true } } });
+  } else if (method === 'session/load') {
+    send({ id, result: { sessionId: 's-meta', configOptions: [{ id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'stub-model', options: [{ value: 'stub-model', name: 'Stub' }] }] } });
+  } else if (method === 'session/set_config_option') {
+    send({ id, result: { configOptions: [] } });
+  } else if (method === 'session/prompt') {
+    send({
+      method: 'session/update',
+      params: {
+        sessionId: 's-meta',
+        update: {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'tc-meta',
+          title: 'Listing project tasks',
+          kind: 'other',
+          _meta: { claudeCode: { toolName: 'mcp__cairn__todos' } },
+          rawInput: {},
+          status: 'pending',
+        },
+      },
+    });
+    send({
+      method: 'session/update',
+      params: {
+        sessionId: 's-meta',
+        update: {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'tc-meta',
+          status: 'failed',
+          rawOutput: 'unknown tool: "mcp__cairn__todos"',
+        },
+      },
+    });
+    send({ id, result: { stopReason: 'end_turn' } });
+  }
+}
+`;
+    const backend = createAcpBackend({
+      harness: 'claude-code',
+      command: process.execPath,
+      args: ['--input-type=module', '-e', fakeScript],
+      allowHostMcp: true,
+    });
+    const session = await backend.continueSession('s-meta', {
+      ...opts,
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      executeRemoteTool: async () => '[]',
+    });
+    const events = await collect(session.events);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    expect(events).toContainEqual({
+      type: 'error',
+      error: {
+        message: expect.stringContaining('Cairn host tools did not attach'),
+        retryable: false,
+      },
+    });
+  });
+
+  test('gemini: detects missing host tools even when progress content precedes failed rawOutput', async () => {
+    const fakeScript = `
+import { createInterface } from 'node:readline';
+const send = (v) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...v }) + '\\n');
+for await (const line of createInterface({ input: process.stdin })) {
+  const { id, method, params } = JSON.parse(line);
+  if (method === 'initialize') {
+    send({ id, result: { protocolVersion: params.protocolVersion, agentCapabilities: { loadSession: true } } });
+  } else if (method === 'session/load') {
+    send({ id, result: { sessionId: 's-gem-split', configOptions: [] } });
+  } else if (method === 'session/prompt') {
+    send({
+      method: 'session/update',
+      params: {
+        sessionId: 's-gem-split',
+        update: {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'tc-gem-1',
+          title: 'mcp_cairn_todos',
+          kind: 'other',
+          rawInput: {},
+          content: [{ type: 'text', text: 'running' }],
+        },
+      },
+    });
+    send({
+      method: 'session/update',
+      params: {
+        sessionId: 's-gem-split',
+        update: {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'tc-gem-1',
+          rawOutput: 'unknown tool: "mcp_cairn_todos"',
+        },
+      },
+    });
+    send({
+      method: 'session/update',
+      params: {
+        sessionId: 's-gem-split',
+        update: {
+          sessionUpdate: 'tool_call_update',
+          toolCallId: 'tc-gem-1',
+          status: 'failed',
+        },
+      },
+    });
+    send({ id, result: { stopReason: 'end_turn' } });
+  }
+}
+`;
+    const backend = createGeminiBackend({
+      executablePath: process.execPath,
+      spawnProcess: (_cmd, _args, spawnOpts) =>
+        spawn(process.execPath, ['--input-type=module', '-e', fakeScript], spawnOpts),
+    });
+    const session = await backend.continueSession('s-gem-split', {
+      ...opts,
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      executeRemoteTool: async () => '[]',
+    });
+    const events = await collect(session.events);
+    expect(events.some((e) => e.type === 'done')).toBe(false);
+    expect(events).toContainEqual({
+      type: 'error',
+      error: {
+        message: expect.stringContaining('Cairn host tools did not attach'),
+        retryable: false,
+      },
+    });
+  });
+
+  test('clears missingHostToolsError if MCP attaches and succeeds later in the same turn', async () => {
+    const fakeScript = `
+import { createConnection } from 'node:net';
+import { createInterface } from 'node:readline';
+const send = (v) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...v }) + '\\n');
+let host = null;
+for await (const line of createInterface({ input: process.stdin })) {
+  const { id, method, params } = JSON.parse(line);
+  if (method === 'initialize') {
+    send({ id, result: { protocolVersion: params.protocolVersion, agentCapabilities: { loadSession: true } } });
+  } else if (method === 'session/load') {
+    host = (params.mcpServers ?? []).find((s) => s.name === 'cairn') ?? null;
+    send({ id, result: { sessionId: 's-recover', configOptions: [{ id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'stub-model', options: [{ value: 'stub-model', name: 'Stub' }] }] } });
+  } else if (method === 'session/set_config_option') {
+    send({ id, result: { configOptions: [] } });
+  } else if (method === 'session/prompt') {
+    send({ method: 'session/update', params: { sessionId: 's-recover', update: { sessionUpdate: 'tool_call', toolCallId: 'tc-fail', title: 'mcp_cairn_todos', kind: 'other', rawInput: {}, status: 'pending' } } });
+    send({ method: 'session/update', params: { sessionId: 's-recover', update: { sessionUpdate: 'tool_call_update', toolCallId: 'tc-fail', status: 'failed', rawOutput: 'unknown tool: "mcp_cairn_todos"' } } });
+    const [portStr, token] = host.args.slice(-2);
+    const out = await new Promise((resolve, reject) => {
+      const sock = createConnection(Number(portStr), '127.0.0.1', () => {
+        sock.write(
+          token + '\\n' +
+          JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'x', version: '1' } } }) + '\\n' +
+          JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }) + '\\n' +
+          JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'todos', arguments: {} } }) + '\\n',
+        );
+      });
+      const replies = [];
+      createInterface({ input: sock }).on('line', (l) => {
+        if (!l.trim()) return;
+        replies.push(JSON.parse(l));
+        if (replies.length === 3) { sock.destroy(); resolve(replies); }
+      });
+      sock.on('error', reject);
+    });
+    const text = out.find((r) => r.id === 3).result.content[0].text;
+    send({ method: 'session/update', params: { sessionId: 's-recover', update: { sessionUpdate: 'tool_call', toolCallId: 'tc-ok', title: 'mcp_cairn_todos', kind: 'other', rawInput: {}, status: 'completed', rawOutput: text } } });
+    send({ method: 'session/update', params: { sessionId: 's-recover', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } } });
+    send({ id, result: { stopReason: 'end_turn' } });
+  }
+}
+`;
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: process.execPath,
+      args: ['--input-type=module', '-e', fakeScript],
+      allowHostMcp: true,
+    });
+    const session = await backend.continueSession('s-recover', {
+      ...opts,
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      executeRemoteTool: async () => 'recovered-todos',
+    });
+    const events = await collect(session.events);
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+    expect(events).toContainEqual({
+      type: 'message_end',
+      message: { role: 'assistant', content: 'recovered-todos' },
+    });
+    expect(events).toContainEqual({ type: 'done', usage: [] });
+  });
+
+  test('devin: steering into a clean prompt clears missingHostToolsError from the interrupted prompt', async () => {
+    const fakeScript = `
+import { createInterface } from 'node:readline';
+const send = (v) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...v }) + '\\n');
+let promptCount = 0;
+let firstPromptId = null;
+for await (const line of createInterface({ input: process.stdin })) {
+  const { id, method, params } = JSON.parse(line);
+  if (method === 'initialize') {
+    send({ id, result: { protocolVersion: params.protocolVersion, agentCapabilities: { loadSession: true } } });
+  } else if (method === 'session/load') {
+    send({ id, result: { sessionId: 's-steer', modes: { currentModeId: 'bypass', availableModes: [{ id: 'bypass', name: 'Bypass' }] }, configOptions: [{ id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'stub-model', options: [{ value: 'stub-model', name: 'Stub' }] }] } });
+  } else if (method === 'session/set_mode') {
+    send({ id, result: {} });
+  } else if (method === 'session/set_config_option') {
+    send({ id, result: { configOptions: [] } });
+  } else if (method === 'session/prompt') {
+    promptCount += 1;
+    if (promptCount === 1) {
+      firstPromptId = id;
+      send({ method: 'session/update', params: { sessionId: 's-steer', update: { sessionUpdate: 'tool_call', toolCallId: 'tc-s1', title: 'mcp_cairn_todos', kind: 'other', rawInput: {}, status: 'pending' } } });
+      send({ method: 'session/update', params: { sessionId: 's-steer', update: { sessionUpdate: 'tool_call_update', toolCallId: 'tc-s1', status: 'failed', rawOutput: 'unknown tool: "mcp_cairn_todos"' } } });
+      send({ method: 'session/update', params: { sessionId: 's-steer', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'ready-for-steer' } } } });
+    } else {
+      send({ id: firstPromptId, result: { stopReason: 'interrupted' } });
+      send({ method: 'session/update', params: { sessionId: 's-steer', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'steered-ok' } } } });
+      send({ id, result: { stopReason: 'end_turn' } });
+    }
+  }
+}
+`;
+    const backend = createAcpBackend({
+      harness: 'devin',
+      command: process.execPath,
+      args: ['--input-type=module', '-e', fakeScript],
+      allowHostMcp: true,
+      steering: 'mid-turn',
+    });
+    const session = await backend.continueSession('s-steer', {
+      ...opts,
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      executeRemoteTool: async () => '[]',
+    });
+    const events: StepEvent[] = [];
+    let steered = false;
+    for await (const ev of session.events) {
+      events.push(ev);
+      if (!steered && ev.type === 'text_delta' && ev.text.includes('ready-for-steer')) {
+        steered = true;
+        await session.steer?.('just answer hi');
+      }
+    }
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+    expect(events).toContainEqual({
+      type: 'message_end',
+      message: { role: 'assistant', content: 'steered-ok' },
+    });
+    expect(events).toContainEqual({ type: 'done', usage: [] });
+  });
 });
