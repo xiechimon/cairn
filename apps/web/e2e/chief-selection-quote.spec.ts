@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import { HISTORY, mockLive, TASK, THREAD } from './chief-home-mock';
+import { decodePng } from './png';
 
 const LAST_REPLY = '这条和 #9 是同一处，已经补给它了。';
 
@@ -78,3 +79,75 @@ test('Cmd+Enter in the quote box sends the quote and the text at once; Escape cl
     .toBe(`<!-- reply source=m6 -->\n> ${LAST_REPLY}\n\n那就合并吧`);
   await expect(page.getByTestId('composer-reply-quote')).toHaveCount(0);
 });
+
+async function textClip(page: Page, sourceId: string) {
+  const rect = await page
+    .locator(`[data-reply-source="${sourceId}"] [data-slot="reply-bubble"]`)
+    .first()
+    .evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const box = range.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    });
+  return {
+    x: Math.ceil(rect.x),
+    y: Math.ceil(rect.y),
+    width: Math.floor(rect.width),
+    height: Math.floor(rect.height),
+  };
+}
+
+async function changedShare(
+  page: Page,
+  clip: { x: number; y: number; width: number; height: number },
+  before: Buffer,
+) {
+  const a = decodePng(before);
+  const b = decodePng(await page.screenshot({ clip, animations: 'disabled' }));
+  let changed = 0;
+  for (let y = 0; y < a.height; y += 1) {
+    for (let x = 0; x < a.width; x += 1) {
+      const [r1, g1, b1] = a.px(x, y);
+      const [r2, g2, b2] = b.px(x, y);
+      if (Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2) > 24) changed += 1;
+    }
+  }
+  return changed / (a.width * a.height);
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`C40 ${theme}: selected text and the span being quoted are visibly marked on a reply bubble`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await openChat(page);
+    await page.evaluate(
+      (light) => document.documentElement.classList.toggle('light', light),
+      theme === 'light',
+    );
+    const clip = await textClip(page, 'm6');
+    const before = await page.screenshot({ clip, animations: 'disabled' });
+
+    await dragSelect(page, 'm6');
+    await expect(page.getByTestId('selection-reply-bar')).toBeVisible();
+    expect(
+      await changedShare(page, clip, before),
+      'C40: the native selection on a reply bubble must differ from the bubble fill',
+    ).toBeGreaterThan(0.4);
+
+    await page.keyboard.press('r');
+    await expect(page.getByTestId('selection-quote-input')).toBeFocused();
+    expect(
+      await changedShare(page, clip, before),
+      'C40: the span being quoted stays marked while the quote box has focus',
+    ).toBeGreaterThan(0.4);
+
+    await page.getByTestId('selection-quote-input').press('Enter');
+    await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
+    expect(
+      await changedShare(page, clip, before),
+      'C40: a staged quote keeps its span marked',
+    ).toBeGreaterThan(0.4);
+  });
+}

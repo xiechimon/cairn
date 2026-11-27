@@ -70,6 +70,7 @@ import { type LateArrival, withoutReturnedText } from './outbox.js';
 import { awaitingStream } from './question-lifecycle.js';
 import { type QueuedMessage, QueueTabs } from './queue-tabs.js';
 import { QuickReplies } from './quick-replies.js';
+import { useQuoteMark } from './quote-mark.js';
 import { ReaderFollowContext, useReaderFollow } from './reader-follow.js';
 import { ReplyingToBar } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
@@ -244,6 +245,7 @@ export function ChiefConversation({
   const { t } = useI18n();
   const [replyQuote, setReplyQuote] = useState<ReplyQuoteDraft | null>(null);
   const [highlightedSource, setHighlightedSource] = useState<ReplyQuoteDraft | null>(null);
+  useQuoteMark(replyQuote?.range);
   const quickKey = (chief.quickReplies ?? []).join('\n');
   const [preview, setPreview] = useState<{ key: string; text: string } | null>(null);
   const previewReply = preview !== null && preview.key === quickKey ? preview.text : null;

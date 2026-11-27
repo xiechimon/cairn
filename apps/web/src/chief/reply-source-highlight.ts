@@ -3,6 +3,7 @@ import { createContext } from 'react';
 export interface ReplyQuoteDraft {
   sourceMessageId: string;
   quote: string;
+  range?: Range;
 }
 
 export const REPLY_SOURCE_ATTR = 'data-reply-source';

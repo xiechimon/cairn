@@ -14,6 +14,7 @@ import { ShortcutHint } from '../components/shortcut-hint.js';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
+import { useQuoteMark } from './quote-mark.js';
 import { REPLY_SOURCE_ATTR, type ReplyQuoteDraft } from './reply-source-highlight.js';
 import { barPosition, replyableText, SETTLE_MS, scrolledAway } from './selection-reply-model.js';
 
@@ -203,8 +204,14 @@ export function SelectionReply({
     };
   }, [target, boxOpen, containerRef]);
 
+  useQuoteMark(boxOpen ? target?.range : null);
+
   if (target === null) return null;
-  const draft = { sourceMessageId: target.sourceMessageId, quote: target.text };
+  const draft = {
+    sourceMessageId: target.sourceMessageId,
+    quote: target.text,
+    range: target.range.cloneRange(),
+  };
   const onBoxKey = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (event.nativeEvent.isComposing) return;
     if (event.key === 'Escape') {

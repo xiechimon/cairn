@@ -122,7 +122,11 @@
     scroll-margin-top: 4rem;
   }
   ::selection {
-    background: color-mix(in oklab, var(--accent) 26%, transparent);
+    background: color-mix(in oklab, var(--card-button) 32%, transparent);
+    color: inherit;
+  }
+  ::highlight(cairn-quote) {
+    background: color-mix(in oklab, var(--card-button) 32%, transparent);
     color: inherit;
   }
   [role="dialog"],
