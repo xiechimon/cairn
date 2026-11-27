@@ -460,6 +460,9 @@ export function evaluateHealth({
       (m) => m.online === true && m.hubConnected === true,
     );
     const hubOk = connectedLocals.length > 0;
+    const offersOwnComputer = localMachines.some(
+      (m) => m.capabilities?.ownComputer === true || m.capabilities?.ownComputerShell === true,
+    );
     const ownReady = coord?.ownComputerReady === true;
     const ownReason = coord?.ownComputerReason ?? null;
     checks.push({
@@ -469,15 +472,19 @@ export function evaluateHealth({
     });
     checks.push({
       id: 'own-computer-ready',
-      ok: ownReady,
-      detail: ownReady ? 'ready' : (ownReason ?? 'ownComputerReady=false'),
+      ok: !offersOwnComputer || ownReady,
+      detail: !offersOwnComputer
+        ? 'not offered on headless local runner'
+        : ownReady
+          ? 'ready'
+          : (ownReason ?? 'ownComputerReady=false'),
     });
-    if (!hubOk || !ownReady) {
+    if (!hubOk || (offersOwnComputer && !ownReady)) {
       const disconnected = localMachines
         .filter((m) => !m.online || !m.hubConnected)
         .map((m) => `${m.name}(online=${m.online},hubConnected=${m.hubConnected})`);
       const reason =
-        ownReason ??
+        (offersOwnComputer ? ownReason : null) ??
         (disconnected.length > 0
           ? `local runner disconnected: ${disconnected.join(', ')}`
           : 'ownComputerReady=false');
@@ -509,40 +516,87 @@ function sleep(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
+export function parseAccessTokenContent(content) {
+  let bareFallback = null;
+  for (const rawLine of String(content ?? '').split('\n')) {
+    const line = rawLine.trim();
+    if (line === '' || line.startsWith('#') || line.startsWith(';')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 0) {
+      bareFallback ??= line;
+      continue;
+    }
+    if (line.slice(0, eq).trim() !== 'CAIRN_TOKEN') continue;
+    let value = line.slice(eq + 1).trim();
+    if (value.length >= 2) {
+      const quote = value[0];
+      if ((quote === '"' || quote === "'") && value[value.length - 1] === quote) {
+        value = value.slice(1, -1);
+      }
+    }
+    return value === '' ? null : value;
+  }
+  return bareFallback;
+}
+
 function buildRemoteHttpScript() {
   return `
-const fs = require('node:fs');
-const path = require('node:path');
-let input = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (chunk) => { input += chunk; });
-process.stdin.on('end', async () => {
-  const req = JSON.parse(input);
-  const home = process.env.HOME || '';
-  const tokenFile = path.join(home, '.cairn-server', 'token');
-  let token = '';
-  try {
-    token = fs.readFileSync(tokenFile, 'utf8').trim();
-  } catch {}
-  const headers = {};
-  if (token) headers.authorization = 'Bearer ' + token;
-  if (req.body !== undefined) headers['content-type'] = 'application/json';
-  const url = 'http://127.0.0.1:' + req.port + req.path;
-  try {
-    const res = await fetch(url, {
-      method: req.method,
-      headers,
-      body: req.body === undefined ? undefined : JSON.stringify(req.body),
-      signal: AbortSignal.timeout(req.timeoutMs || 15000),
-    });
-    const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch {}
-    process.stdout.write(JSON.stringify({ status: res.status, data, text }));
-  } catch (err) {
-    process.stdout.write(JSON.stringify({ status: 0, data: null, text: String(err && err.message || err) }));
-  }
-});
+import json, os, sys, urllib.error, urllib.request
+req = json.load(sys.stdin)
+token_file = os.path.expanduser('~/.cairn-server/token')
+token = ''
+try:
+    raw = open(token_file, encoding='utf-8').read()
+    bare = None
+    for raw_line in raw.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or line.startswith(';'):
+            continue
+        if '=' not in line:
+            if bare is None:
+                bare = line
+            continue
+        k, v = line.split('=', 1)
+        if k.strip() != 'CAIRN_TOKEN':
+            continue
+        val = v.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in ('"', "'"):
+            val = val[1:-1]
+        token = val
+        break
+    if not token and bare:
+        token = bare
+except Exception:
+    pass
+headers = {}
+if token:
+    headers['Authorization'] = 'Bearer ' + token
+body_bytes = None
+if 'body' in req and req['body'] is not None:
+    headers['Content-Type'] = 'application/json'
+    body_bytes = json.dumps(req['body']).encode('utf-8')
+url = 'http://127.0.0.1:' + str(req['port']) + req['path']
+timeout_s = max(1.0, float(req.get('timeoutMs') or 15000) / 1000.0)
+http_req = urllib.request.Request(url, data=body_bytes, headers=headers, method=req['method'])
+try:
+    with urllib.request.urlopen(http_req, timeout=timeout_s) as resp:
+        text = resp.read().decode('utf-8', errors='replace')
+        data = None
+        try:
+            data = json.loads(text)
+        except Exception:
+            pass
+        print(json.dumps({'status': resp.status, 'data': data, 'text': text}))
+except urllib.error.HTTPError as err:
+    text = err.read().decode('utf-8', errors='replace')
+    data = None
+    try:
+        data = json.loads(text)
+    except Exception:
+        pass
+    print(json.dumps({'status': err.code, 'data': data, 'text': text}))
+except Exception as exc:
+    print(json.dumps({'status': 0, 'data': None, 'text': str(exc)}))
 `.trim();
 }
 
@@ -569,43 +623,54 @@ finally:
 
 function buildRemoteDeployScript() {
   return `
-const fs = require('node:fs');
-const path = require('node:path');
-const { execFileSync } = require('node:child_process');
-const home = process.env.HOME || '';
-const readTrim = (p) => { try { return fs.readFileSync(p, 'utf8').trim() || null; } catch { return null; } };
-const readJson = (p) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; } };
-let runnerSha = null;
-try {
-  runnerSha = execFileSync('git', ['-C', path.join(home, 'cairn-runner'), 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-} catch {}
-process.stdout.write(JSON.stringify({
-  deployedShaFile: readTrim(path.join(home, 'cairn-server', 'DEPLOYED_SHA')),
-  deployJson: readJson(path.join(home, '.cairn-server', 'server', 'deploy.json')),
-  runnerSha,
-}));
+import json, os, subprocess
+home = os.path.expanduser('~')
+def read_trim(p):
+    try:
+        v = open(p, encoding='utf-8').read().strip()
+        return v or None
+    except Exception:
+        return None
+def read_json(p):
+    try:
+        return json.load(open(p, encoding='utf-8'))
+    except Exception:
+        return None
+runner_sha = None
+try:
+    runner_sha = subprocess.check_output(
+        ['git', '-C', os.path.join(home, 'cairn-runner'), 'rev-parse', 'HEAD'],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    ).strip() or None
+except Exception:
+    pass
+print(json.dumps({
+    'deployedShaFile': read_trim(os.path.join(home, 'cairn-server', 'DEPLOYED_SHA')),
+    'deployJson': read_json(os.path.join(home, '.cairn-server', 'server', 'deploy.json')),
+    'runnerSha': runner_sha,
+}))
 `.trim();
 }
 
 function buildRemoteTailScript(lines) {
   return `
-const fs = require('node:fs');
-const path = require('node:path');
-const home = process.env.HOME || '';
-const tail = (p) => {
-  try {
-    const raw = fs.readFileSync(p, 'utf8').trim();
-    if (!raw) return '';
-    return raw.split('\\n').slice(-${Number(lines)}).join('\\n');
-  } catch {
-    return null;
-  }
-};
-process.stdout.write(JSON.stringify({
-  serverErr: tail(path.join(home, '.cairn-server', 'launchd-server.err.log')),
-  serverOut: tail(path.join(home, '.cairn-server', 'launchd-server.out.log')),
-  daemonLog: tail(path.join(home, '.cairn', 'daemon.log')) ?? tail(path.join(home, 'Library', 'Application Support', '@cairn', 'desktop', 'runner', 'daemon.log')),
-}));
+import json, os
+home = os.path.expanduser('~')
+limit = ${Number(lines)}
+def tail(p):
+    try:
+        raw = open(p, encoding='utf-8', errors='replace').read().strip()
+        if not raw:
+            return ''
+        return '\\n'.join(raw.splitlines()[-limit:])
+    except Exception:
+        return None
+print(json.dumps({
+    'serverErr': tail(os.path.join(home, '.cairn-server', 'launchd-server.err.log')),
+    'serverOut': tail(os.path.join(home, '.cairn-server', 'launchd-server.out.log')),
+    'daemonLog': tail(os.path.join(home, '.cairn', 'daemon.log')) or tail(os.path.join(home, 'Library', 'Application Support', '@cairn', 'desktop', 'runner', 'daemon.log')),
+}))
 `.trim();
 }
 
@@ -748,8 +813,8 @@ export async function createTargetClient(
       repoRoot,
       async requestJson(method, path, body) {
         const raw = runProdCommand(
-          'node',
-          ['-e', buildRemoteHttpScript()],
+          'python3',
+          ['-c', buildRemoteHttpScript()],
           { method, path, body, port, timeoutMs: 15_000 },
           { env, spawnFn },
         );
@@ -765,14 +830,14 @@ export async function createTargetClient(
         return JSON.parse(raw);
       },
       readDeployArtifacts() {
-        const raw = runProdCommand('node', ['-e', buildRemoteDeployScript()], undefined, {
+        const raw = runProdCommand('python3', ['-c', buildRemoteDeployScript()], undefined, {
           env,
           spawnFn,
         });
         return JSON.parse(raw);
       },
       tailLogs(lines = 40) {
-        const raw = runProdCommand('node', ['-e', buildRemoteTailScript(lines)], undefined, {
+        const raw = runProdCommand('python3', ['-c', buildRemoteTailScript(lines)], undefined, {
           env,
           spawnFn,
         });
@@ -944,10 +1009,12 @@ async function resolveProjectForProbe(client, teamId, opts, allowCreate) {
   if (opts.projectId) {
     return { projectId: opts.projectId, createdProjectId: null };
   }
-  const projectsRes = await client.requestJson('GET', '/api/projects');
-  if (projectsRes.status === 200 && Array.isArray(projectsRes.data)) {
-    const active = projectsRes.data.find((p) => !p.archivedAt);
-    if (active) return { projectId: active.id, createdProjectId: null };
+  if (!(opts.live && client.target === 'prod')) {
+    const projectsRes = await client.requestJson('GET', '/api/projects');
+    if (projectsRes.status === 200 && Array.isArray(projectsRes.data)) {
+      const active = projectsRes.data.find((p) => !p.archivedAt);
+      if (active) return { projectId: active.id, createdProjectId: null };
+    }
   }
   if (!allowCreate) {
     throw new Error('No active project found; pass --project <id>');
@@ -999,12 +1066,7 @@ export async function runCoordinatorTask(client, opts, { cleanup = true } = {}) 
 
   try {
     if (opts.live) {
-      const projectInfo = await resolveProjectForProbe(
-        client,
-        teamId,
-        opts,
-        client.target === 'local',
-      );
+      const projectInfo = await resolveProjectForProbe(client, teamId, opts, true);
       createdProjectId = projectInfo.createdProjectId;
       const clientMessageId = `${marker}-${randomUUID().slice(0, 8)}`;
       const machineHint = opts.machine ? ` Pin it to machine ${opts.machine}.` : '';
@@ -1223,12 +1285,7 @@ export async function runComputerRun(client, opts, { cleanup = true } = {}) {
 
   try {
     if (!buildId && !todoId) {
-      const projectInfo = await resolveProjectForProbe(
-        client,
-        teamId,
-        opts,
-        client.target === 'local',
-      );
+      const projectInfo = await resolveProjectForProbe(client, teamId, opts, true);
       createdProjectId = projectInfo.createdProjectId;
       const marker = `passage-run-${Date.now() % 1_000_000}`;
       const createRes = await client.requestJson(
@@ -1308,7 +1365,7 @@ export async function runComputerRun(client, opts, { cleanup = true } = {}) {
         `Build ${buildId} step ${finishedStep.id} failed (${finishedStep.failureCode ?? buildDb.rows?.[0]?.failureCode ?? 'unknown'}) traceId=${traceId}`,
       );
     }
-    if (targetMachine && finishedStep.machineId !== targetMachine.id) {
+    if (opts.machine && targetMachine && finishedStep.machineId !== targetMachine.id) {
       throw new Error(
         `Expected step.machineId=${targetMachine.id}, got ${finishedStep.machineId ?? 'null'}`,
       );

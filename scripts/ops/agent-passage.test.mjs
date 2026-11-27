@@ -16,6 +16,7 @@ import {
   otlpTraceIdOfBuild,
   otlpTraceIdOfStep,
   otlpTraceIdOfTurn,
+  parseAccessTokenContent,
   parseArgs,
   redactReport,
   runCli,
@@ -253,7 +254,14 @@ test('evaluateHealth detects Coordinator core tool drop and post-restart local M
           ownComputerReason: 'No connected local Mac machine after runner restart',
         },
         machines: [
-          { id: 'mac-1', name: 'Mac mini', kind: 'local', online: true, hubConnected: false },
+          {
+            id: 'mac-1',
+            name: 'Mac mini',
+            kind: 'local',
+            online: true,
+            hubConnected: false,
+            capabilities: { ownComputer: true, ownComputerShell: true },
+          },
         ],
       },
     },
@@ -326,9 +334,41 @@ test('evaluateHealth detects Coordinator core tool drop and post-restart local M
   });
   assert.equal(enrolledOffline.ok, false);
   assert.match(enrolledOffline.errors.join('\n'), /Own computer not ready/);
+
+  const headlessOnline = evaluateHealth({
+    target: 'prod',
+    userMe: { status: 200, data: { id: 'u1', displayName: 'Owner' } },
+    teams: { status: 200, data: [{ id: 'team-1' }] },
+    diagnostics: {
+      status: 200,
+      data: {
+        coordinator: {
+          ...baseDiag.data.coordinator,
+          ownComputerReady: false,
+          ownComputerReason: 'No Mac with the Cairn app is connected',
+        },
+        machines: [
+          {
+            id: 'mac-headless',
+            name: 'Ians-Mac-mini.local',
+            kind: 'local',
+            online: true,
+            hubConnected: true,
+            latestCliVersion: '0.2.3',
+            capabilities: { ownComputer: false, ownComputerShell: false },
+          },
+        ],
+      },
+    },
+    machines: [{ id: 'mac-headless', name: 'Ians-Mac-mini.local', kind: 'local', online: true }],
+    deployAlignment: { ok: true, checks: [], errors: [] },
+  });
+  assert.equal(headlessOnline.ok, true);
+  assert.equal(parseAccessTokenContent('# comment\nCAIRN_TOKEN="abc123def"\n'), 'abc123def');
+  assert.equal(parseAccessTokenContent('baretokenvalue\n'), 'baretokenvalue');
 });
 
-test('createTargetClient prod mode invokes ssh BatchMode with shell-safe remote scripts and zero token leakage', async () => {
+test('createTargetClient prod mode invokes ssh BatchMode with shell-safe python3 scripts and zero token leakage', async () => {
   const sshCalls = [];
   const client = await createTargetClient(
     { target: 'prod' },
@@ -339,7 +379,7 @@ test('createTargetClient prod mode invokes ssh BatchMode with shell-safe remote 
         if (cmd === 'ssh') {
           const remoteCmd = args.at(-1) ?? '';
           assert.equal(remoteCmd.includes('\n'), false);
-          if (remoteCmd.startsWith('node -e ')) {
+          if (remoteCmd.startsWith('python3 -c ')) {
             return {
               status: 0,
               stdout: JSON.stringify({
@@ -398,6 +438,7 @@ function createMockClient({
 } = {}) {
   const calls = [];
   let deletedTodo = false;
+  let deletedProject = false;
   let buildCounter = 0;
   let lastPrompt = '[passage-probe] passage-1';
 
@@ -405,6 +446,9 @@ function createMockClient({
     calls,
     get deletedTodo() {
       return deletedTodo;
+    },
+    get deletedProject() {
+      return deletedProject;
     },
     target,
     baseUrl: 'http://127.0.0.1:8791',
@@ -485,6 +529,17 @@ function createMockClient({
           data: [{ id: 'proj-1', name: 'Demo', archivedAt: null }],
           text: '[]',
         };
+      }
+      if (method === 'POST' && path === '/api/projects') {
+        return {
+          status: 201,
+          data: { id: 'proj-probe-1', name: body?.name ?? 'passage-probe', archivedAt: null },
+          text: '{}',
+        };
+      }
+      if (method === 'DELETE' && path.startsWith('/api/projects/')) {
+        deletedProject = true;
+        return { status: 204, data: null, text: '' };
       }
       if (method === 'POST' && path === '/api/teams/team-1/chief/threads') {
         lastPrompt = typeof body?.content === 'string' ? body.content : lastPrompt;
@@ -700,6 +755,7 @@ test('runCli top-journeys --live succeeds, cleans up probe todo, and writes reda
     ['health', 'coordinator-task', 'computer-run', 'chat-result'],
   );
   assert.equal(mockClient.deletedTodo, true);
+  assert.equal(mockClient.deletedProject, true);
 
   const written = JSON.parse(readFileSync(join(outDir, 'result.json'), 'utf8'));
   assert.equal(written.ok, true);
@@ -724,6 +780,7 @@ test('runCli top-journeys automatically runs diagnose on step failure and redact
   assert.equal(exitCode, 1);
   assert.equal(report.ok, false);
   assert.equal(mockClient.deletedTodo, true);
+  assert.equal(mockClient.deletedProject, true);
   assert.ok(report.diagnosis);
   assert.equal(report.diagnosis.traceId, otlpTraceIdOfBuild('build-1'));
   assert.match(report.diagnosis.langfusePath, /\/api\/public\/v2\/observations\?traceId=/);
