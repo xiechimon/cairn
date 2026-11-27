@@ -8,7 +8,15 @@ import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
 
 registerChiefHarness();
 
-type Document = { file: string; scope: string; baseVersion: string; content: string; id: string };
+type Document = {
+  file: string;
+  scope: string;
+  baseVersion: string;
+  content: string;
+  id: string;
+  indexBaseVersion?: string;
+  reminder?: string;
+};
 type Listing = { documents: Document[] };
 const owner = () => ({ teamId: H.teamId, agentId: AGENT_ID, projectId: null });
 const paths = ['Coordinator', 'worker'] as const;
@@ -478,4 +486,39 @@ test('team preferences stay under the cap, keep project facts out, and record pr
     sourceMessageId: 'msg-remember',
   });
   expect(entries.some((e) => e.line === line(1))).toBe(false);
+});
+
+test('save_memory warns with indexBaseVersion when unlinked from MEMORY.md and omits the reminder once linked', async () => {
+  const indexBefore = await read('Coordinator');
+  const created = (await relay('save_memory', {
+    scope: 'team',
+    file: 'reply-style.md',
+    content: 'Conclusion first.',
+  })) as Document;
+  expect(created.reminder).toContain('MEMORY.md');
+  expect(created.reminder).toContain('not loaded automatically');
+  expect(created.indexBaseVersion).toBe(indexBefore.baseVersion);
+
+  await relay('update_memory', {
+    scope: 'team',
+    file: 'MEMORY.md',
+    baseVersion: created.indexBaseVersion,
+    content: '- [reply style](reply-style.md)',
+  });
+  expect((await read('Coordinator')).content).toContain('reply-style.md');
+
+  const currentIndex = await read('Coordinator');
+  await relay('update_memory', {
+    scope: 'team',
+    file: 'MEMORY.md',
+    baseVersion: currentIndex.baseVersion,
+    content: `${currentIndex.content}\n- [my rule](my%20rule.md)`,
+  });
+  const linked = (await relay('save_memory', {
+    scope: 'team',
+    file: 'my rule.md',
+    content: 'Encoded link already exists.',
+  })) as Document;
+  expect(linked.reminder).toBeUndefined();
+  expect(linked.indexBaseVersion).toBeUndefined();
 });

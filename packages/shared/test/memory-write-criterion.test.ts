@@ -59,3 +59,11 @@ test('the criterion states each rule and stays within its prompt budget', () => 
     expect(MEMORY_WRITE_CRITERION).toContain(rule);
   expect(MEMORY_WRITE_CRITERION.length).toBeLessThanOrEqual(500);
 });
+
+test('save_memory warns on every runtime path that searchable files are not auto-loaded', () => {
+  for (const tools of [WORKER_REMOTE_TOOLS, WORKER_REMOTE_TOOLS_GITHUB, CHIEF_REMOTE_TOOLS]) {
+    const description = tools.find((tool) => tool.name === 'save_memory')?.description ?? '';
+    expect(description).toContain('not auto-loaded on future turns');
+    expect(description).toContain('Only MEMORY.md is always loaded');
+  }
+});

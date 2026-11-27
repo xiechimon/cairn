@@ -308,7 +308,7 @@ function memoryParameters(schema: z.ZodType) {
 export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'save_memory',
-    description: `Create a memory file in the scope. Never overwrites: an occupied name returns 409. MEMORY.md is reserved; edit it with update_memory. There is no file count or content length limit. ${MEMORY_WRITE_CRITERION}`,
+    description: `Create a searchable memory file in the scope (read on demand, not auto-loaded on future turns). Only MEMORY.md is always loaded; put rules that must apply on future turns in MEMORY.md (or link this file from MEMORY.md) with update_memory. Never overwrites: an occupied name returns 409. MEMORY.md is reserved; edit it with update_memory. There is no file count or content length limit. ${MEMORY_WRITE_CRITERION}`,
     parameters: memoryParameters(memoryToolParamsSchemas.save_memory),
   },
   {

@@ -276,7 +276,16 @@ export function executeMemoryDocumentTool(
         })
         .returning()
         .get();
-      return result(row);
+      const index = current(tx, ns, MEMORY_INDEX_TITLE);
+      const indexText = memoryIndexText(index);
+      const linked =
+        indexText.includes(input.file) || indexText.includes(encodeURIComponent(input.file));
+      if (linked) return result(row);
+      return {
+        ...result(row),
+        indexBaseVersion: memoryDocumentVersion(index),
+        reminder: `${input.file} is searchable on demand and not loaded automatically on future turns. Only ${MEMORY_INDEX_TITLE} is always loaded; if this rule must apply on future turns, add it to ${MEMORY_INDEX_TITLE} or link ${input.file} from ${MEMORY_INDEX_TITLE} with update_memory (baseVersion: indexBaseVersion).`,
+      };
     });
   }
   if (name !== 'update_memory' && name !== 'delete_memory')
