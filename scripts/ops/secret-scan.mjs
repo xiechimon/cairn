@@ -18,7 +18,8 @@ const BUFFER = 64 * 1024 * 1024;
 const IGNORE_FILE = '.gitleaksignore';
 const PINNED_ENTRY = /^[0-9a-f]{40}:.+:[\w-]+:\d+$/;
 const LOGGED_ERROR = /(?:^|\s)ERR\s/m;
-const INSTALL = 'node scripts/ops/install-gitleaks.mjs (or brew install gitleaks)';
+const INSTALL =
+  'node scripts/ops/install-gitleaks.mjs (ensure ~/.local/bin is in PATH) or brew install gitleaks';
 const LEAKED =
   'If a finding is real, treat it as leaked: rotate it first, then remove it from every commit that holds it.';
 const FILE_REMEDY = `${LEAKED} For a false positive, commit its Fingerprint line to ${IGNORE_FILE}.`;

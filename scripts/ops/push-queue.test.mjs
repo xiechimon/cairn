@@ -1296,3 +1296,80 @@ if (apiUrl.includes('status=')) {
     releaseTestTempDir(root);
   }
 });
+
+test('push-queue runs secret-scan before enqueueing a rebase-only head whose commit body changed', () => {
+  const root = makeTestTempDir('push-queue-rebase-scan-');
+  const bare = join(root, 'origin.git');
+  const work = join(root, 'wt');
+  const bin = join(root, 'bin');
+  const home = join(root, 'home');
+  try {
+    mkdirSync(bare, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    const env = {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      HOME: home,
+      GIT_AUTHOR_NAME: 'xiechimon',
+      GIT_AUTHOR_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      GIT_COMMITTER_NAME: 'xiechimon',
+      GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+    };
+    const git = (args) => execFileSync('git', args, { cwd: work, encoding: 'utf8', env }).trim();
+    execFileSync('git', ['init', '--bare', '-b', 'main', bare], { encoding: 'utf8' });
+    execFileSync('git', ['clone', bare, work], { encoding: 'utf8' });
+    writeFileSync(join(work, 'base.txt'), 'base\n');
+    git(['add', 'base.txt']);
+    git(['commit', '-qm', 'chore: base']);
+    git(['push', '-qu', 'origin', 'main']);
+
+    git(['checkout', '-qb', 'feat']);
+    writeFileSync(join(work, 'feat.txt'), 'feat\n');
+    git(['add', 'feat.txt']);
+    git(['commit', '-qm', 'feat: work']);
+
+    const stampOut = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL('./preflight.mjs', import.meta.url)), '--stamp-only'],
+      { cwd: work, encoding: 'utf8', env },
+    );
+    assert.equal(stampOut.status, 0, stampOut.stderr);
+    const testedSha = git(['rev-parse', 'HEAD']);
+    const id = readFileSync(join(home, '.config/cairn-dev/lane-machine-id'), 'utf8').trim();
+    git(['push', '-q', 'origin', `${testedSha}:refs/heads/preflight/${id}/wt`]);
+
+    git(['commit', '--quiet', '--amend', '-m', `feat: work\n\nAmended body\n\nLane: ${id}/wt`]);
+    writeFileSync(
+      join(bin, 'gitleaks'),
+      '#!/bin/sh\ncat > /dev/null\necho "WRN leaks found: 1" >&2\nexit 1\n',
+    );
+    chmodSync(join(bin, 'gitleaks'), 0o755);
+    writeFileSync(
+      join(bin, 'gh'),
+      `#!/usr/bin/env node
+const args = process.argv.slice(2).join(' ');
+if (args.includes('/check-runs')) {
+  const runs = args.includes('${testedSha}')
+    ? ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({ name, conclusion: 'success' }))
+    : [];
+  console.log(JSON.stringify([{ check_runs: runs }]));
+} else {
+  console.log(JSON.stringify({ workflow_runs: [{ head_sha: '${testedSha}' }] }));
+}
+`,
+    );
+    chmodSync(join(bin, 'gh'), 0o755);
+
+    const push = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL('./push-queue.mjs', import.meta.url))],
+      { cwd: work, encoding: 'utf8', env },
+    );
+    assert.notEqual(push.status, 0);
+    assert.match(push.stderr, /rotate it first/);
+    assert.equal(git(['ls-remote', 'origin', 'refs/heads/enqueue/*']), '');
+  } finally {
+    releaseTestTempDir(root);
+  }
+});

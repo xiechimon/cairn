@@ -54,6 +54,12 @@ jobs:
           git add apps/daemon/package.json pnpm-lock.yaml pnpm-workspace.yaml
           git commit -m "daemon(deps): bump bundled agent SDKs to latest" -m "$BUMPED"
 
+      - name: Install gitleaks for preflight secret scan (sha256-verified)
+        if: steps.bump.outputs.bumped != ''
+        run: |
+          node scripts/ops/install-gitleaks.mjs --dest "$RUNNER_TEMP/gitleaks-bin"
+          echo "$RUNNER_TEMP/gitleaks-bin" >> "$GITHUB_PATH"
+
       - name: Preflight ci, then queue the bump for promotion
         if: steps.bump.outputs.bumped != ''
         env:

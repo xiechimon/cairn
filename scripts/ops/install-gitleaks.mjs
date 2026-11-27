@@ -15,7 +15,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 
 export const GITLEAKS_VERSION = '8.30.1';
 
@@ -97,6 +97,14 @@ export function downloadWithRetry({
   return { ok: false, error: lastError };
 }
 
+export function isDirOnPath(dir, pathEnv = process.env.PATH ?? '') {
+  const normalized = resolve(dir);
+  return pathEnv
+    .split(delimiter)
+    .filter(Boolean)
+    .some((entry) => resolve(entry) === normalized);
+}
+
 export function parseInstallArgs(argv) {
   let dest = join(homedir(), '.local', 'bin');
   let force = false;
@@ -135,7 +143,12 @@ export function installGitleaks({
     };
   }
   const target = join(dest, 'gitleaks');
-  if (!force && existsSync(target) && matchesExpectedVersion(installedVersion(target, spawn))) {
+  if (
+    !force &&
+    selected.binarySha256 &&
+    existsSync(target) &&
+    sha256File(target) === selected.binarySha256
+  ) {
     return { ok: true, alreadyInstalled: true, target, version: GITLEAKS_VERSION };
   }
   const work = mkdtempSync(join(tmpdir(), 'install-gitleaks-'));
@@ -203,6 +216,11 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(import.met
     if (result.ok) {
       const action = result.alreadyInstalled ? 'already at' : 'installed';
       console.log(`[install-gitleaks] ${action} ${result.version} at ${result.target}`);
+      if (!isDirOnPath(parsed.dest)) {
+        console.log(
+          `[install-gitleaks] ${parsed.dest} is not on PATH; run: export PATH="${parsed.dest}:$PATH"`,
+        );
+      }
     } else {
       console.error(`[install-gitleaks] ${result.error}`);
       process.exitCode = result.code ?? 1;

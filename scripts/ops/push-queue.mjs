@@ -7,6 +7,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { ownerOf, RELEASE_MARKER } from './promote-queue.mjs';
 import { isCleanRebaseOf, rebaseOwnerLane } from './rebase-equivalence.mjs';
+import { scanBranch } from './secret-scan.mjs';
 import { ENQUEUE_PREFIX, makeEnqueueId, sortEnqueueEntries } from './speculative-queue.mjs';
 
 export const DEFAULT_POLL_SECONDS = 15;
@@ -464,6 +465,12 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     console.log(
       `[push-queue] reusing green preflight verdict from ${rebaseEvidence.sha.slice(0, 9)} (rebase-only; queue/try will test merged tree)`,
     );
+    const scanned = scanBranch(process.cwd());
+    if (scanned.output) process.stdout.write(scanned.output);
+    if (scanned.code !== 0) {
+      console.error(`[push-queue] not pushed: ${scanned.message}`);
+      process.exit(scanned.code);
+    }
   }
 
   const refreshed = listRemoteQueue();

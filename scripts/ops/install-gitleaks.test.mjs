@@ -17,6 +17,7 @@ import {
   GITLEAKS_ASSETS,
   GITLEAKS_VERSION,
   installGitleaks,
+  isDirOnPath,
   selectGitleaksAsset,
   sha256File,
 } from './install-gitleaks.mjs';
@@ -52,20 +53,24 @@ test('selectGitleaksAsset maps supported platforms with sha256 digests and rejec
   assert.equal(Object.keys(GITLEAKS_ASSETS).length, 4);
 });
 
-test('installGitleaks verifies sha256, installs atomically, and skips reinstall when already present', (t) => {
+test('installGitleaks verifies sha256, replaces unverified binaries, and skips only when binary sha256 matches', (t) => {
   const { dest, archive, sha256 } = makeTarball(t, 'gitleaks.tar.gz', (payload) => {
     writeFileSync(join(payload, 'gitleaks'), `#!/bin/sh\necho "${GITLEAKS_VERSION}"\n`);
     chmodSync(join(payload, 'gitleaks'), 0o755);
   });
+  const target = join(dest, 'gitleaks');
+  writeFileSync(target, `#!/bin/sh\necho "${GITLEAKS_VERSION}"\n`);
+  chmodSync(target, 0o755);
+
   let downloads = 0;
-  const assets = {
+  const assetsWithoutBinaryPin = {
     'linux/x64': { archive: 'gitleaks.tar.gz', sha256, url: 'https://example.invalid/gl.tar.gz' },
   };
   const first = installGitleaks({
     dest,
     platform: 'linux',
     arch: 'x64',
-    assets,
+    assets: assetsWithoutBinaryPin,
     download: ({ destPath }) => {
       downloads += 1;
       copyFileSync(archive, destPath);
@@ -75,17 +80,20 @@ test('installGitleaks verifies sha256, installs atomically, and skips reinstall 
   assert.equal(first.ok, true, first.error);
   assert.equal(first.alreadyInstalled, false);
   assert.equal(downloads, 1);
-  assert.equal(
-    execFileSync(join(dest, 'gitleaks'), ['version'], { encoding: 'utf8' }).trim(),
-    GITLEAKS_VERSION,
-  );
+  assert.equal(execFileSync(target, ['version'], { encoding: 'utf8' }).trim(), GITLEAKS_VERSION);
 
+  const assetsWithBinaryPin = {
+    'linux/x64': {
+      ...assetsWithoutBinaryPin['linux/x64'],
+      binarySha256: sha256File(target),
+    },
+  };
   const second = installGitleaks({
     dest,
     platform: 'linux',
     arch: 'x64',
-    assets,
-    download: () => assert.fail('must not re-download when expected version is present'),
+    assets: assetsWithBinaryPin,
+    download: () => assert.fail('must not re-download when binary sha256 matches'),
   });
   assert.equal(second.ok, true);
   assert.equal(second.alreadyInstalled, true);
@@ -205,4 +213,6 @@ test('install-gitleaks CLI rejects unknown flags and missing --dest values', () 
     const run = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
     assert.equal(run.status, 2, args.join(' '));
   }
+  assert.equal(isDirOnPath('/tmp/gl-bin', '/usr/bin:/tmp/gl-bin'), true);
+  assert.equal(isDirOnPath('/tmp/gl-bin', '/usr/bin:/bin'), false);
 });
