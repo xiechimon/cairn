@@ -48,15 +48,23 @@ except OSError as error:
 `;
 const PID_NAMESPACE = process.platform === 'linux' ? readlinkSync('/proc/self/ns/pid') : 'host';
 
+export function defaultSlotCount(cores = availableParallelism()) {
+  return Math.max(1, Math.floor(cores / CORES_PER_HEAVY_SLOT));
+}
+
 export const LIVE_STACK_POOL = {
   countEnv: 'CAIRN_LIVE_STACK_SLOTS',
-  defaultCount: 1,
+  defaultCount: defaultSlotCount(),
   dirName: 'live-stack',
   label: 'live-stack-slots',
 };
 
-export function defaultSlotCount(cores = availableParallelism()) {
-  return Math.max(1, Math.floor(cores / CORES_PER_HEAVY_SLOT));
+export function liveStackPorts(slot, env = {}) {
+  const offset = Math.max(0, (Number.isInteger(slot) && slot > 0 ? slot : 1) - 1);
+  return {
+    serverPort: Number(env.VERIFY_PORT ?? 8791 + offset),
+    webPort: Number(env.VERIFY_WEB_PORT ?? 5273 + offset),
+  };
 }
 
 function cpuTotals(read = cpus) {

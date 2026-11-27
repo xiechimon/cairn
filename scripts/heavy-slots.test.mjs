@@ -25,6 +25,8 @@ import {
   cpuUtilizationPercent,
   defaultSlotCount,
   foreignPortHolderReport,
+  LIVE_STACK_POOL,
+  liveStackPorts,
   probeAnswers,
   probePath,
   slotCount,
@@ -1394,4 +1396,159 @@ lease.release();
   } finally {
     cleanup();
   }
+});
+
+test('LIVE_STACK_POOL scales with defaultSlotCount and liveStackPorts isolates slots while keeping overrides', () => {
+  assert.equal(LIVE_STACK_POOL.defaultCount, defaultSlotCount());
+  assert.deepEqual(liveStackPorts(1, {}), { serverPort: 8791, webPort: 5273 });
+  assert.deepEqual(liveStackPorts(2, {}), { serverPort: 8792, webPort: 5274 });
+  assert.deepEqual(liveStackPorts(3, {}), { serverPort: 8793, webPort: 5275 });
+  assert.deepEqual(liveStackPorts(undefined, {}), { serverPort: 8791, webPort: 5273 });
+  assert.deepEqual(liveStackPorts(2, { VERIFY_PORT: '9991', VERIFY_WEB_PORT: '6661' }), {
+    serverPort: 9991,
+    webPort: 6661,
+  });
+});
+
+test('verify stack launches on slot 2 concurrently using slot-2 ports, prevents RUN_DIR races, and cleans ports.json on crash', async () => {
+  const { dir, env, cleanup } = sandbox(2);
+  const reservePort = () =>
+    new Promise((resolvePort, rejectPort) => {
+      const srv = createServer();
+      srv.on('error', rejectPort);
+      srv.listen(0, '127.0.0.1', () => {
+        const port = srv.address().port;
+        srv.close(() => resolvePort(port));
+      });
+    });
+  try {
+    const slotEnv = { ...env, CAIRN_LIVE_STACK_SLOTS: '2' };
+    const holder = startLiveStackHolder(slotEnv);
+    await until(holder, 'out', /LIVE-SLOT 1/);
+    const fakeRepo = join(dir, 'fake-repo');
+    const fakeBin = join(dir, 'fake-bin');
+    const portRecord = join(dir, 'slot2-ports.log');
+    mkdirSync(fakeBin, { recursive: true });
+    mkdirSync(join(fakeRepo, 'apps', 'server'), { recursive: true });
+    mkdirSync(join(fakeRepo, 'apps', 'web', 'node_modules', 'vite', 'bin'), { recursive: true });
+    writeFileSync(join(fakeRepo, 'apps', 'server', 'package.json'), '{}\n');
+    writeFileSync(join(fakeRepo, 'apps', 'web', 'package.json'), '{}\n');
+    writeFileSync(
+      join(fakeBin, 'pnpm'),
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+const http = require('node:http');
+if (process.env.FAKE_FAIL_FAST === '1') {
+  fs.writeFileSync(process.env.FAKE_PORT_RECORD, JSON.stringify({ port: process.env.PORT, webOrigin: process.env.CAIRN_WEB_ORIGIN }));
+  process.exit(2);
+}
+const srv = http.createServer((req, res) => {
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ id: 'owner' }));
+});
+srv.listen(Number(process.env.PORT), '127.0.0.1', () => {
+  if (process.env.FAKE_CRASH_AFTER_MS) {
+    setTimeout(() => process.exit(3), Number(process.env.FAKE_CRASH_AFTER_MS));
+  }
+});
+`,
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(fakeRepo, 'apps', 'web', 'node_modules', 'vite', 'bin', 'vite.js'),
+      `const http = require('node:http');
+const args = process.argv.slice(2);
+const port = Number(args[args.indexOf('--port') + 1]);
+if (process.env.FAKE_FAIL_FAST === '1') process.exit(2);
+http.createServer((req, res) => {
+  res.writeHead(200, { 'content-type': 'text/html' });
+  res.end('<html></html>');
+}).listen(port, '127.0.0.1');
+`,
+    );
+
+    const run2Dir = join(dir, 'run2');
+    const slot2Launch = watch(process.execPath, [launchScript], {
+      env: {
+        ...slotEnv,
+        PATH: `${fakeBin}:${env.PATH}`,
+        FAKE_FAIL_FAST: '1',
+        FAKE_PORT_RECORD: portRecord,
+        VERIFY_REPO_ROOT: fakeRepo,
+        VERIFY_RUN_DIR: run2Dir,
+      },
+    });
+    await until(slot2Launch, 'err', /acquired slot 2\/2/, 5_000);
+    const failCode = await Promise.race([slot2Launch.exited, sleep(5_000).then(() => 'timed-out')]);
+    assert.notEqual(failCode, 'timed-out', slot2Launch.err);
+    assert.equal(failCode, 1);
+    if (existsSync(portRecord)) {
+      assert.deepEqual(JSON.parse(readFileSync(portRecord, 'utf8')), {
+        port: '8792',
+        webOrigin: 'http://127.0.0.1:5274',
+      });
+    } else {
+      assert.match(slot2Launch.err, /VERIFY_(PORT 8792|WEB_PORT 5274)/);
+    }
+    assert.equal(existsSync(join(env.CAIRN_HEAVY_SLOTS_DIR, 'live-stack', 'slot-1.lock')), true);
+    assert.equal(existsSync(join(env.CAIRN_HEAVY_SLOTS_DIR, 'live-stack', 'slot-2.lock')), false);
+    assert.equal(existsSync(`${run2Dir}.lock`), false);
+
+    const serverPort = await reservePort();
+    const webPort = await reservePort();
+    const runShared = join(dir, 'run-shared');
+    const liveCrash = watch(process.execPath, [launchScript], {
+      env: {
+        ...slotEnv,
+        PATH: `${fakeBin}:${env.PATH}`,
+        VERIFY_PORT: String(serverPort),
+        VERIFY_WEB_PORT: String(webPort),
+        FAKE_CRASH_AFTER_MS: '600',
+        VERIFY_REPO_ROOT: fakeRepo,
+        VERIFY_RUN_DIR: runShared,
+      },
+    });
+    await until(liveCrash, 'out', /verify stack ready/, 8_000);
+    assert.equal(existsSync(join(runShared, 'ports.json')), true);
+    const racing = watch(process.execPath, [launchScript], {
+      env: {
+        ...slotEnv,
+        PATH: `${fakeBin}:${env.PATH}`,
+        VERIFY_PORT: String(await reservePort()),
+        VERIFY_WEB_PORT: String(await reservePort()),
+        VERIFY_REPO_ROOT: fakeRepo,
+        VERIFY_RUN_DIR: runShared,
+      },
+    });
+    const raceCode = await Promise.race([racing.exited, sleep(5_000).then(() => 'timed-out')]);
+    assert.equal(raceCode, 1);
+    assert.match(racing.err, /already holds|already running/);
+    assert.equal(existsSync(join(runShared, 'ports.json')), true);
+
+    const crashCode = await Promise.race([liveCrash.exited, sleep(8_000).then(() => 'timed-out')]);
+    assert.equal(crashCode, 1, liveCrash.err);
+    assert.equal(existsSync(join(runShared, 'ports.json')), false);
+    assert.equal(existsSync(`${runShared}.lock`), false);
+    assert.equal(existsSync(join(env.CAIRN_HEAVY_SLOTS_DIR, 'live-stack', 'slot-2.lock')), false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('launch bounds default idle and max lifetimes, waitReady timeout, and clears ports.json on shutdown', () => {
+  const source = readFileSync(launchScript, 'utf8');
+  assert.match(source, /VERIFY_IDLE_TIMEOUT_MS \?\? '300000'/);
+  assert.match(source, /VERIFY_MAX_AGE_MS \?\? '900000'/);
+  assert.match(
+    source,
+    /waitReady\(`http:\/\/127\.0\.0\.1:\$\{SERVER_PORT\}\/api\/user\/me`, 'server', 90_000\)/,
+  );
+  assert.match(source, /liveStackPorts/);
+  assert.match(source, /rmSync\(portsFile, \{ force: true \}\)/);
+  const sweepSource = readFileSync(
+    resolve('.claude/skills/verify-cairn/scripts/drive-1136-stale-sweep.mjs'),
+    'utf8',
+  );
+  assert.match(sweepSource, /ports\.json/);
+  assert.match(sweepSource, /ports\.serverPort/);
 });

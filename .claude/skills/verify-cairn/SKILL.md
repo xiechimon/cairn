@@ -43,7 +43,7 @@ The session that built the screen reviews its own pairs. The evidence limits abo
 
 ## Port and lane discipline (read first)
 
-The in-repo port fleet: **8787** server / **5173** vite / **8399** e2e. Occupants are live processes of another lane (often the user's own dev stack) and **must not be killed**. This skill defaults to 8791 + 5273; if launch finds them taken, override with `VERIFY_PORT` / `VERIFY_WEB_PORT`, never touch anyone else's port. Check occupancy: `lsof -iTCP:8791 -sTCP:LISTEN`. Shared ports and worktree rules: `docs/ops/worktrees-and-ports.md`.
+The in-repo port fleet: **8787** server / **5173** vite / **8399** e2e. Occupants are live processes of another lane (often the user's own dev stack) and **must not be killed**. This skill defaults to `8791 + (slot - 1)` and `5273 + (slot - 1)` (`8791`/`5273` on slot 1, `8792`/`5274` on slot 2); if launch finds them taken, override with `VERIFY_PORT` / `VERIFY_WEB_PORT`, never touch anyone else's port. Check occupancy: `lsof -iTCP:8791 -sTCP:LISTEN`. Shared ports and worktree rules: `docs/ops/worktrees-and-ports.md`.
 
 **Worktree lane**: a worktree checkout carries its own copy of this skill.
 
@@ -64,7 +64,7 @@ node .claude/skills/verify-cairn/scripts/launch.mjs
 
 - Run it as a background task (Claude Code `run_in_background`); it prints `verify stack ready` and then stays in the foreground as the stack's supervisor. Harnesses without background tasks: run `launch.mjs &`, the drives and `cleanup.mjs` in one command; the stack goes down when that shell exits.
 - It starts the server (`pnpm exec tsx src/index.ts`, no watch) and vite dev (`--strictPort`) through `scripts/owned-process.mjs`. Stopping the task, ending the session, `vp.mjs cleanup`, or either process exiting takes the whole stack down.
-- Before starting, `launch.mjs` waits for a shared live-stack slot (`CAIRN_LIVE_STACK_SLOTS`, default 1, under the shared `CAIRN_HEAVY_SLOTS_DIR`); while queued it names each holder's lane, pid, command and age, and repeats that line every 30 s. A stack with no connection for `VERIFY_IDLE_TIMEOUT_MS` (default 20 min, `0` disables) stops itself, and a stack alive for `VERIFY_MAX_AGE_MS` (default 45 min, `0` disables) stops itself so a forgotten stack cannot hold the slot for the rest of the day.
+- Before starting, `launch.mjs` waits for a shared live-stack slot (`CAIRN_LIVE_STACK_SLOTS`, default `max(1, floor(cores/4))`, under the shared `CAIRN_HEAVY_SLOTS_DIR`) and assigns slot-scoped ports (`8791 + (slot - 1)` / `5273 + (slot - 1)`); while queued it names each holder's lane, pid, command and age, and repeats that line every 30 s. A stack with no connection for `VERIFY_IDLE_TIMEOUT_MS` (default 5 min, `0` disables) stops itself, and a stack alive for `VERIFY_MAX_AGE_MS` (default 15 min, `0` disables) stops itself and removes `ports.json` so a forgotten stack cannot hold the slot.
 - **Every launch clears the run directory, so every launch has a fresh DB** (first boot seeds one owner; no login needed).
 - **Run `cleanup.mjs` before re-launching.** Launch refuses when ports are taken or a recorded stack is still alive; if an old stack still holds the ports, probes drive the old stack's DB and "fresh DB" assertions silently mix in the previous round.
 - Readiness: `GET /api/user/me` 200 and `GET /app` 200; on timeout it prints both log tails and stops its own processes.

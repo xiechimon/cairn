@@ -3,8 +3,13 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join, resolve } from 'node:path';
-import { acquireSlot, leaseEnv, LIVE_STACK_POOL } from '../../../../scripts/heavy-slots.mjs';
+import { dirname, join, resolve } from 'node:path';
+import {
+  acquireSlot,
+  leaseEnv,
+  LIVE_STACK_POOL,
+  liveStackPorts,
+} from '../../../../scripts/heavy-slots.mjs';
 import { spawnOwned } from '../../../../scripts/owned-process.mjs';
 
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
@@ -12,14 +17,12 @@ const ROOT = process.env.VERIFY_REPO_ROOT
   ? resolve(process.env.VERIFY_REPO_ROOT)
   : SCRIPT_ROOT;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(ROOT, '.claude', 'verify-run');
-const SERVER_PORT = Number(process.env.VERIFY_PORT ?? 8791);
-const WEB_PORT = Number(process.env.VERIFY_WEB_PORT ?? 5273);
 const HOME_DIR = join(RUN_DIR, 'home');
 const SKILLS_DIR = join(HOME_DIR, 'skills');
-const rawIdleMs = Number(process.env.VERIFY_IDLE_TIMEOUT_MS ?? '1200000');
-const IDLE_TIMEOUT_MS = Number.isFinite(rawIdleMs) && rawIdleMs >= 0 ? rawIdleMs : 1_200_000;
-const rawMaxAgeMs = Number(process.env.VERIFY_MAX_AGE_MS ?? '2700000');
-const MAX_AGE_MS = Number.isFinite(rawMaxAgeMs) && rawMaxAgeMs >= 0 ? rawMaxAgeMs : 2_700_000;
+const rawIdleMs = Number(process.env.VERIFY_IDLE_TIMEOUT_MS ?? '300000');
+const IDLE_TIMEOUT_MS = Number.isFinite(rawIdleMs) && rawIdleMs >= 0 ? rawIdleMs : 300_000;
+const rawMaxAgeMs = Number(process.env.VERIFY_MAX_AGE_MS ?? '900000');
+const MAX_AGE_MS = Number.isFinite(rawMaxAgeMs) && rawMaxAgeMs >= 0 ? rawMaxAgeMs : 900_000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -41,7 +44,49 @@ function groupAlive(pid) {
   }
 }
 
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquireRunDirLock(lockFile) {
+  mkdirSync(dirname(lockFile), { recursive: true });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      writeFileSync(lockFile, `${process.pid}\n`, { flag: 'wx' });
+      return true;
+    } catch (err) {
+      if (err?.code !== 'EEXIST') throw err;
+      let ownerPid = null;
+      try {
+        const parsed = Number(readFileSync(lockFile, 'utf8').trim());
+        if (Number.isInteger(parsed) && parsed > 0) ownerPid = parsed;
+      } catch {}
+      if (ownerPid !== null && pidAlive(ownerPid)) {
+        console.error(`another launch already holds ${lockFile} (pid ${ownerPid})`);
+        return false;
+      }
+      rmSync(lockFile, { force: true });
+    }
+  }
+  return false;
+}
+
 async function main() {
+  const runLockFile = `${RUN_DIR}.lock`;
+  if (!acquireRunDirLock(runLockFile)) process.exit(1);
+  let runLockOwned = true;
+  const releaseRunLock = () => {
+    if (!runLockOwned) return;
+    runLockOwned = false;
+    rmSync(runLockFile, { force: true });
+  };
+  process.once('exit', releaseRunLock);
+
   const portsFile = join(RUN_DIR, 'ports.json');
   if (existsSync(portsFile)) {
     try {
@@ -59,6 +104,7 @@ async function main() {
 
   const lease = await acquireSlot({ pool: LIVE_STACK_POOL });
   if (lease !== null) Object.assign(process.env, leaseEnv(lease));
+  const { serverPort: SERVER_PORT, webPort: WEB_PORT } = liveStackPorts(lease?.slot, process.env);
 
   if (!(await portFree(SERVER_PORT))) {
     console.error(`VERIFY_PORT ${SERVER_PORT} 被占——别的 lane?不能杀,换端口重试:`);
@@ -112,16 +158,25 @@ async function main() {
   writeFileSync(join(RUN_DIR, 'web.pid'), `${web.child.pid}\n`);
 
   const stopStack = () => Promise.all([server.stop(), web.stop()]);
+  let earlyExit = null;
+  void server.exited.then(() => {
+    if (earlyExit === null) earlyExit = 'server';
+  });
+  void web.exited.then(() => {
+    if (earlyExit === null) earlyExit = 'vite dev';
+  });
   let stopping = false;
-  const shutdown = async () => {
+  const shutdown = async (exitCode = 0) => {
     if (stopping) return;
     stopping = true;
     await stopStack();
-    process.exit(0);
+    rmSync(portsFile, { force: true });
+    releaseRunLock();
+    process.exit(exitCode);
   };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
     process.once(signal, () => {
-      void shutdown();
+      void shutdown(0);
     });
 
   const tailOf = (name, lines = 30) => {
@@ -134,25 +189,26 @@ async function main() {
     console.error(msg);
     console.error(`--- server.log 尾 ---\n${tailOf('server.log')}`);
     console.error(`--- web.log 尾 ---\n${tailOf('web.log')}`);
-    await stopStack();
-    process.exit(1);
+    await shutdown(1);
   };
 
   const waitReady = async (url, label, timeoutMs) => {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
+      if (earlyExit !== null) await bail(`${earlyExit} exited before ready`);
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
         if (res.ok) return;
       } catch {
 
       }
+      if (earlyExit !== null) await bail(`${earlyExit} exited before ready`);
       if (Date.now() > deadline) await bail(`${label} 未就绪:${url}`);
       await sleep(300);
     }
   };
 
-  await waitReady(`http://127.0.0.1:${SERVER_PORT}/api/user/me`, 'server', 240_000);
+  await waitReady(`http://127.0.0.1:${SERVER_PORT}/api/user/me`, 'server', 90_000);
   await waitReady(`http://127.0.0.1:${WEB_PORT}/app`, 'vite dev', 60_000);
 
   writeFileSync(
@@ -221,8 +277,7 @@ async function main() {
   ]);
   if (stopping) return;
   console.error(`${ended} exited; stopping the whole stack`);
-  await stopStack();
-  process.exit(1);
+  await shutdown(1);
 }
 
 await main();

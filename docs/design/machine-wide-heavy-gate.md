@@ -13,7 +13,7 @@ One directory (`CAIRN_HEAVY_SLOTS_DIR`, else the Darwin user temp directory or `
 | `slot-<n>.lock` | the lease: JSON `{pid, cwd, namespace, probe, token, count}`. Written only while holding `slot-<n>.lock.guard`'s kernel flock. |
 | `slot-<n>.lock.guard` | a permanent inode; every claimant flocks it through Python 3 before touching the lock. Never unlinked. |
 | `queue-<ts>-<pid>-<token>` | a waiting ticket, oldest name first. |
-| `live-stack/slot-<n>.lock` | the same protocol for one verify-cairn live stack (`CAIRN_LIVE_STACK_SLOTS`, default 1). |
+| `live-stack/slot-<n>.lock` | the same protocol for verify-cairn live stacks (`CAIRN_LIVE_STACK_SLOTS`, default `max(1, floor(cores/4))`, ports `8791 + (slot - 1)` / `5273 + (slot - 1)`). |
 
 Capacity is `max(1, floor(cores/4))`, derived from the machine's core count at admission time; no
 setting overrides it. The probe socket is a unix listener bound at `probePath(token)`, which keeps

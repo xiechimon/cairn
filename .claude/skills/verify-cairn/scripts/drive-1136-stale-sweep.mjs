@@ -2,14 +2,21 @@
 
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
 
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
-const SERVER = `http://127.0.0.1:${process.env.VERIFY_PORT ?? '8791'}`;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(SCRIPT_ROOT, '.claude', 'verify-run');
+const ports = (() => {
+  try {
+    return JSON.parse(readFileSync(join(RUN_DIR, 'ports.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+})();
+const SERVER = `http://127.0.0.1:${ports.serverPort ?? process.env.VERIFY_PORT ?? '8791'}`;
 const DB_PATH = join(RUN_DIR, 'home', 'server', 'server.db');
 const DAEMON_HOME = join(RUN_DIR, 'daemon-1136');
 const MACHINE_NAME = 'verify-1136';
