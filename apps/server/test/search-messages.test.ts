@@ -5,6 +5,7 @@ import {
   chiefMemoryThreadId,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
+import { sql } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, message, project, team, user } from '../src/db/schema.js';
 import { personalSpaceId } from '../src/services/personal-space.js';
@@ -416,5 +417,55 @@ describe('GET /api/search chat messages', () => {
     expect(filtered.messages).toBeUndefined();
     const isFiltered = await runSearch(s, 'is:failed 再加');
     expect(isFiltered.messages).toBeUndefined();
+  });
+
+  test('matches collectChiefStream eventTurn rules and supports { type: "text" } JSON objects via indexed scan', async () => {
+    const s = bootServer();
+    const thread = addChiefThread(s, { projectId: null, title: 'Coordinator' });
+
+    addChiefMessage(s, thread, {
+      id: `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}wake-1`,
+      role: 'user',
+      origin: null,
+      content: '[wake:schedule] wake-turn trigger',
+      createdAt: NOW + 100,
+    });
+    addChiefMessage(s, thread, {
+      role: 'assistant',
+      content: 'event-turn-probe hidden wake assistant reply',
+      createdAt: NOW + 110,
+    });
+    const wakeNotice = addChiefMessage(s, thread, {
+      role: 'system',
+      content: JSON.stringify({
+        kind: CHIEF_NOTICE_KIND,
+        provenance: 'task-finished:t2',
+        message: 'event-turn-probe visible wake notice',
+      }),
+      createdAt: NOW + 120,
+    });
+    const nextUser = addChiefMessage(s, thread, {
+      role: 'user',
+      origin: 'user',
+      content: 'event-turn-probe normal user reset',
+      createdAt: NOW + 130,
+    });
+    const jsonTextAssistant = addChiefMessage(s, thread, {
+      role: 'assistant',
+      content: { type: 'text', text: 'event-turn-probe json text reply' },
+      createdAt: NOW + 140,
+    });
+
+    const hit = await runSearch(s, 'event-turn-probe');
+    expect(hit.messages?.map((m) => m.id)).toEqual([jsonTextAssistant, nextUser, wakeNotice]);
+    expect(hit.messages?.[0]?.snippet).toBe('event-turn-probe json text reply');
+
+    const planRows = s.db.all<{ detail: string }>(
+      sql`EXPLAIN QUERY PLAN SELECT id, role, origin, content, createdAt, rowid FROM chief_message WHERE threadId = ${thread} ORDER BY createdAt DESC, rowid DESC LIMIT 2000`,
+    );
+    const details = planRows.map((row) => row.detail).join(' | ');
+    expect(details).toContain('chief_message_thread_created_idx');
+    expect(details).not.toContain('SCAN chief_message');
+    expect(details).not.toContain('TEMP B-TREE');
   });
 });

@@ -21,41 +21,62 @@ const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 const field = (page: Page) => panel(page).getByRole('textbox', { name: '搜索' });
 const messageRows = (page: Page) => panel(page).locator('[data-row-kind="message"]');
 
-async function installLiveSearch(page: Page) {
+type SearchMockMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  origin?: 'user';
+  projectId?: string;
+  content: string;
+  createdAt: number;
+};
+
+async function installLiveSearch(
+  page: Page,
+  opts: {
+    xMessages?: SearchMockMessage[];
+    coordMessages?: SearchMockMessage[];
+    beforeSearch?: (q: string) => Promise<void> | void;
+  } = {},
+) {
+  const xMessages = opts.xMessages ?? X_MESSAGES;
+  const coordMessages = opts.coordMessages ?? COORD_MESSAGES;
   await mockLive(
     page,
     {
       threads: [THREAD, THREAD_X],
       projects: [PROJECT_X],
-      messages: COORD_MESSAGES,
-      channels: { 'proj-x': X_MESSAGES },
+      messages: coordMessages,
+      channels: { 'proj-x': xMessages },
       todos: [],
       tasks: [],
     },
     (path, route, json) => {
       if (path !== '/api/search') return undefined;
-      const q = (new URL(route.request().url()).searchParams.get('q') ?? '').trim().toLowerCase();
-      const hits = [
-        ...X_MESSAGES.map((m) => ({
-          id: m.id,
-          threadId: THREAD_X.id,
-          projectId: 'proj-x',
-          projectName: 'X',
-          role: m.role,
-          snippet: m.content,
-          createdAt: m.createdAt,
-        })),
-        ...COORD_MESSAGES.map((m) => ({
-          id: m.id,
-          threadId: THREAD.id,
-          projectId: null,
-          projectName: null,
-          role: m.role,
-          snippet: m.content,
-          createdAt: m.createdAt,
-        })),
-      ].filter((m) => q !== '' && m.snippet.toLowerCase().includes(q));
-      return json({ todos: [], projects: [], messages: hits });
+      return (async () => {
+        const q = (new URL(route.request().url()).searchParams.get('q') ?? '').trim().toLowerCase();
+        await opts.beforeSearch?.(q);
+        const hits = [
+          ...xMessages.map((m) => ({
+            id: m.id,
+            threadId: THREAD_X.id,
+            projectId: 'proj-x',
+            projectName: 'X',
+            role: m.role,
+            snippet: m.content.replace(/\s+/g, ' '),
+            createdAt: m.createdAt,
+          })),
+          ...coordMessages.map((m) => ({
+            id: m.id,
+            threadId: THREAD.id,
+            projectId: null,
+            projectName: null,
+            role: m.role,
+            snippet: m.content.replace(/\s+/g, ' '),
+            createdAt: m.createdAt,
+          })),
+        ].filter((m) => q !== '' && m.snippet.toLowerCase().includes(q));
+        return json({ todos: [], projects: [], messages: hits });
+      })();
     },
   );
 }
@@ -132,4 +153,83 @@ test('message search panel fits 390px without overflow and passes WCAG 2.2 AA in
       .analyze();
     expect(violations).toEqual([]);
   }
+});
+
+test('pins and centers off-screen virtualized messages in long threads without snapping back to bottom', async ({
+  page,
+}) => {
+  const longMessages: SearchMockMessage[] = [
+    {
+      id: 'mx-target',
+      role: 'user',
+      origin: 'user',
+      projectId: 'proj-x',
+      content: '首条远古消息\n包含唯一关键锚点-offset\n第三行正文\n第四行正文',
+      createdAt: 10,
+    },
+    ...Array.from({ length: 59 }, (_, i) => ({
+      id: `mx-pad-${i + 2}`,
+      role: (i % 2 === 0 ? 'assistant' : 'user') as 'user' | 'assistant',
+      ...(i % 2 === 1 ? { origin: 'user' as const } : {}),
+      projectId: 'proj-x',
+      content: `第 ${i + 2} 条填充消息\n第二行高度填充\n第三行高度填充\n第四行高度填充`,
+      createdAt: (i + 2) * 10,
+    })),
+  ];
+  await installLiveSearch(page, { xMessages: longMessages });
+  await page.goto('/app');
+  await expect(page.getByTestId('chief-stream')).toBeVisible();
+
+  await pressAndExpect(page, 'Meta+k', panel(page));
+  await field(page).fill('关键锚点-offset');
+  await expect(messageRows(page)).toHaveCount(1);
+  await messageRows(page).first().click();
+
+  await expect(panel(page)).toBeHidden();
+  await expect(page).toHaveURL(/project=proj-x/);
+  await expect(page).toHaveURL(/chat=1/);
+  await expect(page).not.toHaveURL(/msg=/);
+  await settleTransitions(page);
+  await expect(
+    page.locator('[data-testid="chief-stream"] [data-message-id="mx-target"]'),
+  ).toBeInViewport();
+  await expect(
+    page.locator('[data-testid="chief-stream"] [data-message-id="mx-pad-60"]'),
+  ).not.toBeInViewport();
+});
+
+test('does not activate stale cached message hits when pressing Enter while a newer query is pending', async ({
+  page,
+}) => {
+  let markSecondArrived: (() => void) | null = null;
+  const secondArrived = new Promise<void>((resolve) => {
+    markSecondArrived = resolve;
+  });
+  let releaseSecond: (() => void) | null = null;
+  await installLiveSearch(page, {
+    beforeSearch: async (q) => {
+      if (q === '1+1') {
+        markSecondArrived?.();
+        await new Promise<void>((resolve) => {
+          releaseSecond = resolve;
+        });
+      }
+    },
+  });
+  await page.goto('/app');
+  await expect(page.getByTestId('chief-stream')).toBeVisible();
+
+  await pressAndExpect(page, 'Meta+k', panel(page));
+  await field(page).fill('再加');
+  await expect(messageRows(page)).toHaveCount(2);
+
+  await field(page).fill('1+1');
+  await secondArrived;
+  await expect(messageRows(page)).toHaveCount(0);
+  await field(page).press('Enter');
+  await expect(panel(page)).toBeVisible();
+  await expect(page).not.toHaveURL(/project=proj-x/);
+
+  releaseSecond?.();
+  await expect(messageRows(page)).toHaveCount(3);
 });

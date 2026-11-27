@@ -1,5 +1,13 @@
 import { ListChecks, MessageSquareWarning, PackageCheck } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -390,37 +398,29 @@ export function HomeC({
   });
   const jumpKind = jumpStep.kind;
   const jumpFocusId = jumpStep.kind === 'focus' ? jumpStep.messageId : '';
+  const clearJumpParam = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete(MESSAGE_PARAM);
+    setSearchParams(next, { replace: true, state: location.state });
+  }, [searchParams, setSearchParams, location.state]);
+  const handleFocusMessage = useCallback(
+    (found: boolean) => {
+      if (!found) toastError(t('未能定位到这条消息'), null);
+      clearJumpParam();
+    },
+    [clearJumpParam, t],
+  );
   useEffect(() => {
     if (jumpMessageId === null || jumpMessageId === '') return;
-    if (jumpKind === 'focus') {
-      const target = document.querySelector(
-        `[data-testid="chief-stream"] [data-message-id="${CSS.escape(jumpFocusId)}"]`,
-      );
-      if (target !== null) target.scrollIntoView({ block: 'center' });
-      else toastError(t('未能定位到这条消息'), null);
-      const next = new URLSearchParams(searchParams);
-      next.delete(MESSAGE_PARAM);
-      setSearchParams(next, { replace: true, state: location.state });
-    } else if (jumpKind === 'load-earlier') {
+    if (jumpKind === 'load-earlier') {
       if (jumpRef.current.pagesLoaded >= MAX_MESSAGE_JUMP_PAGES) return;
       jumpRef.current.pagesLoaded += 1;
       loadEarlier?.();
     } else if (jumpKind === 'missing') {
       toastError(t('未能定位到这条消息'), null);
-      const next = new URLSearchParams(searchParams);
-      next.delete(MESSAGE_PARAM);
-      setSearchParams(next, { replace: true, state: location.state });
+      clearJumpParam();
     }
-  }, [
-    jumpMessageId,
-    jumpKind,
-    jumpFocusId,
-    loadEarlier,
-    searchParams,
-    setSearchParams,
-    location.state,
-    t,
-  ]);
+  }, [jumpMessageId, jumpKind, loadEarlier, clearJumpParam, t]);
 
   const heading = <h1 className="sr-only">{projectName ?? t('Coordinator')}</h1>;
   const paneButtons = narrow ? (
@@ -648,6 +648,8 @@ export function HomeC({
           <ConversationBoundary key={channelKey} resetKey={conversationResetKey}>
             <ChiefConversation
               mentionGroups={mentionGroups}
+              focusMessageId={jumpKind === 'focus' ? jumpFocusId : null}
+              onFocusMessage={handleFocusMessage}
               chief={{
                 ...chiefData,
                 stream: conversation,

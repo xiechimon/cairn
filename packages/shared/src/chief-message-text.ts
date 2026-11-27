@@ -3,7 +3,7 @@ import { orchestratedTodoIdOf, TRANSCRIPT_PROMPT_ROW_ID_PREFIX } from './records
 import { stripSkillRouteSection } from './skill-route.js';
 import { stripTurnContext } from './turn-context.js';
 
-const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
+export const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 const RAW_API_ERROR_RE = /^API Error: /;
 
 export function isChiefPromptEcho(row: { id: string; origin?: string | null }): boolean {

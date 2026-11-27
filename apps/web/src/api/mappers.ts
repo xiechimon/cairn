@@ -94,6 +94,7 @@ import {
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
   visibleChiefMessageText,
+  WAKE_MARKER_PREFIX_RE,
   WORKSPACE_HOOK_ROW_KIND,
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
@@ -1924,8 +1925,6 @@ export function askQuestionOfContent(content: unknown): {
       : {}),
   };
 }
-
-const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
 
 function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
   const args = call.arguments as { reason?: unknown; phone?: unknown } | null;

@@ -68,11 +68,13 @@ export function VirtualStream({
   cacheKey,
   keys,
   pinned = NO_PINS,
+  focusIndex = null,
   renderRow,
 }: {
   cacheKey: string;
   keys: readonly (string | number)[];
   pinned?: readonly number[];
+  focusIndex?: number | null;
   renderRow: (index: number) => ReactNode;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -89,7 +91,8 @@ export function VirtualStream({
     overscan: OVERSCAN,
     rangeExtractor: useCallback((range: Range) => keepMounted(range, pinned), [pinned]),
     anchorTo: 'end',
-    initialOffset: Number.MAX_SAFE_INTEGER,
+    initialOffset:
+      focusIndex !== null ? focusIndex * ESTIMATED_ROW_HEIGHT : Number.MAX_SAFE_INTEGER,
     initialMeasurementsCache: restored?.items ?? [],
     ...(restored?.rect != null ? { initialRect: restored.rect } : {}),
     scrollEndThreshold: readerLeft ? -1 : FOLLOW_THRESHOLD,
@@ -104,7 +107,7 @@ export function VirtualStream({
     [virtualizer],
   );
   useLayoutEffect(() => {
-    if (!end && !readerLeft) scrollToEnd();
+    if (focusIndex === null && !end && !readerLeft) scrollToEnd();
   });
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -115,10 +118,18 @@ export function VirtualStream({
     );
     if (top !== scrollMargin) setScrollMargin(top);
   });
+  const mountedRef = useRef(false);
   useLayoutEffect(() => {
+    const first = !mountedRef.current;
+    mountedRef.current = true;
+    if (focusIndex !== null) {
+      virtualizer.scrollToIndex(focusIndex, { align: 'center', behavior: 'auto' });
+      return;
+    }
+    if (!first) return;
     const viewport = scrollViewportOf(listRef.current);
     if (viewport !== null) viewport.scrollTop = viewport.scrollHeight;
-  }, []);
+  }, [focusIndex, virtualizer]);
   useLayoutEffect(
     () => () => {
       saveSnapshot(cacheKey, {

@@ -1821,6 +1821,13 @@
       "when": 1795778709421,
       "tag": "0264_message_client_id",
       "breakpoints": true
+    },
+    {
+      "idx": 265,
+      "version": "6",
+      "when": 1795786574343,
+      "tag": "0265_red_silverclaw",
+      "breakpoints": true
     }
   ]
 }

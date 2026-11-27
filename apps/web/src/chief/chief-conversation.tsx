@@ -11,12 +11,14 @@ import {
   Fragment,
   type ReactNode,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { useConnected, useConnectionOutage } from '../api/connection-state.js';
 import {
   useApiMutations,
@@ -113,6 +115,7 @@ function layoutStream(
   previousAt: number | null,
   reportSeen: Set<string>,
   cardFailure: string | null,
+  focusMessageId: string | null = null,
 ): StreamLayout {
   const { rows: folded, startedBy } = foldTaskCards(groupThreadEvents(list), glances);
   const grouped = collapseThinkingRuns(folded);
@@ -121,7 +124,10 @@ function layoutStream(
     grouped,
     keys: chiefStreamRowKeys(grouped),
     pinned: grouped.flatMap(({ item }, n) =>
-      item.kind === 'question' && item.status === 'pending' ? [n] : [],
+      (item.kind === 'question' && item.status === 'pending') ||
+      (focusMessageId !== null && 'id' in item && item.id === focusMessageId)
+        ? [n]
+        : [],
     ),
     runs: bubbleRuns(grouped, previousAt, { cardFailure, startedBy }),
     started: startedBy,
@@ -216,6 +222,8 @@ export interface ChiefConversationProps {
   notice?: ReactNode;
   showBindGate?: boolean;
   pendingComments?: PendingComments | null;
+  focusMessageId?: string | null;
+  onFocusMessage?: (found: boolean) => void;
 }
 
 export function ChiefConversation({
@@ -245,6 +253,8 @@ export function ChiefConversation({
   notice,
   showBindGate = true,
   pendingComments,
+  focusMessageId = null,
+  onFocusMessage,
 }: ChiefConversationProps) {
   const questionPending = useQuestionPending();
   const { t } = useI18n();
@@ -273,8 +283,11 @@ export function ChiefConversation({
   const todosQ = useTodos(teamId, live);
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
-  const { scrollToEnd } = useMessageScroller();
+  const { scrollToEnd, scrollToMessage } = useMessageScroller();
+  const { setReaderLeft } = useContext(ReaderFollowContext);
   const reader = useReaderFollow();
+  const onFocusMessageRef = useRef(onFocusMessage);
+  onFocusMessageRef.current = onFocusMessage;
   const followSentRef = useRef(false);
   const [enteringKey, setEnteringKey] = useState<string | number | null>(null);
   const latestUserKeyRef = useRef<string | number | null>(null);
@@ -283,9 +296,10 @@ export function ChiefConversation({
   useEffect(() => {
     if (prevThreadRef.current === chief.threadTitle) return;
     prevThreadRef.current = chief.threadTitle;
+    if (focusMessageId !== null) return;
     reader.follow();
     scrollToEnd();
-  }, [chief.threadTitle, scrollToEnd, reader]);
+  }, [chief.threadTitle, scrollToEnd, reader, focusMessageId]);
   const [typing, setTyping] = useState(false);
   const [liveDraft, setLiveDraft] = useServerDraft({
     teamId,
@@ -565,12 +579,96 @@ export function ChiefConversation({
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
     const reportSeen = new Set<string>();
-    const before = layoutStream(rows.slice(0, dayEarlier), glances, null, reportSeen, cardFailure);
+    const before = layoutStream(
+      rows.slice(0, dayEarlier),
+      glances,
+      null,
+      reportSeen,
+      cardFailure,
+      focusMessageId,
+    );
     return [
       before,
-      layoutStream(rows.slice(dayEarlier), glances, before.lastAt, reportSeen, cardFailure),
+      layoutStream(
+        rows.slice(dayEarlier),
+        glances,
+        before.lastAt,
+        reportSeen,
+        cardFailure,
+        focusMessageId,
+      ),
     ] as const;
-  }, [rows, glances, dayEarlier, cardFailure]);
+  }, [rows, glances, dayEarlier, cardFailure, focusMessageId]);
+  const focusStreamIndex = useMemo(() => {
+    if (focusMessageId === null || focusMessageId === '') return null;
+    const index = streamLayout.grouped.findIndex(
+      ({ item }) => 'id' in item && item.id === focusMessageId,
+    );
+    return index >= 0 ? index : null;
+  }, [focusMessageId, streamLayout.grouped]);
+  useEffect(() => {
+    if (focusMessageId === null || focusMessageId === '') return;
+    const activeRows =
+      day == null ? streamLayout.grouped : [...earlierLayout.grouped, ...streamLayout.grouped];
+    const hasMatch = activeRows.some(({ item }) => 'id' in item && item.id === focusMessageId);
+    if (!hasMatch) {
+      onFocusMessageRef.current?.(false);
+      return;
+    }
+    flushSync(() => setReaderLeft(true));
+    const selector = `[data-message-id="${CSS.escape(focusMessageId)}"]`;
+    let frame = 0;
+    let cancelled = false;
+    let attempts = 0;
+    const center = (target: Element) => {
+      if (!scrollToMessage(focusMessageId, { align: 'center', behavior: 'instant' })) {
+        target.scrollIntoView({ block: 'center' });
+      }
+    };
+    const tryJump = () => {
+      if (cancelled) return;
+      const target = viewportRef.current?.querySelector(selector) ?? null;
+      if (target === null) {
+        attempts += 1;
+        if (attempts >= 20) {
+          onFocusMessageRef.current?.(false);
+          return;
+        }
+        frame = requestAnimationFrame(tryJump);
+        return;
+      }
+      center(target);
+      frame = requestAnimationFrame(() => {
+        if (cancelled) return;
+        const settled = viewportRef.current?.querySelector(selector) ?? null;
+        if (settled !== null) center(settled);
+        frame = requestAnimationFrame(() => {
+          if (cancelled) return;
+          const latestViewport = viewportRef.current;
+          if (
+            latestViewport !== null &&
+            latestViewport.scrollHeight - latestViewport.scrollTop - latestViewport.clientHeight <=
+              FOLLOW_THRESHOLD
+          ) {
+            setReaderLeft(false);
+          }
+          onFocusMessageRef.current?.(true);
+        });
+      });
+    };
+    tryJump();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [
+    focusMessageId,
+    day,
+    streamLayout.grouped,
+    earlierLayout.grouped,
+    setReaderLeft,
+    scrollToMessage,
+  ]);
   const lastRobotIndex = rows.findLastIndex(
     ({ item }) => item.kind === 'robot' && item.typing !== true,
   );
@@ -687,6 +785,7 @@ export function ChiefConversation({
                             cacheKey={chief.threadId ?? ''}
                             keys={streamLayout.keys}
                             pinned={streamLayout.pinned}
+                            focusIndex={focusStreamIndex}
                             renderRow={(n) => streamEntry(streamLayout, n)}
                           />
                         ) : (

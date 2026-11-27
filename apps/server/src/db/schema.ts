@@ -1284,21 +1284,25 @@ export const coordinatorRun = sqliteTable(
   (t) => [primaryKey({ columns: [t.threadId, t.conversationId, t.taskId] })],
 );
 
-export const chiefMessage = sqliteTable('chief_message', {
-  id: text('id').primaryKey(),
-  threadId: text('threadId')
-    .notNull()
-    .references(() => chiefThread.id, { onDelete: 'cascade' }),
-  role: text('role').$type<'system' | 'user' | 'assistant'>().notNull(),
-  content: json<unknown>('content').notNull(),
-  projectId: text('projectId'),
-  delivery: text('delivery').$type<ChiefMessageDelivery>(),
-  origin: text('origin').$type<TranscriptUserOrigin>(),
-  typedAt: epochMs('typedAt'),
-  sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
-  clientMessageId: text('clientMessageId'),
-  createdAt: epochMs('createdAt').notNull(),
-});
+export const chiefMessage = sqliteTable(
+  'chief_message',
+  {
+    id: text('id').primaryKey(),
+    threadId: text('threadId')
+      .notNull()
+      .references(() => chiefThread.id, { onDelete: 'cascade' }),
+    role: text('role').$type<'system' | 'user' | 'assistant'>().notNull(),
+    content: json<unknown>('content').notNull(),
+    projectId: text('projectId'),
+    delivery: text('delivery').$type<ChiefMessageDelivery>(),
+    origin: text('origin').$type<TranscriptUserOrigin>(),
+    typedAt: epochMs('typedAt'),
+    sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
+    clientMessageId: text('clientMessageId'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [index('chief_message_thread_created_idx').on(t.threadId, t.createdAt)],
+);
 
 export const attachment = sqliteTable('attachment', {
   todoId: text('todoId'),

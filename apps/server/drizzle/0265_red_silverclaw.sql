@@ -1,0 +1,1 @@
+CREATE INDEX `chief_message_thread_created_idx` ON `chief_message` (`threadId`,`createdAt`);

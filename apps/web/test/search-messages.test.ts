@@ -136,18 +136,37 @@ describe('SearchPanel chat message hits', () => {
 });
 
 describe('useSearchResults teamId isolation', () => {
-  test('useSearchResults accepts teamId and exposes settledQuery without throwing', () => {
+  test('isolates cached search hits by teamId in a shared QueryClient', () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    let captured: ReturnType<typeof useSearchResults> | undefined;
+    qc.setQueryData(['search', 'team-a', '再加'], {
+      todos: [],
+      projects: [],
+      messages: [
+        {
+          id: 'm-a',
+          threadId: 'ct-a',
+          projectId: null,
+          projectName: null,
+          role: 'user',
+          snippet: 'team-a 再加',
+          createdAt: 100,
+        },
+      ],
+    });
+    let capturedA: ReturnType<typeof useSearchResults> | undefined;
+    let capturedB: ReturnType<typeof useSearchResults> | undefined;
     function Probe() {
-      captured = useSearchResults('再加', false, 'team-a');
+      capturedA = useSearchResults('再加', false, 'team-a');
+      capturedB = useSearchResults('再加', false, 'team-b');
       return null;
     }
     renderToStaticMarkup(
       createElement(QueryClientProvider, { client: qc, children: createElement(Probe) }),
     );
-    expect(captured).toBeDefined();
-    expect(captured).toHaveProperty('settledQuery');
+    expect(capturedA?.data?.messages?.map((m) => m.id)).toEqual(['m-a']);
+    expect(capturedA?.settledQuery).toBe('再加');
+    expect(capturedB?.data).toBeUndefined();
+    expect(capturedB?.settledQuery).toBeUndefined();
   });
 });
 

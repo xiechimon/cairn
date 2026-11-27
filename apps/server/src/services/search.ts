@@ -1,5 +1,6 @@
 import {
-  CHIEF_NOTICE_KIND,
+  extractPlainMessageText,
+  isChiefPromptEcho,
   type ParsedSearchFilter,
   parseSearchQuery,
   type SearchFilterResult,
@@ -9,21 +10,9 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   visibleChiefMessageText,
   WAITING_PHASES,
+  WAKE_MARKER_PREFIX_RE,
 } from '@cairn/shared';
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  like,
-  not,
-  notLike,
-  or,
-  type SQL,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, not, notLike, or, type SQL, sql } from 'drizzle-orm';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';
 import { build, chiefMessage, chiefThread, project, todo, tokenUsage, user } from '../db/schema.js';
@@ -222,6 +211,15 @@ function formatMessageSnippet(text: string, foldedTerms: string[]): string {
   return `${trimmedStart ? '…' : ''}${rawSnippet}${trimmedEnd ? '…' : ''}`;
 }
 
+function decodeRawContent(raw: string | null): unknown {
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function searchMessages(
   deps: SearchDeps,
   teamId: string,
@@ -262,54 +260,48 @@ function searchMessages(
   for (const thread of threads) {
     const threadLimit = Math.min(SEARCH_THREAD_SCAN_CAP, remainingBudget);
     if (threadLimit <= 0) break;
-    const recentRowids = deps.db
-      .select({ rowid: sql<number>`rowid` })
-      .from(chiefMessage)
-      .where(eq(chiefMessage.threadId, thread.id))
-      .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
-      .limit(threadLimit);
-    const scannedCount =
-      deps.db.select({ count: sql<number>`count(*)` }).from(recentRowids.as('recent')).get()
-        ?.count ?? 0;
-    if (scannedCount === 0) continue;
-    remainingBudget -= scannedCount;
     const rows = deps.db
       .select({
         id: chiefMessage.id,
         role: chiefMessage.role,
         origin: chiefMessage.origin,
-        content: chiefMessage.content,
+        content: sql<
+          string | null
+        >`CASE WHEN ${chiefMessage.role} = 'assistant' AND json_valid(${chiefMessage.content}) AND json_type(${chiefMessage.content}) = 'object' AND coalesce(json_extract(${chiefMessage.content}, '$.type'), '') != 'text' THEN NULL ELSE ${chiefMessage.content} END`,
         createdAt: chiefMessage.createdAt,
         rowid: sql<number>`rowid`,
       })
       .from(chiefMessage)
-      .where(
-        and(
-          inArray(sql`rowid`, recentRowids),
-          or(
-            and(
-              eq(chiefMessage.role, 'user'),
-              or(isNull(chiefMessage.origin), eq(chiefMessage.origin, 'user')),
-              or(
-                eq(chiefMessage.origin, 'user'),
-                notLike(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`),
-              ),
-            ),
-            and(
-              eq(chiefMessage.role, 'assistant'),
-              sql`CASE WHEN json_valid(${chiefMessage.content}) THEN json_type(${chiefMessage.content}) != 'object' ELSE 1 END`,
-            ),
-            and(
-              eq(chiefMessage.role, 'system'),
-              like(chiefMessage.content, `%${CHIEF_NOTICE_KIND}%`),
-            ),
-          ),
-        ),
-      )
+      .where(eq(chiefMessage.threadId, thread.id))
       .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+      .limit(threadLimit)
       .all();
+    if (rows.length === 0) continue;
+    remainingBudget -= rows.length;
+    rows.reverse();
+    let eventTurn = false;
     for (const row of rows) {
-      const visible = visibleChiefMessageText(row);
+      const content = decodeRawContent(row.content);
+      if (
+        row.role === 'system' &&
+        content === '' &&
+        row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+      ) {
+        eventTurn = false;
+        continue;
+      }
+      if (row.role === 'user' && isChiefPromptEcho(row)) {
+        eventTurn = WAKE_MARKER_PREFIX_RE.test(extractPlainMessageText(content).trim());
+        continue;
+      }
+      if (row.role === 'user') eventTurn = false;
+      if (eventTurn && row.role === 'assistant') continue;
+      const visible = visibleChiefMessageText({
+        id: row.id,
+        role: row.role,
+        origin: row.origin,
+        content,
+      });
       if (visible === null) continue;
       const folded = foldSearchText(visible.text);
       if (!foldedTerms.every((term) => folded.includes(term))) continue;
