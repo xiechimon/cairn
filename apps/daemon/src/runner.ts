@@ -47,6 +47,7 @@ import { runStepPasses } from './step-pass-loop.js';
 import { agentStepRefusal, prepareStepPromptDelivery } from './step-preflight.js';
 import {
   composeWorkerSystemPrompt,
+  isCodingTaskStep,
   planStepPrompt,
   prependFailedSetupHookContext,
   taskMetaOpts,
@@ -440,6 +441,7 @@ async function runClaimedStep(
       ? claimed.chief.systemPrompt
       : composeWorkerSystemPrompt(agent.description, agent.memories, {
           ...taskMetaOpts(claimed),
+          codingTask: isCodingTaskStep(claimed),
           attachments:
             claimed.remoteTools === undefined ||
             claimed.remoteTools.some((tool) => tool.name === 'attach_file'),

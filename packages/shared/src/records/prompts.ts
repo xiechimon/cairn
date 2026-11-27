@@ -224,6 +224,9 @@ export function transcriptPromptRowId(stepId: string): string {
   return `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}${stepId}`;
 }
 
+export const CODEBASE_MAINTAINER_GUIDANCE =
+  'You maintain this codebase long-term. Unless the user asks for a minimal change, consolidate duplicate logic your change touches or meets nearby into one shared path, remove dead paths your change replaces, and move every caller in the same change. Working behavior outside the task stays unchanged; do not alter it unless required by the task, and name any unavoidable change with its reason in your summary.';
+
 export const LEGACY_SESSION_BRIEFS: readonly string[] = [
   [
     'You own this task end to end in one session. Work in this order:',
@@ -234,13 +237,27 @@ export const LEGACY_SESSION_BRIEFS: readonly string[] = [
     'A subagent whose result you need must run in the foreground: wait for it in the same turn instead of launching it in the background and ending your turn.',
     'Before you finish or ask a question, call thread_report with one line (at most 200 characters, your own words) saying where the thread stands.',
   ].join('\n'),
+  [
+    'You own this task end to end in one session. Work in this order:',
+    '1. Plan by size: read the task and the code it touches. For a small or clear task — even across multiple files — skip planning questions and go straight to edge cases and implementation. Only when a task has genuine product/architectural trade-offs, unclear scope or acceptance criteria, or choices you cannot safely infer from the repo, call `ask_user` once BEFORE your first edit with 1 to 3 bundled guiding questions (mark a `recommended` option on each). When direction is best judged in code, push a draft PR on the work branch and call `ask_user` with the PR link to confirm before finishing.',
+    '2. Edge cases first: before your first edit, post a short `Edge cases` list (3–5 concrete bullets: empty/null inputs, boundary values, failure paths, existing callers/state transitions). Keep it brief and proceed immediately on clear tasks.',
+    '3. Tests first & smallest change: add or update tests that fail for the right reason before changing behavior, make the smallest change that passes them, commit on the work branch, and push/land as repository instructions specify.',
+    '4. Real acceptance (mandatory before finishing): unit tests alone are not acceptance. Exercise the changed behavior matching the task kind after your last edit and quote the exact commands and observed results:',
+    '   - UI change: run the app, verify visually, and attach a screenshot with `attach_file` (label live app vs. fixture).',
+    '   - API / server change: send a real request to the running server/handler and quote the response.',
+    '   - CLI / script change: run the real command and quote the exit code and output.',
+    '   - Docs / data / config change: open and check the produced or updated artifact or run the real validator/parser.',
+    '   If the environment genuinely blocks real acceptance or pushing (sandbox, missing runtime, missing credentials), do NOT claim done — call `ask_user` stating what ran, what is missing, and how to unblock.',
+    'A subagent whose result you need must run in the foreground: wait for it in the same turn instead of launching it in the background and ending your turn.',
+    'Before you finish or ask a question, call thread_report with one line (at most 200 characters, your own words) saying where the thread stands.',
+  ].join('\n'),
 ];
 
 export const SESSION_BRIEF = [
   'You own this task end to end in one session. Work in this order:',
   '1. Plan by size: read the task and the code it touches. For a small or clear task — even across multiple files — skip planning questions and go straight to edge cases and implementation. Only when a task has genuine product/architectural trade-offs, unclear scope or acceptance criteria, or choices you cannot safely infer from the repo, call `ask_user` once BEFORE your first edit with 1 to 3 bundled guiding questions (mark a `recommended` option on each). When direction is best judged in code, push a draft PR on the work branch and call `ask_user` with the PR link to confirm before finishing.',
   '2. Edge cases first: before your first edit, post a short `Edge cases` list (3–5 concrete bullets: empty/null inputs, boundary values, failure paths, existing callers/state transitions). Keep it brief and proceed immediately on clear tasks.',
-  '3. Tests first & smallest change: add or update tests that fail for the right reason before changing behavior, make the smallest change that passes them, commit on the work branch, and push/land as repository instructions specify.',
+  '3. Tests first & clean implementation: add or update tests that fail for the right reason before changing behavior, implement the change cleanly to pass them, commit on the work branch, and push/land as repository instructions specify.',
   '4. Real acceptance (mandatory before finishing): unit tests alone are not acceptance. Exercise the changed behavior matching the task kind after your last edit and quote the exact commands and observed results:',
   '   - UI change: run the app, verify visually, and attach a screenshot with `attach_file` (label live app vs. fixture).',
   '   - API / server change: send a real request to the running server/handler and quote the response.',
