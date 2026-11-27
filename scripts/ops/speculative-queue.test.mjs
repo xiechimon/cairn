@@ -1050,3 +1050,25 @@ test('a 4xx rerun refusal whose re-read shows an already running retry holds ins
     assert.equal(q.posts().filter((p) => /comments$/.test(p)).length, 0);
   });
 });
+
+test('a superseded queue ref is deleted with its run, so a cancelled attempt is never counted later', () => {
+  queueHarness('queue-superseded-', (q) => {
+    const main1 = q.commit(q.base, 'x.txt', 'x\n');
+    q.push(main1, 'refs/heads/main');
+    const a = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const twin = q.commit(q.base, 'a.txt', 'a\n', 'feat: a again');
+    const aTry = q.commit(main1, 'a.txt', 'a\n', 'feat: a');
+    const twinOld = q.commit(q.base, 'a.txt', 'a\n', 'feat: a again, old try');
+    const [idA, idTwin] = [idAt(1, a), idAt(2, twin)];
+    q.push(a, `${ENQUEUE_PREFIX}${idA}`);
+    q.push(aTry, `${TRY_PREFIX}${idA}`);
+    q.push(twin, `${ENQUEUE_PREFIX}${idTwin}`);
+    q.push(twinOld, `${TRY_PREFIX}${idTwin}`);
+    q.state.green = [a, twin];
+    q.run(aTry, 1, `queue/try/${idA}`, {});
+    q.run(twinOld, 7, `queue/try/${idTwin}`, {});
+    q.pass();
+    assert.deepEqual(q.cancelled(), [7]);
+    assert.equal(q.remote(`${TRY_PREFIX}${idTwin}`), null);
+  });
+});

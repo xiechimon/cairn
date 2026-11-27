@@ -641,6 +641,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
     let prevSha = mainTip;
     let chainBroken = false;
     const supersededRunIds = [];
+    const supersededIds = [];
     for (let i = 0; i < window.length; i += 1) {
       const item = window[i];
       const existingTrySha = tryRaw.get(item.id) ?? null;
@@ -659,6 +660,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
       if (stacksUnchanged || addsNothing) {
         const covering = stacksUnchanged ? item.sha : prevSha;
         if (existingTrySha && existingTrySha !== covering) {
+          supersededIds.push(item.id);
           const stale = readTryVerdict(repo, existingTrySha);
           if (stale.inFlight) supersededRunIds.push(stale.runId);
         }
@@ -713,7 +715,17 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
       }
     }
 
-    if (enforce) cancelRuns(repo, supersededRunIds);
+    if (enforce) {
+      cancelRuns(repo, supersededRunIds);
+      if (
+        deleteRemoteRefs(
+          cwd,
+          supersededIds.map((id) => `${TRY_PREFIX}${id}`),
+        )
+      ) {
+        for (const id of supersededIds) tryRaw.delete(id);
+      }
+    }
 
     if (plan.promote) {
       const { targetSha, entries: promotedEntries, cancelRunIds } = plan.promote;
