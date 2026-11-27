@@ -29,6 +29,7 @@ import {
 import { connectorToolDefsForTeam } from '../services/connector-broker.js';
 import { browserOfferFor } from '../services/coordinator-browser.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
+import { resolveCoordinatorRemoteTools } from '../services/coordinator-diagnostics.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
 import {
@@ -36,7 +37,6 @@ import {
   claimPendingChiefStep,
   recordReusedInstructions,
 } from '../services/coordinator-steps.js';
-import { coordinatorToolDefs } from '../services/coordinator-tool-defs.js';
 import { captureCoordinatorClaim } from '../services/coordinator-turn-capture.js';
 import { readDeployLease } from '../services/deploy-lease.js';
 import { serverTurnModel } from '../services/machine-claim.js';
@@ -531,20 +531,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           systemPrompt: context.systemPrompt,
           trigger: context.trigger,
         },
-        remoteTools: [
-          ...coordinatorToolDefs({
-            routerTools: options.routerTools ?? true,
-            desktopTools: teamOffersDesktop(db, threadRow.teamId),
-            ownComputer: ownComputerOffered(db, row.buildId),
-            ...browserOfferFor(
-              db,
-              threadRow,
-              offeredPhoneNames({ db, machineHub: machine.machineHub }, row.buildId),
-            ),
-            phoneComputer: offeredPhoneNames({ db, machineHub: machine.machineHub }, row.buildId),
-          }),
-          ...connectorToolDefsForTeam(db, threadRow.teamId),
-        ],
+        remoteTools: resolveCoordinatorRemoteTools(machine, {
+          teamId: threadRow.teamId,
+          threadRow,
+          routerTools: options.routerTools ?? true,
+        }).tools,
       },
       volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
     };

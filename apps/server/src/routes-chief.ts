@@ -43,6 +43,7 @@ import {
 } from './services/chief-question-store.js';
 import { parseAnswerBody } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
+import { buildCoordinatorDiagnostics } from './services/coordinator-diagnostics.js';
 import { latestChiefMemoryUsage } from './services/coordinator-steps.js';
 import { sendDesignComments } from './services/design-comments.js';
 import { isOwner } from './services/instance-owner.js';
@@ -117,6 +118,24 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const threadId = c.req.query('threadId');
     return c.json(getChiefEnvelope(svc, teamId, threadId));
+  });
+
+  app.get('/api/teams/:id/chief/diagnostics', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const threadId = c.req.query('threadId');
+    return c.json(
+      buildCoordinatorDiagnostics(
+        {
+          db: ctx.db,
+          machineHub: ctx.machineHub,
+          user: ctx.user,
+          deployRecordPath: ctx.deployRecordPath,
+        },
+        teamId,
+        threadId,
+      ),
+    );
   });
 
   app.get('/api/teams/:id/chief/threads', conditionalGet(), (c) => {

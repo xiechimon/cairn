@@ -55,12 +55,10 @@ import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
-import { connectorToolDefsForTeam } from './connector-broker.js';
-import { browserOfferFor } from './coordinator-browser.js';
 import { coordinatorInServerEnabled, rotatesPastCompaction } from './coordinator-context.js';
+import { resolveCoordinatorRemoteTools } from './coordinator-diagnostics.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
-import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { captureCoordinatorClaim } from './coordinator-turn-capture.js';
 import { readDeployLease } from './deploy-lease.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
@@ -78,7 +76,7 @@ import { githubReadToken } from './github-autonomous-token.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { localMergeAuthorizationRefusal } from './local-merge.js';
-import { stageTurnAttachments, teamOffersDesktop } from './machine-computer.js';
+import { stageTurnAttachments } from './machine-computer.js';
 import {
   type MachineDeps,
   profileForStep,
@@ -105,8 +103,6 @@ import { injectMemoryDocuments } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
-import { ownComputerOffered } from './own-computer.js';
-import { offeredPhoneNames } from './phone-computer.js';
 import {
   coordinatorMemoryOwner,
   coordinatorProfile,
@@ -476,15 +472,10 @@ function chiefClaimPayload(
         ? []
         : memoryEditTurn
           ? [...WORKER_MEMORY_REMOTE_TOOLS]
-          : [
-              ...coordinatorToolDefs({
-                desktopTools: teamOffersDesktop(deps.db, threadRow.teamId),
-                ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
-                ...browserOfferFor(deps.db, threadRow, offeredPhoneNames(deps, stepRow.buildId)),
-                phoneComputer: offeredPhoneNames(deps, stepRow.buildId),
-              }),
-              ...connectorToolDefsForTeam(deps.db, threadRow.teamId),
-            ].map((def) =>
+          : resolveCoordinatorRemoteTools(deps, {
+              teamId: threadRow.teamId,
+              threadRow,
+            }).tools.map((def) =>
               CORE_COORDINATOR_TOOLS.has(def.name) || def.name === SUGGEST_REPLIES_TOOL_NAME
                 ? def
                 : { ...def, deferred: true },
