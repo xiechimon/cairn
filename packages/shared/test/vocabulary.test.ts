@@ -462,7 +462,6 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       customModelReasoning,
       piCacheRetention,
       hookTimeoutMs,
-      coordinatorInServer,
       confineDeniedRoots,
       claudeBin,
       agentImportHome,
@@ -497,7 +496,6 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');
     expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
     expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
-    expect(coordinatorInServer).toBe('CAIRN_COORDINATOR_IN_SERVER');
     expect(confineDeniedRoots).toBe('CAIRN_CONFINE_DENIED_ROOTS');
     expect(claudeBin).toBe('CAIRN_CLAUDE_BIN');
     expect(agentImportHome).toBe('CAIRN_AGENT_IMPORT_HOME');

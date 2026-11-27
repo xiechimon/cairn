@@ -104,7 +104,6 @@ async function startRemoteServer(evidenceDir, webDir) {
       CAIRN_HOME: home,
       CAIRN_TOKEN: token,
       CAIRN_DISABLE_EXTERNAL_CONNECTORS: '1',
-      CAIRN_COORDINATOR_IN_SERVER: '0',
       CAIRN_WEB_DIR: webDir,
       HOST: '127.0.0.1',
       PORT: String(port),

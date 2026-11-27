@@ -89,6 +89,12 @@
       "pattern": "\\beval-weekly(?:\\.yml)?\\b",
       "canary": ".github/workflows/eval-weekly.yml",
       "reason": "the GitHub Actions weekly eval workflow was retired; daily real-task eval runs on a dedicated macOS host via scripts/ops/eval-daily.mjs and launchd (docs/ops/eval-daily.md)"
+    },
+    {
+      "id": "coordinator-in-server-env",
+      "pattern": "\\bCAIRN_COORDINATOR_IN_SERVER\\b",
+      "canary": "CAIRN_COORDINATOR_IN_SERVER=0",
+      "reason": "removed CAIRN_COORDINATOR_IN_SERVER env toggle; in-server Coordinator always starts when config loads"
     }
   ],
   "baseline": {
@@ -137,6 +143,7 @@
     "computer-image-rebuild": {},
     "hash-task-picker": {},
     "one-page-design": {},
-    "eval-weekly-workflow": {}
+    "eval-weekly-workflow": {},
+    "coordinator-in-server-env": {}
   }
 }

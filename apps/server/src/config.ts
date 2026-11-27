@@ -112,7 +112,6 @@ export const serverConfigSchema = z.object({
   trustedProxies: z.array(z.string().min(1)).default([]),
   tsnet: tsnetSettingsSchema,
   mcpConfigPath: z.string(),
-  coordinatorInServer: z.boolean(),
   pushDigestTimes: z
     .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/))
     .length(2)
@@ -228,12 +227,6 @@ function envClerkAuth(explicitWebOrigin: string | null): {
     ownerEmails,
     authorizedParties,
   };
-}
-
-function envFlagDefaultOn(name: string): boolean {
-  const raw = process.env[name];
-  if (raw === undefined) return true;
-  return !['0', 'false', 'no', 'off'].includes(raw.toLowerCase());
 }
 
 function envFlag(name: string): boolean {
@@ -400,7 +393,6 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     mcpConfigPath: resolve(
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
-    coordinatorInServer: envFlagDefaultOn(ENV_VARS.coordinatorInServer),
     pushDigestTimes: (() => {
       const raw = envStr('CAIRN_PUSH_DIGEST_TIMES');
       if (raw === null) return ['09:00', '18:00'];

@@ -50,7 +50,6 @@ async function boot(env: Record<string, string | undefined>): Promise<Booted> {
       NODE_ENV: 'production',
       CAIRN_HOME: home,
       CAIRN_WEB_DIR: webDir,
-      CAIRN_COORDINATOR_IN_SERVER: '0',
       CAIRN_TOKEN: undefined,
       CAIRN_REQUIRE_TOKEN: undefined,
       CAIRN_AUTH: undefined,

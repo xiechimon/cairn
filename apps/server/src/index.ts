@@ -192,7 +192,7 @@ if (seedLocalMachine(db, seeded.team.id) === 'blocked') {
     'an enrolled machine holds the server hostname; the local-machine row stays unseeded until it is renamed or removed',
   );
 }
-setCoordinatorInServer(config.coordinatorInServer);
+setCoordinatorInServer(true);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 runDataMigrationOnce(db, 'token-usage-cost-backfill', () => backfillTokenUsageCost(db));
 runDataMigrationOnce(db, 'token-usage-cost-catalog-backfill', () => backfillTokenUsageCost(db));
@@ -420,43 +420,37 @@ const scheduler = createScheduler(
   { attachmentsDir, logger },
   { githubFetch, logger },
 );
-if (config.coordinatorInServer) {
-  warnTeamsWithoutCoordinatorRule(db, logger);
-}
-const coordinator = config.coordinatorInServer
-  ? startCoordinator({
-      machine: {
-        db,
-        hub,
-        machineHub,
-        box: secretBox,
-        user: seeded.user,
-        vapidKeys,
-        reposDir,
-        get workspacesDir() {
-          return workspacesDirOf();
-        },
-        attachmentsDir,
-        skillsDir: config.skillsDir,
-        mcpConfigPath: config.mcpConfigPath,
-        mcpOAuthState,
-        convHub,
-        githubFetch,
-        githubBaseFetch: globalThis.fetch,
-        oauthClient: config.githubOauth,
-        githubAppTokenSocket: config.githubAppTokenSocket,
-        githubAppIdentity: config.githubAppIdentity,
-      },
-      storageDir: coordinatorStoreDir(config.dataDir),
-      logger,
-    })
-  : null;
-if (coordinator !== null) {
-  setCoordinatorWake((threadId) => coordinator.wake(threadId));
-  setCoordinatorSignal((threadId, kind) =>
-    kind === 'steer' ? coordinator.signalSteer(threadId) : coordinator.signalStop(threadId),
-  );
-}
+warnTeamsWithoutCoordinatorRule(db, logger);
+const coordinator = startCoordinator({
+  machine: {
+    db,
+    hub,
+    machineHub,
+    box: secretBox,
+    user: seeded.user,
+    vapidKeys,
+    reposDir,
+    get workspacesDir() {
+      return workspacesDirOf();
+    },
+    attachmentsDir,
+    skillsDir: config.skillsDir,
+    mcpConfigPath: config.mcpConfigPath,
+    mcpOAuthState,
+    convHub,
+    githubFetch,
+    githubBaseFetch: globalThis.fetch,
+    oauthClient: config.githubOauth,
+    githubAppTokenSocket: config.githubAppTokenSocket,
+    githubAppIdentity: config.githubAppIdentity,
+  },
+  storageDir: coordinatorStoreDir(config.dataDir),
+  logger,
+});
+setCoordinatorWake((threadId) => coordinator.wake(threadId));
+setCoordinatorSignal((threadId, kind) =>
+  kind === 'steer' ? coordinator.signalSteer(threadId) : coordinator.signalStop(threadId),
+);
 if (config.disableExternalConnectors) {
   logger.warn(
     'CAIRN_DISABLE_EXTERNAL_CONNECTORS is set (migration staging only): IM polling, mail polling, and scheduled runs are paused so this instance does not conflict with the source server; remove it before cutover',
@@ -572,7 +566,7 @@ async function shutdown(): Promise<void> {
     waitTimeout(TAILSCALE_WITHDRAW_MS, undefined, { ref: false }),
   ]);
   await Promise.race([
-    coordinator?.close(),
+    coordinator.close(),
     waitTimeout(COORDINATOR_CLOSE_MS, undefined, { ref: false }),
   ]);
   await drainHttp();
