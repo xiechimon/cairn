@@ -108,13 +108,16 @@ test('a strong assertion replaced by visibility in the same file is red', (t) =>
 
 test('the gate refuses to pass without a base and judges against origin/main when it has one', (t) => {
   const { root, git, write, commit } = fixture(t);
-  const scripts = ['test-integrity-gate.mjs', 'regression-inversion-gate.mjs', 'diff-base.mjs'].map(
-    (name) => {
-      mkdirSync(join(root, 'scripts'), { recursive: true });
-      copyFileSync(join(import.meta.dirname, name), join(root, 'scripts', name));
-      return `scripts/${name}`;
-    },
-  );
+  const scripts = [
+    'test-integrity-gate.mjs',
+    'regression-inversion-gate.mjs',
+    'plan-spec.mjs',
+    'diff-base.mjs',
+  ].map((name) => {
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    copyFileSync(join(import.meta.dirname, name), join(root, 'scripts', name));
+    return `scripts/${name}`;
+  });
   commit(scripts, 'ops: add the gate');
   const run = (extra = {}) => {
     const env = { ...process.env, ...extra };

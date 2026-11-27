@@ -257,6 +257,7 @@ test('preflight and push-queue stamp unowned commits with the same machine lane'
       'heavy-slots.mjs',
       'owned-process.mjs',
       'diff-base.mjs',
+      'plan-spec.mjs',
       'regression-inversion-gate.mjs',
       'prepush.mjs',
       'ci-failed-only-state.mjs',

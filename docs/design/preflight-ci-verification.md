@@ -53,7 +53,11 @@ A lane verifies on GitHub before it enters the landing queue:
   is red, no test is run, and CI still checks that the tests fail on the
   parent. `scripts/plan-gate.mjs` also runs in the cheap-checks step and
   `check-core`, refusing Tier 1 commits without a hash-verified `PASS` plan
-  (`docs/ops/plan-gate.md`). On a machine that refuses multi-file test runs
+  reviewed by an independent `Reviewer-Model` (!= `Author-Model`), missing
+  `"this change"` proving test files, or commits without an added/modified
+  runnable proving test (`docs/ops/plan-gate.md`), while
+  `scripts/regression-inversion-gate.mjs` proves those tests fail against the
+  parent product source. On a machine that refuses multi-file test runs
   (no `CI`, `CAIRN_MINI_TEST` or `CAIRN_LOCAL_HEAVY`), `pnpm test:changed`
   runs a single related file, and with two or more it lists them, runs none and
   leaves them to the `ci` run. Setting `CAIRN_PREFLIGHT_GATE_WRAPPER`

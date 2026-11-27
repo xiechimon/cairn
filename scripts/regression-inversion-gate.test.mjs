@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
+import { computePlanHash } from './plan-spec.mjs';
 import {
   changedFilesForCommit,
   evaluateFixCommit,
+  evaluatePlanInversionCommit,
+  evaluateRange,
   isFixSubject,
   isProductRuntimeFile,
   isVitestTestFile,
+  linkDependencyDirs,
   materializeParentTree,
   regressionPlanForCommit,
 } from './regression-inversion-gate.mjs';
@@ -110,7 +116,7 @@ test('static mode refuses a fix without a test and never runs one', (t) => {
 test('static mode judges the commits since origin/main, and no base is red', (t) => {
   const { root, git, write, addCommit } = fixture();
   t.after(() => releaseTestTempDir(root));
-  for (const file of ['regression-inversion-gate.mjs', 'diff-base.mjs'])
+  for (const file of ['regression-inversion-gate.mjs', 'plan-spec.mjs', 'diff-base.mjs'])
     write(`scripts/${file}`, readFileSync(join(import.meta.dirname, file), 'utf8'));
   const run = (env = {}) =>
     spawnSync(process.execPath, ['scripts/regression-inversion-gate.mjs', '--mode', 'static'], {
@@ -164,4 +170,253 @@ test('integration regression tests defer out of the light gate and are scoped in
   const integrationPlan = regressionPlanForCommit(root, commit, 'integration');
   assert.deepEqual(integrationPlan.vitestFiles, ['integration/test/thing.test.ts']);
   assert.equal(integrationPlan.delegated, false);
+});
+
+function writeSignedPlan(write, provingTest, integrationTest = null) {
+  const rows = [
+    `| Missing input | Shows error message | ${provingTest} | this change |`,
+    integrationTest
+      ? `| Integration path | Syncs cleanly | ${integrationTest} | this change |`
+      : '| Future offline | Queues safely | apps/web/e2e/offline.spec.ts | later: slice 2 |',
+  ].join('\n');
+  const body = `# Plan Inversion — plan, 2026-11-27
+## User scenario
+A new user opens the view and triggers the new feature path without manual setup.
+## Scope
+1. Add the new feature behavior.
+2. Keep existing views unchanged.
+## Edge cases
+| Edge case | What the user sees | Proving test | Slice/Status |
+|---|---|---|---|
+${rows}
+## Out of scope
+- Extra settings panels.`;
+  const plan = `${body}\n\n## Review\n\n- Verdict: PASS\n- Plan-SHA256: ${computePlanHash(body)}\n- Author-Model: claude-opus-4-6\n- Reviewer: fresh-codex\n- Reviewer-Model: openai-codex/gpt-6.2-sol\n- Findings: 0 blocking\n`;
+  write('docs/design/inversion.md', plan);
+  return 'docs/design/inversion.md';
+}
+
+test('evaluatePlanInversionCommit checks proving test existence, light inversion, and integration delegation', (t) => {
+  const { root, git, write, addCommit } = fixture();
+  t.after(() => releaseTestTempDir(root));
+  git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+
+  writeSignedPlan(write, 'apps/server/test/missing-proving.test.ts');
+  write('apps/server/src/thing.ts', 'export const thing = "feat-missing";\n');
+  const missingSha = addCommit(
+    ['docs/design/inversion.md', 'apps/server/src/thing.ts'],
+    'feat(server): missing proving test\n\nPlan: docs/design/inversion.md',
+  );
+  const missingStatic = evaluatePlanInversionCommit(root, missingSha, 'static');
+  assert.equal(missingStatic.ok, false);
+  assert.match(missingStatic.reason, /apps\/server\/test\/missing-proving\.test\.ts/);
+
+  writeSignedPlan(write, 'apps/server/test/thing.test.ts');
+  write('apps/server/src/thing.ts', 'export const thing = "feat-untouched";\n');
+  const untouchedSha = addCommit(
+    ['docs/design/inversion.md', 'apps/server/src/thing.ts'],
+    'feat(server): untouched proving test\n\nPlan: docs/design/inversion.md',
+  );
+  const untouchedStatic = evaluatePlanInversionCommit(root, untouchedSha, 'static');
+  assert.equal(untouchedStatic.ok, false);
+  assert.match(untouchedStatic.reason, /unmodified "this change" proving test file/);
+
+  writeSignedPlan(write, 'apps/server/test/thing.test.ts');
+  write('apps/server/src/thing.ts', 'export const thing = "feat-real";\n');
+  write('apps/server/test/thing.test.ts', 'assert feat behavior\n');
+  const realSha = addCommit(
+    ['docs/design/inversion.md', 'apps/server/src/thing.ts', 'apps/server/test/thing.test.ts'],
+    'feat(server): real proving test\n\nPlan: docs/design/inversion.md',
+  );
+  const staticOk = evaluatePlanInversionCommit(root, realSha, 'static', () =>
+    assert.fail('static mode must not run tests'),
+  );
+  assert.equal(staticOk.ok, true);
+  assert.match(staticOk.skipped, /ci/i);
+
+  const parentPassed = evaluatePlanInversionCommit(root, realSha, 'light', () => ({
+    ran: true,
+    passed: true,
+  }));
+  assert.equal(parentPassed.ok, false);
+  assert.match(parentPassed.reason, /pass on the parent/);
+
+  const commitFailed = evaluatePlanInversionCommit(root, realSha, 'light', () => ({
+    ran: true,
+    passed: false,
+  }));
+  assert.equal(commitFailed.ok, false);
+  assert.match(commitFailed.reason, /fail on the commit itself/);
+
+  const parentFailed = evaluatePlanInversionCommit(
+    root,
+    realSha,
+    'light',
+    (_tree, _plan, _mode, phase) => ({
+      ran: true,
+      passed: phase === 'commit',
+    }),
+  );
+  assert.equal(parentFailed.ok, true);
+
+  writeSignedPlan(write, 'apps/server/test/thing.test.ts', 'apps/server/test/second.test.ts');
+  write('apps/server/src/thing.ts', 'export const thing = "feat-two";\n');
+  write('apps/server/test/thing.test.ts', 'assert first behavior\n');
+  write('apps/server/test/second.test.ts', 'assert second behavior\n');
+  const twoSha = addCommit(
+    [
+      'docs/design/inversion.md',
+      'apps/server/src/thing.ts',
+      'apps/server/test/thing.test.ts',
+      'apps/server/test/second.test.ts',
+    ],
+    'feat(server): two proving tests\n\nPlan: docs/design/inversion.md',
+  );
+  const partialFail = evaluatePlanInversionCommit(
+    root,
+    twoSha,
+    'light',
+    (_tree, plan, _mode, phase) => ({
+      ran: true,
+      passed: phase === 'commit' || plan.vitestFiles.includes('apps/server/test/second.test.ts'),
+    }),
+  );
+  assert.equal(partialFail.ok, false);
+  assert.match(
+    partialFail.reason,
+    /pass on the parent source: apps\/server\/test\/second\.test\.ts/,
+  );
+
+  const partialCommitFail = evaluatePlanInversionCommit(
+    root,
+    twoSha,
+    'light',
+    (_tree, plan, _mode, phase) => ({
+      ran: true,
+      passed: phase === 'commit' && !plan.vitestFiles.includes('apps/server/test/second.test.ts'),
+    }),
+  );
+  assert.equal(partialCommitFail.ok, false);
+  assert.match(
+    partialCommitFail.reason,
+    /fail on the commit itself: apps\/server\/test\/second\.test\.ts/,
+  );
+
+  writeSignedPlan(write, 'integration/test/plan-int.test.ts');
+  write('apps/server/src/thing.ts', 'export const thing = "feat-int";\n');
+  write('integration/test/plan-int.test.ts', 'integration proving test\n');
+  const intSha = addCommit(
+    ['docs/design/inversion.md', 'apps/server/src/thing.ts', 'integration/test/plan-int.test.ts'],
+    'feat(server): integration proving test\n\nPlan: docs/design/inversion.md',
+  );
+  assert.equal(
+    evaluatePlanInversionCommit(root, intSha, 'light').skipped,
+    'delegated to integration',
+  );
+  const intOk = evaluatePlanInversionCommit(
+    root,
+    intSha,
+    'integration',
+    (_tree, plan, _mode, phase) => {
+      assert.deepEqual(plan.vitestFiles, ['integration/test/plan-int.test.ts']);
+      return { ran: true, passed: phase === 'commit' };
+    },
+  );
+  assert.equal(intOk.ok, true);
+});
+
+test('evaluateRange includes Tier 1 plan commits per-commit and skips docs/ops/chore commits', (t) => {
+  const { root, git, write, addCommit } = fixture();
+  t.after(() => releaseTestTempDir(root));
+  const base = git(['rev-parse', 'HEAD']);
+
+  write('docs/notes.md', 'hello\n');
+  addCommit(['docs/notes.md'], 'docs: update notes');
+  write('scripts/helper.mjs', 'export const h = 1;\n');
+  addCommit(['scripts/helper.mjs'], 'ops: add helper');
+
+  writeSignedPlan(write, 'apps/server/test/thing.test.ts');
+  write('apps/server/src/thing.ts', 'export const thing = "feat-slice1";\n');
+  write('apps/server/test/thing.test.ts', 'slice 1 proving test\n');
+  const featSha1 = addCommit(
+    ['docs/design/inversion.md', 'apps/server/src/thing.ts', 'apps/server/test/thing.test.ts'],
+    'feat(server): slice 1\n\nPlan: docs/design/inversion.md',
+  );
+
+  writeSignedPlan(write, 'apps/server/test/thing.test.ts', 'apps/server/test/slice2.test.ts');
+  write('apps/server/src/thing.ts', 'export const thing = "feat-slice2";\n');
+  write('apps/server/test/thing.test.ts', 'slice 1+2 proving test\n');
+  write('apps/server/test/slice2.test.ts', 'slice 2 proving test\n');
+  const featSha2 = addCommit(
+    [
+      'docs/design/inversion.md',
+      'apps/server/src/thing.ts',
+      'apps/server/test/thing.test.ts',
+      'apps/server/test/slice2.test.ts',
+    ],
+    'feat(server): slice 2\n\nPlan: docs/design/inversion.md',
+  );
+
+  const results = evaluateRange({
+    cwd: root,
+    base,
+    head: featSha2,
+    mode: 'light',
+    execute: (_tree, _plan, _mode, phase) => ({ ran: true, passed: phase === 'commit' }),
+  });
+  assert.equal(results.length, 2);
+  assert.equal(results[0].commit, featSha1);
+  assert.equal(results[0].ok, true);
+  assert.equal(results[1].commit, featSha2);
+  assert.equal(results[1].ok, true);
+});
+
+test('linkDependencyDirs isolates workspace packages inside the materialized tree', (t) => {
+  const cwd = makeTestTempDir('link-deps-cwd-');
+  const tree = makeTestTempDir('link-deps-tree-');
+  t.after(() => releaseTestTempDir(cwd));
+  t.after(() => releaseTestTempDir(tree));
+
+  const write = (base, rel, content) => {
+    mkdirSync(dirname(join(base, rel)), { recursive: true });
+    writeFileSync(join(base, rel), content);
+  };
+  write(cwd, 'packages/shared/package.json', '{"name":"@cairn/shared","main":"./src/index.mjs"}\n');
+  write(cwd, 'packages/shared/src/index.mjs', 'export const ver = "cwd";\n');
+  write(
+    cwd,
+    'node_modules/third-party/package.json',
+    '{"name":"third-party","main":"./index.js"}\n',
+  );
+  write(cwd, 'node_modules/third-party/index.js', 'module.exports = 1;\n');
+  mkdirSync(join(cwd, 'apps/server/node_modules/@cairn'), { recursive: true });
+  symlinkSync('../../../../packages/shared', join(cwd, 'apps/server/node_modules/@cairn/shared'));
+  symlinkSync(
+    '../../../node_modules/third-party',
+    join(cwd, 'apps/server/node_modules/third-party'),
+  );
+
+  write(
+    tree,
+    'packages/shared/package.json',
+    '{"name":"@cairn/shared","main":"./src/index.mjs"}\n',
+  );
+  write(tree, 'packages/shared/src/index.mjs', 'export const ver = "archive";\n');
+  write(tree, 'apps/server/src/probe.mjs', 'export {};\n');
+
+  linkDependencyDirs(cwd, tree);
+
+  const req = createRequire(pathToFileURL(join(tree, 'apps/server/src/probe.mjs')));
+  const sharedResolved = req.resolve('@cairn/shared');
+  const thirdPartyResolved = req.resolve('third-party');
+  assert.equal(
+    sharedResolved.startsWith(realpathSync(join(tree, 'packages/shared'))),
+    true,
+    sharedResolved,
+  );
+  assert.equal(
+    thirdPartyResolved.startsWith(realpathSync(join(cwd, 'node_modules/third-party'))),
+    true,
+    thirdPartyResolved,
+  );
 });
