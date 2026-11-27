@@ -178,7 +178,7 @@
   --surface-1: var(--canvas);
   --hover-1: var(--sidebar-hover);
   --border-soft: color-mix(in oklab, var(--foreground) 9%, transparent);
-  color-scheme: dark light;
+  color-scheme: dark;
 
   --top: inset 0 1px 0 rgb(255 255 255 / 0.05);
   --cds-shadow-xs: 0 1px 2px rgb(0 0 0 / 0.3);
@@ -335,6 +335,7 @@
 }
 
 .light {
+  color-scheme: light;
   --heat-0: rgb(0 0 0 / 0.05);
   --heat-1: #b7b6b3;
   --heat-2: #8b8a87;

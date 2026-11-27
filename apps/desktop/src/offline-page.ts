@@ -29,10 +29,11 @@ export function offlinePageHtml(input: OfflinePageInput): string {
 <html lang="${zh ? 'zh-CN' : 'en'}">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${escapeHtml(title)}</title>
 <style>
   :root {
+    color-scheme: light;
     --canvas: #e7e6e1;
     --card: #e5e4df;
     --ink: #1c1d1b;
@@ -45,6 +46,7 @@ export function offlinePageHtml(input: OfflinePageInput): string {
   }
   @media (prefers-color-scheme: dark) {
     :root {
+      color-scheme: dark;
       --canvas: #1b1c1b;
       --card: #1f201f;
       --ink: #ecebe6;
@@ -59,7 +61,7 @@ export function offlinePageHtml(input: OfflinePageInput): string {
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    min-height: 100vh;
+    min-height: 100dvh;
     display: grid;
     place-items: center;
     padding: 24px;
@@ -112,6 +114,12 @@ export function offlinePageHtml(input: OfflinePageInput): string {
     font: 500 13px/1.2 inherit;
     cursor: pointer;
     border: 1px solid transparent;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  button:focus-visible {
+    outline: 2px solid #c27829;
+    outline-offset: 2px;
   }
   button:disabled {
     opacity: 0.6;

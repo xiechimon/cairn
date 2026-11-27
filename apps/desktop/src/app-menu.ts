@@ -13,7 +13,7 @@ const LABELS = {
     installUpdate: (version: string) => `安装更新 ${version}…`,
     restartUpdate: (version: string) => `立即更新到 ${version}`,
     downloadingUpdate: (version: string, percent: number) =>
-      `正在下载更新 ${version} (${percent}%)`,
+      `正在下载更新 ${version}（${percent}%）`,
     installingUpdate: (version: string) => `正在安装更新 ${version}…`,
     checkUpdates: '检查更新…',
     switchHost: '切换主机',

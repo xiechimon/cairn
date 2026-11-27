@@ -344,7 +344,7 @@ test('detail face: an over-cap paste is rejected with a toast, grant never fires
 
   const toast = page.locator('[data-sonner-toast]');
   await expect(toast).toBeVisible();
-  await expect(toast).toContainText('附件超过 10MB 上限');
+  await expect(toast).toContainText('附件超过 10 MB 上限');
   expect(uploads.grants).toEqual([]);
 });
 

@@ -108,7 +108,7 @@ describe('statusMarkView', () => {
           USER,
           {
             kind: 'streaming',
-            label: '处理中...',
+            label: '处理中…',
             tools: [{ label: 'projects' }, { label: 'bash pnpm test', running: true }],
           },
         ],
@@ -121,12 +121,12 @@ describe('statusMarkView', () => {
     const typing: ChiefStreamItem = { kind: 'robot', markdown: '我先看', typing: true, seconds: '' };
     expect(statusMarkView(input({ stream: [USER, typing] })).id).toBe('write');
     expect(
-      statusMarkView(input({ stream: [USER, { kind: 'streaming', label: '模型输出中...' }] })).id,
+      statusMarkView(input({ stream: [USER, { kind: 'streaming', label: '模型输出中…' }] })).id,
     ).toBe('write');
   });
 
   it('thinks while running with nothing more specific', () => {
-    expect(statusMarkView(input({ stream: [USER, { kind: 'streaming', label: '处理中...' }] })).id).toBe(
+    expect(statusMarkView(input({ stream: [USER, { kind: 'streaming', label: '处理中…' }] })).id).toBe(
       'think',
     );
     expect(statusMarkView(input({ stream: [USER, { kind: 'thinking', text: '先读' }] })).id).toBe(

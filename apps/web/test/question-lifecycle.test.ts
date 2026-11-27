@@ -3,7 +3,7 @@ import type { ChiefStreamItem } from '../src/fixtures/records.js';
 import { answerLineOf, awaitingStream } from '../src/chief/question-lifecycle.js';
 
 describe('a pending question stops the conversation saying it is working, until the owner speaks', () => {
-  const working: ChiefStreamItem = { kind: 'streaming', label: '处理中...', startedAt: 5, signalAt: 6 };
+  const working: ChiefStreamItem = { kind: 'streaming', label: '处理中…', startedAt: 5, signalAt: 6 };
   const asked = {
     kind: 'question',
     id: 'ask-1',

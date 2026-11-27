@@ -138,6 +138,7 @@ function ConnectDialog({
       >
         <Input
           type="password"
+          spellCheck={false}
           value={token}
           onChange={(event) => setToken(event.target.value)}
           placeholder="123456:ABC…"
@@ -214,6 +215,7 @@ function SlackConnectDialog({
               ref={appTokenRef}
               id="im-app-token"
               type="password"
+              spellCheck={false}
               value={appToken}
               onChange={(event) => setAppToken(event.target.value)}
               placeholder="xapp-…"
@@ -231,6 +233,7 @@ function SlackConnectDialog({
             <Input
               id="im-bot-token"
               type="password"
+              spellCheck={false}
               value={botToken}
               onChange={(event) => setBotToken(event.target.value)}
               placeholder="xoxb-…"

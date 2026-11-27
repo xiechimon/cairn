@@ -317,7 +317,7 @@ describe('mapChief typing tail row (#651 F-B1..B4)', () => {
     expect(content.running).toBe(true);
 
     const stream = content.stream ?? [];
-    expect(stream[stream.length - 1]).toMatchObject({ kind: 'streaming', label: '处理中...' });
+    expect(stream[stream.length - 1]).toMatchObject({ kind: 'streaming', label: '处理中…' });
   });
 });
 
@@ -339,9 +339,9 @@ describe('mapChief in-flight presence tail row (#739 F1/F2/F4/F6)', () => {
     );
   }
 
-  test('presence row: running + empty buffer → streaming presence row hung at the tail (label `处理中...`)', () => {
+  test('presence row: running + empty buffer → streaming presence row hung at the tail (label `处理中…`)', () => {
     const stream = mapChief(ENV, opts({ phase: 'chief' }, '')).stream ?? [];
-    expect(stream[stream.length - 1]).toMatchObject({ kind: 'streaming', label: '处理中...' });
+    expect(stream[stream.length - 1]).toMatchObject({ kind: 'streaming', label: '处理中…' });
   });
 
   test('F4 presence row carries no seconds (#471: no stream events drive re-render in the still window, seconds would freeze and lie)', () => {

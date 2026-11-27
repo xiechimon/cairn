@@ -88,7 +88,8 @@ const STATE_ICON = {
   closed: GitPullRequestClosed,
 } as const;
 
-const CHIP = 'inline-flex min-w-0 items-center gap-1.5 outline-none';
+const CHIP =
+  'inline-flex min-w-0 items-center gap-1.5 rounded-sm outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--focus-ring)';
 
 const OPTICAL_NUDGE: Partial<Record<PrPanelRow['state'], string>> = {
   draft: '0.5px -0.25px',

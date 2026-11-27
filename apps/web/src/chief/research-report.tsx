@@ -138,7 +138,7 @@ export function ResearchReportCard({
           data-grow={grow ? '' : undefined}
           onClick={openInPanel}
           className={cn(
-            'flex max-w-full cursor-pointer items-center gap-1.5 bg-transparent p-0 text-left text-ui leading-5 text-foreground outline-none',
+            'flex max-w-full cursor-pointer items-center gap-1.5 bg-transparent p-0 text-left text-ui leading-5 text-foreground',
             className,
           )}
         >

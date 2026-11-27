@@ -566,6 +566,7 @@ function ComposioKeyDialog({
             className={FORM_CONTROL_CLS}
             type="password"
             autoComplete="off"
+            spellCheck={false}
             placeholder="ak_…"
             value={key}
             onChange={(event) => setKey(event.target.value)}

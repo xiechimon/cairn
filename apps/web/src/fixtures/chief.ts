@@ -82,7 +82,7 @@ export const chiefWorking: FixtureSet = {
     ...streamingChief,
     stream: [
       ...(streamingChief.stream ?? []),
-      { kind: 'streaming', seconds: 72, label: '处理中...' },
+      { kind: 'streaming', seconds: 72, label: '处理中…' },
     ],
   },
 };

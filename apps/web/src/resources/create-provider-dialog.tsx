@@ -355,10 +355,10 @@ export function CreateProviderDialog({
             <Search />
           </InputGroupAddon>
           <InputGroupInput
-            aria-label={t('搜索服务商...')}
+            aria-label={t('搜索服务商…')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('搜索服务商...')}
+            placeholder={t('搜索服务商…')}
             className="text-ui md:text-ui"
           />
         </InputGroup>
@@ -522,6 +522,7 @@ export function CreateProviderDialog({
             id="dlg-provider-apikey"
             className={FORM_CONTROL_CLS}
             type="password"
+            spellCheck={false}
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
             placeholder={t('无密钥网关可留空')}

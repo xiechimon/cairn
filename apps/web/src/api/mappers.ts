@@ -224,8 +224,8 @@ function connectingLine(queue: NonNullable<StepRow['queue']>): {
   const reason = queueLabel(queue);
   if (reason !== null) return { ...reason, blocked: queue.blocked != null };
   return queue.waitingFor != null
-    ? { label: '正在连接 {machine}...', vars: { machine: queue.waitingFor.name }, blocked: false }
-    : { label: '处理中...', blocked: false };
+    ? { label: '正在连接 {machine}…', vars: { machine: queue.waitingFor.name }, blocked: false }
+    : { label: '处理中…', blocked: false };
 }
 
 function quotaWaitLabel(q: NonNullable<StepRow['quotaWait']>): {
@@ -1147,8 +1147,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
                   : stopping
                     ? '正在停止…'
                     : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
-                      ? '准备工作区...'
-                      : '处理中...',
+                      ? '准备工作区…'
+                      : '处理中…',
         ...(queued != null
           ? { labelVars: queued.vars }
           : quota != null
@@ -1164,7 +1164,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     resolvedBuildPrNumber(build) == null &&
     !steps.some((s) => s.status === 'stopped')
   ) {
-    items.push({ kind: 'streaming', label: '执行中...' });
+    items.push({ kind: 'streaming', label: '执行中…' });
   }
 
   if (
@@ -2557,7 +2557,7 @@ export function mapChief(
         chiefStream.push({
           kind: 'streaming',
           ...(turnStartedAt !== undefined ? { startedAt: turnStartedAt } : {}),
-          label: actLabel?.label ?? '处理中...',
+          label: actLabel?.label ?? '处理中…',
           ...(actLabel?.vars !== undefined ? { labelVars: actLabel.vars } : {}),
           ...(opts.activity != null ? { signalAt: opts.activity.at } : {}),
           ...(trailingTools.length > 0 ? { tools: trailingTools } : {}),
@@ -2698,7 +2698,7 @@ export function mapOrchestrationFeedback(
     } else {
       items.push({
         kind: 'streaming',
-        label: 'Coordinator 正在安排这个任务...',
+        label: 'Coordinator 正在安排这个任务…',
         startedAt: request.createdAt,
       });
     }

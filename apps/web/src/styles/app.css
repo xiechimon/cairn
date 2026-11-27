@@ -59,6 +59,10 @@
 }
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-block-start: 4rem;
+  }
   html,
   body,
   #root {
@@ -94,6 +98,37 @@
   [role="checkbox"],
   summary {
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="option"],
+  [role="menuitem"],
+  [role="switch"],
+  [role="checkbox"],
+  summary {
+    user-select: none;
+  }
+  input,
+  textarea,
+  select {
+    touch-action: manipulation;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    scroll-margin-top: 4rem;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 26%, transparent);
+    color: inherit;
+  }
+  [role="dialog"],
+  [role="alertdialog"],
+  [data-slot="popover-content"] {
+    overscroll-behavior: contain;
   }
 
   :where(
@@ -1195,11 +1230,13 @@ html:not(.light)
   transition-duration: 0s;
 }
 
-html:has([data-testid="chief-body"]),
-body:has([data-testid="chief-body"]),
-#root:has([data-testid="chief-body"]),
-#root :has([data-testid="chief-body"]) {
-  overscroll-behavior: none;
+@media (pointer: fine) {
+  html:has([data-testid="chief-body"]),
+  body:has([data-testid="chief-body"]),
+  #root:has([data-testid="chief-body"]),
+  #root :has([data-testid="chief-body"]) {
+    overscroll-behavior: none;
+  }
 }
 
 :root[data-shell="mac-tray"],

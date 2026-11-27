@@ -92,3 +92,15 @@ Cairn adopts Google's [Core Web Vitals](https://web.dev/articles/vitals) as its 
 | [Long tasks](https://web.dev/articles/tbt) | > 50 ms (INP diagnostic, not CWV-gated) | 0 tasks `> 50 ms` while typing in Coordinator composer / add-task (`C36`, INP diagnostic) | `e2e/web-vitals-perf.spec.ts` |
 | [FCP](https://web.dev/articles/fcp) | ≤ 1.8 s (good, supporting) | Measured & reported per surface (not gated) | `e2e/web-vitals-perf.spec.ts` |
 | [TTFB](https://web.dev/articles/ttfb) | ≤ 0.8 s (good, supporting) | Measured & reported per surface (not gated) | `e2e/web-vitals-perf.spec.ts` |
+
+## Adopted standards
+
+Cairn adopts the published standards audited in [ui-guidelines-adoption-2026-11-27.md](../../docs/research/ui-guidelines-adoption-2026-11-27.md), preferring newcomer calm when a source conflicts with Cairn's UX:
+
+| Standard | Surface scope | Enforcement |
+|---|---|---|
+| Vercel Web Interface Guidelines & Rauno `interfaces.rauno.me` | `foundation.md` (`C38`–`C42`, `C44`, `A7`, `T6`, `V31`) | `test/ui-guidelines-static.test.ts`, `e2e/design-rules-measure.spec.ts` |
+| W3C WCAG 2.2 AA (`target-size`, `focus`, dragging, `error`, `labels`) | `foundation.md`, `settings.md`, `conversation.md` | `e2e/a11y-axe.spec.ts` (`wcag22aa`), `e2e/design-rules-measure.spec.ts` |
+| Apple macOS HIG (window, menu, tray, notifications, offline) | `computers.md` (`V26`, `C45`) | `test/ui-guidelines-static.test.ts`, `apps/desktop/scripts/app-menu.test.mjs` |
+| W3C `clreq` & Chinese Copywriting Guidelines (`T1`, `T7`) | `foundation.md`, `apps/web/src/i18n/en.ts` | `test/ui-guidelines-static.test.ts`, `test/unslop-signs.test.ts` |
+| Emil Kowalski & Jakub Krehel craft skills | `motion.md` (`V24`), `apps/web/src/` | `e2e/design-rules-measure.spec.ts` |

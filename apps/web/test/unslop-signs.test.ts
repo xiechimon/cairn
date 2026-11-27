@@ -441,7 +441,7 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     ['API key 无效'],
     ['Cannot connect'],
     ['just now'],
-    ['Connecting to {machine}...'],
+    ['Connecting to {machine}…'],
   ])('T5 register passes %s', (text) => {
     expect(registerOffenders([text])).toEqual([]);
   });

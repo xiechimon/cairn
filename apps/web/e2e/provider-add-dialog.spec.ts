@@ -29,7 +29,7 @@ test('topbar `新建` opens the picker: 38 preset rows, search, `自定义端点
 }) => {
   const dialog = await openPicker(page);
   await expect(dialog).toHaveAccessibleName('添加服务商');
-  await expect(dialog.getByLabel('搜索服务商...')).toBeVisible();
+  await expect(dialog.getByLabel('搜索服务商…')).toBeVisible();
   await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
   await expect(dialog.getByRole('button', { name: '自定义端点' })).toHaveText('自定义端点');
 
@@ -42,7 +42,7 @@ test('search filters by display name and id, case-insensitive; empty query resto
   page,
 }) => {
   const dialog = await openPicker(page);
-  const search = dialog.getByLabel('搜索服务商...');
+  const search = dialog.getByLabel('搜索服务商…');
   await search.fill('deepseek');
   await expect(dialog.locator('[data-preset-id]')).toHaveCount(1);
   await expect(dialog.locator('[data-preset-id]').first()).toContainText('DeepSeek');
@@ -240,7 +240,7 @@ test('fixture submit closes the dialog (accept law) and reopens a clean picker',
 
   const again = await openPicker(page);
   await expect(again.locator('[data-preset-id]')).toHaveCount(38);
-  await expect(again.getByLabel('搜索服务商...')).toHaveValue('');
+  await expect(again.getByLabel('搜索服务商…')).toHaveValue('');
   await again.getByRole('button', { name: '自定义端点' }).click();
   await expect(again.locator('#dlg-provider-id')).toHaveValue('');
   await expect(again.locator('#dlg-provider-label')).toHaveValue('');

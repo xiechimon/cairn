@@ -260,6 +260,7 @@ function TokenField({
         id="mcp-token"
         type="password"
         autoComplete="off"
+        spellCheck={false}
         className={FIELD_CLS}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -519,6 +520,7 @@ function CustomServerDialog({
                   aria-label={t('请求头的值')}
                   type="password"
                   autoComplete="off"
+                  spellCheck={false}
                   className={cn(FIELD_CLS, 'min-w-0 flex-1')}
                   value={header.value}
                   placeholder="Bearer …"

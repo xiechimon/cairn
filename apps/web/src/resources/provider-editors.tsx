@@ -145,6 +145,7 @@ function KeyField({ onReplace }: { onReplace?: (key: string) => unknown }) {
         aria-label={t('新的 API key')}
         type="password"
         autoComplete="off"
+        spellCheck={false}
         autoFocus
         className={cn(FORM_CONTROL_CLS, 'min-w-0 flex-auto')}
         value={draft}

@@ -78,6 +78,7 @@ export const selfTests = [
   'scripts/dead-runtime-exports-gate.test.mjs',
   'scripts/product-surface-gate.test.mjs',
   'scripts/ui-debt-gate.test.mjs',
+  'scripts/ui-guidelines-gate.test.mjs',
 ];
 
 const selfTest = ['node', '--test', ...selfTests];
@@ -200,6 +201,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', 'scripts/product-surface-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
     ['node', 'scripts/ui-page-style-gate.mjs'],
+    ['node', 'scripts/ui-guidelines-gate.mjs'],
     ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
     ['node', 'scripts/packaged-journey-gate.mjs'],
     ['node', 'scripts/visual-baseline-gate.mjs'],

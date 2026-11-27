@@ -403,6 +403,7 @@ export function TokenGate() {
               <Input
                 type="password"
                 autoComplete="current-password"
+                spellCheck={false}
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
                 placeholder={t('粘贴服务器访问令牌')}

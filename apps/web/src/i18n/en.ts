@@ -1042,10 +1042,10 @@ export const EN: Record<string, string> = {
   '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':
     "Switch the Coordinator's Agent? The Coordinator's memory lives on the Agent it runs on. After switching to <agent>, the memory becomes <agent>'s — the current memory is not migrated.",
 
-  '准备工作区...': 'Preparing workspace...',
-  '处理中...': 'Working on it...',
-  '正在连接 {machine}...': 'Connecting to {machine}...',
-  '执行中...': 'Running...',
+  '准备工作区…': 'Preparing workspace…',
+  '处理中…': 'Working on it…',
+  '正在连接 {machine}…': 'Connecting to {machine}…',
+  '执行中…': 'Running…',
   '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁':
     'Queued: no Runner meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed',
   '排队中：暂无 {platform} 执行机 · 需要 {platform}':
@@ -1098,13 +1098,13 @@ export const EN: Record<string, string> = {
   '不限（默认执行机）': 'Any (default Runner)',
   手动: 'Manual',
   推荐: 'Recommended',
-  '正在连接模型...': 'Connecting to the model...',
-  '模型思考中...': 'Model is thinking...',
-  '模型输出中...': 'Model is responding...',
+  '正在连接模型…': 'Connecting to the model…',
+  '模型思考中…': 'Model is thinking…',
+  '模型输出中…': 'Model is responding…',
   '正在执行工具：{n}': 'Running tool: {n}',
   '正在自动重试（第 {n} 次）…': 'Retrying automatically (attempt {n})…',
-  '正在压缩上下文...': 'Compacting context...',
-  '等待模型响应...': 'Waiting for the model...',
+  '正在压缩上下文…': 'Compacting context…',
+  '等待模型响应…': 'Waiting for the model…',
   '最近信号：{n}s 前': 'Last signal {n}s ago',
   '技能：{n}': 'Skills: {n}',
   '挡下：{n}': 'Blocked: {n}',
@@ -1204,7 +1204,7 @@ export const EN: Record<string, string> = {
   原生鉴权: 'native auth',
   '把 Base URL 中的占位符换成你的账户值':
     'Replace the placeholders in the Base URL with your account values',
-  '搜索服务商...': 'Search providers...',
+  '搜索服务商…': 'Search providers…',
   自定义端点: 'Custom endpoint',
   订阅登录: 'Subscription sign-in',
   模型厂商: 'Model vendors',
@@ -1632,7 +1632,7 @@ export const EN: Record<string, string> = {
   有一条消息尚未确认发出: 'A message is not confirmed as sent',
   打开对话: 'Open conversation',
   '恢复失败，请重试。': 'Restore failed. Try again.',
-  '附件超过 10MB 上限': 'Attachment exceeds the 10 MB limit',
+  '附件超过 10 MB 上限': 'Attachment exceeds the 10 MB limit',
   不支持该文件类型: 'That file type is not supported',
   附件上传失败: 'Attachment upload failed',
   附件: 'Attachments',
@@ -1655,7 +1655,7 @@ export const EN: Record<string, string> = {
   排队中: 'Queued',
   '已交给 Coordinator 安排': 'Handed to the Coordinator',
   '已交给 Coordinator：{title}': 'Handed to the Coordinator: {title}',
-  'Coordinator 正在安排这个任务...': 'The Coordinator is arranging this task...',
+  'Coordinator 正在安排这个任务…': 'The Coordinator is arranging this task…',
   'Coordinator 没有派发这个任务，原因见上方的回复。点击「开始」重试。':
     'The Coordinator did not dispatch this task; its reply above says why. Press Start to try again.',
   'Coordinator 没有派发这个任务，也没有说明原因。点击「开始」重试。':

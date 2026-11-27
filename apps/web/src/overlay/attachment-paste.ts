@@ -171,7 +171,7 @@ export function takeAttachmentErrorReason(file: File): string | undefined {
 
 export function attachmentFailureTitle(err: unknown): string {
   if (err instanceof AttachmentError) {
-    if (err.reason === 'size') return '附件超过 10MB 上限';
+    if (err.reason === 'size') return '附件超过 10 MB 上限';
     if (err.reason === 'mime') return '不支持该文件类型';
     if (err.reason === 'quota') return '团队附件空间已满';
   }

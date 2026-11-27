@@ -30,20 +30,20 @@ export const activityStore = {
 export function activityLabel(activity: StepActivity): { label: string; vars?: TVars } {
   switch (activity.phase) {
     case 'preparing':
-      return { label: '准备工作区...' };
+      return { label: '准备工作区…' };
     case 'starting':
-      return { label: '正在连接模型...' };
+      return { label: '正在连接模型…' };
     case 'thinking':
-      return { label: '模型思考中...' };
+      return { label: '模型思考中…' };
     case 'responding':
-      return { label: '模型输出中...' };
+      return { label: '模型输出中…' };
     case 'tool':
       return { label: '正在执行工具：{n}', vars: { n: activity.tool ?? 'tool' } };
     case 'retrying':
       return { label: '正在自动重试（第 {n} 次）…', vars: { n: activity.attempt ?? 1 } };
     case 'compacting':
-      return { label: '正在压缩上下文...' };
+      return { label: '正在压缩上下文…' };
     case 'awaiting_model':
-      return { label: '等待模型响应...' };
+      return { label: '等待模型响应…' };
   }
 }

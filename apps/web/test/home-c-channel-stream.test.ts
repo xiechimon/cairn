@@ -31,7 +31,7 @@ describe('a project channel conversation', () => {
   });
 
   it('while the greeting turn runs the channel shows the running row, not the fallback', () => {
-    const stream = [{ kind: 'streaming' as const, label: '处理中...' }];
+    const stream = [{ kind: 'streaming' as const, label: '处理中…' }];
     expect(channelStream(stream, FALLBACK, false)).toEqual(stream);
   });
 

@@ -52,7 +52,7 @@ describe('foldTaskCards', () => {
 
   test('cards of a turn still running hang on its live row, not on the previous reply', () => {
     const earlier: ChiefStreamItem = { kind: 'robot', id: 'r0', seconds: '', markdown: 'Earlier.' };
-    const live: ChiefStreamItem = { kind: 'streaming', label: '处理中...' };
+    const live: ChiefStreamItem = { kind: 'streaming', label: '处理中…' };
     const list = rows(user, earlier, card('a1'), card('b2'), live);
     const folded = foldTaskCards(list, glances);
     expect(folded.rows.map((row) => row.item.kind)).toEqual(['user', 'robot', 'streaming']);
@@ -68,7 +68,7 @@ describe('foldTaskCards', () => {
   });
 
   test('a live row after a later user message does not take an earlier turn\'s cards', () => {
-    const live: ChiefStreamItem = { kind: 'streaming', label: '处理中...' };
+    const live: ChiefStreamItem = { kind: 'streaming', label: '处理中…' };
     const next: ChiefStreamItem = { kind: 'user', id: 'u2', text: 'more' };
     const folded = foldTaskCards(rows(user, reply, card('a1'), next, live), glances);
     expect(folded.startedBy.get(reply)).toEqual(['a1']);

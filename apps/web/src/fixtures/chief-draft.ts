@@ -63,7 +63,7 @@ export const chiefDraft: FixtureSet = {
         seq: null,
         title: '查看 cairn 仓库（测试）',
       },
-      { kind: 'streaming', seconds: 42, label: '处理中...' },
+      { kind: 'streaming', seconds: 42, label: '处理中…' },
     ],
     quickReplies: ['好，等你汇报', '先只看 README'],
     context: {

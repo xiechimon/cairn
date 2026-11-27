@@ -133,7 +133,7 @@ describe('mapTranscript activity phase (#905)', () => {
       steps: [running],
       activity: act('step-previous-run', 'thinking'),
     });
-    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '处理中...' });
+    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '处理中…' });
   });
 
   test('W4: stopping wins — `正在停止…` is not hijacked by the activity label', () => {
@@ -149,7 +149,7 @@ describe('mapTranscript activity phase (#905)', () => {
   test('W5: no activity signal → existing labels verbatim unchanged (including the pending-plan preparation workspace)', () => {
     const pendingPlan = step('pending', 'plan');
     const items = render({ steps: [pendingPlan], activity: null });
-    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
+    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区…' });
     expect(tail(items)?.labelVars).toBeUndefined();
   });
 
@@ -295,15 +295,15 @@ describe('mapChief activity phase (#905 W7)', () => {
     });
   }
 
-  test('no activity → presence row label `处理中...` unchanged (zero regression)', () => {
+  test('no activity → presence row label `处理中…` unchanged (zero regression)', () => {
     const row = chiefOf().stream?.at(-1);
-    expect(row).toMatchObject({ kind: 'streaming', label: '处理中...' });
+    expect(row).toMatchObject({ kind: 'streaming', label: '处理中…' });
   });
 
   test('thinking phase takes over the label + signalAt comes along', () => {
     expect(chiefOf(act('step-chief-1', 'thinking')).stream?.at(-1)).toMatchObject({
       kind: 'streaming',
-      label: '模型思考中...',
+      label: '模型思考中…',
     });
   });
 
@@ -348,7 +348,7 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
       label: string;
       labelVars?: Record<string, string | number>;
     };
-    expect(row).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
+    expect(row).toMatchObject({ kind: 'streaming', label: '准备工作区…' });
     expect(row.blocked).toBeUndefined();
     expect(translate('zh', EN, row.label, row.labelVars)).not.toMatch(/排队|前面/);
   });
@@ -464,10 +464,10 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
   test('Q3: projection absent (old server) → existing labels verbatim unchanged', () => {
     const firstPlan = step('pending', 'plan');
     const items = render({ steps: [firstPlan] });
-    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
+    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区…' });
     const laterStep = { ...step('pending', 'build') };
     const items2 = render({ steps: [step('done', 'plan'), laterStep] });
-    expect(tail(items2)).toMatchObject({ kind: 'streaming', label: '处理中...' });
+    expect(tail(items2)).toMatchObject({ kind: 'streaming', label: '处理中…' });
   });
 
   test('Q4: queue wins over a stale activity phase (the step is not running)', () => {
@@ -476,12 +476,12 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
       steps: [pending],
       activity: act(pending.id, 'thinking'),
     });
-    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
+    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区…' });
   });
 
   test('Q5: claimed step → `处理中` (current behavior locked)', () => {
     const items = render({ steps: [step('claimed')] });
-    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '处理中...' });
+    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '处理中…' });
   });
 });
 
@@ -551,19 +551,19 @@ describe('mapChief queue projection (#1108 Q6)', () => {
       }).stream?.at(-1),
     ).toMatchObject({
       kind: 'streaming',
-      label: '正在连接 {machine}...',
+      label: '正在连接 {machine}…',
       labelVars: { machine: 'studioMac' },
     });
     expect(
       chiefOfThread({ ...THREAD_Q, turnQueue: { position: 1, waitingFor: null } }).stream?.at(-1),
     ).toMatchObject({
       kind: 'streaming',
-      label: '处理中...',
+      label: '处理中…',
     });
 
     expect(chiefOfThread({ ...THREAD_Q }).stream?.at(-1)).toMatchObject({
       kind: 'streaming',
-      label: '处理中...',
+      label: '处理中…',
     });
   });
 

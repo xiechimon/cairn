@@ -270,6 +270,7 @@ export function AddDevinSubscriptionDialog({
                 data-testid="devin-subscription-token"
                 type="password"
                 autoComplete="off"
+                spellCheck={false}
                 value={token}
                 onChange={(event) => setToken(event.target.value)}
               />

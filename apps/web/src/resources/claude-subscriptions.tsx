@@ -74,6 +74,7 @@ export function AddClaudeSubscriptionDialog({
             data-testid="subscription-token"
             type="password"
             autoComplete="off"
+            spellCheck={false}
             value={token}
             onChange={(event) => setToken(event.target.value)}
           />

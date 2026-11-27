@@ -396,7 +396,7 @@ const REUSED_TRANSCRIPT: TranscriptItem[] = [
   { kind: 'robot', paragraphs: [{ segments: [{ text: '复用了上一次运行的方案。' }] }] },
   { kind: 'run', machine: MACHINE_NAME },
   { kind: 'user', text: '确认' },
-  { kind: 'streaming', seconds: 1, label: '连接执行机...' },
+  { kind: 'streaming', seconds: 1, label: '连接执行机…' },
 ];
 
 const REUSED_REVIEW_TRANSCRIPT: TranscriptItem[] = [
@@ -532,7 +532,7 @@ const AGENT_TODO_TRANSCRIPT: TranscriptItem[] = [
       { text: '重排模型清单和派活方案', state: 'todo' },
     ],
   },
-  { kind: 'streaming', seconds: 12, label: '模型思考中...' },
+  { kind: 'streaming', seconds: 12, label: '模型思考中…' },
 ];
 
 export const agentTodoLive: FixtureSet = {
@@ -630,7 +630,7 @@ export const revisionStreaming: FixtureSet = {
     transcript: [
       ...RUN1_TO_V2,
       { kind: 'user', text: REJECT_FEEDBACK },
-      { kind: 'streaming', seconds: 1, label: '处理中...' },
+      { kind: 'streaming', seconds: 1, label: '处理中…' },
     ],
     doc: DOC_V2,
   },

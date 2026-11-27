@@ -243,7 +243,7 @@ export const homeC: FixtureSet = {
       },
     },
     'home-c-working-c': {
-      transcript: [{ kind: 'streaming', label: '处理中...' }],
+      transcript: [{ kind: 'streaming', label: '处理中…' }],
       usage: {
         rows: [usageRow('build-home-c-working-c', 21_000, 6_200, 184_000, 0.47)],
         machines: ['omarchy'],

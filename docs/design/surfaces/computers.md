@@ -4,11 +4,12 @@ The computers panel (`board/machines-panel.tsx`) and the menu-bar tray page (`/t
 
 ## Rules
 
-Scope: `apps/web/src/tray/` `apps/web/src/board/machines-` `apps/web/src/board/computer-` `apps/web/src/board/fleet-` `apps/web/src/board/machine-capabilities` `apps/web/e2e/machines-` `apps/web/e2e/machine-` `apps/web/e2e/desktop-update` `apps/web/test/tray-` `apps/web/test/machine-` `apps/web/test/computer-` `apps/web/test/fleet-`
+Scope: `apps/web/src/tray/` `apps/web/src/board/machines-` `apps/web/src/board/computer-` `apps/web/src/board/fleet-` `apps/web/src/board/machine-capabilities` `apps/web/e2e/machines-` `apps/web/e2e/machine-` `apps/web/e2e/desktop-update` `apps/web/test/tray-` `apps/web/test/machine-` `apps/web/test/computer-` `apps/web/test/fleet-` `apps/desktop/src/`
 
 | Id | Rule | Check |
 |---|---|---|
 | V26 | The `/tray` popover is operating system chrome: system font, system accent, OS light and dark — the one exception to V2, V3 and V5. | H real Mac capture in the `desktop-mac` run |
+| C45 | Desktop native chrome (menu labels and built-in offline HTML) uses full-width Chinese punctuation, `viewport-fit=cover`, per-theme `color-scheme`, `100dvh`, `focus-visible` outlines and live-status regions (`role="status"` or `aria-live="polite"`). | M `test/ui-guidelines-static.test.ts` checks `apps/desktop/src/app-menu.ts` and `apps/desktop/src/offline-page.ts` |
 
 ## Entry
 

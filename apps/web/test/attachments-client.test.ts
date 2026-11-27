@@ -155,7 +155,7 @@ describe('attachFile session recovery', () => {
 
 describe('attachmentFailureTitle — toast copy mapping (zh keys = en dictionary keys)', () => {
   it('size → size-limit copy', () => {
-    expect(attachmentFailureTitle(new AttachmentError('size', 'x'))).toBe('附件超过 10MB 上限');
+    expect(attachmentFailureTitle(new AttachmentError('size', 'x'))).toBe('附件超过 10 MB 上限');
   });
 
   it('mime → unsupported-type copy', () => {

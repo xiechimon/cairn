@@ -46,7 +46,7 @@ export const ANNOUNCE_SETTLE_MS = 600;
 
 const CONNECTION_LOST_LABEL = '连接断开，正在重连…';
 const OUTAGE_LABEL = '等待恢复';
-const RESPONDING_KEY = '模型输出中...';
+const RESPONDING_KEY = '模型输出中…';
 const QUOTA_WAIT_PREFIX = '等额度';
 const QUEUED_PREFIX = '排队中';
 

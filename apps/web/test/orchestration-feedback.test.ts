@@ -40,7 +40,7 @@ test('while the turn runs the pane says handed to Coordinator with task title an
   ]);
   expect(kinds(items)).toEqual(['note:已交给 Coordinator：{title}', 'streaming']);
   expect(items[0]).toMatchObject({ vars: { title: 'Add a NEWCOMER.md file' } });
-  expect(items[1]).toMatchObject({ label: 'Coordinator 正在安排这个任务...', startedAt: 150 });
+  expect(items[1]).toMatchObject({ label: 'Coordinator 正在安排这个任务…', startedAt: 150 });
 });
 
 test('when Coordinator has an outage, orchestration feedback does not spin', () => {

@@ -218,7 +218,7 @@ test('without a provider, step 1 lists the providers on the page, and Claude Pro
   await expect(page.getByTestId('first-run-setup').getByRole('switch')).toHaveCount(0);
   await expect(page.getByTestId('local-provider-import')).toHaveCount(0);
   const picker = page.getByTestId('first-run-add-provider');
-  await expect(picker.getByRole('textbox', { name: '搜索服务商...' })).toBeVisible();
+  await expect(picker.getByRole('textbox', { name: '搜索服务商…' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await picker.locator('[data-preset-id="claude-subscription"]').click();
@@ -227,7 +227,7 @@ test('without a provider, step 1 lists the providers on the page, and Claude Pro
 
 test('the provider list starts below the language switch', async ({ page }) => {
   await open(page, { ...fresh(), bound: false });
-  const search = page.getByTestId('first-run-add-provider').getByRole('textbox', { name: '搜索服务商...' });
+  const search = page.getByTestId('first-run-add-provider').getByRole('textbox', { name: '搜索服务商…' });
   const language = page.locator('[data-testid="first-run-locale-en"]:visible');
   const searchBox = await search.boundingBox();
   const languageBox = await language.boundingBox();

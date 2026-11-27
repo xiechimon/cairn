@@ -38,6 +38,7 @@ export function resolveStoredTheme(storage: Storage | null = safeLocalStorage())
 export function paintTheme(preference: ThemePreference): void {
   const theme = resolveTheme(preference, systemPrefersLight());
   const root = document.documentElement;
+  root.style.colorScheme = theme;
   const changed =
     root.dataset.theme !== theme || root.classList.contains('light') !== (theme === 'light');
   if (changed) {

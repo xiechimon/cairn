@@ -364,6 +364,7 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
           ) : seg.style != null ? (
             <code
               key={j}
+              translate="no"
               className={cn(
                 codeClassName,
                 CODE_SKIN[codeClassName],

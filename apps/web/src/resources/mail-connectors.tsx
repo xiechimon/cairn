@@ -168,6 +168,7 @@ function AddMailboxDialog({
           <Input
             id="mail-address"
             type="email"
+            spellCheck={false}
             value={address}
             onChange={(event) => changeAddress(event.target.value)}
             placeholder={form.placeholder}
@@ -179,6 +180,7 @@ function AddMailboxDialog({
           <Input
             id="mail-password"
             type="password"
+            spellCheck={false}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="new-password"

@@ -442,6 +442,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
       </div>
       <div className="overflow-x-auto overscroll-x-contain">
         <pre
+          translate="no"
           className="chat-md-code m-0 px-5 py-3 font-prose-mono text-code whitespace-pre text-(--foreground)"
           data-lang={lang ?? ''}
           data-testid="md-code"
@@ -475,7 +476,10 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
             className="absolute top-2 right-2 z-10"
           />
           <div className="overflow-x-auto overscroll-x-contain">
-            <pre className="m-0 px-5 py-3 font-prose-mono text-code whitespace-pre text-(--foreground)">
+            <pre
+              translate="no"
+              className="m-0 px-5 py-3 font-prose-mono text-code whitespace-pre text-(--foreground)"
+            >
               <CodeLines lines={lines} text={text} />
             </pre>
           </div>

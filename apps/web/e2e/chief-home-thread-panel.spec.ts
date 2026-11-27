@@ -413,7 +413,7 @@ test('a running thread ends in an unframed live status row with three typing dot
   const live = page.locator('.side-panel').getByTestId('live-row');
   await expect(live).toHaveCount(1);
   await expect(live).toHaveAttribute('role', 'status');
-  await expect(live).toHaveText('处理中...');
+  await expect(live).toHaveText('处理中…');
   await expect(live.locator('[data-slot="reply-bubble"]')).toHaveCount(0);
   await expect(live.getByTestId('typing-dot')).toHaveCount(3);
   await expect(live.getByTestId('typing-dot').first()).toHaveCSS('animation-name', 'typing-hop');

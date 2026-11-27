@@ -88,7 +88,7 @@ const PROBE_RUN_OPEN: TranscriptItem[] = [
 
 const PROBE_PLANNING_TRANSCRIPT: TranscriptItem[] = [
   ...PROBE_RUN_OPEN,
-  { kind: 'streaming', seconds: 3, label: '准备工作区...' },
+  { kind: 'streaming', seconds: 3, label: '准备工作区…' },
 ];
 
 const PROBE_CONFIRM_TRANSCRIPT: TranscriptItem[] = [
@@ -254,7 +254,7 @@ export function detailBuilding(lateCapture: boolean): FixtureSet {
           label: PROBE_TOOL_CALL_LABEL,
         },
       ]
-    : [{ kind: 'streaming', seconds: 3, label: '处理中...' }];
+    : [{ kind: 'streaming', seconds: 3, label: '处理中…' }];
   return {
     todos: [probeTodo('building', r7(13, 35))],
     now: r7(13, 36),
@@ -271,7 +271,7 @@ export function detailSpinnerQuiescent(): FixtureSet {
     todos: [probeTodo('building', r7(13, 35))],
     now: r7(13, 36),
     detail: {
-      transcript: [...PROBE_BUILD_OPEN, { kind: 'streaming', label: '执行中...' }],
+      transcript: [...PROBE_BUILD_OPEN, { kind: 'streaming', label: '执行中…' }],
       doc: PROBE_PLAN_DOC,
     },
   };

@@ -14,7 +14,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | C2 | No capability, no placeholder: never render a block for a feature that is not available; one line says what is off and the action to enable it. | M no element text matching `^[\s—·-]+$`; no empty fixed-ratio block |
 | C3 | Hidden means no space: an element shown on hover or focus takes no layout when hidden. A message's hover meta sits beside its bubble on the outer side, covering no text and moving nothing; at 640px or narrower, or on touch, there is no hover meta and a press opens the time, `复制` and `选择文字`. | M `e2e/chief-message-toolbar.spec.ts` (C3), `e2e/chief-reply-actions-overlap.spec.ts` |
 | C4 | Every icon-only control has a visible tooltip and an accessible name. | M hover 600ms shows a tooltip; axe `button-name` |
-| C5 | No raw error text reaches the user: map it to a plain sentence saying what to do next; raw text lives in a tooltip or details. | M toast and banner text does not match `\(.*\)$`, `Error:`, `\b[45]\d\d\b` |
+| C5 | No raw error text reaches the user: map it to a plain sentence saying what to do next; raw text lives in a tooltip or details. | M `test/ui-guidelines-static.test.ts`: toast literals never match `\(.*\)$`, `Error:`, `\b[45]\d\d\b` |
 | C6 | Developer switches (feature flags, release buttons) never sit on a user page; they live behind the dev route or dev mode. | H |
 | C7 | A disabled control says why next to it. | M disabled composer has adjacent explanatory text |
 | C12 | An empty state is one sentence and at most one primary action. | G `ui-page-style-gate` |
@@ -59,16 +59,26 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | V28 | Dark layers separate by surface lightness, not stroke; an outlined group fills with `card` in dark. | M `test/dark-text-tertiary-contrast.test.ts` |
 | V29 | A status glyph sits on the optical centre of its box. | M `e2e/texture-glyph-alignment.spec.ts` |
 | V30 | A row of controls or fields fills its card: no blank region of 40% of a row's width at one side while a sibling spans full width; one-line sentences exempt. | M `e2e/design-rules-measure.spec.ts`: blank region beside content |
-| T1 | One language per screen: UI strings go through `t()`, no English inside Chinese labels; use the `CONTEXT.md` glossary term for thread, task and agent. | M no Latin word of 4+ letters inside a CJK string unless it is a glossary term |
+| T1 | One language per screen: UI strings go through `t()`, no English inside Chinese labels; use the `CONTEXT.md` glossary term for thread, task and agent. | M `test/ui-guidelines-static.test.ts`; G `test/unslop-signs.test.ts`: no unapproved Latin word inside CJK strings |
 | T2 | Copy says what happened and what to do, in the user's words; errors say how to fix, empty states what is missing. | H |
 | T3 | No text node contains a backtick; code renders as `<code>`. | M; G `e2e/design-rules-measure.spec.ts` |
 | T4 | Copy is plain: no exclamation mark, emoji or hype word in UI strings; a one-sentence title ends without a period; visible copy states what is, never why (no `因为`, `所以`, `because`); a reason or background sentence goes behind an `InfoTip` (the `info` prop on `SettingsSection`, `SettingsRow`, `IntegrationRow` or `DialogShell`), shown on hover and focus. | M; G `test/unslop-signs.test.ts` |
 | T5 | One word per state and one name per concept: copy uses the status words and the register of `CONTEXT.md` (`## Status words`, `## Copy register`) — neutral written Chinese, no spoken softeners, no English contractions. | M; G `test/unslop-signs.test.ts` reads the Avoid columns |
 | A1 | Click targets are at least 24px on desktop and 44px on touch. | M hit area, also under `pointer: coarse`; `e2e/design-rules-measure.spec.ts` measures the Tasks panel checkbox |
-| A2 | Keyboard focus is visible (`--focus-ring`); `prefers-reduced-motion` respected; animate only `opacity` and `transform` except the named Growth utilities. | M |
+| A2 | Keyboard focus is visible (`--focus-ring`); `prefers-reduced-motion` respected; animate only `opacity` and `transform` except the named Growth utilities. | M `test/ui-guidelines-static.test.ts`: no unguarded `outline-none` and `prefers-reduced-motion` present |
 | A3 | axe reports 0 violations at `wcag2a/aa/21aa/22aa` in light and dark. | M `e2e/a11y-axe.spec.ts` |
 | A4 | Loading shows nothing for 150 to 300ms, then a skeleton in the final shape whose rows sit at the loaded tops. | M Tasks and Made: `tops()` of the skeleton rows equal the loaded rows' in `e2e/chief-home-tasks-panel.spec.ts`; other panels H |
 | R1 | Every state in P3 is checked at 1440px and 390px, light and dark; no horizontal scroll at 390. | M `e2e/design-rules-measure.spec.ts`: `scrollWidth <= innerWidth` at 390px |
+| A7 | Interactive controls use semantic `<button>`, `<a>` or native controls rather than clickable `<div>`/`<span>` or bare `<select>`. | M `test/ui-guidelines-static.test.ts`: zero clickable `div`/`span` and bare `<select>` |
+| C38 | Controls use `touch-action: manipulation`; overlays set `overscroll-behavior: contain`; edge `overscroll-behavior: none` stays in `@media (pointer: fine)`. | M `test/ui-guidelines-static.test.ts` checks `src/styles/app.css` |
+| C39 | Images provide an explicit `alt` attribute (`alt=""` when decorative) and suppress drag on interactive links (`-webkit-user-drag: none`). | M `test/ui-guidelines-static.test.ts` checks `<img>` props and `src/styles/app.css` |
+| C40 | Non-input controls set `user-select: none`; headings set `text-wrap: balance` and scroll margin; text selection uses `--accent`. | M `test/ui-guidelines-static.test.ts` checks `src/styles/app.css` |
+| C41 | Email, URL and password inputs set `spellCheck={false}` to suppress browser red underlines on addresses and secrets. | M `test/ui-guidelines-static.test.ts` checks input sites |
+| C42 | HTML entries declare `viewport-fit=cover`; CSS sets explicit per-theme `color-scheme` and `paintTheme` syncs `documentElement.style.colorScheme`. | M `test/ui-guidelines-static.test.ts` checks HTML, `src/styles/shadcn.css`, `src/theme.ts` |
+| C44 | Global `keydown` listeners guard against editable targets or Escape-only dismissal. | M `test/ui-guidelines-static.test.ts` inspects global `keydown` handlers |
+| T6 | Rendered transcript `<pre>` and `<code>` elements set `translate="no"`; `transition-all` and `hover:font-*` weight shifts are banned. | M `test/ui-guidelines-static.test.ts` checks `src/detail/` and utility classes |
+| T7 | Chinese UI copy uses typographic `…`, single spaces around standalone numeric units like `10 MB`, and `text-autospace: normal`. | M `test/ui-guidelines-static.test.ts` scans CJK strings and `src/styles/app.css` |
+| V31 | UI chrome forbids light font weights below 400 (`font-thin`, `font-extralight`, `font-light`) and sets `-webkit-text-size-adjust: 100%`. | M `test/ui-guidelines-static.test.ts` scans weights and `src/styles/app.css` |
 
 ## Direction
 
