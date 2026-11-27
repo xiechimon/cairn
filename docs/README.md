@@ -23,6 +23,7 @@ The change that retires a mechanism, path or rule updates or deletes every livin
 | `lessons/` | Frozen archive of past mistake notes. Do not add files; the `retro-cairn` skill records a safeguard in the code it concerns |
 | `agent-dispatch-prompts.md` | Rules for dispatched agents, whichever tool runs them: background processes, ticket dispatch, GitHub access, evidence limits, design rule rows and the worker prompt |
 | `ops/langfuse.md` | Self-hosted Langfuse v4 on this machine (compose lives in `ops/langfuse/`, not in the product install path) |
+| `ops/eval-daily.md` | Daily real-task eval on a dedicated macOS host (`scripts/ops/eval-daily.mjs` + `launchd`), outside CI and the merge gate |
 
 ## Records and per-ticket artifacts
 

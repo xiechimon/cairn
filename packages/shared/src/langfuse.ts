@@ -19,6 +19,7 @@ export function openExperimentClient(config: {
     url: `${config.baseUrl.replace(/\/$/, '')}/api/public/otel/v1/traces`,
     headers: {
       Authorization: `Basic ${Buffer.from(`${config.publicKey}:${config.secretKey}`).toString('base64')}`,
+      'x-langfuse-ingestion-version': '4',
     },
     timeoutMillis: OTLP_EXPORT_TIMEOUT_MS,
   });

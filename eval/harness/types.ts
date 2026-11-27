@@ -92,6 +92,8 @@ export const turnRecord = z
     boundModels: z.array(z.string()).optional(),
     promptSystem: z.array(z.string()).optional(),
     promptSha256: z.string().optional(),
+    durationMs: z.number().optional(),
+    diagnostics: z.string().optional(),
     lane: z
       .object({
         exitCode: z.number(),

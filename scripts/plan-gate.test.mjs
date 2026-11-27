@@ -143,6 +143,9 @@ test('Slice/Status, Proving test path extraction, and Author-Model vs Reviewer-M
     ),
     ['packages/shared/test/acceptance.test.ts', 'apps/server/test/acceptance-gate.test.ts'],
   );
+  assert.deepEqual(extractProvingTestPaths('`eval/lane-harness.test.ts`'), [
+    'eval/lane-harness.test.ts',
+  ]);
 
   for (const badProving of ['apps/server/src/app.ts', 'manual check in browser']) {
     const plan = sign(BODY.replace('apps/server/test/todo.test.ts', badProving));

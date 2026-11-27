@@ -21,12 +21,14 @@ afterEach(async () => {
 
 async function serve(status: number, delayMs = 0) {
   const acknowledged: string[] = [];
+  const traceHeaders: Record<string, string | string[] | undefined>[] = [];
   const endpoint = createServer((req, res) => {
     if (req.url === '/api/public/projects') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end('{"data":[{"id":"project-test"}]}');
       return;
     }
+    if (req.url === tracePath) traceHeaders.push(req.headers);
     req.once('end', () => {
       const timer = setTimeout(() => {
         if (res.destroyed) return;
@@ -49,6 +51,7 @@ async function serve(status: number, delayMs = 0) {
   const { port } = endpoint.address() as AddressInfo;
   return {
     acknowledged,
+    traceHeaders,
     traceRequest,
     experiment: openExperimentClient({
       baseUrl: `http://127.0.0.1:${port}`,
@@ -76,10 +79,11 @@ test('close waits for a slow score batch to be acknowledged', { timeout: 20_000 
 });
 
 test('close waits for a slow buffered span to be acknowledged', { timeout: 20_000 }, async () => {
-  const { acknowledged, experiment } = await serve(200, slowResponseMs);
+  const { acknowledged, traceHeaders, experiment } = await serve(200, slowResponseMs);
   await recordTrial(experiment);
   await experiment.close();
   expect(acknowledged).toEqual([tracePath]);
+  expect(traceHeaders[0]?.['x-langfuse-ingestion-version']).toBe('4');
 });
 
 test('close waits for a slow background span to be acknowledged', { timeout: 20_000 }, async () => {

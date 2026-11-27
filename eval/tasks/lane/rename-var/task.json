@@ -11,7 +11,7 @@
       }
     ],
     "commands": [
-      "grep -v tmp code.py"
+      "! grep -qw tmp code.py"
     ]
   },
   "gate": true

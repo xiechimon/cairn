@@ -6,11 +6,12 @@
   "checks": {
     "files": [
       {
-        "path": "sum.py",
-        "contains": "a+b"
+        "path": "sum.py"
       }
     ],
-    "commands": []
+    "commands": [
+      "python3 -c \"import sum; assert sum.s(2, 3) == 5\""
+    ]
   },
   "gate": true
 }

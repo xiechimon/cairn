@@ -512,7 +512,7 @@ test('cache cleanup keeps PR caches when the open-PR list is unreadable, and kee
 test('a scheduled workflow whose last 3 runs failed is flagged', () => {
   assert.equal(
     classifyScheduledRun({
-      name: 'eval-weekly',
+      name: 'agent-sdk-bump',
       recentConclusions: ['failure', 'failure', 'failure'],
       totalRuns: 3,
     }),
@@ -527,7 +527,7 @@ test('a scheduled workflow whose last 3 runs failed is flagged', () => {
     'ok',
   );
   assert.equal(
-    classifyScheduledRun({ name: 'eval-weekly', recentConclusions: [], totalRuns: 0 }),
+    classifyScheduledRun({ name: 'agent-sdk-bump', recentConclusions: [], totalRuns: 0 }),
     'report-never-ran',
   );
 });

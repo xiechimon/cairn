@@ -1,12 +1,14 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { openExperimentClient } from '@cairn/shared/langfuse';
+import { resolveDevinCap } from './harness/budget.js';
 import { runLaneTask } from './harness/lane.js';
 import type { LaneTask, RuntimeTask, SuiteTask, TurnRecord } from './harness/types.js';
 import { activateInServer, deactivateInServer, runRuntimeTurn } from './harness/world.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+export const LANGFUSE_EXIT_CODE = 3;
 
 interface Args {
   arm: string;
@@ -17,8 +19,7 @@ interface Args {
   only?: string;
 }
 
-function args(): Args {
-  const argv = process.argv.slice(2);
+function parseArgs(argv: string[]): Args {
   const get = (name: string, fallback = ''): string => {
     const i = argv.indexOf(`--${name}`);
     return i >= 0 ? (argv[i + 1] ?? fallback) : fallback;
@@ -64,6 +65,10 @@ interface ItemResult {
   comments: Record<string, string>;
   incomplete?: string;
   gate: boolean;
+  durationMs?: number;
+  diagnostics?: string;
+  traceId?: string;
+  traceUrl?: string;
 }
 
 interface ExamModules {
@@ -89,8 +94,65 @@ async function loadExam(examDir: string): Promise<ExamModules> {
   };
 }
 
-async function main() {
-  const a = args();
+export function buildTraceUrl(
+  baseUrl: string,
+  projectId: string | undefined,
+  traceId: string | undefined,
+): string | undefined {
+  if (!projectId || !traceId) return undefined;
+  return `${baseUrl.replace(/\/$/, '')}/project/${encodeURIComponent(projectId)}/traces/${encodeURIComponent(traceId)}`;
+}
+
+async function resolveProjectId(
+  baseUrl: string,
+  experimentUrl: string | undefined,
+  publicKey: string,
+  secretKey: string,
+): Promise<string | undefined> {
+  if (experimentUrl) {
+    const match = /\/project\/([^/?#]+)/.exec(experimentUrl);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+  try {
+    const auth = `Basic ${Buffer.from(`${publicKey}:${secretKey}`).toString('base64')}`;
+    const res = await fetch(`${baseUrl.replace(/\/$/, '')}/api/public/projects`, {
+      headers: { Authorization: auth },
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!res.ok) return undefined;
+    const payload = (await res.json()) as { data?: { id?: string }[] };
+    return payload.data?.[0]?.id;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface RunEvalDeps {
+  openClient?: typeof openExperimentClient;
+}
+
+export async function runEval(
+  argv: string[] = process.argv.slice(2),
+  deps: RunEvalDeps = {},
+): Promise<number> {
+  const startedAt = new Date().toISOString();
+  const startedMs = Date.now();
+  const a = parseArgs(argv);
+  const publicKey = process.env.LANGFUSE_PUBLIC_KEY?.trim() ?? '';
+  const secretKey = process.env.LANGFUSE_SECRET_KEY?.trim() ?? '';
+  const baseUrlEnv = process.env.LANGFUSE_BASE_URL?.trim() ?? '';
+
+  if (a.requireLangfuse && a.offline) {
+    console.error('eval: --require-langfuse cannot be combined with --offline');
+    return LANGFUSE_EXIT_CODE;
+  }
+  if (a.requireLangfuse && (!publicKey || !secretKey || !baseUrlEnv)) {
+    console.error(
+      'eval: --require-langfuse requires LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_BASE_URL',
+    );
+    return LANGFUSE_EXIT_CODE;
+  }
+
   const suite = JSON.parse(readFileSync(join(a.examDir, 'suite.json'), 'utf8')) as {
     dataset: string;
     repeats: Record<string, number>;
@@ -112,8 +174,6 @@ async function main() {
         throw new Error(`eval: suite expects ${want} ${kind} tasks, found ${have}`);
     }
   }
-  const results: ItemResult[] = [];
-  const metadata = { arm: a.arm, examDir: a.examDir };
 
   const items: { input: SuiteTask; expectedOutput?: unknown; metadata: Record<string, unknown> }[] =
     [];
@@ -128,24 +188,30 @@ async function main() {
     }
   }
 
-  const hasLangfuse =
-    !a.offline &&
-    process.env.LANGFUSE_PUBLIC_KEY !== undefined &&
-    process.env.LANGFUSE_SECRET_KEY !== undefined;
-  if (a.requireLangfuse && !hasLangfuse)
-    throw new Error('eval: --require-langfuse set but LANGFUSE keys are absent');
-
-  const devinCap = Number(process.env.EVAL_MAX_DEVIN_RUNS ?? suite.devinBudget.maxSessionsPerRun);
+  const hasLangfuse = !a.offline && publicKey !== '' && secretKey !== '';
+  const baseUrl = baseUrlEnv || 'https://cloud.langfuse.com';
+  const devinCap = resolveDevinCap(
+    process.env.EVAL_MAX_DEVIN_RUNS,
+    suite.devinBudget.maxSessionsPerRun,
+  );
   let devinRuns = 0;
   const execute = async (item: (typeof items)[number]): Promise<TurnRecord> => {
+    const t0 = Date.now();
     const task = item.input;
     if (task.kind === 'lane') {
       devinRuns += 1;
-      if (devinRuns > devinCap)
-        return { caseId: task.id, kind: 'lane', incomplete: `devin budget ${devinCap} exceeded` };
+      if (devinRuns > devinCap) {
+        return {
+          caseId: task.id,
+          kind: 'lane',
+          durationMs: Date.now() - t0,
+          incomplete: `devin budget ${devinCap} exceeded`,
+        };
+      }
       return runLaneTask(task as LaneTask, a.examDir);
     }
-    return runRuntimeTurn(task as RuntimeTask);
+    const record = await runRuntimeTurn(task as RuntimeTask);
+    return record.durationMs === undefined ? { ...record, durationMs: Date.now() - t0 } : record;
   };
 
   const evaluate = (task: SuiteTask, record: TurnRecord) => {
@@ -154,7 +220,13 @@ async function main() {
     return exam.scoreRuntime(task as RuntimeTask, record);
   };
 
-  const collect = (item: (typeof items)[number], record: TurnRecord) => {
+  const results: ItemResult[] = [];
+  const collect = (
+    item: (typeof items)[number],
+    record: TurnRecord,
+    traceId?: string,
+    traceUrl?: string,
+  ) => {
     const checks = evaluate(item.input, record);
     const scores: Record<string, number> = {};
     const comments: Record<string, string> = {};
@@ -170,10 +242,19 @@ async function main() {
       comments,
       incomplete: record.incomplete,
       gate: item.input.gate,
+      ...(record.durationMs !== undefined ? { durationMs: record.durationMs } : {}),
+      ...(record.diagnostics !== undefined ? { diagnostics: record.diagnostics } : {}),
+      ...(traceId !== undefined ? { traceId } : {}),
+      ...(traceUrl !== undefined ? { traceUrl } : {}),
     });
   };
 
+  const metadata = { arm: a.arm, examDir: a.examDir };
   let lf: ReturnType<typeof openExperimentClient> | undefined;
+  let experimentId: string | undefined;
+  let experimentUrl: string | undefined;
+  let projectId: string | undefined;
+
   if (!hasLangfuse) {
     activateInServer();
     try {
@@ -185,15 +266,19 @@ async function main() {
     }
     console.warn('eval: LANGFUSE keys absent or --offline; results written locally only');
   } else {
-    const experiment = openExperimentClient({
-      publicKey: process.env.LANGFUSE_PUBLIC_KEY ?? '',
-      secretKey: process.env.LANGFUSE_SECRET_KEY ?? '',
-      baseUrl: process.env.LANGFUSE_BASE_URL ?? 'https://cloud.langfuse.com',
-    });
-    lf = experiment;
+    const openClient = deps.openClient ?? openExperimentClient;
+    try {
+      lf = openClient({ publicKey, secretKey, baseUrl });
+    } catch (error) {
+      console.error(
+        `eval: Langfuse init failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return LANGFUSE_EXIT_CODE;
+    }
+    let itemResults: { item: unknown; output: unknown; traceId?: string }[] | undefined;
     activateInServer();
     try {
-      const run = await experiment.client.experiment.run({
+      const run = (await lf.client.experiment.run({
         name: `eval-${a.arm}`,
         description: `cairn eval suite arm=${a.arm}`,
         metadata,
@@ -211,29 +296,87 @@ async function main() {
           },
         ],
         maxConcurrency: 1,
-      });
-      const itemResults = (run as { itemResults?: { item: unknown; output: unknown }[] })
-        .itemResults;
-      if (itemResults === undefined) {
-        for (const item of items) collect(item, await execute(item));
-      } else {
-        for (const r of itemResults) {
-          const item = r.item as (typeof items)[number];
-          collect(item, r.output as TurnRecord);
-        }
-      }
+      })) as {
+        experimentId?: string;
+        experimentUrl?: string;
+        itemResults?: { item: unknown; output: unknown; traceId?: string }[];
+      };
+      experimentId = run.experimentId;
+      experimentUrl = run.experimentUrl;
+      itemResults = run.itemResults;
+    } catch (error) {
+      console.error(
+        `eval: Langfuse experiment failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      try {
+        await lf.close();
+      } catch {}
+      return LANGFUSE_EXIT_CODE;
     } finally {
       deactivateInServer();
     }
+    if (itemResults === undefined || itemResults.length !== items.length) {
+      console.error(
+        `eval: Langfuse experiment.run returned ${itemResults?.length ?? 'undefined'} results for ${items.length} items`,
+      );
+      try {
+        await lf.close();
+      } catch {}
+      return LANGFUSE_EXIT_CODE;
+    }
+    projectId = await resolveProjectId(baseUrl, experimentUrl, publicKey, secretKey);
+    for (const r of itemResults) {
+      const item = r.item as (typeof items)[number];
+      const traceId = typeof r.traceId === 'string' && r.traceId ? r.traceId : undefined;
+      collect(item, r.output as TurnRecord, traceId, buildTraceUrl(baseUrl, projectId, traceId));
+    }
   }
 
+  const finishedAt = new Date().toISOString();
+  mkdirSync(dirname(resolve(a.out)), { recursive: true });
   writeFileSync(
     a.out,
-    `${JSON.stringify({ arm: a.arm, counts, suite: suite.dataset, items: results }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        arm: a.arm,
+        startedAt,
+        finishedAt,
+        durationMs: Date.now() - startedMs,
+        counts,
+        suite: suite.dataset,
+        ...(hasLangfuse
+          ? {
+              langfuse: {
+                baseUrl,
+                ...(projectId !== undefined ? { projectId } : {}),
+                ...(experimentId !== undefined ? { experimentId } : {}),
+                ...(experimentUrl !== undefined ? { experimentUrl } : {}),
+              },
+            }
+          : {}),
+        items: results,
+      },
+      null,
+      2,
+    )}\n`,
   );
-  if (lf !== undefined) await lf.close();
+
+  if (lf !== undefined) {
+    try {
+      await lf.close();
+    } catch (error) {
+      console.error(
+        `eval: Langfuse close failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return LANGFUSE_EXIT_CODE;
+    }
+  }
+
   const incomplete = results.filter((r) => r.incomplete !== undefined).length;
   console.log(`eval[${a.arm}]: ${results.length} trials, ${incomplete} incomplete -> ${a.out}`);
+  return 0;
 }
 
-await main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  process.exitCode = await runEval();
+}

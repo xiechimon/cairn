@@ -24,7 +24,7 @@ export CAIRN_OTEL_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_K
 
 A `user:password@` embedded in the endpoint becomes the Basic header. `CAIRN_OTEL_ENVIRONMENT` (lowercase/digits/`_`/`-`, ≤40 chars, not starting `langfuse`) adds `langfuse.environment` to each span; export is off unless the endpoint is set and never blocks a turn.
 
-Eval results: the eval suite (`eval/`, `docs/design/eval-gate.md`) writes runs and item scores into the Langfuse project via `client.experiment.run`.
+Eval results: the eval suite (`eval/`, `docs/design/eval-gate.md`, `docs/ops/eval-daily.md`) writes runs and item scores into the Langfuse project via `client.experiment.run` with `x-langfuse-ingestion-version: 4`. Daily host runs target self-hosted Langfuse via `EVAL_DAILY_LANGFUSE_ENV`.
 
 ## Trace layout
 

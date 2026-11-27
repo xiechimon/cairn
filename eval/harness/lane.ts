@@ -1,31 +1,19 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { laneEnv, resolveDevinBin, scrubDiagnostics } from './devin-env.mjs';
 import type { LaneTask, TurnRecord } from './types.js';
 
-const LANE_ENV_KEYS = [
-  'PATH',
-  'HOME',
-  'USER',
-  'LOGNAME',
-  'LANG',
-  'LC_ALL',
-  'LC_CTYPE',
-  'TMPDIR',
-  'XDG_RUNTIME_DIR',
-  'HTTPS_PROXY',
-  'HTTP_PROXY',
-  'NO_PROXY',
-];
+const MAX_BUFFER_BYTES = 16 * 1024 * 1024;
 
-function laneEnv(): NodeJS.ProcessEnv {
-  const keep = new Set(LANE_ENV_KEYS);
-  return Object.fromEntries(
-    Object.entries(process.env).filter(
-      ([key, value]) => value !== undefined && (keep.has(key) || key.startsWith('DEVIN_')),
-    ),
-  ) as NodeJS.ProcessEnv;
+function isPyCacheArtifact(relPath: string): boolean {
+  return (
+    relPath === '__pycache__' ||
+    relPath.startsWith('__pycache__/') ||
+    relPath.includes('/__pycache__/') ||
+    relPath.endsWith('.pyc')
+  );
 }
 
 function changedFiles(dir: string, baseline: string): string[] | null {
@@ -36,14 +24,16 @@ function changedFiles(dir: string, baseline: string): string[] | null {
   const dirty = spawnSync('git', ['status', '--porcelain', '-z'], { cwd: dir, encoding: 'utf8' });
   if (committed.status !== 0 || dirty.status !== 0) return null;
   const files = new Set<string>();
-  for (const name of committed.stdout.split('\0')) if (name !== '') files.add(name);
+  for (const name of committed.stdout.split('\0')) {
+    if (name !== '' && !isPyCacheArtifact(name)) files.add(name);
+  }
   const entries = dirty.stdout.split('\0');
   for (let i = 0; i < entries.length; i += 1) {
     const line = entries[i];
     if (line === undefined || line === '') continue;
     if (line.startsWith('R ') || line.startsWith('C ')) i += 1;
     const name = line.slice(3);
-    if (name !== '') files.add(name);
+    if (name !== '' && !isPyCacheArtifact(name)) files.add(name);
   }
   return [...files];
 }
@@ -52,9 +42,13 @@ export async function runLaneTask(task: LaneTask, examDir: string): Promise<Turn
   const fixture = join(examDir, 'tasks', 'lane', task.id, 'repo');
   if (!existsSync(fixture))
     return { caseId: task.id, kind: 'lane', incomplete: `missing fixture ${fixture}` };
+  const startedAt = Date.now();
   const work = mkdtempSync(join(tmpdir(), `eval-lane-${task.id}-`));
-  cpSync(fixture, work, { recursive: true });
+  const extraPaths = [process.env.HOME, process.env.EVAL_DAILY_DEVIN_HOME].filter(
+    (value): value is string => Boolean(value),
+  );
   try {
+    cpSync(fixture, work, { recursive: true });
     execFileSync('git', ['init', '-q'], { cwd: work });
     execFileSync('git', ['add', '-A'], { cwd: work });
     execFileSync(
@@ -66,14 +60,91 @@ export async function runLaneTask(task: LaneTask, examDir: string): Promise<Turn
       cwd: work,
       encoding: 'utf8',
     }).trim();
-    const run = spawnSync('devin', ['-p', task.instruction, '--respect-workspace-trust', 'false'], {
-      cwd: work,
-      encoding: 'utf8',
-      timeout: task.timeoutMs,
-      env: laneEnv(),
-    });
-    if (run.error !== undefined)
-      return { caseId: task.id, kind: 'lane', incomplete: `devin: ${run.error.message}` };
+    const devinBin = resolveDevinBin(process.env);
+    const env = laneEnv(process.env);
+    const run = spawnSync(
+      devinBin,
+      [
+        '-p',
+        task.instruction,
+        '--respect-workspace-trust',
+        'false',
+        '--permission-mode',
+        'dangerous',
+        '--process-model',
+        'in-process',
+      ],
+      {
+        cwd: work,
+        encoding: 'utf8',
+        timeout: task.timeoutMs,
+        maxBuffer: MAX_BUFFER_BYTES,
+        env,
+      },
+    );
+    const durationMs = Date.now() - startedAt;
+    const errorCode = (run.error as NodeJS.ErrnoException | undefined)?.code;
+    if (run.error !== undefined && errorCode !== 'ETIMEDOUT' && errorCode !== 'ENOBUFS') {
+      return {
+        caseId: task.id,
+        kind: 'lane',
+        durationMs,
+        incomplete: scrubDiagnostics(`devin: ${run.error.message}`, extraPaths),
+      };
+    }
+    const changed = changedFiles(work, baseline);
+    if (changed === null) {
+      return {
+        caseId: task.id,
+        kind: 'lane',
+        durationMs,
+        incomplete: 'git state unreadable after devin run',
+      };
+    }
+    const rawErr = run.stderr ?? '';
+    const rawOut = run.stdout ?? '';
+    if (changed.length === 0) {
+      if (/rejected a tool call that requires confirmation/i.test(rawErr)) {
+        return {
+          caseId: task.id,
+          kind: 'lane',
+          durationMs,
+          incomplete: scrubDiagnostics(`permission rejection: ${rawErr}`, extraPaths),
+        };
+      }
+      if (
+        (run.status ?? 0) !== 0 &&
+        /(?:Login canceled|Not logged in|Unauthorized|\b401\b)/i.test(rawErr)
+      ) {
+        return {
+          caseId: task.id,
+          kind: 'lane',
+          durationMs,
+          incomplete: scrubDiagnostics(`devin auth: ${rawErr}`, extraPaths),
+        };
+      }
+      if (
+        (run.status ?? 0) !== 0 &&
+        /(?:quota|rate limit|capacity|\b429\b|usage limit)/i.test(rawErr)
+      ) {
+        return {
+          caseId: task.id,
+          kind: 'lane',
+          durationMs,
+          incomplete: scrubDiagnostics(`devin quota: ${rawErr}`, extraPaths),
+        };
+      }
+    }
+    const timedOut = errorCode === 'ETIMEDOUT' || run.signal !== null;
+    const bufferOverflow = errorCode === 'ENOBUFS';
+    const rawDiag = timedOut
+      ? `timeout after ${task.timeoutMs}ms${run.signal ? ` (${run.signal})` : ''}${rawErr ? `: ${rawErr}` : ''}`
+      : bufferOverflow
+        ? `output buffer exceeded (${MAX_BUFFER_BYTES} bytes)${rawErr ? `: ${rawErr}` : ''}`
+        : (run.status ?? 1) !== 0
+          ? rawErr || rawOut || `exit=${run.status ?? 1}`
+          : '';
+    const diagnostics = scrubDiagnostics(rawDiag, extraPaths);
     const files = task.checks.files.map((check) => {
       const path = join(work, check.path);
       const ok =
@@ -86,20 +157,19 @@ export async function runLaneTask(task: LaneTask, examDir: string): Promise<Turn
         cwd: work,
         encoding: 'utf8',
         timeout: 60_000,
-        env: laneEnv(),
+        env,
       });
       return { command, ok: res.status === 0 };
     });
-    const changed = changedFiles(work, baseline);
-    if (changed === null)
-      return { caseId: task.id, kind: 'lane', incomplete: 'git state unreadable after devin run' };
     return {
       caseId: task.id,
       kind: 'lane',
       stepStatus: 'done',
       decision: 'route',
+      durationMs,
+      ...(diagnostics ? { diagnostics } : {}),
       lane: {
-        exitCode: run.status ?? 1,
+        exitCode: timedOut || bufferOverflow ? 1 : (run.status ?? 1),
         changedFiles: changed,
         fileChecks: files,
         commandChecks: commands,
@@ -109,8 +179,14 @@ export async function runLaneTask(task: LaneTask, examDir: string): Promise<Turn
     return {
       caseId: task.id,
       kind: 'lane',
-      incomplete: error instanceof Error ? error.message : String(error),
+      durationMs: Date.now() - startedAt,
+      incomplete: scrubDiagnostics(
+        error instanceof Error ? error.message : String(error),
+        extraPaths,
+      ),
     };
+  } finally {
+    rmSync(work, { recursive: true, force: true });
   }
 }
 

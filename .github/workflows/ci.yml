@@ -75,7 +75,7 @@ jobs:
             if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/|apps/daemon/|integration/|packages/shared/|scripts/|\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'; then
               needs_integration=false
             fi
-            if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/src/coordinator/|apps/server/src/services/(chief|coordinator-|project-instructions|memory|team-memory|routing-|step-route|machine-routing|model-routing|dispatch-|schedules|schedule-run|thread-schedule)|packages/shared/src/(protocol/chief-tools|skill-)|eval/|\.github/workflows/(ci|eval-weekly)\.yml$|docs/agent-dispatch-prompts\.md|scripts/dispatch-agent\.m?js)'; then
+            if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/src/coordinator/|apps/server/src/services/(chief|coordinator-|project-instructions|memory|team-memory|routing-|step-route|machine-routing|model-routing|dispatch-|schedules|schedule-run|thread-schedule)|packages/shared/src/(protocol/chief-tools|skill-)|eval/|\.github/workflows/ci\.yml$|docs/agent-dispatch-prompts\.md|scripts/dispatch-agent\.m?js)'; then
               eval_needed=false
             fi
             has_code=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --has-code) || has_code=true

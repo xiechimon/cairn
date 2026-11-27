@@ -83,6 +83,12 @@
       "pattern": "\\bone-page design\\b",
       "canary": "write a one-page design",
       "reason": "replaced by the hash-verified plan gate in docs/ops/plan-gate.md and scripts/plan-gate.mjs"
+    },
+    {
+      "id": "eval-weekly-workflow",
+      "pattern": "\\beval-weekly(?:\\.yml)?\\b",
+      "canary": ".github/workflows/eval-weekly.yml",
+      "reason": "the GitHub Actions weekly eval workflow was retired; daily real-task eval runs on a dedicated macOS host via scripts/ops/eval-daily.mjs and launchd (docs/ops/eval-daily.md)"
     }
   ],
   "baseline": {
@@ -130,6 +136,7 @@
     "experience-candidate-module": {},
     "computer-image-rebuild": {},
     "hash-task-picker": {},
-    "one-page-design": {}
+    "one-page-design": {},
+    "eval-weekly-workflow": {}
   }
 }
