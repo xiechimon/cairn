@@ -372,13 +372,22 @@ test('at 375px each card sits in the conversation where it was asked, inside the
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(375);
   }
-  const before = (await page.getByText('History message 13').boundingBox())!;
-  const aBox = (await cardA(page).boundingBox())!;
-  const bBox = (await cardB(page).boundingBox())!;
-  const lastBox = (await page.getByText('The final message').boundingBox())!;
-  expect(before.y + before.height).toBeLessThanOrEqual(aBox.y);
-  expect(aBox.y + aBox.height).toBeLessThanOrEqual(bBox.y);
-  expect(bBox.y + bBox.height).toBeLessThanOrEqual(lastBox.y);
+  const handles = await Promise.all(
+    [page.getByText('History message 13'), cardA(page), cardB(page), page.getByText('The final message')].map(
+      (locator) => locator.elementHandle(),
+    ),
+  );
+  const [before, aBox, bBox, lastBox] = await page.evaluate(
+    (elements) =>
+      elements.map((element) => {
+        const rect = element!.getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom };
+      }),
+    handles,
+  );
+  expect(before.bottom).toBeLessThanOrEqual(aBox.top);
+  expect(aBox.bottom).toBeLessThanOrEqual(bBox.top);
+  expect(bBox.bottom).toBeLessThanOrEqual(lastBox.top);
   await expect(composer).toBeInViewport({ ratio: 1 });
 });
 
