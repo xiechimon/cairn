@@ -100,6 +100,8 @@ describe('Coordinator computer tool offers', () => {
     )) {
       expect(def.description).toContain("first try the owner's own Chrome");
       expect(def.description).toContain("fall back to Cairn's own browser");
+      expect(def.description).toContain("never use the owner's Chrome");
+      expect(def.description).toContain('refuse instead of moving browsers');
     }
   });
 

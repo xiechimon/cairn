@@ -390,6 +390,8 @@ async function runInOwnerTab(
         `The owner’s Chrome stopped answering after part of this call had run, so nothing was repeated elsewhere. ${error.message}`,
         'unknown',
       );
+    if (error instanceof ComputerRefusal && error.delivery === 'not_delivered' && ran > 0)
+      throw new ComputerRefusal(error.message, 'unknown');
     throw error;
   }
 }

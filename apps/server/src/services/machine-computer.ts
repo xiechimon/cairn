@@ -688,7 +688,7 @@ function acquireBrowserLease(
     (row.controlLeaseExpiresAt === null || row.controlLeaseExpiresAt > now);
   if (userHolds) {
     if (readOnly) return;
-    throw new HttpError(409, COMPUTER_USER_CONTROL);
+    throw new HttpError(409, noBrowserRun(COMPUTER_USER_CONTROL));
   }
   const lease = db
     .select()
@@ -701,7 +701,7 @@ function acquireBrowserLease(
     )
     .get();
   const held = lease !== undefined && lease.expiresAt > now;
-  if (held && lease.stepId !== stepId) throw new HttpError(409, COMPUTER_BUSY);
+  if (held && lease.stepId !== stepId) throw new HttpError(409, noBrowserRun(COMPUTER_BUSY));
   const renewed = Math.max(now + COMPUTER_EXECUTION_LEASE_MS, deadlineAt);
   if (lease === undefined) {
     db.insert(computerBrowserLease)
@@ -1435,13 +1435,17 @@ export async function forwardComputerCall(
   if (mustUseOwnerChrome && secretActions.length > 0) {
     throw new HttpError(
       409,
-      "This page is open in the owner's own Chrome; saved passwords are never sent through Browser MCP. Open the page in Cairn's browser or ask the owner to sign in.",
+      noBrowserRun(
+        "This page is open in the owner's own Chrome; saved passwords are never sent through Browser MCP. Open the page in Cairn's browser or ask the owner to sign in.",
+      ),
     );
   }
   if (mustUseOwnerChrome && body.params.stealth === true) {
     throw new HttpError(
       409,
-      "This page is open in the owner's own Chrome; open it with browser_navigate and stealth: true to use Cairn's browser.",
+      noBrowserRun(
+        "This page is open in the owner's own Chrome; open it with browser_navigate and stealth: true to use Cairn's browser.",
+      ),
     );
   }
   const mayUseOwnerChrome =
@@ -1499,10 +1503,14 @@ const ownerChromeChains = new Map<
 
 function namingBrowserResult(
   db: Db,
-  row: Pick<CallRow, 'machineId' | 'params' | 'tool'>,
+  row: Pick<CallRow, 'machineId' | 'params' | 'tool' | 'state' | 'errorDelivery'>,
   result: ComputerRelayResult,
 ): ComputerRelayResult {
   if (!isComputerBrowserTool(row.tool)) return result;
+  if (row.state === 'error' && row.errorDelivery === 'not_delivered') {
+    if (result.text.startsWith(NO_BROWSER_RUN_PREFIX)) return result;
+    return { ...result, text: noBrowserRun(result.text) };
+  }
   const host = db.select().from(machine).where(eq(machine.id, row.machineId)).get();
   const name = host?.capabilities?.computerName ?? host?.name ?? row.machineId;
   const ownerChrome = row.params.browserDriver === 'ownerChrome';
@@ -1521,7 +1529,7 @@ function namingBrowserResult(
 
 const NO_BROWSER_RUN_PREFIX = '[Browser: no browser ran; nothing opened or acted.]';
 
-function noBrowserRun(text: string): string {
+export function noBrowserRun(text: string): string {
   return `${NO_BROWSER_RUN_PREFIX}\n${text}`;
 }
 

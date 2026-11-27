@@ -30,7 +30,7 @@ const OWNER_CHROME_TOOLS: ReadonlySet<string> = new Set([
 
 function ownerChromeNote(stealth: boolean): string {
   const instead = stealth ? '; pass stealth: true when you want the stealth browser instead' : '';
-  return ` This team turned on Browser MCP, so these calls first try the owner's own Chrome on an eligible Mac, in background tabs of a tab group Cairn opens, with their own sessions already signed in. Calls filling saved secrets always use Cairn's own browser, never the owner's Chrome. If no owner Chrome can run other calls, they fall back to Cairn's own browser, and the result says which browser and machine ran them${instead}. The first owner-Chrome call may answer that the extension needs Allow, with a six-digit code: tell the owner to click Allow in its popup and end the turn.`;
+  return ` This team turned on Browser MCP, so these calls first try the owner's own Chrome on an eligible Mac, in background tabs of a tab group Cairn opens, with their own sessions already signed in. Calls filling saved secrets never use the owner's Chrome; on a page already open there they refuse instead of moving browsers. If no owner Chrome can run other calls, they fall back to Cairn's own browser, and the result says which browser and machine ran them${instead}. The first owner-Chrome call may answer that the extension needs Allow, with a six-digit code: tell the owner to click Allow in its popup and end the turn.`;
 }
 
 export type CoordinatorComputerToolOffer =

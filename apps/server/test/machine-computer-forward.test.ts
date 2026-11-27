@@ -1583,6 +1583,55 @@ describe('browser calls on Macs', () => {
     expect(text).toContain('没有可用的浏览器');
   });
 
+  test.each([
+    ['Cairn browser', false],
+    ['owner Chrome', true],
+  ])(
+    'a not-delivered browser error says no browser ran instead of naming a browser (%s)',
+    async (_label, ownerChrome) => {
+      const { s, deps } = boot();
+      addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+      if (ownerChrome) browserMcp(s);
+      const calls = connect(s, 'mini');
+      const pending = navigate(deps, `invalid-${ownerChrome}`);
+      pending.catch(() => {});
+      fail(
+        s,
+        'mini',
+        await next(calls, 1),
+        'browser_navigate only accepts well-formed http(s) URLs',
+      );
+      const text = (await pending).text;
+      expect(text).toContain('[Browser: no browser ran; nothing opened or acted.]');
+      expect(text).toContain('the action did not run');
+      expect(text).not.toContain("Cairn's own browser on mini");
+      expect(text).not.toContain("owner's own Chrome on mini");
+    },
+  );
+
+  test('a browser action blocked by owner control says no browser ran', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mac', { browser: true });
+    const calls = connect(s, 'mac');
+    const opened = navigate(deps, 'before-owner-control');
+    opened.catch(() => {});
+    answer(s, 'mac', await next(calls, 1), 'Example Domain');
+    await opened;
+    s.db.update(computerTable).set({ controlHolder: 'user' }).run();
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'browser_act',
+        toolCallId: 'during-owner-control',
+        params: { actions: [{ kind: 'press', text: 'Enter' }] },
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('[Browser: no browser ran; nothing opened or acted.]'),
+    });
+    expect(calls).toHaveLength(1);
+  });
+
   test('a saved password is never sent toward the owner’s Chrome', async () => {
     const { s, deps } = boot();
     addMac(
@@ -1636,7 +1685,34 @@ describe('browser calls on Macs', () => {
       }),
     ).rejects.toMatchObject({
       status: 409,
-      message: expect.stringContaining("owner's own Chrome"),
+      message: expect.stringContaining(
+        "[Browser: no browser ran; nothing opened or acted.]\nThis page is open in the owner's own Chrome",
+      ),
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  test('stealth on an owner-Chrome page refuses before any browser runs', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const opened = navigate(deps, 'owner-page-for-stealth');
+    opened.catch(() => {});
+    answer(s, 'mini', await next(calls, 1), 'their page');
+    await opened;
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'browser_snapshot',
+        toolCallId: 'stealth-after-owner-open',
+        params: { stealth: true },
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining(
+        "[Browser: no browser ran; nothing opened or acted.]\nThis page is open in the owner's own Chrome",
+      ),
     });
     expect(calls).toHaveLength(1);
   });

@@ -247,18 +247,22 @@ describe('the owner’s Chrome through browser tools', () => {
         });
       return '';
     });
-    await expect(
-      runOwnerChromeTool(
-        'browser_act',
-        {
-          actions: [
-            { kind: 'click', ref: '@e1' },
-            { kind: 'click', ref: '@e2' },
-          ],
-        },
-        options(call, ORIGINS),
-      ),
-    ).rejects.toThrow(/is Cairn itself/);
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      {
+        actions: [
+          { kind: 'click', ref: '@e1' },
+          { kind: 'click', ref: '@e2' },
+        ],
+      },
+      options(call, ORIGINS),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as Error).message).toMatch(/is Cairn itself/);
+    expect((outcome as ComputerRefusal).delivery).toBe('unknown');
     expect(seen.flat().filter((line) => line.startsWith('click'))).toEqual(['click e1']);
   });
 
