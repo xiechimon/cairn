@@ -221,6 +221,7 @@ export interface MachineApi {
     connectionId: string,
     hostKey?: string,
     signal?: AbortSignal,
+    legacyHostKeys?: string[],
   ): Promise<string>;
   ackTokenRotation?(rotationId: string, newToken: string, signal?: AbortSignal): Promise<void>;
   stream(
@@ -868,12 +869,14 @@ export class MachineClient implements MachineApi {
     connectionId: string,
     hostKey?: string,
     signal?: AbortSignal,
+    legacyHostKeys?: string[],
   ): Promise<string> {
     const res = await this.request('POST', '/api/machine/token-rotate/claim', {
       body: {
         rotationId,
         connectionId,
         ...(hostKey !== undefined ? { hostKey } : {}),
+        ...(legacyHostKeys !== undefined && legacyHostKeys.length > 0 ? { legacyHostKeys } : {}),
       },
       ...(signal ? { signal } : {}),
       parse: (raw) => machineTokenRotateClaimResponseSchema.parse(raw),

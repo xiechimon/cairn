@@ -619,6 +619,12 @@ describe('in-place runner token rotation', () => {
 
     const w2 = bootServer({ db: w1.s.db, pingIntervalMs: 3_600_000 });
     try {
+      const preAckReconnect = await openMachineStream(w2.app, w1.a.token);
+      expect(preAckReconnect.status).toBe(200);
+      preAckReconnect.abort();
+      expect((machineRowOf(w2, w1.a.machineId) as Record<string, unknown>)?.pendingTokenHash).toBe(
+        hashCredential(newToken),
+      );
       const teamEvents = tapTeamEvents(w2);
       const ackAfterRestart = await call(w2.app, 'POST', '/api/machine/token-rotate/ack', {
         cred: newToken,
@@ -633,7 +639,11 @@ describe('in-place runner token rotation', () => {
 
       w2.db
         .update(machineTable)
-        .set({ online: true, tokenReauthRequired: true } as Record<string, unknown>)
+        .set({
+          online: true,
+          tokenReauthRequired: true,
+          pendingTokenHash: 'staged-next-rotation',
+        } as Record<string, unknown>)
         .where(eq(machineTable.id, w1.a.machineId))
         .run();
       const idempotentAck = await call(w2.app, 'POST', '/api/machine/token-rotate/ack', {
@@ -644,6 +654,9 @@ describe('in-place runner token rotation', () => {
       expect(
         (machineRowOf(w2, w1.a.machineId) as Record<string, unknown>)?.tokenReauthRequired,
       ).toBe(false);
+      expect((machineRowOf(w2, w1.a.machineId) as Record<string, unknown>)?.pendingTokenHash).toBe(
+        'staged-next-rotation',
+      );
       expect(
         teamEvents.some((ev) => ev.type === 'machine_presence' && ev.machineId === w1.a.machineId),
       ).toBe(true);
@@ -739,6 +752,45 @@ describe('in-place runner token rotation', () => {
       expect(((await rotateRes.json()) as { delivery: string }).delivery).toBe('offline');
       expect((await call(w.s.app, 'GET', '/api/machine/me', { cred: w.a.token })).status).toBe(401);
       hijackStream.abort();
+
+      const legacyHostRunner = await enroll(w.s, w.apiKey, 'legacy-host-box', HOST_KEY_A);
+      const legacyStream = await openMachineStream(w.s.app, legacyHostRunner.token);
+      await waitFor(() => legacyStream.getConnectionId() !== '');
+      const legacyRotateP = call(
+        w.s.app,
+        'POST',
+        `/api/machines/${legacyHostRunner.machineId}/rotate-token`,
+        {
+          body: {},
+        },
+      );
+      await waitFor(() => legacyStream.events.some((ev) => ev.type === 'token.rotate'));
+      const legacyEv = legacyStream.events.find((ev) => ev.type === 'token.rotate') as {
+        rotationId: string;
+      };
+      const legacyClaimRes = await call(w.s.app, 'POST', '/api/machine/token-rotate/claim', {
+        cred: legacyHostRunner.token,
+        body: {
+          rotationId: legacyEv.rotationId,
+          connectionId: legacyStream.getConnectionId(),
+          hostKey: HOST_KEY_B,
+          legacyHostKeys: [HOST_KEY_A],
+        },
+      });
+      expect(legacyClaimRes.status).toBe(200);
+      const { token: legacyNewToken } = (await legacyClaimRes.json()) as { token: string };
+      expect(
+        (
+          await call(w.s.app, 'POST', '/api/machine/token-rotate/ack', {
+            cred: legacyNewToken,
+            body: { rotationId: legacyEv.rotationId },
+          })
+        ).status,
+      ).toBe(200);
+      expect(((await (await legacyRotateP).json()) as { delivery: string }).delivery).toBe(
+        'pushed',
+      );
+      legacyStream.abort();
     } finally {
       w.s.dispose();
     }

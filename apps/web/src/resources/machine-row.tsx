@@ -106,6 +106,7 @@ export function MachineRowView({
   const mutations = useApiMutations(teamId);
   const machineId = machine.id ?? '';
   const online = machine.online !== false;
+  const isLocal = machine.kind === 'local';
   const reauthRequired = machine.tokenReauthRequired === true;
   const updateSummary = runnerUpdateSummary(machine.capabilities, online, t);
 
@@ -114,14 +115,12 @@ export function MachineRowView({
   const [confirmRotate, setConfirmRotate] = useState(false);
 
   const ownComputer = useOwnComputerRow(machine);
-  const { access } = useRunnerServerAccess(reauthRequired);
-  const serverOrigin =
-    access?.state === 'ready' && access.url !== null
-      ? access.url
-      : typeof window !== 'undefined'
-        ? window.location.origin
-        : 'http://127.0.0.1:8787';
-  const reconnectCmd = `${PUBLISHED_PACKAGES.cli.command} logout && ${startCommand(serverOrigin)}`;
+  const { access } = useRunnerServerAccess(reauthRequired && !isLocal);
+  const serverOrigin = access?.state === 'ready' && access.url !== null ? access.url : null;
+  const reconnectCmd =
+    serverOrigin === null
+      ? null
+      : `${PUBLISHED_PACKAGES.cli.command} logout && ${startCommand(serverOrigin)}`;
 
   const handleMenuOpenChange = (nextOpen: boolean) => {
     setMenuOpen(nextOpen);
@@ -309,7 +308,7 @@ export function MachineRowView({
                 closeOnClick={confirmRotate}
                 variant={confirmRotate ? 'destructive' : 'default'}
                 disabled={machine.id == null || mutations.rotateMachineToken.isPending}
-                title={t('如果执行机在线，会自动切换到新令牌；离线或已丢失请用「删除执行机」。')}
+                title={t('如果执行机在线，会自动切换到新令牌；离线或已丢失请用「删除执行机」')}
                 onClick={rotateToken}
               >
                 {confirmRotate ? t('确认更换令牌') : t('更换令牌')}
@@ -333,10 +332,22 @@ export function MachineRowView({
           data-testid="machine-token-reauth-drawer"
           className="flex min-w-0 flex-col gap-2 border-t border-border px-4 py-2"
         >
-          <p className="m-0 text-meta text-content-secondary">
-            {t('旧令牌已失效。在这台电脑运行以下命令重新连接：')}
-          </p>
-          <CopyCommand command={reconnectCmd} />
+          {isLocal ? (
+            <p className="m-0 text-meta text-content-secondary">
+              {t('旧令牌已失效。重启桌面端或在主机终端重启 Cairn 后，这台执行机即可重新连接。')}
+            </p>
+          ) : reconnectCmd !== null ? (
+            <>
+              <p className="m-0 text-meta text-content-secondary">
+                {t('旧令牌已失效。在这台电脑运行以下命令重新连接：')}
+              </p>
+              <CopyCommand command={reconnectCmd} />
+            </>
+          ) : (
+            <p className="m-0 text-meta text-content-secondary">
+              {t('旧令牌已失效。开启远程访问后，在那台电脑登出并重新连接这台主机。')}
+            </p>
+          )}
         </div>
       )}
       {ownComputer.drawer}

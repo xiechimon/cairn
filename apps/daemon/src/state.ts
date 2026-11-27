@@ -6,6 +6,7 @@ import {
   type DeviceJson,
   daemonJsonSchema,
   deviceJsonSchema,
+  MACHINE_TOKEN_PATTERN,
   type MachineJson,
   type ModelSourceModel,
   machineJsonSchema,
@@ -17,6 +18,7 @@ import { ensurePrivateDir, sweepStalePrivateTemps, writePrivateFile } from './pr
 export interface StatePaths {
   home: string;
   machineJson: string;
+  pendingTokenRotationJson: string;
   deviceJson: string;
   daemonJson: string;
   daemonLog: string;
@@ -35,6 +37,7 @@ export function statePaths(home: string, workspacesDir?: string): StatePaths {
   return {
     home,
     machineJson: join(home, 'machine.json'),
+    pendingTokenRotationJson: join(home, 'pending-token-rotation.json'),
     deviceJson: join(home, 'device.json'),
     daemonJson: join(home, 'daemon.json'),
     daemonLog: join(home, 'daemon.log'),
@@ -89,7 +92,30 @@ export function saveMachineJson(paths: StatePaths, value: MachineJson): void {
   writePrivateFile(paths.machineJson, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+const pendingTokenRotationSchema = z.object({
+  rotationId: z.string().min(1),
+  token: z.string().regex(MACHINE_TOKEN_PATTERN),
+});
+export type PendingTokenRotation = z.infer<typeof pendingTokenRotationSchema>;
+
+export function loadPendingTokenRotation(paths: StatePaths): PendingTokenRotation | null {
+  const raw = readJsonOr(paths.pendingTokenRotationJson);
+  if (raw === null) return null;
+  const parsed = pendingTokenRotationSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+export function savePendingTokenRotation(paths: StatePaths, value: PendingTokenRotation): void {
+  pendingTokenRotationSchema.parse(value);
+  writePrivateFile(paths.pendingTokenRotationJson, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+export function clearPendingTokenRotation(paths: StatePaths): void {
+  if (existsSync(paths.pendingTokenRotationJson)) rmSync(paths.pendingTokenRotationJson);
+}
+
 export function forgetMachine(paths: StatePaths): boolean {
+  clearPendingTokenRotation(paths);
   if (!existsSync(paths.machineJson)) return false;
   rmSync(paths.machineJson);
   return true;

@@ -790,6 +790,7 @@ export const machineTokenRotateClaimBodySchema = z.object({
   rotationId: z.string().min(1).max(64),
   connectionId: z.string().min(1).max(64),
   hostKey: hostKeySchema.optional(),
+  legacyHostKeys: legacyHostKeysSchema.optional(),
 });
 export type MachineTokenRotateClaimBody = z.infer<typeof machineTokenRotateClaimBodySchema>;
 

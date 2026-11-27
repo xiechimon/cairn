@@ -1128,6 +1128,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
           body.rotationId,
           body.connectionId,
           body.hostKey,
+          body.legacyHostKeys,
         );
         if (token === null) {
           throw new HttpError(404, 'rotation not found');

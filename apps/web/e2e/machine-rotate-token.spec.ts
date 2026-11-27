@@ -5,6 +5,7 @@ interface StubMachine {
   name: string;
   teamId: string;
   online: boolean;
+  lastSeenAt: number | null;
   latestCliVersion: null;
   kind: 'local' | 'remote';
   enabledRuntimes: string[];
@@ -29,8 +30,9 @@ async function setupStubs(
       name: 'mini-runner',
       teamId: 'team-1',
       online: opts.online ?? true,
+      lastSeenAt: Date.now(),
       latestCliVersion: null,
-      kind: 'remote' as const,
+      kind: 'remote' as 'local' | 'remote',
       enabledRuntimes: [],
       tokenReauthRequired: false,
     } satisfies StubMachine,
@@ -141,6 +143,29 @@ test('offline rotation shows reconnect status and command drawer across reload, 
   await page.reload();
   await expect(row.getByTestId('machine-token-reauth-drawer')).toHaveCount(0);
   await expect(row.getByTestId('machine-item-status')).toHaveText('在线');
+});
+
+test('local runner shows host restart guidance and remote runner without Tailscale omits loopback command', async ({
+  page,
+}) => {
+  const state = await setupStubs(page, { online: false, delivery: 'offline' });
+  state.machine = { ...state.machine, kind: 'local', tokenReauthRequired: true };
+  await page.goto(MACHINES_URL);
+  const localRow = page.getByTestId('machine-item').first();
+  const localDrawer = localRow.getByTestId('machine-token-reauth-drawer');
+  await expect(localDrawer).toBeVisible();
+  await expect(localDrawer).toContainText('重启桌面端或在主机终端重启 Cairn');
+  await expect(localDrawer).not.toContainText('cairn logout && cairn start');
+
+  state.machine = { ...state.machine, kind: 'remote', tokenReauthRequired: true };
+  await page.route('**/api/remote/tailscale', (route) =>
+    route.fulfill({ json: { state: 'off', url: null, consentUrl: null } }),
+  );
+  await page.reload();
+  const remoteDrawer = page.getByTestId('machine-token-reauth-drawer');
+  await expect(remoteDrawer).toBeVisible();
+  await expect(remoteDrawer).toContainText('开启远程访问后');
+  await expect(remoteDrawer).not.toContainText('127.0.0.1');
 });
 
 test('error toast on failure and zero horizontal scroll at 1440px and 390px in light and dark', async ({

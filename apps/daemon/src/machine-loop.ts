@@ -118,15 +118,18 @@ import {
   readRunnerReleaseVersion,
 } from './self-update.js';
 import {
+  clearPendingTokenRotation,
   ensureStateDirs,
   loadDevinModels,
   loadMachineJson,
   loadOrCreateDeviceJson,
+  loadPendingTokenRotation,
   recordSession,
   resolveSessionFile,
   type StatePaths,
   saveDevinModels,
   saveMachineJson,
+  savePendingTokenRotation,
 } from './state.js';
 import { resolveStepImages, sweepStepAttachments } from './step-attachments.js';
 import { resumePendingUpload } from './step-final-upload.js';
@@ -1180,15 +1183,84 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     if (claudeAuth === null) await probeAuthAndRemember();
     checkRuntimeUpdates();
   };
+  const finalizeRotatedToken = (newToken: string): boolean => {
+    if (!machineJson) return false;
+    const nextMachineJson = { ...machineJson, token: newToken };
+    try {
+      saveMachineJson(paths, nextMachineJson);
+    } catch (err) {
+      logger.machine(
+        `token rotation skipped: failed to save machine.json (${err instanceof Error ? err.message : String(err)})`,
+      );
+      return false;
+    }
+    clearPendingTokenRotation(paths);
+    machineJson = nextMachineJson;
+    inMemoryToken = newToken;
+    return true;
+  };
+  let rotationInFlight = false;
+  const ackWithRetry = async (
+    rotationId: string,
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<'ok' | 'rejected' | 'transient'> => {
+    if (!client.ackTokenRotation) return 'transient';
+    const attempt = async (): Promise<'ok' | 'rejected' | 'transient'> => {
+      try {
+        await client.ackTokenRotation?.(rotationId, token, signal);
+        return 'ok';
+      } catch (err) {
+        if (err instanceof MachineApiError && (err.status === 401 || err.status === 404)) {
+          return 'rejected';
+        }
+        return 'transient';
+      }
+    };
+    const first = await attempt();
+    if (first !== 'transient' || signal?.aborted) return first;
+    await sleep(100);
+    if (signal?.aborted) return 'transient';
+    return attempt();
+  };
+  const replayPendingTokenRotation = async (
+    signal?: AbortSignal,
+  ): Promise<'none' | 'promoted' | 'rejected' | 'transient'> => {
+    if (rotationInFlight || !client.ackTokenRotation || !machineJson) return 'none';
+    const pending = loadPendingTokenRotation(paths);
+    if (pending === null) return 'none';
+    if (pending.token === machineJson.token) {
+      clearPendingTokenRotation(paths);
+      return 'none';
+    }
+    rotationInFlight = true;
+    try {
+      const outcome = await ackWithRetry(pending.rotationId, pending.token, signal);
+      if (outcome === 'ok') {
+        return finalizeRotatedToken(pending.token) ? 'promoted' : 'transient';
+      }
+      if (outcome === 'rejected') {
+        clearPendingTokenRotation(paths);
+        return 'rejected';
+      }
+      return 'transient';
+    } finally {
+      rotationInFlight = false;
+    }
+  };
   selfUpdater.markBooted();
   try {
     for (let backoff = opts.claimBackoffBaseMs ?? 1_000; ; backoff = nextBackoffMs(backoff)) {
       try {
+        await replayPendingTokenRotation();
         await client.me();
         await presenceReporter.send();
         break;
       } catch (error) {
         if (error instanceof MachineApiError && error.status === 401 && loadedFromDisk) {
+          if ((await replayPendingTokenRotation()) === 'promoted') {
+            continue;
+          }
           await waitForReenrollment(paths.machineJson, {
             log: (line) => logger.machine(line),
             sleep,
@@ -1716,7 +1788,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       activeAntigravityVerifies -= 1;
     }
   };
-  let rotationInFlight = false;
   const handleTokenRotate = async (
     rotationId: string,
     currentConnId: string,
@@ -1725,7 +1796,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   ): Promise<void> => {
     if (rotationInFlight || streamCtrl.signal.aborted) return;
     if (!client.claimTokenRotation || !client.ackTokenRotation) return;
-    const ackTokenRotation = client.ackTokenRotation.bind(client);
     rotationInFlight = true;
     try {
       const newToken = await client.claimTokenRotation(
@@ -1733,58 +1803,29 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         currentConnId,
         hostKey ?? undefined,
         streamCtrl.signal,
+        legacyHostKeys.length > 0 ? legacyHostKeys : undefined,
       );
       if (!machineJson || streamCtrl.signal.aborted) return;
-      const previousMachineJson = machineJson;
-      const previousToken = inMemoryToken;
-      const nextMachineJson = { ...previousMachineJson, token: newToken };
       try {
-        saveMachineJson(paths, nextMachineJson);
+        savePendingTokenRotation(paths, { rotationId, token: newToken });
       } catch (err) {
         logger.machine(
-          `token rotation skipped: failed to save machine.json (${err instanceof Error ? err.message : String(err)})`,
+          `token rotation skipped: failed to save machine.json state (${err instanceof Error ? err.message : String(err)})`,
         );
         return;
       }
-      machineJson = nextMachineJson;
-      inMemoryToken = newToken;
 
-      const rollback = () => {
-        machineJson = previousMachineJson;
-        inMemoryToken = previousToken;
-        try {
-          saveMachineJson(paths, previousMachineJson);
-        } catch (saveErr) {
-          logger.machine(
-            `token rotation rollback failed to save machine.json (${saveErr instanceof Error ? saveErr.message : String(saveErr)})`,
-          );
-        }
-        logger.machine('token rotation rejected by server; restored previous credentials');
-      };
-
-      const tryAck = async (): Promise<'ok' | 'rejected' | 'transient'> => {
-        try {
-          await ackTokenRotation(rotationId, newToken, streamCtrl.signal);
-          return 'ok';
-        } catch (err) {
-          if (err instanceof MachineApiError && (err.status === 401 || err.status === 404)) {
-            return 'rejected';
-          }
-          return 'transient';
-        }
-      };
-
-      let ackOutcome = await tryAck();
-      if (ackOutcome === 'transient' && !streamCtrl.signal.aborted) {
-        await sleep(100);
-        if (!streamCtrl.signal.aborted) {
-          ackOutcome = await tryAck();
-        }
-      }
+      const ackOutcome = await ackWithRetry(rotationId, newToken, streamCtrl.signal);
       if (ackOutcome === 'rejected') {
-        rollback();
+        clearPendingTokenRotation(paths);
+        logger.machine('token rotation rejected by server; restored previous credentials');
         return;
       }
+      if (ackOutcome === 'transient') {
+        logger.machine('token rotation ack deferred until server reconnects');
+        return;
+      }
+      if (!finalizeRotatedToken(newToken)) return;
       markRotated();
       sessionCtrl.abort();
     } catch (err) {
@@ -1869,6 +1910,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
                 void deliverStop(stepId);
               }
             }
+            void replayPendingTokenRotation(streamCtrl.signal).then((outcome) => {
+              if (outcome === 'promoted' && !streamCtrl.signal.aborted) {
+                rotatedReconnect = true;
+                streamSession.abort();
+              }
+            });
           },
         );
         backoff = 1_000;

@@ -218,6 +218,7 @@ export function claimMachineTokenRotation(
   rotationId: string,
   connectionId: string,
   hostKey?: string,
+  legacyHostKeys?: string[],
 ): string | null {
   const pending = hubMap(deps.machineHub).get(machineId);
   if (
@@ -249,7 +250,11 @@ export function claimMachineTokenRotation(
   if (!row || row.retiredAt !== null || row.tokenHash !== pending.oldTokenHash) {
     return null;
   }
-  if (row.hostKey !== null && hostKey !== row.hostKey) {
+  if (
+    row.hostKey !== null &&
+    hostKey !== row.hostKey &&
+    !(legacyHostKeys ?? []).includes(row.hostKey)
+  ) {
     return null;
   }
   const staged = deps.db
@@ -364,19 +369,17 @@ export function ackMachineTokenRotation(
 
   const committed = findMachineByToken(deps.db, newTokenPlain);
   if (committed !== undefined && committed.retiredAt === null) {
-    if (committed.tokenReauthRequired || committed.pendingTokenHash !== null) {
+    if (committed.tokenReauthRequired) {
       deps.db
         .update(machine)
-        .set({ pendingTokenHash: null, tokenReauthRequired: false })
+        .set({ tokenReauthRequired: false })
         .where(eq(machine.id, committed.id))
         .run();
-      if (committed.tokenReauthRequired) {
-        deps.hub.publish(committed.teamId, () => ({
-          type: 'machine_presence',
-          machineId: committed.id,
-          online: committed.online,
-        }));
-      }
+      deps.hub.publish(committed.teamId, () => ({
+        type: 'machine_presence',
+        machineId: committed.id,
+        online: committed.online,
+      }));
     }
     return { ok: true };
   }

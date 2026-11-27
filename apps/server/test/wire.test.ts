@@ -174,6 +174,7 @@ const INFERRED_ROUTES = [
   'GET /api/needs-you',
   'DELETE /api/machines/{id}',
   'POST /api/machines/{id}/revoke',
+  'POST /api/machines/{id}/rotate-token',
   'GET /api/machines/{id}/own-computer/activity',
   'GET /api/machines/{id}/phones',
   'POST /api/machines/{id}/phones',

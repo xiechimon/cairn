@@ -1,7 +1,7 @@
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { MachineApiError } from '../src/machine-client.js';
-import { loadMachineJson } from '../src/state.js';
+import { loadMachineJson, loadPendingTokenRotation } from '../src/state.js';
 import {
   boot,
   CLAIMED,
@@ -60,8 +60,10 @@ describe('daemon runner token rotation handoff', () => {
     await handle.done;
   });
 
-  test('in-flight step finishes with the new token and waiting claim 401 retries immediately after rotation', async () => {
+  test('in-flight step finishes without pre-ack 401 and waiting claim 401 retries immediately after rotation', async () => {
     const newToken = 'e'.repeat(64);
+    const ackStarted = defer<void>();
+    const releaseAck = defer<void>();
     const stepStarted = defer<void>();
     const releaseStep = defer<void>();
     const backend = {
@@ -82,39 +84,61 @@ describe('daemon runner token rotation handoff', () => {
       },
     };
     const api = new FakeMachineApi();
+    let heartbeatCalledBeforeAckSettled = false;
+    const baseHeartbeat = api.heartbeat.bind(api);
+    api.heartbeat = async (stepId: string) => {
+      heartbeatCalledBeforeAckSettled = true;
+      await baseHeartbeat(stepId);
+    };
     const rotApi = api as FakeMachineApi & {
       claimTokenRotation?: (rotationId: string, connectionId: string) => Promise<string>;
       ackTokenRotation?: (rotationId: string, token: string) => Promise<void>;
     };
     rotApi.claimTokenRotation = async () => newToken;
-    rotApi.ackTokenRotation = async () => {};
+    rotApi.ackTokenRotation = async () => {
+      ackStarted.resolve();
+      await releaseAck.promise;
+    };
     api.claimQueue.push(CLAIMED);
 
-    const { handle, paths } = await boot({ api, backend, claimBackoffBaseMs: 5_000 });
+    const { handle, paths } = await boot({
+      api,
+      backend,
+      claimBackoffBaseMs: 5_000,
+      heartbeatIntervalMs: 20,
+    });
+    const oldToken = loadMachineJson(paths)!.token;
     try {
       await stepStarted.promise;
       await waitFor(() => api.onStreamEvent !== null);
 
       api.onStreamEvent?.({ type: 'hello', connectionId: 'conn-step' });
       api.onStreamEvent?.({ type: 'token.rotate', rotationId: 'rot-step' });
+      await ackStarted.promise;
+      await waitFor(() => heartbeatCalledBeforeAckSettled);
+      expect(loadMachineJson(paths)?.token).toBe(oldToken);
+      expect(loadPendingTokenRotation(paths)?.token).toBe(newToken);
+      releaseAck.resolve();
       await waitFor(() => loadMachineJson(paths)?.token === newToken);
     } finally {
+      releaseAck.resolve();
       releaseStep.resolve();
     }
     await waitFor(() => api.doneBodies.length === 1);
     expect(api.doneBodies[0]?.body.status).toBe('success');
 
+    await waitFor(() => api.rejectParked !== null);
     const claimsBefore = api.claimCalls;
-    api.parked?.(Object.assign(new MachineApiError(401, 'unauthorized'), {}) as never);
+    api.rejectParked?.(new MachineApiError(401, 'unauthorized'));
+    await waitFor(() => api.claimCalls > claimsBefore, 1_000);
     await handle.stop();
     await handle.done;
-    expect(api.claimCalls).toBeGreaterThanOrEqual(claimsBefore);
   });
 
-  test('ack rejected with 401 rolls back machine.json to previous token; 5xx retries ack once before self-heal', async () => {
+  test('ack rejected with 401 rolls back to previous token; repeated 5xx defers ack in state until reconnect promotes it', async () => {
     const newToken = 'f'.repeat(64);
     const api = new FakeMachineApi();
-    let ackMode: 'reject-401' | 'flaky-500' = 'reject-401';
+    let ackMode: 'reject-401' | 'flaky-500' | 'down-503' = 'reject-401';
     let ackAttempts = 0;
     const rotApi = api as FakeMachineApi & {
       claimTokenRotation?: () => Promise<string>;
@@ -124,7 +148,10 @@ describe('daemon runner token rotation handoff', () => {
     rotApi.ackTokenRotation = async () => {
       ackAttempts += 1;
       if (ackMode === 'reject-401') throw new MachineApiError(401, 'unauthorized');
-      if (ackAttempts === 1) throw new MachineApiError(503, 'restarting');
+      if (ackMode === 'flaky-500' && ackAttempts === 1) {
+        throw new MachineApiError(503, 'restarting');
+      }
+      if (ackMode === 'down-503') throw new MachineApiError(503, 'still restarting');
     };
 
     const { handle, lines, paths } = await boot({ api });
@@ -136,12 +163,22 @@ describe('daemon runner token rotation handoff', () => {
     await waitFor(() => ackAttempts === 1);
     await new Promise((r) => setTimeout(r, 50));
     expect(loadMachineJson(paths)?.token).toBe(oldToken);
+    expect(loadPendingTokenRotation(paths)).toBeNull();
+
+    ackMode = 'down-503';
+    ackAttempts = 0;
+    api.onStreamEvent?.({ type: 'token.rotate', rotationId: 'rot-defer' });
+    await waitFor(() => ackAttempts === 2);
+    await waitFor(() => loadPendingTokenRotation(paths)?.rotationId === 'rot-defer');
+    expect(loadMachineJson(paths)?.token).toBe(oldToken);
 
     ackMode = 'flaky-500';
     ackAttempts = 0;
-    api.onStreamEvent?.({ type: 'token.rotate', rotationId: 'rot-retry' });
-    await waitFor(() => ackAttempts === 2);
+    api.onStreamEvent = null;
+    api.failStream?.();
+    await waitFor(() => api.onStreamEvent !== null);
     await waitFor(() => loadMachineJson(paths)?.token === newToken);
+    expect(loadPendingTokenRotation(paths)).toBeNull();
 
     await handle.stop();
     await handle.done;

@@ -3295,12 +3295,16 @@ export const EN: Record<string, string> = {
   未能定位到这条消息: 'Could not locate that message',
   更换令牌: 'Rotate token',
   确认更换令牌: 'Confirm token rotation',
-  '如果执行机在线，会自动切换到新令牌；离线或已丢失请用「删除执行机」。':
-    'If the Runner is online, it switches to the new token automatically. If it is offline or lost, use Delete runner.',
+  '如果执行机在线，会自动切换到新令牌；离线或已丢失请用「删除执行机」':
+    'If the Runner is online, it switches to the new token automatically; if offline or lost, use Delete runner',
   '已更换令牌，执行机保持在线': 'Token rotated; Runner stays online',
   '旧令牌已失效，请在该电脑上重新连接': 'Old token invalidated; reconnect from that computer',
   '更换令牌失败，请重试。': 'Could not rotate token. Try again.',
   需要重新连接: 'Reconnect required',
   '旧令牌已失效。在这台电脑运行以下命令重新连接：':
     'The old token is no longer valid. Run this command on that computer to reconnect:',
+  '旧令牌已失效。重启桌面端或在主机终端重启 Cairn 后，这台执行机即可重新连接。':
+    'The old token is no longer valid. Restart the desktop app or restart Cairn on the host computer to reconnect.',
+  '旧令牌已失效。开启远程访问后，在那台电脑登出并重新连接这台主机。':
+    'The old token is no longer valid. Enable remote access, then log out and reconnect from that computer.',
 };

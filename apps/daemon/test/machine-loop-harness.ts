@@ -76,6 +76,7 @@ export const CLAIMED: ClaimedStep = {
 export class FakeMachineApi implements MachineApi {
   claimQueue: (ClaimedStep | Error)[] = [];
   parked: ((v: ClaimedStep | null) => void) | null = null;
+  rejectParked: ((err: Error) => void) | null = null;
   calls: string[] = [];
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   uploads: { url: string; body: TranscriptUpload }[] = [];
@@ -185,10 +186,17 @@ export class FakeMachineApi implements MachineApi {
     return new Promise<ClaimedStep | null>((resolve, reject) => {
       this.parked = (v) => {
         this.parked = null;
+        this.rejectParked = null;
         resolve(v);
+      };
+      this.rejectParked = (err) => {
+        this.parked = null;
+        this.rejectParked = null;
+        reject(err);
       };
       signal?.addEventListener('abort', () => {
         this.parked = null;
+        this.rejectParked = null;
         reject(new Error('aborted'));
       });
     });

@@ -1158,7 +1158,7 @@ export function markConnected(deps: Pick<MachineDeps, 'db' | 'hub'>, machineId: 
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!row) return;
   db.update(machine)
-    .set({ online: true, lastSeenAt: nowMs(), pendingTokenHash: null, tokenReauthRequired: false })
+    .set({ online: true, lastSeenAt: nowMs(), tokenReauthRequired: false })
     .where(eq(machine.id, machineId))
     .run();
   if (!row.online || row.tokenReauthRequired) {
