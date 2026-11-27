@@ -29,7 +29,7 @@ import {
 } from './builds.js';
 import { rewatchCreatingThread } from './chief.js';
 import { claimClientMessage, completeClientMessage } from './client-message.js';
-import { moveQueuedMessages } from './queued-send.js';
+import { externalClientMessageId, moveQueuedMessages } from './queued-send.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import {
   assertAutomaticRetryAllowed,
@@ -164,7 +164,7 @@ export async function restartFailedBuild(
             origin: origin === 'person' ? 'user' : 'synthetic',
           },
           undefined,
-          sseClientMessageId,
+          externalClientMessageId(sseClientMessageId, body.clientMessageId),
         );
       }
       if (
@@ -283,7 +283,7 @@ export async function restartFailedBuild(
           origin: origin === 'person' ? 'user' : 'synthetic',
         },
         undefined,
-        sseClientMessageId,
+        externalClientMessageId(sseClientMessageId, body.clientMessageId),
       );
     }
     if (prClosed !== null && reworkTarget !== null) {

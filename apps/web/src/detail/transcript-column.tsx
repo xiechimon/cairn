@@ -20,7 +20,7 @@ import {
 } from '../components/ui/message-scroller.js';
 import type { TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { openingAnchor } from './scroll-anchor.js';
+import { openingAnchor, opensAtTopOf } from './scroll-anchor.js';
 import { Transcript } from './transcript.js';
 
 const ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 pointer-fine:overscroll-none';
@@ -102,7 +102,7 @@ function TranscriptColumnInner({
       const messageId = bubbles?.item(bubbles.length - 1)?.closest<HTMLElement>('[data-message-id]')
         ?.dataset.messageId;
       if (viewport != null && messageId !== undefined) {
-        const opensAtTop = bubbles?.length === 1 && !hasEarlier;
+        const opensAtTop = opensAtTopOf(transcript, hasEarlier);
         const fade = Number.parseFloat(
           getComputedStyle(viewport).getPropertyValue('--scroll-fade-size'),
         );
@@ -113,7 +113,7 @@ function TranscriptColumnInner({
       }
     }
     setOpenedKey(threadKey);
-  }, [anchor, threadKey, hasEarlier, scrollToEnd, scrollToMessage]);
+  }, [anchor, threadKey, hasEarlier, transcript, scrollToEnd, scrollToMessage]);
   return (
     <MessageScroller className={ROOT_CLS}>
       <FadeScrollerViewport

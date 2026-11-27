@@ -11,6 +11,24 @@ export function openingAnchor(
   return transcript.some((item) => item.kind === 'user') ? 'last-user' : 'end';
 }
 
+const PROLOGUE_KINDS = new Set<TranscriptItem['kind']>(['run', 'chief', 'scheduled']);
+
+export function opensAtTopOf(transcript: readonly TranscriptItem[], hasEarlier: boolean): boolean {
+  if (hasEarlier) return false;
+  let firstUser = -1;
+  for (let i = 0; i < transcript.length; i += 1) {
+    if (transcript[i]?.kind !== 'user') continue;
+    if (firstUser !== -1) return false;
+    firstUser = i;
+  }
+  if (firstUser === -1) return false;
+  for (let i = 0; i < firstUser; i += 1) {
+    const item = transcript[i];
+    if (item === undefined || !PROLOGUE_KINDS.has(item.kind)) return false;
+  }
+  return true;
+}
+
 interface TranscriptQueryState {
   live: boolean;
   todoPending: boolean;

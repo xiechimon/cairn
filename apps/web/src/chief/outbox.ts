@@ -94,6 +94,7 @@ export interface Outbox {
   discard(key: string): OutboxEntry | null;
   acknowledge(key: string): void;
   land(key: string, messageId: string): void;
+  landKnown(loaded: ReadonlyMap<string, string>): void;
   subscribeLateArrival(listener: LateArrival): () => void;
   markRefetched(key: string): void;
   sentKey(messageId: string): string | null;
@@ -116,6 +117,8 @@ export const RESEND_WINDOW_MS = 10 * 60_000;
 export const SEND_TIMEOUT_MS = 30_000;
 
 const LOAD_TIMEOUT_MS = 5_000;
+
+const KNOWN_LOADED_LIMIT = 500;
 
 const unstored: OutboxStore = {
   put: () => Promise.resolve(),
@@ -250,6 +253,16 @@ export function createOutbox({
   const resumed = new Map<string, Promise<void>>();
   const sentKeys = new Map<string, string>();
   const pendingRefetchKeys = new Set<string>();
+  const pendingLateArrivals = new Map<string, string>();
+  const knownLoaded = new Map<string, string>();
+  const recordKnownLoaded = (key: string, messageId: string) => {
+    if (knownLoaded.has(key)) knownLoaded.delete(key);
+    knownLoaded.set(key, messageId);
+    if (knownLoaded.size > KNOWN_LOADED_LIMIT) {
+      const oldest = knownLoaded.keys().next().value;
+      if (oldest !== undefined) knownLoaded.delete(oldest);
+    }
+  };
   const listeners = new Set<() => void>();
   const rowOf = (entry: OutboxEntry, state: StoredOutboxEntry['state']) =>
     entry.scope === null
@@ -384,6 +397,31 @@ export function createOutbox({
       }),
     );
   };
+  const landEntry = (key: string, messageId: string) => {
+    recordKnownLoaded(key, messageId);
+    pendingRefetchKeys.delete(key);
+    const handedBack = returned.find((candidate) => candidate.key === key);
+    if (handedBack !== undefined) {
+      const seenByItsComposer = [...lateListeners].map((listener) => listener(handedBack));
+      if (seenByItsComposer.includes(true)) {
+        returned = returned.filter((candidate) => candidate !== handedBack);
+        pendingLateArrivals.delete(key);
+        sentKeys.set(messageId, key);
+        forget(key);
+      } else {
+        pendingLateArrivals.set(key, messageId);
+      }
+      return;
+    }
+    pendingLateArrivals.delete(key);
+    const entry = list.find((candidate) => candidate.key === key);
+    if (entry === undefined) return;
+    sentKeys.set(messageId, key);
+    replace(
+      list.map((other) => (other === entry ? { ...other, state: 'sent', messageId } : other)),
+    );
+    forget(key);
+  };
   return {
     subscribe(listener) {
       listeners.add(listener);
@@ -407,7 +445,10 @@ export function createOutbox({
             entry.projectId === input.projectId &&
             now() - entry.createdAt <= RETURNED_KEY_TTL_MS,
         )?.key ?? mintKey();
-      for (const retired of replaced) if (retired.key !== key) forget(retired.key);
+      for (const retired of replaced) {
+        pendingLateArrivals.delete(retired.key);
+        if (retired.key !== key) forget(retired.key);
+      }
       if (options?.awaitRefetch === true) pendingRefetchKeys.add(key);
       const entry: OutboxEntry = {
         ...input,
@@ -440,6 +481,7 @@ export function createOutbox({
       const entry = list.find((candidate) => candidate.key === key);
       if (entry?.state !== 'failed') return null;
       pendingRefetchKeys.delete(key);
+      pendingLateArrivals.delete(key);
       replace(list.filter((candidate) => candidate.key !== key));
       if (entry.failure === 'cancelled') {
         forget(key);
@@ -450,28 +492,33 @@ export function createOutbox({
       void amend(handedBack, 'returned');
       return entry;
     },
-    land(key, messageId) {
-      pendingRefetchKeys.delete(key);
-      const handedBack = returned.find((candidate) => candidate.key === key);
-      if (handedBack !== undefined) {
-        const seenByItsComposer = [...lateListeners].map((listener) => listener(handedBack));
-        if (seenByItsComposer.includes(true)) {
-          returned = returned.filter((candidate) => candidate !== handedBack);
-          sentKeys.set(messageId, key);
-          forget(key);
+    land: landEntry,
+    landKnown(loaded) {
+      for (const [key, messageId] of loaded) {
+        recordKnownLoaded(key, messageId);
+        if (
+          list.some((candidate) => candidate.key === key) ||
+          returned.some((candidate) => candidate.key === key)
+        ) {
+          landEntry(key, messageId);
         }
-        return;
       }
-      const entry = list.find((candidate) => candidate.key === key);
-      if (entry === undefined) return;
-      sentKeys.set(messageId, key);
-      replace(
-        list.map((other) => (other === entry ? { ...other, state: 'sent', messageId } : other)),
-      );
-      forget(key);
     },
     subscribeLateArrival(listener) {
       lateListeners.add(listener);
+      for (const [key, messageId] of [...pendingLateArrivals]) {
+        const handedBack = returned.find((candidate) => candidate.key === key);
+        if (handedBack === undefined) {
+          pendingLateArrivals.delete(key);
+          continue;
+        }
+        if (listener(handedBack)) {
+          returned = returned.filter((candidate) => candidate !== handedBack);
+          pendingLateArrivals.delete(key);
+          sentKeys.set(messageId, key);
+          forget(key);
+        }
+      }
       return () => lateListeners.delete(listener);
     },
     markRefetched(key) {
@@ -518,10 +565,27 @@ export function createOutbox({
         );
         const unsent: OutboxEntry[] = [];
         const writes: Promise<void>[] = [];
+        let restoredReturned = false;
         for (const row of restored) {
           const entry = entryOf(row);
+          const knownMessageId = knownLoaded.get(row.key);
+          if (knownMessageId !== undefined) {
+            if (row.state === 'returned') {
+              returned = [...returned, entry];
+              landEntry(entry.key, knownMessageId);
+              if (returned.includes(entry)) {
+                restoredReturned = true;
+                writes.push(keep(entry, 'returned'));
+              }
+            } else {
+              sentKeys.set(knownMessageId, row.key);
+              forget(row.key);
+            }
+            continue;
+          }
           if (row.state === 'returned') {
             returned = [...returned, entry];
+            restoredReturned = true;
             writes.push(keep(entry, 'returned'));
           } else {
             unsent.push(entry);
@@ -545,6 +609,7 @@ export function createOutbox({
             ),
             ...list,
           ]);
+        else if (restoredReturned) replace([...list]);
         for (const entry of unsent)
           if (entry.state === 'failed')
             options?.onFailed?.(entry, restoredError(entry.failure), onRecord.has(entry.key));
@@ -607,9 +672,11 @@ export function unlandedItems(
   known: ReadonlySet<string>,
   globalThreadId: string | null = null,
   channel: string | null = null,
+  knownClientIds?: ReadonlyMap<string, string> | ReadonlySet<string>,
 ): ChiefStreamItem[] {
   return entries.flatMap((entry) =>
     entry.state === 'failed' ||
+    knownClientIds?.has(entry.key) === true ||
     (entry.threadId !== null
       ? entry.threadId !== threadId
       : !(

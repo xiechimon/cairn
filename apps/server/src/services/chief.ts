@@ -1156,7 +1156,13 @@ export interface ChiefSendBody {
 
 export interface ChiefSendResult {
   thread: ChiefThread;
-  message: { id: string; role: 'user'; content: string; createdAt: number };
+  message: {
+    id: string;
+    role: 'user';
+    content: string;
+    createdAt: number;
+    clientMessageId?: string | null;
+  };
 }
 
 interface StoredChiefSend {
@@ -1236,6 +1242,7 @@ export function submitChiefMessage(
     content: body.content,
     projectId: picked?.id ?? null,
     origin,
+    ...(body.clientMessageId !== undefined ? { clientMessageId: body.clientMessageId } : {}),
     createdAt: now,
   };
   try {
@@ -1252,6 +1259,7 @@ export function submitChiefMessage(
           projectId: message.projectId,
           origin,
           sentByAgent: deps.sentByAgent ?? null,
+          clientMessageId: body.clientMessageId ?? null,
           createdAt: now,
         })
         .run();

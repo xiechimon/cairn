@@ -34,10 +34,16 @@ export function insertMessageRow(
       typedAt: typedAt ?? null,
       actor: row.actor ?? null,
       origin: row.origin ?? null,
+      clientMessageId: clientMessageId ?? null,
       conversationId,
     })
     .run();
-  const published = { ...shown, actor: row.actor ?? null, origin: row.origin ?? null };
+  const published = {
+    ...shown,
+    actor: row.actor ?? null,
+    origin: row.origin ?? null,
+    ...(clientMessageId !== undefined ? { clientMessageId } : {}),
+  };
   const publish = () => {
     if (clientMessageId !== undefined) {
       deps.convHub?.publishMessage(conversationId, published, deliveredQueue, clientMessageId);

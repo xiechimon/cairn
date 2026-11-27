@@ -12,6 +12,7 @@ import { toastError } from './ui/toaster.js';
 export interface QueuedCapsule {
   id: string;
   content: string;
+  clientMessageId?: string | null;
   label?: string;
   error?: string | null;
   note?: string;

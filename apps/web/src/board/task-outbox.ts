@@ -104,15 +104,37 @@ export function failedTaskOutbox(entries: readonly OutboxEntry[], todoId: string
   return entries.filter((entry) => entry.task?.todoId === todoId && entry.state === 'failed');
 }
 
+function retireClearedTaskError(todoId: string, retire: () => void): void {
+  const hadFailed = failedTaskOutbox(taskOutbox.entries(), todoId).length > 0;
+  retire();
+  if (hadFailed && failedTaskOutbox(taskOutbox.entries(), todoId).length === 0) {
+    taskOutboxErrors.clear(todoId);
+  }
+}
+
+export function landTaskOutbox(todoId: string, clientMessageId: string, messageId: string): void {
+  retireClearedTaskError(todoId, () => taskOutbox.land(clientMessageId, messageId));
+}
+
+export function landKnownTaskOutbox(
+  todoId: string,
+  knownClientIds: ReadonlyMap<string, string>,
+): void {
+  if (knownClientIds.size === 0) return;
+  retireClearedTaskError(todoId, () => taskOutbox.landKnown(knownClientIds));
+}
+
 export function unlandedTaskBubbles(
   entries: readonly OutboxEntry[],
   todoId: string,
   known: ReadonlySet<string>,
+  knownClientIds?: ReadonlyMap<string, string> | ReadonlySet<string>,
 ): OptimisticTaskUser[] {
   return entries.flatMap((entry) =>
     entry.task?.todoId !== todoId ||
     entry.state === 'failed' ||
     (entry.task.mode !== 'reply' && entry.state !== 'sending') ||
+    knownClientIds?.has(entry.key) === true ||
     (entry.messageId !== null && known.has(entry.messageId))
       ? []
       : [

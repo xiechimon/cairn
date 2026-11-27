@@ -70,6 +70,8 @@ import {
   discardTaskFailed,
   enqueueTaskSend,
   failedTaskOutbox,
+  landKnownTaskOutbox,
+  landTaskOutbox,
   taskOutbox,
   taskOutboxErrors,
   unlandedTaskBubbles,
@@ -160,6 +162,21 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const routingQ = useRoutingSettings(teamId, live);
 
   const known = useMemo(() => new Set(messages.map((m) => m.id)), [messages]);
+  const knownClientIds = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of messages) {
+      if (m.role === 'user' && m.clientMessageId != null) map.set(m.clientMessageId, m.id);
+    }
+    for (const q of newest?.queuedMessages ?? []) {
+      if (q.clientMessageId != null) map.set(q.clientMessageId, q.id);
+    }
+    return map;
+  }, [messages, newest?.queuedMessages]);
+  const settledIds = useMemo(() => {
+    const ids = new Set(known);
+    for (const q of newest?.queuedMessages ?? []) ids.add(q.id);
+    return ids;
+  }, [known, newest?.queuedMessages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     buildId != null ? liveTextStore.getVisible(buildId, known) : '',
   );
@@ -186,7 +203,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       todoId,
       onMessage: (row: TranscriptRow, clientMessageId?: string) => {
         if (row.role === 'user' && clientMessageId !== undefined) {
-          taskOutbox.land(clientMessageId, row.id);
+          landTaskOutbox(todoId, clientMessageId, row.id);
         }
       },
     }),
@@ -195,6 +212,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   useConversationStream(buildId ?? undefined, live, streamHandlers);
   useEffect(() => {
     if (!live || buildId == null) return;
+    landKnownTaskOutbox(todoId, knownClientIds);
     const messagesState = qc.getQueryState(['messages', buildId, 'pages']);
     const fetchSettled =
       !messagesQ.isPending && !messagesQ.isFetching && messagesState?.isInvalidated !== true;
@@ -210,14 +228,15 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         taskOutbox.markRefetched(entry.key);
       }
     }
-    taskOutbox.settle(buildId, known, (entry) => entry.task?.todoId === todoId);
+    taskOutbox.settle(buildId, settledIds, (entry) => entry.task?.todoId === todoId);
   }, [
     live,
     qc,
     outbox,
     todoId,
     buildId,
-    known,
+    settledIds,
+    knownClientIds,
     messagesQ.isPending,
     messagesQ.isFetching,
     messagesQ.dataUpdatedAt,
@@ -263,8 +282,8 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const latestPlan = plans.length > 0 ? plans[plans.length - 1] : undefined;
 
   const optimisticUsers = useMemo(
-    () => (live ? unlandedTaskBubbles(outbox, todoId, known) : []),
-    [live, outbox, todoId, known],
+    () => (live ? unlandedTaskBubbles(outbox, todoId, settledIds, knownClientIds) : []),
+    [live, outbox, todoId, settledIds, knownClientIds],
   );
 
   const transcript = useMemo<TranscriptItem[]>(() => {

@@ -16,6 +16,7 @@ import {
 } from './builds.js';
 import { claimClientMessage, findClientMessage } from './client-message.js';
 import { planAutoConfirmation } from './plan-auto-confirm.js';
+import { externalClientMessageId } from './queued-send.js';
 import { holdSecondRejectionRework } from './research-stuck.js';
 import { assertAutomaticRetryAllowed, assertPermanentRefusalCleared } from './retry-parking.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
@@ -106,7 +107,7 @@ export async function applyBuildStepAction(
         origin: origin === 'person' ? 'user' : 'synthetic',
       },
       undefined,
-      sseClientMessageId,
+      externalClientMessageId(sseClientMessageId, body.clientMessageId),
     );
     beforeCommit?.();
     if (revising.phase === 'review' && buildRunsSession(deps, buildId)) {

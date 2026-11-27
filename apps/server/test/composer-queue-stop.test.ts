@@ -436,6 +436,7 @@ test.each(['success', 'stopped', 'manual', 'local'] as const)(
         conversationId: newBuildId,
         message: expect.objectContaining({ role: 'user', content: 'A' }),
         deliveredQueue: { conversationId: 'build', messageId: queuedA!.id },
+        clientMessageId: expect.any(String),
       },
     ]);
     stopSource();
@@ -443,6 +444,7 @@ test.each(['success', 'stopped', 'manual', 'local'] as const)(
       newBuildId,
       expect.objectContaining({ role: 'user', content: 'A' }),
       { conversationId: 'build', messageId: queuedA!.id },
+      expect.any(String),
     );
     const response = await req(w.s.app, 'GET', `/api/conversations/${newBuildId}/messages`);
     expect(response.status).toBe(200);

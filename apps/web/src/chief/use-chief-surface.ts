@@ -271,6 +271,13 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   );
   useConversationStream(live ? (activeThread?.id ?? undefined) : undefined, live, streamHandlers);
   const knownChiefIds = useMemo(() => new Set(chiefMessages.map((m) => m.id)), [chiefMessages]);
+  const knownClientIds = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of chiefMessages) {
+      if (m.role === 'user' && m.clientMessageId != null) map.set(m.clientMessageId, m.id);
+    }
+    return map;
+  }, [chiefMessages]);
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     activeThreadId !== null ? liveTextStore.getVisible(activeThreadId, knownChiefIds) : '',
   );
@@ -314,16 +321,25 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const outbox = useSyncExternalStore(chiefOutbox.subscribe, chiefOutbox.entries);
   const globalThreadId = live ? (globalCoordinatorThread(liveThreads)?.id ?? null) : null;
   useEffect(() => {
-    if (live) chiefOutbox.settle(activeThreadId, knownChiefIds);
-  }, [live, outbox, activeThreadId, knownChiefIds]);
+    if (!live) return;
+    if (knownClientIds.size > 0) chiefOutbox.landKnown(knownClientIds);
+    chiefOutbox.settle(activeThreadId, knownChiefIds);
+  }, [live, outbox, activeThreadId, knownChiefIds, knownClientIds]);
   const liveChiefWithUnsent = useMemo(() => {
     if (liveChief === null) return null;
-    const unlanded = unlandedItems(outbox, activeThreadId, knownChiefIds, globalThreadId, channel);
+    const unlanded = unlandedItems(
+      outbox,
+      activeThreadId,
+      knownChiefIds,
+      globalThreadId,
+      channel,
+      knownClientIds,
+    );
     return {
       ...liveChief,
       stream: [...keepSentKeys(liveChief.stream ?? [], chiefOutbox), ...unlanded],
     };
-  }, [liveChief, outbox, activeThreadId, knownChiefIds, globalThreadId, channel]);
+  }, [liveChief, outbox, activeThreadId, knownChiefIds, knownClientIds, globalThreadId, channel]);
   const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = chiefMessagesQ;
   const loadEarlier = useCallback(() => {
     void fetchNextPage();

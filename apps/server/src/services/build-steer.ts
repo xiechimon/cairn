@@ -38,7 +38,7 @@ import {
   replayAfterConflict,
 } from './client-message.js';
 import { projectOfTodo } from './git.js';
-import { moveQueuedMessages, refuseRemovedSend } from './queued-send.js';
+import { externalClientMessageId, moveQueuedMessages, refuseRemovedSend } from './queued-send.js';
 import { assertAutomaticRetryAllowed } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -311,7 +311,7 @@ export async function sendBuildSteer(
           body.queuedMessageId === undefined
             ? undefined
             : { conversationId, messageId: body.queuedMessageId },
-          continuationOptions.sseClientMessageId ?? body.clientMessageId,
+          externalClientMessageId(continuationOptions.sseClientMessageId, body.clientMessageId),
         );
       if (running && !answered) {
         const prior = db

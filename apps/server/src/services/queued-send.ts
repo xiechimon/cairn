@@ -66,6 +66,11 @@ export function nestedLedgerId(todoId: string, clientMessageId: string): string 
   return `nested:${todoId}:${clientMessageId}`;
 }
 
+export function externalClientMessageId(explicit?: string, ledgerKey?: string): string | undefined {
+  if (explicit !== undefined) return explicit;
+  return ledgerKey !== undefined && !ledgerKey.startsWith('nested:') ? ledgerKey : undefined;
+}
+
 export function markAsQueuedSend(
   db: Db,
   scopeId: string,

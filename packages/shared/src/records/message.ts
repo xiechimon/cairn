@@ -22,6 +22,7 @@ export const transcriptRowSchema = messageRecordSchema.extend({
   createdAt: epochMs,
   actor: z.string().nullish(),
   origin: z.enum(TRANSCRIPT_USER_ORIGINS).nullish(),
+  clientMessageId: z.string().nullish(),
 });
 export type TranscriptRow = z.infer<typeof transcriptRowSchema>;
 
@@ -527,6 +528,7 @@ export const conversationMessagesResponseSchema = z.object({
         content: z.string(),
         createdAt: epochMs,
         error: z.string().nullable().optional(),
+        clientMessageId: z.string().nullish(),
       }),
     )
     .optional(),

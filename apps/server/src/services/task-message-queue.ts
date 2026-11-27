@@ -130,7 +130,11 @@ export async function queueTaskMessage(
         claimClientMessage(deps.db, runId, clientMessageId);
         deps.db
           .insert(queuedMessage)
-          .values({ ...message, sentByAgent: deps.sentByAgent ?? null })
+          .values({
+            ...message,
+            sentByAgent: deps.sentByAgent ?? null,
+            clientMessageId: clientMessageId ?? null,
+          })
           .run();
         addUserMessageAttachmentGrants(deps.db, task.id, task.teamId, content);
         completeClientMessage(deps.db, runId, clientMessageId, queued);
@@ -139,7 +143,16 @@ export async function queueTaskMessage(
     } catch (error) {
       return replayAfterConflict<QueuedTaskMessageResult>(deps.db, runId, clientMessageId, error);
     }
-    deps.convHub?.publishMessage(runId, { ...message, role: 'user' }, undefined, clientMessageId);
+    deps.convHub?.publishMessage(
+      runId,
+      {
+        ...message,
+        role: 'user',
+        ...(clientMessageId !== undefined ? { clientMessageId } : {}),
+      },
+      undefined,
+      clientMessageId,
+    );
     return queued;
   };
   return coalesceClientMessage(deps.db, task.id, clientMessageId, () =>
@@ -178,7 +191,10 @@ export async function deliverQueuedMessage(
         deps,
         conversationId,
         { content: row.content, queuedMessageId: row.id },
-        true,
+        {
+          afterTurn: true,
+          ...(row.clientMessageId != null ? { sseClientMessageId: row.clientMessageId } : {}),
+        },
       );
     } catch (error) {
       const todoId = deps.db.select().from(build).where(eq(build.id, conversationId)).get()?.todoId;

@@ -4351,6 +4351,12 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "null",
               ],
             },
+            "clientMessageId": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
             "content": {},
             "createdAt": {
               "maximum": 9007199254740991,
@@ -5619,6 +5625,12 @@ exports[`body/envelope schema snapshots > conversationMessagesResponse > convers
               "null",
             ],
           },
+          "clientMessageId": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
           "content": {},
           "createdAt": {
             "maximum": 9007199254740991,
@@ -5667,6 +5679,12 @@ exports[`body/envelope schema snapshots > conversationMessagesResponse > convers
       "items": {
         "additionalProperties": false,
         "properties": {
+          "clientMessageId": {
+            "type": [
+              "string",
+              "null",
+            ],
+          },
           "content": {
             "type": "string",
           },
@@ -5765,6 +5783,12 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
           "additionalProperties": {},
           "properties": {
             "actor": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+            "clientMessageId": {
               "type": [
                 "string",
                 "null",
@@ -9972,6 +9996,12 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                       "additionalProperties": {},
                       "properties": {
                         "actor": {
+                          "type": [
+                            "string",
+                            "null",
+                          ],
+                        },
+                        "clientMessageId": {
                           "type": [
                             "string",
                             "null",

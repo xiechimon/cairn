@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isTranscriptSettled, openingAnchor } from '../src/detail/scroll-anchor.js';
+import { isTranscriptSettled, openingAnchor, opensAtTopOf } from '../src/detail/scroll-anchor.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
 
 const user: TranscriptItem = { kind: 'user', text: 'fix it' };
@@ -51,5 +51,35 @@ describe('isTranscriptSettled', () => {
   it('never waits outside live mode, and waits for the todo in live mode', () => {
     expect(isTranscriptSettled({ ...base, live: false, messagesPending: true })).toBe(true);
     expect(isTranscriptSettled({ ...base, todoPending: true })).toBe(false);
+  });
+});
+
+describe('opensAtTopOf', () => {
+  const run: TranscriptItem = { kind: 'run', at: '14:12', machine: 'dev-mac' };
+  const chief: TranscriptItem = { kind: 'chief' };
+  const scheduled: TranscriptItem = { kind: 'scheduled' };
+  const work: TranscriptItem = {
+    kind: 'work',
+    id: 'w1',
+    steps: [{ kind: 'say', id: 's1', text: 'ran tests' }],
+  };
+
+  it('opens at top only when the single user message has no earlier pages or prior agent work', () => {
+    expect(opensAtTopOf([run, user, robot], false)).toBe(true);
+    expect(opensAtTopOf([run, chief, user, robot], false)).toBe(true);
+    expect(opensAtTopOf([scheduled, run, user, robot], false)).toBe(true);
+    expect(opensAtTopOf([user, robot], false)).toBe(true);
+  });
+
+  it('keeps the anchor on the follow-up user bubble when agent work precedes it', () => {
+    expect(opensAtTopOf([run, work, robot, user, robot], false)).toBe(false);
+    expect(opensAtTopOf([chief, robot, user], false)).toBe(false);
+    expect(opensAtTopOf([robot, user], false)).toBe(false);
+  });
+
+  it('returns false when earlier pages exist or when user count is not one', () => {
+    expect(opensAtTopOf([run, user, robot], true)).toBe(false);
+    expect(opensAtTopOf([user, robot, user, robot], false)).toBe(false);
+    expect(opensAtTopOf([run, robot], false)).toBe(false);
   });
 });

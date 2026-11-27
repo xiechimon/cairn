@@ -252,6 +252,7 @@ export interface MessageRow {
   actor?: string | null;
   origin?: TranscriptUserOrigin | null;
   projectId?: string | null;
+  clientMessageId?: string | null;
 }
 
 function rowProject(row: MessageRow): { projectId?: string | null } {
@@ -822,7 +823,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       }
       if (m.origin === 'task-prompt' || m.origin === 'synthetic') continue;
       if (orchestratedTodoIdOf(text) !== null) continue;
-      const outboxKey = sentKey?.(m.id) ?? null;
+      const outboxKey = m.clientMessageId ?? sentKey?.(m.id) ?? null;
       entries.push({
         at: m.createdAt,
         item: {
@@ -2236,6 +2237,7 @@ function collectChiefStream(
         pending: pendingState,
         at: clockTime(m.createdAt),
         createdAt: m.createdAt,
+        ...(m.clientMessageId != null ? { outboxKey: m.clientMessageId } : {}),
         ...rowProject(m),
       });
       continue;
@@ -2438,6 +2440,7 @@ function collectChiefStream(
         markdown: text,
         at: clockTime(m.createdAt),
         createdAt: m.createdAt,
+        ...(m.clientMessageId != null ? { outboxKey: m.clientMessageId } : {}),
         ...rowProject(m),
       });
       continue;

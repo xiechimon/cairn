@@ -375,6 +375,7 @@ export const message = sqliteTable(
     origin: text('origin').$type<TranscriptUserOrigin>(),
     typedAt: epochMs('typedAt'),
     sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
+    clientMessageId: text('clientMessageId'),
   },
   (t) => [
     index('message_createdAt_idx').on(t.createdAt),
@@ -529,6 +530,7 @@ export const queuedMessage = sqliteTable(
     deliverAfterStop: integer('deliverAfterStop', { mode: 'boolean' }).notNull().default(false),
     error: text('error'),
     sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
+    clientMessageId: text('clientMessageId'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [index('queued_message_conversation_idx').on(t.conversationId, t.createdAt)],
@@ -1294,6 +1296,7 @@ export const chiefMessage = sqliteTable('chief_message', {
   origin: text('origin').$type<TranscriptUserOrigin>(),
   typedAt: epochMs('typedAt'),
   sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
+  clientMessageId: text('clientMessageId'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
