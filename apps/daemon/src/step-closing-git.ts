@@ -29,7 +29,28 @@ export interface ClosingGitOutcome {
   branchDrift: { expected: string; actual: string } | null;
   artifactBranches: string[];
   hasChanges: boolean | null;
+  unpushedCommits?: number | null;
   error: { cause: unknown; duringPush: boolean } | null;
+}
+
+async function countObserveOnlyUnpushed(
+  git: WorktreeOps,
+  cwd: string,
+  refs: readonly string[],
+  log: (message: string) => void,
+): Promise<number | null> {
+  if (refs.length === 0) return 0;
+  if (git.unpushedCommitCount === undefined) return null;
+  try {
+    let total = 0;
+    for (const ref of refs) {
+      total += await git.unpushedCommitCount(cwd, ref);
+    }
+    return total;
+  } catch (err) {
+    log(`unpushed commit count failed: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
 }
 
 export async function commitAndPushStep(input: ClosingGitInput): Promise<ClosingGitOutcome> {
@@ -50,12 +71,21 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       (repoKind === 'github' ||
         (repoKind === 'local' && headBranch !== null && headBranch !== ws.branch));
     if (observeOnly) {
-      await git.fetchBranch?.(ws.cwd, ws.defaultBranch).catch(() => false);
+      let fetchFailed = false;
+      if (git.fetchBranch !== undefined) {
+        const fetched = await git.fetchBranch(ws.cwd, ws.defaultBranch).catch(() => false);
+        if (!fetched) fetchFailed = true;
+      }
       const headCommit = await git.headCommit(ws.cwd);
       outcome.headCommit = headCommit;
       const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
       const scanned: string[] = [];
-      if (headAhead === 0 && input.headAtStart !== null && git.branchesWithNewCommits) {
+      let scanProbeFailed = false;
+      if (
+        (headAhead === 0 || repoKind === 'github') &&
+        input.headAtStart !== null &&
+        git.branchesWithNewCommits
+      ) {
         try {
           const candidates = await git.branchesWithNewCommits(
             ws.cwd,
@@ -66,9 +96,11 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
             ...candidates.filter((b) => b === ws.branch || !b.startsWith(BRAND.branchPrefix)),
           );
         } catch (err) {
+          scanProbeFailed = true;
           log(`branch scan failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
+      const artifactScanned = headAhead === 0 ? scanned : [];
       const probeBranches: string[] = [];
       if (
         headBranch !== null &&
@@ -77,7 +109,7 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       ) {
         probeBranches.push(headBranch);
       }
-      for (const b of scanned) {
+      for (const b of artifactScanned) {
         if (!probeBranches.includes(b)) probeBranches.push(b);
       }
       outcome.artifactBranches = probeBranches;
@@ -95,7 +127,28 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
           `Observed landed commit ${headCommit.slice(0, 7)} on origin/${ws.defaultBranch}.`,
         );
       }
-      outcome.hasChanges = headAhead > 0 || scanned.length > 0 || landed;
+      outcome.hasChanges = headAhead > 0 || artifactScanned.length > 0 || landed;
+      if (repoKind === 'github') {
+        if (landed) {
+          outcome.unpushedCommits = 0;
+        } else {
+          const refsToCheck = ['HEAD', ...scanned.filter((b) => b !== headBranch)];
+          const counted = await countObserveOnlyUnpushed(
+            git,
+            ws.cwd,
+            [...new Set(refsToCheck)],
+            log,
+          );
+          outcome.unpushedCommits =
+            counted === null
+              ? null
+              : counted > 0
+                ? counted
+                : fetchFailed || scanProbeFailed
+                  ? null
+                  : 0;
+        }
+      }
       return outcome;
     }
     const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;

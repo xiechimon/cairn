@@ -165,7 +165,10 @@ const CURRENT_SESSION_BRIEF_FIXTURE = [
 const CURRENT_REWORK_BRIEF_FIXTURE =
   'Rework request on this same session: keep the branch and tests you already have, address the feedback below, run real acceptance matching the task kind (UI screenshot via attach_file, real API request/response, real CLI run, or opening and checking the artifact) and quote the new evidence, then call thread_report.';
 
-test('both historical and current session/rework brief rows are stamped synthetic', async () => {
+const ACCEPTANCE_NUDGE_FIXTURE =
+  '[cairn acceptance check] Real acceptance is missing before this task can finish.';
+
+test('both historical and current session/rework brief rows and acceptance nudges are stamped synthetic', async () => {
   expect(SESSION_BRIEF).toBe(CURRENT_SESSION_BRIEF_FIXTURE);
   expect(SESSION_REWORK_BRIEF).toBe(CURRENT_REWORK_BRIEF_FIXTURE);
 
@@ -194,9 +197,14 @@ test('both historical and current session/rework brief rows are stamped syntheti
         content: `${CURRENT_REWORK_BRIEF_FIXTURE}\n\n请再验证一遍`,
         createdAt: 4,
       }),
+      legacyRow(conversationId, {
+        id: 'acceptance-nudge-1',
+        content: `${ACCEPTANCE_NUDGE_FIXTURE}\n\nMissing live UI screenshot.`,
+        createdAt: 5,
+      }),
     ])
     .run();
 
   const counts = backfillTranscriptOrigins(s.db);
-  expect(counts).toEqual({ 'task-prompt': 0, synthetic: 4, user: 0 });
+  expect(counts).toEqual({ 'task-prompt': 0, synthetic: 5, user: 0 });
 });

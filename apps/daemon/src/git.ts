@@ -1163,9 +1163,11 @@ export const gitPrim = {
     return r.code === 0 && r.stdout.trim() !== '' ? r.stdout.trim() : null;
   },
 
-  async unpushedCommitCount(dir: string): Promise<number> {
-    const head = await gitPrim.head(dir);
-    if (head === null) return 0;
+  async unpushedCommitCount(dir: string, ref = 'HEAD'): Promise<number> {
+    if (ref === 'HEAD') {
+      const head = await gitPrim.head(dir);
+      if (head === null) return 0;
+    }
     const remotes = await runGit(
       ['for-each-ref', '--count=1', '--format=%(refname)', 'refs/remotes/'],
       { cwd: dir, timeoutMs: META_TIMEOUT_MS },
@@ -1181,7 +1183,7 @@ export const gitPrim = {
       if (baseRefs.length === 0) return 1;
       excludeArgs = baseRefs;
     }
-    const r = await runGit(['rev-list', '--count', 'HEAD', '--not', ...excludeArgs], {
+    const r = await runGit(['rev-list', '--count', ref, '--not', ...excludeArgs], {
       cwd: dir,
       timeoutMs: META_TIMEOUT_MS,
     });

@@ -92,6 +92,7 @@ function lifecycleTurns(probeLine: string) {
     },
     { content: '方案已就绪：Context / Changes / Edge cases / Verification 四段完整。' },
     { toolCall: { name: 'bash', arguments: { command: `printf "${probeLine}\\n" >> README.md` } } },
+    { toolCall: { name: 'read', arguments: { path: 'README.md' } } },
     { content: '修改已完成并验证通过。' },
   ];
 }

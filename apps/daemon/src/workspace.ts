@@ -455,6 +455,10 @@ export class WorkspaceManager implements WorktreeOps {
     ]);
   }
 
+  async unpushedCommitCount(cwd: string, ref = 'HEAD'): Promise<number> {
+    return gitPrim.unpushedCommitCount(cwd, ref);
+  }
+
   async push(
     cwd: string,
     branch: string,

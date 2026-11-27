@@ -67,6 +67,7 @@ beforeAll(async () => {
         },
       },
     },
+    { toolCall: { name: 'read', arguments: { path: 'README.md' } } },
     { content: '修改已完成：README.md 末行为 policy probe。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
@@ -178,17 +179,17 @@ describe('pi session policy (#925 trust/telemetry/settings + #927 cost/cache)', 
     const row = rows[0]!;
     expect(row.model).toBe('stub-gw/stub-model');
     expect(row.input).toBe(0);
-    expect(row.output).toBe(1960);
-    expect(row.cacheRead).toBe(200);
+    expect(row.output).toBe(2940);
+    expect(row.cacheRead).toBe(300);
     expect(row.cacheWrite).toBe(0);
     expect(row.costInput).toBe(0);
-    expect(row.costOutput).toBeCloseTo(3920, 6);
-    expect(row.costCacheRead).toBeCloseTo(100, 6);
+    expect(row.costOutput).toBeCloseTo(5880, 6);
+    expect(row.costCacheRead).toBeCloseTo(150, 6);
     expect(row.costCacheWrite).toBe(0);
-    expect(row.costTotal).toBeCloseTo(4020, 6);
+    expect(row.costTotal).toBeCloseTo(6030, 6);
     const dbRows = server.db.select().from(tokenUsage).all();
     expect(dbRows).toHaveLength(1);
-    expect(dbRows[0]!.costTotal).toBeCloseTo(4020, 6);
+    expect(dbRows[0]!.costTotal).toBeCloseTo(6030, 6);
   }, 180_000);
 
   test('legacy context fails through the real daemon before a model request and keeps file bytes', async () => {

@@ -131,6 +131,7 @@ export interface WorktreeOps {
   ): Promise<{ output: string }>;
   headCommit(cwd: string): Promise<string | null>;
   countAhead(cwd: string, defaultBranch: string): Promise<number>;
+  unpushedCommitCount?(cwd: string, ref?: string): Promise<number>;
   commitsAhead?(cwd: string, defaultBranch: string): Promise<string[]>;
   currentBranch?(cwd: string): Promise<string | null>;
   branchesWithNewCommits?(cwd: string, baseCommit: string, sinceMs: number): Promise<string[]>;

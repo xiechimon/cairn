@@ -655,6 +655,7 @@ export const machineDoneBodySchema = z.object({
   noOutput: z.literal(true).optional(),
   skillInjectionFacts: skillInjectionFactsSchema.optional(),
   generation: z.number().int().optional(),
+  unpushedCommits: z.number().int().nonnegative().nullable().optional(),
 });
 export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;

@@ -19,6 +19,7 @@ import { tokenUsageSchema } from './token-usage.js';
 import { userRecordSchema } from './user.js';
 
 export * from '../failure-review.js';
+export * from './acceptance.js';
 export * from './agent.js';
 export * from './api-key.js';
 export * from './artifact.js';

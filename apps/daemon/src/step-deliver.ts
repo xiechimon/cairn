@@ -56,6 +56,7 @@ export interface StepDeliveryInput {
     hasChanges: boolean;
     pushHookOutput: string | null;
     preservedCommits: string[];
+    unpushedCommits?: number | null;
   };
   running: number;
 }
@@ -135,6 +136,7 @@ export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void
       quotaBlock: input.quotaBlock,
       skillInjectionFacts: input.skillInjectionFacts,
       generation: input.claimed.step.generation,
+      ...(git.unpushedCommits !== undefined ? { unpushedCommits: git.unpushedCommits } : {}),
     },
     {
       kind: input.claimed.step.kind,

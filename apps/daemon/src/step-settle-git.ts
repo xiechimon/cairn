@@ -46,6 +46,7 @@ export interface SettledStepGit {
   pushHookOutput: string | null;
   preservedCommits: string[];
   lastError: string | null;
+  unpushedCommits?: number | null;
 }
 
 export async function settleStepGit(input: SettleStepGitInput): Promise<SettledStepGit> {
@@ -96,6 +97,7 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
     settled.headCommit = closing.headCommit;
     settled.branchDrift = closing.branchDrift;
     settled.artifactBranches = closing.artifactBranches;
+    if (closing.unpushedCommits !== undefined) settled.unpushedCommits = closing.unpushedCommits;
     if (closing.hasChanges !== null) settled.hasChanges = closing.hasChanges;
     if (closing.error !== null) {
       const { cause, duringPush } = closing.error;

@@ -1,8 +1,13 @@
 import type { ReviewVerdict } from '@cairn/shared';
 import {
+  type AcceptanceEvaluation,
   ANSWERS_CONTINUE_PROMPT,
+  buildAcceptanceNudgePrompt,
   buildPlanContractRewritePrompt,
   buildPlanRewritePrompt,
+  evaluateStepAcceptance,
+  extractEditedPathsFromMessages,
+  isAcceptanceNudgePrompt,
   isBuildStepKind,
   isInfoOutput,
   isPlanContractRewritePrompt,
@@ -10,9 +15,18 @@ import {
   type TodoOutputKind,
   type VerifyVerdict,
 } from '@cairn/shared';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { runAfterCommit, withCommitEffects } from '../db/commit-effects.js';
-import { build, plan as planTable, step, stopPending, todo } from '../db/schema.js';
+import {
+  attachment,
+  build,
+  message,
+  plan as planTable,
+  project,
+  step,
+  stopPending,
+  todo,
+} from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { settleRetiredGateStep } from './build-gate-steps.js';
@@ -23,7 +37,11 @@ import {
   landReservedPhase,
   settleAfterStopPhase,
 } from './build-stop.js';
-import { askUndeliveredOnce, undeliveredEnd } from './build-undelivered.js';
+import {
+  askAcceptanceBlockedOnce,
+  askUndeliveredOnce,
+  undeliveredEnd,
+} from './build-undelivered.js';
 import {
   applyStepFailure,
   type BuildDeps,
@@ -120,7 +138,10 @@ export interface CompleteStepOutcome {
   report?: string;
   verdictReport?: VerdictReport;
   deliverables?: DeliverableManifest;
+  unpushedCommits?: number | null;
 }
+
+const ACCEPTANCE_NUDGE_MAX = 1;
 
 export function completeStep(
   deps: BuildDeps,
@@ -182,9 +203,114 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     );
     return;
   }
-  const undelivered = undeliveredEnd(stepRow, todoRow, outcome);
-  if (undelivered !== null && pendingWorkerQuestions(deps.db, buildRow.id).length === 0)
-    askUndeliveredOnce(deps, buildRow, undelivered);
+  const blockedByAnswers =
+    receivesAnswers(stepRow.kind) && undeliveredAnswers(deps.db, stepRow.buildId).length > 0;
+  let acceptance: AcceptanceEvaluation | null = null;
+  if (
+    isBuildStepKind(stepRow.kind) &&
+    pendingWorkerQuestions(deps.db, buildRow.id).length === 0 &&
+    !blockedByAnswers
+  ) {
+    const buildSteps = deps.db
+      .select({
+        id: step.id,
+        kind: step.kind,
+        status: step.status,
+        scheduleId: step.scheduleId,
+        createdAt: step.createdAt,
+        finishedAt: step.finishedAt,
+        prompt: step.prompt,
+      })
+      .from(step)
+      .where(eq(step.buildId, buildRow.id))
+      .orderBy(asc(step.createdAt), asc(step.id))
+      .all();
+    const buildStepIds = buildSteps.map((s) => s.id);
+    let rootIdx = buildSteps.findIndex((s) => s.id === stepRow.id);
+    while (rootIdx > 0 && isAcceptanceNudgePrompt(buildSteps[rootIdx]?.prompt)) {
+      let prevIdx = rootIdx - 1;
+      let prevStep = buildSteps[prevIdx];
+      while (prevIdx > 0 && (!prevStep || !isBuildStepKind(prevStep.kind))) {
+        prevIdx -= 1;
+        prevStep = buildSteps[prevIdx];
+      }
+      if (!prevStep || !isBuildStepKind(prevStep.kind)) break;
+      rootIdx = prevIdx;
+    }
+    const attemptRoot = (rootIdx >= 0 ? buildSteps[rootIdx] : undefined) ?? stepRow;
+    const lastPlanFinishedAt = buildSteps.reduce<number | null>(
+      (max, s) =>
+        s.kind === 'plan' && s.status === 'done' && s.finishedAt !== null
+          ? max === null || s.finishedAt > max
+            ? s.finishedAt
+            : max
+          : max,
+      null,
+    );
+    const allBuildMessages = deps.db
+      .select({ role: message.role, content: message.content, createdAt: message.createdAt })
+      .from(message)
+      .where(eq(message.conversationId, buildRow.id))
+      .orderBy(asc(message.createdAt), asc(message.id))
+      .all();
+    const buildMessages =
+      attemptRoot.scheduleId !== null
+        ? allBuildMessages.filter((m) => m.createdAt >= attemptRoot.createdAt)
+        : lastPlanFinishedAt === null
+          ? allBuildMessages
+          : allBuildMessages.filter((m) => m.createdAt > lastPlanFinishedAt);
+    if (buildMessages.some((m) => m.role === 'assistant')) {
+      const projRow = deps.db
+        .select({ repoKind: project.repoKind })
+        .from(project)
+        .where(eq(project.id, todoRow.projectId))
+        .get();
+      const stepAttachments = deps.db
+        .select({
+          id: attachment.id,
+          createdBy: attachment.createdBy,
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType,
+          status: attachment.status,
+          grantId: attachment.grantId,
+          createdAt: attachment.createdAt,
+        })
+        .from(attachment)
+        .where(
+          and(
+            eq(attachment.teamId, todoRow.teamId),
+            inArray(attachment.status, ['ready', 'received', 'pending', 'failed']),
+          ),
+        )
+        .all();
+      const recordedChanges = Array.isArray(buildRow.changes)
+        ? buildRow.changes
+        : (buildRow.changes?.files ?? []);
+      const editedPaths =
+        recordedChanges.length > 0
+          ? recordedChanges.map((f) => f.path)
+          : extractEditedPathsFromMessages(buildMessages);
+      acceptance = evaluateStepAcceptance({
+        output: todoRow.output,
+        repoKind: projRow?.repoKind ?? null,
+        hasChanges: outcome.hasChanges,
+        editedPaths,
+        messages: buildMessages,
+        attachments: stepAttachments,
+        stepIds: buildStepIds,
+        unpushedCommits: outcome.unpushedCommits,
+        report: outcome.report,
+        deliverables: outcome.deliverables,
+      });
+    }
+  }
+  if (acceptance !== null && !acceptance.ok && !acceptance.retryable) {
+    askAcceptanceBlockedOnce(deps, buildRow, stepRow.id, acceptance);
+  } else {
+    const undelivered = undeliveredEnd(stepRow, todoRow, outcome);
+    if (undelivered !== null && pendingWorkerQuestions(deps.db, buildRow.id).length === 0)
+      askUndeliveredOnce(deps, buildRow, undelivered);
+  }
   const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
   const gateFailure = stepArtifactGate(
     deps,
@@ -291,6 +417,42 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     if (isInfoOutput(todoRow.output)) keepInfoReport();
     const hasChanges = deliveredCode ? true : outcome.hasChanges;
     setTodoPhase(deps, todoRow.id, 'needs_input', hasChanges !== undefined ? { hasChanges } : {});
+    return;
+  }
+  if (
+    isBuildStepKind(stepRow.kind) &&
+    acceptance !== null &&
+    !acceptance.ok &&
+    acceptance.retryable
+  ) {
+    const priorNudges = deps.db
+      .select({ prompt: step.prompt })
+      .from(step)
+      .where(eq(step.buildId, stepRow.buildId))
+      .all()
+      .filter((s) => isAcceptanceNudgePrompt(s.prompt)).length;
+    if (priorNudges < ACCEPTANCE_NUDGE_MAX) {
+      if (todoRow.phase !== 'building' && canTransitionPhase(todoRow.phase, 'building')) {
+        setTodoPhase(deps, todoRow.id, 'building');
+      }
+      enqueueStep(
+        deps,
+        stepRow.buildId,
+        stepRow.kind,
+        todoRow.teamId,
+        buildAcceptanceNudgePrompt(acceptance),
+        false,
+        false,
+        { kind: 'continue' },
+      );
+      return;
+    }
+    askAcceptanceBlockedOnce(deps, buildRow, stepRow.id, acceptance);
+    if (isInfoOutput(todoRow.output)) keepInfoReport();
+    if (canTransitionPhase(todoRow.phase, 'needs_input')) {
+      const hasChanges = deliveredCode ? true : outcome.hasChanges;
+      setTodoPhase(deps, todoRow.id, 'needs_input', hasChanges !== undefined ? { hasChanges } : {});
+    }
     return;
   }
   if (isBuildStepKind(stepRow.kind) && isInfoOutput(todoRow.output)) {

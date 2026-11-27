@@ -778,6 +778,9 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
         ...(outcome.verifyVerdictError !== undefined
           ? { verifyVerdictError: outcome.verifyVerdictError }
           : {}),
+        ...(outcome.unpushedCommits !== undefined
+          ? { unpushedCommits: outcome.unpushedCommits }
+          : {}),
         verdictReport,
       });
     complete(deps);

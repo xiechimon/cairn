@@ -30,6 +30,7 @@ export interface StepDoneOutcome {
   quotaBlock: QuotaBlock | null;
   skillInjectionFacts: SkillInjectionFacts | null;
   generation?: number;
+  unpushedCommits?: number | null;
 }
 
 export interface StepVerdictSource {
@@ -81,6 +82,7 @@ export function composeDoneBody(
       ? { skillInjectionFacts: outcome.skillInjectionFacts }
       : {}),
     ...(outcome.generation !== undefined ? { generation: outcome.generation } : {}),
+    ...(outcome.unpushedCommits !== undefined ? { unpushedCommits: outcome.unpushedCommits } : {}),
     ...(outcome.status === 'success' && !source.messages.some((m) => m.role === 'assistant')
       ? { noOutput: true as const }
       : {}),

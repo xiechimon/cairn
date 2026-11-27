@@ -3,6 +3,7 @@ import {
   buildPlanRewritePrompt,
   buildTaskPromptText,
   CONTINUE_PROMPTS,
+  isAcceptanceNudgePrompt,
   LEGACY_PLAN_PROMPTS,
   LEGACY_SESSION_BRIEFS,
   LEGACY_SESSION_REWORK_BRIEFS,
@@ -47,6 +48,7 @@ function isGeneratedInstruction(text: string): boolean {
     wrappedBy(text, MERGED_PR_GUARD_PROMPT_SHAPE.head, MERGED_PR_GUARD_PROMPT_SHAPE.tail) ||
     PLAN_CONTRACT_REWRITE_PROMPT_SHAPES.some((shape) => wrappedBy(text, shape.head, shape.tail)) ||
     wrappedBy(text, RETRY_LESSONS_SHAPE.head, RETRY_LESSONS_SHAPE.tail) ||
+    isAcceptanceNudgePrompt(text) ||
     parseReviewPromptMeta(text) !== null
   );
 }

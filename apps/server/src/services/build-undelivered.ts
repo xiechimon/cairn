@@ -1,4 +1,9 @@
-import { ASK_USER_QUESTION_KIND, isBuildStepKind, isInfoOutput } from '@cairn/shared';
+import {
+  type AcceptanceEvaluation,
+  ASK_USER_QUESTION_KIND,
+  isBuildStepKind,
+  isInfoOutput,
+} from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { type build, message, type step, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
@@ -56,6 +61,38 @@ function excerptOf(text: string | null, missing: string): string {
 const UNDELIVERED_SUMMARY: Record<Undelivered, string> = {
   'no-commits': 'The step ended without committing anything.',
 };
+
+export function askAcceptanceBlockedOnce(
+  deps: BuildDeps,
+  buildRow: BuildRow,
+  stepId: string,
+  evaluation: Exclude<AcceptanceEvaluation, { ok: true }>,
+): void {
+  const requestId = `acceptance-blocked-${stepId}`;
+  const ranLine =
+    evaluation.checksRan.length > 0
+      ? evaluation.checksRan.join(', ')
+      : '(no verification commands)';
+  writeWorkerQuestion(
+    deps,
+    buildRow.id,
+    requestId,
+    {
+      kind: ASK_USER_QUESTION_KIND,
+      requestId,
+      status: 'pending',
+      questions: [
+        {
+          header: 'Acceptance needed',
+          question: `${evaluation.summary}\nWhat ran: ${ranLine}\nMissing: ${evaluation.missing}\nHow to unblock: ${evaluation.unblockHint}`,
+          options: [],
+        },
+      ],
+      answers: null,
+    },
+    nowMs(),
+  );
+}
 
 export function askUndeliveredOnce(deps: BuildDeps, buildRow: BuildRow, kind: Undelivered): void {
   const asked = deps.db
