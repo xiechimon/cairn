@@ -342,6 +342,10 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           stdio: 'inherit',
         });
         if (pushed.status !== 0) {
+          if (git(['rev-parse', 'HEAD']) !== stamped.sha) {
+            armedSha = null;
+            continue;
+          }
           console.error('[push-queue] could not push the preflight ref; fix that and run again.');
           process.exit(1);
         }

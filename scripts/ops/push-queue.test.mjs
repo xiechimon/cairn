@@ -316,6 +316,11 @@ if (process.env.STUB_QUEUE && checkRunsSha && git('ls-remote', 'origin', 'refs/h
     git('commit', '-q', '--allow-empty', '-m', 'reworded after arming');
   }
 }
+if (process.env.STUB_QUEUE && args.some((a) => a.includes('head_sha='))) {
+  if (git('log', '-1', '--format=%s') === 'during push') {
+    git('commit', '-q', '--allow-empty', '-m', 'moved during child preflight');
+  }
+}
 if (process.env.STUB_QUEUE && args.some((a) => a.endsWith('/dispatches'))) {
   git('push', '-q', '--no-follow-tags', 'origin', 'HEAD:refs/heads/main');
 }
@@ -421,7 +426,7 @@ console.log(JSON.stringify(checkRunsSha ? [{ check_runs: checkRuns }] : { workfl
         env: stubbedEnv({
           STUB_QUEUE: '1',
           PUSH_QUEUE_POLL_SECONDS: '0.1',
-          PUSH_QUEUE_WAIT_MINUTES: '3',
+          PUSH_QUEUE_WAIT_MINUTES: '5',
         }),
       },
     );
@@ -662,13 +667,14 @@ test('preflight fast gate invokes preflight-fast-gate locally or via CAIRN_PREFL
   assert.equal(calls[0].options.cwd, '/wt');
 });
 
-test('a new preflight push cancels only the still-active older runs on the same lane ref', () => {
+test('a new preflight push cancels only older runs and leaves newer runs on the same ref alive', () => {
   const run = (id, patch) => ({
     id,
     name: 'ci',
     status: 'in_progress',
     head_branch: 'preflight/host/lane',
     head_sha: 'a'.repeat(40),
+    created_at: '2026-11-27T09:00:00Z',
     ...patch,
   });
   const calls = [];
@@ -684,9 +690,10 @@ test('a new preflight push cancels only the still-active older runs on the same 
           run(1, {}),
           run(2, { status: 'queued' }),
           run(3, { status: 'completed' }),
-          run(4, { head_sha: 'b'.repeat(40) }),
+          run(4, { head_sha: 'b'.repeat(40), created_at: '2026-11-27T09:01:00Z' }),
           run(5, { head_branch: 'preflight/host/other' }),
           run(6, { name: 'promote' }),
+          run(7, { head_sha: 'c'.repeat(40), created_at: '2026-11-27T09:02:00Z' }),
         ],
       };
     },

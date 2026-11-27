@@ -42,8 +42,27 @@ export function isActivePreflightRun(run) {
   );
 }
 
-export function isSupersededRun(run, { ref, sha, keepShas }) {
-  return run.head_branch === ref && run.head_sha !== sha && !keepShas.has(run.head_sha);
+export function isSupersededRun(run, { ref, sha, keepShas, currentRun = null }) {
+  if (run.head_branch !== ref || run.head_sha === sha || keepShas.has(run.head_sha)) {
+    return false;
+  }
+  if (currentRun) {
+    if (
+      typeof currentRun.id === 'number' &&
+      typeof run.id === 'number' &&
+      run.id >= currentRun.id
+    ) {
+      return false;
+    }
+    if (
+      currentRun.created_at &&
+      run.created_at &&
+      Date.parse(run.created_at) > Date.parse(currentRun.created_at)
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function cancelSupersededRuns({
@@ -51,6 +70,7 @@ export function cancelSupersededRuns({
   ref,
   sha,
   queuedShas,
+  currentRun = null,
   gh,
   cancel,
   log = console.log,
@@ -66,6 +86,10 @@ export function cancelSupersededRuns({
     log(`[preflight] could not list superseded runs (${error.message}); leaving them running`);
     return [];
   }
+  const anchor =
+    currentRun ??
+    runs.find((run) => run.name === 'ci' && run.head_branch === ref && run.head_sha === sha) ??
+    null;
   const active = runs.filter(
     (run) =>
       run.name === 'ci' &&
@@ -81,7 +105,9 @@ export function cancelSupersededRuns({
     log(`[preflight] could not list queued shas (${error.message}); cancelling nothing`);
     return [];
   }
-  const superseded = active.filter((run) => isSupersededRun(run, { ref, sha, keepShas }));
+  const superseded = active.filter((run) =>
+    isSupersededRun(run, { ref, sha, keepShas, currentRun: anchor }),
+  );
   return superseded
     .map((run) => run.id)
     .filter((id) => {
@@ -249,17 +275,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   );
   if (push.status !== 0) process.exit(push.status ?? 1);
   console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
-  cancelSupersededRuns({
-    repo,
-    ref,
-    sha,
-    queuedShas: readQueuedShas,
-    gh: ghJson,
-    cancel: (id) =>
-      spawnSync('gh', ['api', '--method', 'POST', `repos/${repo}/actions/runs/${id}/cancel`], {
-        stdio: 'ignore',
-      }).status === 0,
-  });
+  refuseMovedHead(`${sha.slice(0, 9)} was pushed`);
   const readRun = () => {
     const { workflow_runs: runs } = ghJson([
       'api',
@@ -283,6 +299,19 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     );
     process.exit(1);
   }
+  refuseMovedHead(`${sha.slice(0, 9)} was pushed`);
+  cancelSupersededRuns({
+    repo,
+    ref,
+    sha,
+    currentRun: run,
+    queuedShas: readQueuedShas,
+    gh: ghJson,
+    cancel: (id) =>
+      spawnSync('gh', ['api', '--method', 'POST', `repos/${repo}/actions/runs/${id}/cancel`], {
+        stdio: 'ignore',
+      }).status === 0,
+  });
   console.log(`[preflight] ci run: ${run.html_url}`);
   if (!wait) {
     succeed(

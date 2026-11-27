@@ -452,3 +452,23 @@ test('a check run through the retry script still runs in the local fast gate', (
   const wrapped = oneStep('run: bash scripts/ci-retry.sh node scripts/brand-new-gate.mjs');
   assert.deepEqual(selected(['docs/spec/a.md'], wrapped), ['scripts/brand-new-gate.mjs']);
 });
+
+test('runFastGate fails if the worktree becomes dirty while checks are running', () => {
+  let dirty = false;
+  const result = runFastGate({
+    cwd: '/wt',
+    wrapper: '',
+    checkTree: () =>
+      dirty
+        ? 'the worktree does not exactly match HEAD; commit or remove the uncommitted files so the gate tests the tree that preflight pushes'
+        : null,
+    listPaths: () => ['scripts/ops/preflight.mjs'],
+    spawn: () => {
+      dirty = true;
+      return { status: 0 };
+    },
+    log: () => {},
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.error, /does not exactly match HEAD/);
+});

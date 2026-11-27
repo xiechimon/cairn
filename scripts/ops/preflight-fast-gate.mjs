@@ -399,6 +399,8 @@ export function runFastGate({
         status: result.status ?? 1,
       };
     }
+    const dirtyAfter = checkTree(cwd);
+    if (dirtyAfter !== null) return { ok: false, error: dirtyAfter };
     return { ok: true, plan, wrapped: true };
   }
   const reportPath = cachePath ? `${cachePath}.report.json` : null;
@@ -434,6 +436,8 @@ export function runFastGate({
     if (isTestChanged && reportPath) rmSync(reportPath, { force: true });
   }
   if (cachePath) rmSync(cachePath, { force: true });
+  const dirtyAfter = checkTree(cwd);
+  if (dirtyAfter !== null) return { ok: false, error: dirtyAfter };
   return { ok: true, plan, wrapped: false };
 }
 
