@@ -1072,3 +1072,45 @@ test('a superseded queue ref is deleted with its run, so a cancelled attempt is 
     assert.equal(q.remote(`${TRY_PREFIX}${idTwin}`), null);
   });
 });
+
+test('no queue ref is ever built on a sha that is already an entry, so its checks cannot be overwritten', () => {
+  queueHarness('queue-own-sha-', (q) => {
+    const b = q.commit(q.base, 'b.txt', 'b\n', 'feat: b');
+    const aTry = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const bTry = q.commit(aTry, 'b.txt', 'b\n', 'feat: b');
+    const s = q.commit(bTry, 's.txt', 's\n', 'feat: s');
+    const landedA = q.commit(q.base, 'a.txt', 'a\n', 'feat: a (landed under another sha)');
+    const [idB, idS] = [idAt(2, b), idAt(3, s)];
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.push(s, `${ENQUEUE_PREFIX}${idS}`);
+    q.push(landedA, 'refs/heads/main');
+    q.state.green = [b, s];
+    q.run(bTry, 2, `queue/try/${idB}`, {});
+    assert.equal(q.pass().action, 'wait');
+    assert.equal(q.remote(`${TRY_PREFIX}${idS}`), null);
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idS}`), s);
+  });
+});
+
+test('no queue ref is pushed when a rebuild adds no changes to its parent, and any stale ref is deleted', () => {
+  queueHarness('queue-empty-rebuild-', (q) => {
+    const b = q.commit(q.base, 'b.txt', 'b\n', 'feat: b');
+    const aTry = q.commit(q.base, 'a.txt', 'a\n', 'feat: a');
+    const bTry = q.commit(aTry, 'b.txt', 'b\n', 'feat: b');
+    const twin = q.commit(q.base, 'b.txt', 'b\n', 'feat: b again');
+    const twinOld = q.commit(q.base, 'z.txt', 'z\n', 'feat: old');
+    const landedA = q.commit(q.base, 'a.txt', 'a\n', 'feat: a (landed under another sha)');
+    const [idB, idTwin] = [idAt(2, b), idAt(3, twin)];
+    q.push(b, `${ENQUEUE_PREFIX}${idB}`);
+    q.push(bTry, `${TRY_PREFIX}${idB}`);
+    q.push(twin, `${ENQUEUE_PREFIX}${idTwin}`);
+    q.push(twinOld, `${TRY_PREFIX}${idTwin}`);
+    q.push(landedA, 'refs/heads/main');
+    q.state.green = [b, twin];
+    q.run(bTry, 2, `queue/try/${idB}`, {});
+    assert.equal(q.pass().action, 'wait');
+    assert.equal(q.remote(`${TRY_PREFIX}${idTwin}`), null);
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${idTwin}`), twin);
+  });
+});

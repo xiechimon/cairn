@@ -871,6 +871,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
       let hitConflict = false;
       let pushedAny = false;
       let keptAny = false;
+      let coveredAny = false;
       for (const step of plan.rebuild) {
         const res = rebaseOntoTry({
           cwd,
@@ -926,6 +927,14 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
           hitConflict = true;
           break;
         }
+        if (res.sha === step.entry.sha || res.empty) {
+          if (existingTrySha && deleteRemoteRefs(cwd, [`${TRY_PREFIX}${step.entry.id}`])) {
+            tryRaw.delete(step.entry.id);
+          }
+          currentParent = res.sha;
+          coveredAny = true;
+          continue;
+        }
         const pushSha = res.sha;
         const pushTry = spawnSync(
           'git',
@@ -936,13 +945,15 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
           throw new Error(`failed to push ${TRY_PREFIX}${step.entry.id}`);
         }
         console.log(
-          `[speculative-queue] built ${TRY_PREFIX}${step.entry.id} -> ${pushSha.slice(0, 9)} atop ${currentParent.slice(0, 9)}${res.empty ? ' (empty delta preserved)' : ''}`,
+          `[speculative-queue] built ${TRY_PREFIX}${step.entry.id} -> ${pushSha.slice(0, 9)} atop ${currentParent.slice(0, 9)}`,
         );
         currentParent = pushSha;
         pushedAny = true;
       }
       if (hitConflict) continue;
-      if (keptAny && !pushedAny) return { action: 'wait' };
+      if ((keptAny || coveredAny) && !pushedAny) {
+        return { action: didRetry || rerunCarried ? 'retry' : 'wait' };
+      }
       return { action: 'rebuilt' };
     }
 

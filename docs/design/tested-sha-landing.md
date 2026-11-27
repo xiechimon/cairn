@@ -122,6 +122,7 @@ Invariant: a tree reaches `main` only if a `ci` run on that exact tree ended gre
 | Rebase conflict | Ejected with the conflicting files; no verdict is reused for it |
 | Source run failed, cancelled or still running | Never a source |
 | Held run fails or is cancelled | The next pass pushes the rebuilt SHA, which finds no green source and runs in full |
+| Rebuild resolves to the entry's own SHA or its parent | No push; the position is covered by existing evidence |
 | Tree carries the sidecar | No tree reuse; `main` must build the sidecar artifact itself |
 | Two entries with the same tree | An entry that adds nothing shares the candidate ahead; unrelated concurrent runs of one tree both run |
 | Eval required | The source run needs a green `eval` job |
