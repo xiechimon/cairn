@@ -159,3 +159,254 @@ test('all public pages load one deferred Cloudflare beacon with the site token',
     await context.close();
   }
 });
+
+const evalResultsUrl = 'https://raw.githubusercontent.com/xiechimon/cairn/eval-results/latest.json';
+
+function publicEvalPayload(date = new Date().toISOString()) {
+  return {
+    version: 1,
+    dataset: 'cairn-eval-suite',
+    suiteVersion: 1,
+    date,
+    sha: 'a'.repeat(40),
+    status: 'incomplete',
+    summary: {
+      total: 4,
+      passed: 2,
+      failed: 1,
+      incomplete: 1,
+      byKind: {
+        lane: { total: 1, passed: 1, failed: 0, incomplete: 0 },
+        runtime: { total: 2, passed: 1, failed: 1, incomplete: 0 },
+        canary: { total: 1, passed: 0, failed: 0, incomplete: 1 },
+      },
+    },
+    cases: [
+      {
+        caseId: 'fix-bug',
+        kind: 'lane',
+        status: 'pass',
+        passed: 1,
+        failed: 0,
+        incomplete: 0,
+        trials: 1,
+        model: 'Devin CLI · model not recorded',
+      },
+      {
+        caseId: 'answer-read-01',
+        kind: 'runtime',
+        status: 'partial',
+        passed: 1,
+        failed: 1,
+        incomplete: 0,
+        trials: 2,
+        model: 'fauxProvider replay',
+      },
+      {
+        caseId: 'canary-answer',
+        kind: 'canary',
+        status: 'incomplete',
+        passed: 0,
+        failed: 0,
+        incomplete: 1,
+        trials: 1,
+        model: 'fauxProvider replay',
+      },
+    ],
+  };
+}
+
+test.each([
+  {
+    name: 'English',
+    path: '/',
+    locale: 'en-US',
+    latest: 'Latest daily eval',
+    kindScore: 'Real coding 1/1',
+    shortKind: 'Real coding',
+    details: 'Per-case results',
+    status: 'Incomplete',
+  },
+  {
+    name: 'Chinese',
+    path: '/zh-cn/',
+    locale: 'zh-CN',
+    latest: '最新每日评测',
+    kindScore: '真实编码 1/1',
+    shortKind: '真实编码',
+    details: '逐题结果',
+    status: '未完成',
+  },
+])(
+  'renders public eval results in both locales: $name',
+  async ({ path, locale, latest, kindScore, shortKind, details, status }) => {
+    const context = await browser.newContext({ locale });
+    try {
+      let requested = false;
+      await context.route(evalResultsUrl, (route) => {
+        requested = true;
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(publicEvalPayload()),
+        });
+      });
+      const page = await context.newPage();
+      await page.goto(`${baseUrl}${path}`);
+      await browserExpect(page.locator('#eval-live')).toBeVisible();
+      expect(requested).toBe(true);
+      await browserExpect(page.locator('#eval-empty')).toBeHidden();
+      await browserExpect(page.locator('#eval-date')).toContainText(latest);
+      await browserExpect(page.locator('#eval-score')).toContainText(kindScore);
+      await browserExpect(page.locator('[data-eval-bar-fill]')).toHaveCount(3);
+      expect(await page.locator('[data-eval-bar-fill="lane"]').getAttribute('width')).toBe('224');
+      expect(await page.locator('[data-eval-bar-fill="runtime"]').getAttribute('width')).toBe(
+        '112',
+      );
+      expect(await page.locator('[data-eval-bar-fill="canary"]').getAttribute('width')).toBe('0');
+      await page.locator('#eval-details summary').focus();
+      await page.keyboard.press('Enter');
+      await browserExpect(page.locator('#eval-details')).toBeVisible();
+      expect(await page.locator('#eval-details summary').textContent()).toContain(details);
+      const rows = page.locator('#eval-case-rows tr');
+      await browserExpect(rows).toHaveCount(3);
+      await browserExpect(rows.nth(0)).toContainText('fix-bug');
+      await browserExpect(rows.nth(0)).toContainText(shortKind);
+      await browserExpect(rows.nth(0)).toContainText('Devin CLI · model not recorded');
+      await browserExpect(rows.nth(2)).toContainText(status);
+    } finally {
+      await context.close();
+    }
+  },
+);
+
+test('keeps neutral fallback when public results unavailable', async () => {
+  const inconsistent = publicEvalPayload();
+  inconsistent.summary.byKind.lane.passed = 0;
+  const summaryMismatch = publicEvalPayload();
+  summaryMismatch.summary.total = 99;
+  summaryMismatch.summary.passed = 97;
+  const negativeCaseCount = publicEvalPayload();
+  const firstCase = negativeCaseCount.cases[0];
+  if (!firstCase) throw new Error('expected first case');
+  firstCase.passed = -1;
+  firstCase.failed = 2;
+  const emptyCases = { ...publicEvalPayload(), cases: [] };
+  const scenarios = [
+    {
+      name: 'http 404',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({ status: 404, contentType: 'application/json', body: '{}' }),
+    },
+    {
+      name: 'http 429',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({ status: 429, contentType: 'application/json', body: '{}' }),
+    },
+    {
+      name: 'http 500',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
+    },
+    {
+      name: 'inconsistent counts',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(inconsistent),
+        }),
+    },
+    {
+      name: 'summary mismatch',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(summaryMismatch),
+        }),
+    },
+    {
+      name: 'negative case count',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(negativeCaseCount),
+        }),
+    },
+    {
+      name: 'empty cases',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(emptyCases),
+        }),
+    },
+    {
+      name: 'malformed json',
+      respond: (route: import('@playwright/test').Route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: '{broken' }),
+    },
+    {
+      name: 'network abort',
+      respond: (route: import('@playwright/test').Route) => route.abort(),
+    },
+  ];
+  for (const scenario of scenarios) {
+    const context = await browser.newContext({ locale: 'en-US' });
+    try {
+      let requested = false;
+      await context.route(evalResultsUrl, (route) => {
+        requested = true;
+        return scenario.respond(route);
+      });
+      const page = await context.newPage();
+      await page.goto(`${baseUrl}/`);
+      for (let attempt = 0; attempt < 60 && !requested; attempt += 1) await setTimeout(50);
+      expect(requested, scenario.name).toBe(true);
+      await setTimeout(150);
+      await browserExpect(page.locator('#eval-empty'), scenario.name).toBeVisible();
+      await browserExpect(page.locator('#eval-empty'), scenario.name).toContainText(
+        'Public eval results are unavailable',
+      );
+      await browserExpect(page.locator('#eval-live'), scenario.name).toBeHidden();
+    } finally {
+      await context.close();
+    }
+  }
+
+  const noJs = await browser.newContext({ locale: 'en-US', javaScriptEnabled: false });
+  try {
+    const page = await noJs.newPage();
+    await page.goto(`${baseUrl}/`);
+    await browserExpect(page.locator('#eval-empty')).toContainText(
+      'Public eval results are unavailable',
+    );
+  } finally {
+    await noJs.close();
+  }
+});
+
+test('marks stale public eval results', async () => {
+  const context = await browser.newContext({ locale: 'en-US' });
+  try {
+    await context.route(evalResultsUrl, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          publicEvalPayload(new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()),
+        ),
+      }),
+    );
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/`);
+    await browserExpect(page.locator('#eval-live')).toBeVisible();
+    await browserExpect(page.locator('#eval-date')).toContainText('Latest daily eval');
+    await browserExpect(page.locator('#eval-stale')).toContainText('This snapshot may be stale');
+  } finally {
+    await context.close();
+  }
+});

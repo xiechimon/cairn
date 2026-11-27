@@ -54,6 +54,7 @@ export const selfTests = [
   'scripts/ops/ci-failed-only.test.mjs',
   'scripts/ops/merge-queue-invariants.test.mjs',
   'scripts/ops/eval-daily.test.mjs',
+  'scripts/ops/eval-public-results.test.mjs',
   'scripts/ops/preflight-fast-gate.test.mjs',
   'scripts/ops/revert-guard.test.mjs',
   'scripts/ops/secret-scan.test.mjs',

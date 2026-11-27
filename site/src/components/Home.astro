@@ -30,6 +30,14 @@ const evalKinds = (['runtime', 'lane', 'canary'] as const).map((kind) => {
 });
 const evalCases = evalKinds.reduce((sum, row) => sum + row.count, 0);
 const evalTrials = evalKinds.reduce((sum, row) => sum + row.trials, 0);
+const evalResultsUrl = 'https://raw.githubusercontent.com/xiechimon/cairn/eval-results/latest.json';
+const evalClientCopy = {
+  locale: t.htmlLang,
+  latestRun: t.proof.latestRun,
+  stale: t.proof.stale,
+  shortKinds: t.proof.shortKinds,
+  status: t.proof.status,
+};
 const heroShot = (theme: 'light' | 'dark') => `/img/placeholder-hero-${theme}.svg`;
 const stepShot = (name: string, theme: 'light' | 'dark') =>
   name === 'ios-home'
@@ -209,11 +217,35 @@ const jsonLd = {
           </div>
           <figure class="proof-chart">
             <figcaption>{t.proof.chart}</figcaption>
-            <svg viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true">
+            <svg id="eval-history-chart" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
               <path class="grid" d="M0 0.5H400M0 40.5H400M0 80.5H400"></path>
               <path class="axis" d="M0 119.5H400"></path>
             </svg>
-            <p class="proof-empty">{t.proof.empty}</p>
+            <p class="proof-empty" id="eval-empty">{t.proof.empty}</p>
+            <div class="proof-live" id="eval-live" hidden>
+              <p class="proof-date">
+                <span id="eval-date"></span>
+                <span class="proof-stale" id="eval-stale" hidden></span>
+              </p>
+              <p class="proof-score" id="eval-score"></p>
+              <details class="proof-details" id="eval-details">
+                <summary>{t.proof.details}</summary>
+                <div class="proof-table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{t.proof.table.case}</th>
+                        <th>{t.proof.table.kind}</th>
+                        <th>{t.proof.table.passed}</th>
+                        <th>{t.proof.table.status}</th>
+                        <th>{t.proof.table.model}</th>
+                      </tr>
+                    </thead>
+                    <tbody id="eval-case-rows"></tbody>
+                  </table>
+                </div>
+              </details>
+            </div>
           </figure>
         </div>
       </section>
@@ -358,7 +390,7 @@ const jsonLd = {
     </footer>
     <span class="sr-only" aria-live="polite" id="live-status"></span>
 
-    <script is:inline define:vars={{ hasPromoVideo }}>
+    <script is:inline define:vars={{ hasPromoVideo, evalResultsUrl, evalClientCopy }}>
       const root = document.documentElement;
       const themeToggle = document.getElementById('theme-toggle');
       const syncThemeLabel = () => {
@@ -458,6 +490,179 @@ const jsonLd = {
             anim.cancel();
           })
           .catch(() => {});
+      }
+
+      const evalLive = document.getElementById('eval-live');
+      const evalEmpty = document.getElementById('eval-empty');
+      const evalDate = document.getElementById('eval-date');
+      const evalStale = document.getElementById('eval-stale');
+      const evalScore = document.getElementById('eval-score');
+      const evalRows = document.getElementById('eval-case-rows');
+      const evalChart = document.getElementById('eval-history-chart');
+      const evalKinds = ['lane', 'runtime', 'canary'];
+      const validCount = (bucket) =>
+        bucket &&
+        ['total', 'passed', 'failed', 'incomplete'].every((key) =>
+          Number.isInteger(bucket[key]) && bucket[key] >= 0,
+        ) &&
+        bucket.passed + bucket.failed + bucket.incomplete === bucket.total;
+      const consistentEvalData = (data) => {
+        const sums = Object.fromEntries(
+          evalKinds.map((kind) => [kind, { total: 0, passed: 0, failed: 0, incomplete: 0 }]),
+        );
+        for (const row of data.cases) {
+          const bucket = sums[row.kind];
+          bucket.total += row.trials;
+          bucket.passed += row.passed;
+          bucket.failed += row.failed;
+          bucket.incomplete += row.incomplete;
+        }
+        return (
+          evalKinds.every((kind) =>
+            ['total', 'passed', 'failed', 'incomplete'].every(
+              (key) => sums[kind][key] === data.summary.byKind[kind][key],
+            ),
+          ) &&
+          ['total', 'passed', 'failed', 'incomplete'].every(
+            (key) =>
+              data.summary[key] ===
+              evalKinds.reduce((sum, kind) => sum + data.summary.byKind[kind][key], 0),
+          )
+        );
+      };
+      const validEvalData = (data) =>
+        data &&
+        data.version === 1 &&
+        typeof data.date === 'string' &&
+        !Number.isNaN(Date.parse(data.date)) &&
+        Date.parse(data.date) <= Date.now() + 10 * 60 * 1000 &&
+        validCount(data.summary) &&
+        data.summary.byKind &&
+        evalKinds.every((kind) => validCount(data.summary.byKind[kind])) &&
+        Array.isArray(data.cases) &&
+        data.cases.length > 0 &&
+        data.cases.every(
+          (row) =>
+            row &&
+            typeof row.caseId === 'string' &&
+            evalKinds.includes(row.kind) &&
+            ['pass', 'partial', 'fail', 'incomplete'].includes(row.status) &&
+            Number.isInteger(row.passed) &&
+            row.passed >= 0 &&
+            Number.isInteger(row.failed) &&
+            row.failed >= 0 &&
+            Number.isInteger(row.incomplete) &&
+            row.incomplete >= 0 &&
+            Number.isInteger(row.trials) &&
+            row.trials >= 1 &&
+            row.passed + row.failed + row.incomplete === row.trials &&
+            typeof row.model === 'string',
+        ) &&
+        consistentEvalData(data);
+      const appendSvg = (parent, name, attrs) => {
+        const node = document.createElementNS('http://www.w3.org/2000/svg', name);
+        for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+        parent.appendChild(node);
+        return node;
+      };
+      const renderEvalData = (data) => {
+        if (!evalLive || !evalEmpty || !evalDate || !evalScore || !evalRows || !evalChart) return;
+        const timestamp = Date.parse(data.date);
+        const dateText = new Intl.DateTimeFormat(evalClientCopy.locale, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }).format(new Date(timestamp));
+        evalDate.textContent = `${evalClientCopy.latestRun} · ${dateText}`;
+        if (evalStale) {
+          evalStale.hidden = Date.now() - timestamp <= 48 * 3600 * 1000;
+          evalStale.textContent = evalClientCopy.stale;
+        }
+        const parts = evalKinds.map((kind) => {
+          const counts = data.summary.byKind[kind];
+          const label = evalClientCopy.shortKinds[kind] ?? kind;
+          return `${label} ${counts.passed}/${counts.total}`;
+        });
+        evalScore.textContent = parts.join(' · ');
+
+        for (const node of [...evalChart.querySelectorAll('[data-eval-bar]')]) node.remove();
+        evalKinds.forEach((kind, index) => {
+          const counts = data.summary.byKind[kind];
+          const ratio = counts.total > 0 ? counts.passed / counts.total : 0;
+          const y = 8 + index * 40;
+          const label = evalClientCopy.shortKinds[kind] ?? kind;
+          const text = appendSvg(evalChart, 'text', {
+            x: 0,
+            y: y + 13,
+            class: 'eval-bar-label',
+            'data-eval-bar': 'label',
+          });
+          text.textContent = label;
+          appendSvg(evalChart, 'rect', {
+            x: 108,
+            y,
+            width: 224,
+            height: 16,
+            rx: 8,
+            class: 'eval-bar-track',
+            'data-eval-bar': 'track',
+          });
+          const fill = appendSvg(evalChart, 'rect', {
+            x: 108,
+            y,
+            width: Math.max(0, Math.min(1, ratio)) * 224,
+            height: 16,
+            rx: 8,
+            class: 'eval-bar-fill',
+            'data-eval-bar': 'fill',
+            'data-eval-bar-fill': kind,
+          });
+          const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+          title.textContent = `${label} ${counts.passed}/${counts.total}`;
+          fill.appendChild(title);
+          const countText = appendSvg(evalChart, 'text', {
+            x: 396,
+            y: y + 13,
+            'text-anchor': 'end',
+            class: 'eval-bar-count',
+            'data-eval-bar': 'count',
+          });
+          countText.textContent = `${counts.passed}/${counts.total}`;
+        });
+
+        evalRows.replaceChildren();
+        for (const row of data.cases.slice(0, 100)) {
+          const tr = document.createElement('tr');
+          const addCell = (text) => {
+            const td = document.createElement('td');
+            td.textContent = text;
+            tr.appendChild(td);
+            return td;
+          };
+          addCell(row.caseId);
+          addCell(evalClientCopy.shortKinds[row.kind] ?? row.kind);
+          addCell(`${row.passed}/${row.trials}`);
+          const statusCell = document.createElement('td');
+          const badge = document.createElement('span');
+          badge.className = `eval-status eval-status-${row.status}`;
+          badge.textContent = evalClientCopy.status[row.status] ?? row.status;
+          statusCell.appendChild(badge);
+          tr.appendChild(statusCell);
+          addCell(row.model);
+          evalRows.appendChild(tr);
+        }
+        evalEmpty.hidden = true;
+        evalLive.hidden = false;
+      };
+      if (evalLive && evalEmpty) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        fetch(evalResultsUrl, { signal: controller.signal, cache: 'no-store' })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((data) => {
+            if (validEvalData(data)) renderEvalData(data);
+          })
+          .catch(() => {})
+          .finally(() => clearTimeout(timeout));
       }
     </script>
   </body>
@@ -861,7 +1066,7 @@ const jsonLd = {
     font-weight: 500;
   }
   .proof-chart svg {
-    flex: 1;
+    flex: 0 0 auto;
     width: 100%;
     height: auto;
     min-height: 120px;
@@ -883,6 +1088,96 @@ const jsonLd = {
     margin: 0;
     color: var(--ink-3);
     font-size: 14px;
+  }
+  .proof-empty[hidden],
+  .proof-live[hidden],
+  .proof-stale[hidden] {
+    display: none;
+  }
+  .proof-live {
+    margin-top: 10px;
+  }
+  .proof-date {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: 13px;
+  }
+  .proof-stale {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: 12px;
+  }
+  .proof-score {
+    margin: 6px 0 0;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .eval-bar-label,
+  .eval-bar-count {
+    fill: var(--ink-3);
+    stroke: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .eval-bar-track {
+    fill: var(--hover);
+    stroke: none;
+  }
+  .eval-bar-fill {
+    fill: var(--accent);
+    stroke: none;
+  }
+  .proof-details {
+    margin-top: 10px;
+  }
+  .proof-details summary {
+    min-height: 32px;
+    color: var(--accent-ink);
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .proof-table-wrap {
+    overflow-x: auto;
+    margin-top: 6px;
+  }
+  .proof-details table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .proof-details th,
+  .proof-details td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    white-space: nowrap;
+  }
+  .proof-details th {
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+  .eval-status {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--hover);
+    color: var(--ink-2);
+    font-size: 12px;
+  }
+  .eval-status-pass {
+    background: var(--running-soft, var(--hover));
+    color: var(--running-ink, var(--ink-2));
+  }
+  .eval-status-fail,
+  .eval-status-incomplete {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
   }
   @media (max-width: 760px) {
     .proof-card {

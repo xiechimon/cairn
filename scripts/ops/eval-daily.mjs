@@ -10,6 +10,7 @@ import {
   readdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -21,6 +22,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { scrubDiagnostics } from '../../eval/harness/devin-env.mjs';
 import { processInfo, spawnOwned } from '../owned-process.mjs';
+import { PUBLIC_RESULTS_BRANCH, publishPublicResults } from './eval-public-results.mjs';
 
 const DEFAULT_LOCK_MAX_AGE_MS = 4 * 3600 * 1000;
 const DEFAULT_RUN_TIMEOUT_MS = 7_200_000;
@@ -373,6 +375,7 @@ export function summarizeRun({
     durationMs,
     status,
     exitCode,
+    evalExitCode,
     ...(failureReason ? { reason: failureReason } : {}),
     ...(outJson?.langfuse ? { langfuse: outJson.langfuse } : {}),
     summary: { total, passed, failed, incomplete, byKind },
@@ -453,6 +456,9 @@ export function renderSummaryHtml(history) {
           ? `<code>${escapeHtml(String(r.langfuse.experimentUrl))}</code>`
           : '—';
       const durSec = ((r.durationMs ?? 0) / 1000).toFixed(1);
+      const publicResults = r.publicResults?.state
+        ? `${r.publicResults.state}${r.publicResults.commit ? ` @${String(r.publicResults.commit).slice(0, 8)}` : ''}${r.publicResults.reason ? `: ${r.publicResults.reason}` : ''}`
+        : '—';
       return `<tr>
         <td><code>${escapeHtml(r.startedAt)}</code></td>
         <td><code>${escapeHtml(String(r.sha ?? '').slice(0, 8))}</code></td>
@@ -462,6 +468,7 @@ export function renderSummaryHtml(history) {
         <td>${escapeHtml(fmtKind(r.summary?.byKind, 'canary'))}</td>
         <td>${escapeHtml(durSec)}s</td>
         <td>${expLink}</td>
+        <td>${escapeHtml(publicResults)}</td>
         <td>${escapeHtml(r.reason ?? '')}</td>
       </tr>`;
     })
@@ -534,7 +541,7 @@ export function renderSummaryHtml(history) {
 </p>
 <h2>最近运行记录（最多保留 60 次）</h2>
 <table>
-  <thead><tr><th>开始时间</th><th>SHA</th><th>状态</th><th>Lane</th><th>Runtime</th><th>Canary</th><th>耗时</th><th>Langfuse</th><th>说明</th></tr></thead>
+  <thead><tr><th>开始时间</th><th>SHA</th><th>状态</th><th>Lane</th><th>Runtime</th><th>Canary</th><th>耗时</th><th>Langfuse</th><th>公开结果</th><th>说明</th></tr></thead>
   <tbody>${historyRows}</tbody>
 </table>
 <h2>最新一轮逐题明细</h2>
@@ -546,7 +553,11 @@ export function renderSummaryHtml(history) {
 `;
 }
 
-export function updateHistory(stateDir, runRecord, { cap = HISTORY_CAP, nowMs = Date.now() } = {}) {
+export function updateHistory(
+  stateDir,
+  runRecord,
+  { cap = HISTORY_CAP, nowMs = Date.now(), prune = true } = {},
+) {
   const runsDir = join(stateDir, 'runs');
   const tmpDir = join(stateDir, 'tmp');
   const historyPath = join(stateDir, 'history.json');
@@ -583,14 +594,18 @@ export function updateHistory(stateDir, runRecord, { cap = HISTORY_CAP, nowMs = 
   writeAtomic(historyPath, `${JSON.stringify(compactHistory, null, 2)}\n`, 0o600);
   writeAtomic(join(stateDir, 'index.html'), renderSummaryHtml(compactHistory), 0o644);
 
-  const retained = new Set(compactHistory.map((r) => `${r.runId}.json`));
-  for (const name of readdirSync(runsDir)) {
-    if (name.endsWith('.json') && !retained.has(name)) safeUnlink(join(runsDir, name));
-  }
-  if (existsSync(tmpDir)) {
-    for (const name of readdirSync(tmpDir)) {
-      const p = join(tmpDir, name);
-      if (fileAgeMs(p, nowMs) > 24 * 3600 * 1000) safeUnlink(p);
+  if (prune) {
+    const retained = new Set(compactHistory.map((r) => `${r.runId}.json`));
+    for (const name of readdirSync(runsDir)) {
+      if (name.endsWith('.json') && !retained.has(name)) safeUnlink(join(runsDir, name));
+    }
+    if (existsSync(tmpDir)) {
+      for (const name of readdirSync(tmpDir)) {
+        const p = join(tmpDir, name);
+        if (fileAgeMs(p, nowMs) <= 24 * 3600 * 1000) continue;
+        if (statSync(p).isDirectory()) rmSync(p, { recursive: true, force: true });
+        else safeUnlink(p);
+      }
     }
   }
   return compactHistory;
@@ -703,6 +718,7 @@ export async function runDailyEval({
   env = process.env,
   fetchImpl = fetch,
   getInfo = processInfo,
+  publishImpl = publishPublicResults,
 } = {}) {
   if (env.CI && !['false', '0'].includes(env.CI)) {
     console.error('eval-daily: refusing to run inside CI');
@@ -769,6 +785,27 @@ export async function runDailyEval({
       ...summaryInput,
     });
     updateHistory(stateDir, record);
+    if (Array.isArray(record.items) && record.items.length > 0 && record.evalExitCode === 0) {
+      try {
+        record.publicResults = publishImpl(record, { repoDir, stateDir, env });
+      } catch (error) {
+        record.publicResults = {
+          state: 'failed',
+          branch: PUBLIC_RESULTS_BRANCH,
+          reason: scrubDiagnostics(
+            error instanceof Error ? error.message : String(error),
+            extraPaths,
+          ),
+        };
+      }
+    } else {
+      record.publicResults = {
+        state: 'skipped',
+        branch: PUBLIC_RESULTS_BRANCH,
+        reason: 'no complete official eval result',
+      };
+    }
+    updateHistory(stateDir, record, { prune: false });
     releaseLock(stateDir, runId);
     return record.exitCode;
   };

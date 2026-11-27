@@ -350,6 +350,73 @@ test('decision table covers every status, missing config, Langfuse health, auth 
   );
 });
 
+test('skips partial and non-official runs observably, and records publication after private persistence', async (t) => {
+  const dir = makeTempDir(t);
+  const devinHome = join(dir, 'devin-home');
+  mkdirSync(devinHome, { recursive: true });
+  const lfUrl = await startLangfuseMock(t, 200);
+  const repo = createFakeRepo(join(dir, 'publish-integration'));
+  const calls = [];
+  let persistedBeforePublish = false;
+  const state = join(dir, 'state');
+  const code = await runDailyEval({
+    argv: ['--no-fetch'],
+    env: {
+      EVAL_DAILY_STATE: state,
+      EVAL_DAILY_REPO: repo,
+      EVAL_DAILY_DEVIN_HOME: devinHome,
+      EVAL_DAILY_SKIP_INSTALL: '1',
+      LANGFUSE_BASE_URL: lfUrl,
+      LANGFUSE_PUBLIC_KEY: 'pk-1',
+      LANGFUSE_SECRET_KEY: 'sk-1',
+    },
+    publishImpl: (record) => {
+      calls.push(structuredClone(record));
+      persistedBeforePublish = existsSync(join(state, 'latest.json'));
+      return { state: 'published', branch: 'eval-results', commit: 'c'.repeat(40) };
+    },
+  });
+  assert.equal(code, 0);
+  assert.equal(calls.length, 1);
+  assert.equal(persistedBeforePublish, true);
+  assert.equal(calls[0].publicResults, undefined);
+  const latest = JSON.parse(readFileSync(join(state, 'latest.json'), 'utf8'));
+  assert.equal(latest.status, 'ok');
+  assert.deepEqual(latest.publicResults, {
+    state: 'published',
+    branch: 'eval-results',
+    commit: 'c'.repeat(40),
+  });
+  assert.match(readFileSync(join(state, 'index.html'), 'utf8'), /published/);
+
+  const badRepo = createFakeRepo(join(dir, 'bad-out'), {
+    runScript: 'process.exit(1)',
+  });
+  const badState = join(dir, 'bad-state');
+  const badCalls = [];
+  const badCode = await runDailyEval({
+    argv: ['--no-fetch'],
+    env: {
+      EVAL_DAILY_STATE: badState,
+      EVAL_DAILY_REPO: badRepo,
+      EVAL_DAILY_DEVIN_HOME: devinHome,
+      EVAL_DAILY_SKIP_INSTALL: '1',
+      LANGFUSE_BASE_URL: lfUrl,
+      LANGFUSE_PUBLIC_KEY: 'pk-1',
+      LANGFUSE_SECRET_KEY: 'sk-1',
+    },
+    publishImpl: () => {
+      badCalls.push('called');
+      return { state: 'published', branch: 'eval-results' };
+    },
+  });
+  assert.equal(badCode, 1);
+  assert.equal(badCalls.length, 0);
+  const badLatest = JSON.parse(readFileSync(join(badState, 'latest.json'), 'utf8'));
+  assert.equal(badLatest.publicResults.state, 'skipped');
+  assert.match(badLatest.publicResults.reason, /complete official/);
+});
+
 test('handles lock concurrency, corrupt/empty locks, wait-for-exit reclaim, EPERM abort, ENOENT unlink, and displaced signal', async (t) => {
   const dir = makeTempDir(t);
   const liveStart = processInfo(process.pid)?.start ?? 'now';
