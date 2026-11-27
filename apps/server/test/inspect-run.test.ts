@@ -179,4 +179,79 @@ describe('inspect_run', () => {
     ]);
     expect(body.turns[1]?.usage[0]?.ttftMs).toBe(1834);
   });
+
+  test('redacts secrets before clipping across the 400-char line boundary and 160-char tool-args boundary', async () => {
+    const now = nowMs();
+    const skKey = `sk-${'k'.repeat(28)}`;
+    const ghpKey = `ghp_${'p'.repeat(36)}`;
+    const linePrefix = 'x'.repeat(388);
+    const tailPrefix = 'z'.repeat(395);
+    const cmdPrefix = 'y'.repeat(140);
+
+    H.s.db
+      .insert(todo)
+      .values({
+        id: 'todo-clip',
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: 'clip redaction',
+        phaseAt: now,
+        seqNum: 7100,
+        latestBuildId: 'build-clip',
+      })
+      .run();
+    H.s.db
+      .insert(build)
+      .values({
+        id: 'build-clip',
+        todoId: 'todo-clip',
+        withPlan: false,
+        triggerSource: 'user',
+        errorMessage: `${linePrefix}${skKey}`,
+        createdAt: now - 10_000,
+      })
+      .run();
+    H.s.db
+      .insert(step)
+      .values({
+        id: 'step-clip',
+        buildId: 'build-clip',
+        kind: 'build',
+        status: 'failed',
+        holdReason: `${tailPrefix}${skKey}`,
+        createdAt: now - 10_000,
+        finishedAt: now - 5_000,
+      })
+      .run();
+    H.s.db
+      .insert(message)
+      .values({
+        id: 'call-clip',
+        conversationId: 'build-clip',
+        role: 'assistant',
+        content: {
+          kind: 'toolcall',
+          call: {
+            name: 'Bash',
+            arguments: { cmd: `${cmdPrefix}${ghpKey}` },
+            isError: true,
+          },
+        },
+        createdAt: now - 8_000,
+      })
+      .run();
+
+    const body = (await relay('inspect_run', { id: 'todo-clip' })) as {
+      evidence: { text: string };
+      steps: { holdReason: string | null }[];
+      recentToolCalls: { arguments: string }[];
+    };
+
+    expect(body.evidence.text).toBe(`${linePrefix}[REDACTED]`);
+    expect(body.evidence.text).not.toContain('sk-');
+    expect(body.steps[0]?.holdReason).toBe(`${tailPrefix}[REDA…`);
+    expect(body.steps[0]?.holdReason).not.toContain('sk-');
+    expect(body.recentToolCalls[0]?.arguments).toBe(`{"cmd":"${cmdPrefix}[REDACTED]"}`);
+    expect(body.recentToolCalls[0]?.arguments).not.toContain('ghp_');
+  });
 });

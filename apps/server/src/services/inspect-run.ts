@@ -50,8 +50,9 @@ const iso = (ms: number | null | undefined): string | null =>
   ms === null || ms === undefined || ms <= 0 ? null : new Date(ms).toISOString();
 
 const clip = (text: string, max = LINE_MAX_CHARS): string => {
-  const chars = Array.from(text);
-  return chars.length > max ? `${chars.slice(0, max).join('')}…` : text;
+  const redacted = String(redactSecrets(text).value);
+  const chars = Array.from(redacted);
+  return chars.length > max ? `${chars.slice(0, max).join('')}…` : redacted;
 };
 
 function traceExportConfigured(env: NodeJS.ProcessEnv): boolean {
