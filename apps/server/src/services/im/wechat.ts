@@ -18,6 +18,7 @@ const POLL_TIMEOUT_MS = 35_000;
 const SEND_TIMEOUT_MS = 15_000;
 const START_TIMEOUT_MS = 10_000;
 const SESSION_EXPIRED = -14;
+const CONTEXT_TOKEN_LIMIT = 50;
 const START_RETRY_DELAYS_MS = [250, 1_000, 3_000];
 const ILINK_APP_ID = 'bot';
 const ILINK_CLIENT_VERSION = (2 << 16) | (4 << 8) | 6;
@@ -200,6 +201,29 @@ function toWechatSendError(error: unknown): ImSendError {
   return asSendError(error);
 }
 
+function parseContextTokens(raw: string | undefined): Map<string, string> {
+  const map = new Map<string, string>();
+  if (raw === undefined || raw === '') return map;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return map;
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return map;
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key !== '' && typeof value === 'string' && value !== '') {
+      map.delete(key);
+      map.set(key, value);
+      if (map.size > CONTEXT_TOKEN_LIMIT) {
+        const oldest = map.keys().next().value;
+        if (oldest !== undefined) map.delete(oldest);
+      }
+    }
+  }
+  return map;
+}
+
 export function createWechatAdapter(): ImAdapter {
   const logins = new Map<string, { qrcode: string; expiresAt: number }>();
   return {
@@ -279,8 +303,8 @@ export function createWechatAdapter(): ImAdapter {
       const baseUrl = withSlash(
         fields.baseUrl !== undefined && fields.baseUrl !== '' ? fields.baseUrl : QR_BASE,
       );
-      const contextTokens = new Map<string, string>();
-      let cursor = '';
+      const contextTokens = parseContextTokens(fields.contextTokensJson);
+      let cursor = typeof fields.pollOffset === 'string' ? fields.pollOffset : '';
       let stopped = false;
       let readyOnce = false;
       const stopping = new AbortController();
@@ -294,11 +318,23 @@ export function createWechatAdapter(): ImAdapter {
       const degraded = (reason: string) =>
         handlers.onStatus(readyOnce ? 'degraded' : 'connecting', reason);
 
-      const deliver = async (message: WireMessage) => {
+      const deliver = (message: WireMessage): void => {
         const userId = String(message.from_user_id ?? '');
         if (userId === '') return;
         const contextToken = String(message.context_token ?? '');
-        if (contextToken !== '') contextTokens.set(userId, contextToken);
+        if (contextToken !== '' && contextTokens.get(userId) !== contextToken) {
+          contextTokens.delete(userId);
+          contextTokens.set(userId, contextToken);
+          while (contextTokens.size > CONTEXT_TOKEN_LIMIT) {
+            const oldest = contextTokens.keys().next().value;
+            if (oldest === undefined) break;
+            contextTokens.delete(oldest);
+          }
+          handlers.onSecretField?.(
+            'contextTokensJson',
+            JSON.stringify(Object.fromEntries(contextTokens)),
+          );
+        }
         const texts: string[] = [];
         const images: ImInboundFile[] = [];
         for (const raw of Array.isArray(message.item_list) ? message.item_list : []) {
@@ -388,7 +424,9 @@ export function createWechatAdapter(): ImAdapter {
           handlers.onStatus('ready');
           for (const message of orderMessages(answer.msgs)) {
             if (stopped) return;
-            await deliver(message).catch(() => undefined);
+            try {
+              deliver(message);
+            } catch {}
           }
           if (
             typeof answer.get_updates_buf === 'string' &&
@@ -396,6 +434,7 @@ export function createWechatAdapter(): ImAdapter {
             answer.get_updates_buf !== cursor
           ) {
             cursor = answer.get_updates_buf;
+            handlers.onOffset?.(cursor);
           }
         }
       };
@@ -436,6 +475,7 @@ export function createWechatAdapter(): ImAdapter {
       const worker = run();
 
       return {
+        offset: () => (cursor === '' ? null : cursor),
         send: async (msg: ImOutboundMessage) => {
           if (stopped) {
             throw new ImSendError('permanent', 'WeChat connection is stopped');

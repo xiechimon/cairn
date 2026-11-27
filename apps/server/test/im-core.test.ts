@@ -35,11 +35,13 @@ let service: ImService;
 let slept: number[];
 
 interface FakeSession {
+  fields: Record<string, string>;
   handlers: ImConnectionHandlers;
   sent: ImOutboundMessage[];
   sendCount: number;
   stopped: boolean;
   failWith: ImSendError | null;
+  onSend?: (msg: ImOutboundMessage) => Promise<void>;
 }
 
 const sessions: FakeSession[] = [];
@@ -50,8 +52,9 @@ const adapter: ImAdapter = {
     fields.botToken === 'bad-token'
       ? { ok: false, reason: 'telegram refused the token' }
       : { ok: true, accountLabel: '@cairn_test_bot' },
-  connect: async (_fields, handlers, _env) => {
+  connect: async (fields, handlers, _env) => {
     const session: FakeSession = {
+      fields,
       handlers,
       sent: [],
       sendCount: 0,
@@ -62,6 +65,10 @@ const adapter: ImAdapter = {
     return {
       send: async (msg) => {
         session.sendCount += 1;
+        if (session.onSend !== undefined) {
+          await session.onSend(msg);
+          return;
+        }
         if (session.failWith !== null) throw session.failWith;
         session.sent.push(msg);
       },
@@ -85,8 +92,9 @@ const wechatAdapterFake: ImAdapter = {
     fields.token === 'bad-token'
       ? { ok: false, reason: 'missing iLink bot token' }
       : { ok: true, accountLabel: `WeChat ${fields.ilinkBotId ?? 'bot'}` },
-  connect: async (_fields, handlers, _env) => {
+  connect: async (fields, handlers, _env) => {
     const session: FakeSession = {
+      fields,
       handlers,
       sent: [],
       sendCount: 0,
@@ -1021,4 +1029,329 @@ test('the words of a paired chat app message are kept as evidence of a correctio
   expect(s.db.select().from(memoryCorrection).all()).toMatchObject([
     { ownerWords: 'IM CORRECTION: use metric units.', stepId: turnRow.id },
   ]);
+});
+
+describe('text reply cards, cursor recovery, and stale session guards', () => {
+  const sendQuestionAndPark = async (requestId: string) => {
+    sessions[0]?.handlers.onMessage(inbound('55', 'pick something'));
+    const stepRow = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    createOrGetQuestion(
+      { db: s.db, hub: s.hub, convHub: s.convHub, user: s.user },
+      {
+        threadId: stepRow.buildId,
+        requestId,
+        questions: [
+          {
+            header: '选择',
+            question: 'Pick one?',
+            options: [{ label: 'Alpha' }, { label: 'Beta' }],
+          },
+        ],
+        askedFor: [],
+      },
+    );
+    await vi.waitFor(() => expect(sessions[0]?.sent).toHaveLength(1));
+    const card = s.db.select().from(chiefMessage).where(eq(chiefMessage.id, requestId)).get();
+    const parked = { ...(JSON.parse(card?.content as string) as object), parkedAt: nowMs() };
+    s.db
+      .update(chiefMessage)
+      .set({ content: JSON.stringify(parked) })
+      .where(eq(chiefMessage.id, requestId))
+      .run();
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
+    return stepRow;
+  };
+
+  test('text reply resolves pending question card and resumes reply to IM', async () => {
+    seedRoute(s, 'coordinator');
+    await connectAndPair('55');
+    const stepRow = await sendQuestionAndPark('q-text-1');
+    const stepsBefore = s.db.select().from(step).where(eq(step.kind, 'chief')).all().length;
+    sessions[0]?.sent.splice(0);
+
+    sessions[0]?.handlers.onMessage(inbound('55', '2.'));
+
+    const answered = askQuestionContentOf(
+      s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'q-text-1')).get()?.content,
+    );
+    expect(answered?.status).toBe('answered');
+    expect(answered?.answers).toEqual([{ header: '选择', choices: ['Beta'] }]);
+    const pending = s.db
+      .select()
+      .from(step)
+      .where(
+        and(eq(step.buildId, stepRow.buildId), eq(step.kind, 'chief'), eq(step.status, 'pending')),
+      )
+      .all();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.ownerSaid).toBeNull();
+    expect(s.db.select().from(step).where(eq(step.kind, 'chief')).all()).toHaveLength(
+      stepsBefore + 1,
+    );
+    expect(
+      s.db
+        .select()
+        .from(imTurnOrigin)
+        .where(eq(imTurnOrigin.stepId, pending[0]?.id ?? ''))
+        .get()?.chatKey,
+    ).toBe('777');
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, pending[0]?.id ?? ''))
+      .run();
+    upsertChiefRow(
+      { db: s.db, convHub: s.convHub },
+      {
+        id: 'asst-beta',
+        threadId: stepRow.buildId,
+        role: 'assistant',
+        content: 'picked Beta',
+        createdAt: nowMs() + 1,
+      },
+    );
+    s.db
+      .update(step)
+      .set({ status: 'done' })
+      .where(eq(step.id, pending[0]?.id ?? ''))
+      .run();
+    service.runtime.turnFinished(stepById(pending[0]?.id ?? ''));
+    await vi.waitFor(() =>
+      expect(sessions[0]?.sent.some((msg) => msg.text === 'picked Beta')).toBe(true),
+    );
+  });
+
+  test('text reply resolves approval card after restart without creating a user turn', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage(inbound('55', 'send it'));
+    const stepRow = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    const { proposalId } = proposeAction(s.db, {
+      teamId: s.team.id,
+      actionId: 'connector.gmail.send_message',
+      targetId: 'mailto:ian@example.com',
+      input: { to: 'mailto:ian@example.com', body: 'hi' },
+      threadId: stepRow.buildId,
+      scopeProjectId: null,
+      card: [
+        {
+          header: '发送',
+          question: 'Send this mail?',
+          options: [{ label: '发送' }, { label: '不发' }],
+        },
+      ],
+    });
+    announceQuestion(
+      { db: s.db, hub: s.hub, convHub: s.convHub, user: s.user },
+      stepRow.buildId,
+      `approval-${proposalId}`,
+    );
+    await vi.waitFor(() => expect(sessions[0]?.sent).toHaveLength(1));
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
+
+    await service.shutdown();
+    await service.resume();
+    sessions[1]?.handlers.onMessage(inbound('55', '１'));
+
+    expect(
+      s.db.select().from(actionProposal).where(eq(actionProposal.id, proposalId)).get()?.status,
+    ).toBe('executed');
+    await vi.waitFor(() =>
+      expect(sessions[1]?.sent.some((msg) => msg.text === CARD_ENDINGS.executed)).toBe(true),
+    );
+
+    const { proposalId: secondProposal } = proposeAction(s.db, {
+      teamId: s.team.id,
+      actionId: 'connector.gmail.send_message',
+      targetId: 'mailto:ian@example.com',
+      input: { to: 'mailto:ian@example.com', body: 'hi 2' },
+      threadId: stepRow.buildId,
+      scopeProjectId: null,
+      card: [
+        {
+          header: '发送',
+          question: 'Send second mail?',
+          options: [{ label: '发送' }, { label: '不发' }],
+        },
+      ],
+    });
+    const wakeStep = stepById(`wake:${proposalId}:${stepRow.buildId}`);
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, wakeStep.id))
+      .run();
+    announceQuestion(
+      { db: s.db, hub: s.hub, convHub: s.convHub, user: s.user },
+      stepRow.buildId,
+      `approval-${secondProposal}`,
+    );
+    await vi.waitFor(() =>
+      expect(sessions[1]?.sent.some((msg) => msg.text.includes('Send second mail?'))).toBe(true),
+    );
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, wakeStep.id)).run();
+
+    sessions[1]?.handlers.onMessage(inbound('55', '发送'));
+    expect(
+      s.db.select().from(actionProposal).where(eq(actionProposal.id, secondProposal)).get()?.status,
+    ).toBe('executed');
+  });
+
+  test('non-matching text, zero, out-of-range digits, attachments, and unpaired replies do not answer pending cards', async () => {
+    await connectAndPair('55');
+    await sendQuestionAndPark('q-guard');
+    const note = Buffer.from('note\n').toString('base64');
+
+    sessions[0]?.handlers.onMessage(inbound('55', '0'));
+    sessions[0]?.handlers.onMessage(inbound('55', '9'));
+    sessions[0]?.handlers.onMessage(inbound('55', 'maybe'));
+    sessions[0]?.handlers.onMessage({
+      ...inbound('55', '1'),
+      files: [{ name: 'note.txt', mimeType: 'text/plain', dataBase64: note }],
+    });
+    sessions[0]?.handlers.onMessage(inbound('stranger', '1', 'chat-stranger'));
+
+    const content = askQuestionContentOf(
+      s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'q-guard')).get()?.content,
+    );
+    expect(content?.status).toBe('pending');
+  });
+
+  test('restores telegram pollOffset and wechat encrypted contextTokens across shutdown and resume', async () => {
+    adapters.wechat = wechatAdapterFake;
+    await service.createConnection(s.team.id, 'telegram', { botToken: 'good-token' });
+    sessions[0]?.handlers.onOffset?.(102);
+    expect(connRow()?.pollOffset).toBe('102');
+
+    const login = await service.startWechatLogin();
+    wechatWaits.set(login.loginId, {
+      status: 'done',
+      fields: {
+        token: 'wx-tok',
+        ilinkBotId: 'wx@im.bot',
+        ilinkUserId: 'u1@im.wechat',
+        baseUrl: 'https://ilink.example/',
+      },
+    });
+    await service.pollWechatLogin(s.team.id, login.loginId);
+    const wxHandlers = wechatSessions[0]?.handlers as {
+      onOffset?: (offset: string | number) => void;
+      onSecretField?: (key: string, value: string) => void;
+    };
+    wxHandlers.onOffset?.('BUF-2');
+    wxHandlers.onSecretField?.('contextTokensJson', JSON.stringify({ 'u1@im.wechat': 'CTX-9' }));
+
+    await service.shutdown();
+    await service.resume();
+
+    expect(sessions[1]?.fields.pollOffset).toBe('102');
+    expect(wechatSessions[1]?.fields.pollOffset).toBe('BUF-2');
+    expect(wechatSessions[1]?.fields.contextTokensJson).toBe(
+      JSON.stringify({ 'u1@im.wechat': 'CTX-9' }),
+    );
+  });
+
+  test('handles corrupt secretCipher, deleted rows, and stale session errors safely', async () => {
+    await service.createConnection(s.team.id, 'telegram', { botToken: 'good-token' });
+    const first = sessions[0]!;
+    const id = connRow()!.id;
+    let rejectFirst: ((err: Error) => void) | undefined;
+    first.onSend = () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectFirst = reject;
+      });
+    first.handlers.onMessage(inbound('99', 'ping'));
+    await vi.waitFor(() => expect(rejectFirst).toBeTypeOf('function'));
+
+    await service.reconnectConnection(s.team.id, id);
+    rejectFirst?.(new ImSendError('permanent', 'old session broke'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(service.listConnections(s.team.id)[0]?.lastSendError).toBeNull();
+
+    const firstHandlers = first.handlers as {
+      onOffset?: (offset: string | number) => void;
+      onSecretField?: (key: string, value: string) => void;
+    };
+    s.db
+      .update(imConnection)
+      .set({ secretCipher: 'not-valid-cipher' })
+      .where(eq(imConnection.id, id))
+      .run();
+    expect(() => firstHandlers.onSecretField?.('contextTokensJson', '{}')).not.toThrow();
+
+    await service.reconnectConnection(s.team.id, id);
+    expect(connRow()?.status).toBe('error');
+
+    await service.deleteConnection(s.team.id, id);
+    expect(() => firstHandlers.onOffset?.(999)).not.toThrow();
+    expect(() => firstHandlers.onSecretField?.('contextTokensJson', '{}')).not.toThrow();
+  });
+
+  test('next successful send clears lastSendError and ready reconnect preserves pairedSenders', async () => {
+    await connectAndPair('55');
+    const id = connRow()!.id;
+    const session = sessions[0]!;
+    session.handlers.onStatus('ready');
+    session.failWith = new ImSendError('permanent', 'upstream failed');
+    session.handlers.onMessage(inbound('55', 'first ask'));
+    const failedStep = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, failedStep.id))
+      .run();
+    upsertChiefRow(
+      { db: s.db, convHub: s.convHub },
+      {
+        id: 'asst-fail-1',
+        threadId: failedStep.buildId,
+        role: 'assistant',
+        content: 'blocked reply',
+        createdAt: nowMs() + 1,
+      },
+    );
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, failedStep.id)).run();
+    service.runtime.turnFinished(stepById(failedStep.id));
+    await vi.waitFor(() =>
+      expect(service.listConnections(s.team.id)[0]?.lastSendError).toBe('upstream failed'),
+    );
+
+    session.failWith = null;
+    session.handlers.onMessage(inbound('55', 'second ask'));
+    const okStep = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, okStep.id))
+      .run();
+    upsertChiefRow(
+      { db: s.db, convHub: s.convHub },
+      {
+        id: 'asst-ok-2',
+        threadId: okStep.buildId,
+        role: 'assistant',
+        content: 'recovered reply',
+        createdAt: nowMs() + 1,
+      },
+    );
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, okStep.id)).run();
+    service.runtime.turnFinished(stepById(okStep.id));
+    await vi.waitFor(() => {
+      expect(session.sent.some((msg) => msg.text === 'recovered reply')).toBe(true);
+      expect(service.listConnections(s.team.id)[0]?.lastSendError).toBeNull();
+    });
+    expect(connRow()?.status).toBe('ready');
+
+    const reconnected = await service.reconnectConnection(s.team.id, id);
+    expect(reconnected.pairedSenders.map((sender) => sender.id)).toEqual(['55']);
+  });
 });

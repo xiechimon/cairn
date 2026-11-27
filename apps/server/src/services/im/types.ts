@@ -56,6 +56,8 @@ export interface ImConnectionHandlers {
     status: 'connecting' | 'ready' | 'degraded' | 'expired' | 'error',
     detail?: string,
   ): void;
+  onOffset?(offset: string | number): void;
+  onSecretField?(key: string, value: string): void;
 }
 
 export interface ImAdapter {
@@ -69,7 +71,11 @@ export interface ImAdapter {
     handlers: ImConnectionHandlers,
     env: ImEnv,
     ctx?: { connId: string },
-  ): Promise<{ send(msg: ImOutboundMessage): Promise<void>; stop(): Promise<void> }>;
+  ): Promise<{
+    send(msg: ImOutboundMessage): Promise<void>;
+    stop(): Promise<void>;
+    offset?(): string | number | null;
+  }>;
   loginStart?(env: ImEnv): Promise<{ loginId: string; qr?: string; expiresAt: number }>;
   loginWait?(
     loginId: string,

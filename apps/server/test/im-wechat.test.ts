@@ -429,4 +429,83 @@ describe('wechat adapter connect', () => {
     expect(Date.now() - startedStop).toBeLessThan(500);
     expect(statuses.map((s) => s.status)).toContain('connecting');
   });
+
+  test('resumes cursor and contextTokensJson with 50-entry cap and corrupt-json fallback', async () => {
+    const initialTokens: Record<string, string> = {};
+    for (let i = 1; i <= 50; i += 1) initialTokens[`u${i}@im.wechat`] = `CTX-${i}`;
+
+    const secretUpdates: Array<{ key: string; value: string }> = [];
+    const offsetUpdates: Array<string | number> = [];
+    const { env, calls } = makeEnv(
+      sequence({
+        notifystart: [{}],
+        getupdates: [
+          {
+            msgs: [
+              {
+                from_user_id: 'u51@im.wechat',
+                context_token: 'CTX-51',
+                item_list: [{ type: 1, text_item: { text: 'hello new' } }],
+              },
+            ],
+            get_updates_buf: 'BUF-NEXT',
+          },
+        ],
+        sendmessage: [{ ret: 0 }, { ret: 0 }],
+      }),
+    );
+    const { handlers, messages } = makeHandlers();
+    (handlers as { onOffset?: (v: string | number) => void }).onOffset = (v) =>
+      offsetUpdates.push(v);
+    (handlers as { onSecretField?: (k: string, v: string) => void }).onSecretField = (k, v) =>
+      secretUpdates.push({ key: k, value: v });
+
+    const connection = (await wechatAdapter.connect(
+      {
+        ...FIELDS,
+        pollOffset: 'BUF-SAVED',
+        contextTokensJson: JSON.stringify(initialTokens),
+      },
+      handlers,
+      env,
+    )) as {
+      send(msg: ImOutboundMessage): Promise<void>;
+      stop(): Promise<void>;
+      offset?: () => string | number | null;
+    };
+
+    await waitFor(() => offsetUpdates.includes('BUF-NEXT'));
+    expect(messages).toHaveLength(1);
+    expect(callBody(callsTo(calls, 'getupdates')[0] as RecordedCall).get_updates_buf).toBe(
+      'BUF-SAVED',
+    );
+    expect(connection.offset?.()).toBe('BUF-NEXT');
+
+    const latestTokens = JSON.parse(secretUpdates.at(-1)?.value ?? '{}') as Record<string, string>;
+    expect(Object.keys(latestTokens)).toHaveLength(50);
+    expect(latestTokens['u1@im.wechat']).toBeUndefined();
+    expect(latestTokens['u51@im.wechat']).toBe('CTX-51');
+
+    await connection.send({ chatKey: 'u50@im.wechat', text: 'immediate reply' });
+    const sent = callBody(callsTo(calls, 'sendmessage')[0] as RecordedCall).msg as Record<
+      string,
+      unknown
+    >;
+    expect(sent.context_token).toBe('CTX-50');
+    await connection.stop();
+
+    const corrupt = await connectWith({
+      notifystart: [{}],
+      getupdates: [{ msgs: [] }],
+      sendmessage: [{ ret: 0 }],
+    });
+    const corruptConn = await wechatAdapter.connect(
+      { ...FIELDS, contextTokensJson: '{broken-json' },
+      makeHandlers().handlers,
+      corrupt.env,
+    );
+    await corruptConn.send({ chatKey: 'u50@im.wechat', text: 'fallback' });
+    await corruptConn.stop();
+    await corrupt.stop();
+  });
 });

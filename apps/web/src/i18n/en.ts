@@ -2692,6 +2692,7 @@ export const EN: Record<string, string> = {
     'Once deleted, paired contacts can no longer reach the Coordinator through it',
   重连: 'Reconnect',
   '重连失败，请重试。': 'Could not reconnect. Try again.',
+  最近一次回复发送失败: 'Last reply failed to send',
   '删除失败，请重试。': 'Could not delete it. Try again.',
   '连接失败，请重试。': 'Could not connect. Try again.',
   '请求配对 · {platform}': 'Pairing request · {platform}',
@@ -2880,7 +2881,8 @@ export const EN: Record<string, string> = {
     'The Coordinator asks for approval the first time it fills on a site; revoking makes it ask again.',
   '按钮和回复都支持。': 'Buttons and replies are supported.',
   '在私聊里和 Coordinator 对话。': 'Talk to the Coordinator in DMs.',
-  '在平时的聊天里和 Coordinator 对话。': 'Talk to the Coordinator in your usual chat.',
+  '在平时的聊天里和 Coordinator 对话，回复数字或文字就能点卡片上的按钮。':
+    'Talk to the Coordinator in your usual chat. Reply with a number or text to choose a card option.',
   '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。':
     'Connect a Telegram bot, Slack, iMessage or WeChat and talk to the Coordinator from your phone.',
   桌面: 'Desktop',

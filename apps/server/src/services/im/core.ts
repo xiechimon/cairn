@@ -90,6 +90,7 @@ type ConnectionRow = typeof imConnection.$inferSelect;
 interface LiveSession {
   send(msg: ImOutboundMessage): Promise<void>;
   stop(): Promise<void>;
+  offset?(): string | number | null;
 }
 
 export interface ImServiceDeps extends ChiefDeps {
@@ -150,9 +151,8 @@ function questionCard(requestId: string, questions: readonly AskUserQuestion[]) 
   };
 }
 
-function sessionOffset(session: LiveSession): number | null {
-  const probe = session as { offset?: unknown };
-  return typeof probe.offset === 'function' ? (probe.offset as () => number | null)() : null;
+function sessionOffset(session: LiveSession): string | number | null {
+  return typeof session.offset === 'function' ? session.offset() : null;
 }
 
 function sendBackoffMs(attempt: number): number {
@@ -262,21 +262,24 @@ export function createImService(deps: ImServiceDeps): ImService {
     for (let attempt = 0; attempt < SEND_ATTEMPTS; attempt += 1) {
       try {
         await session.send(msg);
-        sendErrors.delete(connId);
+        if (live.get(connId) === session) sendErrors.delete(connId);
         return 'delivered';
       } catch (err) {
         const sendErr = asSendError(err);
-        if (sendErr.authExpired) markStatus(connId, 'expired', sendErr.message);
+        const current = live.get(connId) === session;
+        if (current && sendErr.authExpired) markStatus(connId, 'expired', sendErr.message);
         if (sendErr.kind === 'drop') return 'dropped';
         if (sendErr.kind === 'permanent') {
-          sendErrors.set(connId, sendErr.message);
+          if (current) sendErrors.set(connId, sendErr.message);
           return 'permanent';
         }
+        if (!current) return 'offline';
         if (attempt === SEND_ATTEMPTS - 1) {
           sendErrors.set(connId, sendErr.message);
           return 'failed';
         }
         await deps.env.sleep(sendErr.retryAfterMs ?? sendBackoffMs(attempt));
+        if (live.get(connId) !== session) return 'offline';
       }
     }
     return 'failed';
@@ -578,19 +581,106 @@ export function createImService(deps: ImServiceDeps): ImService {
     return lines.join('\n');
   };
 
-  const persistPollOffset = (connId: string, row: ConnectionRow): void => {
-    const session = live.get(connId);
-    if (session === undefined) return;
-    const offset = sessionOffset(session);
-    if (offset === null) return;
+  const savePollOffset = (connId: string, offset: string | number): string | null => {
+    const row = connRow(connId);
+    if (row === undefined) return null;
     const value = String(offset);
-    if (row.pollOffset === value) return;
+    if (row.pollOffset === value) return value;
     deps.db
       .update(imConnection)
       .set({ pollOffset: value, updatedAt: nowMs() })
       .where(eq(imConnection.id, connId))
       .run();
-    row.pollOffset = value;
+    return value;
+  };
+
+  const persistPollOffset = (connId: string, row: ConnectionRow): void => {
+    const session = live.get(connId);
+    if (session === undefined) return;
+    const offset = sessionOffset(session);
+    if (offset === null) return;
+    const saved = savePollOffset(connId, offset);
+    if (saved !== null) row.pollOffset = saved;
+  };
+
+  const saveSecretField = (connId: string, key: string, value: string): void => {
+    const row = connRow(connId);
+    if (row === undefined) return;
+    let fields: Record<string, string>;
+    try {
+      fields = openFields(row);
+    } catch {
+      return;
+    }
+    if (fields[key] === value) return;
+    deps.db
+      .update(imConnection)
+      .set({
+        secretCipher: deps.box.seal(JSON.stringify({ ...fields, [key]: value })),
+        updatedAt: nowMs(),
+      })
+      .where(eq(imConnection.id, connId))
+      .run();
+  };
+
+  const findPendingCardChoice = (
+    connId: string,
+    chatKey: string,
+    text: string,
+  ): { requestId: string; optionIndex: number } | null => {
+    const trimmed = text.trim();
+    if (trimmed === '') return null;
+    const ascii = trimmed.replace(/[０-９]/g, (ch) =>
+      String.fromCharCode(ch.charCodeAt(0) - 0xfee0),
+    );
+    const numMatch = /^([1-9]\d?)[.。、]?$/.exec(ascii);
+    const numericIndex = numMatch === null ? null : Number(numMatch[1]) - 1;
+    const normalizedLabel = trimmed.toLowerCase();
+    const recentCards = deps.db
+      .select({ payload: externalEffect.payload })
+      .from(externalEffect)
+      .where(
+        and(
+          eq(externalEffect.kind, 'im-send'),
+          eq(externalEffect.state, 'delivered'),
+          sql`json_extract(${externalEffect.payload}, '$.connId') = ${connId}`,
+          sql`json_extract(${externalEffect.payload}, '$.chatKey') = ${chatKey}`,
+          sql`json_extract(${externalEffect.payload}, '$.requestId') IS NOT NULL`,
+        ),
+      )
+      .orderBy(desc(externalEffect.createdAt), sql`rowid desc`)
+      .limit(5)
+      .all();
+    for (const effect of recentCards) {
+      const requestId =
+        typeof effect.payload === 'object' &&
+        effect.payload !== null &&
+        typeof (effect.payload as Record<string, unknown>).requestId === 'string'
+          ? ((effect.payload as Record<string, unknown>).requestId as string)
+          : null;
+      if (requestId === null) continue;
+      const card = deps.db
+        .select({ content: chiefMessage.content })
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, requestId))
+        .get();
+      const content = card === undefined ? null : askQuestionContentOf(card.content);
+      if (content === null || content.status !== 'pending' || content.questions.length !== 1) {
+        continue;
+      }
+      const [question] = content.questions;
+      if (question === undefined || question.options.length === 0) continue;
+      if (numericIndex !== null) {
+        return numericIndex >= 0 && numericIndex < question.options.length
+          ? { requestId, optionIndex: numericIndex }
+          : null;
+      }
+      const labelIndex = question.options.findIndex(
+        (option) => option.label.trim().toLowerCase() === normalizedLabel,
+      );
+      return labelIndex >= 0 ? { requestId, optionIndex: labelIndex } : null;
+    }
+    return null;
   };
 
   const rememberInbound = (connId: string, messageId: string): boolean => {
@@ -676,6 +766,18 @@ export function createImService(deps: ImServiceDeps): ImService {
     if (!paired) {
       recordPairingRequest(row, msg);
       return;
+    }
+    if (msg.images.length === 0 && msg.files.length === 0 && msg.text.trim() !== '') {
+      const cardChoice = findPendingCardChoice(connId, msg.chat.key, msg.text);
+      if (cardChoice !== null) {
+        answerCard(connId, row, {
+          chat: msg.chat,
+          sender: msg.sender,
+          value: `imcb:${cardChoice.requestId}:${cardChoice.optionIndex}`,
+          messageId: msg.messageId,
+        });
+        return;
+      }
     }
     const stored: { id: string; name: string }[] = [];
     let dropped = 0;
@@ -910,6 +1012,10 @@ export function createImService(deps: ImServiceDeps): ImService {
           onMessage: (msg) => onMessage(connId, msg),
           onAction: (action) => onAction(connId, action),
           onStatus: (status, detail) => onStatus(connId, status, detail),
+          onOffset: (offset) => {
+            savePollOffset(connId, offset);
+          },
+          onSecretField: (key, value) => saveSecretField(connId, key, value),
         },
         deps.env,
         { connId },

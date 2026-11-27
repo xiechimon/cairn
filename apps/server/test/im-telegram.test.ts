@@ -461,4 +461,73 @@ describe('telegram adapter reconnect and timeout hardening', () => {
     await session.stop();
     expect(Date.now() - startedStop).toBeLessThan(500);
   });
+
+  test('resumes from fields.pollOffset and persists onOffset only after download completes', async () => {
+    const tg = fakeTelegramEnv();
+    tg.queue('getMe', BOT_ME);
+    tg.queue('getUpdates', { ok: true, result: [directMessage(205, 'resumed')] });
+    tg.queue('getUpdates', PARK);
+    const offsets: Array<string | number> = [];
+    const session = await createTelegramAdapter().connect(
+      { botToken: TOKEN, pollOffset: '205' },
+      {
+        onMessage: () => {},
+        onStatus: () => {},
+        onOffset: (value) => offsets.push(value),
+      },
+      tg.env,
+    );
+    await vi.waitFor(() => expect(offsets).toContain(206));
+    const polls = tg.calls.filter((call) => call.method === 'getUpdates');
+    expect(polls[0]?.body.offset).toBe(205);
+    await session.stop();
+
+    const bad = fakeTelegramEnv();
+    bad.queue('getMe', BOT_ME);
+    bad.queue('getUpdates', PARK);
+    const badSession = await createTelegramAdapter().connect(
+      { botToken: TOKEN, pollOffset: 'not-a-number' },
+      { onMessage: () => {}, onStatus: () => {} },
+      bad.env,
+    );
+    await vi.waitFor(() =>
+      expect(bad.calls.some((call) => call.method === 'getUpdates')).toBe(true),
+    );
+    expect(bad.calls.find((call) => call.method === 'getUpdates')?.body.offset).toBeUndefined();
+    await badSession.stop();
+
+    const midDownload = fakeTelegramEnv();
+    midDownload.queue('getMe', BOT_ME);
+    midDownload.queue('getUpdates', {
+      ok: true,
+      result: [
+        {
+          update_id: 300,
+          message: {
+            message_id: 3001,
+            from: { id: 42, is_bot: false, first_name: 'Ian' },
+            chat: { id: 777, type: 'private' },
+            photo: [{ file_id: 'slow', width: 10, height: 10, file_size: 8 }],
+          },
+        },
+      ],
+    });
+    midDownload.queue('getFile', PARK);
+    const partialOffsets: Array<string | number> = [];
+    const abortSession = (await createTelegramAdapter().connect(
+      { botToken: TOKEN },
+      {
+        onMessage: () => {},
+        onStatus: () => {},
+        onOffset: (value) => partialOffsets.push(value),
+      },
+      midDownload.env,
+    )) as { stop(): Promise<void>; offset?: () => number | null };
+    await vi.waitFor(() =>
+      expect(midDownload.calls.some((c) => c.method === 'getFile')).toBe(true),
+    );
+    await abortSession.stop();
+    expect(partialOffsets).toEqual([]);
+    expect(abortSession.offset?.()).toBeNull();
+  });
 });

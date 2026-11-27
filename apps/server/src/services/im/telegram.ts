@@ -327,7 +327,10 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
       const token = (fields.botToken ?? '').trim();
       if (token === '') throw new Error('telegram connection missing botToken');
       let stopped = false;
-      let offset: number | null = null;
+      const rawOffset = fields.pollOffset?.trim() ?? '';
+      const parsedOffset = /^\d+$/.test(rawOffset) ? Number(rawOffset) : NaN;
+      let offset: number | null =
+        Number.isSafeInteger(parsedOffset) && parsedOffset > 0 ? parsedOffset : null;
       let botUsername = '';
       const abort = new AbortController();
 
@@ -358,15 +361,16 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
             ready = true;
             handlers.onStatus('ready');
             for (const update of updates) {
+              let inbound: ImInboundMessage | null = null;
               if (update.message !== undefined) {
-                const inbound = await normalizeMessage(
-                  update.message,
-                  botUsername,
-                  env,
-                  token,
-                ).catch(() => null);
-                if (inbound !== null) handlers.onMessage(inbound);
+                inbound = await normalizeMessage(update.message, botUsername, env, token).catch(
+                  () => null,
+                );
               }
+              if (stopped) break;
+              offset = update.update_id + 1;
+              handlers.onOffset?.(offset);
+              if (inbound !== null) handlers.onMessage(inbound);
               const query = update.callback_query;
               if (query !== undefined && query.message !== undefined && query.data !== undefined) {
                 const group =
@@ -387,7 +391,6 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
                   callback_query_id: query.id,
                 }).catch(() => {});
               }
-              offset = update.update_id + 1;
             }
           } catch (err) {
             if (stopped || (err instanceof Error && err.name === 'AbortError')) break;

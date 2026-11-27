@@ -83,7 +83,7 @@ const PLATFORM_COPY: Record<
   wechat: {
     name: '微信',
     description: '扫码登录',
-    info: '在平时的聊天里和 Coordinator 对话。',
+    info: '在平时的聊天里和 Coordinator 对话，回复数字或文字就能点卡片上的按钮。',
     connect: '连接微信',
   },
 };
@@ -533,7 +533,7 @@ export function ImConnectionsPage() {
   const connectionRow = (conn: ImConnectionRecord) => {
     const failing =
       conn.status === 'degraded' || conn.status === 'expired' || conn.status === 'error';
-    const detail = conn.statusDetail ?? conn.lastSendError;
+    const mappedSendError = conn.statusDetail === null && conn.lastSendError !== null;
     const name = connectionName(conn);
     return (
       <IntegrationRow
@@ -549,7 +549,15 @@ export function ImConnectionsPage() {
             </span>
             {conn.pairedSenders.length > 0 &&
               ` · ${t('已配对 {count} 个联系人', { count: conn.pairedSenders.length })}`}
-            {detail !== null && ` · ${detail}`}
+            {conn.statusDetail !== null && ` · ${conn.statusDetail}`}
+            {mappedSendError && (
+              <>
+                {' · '}
+                <span className="text-destructive" title={conn.lastSendError ?? undefined}>
+                  {t('最近一次回复发送失败')}
+                </span>
+              </>
+            )}
           </>
         }
         action={
@@ -579,6 +587,20 @@ export function ImConnectionsPage() {
                 sideOffset={4}
                 className="w-auto min-w-40"
               >
+                {live && !(conn.status === 'expired' && conn.platform === 'wechat') && (
+                  <KeyedMenuItem
+                    shortcut="R"
+                    disabled={mutations.reconnectConnection.isPending}
+                    data-testid={`im-reconnect-menu-${conn.id}`}
+                    onClick={() =>
+                      mutations.reconnectConnection.mutate(conn.id, {
+                        onError: (error) => toastError(t('重连失败，请重试。'), error),
+                      })
+                    }
+                  >
+                    {t('重连')}
+                  </KeyedMenuItem>
+                )}
                 {live && (
                   <KeyedMenuItem
                     shortcut="C"
