@@ -79,17 +79,6 @@ export function useRefreshAntigravityQuota(teamId: string | undefined) {
   });
 }
 
-export function hasUsableAntigravitySubscription(
-  subscriptions: readonly Pick<AntigravitySubscription, 'enabled' | 'expiresAt'>[] | undefined,
-  now: number,
-): boolean {
-  return (subscriptions ?? []).some(
-    (subscription) =>
-      subscription.enabled !== false &&
-      (subscription.expiresAt === null || subscription.expiresAt > now),
-  );
-}
-
 const HOST_LOGIN_RETRY_MS = 12_000;
 const HOST_LOGIN_RETRY_ATTEMPTS = 3;
 const HOST_LOGIN_VERIFY_TIMEOUT_MS =
