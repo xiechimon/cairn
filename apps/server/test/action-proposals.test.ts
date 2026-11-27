@@ -1058,4 +1058,37 @@ describe('outbound mail approval', () => {
     expect(proposalById(s.db, proposalId)?.status).toBe('refused');
     s.dispose();
   });
+
+  test('proposeAction strips recommended flags from approval card options and keeps the card answerable', async () => {
+    const s = world();
+    const proposed = proposeAction(s.db, {
+      teamId: s.team.id,
+      actionId: 'connector.cairn-mail.send',
+      targetId: 'cairn-mail#rec',
+      input: { to: 'someone@example.com', subject: 'Re: rec', body: 'Got it.' },
+      threadId: 'thread-a',
+      scopeProjectId: null,
+      card: [
+        {
+          header: '审批',
+          question: '对外发送：cairn-mail send',
+          options: [{ label: SEND_CHOICE, recommended: true }, { label: DECLINE_SEND_CHOICE }],
+        },
+      ],
+    });
+    const stored = askQuestionContentOf(
+      s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, `approval-${proposed.proposalId}`))
+        .get()?.content,
+    );
+    expect(stored?.questions[0]?.options.some((opt) => opt.recommended === true)).toBe(false);
+    const res = await answerMail(s, proposed.proposalId, SEND_CHOICE, {
+      'sec-fetch-site': 'same-origin',
+    });
+    expect(res.status).toBe(200);
+    expect(proposalById(s.db, proposed.proposalId)?.status).toBe('executed');
+    s.dispose();
+  });
 });

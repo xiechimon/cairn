@@ -519,4 +519,30 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
     expect(ASK_HOLD_MS).toBe(70_000);
     void stepTable;
   });
+
+  test('strips recommended from outward email-send options while keeping safe recommendations', async () => {
+    const w = await makeWorld();
+    const created = createOrGetQuestion(
+      { db: w.s.db },
+      {
+        threadId: w.threadId,
+        requestId: 'ask-email-safety',
+        askedFor: [w.stepId],
+        questions: [
+          {
+            header: 'Send email',
+            question: 'Send this email to external@example.com?',
+            options: [{ label: 'Approve send', recommended: true }, { label: 'Keep as draft' }],
+          },
+          {
+            header: 'Format',
+            question: 'Which format?',
+            options: [{ label: 'Markdown', recommended: true }, { label: 'Plain text' }],
+          },
+        ],
+      },
+    );
+    expect(created.content.questions[0]?.options[0]?.recommended).toBeUndefined();
+    expect(created.content.questions[1]?.options[0]?.recommended).toBe(true);
+  });
 });

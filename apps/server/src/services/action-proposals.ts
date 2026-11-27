@@ -9,6 +9,7 @@ import {
   isConnectorActionId,
   isExternalActionClass,
   SLICE1_ACTIONS,
+  stripAllRecommendations,
   type UserRecord,
 } from '@cairn/shared';
 import { and, asc, desc, eq, gt, gte, inArray, lt, lte, ne } from 'drizzle-orm';
@@ -330,7 +331,7 @@ function insertCard(
     kind: ASK_USER_QUESTION_KIND,
     requestId: proposalCardId(proposalId),
     status: 'pending',
-    questions: [...questions],
+    questions: stripAllRecommendations(questions),
     answers: null,
     parkedAt: now,
     askedFor: [`${ACTION_PROPOSAL_CARD_MARKER}${proposalId}`],
@@ -395,10 +396,11 @@ export function proposeAction(
   input: ProposeInput,
 ): { proposalId: string; created: boolean } {
   const now = input.now ?? nowMs();
+  const card = input.card === undefined ? undefined : stripAllRecommendations(input.card);
   const carded =
-    input.card === undefined
+    card === undefined
       ? input.input
-      : { ...(input.input as Record<string, unknown>), cardDigest: cardDigest(input.card) };
+      : { ...(input.input as Record<string, unknown>), cardDigest: cardDigest(card) };
   const stored =
     input.untrusted === true
       ? { ...(carded as Record<string, unknown>), untrustedTurn: true }
@@ -408,7 +410,7 @@ export function proposeAction(
     (tx) => {
       const pending = pendingFor(tx, input.teamId, input.actionId, input.targetId);
       const cardLost =
-        pending !== undefined && input.card !== undefined && cardRow(tx, pending.id) === undefined;
+        pending !== undefined && card !== undefined && cardRow(tx, pending.id) === undefined;
       if (pending && pending.inputHash === inputHash && !cardLost) {
         if (input.subscribe !== false)
           addSubscriber(tx, pending.id, input.threadId, input.scopeProjectId);
@@ -434,8 +436,8 @@ export function proposeAction(
         .run();
       if (input.subscribe !== false)
         addSubscriber(tx, proposalId, input.threadId, input.scopeProjectId);
-      if (input.card !== undefined) {
-        insertCard(tx, proposalId, input.threadId, input.scopeProjectId, input.card, now);
+      if (card !== undefined) {
+        insertCard(tx, proposalId, input.threadId, input.scopeProjectId, card, now);
       }
       return { proposalId, created: true };
     },

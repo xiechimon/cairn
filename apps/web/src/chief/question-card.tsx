@@ -1,4 +1,4 @@
-import type { AskUserAnswer } from '@cairn/shared';
+import { type AskUserAnswer, stripAllRecommendations } from '@cairn/shared';
 import { cn } from 'cn';
 import { ArrowUp, Check, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import {
@@ -216,7 +216,14 @@ export function QuestionCard({
   enter = false,
 }: QuestionCardProps) {
   const { t } = useI18n();
-  const questions = useMemo(() => item.questions.map(recommendedFirst), [item.questions]);
+  const approvalRequest = isApprovalRequest(item.requestId);
+  const questions = useMemo(
+    () =>
+      approvalRequest
+        ? stripAllRecommendations(item.questions)
+        : item.questions.map(recommendedFirst),
+    [approvalRequest, item.questions],
+  );
   const { drafts, step, commit } = useQuestionDrafts(item, questions, draftKey);
   const submitting = useSyncExternalStore(
     questionDraftStore.subscribe,
@@ -231,7 +238,6 @@ export function QuestionCard({
   const headId = useId();
   const listRef = useRef<HTMLDivElement | null>(null);
 
-  const approvalRequest = isApprovalRequest(item.requestId);
   const stepComplete = questionDraftComplete(drafts[step], question);
   const completeIn = (source: QuestionDraft[]) =>
     pending && questions.every((q, i) => questionDraftComplete(source[i], q));

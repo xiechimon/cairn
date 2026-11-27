@@ -578,4 +578,32 @@ describe('worker ask_user tool dispatch and parked replies', () => {
       .filter((s) => s.status === 'pending');
     expect(pending.length).toBeGreaterThan(0);
   });
+
+  test('askWorkerQuestion strips recommended from outward or destructive options', async () => {
+    const { buildId, stepRow } = startSession();
+    H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, stepRow.id)).run();
+    const claimed = H.s.db.select().from(step).where(eq(step.id, stepRow.id)).get()!;
+    await askWorkerQuestion(
+      deps(),
+      claimed,
+      {
+        requestId: 'ask-99999999-0000-0000-0000-000000000001',
+        questions: [
+          {
+            header: 'Deploy',
+            question: 'Push release tag to production?',
+            options: [{ label: '发布并推送', recommended: true }, { label: '暂不发布' }],
+          },
+        ],
+      },
+      { holdMs: 0 },
+    );
+    const stored = H.s.db
+      .select()
+      .from(message)
+      .where(eq(message.id, 'ask-99999999-0000-0000-0000-000000000001'))
+      .get()!.content as { questions: { options: { label: string; recommended?: boolean }[] }[] };
+    expect(stored.questions[0]?.options[0]?.recommended).toBeUndefined();
+    void buildId;
+  });
 });

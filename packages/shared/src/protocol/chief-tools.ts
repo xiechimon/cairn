@@ -800,7 +800,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'ask_user',
     description:
-      'Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). The user states needs and makes architecture decisions; research and decide everything else yourself. Do not ask for facts you can find in the code, the docs or by research, or for implementation details. Ask only for real decisions: an ambiguous need, architecture or product direction, reversing a recorded decision, payments, credentials, irreversible or external actions, or what a team, project or repository rule routes to a person. Batch them into one call instead of asking one at a time; give each the evidence in its description and mark the option you recommend. Every card already offers a free-text answer, so list only real choices.',
+      'Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). The user states needs and makes architecture decisions; research and decide everything else yourself. Do not ask for facts you can find in the code, the docs or by research, or for implementation details. Ask only for real decisions: an ambiguous need, architecture or product direction, reversing a recorded decision, payments, credentials, irreversible or external actions, or what a team, project or repository rule routes to a person. Batch them into one call instead of asking one at a time; give each the evidence in its description, mark a recommendation only on safe internal choices, and never mark an external send, delete, payment, publish or approval action as recommended. Every card already offers a free-text answer, so list only real choices.',
     parameters: obj(
       {
         questions: arr(
@@ -816,7 +816,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
                     recommended: {
                       type: 'boolean',
                       description:
-                        'Mark the one option you recommend; the card shows it first, labelled Recommended.',
+                        'Mark at most one safe internal option you recommend; leave unset on any approval or external, destructive, payment, credential or irreversible action.',
                     },
                   },
                   ['label'],

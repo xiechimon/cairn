@@ -329,6 +329,79 @@ export const askUserQuestionSchema = z.object({
 });
 export type AskUserQuestion = z.infer<typeof askUserQuestionSchema>;
 
+const UNSAFE_OPTION_ACTION_EN =
+  /\b(?:approve|send|email|mail|reply|forward|post|publish|tweet|submit|message|dm|notify|contact|delete|remove|drop\s+(?:table|database|db|collection|index|data)|purge|erase|destroy|overwrite|reset|revoke|pay|charge|purchase|buy|order|subscribe|spend|transfer|deploy|push(?:\s+(?:to|tag|branch|remote|changes|now|it))?|merge(?:\s+(?:pr|pull\s+request|branch|into|to|changes|now|it))?|release(?:\s+(?:v?\d|version|build|package|app|now|it))?|execute|grant|install|credentials?|secrets?|passwords?|tokens?|api\s*keys?)\b/i;
+const UNSAFE_OPTION_ACTION_ZH =
+  /(?:批准|同意|确认|允许)?(?:发送|发出|发邮件|发信|群发|发消息|发短信|回复|转发|发布|发帖|提交|通知|联系|删除|清空|销毁|移除|覆盖|重置|吊销|支付|付款|扣款|购买|下单|订购|订阅|充值|续费|转账|推送|部署|合并|执行(?!机)|授权|安装|密钥|密码|凭据|凭证|令牌)/;
+const UNSAFE_DESCRIPTION_ACTION_EN =
+  /\b(?:send(?:ing)?\s+(?:this\s+|the\s+|an?\s+)?(?:email|mail|message|reply|dm)|outbound|external|publish|deploy|delete|purge|erase|destroy|overwrite|reset|revoke|pay|charge|purchase|transfer|install\s+packages|credentials?|secrets?|passwords?|tokens?|api\s*keys?)\b/i;
+const UNSAFE_DESCRIPTION_ACTION_ZH =
+  /(?:发送|发出|发邮件|发信|发消息|对外|群发|发布|推送|部署|删除|清空|销毁|覆盖|重置|吊销|支付|付款|扣款|购买|下单|订阅|充值|转账|安装|密钥|密码|凭据|凭证|令牌)/;
+const UNSAFE_QUESTION_CONTEXT_EN =
+  /\b(?:send(?:ing)?\s+(?:this\s+|the\s+|an?\s+)?(?:email|mail|message|reply|dm)|outbound|external|publish|deploy|push\s+(?:to|tag|branch)|delete|remove|purge|overwrite|reset|revoke|grant|pay|charge|purchase|order|subscribe|spend|transfer|install(?:ing)?\s+packages?|credentials?|secrets?|passwords?|tokens?|api\s*keys?|approve\s+(?:send|the\s+send))\b/i;
+const UNSAFE_QUESTION_CONTEXT_ZH =
+  /(?:发送|发出|发邮件|发消息|邮件|对外|群发|发布|推送|部署|删除|清空|覆盖|重置|吊销|授权|支付|付款|扣款|下单|订阅|充值|转账|安装|密钥|密码|凭据|凭证|令牌|批准|确认发)/;
+const AFFIRMATIVE_OPTION_EN =
+  /^(?:yes(?:\b|,)|ok(?:ay)?\b|proceed\b|confirm\b|approve\b|allow(?:\s+once)?\b|go\s+ahead\b|do\s+it\b|continue\b|install\b)/i;
+const AFFIRMATIVE_OPTION_ZH =
+  /^(?:是|好|好的|确认|同意|批准|允许|继续|可以|行|发吧|安装)(?:[，。,.!！\s]|$)/;
+
+function stripNegatedActions(text: string): string {
+  return text
+    .replace(
+      /\b(?:do\s+not|don['’]t|never|cancel|decline|refuse|reject|skip|abort|stop|without|no|avoid|not)\b(?:(?!\b(?:and|then|but)\b)[^,.;!?()])*/gi,
+      ' ',
+    )
+    .replace(
+      /(?:不|不要|别|先别|暂不|暂缓|无需|不用|不必|不会|取消|拒绝|跳过)[^，。；,.!?()（）并然后再且但]*/g,
+      ' ',
+    );
+}
+
+export function isUnsafeRecommendationOption(
+  option: Pick<AskUserQuestion['options'][number], 'label' | 'description'>,
+  context: Pick<AskUserQuestion, 'header' | 'question'>,
+): boolean {
+  const label = option.label.trim();
+  const effectiveLabel = stripNegatedActions(label);
+  const effectiveDescription = stripNegatedActions(option.description ?? '');
+  if (
+    UNSAFE_OPTION_ACTION_EN.test(effectiveLabel) ||
+    UNSAFE_OPTION_ACTION_ZH.test(effectiveLabel) ||
+    UNSAFE_DESCRIPTION_ACTION_EN.test(effectiveDescription) ||
+    UNSAFE_DESCRIPTION_ACTION_ZH.test(effectiveDescription)
+  ) {
+    return true;
+  }
+  const prompt = `${context.header} ${context.question}`;
+  const outwardQuestion =
+    UNSAFE_QUESTION_CONTEXT_EN.test(prompt) || UNSAFE_QUESTION_CONTEXT_ZH.test(prompt);
+  if (!outwardQuestion) return false;
+  return AFFIRMATIVE_OPTION_EN.test(effectiveLabel) || AFFIRMATIVE_OPTION_ZH.test(effectiveLabel);
+}
+
+export function stripUnsafeRecommendations(
+  questions: readonly AskUserQuestion[],
+): AskUserQuestion[] {
+  return questions.map((question) => ({
+    ...question,
+    options: question.options.map((option) => {
+      if (option.recommended !== true || !isUnsafeRecommendationOption(option, question)) {
+        return option;
+      }
+      const { recommended: _removed, ...rest } = option;
+      return rest;
+    }),
+  }));
+}
+
+export function stripAllRecommendations(questions: readonly AskUserQuestion[]): AskUserQuestion[] {
+  return questions.map((question) => ({
+    ...question,
+    options: question.options.map(({ recommended: _removed, ...rest }) => rest),
+  }));
+}
+
 export const askUserAnswerSchema = z
   .object({
     header: z.string(),

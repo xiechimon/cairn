@@ -72,6 +72,36 @@ describe('a question card in the conversation', () => {
     expect(html).toContain('data-testid="chief-question-skip"');
     expect(html).not.toContain('chief-question-minimize');
   });
+
+  test('approval requests never promote or badge a recommended option', () => {
+    const approval: ChiefQuestionItem = {
+      kind: 'question',
+      id: 'approval-email-1',
+      requestId: 'approval-email-1',
+      status: 'pending',
+      questions: [
+        {
+          header: '审批',
+          question:
+            '对外发送：mail.send\n收件人：lena@example.com\n正文：你好\n\n只会按上面的内容发出，发出后无法收回。',
+          options: [
+            { label: '不发' },
+            { label: '发送', recommended: true },
+          ],
+        },
+      ],
+      answers: null,
+    };
+    const html = card(approval);
+    expect(html).not.toContain('chief-question-recommended');
+    const firstOptIdx = html.indexOf('data-testid="chief-question-option-0-0"');
+    const firstOptStart = html.indexOf('>', firstOptIdx) + 1;
+    const firstOptEnd = html.indexOf('</button>', firstOptStart);
+    const secondOptIdx = html.indexOf('data-testid="chief-question-option-0-1"');
+    expect(firstOptIdx).toBeGreaterThan(-1);
+    expect(secondOptIdx).toBeGreaterThan(-1);
+    expect(text(html.slice(firstOptStart, firstOptEnd))).toBe('不发');
+  });
 });
 
 describe('an answered question leaves one receipt', () => {

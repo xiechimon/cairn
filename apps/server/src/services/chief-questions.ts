@@ -7,6 +7,7 @@ import {
   askUserQuestionSchema,
   isChiefConversationId,
   sleep,
+  stripUnsafeRecommendations,
   type UserRecord,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -61,24 +62,25 @@ export function createOrGetQuestion(
   }
   const existing = readQuestion(deps.db, input.threadId, input.requestId);
   if (existing !== null) return { content: existing, created: false };
+  const questions = stripUnsafeRecommendations(input.questions);
   if (deps.hub !== undefined && deps.user !== undefined) {
-    assertImQuestionFits(input.threadId, input.requestId, input.questions);
+    assertImQuestionFits(input.threadId, input.requestId, questions);
   }
   const content: AskUserQuestionContent = {
     kind: ASK_USER_QUESTION_KIND,
     requestId: input.requestId,
     status: 'pending',
-    questions: input.questions,
+    questions,
     answers: null,
     ...(input.provenance !== undefined ? { provenance: input.provenance } : {}),
     askedFor: input.askedFor,
   };
   deps.db.transaction(() => {
     writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
-    notifyQuestion(deps, input.threadId, input.questions, input.requestId);
+    notifyQuestion(deps, input.threadId, questions, input.requestId);
   });
   publishQuestion(deps, input.threadId, input.requestId);
-  pushQuestion(deps, input.threadId, input.requestId, input.questions);
+  pushQuestion(deps, input.threadId, input.requestId, questions);
   return { content, created: true };
 }
 

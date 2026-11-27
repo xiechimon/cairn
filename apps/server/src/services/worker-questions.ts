@@ -5,6 +5,7 @@ import {
   type MachineAskResponse,
   redactSecrets,
   sleep,
+  stripUnsafeRecommendations,
   type TaskDecision,
   THREAD_REPORT_LINE_MAX,
 } from '@cairn/shared';
@@ -78,11 +79,12 @@ function openQuestion(
     throw new HttpError(409, 'question request id belongs to another message');
   }
   const askedAt = nowMs();
+  const questions = stripUnsafeRecommendations(body.questions);
   const content: AskUserQuestionContent = {
     kind: ASK_USER_QUESTION_KIND,
     requestId: body.requestId,
     status: 'pending',
-    questions: body.questions,
+    questions,
     answers: null,
   };
   if (!writeWorkerQuestion(deps, row.buildId, body.requestId, content, askedAt)) {
@@ -93,7 +95,7 @@ function openQuestion(
   const record = getTodo(deps, todoId);
   if (record !== null) {
     deps.hub.publishTodoDoc(record.teamId, record);
-    postThreadReport(deps, record, 'needs-you', questionReportLine(body.questions[0]?.question));
+    postThreadReport(deps, record, 'needs-you', questionReportLine(questions[0]?.question));
   }
   return { content, askedAt };
 }
