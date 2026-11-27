@@ -42,6 +42,7 @@ import { externalClientMessageId, moveQueuedMessages, refuseRemovedSend } from '
 import { assertAutomaticRetryAllowed } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
+import { cancelPendingWorkerQuestions } from './worker-question-store.js';
 import { settleQuestionAnswers, settleWorkerReply } from './worker-questions.js';
 
 type BuildRow = typeof build.$inferSelect;
@@ -218,6 +219,11 @@ export async function sendBuildSteer(
         if (wake.createdBy.startsWith('worker:') && isWaitingPhase(todoRow?.phase ?? '')) {
           throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
         }
+        cancelPendingWorkerQuestions(
+          deps,
+          conversationId,
+          'A new scheduled run started before an answer.',
+        );
       }
       const queued =
         body.queuedMessageId === undefined

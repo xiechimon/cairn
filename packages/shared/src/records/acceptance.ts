@@ -108,6 +108,8 @@ const FAILED_OUTPUT_RE =
 const FIXTURE_LABEL_RE = /\b(?:fixture|mock|storybook)\b/i;
 const LIVE_LABEL_RE = /\b(?:live|running|real|prod|app)\b/i;
 
+const SCRATCH_OR_TMP_RE = /(?:^|\/)scratch\/|^\/(?:private\/)?tmp\//i;
+
 const PATCH_PATH_RE = /^\*\*\*\s+(?:Update|Add|Delete)\s+File:\s+(.+)$/gm;
 
 interface ParsedToolCall {
@@ -122,7 +124,8 @@ interface ParsedToolCall {
 function normalizedToolName(raw: string): string {
   const lower = raw.toLowerCase();
   const colonAt = lower.lastIndexOf(':');
-  return colonAt === -1 ? lower : lower.slice(colonAt + 1);
+  const bare = colonAt === -1 ? lower : lower.slice(colonAt + 1);
+  return bare.replace(/^mcp__(?:[^_]+__)+|^mcp_cairn_/, '');
 }
 
 function asRecord(val: unknown): Record<string, unknown> {
@@ -145,7 +148,14 @@ function messageTextOf(content: unknown): string {
 
 function parsedPathsFromToolArgs(name: string, args: Record<string, unknown>): string[] {
   const paths: string[] = [];
-  for (const key of ['path', 'file_path', 'filePath', 'target_file', 'TargetFile'] as const) {
+  for (const key of [
+    'path',
+    'file_path',
+    'filePath',
+    'target_file',
+    'TargetFile',
+    'Path',
+  ] as const) {
     const val = args[key];
     if (typeof val === 'string' && val.trim() !== '') paths.push(val.trim());
   }
@@ -344,84 +354,6 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
   const readCalls = calls.filter((c) => READ_TOOL_NAMES.has(c.name));
   const checksRan = cmdCalls.map((c) => commandOfCall(c.args)).filter((s) => s !== '');
 
-  if (input.repoKind === 'github') {
-    if (input.unpushedCommits === null) {
-      return failResult(
-        'unpushed-unknown',
-        false,
-        checksRan,
-        'Could not confirm whether commits on this GitHub workspace were pushed.',
-        'Remote push state verification (`git rev-list`) failed or was unavailable.',
-        'Verify git remote connectivity/credentials and ensure commits are pushed.',
-      );
-    }
-    if (typeof input.unpushedCommits === 'number' && input.unpushedCommits > 0) {
-      const hasAuthErr =
-        cmdCalls.some((c) => c.isError && PUSH_AUTH_BLOCKER_RE.test(c.resultText)) ||
-        texts.some((t) => PUSH_AUTH_BLOCKER_RE.test(t.text));
-      if (hasAuthErr) {
-        return failResult(
-          'unpushed-blocked',
-          false,
-          checksRan,
-          `${input.unpushedCommits} commit(s) remain unpushed locally due to a git push/auth failure.`,
-          'Push commits to the GitHub remote branch.',
-          'Provide or refresh git push credentials on the runner, then reply to push the branch.',
-        );
-      }
-      return failResult(
-        'unpushed',
-        true,
-        checksRan,
-        `${input.unpushedCommits} local commit(s) are still unpushed on this GitHub task.`,
-        'Push local commits to the remote work branch.',
-        'Push the branch commits to origin so the work is not stranded locally.',
-      );
-    }
-  }
-
-  let lastBlockerIdx = -1;
-  let lastBlockerText = '';
-  for (const call of calls) {
-    const combined = `${call.resultText}\n${commandOfCall(call.args)}`;
-    if ((call.isError || BLOCKER_RE.test(call.resultText)) && BLOCKER_RE.test(combined)) {
-      lastBlockerIdx = call.idx;
-      lastBlockerText = call.resultText || 'Environment blocker';
-    }
-  }
-  for (const t of texts) {
-    if (BLOCKER_RE.test(t.text) && t.idx > lastBlockerIdx) {
-      lastBlockerIdx = t.idx;
-      lastBlockerText = t.text;
-    }
-  }
-
-  let lastEditIdx = -1;
-  let lastEditAt = -1;
-  for (const call of calls) {
-    if (isMutatingCall(call)) {
-      lastEditIdx = call.idx;
-      lastEditAt = Math.max(lastEditAt, call.createdAt);
-    }
-  }
-
-  const postBlockerPass =
-    lastBlockerIdx !== -1 &&
-    (cmdCalls.some(
-      (c) => c.idx > lastBlockerIdx && !c.isError && !isLintOnlyCommand(commandOfCall(c.args)),
-    ) ||
-      attachCalls.some((c) => c.idx > lastBlockerIdx && !c.isError));
-  if (lastBlockerIdx !== -1 && !postBlockerPass) {
-    return failResult(
-      'blocked',
-      false,
-      checksRan,
-      `Real acceptance was blocked (${lastBlockerText.slice(0, 200)}).`,
-      'A passing real verification run without environment blockers.',
-      'Resolve the environment/sandbox blocker or run verification on an unblocked runner.',
-    );
-  }
-
   if (isInfoOutput(input.output)) {
     const writtenFiles = new Map<string, number>();
     for (const call of calls) {
@@ -430,32 +362,37 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
         (WRITE_ONLY_TOOL_NAMES.has(call.name) || EDIT_TOOL_NAMES.has(call.name))
       ) {
         for (const p of parsedPathsFromToolArgs(call.name, call.args)) {
-          writtenFiles.set(p, call.idx);
+          if (!SCRATCH_OR_TMP_RE.test(p)) writtenFiles.set(p, call.idx);
         }
       }
-    }
-    const postEditCmdFailed =
-      cmdCalls.findLast(
-        (c) => c.idx > lastEditIdx && (c.isError || isMeaningfulPassCommand(commandOfCall(c.args))),
-      )?.isError === true;
-    if (postEditCmdFailed) {
-      return failResult(
-        'failing-check',
-        true,
-        checksRan,
-        'The last verification command exited with an error.',
-        'A passing verification command after fixing the failure.',
-        'Fix the failing check and re-run it before submitting.',
-      );
     }
     const deliverableFiles = [...writtenFiles.entries()].filter(([filePath]) =>
       /(?:^|\/)(?:report\.md|deliverables\/)|\.(?:md|html|pdf|pptx|docx|xlsx|csv|png|jpe?g|webp)$/i.test(
         filePath,
       ),
     );
+    if (deliverableFiles.length > 0) {
+      const lastDeliverableIdx = Math.max(...deliverableFiles.map(([, idx]) => idx));
+      const postDeliverableCmd = cmdCalls.findLast(
+        (c) =>
+          c.idx > lastDeliverableIdx &&
+          (c.isError || isMeaningfulPassCommand(commandOfCall(c.args))),
+      );
+      if (postDeliverableCmd?.isError && !BLOCKER_RE.test(postDeliverableCmd.resultText)) {
+        return failResult(
+          'failing-check',
+          true,
+          checksRan,
+          'The last verification command exited with an error.',
+          'A passing verification command after fixing the failure.',
+          'Fix the failing check and re-run it before submitting.',
+        );
+      }
+    }
     const extraDeliverables = (input.deliverables?.files ?? [])
       .map((f) => f.name)
       .filter((name) => {
+        if (SCRATCH_OR_TMP_RE.test(name)) return false;
         const base = name.split('/').pop() ?? name;
         return !deliverableFiles.some(
           ([wp]) => wp === name || wp.endsWith(`/${base}`) || wp === base,
@@ -511,6 +448,84 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
       }
     }
     return { ok: true, checksRan };
+  }
+
+  if (input.repoKind === 'github') {
+    if (input.unpushedCommits === null) {
+      return failResult(
+        'unpushed-unknown',
+        false,
+        checksRan,
+        'Could not confirm whether commits on this GitHub workspace were pushed.',
+        'Remote push state verification (`git rev-list`) failed or was unavailable.',
+        'Verify git remote connectivity/credentials and ensure commits are pushed.',
+      );
+    }
+    if (typeof input.unpushedCommits === 'number' && input.unpushedCommits > 0) {
+      const hasAuthErr =
+        cmdCalls.some((c) => c.isError && PUSH_AUTH_BLOCKER_RE.test(c.resultText)) ||
+        texts.some((t) => PUSH_AUTH_BLOCKER_RE.test(t.text));
+      if (hasAuthErr) {
+        return failResult(
+          'unpushed-blocked',
+          false,
+          checksRan,
+          `${input.unpushedCommits} commit(s) remain unpushed locally due to a git push/auth failure.`,
+          'Push commits to the GitHub remote branch.',
+          'Provide or refresh git push credentials on the runner, then reply to push the branch.',
+        );
+      }
+      return failResult(
+        'unpushed',
+        true,
+        checksRan,
+        `${input.unpushedCommits} local commit(s) are still unpushed on this GitHub task.`,
+        'Push local commits to the remote work branch.',
+        'Push the branch commits to origin so the work is not stranded locally.',
+      );
+    }
+  }
+
+  let lastBlockerIdx = -1;
+  let lastBlockerText = '';
+  for (const call of calls) {
+    const combined = `${call.resultText}\n${commandOfCall(call.args)}`;
+    if (call.isError && BLOCKER_RE.test(combined)) {
+      lastBlockerIdx = call.idx;
+      lastBlockerText = call.resultText || 'Environment blocker';
+    }
+  }
+  for (const t of texts) {
+    if (BLOCKER_RE.test(t.text) && t.idx > lastBlockerIdx) {
+      lastBlockerIdx = t.idx;
+      lastBlockerText = t.text;
+    }
+  }
+
+  let lastEditIdx = -1;
+  let lastEditAt = -1;
+  for (const call of calls) {
+    if (isMutatingCall(call)) {
+      lastEditIdx = call.idx;
+      lastEditAt = Math.max(lastEditAt, call.createdAt);
+    }
+  }
+
+  const postBlockerPass =
+    lastBlockerIdx !== -1 &&
+    (cmdCalls.some(
+      (c) => c.idx > lastBlockerIdx && !c.isError && !isLintOnlyCommand(commandOfCall(c.args)),
+    ) ||
+      attachCalls.some((c) => c.idx > lastBlockerIdx && !c.isError));
+  if (lastBlockerIdx !== -1 && !postBlockerPass) {
+    return failResult(
+      'blocked',
+      false,
+      checksRan,
+      `Real acceptance was blocked (${lastBlockerText.slice(0, 200)}).`,
+      'A passing real verification run without environment blockers.',
+      'Resolve the environment/sandbox blocker or run verification on an unblocked runner.',
+    );
   }
 
   const effectivePaths =
@@ -592,7 +607,7 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
     }
 
     const imageMatchesCall = (img: AcceptanceAttachment, call: ParsedToolCall) => {
-      const p = typeof call.args.path === 'string' ? call.args.path : '';
+      const p = parsedPathsFromToolArgs(call.name, call.args)[0] ?? '';
       const base = p.split('/').pop() ?? p;
       return base !== '' && (base === img.fileName || img.fileName.endsWith(base));
     };

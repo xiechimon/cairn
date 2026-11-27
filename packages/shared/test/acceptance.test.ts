@@ -190,6 +190,95 @@ describe('evaluateStepAcceptance (Slice 2)', () => {
         stepIds: ['step-1'],
       }),
     ).toMatchObject({ ok: true });
+
+    expect(
+      evaluateStepAcceptance({
+        output: 'report',
+        repoKind: 'github',
+        hasChanges: false,
+        editedPaths: [],
+        messages: [
+          toolMsg(
+            'run_command',
+            { CommandLine: 'git fetch origin main' },
+            { result: 'Operation not permitted', isError: true, createdAt: 100 },
+          ),
+          toolMsg(
+            'write_file',
+            { Path: '/home/agent/.gemini/scratch/ci_runs_14d.json' },
+            { createdAt: 150 },
+          ),
+          textMsg(
+            '## 0. Sandbox Blocker\nCommand failed with Operation not permitted and spawn EPERM.',
+            200,
+          ),
+        ],
+        attachments: [],
+        stepIds: ['step-1'],
+        unpushedCommits: null,
+      }),
+    ).toMatchObject({ ok: true });
+
+    expect(
+      evaluateStepAcceptance({
+        output: 'report',
+        repoKind: 'hosted',
+        hasChanges: false,
+        editedPaths: [],
+        messages: [
+          toolMsg('write_file', { Path: '/ws/q3-review.html' }, { createdAt: 100 }),
+          toolMsg(
+            'read_file',
+            { Path: '/ws/q3-review.html' },
+            { result: '<html>...</html>', createdAt: 150 },
+          ),
+          toolMsg(
+            'run_command',
+            { CommandLine: 'python3 check.py' },
+            {
+              result:
+                "Command exited with code 0.\npython3: error: couldn't create cache file (Operation not permitted)",
+              isError: false,
+              createdAt: 200,
+            },
+          ),
+          toolMsg('mcp_cairn_attach_file', { path: 'q3-review.html' }, { createdAt: 250 }),
+        ],
+        attachments: [],
+        stepIds: ['step-1'],
+      }),
+    ).toMatchObject({ ok: true });
+
+    expect(
+      evaluateStepAcceptance({
+        output: 'code',
+        repoKind: 'hosted',
+        hasChanges: true,
+        editedPaths: ['packages/shared/src/records/acceptance.ts'],
+        messages: [
+          toolMsg(
+            'edit',
+            { path: 'packages/shared/src/records/acceptance.ts' },
+            { createdAt: 100 },
+          ),
+          toolMsg(
+            'read_file',
+            { Path: 'packages/shared/src/records/acceptance.ts' },
+            {
+              result: 'const BLOCKER_RE = /spawn EPERM|operation not permitted/i;',
+              createdAt: 150,
+            },
+          ),
+          toolMsg(
+            'bash',
+            { command: 'pnpm exec vitest run test/acceptance.test.ts' },
+            { result: '1 passed', createdAt: 200 },
+          ),
+        ],
+        attachments: [],
+        stepIds: ['step-1'],
+      }),
+    ).toMatchObject({ ok: true });
   });
 
   test('rejects missing, fixture-only, pending/failed, and stale UI screenshots (#18)', () => {

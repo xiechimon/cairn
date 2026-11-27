@@ -3,9 +3,9 @@ import {
   type AskUserQuestionContent,
   askUserQuestionContentSchema,
 } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { message } from '../db/schema.js';
+import { message, step } from '../db/schema.js';
 import type { ConversationStreamHub } from './events.js';
 
 export interface StoreDeps {
@@ -137,4 +137,58 @@ export function cancelPendingWorkerQuestions(
       row.createdAt,
     );
   }
+}
+
+export const ACCEPTANCE_BLOCKED_PREFIX = 'acceptance-blocked-';
+
+export function isAcceptanceBlockedRequestId(requestId: string): boolean {
+  return requestId.startsWith(ACCEPTANCE_BLOCKED_PREFIX);
+}
+
+export function coordinatorAcceptanceBlockedExhausted(db: Db, buildId: string): boolean {
+  const rows = workerQuestionRows(db, buildId);
+  const answeredBlocked = rows
+    .filter((row) => isAcceptanceBlockedRequestId(row.id) && row.content.status === 'answered')
+    .sort(
+      (a, b) =>
+        (b.content.answeredAt ?? b.createdAt) - (a.content.answeredAt ?? a.createdAt) ||
+        b.createdAt - a.createdAt,
+    );
+  const latest = answeredBlocked[0];
+  if (latest === undefined || latest.content.answeredBy !== 'coordinator') return false;
+  const lastCoordAnswerAt = latest.content.answeredAt ?? latest.createdAt;
+  const hasHumanAnswer = rows.some(
+    (row) =>
+      row.content.status === 'answered' &&
+      row.content.answeredBy === 'person' &&
+      (row.content.answeredAt ?? row.createdAt) > lastCoordAnswerAt,
+  );
+  if (hasHumanAnswer) return false;
+  const hasHumanMessage =
+    db
+      .select({ id: message.id })
+      .from(message)
+      .where(
+        and(
+          eq(message.conversationId, buildId),
+          eq(message.role, 'user'),
+          like(message.id, 'human-%'),
+          gt(message.createdAt, lastCoordAnswerAt),
+        ),
+      )
+      .get() !== undefined;
+  if (hasHumanMessage) return false;
+  const hasNewScheduleRun =
+    db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          isNotNull(step.scheduleId),
+          gt(step.createdAt, lastCoordAnswerAt),
+        ),
+      )
+      .get() !== undefined;
+  return !hasNewScheduleRun;
 }

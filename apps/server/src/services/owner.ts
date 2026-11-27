@@ -38,6 +38,10 @@ import type { VapidKeys } from './push.js';
 import { publishStepRow } from './quota-wait.js';
 import { getTodo } from './todos.js';
 import { reportProvenance, turnProvenance } from './turn-provenance.js';
+import {
+  coordinatorAcceptanceBlockedExhausted,
+  isAcceptanceBlockedRequestId,
+} from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 type StepRow = typeof step.$inferSelect;
@@ -185,6 +189,18 @@ function workOwnership(db: Db, row: TodoRow): Ownership | null {
   if (row.archivedAt !== null || row.supersededBy !== null || isEndedPhase(row.phase)) return null;
   const pending = row.latestBuildId === null ? [] : pendingQuestionIds(db, row.latestBuildId);
   if (pending.length > 0) {
+    if (
+      row.latestBuildId !== null &&
+      pending.some(isAcceptanceBlockedRequestId) &&
+      coordinatorAcceptanceBlockedExhausted(db, row.latestBuildId)
+    ) {
+      return {
+        owner: 'owner',
+        reason: 'handoff',
+        from: 'question',
+        workKey: `question:${row.latestBuildId}:${pending.join(',')}:unclaimed`,
+      };
+    }
     return {
       owner: 'coordinator',
       reason: 'question',

@@ -8,7 +8,7 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { type build, message, type step, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
-import { writeWorkerQuestion } from './worker-question-store.js';
+import { ACCEPTANCE_BLOCKED_PREFIX, writeWorkerQuestion } from './worker-question-store.js';
 
 type BuildRow = typeof build.$inferSelect;
 
@@ -68,7 +68,7 @@ export function askAcceptanceBlockedOnce(
   stepId: string,
   evaluation: Exclude<AcceptanceEvaluation, { ok: true }>,
 ): void {
-  const requestId = `acceptance-blocked-${stepId}`;
+  const requestId = `${ACCEPTANCE_BLOCKED_PREFIX}${stepId}`;
   const ranLine =
     evaluation.checksRan.length > 0
       ? evaluation.checksRan.join(', ')

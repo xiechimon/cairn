@@ -1,11 +1,13 @@
 import { ASK_USER_QUESTION_KIND, type DocumentDiffFile } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { attachment, build, message, project, step, todo } from '../src/db/schema.js';
+import { attachment, build, message, project, schedule, step, todo } from '../src/db/schema.js';
 import { markDelivered } from '../src/services/answer-delivery.js';
+import { sendBuildSteer } from '../src/services/build-steer.js';
 import { completeStep, startBuilds } from '../src/services/builds.js';
 import { finishStep } from '../src/services/machines.js';
-import { messageThreadAsUser } from '../src/services/thread-message.js';
+import { ownershipOf } from '../src/services/owner.js';
+import { answerTaskQuestion, messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
 import { pendingWorkerQuestions } from '../src/services/worker-question-store.js';
 import {
@@ -45,7 +47,7 @@ async function createTaskIn(
   s: ReturnType<typeof bootServer>,
   opts: {
     repoKind?: 'hosted' | 'github';
-    output?: 'code' | 'info';
+    output?: 'code' | 'info' | 'report';
     changes?: DocumentDiffFile[] | null;
     machineId: string;
   },
@@ -413,5 +415,251 @@ describe('server acceptance gate on completeStep (Slice 2)', () => {
     });
     expect(s.db.select().from(step).where(eq(step.buildId, replay.buildId)).all()).toHaveLength(2);
     expect(pendingWorkerQuestions(s.db, replay.buildId)).toHaveLength(0);
+  });
+
+  test('report task stating sandbox blocker finishes in review without acceptance-blocked QuestionCard', async () => {
+    const s = bootServer();
+    const machineId = await createWorld(s);
+    const task = await createTaskIn(s, {
+      machineId,
+      repoKind: 'github',
+      output: 'report',
+      changes: [],
+    });
+    pushToolMsg(
+      s,
+      task.buildId,
+      'r1',
+      'run_command',
+      { CommandLine: 'git fetch origin main' },
+      100,
+      { result: 'Operation not permitted', isError: true },
+    );
+    pushToolMsg(
+      s,
+      task.buildId,
+      'r2',
+      'write_file',
+      { Path: '/home/agent/.gemini/scratch/ci_runs.json' },
+      150,
+    );
+    pushTextMsg(
+      s,
+      task.buildId,
+      'r3',
+      '# Weekly Health Check\n\n## 0. Sandbox Blocker\nOperation not permitted in worktree sandbox.',
+      200,
+    );
+    completeStep(depsOf(s), task.stepId, {
+      hasChanges: false,
+      unpushedCommits: null,
+      report: '# Weekly Health Check\nOperation not permitted',
+    });
+    expect(getTodo(depsOf(s), task.todoId)?.phase).toBe('review');
+    expect(pendingWorkerQuestions(s.db, task.buildId)).toHaveLength(0);
+    const todoRow = s.db.select().from(todo).where(eq(todo.id, task.todoId)).get()!;
+    expect(ownershipOf(s.db, todoRow)).toMatchObject({ owner: 'coordinator', reason: 'review' });
+  });
+
+  test('Coordinator answer-path hands off to owner and refuses re-answering when acceptance-blocked repeats on code task', async () => {
+    const s = bootServer();
+    const machineId = await createWorld(s);
+    const task = await createTaskIn(s, {
+      machineId,
+      repoKind: 'github',
+      output: 'code',
+      changes: null,
+    });
+    pushToolMsg(s, task.buildId, 'c1', 'edit', { path: 'apps/server/src/app.ts' }, 100);
+    pushToolMsg(s, task.buildId, 'c2', 'bash', { command: 'vitest run' }, 200, {
+      result: 'Error: spawn EPERM',
+      isError: true,
+    });
+    completeStep(depsOf(s), task.stepId, { hasChanges: false });
+    expect(getTodo(depsOf(s), task.todoId)?.phase).toBe('needs_input');
+
+    const firstReqId = `acceptance-blocked-${task.stepId}`;
+    expect(pendingWorkerQuestions(s.db, task.buildId)[0]?.requestId).toBe(firstReqId);
+    const todoRow1 = s.db.select().from(todo).where(eq(todo.id, task.todoId)).get()!;
+    expect(ownershipOf(s.db, todoRow1)).toMatchObject({ owner: 'coordinator', reason: 'question' });
+
+    await answerTaskQuestion(
+      depsOf(s),
+      s.team.id,
+      { todoId: task.todoId, requestId: firstReqId, answer: 'Re-run check' },
+      'coordinator',
+    );
+    const step2 = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, task.buildId))
+      .all()
+      .find((r) => r.id !== task.stepId)!;
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: 2_000 })
+      .where(eq(step.id, step2.id))
+      .run();
+    s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, task.todoId)).run();
+    markDelivered(depsOf(s), task.buildId, [firstReqId], 'session-start', step2.id);
+
+    const wakesBeforeSecond = s.db
+      .select()
+      .from(step)
+      .where(eq(step.kind, 'chief'))
+      .all()
+      .filter((r) => r.prompt?.includes(task.todoId)).length;
+
+    completeStep(depsOf(s), step2.id, { hasChanges: false });
+    expect(getTodo(depsOf(s), task.todoId)?.phase).toBe('needs_input');
+    const secondReqId = `acceptance-blocked-${step2.id}`;
+    expect(pendingWorkerQuestions(s.db, task.buildId)[0]?.requestId).toBe(secondReqId);
+
+    const todoRow2 = s.db.select().from(todo).where(eq(todo.id, task.todoId)).get()!;
+    expect(ownershipOf(s.db, todoRow2)).toMatchObject({
+      owner: 'owner',
+      reason: 'handoff',
+      from: 'question',
+    });
+    const wakesAfterSecond = s.db
+      .select()
+      .from(step)
+      .where(eq(step.kind, 'chief'))
+      .all()
+      .filter((r) => r.prompt?.includes(task.todoId)).length;
+    expect(wakesAfterSecond).toBe(wakesBeforeSecond);
+
+    await expect(
+      answerTaskQuestion(
+        depsOf(s),
+        s.team.id,
+        { todoId: task.todoId, requestId: secondReqId, answer: 'Try again' },
+        'coordinator',
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+
+    await messageThreadAsUser(depsOf(s), s.team.id, task.todoId, {
+      content: 'Unblocked now, try again',
+      clientMessageId: 'human-unblock-1',
+    });
+    const step3 = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, task.buildId))
+      .all()
+      .find((r) => r.id !== task.stepId && r.id !== step2.id)!;
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: 3_000 })
+      .where(eq(step.id, step3.id))
+      .run();
+    s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, task.todoId)).run();
+    markDelivered(depsOf(s), task.buildId, [secondReqId], 'session-start', step3.id);
+    pushToolMsg(s, task.buildId, 'c3', 'bash', { command: 'vitest run' }, 400, {
+      result: '1 passed',
+    });
+    completeStep(depsOf(s), step3.id, { hasChanges: true });
+    expect(getTodo(depsOf(s), task.todoId)?.phase).toBe('done');
+  });
+
+  test('new scheduled run cancels stale pending acceptance-blocked question so report finishes in review', async () => {
+    const s = bootServer();
+    const machineId = await createWorld(s);
+    const task = await createTaskIn(s, {
+      machineId,
+      repoKind: 'github',
+      output: 'report',
+      changes: [],
+    });
+    const staleReqId = `acceptance-blocked-${task.stepId}`;
+    s.db
+      .update(step)
+      .set({ status: 'done', finishedAt: 1_500 })
+      .where(eq(step.id, task.stepId))
+      .run();
+    s.db
+      .insert(message)
+      .values({
+        id: staleReqId,
+        conversationId: task.buildId,
+        role: 'assistant',
+        createdAt: 1_500,
+        content: {
+          kind: ASK_USER_QUESTION_KIND,
+          requestId: staleReqId,
+          status: 'pending',
+          questions: [{ header: 'Acceptance needed', question: 'Stale blocker', options: [] }],
+          answers: null,
+        },
+      })
+      .run();
+    s.db.update(todo).set({ phase: 'needs_input' }).where(eq(todo.id, task.todoId)).run();
+    const schedId = 'sched-weekly-health';
+    const now = Date.now();
+    s.db
+      .insert(schedule)
+      .values({
+        id: schedId,
+        teamId: s.team.id,
+        projectId: task.projectId,
+        todoId: task.todoId,
+        chiefThreadId: null,
+        kind: 'weekly',
+        cron: '0 9 * * 1',
+        prompt: 'Run weekly check',
+        enabled: true,
+        at: null,
+        tz: 'UTC',
+        nextRunAt: now,
+        createdAt: now,
+        createdBy: 'owner',
+      })
+      .run();
+
+    await sendBuildSteer(
+      depsOf(s),
+      task.buildId,
+      { content: 'Run weekly check' },
+      {
+        afterTurn: true,
+        human: false,
+        schedule: {
+          id: schedId,
+          createdBy: 'owner',
+          at: now,
+          expected: now,
+          next: now + 7 * 86_400_000,
+          triggered: false,
+        },
+      },
+    );
+    expect(pendingWorkerQuestions(s.db, task.buildId)).toHaveLength(0);
+
+    const step2 = s.db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, task.buildId))
+      .all()
+      .find((r) => r.id !== task.stepId)!;
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: now + 100 })
+      .where(eq(step.id, step2.id))
+      .run();
+    s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, task.todoId)).run();
+    pushTextMsg(
+      s,
+      task.buildId,
+      'sched-report',
+      '# Weekly Report\nSandbox Operation not permitted noted.',
+      now + 200,
+    );
+    completeStep(depsOf(s), step2.id, {
+      hasChanges: false,
+      unpushedCommits: null,
+      report: '# Weekly Report\nSandbox Operation not permitted noted.',
+    });
+    expect(getTodo(depsOf(s), task.todoId)?.phase).toBe('review');
+    expect(pendingWorkerQuestions(s.db, task.buildId)).toHaveLength(0);
   });
 });

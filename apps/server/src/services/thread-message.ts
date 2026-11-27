@@ -36,7 +36,12 @@ import {
   type Replacement,
   replacingStrandedSend,
 } from './queued-send.js';
-import { pendingWorkerQuestionIds, pendingWorkerQuestions } from './worker-question-store.js';
+import {
+  coordinatorAcceptanceBlockedExhausted,
+  isAcceptanceBlockedRequestId,
+  pendingWorkerQuestionIds,
+  pendingWorkerQuestions,
+} from './worker-question-store.js';
 import { settleQuestionAnswers } from './worker-questions.js';
 
 type TodoRow = typeof todo.$inferSelect;
@@ -436,6 +441,16 @@ export async function answerTaskQuestion(
     throw new HttpError(
       409,
       `requestId ${input.requestId} is not pending on thread #${row.seqNum}${pending.length > 0 ? `; pending: ${pending.map((q) => q.requestId).join(', ')}` : ''}`,
+    );
+  }
+  if (
+    by === 'coordinator' &&
+    isAcceptanceBlockedRequestId(input.requestId) &&
+    coordinatorAcceptanceBlockedExhausted(deps.db, buildId)
+  ) {
+    throw new HttpError(
+      409,
+      `thread #${row.seqNum} is still blocked on acceptance after the Coordinator already answered an earlier acceptance-blocked question; hand off to the user instead of re-answering`,
     );
   }
   const answer = { question, answer: input.answer, by };
