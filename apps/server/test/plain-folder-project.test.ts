@@ -387,4 +387,39 @@ describe('plain-folder project API, browse, merge/undo orchestration', () => {
     const undoArchived = await req(s.app, 'POST', `/api/builds/${buildId}/undo`);
     expect(undoArchived.status).toBe(409);
   });
+
+  test('requestMerge without plain-folder state does not hijack local git merge routing', async () => {
+    const dir = tempDir('cairn-pf-nonstate-');
+    const createRes = await req(s.app, 'POST', '/api/projects', {
+      name: 'non-plain-build',
+      kind: 'local',
+      localPath: dir,
+    });
+    expect(createRes.status).toBe(201);
+    const { id: projId } = (await createRes.json()) as { id: string };
+    const todoRes = await req(s.app, 'POST', `/api/projects/${projId}/todos`, {
+      title: 'missing plain state merge',
+      spec: 'missing plain state merge',
+    });
+    const todoRow = (await todoRes.json()) as { id: string };
+    const { buildId, stepId } = deliverCodeStep(s.svc, todoRow.id, { hasChanges: true });
+    s.db
+      .update(stepTable)
+      .set({ status: 'done', checkpointCommit: 'b'.repeat(40) })
+      .where(eq(stepTable.id, stepId))
+      .run();
+    s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, todoRow.id)).run();
+
+    const mergeRes = await req(s.app, 'POST', `/api/builds/${buildId}/merge`);
+    expect(mergeRes.status).toBe(409);
+    const body = (await mergeRes.json()) as { error?: string };
+    expect(body.error).toContain('无法读取本地仓库默认分支');
+    const actionSteps = s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, buildId))
+      .all()
+      .filter((row) => parseLocalFolderActionInstruction(row.prompt) !== null);
+    expect(actionSteps).toHaveLength(0);
+  });
 });

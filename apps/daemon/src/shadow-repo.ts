@@ -298,9 +298,9 @@ function shadowGitEnv(
   env.GIT_CONFIG_SYSTEM = join(shadowDir, 'gitconfig_empty');
   env.GIT_CONFIG_NOSYSTEM = '1';
   env.GIT_AUTHOR_NAME = 'cairn-shadow';
-  env.GIT_AUTHOR_EMAIL = 'shadow@cairn.local';
+  env.GIT_AUTHOR_EMAIL = 'shadow@cairn.invalid';
   env.GIT_COMMITTER_NAME = 'cairn-shadow';
-  env.GIT_COMMITTER_EMAIL = 'shadow@cairn.local';
+  env.GIT_COMMITTER_EMAIL = 'shadow@cairn.invalid';
   env.GIT_TERMINAL_PROMPT = '0';
   env.GIT_NO_REPLACE_OBJECTS = '1';
   if (workTree !== null) env.GIT_WORK_TREE = workTree;
