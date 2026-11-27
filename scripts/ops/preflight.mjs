@@ -3,6 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { acquireSlot } from '../heavy-slots.mjs';
 import { MAX_CONCURRENT_PREFLIGHT_RUNS } from './ci-capacity-gate.mjs';
 import { localLane, parsePreflightArgs, stampUnownedCommits } from './push-queue.mjs';
 import { ENQUEUE_PREFIX, TRY_PREFIX } from './speculative-queue.mjs';
@@ -242,6 +243,29 @@ export function collectActivePreflightRuns({
   return { ok: true, runs: [...unique.values()] };
 }
 
+export const PREFLIGHT_PUSH_POOL = {
+  defaultCount: 1,
+  dirName: 'preflight-push',
+  label: 'preflight-queue',
+};
+
+export async function withPreflightAdmission(
+  { bypass = false, env = process.env, log = console.log, acquire = acquireSlot } = {},
+  fn,
+) {
+  if (bypass) return await fn();
+  const lease = await acquire({
+    pool: PREFLIGHT_PUSH_POOL,
+    env: { ...env, CAIRN_CPU_SATURATION_PERCENT: '0', CAIRN_HEAVY_GATE_BYPASS: '' },
+    log,
+  });
+  try {
+    return await fn();
+  } finally {
+    lease?.release();
+  }
+}
+
 export function waitForPreflightCapacity({
   repo,
   gh,
@@ -249,7 +273,7 @@ export function waitForPreflightCapacity({
   log = console.log,
   bypass = false,
   replaced = () => false,
-  pollSeconds = 20,
+  pollSeconds = 10,
   waitMinutes = 60,
   now = () => Date.now(),
 }) {
@@ -359,11 +383,14 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     console.error('[preflight] fast gate failed on the exact HEAD tree; nothing was pushed.');
     process.exit(gate.status ?? 1);
   }
+  const movedHeadError = (outcome = 'Nothing was pushed') => {
+    if (git(['rev-parse', 'HEAD']) === sha) return null;
+    return `[preflight] HEAD moved from ${sha.slice(0, 9)} while pre-flight was running, so this run does not cover the new HEAD; run it again. ${outcome}.`;
+  };
   const refuseMovedHead = (outcome = 'Nothing was pushed') => {
-    if (git(['rev-parse', 'HEAD']) === sha) return;
-    console.error(
-      `[preflight] HEAD moved from ${sha.slice(0, 9)} while pre-flight was running, so this run does not cover the new HEAD; run it again. ${outcome}.`,
-    );
+    const error = movedHeadError(outcome);
+    if (!error) return;
+    console.error(error);
     process.exit(1);
   };
   const succeed = (message) => {
@@ -380,40 +407,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         .filter(Boolean)
         .map((line) => line.split(/\s+/)[0]),
     );
-  let keepShas = null;
-  try {
-    keepShas = readQueuedShas();
-  } catch (error) {
-    console.log(
-      `[preflight] could not list queued shas (${error.message}); counting every active run`,
-    );
-  }
-  const capacity = waitForPreflightCapacity({
-    repo,
-    gh: ghJson,
-    sleep,
-    bypass: process.env.CAIRN_PREFLIGHT_CONCURRENCY_BYPASS === '1',
-    replaced: (run) => keepShas !== null && isSupersededRun(run, { ref, sha, keepShas }),
-  });
-  if (!capacity.ok) {
-    console.error(`[preflight] ${capacity.error}`);
-    process.exit(1);
-  }
-  refuseMovedHead();
-  const push = spawnSync(
-    'git',
-    [
-      'push',
-      '--no-follow-tags',
-      `--force-with-lease=${preflightRef(lane)}`,
-      'origin',
-      `${sha}:${preflightRef(lane)}`,
-    ],
-    { stdio: 'inherit' },
-  );
-  if (push.status !== 0) process.exit(push.status ?? 1);
-  console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
-  refuseMovedHead(`${sha.slice(0, 9)} was pushed`);
   const recordedEntries = guard.sameSha
     ? priorEntries
     : [
@@ -425,8 +418,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           conclusion: null,
         },
       ];
-  history[historyKey] = recordedEntries;
-  writePreflightHistory(historyPath, history);
   const saveConclusion = (conclusion) => {
     const current = readPreflightHistory(historyPath);
     const list = Array.isArray(current[historyKey]) ? current[historyKey] : recordedEntries;
@@ -442,22 +433,72 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     ]);
     return preflightRun(runs, sha, ref);
   };
-  let run = null;
-  for (let attempt = 0; attempt < 12; attempt++) {
+  const bypassConcurrency = process.env.CAIRN_PREFLIGHT_CONCURRENCY_BYPASS === '1';
+  const admission = await withPreflightAdmission({ bypass: bypassConcurrency }, async () => {
+    const preWaitMoved = movedHeadError();
+    if (preWaitMoved) return { ok: false, exitCode: 1, error: preWaitMoved };
+    let keepShas = null;
     try {
-      run = readRun();
-    } catch {
-      run = null;
+      keepShas = readQueuedShas();
+    } catch (error) {
+      console.log(
+        `[preflight] could not list queued shas (${error.message}); counting every active run`,
+      );
     }
-    if (run) break;
-    sleep(5);
-  }
-  if (!run) {
-    console.error(
-      '[preflight] could not read the run: the ci run did not appear; check that the ci workflow is enabled',
+    const capacity = waitForPreflightCapacity({
+      repo,
+      gh: ghJson,
+      sleep,
+      bypass: bypassConcurrency,
+      replaced: (run) => keepShas !== null && isSupersededRun(run, { ref, sha, keepShas }),
+    });
+    if (!capacity.ok) {
+      return { ok: false, exitCode: 1, error: `[preflight] ${capacity.error}` };
+    }
+    const prePushMoved = movedHeadError();
+    if (prePushMoved) return { ok: false, exitCode: 1, error: prePushMoved };
+    const push = spawnSync(
+      'git',
+      [
+        'push',
+        '--no-follow-tags',
+        `--force-with-lease=${preflightRef(lane)}`,
+        'origin',
+        `${sha}:${preflightRef(lane)}`,
+      ],
+      { stdio: 'inherit' },
     );
-    process.exit(1);
+    if (push.status !== 0) return { ok: false, exitCode: push.status ?? 1, error: null };
+    console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
+    history[historyKey] = recordedEntries;
+    writePreflightHistory(historyPath, history);
+    const postPushMoved = movedHeadError(`${sha.slice(0, 9)} was pushed`);
+    if (postPushMoved) return { ok: false, exitCode: 1, error: postPushMoved };
+    let run = null;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      try {
+        run = readRun();
+      } catch {
+        run = null;
+      }
+      if (run) break;
+      sleep(5);
+    }
+    if (!run) {
+      return {
+        ok: false,
+        exitCode: 1,
+        error:
+          '[preflight] could not read the run: the ci run did not appear; check that the ci workflow is enabled',
+      };
+    }
+    return { ok: true, run };
+  });
+  if (!admission.ok) {
+    if (admission.error) console.error(admission.error);
+    process.exit(admission.exitCode);
   }
+  const { run } = admission;
   refuseMovedHead(`${sha.slice(0, 9)} was pushed`);
   cancelSupersededRuns({
     repo,

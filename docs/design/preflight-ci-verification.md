@@ -79,11 +79,18 @@ A lane verifies on GitHub before it enters the landing queue:
   `<wrapper...> sh -c "..."` call so hosts can offload the gate to a dedicated
   test runner without hardcoding host-specific paths in the repository.
 - `scripts/ops/preflight.mjs` admits at most two active (`queued` or
-  `in_progress`) preflight `ci` runs. While two are active it waits before
-  pushing; `CAIRN_PREFLIGHT_CONCURRENCY_BYPASS=1` skips only this efficiency
-  wait, never the fast gate. If the GitHub run-count API is unreadable the
-  script proceeds after the fast gate because capacity is an efficiency gate,
-  while the safety evidence remains the required checks on the exact SHA.
+  `in_progress`) preflight `ci` runs and serializes local pushes on each machine
+  in strict FIFO order through `withPreflightAdmission` (`PREFLIGHT_PUSH_POOL`,
+  `preflight-queue` in `scripts/heavy-slots.mjs`). Only the head-of-line
+  waiter polls GitHub every 10s, and it holds the local admission lock across
+  the `git push` and initial workflow-run appearance check (`readRun`) so
+  queued waiters cannot stampede past the two-run cap; local CPU saturation
+  and `CAIRN_HEAVY_GATE_BYPASS` never block or skip this admission lock.
+  `CAIRN_PREFLIGHT_CONCURRENCY_BYPASS=1` skips both the FIFO lock and the
+  remote capacity wait (never the fast gate). If the GitHub run-count API is
+  unreadable the script proceeds after the fast gate because capacity is an
+  efficiency gate, while the safety evidence remains the required checks on the
+  exact SHA.
 - Still-active `ci` runs on this lane's own ref that test another SHA are being
   replaced: they do not count against that cap, and once the new head is pushed
   they are cancelled. Nothing is cancelled when the wait or the push fails.

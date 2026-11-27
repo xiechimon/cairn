@@ -4,6 +4,7 @@ import {
   chmodSync,
   copyFileSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   symlinkSync,
   writeFileSync,
@@ -11,6 +12,7 @@ import {
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import {
@@ -19,6 +21,7 @@ import {
   fastGateInvocation,
   isActivePreflightRun,
   MAX_CONCURRENT_PREFLIGHT_RUNS,
+  PREFLIGHT_PUSH_POOL,
   parsePreflightArgs,
   preflightCapacityDecision,
   preflightRef,
@@ -27,6 +30,7 @@ import {
   upsertPreflightReason,
   waitForPreflightCapacity,
   watchVerdict,
+  withPreflightAdmission,
 } from './preflight.mjs';
 import {
   classifyWaitStatus,
@@ -353,6 +357,7 @@ console.log(JSON.stringify(checkRunsSha ? [{ check_runs: checkRuns }] : { workfl
       PATH: `${bin}:${process.env.PATH}`,
       HOME: home,
       CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+      CAIRN_HEAVY_SLOTS_DIR: join(root, 'slots'),
       ...extraEnv,
     });
     const preflight = (extraEnv, args = []) =>
@@ -1064,6 +1069,7 @@ test('preflight CLI enforces --reason on 3rd green rerun for same lane+branch an
       GIT_COMMITTER_NAME: 'xiechimon',
       GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
       CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+      CAIRN_HEAVY_SLOTS_DIR: join(root, 'slots'),
     };
     const git = (args) =>
       execFileSync('git', args, { cwd: work, encoding: 'utf8', env: gitEnv }).trim();
@@ -1225,6 +1231,7 @@ test('push-queue --wait --reason arms the post-reason SHA once while checks stay
       GIT_COMMITTER_NAME: 'xiechimon',
       GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
       CAIRN_PREFLIGHT_GATE_WRAPPER: '',
+      CAIRN_HEAVY_SLOTS_DIR: join(root, 'slots'),
       PUSH_QUEUE_POLL_SECONDS: '0.05',
       PUSH_QUEUE_WAIT_MINUTES: '2',
     };
@@ -1371,5 +1378,106 @@ if (args.includes('/check-runs')) {
     assert.equal(git(['ls-remote', 'origin', 'refs/heads/enqueue/*']), '');
   } finally {
     releaseTestTempDir(root);
+  }
+});
+
+test('withPreflightAdmission serializes callers FIFO, releases on throw, and honours bypass/env policy', async () => {
+  assert.deepEqual(PREFLIGHT_PUSH_POOL, {
+    defaultCount: 1,
+    dirName: 'preflight-push',
+    label: 'preflight-queue',
+  });
+
+  const dir = makeTestTempDir('preflight-fifo-');
+  const queueDir = join(dir, PREFLIGHT_PUSH_POOL.dirName);
+  const env = { CAIRN_HEAVY_SLOTS_DIR: dir, CAIRN_HEAVY_GATE_BYPASS: '1' };
+  const waitForTicketCount = async (expected) => {
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      const tickets = readdirSync(queueDir).filter((name) => name.startsWith('queue-'));
+      if (tickets.length >= expected) return;
+      if (Date.now() > deadline)
+        throw new Error(`expected ${expected} queue tickets, saw ${tickets.length}`);
+      await delay(20);
+    }
+  };
+  try {
+    let active = 0;
+    let maxActive = 0;
+    const order = [];
+    let markEnteredA;
+    const enteredA = new Promise((done) => {
+      markEnteredA = done;
+    });
+    let releaseA;
+    const holdA = new Promise((done) => {
+      releaseA = done;
+    });
+
+    const pA = withPreflightAdmission({ env, log: () => {} }, async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      order.push('A');
+      markEnteredA();
+      try {
+        await holdA;
+        throw new Error('slot A boom');
+      } finally {
+        active -= 1;
+      }
+    });
+    await enteredA;
+
+    const pB = withPreflightAdmission({ env, log: () => {} }, async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      order.push('B');
+      await delay(30);
+      active -= 1;
+      return 'ok-B';
+    });
+    await waitForTicketCount(1);
+
+    const pC = withPreflightAdmission({ env, log: () => {} }, async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      order.push('C');
+      active -= 1;
+      return 'ok-C';
+    });
+    await waitForTicketCount(2);
+
+    const bypassRan = await withPreflightAdmission(
+      { bypass: true, env, log: () => {} },
+      async () => 'bypassed',
+    );
+    assert.equal(bypassRan, 'bypassed');
+    assert.deepEqual(order, ['A']);
+
+    releaseA();
+    await assert.rejects(pA, /slot A boom/);
+    assert.equal(await pB, 'ok-B');
+    assert.equal(await pC, 'ok-C');
+    assert.equal(maxActive, 1);
+    assert.deepEqual(order, ['A', 'B', 'C']);
+
+    let seenOpts = null;
+    await withPreflightAdmission(
+      {
+        env: { CAIRN_HEAVY_GATE_BYPASS: '1', CAIRN_CPU_SATURATION_PERCENT: '90', CUSTOM_X: 'yes' },
+        log: () => {},
+        acquire: async (opts) => {
+          seenOpts = opts;
+          return { slot: 1, owner: process.pid, release() {} };
+        },
+      },
+      async () => 'done',
+    );
+    assert.equal(seenOpts.pool, PREFLIGHT_PUSH_POOL);
+    assert.equal(seenOpts.env.CAIRN_HEAVY_GATE_BYPASS, '');
+    assert.equal(seenOpts.env.CAIRN_CPU_SATURATION_PERCENT, '0');
+    assert.equal(seenOpts.env.CUSTOM_X, 'yes');
+  } finally {
+    releaseTestTempDir(dir);
   }
 });
