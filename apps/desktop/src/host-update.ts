@@ -24,6 +24,17 @@ export function readHostUpdateRequest(cairnHome: string): HostUpdateRequest | nu
   }
 }
 
+export function consumeHostUpdateForce(cairnHome: string, requestId: string): void {
+  const current = readHostUpdateRequest(cairnHome);
+  if (current === null || current.id !== requestId || current.force !== true) return;
+  const { force: _consumed, ...rest } = current;
+  const path = join(cairnHome, HOST_UPDATE_REQUEST_FILE);
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const tempPath = `${path}.${process.pid}.tmp`;
+  writeFileSync(tempPath, `${JSON.stringify(rest, null, 2)}\n`, { mode: 0o600 });
+  renameSync(tempPath, path);
+}
+
 export function initialHandledHostRequestId(cairnHome: string): string | null {
   const path = join(cairnHome, HOST_UPDATE_STATUS_FILE);
   if (!existsSync(path)) return null;

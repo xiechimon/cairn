@@ -51,7 +51,6 @@ export const DESKTOP_RELEASE_MANIFEST = 'desktop-latest.json';
 export const RUNNER_RELEASE_MANIFEST = 'runner-latest.json';
 export const DESKTOP_RELEASES_BASE = 'https://github.com/xiechimon/cairn/releases';
 export const DESKTOP_MANIFEST_URL = `${DESKTOP_RELEASES_BASE}/latest/download/${DESKTOP_RELEASE_MANIFEST}`;
-export const RUNNER_MANIFEST_URL = `${DESKTOP_RELEASES_BASE}/latest/download/${RUNNER_RELEASE_MANIFEST}`;
 
 export function resolveUpdateFeedBase(env: NodeJS.ProcessEnv = process.env): {
   releasesBase: string;

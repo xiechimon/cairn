@@ -5,19 +5,18 @@ import {
   constants,
   createWriteStream,
   existsSync,
-  linkSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   renameSync,
   rmSync,
-  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
   isServerVersionNewer,
+  isValidSemverVersion,
   type RunnerAutoUpdateReason,
   type RunnerAutoUpdateReport,
   type RunnerAutoUpdateState,
@@ -72,7 +71,6 @@ export function selfUpdatePaths(cairnHome: string) {
     versionsDir: join(root, 'versions'),
     stateFile: join(root, 'state.json'),
     healthyFile: join(root, 'healthy.json'),
-    lockFile: join(root, '.lock'),
   };
 }
 
@@ -189,42 +187,6 @@ export function clearHealthyRecord(cairnHome: string): void {
   rmSync(healthyFile, { force: true });
 }
 
-export function acquireSelfUpdateLock(cairnHome: string): (() => void) | null {
-  const { lockFile } = selfUpdatePaths(cairnHome);
-  mkdirSync(dirname(lockFile), { recursive: true, mode: 0o700 });
-  const draft = `${lockFile}.${process.pid}.tmp`;
-  writeFileSync(draft, JSON.stringify({ pid: process.pid, at: Date.now() }), { mode: 0o600 });
-  try {
-    linkSync(draft, lockFile);
-    return () => {
-      rmSync(lockFile, { force: true });
-    };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-      try {
-        const holder = JSON.parse(readFileSync(lockFile, 'utf8')) as { pid?: number };
-        if (typeof holder.pid === 'number') {
-          try {
-            process.kill(holder.pid, 0);
-            return null;
-          } catch {
-            rmSync(lockFile, { force: true });
-            linkSync(draft, lockFile);
-            return () => rmSync(lockFile, { force: true });
-          }
-        }
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  } finally {
-    try {
-      unlinkSync(draft);
-    } catch {}
-  }
-}
-
 function defaultWritableCheck(dirPath: string): boolean {
   let probe = resolve(dirPath);
   while (!existsSync(probe)) {
@@ -248,7 +210,11 @@ export function classifyRunnerInstall(opts: {
 }): RunnerInstallClassification {
   const env = opts.env ?? process.env;
   const normalizedScript = opts.scriptPath.replaceAll('\\', '/');
-  if (env.CAIRN_DESKTOP_BUNDLED === '1' || normalizedScript.includes('.app/Contents/')) {
+  if (
+    env.CAIRN_DESKTOP_BUNDLED === '1' ||
+    normalizedScript.includes('.app/Contents/') ||
+    normalizedScript.toLowerCase().includes('/resources/runner/')
+  ) {
     return { supported: false, reason: 'desktop-bundled' };
   }
   if (env.CAIRN_DOCKER === '1' || env.container === 'docker' || existsSync('/.dockerenv')) {
@@ -262,7 +228,13 @@ export function classifyRunnerInstall(opts: {
   ) {
     return { supported: false, reason: 'homebrew' };
   }
-  if (normalizedScript.endsWith('.ts') || normalizedScript.includes('/apps/daemon/src/')) {
+  if (
+    env.VITEST !== undefined ||
+    env.NODE_ENV === 'test' ||
+    normalizedScript.includes('/vitest/') ||
+    normalizedScript.endsWith('.ts') ||
+    normalizedScript.includes('/apps/daemon/src/')
+  ) {
     return { supported: false, reason: 'development' };
   }
   const { versionsDir } = selfUpdatePaths(opts.cairnHome);
@@ -291,10 +263,14 @@ export function syncBaseBinaryOverride(
     baseReleaseVersion === state.activeVersion ||
     isServerVersionNewer(baseReleaseVersion, state.activeVersion)
   ) {
+    const keepPending =
+      state.pending !== null && isServerVersionNewer(state.pending, baseReleaseVersion)
+        ? state.pending
+        : null;
     const next: SelfUpdateDiskState = {
       ...state,
       activeVersion: null,
-      pending: null,
+      pending: keepPending,
       notice: null,
     };
     writeSelfUpdateState(cairnHome, next);
@@ -342,6 +318,23 @@ export function isRunnerWorkIdle(opts: {
   return true;
 }
 
+function assertSafeArchiveEntry(entryName: string, extractRoot: string): string {
+  const normalized = entryName.replaceAll('\\', '/');
+  if (
+    normalized.startsWith('/') ||
+    /^[A-Za-z]:/.test(normalized) ||
+    normalized.split('/').includes('..')
+  ) {
+    throw new Error(`unsafe archive entry path: ${entryName}`);
+  }
+  const resolvedEntry = resolve(extractRoot, normalized);
+  const rel = relative(extractRoot, resolvedEntry);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(`archive entry escapes destination: ${entryName}`);
+  }
+  return resolvedEntry;
+}
+
 async function verifyTarSafety(archivePath: string, extractRoot: string): Promise<void> {
   const { stdout } = await execFileAsync('tar', ['-tvzf', archivePath], {
     maxBuffer: 8 * 1024 * 1024,
@@ -356,14 +349,7 @@ async function verifyTarSafety(archivePath: string, extractRoot: string): Promis
       arrowIndex !== -1
         ? (line.slice(0, arrowIndex).split(/\s+/).at(-1) ?? '')
         : (parts.at(-1) ?? '');
-    if (entryName.startsWith('/') || entryName.split('/').includes('..')) {
-      throw new Error(`unsafe archive entry path: ${entryName}`);
-    }
-    const resolvedEntry = resolve(extractRoot, entryName);
-    const rel = relative(extractRoot, resolvedEntry);
-    if (rel.startsWith('..') || isAbsolute(rel)) {
-      throw new Error(`archive entry escapes destination: ${entryName}`);
-    }
+    const resolvedEntry = assertSafeArchiveEntry(entryName, extractRoot);
     if (mode.startsWith('l') && arrowIndex !== -1) {
       const linkTarget = line.slice(arrowIndex + 4).trim();
       if (isAbsolute(linkTarget)) {
@@ -375,6 +361,73 @@ async function verifyTarSafety(archivePath: string, extractRoot: string): Promis
         throw new Error(`symlink target escapes destination: ${linkTarget}`);
       }
     }
+  }
+}
+
+async function extractRunnerArchive(archivePath: string, extractDir: string): Promise<void> {
+  if (archivePath.endsWith('.tar.gz')) {
+    await verifyTarSafety(archivePath, extractDir);
+    await execFileAsync('tar', ['-xzf', archivePath, '-C', extractDir]);
+    return;
+  }
+  if (process.platform === 'win32') {
+    const psScript = [
+      'Add-Type -AssemblyName System.IO.Compression.FileSystem;',
+      '$z = [System.IO.Compression.ZipFile]::OpenRead($env:ARCHIVE_SRC);',
+      'try { $z.Entries | ForEach-Object { $_.FullName } } finally { $z.Dispose() }',
+    ].join(' ');
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', psScript],
+      {
+        env: { ...process.env, ARCHIVE_SRC: archivePath },
+        maxBuffer: 8 * 1024 * 1024,
+      },
+    );
+    for (const rawLine of stdout.split(/\r?\n/)) {
+      const entry = rawLine.trim();
+      if (entry !== '') assertSafeArchiveEntry(entry, extractDir);
+    }
+    await execFileAsync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'Expand-Archive -LiteralPath $env:ARCHIVE_SRC -DestinationPath $env:ARCHIVE_DST -Force',
+      ],
+      { env: { ...process.env, ARCHIVE_SRC: archivePath, ARCHIVE_DST: extractDir } },
+    );
+    return;
+  }
+  const { stdout } = await execFileAsync('unzip', ['-Z1', archivePath], {
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  for (const rawLine of stdout.split(/\r?\n/)) {
+    const entry = rawLine.trim();
+    if (entry !== '') assertSafeArchiveEntry(entry, extractDir);
+  }
+  if (process.platform === 'darwin') {
+    await execFileAsync('/usr/bin/ditto', ['-x', '-k', archivePath, extractDir]);
+  } else {
+    await execFileAsync('unzip', ['-q', archivePath, '-d', extractDir]);
+  }
+}
+
+function readSlotVerifiedMarker(slotDir: string): { version: string; sha256: string } | null {
+  const markerPath = join(slotDir, '.verified.json');
+  if (!existsSync(markerPath)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(markerPath, 'utf8')) as {
+      version?: unknown;
+      sha256?: unknown;
+    };
+    if (typeof parsed.version === 'string' && typeof parsed.sha256 === 'string') {
+      return { version: parsed.version, sha256: parsed.sha256 };
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -481,21 +534,15 @@ export function createRunnerSelfUpdater(opts: {
   let probationConfirmed = false;
 
   async function stageVersion(version: string): Promise<void> {
+    if (!isValidSemverVersion(version)) return;
     state = 'downloading';
     targetVersion = version;
     reason = null;
     opts.onStateChange?.();
     const { versionsDir } = selfUpdatePaths(opts.cairnHome);
     const destDir = join(versionsDir, version);
-    if (existsSync(destDir) && resolveSlotEntryPath(destDir) !== null) {
-      stagedVersion = version;
-      enterDrain();
-      return;
-    }
-
     const { releasesBase, runnerManifestUrl } = resolveUpdateFeedBase(env);
     const stagingDir = join(versionsDir, `.staging-${version}-${now()}`);
-    mkdirSync(stagingDir, { recursive: true, mode: 0o700 });
     try {
       const manifestRes = await fetchFn(runnerManifestUrl, {
         headers: { accept: 'application/json' },
@@ -527,6 +574,18 @@ export function createRunnerSelfUpdater(opts: {
         backoffUntil.set(version, now() + RUNNER_SELF_UPDATE_BACKOFF_MS);
         return;
       }
+      const existingMarker = readSlotVerifiedMarker(destDir);
+      if (
+        existingMarker !== null &&
+        existingMarker.version === version &&
+        existingMarker.sha256 === asset.sha256 &&
+        resolveSlotEntryPath(destDir) !== null
+      ) {
+        stagedVersion = version;
+        enterDrain();
+        return;
+      }
+      mkdirSync(stagingDir, { recursive: true, mode: 0o700 });
       const archivePath = join(stagingDir, asset.name);
       await downloadAndVerifyArchive({
         url: asset.url,
@@ -538,19 +597,17 @@ export function createRunnerSelfUpdater(opts: {
       });
       const extractDir = join(stagingDir, 'root');
       mkdirSync(extractDir, { recursive: true, mode: 0o700 });
-      if (asset.name.endsWith('.tar.gz')) {
-        await verifyTarSafety(archivePath, extractDir);
-        await execFileAsync('tar', ['-xzf', archivePath, '-C', extractDir]);
-      } else if (process.platform === 'darwin') {
-        await execFileAsync('/usr/bin/ditto', ['-x', '-k', archivePath, extractDir]);
-      } else {
-        await execFileAsync('unzip', ['-q', archivePath, '-d', extractDir]);
-      }
+      await extractRunnerArchive(archivePath, extractDir);
       const cliEntry = resolveSlotEntryPath(extractDir);
       if (cliEntry === null) {
         throw new Error('runner archive missing cli.mjs entry');
       }
       await smokeTestSlot(cliEntry);
+      writeJson0600(join(extractDir, '.verified.json'), {
+        version,
+        sha256: asset.sha256,
+        verifiedAt: now(),
+      });
       rmSync(destDir, { recursive: true, force: true });
       renameSync(extractDir, destDir);
       rmSync(stagingDir, { recursive: true, force: true });
@@ -595,7 +652,26 @@ export function createRunnerSelfUpdater(opts: {
   async function tickDrain(): Promise<void> {
     if (stopped || stagedVersion === null || state !== 'waiting-idle') return;
     const elapsed = drainStartedAt === null ? 0 : now() - drainStartedAt;
-    if (!opts.isIdle() && elapsed < drainCapMs) return;
+    if (!opts.isIdle()) {
+      if (elapsed < drainCapMs) return;
+      if (drainTimer !== null) {
+        clearInterval(drainTimer);
+        drainTimer = null;
+      }
+      const deferredVersion = stagedVersion;
+      stagedVersion = null;
+      drainStartedAt = null;
+      state = 'idle';
+      targetVersion = null;
+      reason = null;
+      backoffUntil.set(deferredVersion, now() + RUNNER_SELF_UPDATE_BACKOFF_MS);
+      opts.resumeClaims();
+      opts.onStateChange?.();
+      opts.log?.(
+        `runner self-update deferred ${deferredVersion}: work remained active after drain cap`,
+      );
+      return;
+    }
     if (drainTimer !== null) {
       clearInterval(drainTimer);
       drainTimer = null;
@@ -634,6 +710,7 @@ export function createRunnerSelfUpdater(opts: {
     },
     async notifyUpdateAvailable(nextVersion: string): Promise<void> {
       if (!install.supported || stopped) return;
+      if (!isValidSemverVersion(nextVersion)) return;
       if (state === 'waiting-idle' || state === 'swapping') return;
       const disk = readSelfUpdateState(opts.cairnHome);
       if (disk.blocked[nextVersion] !== undefined) return;

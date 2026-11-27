@@ -635,5 +635,31 @@ describe('GET /api/server/version and POST /api/server/update', () => {
       })
     ).json()) as { update?: { targetVersion: string } };
     expect(rolledBackPresence.update).toBeUndefined();
+
+    const unknownReleasePresence = (await (
+      await reqWith(s, 'POST', '/api/machine/presence', mHeaders, {
+        cliVersion: '0.2.3',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          runnerProtocolVersion: 1,
+          runnerAutoUpdate: { supported: true, state: 'idle' },
+        },
+      })
+    ).json()) as { update?: { targetVersion: string } };
+    expect(unknownReleasePresence.update).toEqual({ targetVersion: '0.1.726' });
+
+    const unsupportedUnknownRelease = (await (
+      await reqWith(s, 'POST', '/api/machine/presence', mHeaders, {
+        cliVersion: '0.2.3',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          runnerProtocolVersion: 1,
+          runnerAutoUpdate: { supported: false, state: 'unsupported', reason: 'development' },
+        },
+      })
+    ).json()) as { update?: { targetVersion: string } };
+    expect(unsupportedUnknownRelease.update).toBeUndefined();
   });
 });

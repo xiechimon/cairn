@@ -60,8 +60,10 @@ export interface BackgroundDeps {
   lock(): Promise<(() => void) | null>;
   residentBusy(): Promise<boolean>;
   restartResident(): Promise<void>;
+  stopResident?(): Promise<boolean>;
   log(line: string): void;
   force?: boolean;
+  forceVersion?: string | null;
   logPath?: string;
   attemptId?: string;
   acquireLease?(): Promise<boolean>;
@@ -201,8 +203,19 @@ async function runHeadlessProbation(
 
   deps.log(`rolling back ${installed.version} to ${installed.previousVersion}: ${failureReason}`);
   const at = now();
+  let stopped = true;
+  if (deps.stopResident !== undefined) {
+    try {
+      stopped = await deps.stopResident();
+    } catch (error) {
+      stopped = false;
+      deps.log(
+        `rollback stop resident failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
   const hasWrites =
-    installed.dbSnapshot != null && deps.hasDomainWrites !== undefined
+    stopped && installed.dbSnapshot != null && deps.hasDomainWrites !== undefined
       ? await deps.hasDomainWrites(installed.dbSnapshot)
       : false;
   let bundleRestored = false;
@@ -219,9 +232,10 @@ async function runHeadlessProbation(
     );
   }
 
-  let dbRestored = true;
+  let dbRestored = stopped;
   if (
     bundleRestored &&
+    stopped &&
     !hasWrites &&
     installed.dbSnapshot != null &&
     deps.restoreDb !== undefined
@@ -258,7 +272,7 @@ async function runHeadlessProbation(
     failureReason,
     deps.logPath ?? statePath,
     at,
-    bundleRestored && restoredHealthy && !hasWrites,
+    bundleRestored && stopped && restoredHealthy && !hasWrites,
   );
   deps.onRollback?.(notice);
   if (!bundleRestored || !dbRestored || !restoredHealthy) return 'rollback-failed';
@@ -280,7 +294,13 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
       }
       if (deps.probeHealth !== undefined) {
         let leaseHeld = false;
-        if (deps.acquireLease !== undefined) leaseHeld = await deps.acquireLease();
+        if (deps.acquireLease !== undefined) {
+          leaseHeld = await deps.acquireLease();
+          if (!leaseHeld) {
+            deps.log(`holding rollback check for ${version}: could not acquire deploy lease`);
+            return 'resident-busy';
+          }
+        }
         try {
           return await runHeadlessProbation(deps, statePath, state.installed, null);
         } finally {
@@ -301,7 +321,9 @@ export async function runBackgroundUpdate(deps: BackgroundDeps): Promise<Backgro
   try {
     const update = await deps.offeredUpdate(version);
     if (update === null) return 'current';
-    if (deps.force !== true && isAutoInstallBlocked(state, update.version)) return 'blocked';
+    const forced =
+      deps.force === true && (deps.forceVersion == null || deps.forceVersion === update.version);
+    if (!forced && isAutoInstallBlocked(state, update.version)) return 'blocked';
     staged = reusable(readUpdateState(statePath), update, version);
     if (staged === null) {
       await removeStagingFolders(dirname(deps.bundle));

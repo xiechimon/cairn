@@ -1137,12 +1137,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     if (claudeAuth === null) await probeAuthAndRemember();
     checkRuntimeUpdates();
   };
+  selfUpdater.markBooted();
   try {
     for (let backoff = opts.claimBackoffBaseMs ?? 1_000; ; backoff = nextBackoffMs(backoff)) {
       try {
         await client.me();
         await presenceReporter.send();
-        selfUpdater.markBooted();
         break;
       } catch (error) {
         if (error instanceof MachineApiError && error.status === 401 && loadedFromDisk) {

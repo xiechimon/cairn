@@ -40,6 +40,22 @@ describe('standalone runner self-update', () => {
     expect(
       mod.classifyRunnerInstall({
         cairnHome: home,
+        scriptPath: 'C:\\Program Files\\Cairn\\resources\\runner\\dist\\cli.mjs',
+        env: {},
+      }),
+    ).toEqual({ supported: false, reason: 'desktop-bundled' });
+
+    expect(
+      mod.classifyRunnerInstall({
+        cairnHome: home,
+        scriptPath: writableScript,
+        env: { CAIRN_DESKTOP_BUNDLED: '1' },
+      }),
+    ).toEqual({ supported: false, reason: 'desktop-bundled' });
+
+    expect(
+      mod.classifyRunnerInstall({
+        cairnHome: home,
         scriptPath: '/opt/homebrew/Cellar/cairn/0.1.700/libexec/cli.mjs',
         env: {},
       }),
@@ -58,6 +74,22 @@ describe('standalone runner self-update', () => {
         cairnHome: home,
         scriptPath: '/repo/apps/daemon/src/cli.ts',
         env: {},
+      }),
+    ).toEqual({ supported: false, reason: 'development' });
+
+    expect(
+      mod.classifyRunnerInstall({
+        cairnHome: home,
+        scriptPath: '/repo/node_modules/vitest/dist/workers/entry.mjs',
+        env: {},
+      }),
+    ).toEqual({ supported: false, reason: 'development' });
+
+    expect(
+      mod.classifyRunnerInstall({
+        cairnHome: home,
+        scriptPath: writableScript,
+        env: { VITEST: 'true' },
       }),
     ).toEqual({ supported: false, reason: 'development' });
 
@@ -419,5 +451,156 @@ describe('standalone runner self-update', () => {
     process.emit('SIGTERM');
     expect(await termPromise).toBe(0);
     expect(su.readSelfUpdateState(home).blocked['0.1.728']).toBeUndefined();
+  });
+
+  test('cancels swap on drain timeout without killing active work, rejects traversal/non-semver/unverified slots, and survives post-booted delay past preBootTimeoutMs', async () => {
+    const su = await import('../src/self-update.js');
+    const boot = await import('../src/self-update-bootstrap.js');
+    const home = makeTestTempDir('cairn-su-hardening-');
+    tempDirs.push(home);
+    const paths = su.selfUpdatePaths(home);
+
+    const escapeDir = makeTestTempDir('cairn-su-escape-');
+    tempDirs.push(escapeDir);
+    writeFileSync(join(escapeDir, 'payload.mjs'), 'console.log("pwn");\n');
+    const escapeTar = join(home, 'escape.tar.gz');
+    const tarPrefixArgs =
+      process.platform === 'darwin' ? ['-s', '|^|../|'] : ['--transform', 's|^|../|'];
+    execFileSync('tar', [...tarPrefixArgs, '-C', escapeDir, '-czf', escapeTar, 'payload.mjs']);
+    const escapeBytes = readFileSync(escapeTar);
+    const escapeSha = createHash('sha256').update(escapeBytes).digest('hex');
+
+    let fetched = 0;
+    let fakeNow = 5_000_000;
+    let claimsPaused = false;
+    let exited: number | null = null;
+    const key = su.currentRunnerPlatformKey();
+
+    mkdirSync(join(paths.versionsDir, '0.1.810', 'dist'), { recursive: true });
+    writeFileSync(join(paths.versionsDir, '0.1.810', 'dist', 'cli.mjs'), 'process.exit(99);\n');
+
+    const pkgSrc = makeTestTempDir('cairn-su-good2-');
+    tempDirs.push(pkgSrc);
+    mkdirSync(join(pkgSrc, 'dist'), { recursive: true });
+    writeFileSync(
+      join(pkgSrc, 'dist', 'cli.mjs'),
+      'if (process.argv.includes("--version")) { console.log("0.2.3"); process.exit(0); }\n',
+    );
+    const goodTar = join(home, 'good2.tar.gz');
+    const goodMeta = createTarGz(pkgSrc, goodTar);
+
+    const logs: string[] = [];
+    let scenario: 'traversal' | 'unverified-slot-then-good' = 'traversal';
+    const updater = su.createRunnerSelfUpdater({
+      cairnHome: home,
+      currentVersion: '0.1.800',
+      scriptPath: join(home, 'base', 'cli.mjs'),
+      install: { supported: true, reason: null },
+      now: () => fakeNow,
+      drainCapMs: 1_000,
+      isIdle: () => false,
+      pauseClaims: () => {
+        claimsPaused = true;
+      },
+      resumeClaims: () => {
+        claimsPaused = false;
+      },
+      exitForSwap: (code) => {
+        exited = code;
+      },
+      log: (line) => {
+        logs.push(line);
+      },
+      fetchImpl: async (input) => {
+        fetched += 1;
+        const url = String(input);
+        if (url.endsWith('/runner-latest.json')) {
+          const ver = scenario === 'traversal' ? '0.1.809' : '0.1.810';
+          const meta =
+            scenario === 'traversal'
+              ? {
+                  size: escapeBytes.byteLength,
+                  sha256: escapeSha,
+                  name: 'cairn-runner-0.1.809.tar.gz',
+                }
+              : {
+                  size: goodMeta.size,
+                  sha256: goodMeta.sha256,
+                  name: 'cairn-runner-0.1.810.tar.gz',
+                };
+          return new Response(JSON.stringify({ version: ver, files: { [key]: meta } }), {
+            status: 200,
+          });
+        }
+        return new Response(scenario === 'traversal' ? escapeBytes : readFileSync(goodTar), {
+          status: 200,
+        });
+      },
+      env: { CAIRN_UPDATE_FEED_URL: 'https://feed.example.test' },
+    });
+
+    await updater.notifyUpdateAvailable('../evil');
+    expect(fetched).toBe(0);
+
+    await updater.notifyUpdateAvailable('0.1.809');
+    expect(updater.report().state).toBe('failed');
+    expect(
+      logs.some(
+        (line) =>
+          line.includes('unsafe archive entry path') || line.includes('escapes destination'),
+      ),
+    ).toBe(true);
+    expect(claimsPaused).toBe(false);
+
+    scenario = 'unverified-slot-then-good';
+    await updater.notifyUpdateAvailable('0.1.810');
+    expect(updater.report().state).toBe('waiting-idle');
+    expect(claimsPaused).toBe(true);
+    expect(existsSync(join(paths.versionsDir, '0.1.810', '.verified.json'))).toBe(true);
+
+    fakeNow += 2_000;
+    await updater.tickDrain();
+    expect(exited).toBeNull();
+    expect(claimsPaused).toBe(false);
+    expect(updater.report().state).toBe('idle');
+    updater.stop();
+
+    const baseEntry = join(home, 'base-cli.mjs');
+    writeFileSync(
+      baseEntry,
+      'if (process.argv.includes("--version")) process.exit(0);\nprocess.exit(0);\n',
+    );
+    mkdirSync(join(paths.versionsDir, '0.1.811', 'dist'), { recursive: true });
+    writeFileSync(
+      join(paths.versionsDir, '0.1.811', 'dist', 'cli.mjs'),
+      `
+        import { writeFileSync } from 'node:fs';
+        import { join } from 'node:path';
+        const h = join(process.env.CAIRN_HOME, 'self-update', 'healthy.json');
+        const id = process.env.CAIRN_SELF_UPDATE_ATTEMPT;
+        writeFileSync(h, JSON.stringify({ attemptId: id, version: '0.1.811', status: 'booted', at: Date.now() }));
+        setTimeout(() => {
+          writeFileSync(h, JSON.stringify({ attemptId: id, version: '0.1.811', status: 'confirmed', at: Date.now() }));
+          setTimeout(() => process.exit(0), 100);
+        }, 1_100);
+      `,
+    );
+    su.writeSelfUpdateState(home, {
+      activeVersion: '0.1.800',
+      previousVersion: null,
+      pending: '0.1.811',
+      blocked: {},
+      notice: null,
+    });
+    const slowBootCode = await boot.runSelfUpdateBootstrap({
+      cairnHome: home,
+      baseEntryPath: baseEntry,
+      baseReleaseVersion: '0.1.800',
+      argv: ['start', '--foreground'],
+      env: { ...process.env, CAIRN_HOME: home },
+      preBootTimeoutMs: 600,
+    });
+    expect(slowBootCode).toBe(0);
+    expect(su.readSelfUpdateState(home).activeVersion).toBe('0.1.811');
   });
 });

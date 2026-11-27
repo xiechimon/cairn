@@ -400,7 +400,10 @@ export function runnerNeedsUpdate(capabilities: MachineCapabilities | null | und
 
 export function runnerNeedsVersionUpdate(
   capabilities:
-    | Pick<MachineCapabilities, 'runnerProtocolVersion' | 'runnerReleaseVersion'>
+    | Pick<
+        MachineCapabilities,
+        'runnerProtocolVersion' | 'runnerReleaseVersion' | 'runnerAutoUpdate'
+      >
     | null
     | undefined,
   targetVersion: string | null | undefined,
@@ -411,9 +414,19 @@ export function runnerNeedsVersionUpdate(
   const parsedTarget = semver.valid(targetVersion);
   if (parsedTarget === null || parsedTarget === '0.0.0') return false;
   const current = capabilities.runnerReleaseVersion;
-  if (current === undefined) return false;
+  if (current === undefined) {
+    return (
+      capabilities.runnerAutoUpdate?.supported === true &&
+      capabilities.runnerAutoUpdate.state !== 'unsupported'
+    );
+  }
   const parsedCurrent = semver.valid(current);
-  if (parsedCurrent === null || parsedCurrent === '0.0.0') return false;
+  if (parsedCurrent === null || parsedCurrent === '0.0.0') {
+    return (
+      capabilities.runnerAutoUpdate?.supported === true &&
+      capabilities.runnerAutoUpdate.state !== 'unsupported'
+    );
+  }
   return semver.lt(parsedCurrent, parsedTarget);
 }
 

@@ -134,6 +134,10 @@ export const remoteVersionStateSchema = z.strictObject({
 });
 export type RemoteVersionState = z.infer<typeof remoteVersionStateSchema>;
 
+export function isValidSemverVersion(value: string): boolean {
+  return semver.valid(value) === value;
+}
+
 export function isServerVersionNewer(next: string | null, previous: string | null): boolean {
   if (next === null || previous === null) return false;
   const parsedNext = semver.valid(next);

@@ -13,6 +13,8 @@ import {
 } from '@cairn/shared';
 import { parseBatteryLow, runBackgroundUpdate } from './background-update.js';
 import {
+  consumeHostUpdateForce,
+  initialHandledHostRequestId,
   readHostRollbackNotice,
   readHostUpdateRequest,
   writeHostUpdateStatus,
@@ -20,6 +22,7 @@ import {
 import {
   acquireDeployLease,
   hasDomainWritesSinceSnapshot,
+  isResidentInstalled,
   probeResidentHealth,
   readServerOwner,
   releaseDeployLease,
@@ -27,6 +30,7 @@ import {
   restartResidentHost,
   restoreResidentDb,
   snapshotResidentDb,
+  stopResidentHost,
 } from './resident-host.js';
 import { verifyCairnSignature } from './signature.js';
 import {
@@ -72,11 +76,18 @@ async function main(): Promise<void> {
   const cairnHome = join(userData, 'home');
   const log = (line: string): void => appendUpdateLog(userData, `background updater: ${line}`);
   const request = readHostUpdateRequest(cairnHome);
+  const previousHandledId = initialHandledHostRequestId(cairnHome);
   const appWasRunning = appRunning(userData);
+  const hasResident =
+    isResidentInstalled(homedir()) || readServerOwner(cairnHome)?.managedBy === 'launchd';
   const leaseOwner = randomUUID();
   const leaseTtlMs = 120_000;
-  let rollbackNotice: HostRollbackNotice | null | undefined =
-    request?.force === true ? null : (readHostRollbackNotice(cairnHome) ?? undefined);
+  const forceActive =
+    request !== null && request.force === true && request.id !== previousHandledId;
+  let handledRequestId = forceActive ? previousHandledId : (request?.id ?? null);
+  let rollbackNotice: HostRollbackNotice | null | undefined = forceActive
+    ? null
+    : (readHostRollbackNotice(cairnHome) ?? undefined);
   const writeStatus = (
     state: ServerUpdateState,
     targetVersion: string | null = null,
@@ -95,7 +106,7 @@ async function main(): Promise<void> {
         targetVersion,
         percent,
         reason,
-        handledRequestId: request?.id ?? null,
+        handledRequestId,
         updatedAt: Date.now(),
         ...(rollbackNotice !== undefined ? { rollback: rollbackNotice } : {}),
       });
@@ -107,7 +118,8 @@ async function main(): Promise<void> {
   const outcome = await runBackgroundUpdate({
     bundle,
     userData,
-    force: request?.force === true,
+    force: forceActive,
+    forceVersion: request?.requestedVersion ?? null,
     logPath: updateLogPath(userData),
     bundleVersion: async () =>
       bundle.endsWith('.app') && (await verifyCairnSignature(bundle)) === 'accepted'
@@ -128,44 +140,62 @@ async function main(): Promise<void> {
     verify: (staged) => verifyStaged(bundle, staged),
     swap: (staged, version) => swapInStaged(bundle, staged, version),
     lock: () => acquireUpdateLock(updateLockPath(userData), 'background-updater', 0),
-    acquireLease: () =>
-      acquireDeployLease(cairnHome, ownerToken(cairnHome), leaseOwner, leaseTtlMs),
-    releaseLease: () => releaseDeployLease(cairnHome, ownerToken(cairnHome), leaseOwner),
-    snapshotDb: (fromVersion) => snapshotResidentDb(cairnHome, fromVersion),
-    hasDomainWrites: (snapshotPath) => hasDomainWritesSinceSnapshot(cairnHome, snapshotPath),
-    restoreDb: (snapshotPath, failedVersion) =>
-      restoreResidentDb(cairnHome, snapshotPath, failedVersion),
-    probeHealth: () => probeResidentHealth(cairnHome, ownerToken(cairnHome)),
-    restoreBundle: (previousApp) => restorePrevious({ bundle, previousApp }),
-    onRollback: (notice) => {
-      rollbackNotice = notice;
-    },
-    residentBusy: async () => {
-      const token = ownerToken(cairnHome);
-      if (token === null) {
-        const owner = readServerOwner(cairnHome);
-        if (owner !== null && owner.managedBy === 'launchd' && pidAlive(owner.pid)) {
-          log('holding update: resident server is alive without a readable owner token');
-          return true;
+    ...(hasResident
+      ? {
+          acquireLease: () =>
+            acquireDeployLease(cairnHome, ownerToken(cairnHome), leaseOwner, leaseTtlMs),
+          releaseLease: () => releaseDeployLease(cairnHome, ownerToken(cairnHome), leaseOwner),
+          snapshotDb: (fromVersion: string) => snapshotResidentDb(cairnHome, fromVersion),
+          hasDomainWrites: (snapshotPath: string | null) =>
+            hasDomainWritesSinceSnapshot(cairnHome, snapshotPath),
+          restoreDb: (snapshotPath: string | null, failedVersion: string) =>
+            restoreResidentDb(cairnHome, snapshotPath, failedVersion),
+          probeHealth: () => probeResidentHealth(cairnHome, ownerToken(cairnHome)),
+          stopResident: () => stopResidentHost({ homeDir: homedir(), cairnHome }),
+          restoreBundle: (previousApp: string) => restorePrevious({ bundle, previousApp }),
+          onRollback: (notice: HostRollbackNotice) => {
+            rollbackNotice = notice;
+          },
+          residentBusy: async () => {
+            const token = ownerToken(cairnHome);
+            if (token === null) {
+              const owner = readServerOwner(cairnHome);
+              if (owner !== null && owner.managedBy === 'launchd' && pidAlive(owner.pid)) {
+                log('holding update: resident server is alive without a readable owner token');
+                return true;
+              }
+              return false;
+            }
+            const busy = await residentWritingReply(cairnHome, token).catch((error: unknown) => {
+              log(`could not ask the resident server about replies: ${String(error)}`);
+              return true;
+            });
+            if (busy) writeStatus('waiting-idle', request?.requestedVersion ?? null);
+            return busy;
+          },
+          restartResident: async () => {
+            writeStatus('restarting', request?.requestedVersion ?? null, 100);
+            await restartResidentHost({ homeDir: homedir() }).then(
+              (restarted) => restarted && log('restarted the resident server'),
+              (error: unknown) => log(`could not restart the resident server: ${String(error)}`),
+            );
+          },
         }
-        return false;
-      }
-      const busy = await residentWritingReply(cairnHome, token).catch((error: unknown) => {
-        log(`could not ask the resident server about replies: ${String(error)}`);
-        return true;
-      });
-      if (busy) writeStatus('waiting-idle', request?.requestedVersion ?? null);
-      return busy;
-    },
-    restartResident: async () => {
-      writeStatus('restarting', request?.requestedVersion ?? null, 100);
-      await restartResidentHost({ homeDir: homedir() }).then(
-        (restarted) => restarted && log('restarted the resident server'),
-        (error: unknown) => log(`could not restart the resident server: ${String(error)}`),
-      );
-    },
+      : {
+          residentBusy: async () => false,
+          restartResident: async () => {},
+        }),
     log,
   });
+  const deferredOutcome =
+    outcome === 'app-running' ||
+    outcome === 'resident-busy' ||
+    outcome === 'low-battery' ||
+    outcome === 'lock-busy';
+  if (!deferredOutcome && request !== null) {
+    handledRequestId = request.id;
+    if (forceActive) consumeHostUpdateForce(cairnHome, request.id);
+  }
   if (outcome === 'installed') writeStatus('restarting', request?.requestedVersion ?? null, 100);
   else if (outcome === 'confirmed') {
     rollbackNotice = null;

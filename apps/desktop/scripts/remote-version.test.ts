@@ -689,4 +689,113 @@ describe('bidirectional catch-up and rollback notice in remote-version', () => {
     expect(postBodies.at(-1)).toEqual({ targetVersion: '0.1.720', force: true });
     controller.stop();
   });
+
+  test('supports retry when server equals or exceeds appVersion after rollback, and omits force for v1 servers', async () => {
+    const v2Bodies: Array<Record<string, unknown>> = [];
+    const sameVerController = createRemoteVersionController({
+      origin: 'https://remote.example.test',
+      appVersion: '0.1.720',
+      fetchImpl: async (input, init) => {
+        const url = String(input);
+        if (url.includes('/api/server/version')) {
+          return new Response(
+            JSON.stringify({
+              ...versionPayload('0.1.720', {
+                updater: {
+                  supported: true,
+                  state: 'idle',
+                  targetVersion: null,
+                  percent: null,
+                  reason: 'blocked',
+                  updatedAt: 1000,
+                },
+              }),
+              latestRelease: '0.1.721',
+              rollbackNotice: {
+                failedVersion: '0.1.721',
+                restoredVersion: '0.1.720',
+                reason: 'health check failed',
+                at: 1000,
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        v2Bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        return new Response(
+          JSON.stringify({
+            accepted: true,
+            updater: {
+              supported: true,
+              state: 'checking',
+              targetVersion: '0.1.721',
+              percent: null,
+              reason: null,
+              updatedAt: 2000,
+            },
+          }),
+          { status: 202 },
+        );
+      },
+      onState: () => {},
+      onAbout: vi.fn(),
+      onReloadReady: vi.fn(),
+    });
+    await sameVerController.check();
+    expect(sameVerController.state().phase).toBe('failed');
+    await sameVerController.retry();
+    expect(v2Bodies).toEqual([{ targetVersion: '0.1.721', force: true }]);
+    sameVerController.stop();
+
+    const v1Bodies: Array<Record<string, unknown>> = [];
+    let failFirst = true;
+    const v1Controller = createRemoteVersionController({
+      origin: 'https://remote.example.test',
+      appVersion: '0.1.721',
+      fetchImpl: async (input, init) => {
+        const url = String(input);
+        if (url.includes('/api/server/version')) {
+          return new Response(
+            JSON.stringify(
+              versionPayload('0.1.720', {
+                updater: {
+                  supported: true,
+                  state: failFirst ? 'failed' : 'idle',
+                  targetVersion: failFirst ? '0.1.721' : null,
+                  percent: null,
+                  reason: failFirst ? 'offline' : null,
+                  updatedAt: 1000,
+                },
+              }),
+            ),
+            { status: 200 },
+          );
+        }
+        v1Bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        failFirst = false;
+        return new Response(
+          JSON.stringify({
+            accepted: true,
+            updater: {
+              supported: true,
+              state: 'checking',
+              targetVersion: '0.1.721',
+              percent: null,
+              reason: null,
+              updatedAt: 2000,
+            },
+          }),
+          { status: 202 },
+        );
+      },
+      onState: () => {},
+      onAbout: vi.fn(),
+      onReloadReady: vi.fn(),
+    });
+    await v1Controller.check();
+    expect(v1Controller.state().phase).toBe('failed');
+    await v1Controller.retry();
+    expect(v1Bodies).toEqual([{ targetVersion: '0.1.721' }]);
+    v1Controller.stop();
+  });
 });

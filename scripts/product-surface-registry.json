@@ -318,6 +318,54 @@
       "type": "runner-device-field",
       "key": "machine.capabilities.runnerAutoUpdate",
       "userScenario": "Nothing to set: each Runner reports whether it can self-update and its single-line update or rollback status."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_SELF_UPDATE_CHILD",
+      "scope": "product",
+      "userScenario": "Nothing to set: passed internally by the Runner supervisor to the child Runner process so it starts directly instead of nesting another update supervisor."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_SELF_UPDATE_ATTEMPT",
+      "scope": "product",
+      "userScenario": "Nothing to set: passed internally by the Runner supervisor to track one probation boot attempt and confirm or roll back a Runner update."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_SELF_UPDATE_TARGET",
+      "scope": "product",
+      "userScenario": "Nothing to set: passed internally by the Runner supervisor so the spawned Runner slot knows which release version it is verifying."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_RUNNER_RELEASE_VERSION",
+      "scope": "product",
+      "userScenario": "Nothing to set: optional release version override read by a standalone Runner when its bundled build version metadata is overridden by packaging or tests."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DESKTOP_BUNDLED",
+      "scope": "product",
+      "userScenario": "Nothing to set: set when Cairn Desktop starts its bundled Runner so standalone Runner self-update stays off inside the Mac app bundle."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_DOCKER",
+      "scope": "product",
+      "userScenario": "Nothing to set: set inside Cairn container images so containerized Runners report manual container-image updates instead of attempting in-place self-updates."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_RUNNER_READ_ONLY",
+      "scope": "product",
+      "userScenario": "Nothing to set: optional read-only install flag instructing a Runner to show the manual update notice instead of downloading updates."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_SELF_UPDATE_WRITABLE",
+      "scope": "dev-tooling",
+      "userScenario": "Nothing to set: used only in automated tests and isolated verification to allow a standalone Runner script to self-update into its test slot."
     }
   ]
 }

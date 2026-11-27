@@ -14,14 +14,17 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { DesktopUpdate } from '@cairn/shared';
+import { HOST_UPDATE_REQUEST_FILE } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   type BackgroundDeps,
   parseBatteryLow,
   runBackgroundUpdate,
 } from '../src/background-update.js';
+import { consumeHostUpdateForce, readHostUpdateRequest } from '../src/host-update.js';
 import { settleBundleAtLaunch } from '../src/launch-update.js';
 import { finishQuit } from '../src/quit-steps.js';
+import { hasDomainWritesSinceSnapshot, snapshotResidentDb } from '../src/resident-host.js';
 import { swapInStaged, verifyStaged } from '../src/update-core.js';
 import { acquireUpdateLock, updateLockPath } from '../src/update-lock.js';
 import { STAGING_PREFIX } from '../src/update-staging.js';
@@ -691,6 +694,124 @@ describe('headless resident probation, lease drain, DB snapshot, and rollback', 
     const wDead = world(bundle, userData);
     expect(await runBackgroundUpdate(wDead.deps)).toBe('blocked');
     wDead.deps.force = true;
+    wDead.deps.forceVersion = '1.0.9';
+    expect(await runBackgroundUpdate(wDead.deps)).toBe('blocked');
+    wDead.deps.forceVersion = '1.1.0';
     expect(await runBackgroundUpdate(wDead.deps)).toBe('installed');
+
+    const reqHome = join(userData, 'home');
+    mkdirSync(reqHome, { recursive: true });
+    writeFileSync(
+      join(reqHome, HOST_UPDATE_REQUEST_FILE),
+      JSON.stringify({ id: 'req-retry-1', requestedVersion: '1.1.0', requestedAt: 1, force: true }),
+    );
+    consumeHostUpdateForce(reqHome, 'req-retry-1');
+    expect(readHostUpdateRequest(reqHome)?.force).toBeUndefined();
+  });
+
+  test('detects real SQLite column update with unchanged count/rowid, stops server before restore, enforces resume lease, and confirms non-resident desktop update', async () => {
+    const cairnHome = mkdtempSync(join(tmpdir(), 'cairn-sqlite-diff-'));
+    roots.push(cairnHome);
+    const serverDir = join(cairnHome, 'server');
+    mkdirSync(serverDir, { recursive: true });
+    const dbPath = join(serverDir, 'server.db');
+    execFileSync('/usr/bin/sqlite3', [
+      dbPath,
+      'CREATE TABLE user (id TEXT PRIMARY KEY, name TEXT NOT NULL); INSERT INTO user VALUES ("u1", "Alice");',
+    ]);
+    const snapPath = await snapshotResidentDb(cairnHome, '1.0.0', 123);
+    expect(snapPath).not.toBeNull();
+    expect(await hasDomainWritesSinceSnapshot(cairnHome, snapPath)).toBe(false);
+
+    execFileSync('/usr/bin/sqlite3', [
+      dbPath,
+      'UPDATE user SET name = "Alice Renamed" WHERE id = "u1";',
+    ]);
+    expect(await hasDomainWritesSinceSnapshot(cairnHome, snapPath)).toBe(true);
+    expect(await hasDomainWritesSinceSnapshot(cairnHome, join(serverDir, 'missing.db'))).toBe(true);
+
+    const { bundle, root, userData } = mac('1.0.0');
+    const order: string[] = [];
+    let restoredDb = false;
+    let clock = 1_000_000;
+    const wOrder = world(bundle, userData);
+    wOrder.deps.acquireLease = async () => true;
+    wOrder.deps.releaseLease = async () => {};
+    wOrder.deps.snapshotDb = async () => {
+      const p = join(root, 'snap.db');
+      writeFileSync(p, 'snap');
+      return p;
+    };
+    wOrder.deps.stopResident = async () => {
+      order.push('stopResident');
+      return true;
+    };
+    wOrder.deps.hasDomainWrites = async () => {
+      order.push('hasDomainWrites');
+      return false;
+    };
+    wOrder.deps.restoreDb = async () => {
+      order.push('restoreDb');
+      restoredDb = true;
+    };
+    let activeVersion = '1.0.0';
+    wOrder.deps.restartResident = async () => {
+      order.push('restartResident');
+      activeVersion = (await readBundleVersion(bundle)) ?? '1.0.0';
+    };
+    wOrder.deps.probeHealth = async () =>
+      activeVersion === '1.1.0'
+        ? { ok: false, version: null, pid: null, busy: false }
+        : { ok: true, version: '1.0.0', pid: 444, busy: false };
+    wOrder.deps.now = () => clock;
+    wOrder.deps.sleep = async (ms) => {
+      clock += ms;
+    };
+    wOrder.deps.probationDeadlineMs = 10_000;
+    wOrder.deps.probeIntervalMs = 2_000;
+    expect(await runBackgroundUpdate(wOrder.deps)).toBe('rolled-back');
+    expect(restoredDb).toBe(true);
+    expect(order.indexOf('stopResident')).toBeGreaterThan(-1);
+    expect(order.indexOf('stopResident')).toBeLessThan(order.indexOf('hasDomainWrites'));
+    expect(order.indexOf('hasDomainWrites')).toBeLessThan(order.indexOf('restoreDb'));
+
+    const { bundle: b2, root: r2, userData: u2 } = mac('1.0.0');
+    let restoredDbWhenRunning = false;
+    const wFailStop = world(b2, u2);
+    wFailStop.deps.acquireLease = async () => true;
+    wFailStop.deps.releaseLease = async () => {};
+    wFailStop.deps.snapshotDb = async () => {
+      const p = join(r2, 'snap2.db');
+      writeFileSync(p, 'snap');
+      return p;
+    };
+    wFailStop.deps.stopResident = async () => false;
+    wFailStop.deps.restoreDb = async () => {
+      restoredDbWhenRunning = true;
+    };
+    wFailStop.deps.probeHealth = async () => ({ ok: false, version: null, pid: null, busy: false });
+    wFailStop.deps.now = () => clock;
+    wFailStop.deps.sleep = async (ms) => {
+      clock += ms;
+    };
+    wFailStop.deps.probationDeadlineMs = 10_000;
+    wFailStop.deps.probeIntervalMs = 2_000;
+    expect(await runBackgroundUpdate(wFailStop.deps)).toBe('rollback-failed');
+    expect(restoredDbWhenRunning).toBe(false);
+
+    const { bundle: b3, userData: u3 } = mac('1.1.0');
+    writeUpdateState(updateStatePath(u3), {
+      ...emptyUpdateState(),
+      installed: { version: '1.1.0', previousVersion: '1.0.0', previousApp: 'p', at: 1 },
+    });
+    const wResume = world(b3, u3);
+    wResume.deps.acquireLease = async () => false;
+    wResume.deps.probeHealth = async () => ({ ok: false, version: null, pid: null, busy: false });
+    expect(await runBackgroundUpdate(wResume.deps)).toBe('resident-busy');
+
+    const { bundle: b4, userData: u4 } = mac('1.0.0');
+    const wDesktopOnly = world(b4, u4);
+    expect(wDesktopOnly.deps.probeHealth).toBeUndefined();
+    expect(await runBackgroundUpdate(wDesktopOnly.deps)).toBe('installed');
   });
 });

@@ -430,35 +430,30 @@ function quoteIdent(name: string): string {
   return `"${name.replaceAll('"', '""')}"`;
 }
 
-async function readDomainWatermarks(dbPath: string): Promise<Map<string, string>> {
-  const tables = await sqliteQueryJson<{ name: string }>(
-    dbPath,
-    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;",
-  );
-  const watermarks = new Map<string, string>();
-  for (const { name } of tables) {
-    if (IGNORED_DOMAIN_TABLES.has(name)) continue;
-    const q = quoteIdent(name);
-    const cols = await sqliteQueryJson<{ name: string }>(dbPath, `PRAGMA table_info(${q});`);
-    const colNames = new Set(cols.map((col) => col.name));
-    const tsCol = ['updated_at', 'created_at', 'finished_at'].find((c) => colNames.has(c));
-    const tsExpr = tsCol === undefined ? '0' : `COALESCE(MAX(${quoteIdent(tsCol)}), 0)`;
-    const rows = await sqliteQueryJson<{ cnt: number; max_rid?: number | null; max_ts: unknown }>(
+function escapeSqlString(value: string): string {
+  return value.replaceAll("'", "''");
+}
+
+async function sqliteAttachQueryJson<T>(
+  dbPath: string,
+  snapshotPath: string,
+  sql: string,
+): Promise<T[]> {
+  const { stdout } = await execFileAsync(
+    '/usr/bin/sqlite3',
+    [
+      '-readonly',
+      '-json',
       dbPath,
-      `SELECT COUNT(*) AS cnt, MAX(rowid) AS max_rid, ${tsExpr} AS max_ts FROM ${q};`,
-    ).catch(() =>
-      sqliteQueryJson<{ cnt: number; max_ts: unknown }>(
-        dbPath,
-        `SELECT COUNT(*) AS cnt, ${tsExpr} AS max_ts FROM ${q};`,
-      ),
-    );
-    const row = rows[0] ?? { cnt: 0, max_rid: 0, max_ts: 0 };
-    watermarks.set(
-      name,
-      `${row.cnt}:${'max_rid' in row ? (row.max_rid ?? 0) : 0}:${String(row.max_ts ?? 0)}`,
-    );
-  }
-  return watermarks;
+      '.timeout 5000',
+      `ATTACH DATABASE '${escapeSqlString(snapshotPath)}' AS snap;`,
+      sql,
+    ],
+    { maxBuffer: 8 * 1024 * 1024 },
+  );
+  const trimmed = stdout.trim();
+  if (trimmed === '') return [];
+  return JSON.parse(trimmed) as T[];
 }
 
 export async function snapshotResidentDb(
@@ -483,24 +478,82 @@ export async function hasDomainWritesSinceSnapshot(
   cairnHome: string,
   snapshotPath: string | null,
 ): Promise<boolean> {
-  if (snapshotPath === null || !existsSync(snapshotPath)) return false;
+  if (snapshotPath === null) return false;
+  if (!existsSync(snapshotPath)) return true;
   const dbPath = join(cairnHome, 'server', 'server.db');
-  if (!existsSync(dbPath)) return false;
+  if (!existsSync(dbPath)) return true;
   try {
-    const snap = await readDomainWatermarks(snapshotPath);
-    const curr = await readDomainWatermarks(dbPath);
-    for (const [table, sig] of curr) {
-      const prev = snap.get(table);
-      if (prev === undefined) {
-        const count = Number(sig.split(':')[0] ?? '0');
-        if (count > 0) return true;
-        continue;
+    const mainTables = await sqliteQueryJson<{ name: string }>(
+      dbPath,
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;",
+    );
+    const snapTables = await sqliteQueryJson<{ name: string }>(
+      snapshotPath,
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;",
+    );
+    const mainSet = new Set(
+      mainTables.map((t) => t.name).filter((name) => !IGNORED_DOMAIN_TABLES.has(name)),
+    );
+    const snapSet = new Set(
+      snapTables.map((t) => t.name).filter((name) => !IGNORED_DOMAIN_TABLES.has(name)),
+    );
+
+    for (const name of mainSet) {
+      if (!snapSet.has(name)) {
+        const [row] = await sqliteQueryJson<{ cnt: number }>(
+          dbPath,
+          `SELECT COUNT(*) AS cnt FROM ${quoteIdent(name)};`,
+        );
+        if ((row?.cnt ?? 1) > 0) return true;
       }
-      if (prev !== sig) return true;
+    }
+    for (const name of snapSet) {
+      if (!mainSet.has(name)) {
+        const [row] = await sqliteQueryJson<{ cnt: number }>(
+          snapshotPath,
+          `SELECT COUNT(*) AS cnt FROM ${quoteIdent(name)};`,
+        );
+        if ((row?.cnt ?? 1) > 0) return true;
+      }
+    }
+
+    for (const name of mainSet) {
+      if (!snapSet.has(name)) continue;
+      const q = quoteIdent(name);
+      const [counts] = await sqliteAttachQueryJson<{ main_cnt: number; snap_cnt: number }>(
+        dbPath,
+        snapshotPath,
+        `SELECT (SELECT COUNT(*) FROM main.${q}) AS main_cnt, (SELECT COUNT(*) FROM snap.${q}) AS snap_cnt;`,
+      );
+      if (counts === undefined || counts.main_cnt !== counts.snap_cnt) return true;
+      if (counts.main_cnt === 0) continue;
+
+      const mainCols = await sqliteQueryJson<{ name: string }>(dbPath, `PRAGMA table_info(${q});`);
+      const snapCols = await sqliteQueryJson<{ name: string }>(
+        snapshotPath,
+        `PRAGMA table_info(${q});`,
+      );
+      const snapColSet = new Set(snapCols.map((c) => c.name));
+      const commonCols = mainCols.map((c) => c.name).filter((col) => snapColSet.has(col));
+      if (commonCols.length === 0) return true;
+
+      const colList = commonCols.map(quoteIdent).join(', ');
+      const diffForward = await sqliteAttachQueryJson<Record<string, unknown>>(
+        dbPath,
+        snapshotPath,
+        `SELECT 1 AS diff FROM (SELECT ${colList}, COUNT(*) AS _c FROM main.${q} GROUP BY ${colList} EXCEPT SELECT ${colList}, COUNT(*) AS _c FROM snap.${q} GROUP BY ${colList}) LIMIT 1;`,
+      );
+      if (diffForward.length > 0) return true;
+      const diffReverse = await sqliteAttachQueryJson<Record<string, unknown>>(
+        dbPath,
+        snapshotPath,
+        `SELECT 1 AS diff FROM (SELECT ${colList}, COUNT(*) AS _c FROM snap.${q} GROUP BY ${colList} EXCEPT SELECT ${colList}, COUNT(*) AS _c FROM main.${q} GROUP BY ${colList}) LIMIT 1;`,
+      );
+      if (diffReverse.length > 0) return true;
     }
     return false;
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -527,19 +580,55 @@ export async function restoreResidentDb(
   return existsSync(failedDbPath) ? failedDbPath : null;
 }
 
+export async function stopResidentHost(opts: {
+  homeDir: string;
+  cairnHome: string;
+  uid?: number;
+  runLaunchctl?: (args: string[]) => Promise<void>;
+  waitForExit?: () => Promise<boolean>;
+}): Promise<boolean> {
+  if (process.platform !== 'darwin' && opts.runLaunchctl === undefined) {
+    return opts.waitForExit !== undefined
+      ? opts.waitForExit()
+      : waitForResidentExit(opts.cairnHome, { timeoutMs: 10_000 });
+  }
+  if (!isResidentInstalled(opts.homeDir)) return true;
+  const domain = `gui/${opts.uid ?? process.getuid?.() ?? 501}`;
+  const run =
+    opts.runLaunchctl ??
+    (async (args: string[]) => {
+      await execFileAsync('launchctl', args);
+    });
+  try {
+    await run(['bootout', `${domain}/${RESIDENT_LABEL}`]);
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
+  return opts.waitForExit !== undefined
+    ? opts.waitForExit()
+    : waitForResidentExit(opts.cairnHome, { timeoutMs: 10_000 });
+}
+
 export async function kickstartResidentHost(opts: {
   homeDir: string;
   uid?: number;
   runLaunchctl?: (args: string[]) => Promise<void>;
 }): Promise<boolean> {
   if (process.platform !== 'darwin' && opts.runLaunchctl === undefined) return false;
-  if (!isResidentInstalled(opts.homeDir)) return false;
+  const plistPath = residentPlistPath(opts.homeDir);
+  if (!existsSync(plistPath)) return false;
+  const uid = opts.uid ?? process.getuid?.() ?? 501;
+  const domain = `gui/${uid}`;
   const run =
     opts.runLaunchctl ??
     (async (args: string[]) => {
       await execFileAsync('launchctl', args);
     });
-  await run(['kickstart', '-k', `gui/${opts.uid ?? process.getuid?.() ?? 501}/${RESIDENT_LABEL}`]);
+  try {
+    await run(['kickstart', '-k', `${domain}/${RESIDENT_LABEL}`]);
+  } catch {
+    await run(['bootstrap', domain, plistPath]);
+  }
   return true;
 }
 

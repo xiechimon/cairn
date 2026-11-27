@@ -71,6 +71,7 @@ export function createRemoteVersionController(
   let baselineVersion: string | null = null;
   let attemptedKey: string | null = null;
   let restartSince: number | null = null;
+  let serverSupportsV2 = false;
 
   const clearPoll = (): void => {
     if (pollTimer !== null) {
@@ -153,7 +154,8 @@ export function createRemoteVersionController(
       return;
     }
 
-    if (!isRemoteServerOlder(body.version, opts.appVersion)) {
+    const hostIsOlder = isRemoteServerOlder(body.version, opts.appVersion);
+    if (!hostIsOlder && rollbackNotice === null) {
       clearPoll();
       restartSince = null;
       baselineVersion = null;
@@ -166,13 +168,16 @@ export function createRemoteVersionController(
         updaterState: body.updater.state,
         percent: null,
         reason: null,
-        rollbackNotice,
+        rollbackNotice: null,
       });
       return;
     }
 
+    const triggerTarget = hostIsOlder
+      ? opts.appVersion
+      : (rollbackNotice?.failedVersion ?? opts.appVersion);
     const olderVersion = body.version;
-    const attemptKey = `${opts.appVersion}<-${olderVersion ?? 'unknown'}`;
+    const attemptKey = `${triggerTarget}<-${olderVersion ?? 'unknown'}`;
     if (!body.updater.supported) {
       clearPoll();
       restartSince = null;
@@ -181,7 +186,7 @@ export function createRemoteVersionController(
         serverVersion: olderVersion,
         serverCommit: body.commit,
         appVersion: opts.appVersion,
-        targetVersion: opts.appVersion,
+        targetVersion: triggerTarget,
         updaterState: 'unsupported',
         percent: null,
         reason: body.updater.reason ?? 'no-updater',
@@ -200,7 +205,7 @@ export function createRemoteVersionController(
         serverVersion: olderVersion,
         serverCommit: body.commit,
         appVersion: opts.appVersion,
-        targetVersion: body.updater.targetVersion ?? opts.appVersion,
+        targetVersion: body.updater.targetVersion ?? triggerTarget,
         updaterState: body.updater.state,
         percent: body.updater.percent,
         reason: null,
@@ -220,7 +225,7 @@ export function createRemoteVersionController(
         serverVersion: olderVersion,
         serverCommit: body.commit,
         appVersion: opts.appVersion,
-        targetVersion: opts.appVersion,
+        targetVersion: triggerTarget,
         updaterState: body.updater.state,
         percent: null,
         reason,
@@ -231,9 +236,10 @@ export function createRemoteVersionController(
 
     if (
       !forceTrigger &&
-      (body.updater.state === 'failed' ||
+      (!hostIsOlder ||
+        body.updater.state === 'failed' ||
         body.updater.reason === 'blocked' ||
-        (rollbackNotice !== null && rollbackNotice.failedVersion === opts.appVersion) ||
+        (rollbackNotice !== null && rollbackNotice.failedVersion === triggerTarget) ||
         (body.updater.state === 'up-to-date' && body.updater.reason === 'no-release'))
     ) {
       attemptedKey = attemptKey;
@@ -244,7 +250,7 @@ export function createRemoteVersionController(
         serverVersion: olderVersion,
         serverCommit: body.commit,
         appVersion: opts.appVersion,
-        targetVersion: opts.appVersion,
+        targetVersion: triggerTarget,
         updaterState: body.updater.state,
         percent: null,
         reason:
@@ -266,8 +272,8 @@ export function createRemoteVersionController(
           'sec-fetch-site': 'same-origin',
         },
         body: JSON.stringify({
-          targetVersion: opts.appVersion,
-          ...(forceTrigger ? { force: true } : {}),
+          targetVersion: triggerTarget,
+          ...(forceTrigger && serverSupportsV2 ? { force: true } : {}),
         }),
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
@@ -279,10 +285,11 @@ export function createRemoteVersionController(
           serverVersion: olderVersion,
           serverCommit: body.commit,
           appVersion: opts.appVersion,
-          targetVersion: opts.appVersion,
+          targetVersion: triggerTarget,
           updaterState: 'unsupported',
           percent: null,
           reason: 'no-updater',
+          rollbackNotice,
         });
         return;
       }
@@ -293,10 +300,11 @@ export function createRemoteVersionController(
           serverVersion: olderVersion,
           serverCommit: body.commit,
           appVersion: opts.appVersion,
-          targetVersion: opts.appVersion,
+          targetVersion: triggerTarget,
           updaterState: 'failed',
           percent: null,
           reason: 'failed',
+          rollbackNotice,
         });
         return;
       }
@@ -307,10 +315,11 @@ export function createRemoteVersionController(
           serverVersion: olderVersion,
           serverCommit: body.commit,
           appVersion: opts.appVersion,
-          targetVersion: opts.appVersion,
+          targetVersion: triggerTarget,
           updaterState: 'failed',
           percent: null,
           reason: 'failed',
+          rollbackNotice,
         });
         return;
       }
@@ -322,10 +331,11 @@ export function createRemoteVersionController(
           serverVersion: olderVersion,
           serverCommit: body.commit,
           appVersion: opts.appVersion,
-          targetVersion: opts.appVersion,
+          targetVersion: triggerTarget,
           updaterState: 'failed',
           percent: null,
           reason: 'failed',
+          rollbackNotice,
         });
         return;
       }
@@ -337,10 +347,11 @@ export function createRemoteVersionController(
           serverVersion: olderVersion,
           serverCommit: body.commit,
           appVersion: opts.appVersion,
-          targetVersion: opts.appVersion,
+          targetVersion: triggerTarget,
           updaterState: 'unsupported',
           percent: null,
           reason: result.updater.reason ?? 'no-updater',
+          rollbackNotice,
         });
         return;
       }
@@ -351,13 +362,14 @@ export function createRemoteVersionController(
           serverVersion: olderVersion,
           serverCommit: body.commit,
           appVersion: opts.appVersion,
-          targetVersion: opts.appVersion,
+          targetVersion: triggerTarget,
           updaterState: result.updater.state,
           percent: null,
           reason:
             result.updater.state === 'up-to-date'
               ? 'no-release'
               : (result.updater.reason ?? 'failed'),
+          rollbackNotice,
         });
         return;
       }
@@ -366,7 +378,7 @@ export function createRemoteVersionController(
         serverVersion: olderVersion,
         serverCommit: body.commit,
         appVersion: opts.appVersion,
-        targetVersion: result.updater.targetVersion ?? opts.appVersion,
+        targetVersion: result.updater.targetVersion ?? triggerTarget,
         updaterState: result.updater.state,
         percent: result.updater.percent,
         reason: null,
@@ -380,10 +392,11 @@ export function createRemoteVersionController(
         serverVersion: olderVersion,
         serverCommit: body.commit,
         appVersion: opts.appVersion,
-        targetVersion: opts.appVersion,
+        targetVersion: triggerTarget,
         updaterState: 'failed',
         percent: null,
         reason: 'failed',
+        rollbackNotice,
       });
     }
   };
@@ -457,7 +470,12 @@ export function createRemoteVersionController(
           return;
         }
         if (!response.ok) return;
-        const parsed = serverVersionV2ResponseSchema.safeParse(await response.json());
+        const rawJson = (await response.json()) as unknown;
+        serverSupportsV2 =
+          rawJson !== null &&
+          typeof rawJson === 'object' &&
+          ('latestRelease' in rawJson || 'rollbackNotice' in rawJson);
+        const parsed = serverVersionV2ResponseSchema.safeParse(rawJson);
         if (!parsed.success) {
           clearPoll();
           reportAbout(null, null);

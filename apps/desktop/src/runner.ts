@@ -196,6 +196,7 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
     {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
+      CAIRN_DESKTOP_BUNDLED: '1',
       [ENV_VARS.home]: options.home,
       [ENV_VARS.parentPid]: String(process.pid),
       [ENV_VARS.confineDeniedRoots]: [
