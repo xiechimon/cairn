@@ -3,6 +3,7 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useState
 import { Outlet, useLocation } from 'react-router';
 import { MachineIdentityContext } from '../components/machine-label.js';
 import { Badge } from '../components/ui/badge.js';
+import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import { DemoBanner } from '../demo/demo-banner.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
@@ -18,7 +19,9 @@ import { activeLocale } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { translate } from '../i18n/translate.js';
 import { errorWasSurfaced } from '../lib/mutation-error-report.js';
+import { settingsSectionOf } from '../settings/settings-href.js';
 import { ApiError } from './client.js';
+import { useConnectionOutage } from './connection-state.js';
 import { useMachines, useSession, useTeams } from './hooks.js';
 import { refreshQueriesOnGateClose } from './invalidate.js';
 import { isFixtureMode } from './mode.js';
@@ -80,7 +83,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 }
 
 export function LiveDataBridge() {
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const live = useMemo(() => !isFixtureMode(new URLSearchParams(search)), [search]);
   const [fixturesReady, setFixturesReady] = useState(false);
   useEffect(() => {
@@ -97,8 +100,14 @@ export function LiveDataBridge() {
   const session = useSession(live);
   const teamId = teams.data?.[0]?.id;
   const machines = useMachines(teamId, live);
-  const reconnecting = useTeamStream(teamId, live);
+  useTeamStream(teamId, live);
+  const outage = useConnectionOutage();
   const { t } = useI18n();
+  const showOverlayBadge =
+    live &&
+    pathname !== '/app' &&
+    settingsSectionOf(pathname) === null &&
+    (outage.phase === 'reconnecting' || outage.phase === 'long-outage');
   const value = useMemo<LiveData>(
     () => ({
       live,
@@ -118,11 +127,19 @@ export function LiveDataBridge() {
     live || !SCENARIOS_ENABLED ? null : new URLSearchParams(search).get(SCENARIO_PARAM);
   return (
     <LiveDataContext.Provider value={value}>
-      {reconnecting && (
-        <div role="status" className="pointer-events-none fixed top-2 right-3 z-40">
+      {showOverlayBadge && (
+        <div role="status" className="fixed top-2 right-3 z-(--z-dialog) flex items-center gap-1.5">
           <Badge variant="secondary" className="bg-popover text-muted-foreground transition-none">
-            {t('正在重新连接…')}
+            {t(outage.phase === 'long-outage' ? '无法连接服务器' : '正在重新连接…')}
           </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-2 text-caption text-muted-foreground"
+            onClick={outage.retryNow}
+          >
+            {t('立即重试')}
+          </Button>
         </div>
       )}
       <MachineIdentityContext.Provider

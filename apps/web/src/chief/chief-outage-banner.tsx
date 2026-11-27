@@ -137,20 +137,48 @@ export function ChiefFallbackBanner({
   );
 }
 
-export function ChiefConnectionBanner() {
+export function ChiefConnectionBanner({
+  phase = 'reconnecting',
+  onRetry,
+}: {
+  phase?: 'reconnecting' | 'long-outage';
+  onRetry?: (() => void) | undefined;
+} = {}) {
   const { t } = useI18n();
+  const longOutage = phase === 'long-outage';
   return (
-    <div className={NOTICE_WRAP_CLS}>
+    <div className={`${NOTICE_WRAP_CLS} pointer-events-auto`}>
       <NoticeLine
-        tone="danger"
+        tone="waiting"
         live
         icon={WifiOff}
         testId="connection-lost"
+        className="rounded-(--radius-card) bg-card px-3 py-2 shadow-(--e1) inset-ring-1 inset-ring-border before:hidden after:hidden"
         label={
-          <>
-            <b className="font-semibold text-foreground">{t('连接断开，正在重连…')}</b>{' '}
-            {t('恢复连接前，新消息可能发不出去。')}
-          </>
+          longOutage ? (
+            <>
+              <b className="font-semibold text-foreground">{t('无法连接服务器')}</b>{' '}
+              {t('草稿已保留，恢复连接后自动继续。')}
+            </>
+          ) : (
+            <>
+              <b className="font-semibold text-foreground">{t('连接断开，正在重连…')}</b>{' '}
+              {t('草稿已保留，恢复连接前消息暂不发送。')}
+            </>
+          )
+        }
+        actions={
+          onRetry !== undefined ? (
+            <Button
+              variant={longOutage ? 'outline' : 'ghost'}
+              size="sm"
+              className="h-6 flex-none px-2 text-meta pointer-coarse:h-11"
+              data-testid="connection-retry"
+              onClick={onRetry}
+            >
+              {t('立即重试')}
+            </Button>
+          ) : undefined
         }
       />
     </div>

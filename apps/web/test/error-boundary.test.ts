@@ -1,9 +1,10 @@
-import { createElement as h, type ReactNode, useEffect, useState } from 'react';
+import { createElement as h, type ReactNode, Suspense, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { connectionStore, type StreamConnectionHandle } from '../src/api/connection-state.js';
 import { conversationBoundaryKey } from '../src/board/home-c.js';
-import { SubtreeErrorBoundary } from '../src/components/subtree-error-boundary.js';
+import { retryableLazy, SubtreeErrorBoundary } from '../src/components/subtree-error-boundary.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
 class El {
@@ -152,7 +153,9 @@ function click(root: El, target: El) {
 
 
 const roots: ReturnType<typeof createRoot>[] = [];
+const activeStreams: StreamConnectionHandle[] = [];
 afterEach(async () => {
+  for (const stream of activeStreams.splice(0)) stream.detach();
   for (const root of roots.splice(0)) flushSync(() => root.unmount());
   await new Promise<void>((resolve) => setImmediate(() => setImmediate(resolve)));
   vi.unstubAllGlobals();
@@ -292,5 +295,72 @@ describe('SubtreeErrorBoundary', () => {
     });
     expect(stuck).toBe('coordinator:::old-thread');
     expect(next).not.toBe(stuck);
+  });
+
+  it.each(['en', 'zh'] as const)(
+    'shows the calm offline fallback when disconnected and auto-retries on recovery (%s)',
+    (locale) => {
+      const stream = connectionStore.attach();
+      activeStreams.push(stream);
+      let fail = true;
+      function Child() {
+        if (fail) throw new Error('offline subtree failure');
+        return h('span', null, 'ready');
+      }
+      stream.setConnected(false);
+      const view = render(h(SubtreeErrorBoundary, null, h(Child)), locale);
+      expect(view.text()).toContain(
+        locale === 'en' ? 'Cannot connect to the server' : '当前无法连接服务器',
+      );
+      expect(view.text()).toContain(
+        locale === 'en' ? 'Cairn retries automatically once connected.' : '恢复连接后自动重试。',
+      );
+      fail = false;
+      flushSync(() => {
+        stream.setConnected(true);
+      });
+      expect(view.text()).toBe('ready');
+    },
+  );
+
+  it('treats dynamic module fetch failures as offline fallbacks instead of generic errors', () => {
+    function BrokenChunk(): never {
+      throw new TypeError('Failed to fetch dynamically imported module: /assets/settings.js');
+    }
+    const view = render(h(SubtreeErrorBoundary, null, h(BrokenChunk)), 'en');
+    expect(view.text()).toContain('Cannot connect to the server');
+    expect(view.text()).not.toContain('This part failed');
+  });
+
+  it('recovers a retryableLazy import after connectivity returns', async () => {
+    const stream = connectionStore.attach();
+    activeStreams.push(stream);
+    stream.setConnected(false);
+    let attempts = 0;
+    const LazyPanel = retryableLazy(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new TypeError('Failed to fetch dynamically imported module: /assets/settings.js');
+      }
+      return { default: () => h('span', null, 'settings ready') };
+    });
+    const view = render(
+      h(
+        SubtreeErrorBoundary,
+        null,
+        h(Suspense, { fallback: h('span', null, 'loading') }, h(LazyPanel)),
+      ),
+      'en',
+    );
+    await vi.waitFor(() => {
+      expect(view.text()).toContain('Cannot connect to the server');
+    });
+    flushSync(() => {
+      stream.setConnected(true);
+    });
+    await vi.waitFor(() => {
+      expect(view.text()).toBe('settings ready');
+    });
+    expect(attempts).toBe(2);
   });
 });

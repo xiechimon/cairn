@@ -58,6 +58,24 @@ export function nextOpenStep(steps: readonly FirstRunStep[] | null): FirstRunSte
   return steps?.find((step) => !step.done)?.id ?? null;
 }
 
+export function resolveLiveSetupStep({
+  live,
+  connected,
+  anyError,
+  models,
+  machinesReady,
+}: {
+  live: boolean;
+  connected: boolean;
+  anyError: boolean;
+  models: ModelSides | undefined;
+  machinesReady: number | undefined;
+}): { next: FirstRunStepId; models: ModelSides } | null {
+  if (!live || !connected || anyError || models === undefined) return null;
+  const next = nextOpenStep(firstRunSteps({ models, machinesReady }));
+  return next === null ? null : { next, models };
+}
+
 export function firstRunComplete(steps: readonly FirstRunStep[] | null): boolean {
   return steps === null || steps.every((step) => step.done);
 }

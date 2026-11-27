@@ -59,11 +59,23 @@ export function connect(
   };
 
   const retryNow = () => {
-    if (disposed || retryTimer === undefined) return;
-    clearTimeout(retryTimer);
-    retryTimer = undefined;
-    retryDelay = 1_000;
-    open();
+    if (disposed) return;
+    if (retryTimer !== undefined) {
+      clearTimeout(retryTimer);
+      retryTimer = undefined;
+      retryDelay = 1_000;
+      open();
+      return;
+    }
+    if (es !== null && es.readyState !== 1) {
+      const stuck = es;
+      es = null;
+      clearTimeout(watchdog);
+      clearTimeout(bizTimer);
+      stuck.close();
+      retryDelay = 1_000;
+      open();
+    }
   };
 
   function open(): void {

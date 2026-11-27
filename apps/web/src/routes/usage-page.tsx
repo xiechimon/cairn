@@ -6,11 +6,13 @@ import {
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
 } from 'react';
 import { useSearchParams } from 'react-router';
+import { useConnectionOutage } from '../api/connection-state.js';
 import { useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useDailyUsage } from '../api/usage-daily.js';
@@ -631,6 +633,7 @@ export function UsagePage() {
   const { t } = useI18n();
   const [params] = useSearchParams();
   const { live } = useLiveData();
+  const { connected, retryNow } = useConnectionOutage();
   const fixture = resolveScenario(params);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = localDay(live ? Date.now() : fixture.now, tz);
@@ -638,7 +641,17 @@ export function UsagePage() {
   const teamId = teams.isSuccess ? teams.data[0]?.id : undefined;
   const query = useDailyUsage(teamId, USAGE_FETCH_DAYS, tz, live);
   const usage = live ? query.data : (fixture.dailyUsage ?? { days: [], models: [], projects: [] });
-  const failed = live && (teams.isError || query.isError);
+  const failed = live && usage === undefined && (teams.isError || query.isError);
+  const wasDisconnectedRef = useRef(false);
+  useEffect(() => {
+    if (!connected) {
+      wasDisconnectedRef.current = true;
+      return;
+    }
+    if (!wasDisconnectedRef.current) return;
+    wasDisconnectedRef.current = false;
+    if (failed) void (teams.isError ? teams.refetch() : query.refetch());
+  }, [connected, failed, query, teams]);
 
   return (
     <RouteDialog title={t('用量')} size="page" bleed>
@@ -650,7 +663,10 @@ export function UsagePage() {
           description={t('请检查网络后重试。')}
           action={{
             label: t('重试'),
-            onClick: () => void (teams.isError ? teams.refetch() : query.refetch()),
+            onClick: () => {
+              if (!connected) retryNow();
+              void (teams.isError ? teams.refetch() : query.refetch());
+            },
             disabled: teams.isFetching || query.isFetching,
           }}
           className="h-full"

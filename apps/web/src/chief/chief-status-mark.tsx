@@ -219,8 +219,8 @@ export function ChiefStatusMark({
   const [done, setDone] = useState(false);
   useEffect(() => {
     if (isActiveMark(base.id)) sawActiveRef.current = true;
-    if (!finishedTurn(sawActiveRef.current, base.id, lastTurn)) {
-      if (base.id !== 'idle') setDone(false);
+    if (!connected || !finishedTurn(sawActiveRef.current, base.id, lastTurn)) {
+      if (!connected || base.id !== 'idle') setDone(false);
       return;
     }
     sawActiveRef.current = false;
@@ -230,7 +230,7 @@ export function ChiefStatusMark({
       window.clearTimeout(id);
       setDone(false);
     };
-  }, [base.id, lastTurn]);
+  }, [base.id, connected, lastTurn]);
   const live =
     chief.running === true ? stream.findLast((item) => item.kind === 'streaming') : undefined;
   const elapsed = useLiveSeconds(live?.kind === 'streaming' ? live.startedAt : null);

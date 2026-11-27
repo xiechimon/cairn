@@ -1,6 +1,5 @@
 import {
   createContext,
-  lazy,
   Suspense,
   useCallback,
   useContext,
@@ -14,8 +13,11 @@ import { useLiveData } from '../api/provider.js';
 import { ArtifactHost } from '../board/artifact/artifact-host.js';
 import { coordinatorSearch, useOpenComposer, useOpenNewTask } from '../board/open-composer.js';
 import { useTaskOutboxResume } from '../board/task-delivery.js';
+import { retryableLazy, SubtreeErrorBoundary } from '../components/subtree-error-boundary.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { useDesktopMenu } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
+import { useI18n } from '../i18n/provider.js';
 import { isEditableTarget } from '../overlay/hotkeys.js';
 import { RouteDialogCloseProvider } from '../overlay/route-dialog.js';
 import { SETTINGS_HREF, settingsSectionOf } from '../settings/settings-href.js';
@@ -29,7 +31,7 @@ export interface ChiefRootApi {
   pendingQuestions: OriginChiefQuestion[];
 }
 
-const SettingsDialog = lazy(() =>
+const SettingsDialog = retryableLazy(() =>
   import('../settings/settings-page.js').then((m) => ({ default: m.SettingsDialog })),
 );
 
@@ -91,6 +93,7 @@ export function ChiefRoot({
   routes: RouteObject[];
   dialogRoutes: RouteObject[];
 }) {
+  const { t } = useI18n();
   const settings = useSettingsOverlay(dialogRoutes);
   const { pathname = '/app', search = '' } = settings.pageLocation;
   const searchParams = useMemo(() => new URLSearchParams(search), [search]);
@@ -149,9 +152,18 @@ export function ChiefRoot({
           <Suspense fallback={null}>{page}</Suspense>
         </div>
         {settings.section !== null ? (
-          <Suspense fallback={null}>
-            <SettingsDialog section={settings.section} onClose={settings.close} />
-          </Suspense>
+          <SubtreeErrorBoundary
+            resetKey={settings.section}
+            frame={(fallback) => (
+              <DialogShell title={t('设置')} size="m" onClose={settings.close}>
+                {fallback}
+              </DialogShell>
+            )}
+          >
+            <Suspense fallback={null}>
+              <SettingsDialog section={settings.section} onClose={settings.close} />
+            </Suspense>
+          </SubtreeErrorBoundary>
         ) : (
           <RouteDialogCloseProvider value={settings.close}>
             <Suspense fallback={null}>{dialog}</Suspense>

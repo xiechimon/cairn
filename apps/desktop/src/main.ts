@@ -103,7 +103,13 @@ import {
   resolveLocalHostOwner,
 } from './local-host-owner.js';
 import { scanLocalProviders } from './local-providers.js';
-import { type DesktopLocale, desktopLocale, resolveWindowLocale } from './locale.js';
+import {
+  type DesktopLocale,
+  desktopLocale,
+  readPersistedDesktopLocale,
+  resolveWindowLocale,
+  writePersistedDesktopLocale,
+} from './locale.js';
 import {
   type NativeTray,
   nativeTrayAction,
@@ -112,6 +118,7 @@ import {
   withHostState,
 } from './native-tray.js';
 import { offlinePageHtml } from './offline-page.js';
+import { createOfflineRecovery, type OfflineRecoveryController } from './offline-recovery.js';
 import { desktopOtelEnv, withOtelFileEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
 import { type CapturePage, createPageCapture } from './page-capture.js';
@@ -293,6 +300,7 @@ let appOrigin: string | null = null;
 let remoteClerkIssuer: string | null = null;
 let showingOfflinePage = false;
 let expectedOfflineUrl: string | null = null;
+let offlineRecovery: OfflineRecoveryController | null = null;
 let activeRemoteHostName: string | null = null;
 let mainWindowShown = false;
 let windowState: WindowStateStore | null = null;
@@ -360,23 +368,48 @@ async function probeLocalServerVersion(origin: string, ownerToken: string): Prom
   }
 }
 
+async function probeOriginReachable(origin: string): Promise<boolean> {
+  try {
+    const response = await session.defaultSession.fetch(origin, {
+      method: 'GET',
+      cache: 'no-store',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(3_000),
+    });
+    return !isOfflineHttpStatus(response.status);
+  } catch {
+    return false;
+  }
+}
+
 function reloadMainWindowPreserveDrafts(): void {
   const window = mainWindow;
   if (window === null || window.isDestroyed()) return;
-  const token = Date.now();
-  const done = (event: IpcMainEvent, received: unknown): void => {
-    if (event.sender !== window.webContents || received !== token) return;
-    ipcMain.removeListener('desktop-update:prepare-reload-done', done);
-    clearTimeout(timeout);
-    if (!window.isDestroyed()) window.webContents.reload();
+  const runReload = (): void => {
+    if (window.isDestroyed()) return;
+    const token = Date.now();
+    const done = (event: IpcMainEvent, received: unknown): void => {
+      if (event.sender !== window.webContents || received !== token) return;
+      ipcMain.removeListener('desktop-update:prepare-reload-done', done);
+      clearTimeout(timeout);
+      if (!window.isDestroyed()) window.webContents.reload();
+    };
+    const timeout = setTimeout(() => {
+      ipcMain.removeListener('desktop-update:prepare-reload-done', done);
+      if (!window.isDestroyed()) window.webContents.reload();
+    }, 1_200);
+    timeout.unref();
+    ipcMain.on('desktop-update:prepare-reload-done', done);
+    window.webContents.send('desktop-update:prepare-reload', token);
   };
-  const timeout = setTimeout(() => {
-    ipcMain.removeListener('desktop-update:prepare-reload-done', done);
-    if (!window.isDestroyed()) window.webContents.reload();
-  }, 1_200);
-  timeout.unref();
-  ipcMain.on('desktop-update:prepare-reload-done', done);
-  window.webContents.send('desktop-update:prepare-reload', token);
+  if (activeRemoteHostName !== null && appOrigin !== null) {
+    if (offlineRecovery?.isShowingOfflinePage()) return;
+    void probeOriginReachable(appOrigin).then((reachable) => {
+      if (reachable) runReload();
+    });
+    return;
+  }
+  runReload();
 }
 
 let currentRunnerHome: string | null = null;
@@ -705,17 +738,13 @@ function hostMenuEntries(userData: string) {
 }
 
 function showOfflineFallback(window: BrowserWindow, origin: string): void {
+  if (window.isDestroyed()) return;
   const userData = app.getPath('userData');
-  const catalog = readConnectionCatalog(userData);
+  const locale = readPersistedDesktopLocale(userData) ?? desktopLocale(app.getLocale());
   const html = offlinePageHtml({
-    locale: desktopLocale(app.getLocale()),
+    locale,
     hostName: activeRemoteHostName ?? new URL(origin).host,
     hostUrl: origin,
-    connections: [
-      { id: LOCAL_CONNECTION_ID, kind: 'local', name: 'This computer' },
-      ...catalog.items.map((item) => ({ id: item.id, kind: 'remote' as const, name: item.name })),
-    ],
-    activeId: catalog.activeId,
   });
   const offlineUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
   expectedOfflineUrl = offlineUrl;
@@ -837,18 +866,43 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
   });
+  const initialUrl = restore === null ? origin : restoredUrl(origin, restore.path);
+  offlineRecovery?.dispose();
+  const recovery = createOfflineRecovery({
+    origin,
+    initialUrl,
+    isRemote: activeRemoteHostName !== null,
+    probe: () => probeOriginReachable(origin),
+    showOffline: () => showOfflineFallback(window, origin),
+    loadUrl: (url) => {
+      showingOfflinePage = false;
+      expectedOfflineUrl = null;
+      if (!window.isDestroyed()) void window.loadURL(url);
+    },
+    reload: () => {
+      if (!window.isDestroyed()) window.webContents.reload();
+    },
+  });
+  offlineRecovery = recovery;
   window.webContents.on('did-navigate', (_event, url, httpResponseCode) => {
     if (
       activeRemoteHostName !== null &&
       isOfflineHttpStatus(httpResponseCode) &&
       isSameOriginUrl(url, origin)
     ) {
-      showOfflineFallback(window, origin);
+      recovery.handleMainFrameFailure(url);
       return;
     }
     if (expectedOfflineUrl === null || url !== expectedOfflineUrl) {
       showingOfflinePage = false;
       expectedOfflineUrl = null;
+      if (isSameOriginUrl(url, origin)) recovery.markLoaded(url);
+    }
+  });
+  window.webContents.on('did-finish-load', () => {
+    const url = window.webContents.getURL();
+    if (!showingOfflinePage && isSameOriginUrl(url, origin)) {
+      recovery.markLoaded(url);
     }
   });
   window.webContents.on(
@@ -862,14 +916,18 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
       ) {
         return;
       }
-      showOfflineFallback(window, origin);
+      recovery.handleMainFrameFailure(validatedUrl);
     },
   );
   rememberWindow(window, store);
-  void window.loadURL(restore === null ? origin : restoredUrl(origin, restore.path));
+  void window.loadURL(initialUrl);
   mainWindow = window;
   mainWindowShown = false;
   window.on('closed', () => {
+    if (offlineRecovery === recovery) {
+      recovery.dispose();
+      offlineRecovery = null;
+    }
     if (mainWindow === window) {
       mainWindow = null;
       mainWindowShown = false;
@@ -1374,8 +1432,30 @@ function serveUpdates(
             back: () => BrowserWindow.getFocusedWindow()?.webContents.navigationHistory.goBack(),
             forward: () =>
               BrowserWindow.getFocusedWindow()?.webContents.navigationHistory.goForward(),
+            reload: () => {
+              const focused = BrowserWindow.getFocusedWindow();
+              if (focused === null) return;
+              if (focused === mainWindow && offlineRecovery !== null) {
+                void offlineRecovery.requestSafeReload();
+                return;
+              }
+              focused.webContents.reload();
+            },
+            forceReload: () => {
+              const focused = BrowserWindow.getFocusedWindow();
+              if (focused === null) return;
+              if (
+                focused === mainWindow &&
+                offlineRecovery !== null &&
+                activeRemoteHostName !== null
+              ) {
+                void offlineRecovery.requestSafeReload();
+                return;
+              }
+              focused.webContents.reloadIgnoringCache();
+            },
           },
-          desktopLocale(app.getLocale()),
+          readPersistedDesktopLocale(app.getPath('userData')) ?? desktopLocale(app.getLocale()),
           {
             entries: hostMenuEntries(app.getPath('userData')),
             switchHost: (id) => switchDesktopHost(app.getPath('userData'), id),
@@ -1557,6 +1637,11 @@ function serveUpdates(
   ipcMain.handle('desktop-shell:fullscreen', (event) => {
     if (!fromOwnPage(event)) return false;
     return BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false;
+  });
+  ipcMain.on('desktop-shell:locale', (event, locale: unknown) => {
+    if (!fromOwnPage(event) || (locale !== 'zh' && locale !== 'en')) return;
+    writePersistedDesktopLocale(app.getPath('userData'), locale);
+    showMenu(created.state());
   });
   ipcMain.handle('desktop-update:state', (event) =>
     fromOwnPage(event) ? channels.shellState() : null,
@@ -2154,6 +2239,7 @@ async function boot(): Promise<void> {
     });
     powerMonitor.on('resume', () => {
       if (runnerWanted) void bringRunnerUp();
+      void offlineRecovery?.nudge();
     });
     ipcMain.handle('local-runner:reconnect', (event) => {
       if (event.senderFrame?.origin !== origin) return undefined;
@@ -2231,21 +2317,30 @@ async function boot(): Promise<void> {
       return hostStatus();
     });
     ipcMain.handle('desktop-host:retry', async (event) => {
-      if (!fromHostMainPage(event) && !fromOfflinePage(event)) return;
-      showingOfflinePage = false;
-      expectedOfflineUrl = null;
+      if (!fromHostMainPage(event) && !fromOfflinePage(event)) return false;
       if (activeConn.kind === 'remote' && !localHostOwned) {
         const localOwner = await resolveLocalHostOwner({
           origin: activeConn.url,
           candidateHomes: localCandidateHomes(),
         });
         if (localOwner !== null) {
+          showingOfflinePage = false;
+          expectedOfflineUrl = null;
           relaunchForHostTransition();
-          return;
+          return true;
         }
-        await refreshRemoteClerkIssuer(origin);
       }
+      if (offlineRecovery !== null) {
+        const ok = await offlineRecovery.retryNow();
+        if (ok && activeConn.kind === 'remote' && !localHostOwned) {
+          await refreshRemoteClerkIssuer(origin);
+        }
+        return ok;
+      }
+      showingOfflinePage = false;
+      expectedOfflineUrl = null;
       void mainWindow?.loadURL(origin);
+      return true;
     });
     let residentTransitionInFlight = false;
     const relaunchForHostTransition = (): void => {

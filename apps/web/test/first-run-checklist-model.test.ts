@@ -8,6 +8,7 @@ import {
   modelsConfirmed,
   nextOpenStep,
   projectCreationBlocked,
+  resolveLiveSetupStep,
   setupOpenStep,
   setupShown,
 } from '../src/board/first-run-checklist-model.js';
@@ -92,4 +93,34 @@ test('creating the first project is blocked until both steps are done; later pro
   expect(projectCreationBlocked({ projects: 2, progress: open })).toBe(false);
   expect(projectCreationBlocked({ projects: undefined, progress: open })).toBe(false);
   expect(projectCreationBlocked({ projects: 0, progress: undefined })).toBe(false);
+});
+
+test('never reports a missing-model setup step while disconnected or when setup queries failed', () => {
+  expect(
+    resolveLiveSetupStep({
+      live: true,
+      connected: false,
+      anyError: false,
+      models: none,
+      machinesReady: 0,
+    }),
+  ).toBeNull();
+  expect(
+    resolveLiveSetupStep({
+      live: true,
+      connected: true,
+      anyError: true,
+      models: none,
+      machinesReady: 0,
+    }),
+  ).toBeNull();
+  expect(
+    resolveLiveSetupStep({
+      live: true,
+      connected: true,
+      anyError: false,
+      models: none,
+      machinesReady: 1,
+    }),
+  ).toEqual({ next: 'models', models: none });
 });

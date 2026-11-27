@@ -1,5 +1,8 @@
-import { describe, expect, test, vi } from 'vitest';
+import { rmSync } from 'node:fs';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { appMenuTemplate } from '../src/app-menu.js';
+import { readPersistedDesktopLocale, writePersistedDesktopLocale } from '../src/locale.js';
 import { offlinePageHtml } from '../src/offline-page.js';
 import {
   isAllowedRemoteAuthUrl,
@@ -8,45 +11,57 @@ import {
 } from '../src/remote-auth.js';
 import { trayMenuTemplate } from '../src/tray-menu.js';
 
+const tempDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+describe('persisted desktop locale', () => {
+  test('persists the Cairn app locale so offline fallback matches user language even when OS is en-US', () => {
+    const dir = makeTestTempDir('cairn-desktop-locale-');
+    tempDirs.push(dir);
+    expect(readPersistedDesktopLocale(dir)).toBeNull();
+    writePersistedDesktopLocale(dir, 'zh');
+    expect(readPersistedDesktopLocale(dir)).toBe('zh');
+    writePersistedDesktopLocale(dir, 'en');
+    expect(readPersistedDesktopLocale(dir)).toBe('en');
+  });
+});
+
 describe('offlinePageHtml', () => {
-  test('renders zh copy with Cairn tokens, retry button, and switch buttons excluding active host', () => {
+  test('renders zh copy with Cairn tokens, calm retry button, and no host-switch recovery CTA', () => {
     const html = offlinePageHtml({
       locale: 'zh',
       hostName: 'Cloud <prod>',
       hostUrl: 'https://cloud.example.com',
-      activeId: 'remote-1',
-      connections: [
-        { id: 'local', kind: 'local', name: 'This computer' },
-        { id: 'remote-1', kind: 'remote', name: 'Cloud <prod>' },
-        { id: 'remote-2', kind: 'remote', name: 'Home Box' },
-      ],
     });
-    expect(html).toContain('无法连接到 Cloud &lt;prod&gt;');
+    expect(html).toContain('无法连接 Cloud &lt;prod&gt;');
     expect(html).toContain('https://cloud.example.com');
     expect(html).toContain('立即重试');
-    expect(html).toContain('data-switch-id="local"');
-    expect(html).toContain('切换到 本机');
-    expect(html).toContain('data-switch-id="remote-2"');
-    expect(html).not.toContain('data-switch-id="remote-1"');
+    expect(html).toContain('正在自动重试…');
+    expect(html).not.toContain('data-switch-id');
+    expect(html).not.toContain('切换主机');
+    expect(html).not.toContain('Switch to This computer');
+    expect(html).not.toContain('Switch host');
+    expect(html).not.toContain('unreachable');
     expect(html).not.toContain('Error:');
     expect(html).toContain('#e7e6e1');
     expect(html).toContain('#1b1c1b');
   });
 
-  test('renders en copy cleanly', () => {
+  test('renders en copy cleanly without contractions, unreachable, or switch-host buttons', () => {
     const html = offlinePageHtml({
       locale: 'en',
       hostName: 'Cloud',
       hostUrl: 'https://cloud.example.com',
-      activeId: 'remote-1',
-      connections: [
-        { id: 'local', kind: 'local', name: 'This computer' },
-        { id: 'remote-1', kind: 'remote', name: 'Cloud' },
-      ],
     });
-    expect(html).toContain('Cannot reach Cloud');
+    expect(html).toContain('Cannot connect to Cloud');
     expect(html).toContain('Retry now');
-    expect(html).toContain('Switch to This computer');
+    expect(html).toContain('Retrying automatically…');
+    expect(html).not.toContain('Switch to This computer');
+    expect(html).not.toContain('Switch host');
+    expect(html).not.toContain('unreachable');
+    expect(html).not.toContain("n't");
   });
 });
 

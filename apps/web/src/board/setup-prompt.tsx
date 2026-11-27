@@ -2,6 +2,7 @@ import { PUBLISHED_PACKAGES } from '@cairn/shared';
 import { Key, Monitor } from 'lucide-react';
 import { Fragment, type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
+import { useConnected } from '../api/connection-state.js';
 import { useChief, useMachines, useProviders } from '../api/hooks.js';
 import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
@@ -16,11 +17,10 @@ import { UpdateCairnButton } from './desktop-update.js';
 import {
   coordinatorCanAnswer,
   type FirstRunStepId,
-  firstRunSteps,
   type ModelSides,
   modelSides,
   modelSourceCount,
-  nextOpenStep,
+  resolveLiveSetupStep,
 } from './first-run-checklist-model.js';
 
 const CODE_CLS = 'rounded bg-(--menu-hover) px-1 py-px font-mono text-meta text-(--text-secondary)';
@@ -31,11 +31,18 @@ export interface SetupStep {
 }
 
 export function useSetupStep(): SetupStep | null {
-  const { live, teamId } = useLiveData();
+  const { live, teamId, teamsQuery } = useLiveData();
+  const connected = useConnected();
   const providersQ = useProviders(teamId, live);
   const routingQ = useModelRouting(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const chiefQ = useChief(teamId, live);
+  const anyError =
+    teamsQuery?.isError === true ||
+    providersQ.isError ||
+    routingQ.isError ||
+    machinesQ.isError ||
+    chiefQ.isError;
   const models = modelSides(
     coordinatorCanAnswer(chiefQ.data),
     modelSourceCount(
@@ -43,15 +50,14 @@ export function useSetupStep(): SetupStep | null {
       routingQ.data === undefined ? undefined : (routingQ.data.connections ?? []),
     ),
   );
-  const next = nextOpenStep(
-    firstRunSteps({
-      models,
-      machinesReady: machinesQ.data?.filter(
-        (machine) => machine.online || machine.starting === true,
-      ).length,
-    }),
-  );
-  return live && next !== null && models !== undefined ? { next, models } : null;
+  return resolveLiveSetupStep({
+    live,
+    connected,
+    anyError,
+    models,
+    machinesReady: machinesQ.data?.filter((machine) => machine.online || machine.starting === true)
+      .length,
+  });
 }
 
 function withCode(text: string): ReactNode {

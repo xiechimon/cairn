@@ -2083,7 +2083,6 @@ export const EN: Record<string, string> = {
   登录已过期: 'Sign-in expired',
   已接入的执行机: 'Connected Runners',
   '连接断开，正在重连…': 'Connection lost, reconnecting…',
-  '恢复连接前，新消息可能发不出去。': 'Until the connection is back, new messages may not send.',
   '移除后，使用它的模型不再可选。': 'Once removed, its models can no longer be picked.',
   '{n} 分钟后恢复': 'Back in {n#1 minute|# minutes}',
   '{n} 小时后恢复': 'Back in {n#1 hour|# hours}',
@@ -3301,4 +3300,12 @@ export const EN: Record<string, string> = {
     'After connecting and signing in, this computer registers as a Runner on that host automatically.',
   文档已关闭: 'Document closed',
   '请回到对话里重新打开这篇内容。': 'Reopen this document from the conversation.',
+  '草稿已保留，恢复连接前消息暂不发送。':
+    'Your drafts are kept; new messages cannot send until connected.',
+  无法连接服务器: 'Cannot connect to the server',
+  '草稿已保留，恢复连接后自动继续。': 'Your drafts are kept. Cairn continues once connected.',
+  当前无法连接服务器: 'Cannot connect to the server',
+  '恢复连接后自动重试。': 'Cairn retries automatically once connected.',
+  正在加载聊天应用: 'Loading chat apps',
+  聊天应用未能加载: 'Could not load chat apps',
 };

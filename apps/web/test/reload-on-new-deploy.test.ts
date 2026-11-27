@@ -256,3 +256,33 @@ test('the entry script is read from the served index page, not from other script
   );
   expect(entryScriptOf('<script type="module" src="/src/main.tsx"></script>')).toBeNull();
 });
+
+test('defers pending deploy reload while the server is restarting or unreachable, then reloads once it answers', async () => {
+  let latestBuild: string | null | 'reject' = '/assets/index-NEW.js';
+  const tab = harness({
+    latest: async () => {
+      if (latestBuild === 'reject') throw new Error('ERR_CONNECTION_REFUSED');
+      return latestBuild;
+    },
+    visible: true,
+    idleMs: 15_000,
+  });
+
+  await tab.tick();
+  expect(tab.reload).not.toHaveBeenCalled();
+
+  latestBuild = 'reject';
+  await tab.navigate();
+  await tab.blur();
+  await tab.hide();
+  await tab.show();
+  await tab.advanceTimers(20_000);
+  expect(tab.reload).not.toHaveBeenCalled();
+  expect(tab.prepareReload).not.toHaveBeenCalled();
+
+  latestBuild = '/assets/index-NEW.js';
+  await tab.navigate();
+  expect(tab.reload).toHaveBeenCalledTimes(1);
+  expect(tab.prepareReload).toHaveBeenCalledTimes(1);
+  tab.dispose();
+});

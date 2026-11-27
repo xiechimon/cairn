@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useDesktopLocaleSync } from '../desktop-shell.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { EN } from './en.js';
 import {
@@ -31,6 +32,7 @@ export function I18nProvider({
     () => initialLocale ?? readStoredLocale(safeLocalStorage()),
   );
   setActiveLocale(locale);
+  useDesktopLocaleSync(locale);
   const setLocale = useCallback((next: Locale) => {
     persistLocale(next, safeLocalStorage());
     applyLocaleLang(next);

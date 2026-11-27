@@ -1,4 +1,4 @@
-import { lazy, type ReactNode, useSyncExternalStore } from 'react';
+import { type ReactNode, useSyncExternalStore } from 'react';
 import {
   createBrowserRouter,
   Navigate,
@@ -11,7 +11,7 @@ import { sidePanelOpen } from './board/app-sidebar.js';
 import { THREAD_PARAM } from './board/thread-copy.js';
 import { useNarrow, usePanelDocked } from './board/use-narrow.js';
 import { ChiefRoot } from './chief/chief-root.js';
-import { SubtreeErrorBoundary } from './components/subtree-error-boundary.js';
+import { retryableLazy, SubtreeErrorBoundary } from './components/subtree-error-boundary.js';
 import { Toaster } from './components/ui/toaster.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
 import { I18nProvider } from './i18n/provider.js';
@@ -48,16 +48,16 @@ function withBoundary(routes: RouteObject[]): RouteObject[] {
   }));
 }
 
-const UsagePage = lazy(() =>
+const UsagePage = retryableLazy(() =>
   import('./routes/usage-page.js').then((m) => ({ default: m.UsagePage })),
 );
-const ProjectNewPage = lazy(() =>
+const ProjectNewPage = retryableLazy(() =>
   import('./pages/project-new-page.js').then((m) => ({ default: m.ProjectNewPage })),
 );
-const ProjectSettingsPage = lazy(() =>
+const ProjectSettingsPage = retryableLazy(() =>
   import('./pages/project-settings-page.js').then((m) => ({ default: m.ProjectSettingsPage })),
 );
-const MachineAuthorizePage = lazy(() =>
+const MachineAuthorizePage = retryableLazy(() =>
   import('./routes/machine-authorize-page.js').then((m) => ({
     default: m.MachineAuthorizePage,
   })),

@@ -1,12 +1,13 @@
 import { isExcalidrawScene } from '@cairn/shared';
 import { FileWarning } from 'lucide-react';
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { EmptyState } from '../../../components/empty-state.js';
+import { retryableLazy } from '../../../components/subtree-error-boundary.js';
 import { Skeleton } from '../../../components/ui/skeleton.js';
 import { useI18n } from '../../../i18n/provider.js';
 import type { SceneReader } from './whiteboard-canvas.js';
 
-const WhiteboardCanvas = lazy(() => import('./whiteboard-canvas.js'));
+const WhiteboardCanvas = retryableLazy(() => import('./whiteboard-canvas.js'));
 
 export function WhiteboardViewer({
   text,

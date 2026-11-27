@@ -96,15 +96,15 @@ export function useFirstRunSetup() {
     modelSourceCount(providersQ.data?.providers, connections),
   );
   const settings = settingsQ.data;
-  const progress: SetupProgress | undefined =
-    models === undefined || settings === undefined
-      ? undefined
-      : { models, confirmed: modelsConfirmed({ ...settings, rules: settings.rules ?? [] }) };
   const failed =
     teamsQuery?.isError === true ||
     projectsQ.isError ||
     (projectsQ.data?.length === 0 &&
       (chiefQ.isError || providersQ.isError || routingQ.isError || settingsQ.isError));
+  const progress: SetupProgress | undefined =
+    failed || models === undefined || settings === undefined
+      ? undefined
+      : { models, confirmed: modelsConfirmed({ ...settings, rules: settings.rules ?? [] }) };
   return {
     live,
     teamId,

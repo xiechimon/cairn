@@ -32,16 +32,36 @@ export function reloadOnStaleBuild({
   storage,
   reload,
   prepareReload,
+  isServerReachable,
   now,
 }: {
   target: EventTarget;
   storage: Storage | null;
   reload: () => void;
   prepareReload?: () => void;
+  isServerReachable?: () => Promise<boolean>;
   now: () => number;
 }): void {
+  let probing = false;
   target.addEventListener('vite:preloadError', (event) => {
-    if (guardedReload(storage, reload, now, prepareReload)) event.preventDefault();
+    if (isServerReachable === undefined) {
+      if (guardedReload(storage, reload, now, prepareReload)) event.preventDefault();
+      return;
+    }
+    if (storage === null) return;
+    const last = Number(storage.getItem(RELOADED_AT_KEY) ?? 0);
+    if (now() - last < RELOAD_GUARD_MS || probing) return;
+    probing = true;
+    void isServerReachable()
+      .then(
+        (reachable) => {
+          if (reachable) guardedReload(storage, reload, now, prepareReload);
+        },
+        () => {},
+      )
+      .finally(() => {
+        probing = false;
+      });
   });
 }
 
@@ -97,6 +117,7 @@ export function reloadOnNewDeploy({
   let idleTimer: TimerHandle | null = null;
   let navTimer: TimerHandle | null = null;
   let disposed = false;
+  let verifying = false;
 
   const clearIdleTimer = () => {
     if (idleTimer === null) return;
@@ -104,8 +125,20 @@ export function reloadOnNewDeploy({
     idleTimer = null;
   };
 
-  const trySilentReload = (): boolean => {
+  const trySilentReload = async (verifiedReachable = false): Promise<boolean> => {
     if (disposed || !pendingNewBuild || busy()) return false;
+    if (!verifiedReachable) {
+      if (storage === null) return false;
+      const last = Number(storage.getItem(RELOADED_AT_KEY) ?? 0);
+      if (now() - last < RELOAD_GUARD_MS || verifying) return false;
+      verifying = true;
+      try {
+        const latest = await latestEntry().catch(() => null);
+        if (disposed || latest === null || latest === currentEntry || busy()) return false;
+      } finally {
+        verifying = false;
+      }
+    }
     return guardedReload(storage, reload, now, prepareReload);
   };
 
@@ -118,7 +151,7 @@ export function reloadOnNewDeploy({
     }
     idleTimer = setTimer(() => {
       idleTimer = null;
-      trySilentReload();
+      void trySilentReload(false);
     }, idleMs);
   };
 
@@ -127,7 +160,7 @@ export function reloadOnNewDeploy({
     if (disposed || latest === null || latest === currentEntry) return;
     pendingNewBuild = true;
     if (unseenOnReturn || !visible()) {
-      trySilentReload();
+      await trySilentReload(true);
       return;
     }
     armIdleTimer(false);
@@ -135,11 +168,11 @@ export function reloadOnNewDeploy({
 
   const onVisibilityChange = () => {
     if (visible()) void check(true);
-    else trySilentReload();
+    else void trySilentReload(false);
   };
 
   const onBlur = () => {
-    trySilentReload();
+    void trySilentReload(false);
   };
 
   const onActivity = () => {
@@ -159,7 +192,7 @@ export function reloadOnNewDeploy({
     navTimer = setTimer(() => {
       navTimer = null;
       if (shouldSkipNavigationReload?.()) return;
-      trySilentReload();
+      void trySilentReload(false);
     }, 0);
   });
   const stopEvery = every(() => {

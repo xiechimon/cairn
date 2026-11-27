@@ -21,6 +21,7 @@ import { FormActions, FormField, FormStack } from '../components/form-layout.js'
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QrCode } from '../components/qr-code.js';
+import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
@@ -245,11 +246,15 @@ function SlackConnectDialog({
 
 function ImessageConnectDialog({
   machines,
+  machinesReady,
+  machinesError,
   onClose,
   onSubmit,
   pending,
 }: {
   machines: MachineRecord[];
+  machinesReady: boolean;
+  machinesError: boolean;
   onClose: () => void;
   onSubmit: (machineId: string) => void;
   pending: boolean;
@@ -284,7 +289,11 @@ function ImessageConnectDialog({
             '选择一台始终开机的 Mac。这台 Mac 需要安装 imsg 并授予 iMessage 读取权限；首次连接时会自动安装受管版本。',
           )}
         >
-          {machines.length === 0 ? (
+          {!machinesReady && machines.length === 0 ? (
+            <p className="m-0 text-meta text-content-secondary" data-testid="im-machines-status">
+              {machinesError ? t('执行机未能加载') : t('正在加载执行机')}
+            </p>
+          ) : machines.length === 0 ? (
             <p className="m-0 text-meta text-content-secondary" data-testid="im-no-machines">
               {t('暂无已注册的执行机。请先在一台 Mac 上启动执行机。')}
             </p>
@@ -399,7 +408,7 @@ export function ImConnectionsPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
-  const { live, teamId } = useLiveData();
+  const { live, teamId, teamsQuery } = useLiveData();
   const connectionsQ = useImConnections(teamId, live);
   const requestsQ = useImPairingRequests(teamId, live);
   const mutations = useImMutations(teamId);
@@ -409,6 +418,8 @@ export function ImConnectionsPage() {
   const [wechatLogin, setWechatLogin] = useState<ImWechatLoginStart | null>(null);
   const [deleting, setDeleting] = useState<ImConnectionRecord | null>(null);
   const machinesQ = useMachines(teamId, live && connectingImessage);
+  const machinesReady = !live || (machinesQ.data !== undefined && !machinesQ.isError);
+  const machinesError = live && (teamsQuery?.isError === true || machinesQ.isError);
   const allMachines = registeredMachines(machinesQ.data ?? []);
   const macMachines = allMachines.filter((m) => m.capabilities?.osPlatform === 'darwin');
   const machines =
@@ -642,7 +653,15 @@ export function ImConnectionsPage() {
         )}
         testId="im-platforms"
       >
-        <SettingsCard>{PLATFORM_ORDER.flatMap(platformRows)}</SettingsCard>
+        <QueryBoundary
+          query={live ? mergeQueries(connectionsQ, requestsQ) : undefined}
+          isEmpty={live && connectionsQ.data === undefined}
+          empty={null}
+          loadingLabel={t('正在加载聊天应用')}
+          errorTitle={t('聊天应用未能加载')}
+        >
+          <SettingsCard>{PLATFORM_ORDER.flatMap(platformRows)}</SettingsCard>
+        </QueryBoundary>
       </SettingsSection>
       {connecting && (
         <ConnectDialog
@@ -674,6 +693,8 @@ export function ImConnectionsPage() {
       {connectingImessage && (
         <ImessageConnectDialog
           machines={machines}
+          machinesReady={machinesReady}
+          machinesError={machinesError}
           pending={mutations.connectImessage.isPending}
           onClose={() => setConnectingImessage(false)}
           onSubmit={(machineId) =>

@@ -1,6 +1,6 @@
 import { SKILL_PAGE_COPY } from '@cairn/shared';
 import { ChevronDown, Download, Puzzle, Search } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useSkills } from '../api/hooks.js';
 import { mapSkills } from '../api/mappers.js';
@@ -9,6 +9,7 @@ import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { KeyedMenuContent, KeyedMenuRadioItem } from '../components/menu-keys.js';
 import { QueryBoundary } from '../components/query-state.js';
+import { retryableLazy } from '../components/subtree-error-boundary.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
@@ -33,7 +34,7 @@ import {
 import type { SkillEditTarget } from './skill-dialog.js';
 import { SkillImportDialog } from './skill-import-dialog.js';
 
-const SkillDialog = lazy(() =>
+const SkillDialog = retryableLazy(() =>
   import('./skill-dialog.js').then((m) => ({ default: m.SkillDialog })),
 );
 

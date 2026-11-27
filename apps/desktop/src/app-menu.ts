@@ -23,6 +23,8 @@ const LABELS = {
     edit: '编辑',
     find: '查找…',
     view: '视图',
+    reload: '重新加载',
+    forceReload: '强制重新加载',
     history: '历史记录',
     back: '后退',
     forward: '前进',
@@ -42,6 +44,8 @@ const LABELS = {
     edit: 'Edit',
     find: 'Find…',
     view: 'View',
+    reload: 'Reload',
+    forceReload: 'Force Reload',
     history: 'History',
     back: 'Back',
     forward: 'Forward',
@@ -75,6 +79,8 @@ export interface PageMenuActions {
   send: (command: DesktopMenuCommand) => void;
   back: () => void;
   forward: () => void;
+  reload?: () => void;
+  forceReload?: () => void;
 }
 
 export interface HostMenuEntry {
@@ -165,8 +171,16 @@ export function appMenuTemplate(
     {
       label: copy.view,
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
+        page.reload !== undefined
+          ? { label: copy.reload, accelerator: 'CommandOrControl+R', click: page.reload }
+          : { role: 'reload' },
+        page.forceReload !== undefined
+          ? {
+              label: copy.forceReload,
+              accelerator: 'CommandOrControl+Shift+R',
+              click: page.forceReload,
+            }
+          : { role: 'forceReload' },
         { role: 'toggleDevTools' },
         { type: 'separator' },
         { role: 'resetZoom' },

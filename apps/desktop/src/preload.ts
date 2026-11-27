@@ -292,7 +292,7 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     removeRemote: (id: string): Promise<unknown> =>
       ipcRenderer.invoke('desktop-host:remove-remote', id),
     switch: (id: string): Promise<unknown> => ipcRenderer.invoke('desktop-host:switch', id),
-    retry: (): Promise<void> => ipcRenderer.invoke('desktop-host:retry'),
+    retry: (): Promise<boolean> => ipcRenderer.invoke('desktop-host:retry'),
     setResident: (enabled: boolean): Promise<unknown> =>
       ipcRenderer.invoke('desktop-host:set-resident', enabled),
   },
@@ -326,6 +326,9 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
   shell: {
     ...(shellDescriptor ?? {}),
     isFullScreen: (): Promise<boolean> => ipcRenderer.invoke('desktop-shell:fullscreen'),
+    setLocale: (locale: 'zh' | 'en'): void => {
+      if (locale === 'zh' || locale === 'en') ipcRenderer.send('desktop-shell:locale', locale);
+    },
     onFullScreenChange: (listener: (fullScreen: boolean) => void): (() => void) => {
       const relay = (_event: unknown, fullScreen: boolean) => listener(fullScreen === true);
       ipcRenderer.on('desktop-shell:fullscreen', relay);

@@ -402,6 +402,7 @@ export function RemoteAccessPage() {
           </p>
         )}
       {live && routesQ.data === undefined ? null : pairingBlocked && !awaitingTailnetLogin ? (
+        (!live || devicesQ.data !== undefined) &&
         devices.length === 0 && (
           <p className="m-0 mt-3 text-meta text-content-tertiary" data-testid="remote-routes-empty">
             {t('暂无已配对的设备')}

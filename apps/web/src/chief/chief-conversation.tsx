@@ -18,7 +18,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useConnected } from '../api/connection-state.js';
+import { useConnected, useConnectionOutage } from '../api/connection-state.js';
 import {
   useApiMutations,
   useArchivedTodos,
@@ -357,6 +357,7 @@ export function ChiefConversation({
   const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const connected = useConnected();
+  const outage = useConnectionOutage();
   const restoreSent = (text: string) => {
     followSentRef.current = false;
     const reply = parseReplyQuote(text);
@@ -709,9 +710,7 @@ export function ChiefConversation({
         </>
       )}
 
-      {!connected ? (
-        <ChiefConnectionBanner />
-      ) : chief.outage != null ? (
+      {chief.outage != null ? (
         <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
       ) : queueWait !== null ? (
         <QueueWaitCard
@@ -738,8 +737,13 @@ export function ChiefConversation({
       <div
         {...drop.bind}
         data-testid="chief-composer-block"
-        className="group/composer flex max-h-[65%] min-h-0 flex-none flex-col"
+        className="group/composer relative flex max-h-[65%] min-h-0 flex-none flex-col"
       >
+        {(outage.phase === 'reconnecting' || outage.phase === 'long-outage') && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-full z-(--z-floating)">
+            <ChiefConnectionBanner phase={outage.phase} onRetry={outage.retryNow} />
+          </div>
+        )}
         {composerReplacement ?? (
           <ComposerSurface
             key="thread"

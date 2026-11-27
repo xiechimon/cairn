@@ -53,6 +53,14 @@ describe('statusMarkView', () => {
     ).toBe('idle');
   });
 
+  it('rests in chat when the connection drops so the composer card is the only disconnect notice', () => {
+    expect(chatMarkView(input({}, { connected: false }))).toEqual({
+      id: 'idle',
+      label: '',
+      announce: false,
+    });
+  });
+
   it('a pending question is ask, even while a tool runs', () => {
     expect(statusMarkView(input({ runningTool: 'bash' }, { questionPending: true })).id).toBe('ask');
   });

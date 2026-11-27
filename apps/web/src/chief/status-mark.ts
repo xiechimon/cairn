@@ -143,6 +143,7 @@ export function statusMarkView({
 }
 
 export function chatMarkView(input: StatusMarkInput): StatusMarkView {
+  if (!input.connected) return view('idle', '', false);
   const marked = statusMarkView(input);
   return marked.id === 'error' ? view('idle') : marked;
 }

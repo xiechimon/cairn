@@ -1,17 +1,9 @@
 import type { DesktopLocale } from './locale.js';
 
-export interface OfflineConnectionOption {
-  id: string;
-  name: string;
-  kind: 'local' | 'remote';
-}
-
 export interface OfflinePageInput {
   locale: DesktopLocale;
   hostName: string;
   hostUrl: string;
-  connections: readonly OfflineConnectionOption[];
-  activeId: string;
 }
 
 function escapeHtml(text: string): string {
@@ -25,22 +17,13 @@ function escapeHtml(text: string): string {
 
 export function offlinePageHtml(input: OfflinePageInput): string {
   const zh = input.locale === 'zh';
-  const title = zh ? `无法连接到 ${input.hostName}` : `Cannot reach ${input.hostName}`;
+  const title = zh ? `无法连接 ${input.hostName}` : `Cannot connect to ${input.hostName}`;
   const subtitle = zh
-    ? '远程服务器暂时离线或网络中断。你的数据仍安全保存在服务器上，可以稍后重试，或切换回其他主机继续使用。'
-    : 'The remote server is temporarily unreachable. Your data remains safe on the server. Retry or switch to another host.';
+    ? `你的任务和对话保存在 ${input.hostName} 上。恢复连接后页面自动打开。`
+    : `Your tasks and conversations stay on ${input.hostName}. Cairn opens automatically once it responds.`;
   const retryLabel = zh ? '立即重试' : 'Retry now';
-  const autoRetryPrefix = zh ? '秒后自动重试' : 's until automatic retry';
-  const switchHeading = zh ? '切换主机' : 'Switch host';
-  const localLabel = zh ? '本机' : 'This computer';
-
-  const alternatives = input.connections.filter((conn) => conn.id !== input.activeId);
-  const switchButtons = alternatives
-    .map((conn) => {
-      const label = conn.kind === 'local' ? localLabel : conn.name;
-      return `<button type="button" class="btn-secondary" data-switch-id="${escapeHtml(conn.id)}">${escapeHtml(zh ? `切换到 ${label}` : `Switch to ${label}`)}</button>`;
-    })
-    .join('');
+  const retryingLabel = zh ? '正在连接…' : 'Connecting…';
+  const autoRetryStatus = zh ? '正在自动重试…' : 'Retrying automatically…';
 
   return `<!doctype html>
 <html lang="${zh ? 'zh-CN' : 'en'}">
@@ -121,16 +104,6 @@ export function offlinePageHtml(input: OfflinePageInput): string {
     gap: 8px;
     margin-top: 4px;
   }
-  .divider {
-    height: 1px;
-    background: var(--line);
-    margin: 4px 0;
-  }
-  .section-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--ink-3);
-  }
   button {
     width: 100%;
     min-height: 36px;
@@ -140,19 +113,15 @@ export function offlinePageHtml(input: OfflinePageInput): string {
     cursor: pointer;
     border: 1px solid transparent;
   }
+  button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
   .btn-primary {
     background: var(--primary);
     color: var(--on-primary);
   }
-  .btn-secondary {
-    background: transparent;
-    color: var(--ink);
-    border-color: var(--line);
-  }
-  .btn-secondary:hover {
-    background: var(--hover);
-  }
-  .countdown {
+  .status {
     text-align: center;
     font-size: 12px;
     color: var(--ink-3);
@@ -167,33 +136,32 @@ export function offlinePageHtml(input: OfflinePageInput): string {
     <p class="meta">${escapeHtml(input.hostUrl)}</p>
     <div class="actions">
       <button type="button" class="btn-primary" id="retry-btn">${escapeHtml(retryLabel)}</button>
-      <p class="countdown"><span id="countdown-num">15</span> ${escapeHtml(autoRetryPrefix)}</p>
+      <p class="status" role="status">${escapeHtml(autoRetryStatus)}</p>
     </div>
-    ${
-      switchButtons !== ''
-        ? `<div class="divider"></div><div class="section-label">${escapeHtml(switchHeading)}</div><div class="actions">${switchButtons}</div>`
-        : ''
-    }
   </main>
   <script>
-    const retry = () => window.cairnDesktop?.host?.retry?.();
-    document.getElementById('retry-btn')?.addEventListener('click', retry);
-    for (const btn of document.querySelectorAll('[data-switch-id]')) {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-switch-id');
-        if (id) window.cairnDesktop?.host?.switch?.(id);
-      });
-    }
-    let seconds = 15;
-    const label = document.getElementById('countdown-num');
-    setInterval(() => {
-      seconds -= 1;
-      if (seconds <= 0) {
-        seconds = 15;
-        retry();
+    const retryBtn = document.getElementById('retry-btn');
+    const idleLabel = ${JSON.stringify(retryLabel)};
+    const busyLabel = ${JSON.stringify(retryingLabel)};
+    let busy = false;
+    retryBtn?.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      retryBtn.disabled = true;
+      retryBtn.textContent = busyLabel;
+      try {
+        const ok = await window.cairnDesktop?.host?.retry?.();
+        if (!ok) {
+          busy = false;
+          retryBtn.disabled = false;
+          retryBtn.textContent = idleLabel;
+        }
+      } catch {
+        busy = false;
+        retryBtn.disabled = false;
+        retryBtn.textContent = idleLabel;
       }
-      if (label) label.textContent = String(seconds);
-    }, 1000);
+    });
   </script>
 </body>
 </html>`;

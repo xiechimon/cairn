@@ -70,6 +70,15 @@ interface DesktopWindowControlsBridge {
 export interface DesktopShellBridge {
   isFullScreen?: () => Promise<boolean>;
   onFullScreenChange?: (listener: (fullScreen: boolean) => void) => () => void;
+  setLocale?: (locale: 'zh' | 'en') => void;
+}
+
+export function useDesktopLocaleSync(locale: 'zh' | 'en'): void {
+  useEffect(() => {
+    (
+      window as Window & { cairnDesktop?: { shell?: DesktopShellBridge } }
+    ).cairnDesktop?.shell?.setLocale?.(locale);
+  }, [locale]);
 }
 
 export function syncDesktopFullScreen(root: HTMLElement): () => void {

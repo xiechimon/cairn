@@ -98,6 +98,14 @@ reloadOnStaleBuild({
   storage: safeSessionStorage(),
   reload: () => window.location.reload(),
   prepareReload,
+  isServerReachable: async () => {
+    try {
+      const response = await fetch('/', { cache: 'no-store', signal: AbortSignal.timeout(3_000) });
+      return response.ok && entryScriptOf(await response.text()) !== null;
+    } catch {
+      return false;
+    }
+  },
   now: Date.now,
 });
 const currentEntry = entryScriptOf(document.documentElement.outerHTML);

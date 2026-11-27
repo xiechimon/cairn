@@ -209,4 +209,47 @@ describe('connection state from server stream reachability', () => {
     store.subscribe(cb)();
     expect(cb).not.toHaveBeenCalled();
   });
+
+  it('tracks outage grace (2s), reconnecting, long-outage (60s), and triggers immediate manual retryNow', async () => {
+    await loadModules(true);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let failTicket = false;
+    let ticketAttempts = 0;
+    const stop = sse.startTeamStream('team-1', qc, 0, null, async () => {
+      ticketAttempts += 1;
+      if (failTicket) throw new Error('server down');
+      return '/api/teams/team-1/stream';
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    const first = FakeEventSource.instances[0] as FakeEventSource;
+    first.fireOpen();
+    expect(connectionState.connectionStore.getOutagePhase(Date.now())).toBe('connected');
+
+    failTicket = true;
+    first.fireError();
+    expect(connectionState.connectionStore.getOutagePhase(Date.now())).toBe('grace');
+
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(connectionState.connectionStore.getOutagePhase(Date.now())).toBe('grace');
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(connectionState.connectionStore.getOutagePhase(Date.now())).toBe('reconnecting');
+
+    await vi.advanceTimersByTimeAsync(58_000);
+    expect(connectionState.connectionStore.getOutagePhase(Date.now())).toBe('long-outage');
+
+    const beforeRetry = ticketAttempts;
+    failTicket = false;
+    connectionState.connectionStore.retryNow();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ticketAttempts).toBeGreaterThan(beforeRetry);
+
+    const recovered = FakeEventSource.instances.at(-1) as FakeEventSource;
+    recovered.fireOpen();
+    expect(connectionState.connectionStore.getOutagePhase(Date.now())).toBe('connected');
+
+    stop();
+    qc.clear();
+  });
 });

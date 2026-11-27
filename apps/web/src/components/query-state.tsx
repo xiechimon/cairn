@@ -1,6 +1,7 @@
 import { cn } from 'cn';
 import { TriangleAlert } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
+import { useConnectionOutage } from '../api/connection-state.js';
 import { useLiveData } from '../api/provider.js';
 import { useI18n } from '../i18n/provider.js';
 import { EmptyState } from './empty-state.js';
@@ -75,8 +76,19 @@ export function QueryBoundary({
 }: QueryBoundaryProps) {
   const { t } = useI18n();
   const { teamsQuery } = useLiveData();
+  const { connected, retryNow } = useConnectionOutage();
   const effective = withTeamsFailure(query, teamsQuery);
   const phase = queryPhase(effective, isEmpty, errorWins);
+  const wasDisconnectedRef = useRef(false);
+  useEffect(() => {
+    if (!connected) {
+      wasDisconnectedRef.current = true;
+      return;
+    }
+    if (!wasDisconnectedRef.current) return;
+    wasDisconnectedRef.current = false;
+    if (effective?.isError) void effective.refetch();
+  }, [connected, effective]);
   if (phase === 'loading') {
     return (
       <div
@@ -104,7 +116,10 @@ export function QueryBoundary({
         action={{
           label: t('重试'),
           disabled: effective?.isFetching,
-          onClick: () => void effective?.refetch(),
+          onClick: () => {
+            if (!connected) retryNow();
+            void effective?.refetch();
+          },
         }}
         className={className}
       />

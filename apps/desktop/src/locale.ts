@@ -1,7 +1,30 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
 export type DesktopLocale = 'zh' | 'en';
+
+const LOCALE_FILE_NAME = 'locale';
 
 export function desktopLocale(lang: unknown): DesktopLocale {
   return typeof lang === 'string' && lang.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+
+export function readPersistedDesktopLocale(userData: string): DesktopLocale | null {
+  const path = join(userData, LOCALE_FILE_NAME);
+  if (!existsSync(path)) return null;
+  try {
+    const raw = readFileSync(path, 'utf8').trim().toLowerCase();
+    if (raw === 'zh' || raw === 'en') return raw;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function writePersistedDesktopLocale(userData: string, locale: DesktopLocale): void {
+  const path = join(userData, LOCALE_FILE_NAME);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${locale}\n`, 'utf8');
 }
 
 export interface LocaleWindowCandidate {
