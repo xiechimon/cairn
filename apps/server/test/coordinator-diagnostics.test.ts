@@ -523,6 +523,26 @@ describe('coordinator diagnostics and shared tool resolution', () => {
         .run();
       s.db.delete(phoneTable).where(eq(phoneTable.teamId, s.team.id)).run();
 
+      const browserOnlyResolved = resolveCoordinatorRemoteTools(
+        { db: s.db, machineHub: s.machineHub },
+        { teamId: s.team.id, threadRow },
+      );
+      expect(browserOnlyResolved.groups.ownerChrome).toBe(false);
+      expect(browserOnlyResolved.groups.browser).toBe(true);
+
+      s.db
+        .update(machineTable)
+        .set({
+          capabilities: {
+            mcpServers: ['browsermcp'],
+            skills: [],
+            browser: true,
+            ownerChrome: true,
+          },
+        })
+        .where(eq(machineTable.id, macId))
+        .run();
+
       const ownerChromeResolved = resolveCoordinatorRemoteTools(
         { db: s.db, machineHub: s.machineHub },
         { teamId: s.team.id, threadRow },
