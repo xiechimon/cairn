@@ -99,4 +99,72 @@ describe('createOfflineRecovery', () => {
     expect(loadUrl).toHaveBeenCalledWith('http://mac-mini.tailac09a9.ts.net:8787/app');
     recovery.dispose();
   });
+
+  test('runs onBeforeRecover before loadUrl across automatic, manual, and wake recovery', async () => {
+    let reachable = false;
+    let shouldFailHook = false;
+    const events: string[] = [];
+    const probe = vi.fn(async () => reachable);
+    const onBeforeRecover = vi.fn(async () => {
+      events.push('hook');
+      if (shouldFailHook) throw new Error('issuer unavailable');
+    });
+    const loadUrl = vi.fn((url: string) => {
+      events.push(`load:${url}`);
+    });
+
+    const recovery = createOfflineRecovery({
+      origin: 'https://cloud.example.com',
+      initialUrl: 'https://cloud.example.com/app',
+      isRemote: true,
+      probe,
+      onBeforeRecover,
+      showOffline: vi.fn(),
+      loadUrl,
+      reload: vi.fn(),
+    });
+
+    recovery.handleMainFrameFailure('https://cloud.example.com/app');
+    reachable = true;
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(events).toEqual(['hook', 'load:https://cloud.example.com/app']);
+
+    events.length = 0;
+    reachable = false;
+    shouldFailHook = true;
+    recovery.handleMainFrameFailure('https://cloud.example.com/app/tasks');
+    reachable = true;
+    await expect(recovery.retryNow()).resolves.toBe(true);
+    expect(events).toEqual(['hook', 'load:https://cloud.example.com/app/tasks']);
+
+    events.length = 0;
+    reachable = false;
+    shouldFailHook = false;
+    recovery.handleMainFrameFailure('https://cloud.example.com/app');
+    reachable = true;
+    await expect(recovery.nudge()).resolves.toBe(true);
+    expect(events).toEqual(['hook', 'load:https://cloud.example.com/app']);
+
+    let resolveSlow!: () => void;
+    const slowRecovery = createOfflineRecovery({
+      origin: 'https://cloud.example.com',
+      initialUrl: 'https://cloud.example.com/app',
+      isRemote: true,
+      probe: vi.fn(async () => true),
+      onBeforeRecover: () =>
+        new Promise<void>((resolve) => {
+          resolveSlow = resolve;
+        }),
+      showOffline: vi.fn(),
+      loadUrl,
+      reload: vi.fn(),
+    });
+    slowRecovery.handleMainFrameFailure('https://cloud.example.com/app');
+    const pendingRetry = slowRecovery.retryNow();
+    await Promise.resolve();
+    slowRecovery.dispose();
+    resolveSlow();
+    await expect(pendingRetry).resolves.toBe(false);
+    expect(loadUrl).toHaveBeenCalledTimes(3);
+  });
 });

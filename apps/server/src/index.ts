@@ -554,6 +554,8 @@ antigravityQuotaPollTimer?.unref();
 
 const COORDINATOR_CLOSE_MS = 5_000;
 const TAILSCALE_WITHDRAW_MS = 3_000;
+const SHUTDOWN_STEP_MS = 3_000;
+const OTEL_SEAL_MS = 2_000;
 let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
@@ -574,18 +576,22 @@ async function shutdown(): Promise<void> {
     waitTimeout(COORDINATOR_CLOSE_MS, undefined, { ref: false }),
   ]);
   await drainHttp();
-  await tailnetReady;
-  await tailnet.stop();
-  await im.shutdown().catch(() => {});
-  await mail.shutdown().catch(() => {});
+  await Promise.race([
+    Promise.allSettled([tailnetReady.then(() => tailnet.stop()), im.shutdown(), mail.shutdown()]),
+    waitTimeout(SHUTDOWN_STEP_MS, undefined, { ref: false }),
+  ]);
   setImRuntime(null);
-  await sealRuntimeOtel();
+  await Promise.race([
+    sealRuntimeOtel().catch(() => {}),
+    waitTimeout(OTEL_SEAL_MS, undefined, { ref: false }),
+  ]);
   const dropped = spansDroppedBySeal();
   if (dropped > 0) {
     logger.warn({ spans: dropped }, 'spans dropped after the final tracing shutdown');
   }
   close();
   clearLaunchdServerOwner(config.homeDir);
+  logger.info('cairn-server stopped');
   process.exit(0);
 }
 

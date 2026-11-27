@@ -5,7 +5,8 @@ apps/server/web
 docs
 site
 assets
-ops
+ops/*
+!ops/app-token-mint
 integration
 coverage
 .env*

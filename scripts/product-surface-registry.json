@@ -33,6 +33,30 @@
       "type": "setting",
       "key": "createTodoBodySchema.machineId",
       "userScenario": "Nothing to set: when you have two or more computers, choosing one in the new-task row sends its id so the task waits for that computer."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_LITESTREAM_BUCKET",
+      "scope": "product",
+      "userScenario": "Set in Docker or hosted cloud deployments to enable continuous SQLite WAL replication and cold-volume restore to an S3-compatible bucket; leave unset to run Node directly with zero overhead."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_LITESTREAM_PATH",
+      "scope": "product",
+      "userScenario": "Optional relative S3 key prefix for Litestream WAL replication inside the bucket (defaults to server.db); unset on a single-user self-hosted bucket."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_LITESTREAM_ENDPOINT",
+      "scope": "product",
+      "userScenario": "Optional S3-compatible endpoint URL (such as R2, Tigris, GCS interop, or MinIO) paired with CAIRN_LITESTREAM_BUCKET when not targeting AWS S3 directly."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_LITESTREAM_REGION",
+      "scope": "product",
+      "userScenario": "Optional bucket region for Litestream S3 replication; defaults to auto when CAIRN_LITESTREAM_ENDPOINT is set."
     }
   ]
 }

@@ -7,6 +7,7 @@ export interface OfflineRecoveryOptions {
   initialUrl: string;
   isRemote: boolean;
   probe: () => Promise<boolean>;
+  onBeforeRecover?: () => Promise<void>;
   showOffline: () => void;
   loadUrl: (url: string) => void;
   reload: () => void;
@@ -67,6 +68,14 @@ export function createOfflineRecovery(opts: OfflineRecoveryOptions): OfflineReco
       }
       if (disposed) return false;
       if (ok) {
+        if (opts.onBeforeRecover !== undefined) {
+          try {
+            await opts.onBeforeRecover();
+          } catch (error) {
+            console.debug('cairn: recoverable operation failed', error);
+          }
+        }
+        if (disposed) return false;
         clearTimer();
         offline = false;
         backoffIndex = 0;

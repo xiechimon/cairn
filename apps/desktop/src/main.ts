@@ -298,6 +298,7 @@ const serverExited = createServerExitHandler<RunningServer>({
 let mainWindow: BrowserWindow | null = null;
 let appOrigin: string | null = null;
 let remoteClerkIssuer: string | null = null;
+let localHostOwned = false;
 let showingOfflinePage = false;
 let expectedOfflineUrl: string | null = null;
 let offlineRecovery: OfflineRecoveryController | null = null;
@@ -737,6 +738,25 @@ function hostMenuEntries(userData: string) {
   ];
 }
 
+function isRemoteClerkOrigin(): boolean {
+  return activeRemoteHostName !== null && !localHostOwned;
+}
+
+async function refreshRemoteClerkIssuer(remoteOrigin: string): Promise<void> {
+  try {
+    const response = await session.defaultSession.fetch(`${remoteOrigin}/api/auth/clerk/config`, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(2_500),
+    });
+    if (response.ok) {
+      const body = (await response.json()) as { enabled?: boolean; issuer?: unknown };
+      remoteClerkIssuer = body.enabled === true ? parseHttpsOrigin(body.issuer) : null;
+    }
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
+}
+
 function showOfflineFallback(window: BrowserWindow, origin: string): void {
   if (window.isDestroyed()) return;
   const userData = app.getPath('userData');
@@ -873,6 +893,8 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
     initialUrl,
     isRemote: activeRemoteHostName !== null,
     probe: () => probeOriginReachable(origin),
+    onBeforeRecover: () =>
+      isRemoteClerkOrigin() ? refreshRemoteClerkIssuer(origin) : Promise.resolve(),
     showOffline: () => showOfflineFallback(window, origin),
     loadUrl: (url) => {
       showingOfflinePage = false;
@@ -903,6 +925,9 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
     const url = window.webContents.getURL();
     if (!showingOfflinePage && isSameOriginUrl(url, origin)) {
       recovery.markLoaded(url);
+      if (isRemoteClerkOrigin() && remoteClerkIssuer === null) {
+        void refreshRemoteClerkIssuer(origin);
+      }
     }
   });
   window.webContents.on(
@@ -2014,26 +2039,8 @@ async function boot(): Promise<void> {
     let ownerToken = '';
     let attachedToResident = false;
 
-    const refreshRemoteClerkIssuer = async (remoteOrigin: string): Promise<void> => {
-      try {
-        const response = await session.defaultSession.fetch(
-          `${remoteOrigin}/api/auth/clerk/config`,
-          {
-            redirect: 'error',
-            signal: AbortSignal.timeout(2_500),
-          },
-        );
-        if (response.ok) {
-          const body = (await response.json()) as { enabled?: boolean; issuer?: unknown };
-          remoteClerkIssuer = body.enabled === true ? parseHttpsOrigin(body.issuer) : null;
-        }
-      } catch (error) {
-        console.debug('cairn: recoverable operation failed', error);
-      }
-    };
-
-    let localHostOwned = false;
     let localOwnerHome: string | null = null;
+    localHostOwned = false;
     const localCandidateHomes = () =>
       defaultLocalServerHomes({
         env: process.env,
@@ -2331,11 +2338,7 @@ async function boot(): Promise<void> {
         }
       }
       if (offlineRecovery !== null) {
-        const ok = await offlineRecovery.retryNow();
-        if (ok && activeConn.kind === 'remote' && !localHostOwned) {
-          await refreshRemoteClerkIssuer(origin);
-        }
-        return ok;
+        return offlineRecovery.retryNow();
       }
       showingOfflinePage = false;
       expectedOfflineUrl = null;

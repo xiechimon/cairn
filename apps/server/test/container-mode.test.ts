@@ -1,8 +1,10 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { networkInterfaces } from 'node:os';
 import { join, resolve } from 'node:path';
 import { ACCESS_TOKEN_FILE_NAME, parseAccessTokenFile } from '@cairn/shared';
+import Database from 'better-sqlite3';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 
@@ -335,11 +337,78 @@ describe('container image definition', () => {
     expect(dockerfile).toMatch(/^ENV .*HOST=0\.0\.0\.0/m);
     expect(dockerfile).toMatch(/^ENV .*CAIRN_HOME=\/data/m);
     expect(dockerfile).toMatch(/^VOLUME \/data/m);
+    expect(dockerfile).toMatch(/litestream-0\.5\.18-linux-\$\{ARCH\}\.tar\.gz/);
+    expect(dockerfile).toMatch(/sha256sum -c/);
+    expect(dockerfile).toMatch(/ca-certificates/);
+    expect(dockerfile).toMatch(/^STOPSIGNAL SIGTERM$/m);
+    expect(dockerfile).toMatch(/^ENTRYPOINT \["\/usr\/local\/bin\/cairn-entrypoint"\]$/m);
+    const dockerignore = readFileSync(join(repoRoot, '.dockerignore'), 'utf8');
+    expect(dockerignore).toMatch(/^!ops\/app-token-mint$/m);
   });
 
   test('image never bakes a token and never ships the daemon', () => {
     const dockerfile = readFileSync(join(repoRoot, 'Dockerfile'), 'utf8');
     expect(dockerfile).not.toMatch(/CAIRN_TOKEN\s*=/);
     expect(dockerfile).not.toMatch(/apps\/daemon/);
+  });
+
+  test('SIGTERM drains SSE and keep-alive connections and exits 0 promptly', async () => {
+    const booted = await boot({ CAIRN_REQUIRE_TOKEN: '1', CAIRN_TOKEN: TOKEN });
+    await untilOnline(booted);
+    const base = `http://127.0.0.1:${booted.port}`;
+    const teams = (await (
+      await fetch(`${base}/api/teams`, { headers: { authorization: `Bearer ${TOKEN}` } })
+    ).json()) as { id: string }[];
+    const teamId = teams[0]?.id;
+    expect(teamId).toBeTruthy();
+
+    const ticket = (
+      (await (
+        await fetch(`${base}/api/auth/stream-ticket`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${TOKEN}` },
+        })
+      ).json()) as { ticket: string }
+    ).ticket;
+    const sseController = new AbortController();
+    const stream = await fetch(`${base}/api/teams/${teamId}/stream?ticket=${ticket}`, {
+      signal: sseController.signal,
+    });
+    expect(stream.status).toBe(200);
+
+    let keepAliveSocketClosed = false;
+    await new Promise<void>((done, fail) => {
+      const req = httpRequest(
+        {
+          host: '127.0.0.1',
+          port: booted.port,
+          path: '/api/user/me',
+          headers: { authorization: `Bearer ${TOKEN}`, connection: 'keep-alive' },
+        },
+        (res) => {
+          res.resume();
+          res.once('end', () => done());
+        },
+      );
+      req.on('socket', (sock) => sock.once('close', () => (keepAliveSocketClosed = true)));
+      req.on('error', fail);
+      req.end();
+    });
+
+    const startedAt = Date.now();
+    booted.child.kill('SIGTERM');
+    const code = await Promise.race([
+      booted.exited,
+      new Promise<null>((done) => setTimeout(() => done(null), 4_000)),
+    ]);
+    const elapsedMs = Date.now() - startedAt;
+    sseController.abort();
+
+    expect(code).toBe(0);
+    expect(elapsedMs).toBeLessThan(3_000);
+    expect(keepAliveSocketClosed).toBe(true);
+    const checkDb = new Database(join(booted.home, 'server', 'server.db'), { readonly: true });
+    expect(checkDb.pragma('quick_check', { simple: true })).toBe('ok');
+    checkDb.close();
   });
 });

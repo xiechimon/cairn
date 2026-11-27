@@ -1,0 +1,38 @@
+# Cairn Cloud container hardening — plan, 2026-11-27
+
+## User scenario
+
+Someone deploying Cairn in Docker meets this change when starting the container (`docker run` or hosted Fly.io Machines) and when reconnecting Cairn Desktop to a sleeping remote host. A first-time self-hoster only sets `CAIRN_TOKEN` (no extra accounts or cloud buckets required): the container starts Node directly with zero Litestream overhead and rejects startup with exit code 1 if `CAIRN_TOKEN` and `<CAIRN_HOME>/token` are both absent. A user who wants continuous SQLite WAL backup sets `CAIRN_LITESTREAM_BUCKET` (plus optional endpoint/path/region and standard `LITESTREAM_ACCESS_KEY_ID` / `LITESTREAM_SECRET_ACCESS_KEY` S3 credentials); on a cold or replaced `/data` volume, the container restores `server.db` before Node starts and streams WAL frames continuously to S3 using Litestream's `replica:` schema, failing fast without overwriting the volume if restore fails. Because `secretbox.key` lives outside `server.db`, users still back up `secretbox.key` via whole-account export or host secret injection. When a container receives `SIGTERM` during upgrades, open SSE streams and idle keep-alive sockets close immediately so SQLite WAL flushes and closes cleanly before exit 0. In Cairn Desktop, when a sleeping remote Cloud container wakes up during offline recovery, the shell refreshes the remote host's Clerk issuer before reloading so OAuth popups work immediately.
+
+## Scope
+
+1. Update `Dockerfile` to bundle SHA-256 verified Litestream `v0.5.18` (`litestream-0.5.18-linux-x86_64.tar.gz` for `amd64` and `litestream-0.5.18-linux-arm64.tar.gz` for `arm64` via `TARGETARCH`) and install runtime `ca-certificates`, keep `ops/app-token-mint` included via `.dockerignore` (`!ops/app-token-mint`) so the server build resolves its GitHub App token helper, keep existing `CAIRN_REQUIRE_TOKEN=1`, `HOST=0.0.0.0`, `PORT=8787`, `CAIRN_HOME=/data`, `VOLUME /data`, `USER node`, and `HEALTHCHECK`, and set `STOPSIGNAL SIGTERM`, `ENTRYPOINT ["/usr/local/bin/cairn-entrypoint"]`, and `CMD ["node", "dist/index.mjs"]` (without adding `CAIRN_TOKEN=`).
+2. Add `scripts/litestream-config.mjs` and `scripts/docker-entrypoint.sh`: when `CAIRN_LITESTREAM_BUCKET` is unset or the command is not `node dist/index.mjs`, execute `"$@"` directly; when `CAIRN_REQUIRE_TOKEN` is truthy, `CAIRN_TOKEN` is empty/unset, and `<CAIRN_HOME>/token` does not exist, defer directly to Cairn's refusal without creating `/data/server`; otherwise validate `CAIRN_LITESTREAM_BUCKET`, `CAIRN_LITESTREAM_PATH` (default `server.db`), `CAIRN_LITESTREAM_ENDPOINT`, and `CAIRN_LITESTREAM_REGION` into a `0600` temp config using singular `replica:` and zero embedded S3 secrets, run `litestream restore -config <cfg> -if-db-not-exists -if-replica-exists <dbPath>`, and `exec litestream replicate -config <cfg> -exec "node dist/index.mjs"`.
+3. Bound graceful `SIGTERM` shutdown in `apps/server/src/shutdown-http.ts` (end `text/event-stream` responses and call guarded `closeIdleConnections()` immediately on drain) and `apps/server/src/index.ts` (run `tailnetReady.then(() => tailnet.stop())`, `im.shutdown()`, and `mail.shutdown()` concurrently with a `3_000 ms` timeout, bound `sealRuntimeOtel()` to `2_000 ms`, then close SQLite and exit `0`).
+4. Add `onBeforeRecover?: () => Promise<void>` in `apps/desktop/src/offline-recovery.ts` (awaited before `loadUrl` on automatic, manual, and wake recovery with `if (disposed) return false` re-checked afterward while tolerating rejections) and hoist `localHostOwned` / `refreshRemoteClerkIssuer` in `apps/desktop/src/main.ts` so remote hosts (excluding local-owned) refresh `remoteClerkIssuer` on `onBeforeRecover` and fallback `did-finish-load` without duplicating `retryNow()`.
+5. Register `CAIRN_LITESTREAM_BUCKET`, `CAIRN_LITESTREAM_PATH`, `CAIRN_LITESTREAM_ENDPOINT`, and `CAIRN_LITESTREAM_REGION` in `scripts/product-surface-registry.json` and document them alongside `SIGTERM` shutdown and `secretbox.key` persistence in `docs/getting-started.md` and `docs/configuration.md`; leave auth refusals, SQLite schemas, local-only server startup, and non-container runners unchanged.
+
+## Edge cases
+
+| Edge case | What the user sees | Proving test |
+|---|---|---|
+| `CAIRN_LITESTREAM_BUCKET` is unset | Container executes `node dist/index.mjs` directly with zero Litestream process or temp YAML config | `apps/server/test/litestream-entrypoint.test.ts` — `execs command directly without litestream when bucket is unset` |
+| `CAIRN_REQUIRE_TOKEN=1` with empty `CAIRN_TOKEN` and missing `<CAIRN_HOME>/token` while `CAIRN_LITESTREAM_BUCKET` is set (vs present `<CAIRN_HOME>/token`) | Missing token skips S3 restore, creates nothing under `CAIRN_HOME/server`, logs `CAIRN_TOKEN`, and exits `1`; present `<CAIRN_HOME>/token` proceeds with Litestream restore and replicate | `apps/server/test/litestream-entrypoint.test.ts` — `defers to server refusal when CAIRN_REQUIRE_TOKEN lacks token everywhere` & `uses litestream when CAIRN_REQUIRE_TOKEN=1 has token file`; `apps/server/test/container-mode.test.ts` — `flag on and empty token: still refuses (empty string counts as unset)` |
+| Malformed `CAIRN_LITESTREAM_PATH` (`../escape`, `/abs`, control chars), bad bucket, or non-http(s) / credentialed `CAIRN_LITESTREAM_ENDPOINT` | Config generator rejects input to stderr and exits `1` before starting Litestream or writing config | `apps/server/test/litestream-entrypoint.test.ts` — `buildLitestreamConfig rejects unsafe bucket, path, region, and endpoint values` |
+| `litestream restore` fails (unreachable S3 endpoint or invalid credentials) | Container exits non-zero immediately without launching Cairn over an empty DB | `apps/server/test/litestream-entrypoint.test.ts` — `fails fast when litestream restore exits non-zero` |
+| `SIGTERM` arrives while HTTP/1.1 keep-alive connections and SSE streams are open | Idle keep-alive sockets and SSE streams close immediately, bounded teardown runs, SQLite closes cleanly, and process exits `0` within 3s | `apps/server/test/container-mode.test.ts` — `SIGTERM drains SSE and keep-alive connections and exits 0 promptly` |
+| Sleeping remote Cloud server wakes via backoff probe, manual retry, or wake nudge | `onBeforeRecover` awaits `refreshRemoteClerkIssuer` before `loadUrl` runs; rejection still lets `loadUrl` proceed, and disposal during await cancels navigation | `apps/desktop/scripts/offline-recovery.test.ts` — `runs onBeforeRecover before loadUrl across automatic, manual, and wake recovery` |
+
+## Out of scope
+
+- Multi-tenant Fly.io Machines orchestrator, Clerk web portal, and Creem billing ledger (private `xiechimon/cairn-cloud` repo in Wave 5).
+- Envelope KMS wrapping of `secretbox.key` inside the cloud host orchestrator (Wave 5).
+- Modifying `apps/web` Clerk sign-in flows unless live acceptance uncovers a defect.
+
+## Review
+
+- Verdict: PASS
+- Plan-SHA256: e359f1ca118cd855da09a3954c0273db929c91e4aedeb71d7daf91a863a54cd2
+- Reviewer: fresh-context research subagent (`3d5b258b-ca81-4312-91a7-fa27dc43b22d`) + all 3 blocking findings, 3 subtle risks, and `.dockerignore` `ops/app-token-mint` un-ignore fix resolved
+- Findings: fixed `litestream restore` flags (`-config <cfg> -if-db-not-exists -if-replica-exists <dbPath>`, dropped invalid `-v`), checked `<CAIRN_HOME>/token` before skipping Litestream on `CAIRN_REQUIRE_TOKEN=1`, pinned singular `replica:` schema + `v0.5.18` asset names + runtime `ca-certificates`, bounded `tailnetReady` shutdown, guarded `closeIdleConnections`, and hoisted `localHostOwned` / `refreshRemoteClerkIssuer` in Electron main.
+

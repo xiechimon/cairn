@@ -104,7 +104,7 @@ docker build -t cairn .
 docker run -d --name cairn -v cairn-data:/data -e CAIRN_TOKEN="$(openssl rand -hex 32)" -p 8787:8787 cairn
 ```
 
-The image sets `CAIRN_REQUIRE_TOKEN=1`: without a non-empty `CAIRN_TOKEN` the container logs the reason and exits with code 1 instead of serving an open API on a public address. Back up by copying the whole `/data` volume (database and `secretbox.key` together). Terminate TLS in front of the container (a reverse proxy, or the platform's HTTPS domain), since the bearer token travels in a header.
+The image sets `CAIRN_REQUIRE_TOKEN=1`: without a non-empty `CAIRN_TOKEN` (or `<CAIRN_HOME>/token`) the container logs the reason and exits with code 1 instead of serving an open API on a public address. Back up the whole `/data` volume (especially `secretbox.key`, attachments, repos, and Coordinator files), or enable continuous SQLite WAL replication to S3/R2/Tigris alongside `CAIRN_HOME` backups by setting `CAIRN_LITESTREAM_BUCKET`, optional `CAIRN_LITESTREAM_ENDPOINT` / `CAIRN_LITESTREAM_PATH` / `CAIRN_LITESTREAM_REGION`, and standard `LITESTREAM_ACCESS_KEY_ID` / `LITESTREAM_SECRET_ACCESS_KEY` credentials — on an empty `/data/server` volume the container restores `server.db` before Node starts, and on `SIGTERM` Cairn drains SSE/keep-alive sockets cleanly while Litestream flushes its final WAL sync. Because `secretbox.key` lives outside `server.db`, keep `secretbox.key` in persistent volume backups or whole-account exports too. Terminate TLS in front of the container (a reverse proxy, or the platform's HTTPS domain), since the bearer token travels in a header.
 
 ## Develop from source
 
