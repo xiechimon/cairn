@@ -443,6 +443,7 @@ test.each(['failure', 'direct-residual'] as const)(
         id: 'delivered-plan',
         buildId: s.buildId,
         content: 'Delivered plan',
+        autoApprovePausedAt: s.due,
         createdAt: s.due,
       })
       .run();

@@ -91,6 +91,12 @@
       "reason": "the GitHub Actions weekly eval workflow was retired; daily real-task eval runs on a dedicated macOS host via scripts/ops/eval-daily.mjs and launchd (docs/ops/eval-daily.md)"
     },
     {
+      "id": "plan-verification-rule",
+      "pattern": "\\bPLAN_VERIFICATION_RULE\\b|\\bcheckPlanContract\\b|\\bbuildPlanContractRewritePrompt\\b",
+      "canary": "PLAN_VERIFICATION_RULE",
+      "reason": "retired in refactor(plan); plan.md verification contract checks were replaced by mandatory real acceptance on delivery"
+    },
+    {
       "id": "coordinator-in-server-env",
       "pattern": "\\bCAIRN_COORDINATOR_IN_SERVER\\b",
       "canary": "CAIRN_COORDINATOR_IN_SERVER=0",

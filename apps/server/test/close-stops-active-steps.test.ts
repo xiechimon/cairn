@@ -413,6 +413,7 @@ describe('#1453 a step finishing while a stop is in flight: no advance, no re-qu
         buildId: w.buildId,
         content: '# plan',
         stepId: null,
+        autoApprovePausedAt: w.base,
         createdAt: w.base,
       })
       .run();

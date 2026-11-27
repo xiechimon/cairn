@@ -2,7 +2,6 @@ import {
   BUILD_FAILURE_ROW_KIND,
   type ClaimedStep,
   claimedStepSchema,
-  isPlanContractRewritePrompt,
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
   systemRowOf,
@@ -143,7 +142,6 @@ type World = Awaited<ReturnType<typeof setupWorld>>;
 
 const GOOD_PLAN =
   '# 方案\nKind: fix\nContext: x\n\n## Verification\n- `pnpm exec vitest run README.test.ts` 通过\n';
-const VAGUE_PLAN = '# 方案\nKind: fix\nContext: x\n\n## Verification\n- 确认没问题\n';
 
 async function runTwoEmptyPlanRounds(w: World): Promise<{ buildId: string; secondStepId: string }> {
   const buildId = await w.startBuild(true);
@@ -354,95 +352,6 @@ describe('branch choice no longer fails the step', () => {
       });
       expect(w.buildRow(buildId).errorMessage).toBeNull();
       expect(w.todoRow().phase).toBe('needs_input');
-    } finally {
-      w.s.dispose();
-    }
-  });
-});
-
-describe('plan structure gate (#1492): invalid Verification -> confirm unreachable', () => {
-  test('failure modes 10 and 12: first round has a fluff plan -> stays planning, enqueues a structure completion round naming the problem', async () => {
-    const w = await setupWorld();
-    try {
-      const buildId = await w.startBuild(true);
-      const first = await w.claim();
-      await w.uploadPlan(first.step.id, VAGUE_PLAN);
-      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c1' });
-      expect(w.todoRow().phase).toBe('planning');
-      expect(w.todoRow().hasPlan).toBe(false);
-      const pending = w
-        .stepsOf(buildId)
-        .filter((st) => st.kind === 'plan' && st.status === 'pending');
-      expect(pending).toHaveLength(1);
-      expect(isPlanContractRewritePrompt(pending[0]!.prompt)).toBe(true);
-      expect(pending[0]!.prompt).toContain('第 1 项');
-    } finally {
-      w.s.dispose();
-    }
-  });
-
-  test('failure mode 11: structure completion round still invalid -> failure wrap-up naming the reason, plan step capped at two rounds', async () => {
-    const w = await setupWorld();
-    try {
-      const buildId = await w.startBuild(true);
-      const first = await w.claim();
-      await w.uploadPlan(first.step.id, VAGUE_PLAN);
-      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c2' });
-      const second = await w.claim();
-      await w.uploadPlan(second.step.id, `${VAGUE_PLAN}- 再看一眼\n`);
-      await w.done(second.step.id, { status: 'success', sessionId: 'pi-c2' });
-      expect(w.todoRow().phase).toBe('failed');
-      expect(w.stepRow(second.step.id).status).toBe('failed');
-      expect(w.buildRow(buildId).errorMessage).toContain('方案结构不合格');
-      expect(w.buildRow(buildId).errorMessage).toContain('Verification');
-      expect(w.stepsOf(buildId).filter((st) => st.kind === 'plan')).toHaveLength(2);
-    } finally {
-      w.s.dispose();
-    }
-  });
-
-  test('failure mode 13: structure completion round not re-uploaded -> judged on the old version, still invalid so it fails', async () => {
-    const w = await setupWorld();
-    try {
-      const buildId = await w.startBuild(true);
-      const first = await w.claim();
-      await w.uploadPlan(first.step.id, VAGUE_PLAN);
-      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c3' });
-      const second = await w.claim();
-      await w.done(second.step.id, { status: 'success', sessionId: 'pi-c3' });
-      expect(w.todoRow().phase).toBe('failed');
-      expect(w.buildRow(buildId).errorMessage).toContain('方案结构不合格');
-    } finally {
-      w.s.dispose();
-    }
-  });
-
-  test('structure completion round fills in Verification -> proceeds to confirm', async () => {
-    const w = await setupWorld();
-    try {
-      await w.startBuild(true);
-      const first = await w.claim();
-      await w.uploadPlan(first.step.id, VAGUE_PLAN);
-      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c4' });
-      const second = await w.claim();
-      await w.uploadPlan(second.step.id, GOOD_PLAN);
-      await w.done(second.step.id, { status: 'success', sessionId: 'pi-c4' });
-      expect(w.todoRow().phase).toBe('confirm');
-      expect(w.todoRow().hasPlan).toBe(true);
-    } finally {
-      w.s.dispose();
-    }
-  });
-
-  test('failure mode 14: a valid first-round plan proceeds straight to confirm, no extra completion round', async () => {
-    const w = await setupWorld();
-    try {
-      const buildId = await w.startBuild(true);
-      const first = await w.claim();
-      await w.uploadPlan(first.step.id, GOOD_PLAN);
-      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c5' });
-      expect(w.todoRow().phase).toBe('confirm');
-      expect(w.stepsOf(buildId).filter((st) => st.kind === 'plan')).toHaveLength(1);
     } finally {
       w.s.dispose();
     }

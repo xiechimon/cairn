@@ -378,42 +378,32 @@ export function composeTaskPromptWithInstruction(taskText: string, instruction: 
 }
 
 export function buildPlanRewritePrompt(): string {
-  return `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。${PLAN_VERIFICATION_RULE}`;
+  return `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。`;
 }
 
-export const PLAN_VERIFICATION_RULE =
+const LEGACY_PLAN_VERIFICATION_RULE =
   'Verification 每一项必须是可执行的检查：命令、测试文件路径或可断言的结果（如接口返回值），不写「确认没问题」这类空话，也不留待定、待补之类的占位。';
 
 export const LEGACY_PLAN_PROMPTS = [
   `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。`,
+  `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。${LEGACY_PLAN_VERIFICATION_RULE}`,
   `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。`,
+  `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。${LEGACY_PLAN_VERIFICATION_RULE}`,
 ] as const;
 
 export const PLAN_CONTRACT_REWRITE_PROMPT_SHAPES = [
   {
     head: '方案没过结构检查：「',
-    tail: `」。请更新 ${PLAN_FILE_NAME} 交接位置指定的文件，按这条问题补齐后再结束本步。${PLAN_VERIFICATION_RULE}已经通过的小节不必改动。`,
+    tail: `」。请更新 ${PLAN_FILE_NAME} 交接位置指定的文件，按这条问题补齐后再结束本步。${LEGACY_PLAN_VERIFICATION_RULE}已经通过的小节不必改动。`,
   },
   {
     head: '方案的 Verification 小节没过结构检查：「',
-    tail: `」。请更新 ${PLAN_FILE_NAME} 交接位置指定的文件，补齐 Verification 小节再结束本步。${PLAN_VERIFICATION_RULE}其余小节不必改动。`,
+    tail: `」。请更新 ${PLAN_FILE_NAME} 交接位置指定的文件，补齐 Verification 小节再结束本步。${LEGACY_PLAN_VERIFICATION_RULE}其余小节不必改动。`,
   },
 ] as const;
 
-export function buildPlanContractRewritePrompt(problem: string): string {
-  const shape = PLAN_CONTRACT_REWRITE_PROMPT_SHAPES[0];
-  return `${shape.head}${problem}${shape.tail}`;
-}
-
-export function isPlanContractRewritePrompt(prompt: string | null | undefined): boolean {
-  return (
-    prompt != null &&
-    PLAN_CONTRACT_REWRITE_PROMPT_SHAPES.some((shape) => wrappedBy(prompt, shape.head, shape.tail))
-  );
-}
-
 export function buildPlanFirstRoundInstruction(): string {
-  return `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。${PLAN_VERIFICATION_RULE}`;
+  return `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。`;
 }
 
 const PLAN_NOTE_HEAD = `${PLAN_FILE_NAME} 交接位置：`;

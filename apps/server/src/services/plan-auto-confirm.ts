@@ -1,10 +1,4 @@
-import {
-  ACTIVE_STEP_STATUSES,
-  checkPlanContract,
-  isPlanContractRewritePrompt,
-  type PlanContractCheck,
-  projectMergeConfigSchema,
-} from '@cairn/shared';
+import { ACTIVE_STEP_STATUSES, projectMergeConfigSchema } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import {
   build,
@@ -32,17 +26,6 @@ export function latestPlanRow(
     .where(eq(planTable.buildId, buildId))
     .orderBy(desc(planTable.version))
     .get();
-}
-
-export function planContractOfStep(
-  deps: Pick<BuildDeps, 'db'>,
-  stepRow: typeof step.$inferSelect,
-): PlanContractCheck | null {
-  const rewrite = isPlanContractRewritePrompt(stepRow.prompt);
-  const latest = latestPlanRow(deps, stepRow.buildId);
-  if (latest === undefined) return null;
-  if (!rewrite && latest.stepId !== stepRow.id) return null;
-  return checkPlanContract(latest.content);
 }
 
 type PlanAutoConfirmation =
@@ -85,8 +68,6 @@ export function planAutoConfirmation(
     .where(and(eq(step.buildId, buildId), inArray(step.status, [...ACTIVE_STEP_STATUSES])))
     .get();
   if (liveStep !== undefined) return { eligible: false, reason: 'Build still has an active step' };
-  if (!checkPlanContract(latestPlan.content).ok)
-    return { eligible: false, reason: 'Plan does not satisfy the verification contract' };
   if (planHasOpenDecisions(latestPlan.content))
     return {
       eligible: false,

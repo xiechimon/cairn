@@ -201,25 +201,6 @@ describe('the plan-gate deliverable check (#113 candidate 1: the plan is the fil
     }
   });
 
-  test('a plan.md that fails the structure check -> a rewrite step queued, marked as a plan rewrite', async () => {
-    const w = await setupWorld();
-    try {
-      const buildId = w.startBuild(true);
-      const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案\nContext: x');
-      await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
-      const pending = w
-        .stepsOf(buildId)
-        .filter((st) => st.kind === 'plan' && st.status === 'pending');
-      expect(pending).toHaveLength(1);
-      expect(pending[0]!.prompt).toContain('结构检查');
-      expect(pending[0]!.promptOrigin).toEqual({ kind: 'plan-rewrite' });
-      expect(w.todoRow().phase).toBe('planning');
-    } finally {
-      w.s.dispose();
-    }
-  });
-
   test('no regression on the normal path: the plan.md deliverable present -> confirm + hasPlan set (no backfill step)', async () => {
     const w = await setupWorld();
     try {

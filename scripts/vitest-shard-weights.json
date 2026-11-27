@@ -93,8 +93,6 @@
   "@cairn/shared:test/otel.test.ts": 9,
   "@cairn/shared:test/own-computer.test.ts": 30,
   "@cairn/shared:test/permission-rules.test.ts": 8,
-  "@cairn/shared:test/plan-contract-prompt.test.ts": 4,
-  "@cairn/shared:test/plan-contract.test.ts": 28,
   "@cairn/shared:test/plan-export-boundary.test.ts": 7,
   "@cairn/shared:test/plan-first-round-prompt.test.ts": 5,
   "@cairn/shared:test/provider-presets.test.ts": 19,

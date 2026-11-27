@@ -30,20 +30,6 @@ export const planResponseSchema = planRowSchema.extend({
 });
 export type PlanResponse = z.infer<typeof planResponseSchema>;
 
-export type PlanContractCheck = { ok: true; items: string[] } | { ok: false; problem: string };
-
-const ANCHOR_PATTERNS: readonly RegExp[] = [
-  /`[^`]+`/,
-  /https?:\/\/\S+/,
-  /[\w.-]\/[\w.-]+\.\w{1,8}\b/,
-  /\w\.(?:md|ts|tsx|js|mjs|cjs|json|ya?ml|toml|sql|sh|py|go|rs|css|html)\b/i,
-  /(?:^|\s)\/[\w-]+(?:\/[\w:{}.-]+)+/,
-  /\b(?:pnpm|npm|npx|vitest|playwright|pytest|curl|gh|git|bash|cargo|docker)\b/i,
-  /^(?:node|make|python3?|go|sh|bun|deno)\b/i,
-];
-
-const VAGUE_PATTERN = /\b(?:TODO|TBD|FIXME)\b|待定|待补|待确认/;
-
 const LIST_ITEM = /^(\s*)(?:[-*•]|\d+[.)])\s+(\S.*|)$/;
 
 const CHECK_LABEL = /^\s*(?:\*\*\S|#{3,6}\s)/;
@@ -201,48 +187,10 @@ function splitItems(section: { head: string; lines: string[] }): {
   return items.map(({ text, fenced }) => ({ text, fenced }));
 }
 
-function checkVerificationContract(content: string): PlanContractCheck {
-  const normalized = content.replace(/\r\n?/g, '\n');
-  const section = namedSection(normalized, 'verification');
-  const problems: string[] = [];
-  let items: { text: string; fenced: boolean }[] = [];
-  if (section === undefined) problems.push('方案缺少 Verification 小节');
-  else {
-    items = splitItems(section);
-    if (items.length === 0) problems.push('Verification 小节为空');
-    else {
-      const vague: number[] = [];
-      const unanchored: number[] = [];
-      items.forEach((item, i) => {
-        if (item.fenced) return;
-        if (
-          VAGUE_PATTERN.test(
-            item.text
-              .replace(/^[^\S\n\r\u2028\u2029]*```[\s\S]*?^[^\S\n\r\u2028\u2029]*```/gm, '')
-              .replace(/`[^`]*`/g, ''),
-          )
-        )
-          vague.push(i + 1);
-        else if (!ANCHOR_PATTERNS.some((p) => p.test(item.text))) unanchored.push(i + 1);
-      });
-      const itemLabel = (n: number) => `第 ${n} 项`;
-      if (unanchored.length > 0)
-        problems.push(
-          `Verification ${unanchored.map(itemLabel).join('、')}没有可执行的检查（要写命令、测试文件路径或可断言的结果）`,
-        );
-      if (vague.length > 0)
-        problems.push(`Verification ${vague.map(itemLabel).join('、')}含待定之类的占位词`);
-    }
-  }
-  if (problems.length > 0) return { ok: false, problem: problems.join('；') };
-  return { ok: true, items: items.map((i) => i.text) };
-}
-
-export function checkPlanContract(content: string): PlanContractCheck {
-  return checkVerificationContract(content.replace(/\r\n?/g, '\n'));
-}
-
 export function planVerificationItems(content: string): string[] {
-  const r = checkVerificationContract(content.replace(/\r\n?/g, '\n'));
-  return r.ok ? r.items : [];
+  const section = namedSection(content.replace(/\r\n?/g, '\n'), 'verification');
+  if (section === undefined) return [];
+  return splitItems(section)
+    .filter((i) => i.text.trim() !== '')
+    .map((i) => i.text);
 }

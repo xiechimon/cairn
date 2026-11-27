@@ -451,7 +451,14 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     const planId = newRecordId();
     w.s.db
       .insert(planTable)
-      .values({ id: planId, buildId: w.buildId, version: 1, content: '# v1', createdAt: nowMs() })
+      .values({
+        id: planId,
+        buildId: w.buildId,
+        version: 1,
+        content: '# v1',
+        autoApprovePausedAt: nowMs(),
+        createdAt: nowMs(),
+      })
       .run();
     w.s.db.update(buildTable).set({ planDocId: planId }).where(eq(buildTable.id, w.buildId)).run();
     const planStep = stepsOf(w, w.buildId).find((st) => st.kind === 'plan')!;

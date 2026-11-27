@@ -2,15 +2,12 @@ import {
   type AcceptanceEvaluation,
   ANSWERS_CONTINUE_PROMPT,
   buildAcceptanceNudgePrompt,
-  buildPlanContractRewritePrompt,
   buildPlanRewritePrompt,
   evaluateStepAcceptance,
   extractEditedPathsFromMessages,
   isAcceptanceNudgePrompt,
   isBuildStepKind,
   isInfoOutput,
-  isPlanContractRewritePrompt,
-  type PlanContractCheck,
   type TodoOutputKind,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, ne } from 'drizzle-orm';
@@ -62,7 +59,7 @@ import {
   MERGE_UNCONFIRMED_TEXT,
 } from './merge-announcement.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
-import { planAutoConfirmation, planContractOfStep } from './plan-auto-confirm.js';
+import { planAutoConfirmation } from './plan-auto-confirm.js';
 import { finishScheduledStep } from './schedules.js';
 import { noteTaskCodeDelivered, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -80,7 +77,6 @@ function stepArtifactGate(
     output?: TodoOutputKind;
     deliverables?: DeliverableManifest;
   },
-  planContract: PlanContractCheck | null,
 ): string | null {
   if (stepRow.kind === 'plan') {
     const planRow = deps.db
@@ -89,13 +85,6 @@ function stepArtifactGate(
       .where(eq(planTable.buildId, stepRow.buildId))
       .get();
     if (planRow !== undefined) {
-      if (
-        planContract !== null &&
-        !planContract.ok &&
-        isPlanContractRewritePrompt(stepRow.prompt)
-      ) {
-        return `方案结构不合格：${planContract.problem}`;
-      }
       return null;
     }
     const priorPlanStep = deps.db
@@ -301,13 +290,10 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     if (undelivered !== null && pendingWorkerQuestions(deps.db, buildRow.id).length === 0)
       askUndeliveredOnce(deps, buildRow, undelivered);
   }
-  const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
-  const gateFailure = stepArtifactGate(
-    deps,
-    stepRow,
-    { ...outcome, output: todoRow.output },
-    planContract,
-  );
+  const gateFailure = stepArtifactGate(deps, stepRow, {
+    ...outcome,
+    output: todoRow.output,
+  });
   if (gateFailure !== null) {
     applyStepFailure(deps, stepRow, gateFailure, undefined, {
       code: 'gate_rejection',
@@ -365,19 +351,6 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         {
           kind: 'plan-rewrite',
         },
-      );
-      return;
-    }
-    if (planContract !== null && !planContract.ok) {
-      enqueueStep(
-        deps,
-        stepRow.buildId,
-        'plan',
-        todoRow.teamId,
-        buildPlanContractRewritePrompt(planContract.problem),
-        undefined,
-        undefined,
-        { kind: 'plan-rewrite' },
       );
       return;
     }

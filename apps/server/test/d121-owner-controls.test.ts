@@ -319,7 +319,7 @@ test('project list reports the stored plan auto-approve toggle', async () => {
   expect(list.find((item) => item.id === 'project')?.planAutoApproveEnabled).toBe(false);
 });
 
-test.each(['questions', 'invalid', 'archived', 'busy', 'stale', 'split', 'revision'] as const)(
+test.each(['questions', 'archived', 'busy', 'stale', 'split', 'revision'] as const)(
   'no deadline when blocked by %s',
   async (reason) => {
     const w = world();
@@ -348,7 +348,6 @@ test.each(['questions', 'invalid', 'archived', 'busy', 'stale', 'split', 'revisi
           createdAt: READY_AT,
         })
         .run();
-    if (reason === 'invalid') w.db.update(plan).set({ content: 'no verification' }).run();
     if (reason === 'archived') w.db.update(todo).set({ archivedAt: READY_AT }).run();
     if (reason === 'busy')
       w.db

@@ -8,7 +8,7 @@ import { parseOtlpTarget } from '../src/otel.js';
 import { ownComputerHardlineRefusal } from '../src/protocol/own-computer.js';
 import { sanitizeSubagentSummary } from '../src/protocol/subagent.js';
 import { publicUrl } from '../src/public-url.js';
-import { checkPlanContract } from '../src/records/plan.js';
+import { planVerificationItems } from '../src/records/plan.js';
 import { mailSharedTranscript, orchestratedTodoIdOf } from '../src/records/prompts.js';
 import { systemRowOf } from '../src/records/system-row.js';
 import { ticketDedupeKey } from '../src/records/ticket-dedupe.js';
@@ -60,7 +60,7 @@ const hostile: [string, () => unknown][] = [
   ['shell sudo flags', () => ownComputerHardlineRefusal(`;sudo${' -;sudo'.repeat(N / 6)}`)],
   ['attachment target', () => renderAttachmentTokensToLabels('![](attachment:'.repeat(N / 4))],
   ['control tag', () => sanitizeSubagentSummary('<tools '.repeat(N / 2), 'child')],
-  ['plan path', () => checkPlanContract(`## Verification\n- ${'a.'.repeat(N)}`)],
+  ['plan path', () => planVerificationItems(`## Verification\n- ${'a.'.repeat(N)}`)],
   ['app image folder', () => discoverOnLinux({ APPIMAGE: 'x', APPDIR: `${'/'.repeat(N)}x` })],
   ['runtime folder', () => discoverOnLinux({ XDG_RUNTIME_DIR: `${'/'.repeat(LONG)}x` })],
 ];
