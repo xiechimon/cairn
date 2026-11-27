@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "ad3084ec018d8dcc22105183efa844a3eaeede5d",
-    "date": "2026-11-26"
+    "sha": "9e4a677c8f7c7dbb90fa002f398a00dd0662b40e",
+    "date": "2026-11-27"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files; helperText = helper-producing settings/form/dialog props, description/info-tip nodes and SETTINGS_HINT_CLS uses in the same scope; permanentlyDisabledControls = static disabled or disabled={true} JSX attributes plus disabled: true action config in the same scope",
   "perFaceCss": {},
@@ -39,10 +39,9 @@
     }
   },
   "helperText": {
-    "total": 102,
+    "total": 101,
     "files": {
       "board/route-override-dialog.tsx": 5,
-      "board/side-chat.tsx": 1,
       "board/sidebar.tsx": 1,
       "chief/memory-dialog.tsx": 1,
       "chief/memory-panel.tsx": 1,

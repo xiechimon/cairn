@@ -21,6 +21,15 @@ async function relativeY(locator: Locator): Promise<number> {
   });
 }
 
+async function waitForFiniteAnimations(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const finite = document
+      .getAnimations()
+      .filter((a) => a.effect?.getComputedTiming().iterations !== Number.POSITIVE_INFINITY);
+    await Promise.all(finite.map((a) => a.finished.catch(() => {})));
+  });
+}
+
 async function expectNoLayoutShift(
   page: Page,
   below: Locator,
@@ -29,12 +38,7 @@ async function expectNoLayoutShift(
   options?: { ignoreSources?: readonly string[] },
 ): Promise<void> {
   await expect(below, `C34: ${label} anchor should be visible before trigger`).toBeVisible();
-  await page.evaluate(async () => {
-    const finite = document
-      .getAnimations()
-      .filter((a) => a.effect?.getComputedTiming().iterations !== Number.POSITIVE_INFINITY);
-    await Promise.all(finite.map((a) => a.finished.catch(() => {})));
-  });
+  await waitForFiniteAnimations(page);
   const beforeY = await relativeY(below);
 
   await page.evaluate(() => {
@@ -126,8 +130,8 @@ async function expectNoLayoutShift(
   ).toBe(beforeY);
 }
 
-test.describe('C34: no layout shift on transient states', () => {
-  test('new-task row: blank validation, slow submit, rejected save and tooltip keep task list steady', async ({
+function registerC34Suite(mode: 'desktop' | 'mobile') {
+  test(`new-task row (${mode}): blank validation, slow submit, rejected save and tooltip keep task list steady`, async ({
     page,
   }) => {
     await mockLive(
@@ -261,17 +265,27 @@ test.describe('C34: no layout shift on transient states', () => {
     );
 
     await page.goto('/app');
-    const home = page.getByTestId('home-c');
-    const plus = home.getByTestId('composer-plus');
-    const composer = home.getByTestId('chief-composer-input');
-    const stop = home.getByTestId('chief-composer-stop');
+    const chiefHome = page.getByTestId('home-c');
+    const plus = chiefHome.getByTestId('composer-plus');
+    const composer = chiefHome.getByTestId('chief-composer-input');
+    const stop = chiefHome.getByTestId('chief-composer-stop');
     await expect(composer).toBeVisible();
     await expect(stop).toBeVisible();
+    const home = mode === 'mobile' ? page.getByRole('menu') : chiefHome;
 
-    await expectNoLayoutShift(page, plus, 'Coordinator context meter loading -> loaded', async () => {
+    await expectNoLayoutShift(page, mode === 'mobile' ? composer : plus, 'Coordinator context meter loading -> loaded', async () => {
+      if (mode === 'mobile') {
+        await plus.click();
+        await expect(home.getByTestId('composer-context-meter')).toHaveAttribute('aria-busy', 'true');
+      }
       await delay(600);
       releaseChief();
       await expect(home.getByTestId('composer-context-meter')).toHaveAttribute('aria-busy', 'false');
+      if (mode === 'mobile') {
+        await page.keyboard.press('Escape');
+        await expect(home).toHaveCount(0);
+        await expect(page.locator('[data-base-ui-inert]')).toHaveCount(0);
+      }
     });
 
     await expectNoLayoutShift(page, plus, 'Coordinator composer stop state settling', async () => {
@@ -300,7 +314,7 @@ test.describe('C34: no layout shift on transient states', () => {
       { ignoreSources: ['chief-virtual-rows'] },
     );
 
-    await expectNoLayoutShift(page, home.locator('.chief-composer'), 'Coordinator composer plus tooltip', async () => {
+    await expectNoLayoutShift(page, chiefHome.locator('.chief-composer'), 'Coordinator composer plus tooltip', async () => {
       await plus.hover();
       await delay(700);
     });
@@ -531,9 +545,13 @@ test.describe('C34: no layout shift on transient states', () => {
     });
   });
 
-  test('project settings: invalid GitHub repo validation keeps target branch row below steady', async ({
+  test(`project settings (${mode}): repo validation and branch load error wrap below controls without shifting layout`, async ({
     page,
   }) => {
+    let releaseBranches!: () => void;
+    const branchesHeld = new Promise<void>((resolve) => {
+      releaseBranches = resolve;
+    });
     await mockLive(
       page,
       {
@@ -551,10 +569,7 @@ test.describe('C34: no layout shift on transient states', () => {
       },
       (path, _route, json) => {
         if (path === '/api/projects/proj-1/branches') {
-          return json({
-            defaultBranch: 'main',
-            branches: [{ name: 'main', isDefault: true }],
-          });
+          return branchesHeld.then(() => json({ error: 'branches failed' }, 500));
         }
         return undefined;
       },
@@ -563,16 +578,85 @@ test.describe('C34: no layout shift on transient states', () => {
     await page.goto('/app/project/proj-1/settings');
     const input = page.getByRole('textbox', { name: 'GitHub 仓库（owner/repo）' });
     const branchRow = page.locator('[data-settings-label="目标分支"]');
+    const branchTrigger = page.getByTestId('project-base-branch');
+    const archiveBtn = page.getByTestId('project-archive');
     await expect(input).toBeVisible();
     await expect(branchRow).toBeVisible();
+    await expect(branchTrigger).toBeVisible();
+    await expect(archiveBtn).toBeVisible();
 
-    await expectNoLayoutShift(page, branchRow, 'project settings invalid github repo validation', async () => {
+    await waitForFiniteAnimations(page);
+    const inputBefore = await input.boundingBox();
+    expect(inputBefore).not.toBeNull();
+
+    await expectNoLayoutShift(page, branchRow, `project settings invalid github repo validation (${mode})`, async () => {
       await input.fill('invalid-repo');
       await page.getByRole('button', { name: '保存仓库' }).click();
       await expect(
         page.getByRole('alert').filter({ hasText: 'GitHub 仓库格式应为 owner/repo。' }),
       ).toBeVisible();
     });
+
+    await waitForFiniteAnimations(page);
+    const repoAlert = page.getByRole('alert').filter({ hasText: 'GitHub 仓库格式应为 owner/repo。' });
+    const inputAfter = await input.boundingBox();
+    const repoAlertBox = await repoAlert.boundingBox();
+    expect(inputAfter).not.toBeNull();
+    expect(repoAlertBox).not.toBeNull();
+    expect(
+      inputAfter!.x,
+      `C34: project settings repo input shifted sideways at ${mode} from x=${inputBefore!.x} to x=${inputAfter!.x}`,
+    ).toBe(inputBefore!.x);
+    expect(
+      inputAfter!.width,
+      `C34: project settings repo input shrank at ${mode} from w=${inputBefore!.width} to w=${inputAfter!.width}`,
+    ).toBe(inputBefore!.width);
+    expect(
+      repoAlertBox!.y,
+      `C34: project settings repo error (${repoAlertBox!.y}) must wrap below input (${inputAfter!.y + inputAfter!.height}) at ${mode}`,
+    ).toBeGreaterThanOrEqual(inputAfter!.y + inputAfter!.height - 1);
+    expect(
+      Math.abs(repoAlertBox!.x - inputAfter!.x),
+      `C34: project settings repo error (${repoAlertBox!.x}) must align below input (${inputAfter!.x}) at ${mode}`,
+    ).toBeLessThanOrEqual(16);
+
+    await input.fill('octo/cairn');
+    await expect(repoAlert).toHaveCount(0);
+    await branchTrigger.evaluate((el) =>
+      el.scrollIntoView({ block: 'center', behavior: 'instant' }),
+    );
+    await waitForFiniteAnimations(page);
+    const branchBefore = await branchTrigger.boundingBox();
+    expect(branchBefore).not.toBeNull();
+    const branchAlert = page.getByRole('alert').filter({ hasText: '读取失败' });
+
+    await expectNoLayoutShift(page, archiveBtn, `project settings branch load error (${mode})`, async () => {
+      await delay(600);
+      releaseBranches();
+      await expect(branchAlert).toBeVisible();
+    });
+
+    await waitForFiniteAnimations(page);
+    const branchAfter = await branchTrigger.boundingBox();
+    const branchAlertBox = await branchAlert.boundingBox();
+    expect(branchAfter).not.toBeNull();
+    expect(branchAlertBox).not.toBeNull();
+    expect(
+      branchAfter!.x,
+      `C34: project settings branch picker shifted sideways at ${mode} from x=${branchBefore!.x} to x=${branchAfter!.x}`,
+    ).toBe(branchBefore!.x);
+    expect(
+      branchAfter!.width,
+      `C34: project settings branch picker shrank at ${mode} from w=${branchBefore!.width} to w=${branchAfter!.width}`,
+    ).toBe(branchBefore!.width);
+    expect(
+      branchAlertBox!.y,
+      `C34: project settings branch error (${branchAlertBox!.y}) must wrap below picker (${branchAfter!.y + branchAfter!.height}) at ${mode}`,
+    ).toBeGreaterThanOrEqual(branchAfter!.y + branchAfter!.height - 1);
+    expect(
+      Math.abs(branchAlertBox!.x - branchAfter!.x),
+      `C34: project settings branch error (${branchAlertBox!.x}) must align below picker (${branchAfter!.x}) at ${mode}`,
+    ).toBeLessThanOrEqual(16);
   });
 
   test('thread panel: schedules loading, action chip pending/error, stop pending/error and send failure keep layout steady', async ({
@@ -705,14 +789,26 @@ test.describe('C34: no layout shift on transient states', () => {
 
     await page.goto('/app?thread=todo-run');
     const sidePanel = page.getByTestId('side-chat-panel');
-    const tools = sidePanel.locator('[data-slot="composer-tools"]');
+    const tools =
+      mode === 'mobile'
+        ? sidePanel.getByTestId('composer-toolbar')
+        : sidePanel.locator('[data-slot="composer-tools"]');
     const stopBtn = sidePanel.locator('.composer-stop');
     await expect(stopBtn).toBeVisible();
     await expect(tools).toBeVisible();
 
-    await expectNoLayoutShift(page, tools, 'thread panel stop loading + error toast', async () => {
+    await expectNoLayoutShift(page, tools, `thread panel stop loading + error toast (${mode})`, async () => {
       await stopBtn.click();
       await expect(page.locator('[data-sonner-toast]').filter({ hasText: '停止失败，请重试。' })).toBeVisible();
     });
   });
+}
+
+test.describe('C34: no layout shift on transient states (desktop 1440px)', () => {
+  registerC34Suite('desktop');
+});
+
+test.describe('C34: no layout shift on transient states (mobile 390px)', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
+  registerC34Suite('mobile');
 });

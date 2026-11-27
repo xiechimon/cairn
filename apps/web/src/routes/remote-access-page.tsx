@@ -314,7 +314,11 @@ export function RemoteAccessPage() {
             label={t('远程访问')}
             hint={tailnetHint}
             className="[&>span:first-child]:w-3/5 [&>span:first-child]:flex-none"
-            hintClassName={tailnetFailed || routesFailed ? 'min-h-10 text-destructive' : 'min-h-10'}
+            hintClassName={
+              tailnetFailed || routesFailed
+                ? 'min-h-16 sm:min-h-10 text-destructive'
+                : 'min-h-16 sm:min-h-10'
+            }
           >
             {routesFailed && (
               <Button
@@ -385,7 +389,7 @@ export function RemoteAccessPage() {
         requestsQ.data !== undefined &&
         requests.length === 0 && (
           <p
-            className="m-0 mt-3 min-h-10 text-meta text-content-secondary"
+            className="m-0 mt-3 min-h-16 sm:min-h-10 text-meta text-content-secondary"
             data-testid="pairing-blocked"
           >
             {tailnetOn

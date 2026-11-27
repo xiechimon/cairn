@@ -161,7 +161,7 @@ export function ProjectSettingsPage() {
   const [convConfirmRepo, setConvConfirmRepo] = useState<string | null>(null);
   const [repoDraft, setRepoDraft] = useState<string | null>(null);
   const [repoError, setRepoError] = useState<string | null>(null);
-  const [repoSaveEl, setRepoSaveEl] = useState<HTMLButtonElement | null>(null);
+  const [repoInputEl, setRepoInputEl] = useState<HTMLInputElement | null>(null);
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const mutations = useApiMutations(teamId);
@@ -336,6 +336,7 @@ export function ProjectSettingsPage() {
               {live && wireProject?.repoKind === 'github' ? (
                 <SettingsRow label={t('仓库')}>
                   <Input
+                    ref={setRepoInputEl}
                     aria-label={t('GitHub 仓库（owner/repo）')}
                     className={`${ROW_INPUT_CLS} font-mono`}
                     placeholder="owner/repo"
@@ -346,7 +347,6 @@ export function ProjectSettingsPage() {
                     }}
                   />
                   <Button
-                    ref={setRepoSaveEl}
                     className={DIALOG_PRIMARY_BUTTON}
                     aria-label={t('保存仓库')}
                     disabled={
@@ -377,7 +377,7 @@ export function ProjectSettingsPage() {
                   >
                     {t('保存')}
                   </Button>
-                  {repoSaveEl !== null && (
+                  {repoInputEl !== null && (
                     <Popover
                       open={repoError !== null}
                       onOpenChange={(open) => {
@@ -385,12 +385,13 @@ export function ProjectSettingsPage() {
                       }}
                     >
                       <PopoverContent
-                        anchor={repoSaveEl}
-                        align="end"
+                        anchor={repoInputEl}
+                        align="start"
                         sideOffset={6}
+                        collisionPadding={12}
                         initialFocus={false}
                         finalFocus={false}
-                        className="w-auto max-w-80 p-2.5"
+                        className="w-auto max-w-[min(20rem,calc(100vw-2rem))] p-2.5"
                       >
                         <p role="alert" className="m-0 text-meta text-destructive">
                           {repoError}
@@ -519,9 +520,10 @@ export function ProjectSettingsPage() {
                           anchor={convBtnEl}
                           align="start"
                           sideOffset={6}
+                          collisionPadding={12}
                           initialFocus={false}
                           finalFocus={false}
-                          className="w-auto max-w-80 p-2.5"
+                          className="w-auto max-w-[min(20rem,calc(100vw-2rem))] p-2.5"
                         >
                           <p role="alert" className="m-0 text-meta text-destructive">
                             {convError}
