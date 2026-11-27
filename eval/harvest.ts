@@ -44,23 +44,23 @@ interface SnapshotPayload {
 }
 
 function items(): { id: string; input: Record<string, unknown>; expectedOutput: unknown }[] {
+  if (!Number.isFinite(LIMIT) || LIMIT <= 0) return [];
   if (!process.env.HARVEST_DB) {
     console.warn(`harvest: set HARVEST_DB to a sealed snapshot db; default path is owner-local`);
   }
   const db = new BetterSqlite(process.env.HARVEST_DB ?? DB, { readonly: true });
-  const rows = db
-    .prepare(
-      `SELECT turnId, payload FROM coordinator_turn_snapshot WHERE status='sealed' ORDER BY capturedAt DESC LIMIT ?`,
-    )
-    .all(LIMIT) as SnapshotRow[];
+  const stmt = db.prepare(
+    `SELECT turnId, payload FROM coordinator_turn_snapshot WHERE status='sealed' AND json_valid(payload) AND json_type(payload, '$.claim') = 'object' ORDER BY capturedAt DESC`,
+  );
   const out = [];
-  for (const row of rows) {
-    let payload: SnapshotPayload;
+  for (const row of stmt.iterate() as IterableIterator<SnapshotRow>) {
+    let payload: SnapshotPayload | null;
     try {
-      payload = JSON.parse(row.payload) as SnapshotPayload;
+      payload = JSON.parse(row.payload) as SnapshotPayload | null;
     } catch {
       continue;
     }
+    if (payload === null || typeof payload !== 'object') continue;
     const claim = payload.claim;
     if (claim === null || claim === undefined) continue;
     const rawRequest = claim.instruction;
@@ -88,6 +88,7 @@ function items(): { id: string; input: Record<string, unknown>; expectedOutput: 
     const parsed = runtimeTask.safeParse(candidate);
     if (!parsed.success) continue;
     out.push({ id: parsed.data.id, input: parsed.data, expectedOutput: parsed.data.expected });
+    if (out.length >= LIMIT) break;
   }
   return out;
 }

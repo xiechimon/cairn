@@ -11,19 +11,15 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import {
-  build,
   chief,
   chiefMessage,
   chiefThread,
   coordinatorConversation,
   coordinatorEntry,
   coordinatorInput,
-  project,
   step,
-  todo,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { blockedNow } from '../services/blockers.js';
 import { greetingReadmeSection, parseChiefTrigger } from '../services/chief.js';
 import {
   CHIEF_STOP_ROW_ID_PREFIX,
@@ -41,7 +37,7 @@ import {
   recordReusedInstructions,
 } from '../services/coordinator-steps.js';
 import { coordinatorToolDefs } from '../services/coordinator-tool-defs.js';
-import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
+import { captureCoordinatorClaim } from '../services/coordinator-turn-capture.js';
 import { readDeployLease } from '../services/deploy-lease.js';
 import { serverTurnModel } from '../services/machine-claim.js';
 import { stageTurnAttachments, teamOffersDesktop } from '../services/machine-computer.js';
@@ -53,8 +49,6 @@ import {
   mcpConnectorDepsOf,
 } from '../services/mcp-servers.js';
 import { ownComputerOffered } from '../services/own-computer.js';
-import { ownershipOf } from '../services/owner.js';
-import { listedProjects } from '../services/personal-space.js';
 import { offeredPhoneNames } from '../services/phone-computer.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
 import { markProviderModelTextOnly } from '../services/providers.js';
@@ -495,83 +489,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       },
       'coordinator memory injected',
     );
-    captureClaimInputs(row.id, {
-      initialTodos: db
-        .select()
-        .from(todo)
-        .where(eq(todo.teamId, threadRow.teamId))
-        .all()
-        .map((t) => ({
-          id: t.id,
-          projectId: t.projectId,
-          title: t.title,
-          spec: t.spec,
-          phase: t.phase,
-          phaseAt: t.phaseAt,
-          archivedAt: t.archivedAt ?? null,
-          seqNum: t.seqNum,
-          orderIndex: t.orderIndex,
-          blockedBy: t.blockedBy ?? null,
-          latestBuildId: t.latestBuildId ?? null,
-          sourceKind: t.sourceKind ?? null,
-          sourceRef: t.sourceRef ?? null,
-          request: t.request ?? null,
-          output: t.output,
-        })),
-      initialThreads: (() => {
-        const todosRow = db.select().from(todo).where(eq(todo.teamId, threadRow.teamId)).all();
-        const buildIds = todosRow
-          .map((t) => t.latestBuildId)
-          .filter((id): id is string => id !== null);
-        if (buildIds.length === 0) return [];
-        return db
-          .select()
-          .from(build)
-          .where(inArray(build.id, buildIds))
-          .all()
-          .map((b) => ({
-            id: b.id,
-            todoId: b.todoId,
-            withPlan: b.withPlan,
-            prevPhase: b.prevPhase ?? null,
-            triggerSource: b.triggerSource,
-            planDocId: b.planDocId ?? null,
-            errorMessage: b.errorMessage ?? null,
-            prUrl: b.prUrl ?? null,
-            prNumber: b.prNumber ?? null,
-            diffHash: b.diffHash ?? null,
-            reportAttachmentId: b.reportAttachmentId ?? null,
-            stop: b.stop ?? null,
-            reportLine: b.reportLine ?? null,
-            createdAt: b.createdAt,
-          }));
-      })(),
-      initialVisible: db
-        .select()
-        .from(todo)
-        .where(eq(todo.teamId, threadRow.teamId))
-        .all()
-        .map((t) => {
-          const ownership = ownershipOf(db, t);
-          return {
-            id: t.id,
-            ownership:
-              ownership === null ? null : { owner: ownership.owner, reason: ownership.reason },
-            blocks: blockedNow(db, { blockedBy: [t.id] }),
-          };
-        }),
-      projects: db
-        .select()
-        .from(project)
-        .where(listedProjects(threadRow.teamId))
-        .all()
-        .map((p) => ({
-          id: p.id,
-          name: p.name,
-          description: p.description ?? null,
-          repoKind: p.repoKind ?? null,
-          archivedAt: p.archivedAt ?? null,
-        })),
+    captureCoordinatorClaim(db, row.id, threadRow.teamId, {
       systemPrompt: context.systemPrompt,
       instruction:
         row.prompt === null || context.trigger === 'user'

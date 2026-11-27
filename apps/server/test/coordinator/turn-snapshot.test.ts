@@ -5,8 +5,9 @@ import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-work
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '../../src/db/client.js';
-import { coordinatorTurnSnapshot, project, step, todo } from '../../src/db/schema.js';
+import { coordinatorTurnSnapshot, machine, project, step, todo } from '../../src/db/schema.js';
 import * as ids from '../../src/lib/ids.js';
+import { setCoordinatorInServer } from '../../src/services/coordinator-context.js';
 import {
   capturePreCallWorld,
   captureToolResult,
@@ -14,6 +15,8 @@ import {
   openTurnCapture,
   sealCoordinatorTurnSnapshot,
 } from '../../src/services/coordinator-turn-capture.js';
+import { claimStep } from '../../src/services/machine-claim.js';
+import { finishStepForClaim } from '../helpers.js';
 import { boot, stub, type World, world } from './runner-world.js';
 
 beforeEach(() => {
@@ -381,4 +384,43 @@ it('seals a closure whose text mentions bearer auth descriptively', async () => 
   expect(row?.redactionCount).toBe(0);
   const payload = JSON.parse(row?.payload ?? 'null');
   expect(payload?.claim?.initialTodos?.[0]?.spec).toContain('Bearer vs api-key');
+});
+
+it('captures claim inputs when a Runner claims and finishes a Coordinator turn', async () => {
+  const w = await world('what should I harvest?');
+  w.s.db.insert(project).values({ id: 'p-runner', teamId: w.teamId, name: 'ops' }).run();
+  setCoordinatorInServer(false);
+  const machineRow = w.s.db.select().from(machine).where(eq(machine.teamId, w.teamId)).get();
+  expect(machineRow).toBeDefined();
+  const deps = {
+    ...w.s.svc,
+    box: w.s.secretBox,
+    reposDir: w.s.reposDir,
+    attachmentsDir: w.s.attachmentsDir,
+  };
+
+  const claimed = await claimStep(deps, machineRow!.id, w.teamId, 10, 'http://localhost');
+  expect(claimed).not.toBeNull();
+  await finishStepForClaim(deps, machineRow!.id, w.stepId, {
+    status: 'success',
+    usage: [],
+  });
+
+  const row = snapshotRow(w.s.db, w.stepId);
+  expect(row?.status).toBe('sealed');
+  const payload = JSON.parse(row?.payload ?? 'null');
+  expect(payload?.claim).not.toBeNull();
+  expect(payload?.claim?.instruction).toBe('what should I harvest?');
+  expect(payload?.claim?.systemPrompt).toContain('Coordinator');
+  expect(payload?.claim?.systemPrompt).toContain('<quick_replies>');
+  expect(payload?.claim?.trigger).toBe('user');
+  expect(Array.isArray(payload?.claim?.memories)).toBe(true);
+  expect(payload?.claim?.memories.join('\n')).toContain('记忆文件');
+  expect(payload?.claim?.provider).toBe('stub');
+  expect(payload?.claim?.modelId).toBe('m');
+  expect(payload?.claim?.thinkingLevel).toBeNull();
+  expect(payload?.claim?.projects).toEqual([
+    expect.objectContaining({ id: 'p-runner', name: 'ops' }),
+  ]);
+  expect(payload?.claim?.volatileText).toMatch(/^<turn_state>\nNow: /);
 });

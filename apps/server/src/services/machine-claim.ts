@@ -64,6 +64,7 @@ import { coordinatorInServerEnabled, rotatesPastCompaction } from './coordinator
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
+import { captureCoordinatorClaim } from './coordinator-turn-capture.js';
 import { readDeployLease } from './deploy-lease.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import {
@@ -331,6 +332,12 @@ async function buildChiefClaim(
     stillAuthorized,
   });
   if (claimed === null) return null;
+  const stagedUploads =
+    claimed.prompt !== null
+      ? await stageTurnAttachments(deps, claimed, threadRow, claimed.prompt, signal).catch(
+          () => null,
+        )
+      : null;
   return chiefClaimPayload(
     deps,
     machineId,
@@ -338,6 +345,7 @@ async function buildChiefClaim(
     threadRow,
     agentRow,
     readmeSection,
+    stagedUploads,
     freshMachine,
   );
 }
@@ -355,19 +363,26 @@ function chiefClaimPayload(
   threadRow: typeof chiefThread.$inferSelect,
   agentRow: RouteProfile,
   readmeSection: string | null,
+  stagedUploads: string | null,
   machineRow?: typeof machine.$inferSelect,
 ): ClaimedStep {
   const model = effectiveModel(agentRow, stepRow);
-  const { trigger, systemPrompt, memories, instruction, memoryTrace } = chiefTurnContext(
+  const { trigger, systemPrompt, memories, instruction, sections, memoryTrace } = chiefTurnContext(
     deps,
     stepRow,
     threadRow,
     coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
-  const fullInstruction =
+  const baseInstruction =
     instruction !== null && readmeSection !== null
       ? `${instruction}\n\n${readmeSection}`
       : (instruction ?? readmeSection);
+  const fullInstruction =
+    stagedUploads === null
+      ? baseInstruction
+      : baseInstruction !== null && baseInstruction !== ''
+        ? `${baseInstruction}\n\n${stagedUploads}`
+        : stagedUploads;
   deps.db.update(step).set({ memoryTrace }).where(eq(step.id, stepRow.id)).run();
   const runtime = stepRuntimeFor(model.provider);
   const boundSubscriptionId =
@@ -406,6 +421,25 @@ function chiefClaimPayload(
         ));
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const memoryEditTurn = memoryEditIdOfPrompt(stepRow.prompt) !== null;
+  const effectiveSystemPrompt =
+    mailTurn || memoryEditTurn
+      ? systemPrompt
+      : `${systemPrompt}\n\n${DAEMON_QUICK_REPLIES_GUIDANCE}`;
+  const volatileParts = [
+    ...sections,
+    ...(readmeSection !== null ? [readmeSection] : []),
+    ...(stagedUploads !== null ? [stagedUploads] : []),
+  ];
+  captureCoordinatorClaim(deps.db, stepRow.id, threadRow.teamId, {
+    systemPrompt: effectiveSystemPrompt,
+    instruction: stepRow.prompt,
+    trigger,
+    memories: memories.map((m) => `- ${m.title}：${m.content}`),
+    provider: model.provider ?? '',
+    modelId: model.modelId ?? '',
+    thinkingLevel: stepRow.fallback?.model ? null : (agentRow.thinkingLevel ?? null),
+    volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
+  });
   const locked = chiefTurnLocked(stepRow);
   const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
   const chiefMcp = machineRow ? stepMcpGrant(deps.db, machineRow, locked) : locked ? [] : undefined;
@@ -439,10 +473,7 @@ function chiefClaimPayload(
     },
     chief: {
       threadId: threadRow.id,
-      systemPrompt:
-        mailTurn || memoryEditTurn
-          ? systemPrompt
-          : `${systemPrompt}\n\n${DAEMON_QUICK_REPLIES_GUIDANCE}`,
+      systemPrompt: effectiveSystemPrompt,
       trigger,
       ...(history !== null ? { history } : {}),
     },
@@ -566,25 +597,6 @@ async function claimChiefTurn(
       resolution.failover,
     );
     if (claimed) {
-      if (cand.stepRow.prompt !== null) {
-        const claimedRow = deps.db.select().from(step).where(eq(step.id, claimed.step.id)).get();
-        const stagedUploads =
-          claimedRow !== undefined
-            ? await stageTurnAttachments(
-                deps,
-                claimedRow,
-                cand.threadRow,
-                cand.stepRow.prompt,
-                signal,
-              ).catch(() => null)
-            : null;
-        if (stagedUploads !== null) {
-          claimed.instruction =
-            claimed.instruction !== undefined && claimed.instruction !== ''
-              ? `${claimed.instruction}\n\n${stagedUploads}`
-              : stagedUploads;
-        }
-      }
       publishStepStatus(deps, claimed.step.id);
       return claimed;
     }

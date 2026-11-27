@@ -1,10 +1,20 @@
 import { createHash } from 'node:crypto';
 import { redactSecrets } from '@cairn/shared';
 import { otlpTraceIdOfTurn } from '@cairn/shared/otel';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { chiefThread, coordinatorTurnSnapshot, type step, todo } from '../db/schema.js';
+import {
+  build,
+  chiefThread,
+  coordinatorTurnSnapshot,
+  project,
+  type step,
+  todo,
+} from '../db/schema.js';
+import { blockedNow } from './blockers.js';
+import { ownershipOf } from './owner.js';
+import { listedProjects } from './personal-space.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -154,6 +164,95 @@ export function captureClaimInputs(stepId: string, claim: z.infer<typeof claimVi
   const capture = existingTurnCapture(stepId);
   if (capture === undefined || capture.claim !== null) return;
   capture.claim = claimView.parse(claim);
+}
+
+export function captureCoordinatorClaim(
+  db: Db,
+  stepId: string,
+  teamId: string,
+  input: {
+    systemPrompt: string;
+    instruction: string | null;
+    trigger: string;
+    memories: string[];
+    provider: string;
+    modelId: string;
+    thinkingLevel: string | null;
+    volatileText: string | null;
+  },
+): void {
+  const capture = existingTurnCapture(stepId);
+  if (capture === undefined || capture.claim !== null) return;
+  const todoRows = db.select().from(todo).where(eq(todo.teamId, teamId)).all();
+  const buildIds = todoRows.map((t) => t.latestBuildId).filter((id): id is string => id !== null);
+  const initialTodos = todoRows.map((t) => ({
+    id: t.id,
+    projectId: t.projectId,
+    title: t.title,
+    spec: t.spec,
+    phase: t.phase,
+    phaseAt: t.phaseAt,
+    archivedAt: t.archivedAt ?? null,
+    seqNum: t.seqNum,
+    orderIndex: t.orderIndex,
+    blockedBy: t.blockedBy ?? null,
+    latestBuildId: t.latestBuildId ?? null,
+    sourceKind: t.sourceKind ?? null,
+    sourceRef: t.sourceRef ?? null,
+    request: t.request ?? null,
+    output: t.output,
+  }));
+  const initialThreads =
+    buildIds.length === 0
+      ? []
+      : db
+          .select()
+          .from(build)
+          .where(inArray(build.id, buildIds))
+          .all()
+          .map((b) => ({
+            id: b.id,
+            todoId: b.todoId,
+            withPlan: b.withPlan,
+            prevPhase: b.prevPhase ?? null,
+            triggerSource: b.triggerSource,
+            planDocId: b.planDocId ?? null,
+            errorMessage: b.errorMessage ?? null,
+            prUrl: b.prUrl ?? null,
+            prNumber: b.prNumber ?? null,
+            diffHash: b.diffHash ?? null,
+            reportAttachmentId: b.reportAttachmentId ?? null,
+            stop: b.stop ?? null,
+            reportLine: b.reportLine ?? null,
+            createdAt: b.createdAt,
+          }));
+  const initialVisible = todoRows.map((t) => {
+    const ownership = ownershipOf(db, t);
+    return {
+      id: t.id,
+      ownership: ownership === null ? null : { owner: ownership.owner, reason: ownership.reason },
+      blocks: blockedNow(db, { blockedBy: [t.id] }),
+    };
+  });
+  const projects = db
+    .select()
+    .from(project)
+    .where(listedProjects(teamId))
+    .all()
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description ?? null,
+      repoKind: p.repoKind ?? null,
+      archivedAt: p.archivedAt ?? null,
+    }));
+  captureClaimInputs(stepId, {
+    initialTodos,
+    initialThreads,
+    initialVisible,
+    projects,
+    ...input,
+  });
 }
 
 export function capturePreCallWorld(
