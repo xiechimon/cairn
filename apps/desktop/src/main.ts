@@ -23,6 +23,7 @@ import {
   isDesktopActivity,
   isDesktopDismissTag,
   isDesktopNotifyPayload,
+  isKeepAwakeMode,
   type NativeTrayMenu,
   nativeTrayMenuSchema,
   OWNER_CHANNEL_HEADER,
@@ -115,10 +116,10 @@ import {
 } from './locale.js';
 import {
   type NativeTray,
+  nativeMenuWithHostState,
   nativeTrayAction,
   skeletonTrayMenu,
   startNativeTray,
-  withHostState,
 } from './native-tray.js';
 import { offlinePageHtml } from './offline-page.js';
 import { createOfflineRecovery, type OfflineRecoveryController } from './offline-recovery.js';
@@ -225,7 +226,6 @@ import {
   updateBlocker,
 } from './updater.js';
 import { ensureUpdaterAgent, UPDATER_ENTRY, updaterPlistPath } from './updater-agent.js';
-import { createWakeAhead, earliestScheduleNextRunAt } from './wake-ahead.js';
 import {
   clampBounds,
   createWindowStateStore,
@@ -1045,8 +1045,8 @@ function openFromTray(target: unknown): void {
 interface TrayControls {
   connectionLabel: string | null;
   runner: () => DesktopRunnerState;
+  stepsInFlight: () => number;
   setRunner: (on: boolean) => Promise<void>;
-  nextRunAt?: () => Promise<number | null>;
 }
 
 function createTrayPopover(): BrowserWindow {
@@ -1152,8 +1152,9 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   };
   const pushMenu = (force = false): void => {
     if (native === null) return;
-    const menu = withHostState(pageMenu ?? sentMenu, {
-      keepAwake: keepAwake.isOn(),
+    const menu = nativeMenuWithHostState(pageMenu, desktopLocale(app.getLocale()), {
+      keepAwake: keepAwake.mode(),
+      lidClosedAvailable: lidClosedAvailable(),
       runner: controls.runner(),
     });
     const json = JSON.stringify(menu);
@@ -1166,7 +1167,8 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
     Menu.buildFromTemplate(
       trayMenuTemplate(
         controls.connectionLabel,
-        keepAwake.isOn(),
+        keepAwake.mode(),
+        lidClosedAvailable(),
         {
           open: focusWindow,
           setKeepAwake,
@@ -1177,25 +1179,18 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
         desktopLocale(app.getLocale()),
       ),
     );
-  const setKeepAwake = (on: boolean): void => {
-    keepAwake.set(on);
-    refreshIcon();
+  const lidClosedAvailable = (): boolean => IS_MAC && !powerMonitor.isOnBatteryPower();
+  const setKeepAwake = (mode: unknown): void => {
+    if (!isKeepAwakeMode(mode)) return;
+    if (mode === 'lid-closed' && !lidClosedAvailable()) return;
+    keepAwake.setMode(mode);
+    syncPower();
     if (!IS_MAC) created?.setContextMenu(fallbackMenu());
   };
-  let wakeAhead: ReturnType<typeof createWakeAhead> | null = null;
-  if (controls.nextRunAt !== undefined) {
-    const nextRunAt = controls.nextRunAt;
-    const monitor = createWakeAhead({
-      nextRunAt,
-      onWindow: (active) => {
-        keepAwake.setWakeAhead(active);
-        refreshIcon();
-      },
-    });
-    wakeAhead = monitor;
-    monitor.start();
-    powerMonitor.on('resume', () => void monitor.pollNow());
-  }
+  const syncPower = (): void => {
+    keepAwake.sync({ runner: controls.runner(), inFlight: controls.stepsInFlight() });
+    refreshIcon();
+  };
   globalShortcut.register(NEW_TASK_SHORTCUT, () => sendToWindow('desktop-menu', 'new-task'));
   const popover = createTrayPopover();
   const contents = popover.webContents;
@@ -1208,13 +1203,18 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   let pendingLoadStart = false;
   const state = (): DesktopTrayState => ({
     runner: controls.runner(),
-    keepAwake: keepAwake.isOn(),
+    keepAwake: keepAwake.mode(),
+    lidClosedAvailable: lidClosedAvailable(),
     accent: systemAccent(),
   });
   const publish = (): void => {
+    syncPower();
     if (!contents.isDestroyed()) contents.send('desktop-tray:state', state());
     pushMenu();
   };
+  powerMonitor.on('on-ac', publish);
+  powerMonitor.on('on-battery', publish);
+  syncPower();
   const place = (): void => {
     if (created === null) return;
     const iconBounds = created.getBounds();
@@ -1355,7 +1355,7 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
     } else if (action.kind === 'runner') {
       void controls.setRunner(action.on).then(publish);
     } else if (action.kind === 'keep-awake') {
-      setKeepAwake(action.on);
+      setKeepAwake(action.mode);
       publish();
     } else {
       app.quit();
@@ -1402,9 +1402,9 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
     await controls.setRunner(on === true);
     publish();
   });
-  ipcMain.on('desktop-tray:keep-awake', (event, on: unknown) => {
+  ipcMain.on('desktop-tray:keep-awake', (event, mode: unknown) => {
     if (!fromPopover(event)) return;
-    setKeepAwake(on === true);
+    setKeepAwake(mode);
     publish();
   });
   ipcMain.on('desktop-tray:resize', (event, next: unknown) => {
@@ -1433,8 +1433,8 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   return {
     destroy: () => {
       clearInterval(refreshTimer);
-      wakeAhead?.stop();
-      wakeAhead = null;
+      powerMonitor.off('on-ac', publish);
+      powerMonitor.off('on-battery', publish);
       native?.stop();
       native = null;
       created?.destroy();
@@ -2312,6 +2312,7 @@ async function boot(): Promise<void> {
           ...(localOwnerHome === null ? [] : [localOwnerHome]),
         ],
         origin,
+        keepAwakeFile: join(app.getPath('userData'), 'keep-awake'),
         ownerToken,
         ownerChannelKey: server !== null ? ownerChannelKey : '',
         authMode: useTokenAuth ? 'token' : 'session',
@@ -2377,10 +2378,7 @@ async function boot(): Promise<void> {
         if (on) await bringRunnerUp();
         else await runner?.stop();
       },
-      nextRunAt:
-        activeConn.kind === 'local'
-          ? () => earliestScheduleNextRunAt(origin, ownerToken)
-          : undefined,
+      stepsInFlight: () => runnerStepsInFlight(activeRunnerHome),
     });
     powerMonitor.on('resume', () => {
       if (runnerWanted) void bringRunnerUp();

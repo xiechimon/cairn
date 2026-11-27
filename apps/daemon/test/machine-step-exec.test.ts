@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ToolCallRecord } from '@cairn/shared';
+import type { AgentBackend, ToolCallRecord } from '@cairn/shared';
 import {
   appendPlanLocationNote,
   buildPlanFirstRoundInstruction,
@@ -13,6 +13,43 @@ import { describe, expect, test } from 'vitest';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
 describe('step execution full chain (02 §5.7 lifecycle lines + journal endpoint vocabulary)', () => {
+  test('the machine claims sleep prevention before launching the step session', async () => {
+    const api = new FakeMachineApi();
+    const order: string[] = [];
+    const base = fakeBackend([{ type: 'done', usage: [] }]);
+    const backend: AgentBackend = {
+      capabilities: base.backend.capabilities,
+      async createSession(opts) {
+        order.push('launch');
+        return base.backend.createSession(opts);
+      },
+      async continueSession(id, opts) {
+        return base.backend.continueSession(id, opts);
+      },
+    };
+    const { handle } = await boot({
+      api,
+      backend,
+      sleepPrevention: {
+        claim() {
+          order.push('claim');
+        },
+        sync() {},
+        stop() {},
+        isHolding() {
+          return false;
+        },
+      },
+    });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => base.created.length === 1);
+    expect(order).toEqual(['claim', 'launch']);
+    await waitFor(() => api.doneBodies.length === 1);
+    await handle.stop();
+    await handle.done;
+  });
+
   test('claim → token → session → events → tool relay → upload → done', async () => {
     const api = new FakeMachineApi();
     const toolCall: ToolCallRecord = {

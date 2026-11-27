@@ -438,7 +438,7 @@ try {
     (await driver.send({ cmd: 'menuItems', pid })).items.map((item) => item.title);
 
   const nativeMenu = {
-    name: 'native menu: skeleton while the page loads, content, keyboard, the keep-awake button, Esc and Settings',
+    name: 'native menu: skeleton while the page loads, content, keyboard, keep-awake modes, Esc and Settings',
     result: 'red',
     detail: '',
   };
@@ -526,36 +526,53 @@ try {
       await app.evaluate(({ app: electronApp }) => electronApp.getPath('userData')),
       'keep-awake',
     );
-    const keepAwakeTitle = content.includes('Keep the screen on')
+    const screenOnTitle = content.includes('Keep the screen on')
       ? 'Keep the screen on'
-      : '保持屏幕常亮';
-    for (const expected of ['on', 'off']) {
+      : '屏幕常亮';
+    const systemTitle = content.includes('Let the screen sleep')
+      ? 'Let the screen sleep'
+      : '屏幕可熄灭';
+    const lidTitle = content.includes('Keep running with the lid closed')
+      ? 'Keep running with the lid closed'
+      : '合盖继续运行';
+    const choices = [
+      [screenOnTitle, 'screen-on'],
+      [lidTitle, 'lid-closed'],
+      [systemTitle, 'system'],
+    ];
+    for (const [title, expected] of choices) {
+      if (!content.includes(title)) continue;
       await openNativeMenu(helper);
       const switched = await driver.send({
         cmd: 'clickMenuItem',
         pid: helper,
-        title: keepAwakeTitle,
+        title,
         hoverMs: 300,
       });
       assert.equal(
         switched.ok,
         true,
-        `the keep-awake button got no click: ${JSON.stringify(switched)}`,
+        `the ${expected} menu row got no click: ${JSON.stringify(switched)}`,
       );
       assert.equal(
         await waitForNativeMenu(helper, false),
         true,
-        'clicking the keep-awake button left the menu open',
+        `clicking the ${expected} menu row left the menu open`,
       );
       const saved = () =>
-        existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : 'off';
+        existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : '';
       const switchDeadline = Date.now() + OPEN_TIMEOUT_MS;
       while (saved() !== expected && Date.now() < switchDeadline) {
         await driver.send({ cmd: 'sleep', ms: 100 });
       }
-      assert.equal(saved(), expected, `clicking the keep-awake button did not turn it ${expected}`);
+      assert.equal(saved(), expected, `clicking the ${expected} menu row saved ${saved()}`);
       await driver.send({ cmd: 'sleep', ms: DISMISS_GAP_MS });
     }
+    assert.equal(
+      readFileSync(keepAwakeChoice, 'utf8').trim(),
+      'system',
+      'the mode rows did not finish back on the default system mode',
+    );
 
     await popoverWindow(({ BrowserWindow }, width) => {
       for (const candidate of BrowserWindow.getAllWindows())
@@ -618,9 +635,7 @@ try {
       await reopen(`${label} first`);
       await pause(800);
       const titles = await nativeTitles(pid);
-      const awake = titles.find(
-        (title) => title === 'Keep the screen on' || title === '保持屏幕常亮',
-      );
+      const awake = titles.find((title) => title === 'Keep the screen on' || title === '屏幕常亮');
       for (const title of titles.filter(Boolean).slice(0, 6)) {
         await driver.send({ cmd: 'clickMenuItem', pid, title, hoverOnly: true, hoverMs: 450 });
       }

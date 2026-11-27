@@ -151,7 +151,7 @@ describe('Switch Host native menus', () => {
 
   test('trayMenuTemplate includes Switch Host submenu when multiple hosts exist', () => {
     const switchHost = vi.fn();
-    const items = trayMenuTemplate('cloud.example.com', false, {
+    const items = trayMenuTemplate('cloud.example.com', 'system', false, {
       open: vi.fn(),
       setKeepAwake: vi.fn(),
       hosts: [

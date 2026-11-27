@@ -65,6 +65,7 @@ interface StartOptions {
   name?: string;
   server?: string;
   workspacesDir?: string;
+  keepAwakeFile?: string;
 }
 
 function configInput(opts: StartOptions): DaemonConfigInput {
@@ -85,6 +86,7 @@ function passthroughArgv(opts: StartOptions): string[] {
   if (opts.name) argv.push('--name', opts.name);
   if (opts.server) argv.push('--server', opts.server);
   if (opts.workspacesDir) argv.push('--workspaces-dir', opts.workspacesDir);
+  if (opts.keepAwakeFile) argv.push('--keep-awake-file', opts.keepAwakeFile);
   return argv;
 }
 
@@ -128,6 +130,7 @@ export async function runForeground(opts: StartOptions): Promise<void> {
     paths,
     logger,
     idleSleepPrevention: true,
+    ...(opts.keepAwakeFile !== undefined ? { keepAwakeFile: opts.keepAwakeFile } : {}),
     hookTimeoutMs: config.hookTimeoutMs,
   });
   const onSignal = (signal: string) => {
@@ -167,6 +170,7 @@ export function buildProgram(): Command {
     .option('--name <name>', 'machine name (default hostname)')
     .option('--server <url>', 'server URL')
     .option('--workspaces-dir <dir>', 'persistent workspaces root (parent must exist)')
+    .option('--keep-awake-file <path>', 'desktop keep-awake mode file')
     .action(async (opts: StartOptions) => {
       if (opts.foreground) {
         await runForeground(opts);

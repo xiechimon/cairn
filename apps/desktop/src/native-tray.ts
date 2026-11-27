@@ -1,16 +1,31 @@
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import type { DesktopRunnerState, DesktopTrayOpen, NativeTrayMenu } from '@cairn/shared';
+import type {
+  DesktopRunnerState,
+  DesktopTrayOpen,
+  KeepAwakeMode,
+  NativeTrayMenu,
+} from '@cairn/shared';
 import type { DesktopLocale } from './locale.js';
 import type { RestartBudget } from './restart-budget.js';
 
 export const NATIVE_TRAY_READY_MS = 5_000;
 export const NATIVE_TRAY_RESTART_DELAYS_MS = [1_000, 2_000, 4_000];
 
+const KEEP_AWAKE_ITEM_MODES: Readonly<Record<string, KeepAwakeMode>> = {
+  'keep-awake-screen-on': 'screen-on',
+  'keep-awake-system': 'system',
+  'keep-awake-lid-closed': 'lid-closed',
+};
+
+function keepAwakeModeForItemId(id: string): KeepAwakeMode | null {
+  return KEEP_AWAKE_ITEM_MODES[id] ?? null;
+}
+
 export type NativeTrayAction =
   | { kind: 'open'; target: DesktopTrayOpen }
   | { kind: 'runner'; on: boolean }
-  | { kind: 'keep-awake'; on: boolean }
+  | { kind: 'keep-awake'; mode: KeepAwakeMode }
   | { kind: 'quit' };
 
 export function nativeTrayAction(menu: NativeTrayMenu, id: unknown): NativeTrayAction | null {
@@ -22,9 +37,12 @@ export function nativeTrayAction(menu: NativeTrayMenu, id: unknown): NativeTrayA
       return item.open === undefined ? null : { kind: 'open', target: item.open };
     case 'switch':
       if (!item.enabled) return null;
-      return item.id === 'runner'
-        ? { kind: 'runner', on: !item.on }
-        : { kind: 'keep-awake', on: !item.on };
+      return { kind: 'runner', on: !item.on };
+    case 'choice': {
+      if (!item.enabled) return null;
+      const mode = keepAwakeModeForItemId(item.id);
+      return mode === null ? null : { kind: 'keep-awake', mode };
+    }
     case 'command':
       return item.id === 'quit'
         ? { kind: 'quit' }
@@ -34,9 +52,33 @@ export function nativeTrayAction(menu: NativeTrayMenu, id: unknown): NativeTrayA
   }
 }
 
-const SKELETON_COPY: Record<DesktopLocale, { open: string; keepAwake: string; quit: string }> = {
-  zh: { open: '打开 Cairn', keepAwake: '保持屏幕常亮', quit: '退出 Cairn' },
-  en: { open: 'Open Cairn', keepAwake: 'Keep the screen on', quit: 'Quit Cairn' },
+const SKELETON_COPY: Record<
+  DesktopLocale,
+  {
+    open: string;
+    heading: string;
+    screenOn: string;
+    system: string;
+    lidClosed: string;
+    quit: string;
+  }
+> = {
+  zh: {
+    open: '打开 Cairn',
+    heading: '有任务运行时保持唤醒',
+    screenOn: '屏幕常亮',
+    system: '屏幕可熄灭',
+    lidClosed: '合盖继续运行',
+    quit: '退出 Cairn',
+  },
+  en: {
+    open: 'Open Cairn',
+    heading: 'Stay awake while tasks run',
+    screenOn: 'Keep the screen on',
+    system: 'Let the screen sleep',
+    lidClosed: 'Keep running with the lid closed',
+    quit: 'Quit Cairn',
+  },
 };
 
 export function skeletonTrayMenu(locale: DesktopLocale): NativeTrayMenu {
@@ -52,7 +94,28 @@ export function skeletonTrayMenu(locale: DesktopLocale): NativeTrayMenu {
         open: { kind: 'path', path: '/app' },
       },
       { kind: 'separator', id: 'controls-rule' },
-      { kind: 'switch', id: 'keep-awake', title: copy.keepAwake, on: false, enabled: true },
+      { kind: 'header', id: 'keep-awake-title', title: copy.heading },
+      {
+        kind: 'choice',
+        id: 'keep-awake-screen-on',
+        title: copy.screenOn,
+        on: false,
+        enabled: true,
+      },
+      {
+        kind: 'choice',
+        id: 'keep-awake-system',
+        title: copy.system,
+        on: true,
+        enabled: true,
+      },
+      {
+        kind: 'choice',
+        id: 'keep-awake-lid-closed',
+        title: copy.lidClosed,
+        on: false,
+        enabled: true,
+      },
       { kind: 'separator', id: 'account-rule' },
       { kind: 'command', id: 'quit', title: copy.quit, key: 'q' },
     ],
@@ -61,14 +124,39 @@ export function skeletonTrayMenu(locale: DesktopLocale): NativeTrayMenu {
 
 export function withHostState(
   menu: NativeTrayMenu,
-  state: { keepAwake: boolean; runner: DesktopRunnerState },
+  state: {
+    keepAwake: KeepAwakeMode;
+    lidClosedAvailable: boolean;
+    runner: DesktopRunnerState;
+  },
 ): NativeTrayMenu {
+  const effective =
+    state.keepAwake === 'lid-closed' && !state.lidClosedAvailable ? 'system' : state.keepAwake;
   return {
     ...menu,
-    items: menu.items.map((item) =>
-      item.kind === 'switch' && item.id === 'keep-awake' ? { ...item, on: state.keepAwake } : item,
-    ),
+    items: menu.items
+      .filter(
+        (item) =>
+          item.kind !== 'choice' || item.id !== 'keep-awake-lid-closed' || state.lidClosedAvailable,
+      )
+      .map((item) => {
+        if (item.kind !== 'choice') return item;
+        const mode = keepAwakeModeForItemId(item.id);
+        return mode === null ? item : { ...item, on: mode === effective };
+      }),
   };
+}
+
+export function nativeMenuWithHostState(
+  pageMenu: NativeTrayMenu | null,
+  locale: DesktopLocale,
+  state: {
+    keepAwake: KeepAwakeMode;
+    lidClosedAvailable: boolean;
+    runner: DesktopRunnerState;
+  },
+): NativeTrayMenu {
+  return withHostState(pageMenu ?? skeletonTrayMenu(locale), state);
 }
 
 export type NativeTrayEvent =

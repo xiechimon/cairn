@@ -1,4 +1,4 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -130,6 +130,7 @@ import {
 import { resolveStepImages, sweepStepAttachments } from './step-attachments.js';
 import { resumePendingUpload } from './step-final-upload.js';
 import { StepStops } from './step-stops.js';
+import { createTaskSleepPrevention, type TaskSleepPrevention } from './task-sleep-prevention.js';
 import { DAEMON_VERSION } from './version.js';
 import { agentReachEnabled, readScrapling, ScraplingProbe } from './web-tools.js';
 import { WorkspaceManager } from './workspace.js';
@@ -172,6 +173,8 @@ export interface MachineLoopOpts {
   orbComputer?: ScopedComputerProviders;
   heartbeatIntervalMs?: number;
   idleSleepPrevention?: boolean;
+  keepAwakeFile?: string;
+  sleepPrevention?: TaskSleepPrevention;
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
   otel?: DaemonOtel | null;
@@ -1169,16 +1172,21 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   logger.raw(`Online (machineId=${machineId}); polling ${config.serverUrl}`);
 
-  let caffeinate: ChildProcess | undefined;
-  if (opts.idleSleepPrevention !== false && process.platform === 'darwin') {
-    try {
-      caffeinate = spawn('caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore' });
-      caffeinate.unref();
-      logger.raw('Idle-sleep prevention active (caffeinate)');
-    } catch {}
-  }
-
   const journal = new StepJournal(paths.outboxDir);
+  const sleepPrevention =
+    opts.sleepPrevention ??
+    createTaskSleepPrevention({
+      enabled: opts.idleSleepPrevention !== false,
+      platform: process.platform,
+      pid: process.pid,
+      hasPending: () => journal.pending().length > 0,
+      spawn: (command, args, options) => spawn(command, args, options),
+      ...(opts.keepAwakeFile !== undefined ? { modeFile: opts.keepAwakeFile } : {}),
+      log: (line) => logger.machine(line),
+    });
+  sleepPrevention.sync();
+  const sleepPreventionTimer = setInterval(() => sleepPrevention.sync(), 1_000);
+  sleepPreventionTimer.unref?.();
   const workspace = new WorkspaceManager({
     logger,
     ...(opts.orphanTtlMs !== undefined ? { orphanTtlMs: opts.orphanTtlMs } : {}),
@@ -1949,6 +1957,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         continue;
       }
       const stepEnv = step.step.kind === 'chief' ? undefined : workerEnv(stepId);
+      sleepPrevention.claim();
       launchStepRun(step, {
         running: inFlight.size + 1,
         ...(stepEnv !== undefined ? { env: stepEnv } : {}),
@@ -1963,6 +1972,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     selfUpdater.stop();
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
+    clearInterval(sleepPreventionTimer);
     clearInterval(strandedTimer);
     clearInterval(orphanTimer);
     clearInterval(desktopSweepTimer);
@@ -1974,7 +1984,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     imsgBridge.stop();
     installStop.abort();
     void screens.close();
-    caffeinate?.kill();
+    sleepPrevention.stop();
     await Promise.allSettled([...pendingInstalls]);
     await presenceReporter.close();
     if (connectionId !== null && client.offline) {

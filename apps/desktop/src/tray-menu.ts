@@ -1,3 +1,4 @@
+import type { KeepAwakeMode } from '@cairn/shared';
 import type { MenuItemConstructorOptions } from 'electron';
 import type { DesktopLocale } from './locale.js';
 
@@ -9,7 +10,7 @@ export interface TrayHostOption {
 
 export interface TrayMenuActions {
   open: () => void;
-  setKeepAwake: (on: boolean) => void;
+  setKeepAwake: (mode: KeepAwakeMode) => void;
   switchHost?: (id: string) => void;
   hosts?: readonly TrayHostOption[];
   quit: () => void;
@@ -20,21 +21,28 @@ const LABELS = {
     status: (host: string | null) => (host === null ? '正在运行' : `已连接 ${host}`),
     open: '打开 Cairn',
     switchHost: '切换主机',
-    keepAwake: '保持屏幕常亮',
+    keepAwakeHeading: '有任务运行时保持唤醒',
+    screenOn: '屏幕常亮',
+    system: '屏幕可熄灭',
+    lidClosed: '合盖继续运行',
     quit: '退出 Cairn',
   },
   en: {
     status: (host: string | null) => (host === null ? 'Running' : `Running at ${host}`),
     open: 'Open Cairn',
     switchHost: 'Switch Host',
-    keepAwake: 'Keep the Screen On',
+    keepAwakeHeading: 'Stay awake while tasks run',
+    screenOn: 'Keep the screen on',
+    system: 'Let the screen sleep',
+    lidClosed: 'Keep running with the lid closed',
     quit: 'Quit Cairn',
   },
 } as const;
 
 export function trayMenuTemplate(
   host: string | null,
-  keepAwake: boolean,
+  keepAwake: KeepAwakeMode,
+  lidClosedAvailable: boolean,
   actions: TrayMenuActions,
   locale: DesktopLocale = 'en',
 ): MenuItemConstructorOptions[] {
@@ -53,17 +61,22 @@ export function trayMenuTemplate(
           },
         ]
       : [];
+  const effective = keepAwake === 'lid-closed' && !lidClosedAvailable ? 'system' : keepAwake;
+  const choice = (mode: KeepAwakeMode, label: string): MenuItemConstructorOptions => ({
+    label,
+    type: 'radio',
+    checked: effective === mode,
+    click: () => actions.setKeepAwake(mode),
+  });
   return [
     { label: copy.status(host), enabled: false },
     { type: 'separator' },
     { label: copy.open, click: actions.open },
     ...switchHostItem,
-    {
-      label: copy.keepAwake,
-      type: 'checkbox',
-      checked: keepAwake,
-      click: () => actions.setKeepAwake(!keepAwake),
-    },
+    { label: copy.keepAwakeHeading, enabled: false },
+    choice('screen-on', copy.screenOn),
+    choice('system', copy.system),
+    ...(lidClosedAvailable ? [choice('lid-closed', copy.lidClosed)] : []),
     { type: 'separator' },
     { label: copy.quit, accelerator: 'CommandOrControl+Q', click: actions.quit },
   ];

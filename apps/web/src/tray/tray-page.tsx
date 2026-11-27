@@ -1,7 +1,7 @@
 import type { DesktopTrayOpen, DesktopTrayState } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
-import { ChartColumn, Coffee, Laptop, Settings } from 'lucide-react';
+import { ChartColumn, Laptop, Settings } from 'lucide-react';
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -24,6 +24,7 @@ import { tasksFromQuery } from '../board/tasks-sections.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { MachineIcon } from '../components/machine-label.js';
+import { SegmentedRadio } from '../components/segmented.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
@@ -226,8 +227,35 @@ export function TrayPage() {
   const open = (target: DesktopTrayOpen) => bridge?.open(target);
   const runner = state?.runner ?? 'starting';
   const runnerOn = runner === 'on' || runner === 'starting';
-  const keepAwake = state?.keepAwake ?? false;
+  const storedKeepAwake = state?.keepAwake ?? 'system';
+  const lidClosedAvailable = state?.lidClosedAvailable ?? false;
+  const keepAwake =
+    storedKeepAwake === 'lid-closed' && !lidClosedAvailable ? 'system' : storedKeepAwake;
   const accent = state?.accent == null ? {} : { '--tray-accent': state.accent };
+  const keepAwakeOptions = [
+    {
+      value: 'screen-on' as const,
+      label: t('屏幕常亮'),
+      testId: 'tray-keep-awake-screen-on',
+      disabled: bridge === null,
+    },
+    {
+      value: 'system' as const,
+      label: t('屏幕可熄灭'),
+      testId: 'tray-keep-awake-system',
+      disabled: bridge === null,
+    },
+    ...(lidClosedAvailable
+      ? [
+          {
+            value: 'lid-closed' as const,
+            label: t('合盖继续运行'),
+            testId: 'tray-keep-awake-lid-closed',
+            disabled: bridge === null,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <section
@@ -313,17 +341,6 @@ export function TrayPage() {
         </Button>
         <Button
           variant="ghost"
-          role="switch"
-          aria-checked={keepAwake}
-          className="tray-disc"
-          title={t('保持屏幕常亮')}
-          aria-label={t('保持屏幕常亮')}
-          onClick={() => bridge?.setKeepAwake(!keepAwake)}
-        >
-          <Coffee className="size-5" aria-hidden="true" />
-        </Button>
-        <Button
-          variant="ghost"
           className="tray-disc"
           title={t('设置')}
           aria-label={t('设置')}
@@ -331,6 +348,20 @@ export function TrayPage() {
         >
           <Settings className="size-5" aria-hidden="true" />
         </Button>
+      </div>
+
+      <div className="flex flex-col">
+        <h2 className="tray-head">
+          <span className="tray-head-name">{t('有任务运行时保持唤醒')}</span>
+        </h2>
+        <SegmentedRadio
+          value={keepAwake}
+          options={keepAwakeOptions}
+          label={t('有任务运行时保持唤醒')}
+          className="h-auto w-full flex-col items-stretch"
+          optionHandle="w-full justify-start"
+          onChange={(mode) => bridge?.setKeepAwake(mode)}
+        />
       </div>
 
       <div className="tray-rule" aria-hidden="true" />

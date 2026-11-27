@@ -19,7 +19,7 @@ struct Reading: Decodable, Equatable {
 }
 
 enum ItemKind: String, Decodable {
-  case row, header, `switch`, command, separator
+  case row, header, `switch`, choice, command, separator
 }
 
 struct TrayItem: Decodable, Equatable {

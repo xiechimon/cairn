@@ -18,6 +18,11 @@
       "userScenario": "Nothing to set: pressing Stop on your own message that has not started sends its id, so that turn is the one stopped."
     },
     {
+      "type": "setting",
+      "key": "desktop.keepAwake",
+      "userScenario": "A new desktop user does nothing: while the Runner is working the computer stays awake but its screen may sleep; the menu-bar menu can instead keep the screen on or, on AC-powered macOS, keep running with the lid closed."
+    },
+    {
       "type": "env",
       "key": "CAIRN_AGENT_BROWSER",
       "scope": "product",

@@ -25,7 +25,16 @@ const menu = {
     { kind: 'header', id: 'waiting', title: '等你' },
     { kind: 'row', id: 'user', title: '本地用户', image: 'user' },
     { kind: 'switch', id: 'runner', title: '本机执行机', on: true, enabled: true },
-    { kind: 'switch', id: 'keep-awake', title: '保持屏幕常亮', on: false, enabled: true },
+    { kind: 'header', id: 'keep-awake-title', title: '有任务运行时保持唤醒' },
+    { kind: 'choice', id: 'keep-awake-screen-on', title: '屏幕常亮', on: false, enabled: true },
+    { kind: 'choice', id: 'keep-awake-system', title: '屏幕可熄灭', on: true, enabled: true },
+    {
+      kind: 'choice',
+      id: 'keep-awake-lid-closed',
+      title: '合盖继续运行',
+      on: false,
+      enabled: true,
+    },
     { kind: 'command', id: 'settings', title: '设置', key: ',' },
     { kind: 'separator', id: 'account-rule' },
     { kind: 'command', id: 'quit', title: '退出 Cairn', key: 'q' },
@@ -107,7 +116,10 @@ test('picked ids map to what main does, and nothing else opens anything', () => 
     target: { kind: 'path', path: '/app' },
   });
   assert.deepEqual(nativeTrayAction(menu, 'runner'), { kind: 'runner', on: false });
-  assert.deepEqual(nativeTrayAction(menu, 'keep-awake'), { kind: 'keep-awake', on: true });
+  assert.deepEqual(nativeTrayAction(menu, 'keep-awake-screen-on'), {
+    kind: 'keep-awake',
+    mode: 'screen-on',
+  });
   assert.deepEqual(nativeTrayAction(menu, 'settings'), {
     kind: 'open',
     target: { kind: 'command', command: 'settings' },
@@ -134,14 +146,22 @@ test('the skeleton opens Cairn, keeps the screen on and quits, in both languages
       kind: 'open',
       target: { kind: 'path', path: '/app' },
     });
-    assert.deepEqual(nativeTrayAction(skeleton, 'keep-awake'), { kind: 'keep-awake', on: true });
+    assert.deepEqual(nativeTrayAction(skeleton, 'keep-awake-system'), {
+      kind: 'keep-awake',
+      mode: 'system',
+    });
     assert.deepEqual(nativeTrayAction(skeleton, 'quit'), { kind: 'quit' });
   }
 });
 
-test('the keep-awake switch shows main state, not the page snapshot', () => {
-  const merged = withHostState(menu, { keepAwake: true, runner: 'on' });
-  assert.equal(merged.items.find((item) => item.id === 'keep-awake').on, true);
+test('the keep-awake choices show main state, not the page snapshot', () => {
+  const merged = withHostState(menu, {
+    keepAwake: 'lid-closed',
+    lidClosedAvailable: true,
+    runner: 'on',
+  });
+  assert.equal(merged.items.find((item) => item.id === 'keep-awake-lid-closed').on, true);
+  assert.equal(merged.items.find((item) => item.id === 'keep-awake-system').on, false);
 });
 
 test('a crash brings the fallback at once and a restart takes it away', async () => {

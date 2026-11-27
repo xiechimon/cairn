@@ -62,6 +62,11 @@ final class TrayMenu: NSObject, NSMenuDelegate {
       guard let item = items[entry.id] else { continue }
       switch entry.kind {
       case .row, .command: dress(item, entry)
+      case .choice:
+        item.title = entry.title ?? ""
+        item.state = entry.on == true ? .on : .off
+        item.isEnabled = entry.enabled ?? false
+        item.setAccessibilityLabel(entry.title ?? "")
       case .switch: buttons[entry.id]?.content = content(entry)
       case .header:
         if let header = headers[entry.id] {
@@ -108,6 +113,14 @@ final class TrayMenu: NSObject, NSMenuDelegate {
       let button = BigButton(content: content(entry)) { [weak self] in self?.chooseSwitch(id) }
       item.view = button
       buttons[entry.id] = button
+      return item
+    case .choice:
+      let item = NSMenuItem(title: entry.title ?? "", action: #selector(pick(_:)), keyEquivalent: "")
+      item.target = self
+      item.representedObject = entry.id
+      item.isEnabled = entry.enabled ?? false
+      item.state = entry.on == true ? .on : .off
+      item.setAccessibilityLabel(entry.title ?? "")
       return item
     case .row, .command:
       let item = NSMenuItem(title: "", action: #selector(pick(_:)), keyEquivalent: entry.key ?? "")

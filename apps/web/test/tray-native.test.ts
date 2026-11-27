@@ -18,7 +18,7 @@ const t = (locale: Locale) => (key: string, vars?: Record<string, string | numbe
   translate(locale, EN, key, vars);
 
 const state = (extra: Partial<DesktopTrayState> = {}): DesktopTrayState =>
-  ({ keepAwake: false, runner: 'on', ...extra }) as DesktopTrayState;
+  ({ keepAwake: 'system', lidClosedAvailable: true, runner: 'on', ...extra }) as DesktopTrayState;
 
 const groups: TrayGroup[] = [
   {
@@ -79,7 +79,10 @@ test('the native menu carries the tray content in order and passes the schema ma
     'usage',
     'controls-rule',
     'runner',
-    'keep-awake',
+    'keep-awake-title',
+    'keep-awake-screen-on',
+    'keep-awake-system',
+    'keep-awake-lid-closed',
     'settings',
     'account-rule',
     'user',
@@ -126,7 +129,10 @@ test('the menu speaks the app language through the same t() strings', () => {
   const menu = model('en');
   expect(byId(menu, 'coordinator')).toMatchObject({ status: 'Replying' });
   expect(byId(menu, 'runner')).toMatchObject({ title: 'Runner', detail: 'Running' });
-  expect(byId(menu, 'keep-awake')).toMatchObject({ title: 'Keep the screen on' });
+  expect(byId(menu, 'keep-awake-title')).toMatchObject({ title: 'Stay awake while tasks run' });
+  expect(byId(menu, 'keep-awake-screen-on')).toMatchObject({ title: 'Keep the screen on' });
+  expect(byId(menu, 'keep-awake-system')).toMatchObject({ title: 'Let the screen sleep' });
+  expect(byId(menu, 'keep-awake-lid-closed')).toMatchObject({ title: 'Keep running with the lid closed' });
   expect(byId(menu, 'settings')).toMatchObject({ title: 'Settings' });
   expect(byId(menu, 'quit')).toMatchObject({ title: 'Quit Cairn' });
   expect(byId(menu, 'usage')).toMatchObject({ title: 'Used today: 1.2M' });
@@ -190,7 +196,10 @@ test('with nothing waiting and no usage the menu says so and keeps the controls'
     'empty',
     'controls-rule',
     'runner',
-    'keep-awake',
+    'keep-awake-title',
+    'keep-awake-screen-on',
+    'keep-awake-system',
+    'keep-awake-lid-closed',
     'settings',
     'account-rule',
     'user',
@@ -207,8 +216,33 @@ test('the Runner switch follows every Runner state, and nothing toggles before m
   expect(runner(state({ runner: 'starting' }))).toMatchObject({ detail: '正在启动', on: true, enabled: false });
   expect(runner(state({ runner: 'failed' }))).toMatchObject({ detail: '已停止', on: false, enabled: true, warn: true });
   expect(runner(null)).toMatchObject({ enabled: false });
-  expect(byId(model('zh', { state: null }), 'keep-awake')).toMatchObject({ on: false, enabled: false });
-  expect(byId(model('zh', { state: state({ keepAwake: true }) }), 'keep-awake')).toMatchObject({ on: true, enabled: true });
+  for (const id of ['keep-awake-screen-on', 'keep-awake-system']) {
+    expect(byId(model('zh', { state: null }), id)).toMatchObject({ on: false, enabled: false });
+  }
+  expect(byId(model('zh', { state: state({ keepAwake: 'screen-on' }) }), 'keep-awake-screen-on')).toMatchObject({ on: true, enabled: true });
+  expect(byId(model('zh', { state: state({ keepAwake: 'screen-on' }) }), 'keep-awake-system')).toMatchObject({ on: false, enabled: true });
+});
+
+test('battery hides lid-closed and checks the effective system fallback', () => {
+  const menu = model('zh', {
+    state: state({ keepAwake: 'lid-closed', lidClosedAvailable: false }),
+  });
+  expect(menu.items.some((item) => item.id === 'keep-awake-lid-closed')).toBe(false);
+  expect(byId(menu, 'keep-awake-system')).toMatchObject({ on: true, enabled: true });
+  expect(byId(menu, 'keep-awake-screen-on')).toMatchObject({ on: false, enabled: true });
+  expect(nativeTrayMenuSchema.parse(menu)).toEqual(menu);
+});
+
+test('power-state publish updates checked and available rows', () => {
+  const onBattery = model('zh', {
+    state: state({ keepAwake: 'lid-closed', lidClosedAvailable: false }),
+  });
+  const onAc = model('zh', {
+    state: state({ keepAwake: 'lid-closed', lidClosedAvailable: true }),
+  });
+  expect(byId(onBattery, 'keep-awake-system')).toMatchObject({ on: true });
+  expect(byId(onAc, 'keep-awake-system')).toMatchObject({ on: false });
+  expect(byId(onAc, 'keep-awake-lid-closed')).toMatchObject({ on: true, enabled: true });
 });
 
 test('main refuses a menu that names an unknown switch or a path outside the app', () => {

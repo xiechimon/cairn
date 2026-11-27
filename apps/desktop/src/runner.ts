@@ -44,6 +44,7 @@ export interface RunnerOptions {
   serverHome: string;
   deniedServerHomes?: readonly string[];
   origin: string;
+  keepAwakeFile?: string;
   ownerToken: string;
   ownerChannelKey: string;
   authMode?: 'token' | 'session';
@@ -278,6 +279,7 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
       join(options.root, 'dist', 'cli.mjs'),
       'start',
       '--foreground',
+      ...(options.keepAwakeFile !== undefined ? ['--keep-awake-file', options.keepAwakeFile] : []),
       '--server',
       options.origin,
     ];

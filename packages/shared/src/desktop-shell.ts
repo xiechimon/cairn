@@ -77,9 +77,34 @@ export const DESKTOP_TRAY_PATH = '/tray';
 
 export type DesktopRunnerState = 'starting' | 'on' | 'off' | 'failed';
 
+export const KEEP_AWAKE_MODES = ['screen-on', 'system', 'lid-closed'] as const;
+export type KeepAwakeMode = (typeof KEEP_AWAKE_MODES)[number];
+
+export function isKeepAwakeMode(value: unknown): value is KeepAwakeMode {
+  return typeof value === 'string' && (KEEP_AWAKE_MODES as readonly string[]).includes(value);
+}
+
+export function keepAwakeModeFromPersisted(raw: string): KeepAwakeMode {
+  const value = raw.trim();
+  if (value === 'on') return 'screen-on';
+  return isKeepAwakeMode(value) ? value : 'system';
+}
+
+export const KEEP_AWAKE_ITEM_IDS = {
+  'screen-on': 'keep-awake-screen-on',
+  system: 'keep-awake-system',
+  'lid-closed': 'keep-awake-lid-closed',
+} as const satisfies Record<KeepAwakeMode, string>;
+
+export function keepAwakeModeForItemId(id: string): KeepAwakeMode | null {
+  for (const mode of KEEP_AWAKE_MODES) if (KEEP_AWAKE_ITEM_IDS[mode] === id) return mode;
+  return null;
+}
+
 export interface DesktopTrayState {
   runner: DesktopRunnerState;
-  keepAwake: boolean;
+  keepAwake: KeepAwakeMode;
+  lidClosedAvailable: boolean;
   accent: string | null;
 }
 
@@ -146,10 +171,17 @@ export const nativeTrayItemSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     kind: z.literal('switch'),
-    id: z.enum(['runner', 'keep-awake']),
+    id: z.enum(['runner']),
     title: trayText,
     detail: trayText.optional(),
     warn: z.boolean().optional(),
+    on: z.boolean(),
+    enabled: z.boolean(),
+  }),
+  z.strictObject({
+    kind: z.literal('choice'),
+    id: z.enum(['keep-awake-screen-on', 'keep-awake-system', 'keep-awake-lid-closed']),
+    title: trayText,
     on: z.boolean(),
     enabled: z.boolean(),
   }),

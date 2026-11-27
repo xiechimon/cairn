@@ -27,6 +27,7 @@ import { type DaemonLogger, formatLine } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runMachine } from '../src/machine-loop.js';
 import { ensureStateDirs, type StatePaths, saveMachineJson, statePaths } from '../src/state.js';
+import type { TaskSleepPrevention } from '../src/task-sleep-prevention.js';
 import { offlineDaemonRuntimeOpts } from './runtime-stubs.js';
 
 export {
@@ -351,6 +352,7 @@ export interface BootOpts {
   updateCheckIntervalMs?: number;
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
   heartbeatIntervalMs?: number;
+  sleepPrevention?: TaskSleepPrevention;
 }
 
 export function startMachine(opts: BootOpts) {
@@ -403,6 +405,7 @@ export function startMachine(opts: BootOpts) {
         ? { capabilitiesProbe: opts.capabilitiesProbe }
         : {}),
       idleSleepPrevention: false,
+      ...(opts.sleepPrevention !== undefined ? { sleepPrevention: opts.sleepPrevention } : {}),
       presenceIntervalMs: opts.presenceIntervalMs ?? 60_000,
       ...(opts.heartbeatIntervalMs !== undefined
         ? { heartbeatIntervalMs: opts.heartbeatIntervalMs }

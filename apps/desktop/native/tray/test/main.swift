@@ -125,11 +125,16 @@ expect(tray.items["settings"]!.keyEquivalent == ",", "settings key \(tray.items[
 expect(tray.items["quit"]!.keyEquivalent == "q", "quit key")
 
 let runner = tray.buttons["runner"]!
-let awake = tray.buttons["keep-awake"]!
 expect(runner.accessibilityRole() == .checkBox && runner.accessibilitySubrole() == .switch, "runner role")
 expect((runner.accessibilityValue() as? NSNumber)?.intValue == 1, "runner value")
-expect((awake.accessibilityValue() as? NSNumber)?.intValue == 0, "keep-awake value")
 expect(runner.accessibilityLabel() == "本机执行机" && runner.accessibilityHelp() == "运行中", "runner label")
+
+let screenOn = tray.items["keep-awake-screen-on"]!
+let system = tray.items["keep-awake-system"]!
+let lidClosed = tray.items["keep-awake-lid-closed"]!
+expect(screenOn.state == .off && system.state == .on && lidClosed.state == .off, "mode checkmarks")
+expect(screenOn.isEnabled && system.isEnabled && lidClosed.isEnabled, "mode rows are disabled")
+expect(system.accessibilityLabel() == "屏幕可熄灭", "system label \(system.accessibilityLabel() ?? "nil")")
 
 expect(!runner.acceptsFirstResponder && !runner.showsFocusRing, "a big button takes focus before any keyboard highlight")
 tray.highlightFromKeyboard = { false }
@@ -138,18 +143,11 @@ expect(!runner.keyboardFocused && !runner.showsFocusRing, "a mouse highlight dre
 tray.highlightFromKeyboard = { true }
 tray.menu(menu, willHighlight: tray.items["runner"])
 expect(runner.keyboardFocused && runner.showsFocusRing && runner.acceptsFirstResponder, "arrow key did not focus the big button")
-tray.menu(menu, willHighlight: tray.items["keep-awake"])
-expect(!runner.keyboardFocused && awake.keyboardFocused, "focus did not move to the next big button")
 tray.menu(menu, willHighlight: tray.items["settings"])
-expect(!awake.keyboardFocused, "focus stayed on a big button after leaving it")
+expect(!runner.keyboardFocused, "focus stayed on a big button after leaving it")
 
-let returnKey = NSEvent.keyEvent(
-  with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
-  characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!
-awake.keyDown(with: returnKey)
-expect(sent.last == "keep-awake", "Return on a big button sent \(sent.last ?? "nothing")")
-expect(awake.accessibilityPerformPress(), "VoiceOver press failed")
-expect(sent.last == "keep-awake", "VoiceOver press sent \(sent.last ?? "nothing")")
+menu.performActionForItem(at: menu.index(of: lidClosed))
+expect(sent.last == "keep-awake-lid-closed", "picking lid mode sent \(sent.last ?? "nothing")")
 
 menu.performActionForItem(at: menu.index(of: coordinator))
 expect(sent.last == "coordinator", "picking Coordinator sent \(sent.last ?? "nothing")")
@@ -158,11 +156,12 @@ tray.menuWillOpen(menu)
 expect(tray.isOpen && sent.last == "opened", "open was not reported")
 var updated = fixture.items
 updated[0].status = nil
-updated[updated.firstIndex { $0.id == "keep-awake" }!].on = true
+updated[updated.firstIndex { $0.id == "keep-awake-screen-on" }!].on = true
+updated[updated.firstIndex { $0.id == "keep-awake-system" }!].on = false
 tray.apply(TrayMenuModel(label: fixture.label, items: updated))
 expect(tray.items["coordinator"] === coordinator, "an update with the same rows rebuilt the menu while open")
 expect(coordinator.title == "Coordinator", "the open menu did not update in place: \(coordinator.title)")
-expect(awake.content.on, "the open big button did not update in place")
+expect(screenOn.state == .on && system.state == .off, "the open mode rows did not update in place")
 
 let shorter = Array(updated.dropFirst(2))
 tray.apply(TrayMenuModel(label: fixture.label, items: shorter))

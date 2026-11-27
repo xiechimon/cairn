@@ -23,6 +23,7 @@ import {
   type DevinLocalStatus,
   type DevinLoginOutcome,
   type HostPermissions,
+  type KeepAwakeMode,
   MIN_SUPPORTED_BRIDGE_VERSION,
   type NativeTrayMenu,
   type RemoteVersionState,
@@ -167,7 +168,7 @@ export interface DesktopTrayBridge {
   subscribe: (listener: (state: DesktopTrayState) => void) => () => void;
   open: (target: DesktopTrayOpen) => void;
   setRunner: (on: boolean) => Promise<void>;
-  setKeepAwake: (on: boolean) => void;
+  setKeepAwake: (mode: KeepAwakeMode) => void;
   resize: (height: number) => void;
   hide: () => void;
   quit: () => void;

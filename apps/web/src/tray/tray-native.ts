@@ -4,6 +4,7 @@ import type {
   NativeTrayItem,
   NativeTrayMenu,
 } from '@cairn/shared';
+import { KEEP_AWAKE_ITEM_IDS } from '@cairn/shared';
 import type { TVars } from '../i18n/translate.js';
 import { USAGE_PATH } from '../resources/hrefs.js';
 import type { TrayGroup, TrayMachineState, TrayText, TrayUsage } from './tray-groups.js';
@@ -145,6 +146,16 @@ export function trayMenuModel({
     });
   }
   const runner = state?.runner ?? 'starting';
+  const storedMode = state?.keepAwake ?? 'system';
+  const lidClosedAvailable = state?.lidClosedAvailable ?? false;
+  const effectiveMode = storedMode === 'lid-closed' && !lidClosedAvailable ? 'system' : storedMode;
+  const choice = (mode: keyof typeof KEEP_AWAKE_ITEM_IDS, title: string): NativeTrayItem => ({
+    kind: 'choice',
+    id: KEEP_AWAKE_ITEM_IDS[mode],
+    title,
+    on: state !== null && effectiveMode === mode,
+    enabled: state !== null,
+  });
   items.push(
     { kind: 'separator', id: 'controls-rule' },
     {
@@ -156,13 +167,10 @@ export function trayMenuModel({
       on: runner === 'on' || runner === 'starting',
       enabled: state !== null && runner !== 'starting',
     },
-    {
-      kind: 'switch',
-      id: 'keep-awake',
-      title: t('保持屏幕常亮'),
-      on: state?.keepAwake ?? false,
-      enabled: state !== null,
-    },
+    { kind: 'header', id: 'keep-awake-title', title: t('有任务运行时保持唤醒') },
+    choice('screen-on', t('屏幕常亮')),
+    choice('system', t('屏幕可熄灭')),
+    ...(lidClosedAvailable ? [choice('lid-closed', t('合盖继续运行'))] : []),
     { kind: 'command', id: 'settings', title: t('设置'), key: ',' },
     { kind: 'separator', id: 'account-rule' },
     { kind: 'row', id: 'user', title: userName, image: 'user' },

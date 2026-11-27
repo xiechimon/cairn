@@ -1255,6 +1255,7 @@ html:not(.light)
   --tray-fill: rgb(0 0 0 / 0.055);
   --tray-fill-hover: rgb(0 0 0 / 0.1);
   --tray-fill-down: rgb(0 0 0 / 0.16);
+  --tray-seg-active: rgb(255 255 255 / 0.92);
   --tray-warn: rgb(178 107 0);
   --tray-highlight: var(--tray-accent, Highlight);
   --tray-on-highlight: rgb(255 255 255);
@@ -1277,6 +1278,7 @@ html:not(.light)
   --tray-fill: rgb(255 255 255 / 0.09);
   --tray-fill-hover: rgb(255 255 255 / 0.15);
   --tray-fill-down: rgb(255 255 255 / 0.22);
+  --tray-seg-active: rgb(255 255 255 / 0.16);
   --tray-warn: rgb(255 179 64);
 }
 
@@ -1296,6 +1298,7 @@ html:not(.light)
     --tray-fill: rgb(255 255 255 / 0.09);
     --tray-fill-hover: rgb(255 255 255 / 0.15);
     --tray-fill-down: rgb(255 255 255 / 0.22);
+    --tray-seg-active: rgb(255 255 255 / 0.16);
     --tray-warn: rgb(255 179 64);
   }
 
@@ -1521,6 +1524,43 @@ html:not(.light)
   height: 1px;
   margin: 0 8px;
   background: var(--tray-line);
+}
+
+.tray-pop [data-segmented="track"] {
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--tray-fill);
+}
+
+.tray-pop [data-segmented="indicator"] {
+  border-radius: 6px;
+  background: var(--tray-seg-active);
+  box-shadow: 0 0 0 1px var(--tray-line);
+}
+
+:root[data-theme="dark"] .tray-pop [data-segmented="indicator"] {
+  box-shadow: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tray-pop [data-segmented="indicator"] {
+    box-shadow: none;
+  }
+}
+
+.tray-pop [data-segmented="option"] {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--tray-ink);
+}
+
+.tray-pop [data-segmented="option"][data-active] {
+  font-weight: 500;
+}
+
+.tray-pop [data-segmented="option"]:disabled {
+  color: var(--tray-ink-2);
 }
 
 :root {

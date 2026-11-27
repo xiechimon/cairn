@@ -1,9 +1,8 @@
-# Routines: event triggers, wake-ahead and the missed-run window
+# Routines: event triggers and the missed-run window
 
 Seq 31. Today a `schedule` row fires only on a clock (`once`, `hourly`,
-`daily`, `weekly`, `cron`). This adds two trigger kinds, an explicit
-catch-up window on late runs, and a desktop keep-awake window keyed on
-`nextRunAt`. The firing path is unchanged: every trigger lands on
+`daily`, `weekly`, `cron`). This adds two trigger kinds and an explicit
+catch-up window on late runs. The firing path is unchanged: every trigger lands on
 `fireSchedule`, which steers the todo's latest build or starts a fresh one.
 
 ## Model
@@ -101,19 +100,16 @@ never a burst. The check lives in `runSchedule`, so both delivery paths
 (the `schedule` due_event handler and the `runTick` `dueSchedules` sweep)
 share it.
 
-## Desktop wake-ahead
+## Desktop sleep behavior
 
-`powerSaveBlocker` cannot wake a sleeping machine; it can only refuse
-idle sleep. The desktop therefore holds a blocker across the window in
-which a due run should start: while
-`now ∈ [nextRunAt - 15min, nextRunAt + 5min]` for the earliest enabled
-`nextRunAt` reported by `GET /api/schedules` on localhost (owner Bearer
-token, polled every 60s, re-polled on `powerMonitor` `resume`). Failures
-keep the last computed state. `createKeepAwake` gains a second input —
-the tray switch stays a manual override (`manual on` always holds) and
-`isOn()` reports either source for the icon. If the machine sleeps
-through the whole window anyway, the server-side missed-run policy above
-decides the outcome.
+No power assertion can wake a machine that is already asleep, and Cairn
+does not hold one merely because a schedule is due. A machine asleep
+through its run window therefore wakes later and the server-side
+missed-run policy above decides the outcome: inside the window the run
+fires once; past it the run is skipped or rolled forward. Once a runner
+claims the resulting step, the ordinary task-scoped keep-awake mode in
+`docs/design/keep-awake-modes.md` protects that in-flight work and is
+released when no work remains.
 
 ## UI
 
@@ -146,5 +142,6 @@ trigger wording for the new kinds, and a triggered schedule with
 - server restart: claims are rows (`nextRunAt`), so a pending fire
   survives; `syncDueSources` re-mirrors on boot. `webhookDeliveries`
   persists, so replay-after-restart is still `duplicate`.
-- desktop offline or server down: wake-ahead keeps its last state; the
-  next successful poll re-arms.
+- desktop offline or server down: the machine may sleep before a claim;
+  after it wakes for another reason, the normal claim and missed-run
+  paths decide whether the routine still runs.
