@@ -33,6 +33,7 @@ import type { InputReceipts } from './input-receipts.js';
 import type { MachineApi } from './machine-api.js';
 import { createTurnMirror } from './mirror.js';
 import type { CoordinatorModels } from './models.js';
+import type { ResponsivenessTracker } from './responsiveness.js';
 import { cancelStoppedRequests } from './stopped-turn.js';
 import { suggestAfterTurn } from './suggest-replies.js';
 import type { ConversationGate, StepGate } from './tools.js';
@@ -55,6 +56,7 @@ export interface TurnDeps {
   gate?: StepGate;
   conversationGate?: ConversationGate;
   volatile?: VolatileContext;
+  responsiveness?: ResponsivenessTracker;
   volatileText?: string | null;
   onModel?: (ref: ModelRef) => void;
   suggestionYield?: AbortSignal;
@@ -409,6 +411,10 @@ export async function runCoordinatorTurn(
     );
     deps.setupPhase?.('input prepare');
     await cancelStoppedRequests(harness, root, await api.stoppedTurns(threadId), context);
+    deps.responsiveness?.beginTurn(activeRootKey, {
+      interactive: !mailTurn && claimed.chief.trigger === 'user',
+      mailTurn,
+    });
     const initialRequestId = initial?.id ?? stepId;
     const submission = await root.submit(
       {
@@ -610,6 +616,7 @@ export async function runCoordinatorTurn(
     clearInterval(steerPoll);
     deps.gate?.set(null);
     if (rootKey !== null) {
+      deps.responsiveness?.endTurn(rootKey);
       deps.conversationGate?.set(rootKey, null);
       deps.volatile?.set(rootKey, null);
       deps.volatile?.setStep(rootKey, null);

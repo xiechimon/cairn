@@ -1,6 +1,28 @@
 import type { KeyboardEvent } from 'react';
 import { expect, test, vi } from 'vitest';
+import { withoutReturnedText } from '../src/chief/outbox.js';
 import { useComposerWire } from '../src/overlay/composer-wire.js';
+import { DraftSync } from '../src/overlay/draft-sync.js';
+
+const hooks = vi.hoisted(() => ({
+  active: false,
+  slots: [] as unknown[],
+  cursor: 0,
+  run<T>(fn: () => T): T {
+    this.active = true;
+    this.cursor = 0;
+    try {
+      return fn();
+    } finally {
+      this.active = false;
+    }
+  },
+  reset() {
+    this.slots = [];
+    this.cursor = 0;
+    this.active = false;
+  },
+}));
 
 vi.mock('react', () => ({
   useCallback: (callback: unknown) => callback,
@@ -8,8 +30,26 @@ vi.mock('react', () => ({
   useLayoutEffect: () => {},
   useId: () => 'test-id',
   useMemo: (factory: () => unknown) => factory(),
-  useRef: (current: unknown) => ({ current }),
-  useState: (value: unknown) => [value, vi.fn()],
+  useRef: (initial: unknown) => {
+    if (!hooks.active) return { current: initial };
+    const idx = hooks.cursor++;
+    if (!(idx in hooks.slots)) hooks.slots[idx] = { current: initial };
+    return hooks.slots[idx];
+  },
+  useState: (initial: unknown) => {
+    if (!hooks.active) return [initial, vi.fn()];
+    const idx = hooks.cursor++;
+    if (!(idx in hooks.slots)) {
+      hooks.slots[idx] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
+    }
+    const set = (next: unknown) => {
+      hooks.slots[idx] =
+        typeof next === 'function'
+          ? (next as (prev: unknown) => unknown)(hooks.slots[idx])
+          : next;
+    };
+    return [hooks.slots[idx], set];
+  },
 }));
 vi.mock('../src/i18n/provider.js', () => ({ useI18n: () => ({ t: (text: string) => text }) }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -186,4 +226,141 @@ test('non-composing handleChange resets stuck composing while composing or unspe
   } as unknown as Parameters<typeof wire.handleChange>[0]);
   wire.handleKeyDown(keyboard('Enter'));
   expect(wire.onSend).toHaveBeenCalledExactlyOnceWith('Next message');
+});
+
+test('synchronous Enter clears refs immediately and resists stale-prop re-renders so M2 never merges with M1', () => {
+  hooks.reset();
+  const sent: string[] = [];
+  const draftChanges: string[] = [];
+  const render = (draftProp: string) =>
+    hooks.run(() =>
+      useComposerWire({
+        editable: true,
+        draft: draftProp,
+        onDraftChange: (next) => draftChanges.push(next),
+        onSend: (text) => {
+          sent.push(text);
+        },
+        onQueue: vi.fn(),
+      }),
+    );
+
+  const wire1 = render('First message');
+  wire1.handleKeyDown(keyboard('Enter'));
+  expect(sent).toEqual(['First message']);
+  expect(draftChanges).toEqual(['']);
+
+  const wireStale = render('First message');
+  wireStale.setDraft((current) => `${current}Second message`);
+  expect(draftChanges.at(-1)).toBe('Second message');
+
+  wireStale.handleKeyDown(keyboard('Enter'));
+  expect(sent).toEqual(['First message', 'Second message']);
+});
+
+test('async caller preserves M2 typed before M1 promise settles', async () => {
+  hooks.reset();
+  let resolveM1!: () => void;
+  let draftProp = 'First';
+  const sent: string[] = [];
+  const render = () =>
+    hooks.run(() =>
+      useComposerWire({
+        editable: true,
+        draft: draftProp,
+        onDraftChange: (next) => {
+          draftProp = next;
+        },
+        onSend: (text) => {
+          sent.push(text);
+          if (sent.length === 1) {
+            return new Promise<void>((resolve) => {
+              resolveM1 = resolve;
+            });
+          }
+          return undefined;
+        },
+        onQueue: vi.fn(),
+      }),
+    );
+
+  const wire1 = render();
+  wire1.handleKeyDown(keyboard('Enter'));
+  expect(draftProp).toBe('First');
+
+  wire1.handleChange({
+    target: { value: 'Second' },
+    nativeEvent: { isComposing: false },
+  } as unknown as Parameters<typeof wire1.handleChange>[0]);
+  expect(draftProp).toBe('Second');
+  render();
+
+  resolveM1();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(draftProp).toBe('Second');
+});
+
+test('failed-send withoutReturnedText restore does not merge new draft text and sendAfterUploadRef / draftSync.refresh preserve input', async () => {
+  expect(withoutReturnedText('M1', 'M1')).toBe('');
+  expect(withoutReturnedText('M1\nM2', 'M1')).toBe('M2');
+  expect(withoutReturnedText('M2\nM1', 'M1')).toBe('M2');
+
+  hooks.reset();
+  let resolveUpload: ((tokens: string[]) => void) | undefined;
+  let draftProp = 'Attach note';
+  const sent: string[] = [];
+  const render = () =>
+    hooks.run(() =>
+      useComposerWire({
+        editable: true,
+        draft: draftProp,
+        onDraftChange: (next) => {
+          draftProp = next;
+        },
+        onSend: (text) => {
+          sent.push(text);
+        },
+        onQueue: vi.fn(),
+        onAttachment: () =>
+          new Promise<string[]>((resolve) => {
+            resolveUpload = resolve;
+          }),
+      }),
+    );
+
+  const w1 = render();
+  w1.attachFiles([new File(['x'], 'doc.txt', { type: 'text/plain' })]);
+  await vi.waitFor(() => expect(resolveUpload).toBeTypeOf('function'));
+  render().handleKeyDown(keyboard('Enter'));
+  expect(sent).toEqual([]);
+
+  resolveUpload!(['![doc.txt](attachment:t1/a1.txt)']);
+  await vi.waitFor(() =>
+    expect(sent).toEqual(['![doc.txt](attachment:t1/a1.txt)\nAttach note']),
+  );
+
+  const remoteCalls: string[] = [];
+  const mem = new Map<string, string>();
+  const sync = new DraftSync({
+    transport: {
+      load: async () => ({ content: 'stale remote', updatedAt: 1 }),
+      save: async () => ({ content: 'live local', updatedAt: 2 }),
+    },
+    storage: {
+      getItem: (k) => mem.get(k) ?? null,
+      setItem: (k, v) => {
+        mem.set(k, v);
+      },
+      removeItem: (k) => {
+        mem.delete(k);
+      },
+    },
+    localKey: 'test-draft',
+    onRemote: (content: string) => remoteCalls.push(content),
+  });
+  sync.edit('live local');
+  await sync.refresh();
+  expect(sync.current()).toBe('live local');
+  expect(remoteCalls).toEqual([]);
 });

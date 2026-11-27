@@ -92,6 +92,7 @@ export function entryRowSources(
 function liveStateOf(view: ConversationView): {
   taskId?: number | string;
   text: string;
+  timestamp?: number;
 } {
   const live = view.docs['pi.live'] as
     | { run?: { taskId?: number | string }; generation?: { message?: AssistantMessage } }
@@ -100,6 +101,7 @@ function liveStateOf(view: ConversationView): {
   return {
     ...(live?.run?.taskId === undefined ? {} : { taskId: live.run.taskId }),
     text: message === undefined ? '' : textBlocks(message),
+    ...(message?.timestamp === undefined ? {} : { timestamp: message.timestamp }),
   };
 }
 
@@ -123,23 +125,37 @@ export function createTurnMirror(
   const posted = new Map<string, string>();
   const suppressedTasks = new Set<string>();
   let streamed = '';
+  let lastCommittedAssistantTs: number | undefined;
   let activeView: Promise<void> = Promise.resolve();
   const post = async (entries: readonly EntryRecord[], stoppedEntry?: EntryId) => {
+    let assistantTextTs: number | undefined;
     for (const { row, entryId } of entryRowSources(stepId, entries, storeId, stoppedEntry)) {
       const body = JSON.stringify(row.content);
       if (posted.get(row.id) === body) continue;
       await api.transcriptRow(stepId, row, entryId);
       posted.set(row.id, body);
+      if (row.role === 'assistant' && Array.isArray(row.content)) {
+        assistantTextTs = row.createdAt;
+      }
     }
+    return assistantTextTs;
   };
   return {
     onView: (view) => {
       const run = activeView.then(async () => {
-        await post(
+        const committedTs = await post(
           view.entries.filter((entry) => afterEntryId === undefined || entry.id > afterEntryId),
         );
         const live = liveStateOf(view);
+        if (committedTs !== undefined) {
+          lastCommittedAssistantTs = committedTs;
+          if (live.timestamp !== lastCommittedAssistantTs) streamed = '';
+        }
         if (live.taskId !== undefined && suppressedTasks.has(String(live.taskId))) return;
+        if (live.timestamp !== undefined && live.timestamp === lastCommittedAssistantTs) {
+          streamed = live.text;
+          return;
+        }
         const delta = live.text.startsWith(streamed) ? live.text.slice(streamed.length) : live.text;
         if (delta !== '') await api.transcriptDelta(stepId, delta);
         streamed = live.text;
@@ -154,8 +170,8 @@ export function createTurnMirror(
     drain: async () => {
       await activeView;
     },
-    flush: (entries, stopped = false, minStoppedEntryId?: EntryId) =>
-      post(
+    flush: async (entries, stopped = false, minStoppedEntryId?: EntryId) => {
+      await post(
         entries,
         stopped
           ? entries.findLast(
@@ -164,6 +180,7 @@ export function createTurnMirror(
                 (minStoppedEntryId === undefined || Number(entry.id) > Number(minStoppedEntryId)),
             )?.id
           : undefined,
-      ),
+      );
+    },
   };
 }

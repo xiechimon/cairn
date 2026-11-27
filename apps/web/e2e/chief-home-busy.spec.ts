@@ -132,6 +132,10 @@ async function mockLive(page: Page, state: State) {
       if (p.endsWith('/steer')) return json({ steered: true });
       if (p.endsWith('/stop')) return json({ delegated: true });
     }
+    if (p.startsWith('/api/streams/') && p.endsWith('/conversations') && request.method() === 'PUT') {
+      const body = request.postDataJSON() as { revision?: number } | null;
+      return json({ revision: body?.revision ?? 0 });
+    }
     if (p === '/api/teams') return json([TEAM]);
     if (p === '/api/user/me') return json(USER);
     if (p === '/api/teams/t1/notifications') return json({ unreadThreadIds: [] });
@@ -639,4 +643,64 @@ test.describe('held messages never push the input out of the composer', () => {
       await expect(root.getByRole('button', { name: '发送' })).toBeInViewport({ ratio: 1 });
     });
   }
+});
+
+test.describe('pressing Enter while Coordinator turn runs clears composer immediately', () => {
+  test('M1 clears on Enter during live SSE ticks so immediate M2 sends as a separate second message', async ({
+    page,
+  }) => {
+    const bodies: unknown[] = [];
+    const s = busyState();
+    s.bodies = bodies;
+    await mockLive(page, s);
+    await page.addInitScript(() => {
+      const Orig = window.EventSource;
+      class TickingEventSource extends Orig {
+        constructor(url: string) {
+          super(url);
+          if (url.includes('/api/teams/') && url.includes('/stream')) {
+            queueMicrotask(() => {
+              this.onmessage?.({
+                data: JSON.stringify({
+                  type: 'hello',
+                  connectionId: 'conn-e2e',
+                  followRevision: true,
+                }),
+              });
+            });
+            let ticks = 0;
+            const id = window.setInterval(() => {
+              ticks += 1;
+              this.onmessage?.({
+                data: JSON.stringify({
+                  type: 'conversation',
+                  conversationId: 'chief-home',
+                  event: { type: 'text_delta', text: ticks === 1 ? '正在排查' : '·' },
+                }),
+              });
+            }, 30);
+            window.setTimeout(() => window.clearInterval(id), 1500);
+          }
+        }
+      }
+      Object.defineProperty(window, 'EventSource', { configurable: true, value: TickingEventSource });
+    });
+
+    await page.goto('/app');
+    const root = page.getByTestId('home-c');
+    await expect(root).toContainText('正在排查');
+    const input = root.getByTestId('chief-composer-input');
+    await input.click();
+    await input.pressSequentially('第一条插话', { delay: 5 });
+    await input.press('Enter');
+    await expect(input).toHaveValue('');
+
+    await input.pressSequentially('第二条插话', { delay: 5 });
+    await input.press('Enter');
+    await expect(input).toHaveValue('');
+
+    await expect.poll(() => bodies.length).toBe(2);
+    expect(bodies[0]).toMatchObject({ content: '第一条插话' });
+    expect(bodies[1]).toMatchObject({ content: '第二条插话' });
+  });
 });

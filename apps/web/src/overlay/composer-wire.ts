@@ -136,6 +136,9 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const writeFull = (display: string) => {
     if (staticFace) return;
     fullDraftRef.current = display;
+    const parts = splitDraft(display);
+    draftRef.current = parts.text;
+    tokensRef.current = parts.tokens;
     const wire = toWire(display, registry);
     if (controlled) (onDraftChange as (value: string) => void)(wire);
     else setInternalDraft(wire);
@@ -153,12 +156,16 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     );
   };
 
+  const prevWireDraftRef = useRef(wireDraft);
   const draftRef = useRef(draft);
-  draftRef.current = draft;
   const tokensRef = useRef(tokens);
-  tokensRef.current = tokens;
   const fullDraftRef = useRef(fullDraft);
-  fullDraftRef.current = fullDraft;
+  if (wireDraft !== prevWireDraftRef.current) {
+    prevWireDraftRef.current = wireDraft;
+    draftRef.current = draft;
+    tokensRef.current = tokens;
+    fullDraftRef.current = fullDraft;
+  }
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inlineListboxRef = useRef<HTMLDivElement | null>(null);

@@ -13,7 +13,7 @@ export const SUBAGENT_MAX_PER_TURN = 8;
 export const SUBAGENT_SUMMARY_MAX_CHARS = 8_000;
 export const SUBAGENT_CONTEXT_MAX_CHARS = 16_000;
 export const SUBAGENT_LABEL_MAX_CHARS = 60;
-export const SUBAGENT_TIMEOUT_DEFAULT_SEC = 120;
+export const SUBAGENT_TIMEOUT_DEFAULT_SEC = 30;
 export const SUBAGENT_TIMEOUT_MIN_SEC = 10;
 export const SUBAGENT_TIMEOUT_MAX_SEC = 300;
 export const SUBAGENT_MAX_TURNS_DEFAULT = 15;
@@ -201,7 +201,7 @@ export const SUBAGENT_TOOL_DEF: RemoteToolDef = {
       },
       timeoutSec: {
         type: 'integer',
-        description: 'Optional wall-clock timeout in seconds (10 to 300, default 120).',
+        description: 'Optional wall-clock timeout in seconds (10 to 300, default 30).',
       },
       maxTurns: {
         type: 'integer',

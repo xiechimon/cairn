@@ -318,12 +318,16 @@ export function ChiefConversation({
           followSentRef.current = true;
           userKeyAtSendRef.current = latestUserKeyRef.current;
           const sent = onSend(quoted === null ? text : encodeReplyQuote(quoted, text));
-          Promise.resolve(sent).then(
-            () => setReplyQuote((current) => (current === quoted ? null : current)),
-            () => {
-              followSentRef.current = false;
-            },
-          );
+          if (sent instanceof Promise) {
+            Promise.resolve(sent).then(
+              () => setReplyQuote((current) => (current === quoted ? null : current)),
+              () => {
+                followSentRef.current = false;
+              },
+            );
+          } else {
+            setReplyQuote((current) => (current === quoted ? null : current));
+          }
           return sent;
         };
   const sendFromComposer =

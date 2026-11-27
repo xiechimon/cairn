@@ -606,7 +606,7 @@ export function HomeC({
                     ? (text: string) => surface.onSend?.(text, projectId, designComposer?.ids)
                     : live
                       ? undefined
-                      : () => Promise.resolve()
+                      : () => {}
               }
               onRewind={archived === null ? surface.onRewind : undefined}
               onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}

@@ -589,7 +589,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           deliver,
           { onFailed: sendFailed },
         );
-        return Promise.resolve();
       }
     : DEMO_MODE
       ? () => {

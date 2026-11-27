@@ -30,6 +30,11 @@ import { replayCoordinatorInputs } from './input-replay.js';
 import type { MachineApi } from './machine-api.js';
 import { type CoordinatorModels, createCoordinatorModels } from './models.js';
 import { openReconciledHarness, type ReconcileFacts, type ReconcileOutcome } from './reconcile.js';
+import {
+  coordinatorResponsivenessExtension,
+  createResponsivenessTracker,
+  type ResponsivenessTracker,
+} from './responsiveness.js';
 import { syncToRewind } from './rewind-sync.js';
 import { coordinatorStoreId } from './store-identity.js';
 import { coordinatorSubagentExtension, SubagentTurnLimiter } from './subagent.js';
@@ -95,6 +100,7 @@ interface ThreadState {
   inputs: InputReceipts | undefined;
   gate: ConversationGate;
   volatile: VolatileContext;
+  responsiveness: ResponsivenessTracker;
   summary: { ref: ModelRef | null };
   syncConnectorTools: () => void;
 }
@@ -141,6 +147,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
             config.onInputError?.(threadId, error),
           );
     const volatile = createVolatileContext();
+    const responsiveness = createResponsivenessTracker();
     const summary: ThreadState['summary'] = { ref: null };
     const registry = createRegistry();
     const memoryThread = isChiefMemoryThreadId(threadId);
@@ -222,6 +229,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           ]
         : []),
       volatileContextExtension(volatile),
+      coordinatorResponsivenessExtension(responsiveness),
       coordinatorCompactionExtension(
         () => summary.ref,
         () => config.memoryFlush?.(threadId) ?? null,
@@ -262,7 +270,16 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       config.onReconciled?.(threadId, result.outcome, result.stale);
       return result.harness;
     });
-    const state = { harness, models, gate, volatile, summary, inputs, syncConnectorTools };
+    const state = {
+      harness,
+      models,
+      gate,
+      volatile,
+      responsiveness,
+      summary,
+      inputs,
+      syncConnectorTools,
+    };
     open.set(threadId, state);
     harness.catch(() => open.delete(threadId));
     return state;
@@ -284,6 +301,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     open.delete(threadId);
     lastUsed.delete(threadId);
     const shutdown = (async () => {
+      state.responsiveness.clear();
       const harness = await state.harness.catch(() => null);
       state.inputs?.stop();
       await harness?.close(context);
@@ -401,6 +419,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
               now: Date.now,
               conversationGate: current.gate,
               volatile: current.volatile,
+              responsiveness: current.responsiveness,
               volatileText: turn.volatileText,
               suggestionYield: suggestionYield.signal,
               setupPhase: (name) => setup.mark(threadId, name),

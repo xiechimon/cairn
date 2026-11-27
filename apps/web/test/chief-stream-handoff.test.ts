@@ -260,3 +260,65 @@ describe('chief streaming handoff (#857 F-H1..H6)', () => {
   });
 });
 
+describe('multi-bubble liveTextStore handoffs and SSE reconnect cleanup', () => {
+  test('retires settled slices in order and keeps only subsequent round text visible', () => {
+    liveTextStore.append(CONV, 'Ack.');
+    liveTextStore.noteSettled(CONV, 'm1');
+    expect(liveTextStore.getVisible(CONV, new Set())).toBe('Ack.');
+
+    liveTextStore.append(CONV, 'Full answer.');
+    expect(liveTextStore.getVisible(CONV, new Set())).toBe('Ack.Full answer.');
+    expect(liveTextStore.getVisible(CONV, new Set(['m1']))).toBe('Full answer.');
+
+    liveTextStore.noteSettled(CONV, 'm2');
+    expect(liveTextStore.getVisible(CONV, new Set(['m1']))).toBe('Full answer.');
+    expect(liveTextStore.getVisible(CONV, new Set(['m1', 'm2']))).toBe('');
+
+    liveTextStore.prune(CONV, new Set(['m1', 'm2']));
+    expect(liveTextStore.get(CONV)).toBe('');
+  });
+
+  test('out-of-order knownIds containing m2 before m1 retires through m2', () => {
+    liveTextStore.append(CONV, 'Ack.');
+    liveTextStore.noteSettled(CONV, 'm1');
+    liveTextStore.append(CONV, 'Full answer.');
+    liveTextStore.noteSettled(CONV, 'm2');
+    liveTextStore.append(CONV, 'Tail.');
+
+    expect(liveTextStore.getVisible(CONV, new Set(['m2']))).toBe('Tail.');
+    liveTextStore.prune(CONV, new Set(['m2']));
+    expect(liveTextStore.get(CONV)).toBe('Tail.');
+    expect(liveTextStore.getVisible(CONV, new Set())).toBe('Tail.');
+  });
+
+  test('duplicate noteSettled updates prefixLen and clearUnlessSettling truncates uncommitted Round 2 tail', () => {
+    liveTextStore.append(CONV, 'Ack');
+    liveTextStore.noteSettled(CONV, 'm1');
+    liveTextStore.append(CONV, '!');
+    liveTextStore.noteSettled(CONV, 'm1');
+    liveTextStore.append(CONV, 'Halfway answer');
+
+    expect(liveTextStore.getVisible(CONV, new Set(['m1']))).toBe('Halfway answer');
+    liveTextStore.clearUnlessSettling(CONV);
+    expect(liveTextStore.get(CONV)).toBe('Ack!');
+    expect(liveTextStore.getVisible(CONV, new Set(['m1']))).toBe('');
+  });
+
+  test('terminal Round 2 step retains settled Round 1 prefix until message lands, then SSE reconnect resync clears', async () => {
+    const qc = freshClient();
+    const h = startStream(qc);
+    h.push({ type: 'text_delta', text: 'Checking now.' });
+    h.push({ type: 'message', message: textRow('m1', 'Checking now.') });
+    h.push({ type: 'text_delta', text: 'Round 2 partial' });
+    h.push(stepEvent('failed'));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(liveTextStore.get(CONV)).toBe('Checking now.');
+    expect(liveTextStore.getVisible(CONV, new Set(['m1']))).toBe('');
+
+    FakeEventSource.instances[0]?.onerror?.();
+    h.fireOpen();
+    expect(liveTextStore.get(CONV)).toBe('');
+  });
+});
+

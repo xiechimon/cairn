@@ -31,6 +31,7 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import {
   attachment,
   build,
@@ -87,6 +88,7 @@ import { effectDedupeKey } from './external-effects.js';
 import { isGithubRepoRef, PROJECT_FILES_MAX_LIMIT, readFile, readFiles } from './git.js';
 import { assertGithubConnectionCurrent } from './github-connection.js';
 import { executeGithubReadTool } from './github-reads.js';
+import { imNotice } from './im/runtime.js';
 import { inspectRun } from './inspect-run.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
@@ -134,7 +136,7 @@ import {
 import { readTopModels } from './top-models.js';
 import { insertGateAnnouncement } from './transcript.js';
 
-export interface ChiefToolDeps {
+export interface ChiefToolDeps extends CommitEffects {
   githubAppTokenSocket?: string | null | undefined;
   githubAppIdentity?: GitIdentity | null | undefined;
   db: Db;
@@ -1334,6 +1336,7 @@ export async function executeChiefTool(
         params.provenance,
         'notify_user',
       );
+      const isUserTurn = provenance === 'user';
       const report = reportRefOfPrompt(ctx.turnPrompt ?? null);
       if (report !== null && reportAcknowledged(db, ctx.threadId, report)) {
         return json({ notified: false, reason: 'already-acknowledged' });
@@ -1349,9 +1352,11 @@ export async function executeChiefTool(
         throw error;
       }
       const noticeId =
-        report === null
-          ? `notice-${effectDedupeKey(ctx.threadId, ctx.turnPrompt ?? '', provenance, text)}`
-          : reportNoticeId(ctx.threadId, report);
+        report !== null
+          ? reportNoticeId(ctx.threadId, report)
+          : isUserTurn && ctx.toolCallId !== undefined && ctx.toolCallId !== ''
+            ? `notice-${effectDedupeKey(ctx.threadId, ctx.turnPrompt ?? '', provenance, ctx.toolCallId, text)}`
+            : `notice-${effectDedupeKey(ctx.threadId, ctx.turnPrompt ?? '', provenance, text)}`;
       const notice = {
         id: noticeId,
         threadId: ctx.threadId,
@@ -1371,35 +1376,41 @@ export async function executeChiefTool(
         const existing = db.select().from(chiefMessage).where(eq(chiefMessage.id, noticeId)).get();
         if (existing !== undefined) {
           deps.convHub?.publishMessage(ctx.threadId, existing);
-          const notificationId = `${deps.user.id}:${ctx.threadId}`;
-          const announced =
-            db
-              .select({ id: notification.id })
-              .from(notification)
-              .where(eq(notification.id, notificationId))
-              .get() !== undefined;
-          if (!announced) {
-            notifyChiefMessage(
-              { db, hub: deps.hub, user: deps.user },
-              {
-                threadId: ctx.threadId,
-                message: text,
-                agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
-              },
-            );
+          if (!isUserTurn) {
+            const notificationId = `${deps.user.id}:${ctx.threadId}`;
+            const announced =
+              db
+                .select({ id: notification.id })
+                .from(notification)
+                .where(eq(notification.id, notificationId))
+                .get() !== undefined;
+            if (!announced) {
+              notifyChiefMessage(
+                { db, hub: deps.hub, user: deps.user },
+                {
+                  threadId: ctx.threadId,
+                  message: text,
+                  agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+                },
+              );
+            }
           }
         }
         return json({ notified: true, duplicate: true });
       }
       deps.convHub?.publishMessage(ctx.threadId, stored);
-      notifyChiefMessage(
-        { db, hub: deps.hub, user: deps.user },
-        {
-          threadId: ctx.threadId,
-          message: text,
-          agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
-        },
-      );
+      if (isUserTurn) {
+        runAfterCommit(deps, 'imNotice', () => imNotice(ctx.threadId, text));
+      } else {
+        notifyChiefMessage(
+          { db, hub: deps.hub, user: deps.user },
+          {
+            threadId: ctx.threadId,
+            message: text,
+            agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+          },
+        );
+      }
       return json({ notified: true });
     }
     case 'save_memory':
