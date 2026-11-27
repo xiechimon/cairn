@@ -779,10 +779,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       c,
       () => jsonBody(c),
       async (row, decoded) => {
+        const stepId = c.req.param('stepId');
         const body = parseWith(machineHeartbeatBodySchema, decoded ?? {}, 'body');
-        withFencedTransaction(claimDeps(c, row), (settled) => {
-          heartbeatStep(settled, row.id, c.req.param('stepId'));
-          recordBuildProvenance(settled.db, c.req.param('stepId'), body);
+        withFencedTransaction(claimDeps(c, row, stepId), (settled) => {
+          heartbeatStep(settled, row.id, stepId);
+          recordBuildProvenance(settled.db, stepId, body);
         });
         return c.json({ ok: true as const });
       },
@@ -794,41 +795,42 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       c,
       () => jsonBody(c),
       async (row, raw) => {
-        const deps = claimDeps(c, row);
+        const stepId = c.req.param('stepId');
+        const deps = claimDeps(c, row, stepId);
         if (isDeltaBody(raw)) {
           const delta = parseWith(machineTranscriptDeltaBodySchema, raw, 'body');
-          reportTranscriptDelta(deps, row.id, c.req.param('stepId'), delta.text);
+          reportTranscriptDelta(deps, row.id, stepId, delta.text);
           return c.json({ ok: true as const });
         }
         if (isThinkingDeltaBody(raw)) {
           const delta = parseWith(machineThinkingDeltaBodySchema, raw, 'body');
-          reportThinkingDelta(deps, row.id, c.req.param('stepId'), delta.text);
+          reportThinkingDelta(deps, row.id, stepId, delta.text);
           return c.json({ ok: true as const });
         }
         if (isActivityBody(raw)) {
           const act = parseWith(machineActivityBodySchema, raw, 'body');
-          reportActivity(deps, row.id, c.req.param('stepId'), act.activity);
+          reportActivity(deps, row.id, stepId, act.activity);
           return c.json({ ok: true as const });
         }
         if (isAgentTodoBody(raw)) {
           const body = parseWith(machineAgentTodoBodySchema, raw, 'body');
-          reportAgentTodo(deps, row.id, c.req.param('stepId'), body.todo);
+          reportAgentTodo(deps, row.id, stepId, body.todo);
           return c.json({ ok: true as const });
         }
         if (isBackgroundTaskBody(raw)) {
           const body = parseWith(machineBackgroundTaskBodySchema, raw, 'body');
-          reportBackgroundTask(deps, row.id, c.req.param('stepId'), body.task);
+          reportBackgroundTask(deps, row.id, stepId, body.task);
           return c.json({ ok: true as const });
         }
         if (isTranscriptRowBody(raw)) {
           const seg = parseWith(machineTranscriptRowBodySchema, raw, 'body');
-          reportTranscriptRow(deps, row.id, c.req.param('stepId'), seg.row);
+          reportTranscriptRow(deps, row.id, stepId, seg.row);
           return c.json({ ok: true as const });
         }
         if (isComputerRelayBody(raw)) {
           const relay = parseWith(machineComputerRelayBodySchema, raw, 'body');
           return c.json(
-            await forwardComputerCall(deps, row.id, c.req.param('stepId'), relay, {
+            await forwardComputerCall(deps, row.id, stepId, relay, {
               signal: c.req.raw.signal,
             }),
           );
@@ -838,7 +840,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
           const text = await executeRelayToolCall(
             deps,
             row.id,
-            c.req.param('stepId'),
+            stepId,
             relay.name,
             relay.params,
             relay.toolCallId,
@@ -848,7 +850,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
           return c.json({ text });
         }
         const body = parseWith(machineToolBodySchema, raw, 'body');
-        reportTool(deps, row.id, c.req.param('stepId'), body as ToolCallRecord);
+        reportTool(deps, row.id, stepId, body as ToolCallRecord);
         return c.json({ ok: true as const });
       },
     );
@@ -859,13 +861,14 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       c,
       () => jsonBody(c),
       async (row, decoded) => {
-        const deps = claimDeps(c, row);
+        const stepId = c.req.param('stepId');
+        const deps = claimDeps(c, row, stepId);
         const body = parseWith(machineAskBodySchema, decoded, 'body');
         const rawHold = Number(c.req.query('holdMs'));
         const holdMs =
           Number.isFinite(rawHold) && rawHold >= 0 ? Math.min(rawHold, 70_000) : 70_000;
         return c.json(
-          await machineAsk(deps, row.id, c.req.param('stepId'), body, {
+          await machineAsk(deps, row.id, stepId, body, {
             holdMs,
             signal: c.req.raw.signal,
           }),
@@ -979,7 +982,8 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/machine/session/:stepId', (c) => {
     const row = me(c);
-    return c.json(getStepSession(claimDeps(c, row), row.id, c.req.param('stepId')));
+    const stepId = c.req.param('stepId');
+    return c.json(getStepSession(claimDeps(c, row, stepId), row.id, stepId));
   });
 
   app.post('/api/machine/local-merge-recheck/:stepId', async (c) => {
@@ -987,9 +991,10 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       c,
       () => jsonBody(c),
       async (row, decoded) => {
+        const stepId = c.req.param('stepId');
         const body = parseWith(machineLocalMergeRecheckBodySchema, decoded, 'body');
         return c.json(
-          localMergeRecheckAuthorization(claimDeps(c, row), row.id, c.req.param('stepId'), body),
+          localMergeRecheckAuthorization(claimDeps(c, row, stepId), row.id, stepId, body),
         );
       },
     );

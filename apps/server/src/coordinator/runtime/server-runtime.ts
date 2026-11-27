@@ -90,6 +90,7 @@ export interface ProviderBinding {
 export interface ServerTurn {
   claimed: ClaimedStep;
   volatileText: string | null;
+  freshSession?: boolean;
   router: ProviderBinding;
   summary: ProviderBinding;
 }
@@ -372,22 +373,28 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       suggestionYields.set(threadId, suggestionYield);
       try {
         let current = state;
-        const synced = await syncToRewind(
-          await current.harness,
-          context,
-          config.factsFor(threadId),
-        );
-        if (synced.action === 'reseed') {
+        const mailTurn =
+          config.setConversation !== undefined && isMailWakeText(turn.claimed.instruction ?? '');
+        if (turn.freshSession === true && !mailTurn) {
           await closeThread(threadId);
           current = prepare(stateOf(threadId, true));
           await current.harness;
-        } else if (synced.action === 'forked') {
-          config.recordConversation?.(threadId, synced.conversationId, synced.entryId);
+        } else {
+          const synced = await syncToRewind(
+            await current.harness,
+            context,
+            config.factsFor(threadId),
+          );
+          if (synced.action === 'reseed') {
+            await closeThread(threadId);
+            current = prepare(stateOf(threadId, true));
+            await current.harness;
+          } else if (synced.action === 'forked') {
+            config.recordConversation?.(threadId, synced.conversationId, synced.entryId);
+          }
         }
         setup.mark(threadId, 'open store');
         const prior = config.factsFor(threadId);
-        const mailTurn =
-          config.setConversation !== undefined && isMailWakeText(turn.claimed.instruction ?? '');
         if (mailTurn) untrustedSteps.add(claimed.step.id);
         const run = async (conversationId: string | null) =>
           runCoordinatorTurn(

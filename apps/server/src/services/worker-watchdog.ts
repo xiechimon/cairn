@@ -34,7 +34,8 @@ function stuckReason(db: NotificationDeps['db'], buildId: string, now: number): 
     .select()
     .from(step)
     .where(and(eq(step.buildId, buildId), eq(step.status, 'claimed')))
-    .all();
+    .all()
+    .filter((row) => row.stallState?.reportedAt == null);
   const silent = claimed.filter((row) => now - stepProgressAt(row) >= WATCHDOG_STUCK_MS);
   if (silent.length === 0) return null;
   if (pendingWorkerQuestions(db, buildId).length > 0) return null;

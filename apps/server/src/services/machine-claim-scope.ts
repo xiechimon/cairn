@@ -16,7 +16,9 @@ export function claimGenerationAccepted(
   machineId: string | null,
   claimedAt: number | null,
   generation: number | undefined,
+  requireGeneration = false,
 ): boolean {
+  if (requireGeneration) return generation !== undefined && claimedAt === generation;
   if (generation !== undefined) return claimedAt === generation;
   if (machineId === null) return false;
   const runner = db
@@ -38,7 +40,15 @@ export function assertMachineClaim(deps: Pick<MachineDeps, 'db'>, claim: Machine
     if (runner?.tokenHash !== claim.tokenHash || runner.retiredAt !== null)
       throw new HttpError(401, 'unauthorized');
   }
-  if (!claimGenerationAccepted(deps.db, claim.machineId, row.claimedAt, claim.generation))
+  if (
+    !claimGenerationAccepted(
+      deps.db,
+      claim.machineId,
+      row.claimedAt,
+      claim.generation,
+      row.stallState?.lastRecoveredAt != null,
+    )
+  )
     throw new HttpError(409, `step ${claim.stepId} requires its current claim generation`);
 }
 

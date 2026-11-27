@@ -129,7 +129,7 @@ import {
 } from './state.js';
 import { resolveStepImages, sweepStepAttachments } from './step-attachments.js';
 import { resumePendingUpload } from './step-final-upload.js';
-import { StepStops } from './step-stops.js';
+import { deliverStopRequest, StepStops } from './step-stops.js';
 import { createTaskSleepPrevention, type TaskSleepPrevention } from './task-sleep-prevention.js';
 import { DAEMON_VERSION } from './version.js';
 import { agentReachEnabled, readScrapling, ScraplingProbe } from './web-tools.js';
@@ -1477,25 +1477,16 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   };
   const deliveredStops = new Set<string>();
   const deliverStop = async (stepId: string): Promise<void> => {
-    const client = bindMachineClaim(
-      stepDeps().client,
+    const generation = journal.get(stepId)?.claimed?.step.generation;
+    const client = bindMachineClaim(stepDeps().client, stepId, generation);
+    await deliverStopRequest({
       stepId,
-      journal.get(stepId)?.claimed?.step.generation,
-    );
-    try {
-      const discard = await client.stop(stepId);
-      if (discard === null || deliveredStops.has(stepId)) return;
-      const run = stops.get(stepId);
-      if (run === undefined) {
-        logger.step(`stop dropped (no live session) step=${stepId}`);
-        return;
-      }
-      await run.deliver({ discard });
-      deliveredStops.add(stepId);
-      logger.step(`stop delivered step=${stepId}`);
-    } catch (err) {
-      logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+      generation,
+      fetchStop: () => client.stop(stepId),
+      stops,
+      deliveredStops,
+      log: (line) => logger.step(line),
+    });
   };
   const computerDispatcher = createComputerDispatcher({
     client,

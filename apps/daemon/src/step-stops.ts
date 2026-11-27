@@ -1,4 +1,5 @@
 import type { AgentSessionHandle } from '@cairn/shared';
+import { MachineApiError } from './machine-client.js';
 
 export interface StopRequest {
   discard: boolean;
@@ -67,5 +68,47 @@ export class StepStops {
 
   get(stepId: string): RunStop | undefined {
     return this.runs.get(stepId);
+  }
+}
+
+export async function deliverStopRequest(input: {
+  stepId: string;
+  generation?: number | undefined;
+  fetchStop: () => Promise<boolean | null>;
+  stops: StepStops;
+  deliveredStops: Set<string>;
+  log: (line: string) => void;
+}): Promise<void> {
+  const { stepId, generation, fetchStop, stops, deliveredStops, log } = input;
+  const deliveredKey = generation === undefined ? stepId : `${stepId}:${generation}`;
+  const target = stops.get(stepId);
+  if (target === undefined) {
+    log(`stop dropped (no live session) step=${stepId}`);
+    return;
+  }
+  try {
+    let discard: boolean | null;
+    try {
+      discard = await fetchStop();
+    } catch (err) {
+      if (
+        err instanceof MachineApiError &&
+        (err.status === 404 || err.status === 409 || err.status === 410)
+      ) {
+        discard = false;
+      } else {
+        throw err;
+      }
+    }
+    if (discard === null || deliveredStops.has(deliveredKey)) return;
+    if (stops.get(stepId) !== target) {
+      log(`stop dropped (session replaced) step=${stepId}`);
+      return;
+    }
+    await target.deliver({ discard });
+    deliveredStops.add(deliveredKey);
+    log(`stop delivered step=${stepId}`);
+  } catch (err) {
+    log(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 }

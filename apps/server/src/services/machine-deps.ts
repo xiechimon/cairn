@@ -8,8 +8,9 @@ import {
   type ScheduleEffect,
   withCommitEffects,
 } from '../db/commit-effects.js';
-import { build, chiefThread, message, step, todo } from '../db/schema.js';
+import { build, chiefThread, message, type StepStallMeta, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
+import { nowMs } from '../lib/ids.js';
 import type { KeySecretBox } from '../lib/secret-box.js';
 import { NotFoundError } from './builds.js';
 import { upsertChiefMessage } from './chief.js';
@@ -121,7 +122,10 @@ export function ownedStep(deps: MachineDeps, machineId: string | null, stepId: s
   return row;
 }
 
-export function stepTeamId(deps: MachineDeps, stepRow: typeof step.$inferSelect): string | null {
+export function stepTeamId(
+  deps: Pick<MachineDeps, 'db'>,
+  stepRow: typeof step.$inferSelect,
+): string | null {
   const { db } = deps;
   if (isChiefConversation(stepRow.buildId)) {
     return (
@@ -179,4 +183,60 @@ export function upsertChiefRow(
 ): void {
   const stored = upsertChiefMessage(deps.db, row);
   deps.convHub?.publishMessage(row.threadId, stored);
+}
+
+const PROGRESS_WRITE_INTERVAL_MS = 30_000;
+
+export function clearedStallMeta(meta: StepStallMeta | null | undefined): {
+  changed: boolean;
+  value: StepStallMeta | null;
+} {
+  if (!meta) return { changed: false, value: null };
+  if (
+    meta.activity === undefined &&
+    meta.reportedAt === undefined &&
+    meta.reportedFingerprint === undefined
+  ) {
+    return { changed: false, value: meta };
+  }
+  const next: StepStallMeta = {};
+  if (meta.recoveryCount !== undefined) next.recoveryCount = meta.recoveryCount;
+  if (meta.lastCause !== undefined) next.lastCause = meta.lastCause;
+  if (meta.lastRecoveredAt !== undefined) next.lastRecoveredAt = meta.lastRecoveredAt;
+  if (meta.lastRecoveredFromMachineId !== undefined)
+    next.lastRecoveredFromMachineId = meta.lastRecoveredFromMachineId;
+  return { changed: true, value: Object.keys(next).length > 0 ? next : null };
+}
+
+export function markStepProgress(
+  db: Db,
+  row: Pick<typeof step.$inferSelect, 'id' | 'status' | 'lastProgressAt' | 'stallState'>,
+  now: number = nowMs(),
+): void {
+  if (row.status !== 'claimed') return;
+  const cleaned = clearedStallMeta(row.stallState);
+  const dueProgress =
+    row.lastProgressAt === null || now - row.lastProgressAt >= PROGRESS_WRITE_INTERVAL_MS;
+  if (!dueProgress && !cleaned.changed) return;
+  db.update(step)
+    .set({
+      ...(dueProgress ? { lastProgressAt: now } : {}),
+      ...(cleaned.changed ? { stallState: cleaned.value } : {}),
+    })
+    .where(eq(step.id, row.id))
+    .run();
+}
+
+export function touchStepProgress(db: Db, stepId: string, now: number = nowMs()): void {
+  const row = db
+    .select({
+      id: step.id,
+      status: step.status,
+      lastProgressAt: step.lastProgressAt,
+      stallState: step.stallState,
+    })
+    .from(step)
+    .where(eq(step.id, stepId))
+    .get();
+  if (row !== undefined) markStepProgress(db, row, now);
 }

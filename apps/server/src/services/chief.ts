@@ -155,6 +155,7 @@ import {
   coordinatorProfile,
   type RouteProfile,
 } from './routing-rules.js';
+import { isStepWaitingPermission } from './step-permission-wait.js';
 import { stepQueueProjector } from './step-queue.js';
 import { rewriteGivenClaims } from './terminal-claims.js';
 import { getTodo } from './todos.js';
@@ -2805,6 +2806,7 @@ export function sweepAbandonedChiefSteps(
     .all()
     .filter((r) => r.status === 'claimed' && memoryEditIdOfPrompt(r.prompt) === null);
   for (const row of candidates) {
+    if (row.machineId === null && isStepWaitingPermission(deps.db, row)) continue;
     const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, row.buildId)).get();
     if (!thread) continue;
     const machineRow = row.machineId

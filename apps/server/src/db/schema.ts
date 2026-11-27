@@ -307,6 +307,32 @@ export interface StepRanModel extends ModelRef {
   thinkingLevel?: string | null;
 }
 
+export type StepStallCause =
+  | 'permission_wait'
+  | 'missing_tools'
+  | 'quota'
+  | 'dead_turn'
+  | 'silent_turn';
+
+export interface StepStallActivity {
+  phase: string;
+  stallSignal?: 'quota' | 'capacity' | 'missing_tools' | 'permission';
+  attempt?: number;
+  detail?: string;
+  firstSeenAt: number;
+  at: number;
+}
+
+export interface StepStallMeta {
+  recoveryCount?: number;
+  lastCause?: StepStallCause;
+  lastRecoveredAt?: number;
+  lastRecoveredFromMachineId?: string | null;
+  reportedAt?: number;
+  reportedFingerprint?: string;
+  activity?: StepStallActivity;
+}
+
 export const step = sqliteTable(
   'step',
   {
@@ -322,6 +348,7 @@ export const step = sqliteTable(
     quotaBlock: json<QuotaWaitRow>('quotaBlock'),
     fallback: json<StepFallbackRow>('fallback'),
     ranModel: json<StepRanModel>('ranModel'),
+    stallState: json<StepStallMeta>('stallState'),
     sessionId: text('sessionId'),
     scheduleId: text('scheduleId'),
     scheduledBy: text('scheduledBy'),

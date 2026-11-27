@@ -15,6 +15,7 @@ import type { StoppedTurn } from './stopped-turn.js';
 
 export interface MachineApi {
   inputs?: InputChannel;
+  forGeneration?(stepId: string, generation: number): MachineApi;
   claim(): Promise<ClaimedStep | null>;
   recover(): Promise<StepRecord[]>;
   token(stepId: string): Promise<MachineTokenResponse>;

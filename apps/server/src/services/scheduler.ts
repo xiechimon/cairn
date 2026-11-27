@@ -74,6 +74,7 @@ import {
   WORKER_SCHEDULE_RUN_LIMIT,
   workerScheduleRunHistory,
 } from './schedules.js';
+import { sweepStallMonitor } from './stall-monitor.js';
 import { createTaskIssueSync } from './task-issue-sync.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
 import { sweepWorkerWatchdog } from './worker-watchdog.js';
@@ -442,8 +443,9 @@ export function createScheduler(
     releaseBlockedSteps(deps);
     sweepStaleMachines(deps);
     sweepAbandonedMemoryEditSteps(deps, now);
-    sweepAbandonedChiefSteps(deps, now);
     sweepOverlongChiefTurns(deps, now);
+    sweepStallMonitor(deps, now);
+    sweepAbandonedChiefSteps(deps, now);
     sweepAbandonedBuildSteps(deps, now);
     sweepZombieQueuedTodos(deps, now);
     sweepStalledRunningTodos(deps, now);

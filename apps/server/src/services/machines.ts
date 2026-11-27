@@ -17,6 +17,7 @@ import type {
 } from '@cairn/shared';
 import {
   backgroundTaskMessageId,
+  CORE_COORDINATOR_TOOLS,
   claudeLoginSchema,
   HOST_NAME_NEEDS_LOOPBACK_REFUSAL,
   HOST_NAME_TAKEN_REFUSAL,
@@ -29,6 +30,11 @@ import {
   parseReportedCapabilities,
   parseStoredCapabilities,
   transcriptPromptRowId,
+  WORKER_ASK_USER_TOOL,
+  WORKER_CLOSE_AS_DUPLICATE_TOOL,
+  WORKER_REMOTE_TOOLS,
+  WORKER_REMOTE_TOOLS_GITHUB,
+  WORKER_THREAD_REPORT_TOOL,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -40,6 +46,8 @@ import {
   machine,
   phone,
   routingRule,
+  type StepStallActivity,
+  type StepStallMeta,
   steerPending,
   step,
   stopPending,
@@ -61,6 +69,7 @@ import { applyComputerPresence } from './machine-computer-presence.js';
 import {
   isChiefConversation,
   type MachineDeps,
+  markStepProgress,
   ownedStep,
   ownedStepRow,
   profileForStep,
@@ -1225,16 +1234,65 @@ export function heartbeatStep(deps: MachineDeps, machineId: string | null, stepI
   deps.db.update(step).set({ lastHeartbeatAt: nowMs() }).where(eq(step.id, row.id)).run();
 }
 
-const PROGRESS_WRITE_INTERVAL_MS = 30_000;
+const MISSING_HOST_TOOL_RE =
+  /unknown tool|no such tool|tool .* not found|Cairn host tools did not attach/i;
+const LEGACY_HOST_TOOL_NAMES: readonly string[] = [
+  ...CORE_COORDINATOR_TOOLS,
+  WORKER_ASK_USER_TOOL.name,
+  WORKER_THREAD_REPORT_TOOL.name,
+  WORKER_CLOSE_AS_DUPLICATE_TOOL.name,
+  ...WORKER_REMOTE_TOOLS.map((t) => t.name),
+  ...WORKER_REMOTE_TOOLS_GITHUB.map((t) => t.name),
+];
+
+function recordStepActivity(
+  db: Db,
+  row: Pick<typeof step.$inferSelect, 'id' | 'status' | 'stallState'>,
+  input: {
+    phase: string;
+    stallSignal?: StepStallActivity['stallSignal'];
+    attempt?: number;
+    detail?: string;
+  },
+  now: number = nowMs(),
+): void {
+  if (row.status !== 'claimed') return;
+  const prev = row.stallState;
+  const prevAct = prev?.activity;
+  const sameSignal =
+    prevAct !== undefined &&
+    prevAct.phase === input.phase &&
+    prevAct.stallSignal === input.stallSignal;
+  const activity: StepStallActivity = {
+    phase: input.phase,
+    ...(input.stallSignal !== undefined ? { stallSignal: input.stallSignal } : {}),
+    ...(input.attempt !== undefined ? { attempt: input.attempt } : {}),
+    ...(input.detail !== undefined ? { detail: input.detail.slice(0, 400) } : {}),
+    firstSeenAt: sameSignal ? prevAct.firstSeenAt : now,
+    at: now,
+  };
+  const nextMeta: StepStallMeta = { ...(prev ?? {}), activity };
+  db.update(step).set({ stallState: nextMeta }).where(eq(step.id, row.id)).run();
+}
+
+function missingHostToolDetail(call: ToolCallRecord): string | null {
+  if (call.isError !== true) return null;
+  const hostTool =
+    /^mcp[_-]+cairn/i.test(call.name) ||
+    /^call_mcp_tool/i.test(call.name) ||
+    LEGACY_HOST_TOOL_NAMES.includes(call.name);
+  if (!hostTool) return null;
+  const text = typeof call.result === 'string' ? call.result : JSON.stringify(call.result ?? '');
+  if (!MISSING_HOST_TOOL_RE.test(text)) return null;
+  return text.slice(0, 400);
+}
 
 function markProgress(
   deps: Pick<MachineDeps, 'db'>,
-  row: Pick<typeof step.$inferSelect, 'id' | 'status' | 'lastProgressAt'>,
+  row: Pick<typeof step.$inferSelect, 'id' | 'status' | 'lastProgressAt' | 'stallState'>,
+  now: number = nowMs(),
 ): void {
-  const now = nowMs();
-  if (row.status !== 'claimed') return;
-  if (row.lastProgressAt !== null && now - row.lastProgressAt < PROGRESS_WRITE_INTERVAL_MS) return;
-  deps.db.update(step).set({ lastProgressAt: now }).where(eq(step.id, row.id)).run();
+  markStepProgress(deps.db, row, now);
 }
 
 export function reportTool(
@@ -1244,7 +1302,16 @@ export function reportTool(
   call: ToolCallRecord,
 ): void {
   const row = ownedStep(deps, machineId, stepId);
-  markProgress(deps, row);
+  const missingDetail = missingHostToolDetail(call);
+  if (missingDetail !== null) {
+    recordStepActivity(deps.db, row, {
+      phase: 'tool',
+      stallSignal: 'missing_tools',
+      detail: missingDetail,
+    });
+  } else {
+    markProgress(deps, row);
+  }
   const messageRow = {
     id: call.id,
     role: 'assistant' as const,
@@ -1375,8 +1442,23 @@ export function reportActivity(
   report: StepActivityReport,
 ): void {
   const row = ownedStep(deps, machineId, stepId);
-  if (PROGRESS_ACTIVITY_PHASES.includes(report.phase)) markProgress(deps, row);
-  deps.convHub?.publishActivity(row.buildId, { ...report, stepId, at: nowMs() });
+  const now = nowMs();
+  if (report.phase === 'retrying' || report.stallSignal !== undefined) {
+    recordStepActivity(
+      deps.db,
+      row,
+      {
+        phase: report.phase,
+        ...(report.stallSignal !== undefined ? { stallSignal: report.stallSignal } : {}),
+        ...(report.attempt !== undefined ? { attempt: report.attempt } : {}),
+        ...(report.detail !== undefined ? { detail: report.detail } : {}),
+      },
+      now,
+    );
+  } else if (PROGRESS_ACTIVITY_PHASES.includes(report.phase)) {
+    markProgress(deps, row, now);
+  }
+  deps.convHub?.publishActivity(row.buildId, { ...report, stepId, at: now });
 }
 
 export function reportAgentTodo(

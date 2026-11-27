@@ -140,13 +140,20 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       errorMessage: scrubProviderError({ db, box: machine.box }, teamId, ids, body.errorMessage),
     };
   };
-  const api: MachineApi = {
-    ...serverApi,
+  const forGen = serverApi.forGeneration;
+  const wrapApi = (target: MachineApi): MachineApi => ({
+    ...target,
     reusedInstructions: async (stepId, sentBy) => recordReusedInstructions(db, stepId, sentBy),
     done: async (stepId, body, observation) => {
-      if (!closing) await serverApi.done(stepId, scrubbed(stepId, body), observation);
+      if (!closing) await target.done(stepId, scrubbed(stepId, body), observation);
     },
-  };
+    ...(forGen !== undefined
+      ? {
+          forGeneration: (boundStepId, generation) => wrapApi(forGen(boundStepId, generation)),
+        }
+      : {}),
+  });
+  const api: MachineApi = wrapApi(serverApi);
   const leases = new Map<string, Lease>();
   const draining = new Map<string, Promise<void>>();
   const dirty = new Set<string>();
@@ -576,6 +583,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       await runtime.runTurn({
         claimed: payload.claimed,
         volatileText: payload.volatileText,
+        ...(row.freshSession ? { freshSession: true } : {}),
         router: binding(teamId, providers.router),
         summary: binding(teamId, providers.summary),
       });
@@ -584,7 +592,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       const scrubbed = scrubProviderError({ db, box: machine.box }, teamId, keyed, message);
       logger.error({ stepId: row.id, error: scrubbed }, 'coordinator turn failed');
       const current = db.select().from(step).where(eq(step.id, row.id)).get();
-      if (!closing && current?.status === 'claimed') {
+      if (!closing && current?.status === 'claimed' && current.claimedAt === row.claimedAt) {
         await api.done(row.id, {
           status: 'failed',
           errorMessage: scrubbed,

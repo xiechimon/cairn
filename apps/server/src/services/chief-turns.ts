@@ -13,6 +13,7 @@ import {
 import { and, asc, eq, gt, inArray, isNull, lt, lte, notInArray, or, sql } from 'drizzle-orm';
 import { steerWithdrawals } from '../coordinator/steer-withdrawals.js';
 import type { Db } from '../db/client.js';
+import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import {
   chiefMessage,
   chiefThread,
@@ -53,7 +54,7 @@ export { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 export const CHIEF_TURN_MAX_MS = 30 * 60_000;
 export const CHIEF_TURN_STOP_GRACE_MS = 120_000;
 
-export interface ChiefTurnDeps {
+export interface ChiefTurnDeps extends CommitEffects {
   db: Db;
   machineHub?: MachineWakeHub;
   convHub?: ConversationStreamHub;
@@ -754,7 +755,7 @@ function stopClaimedChiefStep(
   return { delegated: false };
 }
 
-function endChiefStepAsStopped(
+export function endChiefStepAsStopped(
   deps: ChiefTurnDeps,
   thread: typeof chiefThread.$inferSelect,
   head: StepRow,
@@ -771,7 +772,7 @@ function endChiefStepAsStopped(
   releaseUnconsumedSteer(deps.db, head);
   settleMemoryEditTurn(deps.db, head, 'stopped', memoryEditReason);
   deps.machineHub?.stopSignal(thread.teamId, head.id);
-  signalCoordinator(threadId, 'stop');
+  runAfterCommit(deps, 'chiefStopCoordinator', () => signalCoordinator(threadId, 'stop'));
   settleChiefActiveRun(deps.db, threadId);
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);

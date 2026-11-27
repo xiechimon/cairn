@@ -4273,6 +4273,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               "minimum": 0,
               "type": "number",
             },
+            "detail": {
+              "maxLength": 400,
+              "type": "string",
+            },
             "phase": {
               "enum": [
                 "preparing",
@@ -4308,6 +4312,15 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "type": "object",
               },
               "type": "array",
+            },
+            "stallSignal": {
+              "enum": [
+                "quota",
+                "capacity",
+                "missing_tools",
+                "permission",
+              ],
+              "type": "string",
             },
             "tokens": {
               "additionalProperties": false,
@@ -6633,6 +6646,10 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "minimum": 0,
               "type": "number",
             },
+            "detail": {
+              "maxLength": 400,
+              "type": "string",
+            },
             "phase": {
               "enum": [
                 "preparing",
@@ -6668,6 +6685,15 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                 "type": "object",
               },
               "type": "array",
+            },
+            "stallSignal": {
+              "enum": [
+                "quota",
+                "capacity",
+                "missing_tools",
+                "permission",
+              ],
+              "type": "string",
             },
             "stepId": {
               "type": "string",
@@ -10916,6 +10942,10 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                           "minimum": 0,
                           "type": "number",
                         },
+                        "detail": {
+                          "maxLength": 400,
+                          "type": "string",
+                        },
                         "phase": {
                           "enum": [
                             "preparing",
@@ -10951,6 +10981,15 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                             "type": "object",
                           },
                           "type": "array",
+                        },
+                        "stallSignal": {
+                          "enum": [
+                            "quota",
+                            "capacity",
+                            "missing_tools",
+                            "permission",
+                          ],
+                          "type": "string",
                         },
                         "stepId": {
                           "type": "string",

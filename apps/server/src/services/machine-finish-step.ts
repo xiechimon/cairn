@@ -19,7 +19,7 @@ import {
   skillFactsFromContents,
   WORKFLOW_PUSH_REFUSAL,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { runAfterCommit } from '../db/commit-effects.js';
 import {
   build,
@@ -56,6 +56,7 @@ import {
   deadLoopMessage,
 } from './ci-loop.js';
 import { recoverClaudeRateLimitFailure } from './claude-rate-limit.js';
+import { wakeCoordinator } from './coordinator-context.js';
 import { finishCoordinatorTurn, recordStepUsage } from './coordinator-steps.js';
 import { revokeStepGitCredential } from './credentials.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
@@ -263,6 +264,30 @@ export async function finishStep(
   stepId: string,
   body: MachineDoneBody,
 ): Promise<void> {
+  const precheck = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  if (
+    precheck !== undefined &&
+    precheck.stallState?.lastRecoveredAt != null &&
+    precheck.status === 'pending' &&
+    precheck.holdReason === 'stall_recovery' &&
+    body.generation !== undefined &&
+    body.generation === precheck.claimedAt &&
+    machineId !== null &&
+    machineId === precheck.stallState.lastRecoveredFromMachineId
+  ) {
+    const released = deps.db
+      .update(step)
+      .set({ holdReason: null, holdUntil: null })
+      .where(
+        and(eq(step.id, stepId), eq(step.status, 'pending'), eq(step.holdReason, 'stall_recovery')),
+      )
+      .run();
+    if (released.changes > 0) {
+      if (precheck.kind === 'chief') wakeCoordinator(precheck.buildId);
+      const teamId = stepTeamId(deps, precheck);
+      if (teamId !== null) deps.machineHub?.wake(teamId);
+    }
+  }
   const prepared = withFencedTransaction(deps, (settleDeps) =>
     prepareStepReport(settleDeps, machineId, stepId, body),
   );
@@ -288,9 +313,19 @@ function prepareStepReport(
 ) {
   const { db } = deps;
   const found = db.select().from(step).where(eq(step.id, stepId)).get();
+  const recovered = found?.stallState?.lastRecoveredAt != null;
+  if (recovered && found !== undefined && found.status !== 'claimed') {
+    throw conflict(`step ${stepId} was recovered after stall`);
+  }
   if (
     machineId !== null &&
-    (!claimGenerationAccepted(db, machineId, found?.claimedAt ?? null, body.generation) ||
+    (!claimGenerationAccepted(
+      db,
+      machineId,
+      found?.claimedAt ?? null,
+      body.generation,
+      recovered,
+    ) ||
       (body.generation === undefined && found?.machineId !== machineId))
   ) {
     throw conflict(

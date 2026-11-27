@@ -110,10 +110,15 @@ export async function runCoordinatorTurn(
   deps: TurnDeps,
   claimed: ClaimedStep,
 ): Promise<MachineDoneBody> {
-  const { harness, api, context } = deps;
-  if (api.inputs !== undefined && deps.inputs === undefined)
+  const { harness, context } = deps;
+  const baseApi = deps.api;
+  if (baseApi.inputs !== undefined && deps.inputs === undefined)
     throw new Error('Native Coordinator input channel requires a receipt observer');
   const stepId = claimed.step.id;
+  const api =
+    claimed.step.generation !== undefined && baseApi.forGeneration !== undefined
+      ? baseApi.forGeneration(stepId, claimed.step.generation)
+      : baseApi;
   let observation: OtelObservation | undefined;
   const done = async (body: MachineDoneBody) => {
     await deps.inputs?.barrier();
@@ -156,7 +161,7 @@ export async function runCoordinatorTurn(
     rootKey = String(root.id);
     const activeRootKey = rootKey;
     const conversationKey = deps.inputs?.key(rootKey) ?? rootKey;
-    deps.conversationGate?.set(rootKey, stepId);
+    deps.conversationGate?.set(rootKey, stepId, claimed.step.generation);
     const storedInstruction = mailTurn
       ? mailSharedTranscript(claimed.instruction ?? '')
       : claimed.instruction;

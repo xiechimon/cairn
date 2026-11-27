@@ -44,7 +44,7 @@ export const COORDINATOR_TOOL_OUTPUT_MAX_BYTES = 32_768;
 
 export type ToolChannel = Pick<
   MachineApi,
-  'relayTool' | 'relayComputer' | 'askUser' | 'transcriptRow'
+  'relayTool' | 'relayComputer' | 'askUser' | 'transcriptRow' | 'forGeneration'
 >;
 
 function imageReadMarker(fileName: string | undefined, read: AttachmentImageTextResult): string {
@@ -107,6 +107,7 @@ async function askThroughChannel(
 
 export interface StepResolver {
   stepFor(conversationId: string): Promise<string>;
+  generationFor?(conversationId: string): number | undefined;
 }
 
 export interface StepGate extends StepResolver {
@@ -115,11 +116,12 @@ export interface StepGate extends StepResolver {
 }
 
 export interface ConversationGate extends StepResolver {
-  set(conversationId: string, stepId: string | null): void;
+  set(conversationId: string, stepId: string | null, generation?: number): void;
 }
 
 export function createConversationGate(): ConversationGate {
   const steps = new Map<string, string>();
+  const generations = new Map<string, number>();
   return {
     stepFor: async (conversationId) => {
       const stepId = steps.get(conversationId);
@@ -130,9 +132,16 @@ export function createConversationGate(): ConversationGate {
       }
       return stepId;
     },
-    set: (conversationId, stepId) => {
-      if (stepId === null) steps.delete(conversationId);
-      else steps.set(conversationId, stepId);
+    generationFor: (conversationId) => generations.get(conversationId),
+    set: (conversationId, stepId, generation) => {
+      if (stepId === null) {
+        steps.delete(conversationId);
+        generations.delete(conversationId);
+      } else {
+        steps.set(conversationId, stepId);
+        if (generation === undefined) generations.delete(conversationId);
+        else generations.set(conversationId, generation);
+      }
     },
   };
 }
@@ -176,8 +185,14 @@ export function coordinatorTool(
     replay: def.replaySafe === true || def.name === 'ask_user' ? 'safe' : 'unsafe',
     outputLimits: { maxBytes: COORDINATOR_TOOL_OUTPUT_MAX_BYTES, retain: 'head' },
     execute: async (args, api, context) => {
-      const stepId = await gate.stepFor(String(api.conversationId));
-      await beforeTool?.(context.abortSignal, String(api.conversationId));
+      const conversationId = String(api.conversationId);
+      const stepId = await gate.stepFor(conversationId);
+      const generation = gate.generationFor?.(conversationId);
+      const scoped =
+        generation !== undefined && channel.forGeneration !== undefined
+          ? channel.forGeneration(stepId, generation)
+          : channel;
+      await beforeTool?.(context.abortSignal, conversationId);
       const store = storeId?.();
       const callId = store === undefined ? api.callId : coordinatorToolSourceId(store, api.callId);
       const params = args as Record<string, unknown>;
@@ -193,7 +208,7 @@ export function coordinatorTool(
       try {
         if (def.name === 'ask_user') {
           const text = await askThroughChannel(
-            channel,
+            scoped,
             stepId,
             callId,
             params,
@@ -207,7 +222,7 @@ export function coordinatorTool(
           if (!seesImages && (def.name === 'computer_observe' || def.name === 'computer_act')) {
             return { output: [{ type: 'text', text: SCREENSHOT_UNAVAILABLE }], isError: true };
           }
-          const result = await channel.relayComputer(
+          const result = await scoped.relayComputer(
             stepId,
             def.name,
             params,
@@ -223,7 +238,7 @@ export function coordinatorTool(
             : [];
           return { output: [{ type: 'text', text: result.text }, ...images] };
         }
-        const text = await channel.relayTool(stepId, def.name, params, callId, context.abortSignal);
+        const text = await scoped.relayTool(stepId, def.name, params, callId, context.abortSignal);
         if (def.name === 'attachment' || def.name === 'read_file') {
           let attachment:
             | {

@@ -594,6 +594,12 @@ async function claimChiefTurn(
   const currentTeamMachines = teamMachinesNow();
   for (const cand of cands) {
     if (!stillAuthorized()) return null;
+    if (
+      cand.stepRow.stallState?.lastRecoveredAt != null &&
+      machineRow.capabilities?.claimGeneration !== true
+    ) {
+      continue;
+    }
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
     if (
       turnProvenance(cand.stepRow.prompt)?.startsWith('mail:') === true &&
@@ -688,6 +694,12 @@ async function tryClaim(
   if (!machineRow || runnerFull(db, machineRow.id, maxWorkers)) return null;
 
   for (const cand of workerCands) {
+    if (
+      cand.stepRow.stallState?.lastRecoveredAt != null &&
+      machineRow.capabilities?.claimGeneration !== true
+    ) {
+      continue;
+    }
     if (
       cand.stepRow.kind === 'verify' &&
       parseVerifyPromptMeta(cand.stepRow.prompt)?.evidence === 'attachments' &&

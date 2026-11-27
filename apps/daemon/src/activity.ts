@@ -3,6 +3,7 @@ import type {
   SkillFact,
   StepActivityPhase,
   StepActivityReport,
+  StepStallSignal,
 } from '@cairn/shared';
 
 export const ACTIVITY_REPEAT_MS = 5_000;
@@ -18,7 +19,13 @@ export interface ActivityTrackerDeps {
 export interface ActivityTracker {
   setPhase: (
     phase: StepActivityPhase,
-    extra?: { tool?: string; attempt?: number; resetLive?: boolean },
+    extra?: {
+      tool?: string;
+      attempt?: number;
+      resetLive?: boolean;
+      stallSignal?: StepStallSignal;
+      detail?: string;
+    },
   ) => void;
   noteEvent: () => void;
   toolStarted: (id: string, name: string) => void;
@@ -27,7 +34,10 @@ export interface ActivityTracker {
   noteUsage: (usage: AgentTokenUsage) => void;
 }
 
-type ActivityBase = Pick<StepActivityReport, 'phase' | 'tool' | 'attempt' | 'resetLive'>;
+type ActivityBase = Pick<
+  StepActivityReport,
+  'phase' | 'tool' | 'attempt' | 'resetLive' | 'stallSignal' | 'detail'
+>;
 
 export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracker {
   const now = deps.now ?? (() => Date.now());
@@ -80,12 +90,18 @@ export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracke
         ...(extra?.tool !== undefined ? { tool: extra.tool } : {}),
         ...(extra?.attempt !== undefined ? { attempt: extra.attempt } : {}),
         ...(extra?.resetLive === true ? { resetLive: true } : {}),
+        ...(extra?.stallSignal !== undefined ? { stallSignal: extra.stallSignal } : {}),
+        ...(extra?.detail !== undefined ? { detail: extra.detail } : {}),
       };
       emit(withSkills(base));
       if (extra?.resetLive === true && base !== null) {
         const { resetLive: _drop, ...rest } = base;
         base = rest;
         current = withSkills(base);
+        if (lastSent?.resetLive === true) {
+          const { resetLive: _dropSent, ...restSent } = lastSent;
+          lastSent = restSent;
+        }
       }
     },
     noteEvent() {
@@ -205,6 +221,8 @@ function sameReport(a: StepActivityReport | null, b: StepActivityReport | null):
     a.tool === b.tool &&
     a.attempt === b.attempt &&
     a.resetLive === b.resetLive &&
+    a.stallSignal === b.stallSignal &&
+    a.detail === b.detail &&
     a.tokens?.input === b.tokens?.input &&
     a.tokens?.output === b.tokens?.output &&
     a.cacheRead === b.cacheRead &&

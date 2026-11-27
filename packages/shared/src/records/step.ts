@@ -191,11 +191,17 @@ export function isStalled(lastProgressAt: number, now: number): boolean {
   return now - lastProgressAt >= STALL_AFTER_MS;
 }
 
+export const STEP_STALL_SIGNALS = ['quota', 'capacity', 'missing_tools', 'permission'] as const;
+export const stepStallSignalSchema = z.enum(STEP_STALL_SIGNALS);
+export type StepStallSignal = z.infer<typeof stepStallSignalSchema>;
+
 export const stepActivityReportSchema = z.object({
   phase: stepActivityPhaseSchema,
   tool: z.string().optional(),
   attempt: z.number().int().optional(),
   resetLive: z.boolean().optional(),
+  stallSignal: stepStallSignalSchema.optional(),
+  detail: z.string().max(400).optional(),
   skills: z.array(skillFactSchema).optional(),
   tokens: z
     .object({ input: z.number().int().nonnegative(), output: z.number().int().nonnegative() })

@@ -5,6 +5,7 @@ import { nowMs } from '../lib/ids.js';
 import { applyStoppedStep, stopStepKeepPhase } from './build-stop.js';
 import { applyStepFailure, type BuildDeps } from './builds.js';
 import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
+import { isStepWaitingPermission } from './step-permission-wait.js';
 
 export const BUILD_ABANDONED_STEP_MS = 120_000;
 
@@ -63,6 +64,7 @@ function abandonedEnding(
   const progressed =
     row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
   const live = machineRow?.online === true && !deps.machineHub?.silentSinceDrop(machineRow.id);
+  if (live && isStepWaitingPermission(deps.db, row)) return null;
   if (live && progressed) return null;
   return row.archiveStop !== null ||
     todoRow.archivedAt !== null ||

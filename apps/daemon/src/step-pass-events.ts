@@ -20,6 +20,7 @@ import {
 } from '@cairn/shared';
 import type { ActivityTracker } from './activity.js';
 import type { AgentTodoReporter } from './agent-todo.js';
+import { MISSING_HOST_TOOL } from './backend/errors.js';
 import type { QuotaTrip } from './claude-quota-trip.js';
 import type { TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -193,6 +194,19 @@ export async function consumeStepPassEvent(
         );
       } else {
         activity.toolEnded(ev.call.id);
+        if (ev.call.isError === true) {
+          const text =
+            typeof ev.call.result === 'string'
+              ? ev.call.result
+              : JSON.stringify(ev.call.result ?? '');
+          if (MISSING_HOST_TOOL.test(text)) {
+            activity.setPhase('tool', {
+              tool: ev.call.name || 'tool',
+              stallSignal: 'missing_tools',
+              detail: text.slice(0, 400),
+            });
+          }
+        }
         const skillFact = classifySkillFact(ev.call);
         if (skillFact !== null) activity.noteSkill(skillFact);
       }
@@ -281,6 +295,12 @@ export async function consumeStepPassEvent(
           ? 'other'
           : classifyAgentFailure(ev.error.message);
         if (!s.lastErrorWasProcessCrash && failureEndsStepNow(ev.error.message)) {
+          if (ev.error.message.includes('Cairn host tools did not attach')) {
+            activity.setPhase('tool', {
+              stallSignal: 'missing_tools',
+              detail: ev.error.message.slice(0, 400),
+            });
+          }
           logger.step(
             `${classifyStepFailure(ev.error.message)}: ${modelKey} — stopping session without retry`,
           );
@@ -320,7 +340,10 @@ export async function consumeStepPassEvent(
       if (ok === null) logger.step(`background task relay failed for ${ev.task.taskId}`);
       break;
     }
-    case 'auto_retry_start':
+    case 'auto_retry_start': {
+      const retryError = s.lastModelError ?? s.lastError ?? '';
+      const retryKind = retryError !== '' ? classifyAgentFailure(retryError) : null;
+      const retrySignal = retryKind === 'quota' || retryKind === 'capacity' ? retryKind : undefined;
       s.lastError = null;
       s.failureCode = null;
       s.failureDetail = null;
@@ -334,8 +357,15 @@ export async function consumeStepPassEvent(
       }
       logger.step(`auto_retry_start attempt=${ev.attempt}`);
       stream.discardAttempt();
-      activity.setPhase('retrying', { attempt: ev.attempt, resetLive: true });
+      activity.setPhase('retrying', {
+        attempt: ev.attempt,
+        resetLive: true,
+        ...(retrySignal !== undefined
+          ? { stallSignal: retrySignal, detail: retryError.slice(0, 400) }
+          : {}),
+      });
       break;
+    }
     case 'auto_retry_end':
       activity.setPhase('awaiting_model');
       break;
