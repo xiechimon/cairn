@@ -1376,6 +1376,24 @@ export const EN: Record<string, string> = {
     'Current state saved and restore started. The server is restarting.',
   '已保存当前状态并完成恢复准备，重启服务后生效':
     'Current state saved and restore staged. Restart the server to apply.',
+  导入数据: 'Import data',
+  选择备份文件: 'Choose backup file',
+  '正在导入…': 'Importing…',
+  '正在上传备份文件 ({percent}%)…': 'Uploading backup archive ({percent}%)…',
+  '正在校验并导入数据…': 'Verifying and importing data…',
+  确认导入数据: 'Confirm data import',
+  确认导入: 'Confirm import',
+  '导入失败，请检查备份文件后重试。': 'Import failed. Check the backup archive and try again.',
+  '已保存当前状态并开始导入，服务正在重启':
+    'Current state saved and import started. The server is restarting.',
+  '已保存当前状态并完成导入准备，重启服务后生效':
+    'Current state saved and import staged. Restart the server to apply.',
+  '{base}；已暂停 {paused} 项外部触发器，{cleared} 项密钥需重新填写':
+    '{base}; {paused} external triggers paused and {cleared} stored credentials need re-entry.',
+  '{base}；已暂停 {paused} 项外部触发器': '{base}; {paused} external triggers paused.',
+  '{base}；{cleared} 项密钥需重新填写': '{base}; {cleared} stored credentials need re-entry.',
+  '导入前会为当前数据留存快照，同时暂停导入的聊天软件连接与定时任务。':
+    'Current data is saved as a snapshot before import. Imported chat apps and schedules start paused on this host.',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
   '该 Agent 执行任务时可读取的团队技能范围。开启「不限制」= 全量可读；关闭后仅勾选的技能可读，未勾选一律拒绝——「不限制」与全不勾是两种状态，可随时互转。':
     'Which team skills this Agent may read. Unrestricted reads everything; once restricted, only the checked skills are readable and every unchecked one is denied. Unrestricted and nothing-checked are two different states, switchable either way.',

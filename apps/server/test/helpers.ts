@@ -111,6 +111,7 @@ export function bootServer(
     composioFetch?: AppContext['composioFetch'];
     mcpGithubApp?: AppContext['mcpGithubApp'];
     backupStatusPath?: string;
+    backupService?: AppContext['backupService'];
     deployRecordPath?: string;
     hostUpdate?: AppContext['hostUpdate'];
     capturePage?: CapturePage;
@@ -231,6 +232,7 @@ export function bootServer(
       attachmentsDir,
       pageThumbnails: createPageThumbnails({ attachmentsDir, capture: opts.capturePage }),
       ...(opts.backupStatusPath !== undefined ? { backupStatusPath: opts.backupStatusPath } : {}),
+      ...(opts.backupService !== undefined ? { backupService: opts.backupService } : {}),
       ...(opts.deployRecordPath !== undefined ? { deployRecordPath: opts.deployRecordPath } : {}),
       ...(opts.hostUpdate !== undefined ? { hostUpdate: opts.hostUpdate } : {}),
       skillsDir,

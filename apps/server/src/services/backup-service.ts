@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statfsSync,
@@ -14,8 +15,10 @@ import {
 } from 'node:fs';
 import { hostname } from 'node:os';
 import { basename, dirname, join, resolve, sep } from 'node:path';
+import type { Readable } from 'node:stream';
 import {
   type BackupHealth,
+  type BackupImportResult,
   type BackupManagedInfo,
   type BackupRestoreResult,
   type BackupSnapshotKind,
@@ -26,11 +29,13 @@ import {
   isValidBackupSnapshotId,
 } from '@cairn/shared';
 import Database from 'better-sqlite3';
+import { createKeyfileSecretBox, type KeySecretBox } from '../lib/secret-box.js';
 import {
   collectDirectoryEntries,
   decryptBackupPayload,
   encryptBackupPayload,
   extractEntriesToDir,
+  extractTarGzStreamToDir,
   packTarGz,
   resolveBackupEncryptionKey,
   sha256Hex,
@@ -50,7 +55,11 @@ const CLOUD_LOCAL_CACHE_COUNT = 2;
 const DEFAULT_MIN_FREE_BYTES = 512 * 1024 * 1024;
 const DATA_DIRS = ['attachments', 'repos'] as const;
 const DATA_FILES = ['environment-id', 'vapid.json', 'secretbox.key'] as const;
-const EXPORT_EXCLUDED_PATHS: readonly string[] = ['secretbox.key', 'vapid.json'];
+const EXPORT_EXCLUDED_PATHS: readonly string[] = ['environment-id', 'secretbox.key', 'vapid.json'];
+const HOST_IDENTITY_FILES: readonly string[] = ['environment-id', 'secretbox.key', 'vapid.json'];
+const MAX_IMPORT_BYTES = 256 * 1024 * 1024;
+const OAUTH_CIPHER_PREFIX = 'oauth-personal:';
+const BOUND_OAUTH_CIPHER_PREFIX = `${OAUTH_CIPHER_PREFIX}v2:`;
 
 interface BackupManifest {
   version: 1;
@@ -70,6 +79,7 @@ interface PendingRestoreRecord {
   snapshotId: string;
   stagedDir: string;
   createdAt: number;
+  keepHost?: boolean;
 }
 
 export class BackupInProgressError extends Error {
@@ -86,11 +96,27 @@ export class BackupNotFoundError extends Error {
   }
 }
 
+export class BackupImportInvalidError extends Error {
+  constructor(message = 'Invalid or corrupted backup archive.') {
+    super(message);
+    this.name = 'BackupImportInvalidError';
+  }
+}
+
+export interface BackupImportOptions {
+  keepHost?: boolean;
+  pauseExternalConnectors?: boolean;
+}
+
 export interface BackupService {
   health(): Promise<BackupHealth>;
   runBackup(kind?: BackupSnapshotKind): Promise<BackupSnapshotSummary>;
   exportArchive(): Promise<{ filename: string; buffer: Buffer; snapshotId: string }>;
   prepareRestore(snapshotId: string): Promise<BackupRestoreResult>;
+  prepareImport(
+    archive: Buffer | Readable,
+    options?: BackupImportOptions,
+  ): Promise<BackupImportResult>;
   start(): void;
   stop(): void;
 }
@@ -283,11 +309,23 @@ function removeWalSidecars(dbFilePath: string): void {
   }
 }
 
+function finalizeStagedSqlite(dbFilePath: string): void {
+  const rw = new Database(dbFilePath);
+  try {
+    rw.pragma('wal_checkpoint(TRUNCATE)');
+    rw.pragma('journal_mode = DELETE');
+  } finally {
+    rw.close();
+  }
+  removeWalSidecars(dbFilePath);
+}
+
 function installVerifiedDirIntoDataDir(
   stagedDir: string,
   dataDir: string,
   dbPath: string,
   skillsDir?: string,
+  keepHost = false,
 ): void {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   mkdirSync(dirname(dbPath), { recursive: true, mode: 0o700 });
@@ -317,12 +355,426 @@ function installVerifiedDirIntoDataDir(
     copyDirectoryTree(skillsSrc, skillsDir);
   }
 
-  for (const fileName of DATA_FILES) {
-    const src = join(stagedDir, fileName);
-    if (existsSync(src)) {
-      copyAtomic(src, join(dataDir, fileName), 0o600);
+  if (!keepHost) {
+    for (const fileName of DATA_FILES) {
+      const src = join(stagedDir, fileName);
+      if (existsSync(src)) {
+        copyAtomic(src, join(dataDir, fileName), 0o600);
+      }
     }
   }
+}
+
+function hasSqliteTable(db: Database.Database, name: string): boolean {
+  return (
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) !==
+    undefined
+  );
+}
+
+function unwrapCipherPrefix(raw: string): { prefix: string; envelope: string } {
+  if (raw.startsWith(BOUND_OAUTH_CIPHER_PREFIX)) {
+    return {
+      prefix: BOUND_OAUTH_CIPHER_PREFIX,
+      envelope: raw.slice(BOUND_OAUTH_CIPHER_PREFIX.length),
+    };
+  }
+  if (raw.startsWith(OAUTH_CIPHER_PREFIX)) {
+    return {
+      prefix: OAUTH_CIPHER_PREFIX,
+      envelope: raw.slice(OAUTH_CIPHER_PREFIX.length),
+    };
+  }
+  return { prefix: '', envelope: raw };
+}
+
+function canOpenCipher(raw: string, box: KeySecretBox): boolean {
+  try {
+    box.open(unwrapCipherPrefix(raw).envelope);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resealCipherValue(raw: string, sourceBox: KeySecretBox, targetBox: KeySecretBox): string {
+  const { prefix, envelope } = unwrapCipherPrefix(raw);
+  return `${prefix}${targetBox.seal(sourceBox.open(envelope))}`;
+}
+
+function resealAllTables(
+  rw: Database.Database,
+  sourceBox: KeySecretBox,
+  targetBox: KeySecretBox,
+): number {
+  let updated = 0;
+
+  if (hasSqliteTable(rw, 'provider')) {
+    const rows = rw
+      .prepare('SELECT id, apiKeyCipher FROM provider WHERE apiKeyCipher IS NOT NULL')
+      .all() as Array<{ id: string; apiKeyCipher: string }>;
+    const stmt = rw.prepare('UPDATE provider SET apiKeyCipher = ? WHERE id = ?');
+    for (const row of rows) {
+      stmt.run(resealCipherValue(row.apiKeyCipher, sourceBox, targetBox), row.id);
+      updated += 1;
+    }
+  }
+
+  if (hasSqliteTable(rw, 'secret')) {
+    const rows = rw
+      .prepare(
+        'SELECT id, valueCipher, usernameCipher, envSeal FROM secret WHERE valueCipher IS NOT NULL OR usernameCipher IS NOT NULL',
+      )
+      .all() as Array<{
+      id: string;
+      valueCipher: string | null;
+      usernameCipher: string | null;
+      envSeal: string | null;
+    }>;
+    const stmt = rw.prepare(
+      'UPDATE secret SET valueCipher = ?, usernameCipher = ?, envSeal = ? WHERE id = ?',
+    );
+    for (const row of rows) {
+      const nextValueCipher =
+        row.valueCipher === null ? null : resealCipherValue(row.valueCipher, sourceBox, targetBox);
+      const nextUsernameCipher =
+        row.usernameCipher === null
+          ? null
+          : resealCipherValue(row.usernameCipher, sourceBox, targetBox);
+      const wasEnv =
+        row.valueCipher !== null &&
+        row.envSeal !== null &&
+        row.envSeal === sha256Hex(Buffer.from(row.valueCipher, 'utf8'));
+      const nextEnvSeal =
+        wasEnv && nextValueCipher !== null
+          ? sha256Hex(Buffer.from(nextValueCipher, 'utf8'))
+          : row.envSeal;
+      stmt.run(nextValueCipher, nextUsernameCipher, nextEnvSeal, row.id);
+      updated += 1;
+    }
+  }
+
+  if (hasSqliteTable(rw, 'github_connection')) {
+    const rows = rw
+      .prepare('SELECT teamId, accessTokenCipher, refreshTokenCipher FROM github_connection')
+      .all() as Array<{
+      teamId: string;
+      accessTokenCipher: string;
+      refreshTokenCipher: string | null;
+    }>;
+    const stmt = rw.prepare(
+      'UPDATE github_connection SET accessTokenCipher = ?, refreshTokenCipher = ? WHERE teamId = ?',
+    );
+    for (const row of rows) {
+      stmt.run(
+        resealCipherValue(row.accessTokenCipher, sourceBox, targetBox),
+        row.refreshTokenCipher === null
+          ? null
+          : resealCipherValue(row.refreshTokenCipher, sourceBox, targetBox),
+        row.teamId,
+      );
+      updated += 1;
+    }
+  }
+
+  for (const table of ['claude_subscription', 'devin_subscription'] as const) {
+    if (!hasSqliteTable(rw, table)) continue;
+    const rows = rw.prepare(`SELECT id, tokenCipher FROM ${table}`).all() as Array<{
+      id: string;
+      tokenCipher: string;
+    }>;
+    const stmt = rw.prepare(`UPDATE ${table} SET tokenCipher = ? WHERE id = ?`);
+    for (const row of rows) {
+      stmt.run(resealCipherValue(row.tokenCipher, sourceBox, targetBox), row.id);
+      updated += 1;
+    }
+  }
+
+  if (hasSqliteTable(rw, 'antigravity_subscription')) {
+    const rows = rw
+      .prepare('SELECT id, tokenCipher FROM antigravity_subscription WHERE tokenCipher IS NOT NULL')
+      .all() as Array<{ id: string; tokenCipher: string }>;
+    const stmt = rw.prepare('UPDATE antigravity_subscription SET tokenCipher = ? WHERE id = ?');
+    for (const row of rows) {
+      stmt.run(resealCipherValue(row.tokenCipher, sourceBox, targetBox), row.id);
+      updated += 1;
+    }
+  }
+
+  if (hasSqliteTable(rw, 'mcp_connector')) {
+    const rows = rw
+      .prepare(
+        'SELECT id, valuesCipher, oauthCipher FROM mcp_connector WHERE valuesCipher IS NOT NULL OR oauthCipher IS NOT NULL',
+      )
+      .all() as Array<{ id: string; valuesCipher: string | null; oauthCipher: string | null }>;
+    const stmt = rw.prepare(
+      'UPDATE mcp_connector SET valuesCipher = ?, oauthCipher = ? WHERE id = ?',
+    );
+    for (const row of rows) {
+      stmt.run(
+        row.valuesCipher === null
+          ? null
+          : resealCipherValue(row.valuesCipher, sourceBox, targetBox),
+        row.oauthCipher === null ? null : resealCipherValue(row.oauthCipher, sourceBox, targetBox),
+        row.id,
+      );
+      updated += 1;
+    }
+  }
+
+  if (hasSqliteTable(rw, 'im_connection')) {
+    const rows = rw.prepare('SELECT id, secretCipher FROM im_connection').all() as Array<{
+      id: string;
+      secretCipher: string;
+    }>;
+    const stmt = rw.prepare('UPDATE im_connection SET secretCipher = ? WHERE id = ?');
+    for (const row of rows) {
+      stmt.run(resealCipherValue(row.secretCipher, sourceBox, targetBox), row.id);
+      updated += 1;
+    }
+  }
+
+  return updated;
+}
+
+function scrubUnreadableTables(rw: Database.Database, targetBox: KeySecretBox): number {
+  let cleared = 0;
+
+  if (hasSqliteTable(rw, 'provider')) {
+    const rows = rw
+      .prepare('SELECT id, apiKeyCipher FROM provider WHERE apiKeyCipher IS NOT NULL')
+      .all() as Array<{ id: string; apiKeyCipher: string }>;
+    const stmt = rw.prepare('UPDATE provider SET apiKeyCipher = NULL WHERE id = ?');
+    for (const row of rows) {
+      if (!canOpenCipher(row.apiKeyCipher, targetBox)) {
+        stmt.run(row.id);
+        cleared += 1;
+      }
+    }
+  }
+
+  if (hasSqliteTable(rw, 'secret')) {
+    const rows = rw
+      .prepare(
+        'SELECT id, valueCipher, usernameCipher FROM secret WHERE valueCipher IS NOT NULL OR usernameCipher IS NOT NULL',
+      )
+      .all() as Array<{ id: string; valueCipher: string | null; usernameCipher: string | null }>;
+    const stmt = rw.prepare(
+      'UPDATE secret SET valueCipher = NULL, usernameCipher = NULL, envSeal = NULL WHERE id = ?',
+    );
+    for (const row of rows) {
+      const valueBroken = row.valueCipher !== null && !canOpenCipher(row.valueCipher, targetBox);
+      const userBroken =
+        row.usernameCipher !== null && !canOpenCipher(row.usernameCipher, targetBox);
+      if (valueBroken || userBroken) {
+        stmt.run(row.id);
+        cleared += 1;
+      }
+    }
+  }
+
+  if (hasSqliteTable(rw, 'github_connection')) {
+    const rows = rw
+      .prepare('SELECT teamId, accessTokenCipher, refreshTokenCipher FROM github_connection')
+      .all() as Array<{
+      teamId: string;
+      accessTokenCipher: string;
+      refreshTokenCipher: string | null;
+    }>;
+    const delStmt = rw.prepare('DELETE FROM github_connection WHERE teamId = ?');
+    const clearRefreshStmt = rw.prepare(
+      'UPDATE github_connection SET refreshTokenCipher = NULL WHERE teamId = ?',
+    );
+    for (const row of rows) {
+      if (!canOpenCipher(row.accessTokenCipher, targetBox)) {
+        delStmt.run(row.teamId);
+        cleared += 1;
+      } else if (
+        row.refreshTokenCipher !== null &&
+        !canOpenCipher(row.refreshTokenCipher, targetBox)
+      ) {
+        clearRefreshStmt.run(row.teamId);
+        cleared += 1;
+      }
+    }
+  }
+
+  for (const table of ['claude_subscription', 'devin_subscription'] as const) {
+    if (!hasSqliteTable(rw, table)) continue;
+    const rows = rw.prepare(`SELECT id, tokenCipher FROM ${table}`).all() as Array<{
+      id: string;
+      tokenCipher: string;
+    }>;
+    const delStmt = rw.prepare(`DELETE FROM ${table} WHERE id = ?`);
+    for (const row of rows) {
+      if (!canOpenCipher(row.tokenCipher, targetBox)) {
+        delStmt.run(row.id);
+        cleared += 1;
+      }
+    }
+  }
+
+  if (hasSqliteTable(rw, 'antigravity_subscription')) {
+    const rows = rw
+      .prepare(
+        'SELECT id, tokenCipher, runnerId FROM antigravity_subscription WHERE tokenCipher IS NOT NULL',
+      )
+      .all() as Array<{ id: string; tokenCipher: string; runnerId: string | null }>;
+    const clearTokenStmt = rw.prepare(
+      'UPDATE antigravity_subscription SET tokenCipher = NULL WHERE id = ?',
+    );
+    const delStmt = rw.prepare('DELETE FROM antigravity_subscription WHERE id = ?');
+    for (const row of rows) {
+      if (!canOpenCipher(row.tokenCipher, targetBox)) {
+        if (row.runnerId !== null) clearTokenStmt.run(row.id);
+        else delStmt.run(row.id);
+        cleared += 1;
+      }
+    }
+  }
+
+  if (hasSqliteTable(rw, 'mcp_connector')) {
+    const rows = rw
+      .prepare(
+        'SELECT id, valuesCipher, oauthCipher FROM mcp_connector WHERE valuesCipher IS NOT NULL OR oauthCipher IS NOT NULL',
+      )
+      .all() as Array<{ id: string; valuesCipher: string | null; oauthCipher: string | null }>;
+    const stmt = rw.prepare(
+      'UPDATE mcp_connector SET valuesCipher = ?, oauthCipher = ? WHERE id = ?',
+    );
+    for (const row of rows) {
+      const clearValues = row.valuesCipher !== null && !canOpenCipher(row.valuesCipher, targetBox);
+      const clearOauth = row.oauthCipher !== null && !canOpenCipher(row.oauthCipher, targetBox);
+      if (clearValues || clearOauth) {
+        stmt.run(
+          clearValues ? null : row.valuesCipher,
+          clearOauth ? null : row.oauthCipher,
+          row.id,
+        );
+        cleared += 1;
+      }
+    }
+  }
+
+  if (hasSqliteTable(rw, 'im_connection')) {
+    const rows = rw.prepare('SELECT id, secretCipher FROM im_connection').all() as Array<{
+      id: string;
+      secretCipher: string;
+    }>;
+    const stmt = rw.prepare(
+      "UPDATE im_connection SET secretCipher = ?, status = 'expired', statusDetail = 'Credentials excluded from portable export — reconnect to re-enter credentials on this host.', pollOffset = NULL WHERE id = ?",
+    );
+    for (const row of rows) {
+      if (!canOpenCipher(row.secretCipher, targetBox)) {
+        stmt.run(targetBox.seal('{}'), row.id);
+        cleared += 1;
+      }
+    }
+  }
+
+  return cleared;
+}
+
+function reconcileStagedCredentials(
+  stagedDir: string,
+  stagedDbPath: string,
+  targetDataDir: string,
+  keepHost: boolean,
+): { resealedCredentials: number; clearedCredentials: number } {
+  const stagedKeyPath = join(stagedDir, 'secretbox.key');
+  const hasArchiveKey = existsSync(stagedKeyPath);
+  if (hasArchiveKey && !keepHost) {
+    try {
+      createKeyfileSecretBox(stagedKeyPath);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Invalid secretbox.key inside backup archive.';
+      throw new BackupImportInvalidError(message);
+    }
+    return { resealedCredentials: 0, clearedCredentials: 0 };
+  }
+
+  const targetBox = createKeyfileSecretBox(join(targetDataDir, 'secretbox.key'));
+  let sourceBox: KeySecretBox | null = null;
+  if (hasArchiveKey && keepHost) {
+    try {
+      sourceBox = createKeyfileSecretBox(stagedKeyPath);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Invalid secretbox.key inside backup archive.';
+      throw new BackupImportInvalidError(message);
+    }
+  }
+
+  const rw = new Database(stagedDbPath);
+  let resealedCredentials = 0;
+  let clearedCredentials = 0;
+  try {
+    const tx = rw.transaction(() => {
+      if (sourceBox !== null) {
+        try {
+          resealedCredentials = resealAllTables(rw, sourceBox, targetBox);
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? `Archive credentials could not be opened with archive keyfile: ${error.message}`
+              : 'Archive credentials could not be opened with archive keyfile.';
+          throw new BackupImportInvalidError(message);
+        }
+      } else {
+        clearedCredentials = scrubUnreadableTables(rw, targetBox);
+      }
+    });
+    tx();
+    rw.pragma('wal_checkpoint(TRUNCATE)');
+    rw.pragma('journal_mode = DELETE');
+  } finally {
+    rw.close();
+  }
+  removeWalSidecars(stagedDbPath);
+  verifySqliteIntegrity(stagedDbPath);
+  return { resealedCredentials, clearedCredentials };
+}
+
+function pauseStagedConnectors(stagedDbPath: string): {
+  pausedImConnections: number;
+  pausedSchedules: number;
+  pausedMailAccounts: number;
+} {
+  const rw = new Database(stagedDbPath);
+  let pausedImConnections = 0;
+  let pausedSchedules = 0;
+  let pausedMailAccounts = 0;
+  try {
+    if (hasSqliteTable(rw, 'im_connection')) {
+      pausedImConnections = rw
+        .prepare(
+          "UPDATE im_connection SET status = 'expired', statusDetail = 'Paused after data import — reconnect to resume on this host.', pollOffset = NULL WHERE status IN ('connecting', 'ready', 'degraded')",
+        )
+        .run().changes;
+    }
+    if (hasSqliteTable(rw, 'schedule')) {
+      pausedSchedules = rw
+        .prepare(
+          "UPDATE schedule SET enabled = 0, pausedReason = 'Paused after data import — re-enable when ready on this host.' WHERE enabled = 1",
+        )
+        .run().changes;
+    }
+    if (hasSqliteTable(rw, 'mail_account')) {
+      pausedMailAccounts = rw
+        .prepare(
+          "UPDATE mail_account SET status = 'disconnected', lastError = 'Paused after data import — reconnect to resume on this host.' WHERE status IN ('connecting', 'watching', 'degraded')",
+        )
+        .run().changes;
+    }
+    rw.pragma('wal_checkpoint(TRUNCATE)');
+    rw.pragma('journal_mode = DELETE');
+  } finally {
+    rw.close();
+  }
+  removeWalSidecars(stagedDbPath);
+  verifySqliteIntegrity(stagedDbPath);
+  return { pausedImConnections, pausedSchedules, pausedMailAccounts };
 }
 
 function sanitizeBackupErrorDetail(error: unknown): string {
@@ -396,14 +848,22 @@ export function applyPendingRestoreIfAny(
     return null;
   }
   const stagedPath = resolve(record.stagedDir);
-  if (!stagedPath.startsWith(`${stagedParent}${sep}`) || !existsSync(stagedPath)) {
+  const canonicalParent = existsSync(stagedParent) ? realpathSync(stagedParent) : stagedParent;
+  const canonicalStaged = existsSync(stagedPath) ? realpathSync(stagedPath) : stagedPath;
+  if (!canonicalStaged.startsWith(`${canonicalParent}${sep}`) || !existsSync(canonicalStaged)) {
     logger?.warn({ snapshotId: record.snapshotId }, 'pending restore staging directory missing');
     rmSync(markerPath, { force: true });
     rmSync(stagedParent, { recursive: true, force: true });
     return null;
   }
-  verifyExtractedSnapshot(stagedPath, record.snapshotId);
-  installVerifiedDirIntoDataDir(stagedPath, dataDir, dbPath, skillsDir);
+  verifyExtractedSnapshot(canonicalStaged, record.snapshotId);
+  installVerifiedDirIntoDataDir(
+    canonicalStaged,
+    dataDir,
+    dbPath,
+    skillsDir,
+    record.keepHost === true,
+  );
   rmSync(markerPath, { force: true });
   rmSync(stagedParent, { recursive: true, force: true });
   logger?.info({ snapshotId: record.snapshotId }, 'applied pending backup restore');
@@ -553,9 +1013,12 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
     throw new BackupNotFoundError(validId);
   }
 
-  async function runBackupUnlocked(kind: BackupSnapshotKind): Promise<BackupSnapshotSummary> {
-    const startedAt = now();
-    const id = formatSnapshotId(startedAt);
+  async function buildSnapshotBundle(
+    id: string,
+    startedAt: number,
+    kind: BackupSnapshotKind,
+    includeHostIdentity: boolean,
+  ): Promise<{ manifest: BackupManifest; tarGz: Buffer }> {
     const stagingDir = join(backupsDir, `.staging-${id}`);
     try {
       ensureDiskSpace();
@@ -563,6 +1026,7 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
 
       const serverDbDest = join(stagingDir, 'server.db');
       await options.sqlite.backup(serverDbDest);
+      finalizeStagedSqlite(serverDbDest);
       verifySqliteIntegrity(serverDbDest);
 
       const coordSrc = join(options.dataDir, 'coordinator');
@@ -578,6 +1042,7 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
           } finally {
             srcDb.close();
           }
+          finalizeStagedSqlite(destPath);
           verifySqliteIntegrity(destPath);
         }
       }
@@ -589,6 +1054,7 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
         copyDirectoryTree(options.skillsDir, join(stagingDir, 'skills'), 0o600);
       }
       for (const fileName of DATA_FILES) {
+        if (!includeHostIdentity && EXPORT_EXCLUDED_PATHS.includes(fileName)) continue;
         const src = join(options.dataDir, fileName);
         if (existsSync(src)) {
           copyAtomic(src, join(stagingDir, fileName), 0o600);
@@ -613,6 +1079,17 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
         ...dataEntries,
         { path: 'manifest.json', content: manifestBuf, mode: 0o600 },
       ]);
+      return { manifest, tarGz };
+    } finally {
+      rmSync(stagingDir, { recursive: true, force: true });
+    }
+  }
+
+  async function runBackupUnlocked(kind: BackupSnapshotKind): Promise<BackupSnapshotSummary> {
+    const startedAt = now();
+    const id = formatSnapshotId(startedAt);
+    try {
+      const { tarGz } = await buildSnapshotBundle(id, startedAt, kind, true);
       const encrypted = encryptBackupPayload(tarGz, encryptionKey, id);
 
       const summary: BackupSnapshotSummary = {
@@ -643,8 +1120,6 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
       recordStatus('error', sanitizeBackupErrorDetail(error), now());
       options.logger?.warn({ err: error, kind }, 'backup failed');
       throw error;
-    } finally {
-      rmSync(stagingDir, { recursive: true, force: true });
     }
   }
 
@@ -675,38 +1150,23 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
     buffer: Buffer;
     snapshotId: string;
   }> {
-    let latest = (await listSnapshots())[0];
-    if (latest === undefined || now() - latest.createdAt > 5 * 60 * 1000) {
-      latest = await runBackup('manual');
+    if (inProgress || restorePending) {
+      throw new BackupInProgressError();
     }
-    const encrypted = await readEncryptedSnapshot(latest.id);
-    const tarGz = decryptBackupPayload(encrypted, encryptionKey, latest.id);
-    const filteredEntries = unpackTarGz(tarGz).filter(
-      (entry) => !EXPORT_EXCLUDED_PATHS.includes(entry.path),
-    );
-    const exportFiles: Record<string, string> = {};
-    const nonManifest = filteredEntries.filter((entry) => entry.path !== 'manifest.json');
-    for (const entry of nonManifest) {
-      exportFiles[entry.path] = sha256Hex(entry.content);
+    inProgress = true;
+    try {
+      const startedAt = now();
+      const snapshotId = formatSnapshotId(startedAt);
+      const { tarGz } = await buildSnapshotBundle(snapshotId, startedAt, 'manual', false);
+      const dateStamp = new Date(startedAt).toISOString().slice(0, 10);
+      return {
+        filename: `cairn-backup-${dateStamp}.tar.gz`,
+        buffer: tarGz,
+        snapshotId,
+      };
+    } finally {
+      inProgress = false;
     }
-    const manifestEntry = filteredEntries.find((entry) => entry.path === 'manifest.json');
-    const updatedEntries = [...nonManifest];
-    if (manifestEntry !== undefined) {
-      const parsed = parseManifest(manifestEntry.content.toString('utf8'));
-      const exportManifest = { ...parsed, files: exportFiles };
-      updatedEntries.push({
-        path: 'manifest.json',
-        content: Buffer.from(`${JSON.stringify(exportManifest, null, 2)}\n`, 'utf8'),
-        mode: 0o600,
-      });
-    }
-    const sanitizedTarGz = packTarGz(updatedEntries);
-    const dateStamp = new Date(latest.createdAt).toISOString().slice(0, 10);
-    return {
-      filename: `cairn-backup-${dateStamp}.tar.gz`,
-      buffer: sanitizedTarGz,
-      snapshotId: latest.id,
-    };
   }
 
   async function prepareRestore(snapshotId: string): Promise<BackupRestoreResult> {
@@ -724,8 +1184,7 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
       ensureDiskSpace();
       const encrypted = await readEncryptedSnapshot(validId);
       const tarGz = decryptBackupPayload(encrypted, encryptionKey, validId);
-      const entries = unpackTarGz(tarGz);
-      extractEntriesToDir(entries, stagedDir);
+      await extractTarGzStreamToDir(tarGz, stagedDir);
       verifyExtractedSnapshot(stagedDir, validId);
 
       const undoSnapshot = await runBackupUnlocked('pre-restore');
@@ -752,6 +1211,123 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
       };
     } catch (error) {
       rmSync(stagedDir, { recursive: true, force: true });
+      const stagedParent = join(options.dataDir, '.restore-staged');
+      if (existsSync(stagedParent) && readdirSync(stagedParent).length === 0) {
+        rmSync(stagedParent, { recursive: true, force: true });
+      }
+      throw error;
+    } finally {
+      inProgress = false;
+    }
+  }
+
+  async function prepareImport(
+    archive: Buffer | Readable,
+    importOptions: BackupImportOptions = {},
+  ): Promise<BackupImportResult> {
+    if (inProgress || restorePending) {
+      throw new BackupInProgressError();
+    }
+    if (Buffer.isBuffer(archive) && (archive.length === 0 || archive.length > MAX_IMPORT_BYTES)) {
+      throw new BackupImportInvalidError(
+        'Backup archive is empty or exceeds maximum allowed size.',
+      );
+    }
+    const keepHost = importOptions.keepHost ?? true;
+    const pauseExternalConnectors = importOptions.pauseExternalConnectors ?? true;
+    inProgress = true;
+    const stagedDir = join(
+      options.dataDir,
+      '.restore-staged',
+      `import-${randomBytes(6).toString('hex')}`,
+    );
+    try {
+      let manifest: BackupManifest;
+      try {
+        await extractTarGzStreamToDir(archive, stagedDir, { maxCompressedBytes: MAX_IMPORT_BYTES });
+        const manifestPath = join(stagedDir, 'manifest.json');
+        if (!existsSync(manifestPath)) {
+          throw new Error('backup archive is missing manifest.json');
+        }
+        const rawManifest = parseManifest(readFileSync(manifestPath, 'utf8'));
+        manifest = verifyExtractedSnapshot(stagedDir, rawManifest.id);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Invalid or corrupted backup archive.';
+        throw new BackupImportInvalidError(message);
+      }
+
+      const stagedDbPath = join(stagedDir, 'server.db');
+      let pausedImConnections = 0;
+      let pausedSchedules = 0;
+      let pausedMailAccounts = 0;
+      if (pauseExternalConnectors) {
+        const paused = pauseStagedConnectors(stagedDbPath);
+        pausedImConnections = paused.pausedImConnections;
+        pausedSchedules = paused.pausedSchedules;
+        pausedMailAccounts = paused.pausedMailAccounts;
+      }
+
+      const { resealedCredentials, clearedCredentials } = reconcileStagedCredentials(
+        stagedDir,
+        stagedDbPath,
+        options.dataDir,
+        keepHost,
+      );
+
+      if (keepHost) {
+        for (const relPath of HOST_IDENTITY_FILES) {
+          rmSync(join(stagedDir, relPath), { force: true });
+          delete manifest.files[relPath];
+        }
+      }
+      removeWalSidecars(stagedDbPath);
+
+      manifest.files['server.db'] = sha256Hex(readFileSync(stagedDbPath));
+      manifest.counts = readDbCounts(stagedDbPath);
+      writeAtomic(
+        join(stagedDir, 'manifest.json'),
+        `${JSON.stringify(manifest, null, 2)}\n`,
+        0o600,
+      );
+      verifyExtractedSnapshot(stagedDir, manifest.id);
+
+      ensureDiskSpace();
+      const undoSnapshot = await runBackupUnlocked('pre-restore');
+      const marker: PendingRestoreRecord = {
+        version: 1,
+        snapshotId: manifest.id,
+        stagedDir,
+        createdAt: now(),
+        keepHost,
+      };
+      writeAtomic(
+        join(options.dataDir, RESTORE_MARKER),
+        `${JSON.stringify(marker, null, 2)}\n`,
+        0o600,
+      );
+      restorePending = true;
+      const restarting = options.onRestart !== undefined;
+      if (options.onRestart !== undefined) {
+        setTimeout(() => options.onRestart?.(), 250).unref();
+      }
+      return {
+        importedId: manifest.id,
+        undoBackupId: undoSnapshot.id,
+        restarting,
+        pausedImConnections,
+        pausedSchedules,
+        pausedMailAccounts,
+        resealedCredentials,
+        clearedCredentials,
+        counts: manifest.counts,
+      };
+    } catch (error) {
+      rmSync(stagedDir, { recursive: true, force: true });
+      const stagedParent = join(options.dataDir, '.restore-staged');
+      if (existsSync(stagedParent) && readdirSync(stagedParent).length === 0) {
+        rmSync(stagedParent, { recursive: true, force: true });
+      }
       throw error;
     } finally {
       inProgress = false;
@@ -773,6 +1349,7 @@ export function createBackupService(options: BackupServiceOptions): BackupServic
     runBackup,
     exportArchive,
     prepareRestore,
+    prepareImport,
     start() {
       if (initialTimer !== null || periodicTimer !== null) return;
       initialTimer = setTimeout(() => {

@@ -42,6 +42,23 @@ export const backupRestoreResultSchema = z.object({
 });
 export type BackupRestoreResult = z.infer<typeof backupRestoreResultSchema>;
 
+export const backupImportResultSchema = z.object({
+  importedId: z.string().min(1),
+  undoBackupId: z.string().min(1),
+  restarting: z.boolean(),
+  pausedImConnections: z.number().int().nonnegative(),
+  pausedSchedules: z.number().int().nonnegative(),
+  pausedMailAccounts: z.number().int().nonnegative(),
+  resealedCredentials: z.number().int().nonnegative(),
+  clearedCredentials: z.number().int().nonnegative(),
+  counts: z.object({
+    projects: z.number().int().nonnegative(),
+    todos: z.number().int().nonnegative(),
+    messages: z.number().int().nonnegative(),
+  }),
+});
+export type BackupImportResult = z.infer<typeof backupImportResultSchema>;
+
 export const backupStatusSchema = z.object({
   host: z.string(),
   lastRunAt: z.number().int(),

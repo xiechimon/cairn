@@ -83,6 +83,8 @@ export function BackupSettingsSection() {
   const backupQ = useServerBackup(live);
   const mutations = useBackupMutations();
   const [exporting, setExporting] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [importProgress, setImportProgress] = useState<number | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
   const [confirmSnapshot, setConfirmSnapshot] = useState<BackupSnapshotSummary | null>(null);
@@ -94,7 +96,12 @@ export function BackupSettingsSection() {
 
   const statusLine = backupStatusLine(health, locale, t);
   const snapshots = managed.snapshots;
-  const busy = managed.inProgress || mutations.runNow.isPending;
+  const isBackingUp = mutations.runNow.isPending;
+  const isImporting = mutations.importArchive.isPending;
+  const isRestoring = mutations.restore.isPending;
+  const busy = managed.inProgress || isBackingUp || isImporting || isRestoring || exporting;
+  const backupButtonBusy =
+    isBackingUp || (managed.inProgress && !isImporting && !isRestoring && !exporting);
 
   const handleExport = async () => {
     if (exporting) return;
@@ -126,7 +133,7 @@ export function BackupSettingsSection() {
   };
 
   const handleRestoreConfirm = () => {
-    if (confirmSnapshot === null) return;
+    if (confirmSnapshot === null || isRestoring) return;
     const target = confirmSnapshot;
     setConfirmSnapshot(null);
     mutations.restore.mutate(target.id, {
@@ -139,6 +146,73 @@ export function BackupSettingsSection() {
       },
       onError: (error) => toastError(t('恢复失败，请重试。'), error),
     });
+  };
+
+  const handlePickImportFile = () => {
+    if (busy) return;
+    const picker = document.createElement('input');
+    picker.type = 'file';
+    picker.accept = '.tar.gz,.tgz,application/gzip';
+    picker.onchange = () => {
+      const selected = picker.files?.[0] ?? null;
+      if (selected !== null) {
+        setPendingImportFile(selected);
+        setImportProgress(null);
+      }
+    };
+    picker.click();
+  };
+
+  const handleImportConfirm = () => {
+    if (pendingImportFile === null || isImporting) return;
+    const target = pendingImportFile;
+    setImportProgress(0);
+    mutations.importArchive.mutate(
+      {
+        file: target,
+        onProgress: (percent) => setImportProgress(percent),
+      },
+      {
+        onSuccess: (result) => {
+          setPendingImportFile(null);
+          setImportProgress(null);
+          const pausedTotal =
+            result.pausedImConnections + result.pausedSchedules + result.pausedMailAccounts;
+          const baseMessage = result.restarting
+            ? t('已保存当前状态并开始导入，服务正在重启')
+            : t('已保存当前状态并完成导入准备，重启服务后生效');
+          if (pausedTotal > 0 && result.clearedCredentials > 0) {
+            toastSuccess(
+              t('{base}；已暂停 {paused} 项外部触发器，{cleared} 项密钥需重新填写', {
+                base: baseMessage,
+                paused: pausedTotal,
+                cleared: result.clearedCredentials,
+              }),
+            );
+          } else if (pausedTotal > 0) {
+            toastSuccess(
+              t('{base}；已暂停 {paused} 项外部触发器', {
+                base: baseMessage,
+                paused: pausedTotal,
+              }),
+            );
+          } else if (result.clearedCredentials > 0) {
+            toastSuccess(
+              t('{base}；{cleared} 项密钥需重新填写', {
+                base: baseMessage,
+                cleared: result.clearedCredentials,
+              }),
+            );
+          } else {
+            toastSuccess(baseMessage);
+          }
+        },
+        onError: (error) => {
+          setImportProgress(null);
+          toastError(t('导入失败，请检查备份文件后重试。'), error);
+        },
+      },
+    );
   };
 
   return (
@@ -192,7 +266,7 @@ export function BackupSettingsSection() {
               })
             }
           >
-            {busy ? t('正在备份…') : t('立即备份')}
+            {backupButtonBusy ? t('正在备份…') : t('立即备份')}
           </Button>
         </SettingsRow>
 
@@ -204,11 +278,24 @@ export function BackupSettingsSection() {
             variant="outline"
             size="sm"
             className="pointer-coarse:h-11"
-            disabled={exporting || busy}
+            disabled={busy}
             data-testid="backup-export-all"
             onClick={() => void handleExport()}
           >
             {exporting ? t('正在打包…') : t('下载全部数据')}
+          </Button>
+        </SettingsRow>
+
+        <SettingsRow label={t('导入数据')}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="pointer-coarse:h-11"
+            disabled={busy}
+            data-testid="backup-import-trigger"
+            onClick={handlePickImportFile}
+          >
+            {isImporting ? t('正在导入…') : t('选择备份文件')}
           </Button>
         </SettingsRow>
 
@@ -253,7 +340,7 @@ export function BackupSettingsSection() {
                   variant="outline"
                   size="sm"
                   className="pointer-coarse:h-11"
-                  disabled={mutations.restore.isPending || busy}
+                  disabled={busy}
                   onClick={() => setConfirmSnapshot(snapshot)}
                 >
                   {t('恢复到这份备份')}
@@ -266,6 +353,7 @@ export function BackupSettingsSection() {
 
       {confirmSnapshot !== null && (
         <DialogShell
+          stacked
           title={t('恢复到这份备份')}
           subtitle={t('将把全部对话、任务与设置回滚到 {time} 的状态。', {
             time: formatBackupTime(confirmSnapshot.createdAt, locale, t),
@@ -293,6 +381,61 @@ export function BackupSettingsSection() {
               '执行恢复前，系统会自动为当前数据留存一份快照。如果恢复后发现选错，随时可以从历史备份一键撤回。',
             )}
           </p>
+        </DialogShell>
+      )}
+
+      {pendingImportFile !== null && (
+        <DialogShell
+          stacked
+          title={t('确认导入数据')}
+          onClose={() => {
+            if (!isImporting) {
+              setPendingImportFile(null);
+              setImportProgress(null);
+            }
+          }}
+          footer={
+            <>
+              <Button
+                variant="ghost"
+                disabled={isImporting}
+                onClick={() => {
+                  setPendingImportFile(null);
+                  setImportProgress(null);
+                }}
+              >
+                {t('取消')}
+              </Button>
+              <Button
+                variant="outline"
+                className={DIALOG_PRIMARY_BUTTON}
+                disabled={isImporting}
+                data-testid="backup-import-confirm"
+                onClick={handleImportConfirm}
+              >
+                {isImporting ? t('正在导入…') : t('确认导入')}
+              </Button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-2">
+            <p className="m-0 text-ui font-medium tabular-nums text-foreground">
+              {pendingImportFile.name} · {formatBackupSize(pendingImportFile.size)}
+            </p>
+            <p className="m-0 text-ui text-content-secondary">
+              {t('导入前会为当前数据留存快照，同时暂停导入的聊天软件连接与定时任务。')}
+            </p>
+            {isImporting && (
+              <p
+                className="m-0 text-ui text-content-secondary tabular-nums"
+                data-testid="backup-import-progress"
+              >
+                {importProgress !== null && importProgress < 100
+                  ? t('正在上传备份文件 ({percent}%)…', { percent: importProgress })
+                  : t('正在校验并导入数据…')}
+              </p>
+            )}
+          </div>
         </DialogShell>
       )}
     </SettingsSection>

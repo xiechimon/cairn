@@ -27,6 +27,7 @@ import { bootServer, insertMachine, postProject, req, startLegacyBuild } from '.
 const INFERRED_ROUTES = [
   'POST /api/server/backup/run',
   'POST /api/server/backup/export',
+  'POST /api/server/backup/import',
   'POST /api/server/backup/{id}/restore',
   'GET /api/server/deploy/lease',
   'PUT /api/server/deploy/lease',

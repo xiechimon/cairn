@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
+import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import {
   BROWSER_AUTH_HEADER,
   type ClerkAuthConfigResponse,
@@ -32,7 +34,11 @@ import {
   sameOriginPageWrite,
 } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
-import { BackupInProgressError, BackupNotFoundError } from './services/backup-service.js';
+import {
+  BackupImportInvalidError,
+  BackupInProgressError,
+  BackupNotFoundError,
+} from './services/backup-service.js';
 import { readBackupHealth } from './services/backup-status.js';
 import {
   AUTH_COOKIE,
@@ -347,6 +353,52 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       }
       ctx.logger?.warn({ err: error, snapshotId: id }, 'backup restore failed');
       throw new HttpError(500, 'Backup restore failed.');
+    }
+  });
+
+  app.post('/api/server/backup/import', async (c) => {
+    if (ctx.backupService === undefined) {
+      throw new HttpError(503, 'Built-in backup is not enabled on this server.');
+    }
+    if (
+      getCookie(c, AUTH_COOKIE) !== undefined &&
+      !sameOriginPageWrite(c, ctx.webOrigin, ctx.trustedProxies)
+    ) {
+      return c.body(null, 403);
+    }
+    let source: Buffer | Readable;
+    const contentType = c.req.header('content-type') ?? '';
+    if (contentType.toLowerCase().startsWith('multipart/form-data')) {
+      const form = await c.req.formData().catch(() => null);
+      const file = form?.get('file');
+      if (file === null || file === undefined || typeof file === 'string') {
+        throw new HttpError(400, 'Missing backup archive file.');
+      }
+      source = Readable.fromWeb(file.stream() as unknown as WebReadableStream<Uint8Array>);
+    } else if (c.req.raw.body !== null) {
+      source = Readable.fromWeb(c.req.raw.body as unknown as WebReadableStream<Uint8Array>);
+    } else {
+      source = Buffer.alloc(0);
+    }
+    const keepHostRaw = c.req.query('keepHost');
+    const pauseRaw = c.req.query('pauseExternalConnectors');
+    const keepHost = keepHostRaw !== '0' && keepHostRaw !== 'false';
+    const pauseExternalConnectors = pauseRaw !== '0' && pauseRaw !== 'false';
+    try {
+      const result = await ctx.backupService.prepareImport(source, {
+        keepHost,
+        pauseExternalConnectors,
+      });
+      return c.json(result);
+    } catch (error) {
+      if (error instanceof BackupImportInvalidError) {
+        throw new HttpError(400, error.message);
+      }
+      if (error instanceof BackupInProgressError) {
+        throw new HttpError(409, error.message);
+      }
+      ctx.logger?.warn({ err: error }, 'backup import failed');
+      throw new HttpError(500, 'Backup import failed.');
     }
   });
 

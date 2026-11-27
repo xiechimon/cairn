@@ -114,9 +114,11 @@ import type {
 } from '@cairn/shared';
 import {
   type BackupHealth,
+  type BackupImportResult,
   type BackupRestoreResult,
   type BackupSnapshotSummary,
   backupHealthSchema,
+  backupImportResultSchema,
   backupNotice,
   IN_PROGRESS_PHASES,
   isRegisteredMachine,
@@ -516,6 +518,63 @@ export function useBackupMutations() {
         api.post<BackupRestoreResult>(
           `/api/server/backup/${encodeURIComponent(snapshotId)}/restore`,
         ),
+      onSettled: invalidate,
+    }),
+    importArchive: useMutation({
+      mutationFn: async (input: {
+        file: File;
+        onProgress?: (percent: number) => void;
+      }): Promise<BackupImportResult> => {
+        const uploadViaFetch = async (): Promise<BackupImportResult> => {
+          const res = await fetchWithSession('/api/server/backup/import', {
+            method: 'POST',
+            headers: { 'content-type': 'application/gzip' },
+            body: input.file,
+          });
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          if (!res.ok) {
+            throw new ApiError(res.status, body?.error ?? res.statusText);
+          }
+          return backupImportResultSchema.parse(body);
+        };
+        if (typeof XMLHttpRequest === 'undefined') {
+          return uploadViaFetch();
+        }
+        const xhrResult = await new Promise<{ status: number; statusText: string; text: string }>(
+          (resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/server/backup/import');
+            xhr.withCredentials = true;
+            xhr.setRequestHeader('content-type', 'application/gzip');
+            xhr.upload.onprogress = (event) => {
+              if (event.lengthComputable && event.total > 0) {
+                input.onProgress?.(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+              }
+            };
+            xhr.onload = () =>
+              resolve({ status: xhr.status, statusText: xhr.statusText, text: xhr.responseText });
+            xhr.onerror = () => reject(new Error('Network error while uploading backup archive.'));
+            xhr.send(input.file);
+          },
+        );
+        if (xhrResult.status === 401) {
+          return uploadViaFetch();
+        }
+        const parsedBody = (() => {
+          try {
+            return JSON.parse(xhrResult.text) as { error?: string } | null;
+          } catch {
+            return null;
+          }
+        })();
+        if (xhrResult.status < 200 || xhrResult.status >= 300) {
+          throw new ApiError(
+            xhrResult.status,
+            parsedBody?.error ?? (xhrResult.statusText || 'Import failed.'),
+          );
+        }
+        return backupImportResultSchema.parse(parsedBody);
+      },
       onSettled: invalidate,
     }),
   };

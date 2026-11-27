@@ -200,6 +200,7 @@ describe('paired devices hold full owner rights', () => {
         ['POST', '/api/server/backup/run'],
         ['POST', '/api/server/backup/export'],
         ['POST', '/api/server/backup/snap-1/restore'],
+        ['POST', '/api/server/backup/import'],
         ['PUT', `/api/teams/${s.team.id}/top-models`, { models: [] }],
         ['GET', '/api/actions/journal'],
         ['GET', '/api/actions/proposals'],

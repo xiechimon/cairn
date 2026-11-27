@@ -2596,6 +2596,7 @@
           "/api/server/backup",
           "/api/server/backup/run",
           "/api/server/backup/export",
+          "/api/server/backup/import",
           "/api/server/backup/:id/restore",
           "/api/server/deploy",
           "/api/server/deploy/lease",

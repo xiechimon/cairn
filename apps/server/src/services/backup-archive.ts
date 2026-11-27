@@ -1,15 +1,20 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import {
   chmodSync,
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { dirname, join, normalize, relative, resolve, sep } from 'node:path';
-import { gunzipSync, gzipSync } from 'node:zlib';
+import { Readable, Transform, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { createGunzip, gunzipSync, gzipSync } from 'node:zlib';
 
 const TAR_BLOCK = 512;
 const BACKUP_ENVELOPE_MAGIC = Buffer.from('CAIRNBAK\x01', 'binary');
@@ -18,11 +23,20 @@ const IV_BYTES = 12;
 const TAG_BYTES = 16;
 const MAX_ARCHIVE_FILES = 50_000;
 const MAX_ARCHIVE_TOTAL_BYTES = 2 * 1024 * 1024 * 1024;
+const DEFAULT_STREAM_MAX_BYTES = 1024 * 1024 * 1024;
+const DEFAULT_MAX_COMPRESSED_BYTES = 256 * 1024 * 1024;
+const STRICT_OCTAL_RE = /^[0-7]+$/;
 
 export interface TarEntry {
   path: string;
   content: Buffer;
   mode: number;
+}
+
+export interface TarExtractLimits {
+  maxFiles?: number;
+  maxTotalBytes?: number;
+  maxCompressedBytes?: number;
 }
 
 export function sha256Hex(data: Buffer): string {
@@ -105,6 +119,27 @@ function readTarString(buf: Buffer, start: number, length: number): string {
   return (zero >= 0 ? slice.subarray(0, zero) : slice).toString('utf8');
 }
 
+function parseTarOctal(
+  raw: string,
+  fieldName: string,
+  fullPath: string,
+  defaultValue?: number,
+): number {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    if (defaultValue !== undefined) return defaultValue;
+    throw new Error(`malformed tar entry ${fieldName} for ${fullPath}`);
+  }
+  if (!STRICT_OCTAL_RE.test(trimmed)) {
+    throw new Error(`malformed tar entry ${fieldName} for ${fullPath}`);
+  }
+  const value = Number.parseInt(trimmed, 8);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`malformed tar entry ${fieldName} for ${fullPath}`);
+  }
+  return value;
+}
+
 export function unpackTarGz(archive: Buffer): TarEntry[] {
   const raw = gunzipSync(archive, { maxOutputLength: MAX_ARCHIVE_TOTAL_BYTES });
   const entries: TarEntry[] = [];
@@ -118,13 +153,8 @@ export function unpackTarGz(archive: Buffer): TarEntry[] {
     const name = readTarString(header, 0, 100);
     const prefix = readTarString(header, 345, 155);
     const fullPath = prefix === '' ? name : `${prefix}/${name}`;
-    const sizeText = readTarString(header, 124, 12).trim();
-    const size = sizeText === '' ? 0 : Number.parseInt(sizeText, 8);
-    if (!Number.isSafeInteger(size) || size < 0) {
-      throw new Error(`malformed tar entry size for ${fullPath}`);
-    }
-    const modeText = readTarString(header, 100, 8).trim();
-    const mode = modeText === '' ? 0o600 : Number.parseInt(modeText, 8) & 0o777;
+    const size = parseTarOctal(readTarString(header, 124, 12), 'size', fullPath, 0);
+    const mode = parseTarOctal(readTarString(header, 100, 8), 'mode', fullPath, 0o600) & 0o777;
     const padded = Math.ceil(size / TAR_BLOCK) * TAR_BLOCK;
     if (offset + size > raw.length) {
       throw new Error(`truncated tar entry: ${fullPath}`);
@@ -145,6 +175,181 @@ export function unpackTarGz(archive: Buffer): TarEntry[] {
     offset += padded;
   }
   return entries;
+}
+
+export async function extractTarGzStreamToDir(
+  source: Buffer | Readable,
+  destDir: string,
+  limits: TarExtractLimits = {},
+): Promise<void> {
+  const maxFiles = limits.maxFiles ?? MAX_ARCHIVE_FILES;
+  const maxTotalBytes = limits.maxTotalBytes ?? DEFAULT_STREAM_MAX_BYTES;
+  const maxCompressedBytes = limits.maxCompressedBytes ?? DEFAULT_MAX_COMPRESSED_BYTES;
+  if (Buffer.isBuffer(source)) {
+    if (source.length === 0) throw new Error('backup archive is empty');
+    if (source.length > maxCompressedBytes) {
+      throw new Error('backup archive exceeds safe extraction limits');
+    }
+  }
+  const resolvedRoot = resolve(destDir);
+  mkdirSync(resolvedRoot, { recursive: true, mode: 0o700 });
+
+  let compressedBytes = 0;
+  let totalUncompressedBytes = 0;
+  let fileCount = 0;
+  const seenPaths = new Set<string>();
+  const hdrScratch = Buffer.alloc(TAR_BLOCK);
+  let hdrFill = 0;
+  let state: 'header' | 'file' | 'pad' | 'done' = 'header';
+  let fileRemaining = 0;
+  let padRemaining = 0;
+  let currentFd: number | null = null;
+  let currentTarget = '';
+
+  const closeActiveFd = () => {
+    if (currentFd !== null) {
+      try {
+        closeSync(currentFd);
+      } catch {}
+      currentFd = null;
+    }
+  };
+
+  const compressedMeter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      compressedBytes += chunk.length;
+      if (compressedBytes > maxCompressedBytes) {
+        callback(new Error('backup archive exceeds safe extraction limits'));
+        return;
+      }
+      callback(null, chunk);
+    },
+    flush(callback) {
+      if (compressedBytes === 0) {
+        callback(new Error('backup archive is empty'));
+        return;
+      }
+      callback();
+    },
+  });
+
+  const tarExtractor = new Writable({
+    write(chunk: Buffer, _encoding, callback) {
+      try {
+        totalUncompressedBytes += chunk.length;
+        if (totalUncompressedBytes > maxTotalBytes) {
+          throw new Error('backup archive exceeds safe extraction limits');
+        }
+        let pos = 0;
+        while (pos < chunk.length) {
+          if (state === 'done') {
+            break;
+          }
+          if (state === 'header') {
+            const take = Math.min(TAR_BLOCK - hdrFill, chunk.length - pos);
+            chunk.copy(hdrScratch, hdrFill, pos, pos + take);
+            hdrFill += take;
+            pos += take;
+            if (hdrFill < TAR_BLOCK) break;
+            hdrFill = 0;
+            if (hdrScratch.every((b) => b === 0)) {
+              state = 'done';
+              break;
+            }
+            const typeFlag = hdrScratch[156];
+            const name = readTarString(hdrScratch, 0, 100);
+            const prefix = readTarString(hdrScratch, 345, 155);
+            const fullPath = prefix === '' ? name : `${prefix}/${name}`;
+            const size = parseTarOctal(readTarString(hdrScratch, 124, 12), 'size', fullPath, 0);
+            parseTarOctal(readTarString(hdrScratch, 100, 8), 'mode', fullPath, 0o600);
+            const rem = size % TAR_BLOCK;
+            const entryPad = rem === 0 ? 0 : TAR_BLOCK - rem;
+
+            if (typeFlag === 0 || typeFlag === 48) {
+              const safeRel = assertSafeRelativePath(fullPath);
+              if (seenPaths.has(safeRel)) {
+                throw new Error(`duplicate backup archive entry: ${safeRel}`);
+              }
+              seenPaths.add(safeRel);
+              fileCount += 1;
+              if (fileCount > maxFiles) {
+                throw new Error('backup archive exceeds safe extraction limits');
+              }
+              const target = resolve(resolvedRoot, normalize(safeRel));
+              if (!target.startsWith(`${resolvedRoot}${sep}`)) {
+                throw new Error(`archive entry escapes destination: ${safeRel}`);
+              }
+              mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+              currentFd = openSync(target, 'w', 0o600);
+              currentTarget = target;
+              fileRemaining = size;
+              padRemaining = entryPad;
+              if (fileRemaining === 0) {
+                closeActiveFd();
+                chmodSync(currentTarget, 0o600);
+                state = padRemaining > 0 ? 'pad' : 'header';
+              } else {
+                state = 'file';
+              }
+            } else if (typeFlag === 53) {
+              assertSafeRelativePath(fullPath);
+              const skipTotal = size + entryPad;
+              if (skipTotal > 0) {
+                padRemaining = skipTotal;
+                state = 'pad';
+              }
+            } else {
+              throw new Error(`unsupported tar entry type ${typeFlag} for ${fullPath}`);
+            }
+          } else if (state === 'file') {
+            const take = Math.min(fileRemaining, chunk.length - pos);
+            let written = 0;
+            while (written < take && currentFd !== null) {
+              written += writeSync(currentFd, chunk, pos + written, take - written);
+            }
+            pos += take;
+            fileRemaining -= take;
+            if (fileRemaining === 0) {
+              closeActiveFd();
+              chmodSync(currentTarget, 0o600);
+              state = padRemaining > 0 ? 'pad' : 'header';
+            }
+          } else if (state === 'pad') {
+            const skip = Math.min(padRemaining, chunk.length - pos);
+            pos += skip;
+            padRemaining -= skip;
+            if (padRemaining === 0) {
+              state = 'header';
+            }
+          }
+        }
+        callback();
+      } catch (error) {
+        closeActiveFd();
+        callback(error instanceof Error ? error : new Error(String(error)));
+      }
+    },
+    final(callback) {
+      closeActiveFd();
+      if (hdrFill !== 0 || state === 'file' || state === 'pad') {
+        callback(new Error('truncated tar entry in backup archive'));
+        return;
+      }
+      callback();
+    },
+  });
+
+  const inputStream = Buffer.isBuffer(source) ? Readable.from([source]) : source;
+  try {
+    await pipeline(
+      inputStream,
+      compressedMeter,
+      createGunzip({ chunkSize: 64 * 1024 }),
+      tarExtractor,
+    );
+  } finally {
+    closeActiveFd();
+  }
 }
 
 export function collectDirectoryEntries(rootDir: string): TarEntry[] {
