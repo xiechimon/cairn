@@ -32,6 +32,7 @@ import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { ChiefStreamItem, MachineRow, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { useThreadPresence } from '../pwa/thread-presence.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import {
   ARCHIVED_PROJECT_WRITE_REASON,
@@ -62,6 +63,7 @@ import {
 } from './tasks-sections.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { useCloseThread, useOpenThread } from './thread-link.js';
+import { useMarkThreadRead } from './use-mark-thread-read.js';
 import { useMediaQuery, useNarrow } from './use-narrow.js';
 import { PANE_PARAM, paneOf, TASKS_TAB_PARAM, type WorkPane, WorkPanel } from './work-panel.js';
 
@@ -248,6 +250,10 @@ export function HomeC({
   );
   const [loadingDraft, setLoadingDraft] = useState('');
   const { chiefData } = surface;
+  const activeChiefThreadId =
+    live && threadId === null ? (chiefData.threadId ?? undefined) : undefined;
+  useThreadPresence(teamId, activeChiefThreadId, activeChiefThreadId !== undefined);
+  useMarkThreadRead(activeChiefThreadId);
   const conversationResetKey = conversationBoundaryKey({
     projectId,
     chat: searchParams.get('chat'),

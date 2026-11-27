@@ -30,7 +30,7 @@ import {
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { assertImQuestionFits } from './im/runtime.js';
 import { notifyChiefMessage } from './notifications.js';
-import { pushToUserSafely, type VapidKeys } from './push.js';
+import type { VapidKeys } from './push.js';
 import { coordinatorProfile } from './routing-rules.js';
 
 export interface ChiefQuestionDeps extends CommitEffects {
@@ -64,7 +64,7 @@ export function createOrGetQuestion(
   if (existing !== null) return { content: existing, created: false };
   const questions = stripUnsafeRecommendations(input.questions);
   if (deps.hub !== undefined && deps.user !== undefined) {
-    assertImQuestionFits(input.threadId, input.requestId, questions);
+    assertImQuestionFits(input.threadId, input.requestId, questions, deps.db);
   }
   const content: AskUserQuestionContent = {
     kind: ASK_USER_QUESTION_KIND,
@@ -80,7 +80,6 @@ export function createOrGetQuestion(
     notifyQuestion(deps, input.threadId, questions, input.requestId);
   });
   publishQuestion(deps, input.threadId, input.requestId);
-  pushQuestion(deps, input.threadId, input.requestId, questions);
   return { content, created: true };
 }
 
@@ -97,49 +96,20 @@ function notifyQuestion(
       ? undefined
       : deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   const agentRow = chiefRow === undefined ? null : coordinatorProfile(deps.db, chiefRow.teamId);
+  const questionLines = questions.map((q) => {
+    const options = q.options.map((o) => o.label).join(' / ');
+    return options.length > 0 ? `${q.question}（${options}）` : q.question;
+  });
   notifyChiefMessage(
     { ...deps, hub: deps.hub, user: deps.user },
     {
       threadId,
-      message: questions[0]?.question ?? '',
+      message: questionLines.join('\n'),
       ...(agentRow
         ? { agent: { name: agentRow.displayName, avatarUrl: null } }
         : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
       ...(requestId !== undefined ? { card: { requestId } } : {}),
     },
-  );
-}
-
-function pushQuestion(
-  deps: ChiefQuestionDeps,
-  threadId: string,
-  requestId: string,
-  questions: readonly AskUserQuestion[],
-): void {
-  if (deps.user === undefined || deps.vapidKeys == null) return;
-  const teamId =
-    deps.db
-      .select({ teamId: chiefThread.teamId })
-      .from(chiefThread)
-      .where(eq(chiefThread.id, threadId))
-      .get()?.teamId ?? '';
-  const questionLines = questions.map((q) => {
-    const options = q.options.map((o) => o.label).join(' / ');
-    return options.length > 0 ? `${q.question}（${options}）` : q.question;
-  });
-  pushToUserSafely(
-    deps.db,
-    deps.vapidKeys ?? null,
-    deps.user.id,
-    teamId,
-    {
-      title: '需要你决定',
-      body: questionLines.join('\n'),
-      href: `/app?chief=${encodeURIComponent(threadId)}`,
-      tag: `${deps.user.id}:${requestId}`,
-    },
-    undefined,
-    deps,
   );
 }
 
@@ -152,7 +122,6 @@ export function announceQuestion(
   if (content === null) return;
   notifyQuestion(deps, threadId, content.questions, requestId);
   publishQuestion(deps, threadId, requestId);
-  pushQuestion(deps, threadId, requestId, content.questions);
 }
 
 export async function holdForQuestion(

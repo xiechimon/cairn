@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir, release } from 'node:os';
@@ -12,15 +12,16 @@ import {
   DESKTOP_TRAY_PATH,
   type DesktopActivity,
   type DesktopMenuCommand,
+  type DesktopPresenceState,
   type DesktopRunnerState,
   type DesktopTrayState,
   type DesktopUpdateInstallResult,
   type DesktopUpdateState,
-  desktopNotificationOptions,
   ENV_VARS,
   HOST_UPDATE_REQUEST_MESSAGE,
   isAppPath,
   isDesktopActivity,
+  isDesktopDismissTag,
   isDesktopNotifyPayload,
   type NativeTrayMenu,
   nativeTrayMenuSchema,
@@ -83,6 +84,7 @@ import {
   setActiveConnection,
 } from './connections.js';
 import { installContextMenu } from './context-menu.js';
+import { createDesktopNotificationController } from './desktop-notifications.js';
 import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
 import { canInvokeHostIpc, canSwitchHost, probeRemoteReachable } from './host-lifecycle.js';
 import {
@@ -321,6 +323,32 @@ let pageActivity: DesktopActivity | null = null;
 let openMessageBoxes = 0;
 let launchActivationPending = BACKGROUND_LAUNCH;
 let activeGuard: VersionGuard | null = null;
+const desktopClientId = randomUUID();
+let desktopPresenceSeq = 0;
+let screenLockedState = false;
+let notificationController: ReturnType<typeof createDesktopNotificationController> | null = null;
+
+function currentDesktopPresence(): DesktopPresenceState & { clientId: string } {
+  const open = mainWindow !== null && !mainWindow.isDestroyed() && mainWindow.isVisible();
+  const focused = open && (mainWindow?.isFocused() ?? false);
+  const idleState = powerMonitor.getSystemIdleState(1);
+  return {
+    clientId: desktopClientId,
+    mainWindowOpen: open,
+    windowFocused: focused,
+    screenLocked: screenLockedState || idleState === 'locked',
+    systemIdleSec: powerMonitor.getSystemIdleTime(),
+  };
+}
+
+function broadcastDesktopPresence(): void {
+  const state = currentDesktopPresence();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send('desktop-presence:change', state);
+    }
+  }
+}
 const otelHeaderLogSecrets: string[] = [];
 let ownerTokenLogSecret: string | null = null;
 
@@ -786,7 +814,11 @@ function shellDescriptorArg(): string {
   )}`;
 }
 
-function openWindow(origin: string, restore: RelaunchWindow | null = null): BrowserWindow {
+function openWindow(
+  origin: string,
+  restore: RelaunchWindow | null = null,
+  initialPath?: string,
+): BrowserWindow {
   const store = windowStateStore();
   const window = new BrowserWindow({
     ...restoredBounds(store),
@@ -822,10 +854,14 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
   window.on('hide', clearQueuedTrayOpen);
   window.on('show', () => {
     if (mainWindow === window) mainWindowShown = true;
+    broadcastDesktopPresence();
   });
   window.on('hide', () => {
     if (mainWindow === window) mainWindowShown = false;
+    broadcastDesktopPresence();
   });
+  window.on('focus', broadcastDesktopPresence);
+  window.on('blur', broadcastDesktopPresence);
   const publishFullScreen = (fullScreen: boolean): void => {
     if (!window.isDestroyed()) {
       window.webContents.send('desktop-shell:fullscreen', fullScreen);
@@ -887,7 +923,12 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
   });
-  const initialUrl = restore === null ? origin : restoredUrl(origin, restore.path);
+  const initialUrl =
+    initialPath !== undefined && isAppPath(initialPath)
+      ? `${origin}${initialPath}`
+      : restore === null
+        ? origin
+        : restoredUrl(origin, restore.path);
   offlineRecovery?.dispose();
   const recovery = createOfflineRecovery({
     origin,
@@ -929,6 +970,7 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
       if (isRemoteClerkOrigin() && remoteClerkIssuer === null) {
         void refreshRemoteClerkIssuer(origin);
       }
+      notificationController?.flushPendingNavigate();
     }
   });
   window.webContents.on(
@@ -959,6 +1001,7 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
       mainWindowShown = false;
       pageActivity = null;
     }
+    broadcastDesktopPresence();
   });
   return window;
 }
@@ -969,12 +1012,24 @@ function focusWindow(): void {
     if (appOrigin !== null) openWindow(appOrigin);
     return;
   }
+  app.focus({ steal: true });
   if (window.isMinimized()) window.restore();
   window.show();
   window.focus();
 }
 
 function sendToWindow(channel: string, payload: unknown): void {
+  if (
+    mainWindow === null &&
+    channel === 'desktop-navigate' &&
+    typeof payload === 'string' &&
+    isAppPath(payload) &&
+    appOrigin !== null
+  ) {
+    app.focus({ steal: true });
+    openWindow(appOrigin, null, payload);
+    return;
+  }
   focusWindow();
   mainWindow?.webContents.send(channel, payload);
 }
@@ -1412,28 +1467,79 @@ function servePageActivity(origin: string): void {
 }
 
 function serveNotifications(origin: string): void {
+  notificationController = createDesktopNotificationController({
+    isSupported: () => Notification.isSupported(),
+    createNotification: (opts) => new Notification(opts),
+    getHistory: async () => {
+      const api = Notification as typeof Notification & {
+        getHistory?: () => Promise<Array<{ id: string; tag?: string; close: () => void }>>;
+      };
+      return typeof api.getHistory === 'function' ? api.getHistory() : [];
+    },
+    appFocus: () => app.focus({ steal: true }),
+    hasMainWindow: () => mainWindow !== null && !mainWindow.isDestroyed(),
+    isMainWindowLoading: () =>
+      mainWindow !== null &&
+      !mainWindow.isDestroyed() &&
+      mainWindow.webContents.isLoadingMainFrame(),
+    openWindowAt: (href) => {
+      if (appOrigin === null) return;
+      const win = openWindow(appOrigin, null, href);
+      win.once('ready-to-show', () => {
+        app.focus({ steal: true });
+        win.show();
+        win.focus();
+      });
+    },
+    focusAndSend: (href) => sendToWindow('desktop-navigate', href),
+    onDialogFallback: (dialogOpts) => {
+      void messageBox({
+        type: 'warning',
+        message: dialogOpts.title,
+        detail: dialogOpts.detail,
+      });
+    },
+    onDeliveryFailed: (deliveryId) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('desktop-notify:failed', deliveryId);
+        }
+      }
+    },
+  });
   ipcMain.on('desktop-notify', (event, payload: unknown) => {
     if (event.senderFrame?.origin !== origin || !isDesktopNotifyPayload(payload)) return;
-    const fallback = (): void => {
-      if (payload.dialog !== undefined) {
-        void messageBox({
-          type: 'warning',
-          message: payload.dialog.title,
-          detail: payload.dialog.detail,
-        });
-      }
-    };
-    if (!Notification.isSupported()) {
-      fallback();
+    notificationController?.show(payload);
+  });
+  ipcMain.on('desktop-notify:dismiss', (event, tag: unknown) => {
+    if (event.senderFrame?.origin !== origin || !isDesktopDismissTag(tag)) return;
+    void notificationController?.dismiss(tag);
+  });
+  ipcMain.handle('desktop-presence:state', (event) =>
+    event.senderFrame?.origin === origin ? currentDesktopPresence() : null,
+  );
+  ipcMain.on('desktop-presence:seq', (event) => {
+    if (event.senderFrame?.origin !== origin) {
+      event.returnValue = null;
       return;
     }
-    const notification = new Notification(desktopNotificationOptions(payload));
-    notification.on('click', () => sendToWindow('desktop-navigate', payload.href));
-    notification.on('failed', (_event, error) => {
-      console.warn('notification failed:', error);
-      fallback();
-    });
-    notification.show();
+    desktopPresenceSeq += 1;
+    event.returnValue = desktopPresenceSeq;
+  });
+  app.on('browser-window-focus', broadcastDesktopPresence);
+  app.on('browser-window-blur', broadcastDesktopPresence);
+  powerMonitor.on('lock-screen', () => {
+    screenLockedState = true;
+    broadcastDesktopPresence();
+  });
+  powerMonitor.on('unlock-screen', () => {
+    screenLockedState = false;
+    broadcastDesktopPresence();
+  });
+  powerMonitor.on('suspend', broadcastDesktopPresence);
+  powerMonitor.on('resume', () => {
+    screenLockedState = powerMonitor.getSystemIdleState(1) === 'locked';
+    broadcastDesktopPresence();
   });
 }
 

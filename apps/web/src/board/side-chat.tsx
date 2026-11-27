@@ -22,6 +22,7 @@ import { Link, useSearchParams } from 'react-router';
 import { activityStore } from '../api/activity.js';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { dismissNotificationForEntity } from '../api/sse.js';
 import { contextPercentOf } from '../chief/context-meter-ring.js';
 import { withoutReturnedText } from '../chief/outbox.js';
 import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
@@ -199,8 +200,9 @@ function Unavailable({ todoId, chat }: { todoId: string; chat: ThreadChat }) {
   const { t } = useI18n();
   const failedCount = chat.unsent?.failed.length ?? 0;
   useEffect(() => {
-    if (chat.load === 'missing' && failedCount > 0) {
-      acknowledgeTaskFailed(todoId);
+    if (chat.load === 'missing') {
+      dismissNotificationForEntity(todoId);
+      if (failedCount > 0) acknowledgeTaskFailed(todoId);
     }
   }, [chat.load, failedCount, todoId]);
   return (

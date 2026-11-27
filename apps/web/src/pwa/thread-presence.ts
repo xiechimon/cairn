@@ -1,8 +1,48 @@
-import { useEffect } from 'react';
+import { DESKTOP_TRAY_PATH, type DesktopPresenceState } from '@cairn/shared';
+import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
+import { readNotifyPref } from '../board/notify-pref.js';
+import { desktopPresence } from '../desktop-shell.js';
+import { safeLocalStorage } from '../safe-storage.js';
 
 const browserTabId = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 const presenceWrites = new Map<string, Promise<unknown>>();
+
+let cachedDesktopClientId: string | null = null;
+let clientPresenceSeq = 0;
+
+function nextClientSeq(bridge: { nextSeq?: () => number } | null): number {
+  const sharedSeq = bridge?.nextSeq?.();
+  if (typeof sharedSeq === 'number' && Number.isFinite(sharedSeq) && sharedSeq >= 0) {
+    return sharedSeq;
+  }
+  clientPresenceSeq += 1;
+  return clientPresenceSeq;
+}
+let currentActiveThreadId: string | null = null;
+let lastWebActivityMs = Date.now();
+const activeThreadListeners = new Set<() => void>();
+
+function notifyActiveThreadListeners(): void {
+  for (const listener of activeThreadListeners) listener();
+}
+
+export async function resolveCurrentClientId(): Promise<string> {
+  const bridge = desktopPresence();
+  if (bridge !== null) {
+    try {
+      const state = await bridge.state();
+      if (state?.clientId !== undefined && state.clientId !== '') {
+        cachedDesktopClientId = state.clientId;
+        return state.clientId;
+      }
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
+    if (cachedDesktopClientId !== null) return cachedDesktopClientId;
+  }
+  return browserTabId;
+}
 
 export function startThreadPresence(
   teamId: string,
@@ -49,6 +89,173 @@ export function useThreadPresence(
 ): void {
   useEffect(() => {
     if (!enabled || teamId == null || todoId === undefined) return;
-    return startThreadPresence(teamId, todoId);
+    const prev = currentActiveThreadId;
+    currentActiveThreadId = todoId;
+    notifyActiveThreadListeners();
+    return () => {
+      if (currentActiveThreadId === todoId) {
+        currentActiveThreadId = prev === todoId ? null : prev;
+        notifyActiveThreadListeners();
+      }
+    };
   }, [teamId, todoId, enabled]);
+}
+
+function webHasNotificationPermission(): boolean {
+  return typeof Notification !== 'undefined' && Notification.permission === 'granted';
+}
+
+export function useClientPresence(teamId: string | undefined, enabled: boolean): void {
+  const [desktopState, setDesktopState] = useState<
+    (DesktopPresenceState & { clientId?: string }) | null
+  >(null);
+
+  useEffect(() => {
+    const bridge = desktopPresence();
+    if (!enabled || bridge === null) return;
+    let active = true;
+    void bridge
+      .state()
+      .then((initial) => {
+        if (!active || initial === null) return;
+        if (initial.clientId !== undefined && initial.clientId !== '') {
+          cachedDesktopClientId = initial.clientId;
+        }
+        setDesktopState(initial);
+      })
+      .catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      });
+    const unsubscribe = bridge.subscribe((next) => {
+      if (!active) return;
+      if (next.clientId !== undefined && next.clientId !== '') {
+        cachedDesktopClientId = next.clientId;
+      }
+      setDesktopState(next);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled || teamId === undefined) return;
+    const isTray = typeof window !== 'undefined' && window.location.pathname === DESKTOP_TRAY_PATH;
+    const path = `/api/teams/${encodeURIComponent(teamId)}/presence`;
+    const bridge = desktopPresence();
+    let latestDesktop = desktopState;
+    let lastPostedClientId: string | null = null;
+
+    const buildPayload = () => {
+      const clientId = latestDesktop?.clientId ?? cachedDesktopClientId ?? browserTabId;
+      const notifyEnabled = readNotifyPref(safeLocalStorage()) !== 'off';
+      if (bridge !== null) {
+        if (isTray && latestDesktop?.mainWindowOpen !== false) return null;
+        const focused =
+          !isTray &&
+          (latestDesktop?.windowFocused ??
+            (document.visibilityState === 'visible' &&
+              (typeof document.hasFocus !== 'function' || document.hasFocus())));
+        return {
+          clientId,
+          kind: 'desktop' as const,
+          focused,
+          activeThreadId: focused ? currentActiveThreadId : null,
+          screenLocked: latestDesktop?.screenLocked ?? false,
+          systemIdleSec: latestDesktop?.systemIdleSec ?? 0,
+          canNotify: notifyEnabled,
+        };
+      }
+      const focused =
+        document.visibilityState === 'visible' &&
+        (typeof document.hasFocus !== 'function' || document.hasFocus());
+      return {
+        clientId,
+        kind: 'web' as const,
+        focused,
+        activeThreadId: focused ? currentActiveThreadId : null,
+        screenLocked: false,
+        systemIdleSec: Math.floor(Math.max(0, Date.now() - lastWebActivityMs) / 1000),
+        canNotify: notifyEnabled && webHasNotificationPermission(),
+      };
+    };
+
+    const sendPresence = () => {
+      const payload = buildPayload();
+      if (payload === null) return;
+      const seq = nextClientSeq(bridge);
+      lastPostedClientId = payload.clientId;
+      void api
+        .post(path, { ...payload, seq })
+        .catch((error) => console.debug('cairn: recoverable operation failed', error));
+    };
+
+    const sendDelete = (keepalive = false) => {
+      if (lastPostedClientId === null) return;
+      const clientId = lastPostedClientId;
+      lastPostedClientId = null;
+      const seq = nextClientSeq(bridge);
+      if (keepalive && typeof fetch === 'function') {
+        void fetch(path, {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ clientId, seq }),
+          keepalive: true,
+        }).catch((error) => {
+          console.debug('cairn: recoverable operation failed', error);
+        });
+        return;
+      }
+      void api
+        .del(path, { clientId, seq })
+        .catch((error) => console.debug('cairn: recoverable operation failed', error));
+    };
+
+    const markActivity = () => {
+      lastWebActivityMs = Date.now();
+    };
+    const onFocus = () => {
+      markActivity();
+      sendPresence();
+    };
+    const onPageHide = () => sendDelete(true);
+
+    markActivity();
+    sendPresence();
+    const timer = setInterval(sendPresence, 30_000);
+    activeThreadListeners.add(sendPresence);
+    document.addEventListener('visibilitychange', sendPresence);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', sendPresence);
+    window.addEventListener('storage', sendPresence);
+    window.addEventListener('pointerdown', markActivity, true);
+    window.addEventListener('input', markActivity, true);
+    window.addEventListener('wheel', markActivity, { capture: true, passive: true });
+    window.addEventListener('pagehide', onPageHide);
+
+    const unsubDesktop =
+      bridge?.subscribe((next) => {
+        latestDesktop = next;
+        if (next.clientId !== undefined && next.clientId !== '') {
+          cachedDesktopClientId = next.clientId;
+        }
+        sendPresence();
+      }) ?? (() => {});
+
+    return () => {
+      clearInterval(timer);
+      unsubDesktop();
+      activeThreadListeners.delete(sendPresence);
+      document.removeEventListener('visibilitychange', sendPresence);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', sendPresence);
+      window.removeEventListener('storage', sendPresence);
+      window.removeEventListener('pointerdown', markActivity, true);
+      window.removeEventListener('input', markActivity, true);
+      window.removeEventListener('wheel', markActivity, { capture: true });
+      window.removeEventListener('pagehide', onPageHide);
+      sendDelete(false);
+    };
+  }, [teamId, enabled, desktopState]);
 }

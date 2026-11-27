@@ -180,7 +180,20 @@ export interface DesktopNotifyPayload {
   body: string;
   href: string;
   tag: string;
+  deliveryId?: string;
   dialog?: DesktopNotifyDialog;
+}
+
+export interface DesktopPresenceState {
+  clientId?: string;
+  mainWindowOpen: boolean;
+  windowFocused: boolean;
+  screenLocked: boolean;
+  systemIdleSec: number;
+}
+
+export function isDesktopDismissTag(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= 100;
 }
 
 function isDesktopNotifyDialog(value: unknown): value is DesktopNotifyDialog {
@@ -208,6 +221,10 @@ export function isDesktopNotifyPayload(value: unknown): value is DesktopNotifyPa
     isAppPath(payload.href) &&
     typeof payload.tag === 'string' &&
     payload.tag.length <= 100 &&
+    (payload.deliveryId === undefined ||
+      (typeof payload.deliveryId === 'string' &&
+        payload.deliveryId.length > 0 &&
+        payload.deliveryId.length <= 128)) &&
     (payload.dialog === undefined || isDesktopNotifyDialog(payload.dialog))
   );
 }

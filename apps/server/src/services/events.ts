@@ -3,6 +3,7 @@ import type {
   BuildRecord,
   ConversationMessageEvent,
   ConversationStepEvent,
+  NotificationDelivery,
   NotificationRecord,
   StepActivity,
   TodoRecord,
@@ -54,8 +55,16 @@ export class TeamStreamHub {
     });
   }
 
-  publishNotification(teamId: string, record: NotificationRecord): void {
-    this.publish(teamId, () => ({ type: 'notification', notification: record }));
+  publishNotification(
+    teamId: string,
+    record: NotificationRecord,
+    delivery?: NotificationDelivery,
+  ): void {
+    this.publishPrivate(teamId, record.userId, () => ({
+      type: 'notification',
+      notification: record,
+      ...(delivery === undefined ? {} : { delivery }),
+    }));
   }
 
   publishPrivate(teamId: string, userId: string, frame: () => object): void {

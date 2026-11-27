@@ -20,6 +20,7 @@ import {
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
+import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
@@ -62,6 +63,7 @@ import {
 } from './services/github-autonomy-brake.js';
 import { isOwner } from './services/instance-owner.js';
 import { getModelRouting } from './services/model-routing.js';
+import { handleDeliveryFailed, setNotificationVapidKeys } from './services/notification-router.js';
 import {
   listUnreadEntityIds,
   markNotificationRead,
@@ -83,6 +85,8 @@ import { buildServerVersionResponse, requestHostUpdate } from './services/server
 import { filterKnownSkillIds } from './services/skills.js';
 import { readTopModels, writeTopModels } from './services/top-models.js';
 import { dailyUsage } from './services/usage-daily.js';
+
+const deliveryFailedBodySchema = z.object({ deliveryId: z.string().min(1).max(128) }).strict();
 
 const TEAM_PING = JSON.stringify({ type: 'ping' });
 
@@ -570,7 +574,13 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(rows);
   });
 
-  const notificationDeps = { db: ctx.db, hub: ctx.hub, user: ctx.user };
+  setNotificationVapidKeys(ctx.db, ctx.vapidKeys ?? null);
+  const notificationDeps = {
+    db: ctx.db,
+    hub: ctx.hub,
+    user: ctx.user,
+    vapidKeys: ctx.vapidKeys,
+  };
 
   app.get('/api/teams/:id/notifications', conditionalGet(), (c) => {
     const id = c.req.param('id');
@@ -588,6 +598,20 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     return c.json(markNotificationUnread(notificationDeps, id, c.req.param('entityId')));
+  });
+
+  app.post('/api/teams/:id/notifications/:entityId/delivery-failed', async (c) => {
+    const id = c.req.param('id');
+    requireTeam(ctx, id);
+    const body = parseWith(deliveryFailedBodySchema, await jsonBody(c), 'body');
+    const result = handleDeliveryFailed(
+      notificationDeps,
+      id,
+      c.req.param('entityId'),
+      body.deliveryId,
+    );
+    if (!result.handled) return c.json({ error: 'stale delivery' }, 409);
+    return c.json({ ok: true });
   });
 
   app.get('/api/teams/:id/stream', (c) => {

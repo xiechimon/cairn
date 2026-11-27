@@ -34,7 +34,7 @@ import {
 import { settleChiefActiveRun } from './chief-turns.js';
 import { failureAwaitsAutomaticRetry } from './needs-you.js';
 import { notifyOwnership } from './notifications.js';
-import { pushToUserSafely, type VapidKeys } from './push.js';
+import type { VapidKeys } from './push.js';
 import { publishStepRow } from './quota-wait.js';
 import { getTodo } from './todos.js';
 import { reportProvenance, turnProvenance } from './turn-provenance.js';
@@ -232,29 +232,8 @@ export function coordinatorAcceptsReview(ownership: Ownership | null): boolean {
   return ownership.owner === 'coordinator' && ownership.reason === 'review';
 }
 
-const PUSH_TITLE: Record<NeedsYouReason, string> = {
-  question: '需要你决定',
-  confirm: '方案已就绪',
-  review: '构建待审核',
-  handoff: '协调者交给你处理',
-};
-
 function notifyOwner(deps: OwnerDeps, row: TodoRow, reason: NeedsYouReason): void {
   notifyOwnership(deps, row, reason);
-  pushToUserSafely(
-    deps.db,
-    deps.vapidKeys ?? null,
-    deps.user.id,
-    row.teamId,
-    {
-      title: PUSH_TITLE[reason],
-      body: row.title,
-      href: `/app/todo/${row.id}`,
-      tag: `${deps.user.id}:${row.id}`,
-    },
-    undefined,
-    deps,
-  );
 }
 
 function claimCheckpoint(db: Db, row: TodoRow, owner: string, workKey: string): boolean {

@@ -10,7 +10,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import webpush from 'web-push';
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
@@ -143,6 +143,7 @@ export async function sendPushToUser(
   teamId: string,
   msg: PushMessage,
   delivery = { id: newRecordId(), required: false },
+  options?: { singleDevice?: boolean },
 ): Promise<PushOutcome> {
   const id = delivery.id;
   if (delivery.required)
@@ -156,25 +157,109 @@ export async function sendPushToUser(
         message: msg,
       })
       .run();
-  const rows = db
-    .select()
-    .from(pushSubscription)
-    .where(and(eq(pushSubscription.userId, userId), eq(pushSubscription.teamId, teamId)))
-    .all();
-  const devices =
+  const allDevices =
     vapid.apns == null
       ? []
       : db
           .select()
           .from(apnsDevice)
           .where(and(eq(apnsDevice.userId, userId), eq(apnsDevice.teamId, teamId)))
+          .orderBy(desc(apnsDevice.createdAt), asc(apnsDevice.id))
           .all();
-  if (rows.length === 0 && devices.length === 0) return { status: 'no-subscription', id };
+  const single = options?.singleDevice === true;
+  const allRows = db
+    .select()
+    .from(pushSubscription)
+    .where(and(eq(pushSubscription.userId, userId), eq(pushSubscription.teamId, teamId)))
+    .orderBy(desc(pushSubscription.createdAt), asc(pushSubscription.id))
+    .all();
+  if (allRows.length === 0 && allDevices.length === 0) return { status: 'no-subscription', id };
   const apns = vapid.apns;
+
+  const deliverWebPushRow = async (row: typeof pushSubscription.$inferSelect) => {
+    let providerDeadline: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    try {
+      await Promise.race([
+        webpush.sendNotification(
+          {
+            endpoint: row.endpoint,
+            keys: { p256dh: row.p256dh, auth: row.auth },
+            expirationTime: null,
+          },
+          buildPushPayload(
+            vapid.webOrigin,
+            msg,
+            delivery.required ? { id, teamId, required: true } : undefined,
+          ),
+          { timeout: 10_000, TTL, vapidDetails: vapid },
+        ),
+        new Promise<never>((_resolve, reject) => {
+          providerDeadline = setTimeout(() => {
+            timedOut = true;
+            reject(new Error('web push provider deadline exceeded'));
+          }, 10_000);
+        }),
+      ]);
+      return 'accepted' as const;
+    } catch (err) {
+      if (err instanceof webpush.WebPushError && GONE_STATUSES.has(err.statusCode)) {
+        db.delete(pushSubscription)
+          .where(
+            and(
+              eq(pushSubscription.endpoint, row.endpoint),
+              eq(pushSubscription.userId, userId),
+              eq(pushSubscription.teamId, teamId),
+            ),
+          )
+          .run();
+        return 'expired' as const;
+      }
+      process.stderr.write('web push delivery failed\n');
+      return timedOut || (delivery.required && !(err instanceof webpush.WebPushError))
+        ? ('unknown' as const)
+        : ('failed' as const);
+    } finally {
+      if (providerDeadline !== undefined) clearTimeout(providerDeadline);
+    }
+  };
+
+  if (single) {
+    let failedCount = 0;
+    let unknownSeen = false;
+    let allExpired = true;
+    if (apns != null) {
+      for (const device of allDevices) {
+        const outcome = await sendApns(apns, device, msg);
+        if (outcome === 'accepted') return { status: 'delivered', count: 1, failedCount, id };
+        if (outcome === 'expired') {
+          db.delete(apnsDevice)
+            .where(and(eq(apnsDevice.token, device.token), eq(apnsDevice.userId, userId)))
+            .run();
+          continue;
+        }
+        allExpired = false;
+        failedCount += 1;
+        process.stderr.write('apns delivery failed\n');
+      }
+    }
+    for (const row of allRows) {
+      const outcome = await deliverWebPushRow(row);
+      if (outcome === 'accepted') return { status: 'delivered', count: 1, failedCount, id };
+      if (outcome === 'expired') continue;
+      allExpired = false;
+      failedCount += 1;
+      if (outcome === 'unknown') unknownSeen = true;
+    }
+    if (delivery.required && unknownSeen) return { status: 'unknown', id };
+    if (allExpired) return { status: 'all-expired', id };
+    return { status: 'failed', id };
+  }
+
   const apnsResults =
     apns == null
       ? []
-      : devices.map(async (device) => {
+      : allDevices.map(async (device) => {
           const outcome = await sendApns(apns, device, msg);
           if (outcome === 'expired')
             db.delete(apnsDevice)
@@ -185,53 +270,7 @@ export async function sendPushToUser(
         });
   const results = await Promise.allSettled([
     ...apnsResults,
-    ...rows.map(async (row) => {
-      let providerDeadline: ReturnType<typeof setTimeout> | undefined;
-      let timedOut = false;
-      try {
-        await Promise.race([
-          webpush.sendNotification(
-            {
-              endpoint: row.endpoint,
-              keys: { p256dh: row.p256dh, auth: row.auth },
-              expirationTime: null,
-            },
-            buildPushPayload(
-              vapid.webOrigin,
-              msg,
-              delivery.required ? { id, teamId, required: true } : undefined,
-            ),
-            { timeout: 10_000, TTL, vapidDetails: vapid },
-          ),
-          new Promise<never>((_resolve, reject) => {
-            providerDeadline = setTimeout(() => {
-              timedOut = true;
-              reject(new Error('web push provider deadline exceeded'));
-            }, 10_000);
-          }),
-        ]);
-        return 'accepted';
-      } catch (err) {
-        if (err instanceof webpush.WebPushError && GONE_STATUSES.has(err.statusCode)) {
-          db.delete(pushSubscription)
-            .where(
-              and(
-                eq(pushSubscription.endpoint, row.endpoint),
-                eq(pushSubscription.userId, userId),
-                eq(pushSubscription.teamId, teamId),
-              ),
-            )
-            .run();
-          return 'expired';
-        }
-        process.stderr.write('web push delivery failed\n');
-        return timedOut || (delivery.required && !(err instanceof webpush.WebPushError))
-          ? 'unknown'
-          : 'failed';
-      } finally {
-        if (providerDeadline !== undefined) clearTimeout(providerDeadline);
-      }
-    }),
+    ...allRows.map((row) => deliverWebPushRow(row)),
   ]);
   const count = results.filter(
     (result) => result.status === 'fulfilled' && result.value === 'accepted',

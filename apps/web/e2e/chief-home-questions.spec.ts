@@ -559,7 +559,11 @@ test('a multi-question request sends nothing and starts no turn until its last q
   const state = structuredClone(MIXED);
   const answer = answerRoute(state, answered);
   await mockLive(page, state, (path, route, json) => {
-    if (route.request().method() === 'POST' && !path.startsWith('/api/auth/'))
+    if (
+      route.request().method() === 'POST' &&
+      !path.startsWith('/api/auth/') &&
+      !path.endsWith('/presence')
+    )
       posts.push({ path, body: route.request().postDataJSON() });
     return answer(path, route, json);
   });

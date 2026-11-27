@@ -11,6 +11,7 @@ import type { TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyChiefMessage } from './notifications.js';
 import { type PushMessage, pushToUserSafely, queuePushDigest, type VapidKeys } from './push.js';
+import { isDesktopActive } from './thread-presence.js';
 
 const ACCOUNT_NEXT: Record<MailAccountStatus, readonly MailAccountStatus[]> = {
   disconnected: ['connecting'],
@@ -172,6 +173,7 @@ export function deliverMailEvent(
       threadId: thread.id,
       message: notice.body,
       agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+      skipAwayDispatch: true,
     });
     if (existing === undefined) {
       const excerpt = [
@@ -199,7 +201,7 @@ export function deliverMailEvent(
     pending.push = { teamId: account.teamId, msg };
     status = 'delivered';
   });
-  if (pending.push !== null) {
+  if (pending.push !== null && !isDesktopActive(deps.db, deps.user.id, nowMs())) {
     (deps.pushToUser ?? pushToUserSafely)(
       deps.db,
       deps.vapidKeys,

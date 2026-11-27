@@ -586,7 +586,7 @@ export function finishCoordinatorTurn(
   );
   if (stepRow.scheduleId !== null) {
     finishScheduledStep(
-      { db: deps.db, hub: deps.hub, user: deps.user },
+      { db: deps.db, hub: deps.hub, user: deps.user, vapidKeys: deps.vapidKeys },
       stepRow,
       outcome.status === 'success'
         ? { status: 'completed' }
@@ -603,7 +603,7 @@ export function finishCoordinatorTurn(
   );
   if (outcome.status === 'success') settleNotifiedReportTurn(deps, stepRow);
   if (outcome.status === 'success') announcePrimaryRestored(deps, stepRow);
-  if (outcome.status === 'success')
+  if (outcome.status === 'success' && stepRow.scheduleId === null)
     notifyChiefTurn(
       deps,
       stepRow.buildId,
@@ -629,7 +629,7 @@ export function finishCoordinatorTurn(
   }
   const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
   if (finished !== undefined)
-    runAfterCommit(deps, 'imTurnFinished', () => imTurnFinished(finished));
+    runAfterCommit(deps, 'imTurnFinished', () => imTurnFinished(finished, deps.db));
   runAfterCommit(deps, 'emitRuntimeStepSpan', () =>
     emitRuntimeStepSpan(db, stepRow.id, process.env, observation),
   );

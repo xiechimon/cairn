@@ -9797,6 +9797,25 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
     {
       "additionalProperties": false,
       "properties": {
+        "delivery": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+            },
+            "targetClientId": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+          },
+          "required": [
+            "id",
+            "targetClientId",
+          ],
+          "type": "object",
+        },
         "notification": {
           "additionalProperties": false,
           "properties": {

@@ -9,13 +9,27 @@ import { isServerUnreachable } from '../lib/error-copy.js';
 
 const UNREACHABLE_ATTEMPTS = 3;
 
-function useDocumentVisible(): boolean {
-  const [visible, setVisible] = useState(() => document.visibilityState === 'visible');
+export function isWindowFocusedAndVisible(
+  doc: { visibilityState: string; hasFocus?: () => boolean } = document,
+): boolean {
+  return (
+    doc.visibilityState === 'visible' && (typeof doc.hasFocus !== 'function' || doc.hasFocus())
+  );
+}
+
+function useWindowFocusedAndVisible(): boolean {
+  const [visible, setVisible] = useState(() => isWindowFocusedAndVisible());
   useEffect(() => {
-    const sync = () => setVisible(document.visibilityState === 'visible');
+    const sync = () => setVisible(isWindowFocusedAndVisible());
     sync();
     document.addEventListener('visibilitychange', sync);
-    return () => document.removeEventListener('visibilitychange', sync);
+    window.addEventListener('focus', sync);
+    window.addEventListener('blur', sync);
+    return () => {
+      document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('focus', sync);
+      window.removeEventListener('blur', sync);
+    };
   }, []);
   return visible;
 }
@@ -27,7 +41,7 @@ export function useMarkThreadRead(todoId: string | undefined): void {
   const notificationsQ = useNotifications(teamId, live);
   const mutations = useApiMutations(teamId);
   const [, refresh] = useReducer((n: number) => n + 1, 0);
-  const visible = useDocumentVisible();
+  const visible = useWindowFocusedAndVisible();
   const connected = useConnected();
   const autoRead = useRef({ todoId, pending: false, failures: 0, returns: 0 });
 

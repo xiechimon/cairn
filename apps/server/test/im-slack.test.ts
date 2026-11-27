@@ -695,6 +695,17 @@ describe('Slack question size guard', () => {
 
       s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
       seedRoute(s, 'coordinator');
+      const presenceRes = await req(s.app, 'POST', `/api/teams/${s.team.id}/presence`, {
+        clientId: 'cairn-web',
+        kind: 'web',
+        focused: true,
+        activeThreadId: null,
+        screenLocked: false,
+        systemIdleSec: 0,
+        canNotify: false,
+        seq: 1,
+      });
+      expect(presenceRes.status).toBe(200);
       const sent = await req(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, {
         content: 'Ask me from Cairn.',
       });

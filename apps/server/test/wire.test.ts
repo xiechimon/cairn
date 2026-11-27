@@ -63,6 +63,7 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/antigravity-subscriptions/{cid}/upstream-models',
   'POST /api/teams/{id}/presence',
   'DELETE /api/teams/{id}/presence',
+  'POST /api/teams/{id}/notifications/{entityId}/delivery-failed',
   'POST /api/projects',
   'PATCH /api/projects/{id}',
   'PATCH /api/user/me',

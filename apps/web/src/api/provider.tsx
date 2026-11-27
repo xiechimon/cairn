@@ -19,6 +19,7 @@ import { activeLocale } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { translate } from '../i18n/translate.js';
 import { errorWasSurfaced } from '../lib/mutation-error-report.js';
+import { useClientPresence } from '../pwa/thread-presence.js';
 import { settingsSectionOf } from '../settings/settings-href.js';
 import { ApiError } from './client.js';
 import { useConnectionOutage } from './connection-state.js';
@@ -101,6 +102,7 @@ export function LiveDataBridge() {
   const teamId = teams.data?.[0]?.id;
   const machines = useMachines(teamId, live);
   useTeamStream(teamId, live);
+  useClientPresence(teamId, live);
   const outage = useConnectionOutage();
   const { t } = useI18n();
   const showOverlayBadge =

@@ -9,6 +9,7 @@ import {
   type DesktopLocalProvider,
   type DesktopMenuCommand,
   type DesktopNotifyPayload,
+  type DesktopPresenceState,
   type DesktopProviderImportInput,
   type DesktopProviderImportResult,
   type DesktopRollbackNotice,
@@ -109,8 +110,10 @@ export function setDesktopWindowControlsVisible(visible: boolean): void {
   ).cairnDesktop?.windowControls?.setVisible(visible);
 }
 
-interface DesktopNotifyBridge {
+export interface DesktopNotifyBridge {
   show: (payload: DesktopNotifyPayload) => void;
+  dismiss?: (tag: string) => void;
+  onFailed?: (listener: (deliveryId: string) => void) => () => void;
 }
 
 export function desktopNotify(): DesktopNotifyBridge | null {
@@ -118,6 +121,22 @@ export function desktopNotify(): DesktopNotifyBridge | null {
   return (
     (window as Window & { cairnDesktop?: { notify?: DesktopNotifyBridge } }).cairnDesktop?.notify ??
     null
+  );
+}
+
+export interface DesktopPresenceBridge {
+  state: () => Promise<(DesktopPresenceState & { clientId?: string }) | null>;
+  nextSeq?: () => number;
+  subscribe: (
+    listener: (state: DesktopPresenceState & { clientId?: string }) => void,
+  ) => () => void;
+}
+
+export function desktopPresence(): DesktopPresenceBridge | null {
+  if (typeof window === 'undefined') return null;
+  return (
+    (window as Window & { cairnDesktop?: { presence?: DesktopPresenceBridge } }).cairnDesktop
+      ?.presence ?? null
   );
 }
 
@@ -197,6 +216,8 @@ export type DesktopCapabilityState = 'allowed' | 'needs-update' | 'hidden';
 interface CairnDesktopWindow extends Window {
   cairnDesktop?: {
     shell?: DesktopShellBridge & Partial<DesktopShellDescriptor>;
+    notify?: DesktopNotifyBridge;
+    presence?: DesktopPresenceBridge;
     update?: DesktopUpdateBridge;
     antigravity?: AntigravityBridge;
     devin?: DevinBridge;

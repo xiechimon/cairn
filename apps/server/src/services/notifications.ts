@@ -1,17 +1,28 @@
-import type { NeedsYouReason, NotificationRecord, UserRecord } from '@cairn/shared';
+import {
+  type NeedsYouReason,
+  type NotificationRecord,
+  SILENT_NOTIFICATION_TYPES,
+  type UserRecord,
+} from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { chiefThread, noticeMark, notification, todo as todoTable } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
-import { nowMs } from '../lib/ids.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
 import { imNotice } from './im/runtime.js';
+import {
+  cancelPendingNotificationDelivery,
+  routeNotificationDelivery,
+} from './notification-router.js';
+import type { VapidKeys } from './push.js';
 
 export interface NotificationDeps extends CommitEffects {
   db: Db;
   hub: TeamStreamHub;
   user: UserRecord;
+  vapidKeys?: VapidKeys | null;
 }
 
 type NotificationRow = typeof notification.$inferSelect;
@@ -41,9 +52,79 @@ interface NotificationInput {
   snippet: string | null;
 }
 
-function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): NotificationRecord {
+function upsertAndPublish(
+  deps: NotificationDeps,
+  input: NotificationInput,
+  options?: { skipAwayDispatch?: boolean },
+): NotificationRecord {
   const id = `${deps.user.id}:${input.entityId}`;
   const createdAt = nowMs();
+  const existing = deps.db.select().from(notification).where(eq(notification.id, id)).get();
+  const isSilent = SILENT_NOTIFICATION_TYPES.includes(input.type);
+
+  if (isSilent) {
+    if (
+      (input.type === 'todo_done' || input.type === 'todo_failed') &&
+      existing !== undefined &&
+      existing.readAt === null &&
+      existing.type === 'schedule_run' &&
+      (existing.deliveryStatus === 'desktop' ||
+        existing.deliveryStatus === 'pending_away' ||
+        existing.deliveryStatus === 'away')
+    ) {
+      return toNotificationRecord(existing);
+    }
+    if (existing !== undefined && existing.deliveryStatus === 'pending_away') {
+      cancelPendingNotificationDelivery(deps.db, id, existing.deliveryId);
+    }
+    deps.db
+      .insert(notification)
+      .values({
+        id,
+        teamId: input.teamId,
+        userId: deps.user.id,
+        type: input.type,
+        entityId: input.entityId,
+        entityRef: input.entityRef,
+        agentName: input.agent.name,
+        agentAvatarUrl: input.agent.avatarUrl,
+        snippet: input.snippet,
+        readAt: null,
+        createdAt,
+        channels: ['in_app'],
+        deliveryId: null,
+        deliveryStatus: 'none',
+        deliveryTarget: null,
+        deliveryDueAt: null,
+      })
+      .onConflictDoUpdate({
+        target: notification.id,
+        set: {
+          type: input.type,
+          entityRef: input.entityRef,
+          agentName: input.agent.name,
+          agentAvatarUrl: input.agent.avatarUrl,
+          snippet: input.snippet,
+          readAt: null,
+          createdAt,
+          deliveryId: null,
+          deliveryStatus: 'none',
+          deliveryTarget: null,
+          deliveryDueAt: null,
+        },
+      })
+      .run();
+    const row = deps.db.select().from(notification).where(eq(notification.id, id)).get();
+    if (!row) throw new Error(`notification ${id} missing after upsert`);
+    const record = toNotificationRecord(row);
+    deps.hub.publishNotification(record.teamId, record, { id: '', targetClientId: null });
+    return record;
+  }
+
+  if (existing !== undefined) {
+    cancelPendingNotificationDelivery(deps.db, id, existing.deliveryId);
+  }
+  const deliveryId = newRecordId();
   deps.db
     .insert(notification)
     .values({
@@ -59,6 +140,10 @@ function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): Not
       readAt: null,
       createdAt,
       channels: ['in_app'],
+      deliveryId,
+      deliveryStatus: 'none',
+      deliveryTarget: null,
+      deliveryDueAt: null,
     })
     .onConflictDoUpdate({
       target: notification.id,
@@ -70,14 +155,19 @@ function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): Not
         snippet: input.snippet,
         readAt: null,
         createdAt,
+        deliveryId,
+        deliveryStatus: 'none',
+        deliveryTarget: null,
+        deliveryDueAt: null,
       },
     })
     .run();
   const row = deps.db.select().from(notification).where(eq(notification.id, id)).get();
   if (!row) throw new Error(`notification ${id} missing after upsert`);
   const record = toNotificationRecord(row);
-  deps.hub.publishNotification(record.teamId, record);
-  return record;
+  const routed = routeNotificationDelivery(deps, record, deliveryId, options);
+  deps.hub.publishNotification(routed.record.teamId, routed.record, routed.delivery);
+  return routed.record;
 }
 
 interface TodoNoticeSource {
@@ -125,14 +215,14 @@ export function notifyOwnership(
 
 export function notifyScheduleRun(
   deps: NotificationDeps,
-  todoRow: TodoNoticeSource,
+  targetRow: TodoNoticeSource,
   snippet: string | null,
 ): NotificationRecord {
   return upsertAndPublish(deps, {
-    teamId: todoRow.teamId,
+    teamId: targetRow.teamId,
     type: 'schedule_run',
-    entityId: todoRow.id,
-    entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
+    entityId: targetRow.id,
+    entityRef: { title: targetRow.title, projectId: targetRow.projectId, seqNum: targetRow.seqNum },
     agent: todoNoticeAgent(deps),
     snippet,
   });
@@ -180,7 +270,12 @@ export function markNotificationRead(
     .get();
   if (!row) throw notFound(`notification ${entityId}`);
   if (row.readAt !== null) return toNotificationRecord(row);
-  deps.db.update(notification).set({ readAt: nowMs() }).where(eq(notification.id, row.id)).run();
+  deps.db
+    .update(notification)
+    .set({ readAt: nowMs(), deliveryStatus: 'read', deliveryDueAt: null })
+    .where(eq(notification.id, row.id))
+    .run();
+  cancelPendingNotificationDelivery(deps.db, row.id, row.deliveryId);
   return republish(deps, row.id);
 }
 
@@ -195,9 +290,19 @@ export function markNotificationUnread(
     .where(and(eq(notification.id, `${deps.user.id}:${entityId}`), eq(notification.teamId, teamId)))
     .get();
   if (row) {
-    if (row.readAt === null) return toNotificationRecord(row);
-    deps.db.update(notification).set({ readAt: null }).where(eq(notification.id, row.id)).run();
-    return republish(deps, row.id);
+    cancelPendingNotificationDelivery(deps.db, row.id, row.deliveryId);
+    if (row.readAt === null && row.deliveryStatus === 'none') return toNotificationRecord(row);
+    deps.db
+      .update(notification)
+      .set({
+        readAt: null,
+        deliveryStatus: 'none',
+        deliveryTarget: null,
+        deliveryDueAt: null,
+      })
+      .where(eq(notification.id, row.id))
+      .run();
+    return republish(deps, row.id, { id: '', targetClientId: null });
   }
   const todoRow = deps.db
     .select()
@@ -215,11 +320,15 @@ export function markNotificationUnread(
   });
 }
 
-function republish(deps: NotificationDeps, id: string): NotificationRecord {
+function republish(
+  deps: NotificationDeps,
+  id: string,
+  delivery?: { id: string; targetClientId: string | null },
+): NotificationRecord {
   const row = deps.db.select().from(notification).where(eq(notification.id, id)).get();
   if (!row) throw new Error(`notification ${id} missing after update`);
   const record = toNotificationRecord(row);
-  deps.hub.publishNotification(record.teamId, record);
+  deps.hub.publishNotification(record.teamId, record, delivery);
   return record;
 }
 
@@ -230,28 +339,37 @@ export function notifyChiefMessage(
     message: string;
     agent: { name: string; avatarUrl: string | null };
     card?: { requestId: string };
+    skipAwayDispatch?: boolean;
   },
 ): NotificationRecord {
   const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, input.threadId)).get();
   if (!thread) throw notFound(`chief thread ${input.threadId}`);
-  const record = upsertAndPublish(deps, {
-    teamId: thread.teamId,
-    type: 'chief_message',
-    entityId: thread.id,
-    entityRef: { title: thread.title, projectId: null, seqNum: null },
-    agent: input.agent,
-    snippet: input.message,
-  });
-  runAfterCommit(deps, 'imNotice', () => imNotice(input.threadId, input.message, input.card));
+  const record = upsertAndPublish(
+    deps,
+    {
+      teamId: thread.teamId,
+      type: 'chief_message',
+      entityId: thread.id,
+      entityRef: { title: thread.title, projectId: null, seqNum: null },
+      agent: input.agent,
+      snippet: input.message,
+    },
+    { skipAwayDispatch: input.skipAwayDispatch },
+  );
+  runAfterCommit(deps, 'imNotice', () =>
+    imNotice(input.threadId, input.message, input.card, deps.db),
+  );
   return record;
 }
 
 export const CHIEF_UNREAD_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function sweepIdleChiefUnread(deps: { db: Db }, now: number): void {
+export function sweepIdleChiefUnread(deps: { db: Db; hub?: TeamStreamHub }, now: number): void {
   const rows = deps.db
     .select({
       id: notification.id,
+      teamId: notification.teamId,
+      deliveryId: notification.deliveryId,
       updatedAt: chiefThread.updatedAt,
       lastTurnAt: chiefThread.lastTurnAt,
     })
@@ -262,7 +380,18 @@ export function sweepIdleChiefUnread(deps: { db: Db }, now: number): void {
   for (const row of rows) {
     const last = Math.max(row.updatedAt, row.lastTurnAt ?? 0);
     if (now - last <= CHIEF_UNREAD_IDLE_MS) continue;
-    deps.db.update(notification).set({ readAt: now }).where(eq(notification.id, row.id)).run();
+    deps.db
+      .update(notification)
+      .set({ readAt: now, deliveryStatus: 'read', deliveryDueAt: null })
+      .where(eq(notification.id, row.id))
+      .run();
+    cancelPendingNotificationDelivery(deps.db, row.id, row.deliveryId);
+    if (deps.hub !== undefined) {
+      const updated = deps.db.select().from(notification).where(eq(notification.id, row.id)).get();
+      if (updated !== undefined) {
+        deps.hub.publishNotification(updated.teamId, toNotificationRecord(updated));
+      }
+    }
   }
 }
 

@@ -17,7 +17,7 @@ export type EffectProbeVerdict =
 
 export interface EffectKindDef {
   policy: EffectPolicy;
-  send?: (row: EffectRow) => Promise<unknown>;
+  send?: (row: EffectRow, db: Db) => Promise<unknown>;
   probe?: (row: EffectRow) => Promise<EffectProbeVerdict>;
   scopeGone?: (db: Db, row: EffectRow) => boolean;
 }
@@ -218,7 +218,7 @@ export async function runEffectRow(
   const claimed = claimEffect(db, id, now);
   if (claimed === null) return 'skipped';
   try {
-    const receipt = await def.send(claimed);
+    const receipt = await def.send(claimed, db);
     markEffectDelivered(db, id, claimed.claimFence ?? now, receipt ?? null);
     noteEffectHealth(db, claimed.kind, true);
     return 'delivered';

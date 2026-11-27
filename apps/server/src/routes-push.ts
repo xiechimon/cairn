@@ -6,19 +6,50 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { apnsDevice, pushDelivery, pushSubscription, todo } from './db/schema.js';
+import { apnsDevice, chiefThread, pushDelivery, pushSubscription, todo } from './db/schema.js';
 import { parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam } from './routes-helpers.js';
 import { APNS_TOKEN_PATTERN } from './services/apns.js';
+import { reconcilePendingAwayNotifications } from './services/notification-router.js';
 import { assertDeviceActive } from './services/paired-devices.js';
 import { sendMustReachAlert } from './services/push-alerts.js';
-import { clearThreadPresence, recordThreadPresence } from './services/thread-presence.js';
+import {
+  clearClientPresence,
+  clearThreadPresence,
+  recordClientPresence,
+  recordThreadPresence,
+} from './services/thread-presence.js';
 
-const threadPresenceBodySchema = z
+const legacyPresenceBodySchema = z
   .object({ todoId: z.string().min(1).max(128), tabId: z.string().min(1).max(128) })
   .strict();
+
+const clientPresenceBodySchema = z
+  .object({
+    clientId: z.string().min(1).max(128),
+    kind: z.enum(['desktop', 'web']),
+    focused: z.boolean(),
+    activeThreadId: z.string().min(1).max(128).nullable(),
+    screenLocked: z.boolean(),
+    systemIdleSec: z.number().min(0).max(10_000_000),
+    canNotify: z.boolean(),
+    seq: z.number().int().min(0),
+  })
+  .strict();
+
+const presencePostBodySchema = z.union([legacyPresenceBodySchema, clientPresenceBodySchema]);
+
+const presenceDeleteBodySchema = z.union([
+  legacyPresenceBodySchema,
+  z
+    .object({
+      clientId: z.string().min(1).max(128),
+      seq: z.number().int().min(0).optional(),
+    })
+    .strict(),
+]);
 
 const apnsDeviceBodySchema = z
   .object({
@@ -47,21 +78,66 @@ function allowRequest(ctx: AppContext, key: string): boolean {
 export function registerPushRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/presence', async (c) => {
     requireTeam(ctx, c.req.param('id'));
-    const body = parseWith(threadPresenceBodySchema, await jsonBody(c), 'body');
-    const row = ctx.db
-      .select({ id: todo.id })
-      .from(todo)
-      .where(and(eq(todo.id, body.todoId), eq(todo.teamId, ctx.team.id)))
-      .get();
-    if (row === undefined) return c.json({ error: 'thread not found' }, 404);
-    recordThreadPresence(ctx.db, ctx.user.id, ctx.team.id, row.id, body.tabId);
-    return c.json({ ok: true });
+    const body = parseWith(presencePostBodySchema, await jsonBody(c), 'body');
+    if ('todoId' in body) {
+      const row = ctx.db
+        .select({ id: todo.id })
+        .from(todo)
+        .where(and(eq(todo.id, body.todoId), eq(todo.teamId, ctx.team.id)))
+        .get();
+      if (row === undefined) return c.json({ error: 'thread not found' }, 404);
+      recordThreadPresence(ctx.db, ctx.user.id, ctx.team.id, row.id, body.tabId);
+      return c.json({ ok: true });
+    }
+    if (body.activeThreadId !== null) {
+      const todoRow = ctx.db
+        .select({ id: todo.id })
+        .from(todo)
+        .where(and(eq(todo.id, body.activeThreadId), eq(todo.teamId, ctx.team.id)))
+        .get();
+      const chiefRow =
+        todoRow !== undefined
+          ? undefined
+          : ctx.db
+              .select({ id: chiefThread.id })
+              .from(chiefThread)
+              .where(
+                and(eq(chiefThread.id, body.activeThreadId), eq(chiefThread.teamId, ctx.team.id)),
+              )
+              .get();
+      if (todoRow === undefined && chiefRow === undefined) {
+        return c.json({ error: 'thread not found' }, 404);
+      }
+    }
+    const { accepted, shouldReconcile } = recordClientPresence(ctx.db, {
+      userId: ctx.user.id,
+      teamId: ctx.team.id,
+      clientId: body.clientId,
+      kind: body.kind,
+      focused: body.focused,
+      activeThreadId: body.activeThreadId,
+      screenLocked: body.screenLocked,
+      systemIdleSec: body.systemIdleSec,
+      canNotify: body.canNotify,
+      seq: body.seq,
+    });
+    if (accepted && shouldReconcile) {
+      reconcilePendingAwayNotifications(
+        { db: ctx.db, hub: ctx.hub, user: ctx.user, vapidKeys: ctx.vapidKeys },
+        ctx.user.id,
+      );
+    }
+    return c.json({ ok: true, accepted });
   });
 
   app.delete('/api/teams/:id/presence', async (c) => {
     requireTeam(ctx, c.req.param('id'));
-    const body = parseWith(threadPresenceBodySchema, await jsonBody(c), 'body');
-    clearThreadPresence(ctx.db, ctx.user.id, ctx.team.id, body.todoId, body.tabId);
+    const body = parseWith(presenceDeleteBodySchema, await jsonBody(c), 'body');
+    if ('todoId' in body) {
+      clearThreadPresence(ctx.db, ctx.user.id, ctx.team.id, body.todoId, body.tabId);
+      return c.json({ ok: true });
+    }
+    clearClientPresence(ctx.db, ctx.user.id, body.clientId, body.seq);
     return c.json({ ok: true });
   });
 

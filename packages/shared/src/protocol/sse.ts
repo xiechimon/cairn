@@ -55,9 +55,16 @@ export const buildDocEventSchema = z.object({
   doc: buildRecordSchema,
 });
 
+export const notificationDeliverySchema = z.object({
+  id: z.string(),
+  targetClientId: z.string().nullable(),
+});
+export type NotificationDelivery = z.infer<typeof notificationDeliverySchema>;
+
 export const notificationEventSchema = z.object({
   type: z.literal('notification'),
   notification: notificationRecordSchema,
+  delivery: notificationDeliverySchema.optional(),
 });
 
 export const computerStateEventSchema = z.object({

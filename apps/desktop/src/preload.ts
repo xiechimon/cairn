@@ -7,6 +7,7 @@ import type {
   DesktopLocalProvider,
   DesktopMenuCommand,
   DesktopNotifyPayload,
+  DesktopPresenceState,
   DesktopProviderImportInput,
   DesktopProviderImportResult,
   DesktopRollbackNotice,
@@ -256,6 +257,29 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
   },
   notify: {
     show: (payload: DesktopNotifyPayload): void => ipcRenderer.send('desktop-notify', payload),
+    dismiss: (tag: string): void => ipcRenderer.send('desktop-notify:dismiss', tag),
+    onFailed: (listener: (deliveryId: string) => void): (() => void) => {
+      const relay = (_event: unknown, deliveryId: string) => listener(deliveryId);
+      ipcRenderer.on('desktop-notify:failed', relay);
+      return () => {
+        ipcRenderer.removeListener('desktop-notify:failed', relay);
+      };
+    },
+  },
+  presence: {
+    state: (): Promise<DesktopPresenceState & { clientId: string }> =>
+      ipcRenderer.invoke('desktop-presence:state'),
+    nextSeq: (): number => ipcRenderer.sendSync('desktop-presence:seq') as number,
+    subscribe: (
+      listener: (state: DesktopPresenceState & { clientId: string }) => void,
+    ): (() => void) => {
+      const relay = (_event: unknown, state: DesktopPresenceState & { clientId: string }) =>
+        listener(state);
+      ipcRenderer.on('desktop-presence:change', relay);
+      return () => {
+        ipcRenderer.removeListener('desktop-presence:change', relay);
+      };
+    },
   },
   tray: {
     state: (): Promise<DesktopTrayState | null> => ipcRenderer.invoke('desktop-tray:state'),

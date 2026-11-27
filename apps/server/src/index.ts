@@ -78,6 +78,7 @@ import {
   newMcpOAuthState,
   publicOAuthFetch,
 } from './services/mcp-servers.js';
+import { registerNotificationDelivery } from './services/notification-router.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
 import { capturePageOver, createPageThumbnails, parentPortOf } from './services/page-thumbnails.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
@@ -264,7 +265,8 @@ const im = createImService({
     imessage: createImessageAdapter({ db, bridge: imBridge }),
   },
 });
-setImRuntime(im.runtime);
+setImRuntime(im.runtime, db);
+registerNotificationDelivery(db, vapidKeys);
 const mail = createMailConnector({
   secrets: { db, box: secretBox },
   mailDeps: { db, hub, machineHub, user: seeded.user, vapidKeys },

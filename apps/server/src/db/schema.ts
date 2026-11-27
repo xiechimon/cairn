@@ -95,6 +95,7 @@ export const user = sqliteTable('user', {
   displayName: text('displayName').notNull(),
   displayNameEdited: bool('displayNameEdited'),
   avatarUrl: text('avatarUrl'),
+  lastDesktopActiveAt: epochMs('lastDesktopActiveAt'),
 });
 
 export const team = sqliteTable('team', {
@@ -637,6 +638,13 @@ export const notification = sqliteTable(
     readAt: epochMs('readAt'),
     createdAt: epochMs('createdAt').notNull(),
     channels: json<['in_app']>('channels').notNull().default(['in_app']),
+    deliveryId: text('deliveryId'),
+    deliveryStatus: text('deliveryStatus')
+      .$type<'none' | 'suppressed' | 'desktop' | 'pending_away' | 'away' | 'read'>()
+      .notNull()
+      .default('none'),
+    deliveryTarget: text('deliveryTarget'),
+    deliveryDueAt: epochMs('deliveryDueAt'),
   },
   (t) => [index('notification_type_readAt_idx').on(t.type, t.readAt)],
 );

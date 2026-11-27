@@ -18,6 +18,7 @@ import {
   SHOW_DIFF_TOOL,
 } from '@cairn/shared';
 import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { type CommitEffects, runAfterCommit } from '../../db/commit-effects.js';
 import {
   attachment,
   chiefMessage,
@@ -76,7 +77,7 @@ import {
   waitEffect,
 } from '../external-effects.js';
 import { asSendError } from './errors.js';
-import type { ImRuntimeHooks, ImStepRow } from './runtime.js';
+import type { ImAwayNoticeInput, ImRuntimeHooks, ImStepRow } from './runtime.js';
 import { slackCardBlocks } from './slack.js';
 import type {
   ImAdapter,
@@ -318,6 +319,8 @@ export function createImService(deps: ImServiceDeps): ImService {
       dedupe: string;
       requestId?: string;
       owned?: string[];
+      deliveryId?: string;
+      defer?: CommitEffects;
     },
   ): void => {
     const conn = connRow(connId);
@@ -346,17 +349,22 @@ export function createImService(deps: ImServiceDeps): ImService {
         buttons: msg.buttons ?? null,
         requestId: scope?.requestId ?? null,
         owned: scope?.owned ?? null,
+        deliveryId: scope?.deliveryId ?? null,
       },
     });
     if (row.state !== 'pending') return;
-    const key = `${connId}\n${msg.chatKey}`;
-    const prev = queueChains.get(key) ?? Promise.resolve();
-    const next = prev
-      .then(async () => {
-        await runEffectRow(deps.db, effectRegistry, row.id);
-      })
-      .catch(() => {});
-    queueChains.set(key, next);
+    const dispatch = () => {
+      const key = `${connId}\n${msg.chatKey}`;
+      const prev = queueChains.get(key) ?? Promise.resolve();
+      const next = prev
+        .then(async () => {
+          await runEffectRow(deps.db, effectRegistry, row.id);
+        })
+        .catch(() => {});
+      queueChains.set(key, next);
+    };
+    if (scope?.defer !== undefined) runAfterCommit(scope.defer, 'imAwaySend', dispatch);
+    else dispatch();
   };
 
   const sendToOrigin = (
@@ -1212,6 +1220,41 @@ export function createImService(deps: ImServiceDeps): ImService {
         const text = stepAlreadySentToIm(stepRow.id) ? null : lastAssistantText(stepRow);
         const reply = [...blockFallbacks(stepRow), ...(text === null ? [] : [text])];
         if (reply.length > 0) sendToOrigin(origin, reply.join('\n\n'), stepRow);
+      },
+
+      hasActiveOrigin(threadId: string): boolean {
+        return noticeOrigins(threadId).length > 0;
+      },
+
+      sendAwayNotice(input: ImAwayNoticeInput): { sent: boolean; connectionId?: string } {
+        const rows = deps.db
+          .select()
+          .from(imConnection)
+          .where(and(eq(imConnection.teamId, input.teamId), eq(imConnection.status, 'ready')))
+          .orderBy(desc(imConnection.updatedAt), asc(imConnection.id))
+          .all();
+        for (const row of rows) {
+          if (!live.has(row.id) || row.pairedSenders.length === 0) continue;
+          const recipient = row.pairedSenders.find(
+            (sender): sender is typeof sender & { chatKey: string } =>
+              sender.chatKey !== null && sender.chatKey !== '',
+          );
+          if (recipient === undefined) continue;
+          const text = input.body.trim() === '' ? input.title : `${input.title}\n${input.body}`;
+          enqueueSend(
+            row.id,
+            { chatKey: recipient.chatKey, text },
+            {
+              kind: 'imConnection',
+              id: row.id,
+              dedupe: `notify-away:${input.deliveryId}`,
+              deliveryId: input.deliveryId,
+              defer: input.effects,
+            },
+          );
+          return { sent: true, connectionId: row.id };
+        }
+        return { sent: false };
       },
     },
 

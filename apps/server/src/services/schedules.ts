@@ -20,6 +20,7 @@ import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { databaseIdentity } from '../db/identity.js';
 import {
   build,
+  chiefMessage,
   chiefThread,
   dueEvent,
   message,
@@ -34,10 +35,12 @@ import { newWebhookToken, webhookSecretOf } from '../lib/webhook-token.js';
 import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
 import { notifyScheduleRun } from './notifications.js';
+import type { VapidKeys } from './push.js';
 
 export interface ScheduleDeps extends CommitEffects {
   db: Db;
   hub: TeamStreamHub;
+  vapidKeys?: VapidKeys | null;
 }
 
 type ScheduleRow = typeof schedule.$inferSelect;
@@ -867,6 +870,98 @@ export function settleScheduledStepOutcome(
     .run();
 }
 
+function textFromContent(content: unknown): string {
+  if (typeof content === 'string') return content.trim();
+  if (Array.isArray(content)) {
+    return content
+      .map((part) =>
+        typeof part === 'object' &&
+        part !== null &&
+        'text' in part &&
+        typeof (part as { text?: unknown }).text === 'string'
+          ? (part as { text: string }).text
+          : '',
+      )
+      .join('')
+      .trim();
+  }
+  if (
+    typeof content === 'object' &&
+    content !== null &&
+    'text' in content &&
+    typeof (content as { text?: unknown }).text === 'string'
+  ) {
+    return (content as { text: string }).text.trim();
+  }
+  return '';
+}
+
+function extractScheduleSummary(db: Db, stepRow: typeof step.$inferSelect): string | null {
+  if (stepRow.kind === 'chief') {
+    const rows = db
+      .select({ content: chiefMessage.content })
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.threadId, stepRow.buildId), eq(chiefMessage.role, 'assistant')))
+      .orderBy(desc(chiefMessage.createdAt), desc(chiefMessage.id))
+      .limit(10)
+      .all();
+    for (const row of rows) {
+      const text = textFromContent(row.content);
+      if (text !== '' && !text.startsWith('{')) return text.slice(0, 240);
+    }
+    return null;
+  }
+  const msgRows = db
+    .select({ content: message.content })
+    .from(message)
+    .where(and(eq(message.conversationId, stepRow.buildId), eq(message.role, 'assistant')))
+    .orderBy(desc(message.createdAt), desc(message.id))
+    .limit(10)
+    .all();
+  for (const row of msgRows) {
+    const text = textFromContent(row.content);
+    if (text !== '') return text.slice(0, 240);
+  }
+  return null;
+}
+
+export function formatScheduleFailureSnippet(reason: string): string {
+  const suffix = scheduleFailureIsTransient(reason) ? 'will retry in 5m' : 'schedule paused';
+  return `Scheduled run failed: ${reason} (${suffix})`;
+}
+
+export function notifyScheduleTarget(
+  deps: ScheduleDeps & { user: UserRecord },
+  row: Pick<ScheduleRow, 'todoId' | 'chiefThreadId'>,
+  snippet: string | null,
+): void {
+  if (row.todoId !== null) {
+    const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+    if (todoRow) notifyScheduleRun(deps, todoRow, snippet);
+    return;
+  }
+  if (row.chiefThreadId !== null) {
+    const threadRow = deps.db
+      .select()
+      .from(chiefThread)
+      .where(eq(chiefThread.id, row.chiefThreadId))
+      .get();
+    if (threadRow) {
+      notifyScheduleRun(
+        deps,
+        {
+          id: threadRow.id,
+          teamId: threadRow.teamId,
+          title: threadRow.title,
+          projectId: null,
+          seqNum: null,
+        },
+        snippet,
+      );
+    }
+  }
+}
+
 export function finishScheduledStep(
   deps: ScheduleDeps & { user: UserRecord },
   stepRow: typeof step.$inferSelect,
@@ -882,15 +977,12 @@ export function finishScheduledStep(
     .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
     .get();
   if (!row || FINISHED_RUN_STATUSES.has(row.lastRunStatus ?? '')) return;
-  if (outcome.status !== 'stopped' && row.todoId !== null) {
-    const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-    if (todoRow) {
-      notifyScheduleRun(
-        deps,
-        todoRow,
-        outcome.status === 'failed' ? `Scheduled run failed: ${outcome.error}` : null,
-      );
-    }
+  if (outcome.status !== 'stopped') {
+    const snippet =
+      outcome.status === 'failed'
+        ? formatScheduleFailureSnippet(outcome.error)
+        : extractScheduleSummary(deps.db, stepRow);
+    notifyScheduleTarget(deps, row, snippet);
   }
   if (outcome.status === 'failed') {
     recordScheduleFailure(deps, row.id, outcome.error, nowMs(), stepRow.id);

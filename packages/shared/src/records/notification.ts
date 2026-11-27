@@ -18,7 +18,6 @@ export const NOTIFICATION_TYPES = [
 export const SILENT_NOTIFICATION_TYPES: readonly NotificationType[] = [
   'todo_done',
   'todo_failed',
-  'schedule_run',
   'marked_unread',
 ];
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES);

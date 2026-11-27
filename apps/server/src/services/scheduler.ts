@@ -39,6 +39,12 @@ import { sweepStaleMachines } from './machines.js';
 import { purgeExpiredMemoryVersions } from './memory.js';
 import { sweepAbandonedMemoryEditSteps } from './memory-edit-turns.js';
 import { sweepFailedRetries } from './needs-you.js';
+import {
+  notificationAwayEventId,
+  processNotificationAwayDue,
+  registerNotificationDelivery,
+  setNotificationClockListener,
+} from './notification-router.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { handoffUnclaimedOwnershipWake, ownershipHandoffEventId } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
@@ -54,10 +60,12 @@ import {
   assertWorkerScheduleInterval,
   computeNextRunAt,
   dueSchedules,
+  formatScheduleFailureSnippet,
   isRecurring,
   isTriggerKind,
   isWorkerSchedule,
   notifyScheduleClock,
+  notifyScheduleTarget,
   pauseSchedule,
   recordScheduleFailure,
   setScheduleClockListener,
@@ -94,6 +102,7 @@ export function createScheduler(
   gc?: AttachmentGcRun | null,
   ci?: CiPollRun | null,
 ): Scheduler {
+  registerNotificationDelivery(deps.db, deps.vapidKeys ?? null);
   const lastDigestRun = new Map<string, number>();
   let digestSweeping = false;
   let lastResearchFailure: string | null = null;
@@ -155,7 +164,9 @@ export function createScheduler(
       try {
         nextRunAt = computeNextRunAt(row.kind, row.at, row.tz, now, row.cron);
       } catch (err) {
-        pauseSchedule(deps, row.id, err instanceof Error ? err.message : String(err));
+        const reason = err instanceof Error ? err.message : String(err);
+        pauseSchedule(deps, row.id, reason);
+        notifyScheduleTarget(deps, row, formatScheduleFailureSnippet(reason));
         return;
       }
     }
@@ -379,6 +390,7 @@ export function createScheduler(
         }
         const reason = err instanceof Error ? err.message : String(err);
         recordScheduleFailure(deps, row.id, reason, now);
+        notifyScheduleTarget(deps, row, formatScheduleFailureSnippet(reason));
         process.stderr.write(`Schedule ${row.id} failed: ${reason}\n`);
       })
       .catch(() => {
@@ -605,6 +617,11 @@ export function createScheduler(
           rescheduleAt: handoffUnclaimedOwnershipWake(deps, event.id.slice(prefix.length), now),
         };
       },
+      'notification-away': (event, now) => {
+        const prefix = notificationAwayEventId('');
+        if (!event.id.startsWith(prefix)) return { rescheduleAt: null };
+        return processNotificationAwayDue(deps, event.id.slice(prefix.length), now);
+      },
       wake: (_event, now) => {
         fireDueChiefWakes(deps, now);
         return { rescheduleAt: null };
@@ -639,6 +656,7 @@ export function createScheduler(
       dispatchActionWakes(deps);
       if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir);
       setScheduleClockListener(deps.db, () => dueRunner.arm());
+      setNotificationClockListener(deps.db, () => dueRunner.arm());
       ensureDue('sweep:main', 'sweep', opts.tickMs);
       ensureDue(
         'gc:coordinator-snapshots',
@@ -652,6 +670,7 @@ export function createScheduler(
     stop() {
       dueStarted = false;
       setScheduleClockListener(deps.db, null);
+      setNotificationClockListener(deps.db, null);
       dueRunner.stop();
       if (gcImmediate !== null) clearImmediate(gcImmediate);
       gcImmediate = null;

@@ -3,6 +3,7 @@ import type {
   ConversationAgentTodoEvent,
   ConversationMessagesResponse,
   ConversationStepEvent,
+  NotificationDelivery,
   NotificationRecord,
   TranscriptRow,
 } from '@cairn/shared';
@@ -10,6 +11,7 @@ import {
   conversationMessageEventSchema,
   DESKTOP_TRAY_PATH,
   isChiefConversationId,
+  notificationDeliverySchema,
   SILENT_NOTIFICATION_TYPES,
   streamHelloEventSchema,
 } from '@cairn/shared';
@@ -17,14 +19,16 @@ import { type InfiniteData, type QueryClient, useQueryClient } from '@tanstack/r
 import { useEffect, useState } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
-import { desktopNotify } from '../desktop-shell.js';
+import { desktopNotify, desktopPresence } from '../desktop-shell.js';
 import { EN } from '../i18n/en.js';
 import { readStoredLocale } from '../i18n/locale.js';
 import { translate } from '../i18n/translate.js';
+import { resolveCurrentClientId } from '../pwa/thread-presence.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
 import { fetchWithSession, useAuth } from './auth.js';
+import { api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { connectionStore } from './connection-state.js';
 import {
@@ -125,8 +129,18 @@ export function startTeamStream(
         );
         return;
       }
+      if (ev.type === 'notification') {
+        const notification = applyTeamStreamEvent(qc, teamId, ev);
+        const parsedDelivery =
+          ev.delivery === undefined ? null : notificationDeliverySchema.safeParse(ev.delivery);
+        const delivery = parsedDelivery?.success ? parsedDelivery.data : undefined;
+        if (notification !== undefined) {
+          void handleNotificationEvent(teamId, notification, delivery);
+        }
+        return;
+      }
       const notification = applyTeamStreamEvent(qc, teamId, ev);
-      if (notification !== undefined) fireDesktopNotification(notification);
+      if (notification !== undefined) void handleNotificationEvent(teamId, notification);
     },
     {
       onReconnecting,
@@ -140,7 +154,29 @@ export function startTeamStream(
       onOnlineHint: connectionStore.onOnlineHint,
     },
   );
+  void resolveCurrentClientId();
+  const unsubFailed =
+    desktopNotify()?.onFailed?.((deliveryId) => {
+      const target = pendingDeliveryMeta.get(deliveryId);
+      if (target === undefined) return;
+      pendingDeliveryMeta.delete(deliveryId);
+      void reportDeliveryFailed(target.teamId, target.entityId, deliveryId);
+    }) ?? (() => {});
+  const unsubCache =
+    typeof qc.getQueryCache === 'function'
+      ? qc.getQueryCache().subscribe((event) => {
+          if (event.type !== 'updated') return;
+          const key = event.query.queryKey;
+          if (!Array.isArray(key) || key[0] !== 'notifications' || key[1] !== teamId) return;
+          const data = event.query.state.data as { unreadThreadIds?: string[] } | undefined;
+          if (data?.unreadThreadIds !== undefined) {
+            syncDeliveredBanners(data.unreadThreadIds);
+          }
+        })
+      : () => {};
   return () => {
+    unsubFailed();
+    unsubCache();
     disconnect();
     connection.detach();
     detachConnection();
@@ -159,8 +195,41 @@ export const NOTIFICATION_TITLES: Partial<Record<NotificationRecord['type'], str
   no_machine: '没有可运行的执行机',
 };
 
+const deliveredTagsByEntity = new Map<string, string>();
+const pendingDeliveryMeta = new Map<string, { teamId: string; entityId: string }>();
+
+function reportDeliveryFailed(teamId: string, entityId: string, deliveryId: string): Promise<void> {
+  return api
+    .post(
+      `/api/teams/${encodeURIComponent(teamId)}/notifications/${encodeURIComponent(entityId)}/delivery-failed`,
+      { deliveryId },
+    )
+    .then(() => undefined)
+    .catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
+}
+
+export function dismissNotificationForEntity(entityId: string): void {
+  const tag = deliveredTagsByEntity.get(entityId);
+  if (tag === undefined) return;
+  deliveredTagsByEntity.delete(entityId);
+  desktopNotify()?.dismiss?.(tag);
+}
+
+function syncDeliveredBanners(unreadEntityIds: readonly string[]): void {
+  const unread = new Set(unreadEntityIds);
+  const desktop = desktopNotify();
+  for (const [entityId, tag] of deliveredTagsByEntity) {
+    if (!unread.has(entityId)) {
+      deliveredTagsByEntity.delete(entityId);
+      desktop?.dismiss?.(tag);
+    }
+  }
+}
+
 function notificationHref(record: NotificationRecord): string {
-  return record.type === 'chief_message'
+  return isChiefConversationId(record.entityId)
     ? `/app?chief=${encodeURIComponent(record.entityId)}`
     : `/app?thread=${encodeURIComponent(record.entityId)}`;
 }
@@ -185,10 +254,38 @@ async function showViaServiceWorker(
   }
 }
 
-function fireDesktopNotification(record: NotificationRecord): void {
-  if (window.location.pathname === DESKTOP_TRAY_PATH) return;
-  if (record.readAt !== null || SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
-  if (readNotifyPref(safeLocalStorage()) === 'off') return;
+async function handleNotificationEvent(
+  teamId: string,
+  record: NotificationRecord,
+  delivery?: NotificationDelivery,
+): Promise<void> {
+  if (record.readAt !== null) {
+    deliveredTagsByEntity.delete(record.entityId);
+    desktopNotify()?.dismiss?.(record.id);
+    return;
+  }
+  if (SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
+
+  if (window.location.pathname === DESKTOP_TRAY_PATH) {
+    const bridge = desktopPresence();
+    if (bridge === null) return;
+    const state = await bridge.state().catch(() => null);
+    if (state === null || state.mainWindowOpen !== false) return;
+  }
+
+  if (delivery !== undefined) {
+    if (delivery.targetClientId === null) return;
+    const myClientId = await resolveCurrentClientId();
+    if (delivery.targetClientId !== myClientId) return;
+  }
+
+  if (readNotifyPref(safeLocalStorage()) === 'off') {
+    if (delivery?.id !== undefined) {
+      void reportDeliveryFailed(teamId, record.entityId, delivery.id);
+    }
+    return;
+  }
+
   const t = (source: string) => translate(readStoredLocale(safeLocalStorage()), EN, source);
   const titleSource = NOTIFICATION_TITLES[record.type];
   const title = titleSource === undefined ? record.entityRef.title : t(titleSource);
@@ -196,11 +293,30 @@ function fireDesktopNotification(record: NotificationRecord): void {
   const href = notificationHref(record);
   const desktop = desktopNotify();
   if (desktop !== null) {
-    desktop.show({ title, body, href, tag: record.id });
+    if (delivery?.id !== undefined) {
+      pendingDeliveryMeta.set(delivery.id, { teamId, entityId: record.entityId });
+      if (pendingDeliveryMeta.size > 200) {
+        const oldest = pendingDeliveryMeta.keys().next().value;
+        if (oldest !== undefined) pendingDeliveryMeta.delete(oldest);
+      }
+    }
+    deliveredTagsByEntity.set(record.entityId, record.id);
+    desktop.show({
+      title,
+      body,
+      href,
+      tag: record.id,
+      ...(delivery?.id !== undefined ? { deliveryId: delivery.id } : {}),
+    });
     return;
   }
-  if (!document.hidden) return;
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if (delivery === undefined && !document.hidden) return;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+    if (delivery?.id !== undefined) {
+      void reportDeliveryFailed(teamId, record.entityId, delivery.id);
+    }
+    return;
+  }
   void showViaServiceWorker(title, body, record.id, href).then((shown) => {
     if (shown) return;
     try {
@@ -209,8 +325,17 @@ function fireDesktopNotification(record: NotificationRecord): void {
         window.focus();
         window.location.assign(href);
       };
+      if (delivery?.id !== undefined) {
+        const deliveryId = delivery.id;
+        fallback.onerror = () => {
+          void reportDeliveryFailed(teamId, record.entityId, deliveryId);
+        };
+      }
     } catch (error) {
       console.debug('cairn: recoverable operation failed', error);
+      if (delivery?.id !== undefined) {
+        void reportDeliveryFailed(teamId, record.entityId, delivery.id);
+      }
     }
   });
 }
