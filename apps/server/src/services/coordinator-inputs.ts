@@ -61,7 +61,10 @@ export function stoppedCoordinatorTurns(db: Db, threadId: string): StoppedTurn[]
   const answeredSince = Math.max(
     0,
     ...ended
-      .filter((row) => row.status === 'done' && !isMailWakeText(row.prompt ?? ''))
+      .filter(
+        (row) =>
+          row.status === 'done' && row.machineId === null && !isMailWakeText(row.prompt ?? ''),
+      )
       .map((row) => row.claimedAt ?? row.finishedAt ?? 0),
   );
   const inputs = coordinatorInputs(db, threadId);

@@ -115,6 +115,17 @@ describe('which Coordinator requests a stop cancels', () => {
         ],
       },
     ]);
+
+    turn('answered-on-a-runner', 'done', 450);
+    w.s.db
+      .update(step)
+      .set({ machineId: 'a-runner' })
+      .where(eq(step.id, 'answered-on-a-runner'))
+      .run();
+    expect(
+      stoppedCoordinatorTurns(w.s.db, w.threadId).map((stopped) => stopped.stepId),
+      'a runner turn never wrote the note, so the stop is still owed',
+    ).toEqual(['stopped-on-retry']);
   });
 });
 
