@@ -310,6 +310,8 @@ test('a docs-only head gets every check CI runs for it, including those outside 
   const code = selected(['apps/web/src/a.ts']);
   assert.ok(code.includes('scripts/ui-debt-gate.mjs'));
   assert.ok(code.includes('scripts/test-integrity-gate.mjs'));
+  assert.ok(code.includes('scripts/plan-gate.mjs'));
+  assert.ok(!docs.includes('scripts/plan-gate.mjs'));
   assert.ok(!code.includes('scripts/comment-discipline-gate.mjs'));
 });
 

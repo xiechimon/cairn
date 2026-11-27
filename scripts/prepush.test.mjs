@@ -738,6 +738,7 @@ test('code changes keep suites in CI and out of local plans', () => {
         ['node', 'scripts/ui-debt-gate.mjs'],
         ['node', 'scripts/flake-ledger.mjs'],
         ['node', 'scripts/test-integrity-gate.mjs'],
+        ['node', 'scripts/plan-gate.mjs'],
         ['node', 'scripts/regression-test-ledger.mjs'],
         ['node', 'scripts/product-surface-gate.mjs'],
         ['node', 'scripts/ui-drift-gate.mjs'],
