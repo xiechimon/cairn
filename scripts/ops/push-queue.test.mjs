@@ -36,6 +36,7 @@ import {
   missingGreenContexts,
   pollWaitStep,
   preflightEvidence,
+  resolveRebaseOnlyEvidence,
   stampCommand,
   unownedCommits,
 } from './push-queue.mjs';
@@ -725,5 +726,86 @@ test('pollWaitStep retries when another worktree holds or has moved the shared o
       enqueueRef: 'refs/heads/enqueue/1-abc',
     });
     assert.equal(raced.state, 'retry', reason);
+  }
+});
+
+test('resolveRebaseOnlyEvidence reuses a green tested SHA only for a clean rebase with identical patches', () => {
+  const greenChecks = ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({
+    name,
+    conclusion: 'success',
+  }));
+  const reused = resolveRebaseOnlyEvidence({
+    pushedSha: 'rebased-s2',
+    candidateShas: ['red-sha', 's1-tested'],
+    isCleanRebase: (testedSha, headSha) => testedSha === 's1-tested' && headSha === 'rebased-s2',
+    checkRunsOf: (sha) =>
+      sha === 's1-tested' ? greenChecks : [{ name: 'check', conclusion: 'failure' }],
+  });
+  assert.deepEqual(reused, { ok: true, sha: 's1-tested', mode: 'rebase-only' });
+
+  const modified = resolveRebaseOnlyEvidence({
+    pushedSha: 'edited-s2',
+    candidateShas: ['s1-tested'],
+    isCleanRebase: () => false,
+    checkRunsOf: () => greenChecks,
+  });
+  assert.deepEqual(modified, { ok: false });
+
+  const redSource = resolveRebaseOnlyEvidence({
+    pushedSha: 'rebased-s2',
+    candidateShas: ['s1-red'],
+    isCleanRebase: () => true,
+    checkRunsOf: () => [{ name: 'check', conclusion: 'failure' }],
+  });
+  assert.deepEqual(redSource, { ok: false });
+});
+
+test('preflight --stamp-only stamps Lane trailer and exits 0 without running fast gate or pushing', () => {
+  const root = makeTestTempDir('preflight-stamp-only-');
+  const bare = join(root, 'origin.git');
+  const work = join(root, 'work');
+  const home = join(root, 'home');
+  try {
+    mkdirSync(bare, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    execFileSync('git', ['init', '--bare', '-b', 'main', bare], { encoding: 'utf8' });
+    execFileSync('git', ['clone', bare, work], { encoding: 'utf8' });
+    const gitEnv = {
+      ...process.env,
+      HOME: home,
+      GIT_AUTHOR_NAME: 'xiechimon',
+      GIT_AUTHOR_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+      GIT_COMMITTER_NAME: 'xiechimon',
+      GIT_COMMITTER_EMAIL: '157263579+xiechimon@users.noreply.github.com',
+    };
+    const git = (args) =>
+      execFileSync('git', args, {
+        cwd: work,
+        encoding: 'utf8',
+        env: gitEnv,
+      }).trim();
+    writeFileSync(join(work, 'base.txt'), 'base\n');
+    git(['add', 'base.txt']);
+    git(['commit', '--quiet', '-m', 'chore: base']);
+    git(['push', '--quiet', '-u', 'origin', 'main']);
+
+    git(['checkout', '--quiet', '-b', 'feat']);
+    writeFileSync(join(work, 'feat.txt'), 'feat\n');
+    git(['add', 'feat.txt']);
+    git(['commit', '--quiet', '-m', 'feat: work']);
+
+    const scriptPath = fileURLToPath(new URL('./preflight.mjs', import.meta.url));
+    const res = spawnSync(process.execPath, [scriptPath, '--stamp-only'], {
+      cwd: work,
+      encoding: 'utf8',
+      env: gitEnv,
+    });
+    assert.equal(res.status, 0, res.stderr);
+    assert.match(res.stdout, /stamped/i);
+    const body = git(['log', '-1', '--format=%B']);
+    assert.match(body, /^Lane: m-[0-9a-f]{8}\/work$/m);
+    assert.equal(git(['ls-remote', 'origin', 'refs/heads/preflight/*']), '');
+  } finally {
+    releaseTestTempDir(root);
   }
 });

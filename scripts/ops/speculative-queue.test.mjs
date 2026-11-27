@@ -465,12 +465,16 @@ if (args.includes('POST')) {
 } else {
   const checks = /commits\\/([0-9a-f]+)\\/check-runs/.exec(path);
   const runs = /head_sha=([0-9a-f]+)/.exec(path);
+  const branchRuns = /branch=([^&]+)/.exec(path);
   const jobs = /runs\\/(\\d+)\\/jobs/.exec(path);
   let body = [];
   if (checks) {
     body = { check_runs: state.green.includes(checks[1]) ? ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({ name, status: 'completed', conclusion: 'success' })) : [] };
   } else if (runs) {
     body = { workflow_runs: state.runs.filter((run) => run.head_sha === runs[1]) };
+  } else if (branchRuns) {
+    const branch = decodeURIComponent(branchRuns[1]);
+    body = { workflow_runs: state.runs.filter((run) => run.head_branch === branch && run.status === 'completed' && run.conclusion === 'success') };
   } else if (jobs) {
     body = { jobs: state.jobs?.[jobs[1]] ?? [] };
   }
@@ -1193,5 +1197,52 @@ test('ejecting a red head keeps valid followers behind an addsNothing twin', () 
     q.pass();
     assert.equal(q.remote(`${ENQUEUE_PREFIX}${idA}`), null);
     assert.deepEqual(q.cancelled(), []);
+  });
+});
+
+test('rebase-only candidate reuses green preflight verdict for admission, runs queue/try CI, and promotes', () => {
+  queueHarness('queue-rebase-admit-', (q) => {
+    const main1 = q.commit(q.base, 'x.txt', 'x\n', 'chore: x');
+    q.push(main1, 'refs/heads/main');
+    const lane = 'm-0123abcd/lane-a';
+    const msg = `feat: a\n\nLane: ${lane}`;
+    const s1 = q.commit(q.base, 'a.txt', 'a\n', msg);
+    const s2 = q.commit(main1, 'a.txt', 'a\n', msg);
+    const id = idAt(1, s2);
+    q.push(s1, `refs/heads/preflight/${lane}`);
+    q.push(s2, `${ENQUEUE_PREFIX}${id}`);
+    q.state.green = [s1];
+    q.run(s1, 10, `preflight/${lane}`, { status: 'completed', conclusion: 'success' });
+
+    const first = q.pass();
+    assert.equal(first.action, 'rebuilt');
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${id}`), s2);
+    assert.equal(q.remote(`${TRY_PREFIX}${id}`), s2);
+    assert.equal(q.remote('refs/heads/main'), main1);
+
+    q.run(s2, 11, `queue/try/${id}`, { status: 'completed', conclusion: 'success' });
+    q.state.green.push(s2);
+    q.pass();
+    assert.equal(q.remote('refs/heads/main'), s2);
+  });
+});
+
+test('candidate edited relative to green preflight is ejected when not exact-green', () => {
+  queueHarness('queue-rebase-edited-', (q) => {
+    const main1 = q.commit(q.base, 'x.txt', 'x\n', 'chore: x');
+    q.push(main1, 'refs/heads/main');
+    const lane = 'm-0123abcd/lane-a';
+    const msg = `feat: a\n\nLane: ${lane}`;
+    const s1 = q.commit(q.base, 'a.txt', 'a\n', msg);
+    const s2 = q.commit(main1, 'a.txt', 'a modified\n', msg);
+    const id = idAt(1, s2);
+    q.push(s1, `refs/heads/preflight/${lane}`);
+    q.push(s2, `${ENQUEUE_PREFIX}${id}`);
+    q.state.green = [s1];
+    q.run(s1, 10, `preflight/${lane}`, { status: 'completed', conclusion: 'success' });
+
+    q.pass();
+    assert.equal(q.remote(`${ENQUEUE_PREFIX}${id}`), null);
+    assert.equal(q.remote('refs/heads/main'), main1);
   });
 });

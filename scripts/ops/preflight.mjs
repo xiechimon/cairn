@@ -167,6 +167,7 @@ export function watchVerdict(status, conclusion, watchStatus) {
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const wait = process.argv.includes('--wait');
+  const stampOnly = process.argv.includes('--stamp-only');
   const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
   const lane = localLane(git(['rev-parse', '--show-toplevel']));
@@ -179,6 +180,10 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     process.exit(1);
   }
   const sha = stamped.sha;
+  if (stampOnly) {
+    console.log(`[preflight] stamped ${sha}`);
+    process.exit(0);
+  }
   const root = git(['rev-parse', '--show-toplevel']);
   const invocation = fastGateInvocation();
   console.log(

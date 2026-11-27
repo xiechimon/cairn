@@ -11,6 +11,7 @@ import {
   RELEASE_MARKER,
   REQUIRED_CHECKS,
 } from './promote-queue.mjs';
+import { isCleanRebaseOf, rebaseOwnerLane } from './rebase-equivalence.mjs';
 
 export const ENQUEUE_PREFIX = 'refs/heads/enqueue/';
 export const TRY_PREFIX = 'refs/heads/queue/try/';
@@ -408,7 +409,13 @@ function cancelRuns(repo, runIds) {
   }
 }
 
-function readEntryMeta(repo, cwd, sha) {
+function hasVerifiedChecks(repo, sha) {
+  const checkRuns = ghPages(`repos/${repo}/commits/${sha}/check-runs?per_page=100`, 'check_runs');
+  const byName = latestCompletedCheckMap(checkRuns);
+  return REQUIRED_CHECKS.every((name) => GREEN_CONCLUSIONS.has(byName.get(name) ?? ''));
+}
+
+function readEntryMeta(repo, cwd, sha, mainTip) {
   const subject = runGit(cwd, ['log', '-1', '--format=%s', sha]);
   const body = runGit(cwd, ['log', '-1', '--format=%B', sha]);
   const owner = ownerOf(body);
@@ -419,10 +426,40 @@ function readEntryMeta(repo, cwd, sha) {
   } catch {
     released = false;
   }
-  const checkRuns = ghPages(`repos/${repo}/commits/${sha}/check-runs?per_page=100`, 'check_runs');
-  const byName = latestCompletedCheckMap(checkRuns);
-  const verified = REQUIRED_CHECKS.every((name) => GREEN_CONCLUSIONS.has(byName.get(name) ?? ''));
-  return { subject, owner, released, verified };
+  const exactVerified = hasVerifiedChecks(repo, sha);
+  const ownerLane = rebaseOwnerLane(body);
+  let rebaseVerified = false;
+  if (!exactVerified && mainTip && ownerLane) {
+    const { workflow_runs: greenRuns } = gh([
+      `repos/${repo}/actions/workflows/ci.yml/runs?branch=${encodeURIComponent(`preflight/${ownerLane}`)}&status=success&per_page=10`,
+    ]);
+    let fetchedPreflightRef = false;
+    const seen = new Set();
+    for (const run of greenRuns ?? []) {
+      const testedSha = run?.head_sha;
+      if (!testedSha || seen.has(testedSha)) continue;
+      seen.add(testedSha);
+      if (!hasCommit(cwd, testedSha)) {
+        spawnSync('git', ['fetch', '--quiet', 'origin', testedSha], { cwd, stdio: 'ignore' });
+      }
+      if (!hasCommit(cwd, testedSha) && !fetchedPreflightRef) {
+        fetchedPreflightRef = true;
+        spawnSync('git', ['fetch', '--quiet', 'origin', `refs/heads/preflight/${ownerLane}`], {
+          cwd,
+          stdio: 'ignore',
+        });
+      }
+      if (
+        hasCommit(cwd, testedSha) &&
+        isCleanRebaseOf({ cwd, baseRef: mainTip, testedSha, headSha: sha }) &&
+        hasVerifiedChecks(repo, testedSha)
+      ) {
+        rebaseVerified = true;
+        break;
+      }
+    }
+  }
+  return { subject, owner, released, verified: exactVerified || rebaseVerified, exactVerified };
 }
 
 function readTryVerdict(repo, sha) {
@@ -614,7 +651,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
 
     const entries = enqueue.map((item) => ({
       ...item,
-      ...readEntryMeta(repo, cwd, item.sha),
+      ...readEntryMeta(repo, cwd, item.sha, mainTip),
     }));
 
     const landedSet = new Set();
@@ -651,6 +688,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
         isTryValid({ cwd, expectedParent: prevSha, trySha: existingTrySha, entrySha: item.sha });
       const stacksUnchanged =
         !chainBroken &&
+        item.exactVerified !== false &&
         (!existingValid || existingTrySha === item.sha) &&
         isAncestor(cwd, prevSha, item.sha);
       const addsNothing =
@@ -853,7 +891,9 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
           trySha !== null &&
           isTryValid({ cwd, expectedParent: nextParent, trySha, entrySha: item.sha });
         const stacksUnchanged =
-          (!validTry || trySha === item.sha) && isAncestor(cwd, nextParent, item.sha);
+          item.exactVerified !== false &&
+          (!validTry || trySha === item.sha) &&
+          isAncestor(cwd, nextParent, item.sha);
         const addsNothing =
           nextParent !== mainTip && cherrySignatures(cwd, nextParent, item.sha).length === 0;
         if (stacksUnchanged || addsNothing) {
@@ -950,7 +990,7 @@ export function runQueuePass({ repo, enforce = true, cwd = process.cwd() }) {
           hitConflict = true;
           break;
         }
-        if (res.sha === step.entry.sha || res.empty) {
+        if ((res.sha === step.entry.sha && step.entry.exactVerified !== false) || res.empty) {
           if (existingTrySha && deleteRemoteRefs(cwd, [`${TRY_PREFIX}${step.entry.id}`])) {
             tryRaw.delete(step.entry.id);
           }

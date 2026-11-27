@@ -6,6 +6,7 @@ import { existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } 
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { ownerOf, RELEASE_MARKER } from './promote-queue.mjs';
+import { isCleanRebaseOf, rebaseOwnerLane } from './rebase-equivalence.mjs';
 import { ENQUEUE_PREFIX, makeEnqueueId, sortEnqueueEntries } from './speculative-queue.mjs';
 
 export const DEFAULT_POLL_SECONDS = 15;
@@ -143,6 +144,23 @@ export function preflightEvidence({ shas, pushedTree, treeOf, checkRunsOf }) {
   return { ok: false };
 }
 
+export function resolveRebaseOnlyEvidence({
+  pushedSha,
+  candidateShas,
+  isCleanRebase,
+  checkRunsOf,
+}) {
+  for (const sha of candidateShas) {
+    if (!sha || sha === pushedSha) continue;
+    if (!isCleanRebase(sha, pushedSha)) continue;
+    const runs = checkRunsOf(sha) ?? [];
+    if (missingGreenContexts(runs).length === 0) {
+      return { ok: true, sha, mode: 'rebase-only' };
+    }
+  }
+  return { ok: false };
+}
+
 export const RED_CONCLUSIONS = ['failure', 'timed_out', 'cancelled'];
 
 export function failedGreenContexts(checkRuns) {
@@ -212,7 +230,63 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const checkRunsOf = (sha) => fetchCheckRuns({ repo, sha, gh: ghJson });
   const sleep = (seconds) =>
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
+  const resolveRebaseCandidate = (headSha) => {
+    const ownerLane = rebaseOwnerLane(git(['log', '-1', '--format=%B', headSha]));
+    if (!ownerLane) return { ok: false };
+    spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { stdio: 'ignore' });
+    spawnSync(
+      'git',
+      [
+        'fetch',
+        '--quiet',
+        'origin',
+        `+refs/heads/preflight/${ownerLane}:refs/remotes/origin/preflight/${ownerLane}`,
+      ],
+      { stdio: 'ignore' },
+    );
+    const candidates = new Set();
+    const remoteRef = spawnSync(
+      'git',
+      ['rev-parse', '--verify', `refs/remotes/origin/preflight/${ownerLane}`],
+      { encoding: 'utf8' },
+    );
+    if (remoteRef.status === 0 && remoteRef.stdout.trim()) {
+      candidates.add(remoteRef.stdout.trim());
+    }
+    try {
+      const listed = ghJson([
+        'api',
+        `repos/${repo}/actions/workflows/ci.yml/runs?branch=${encodeURIComponent(`preflight/${ownerLane}`)}&status=success&per_page=10`,
+      ]);
+      for (const run of listed?.workflow_runs ?? []) {
+        if (!run?.head_sha) continue;
+        if (spawnSync('git', ['cat-file', '-e', `${run.head_sha}^{commit}`]).status !== 0) {
+          spawnSync('git', ['fetch', '--quiet', 'origin', run.head_sha], { stdio: 'ignore' });
+        }
+        candidates.add(run.head_sha);
+      }
+    } catch {}
+    return resolveRebaseOnlyEvidence({
+      pushedSha: headSha,
+      candidateShas: [...candidates],
+      isCleanRebase: (testedSha, targetSha) =>
+        isCleanRebaseOf({
+          cwd: process.cwd(),
+          baseRef: 'origin/main',
+          testedSha,
+          headSha: targetSha,
+        }),
+      checkRunsOf: (sha) => {
+        try {
+          return checkRunsOf(sha);
+        } catch {
+          return null;
+        }
+      },
+    });
+  };
 
+  let cachedRebase = { head: null, result: { ok: false } };
   if (wait) {
     let armedTree = null;
     for (;;) {
@@ -243,15 +317,16 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         shas: [head],
         pushedTree: headTree,
         treeOf,
-        checkRunsOf: (sha) => {
-          try {
-            return checkRunsOf(sha);
-          } catch {
-            return null;
-          }
-        },
+        checkRunsOf: (sha) => (sha === head ? runs : null),
       });
-      if (ev.ok) break;
+      let rebaseOk = false;
+      if (!ev.ok) {
+        if (head !== cachedRebase.head) {
+          cachedRebase = { head, result: resolveRebaseCandidate(head) };
+        }
+        rebaseOk = cachedRebase.result.ok;
+      }
+      if (ev.ok || rebaseOk) break;
       if (headTree !== armedTree) {
         const pushed = spawnSync(process.execPath, [join(import.meta.dirname, 'preflight.mjs')], {
           stdio: 'inherit',
@@ -302,7 +377,19 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     );
     process.exit(1);
   }
-  if (!evidence.ok) {
+  const exactEvidence = evidence.ok && evidence.sha === pushedSha;
+  const rebaseEvidence = exactEvidence
+    ? { ok: false }
+    : pushedSha === cachedRebase.head && cachedRebase.result.ok
+      ? cachedRebase.result
+      : resolveRebaseCandidate(pushedSha);
+  if (!exactEvidence && !rebaseEvidence.ok) {
+    if (evidence.ok && evidence.sha !== pushedSha) {
+      console.error(
+        `[push-queue] not pushed: ${pushedSha.slice(0, 9)} lacks exact-SHA green evidence (e.g. Lane: trailer stamped a new SHA); run node scripts/ops/preflight.mjs --wait first.`,
+      );
+      process.exit(1);
+    }
     console.error(
       `[push-queue] not pushed: ${pushedSha.slice(0, 9)} has no green ci evidence for ${GREEN_CONTEXTS.join(' + ')}.\n` +
         'Run node scripts/ops/preflight.mjs --wait — it pushes HEAD to refs/heads/preflight/<lane> and waits for the ci run.',
@@ -311,11 +398,10 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   }
 
   spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { stdio: 'inherit' });
-  if (evidence.sha !== pushedSha) {
-    console.error(
-      `[push-queue] not pushed: ${pushedSha.slice(0, 9)} lacks exact-SHA green evidence (e.g. Lane: trailer stamped a new SHA); run node scripts/ops/preflight.mjs --wait first.`,
+  if (rebaseEvidence.ok) {
+    console.log(
+      `[push-queue] reusing green preflight verdict from ${rebaseEvidence.sha.slice(0, 9)} (rebase-only; queue/try will test merged tree)`,
     );
-    process.exit(1);
   }
 
   const refreshed = listRemoteQueue();

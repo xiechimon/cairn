@@ -33,9 +33,12 @@ accepted and pushing an untested one is rejected.
 
 - It stamps `Lane: <machine id>/<worktree>` on commits in `origin/main..HEAD` that have
   no `Amp-Thread-ID` or `Lane` trailer, runs the English-only gate, and requires
-  green `check` + `pack-smoke` + `e2e-gate` on the exact SHA of `HEAD`.
-  `preflight.mjs` stamps before it pushes, so the SHA it tested is the one
-  submitted; a later commit, rebase or amend needs a new pre-flight run.
+  green `check` + `pack-smoke` + `e2e-gate` on the exact SHA of `HEAD` (or a
+  tested clean-rebase `preflight/<lane>` ancestor with identical patch-ids via
+  `scripts/ops/rebase-equivalence.mjs`, in which case `queue/try/*` still tests
+  the merged tree). `preflight.mjs` stamps before it pushes, so the SHA it tested
+  is the one submitted; a later code edit or conflict resolution needs a new
+  pre-flight run.
 - It pushes `HEAD` to `enqueue/*` (reusing the ref when that SHA is already
   queued) and dispatches `promote.yml`. If the dispatch fails, the schedule
   backstop picks the entry up.
@@ -49,13 +52,18 @@ accepted and pushing an untested one is rejected.
 
 - **Prune and admit.** Entries already on `main`, or carrying a
   `queue/main release:` comment, are removed, as are `try` refs with no entry in
-  the window. An entry without the three green checks on its SHA is ejected.
-- **Window.** The first four entries are active. The first one, when it contains
-  the `main` tip and has no `try` ref, is already tested and counts as green.
-  Later entries can count without a ref of their own too (*Verdict reuse*).
-  Otherwise a `try` ref is kept, with its running CI, while it sits on the
-  expected parent and carries the same commits; if not, it and everything after
-  it are rebuilt in a temporary worktree.
+  the window. An entry is admitted if the three green checks pass on its exact
+  SHA (`exactVerified`) OR on a tested `preflight/<lane>` SHA `S` where
+  `isCleanRebaseOf` holds cleanly against `main` (`rebase-only` admission). Any
+  unverified entry is ejected.
+- **Window.** The first four entries are active. The first one, when it is
+  `exactVerified`, contains the `main` tip, and has no `try` ref, is already
+  tested and counts as green (a `rebase-only` entry with `exactVerified = false`
+  must still run `queue/try/*` on its rebased tree). Later entries can count
+  without a ref of their own too (*Verdict reuse*). Otherwise a `try` ref is
+  kept, with its running CI, while it sits on the expected parent and carries
+  the same commits; if not, it and everything after it are rebuilt in a
+  temporary worktree.
 - **Batch fast-forward.** The furthest position in the valid prefix that may be
   passed to is pushed to `main`, because its tree contains the earlier ones.
   Superseded runs are cancelled, `enqueue/*` and `try` refs are deleted, and the

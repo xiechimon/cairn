@@ -109,6 +109,14 @@ test('safety invariant: speculative queue verifies admission checks and never fo
   assert.doesNotMatch(spec, /'push'[^\n]*'--force'[^\n]*refs\/heads\/main/);
 });
 
+test('safety invariant: rebase-only admission requires clean patch equivalence and still runs queue/try before main', () => {
+  const spec = read('scripts/ops/speculative-queue.mjs');
+  assert.match(spec, /isCleanRebaseOf/);
+  assert.match(spec, /item\.exactVerified !== false/);
+  const pushQueue = read('scripts/ops/push-queue.mjs');
+  assert.match(pushQueue, /resolveRebaseOnlyEvidence/);
+});
+
 test('efficiency invariant: queue depth, poll cadence, shard cap, and poll resilience stay bounded', () => {
   assert.ok(
     MAX_SPECULATIVE_DEPTH >= 2 && MAX_SPECULATIVE_DEPTH <= 6,

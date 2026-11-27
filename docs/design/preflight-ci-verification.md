@@ -83,11 +83,28 @@ A lane verifies on GitHub before it enters the landing queue:
 
 ## Gate predicate
 
-`push-queue.mjs` admits `HEAD` only with `conclusion: success` or `skipped` for
-`check`, `pack-smoke` and `e2e-gate` on its exact SHA. `preflight.mjs` stamps the
-`Lane:` trailer before it pushes, so the SHA it tests is the SHA submitted. A
-green run on another SHA with the same tree does not admit `HEAD`. The first
-entry on current `main` lands without a second CI run.
+`push-queue.mjs` admits `HEAD` with `conclusion: success` or `skipped` for
+`check`, `pack-smoke` and `e2e-gate` in either of two admission states:
+
+1. **`exact-green`**: exact `HEAD` SHA holds the three required green checks.
+2. **`rebase-only-green`**: a tested `preflight/<lane>` SHA `S` holds the three
+   required green checks, and `isCleanRebaseOf({ cwd, baseRef: 'origin/main', testedSha: S, headSha: HEAD })`
+   holds (`testedBase = merge-base(origin/main, S)` is an ancestor of
+   `headBase = merge-base(origin/main, HEAD)`, zero merge commits exist in either
+   range, the commit ranges are non-empty, and every commit matches in order on
+   `git patch-id --verbatim`, subject, author name and author email). In this
+   state, `push-queue.mjs` and `speculative-queue.mjs` admit `HEAD` into
+   `enqueue/*` without re-running `preflight`, while `speculative-queue.mjs`
+   withholds `exactVerified` so the candidate MUST build and pass `queue/try/*`
+   CI on its rebased tree before promotion to `main`.
+3. **`unverified`**: neither holds (including any conflict edit, subject edit,
+   added/dropped commit, backward rebase, merge commit, red `S`, or unreachable
+   GitHub API -> fail closed); `push-queue` refuses (or runs `preflight` under `--wait`).
+
+To overlap CI wait with landing review, lanes may run
+`node scripts/ops/preflight.mjs --stamp-only` first to freeze `Lane:` trailers on
+`HEAD`, then run `node scripts/ops/preflight.mjs --wait` concurrently with
+`review-head` on that exact SHA, fixing all findings in one batch.
 
 ## States and failure behaviour
 
