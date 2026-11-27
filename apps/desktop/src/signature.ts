@@ -5,7 +5,7 @@ const run = promisify(execFile);
 const CODESIGN = '/usr/bin/codesign';
 const VERIFY = ['--verify', '--strict'];
 const BUNDLE_ID = 'io.github.xiechimon.cairn';
-const FINGERPRINT = '19AA592374DC19928A4C5494BCAC5A984182EA8A';
+const FINGERPRINT = '0534637BC4A0AE2E430CFF4D16661F5EA9899DCB';
 
 export const CAIRN_REQUIREMENT = `identifier "${BUNDLE_ID}" and certificate leaf = H"${FINGERPRINT}"`;
 

@@ -4,46 +4,41 @@ Every Mac release is signed with one self-signed code-signing certificate that C
 
 | Item | Value |
 |---|---|
-| Subject | `CN=Cairn Mac Self-Signed, O=xiechimon` |
-| SHA-1 fingerprint | `19AA592374DC19928A4C5494BCAC5A984182EA8A` |
+| Subject | `CN=Cairn Mac Self-Signed` |
+| SHA-1 fingerprint | `0534637BC4A0AE2E430CFF4D16661F5EA9899DCB` |
 | Key | RSA 3072 |
-| Valid until | 2046-11-11 |
-| Created | 2026-11-16 on omarchy, by the same steps as `apps/desktop/scripts/new-signing-certificate.sh` |
+| Valid until | 2046-11-22 |
+| Created | 2026-11-27 on the owner's MacBook, by `apps/desktop/scripts/new-signing-certificate.sh` |
 
 ## Where it lives
 
 | Copy | Location | Who can read it |
 |---|---|---|
 | Public certificate | `apps/desktop/signing/cairn-mac-self-signed.crt` in this repository | anyone; it holds no key |
-| Private key, certificate, PKCS#12 and its password | `~/.config/cairn/desktop-signing/` on omarchy: the directory is mode 0700, every file 0600 (`signing.key.pem`, `signing.cert.pem`, `signing.p12`, `p12-password`, `openssl.cnf`) | the `ian` account on omarchy |
+| Private key, certificate, PKCS#12 and its password | `~/.config/cairn/desktop-signing-20261127/` on the owner's MacBook and Mac mini: the directory is mode 0700, every file 0600 (`signing.key.pem`, `signing.cert.pem`, `signing.p12`, `p12-password`, `openssl.cnf`) | the owner's local accounts on those two Macs |
 | CI | GitHub environment `desktop-release`, secrets `MAC_SIGNING_P12_BASE64` (the base64 PKCS#12) and `MAC_SIGNING_P12_PASSWORD`. The environment admits deployments from `main` only, and only the `release` job of `desktop-release.yml` names it | release runs on `main`; GitHub secrets cannot be read back |
 
-The repository ignores `*.pem` and `*.key`, which is why the public certificate is committed as `.crt`. Never commit anything from `~/.config/cairn/desktop-signing/`.
+The repository ignores `*.pem` and `*.key`, which is why the public certificate is committed as `.crt`. Never commit anything from `~/.config/cairn/desktop-signing-*/`.
 
 Pull requests never see the key. `desktop-mac.yml` creates a throwaway certificate on the runner, signs with it and runs the same check. `desktop-release.yml` imports the release PKCS#12 into a temporary keychain (`apps/desktop/scripts/import-signing-identity.sh`), signs through `apps/desktop/scripts/sign-mac.cjs`, checks both update zips with `apps/desktop/scripts/check-signature.mjs` before publishing, and deletes the keychain at the end. The trust boundary is that whole job: every later step in it can use the unlocked keychain, and `security import` takes the PKCS#12 password as a process argument on the runner. So the job runs only code from `main`, and the decoded PKCS#12 and password files are removed when the import step exits, whether it succeeds or not.
 
 ## What the updater accepts
 
-The updater verifies the staged app against this certificate and identifier alone, `identifier "io.github.xiechimon.cairn" and certificate leaf = H"19AA592374DC19928A4C5494BCAC5A984182EA8A"` in `apps/desktop/src/signature.ts`. It reads nothing from the installed copy: whatever signed the copy that is running, the staged app must be signed by this certificate for this identifier.
+The updater verifies the staged app against this certificate and identifier alone, `identifier "io.github.xiechimon.cairn" and certificate leaf = H"0534637BC4A0AE2E430CFF4D16661F5EA9899DCB"` in `apps/desktop/src/signature.ts`. It reads nothing from the installed copy: whatever signed the copy that is running, the staged app must be signed by this certificate for this identifier.
 
 - A locally built or ad-hoc copy, so one this certificate did not sign, updates only to an official release. That first update installs an officially signed build, and every later one passes normally.
 - Rotating the certificate needs a manual install for clients pinned to the old certificate, because they refuse a build signed with the new certificate.
 
 ## Backup
 
-GitHub is not a backup, because its secrets cannot be read back. The only readable copy is the one on omarchy, so keep one encrypted copy away from that disk:
+GitHub is not a backup, because its secrets cannot be read back. The signing directory (`~/.config/cairn/desktop-signing-20261127/`, directory mode 0700, every file 0600) lives on two machines of the owner — the owner's MacBook and Mac mini — synced with `scp -r` keeping those same permissions:
 
 ```bash
-tar -C ~/.config/cairn -c desktop-signing \
-  | gpg --symmetric --cipher-algo AES256 -o ~/backups/desktop-signing-$(date -u +%Y%m%d).tar.gpg
+scp -r ~/.config/cairn/desktop-signing-20261127 macmini:~/.config/cairn/
+ssh macmini 'chmod 700 ~/.config/cairn/desktop-signing-20261127 && chmod 600 ~/.config/cairn/desktop-signing-20261127/*'
 ```
 
-Copy the `.tar.gpg` file to the off-host backup destination used for the server backups (`CAIRN_BACKUP_REMOTE`). Keep the gpg passphrase in the owner's password manager, never next to the file. To restore it:
-
-```bash
-install -d -m 700 ~/.config/cairn
-gpg -d desktop-signing-<date>.tar.gpg | tar -C ~/.config/cairn -x
-```
+Holding the directory on both owner machines is the backup; there is no separate encrypted archive or passphrase step.
 
 ## Losing it or leaking it
 
@@ -64,7 +59,7 @@ gpg -d desktop-signing-<date>.tar.gpg | tar -C ~/.config/cairn -x
 1. `apps/desktop/scripts/new-signing-certificate.sh ~/.config/cairn/desktop-signing-<date> "Cairn Mac Self-Signed" 7300`.
 2. Store the new PKCS#12 and its password in the environment. The values go through stdin, so they never appear in the shell history or on a command line:
    ```bash
-   base64 -w0 signing.p12 | gh secret set MAC_SIGNING_P12_BASE64 --repo xiechimon/cairn --env desktop-release
+   base64 < signing.p12 | tr -d '\n' | gh secret set MAC_SIGNING_P12_BASE64 --repo xiechimon/cairn --env desktop-release
    gh secret set MAC_SIGNING_P12_PASSWORD --repo xiechimon/cairn --env desktop-release < p12-password
    ```
 3. In one PR, replace `apps/desktop/signing/cairn-mac-self-signed.crt` and the fingerprint in `apps/desktop/src/signature.ts`, `apps/desktop/scripts/check-signature.test.mjs` and in this file. Releases fail their signature check until the secrets and the committed certificate match.

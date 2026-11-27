@@ -14,7 +14,7 @@ import {
 const { CAIRN_REQUIREMENT } = await import('../src/signature.ts');
 
 const BUNDLE = 'io.github.xiechimon.cairn';
-const RELEASE_FINGERPRINT = '19AA592374DC19928A4C5494BCAC5A984182EA8A';
+const RELEASE_FINGERPRINT = '0534637BC4A0AE2E430CFF4D16661F5EA9899DCB';
 const CERT = join(import.meta.dirname, '..', 'signing', 'cairn-mac-self-signed.crt');
 
 function runCli({ plistId, requirement, pinned = 0 }) {
