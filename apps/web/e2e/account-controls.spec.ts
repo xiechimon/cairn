@@ -291,3 +291,69 @@ for (const avatar of ['supplied', 'missing', 'broken']) {
     }
   });
 }
+
+test('settings account: section titles align with rows below and account name uses the page sans font', async ({
+  page,
+}) => {
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: USER_NAME, avatarUrl: null, type: 'user' } }),
+  );
+  await page.route('**/api/server/version', (route) =>
+    route.fulfill({ json: { version: '0.1.765', commit: 'abc1234' } }),
+  );
+  await page.route('**/api/server/backup', (route) =>
+    route.fulfill({
+      json: {
+        state: 'none',
+        managed: {
+          enabled: true,
+          storage: 'local',
+          schedule: 'daily',
+          inProgress: false,
+          snapshots: [],
+        },
+      },
+    }),
+  );
+
+  await page.goto('/app/settings/account');
+  await expect(page.getByTestId('account-appearance')).toBeVisible();
+  await expect(page.getByTestId('account-about')).toBeVisible();
+  await expect(page.getByTestId('account-backup')).toBeVisible();
+
+  const metrics = await page.evaluate(() => {
+    const xOf = (selector: string) =>
+      document.querySelector(selector)?.getBoundingClientRect().x ?? null;
+    const head = document.querySelector('[data-testid="settings-head"]');
+    const accountName = document.querySelector('.account-header h2');
+    const headStyle = head ? getComputedStyle(head) : null;
+    const nameStyle = accountName ? getComputedStyle(accountName) : null;
+    return {
+      headX: xOf('[data-testid="settings-head"]'),
+      languageLabelX: xOf('[data-settings-label="语言"] span[id]'),
+      appearanceTitleX: xOf('[data-testid="account-appearance"] h2'),
+      appearanceRowX: xOf('[data-testid="account-appearance"] [data-settings-label] span[id]'),
+      aboutTitleX: xOf('[data-testid="account-about"] h2'),
+      aboutRowX: xOf('[data-testid="account-about"] [data-settings-label] span[id]'),
+      backupTitleX: xOf('[data-testid="account-backup"] h2'),
+      backupRowX: xOf('[data-testid="account-backup"] [data-settings-label] span[id]'),
+      headFont: headStyle?.fontFamily.split(',')[0]?.replace(/["']/g, '').trim() ?? null,
+      nameFont: nameStyle?.fontFamily.split(',')[0]?.replace(/["']/g, '').trim() ?? null,
+      nameSize: nameStyle?.fontSize ?? null,
+      nameWeight: nameStyle?.fontWeight ?? null,
+    };
+  });
+
+  expect(metrics.appearanceTitleX).not.toBeNull();
+  expect(metrics.appearanceRowX).not.toBeNull();
+  expect(Math.abs((metrics.appearanceTitleX ?? 0) - (metrics.appearanceRowX ?? 0))).toBeLessThan(1);
+  expect(Math.abs((metrics.aboutTitleX ?? 0) - (metrics.aboutRowX ?? 0))).toBeLessThan(1);
+  expect(Math.abs((metrics.backupTitleX ?? 0) - (metrics.backupRowX ?? 0))).toBeLessThan(1);
+  expect(Math.abs((metrics.appearanceTitleX ?? 0) - (metrics.languageLabelX ?? 0))).toBeLessThan(1);
+  expect(Math.abs((metrics.appearanceTitleX ?? 0) - (metrics.headX ?? 0))).toBeLessThan(1);
+
+  expect(metrics.nameFont).toBe(metrics.headFont);
+  expect(metrics.nameFont).not.toMatch(/sourceSerif4/i);
+  expect(metrics.nameSize).toBe('18px');
+  expect(metrics.nameWeight).toBe('600');
+});

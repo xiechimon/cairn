@@ -68,8 +68,13 @@ describe('the serif voice follows claude.ai (docs/design/surfaces/foundation.md 
   it('page titles and the wordmark are the title voice', () => {
     expect(read('components/title-menu-trigger.tsx')).toMatch(/page: '[^']*voice-title text-page/);
     expect(read('pages/shell.tsx')).toContain('voice-title text-page');
-    expect(read('components/settings-list.tsx')).toContain('voice-title text-page');
     expect(read('board/sidebar.tsx')).toMatch(/sidebar-team-name[^"]*voice-title text-brand/);
+  });
+
+  it('settings headers use the sans heading voice matching the settings modal', () => {
+    const settingsList = read('components/settings-list.tsx');
+    expect(settingsList).not.toContain('voice-title');
+    expect(settingsList).toContain('text-heading font-title');
   });
 
   it('agent replies are sans like the approved chat draft, not the response voice', () => {

@@ -43,8 +43,9 @@ export function SettingsHeader({
   avatarClassName,
   titleClassName,
 }: SettingsHeaderProps) {
+  const rows = useContext(SettingsRowsContext);
   return (
-    <div className={cn('flex min-h-14 items-center gap-4 px-1', className)}>
+    <div className={cn('flex min-h-14 items-center gap-4', !rows && 'px-1', className)}>
       {avatar != null && (
         <span
           className={cn(
@@ -59,7 +60,7 @@ export function SettingsHeader({
         <>
           <div className="flex min-w-0 flex-auto flex-col gap-0.5">
             <h2
-              className={cn('m-0 truncate voice-title text-page text-foreground', titleClassName)}
+              className={cn('m-0 truncate text-heading font-title text-foreground', titleClassName)}
             >
               {title}
             </h2>
@@ -275,7 +276,9 @@ export function SettingsSection({
       data-testid={testId}
       className={cn('flex flex-col', rows ? 'gap-3' : 'gap-2', className)}
     >
-      <div className={cn('flex min-h-7 items-center justify-between gap-3', !flat && 'px-1')}>
+      <div
+        className={cn('flex min-h-7 items-center justify-between gap-3', !flat && !rows && 'px-1')}
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           <h2 className="m-0 truncate text-heading font-title text-foreground">{title}</h2>
           {info !== undefined && <InfoTip info={info} />}
