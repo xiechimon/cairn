@@ -1,5 +1,5 @@
 import { DESKTOP_TRAY_PATH, type DesktopPresenceState } from '@cairn/shared';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { api } from '../api/client.js';
 import { readNotifyPref } from '../board/notify-pref.js';
 import { desktopPresence } from '../desktop-shell.js';
@@ -106,55 +106,24 @@ function webHasNotificationPermission(): boolean {
 }
 
 export function useClientPresence(teamId: string | undefined, enabled: boolean): void {
-  const [desktopState, setDesktopState] = useState<
-    (DesktopPresenceState & { clientId?: string }) | null
-  >(null);
-
-  useEffect(() => {
-    const bridge = desktopPresence();
-    if (!enabled || bridge === null) return;
-    let active = true;
-    void bridge
-      .state()
-      .then((initial) => {
-        if (!active || initial === null) return;
-        if (initial.clientId !== undefined && initial.clientId !== '') {
-          cachedDesktopClientId = initial.clientId;
-        }
-        setDesktopState(initial);
-      })
-      .catch((error) => {
-        console.debug('cairn: recoverable operation failed', error);
-      });
-    const unsubscribe = bridge.subscribe((next) => {
-      if (!active) return;
-      if (next.clientId !== undefined && next.clientId !== '') {
-        cachedDesktopClientId = next.clientId;
-      }
-      setDesktopState(next);
-    });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, [enabled]);
-
   useEffect(() => {
     if (!enabled || teamId === undefined) return;
     const isTray = typeof window !== 'undefined' && window.location.pathname === DESKTOP_TRAY_PATH;
     const path = `/api/teams/${encodeURIComponent(teamId)}/presence`;
     const bridge = desktopPresence();
-    let latestDesktop = desktopState;
+    let active = true;
+    let latestDesktop: (DesktopPresenceState & { clientId?: string }) | null = null;
     let lastPostedClientId: string | null = null;
 
     const buildPayload = () => {
-      const clientId = latestDesktop?.clientId ?? cachedDesktopClientId ?? browserTabId;
       const notifyEnabled = readNotifyPref(safeLocalStorage()) !== 'off';
       if (bridge !== null) {
-        if (isTray && latestDesktop?.mainWindowOpen !== false) return null;
+        if (latestDesktop === null) return null;
+        if (isTray && latestDesktop.mainWindowOpen !== false) return null;
+        const clientId = latestDesktop.clientId ?? cachedDesktopClientId ?? browserTabId;
         const focused =
           !isTray &&
-          (latestDesktop?.windowFocused ??
+          (latestDesktop.windowFocused ??
             (document.visibilityState === 'visible' &&
               (typeof document.hasFocus !== 'function' || document.hasFocus())));
         return {
@@ -162,8 +131,8 @@ export function useClientPresence(teamId: string | undefined, enabled: boolean):
           kind: 'desktop' as const,
           focused,
           activeThreadId: focused ? currentActiveThreadId : null,
-          screenLocked: latestDesktop?.screenLocked ?? false,
-          systemIdleSec: latestDesktop?.systemIdleSec ?? 0,
+          screenLocked: latestDesktop.screenLocked ?? false,
+          systemIdleSec: latestDesktop.systemIdleSec ?? 0,
           canNotify: notifyEnabled,
         };
       }
@@ -171,7 +140,7 @@ export function useClientPresence(teamId: string | undefined, enabled: boolean):
         document.visibilityState === 'visible' &&
         (typeof document.hasFocus !== 'function' || document.hasFocus());
       return {
-        clientId,
+        clientId: cachedDesktopClientId ?? browserTabId,
         kind: 'web' as const,
         focused,
         activeThreadId: focused ? currentActiveThreadId : null,
@@ -182,6 +151,7 @@ export function useClientPresence(teamId: string | undefined, enabled: boolean):
     };
 
     const sendPresence = () => {
+      if (!active) return;
       const payload = buildPayload();
       if (payload === null) return;
       const seq = nextClientSeq(bridge);
@@ -189,6 +159,26 @@ export function useClientPresence(teamId: string | undefined, enabled: boolean):
       void api
         .post(path, { ...payload, seq })
         .catch((error) => console.debug('cairn: recoverable operation failed', error));
+    };
+
+    const refreshDesktopAndSend = () => {
+      if (bridge === null) {
+        sendPresence();
+        return;
+      }
+      void bridge
+        .state()
+        .then((next) => {
+          if (!active || next === null) return;
+          latestDesktop = next;
+          if (next.clientId !== undefined && next.clientId !== '') {
+            cachedDesktopClientId = next.clientId;
+          }
+          sendPresence();
+        })
+        .catch((error) => {
+          console.debug('cairn: recoverable operation failed', error);
+        });
     };
 
     const sendDelete = (keepalive = false) => {
@@ -222,8 +212,9 @@ export function useClientPresence(teamId: string | undefined, enabled: boolean):
     const onPageHide = () => sendDelete(true);
 
     markActivity();
-    sendPresence();
-    const timer = setInterval(sendPresence, 30_000);
+    if (bridge !== null) refreshDesktopAndSend();
+    else sendPresence();
+    const timer = setInterval(refreshDesktopAndSend, 30_000);
     activeThreadListeners.add(sendPresence);
     document.addEventListener('visibilitychange', sendPresence);
     window.addEventListener('focus', onFocus);
@@ -236,6 +227,7 @@ export function useClientPresence(teamId: string | undefined, enabled: boolean):
 
     const unsubDesktop =
       bridge?.subscribe((next) => {
+        if (!active) return;
         latestDesktop = next;
         if (next.clientId !== undefined && next.clientId !== '') {
           cachedDesktopClientId = next.clientId;
@@ -244,6 +236,7 @@ export function useClientPresence(teamId: string | undefined, enabled: boolean):
       }) ?? (() => {});
 
     return () => {
+      active = false;
       clearInterval(timer);
       unsubDesktop();
       activeThreadListeners.delete(sendPresence);
@@ -257,5 +250,5 @@ export function useClientPresence(teamId: string | undefined, enabled: boolean):
       window.removeEventListener('pagehide', onPageHide);
       sendDelete(false);
     };
-  }, [teamId, enabled, desktopState]);
+  }, [teamId, enabled]);
 }

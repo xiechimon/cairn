@@ -373,3 +373,90 @@ test('focused web tab without input ages systemIdleSec past 600s so away routing
   expect(latest?.focused).toBe(true);
   expect(Number(latest?.systemIdleSec)).toBeGreaterThanOrEqual(600);
 });
+
+test('desktop presence waits for bridge.state, refreshes systemIdleSec on heartbeat, and avoids DELETE on focus updates', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'] });
+  const { win, host } = installHookTestDom({
+    visibilityState: 'visible',
+    hasFocus: () => false,
+  });
+  let currentDesktopState = {
+    clientId: 'desktop-1',
+    mainWindowOpen: true,
+    windowFocused: false,
+    screenLocked: false,
+    systemIdleSec: 700,
+  };
+  let seq = 0;
+  let resolveInitial!: (value: typeof currentDesktopState) => void;
+  let calls = 0;
+  let subListener: ((state: typeof currentDesktopState) => void) | null = null;
+  (win as Record<string, unknown>).cairnDesktop = {
+    presence: {
+      state: () => {
+        calls += 1;
+        if (calls === 1) {
+          return new Promise<typeof currentDesktopState>((resolve) => {
+            resolveInitial = resolve;
+          });
+        }
+        return Promise.resolve(currentDesktopState);
+      },
+      subscribe: (listener: (state: typeof currentDesktopState) => void) => {
+        subListener = listener;
+        return () => {
+          if (subListener === listener) subListener = null;
+        };
+      },
+      nextSeq: () => {
+        seq += 1;
+        return seq;
+      },
+    },
+  };
+
+  const posted: Array<Record<string, unknown>> = [];
+  let deleteCount = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST' && typeof init.body === 'string') {
+        posted.push(JSON.parse(init.body) as Record<string, unknown>);
+      } else if (init?.method === 'DELETE') {
+        deleteCount += 1;
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }),
+  );
+
+  function Probe() {
+    useClientPresence('team', true);
+    return null;
+  }
+
+  const root = createRoot(host as unknown as HTMLElement);
+  mountedRoots.push(root);
+  await act(async () => {
+    root.render(createElement(Probe));
+  });
+
+  expect(posted).toHaveLength(0);
+
+  await act(async () => {
+    resolveInitial(currentDesktopState);
+  });
+  expect(posted).toHaveLength(1);
+  expect(posted[0]?.systemIdleSec).toBe(700);
+
+  currentDesktopState = { ...currentDesktopState, systemIdleSec: 5 };
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(30_000);
+  });
+  expect(posted.at(-1)?.systemIdleSec).toBe(5);
+
+  await act(async () => {
+    subListener?.({ ...currentDesktopState, windowFocused: true });
+  });
+  expect(deleteCount).toBe(0);
+  expect(posted.at(-1)?.focused).toBe(true);
+});
