@@ -123,7 +123,7 @@ const WORKSPACE_PACKAGE_DIRS = {
   '@cairn/desktop': 'apps/desktop',
   '@cairn/integration': 'integration',
 };
-const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
+const ANSI_ESCAPE = new RegExp(`(?:${String.fromCharCode(27)}|\\^\\[)\\[[0-9;]*m`, 'g');
 const GH_STEP_PREFIX = /^[^\t]*\t[^\t]*\t(?:\uFEFF?\d{4}-\d{2}-\d{2}T[\d:.]+Z\s?)?/;
 const TEST_FILE_CANDIDATE = /[\w./-]+\.(?:test|spec)\.[cm]?[jt]sx?/g;
 

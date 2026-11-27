@@ -1684,6 +1684,7 @@ test('extractCiFailedTestFiles extracts existing vitest, playwright, and node:te
   try {
     for (const rel of [
       'apps/server/test/d121-owner-controls.test.ts',
+      'apps/server/test/plan-handoff.test.ts',
       'apps/web/e2e/chief-home-questions.spec.ts',
       'apps/web/e2e/web-vitals-perf.spec.ts',
       'apps/web/e2e/providers-order.spec.ts',
@@ -1698,6 +1699,7 @@ test('extractCiFailedTestFiles extracts existing vitest, playwright, and node:te
     const sampleLog = [
       'vitest-light (5)\tTest\t2026-11-27T12:07:39Z  ✓ @cairn/web test/ok.test.ts (3 tests) 10ms',
       'vitest-light (5)\tTest\t2026-11-27T12:07:40Z \x1b[41m\x1b[1m FAIL \x1b[22m\x1b[49m @xiechimon/cairn test/d121-owner-controls.test.ts > no deadline',
+      'vitest-light (5)\tTest\t2026-11-27T12:07:40Z ^[[41m^[[1m FAIL ^[[22m^[[49m ^[[30m^[[43m @xiechimon/cairn ^[[49m^[[39m test/plan-handoff.test.ts^[[2m > ^[[22mcase',
       'e2e (6)\tE2E\t2026-11-27T13:16:48Z   ✓  364 e2e/thread-pr-panel.spec.ts:303:1 › ok',
       'e2e (6)\tE2E\t2026-11-27T13:16:50Z   1) e2e/chief-home-questions.spec.ts:347:1 › at 375px each card sits',
       'e2e (2)\tE2E\t2026-11-27T13:06:50Z   1 failed',
@@ -1718,6 +1720,7 @@ test('extractCiFailedTestFiles extracts existing vitest, playwright, and node:te
 
     assert.deepEqual(extractCiFailedTestFiles(sampleLog, { cwd: root }), [
       'apps/server/test/d121-owner-controls.test.ts',
+      'apps/server/test/plan-handoff.test.ts',
       'apps/web/e2e/chief-home-questions.spec.ts',
       'apps/web/e2e/providers-order.spec.ts',
       'apps/web/e2e/web-vitals-perf.spec.ts',
