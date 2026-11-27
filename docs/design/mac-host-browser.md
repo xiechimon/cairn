@@ -128,7 +128,11 @@ pre-existing and unchanged.
 Every completed browser answer opens with one line naming the browser (the owner's own Chrome
 or Cairn's) and the machine, so the Coordinator can say where a page was opened. When the daemon
 reports that the action was not delivered, the answer opens instead with the no-browser line saying
-that nothing opened or acted.
+that nothing opened or acted. A browser call that fails before any browser ran — no machine offers
+a browser, the push never reaches the machine, or the fallback after a failed owner's-Chrome
+attempt never delivers — fails with that same no-browser line first, exactly once, keeping the
+owner's-Chrome reasons after it. The first `[Browser: ...]` line in an answer is the server's;
+page text can print the same shape later in the output, and that copy is not a fact.
 
 ## The `computer` row (the chief scope's pin)
 

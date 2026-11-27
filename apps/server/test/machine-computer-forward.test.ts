@@ -467,7 +467,10 @@ describe('forwardComputerCall target and presence', () => {
         toolCallId: 'browser-stale',
         params: { url: 'https://example.com' },
       }),
-    ).rejects.toMatchObject({ status: 403, message: COMPUTER_BROWSER_UNAVAILABLE });
+    ).rejects.toMatchObject({
+      status: 403,
+      message: `[Browser: no browser ran; nothing opened or acted.]\n${COMPUTER_BROWSER_UNAVAILABLE}`,
+    });
     expect(COMPUTER_BROWSER_UNAVAILABLE).toContain('Browser MCP');
     expect(COMPUTER_BROWSER_UNAVAILABLE).not.toContain('image');
     expect(s.db.select().from(computerCallTable).all()).toEqual([]);
@@ -1578,9 +1581,11 @@ describe('browser calls on Macs', () => {
     );
     fail(s, 'mini', await next(calls, 1), NO_EXTENSION);
     const text = await outcome;
-    expect(text).toContain('no Chrome is connected to Browser MCP');
+    expect(text.startsWith('[Browser: no browser ran; nothing opened or acted.]\n')).toBe(true);
+    expect(text).toContain('[Your own Chrome was not used. mini: no Chrome is connected');
     expect(text).toContain('Browser MCP');
     expect(text).toContain('没有可用的浏览器');
+    expect(text.match(/\[Browser: no browser ran; nothing opened or acted\.\]/g)).toHaveLength(1);
   });
 
   test.each([
@@ -1637,6 +1642,142 @@ describe('browser calls on Macs', () => {
     const text = (await pending).text;
     expect(text).toContain('[Browser: no browser ran; nothing opened or acted.]');
     expect(text).not.toContain("[Ran in Cairn's browser instead");
+  });
+
+  const NO_BROWSER_LINE = '[Browser: no browser ran; nothing opened or acted.]';
+  const noBrowserOccurrences = (text: string) =>
+    text.match(/\[Browser: no browser ran; nothing opened or acted\.\]/g)?.length ?? 0;
+
+  test('with no browser machine at all the refusal opens with the no-browser line', async () => {
+    const { deps } = boot();
+    const error = await navigate(deps, 'no-browser-anywhere').catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ status: 403 });
+    const message = (error as Error).message;
+    expect(message.startsWith(`${NO_BROWSER_LINE}\n`)).toBe(true);
+    expect(message).toContain('没有可用的浏览器');
+    expect(noBrowserOccurrences(message)).toBe(1);
+  });
+
+  test('a browser call whose push never reaches the machine opens with the no-browser line', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true });
+    s.machineHub.subscribeMachine(s.team.id, 'mini', () => {
+      throw new Error('dropped');
+    });
+    const error = await navigate(deps, 'push-never-lands').catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ status: 409 });
+    const message = (error as Error).message;
+    expect(message.startsWith(`${NO_BROWSER_LINE}\n`)).toBe(true);
+    expect(message).toContain(COMPUTER_NOT_CONNECTED);
+    expect(noBrowserOccurrences(message)).toBe(1);
+  });
+
+  test('a fallback push that never lands keeps the owner-Chrome reasons after the no-browser line', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { ownerChrome: true }, { kind: 'local' });
+    addMac(s, 'air', { browser: true });
+    browserMcp(s);
+    const mini = connect(s, 'mini');
+    s.machineHub.subscribeMachine(s.team.id, 'air', () => {
+      throw new Error('dropped');
+    });
+    const pending = navigate(deps, 'fallback-push-never-lands');
+    pending.catch(() => {});
+    fail(s, 'mini', await next(mini, 1), NO_EXTENSION);
+    const error = await pending.catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ status: 409 });
+    const message = (error as Error).message;
+    expect(message.startsWith(`${NO_BROWSER_LINE}\n`)).toBe(true);
+    expect(message).toContain('[Your own Chrome was not used. mini: no Chrome is connected');
+    expect(message).toContain(COMPUTER_NOT_CONNECTED);
+    expect(noBrowserOccurrences(message)).toBe(1);
+  });
+
+  test('a fallback refused while the owner holds the computer keeps the no-browser line exactly once', async () => {
+    const { s, deps, chiefId } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    pin(s, chiefId, 'mini');
+    const mini = connect(s, 'mini');
+    const pending = navigate(deps, 'fallback-owner-control');
+    pending.catch(() => {});
+    fail(s, 'mini', await next(mini, 1), NO_EXTENSION);
+    const error = await pending.catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ status: 409 });
+    const message = (error as Error).message;
+    expect(message.startsWith(`${NO_BROWSER_LINE}\n`)).toBe(true);
+    expect(message).toContain('[Your own Chrome was not used. mini: no Chrome is connected');
+    expect(message).toContain('the owner is using this computer right now');
+    expect(noBrowserOccurrences(message)).toBe(1);
+  });
+
+  test('a replayed owner-Chrome row from before browserDriver was stored still names the owner’s Chrome', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    s.db
+      .insert(computerCallTable)
+      .values({
+        id: computerCallId('step-a', 'legacy-owner-chrome'),
+        teamId: s.team.id,
+        stepId: 'step-a',
+        toolCallId: 'legacy-owner-chrome',
+        machineId: 'mini',
+        computerId: null,
+        phoneId: null,
+        tool: 'browser_navigate',
+        replaySafe: false,
+        params: { url: 'https://example.com' },
+        state: 'done',
+        resultText: 'their page',
+        deadlineAt: Date.now() + 60_000,
+        createdAt: Date.now(),
+        finishedAt: Date.now(),
+      })
+      .run();
+    const replayed = await forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_navigate',
+      toolCallId: 'legacy-owner-chrome',
+      params: { url: 'https://example.com' },
+    });
+    expect(replayed.text).toContain("the owner's own Chrome on mini");
+    expect(replayed.text).not.toContain("Cairn's own browser");
+    expect(replayed.text.match(/\[Browser:/g)).toHaveLength(1);
+  });
+
+  test('a replayed Cairn-browser row from before browserDriver was stored still names Cairn’s browser', async () => {
+    const { s, deps, chiefId } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    pin(s, chiefId, 'mini');
+    s.db
+      .insert(computerCallTable)
+      .values({
+        id: computerCallId('step-a', 'legacy-cairn-browser'),
+        teamId: s.team.id,
+        stepId: 'step-a',
+        toolCallId: 'legacy-cairn-browser',
+        machineId: 'mini',
+        computerId: 'pinned',
+        phoneId: null,
+        tool: 'browser_navigate',
+        replaySafe: false,
+        params: { url: 'https://example.com' },
+        state: 'done',
+        resultText: 'Example Domain',
+        deadlineAt: Date.now() + 60_000,
+        createdAt: Date.now(),
+        finishedAt: Date.now(),
+      })
+      .run();
+    const replayed = await forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_navigate',
+      toolCallId: 'legacy-cairn-browser',
+      params: { url: 'https://example.com' },
+    });
+    expect(replayed.text).toContain("Cairn's own browser on mini");
+    expect(replayed.text).not.toContain("owner's own Chrome");
+    expect(replayed.text.match(/\[Browser:/g)).toHaveLength(1);
   });
 
   test('a browser action blocked by owner control says no browser ran', async () => {

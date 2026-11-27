@@ -1466,14 +1466,28 @@ export async function forwardComputerCall(
     : [];
   if (candidates.length === 0) {
     if (mustUseOwnerChrome) throw new HttpError(409, noBrowserRun(COMPUTER_NOT_CONNECTED));
-    return onTarget();
+    return isComputerBrowserTool(tool) ? withNoBrowserLine(onTarget) : onTarget();
   }
-  const chain = throughOwnerChrome(deps, request, candidates, onTarget, !mustUseOwnerChrome);
+  const chain = withNoBrowserLine(() =>
+    throughOwnerChrome(deps, request, candidates, onTarget, !mustUseOwnerChrome),
+  );
   ownerChromeChains.set(baseId, { tool, chain });
   try {
     return await chain;
   } finally {
     ownerChromeChains.delete(baseId);
+  }
+}
+
+async function withNoBrowserLine(
+  dispatch: () => Promise<ComputerRelayResult>,
+): Promise<ComputerRelayResult> {
+  try {
+    return await dispatch();
+  } catch (error) {
+    if (error instanceof HttpError && !error.message.startsWith(NO_BROWSER_RUN_PREFIX))
+      throw new HttpError(error.status, noBrowserRun(error.message), error.reason, error.fields);
+    throw error;
   }
 }
 
@@ -1506,7 +1520,10 @@ const ownerChromeChains = new Map<
 
 function namingBrowserResult(
   db: Db,
-  row: Pick<CallRow, 'machineId' | 'params' | 'tool' | 'state' | 'errorDelivery'>,
+  row: Pick<
+    CallRow,
+    'machineId' | 'params' | 'tool' | 'state' | 'errorDelivery' | 'computerId' | 'phoneId'
+  >,
   result: ComputerRelayResult,
 ): ComputerRelayResult {
   if (!isComputerBrowserTool(row.tool)) return result;
@@ -1516,7 +1533,9 @@ function namingBrowserResult(
   }
   const host = db.select().from(machine).where(eq(machine.id, row.machineId)).get();
   const name = host?.capabilities?.computerName ?? host?.name ?? row.machineId;
-  const ownerChrome = row.params.browserDriver === 'ownerChrome';
+  const ownerChrome =
+    row.params.browserDriver === 'ownerChrome' ||
+    (row.params.browserDriver === undefined && row.computerId === null && row.phoneId === null);
   const access = ownerChrome
     ? 'the owner can watch it in Chrome, but there is no coordinated takeover handoff'
     : host?.capabilities?.screenHandoff === true
@@ -1580,9 +1599,14 @@ async function throughOwnerChrome(
     };
   } catch (error) {
     if (!(error instanceof HttpError)) throw error;
+    const bare = error.message.startsWith(NO_BROWSER_RUN_PREFIX)
+      ? error.message.slice(NO_BROWSER_RUN_PREFIX.length).replace(/^\n/, '')
+      : error.message;
     throw new HttpError(
       error.status,
-      `[Your own Chrome was not used. ${reasons}] ${error.message}`,
+      `[Your own Chrome was not used. ${reasons}] ${bare}`,
+      error.reason,
+      error.fields,
     );
   }
 }

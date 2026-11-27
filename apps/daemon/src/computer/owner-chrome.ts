@@ -26,6 +26,8 @@ const PAIRING_MARKER = "Click Allow in the Browser MCP extension's popup";
 const NO_EXTENSION_MARKER = 'No browser is connected';
 const PAUSED_MARKER = 'The user paused Browser MCP';
 const MUTATING_COMMAND = /^(goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/;
+const SUCCESSFUL_MUTATING_LINE =
+  /^✓ (?:goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/m;
 
 const PAGE_TEXT_TRUNCATED =
   '\n[page text truncated here; the rest of the page is not shown. Call browser_snapshot with selector (a CSS selector or an @ref) to read one section in full]';
@@ -387,7 +389,11 @@ async function runInOwnerTab(
   let ran = 0;
   const call: OwnerChromeCaller = async (...request) => {
     const answer = await reach(...request);
-    if (!answer.isError && request[1].some((command) => MUTATING_COMMAND.test(command))) ran += 1;
+    if (answer.isError) {
+      if (SUCCESSFUL_MUTATING_LINE.test(answer.text)) ran += 1;
+    } else if (request[1].some((command) => MUTATING_COMMAND.test(command))) {
+      ran += 1;
+    }
     return answer;
   };
   try {

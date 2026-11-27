@@ -310,6 +310,79 @@ describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
     expect((outcome as ComputerRefusal).delivery).toBe('unknown');
   });
 
+  test('a click that succeeded before the type failed makes the batch unsafe to repeat', async () => {
+    const { call, seen } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('get attr type')) return 'text';
+      if (command.startsWith('get attr autocomplete')) return '(none)';
+      if (commands.length === 2 && command.startsWith('click'))
+        return {
+          text: '✓ click e7\n✗ step 2: type — element is not editable\nPage: https://shop.example.com/ — "Shop"',
+          isError: true,
+        };
+      return '✓';
+    });
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'type', ref: '@e7', text: 'hello' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('unknown');
+    expect(seen).toContainEqual(['click e7', 'type "hello"']);
+  });
+
+  test('a failure whose only successes are read-only probes is still safe to repeat', async () => {
+    const { call } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('get attr type')) return 'text';
+      if (command.startsWith('get attr autocomplete')) return '(none)';
+      if (commands.length === 2 && command.startsWith('click'))
+        return {
+          text: '✗ step 1: click e7 — element is not visible\nStep 2 not run',
+          isError: true,
+        };
+      return '✓';
+    });
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'type', ref: '@e7', text: 'hello' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('not_delivered');
+  });
+
+  test('a successful read-only line in a failed batch does not make it unsafe to repeat', async () => {
+    const { call } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('get attr type')) return 'text';
+      if (command.startsWith('get attr autocomplete')) return '(none)';
+      if (commands.length === 2 && command.startsWith('click'))
+        return {
+          text: '✓ get attr type e7\n✗ step 2: click e7 — element is not visible',
+          isError: true,
+        };
+      return '✓';
+    });
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'type', ref: '@e7', text: 'hello' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('not_delivered');
+  });
+
   test('an extension that drops after a click ran is never reported as safe to repeat', async () => {
     const { call } = recording((commands) =>
       commands[0] === 'click e2'
