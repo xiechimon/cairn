@@ -109,6 +109,35 @@
         }
       }
     },
+    "agent-passages": {
+      "recipe": "features/agent-passages.md",
+      "cases": {
+        "health": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-agent-passages.mjs",
+          "args": [
+            "health"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Verifies server reachability, deploy/version alignment, Coordinator core tools, and local Mac runner ownComputer readiness via GET /api/teams/:id/chief/diagnostics.",
+          "usage": "[-- --expect-sha <sha> --machine <name|id>]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        },
+        "top-journeys": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-agent-passages.mjs",
+          "args": [
+            "top-journeys"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Runs health, coordinator-task, computer-run and chat-result sequentially, writing redacted result.json and auto-running diagnose on failure.",
+          "usage": "[-- --live --machine <name|id> --expect-sha <sha>]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
     "ansi-error-display": {
       "recipe": null,
       "cases": {

@@ -109,6 +109,8 @@ Core probes (`scripts/drive.mjs <probe>`, each a real user journey with assertio
 
 GitHub-facing PR evidence: `features/github-emulator.md` and `vp.mjs drive github-emulator pr-watch` (real PR-watch poller over HTTP, no GitHub credentials).
 
+Agent passages (Coordinator health, task creation, computer run, chat result, failure diagnosis): `features/agent-passages.md` and `vp.mjs drive agent-passages health` / `vp.mjs drive agent-passages top-journeys`, backed by `scripts/ops/agent-passage.mjs` (supports both `--target local` and `--target prod`).
+
 ## Evidence
 
 Evidence directory = `VERIFY_EVIDENCE_DIR`, or the default above for `vp.mjs drive`; scripts run directly use their own default, mostly under the **main checkout** `.claude/verify-evidence/<timestamp>-<probe>/`. It holds `result.json` (probe, per-check ok/label, stack coordinates) and screenshots. **cleanup does not delete evidence.** Proof standard: before and after screenshots, every `result.json` check ok, and API/DB truth fields, not just the final screen. Evidence goes to the main checkout rather than `VERIFY_REPO_ROOT` because a worktree's evidence is lost when the worktree is deleted.
@@ -169,6 +171,7 @@ SIGTERMs the supervisor recorded in `ports.json`, then, for stacks started witho
 | `scripts/launch.mjs` | start the isolated stack and supervise it until cleanup or owner death |
 | `scripts/doctor.mjs` | read-only health check |
 | `scripts/drive.mjs` | core Playwright probes (above) |
+| `scripts/drive-agent-passages.mjs` | `verify-cairn` wrapper for `scripts/ops/agent-passage.mjs` |
 | `scripts/cleanup.mjs` | reclaim the stack, keep evidence |
 
 ## When not to use this skill
