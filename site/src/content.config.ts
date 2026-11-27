@@ -3,6 +3,10 @@ import { docsSchema } from '@astrojs/starlight/schema';
 import { z } from 'astro/zod';
 import { defineCollection } from 'astro:content';
 
+const isoDateField = z
+  .union([z.string(), z.date()])
+  .transform((v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v));
+
 export const collections = {
   docs: defineCollection({
     loader: docsLoader(),
@@ -15,12 +19,12 @@ export const collections = {
             cluster: z.string(),
             sources: z.array(z.string()).min(1),
             verifiedVersion: z.string(),
-            verifiedDate: z.string(),
+            verifiedDate: isoDateField,
             competitorSources: z
               .array(
                 z.object({
                   url: z.string().url(),
-                  date: z.string(),
+                  date: isoDateField,
                 }),
               )
               .optional(),
