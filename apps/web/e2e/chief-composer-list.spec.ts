@@ -62,26 +62,53 @@ test.describe('Coordinator composer unified list markers and keys', () => {
         (span) => !span.hasAttribute('data-list-marker') && (span.textContent ?? '').includes('第一项'),
       );
       if (!ord || !bul || !plain) return null;
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'var(--prose-code-fill)';
+      probe.style.color = 'var(--text-secondary)';
+      probe.style.borderRadius = 'var(--cds-radius-xs)';
+      el.appendChild(probe);
+      const spotProbe = document.createElement('span');
+      spotProbe.style.backgroundColor = 'var(--spot-soft)';
+      spotProbe.style.color = 'var(--spot-text-on-tint)';
+      el.appendChild(spotProbe);
       const csOrd = getComputedStyle(ord);
       const csBul = getComputedStyle(bul);
       const csPlain = getComputedStyle(plain);
-      return {
+      const csProbe = getComputedStyle(probe);
+      const csSpot = getComputedStyle(spotProbe);
+      const result = {
         ordBg: csOrd.backgroundColor,
         ordColor: csOrd.color,
+        ordRadius: csOrd.borderRadius,
         ordBoxShadow: csOrd.boxShadow,
         bulBg: csBul.backgroundColor,
         bulColor: csBul.color,
+        bulRadius: csBul.borderRadius,
         bulBoxShadow: csBul.boxShadow,
         plainBg: csPlain.backgroundColor,
         plainColor: csPlain.color,
+        expectedBg: csProbe.backgroundColor,
+        expectedColor: csProbe.color,
+        expectedRadius: csProbe.borderRadius,
+        spotBg: csSpot.backgroundColor,
+        spotColor: csSpot.color,
       };
+      probe.remove();
+      spotProbe.remove();
+      return result;
     });
     expect(styles).not.toBeNull();
-    expect(styles!.ordBg).toBe(styles!.plainBg);
-    expect(styles!.ordColor).toBe(styles!.plainColor);
+    expect(styles!.ordBg).toBe(styles!.expectedBg);
+    expect(styles!.ordColor).toBe(styles!.expectedColor);
+    expect(styles!.ordRadius).toBe(styles!.expectedRadius);
+    expect(styles!.ordBg).not.toBe(styles!.plainBg);
+    expect(styles!.ordColor).not.toBe(styles!.plainColor);
+    expect(styles!.ordBg).not.toBe(styles!.spotBg);
+    expect(styles!.ordColor).not.toBe(styles!.spotColor);
     expect(styles!.ordBoxShadow).toBe('none');
-    expect(styles!.bulBg).toBe(styles!.plainBg);
-    expect(styles!.bulColor).toBe(styles!.plainColor);
+    expect(styles!.bulBg).toBe(styles!.ordBg);
+    expect(styles!.bulColor).toBe(styles!.ordColor);
+    expect(styles!.bulRadius).toBe(styles!.ordRadius);
     expect(styles!.bulBoxShadow).toBe('none');
 
     const alignment = await page.evaluate(() => {

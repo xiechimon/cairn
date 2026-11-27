@@ -36,6 +36,8 @@ const KIND_SKIN: Record<MentionKind, string> = {
   todo: 'bg-(--spot-soft) text-(--spot-text-on-tint)',
 };
 
+const LIST_MARKER_SKIN = 'rounded-(--cds-radius-xs) bg-(--prose-code-fill) text-content-secondary';
+
 export const MENTION_TEXTAREA_CLS =
   'relative z-10 bg-transparent text-transparent caret-foreground selection:bg-(--focus-halo) selection:text-transparent placeholder:text-content-tertiary';
 
@@ -146,7 +148,7 @@ export function MentionHighlight({
             {part.text}
           </span>
         ) : part.listKind !== undefined ? (
-          <span key={i} data-list-marker={part.listKind}>
+          <span key={i} data-list-marker={part.listKind} className={LIST_MARKER_SKIN}>
             {part.text}
           </span>
         ) : (
