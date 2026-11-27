@@ -7,7 +7,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, test, vi } from 'vitest';
-import { bridgeHttpMcpToStdio, openAcpTools } from '../src/backend/acp-tools.js';
+import {
+  bridgeHttpMcpToStdio,
+  type HttpMcpToolsResult,
+  openAcpTools,
+} from '../src/backend/acp-tools.js';
 
 const opts = {
   cwd: process.cwd(),
@@ -737,6 +741,89 @@ describe('ACP stdio host tools lifecycle', () => {
       });
     } finally {
       httpBridge.close();
+      upstream.close();
+      upstream.closeAllConnections();
+    }
+  });
+
+  test('reuses cached HTTP MCP tools list across sequential sessions without upstream connect', async () => {
+    let listCalls = 0;
+    let toolCalls = 0;
+    const upstream = createHttpServer(async (req, res) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req)
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const body =
+        chunks.length > 0 ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined;
+      const server = new Server({ name: 'ext', version: '1.0.0' }, { capabilities: { tools: {} } });
+      server.setRequestHandler(ListToolsRequestSchema, () => {
+        listCalls += 1;
+        return {
+          tools: [{ name: 'ext_cached', description: 'Cached', inputSchema: { type: 'object' } }],
+        };
+      });
+      server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+        toolCalls += 1;
+        return { content: [{ type: 'text', text: `called:${params.name}` }] };
+      });
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+      res.once('close', () => void server.close().catch(() => {}));
+      await server.connect(transport);
+      await transport.handleRequest(req, res, body);
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+    const upstreamAddr = upstream.address() as { port: number };
+
+    const toolsCache = new Map<string, HttpMcpToolsResult>();
+
+    const endpoint = {
+      slug: 'ext',
+      transport: 'http' as const,
+      url: `http://127.0.0.1:${upstreamAddr.port}/mcp`,
+      headers: { Authorization: 'Bearer token-1' },
+    };
+
+    const first = await bridgeHttpMcpToStdio(endpoint, { toolsCache });
+    const rpc1 = spawnStdioRpc(first.declaration);
+    try {
+      await rpc1.call('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '1' },
+      });
+      const listed1 = (await rpc1.call('tools/list')) as {
+        result: { tools: Array<{ name: string }> };
+      };
+      expect(listed1.result.tools.map((t) => t.name)).toEqual(['ext_cached']);
+    } finally {
+      rpc1.close();
+      first.close();
+    }
+
+    const second = await bridgeHttpMcpToStdio(endpoint, { toolsCache });
+    const rpc2 = spawnStdioRpc(second.declaration);
+    try {
+      await rpc2.call('initialize', {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        clientInfo: { name: 'test', version: '1' },
+      });
+      const listed2 = (await rpc2.call('tools/list')) as {
+        result: { tools: Array<{ name: string }> };
+      };
+      expect(listed2.result.tools.map((t) => t.name)).toEqual(['ext_cached']);
+      expect(listCalls).toBe(1);
+      const called = (await rpc2.call('tools/call', { name: 'ext_cached', arguments: {} })) as {
+        result: { content: Array<{ text: string }> };
+      };
+      expect(called.result.content[0]?.text).toBe('called:ext_cached');
+      expect(toolCalls).toBe(1);
+    } finally {
+      rpc2.close();
+      second.close();
       upstream.close();
       upstream.closeAllConnections();
     }

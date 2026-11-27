@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, type Socket } from 'node:net';
 import { PassThrough } from 'node:stream';
 import type { McpServerStdio } from '@agentclientprotocol/sdk';
@@ -611,12 +611,32 @@ export async function openAcpTools(
   };
 }
 
-export async function bridgeHttpMcpToStdio(endpoint: McpEndpoint): Promise<AcpStdioBridge> {
+export type HttpMcpToolsResult = Awaited<ReturnType<Client['listTools']>>;
+
+export interface HttpMcpToolsCache {
+  get(key: string): HttpMcpToolsResult | undefined;
+  set(key: string, value: HttpMcpToolsResult): void;
+}
+
+function httpMcpCacheKey(targetUrl: URL, headers: Record<string, string>): string {
+  const headerDigest = createHash('sha256')
+    .update(
+      JSON.stringify(Object.entries(headers).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
+    )
+    .digest('hex');
+  return `${targetUrl.href}|${headerDigest}`;
+}
+
+export async function bridgeHttpMcpToStdio(
+  endpoint: McpEndpoint,
+  options?: { toolsCache?: HttpMcpToolsCache },
+): Promise<AcpStdioBridge> {
   if (endpoint.transport !== 'http' || endpoint.url === undefined) {
     throw new Error(`Cannot bridge non-HTTP MCP endpoint ${endpoint.slug}`);
   }
   const targetUrl = new URL(endpoint.url);
   const headers = endpoint.headers ?? {};
+  const cacheKey = httpMcpCacheKey(targetUrl, headers);
   const clients = new Set<Client>();
   let pendingClient: Promise<Client> | null = null;
 
@@ -644,9 +664,18 @@ export async function bridgeHttpMcpToStdio(endpoint: McpEndpoint): Promise<AcpSt
     [],
     (server) => {
       server.setRequestHandler(ListToolsRequestSchema, async ({ params }) => {
+        const cache = params?.cursor === undefined ? options?.toolsCache : undefined;
+        if (cache !== undefined) {
+          const cached = cache.get(cacheKey);
+          if (cached !== undefined) {
+            listedTools = true;
+            return cached;
+          }
+        }
         const client = await getClient();
         const result = await client.listTools(params);
         listedTools = true;
+        cache?.set(cacheKey, result);
         return result;
       });
       server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {

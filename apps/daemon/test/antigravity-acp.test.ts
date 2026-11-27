@@ -1436,4 +1436,56 @@ describe('antigravity ACP runtime and credentials', () => {
       },
     });
   });
+
+  test('skips redundant session/set_config_option RPC when resumed session already uses target model', async () => {
+    const dir = tempDir('ag-skip-set-config-');
+    const agent = join(dir, 'agy-skip-config.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'const methodsSeen = [];',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  methodsSeen.push(msg.method);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } } });',
+          '  } else if (msg.method === "session/resume") {',
+          '    send({ id: msg.id, result: { sessionId: msg.params.sessionId, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    send({ method: "session/update", params: { sessionId: msg.params.sessionId, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: JSON.stringify(methodsSeen) } } } });',
+          '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const learned: string[] = [];
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      onAntigravityModels: (models) => learned.push(...models.map((m) => m.id)),
+    });
+    const session = await backend.continueSession('sess-existing', {
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      prompt: '1+1',
+    });
+    const events = await collect(session.events);
+    const msg = events.find((e) => e.type === 'message_end') as
+      | { type: 'message_end'; message: { content: string } }
+      | undefined;
+    expect(JSON.parse(msg?.message.content ?? '[]')).not.toContain('session/set_config_option');
+    expect(learned).toContain('gemini-4-hydrogen');
+  });
 });

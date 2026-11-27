@@ -255,6 +255,9 @@ describe('suggest_replies (Coordinator quick replies)', () => {
     expect(def).toBeDefined();
     expect(def?.deferred).not.toBe(true);
     expect(turn.chief?.systemPrompt).toContain(SUGGEST_REPLIES_TOOL_NAME);
+    expect(turn.chief?.systemPrompt).toMatch(/answer.*directly first/i);
+    expect(turn.chief?.systemPrompt).toMatch(/never call suggest_replies before answering/i);
+    expect(turn.chief?.systemPrompt).toMatch(/skip it on simple questions/i);
   });
 
   test('daemon turn finishing with skillInjectionFacts keeps suggested replies visible', async () => {

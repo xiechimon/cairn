@@ -58,7 +58,13 @@ import {
   isHostToolCall,
   restrictiveAcpMode,
 } from './acp-permission-gate.js';
-import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
+import {
+  type AcpStdioBridge,
+  bridgeHttpMcpToStdio,
+  type HttpMcpToolsCache,
+  type HttpMcpToolsResult,
+  openAcpTools,
+} from './acp-tools.js';
 import { installAntigravityTurnHooks } from './antigravity-hooks.js';
 
 import {
@@ -829,8 +835,31 @@ export interface GeminiBackendOptions {
     Pick<ChildProcess, 'once' | 'kill' | 'pid'>;
 }
 
+const HTTP_MCP_TOOLS_CACHE_TTL_MS = 5 * 60_000;
+
 class AcpBackend implements AgentBackend {
   private readonly imageSupport = new Map<string, boolean>();
+  private readonly httpMcpToolsCache = new Map<
+    string,
+    { value: HttpMcpToolsResult; expiresAt: number }
+  >();
+  private readonly httpMcpToolsAdapter: HttpMcpToolsCache = {
+    get: (key) => {
+      const entry = this.httpMcpToolsCache.get(key);
+      if (entry === undefined) return undefined;
+      if (Date.now() >= entry.expiresAt) {
+        this.httpMcpToolsCache.delete(key);
+        return undefined;
+      }
+      return entry.value;
+    },
+    set: (key, value) => {
+      this.httpMcpToolsCache.set(key, {
+        value,
+        expiresAt: Date.now() + HTTP_MCP_TOOLS_CACHE_TTL_MS,
+      });
+    },
+  };
   readonly capabilities: AgentBackendCapabilities;
   readonly brief?: BriefChannel;
 
@@ -1246,7 +1275,9 @@ class AcpBackend implements AgentBackend {
                 })),
               });
             } else {
-              const bridge = await bridgeHttpMcpToStdio(endpoint);
+              const bridge = await bridgeHttpMcpToStdio(endpoint, {
+                toolsCache: this.httpMcpToolsAdapter,
+              });
               mcpBridges.push(bridge);
               externalMcpServers.push(bridge.declaration);
             }
@@ -1329,11 +1360,13 @@ class AcpBackend implements AgentBackend {
       const modelOption = response.configOptions?.find((option) => option.category === 'model');
       let configOptions = response.configOptions ?? [];
       if (modelOption) {
-        const selected = await connection.agent.request<SetSessionConfigOptionResponse>(
-          methods.agent.session.setConfigOption,
-          { sessionId, configId: modelOption.id, value: opts.modelId },
-        );
-        configOptions = selected.configOptions ?? [];
+        if (currentValueOf(modelOption) !== opts.modelId) {
+          const selected = await connection.agent.request<SetSessionConfigOptionResponse>(
+            methods.agent.session.setConfigOption,
+            { sessionId, configId: modelOption.id, value: opts.modelId },
+          );
+          configOptions = selected.configOptions ?? [];
+        }
         if (adapter?.harness === 'devin') {
           const models = advertisedAcpModels(modelOption, {
             [currentValueOf(modelOption)]: response.configOptions ?? [],
@@ -1373,7 +1406,11 @@ class AcpBackend implements AgentBackend {
                 thinkingValues.has('medium')
               ? 'medium'
               : undefined;
-      if (thinkingOption !== undefined && thinkingValue !== undefined) {
+      if (
+        thinkingOption !== undefined &&
+        thinkingValue !== undefined &&
+        currentValueOf(thinkingOption) !== thinkingValue
+      ) {
         await connection.agent.request(methods.agent.session.setConfigOption, {
           sessionId,
           configId: thinkingOption.id,

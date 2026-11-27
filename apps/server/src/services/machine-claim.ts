@@ -346,7 +346,7 @@ async function buildChiefClaim(
 
 const DAEMON_QUICK_REPLIES_GUIDANCE = [
   '<quick_replies>',
-  `On user turns (never on [wake:…] event turns), before writing your final reply call ${SUGGEST_REPLIES_TOOL_NAME} once with 1 to 3 brief follow-ups the owner might send next, in the conversation's language (skip if you already called ask_user or if no natural follow-up fits; never suggest destructive or irreversible actions).`,
+  `On user turns (never on [wake:…] event turns), answer the user directly first; never call ${SUGGEST_REPLIES_TOOL_NAME} before answering, and skip it on simple questions, short replies, or if you called ask_user. Only after finishing a substantive multi-step reply where 1 to 3 concrete next actions genuinely help, optionally call ${SUGGEST_REPLIES_TOOL_NAME} once in the conversation's language (never suggest destructive or irreversible actions).`,
   '</quick_replies>',
 ].join('\n');
 

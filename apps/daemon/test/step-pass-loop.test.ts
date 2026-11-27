@@ -184,4 +184,17 @@ describe('runStepPasses', () => {
     expect(h.input.sessionOpts.provider).toBe(amended);
     expect(h.opened).toHaveLength(2);
   });
+
+  test('transitions activity from starting to awaiting_model as soon as session opens', async () => {
+    const phases: string[] = [];
+    const h = harness([sessionHandle('sess-1', [done])], {
+      activity: {
+        setPhase: (phase: string) => phases.push(phase),
+        noteEvent: () => {},
+        noteUsage: () => {},
+      } as unknown as StepPassLoopInput['activity'],
+    });
+    await runStepPasses(h.input);
+    expect(phases).toEqual(['starting', 'awaiting_model']);
+  });
 });

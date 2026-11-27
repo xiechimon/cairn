@@ -288,8 +288,6 @@ interface ChiefStreamRowProps {
   glancesReady?: boolean;
 }
 
-const STEERING_BUBBLE_CLS =
-  'bg-transparent text-(--text-secondary) inset-ring-1 inset-ring-(--input)';
 const NO_TASKS: readonly string[] = [];
 const NO_REPORTS: readonly string[] = [];
 
@@ -592,7 +590,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const showBubble = bubbleText !== '' || reply != null || sentFiles.length === 0;
     const sending = item.delivery === 'sending';
     const steering = item.pending === 'steering';
-    const fade = sending ? 'opacity-55' : '';
     const actions: MessageActions = {
       at: item.createdAt,
       fallbackAt: item.at,
@@ -612,7 +609,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         {...highlight(item.id)}
         {...(sending ? { 'data-delivery': 'sending' } : {})}
         {...(steering ? { 'data-steering': '' } : {})}
-        className={`${shown != null ? BUBBLE_MD_CLS : ''} ${fade} ${steering ? STEERING_BUBBLE_CLS : ''}`}
+        className={shown != null ? BUBBLE_MD_CLS : undefined}
       >
         {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
         {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
@@ -627,7 +624,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         >
           <MessageContent className={`${BUBBLE_COL_CLS} items-end`} data-testid="chief-msg-col">
             {sentFiles.length > 0 && (
-              <div className={`relative max-w-full ${showBubble ? 'mb-2' : ''} ${fade}`}>
+              <div className={`relative max-w-full ${showBubble ? 'mb-2' : ''}`}>
                 <SentAttachments files={sentFiles} />
               </div>
             )}

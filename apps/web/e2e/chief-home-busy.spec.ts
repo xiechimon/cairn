@@ -703,4 +703,66 @@ test.describe('pressing Enter while Coordinator turn runs clears composer immedi
     expect(bodies[0]).toMatchObject({ content: '第一条插话' });
     expect(bodies[1]).toMatchObject({ content: '第二条插话' });
   });
+
+  test('sending and steering user messages keep the normal solid owner bubble style without dimming or outlined jumps', async ({
+    page,
+  }) => {
+    const s = busyState();
+    s.pending = [];
+    s.messages = [FIRST];
+    let releasePost!: () => void;
+    const postGate = new Promise<void>((resolve) => {
+      releasePost = resolve;
+    });
+    await mockLive(page, s);
+    await page.route('**/api/conversations/chief-home/messages', async (route) => {
+      const req = route.request();
+      if (req.method() !== 'POST') return route.fallback();
+      const body = req.postDataJSON() as { content: string };
+      await postGate;
+      const msg = { id: 'm-steer-2', role: 'user', content: body.content, createdAt: 20 };
+      s.messages.push(msg);
+      s.pending.push({ messageId: 'm-steer-2', state: 'steering' });
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ thread: thread(s) }),
+      });
+    });
+
+    await page.goto('/app');
+    const root = page.getByTestId('home-c');
+    const settledBubble = root
+      .getByTestId('chief-msg')
+      .filter({ hasText: FIRST.content })
+      .getByTestId('chief-bubble');
+    await expect(settledBubble).toBeVisible();
+    const settledBg = await settledBubble.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    const input = root.getByTestId('chief-composer-input');
+    await input.fill('第二条马上跟上');
+    await input.press('Enter');
+
+    const sendingBubble = root.locator('[data-delivery="sending"]');
+    await expect(sendingBubble).toHaveText('第二条马上跟上');
+    expect(
+      await sendingBubble.evaluate((el) => ({
+        opacity: getComputedStyle(el).opacity,
+        bg: getComputedStyle(el).backgroundColor,
+      })),
+    ).toEqual({ opacity: '1', bg: settledBg });
+
+    releasePost();
+    await page.evaluate(() => {});
+    await expect.poll(() => s.pending.length).toBe(1);
+    const steeringRow = root.getByTestId('chief-msg').filter({ hasText: '第二条马上跟上' });
+    const steeringBubble = steeringRow.locator('[data-steering]');
+    await expect(steeringBubble).toBeVisible();
+    expect(
+      await steeringBubble.evaluate((el) => ({
+        opacity: getComputedStyle(el).opacity,
+        bg: getComputedStyle(el).backgroundColor,
+      })),
+    ).toEqual({ opacity: '1', bg: settledBg });
+  });
 });

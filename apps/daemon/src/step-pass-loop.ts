@@ -158,6 +158,7 @@ export async function runStepPasses(input: StepPassLoopInput): Promise<StepPassL
         ? `continue session ${input.convId}`
         : `new session ${input.convId}`,
     );
+    input.activity.setPhase('awaiting_model');
     if (!input.isChief && opener.imageSupport === null) {
       try {
         opener.setImageSupport(
