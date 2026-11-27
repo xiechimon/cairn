@@ -590,6 +590,7 @@ test('a new preflight push cancels only the still-active older runs on the same 
     repo: 'xiechimon/cairn',
     ref: 'preflight/host/lane',
     sha: 'b'.repeat(40),
+    queuedShas: () => new Set(),
     gh: (args) => {
       calls.push(args.at(-1));
       return {
@@ -636,12 +637,61 @@ test('a superseded run whose sha is already queued keeps running', () => {
     repo: 'xiechimon/cairn',
     ref: 'preflight/host/lane',
     sha: 'b'.repeat(40),
-    keepShas: new Set(['c'.repeat(40)]),
+    queuedShas: () => new Set(['c'.repeat(40)]),
     gh: () => ({ workflow_runs: [run(1, 'a'.repeat(40)), run(2, 'c'.repeat(40))] }),
     cancel: () => true,
     log: () => {},
   });
   assert.deepEqual(cancelled, [1]);
+});
+
+test('a sha queued after the lane started waiting is still protected when old runs are cancelled', () => {
+  const run = (id, head_sha) => ({
+    id,
+    name: 'ci',
+    status: 'in_progress',
+    head_branch: 'preflight/host/lane',
+    head_sha,
+  });
+  let queued = new Set();
+  const cancelled = cancelSupersededRuns({
+    repo: 'xiechimon/cairn',
+    ref: 'preflight/host/lane',
+    sha: 'b'.repeat(40),
+    queuedShas: () => queued,
+    gh: () => {
+      queued = new Set(['c'.repeat(40)]);
+      return { workflow_runs: [run(1, 'a'.repeat(40)), run(2, 'c'.repeat(40))] };
+    },
+    cancel: () => true,
+    log: () => {},
+  });
+  assert.deepEqual(cancelled, [1]);
+});
+
+test('an unreadable queue cancels nothing', () => {
+  const cancelled = cancelSupersededRuns({
+    repo: 'xiechimon/cairn',
+    ref: 'preflight/host/lane',
+    sha: 'b'.repeat(40),
+    queuedShas: () => {
+      throw new Error('ls-remote failed');
+    },
+    gh: () => ({
+      workflow_runs: [
+        {
+          id: 1,
+          name: 'ci',
+          status: 'in_progress',
+          head_branch: 'preflight/host/lane',
+          head_sha: 'a'.repeat(40),
+        },
+      ],
+    }),
+    cancel: () => assert.fail('must not cancel without knowing the queue'),
+    log: () => {},
+  });
+  assert.deepEqual(cancelled, []);
 });
 
 test('runs this push is about to replace do not count against the preflight cap', () => {

@@ -69,8 +69,10 @@ A lane verifies on GitHub before it enters the landing queue:
   they are cancelled. Nothing is cancelled when the wait or the push fails.
   Other lanes' refs, completed runs, a run on the same SHA and a run whose SHA
   sits under `enqueue/*` or `queue/try/*` (its verdict is still wanted) are left
-  alone; if those refs cannot be listed, nothing is cancelled. A failed lookup or
-  cancel never blocks the push.
+  alone. The queued SHAs are read again right before cancelling, after the
+  runs are listed, so a head queued during the capacity wait is kept; if those
+  refs cannot be listed, nothing is cancelled. A failed lookup or cancel never
+  blocks the push.
 - `scripts/ops/push-queue.mjs` refuses to land a head with no green
   pre-flight evidence; local `pnpm prepush` / `pnpm test:changed` stay
   recommended but are no longer the gate. It always enqueues `HEAD` into

@@ -50,7 +50,7 @@ export function cancelSupersededRuns({
   repo,
   ref,
   sha,
-  keepShas = new Set(),
+  queuedShas,
   gh,
   cancel,
   log = console.log,
@@ -64,13 +64,24 @@ export function cancelSupersededRuns({
       ])?.workflow_runs ?? [];
   } catch (error) {
     log(`[preflight] could not list superseded runs (${error.message}); leaving them running`);
+    return [];
   }
-  const superseded = runs.filter(
+  const active = runs.filter(
     (run) =>
       run.name === 'ci' &&
-      isSupersededRun(run, { ref, sha, keepShas }) &&
+      run.head_branch === ref &&
+      run.head_sha !== sha &&
       isActivePreflightRun(run),
   );
+  if (active.length === 0) return [];
+  let keepShas;
+  try {
+    keepShas = queuedShas();
+  } catch (error) {
+    log(`[preflight] could not list queued shas (${error.message}); cancelling nothing`);
+    return [];
+  }
+  const superseded = active.filter((run) => isSupersededRun(run, { ref, sha, keepShas }));
   return superseded
     .map((run) => run.id)
     .filter((id) => {
@@ -191,7 +202,9 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   try {
     keepShas = readQueuedShas();
   } catch (error) {
-    console.log(`[preflight] could not list queued shas (${error.message}); cancelling nothing`);
+    console.log(
+      `[preflight] could not list queued shas (${error.message}); counting every active run`,
+    );
   }
   const capacity = waitForPreflightCapacity({
     repo,
@@ -211,19 +224,17 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   );
   if (push.status !== 0) process.exit(push.status ?? 1);
   console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
-  if (keepShas !== null) {
-    cancelSupersededRuns({
-      repo,
-      ref,
-      sha,
-      keepShas,
-      gh: ghJson,
-      cancel: (id) =>
-        spawnSync('gh', ['api', '--method', 'POST', `repos/${repo}/actions/runs/${id}/cancel`], {
-          stdio: 'ignore',
-        }).status === 0,
-    });
-  }
+  cancelSupersededRuns({
+    repo,
+    ref,
+    sha,
+    queuedShas: readQueuedShas,
+    gh: ghJson,
+    cancel: (id) =>
+      spawnSync('gh', ['api', '--method', 'POST', `repos/${repo}/actions/runs/${id}/cancel`], {
+        stdio: 'ignore',
+      }).status === 0,
+  });
   const readRun = () => {
     const { workflow_runs: runs } = ghJson([
       'api',
