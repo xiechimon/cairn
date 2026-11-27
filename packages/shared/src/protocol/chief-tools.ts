@@ -1186,9 +1186,13 @@ const WORKER_SCHEDULE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const WORKER_ASK_USER_TOOL: RemoteToolDef = CHIEF_REMOTE_TOOLS.find(
-  (t) => t.name === 'ask_user',
-) as RemoteToolDef;
+const WORKER_ASK_USER_BASE = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'ask_user') as RemoteToolDef;
+
+export const WORKER_ASK_USER_TOOL: RemoteToolDef = {
+  ...WORKER_ASK_USER_BASE,
+  description:
+    'Ask the user structured guiding questions and block this turn until they answer a question card (the session resumes with their answers). Call this once BEFORE your first edit ONLY when a task has genuine user decisions to make (unclear scope/deliverable shape, unstated acceptance criteria, or architectural trade-offs you cannot infer from the repo — bundle 1 to 3 questions and mark a `recommended` option on each), after pushing a guiding draft PR with the PR link to confirm direction before finishing, or when real acceptance or pushing is genuinely blocked (sandbox, missing runtime, or missing credentials). If the request is clear — even across multiple files — proceed without calling this, and never ask for facts readable in the repo.',
+};
 
 export const WORKER_THREAD_REPORT_TOOL: RemoteToolDef = {
   name: 'thread_report',

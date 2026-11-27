@@ -36,7 +36,7 @@ describe('info task step prompt brief', () => {
     );
     const firstStep = info.s.db.select().from(step).where(eq(step.buildId, infoBuild!.id)).get();
     expect(firstStep?.prompt ?? '').not.toContain('1. Plan');
-    expect(firstStep?.prompt ?? '').not.toContain('Write tests first');
+    expect(firstStep?.prompt ?? '').not.toContain('Tests first');
     expect(firstStep?.prompt ?? '').not.toContain(SESSION_BRIEF);
 
     info.s.db.update(step).set({ status: 'failed' }).where(eq(step.id, firstStep!.id)).run();

@@ -4,6 +4,8 @@ import {
   buildTaskPromptText,
   CONTINUE_PROMPTS,
   LEGACY_PLAN_PROMPTS,
+  LEGACY_SESSION_BRIEFS,
+  LEGACY_SESSION_REWORK_BRIEFS,
   MERGED_PR_GUARD_PROMPT_SHAPE,
   PLAN_CONTRACT_REWRITE_PROMPT_SHAPES,
   parseReviewPromptMeta,
@@ -36,7 +38,9 @@ function isGeneratedInstruction(text: string): boolean {
     EXACT_SYNTHETIC_TEXTS.has(text) ||
     text === SESSION_BRIEF ||
     text.startsWith(`${SESSION_BRIEF}\n\n`) ||
+    LEGACY_SESSION_BRIEFS.some((legacy) => text === legacy || text.startsWith(`${legacy}\n\n`)) ||
     text.startsWith(SESSION_REWORK_BRIEF) ||
+    LEGACY_SESSION_REWORK_BRIEFS.some((legacy) => text.startsWith(legacy)) ||
     wrappedBy(text, REPLAN_PROMPT_SHAPE.head, REPLAN_PROMPT_SHAPE.tail) ||
     wrappedBy(text, REVIEW_REJECT_PROMPT_SHAPE.head, REVIEW_REJECT_PROMPT_SHAPE.tail) ||
     wrappedBy(text, RESTART_PROMPT_SHAPE.head, RESTART_PROMPT_SHAPE.tail) ||
