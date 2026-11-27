@@ -240,12 +240,20 @@ function pushReport(
 
 describe('GitHub push capability claim gate', () => {
   test.each([
-    ['missing report', undefined],
     ['unauthenticated', { login: 'unauthenticated' as const, checkedAt: Date.now(), repos: [] }],
+    ['repo unauthenticated', pushReport('unauthenticated')],
     ['no-write', pushReport('no-write')],
-    ['unknown', pushReport('unknown')],
-    ['wrong repo', pushReport('write', 'octo/other')],
-    ['stale write', pushReport('write', REPO, Date.now() - 16 * 60_000)],
+    [
+      'target repo no-write alongside another write repo',
+      {
+        login: 'ok' as const,
+        checkedAt: Date.now(),
+        repos: [
+          { repo: 'octo/other', state: 'write' as const, checkedAt: Date.now() },
+          { repo: REPO, state: 'no-write' as const, checkedAt: Date.now() },
+        ],
+      },
+    ],
   ])('%s cannot claim a GitHub build step', async (_name, githubPush) => {
     const w = setupWorld();
     const runner = await enrollMachine(w, {
@@ -259,6 +267,48 @@ describe('GitHub push capability claim gate', () => {
     ).toBe('pending');
   });
 
+  test.each([
+    ['missing report', undefined],
+    ['unknown login', { login: 'unknown' as const, checkedAt: Date.now(), repos: [] }],
+    ['unknown repo state', pushReport('unknown')],
+    ['unlisted repo', pushReport('write', 'octo/other')],
+    ['stale write', pushReport('write', REPO, Date.now() - 16 * 60_000)],
+    ['stale no-write', pushReport('no-write', REPO, Date.now() - 16 * 60_000)],
+    [
+      'stale unauthenticated',
+      {
+        login: 'unauthenticated' as const,
+        checkedAt: Date.now() - 16 * 60_000,
+        repos: [],
+      },
+    ],
+  ])(
+    'old runner or non-refusal report (%s) can claim a GitHub build step',
+    async (_name, githubPush) => {
+      const w = setupWorld();
+      const runner = await enrollMachine(w, {
+        name: `runner-ok-${_name}`,
+        capabilities: baseCapabilities(githubPush),
+      });
+      const pending = insertPendingStep(w);
+      expect((await claimAs(w, runner.machineId))?.step.id).toBe(pending.stepId);
+    },
+  );
+
+  test('runner with null capabilities can claim a GitHub build step', async () => {
+    const w = setupWorld();
+    const runner = await enrollMachine(w, {
+      name: 'runner-null-caps',
+    });
+    w.s.db
+      .update(machineTable)
+      .set({ capabilities: null })
+      .where(eq(machineTable.id, runner.machineId))
+      .run();
+    const pending = insertPendingStep(w);
+    expect((await claimAs(w, runner.machineId))?.step.id).toBe(pending.stepId);
+  });
+
   test('fresh exact-repo write can claim the same GitHub build step', async () => {
     const w = setupWorld();
     const runner = await enrollMachine(w, {
@@ -269,27 +319,34 @@ describe('GitHub push capability claim gate', () => {
     expect((await claimAs(w, runner.machineId))?.step.id).toBe(pending.stepId);
   });
 
-  test('repository-evidence verify requires the report; attachment-evidence verify does not', async () => {
+  test('repository-evidence verify refuses explicit no-write; attachment-evidence verify and absent report still claim', async () => {
     const w = setupWorld();
-    const runner = await enrollMachine(w, {
-      name: 'runner-verify',
-      capabilities: baseCapabilities(),
+    const refusedRunner = await enrollMachine(w, {
+      name: 'runner-verify-no-write',
+      capabilities: baseCapabilities(pushReport('no-write')),
     });
     const repositoryStep = insertPendingStep(w, {
       kind: 'verify',
       prompt: 'repository evidence prompt',
     });
-    expect(await claimAs(w, runner.machineId, { verifyAttachments: true })).toBeNull();
+    expect(await claimAs(w, refusedRunner.machineId, { verifyAttachments: true })).toBeNull();
     expect(
       w.s.db.select().from(stepTable).where(eq(stepTable.id, repositoryStep.stepId)).get()?.status,
     ).toBe('pending');
-    w.s.db.delete(stepTable).where(eq(stepTable.id, repositoryStep.stepId)).run();
+
+    const oldRunner = await enrollMachine(w, {
+      name: 'runner-verify-old',
+      capabilities: baseCapabilities(),
+    });
+    expect((await claimAs(w, oldRunner.machineId, { verifyAttachments: true }))?.step.id).toBe(
+      repositoryStep.stepId,
+    );
 
     const attachmentStep = insertPendingStep(w, {
       kind: 'verify',
       prompt: `${JSON.stringify({ kind: 'verify', evidence: 'attachments', evidenceDirectory: '.cairn-verify/t/' })}\nattachments prompt`,
     });
-    expect((await claimAs(w, runner.machineId, { verifyAttachments: true }))?.step.id).toBe(
+    expect((await claimAs(w, refusedRunner.machineId, { verifyAttachments: true }))?.step.id).toBe(
       attachmentStep.stepId,
     );
   });
@@ -300,7 +357,11 @@ describe('GitHub push capability queue reason and presence repo list', () => {
     const w = setupWorld();
     const runner = await enrollMachine(w, {
       name: 'mac-mini-no-github',
-      capabilities: baseCapabilities(),
+      capabilities: baseCapabilities({
+        login: 'unauthenticated',
+        checkedAt: Date.now(),
+        repos: [],
+      }),
     });
     const pending = insertPendingStep(w, { homeMachineId: runner.machineId });
     const info = stepQueueProjector(w.s.db, w.s.team.id).project({
@@ -310,6 +371,22 @@ describe('GitHub push capability queue reason and presence repo list', () => {
     });
     expect(info?.waitingFor).toEqual({ machineId: runner.machineId, name: 'mac-mini-no-github' });
     expect(info?.blocked).toEqual({ kind: 'github-push-missing', missing: [] });
+  });
+
+  test('queue leaves an older runner without githubPush eligible (not github-push-missing)', async () => {
+    const w = setupWorld();
+    const runner = await enrollMachine(w, {
+      name: 'macbook-old-daemon',
+      capabilities: baseCapabilities(),
+    });
+    const pending = insertPendingStep(w, { homeMachineId: runner.machineId });
+    const info = stepQueueProjector(w.s.db, w.s.team.id).project({
+      id: pending.stepId,
+      createdAt: pending.createdAt,
+      homeMachineId: runner.machineId,
+    });
+    expect(info?.waitingFor).toEqual({ machineId: runner.machineId, name: 'macbook-old-daemon' });
+    expect(info?.blocked).toBeUndefined();
   });
 
   test('presence response lists active GitHub repos only', async () => {
@@ -430,11 +507,15 @@ describe('GitHub push capability queue reason and presence repo list', () => {
     expect(info?.blocked).toEqual({ kind: 'github-push-missing', missing: [] });
   });
 
-  test('non-push steps are not blocked without githubPush', async () => {
+  test('non-push steps are not blocked even when runner reports unauthenticated', async () => {
     const w = setupWorld();
     const runner = await enrollMachine(w, {
       name: 'runner-non-push',
-      capabilities: baseCapabilities(),
+      capabilities: baseCapabilities({
+        login: 'unauthenticated',
+        checkedAt: Date.now(),
+        repos: [],
+      }),
     });
     const hostedId = 'proj-push-hosted';
     w.s.db
@@ -604,5 +685,58 @@ describe('GitHub push capability queue reason and presence repo list', () => {
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.snippet).toContain('runner-stuck-gh');
     expect(alerts[0]?.snippet).toContain('gh auth login');
+  });
+
+  test('runner-offline recommends an online runner lacking githubPush as an alternative', async () => {
+    const w = setupWorld();
+    const t0 = Date.now();
+    const sweepAt = t0 + RUNNER_OFFLINE_NOTICE_MS + 10_000;
+    const offlineHome = await enrollMachine(w, {
+      name: 'runner-offline-home-old',
+      capabilities: baseCapabilities(pushReport('write', REPO, t0)),
+    });
+    w.s.db
+      .update(machineTable)
+      .set({ online: false, lastSeenAt: t0 })
+      .where(eq(machineTable.id, offlineHome.machineId))
+      .run();
+    const olderOnline = await enrollMachine(w, {
+      name: 'runner-online-old-daemon',
+      capabilities: baseCapabilities(),
+    });
+    insertPendingStep(w, { homeMachineId: offlineHome.machineId });
+
+    sweepOfflineRunners(w.s.svc, sweepAt);
+    const row = w.s.db
+      .select()
+      .from(chiefMessageTable)
+      .where(eq(chiefMessageTable.id, `runner-offline-${offlineHome.machineId}`))
+      .get();
+    expect(row).toBeDefined();
+    const content = JSON.parse(String(row?.content)) as RunnerOfflineContent;
+    expect(content.alternative).toEqual(
+      expect.objectContaining({
+        machineId: olderOnline.machineId,
+        name: 'runner-online-old-daemon',
+      }),
+    );
+  });
+
+  test('sweepUnplaceableSteps does not raise a no_machine alert for an online runner without githubPush', async () => {
+    const w = setupWorld();
+    const sweepAt = Date.now() + NO_MACHINE_ALERT_MS + 60_000;
+    const runner = await enrollMachine(w, {
+      name: 'runner-old-daemon',
+      capabilities: baseCapabilities(),
+    });
+    insertPendingStep(w, { homeMachineId: runner.machineId });
+
+    sweepUnplaceableSteps(w.s.svc, sweepAt);
+    const alerts = w.s.db
+      .select()
+      .from(notificationTable)
+      .all()
+      .filter((row) => row.type === 'no_machine');
+    expect(alerts).toHaveLength(0);
   });
 });

@@ -290,15 +290,15 @@ export function githubPushCapable(
   now: number,
 ): boolean {
   const report = capabilities?.githubPush;
-  if (report === undefined || report.login !== 'ok') return false;
-  if (now - report.checkedAt > GITHUB_PUSH_REPORT_MAX_AGE_MS) return false;
+  if (report === undefined) return true;
+  if (now - report.checkedAt > GITHUB_PUSH_REPORT_MAX_AGE_MS) return true;
+  if (report.login === 'unauthenticated') return false;
+  if (report.login !== 'ok') return true;
   const target = repo.toLowerCase();
   const entry = report.repos.find((item) => item.repo.toLowerCase() === target);
-  return (
-    entry !== undefined &&
-    entry.state === 'write' &&
-    now - entry.checkedAt <= GITHUB_PUSH_REPORT_MAX_AGE_MS
-  );
+  if (entry === undefined) return true;
+  if (now - entry.checkedAt > GITHUB_PUSH_REPORT_MAX_AGE_MS) return true;
+  return entry.state !== 'no-write' && entry.state !== 'unauthenticated';
 }
 
 export function requiredGithubPushRepoForStep(input: {
