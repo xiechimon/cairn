@@ -32,6 +32,7 @@ export const prepushModules = [
   'scripts/doc-refs-gate.mjs',
   'scripts/doc-retired-terms-gate.mjs',
   'scripts/doc-retired-terms.json',
+  'scripts/deleted-referenced-file-gate.mjs',
   'scripts/living-docs.mjs',
 ];
 
@@ -74,6 +75,7 @@ export const selfTests = [
   'scripts/doc-reader-tests.test.mjs',
   'scripts/doc-refs-gate.test.mjs',
   'scripts/doc-retired-terms-gate.test.mjs',
+  'scripts/deleted-referenced-file-gate.test.mjs',
   'scripts/import-cycle-gate.test.mjs',
   'scripts/epic-done.test.mjs',
   'scripts/agent-rules.test.mjs',
@@ -186,6 +188,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
       conflictMarker,
       ['node', 'scripts/doc-refs-gate.mjs'],
       ['node', 'scripts/doc-retired-terms-gate.mjs'],
+      ['node', 'scripts/deleted-referenced-file-gate.mjs'],
     ];
     if (paths.some((path) => CANON_INPUTS.test(path)))
       checks.push(['node', 'scripts/generate-canon.mjs', '--check']);
@@ -198,6 +201,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     conflictMarker,
     ['node', 'scripts/doc-refs-gate.mjs'],
     ['node', 'scripts/doc-retired-terms-gate.mjs'],
+    ['node', 'scripts/deleted-referenced-file-gate.mjs'],
     ['node', 'scripts/journal-newline-gate.mjs'],
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/flake-ledger.mjs'],
