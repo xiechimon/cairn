@@ -50,6 +50,7 @@ import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
+import { antigravitySubscriptionAllowsRunner } from './antigravity-subscriptions.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta, resolveToolAttachmentId } from './attachments.js';
 import { browserPasswordIds } from './browser-passwords.js';
@@ -318,10 +319,15 @@ function trimProviderSummary<T extends { installed: boolean }>(
 
 function trimCapabilitiesForCoordinator(
   capabilities: NonNullable<ReturnType<typeof parseStoredCapabilities>>,
+  antigravityAllowed = false,
 ) {
   const devin = trimProviderSummary(capabilities.devin);
   const gemini = trimProviderSummary(capabilities.gemini);
-  const antigravity = trimProviderSummary(capabilities.antigravity, true);
+  const rawAntigravity = trimProviderSummary(capabilities.antigravity, true);
+  const antigravity =
+    rawAntigravity?.installed && antigravityAllowed
+      ? { ...rawAntigravity, authenticated: true }
+      : rawAntigravity;
   return {
     ...(capabilities.osPlatform !== undefined ? { osPlatform: capabilities.osPlatform } : {}),
     ...(capabilities.computerName !== undefined ? { computerName: capabilities.computerName } : {}),
@@ -523,12 +529,17 @@ export async function executeChiefTool(
       return json(
         rows.map((m) => {
           const parsed = m.online ? parseStoredCapabilities(m.capabilities) : null;
+          const antigravityAllowed =
+            parsed != null &&
+            parsed.antigravity?.installed === true &&
+            antigravitySubscriptionAllowsRunner(db, ctx.teamId, m.id, parsed);
           return {
             id: m.id,
             name: m.name,
             online: m.online,
             latestCliVersion: m.latestCliVersion,
-            capabilities: parsed ? trimCapabilitiesForCoordinator(parsed) : null,
+            capabilities:
+              parsed != null ? trimCapabilitiesForCoordinator(parsed, antigravityAllowed) : null,
           };
         }),
       );

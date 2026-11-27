@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { chiefMessage, machine, message } from '../src/db/schema.js';
+import { antigravitySubscription, chiefMessage, machine, message } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { nowMs } from '../src/lib/ids.js';
 import { H, registerChiefHarness, relay, seedMachineReport } from './chief-harness.js';
@@ -180,6 +180,92 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
     expect(entry?.capabilities?.antigravity).toEqual({
       installed: true,
       authenticated: true,
+      version: '1.5.18',
+    });
+  });
+
+  test('machines reports antigravity authenticated when an enabled portable subscription allows the runner', async () => {
+    const now = nowMs();
+    H.s.db
+      .insert(antigravitySubscription)
+      .values({
+        id: 'agy-sub-oauth',
+        teamId: H.teamId,
+        label: 'Portable OAuth',
+        tokenCipher: 'oauth-personal:v2:test',
+        expiresAt: now + 3_600_000,
+        enabledAt: now,
+        createdAt: now,
+        models: [],
+      })
+      .run();
+    seedMachineReport('mini-oauth', { installed: false, hostname: 'mini-oauth', models: [] });
+    seedMachineReport('legacy-no-profile', {
+      installed: false,
+      hostname: 'legacy-no-profile',
+      models: [],
+    });
+    H.s.db
+      .update(machine)
+      .set({
+        online: true,
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          antigravityOAuthProfile: true,
+          antigravity: { installed: true, authenticated: false, version: '1.5.18', models: [] },
+        },
+      })
+      .where(eq(machine.id, 'machine-mini-oauth'))
+      .run();
+    H.s.db
+      .update(machine)
+      .set({
+        online: true,
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          antigravity: { installed: true, authenticated: false, version: '1.5.18', models: [] },
+        },
+      })
+      .where(eq(machine.id, 'machine-legacy-no-profile'))
+      .run();
+
+    const rows = (await relay('machines', {})) as Array<{
+      id: string;
+      capabilities: {
+        antigravity?: { installed: boolean; authenticated?: boolean; version?: string };
+      } | null;
+    }>;
+    expect(rows.find((r) => r.id === 'machine-mini-oauth')?.capabilities?.antigravity).toEqual({
+      installed: true,
+      authenticated: true,
+      version: '1.5.18',
+    });
+    expect(
+      rows.find((r) => r.id === 'machine-legacy-no-profile')?.capabilities?.antigravity,
+    ).toEqual({
+      installed: true,
+      authenticated: false,
+      version: '1.5.18',
+    });
+
+    H.s.db
+      .update(antigravitySubscription)
+      .set({ tokenCipher: null, runnerId: null })
+      .where(eq(antigravitySubscription.id, 'agy-sub-oauth'))
+      .run();
+    const afterHostSwitch = (await relay('machines', {})) as Array<{
+      id: string;
+      capabilities: {
+        antigravity?: { installed: boolean; authenticated?: boolean; version?: string };
+      } | null;
+    }>;
+    expect(
+      afterHostSwitch.find((r) => r.id === 'machine-mini-oauth')?.capabilities?.antigravity,
+    ).toEqual({
+      installed: true,
+      authenticated: false,
       version: '1.5.18',
     });
   });
