@@ -1,12 +1,12 @@
 # @mentions (composer, #311/#327)
 
-Users reference other entities (agent/todo/skill/project/machine, plus files) in a composer by typing `@` in the textarea, which opens the inline completion (`.mention-inline`) grouped by kind. The textarea shows the chosen mention as `@label`; the text that is sent keeps the wire token — agent -> `[名](agent:{id})`, task -> `#seq`. The execution surface (Segments rendering) parses tokens back into chips. The former toolbar `提及` button, the five-group picker dialog and the slash-command menu were removed (a leading `/` is plain text); the new-task dialog has no mention route.
+Users reference entities (skill, project, machine, plus files) in a composer by typing `@` in the textarea, which opens the inline completion (`.mention-inline`) grouped by kind. The textarea shows the chosen mention as `@label`; the text that is sent keeps the wire token — e.g. `[名](skill:{id})` or `[名](project:{id})`. Tasks never appear in `@` and typing `#` opens no picker (owner decision 2026-11-22: users name tasks in words); messages already stored with `[#n](todo:<id>)` still render as task title words in `Segments`. The former toolbar `提及` button, the five-group picker dialog and the slash-command menu were removed (a leading `/` is plain text); the new-task dialog has no mention route.
 
 ## Sub-features
 
-- `mention-inline-at` typing `@` in the composer textarea opens the grouped inline completion, filtered by `@partial`; Enter/click inserts, Esc closes.
-- `mention-serialization` the textarea shows `@label`; the sent text carries `[名](agent:{id})` / `#seq`.
-- `mention-render-back` after submitting, the execution surface / detail spec rendering parses the token back into a chip (Segments component).
+- `mention-inline-at` typing `@` in the composer textarea opens the inline completion, filtered by `@partial`; Enter/click inserts, Esc closes; typing `#` opens nothing and tasks never appear in `@`.
+- `mention-serialization` the textarea shows `@label`; the sent text carries `[名](skill:{id})` / `[名](project:{id})` / `[名](machine:{id})` or bare file path.
+- `mention-render-back` after submitting, the execution surface / detail spec rendering parses the token back into a chip or task word (`Segments` component).
 
 ## How to get to it (user POV)
 
@@ -22,7 +22,7 @@ Preconditions:
 2. The live surface needs referenceable entities: seed at least one agent (`POST /api/teams/{t}/agents`) and a todo in an editable phase (`setup-review-seed.mjs`).
 
 - **How to run.** `node <skill>/scripts/drive-mentions.mjs <todoId>`.
-- **Truth.** After submitting, `GET /api/todos/{id}`'s spec or the conversation message content contains the serialized token (`[名](agent:` / `#seq`); the detail spec rendering surface shows a chip.
+- **Truth.** After submitting, `GET /api/todos/{id}`'s spec or the conversation message content contains the serialized token (`[名](skill:` / `[名](project:` / `[名](machine:`); legacy stored `[#n](todo:<id>)` still renders as a task word.
 
 ## Gotchas
 

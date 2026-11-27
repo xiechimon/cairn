@@ -71,6 +71,12 @@
       "pattern": "\\brebuild the computer image\\b",
       "canary": "rebuild the computer image",
       "reason": "the built-in Linux VM and its image are gone; a Mac browser comes from the app itself (docs/design/mac-host-browser.md)"
+    },
+    {
+      "id": "hash-task-picker",
+      "pattern": "`#`\\s+(?:mention\\s+|task\\s+)?picker|\\bhash[- ]task[- ]picker\\b",
+      "canary": "the `#` picker and the `#n` it inserts",
+      "reason": "owner decision 2026-11-22: the product never shows a # picker for choosing a task; the user names a task in words"
     }
   ],
   "baseline": {
@@ -116,6 +122,7 @@
     "restore-to-here": {},
     "memory-candidate-table": {},
     "experience-candidate-module": {},
-    "computer-image-rebuild": {}
+    "computer-image-rebuild": {},
+    "hash-task-picker": {}
   }
 }

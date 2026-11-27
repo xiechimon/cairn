@@ -12,7 +12,7 @@ import { Cell, Section, Specimen } from './specimen.js';
 
 const INLINE_ROWS = [
   ...MENTION_GROUPS.agent.map((e) => ({ kind: 'agent' as const, ...e })),
-  ...MENTION_GROUPS.todo.map((e) => ({ kind: 'todo' as const, ...e })),
+  ...MENTION_GROUPS.skill.map((e) => ({ kind: 'skill' as const, ...e })),
   {
     kind: 'file' as const,
     id: 'apps/web/src/board',

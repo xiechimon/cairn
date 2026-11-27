@@ -162,17 +162,11 @@ export function ChiefScrollProvider({ children }: { children: React.ReactNode })
 
 export function useMentionGroups(): MentionGroups {
   const { live, teamId } = useLiveData();
-  const todosQ = useTodos(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const skillsQ = useSkills(teamId, live);
   const machinesQ = useMachines(teamId, live);
   return {
-    todo: (todosQ.data ?? []).map((td) => ({
-      id: td.id,
-      label: td.title,
-      seq: td.seqNum,
-      subtitle: td.phase,
-    })),
+    todo: [],
     agent: [],
     project: (projectsQ.data ?? []).map((p) => ({ id: p.id, label: p.name })),
     skill: (skillsQ.data ?? []).map((s) => ({

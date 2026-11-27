@@ -1,7 +1,6 @@
 import { useSearchParams } from 'react-router';
-import { useMachines, useProjectFiles, useProjects, useSkills, useTodos } from '../api/hooks.js';
+import { useMachines, useProjectFiles, useProjects, useSkills } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { withoutClosed } from '../fixtures/deletions.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.js';
 
@@ -11,7 +10,6 @@ export function useThreadMentions(projectId: string | undefined): {
 } {
   const { live, teamId } = useLiveData();
   const [searchParams] = useSearchParams();
-  const todosQ = useTodos(teamId, live);
   const projectsQ = useProjects(teamId, live);
   const skillsQ = useSkills(teamId, live);
   const machinesQ = useMachines(teamId, live);
@@ -19,12 +17,7 @@ export function useThreadMentions(projectId: string | undefined): {
   if (live) {
     return {
       groups: {
-        todo: (todosQ.data ?? []).map((t) => ({
-          id: t.id,
-          label: t.title,
-          seq: t.seqNum,
-          subtitle: t.phase,
-        })),
+        todo: [],
         agent: [],
         project: (projectsQ.data ?? []).map((p) => ({ id: p.id, label: p.name })),
         skill: (skillsQ.data ?? []).map((s) => ({
@@ -44,12 +37,7 @@ export function useThreadMentions(projectId: string | undefined): {
   const fixture = resolveScenario(searchParams);
   return {
     groups: {
-      todo: withoutClosed(fixture.todos).map((t) => ({
-        id: t.id,
-        label: t.title,
-        seq: t.seqNum,
-        subtitle: t.phase,
-      })),
+      todo: [],
       agent: (fixture.team?.agents ?? []).map((a) => ({
         id: a.id,
         label: a.displayName,

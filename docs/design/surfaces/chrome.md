@@ -21,7 +21,7 @@ The global furniture every surface shares: buttons, the `SidePanel`, empty state
 ## Slash and @ lists (Claude Code)
 
 - The slash list is 240px of 28px rows: the command name in sans `text-ui`, no `/` prefix and no monospace, the typed part in bold; no group headings, a thin rule between commands and skills. The description shows only as a dark bubble beside the highlighted row.
-- The @ list is one mixed list (agents, tasks, projects, files) with no headings or rules: a 16px avatar or outlined kind icon, the name, then its secondary text inline in `ink-3`, truncated.
+- The @ list is one mixed list (skills, projects, machines, files; tasks never appear) with no headings or rules: a 16px avatar or outlined kind icon, the name, then its secondary text inline in `ink-3`, truncated.
 
 ## Empty state
 

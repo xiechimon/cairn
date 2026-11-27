@@ -443,3 +443,78 @@ test('transcript: an agent mention renders as its name and an attachment as a ca
   await expect(bubble).not.toContainText('![shot.png]');
   await evidenceShot(page, 'chief-transcript-chips.png');
 });
+
+test('C15: typing # opens no picker and @ never offers tasks or inserts #seq', async ({ page }) => {
+  const { input, listbox, rows } = await openChief(page);
+
+  await input.fill('#');
+  await expect(listbox).toBeHidden();
+  await expect(input).toHaveValue('#');
+
+  await input.fill('#9');
+  await expect(listbox).toBeHidden();
+  await expect(input).toHaveValue('#9');
+
+  await input.fill('@');
+  await expect(listbox).toBeVisible();
+  await expect(rows).toHaveCount(5);
+  await expect(listbox).not.toContainText('提及数据源探针');
+
+  await input.fill('@提及');
+  await expect(rows).toHaveCount(0);
+  await expect(listbox.locator('.mention-inline-empty')).toContainText('没有与"@提及"匹配的结果');
+  await expect(input).toHaveValue('@提及');
+});
+
+test('C15: stored [#n](todo:<id>) in Coordinator transcript still renders as task title and links to thread', async ({
+  page,
+}) => {
+  await stubBoot(page);
+  await stubMentionSources(page);
+  await page.route(`**/api/teams/${TEAM_ID}/chief/threads`, (route) =>
+    route.fulfill({ json: [THREAD] }),
+  );
+  await page.route(`**/api/teams/${TEAM_ID}/chief`, (route) =>
+    route.fulfill({
+      json: {
+        chief: {
+          id: 'chief-u1-t1',
+          userId: USER.id,
+          teamId: TEAM_ID,
+          agent: { agentId: 'agent-1' },
+          lastTurnAt: null,
+          createdAt: 0,
+          tz: null,
+        },
+        agentActor: CHIEF_AGENT,
+        context: null,
+        watches: [],
+        wakes: [],
+      },
+    }),
+  );
+  await page.route('**/api/conversations/chief-bbb/messages', (route) =>
+    route.fulfill({
+      json: {
+        messages: [
+          {
+            id: 'm1',
+            role: 'user',
+            content: '请查看 [#9](todo:todo-1) 的进展',
+            createdAt: 1,
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/app?chief=chief-bbb');
+  const coordinator = page.getByTestId('home-c');
+  await expect(coordinator).toBeVisible();
+
+  const bubble = coordinator.getByTestId('chief-bubble').first();
+  const taskLink = bubble.locator('a[data-slot="task-mention"]');
+  await expect(taskLink).toHaveCount(1);
+  await expect(taskLink).toHaveText('提及数据源探针');
+  await expect(taskLink).toHaveAttribute('href', /^\/app\?(.*&)?thread=todo-1$/);
+  await expect(bubble).not.toContainText('#9');
+});

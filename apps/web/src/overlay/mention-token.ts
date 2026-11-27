@@ -7,7 +7,6 @@ export interface MentionGroupEntry {
   id: string;
   label: string;
   subtitle?: string;
-  seq?: number;
   capabilities?: MachineCapabilities;
 }
 
@@ -19,12 +18,11 @@ export interface FileMentionEntry {
 }
 
 export interface InlineCompletionRow {
-  kind: MentionKind | 'file';
+  kind: Exclude<MentionKind, 'todo'> | 'file';
   id: string;
   label: string;
   subtitle?: string;
   fileType?: 'blob' | 'tree';
-  seq?: number;
   capabilities?: MachineCapabilities;
 }
 
@@ -42,15 +40,6 @@ export function buildInlineRows(
         id: a.id,
         label: a.label,
         ...(a.subtitle !== undefined ? { subtitle: a.subtitle } : {}),
-      }),
-    ),
-    ...groups.todo.map(
-      (t): InlineCompletionRow => ({
-        kind: 'todo',
-        id: t.id,
-        label: t.label,
-        ...(t.subtitle !== undefined ? { subtitle: t.subtitle } : {}),
-        ...(t.seq !== undefined ? { seq: t.seq } : {}),
       }),
     ),
     ...groups.skill.map(

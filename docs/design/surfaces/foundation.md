@@ -18,7 +18,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | C6 | Developer switches (feature flags, release buttons) never sit on a user page; they live behind the dev route or dev mode. | H |
 | C7 | A disabled control says why next to it. | M disabled composer has adjacent explanatory text |
 | C12 | An empty state is one sentence and at most one primary action. | G `ui-page-style-gate` |
-| C15 | A task is named by its title wherever a person reads it; the sequence number shows only in the `#` picker and the `#n` it inserts. | G `e2e/chief-thread-report.spec.ts`, `e2e/chief-stream-markdown.spec.ts`, `test/segments-mention-nav.test.ts` |
+| C15 | A task is named by its title wherever a person reads it; no composer trigger, picker or inserted token names a task by its sequence number. | G `e2e/chief-thread-report.spec.ts`, `e2e/chief-stream-markdown.spec.ts`, `e2e/composer-inline-mention.spec.ts`, `e2e/chief-composer-tools.spec.ts`, `test/segments-mention-nav.test.ts` |
 | C19 | A user-data picker with more than 10 options filters as you type; build it from `components/filter-picker.tsx`. | G `e2e/picker-filter.spec.ts` |
 | C21 | A picker of something invisible (sound, haptics, timing) lets the user experience the real artifact in place, never a description alone. | H |
 | C23 | What the user already sees stays put while a live surface updates: no remount and no offset change until it settles. | G `e2e/chief-live-stability.spec.ts` |

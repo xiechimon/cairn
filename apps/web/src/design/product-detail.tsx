@@ -17,7 +17,7 @@ import { Cell, Labeled, Section, Specimen } from './specimen.js';
 
 const READ_ONLY_REASON = '此任务为只读，请在实时工作区中打开后继续。';
 
-const MENTION_DRAFT = `Use ${serializeMention({ kind: 'skill', id: 'frontend-design', label: 'frontend-design' })} and ask ${serializeMention({ kind: 'agent', id: 'reviewer', label: 'reviewer' })} to check ${serializeMention({ kind: 'todo', id: 'gallery-44', label: 'Fix the stale branch badge', seq: 44 })}`;
+const MENTION_DRAFT = `Use ${serializeMention({ kind: 'skill', id: 'frontend-design', label: 'frontend-design' })} and ask ${serializeMention({ kind: 'agent', id: 'reviewer', label: 'reviewer' })} to check ${serializeMention({ kind: 'project', id: 'docs-site', label: 'docs-site' })}`;
 
 const TILE_IMAGE = `data:image/svg+xml;utf8,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="112" height="112"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#2fd4a7"/></linearGradient></defs><rect width="112" height="112" fill="url(#g)"/></svg>',

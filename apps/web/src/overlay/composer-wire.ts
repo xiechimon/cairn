@@ -178,7 +178,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   const inlineListboxId = useId();
   const entityCount =
     (mentionGroups?.agent.length ?? 0) +
-    (mentionGroups?.todo.length ?? 0) +
     (mentionGroups?.skill.length ?? 0) +
     (mentionGroups?.project.length ?? 0) +
     (mentionGroups?.machine.length ?? 0);
@@ -437,7 +436,6 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
         kind: row.kind,
         id: row.id,
         label: row.label,
-        ...(row.seq !== undefined ? { seq: row.seq } : {}),
       },
     ]);
   };

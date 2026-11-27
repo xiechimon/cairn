@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { FileCheck, FileText, Layers, Puzzle } from 'lucide-react';
+import { FileText, Layers, Puzzle } from 'lucide-react';
 import { type Ref, useEffect } from 'react';
 import { MachineIcon } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
@@ -21,8 +21,6 @@ export interface MentionInlineProps {
 
 function InlineKindIcon({ row }: { row: InlineCompletionRow }) {
   switch (row.kind) {
-    case 'todo':
-      return <FileCheck className="size-4" />;
     case 'skill':
       return <Puzzle className="size-4" />;
     case 'project':

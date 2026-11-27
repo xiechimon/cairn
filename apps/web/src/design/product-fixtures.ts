@@ -340,10 +340,7 @@ export const CHANGES: ChangesContent = {
 };
 
 export const MENTION_GROUPS: MentionGroups = {
-  todo: [
-    { id: 'gallery-44', label: 'Fix the stale branch badge on cards', seq: 44 },
-    { id: 'gallery-48', label: 'Migrate the schedules table', seq: 48 },
-  ],
+  todo: [],
   skill: [
     { id: 'frontend-design', label: 'frontend-design', subtitle: 'Distinctive UI direction' },
     { id: 'verify', label: 'verify', subtitle: 'Prove a change works' },

@@ -177,7 +177,7 @@ test('trigger: line start / after whitespace / after CJK punctuation — never m
 });
 
 test('filter: fuzzy subsequence, smart case, empty-state row', async ({ page }) => {
-  const { input, rows } = await openDetail(page);
+  const { input, listbox, rows } = await openDetail(page);
 
   await input.fill('@bld');
   await expect(rows).toHaveCount(1);
@@ -189,12 +189,12 @@ test('filter: fuzzy subsequence, smart case, empty-state row', async ({ page }) 
   await evidenceShot(page, 'filter-smart-case-empty.png');
 
   await input.fill('@');
-  await expect(rows).toHaveCount(5);
-  await expect(rows.nth(0)).toContainText('内联提及探针');
-  await expect(rows.nth(1)).toContainText('builder');
-  await expect(rows.nth(2)).toContainText('reviewer');
-  await expect(rows.nth(3)).toContainText('deploy-bot');
-  await expect(rows.nth(4)).toContainText('cairn');
+  await expect(rows).toHaveCount(4);
+  await expect(rows.nth(0)).toContainText('builder');
+  await expect(rows.nth(1)).toContainText('reviewer');
+  await expect(rows.nth(2)).toContainText('deploy-bot');
+  await expect(rows.nth(3)).toContainText('cairn');
+  await expect(listbox).not.toContainText('内联提及探针');
 });
 
 test('filter: candidate list caps at 15 (CN=15)', async ({ page }) => {
@@ -210,7 +210,7 @@ test('filter: candidate list caps at 15 (CN=15)', async ({ page }) => {
 test('keyboard: arrows cycle the highlight, the top row is NOT preselected', async ({ page }) => {
   const { input, rows } = await openDetail(page);
   await input.fill('@');
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(4);
   // CC rule 56 isomorph: opening highlights nothing — Enter would send.
   await expect(page.locator('.mention-inline-row--active')).toHaveCount(0);
 
@@ -222,7 +222,7 @@ test('keyboard: arrows cycle the highlight, the top row is NOT preselected', asy
   await expect(rows.nth(0)).toHaveClass(/mention-inline-row--active/);
   // Wrap up past the first row → last row (cyclic, ticket acceptance).
   await input.press('ArrowUp');
-  await expect(rows.nth(4)).toHaveClass(/mention-inline-row--active/);
+  await expect(rows.nth(3)).toHaveClass(/mention-inline-row--active/);
   // Wrap down past the last row → first row.
   await input.press('ArrowDown');
   await expect(rows.nth(0)).toHaveClass(/mention-inline-row--active/);
@@ -362,7 +362,7 @@ test('close set: backspace shortens the query, backspacing past @ closes (F7)', 
 
   await input.press('Backspace'); // '@' — empty query, full roster
   await expect(listbox).toBeVisible();
-  await expect(rows).toHaveCount(5);
+  await expect(rows).toHaveCount(4);
 
   await input.press('Backspace'); // '' — past the trigger, closed
   await expect(listbox).toBeHidden();
@@ -512,16 +512,17 @@ async function openDetailWithFiles(page: Page) {
 }
 
 test('files: empty query lists entities then files in roster order', async ({ page }) => {
-  const { input, rows } = await openDetailWithFiles(page);
+  const { input, listbox, rows } = await openDetailWithFiles(page);
   await input.fill('@');
 
-  await expect(rows).toHaveCount(8);
-  await expect(rows.nth(0)).toContainText('内联提及探针');
-  await expect(rows.nth(1)).toContainText('builder');
-  await expect(rows.nth(3)).toContainText('deploy-bot');
-  await expect(rows.nth(4)).toContainText('cairn');
-  await expect(rows.nth(5)).toContainText('apps/web/src/ui/button.tsx');
-  await expect(rows.nth(6)).toContainText('apps/web/src/ui/');
+  await expect(rows).toHaveCount(7);
+  await expect(rows.nth(0)).toContainText('builder');
+  await expect(rows.nth(1)).toContainText('reviewer');
+  await expect(rows.nth(2)).toContainText('deploy-bot');
+  await expect(rows.nth(3)).toContainText('cairn');
+  await expect(rows.nth(4)).toContainText('apps/web/src/ui/button.tsx');
+  await expect(rows.nth(5)).toContainText('apps/web/src/ui/');
+  await expect(listbox).not.toContainText('内联提及探针');
   await evidenceShot(page, 'files-unified-list.png');
 });
 
@@ -700,15 +701,15 @@ const FOUR_KIND = {
   machines: [{ id: 'machine-1', name: 'mea' }],
 };
 
-test('four-kind: bare @ lists todo, skill, project, machine in roster order', async ({ page }) => {
-  const { input, rows } = await openDetail(page, FOUR_KIND);
+test('four-kind: bare @ lists skill, project, machine in roster order — a task never appears (C15)', async ({ page }) => {
+  const { input, listbox, rows } = await openDetail(page, FOUR_KIND);
   await input.fill('@');
 
-  await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText('内联提及探针');
-  await expect(rows.nth(1)).toContainText('code-review');
-  await expect(rows.nth(2)).toContainText('cairn');
-  await expect(rows.nth(3)).toContainText('mea');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText('code-review');
+  await expect(rows.nth(1)).toContainText('cairn');
+  await expect(rows.nth(2)).toContainText('mea');
+  await expect(listbox).not.toContainText('内联提及探针');
   await evidenceShot(page, 'four-kind-list.png');
 });
 
@@ -725,20 +726,22 @@ test('four-kind: skill Tab-inserts the display form and the highlight confirms',
   await evidenceShot(page, 'four-kind-skill-insert.png');
 });
 
-test('four-kind: todo Enter-inserts the plain #seq token without sending', async ({
+test('four-kind: a task query matches nothing — no # trigger path (C15)', async ({
   page,
 }) => {
-  const { input, rows, sent } = await openDetail(page, FOUR_KIND);
-  await input.fill('@内联');
-  await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('内联提及探针');
-  await input.press('ArrowDown');
-  await input.press('Enter');
+  const { input, listbox, rows } = await openDetail(page, FOUR_KIND);
+  await input.fill('#');
+  await expect(listbox).toBeHidden();
+  await expect(input).toHaveValue('#');
 
-  await expect(input).toHaveValue('#9 ');
-  expect(sent).toHaveLength(0);
-  await input.press('Enter');
-  await expect.poll(() => sent.length).toBe(1);
+  await input.fill('#9');
+  await expect(listbox).toBeHidden();
+  await expect(input).toHaveValue('#9');
+
+  await input.fill('@内联');
+  await expect(rows).toHaveCount(0);
+  await expect(page.locator('.mention-inline-empty')).toContainText('没有与"@内联"匹配的结果');
+  await expect(input).toHaveValue('@内联');
 });
 
 test('four-kind: project click inserts the display form and the highlight confirms', async ({
