@@ -74,6 +74,7 @@ describe('frequently used model rows', () => {
     for (const row of three) {
       expect(row).toContain('data-testid="frequent-model-drag-grip"');
       expect(row).toContain('aria-roledescription="sortable"');
+      expect(row).not.toContain('sortable-move-');
     }
     const singleHtml = renderToStaticMarkup(
       createElement(I18nProvider, {

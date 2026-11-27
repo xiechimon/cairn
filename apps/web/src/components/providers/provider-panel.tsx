@@ -18,13 +18,8 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-
-export { arrayMove as moveSortableItem } from '@dnd-kit/sortable';
-
 import { cn } from 'cn';
 import {
-  ArrowDown,
-  ArrowUp,
   CircleCheck,
   CircleHelp,
   CircleMinus,
@@ -36,9 +31,8 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import type { ComponentType, CSSProperties, DOMAttributes, ReactNode, Ref, SVGProps } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { IconTooltip } from '../icon-tooltip.js';
 import { SettingsPanel } from '../settings-list.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
@@ -96,98 +90,6 @@ export function ProviderMarkTile({ Mark }: { Mark: ProviderMark }) {
   );
 }
 
-export function SortableMoveButtons({
-  label,
-  onMoveUp,
-  onMoveDown,
-  revealOnHover = false,
-}: {
-  label: string;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
-  revealOnHover?: boolean;
-}) {
-  const { t } = useI18n();
-  const upRef = useRef<HTMLButtonElement | null>(null);
-  const downRef = useRef<HTMLButtonElement | null>(null);
-  const pendingFocusRef = useRef<'up' | 'down' | null>(null);
-
-  useEffect(() => {
-    const dir = pendingFocusRef.current;
-    if (dir === null) return;
-    pendingFocusRef.current = null;
-    if (dir === 'up') {
-      if (upRef.current !== null) upRef.current.focus();
-      else downRef.current?.focus();
-    } else if (downRef.current !== null) {
-      downRef.current.focus();
-    } else {
-      upRef.current?.focus();
-    }
-  }, [onMoveUp, onMoveDown]);
-
-  if (onMoveUp === undefined && onMoveDown === undefined) return null;
-  const actions: Array<{
-    key: 'up' | 'down';
-    tip: string;
-    handler: () => void;
-    Icon: typeof ArrowUp;
-    buttonRef: Ref<HTMLButtonElement>;
-  }> = [];
-  if (onMoveUp !== undefined) {
-    actions.push({
-      key: 'up',
-      tip: t('上移 {label}', { label }),
-      handler: onMoveUp,
-      Icon: ArrowUp,
-      buttonRef: upRef,
-    });
-  }
-  if (onMoveDown !== undefined) {
-    actions.push({
-      key: 'down',
-      tip: t('下移 {label}', { label }),
-      handler: onMoveDown,
-      Icon: ArrowDown,
-      buttonRef: downRef,
-    });
-  }
-  return (
-    <span
-      className={cn(
-        'flex flex-none items-center gap-0.5',
-        revealOnHover &&
-          'self-center pointer-fine:pointer-events-none pointer-fine:-ml-3 pointer-fine:h-0 pointer-fine:w-0 pointer-fine:justify-end pointer-fine:overflow-hidden pointer-fine:opacity-0 pointer-fine:group-hover/row:pointer-events-auto pointer-fine:group-hover/row:-ml-1 pointer-fine:group-hover/row:h-auto pointer-fine:group-hover/row:w-auto pointer-fine:group-hover/row:overflow-visible pointer-fine:group-hover/row:opacity-100 pointer-fine:group-focus-within/row:pointer-events-auto pointer-fine:group-focus-within/row:-ml-1 pointer-fine:group-focus-within/row:h-auto pointer-fine:group-focus-within/row:w-auto pointer-fine:group-focus-within/row:overflow-visible pointer-fine:group-focus-within/row:opacity-100 pointer-coarse:gap-1',
-      )}
-    >
-      {actions.map(({ key, tip, handler, Icon, buttonRef }) => (
-        <IconTooltip
-          key={key}
-          label={tip}
-          trigger={
-            <Button
-              ref={buttonRef}
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              data-testid={`sortable-move-${key}`}
-              className="text-content-tertiary hover:text-foreground focus-visible:ring-2 focus-visible:ring-(--focus-ring) pointer-coarse:size-11"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                if (event.detail === 0) pendingFocusRef.current = key;
-                handler();
-              }}
-            />
-          }
-        >
-          <Icon aria-hidden className="size-4" />
-        </IconTooltip>
-      ))}
-    </span>
-  );
-}
-
 export function ProviderInstanceRow({
   item,
   selected,
@@ -199,8 +101,6 @@ export function ProviderInstanceRow({
   style,
   dragging = false,
   grip,
-  onMoveUp,
-  onMoveDown,
 }: {
   item: ProviderItem;
   selected: boolean;
@@ -212,8 +112,6 @@ export function ProviderInstanceRow({
   selectProps?: Record<string, unknown>;
   style?: CSSProperties;
   dragging?: boolean;
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
 }) {
   const { t } = useI18n();
   const { Icon: StatusIcon, tone, label } = PROVIDER_STATUS[item.statusGlyph];
@@ -293,12 +191,6 @@ export function ProviderInstanceRow({
           </span>
         </span>
       </Button>
-      <SortableMoveButtons
-        revealOnHover
-        label={item.name}
-        onMoveUp={onMoveUp}
-        onMoveDown={onMoveDown}
-      />
     </div>
   );
 }
@@ -519,7 +411,6 @@ function SortableRows({
   onSelect: (id: string) => void;
   onReorder: (ids: string[]) => void;
 }) {
-  const ids = items.map((entry) => entry.id);
   return (
     <SortableList
       items={items}
@@ -528,29 +419,20 @@ function SortableRows({
       onReorder={onReorder}
       onDragStartId={onSelect}
       className="flex flex-col divide-y divide-border"
-      renderItem={(item, bind) => {
-        const index = ids.indexOf(item.id);
-        return (
-          <ProviderInstanceRow
-            item={item}
-            selected={item.id === selectedId}
-            onSelect={() => onSelect(item.id)}
-            grip={<SortableGrip dragging={bind.dragging} testId="provider-drag-grip" />}
-            rowRef={bind.rowRef}
-            rowListeners={bind.rowListeners}
-            selectRef={bind.activatorRef}
-            selectProps={bind.activatorProps}
-            dragging={bind.dragging}
-            style={bind.style}
-            onMoveUp={index > 0 ? () => onReorder(arrayMove(ids, index, index - 1)) : undefined}
-            onMoveDown={
-              index >= 0 && index < ids.length - 1
-                ? () => onReorder(arrayMove(ids, index, index + 1))
-                : undefined
-            }
-          />
-        );
-      }}
+      renderItem={(item, bind) => (
+        <ProviderInstanceRow
+          item={item}
+          selected={item.id === selectedId}
+          onSelect={() => onSelect(item.id)}
+          grip={<SortableGrip dragging={bind.dragging} testId="provider-drag-grip" />}
+          rowRef={bind.rowRef}
+          rowListeners={bind.rowListeners}
+          selectRef={bind.activatorRef}
+          selectProps={bind.activatorProps}
+          dragging={bind.dragging}
+          style={bind.style}
+        />
+      )}
     />
   );
 }

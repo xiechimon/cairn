@@ -3270,6 +3270,4 @@ export const EN: Record<string, string> = {
   正在加载聊天应用: 'Loading chat apps',
   聊天应用未能加载: 'Could not load chat apps',
   可横向滚动的表格: 'Horizontally scrollable table',
-  '上移 {label}': 'Move {label} up',
-  '下移 {label}': 'Move {label} down',
 };

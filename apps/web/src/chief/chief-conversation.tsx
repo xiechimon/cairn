@@ -118,7 +118,7 @@ function layoutStream(
     pinned: grouped.flatMap(({ item }, n) =>
       item.kind === 'question' && item.status === 'pending' ? [n] : [],
     ),
-    runs: bubbleRuns(grouped, previousAt),
+    runs: bubbleRuns(grouped, previousAt, { cardFailure, startedBy }),
     started: startedBy,
     reports: placeReportCards(grouped, startedBy, glances, reportSeen),
     dividers,

@@ -81,7 +81,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | V31 | UI chrome forbids light font weights below 400 (`font-thin`, `font-extralight`, `font-light`) and sets `-webkit-text-size-adjust: 100%`. | M `test/ui-guidelines-static.test.ts` scans weights and `src/styles/app.css` |
 | A8 | WCAG 2.2 target size minimum (SC 2.5.8): interactive controls outside inline prose links measure at least 24 by 24 CSS pixels on desktop and 44 by 44 on touch. | M `e2e/design-rules-guidelines.spec.ts` |
 | A9 | WCAG 2.2 focus not obscured (SC 2.4.11): tabbed controls are not covered by sticky headers, docked composers or overlays. | M `e2e/design-rules-guidelines.spec.ts` |
-| A10 | WCAG 2.2 dragging movements (SC 2.5.7): every drag-reorderable list offers single-pointer move up and down controls that persist order without dragging. | M `e2e/providers-order.spec.ts` |
+| A10 | Drag-reorderable lists keep pointer drag and keyboard reordering (Space + arrow keys on the row or drag handle) without extra hover up/down move buttons (owner decision 2026-11-27). | M `e2e/providers-order.spec.ts`, `e2e/settings-routing.spec.ts` |
 | V32 | Titles are 18px at 600, body 16px and UI text 14px at 400 or 500; text has two inks, primary `ink` and secondary `ink-2` (light `#181818`/`#545454`, dark `#ededed`/`#b0b0b0`), besides the V5 role colours. | M `e2e/design-rules-measure.spec.ts`: computed title, section, label and secondary text in light and dark, 1440px and 390px |
 
 ## Direction

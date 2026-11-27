@@ -427,12 +427,12 @@ test.describe('A8 touch targets under pointer: coarse', () => {
   test('A8: touch reorder controls and key interactive controls meet 44x44', async ({ page }) => {
     await page.goto('/app/settings/routing?scenario=model-routing');
     await expect(page.getByTestId('provider-editor')).toBeVisible();
-    await expect(page.getByTestId('sortable-move-down').first()).toBeVisible();
+    await expect(page.getByTestId('provider-instance').first()).toBeVisible();
     const audit = await page.evaluate(() => {
       const bad: string[] = [];
       let checked = 0;
       for (const el of document.querySelectorAll(
-        '[data-testid="sortable-move-up"], [data-testid="sortable-move-down"], [data-testid="provider-instance"] button, main button[data-slot="button"]',
+        '[data-testid="provider-instance"] button, [data-testid="frequent-model-drag-grip"], main button[data-slot="button"]',
       )) {
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;

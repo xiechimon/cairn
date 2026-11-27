@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive, THREAD } from './chief-home-mock.js';
 import { evidenceShot } from './evidence';
 
 const ROUTE = '/app?scenario=chief-md-ref';
@@ -391,3 +392,78 @@ for (const width of [1440, 390]) {
     }
   });
 }
+
+test('consecutive assistant replies separated by thinking or tool calls cluster at 2px like user bubbles, while user-to-assistant stays 24px', async ({
+  page,
+}) => {
+  const now = Date.now();
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'u-1', role: 'user', content: '测试', createdAt: now - 120_000 },
+      { id: 'u-2', role: 'user', content: '你是什么大模型', createdAt: now - 110_000 },
+      {
+        id: 'a-1',
+        role: 'assistant',
+        content: '收到，我在的。有什么需要我做的随时告诉我。',
+        createdAt: now - 100_000,
+      },
+      {
+        id: 'a-think',
+        role: 'assistant',
+        content: [{ type: 'thinking', thinking: '检查 usage 记录' }],
+        createdAt: now - 95_000,
+      },
+      {
+        id: 'a-tool',
+        role: 'assistant',
+        content: {
+          kind: 'toolcall',
+          call: { id: 'tc-1', name: 'read_usage', arguments: {}, result: 'ok' },
+        },
+        createdAt: now - 92_000,
+      },
+      {
+        id: 'a-2',
+        role: 'assistant',
+        content: '我查了 usage 记录，我现在使用的是 Gemini 4。',
+        createdAt: now - 90_000,
+      },
+    ],
+  });
+
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  await expect(stream).toContainText('我查了 usage 记录');
+
+  const userBubbles = stream.locator('[data-slot="message-bubble"][data-side="owner"]');
+  const replyBubbles = stream.locator('[data-slot="message-bubble"][data-side="coordinator"]');
+  await expect(userBubbles).toHaveCount(2);
+  await expect(replyBubbles).toHaveCount(2);
+
+  await expect(userBubbles.nth(0)).toHaveAttribute('data-run', 'first');
+  await expect(userBubbles.nth(1)).toHaveAttribute('data-run', 'last');
+  await expect(replyBubbles.nth(0)).toHaveAttribute('data-run', 'first');
+  await expect(replyBubbles.nth(1)).toHaveAttribute('data-run', 'last');
+
+  const boxes = await page.evaluate(() => {
+    const rect = (el: Element | null) => el?.getBoundingClientRect() ?? null;
+    const users = [
+      ...document.querySelectorAll('[data-testid="chief-stream"] [data-slot="message-bubble"][data-side="owner"]'),
+    ].map(rect);
+    const replies = [
+      ...document.querySelectorAll(
+        '[data-testid="chief-stream"] [data-slot="message-bubble"][data-side="coordinator"]',
+      ),
+    ].map(rect);
+    return { users, replies };
+  });
+
+  const uGap = Math.round(boxes.users[1]!.top - boxes.users[0]!.bottom);
+  const rGap = Math.round(boxes.replies[1]!.top - boxes.replies[0]!.bottom);
+  const turnGap = Math.round(boxes.replies[0]!.top - boxes.users[1]!.bottom);
+
+  expect(uGap).toBe(2);
+  expect(rGap).toBe(2);
+  expect(turnGap).toBe(24);
+});

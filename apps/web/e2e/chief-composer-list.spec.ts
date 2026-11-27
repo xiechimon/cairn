@@ -68,19 +68,21 @@ test.describe('Coordinator composer unified list markers and keys', () => {
       return {
         ordBg: csOrd.backgroundColor,
         ordColor: csOrd.color,
-        ordRadius: csOrd.borderRadius,
+        ordBoxShadow: csOrd.boxShadow,
         bulBg: csBul.backgroundColor,
         bulColor: csBul.color,
-        bulRadius: csBul.borderRadius,
+        bulBoxShadow: csBul.boxShadow,
         plainBg: csPlain.backgroundColor,
         plainColor: csPlain.color,
       };
     });
     expect(styles).not.toBeNull();
-    expect(styles!.ordBg).toBe(styles!.bulBg);
-    expect(styles!.ordColor).toBe(styles!.bulColor);
-    expect(styles!.ordRadius).toBe(styles!.bulRadius);
-    expect(styles!.ordBg).not.toBe(styles!.plainBg);
+    expect(styles!.ordBg).toBe(styles!.plainBg);
+    expect(styles!.ordColor).toBe(styles!.plainColor);
+    expect(styles!.ordBoxShadow).toBe('none');
+    expect(styles!.bulBg).toBe(styles!.plainBg);
+    expect(styles!.bulColor).toBe(styles!.plainColor);
+    expect(styles!.bulBoxShadow).toBe('none');
 
     const alignment = await page.evaluate(() => {
       const ta = document.querySelector('[data-testid="chief-composer-input"]') as HTMLTextAreaElement;
