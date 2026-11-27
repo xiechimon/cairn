@@ -266,6 +266,62 @@ describe('resolveStepPassOutcome', () => {
     expect(settled.quotaBlock?.kind).toBe('quota');
     expect(settled.failureCode).toBe('quota');
   });
+
+  test('trailing runtime exit noise with quota text after a real model error does not trip quotaTrip or stop', async () => {
+    const state = newStepPassState();
+    let stopped = 0;
+    const ctx: Parameters<typeof consumeStepPassEvent>[1] = {
+      stepId: 's1',
+      client: {} as MachineApi,
+      logger: { step: () => {} } as unknown as DaemonLogger,
+      modelKey: 'antigravity/gemini-4-hydrogen',
+      provider: null,
+      handle: {
+        stop: async () => {
+          stopped += 1;
+        },
+      } as unknown as AgentSessionHandle,
+      promptImages: undefined,
+      retryStormMax: 3,
+      now: () => 1,
+      watchdog: {} as StreamWatchdog,
+      activity: {} as ActivityTracker,
+      stream: { segments: {} } as unknown as StepTranscriptStream,
+      transcript: {} as TranscriptBuffer,
+      agentTodo: {} as AgentTodoReporter,
+      toolStartedAt: new Map(),
+    };
+    await consumeStepPassEvent(
+      {
+        type: 'error',
+        error: {
+          message: 'Model unavailable',
+          retryable: false,
+          failureCode: 'model_unavailable',
+        },
+      },
+      ctx,
+      state,
+    );
+    expect(stopped).toBe(1);
+    await consumeStepPassEvent(
+      {
+        type: 'error',
+        error: {
+          message: 'ACP exited (1): 402 insufficient credits in stderr noise',
+          retryable: false,
+          processCrash: true,
+          failureCode: 'runtime_exited',
+          failureDetail: { runtime: 'antigravity', exitCode: 1 },
+        },
+      },
+      ctx,
+      state,
+    );
+    expect(state.quotaTrip).toBeNull();
+    expect(stopped).toBe(1);
+    expect(state.failureCode).toBe('model_unavailable');
+  });
 });
 
 describe('rewindAfterStep', () => {

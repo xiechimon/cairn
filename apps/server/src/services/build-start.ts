@@ -171,6 +171,8 @@ export function startBuilds(
           scheduledBy: input.scheduledBy ?? null,
           planDocId: null,
           errorMessage: null,
+          failureCode: null,
+          failureDetail: null,
           prUrl: null,
           prNumber: null,
           changes: null,

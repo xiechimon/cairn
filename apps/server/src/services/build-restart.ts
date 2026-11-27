@@ -1,9 +1,11 @@
-import type { StepActionOrigin, TodoRecord, TriggerSource } from '@cairn/shared';
+import type { RetryFailureClass, StepActionOrigin, TodoRecord, TriggerSource } from '@cairn/shared';
 import {
+  automaticRetryRowContent,
   buildFailureRowContent,
   buildRestartPrompt,
   buildReworkNewBranchNote,
   buildReworkReuseNote,
+  classifyRetryFailureWithCode,
   conversationBranch,
   isInfoOutput,
   SESSION_BRIEF,
@@ -60,17 +62,27 @@ export async function restartFailedBuild(
   if (todoRecord.phase !== 'failed') {
     throw new HttpError(409, `restart 仅适用于 failed 相位（当前 ${todoRecord.phase}）`);
   }
-  const resuming = row.retryParkReason != null || retryIsParked(row.errorMessage ?? '');
+  const resuming =
+    row.retryParkReason != null || retryIsParked(row.errorMessage ?? '', row.failureCode);
   const isRateLimit = row.retryClass === 'rate_limit';
   const nextRetryAttempt =
     origin === 'person' || resuming ? 0 : isRateLimit ? row.retryAttempt : row.retryAttempt + 1;
   const nextWindowStartedAt =
     origin === 'person' || resuming ? null : (row.retryWindowStartedAt ?? todoRecord.phaseAt);
-  const autoRetryNote = isRateLimit
-    ? 'Automatic retry after rate limit'
-    : row.retryClass === 'unknown' || row.retryClass == null
-      ? `Automatic retry ${nextRetryAttempt}/${UNKNOWN_RETRY_LIMIT}`
-      : `Automatic retry ${nextRetryAttempt}`;
+  const priorClassified = classifyRetryFailureWithCode(
+    row.errorMessage ?? '',
+    row.failureCode,
+    nowMs(),
+  );
+  const priorClass: RetryFailureClass = row.retryClass ?? priorClassified.failureClass;
+  const autoRetryNote = automaticRetryRowContent({
+    attempt: nextRetryAttempt,
+    maxAttempts: priorClass === 'unknown' ? UNKNOWN_RETRY_LIMIT : null,
+    reasonCode: priorClassified.reasonCode,
+    failureClass: priorClass,
+    detail: row.failureDetail ?? null,
+    priorError: row.errorMessage,
+  });
   const feedbackText = body.feedback.trim() === '' ? null : body.feedback;
   const preservedStep = deps.db
     .select({ id: step.id })
@@ -196,6 +208,8 @@ export async function restartFailedBuild(
         .update(build)
         .set({
           errorMessage: null,
+          failureCode: null,
+          failureDetail: null,
           prevPhase: 'failed',
           retryAttempt: nextRetryAttempt,
           retryClass: null,
@@ -248,6 +262,8 @@ export async function restartFailedBuild(
         retryParkReason: null,
         planDocId: null,
         errorMessage: null,
+        failureCode: null,
+        failureDetail: null,
         prUrl: null,
         prNumber: null,
         changes: null,

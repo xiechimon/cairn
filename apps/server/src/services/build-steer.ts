@@ -278,6 +278,8 @@ export async function sendBuildSteer(
             retryNextAt: null,
             retryWindowStartedAt: nextRetryWindowStartedAt,
             retryParkReason: null,
+            failureCode: null,
+            failureDetail: null,
             createdAt: now,
           })
           .run();
@@ -348,6 +350,8 @@ export async function sendBuildSteer(
           db.update(build)
             .set({
               errorMessage: null,
+              failureCode: null,
+              failureDetail: null,
               prevPhase: todoRow?.phase ?? 'done',
               retryAttempt: nextRetryAttempt,
               retryClass: null,

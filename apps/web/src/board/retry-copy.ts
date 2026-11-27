@@ -1,4 +1,4 @@
-import type { RetryReasonCode, TodoRetryState } from '@cairn/shared';
+import type { AutomaticRetryRow, RetryReasonCode, TodoRetryState } from '@cairn/shared';
 import type { TodoRecord } from '../fixtures/records.js';
 import { dateTimeFormat } from '../lib/date-format.js';
 
@@ -52,6 +52,14 @@ export function scheduledFailureHeadline(reasonCode: RetryReasonCode): RetryPhra
       return { key: '服务商暂时异常' };
     case 'runner_disconnect':
       return { key: '执行机连接中断' };
+    case 'runtime_exited':
+      return { key: '运行环境意外退出' };
+    case 'runtime_startup_timeout':
+      return { key: '运行环境启动超时' };
+    case 'stream_timeout':
+      return { key: '模型响应超时' };
+    case 'silent_no_op':
+      return { key: '本轮未返回结果' };
     case 'quota':
       return { key: '额度已用尽' };
     case 'rate_limit':
@@ -59,6 +67,10 @@ export function scheduledFailureHeadline(reasonCode: RetryReasonCode): RetryPhra
     default:
       return { key: '本步异常结束' };
   }
+}
+
+export function automaticRetryRowHeadline(row: AutomaticRetryRow): RetryPhrase {
+  return scheduledFailureHeadline(row.reasonCode);
 }
 
 export function parkedRetryCopy(retry: Extract<TodoRetryState, { state: 'parked' }>): {
@@ -73,7 +85,10 @@ export function parkedRetryCopy(retry: Extract<TodoRetryState, { state: 'parked'
       };
     case 'missing_tool':
       return {
-        title: { key: '缺少所需工具，已停止自动重试' },
+        title:
+          retry.detail !== null && retry.detail !== ''
+            ? { key: '缺少所需工具（{tool}），已停止自动重试', params: { tool: retry.detail } }
+            : { key: '缺少所需工具，已停止自动重试' },
         fix: { key: '请在执行机安装缺少的工具后重试。' },
       };
     case 'auth':

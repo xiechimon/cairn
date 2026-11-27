@@ -1,11 +1,14 @@
 import {
-  classifyRetryFailure,
+  classifyRetryFailureWithCode,
   RETRY_AFTER_MAX_MS,
   RETRY_AFTER_MIN_MS,
   RETRY_PARKED_MARK,
   type RetryFailureClass,
   type RetryReasonCode,
+  redactSecrets,
   runtimeUpdateRequired,
+  type StepFailureCode,
+  type StepFailureDetail,
   type TodoRetryState,
 } from '@cairn/shared';
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
@@ -37,7 +40,7 @@ export const ERROR_SCAN_LIMIT = 8_192;
 
 export function sanitizeDetail(raw: string | null | undefined): string | null {
   if (raw == null) return null;
-  const cleaned = raw
+  const cleaned = String(redactSecrets(raw).value)
     .replace(/[\p{Cc}[\]()`]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -49,6 +52,8 @@ export interface RetryBuildSlice {
   id: string;
   todoId?: string;
   errorMessage: string | null;
+  failureCode?: StepFailureCode | null;
+  failureDetail?: StepFailureDetail | null;
   retryAttempt: number;
   retryClass?: RetryFailureClass | null;
   retryNextAt?: number | null;
@@ -56,10 +61,10 @@ export interface RetryBuildSlice {
   retryParkReason?: RetryReasonCode | null;
 }
 
-export function retryIsParked(error: string): boolean {
+export function retryIsParked(error: string, failureCode?: StepFailureCode | null): boolean {
   if (error.startsWith(RETRY_PARKED_MARK)) return true;
   if (error.startsWith('PR Auto-fix needs you:')) return false;
-  return classifyRetryFailure(error).failureClass === 'permanent';
+  return classifyRetryFailureWithCode(error, failureCode).failureClass === 'permanent';
 }
 
 export function runtimeUpdateReason(
@@ -72,9 +77,12 @@ export function runtimeUpdateReason(
     : `${RETRY_PARKED_MARK}: Cairn's built-in ${runtime} ${update.current} is too old: ${need}. Update Cairn, then retry.`;
 }
 
-export function failureNeedsHuman(errorMessage: string): boolean {
-  if (retryIsParked(errorMessage)) return true;
-  return classifyRetryFailure(errorMessage).failureClass === 'permanent';
+export function failureNeedsHuman(
+  errorMessage: string,
+  failureCode?: StepFailureCode | null,
+): boolean {
+  if (retryIsParked(errorMessage, failureCode)) return true;
+  return classifyRetryFailureWithCode(errorMessage, failureCode).failureClass === 'permanent';
 }
 
 export function nominalDelayForClass(
@@ -114,13 +122,16 @@ export function automaticRetryDueAt(
   phaseAt: number,
   attemptOrBuild:
     | number
-    | Pick<RetryBuildSlice, 'retryAttempt' | 'retryClass' | 'retryNextAt' | 'errorMessage'>,
+    | Pick<
+        RetryBuildSlice,
+        'retryAttempt' | 'retryClass' | 'retryNextAt' | 'errorMessage' | 'failureCode'
+      >,
 ): number {
   if (typeof attemptOrBuild === 'number') {
     return phaseAt + automaticRetryDelayMs(attemptOrBuild);
   }
   const error = attemptOrBuild.errorMessage ?? '';
-  const classified = classifyRetryFailure(error, phaseAt);
+  const classified = classifyRetryFailureWithCode(error, attemptOrBuild.failureCode, phaseAt);
   const failureClass: Exclude<RetryFailureClass, 'permanent'> =
     attemptOrBuild.retryClass != null && attemptOrBuild.retryClass !== 'permanent'
       ? attemptOrBuild.retryClass
@@ -161,10 +172,10 @@ function lastStepScheduledBuildIds(db: Db, buildIds: string[]): Set<string> {
 }
 
 export function resolvedClassFor(
-  row: Pick<RetryBuildSlice, 'errorMessage' | 'retryClass'>,
+  row: Pick<RetryBuildSlice, 'errorMessage' | 'retryClass' | 'failureCode'>,
   now: number,
 ) {
-  const classified = classifyRetryFailure(row.errorMessage ?? '', now);
+  const classified = classifyRetryFailureWithCode(row.errorMessage ?? '', row.failureCode, now);
   const failureClass = row.retryClass ?? classified.failureClass;
   return { failureClass, classified };
 }
@@ -197,7 +208,13 @@ export function budgetExhaustedReason(
   db: Db,
   row: Pick<
     RetryBuildSlice,
-    'id' | 'todoId' | 'errorMessage' | 'retryAttempt' | 'retryClass' | 'retryWindowStartedAt'
+    | 'id'
+    | 'todoId'
+    | 'errorMessage'
+    | 'failureCode'
+    | 'retryAttempt'
+    | 'retryClass'
+    | 'retryWindowStartedAt'
   >,
   now: number,
 ): RetryReasonCode | null {
@@ -227,7 +244,7 @@ export function budgetExhaustedReason(
 
 export function automaticRetryOwed(db: Db, buildRow: RetryBuildSlice, now = nowMs()): boolean {
   if (buildRow.retryParkReason != null) return false;
-  if (failureNeedsHuman(buildRow.errorMessage ?? '')) return false;
+  if (failureNeedsHuman(buildRow.errorMessage ?? '', buildRow.failureCode)) return false;
   if (budgetExhaustedReason(db, buildRow, now) !== null) return false;
   if (pendingWorkerQuestions(db, buildRow.id).length > 0) return false;
   return !lastStepScheduledBuildIds(db, [buildRow.id]).has(buildRow.id);
@@ -267,7 +284,9 @@ export function todoRetryStateOf(
         null)
       : null;
   const detail = sanitizeDetail(
-    update !== null ? `${update.runtime ?? 'Agent'} ${update.required}` : modelDetail,
+    update !== null
+      ? `${update.runtime ?? 'Agent'} ${update.required}`
+      : (modelDetail ?? (reasonCode === 'missing_tool' ? buildRow.failureDetail?.tool : null)),
   );
   return {
     state: 'parked',

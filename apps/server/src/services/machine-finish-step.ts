@@ -644,6 +644,8 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       stepRow,
       `${outcome.errorMessage ?? ''}\nModel ${ran?.modelId ?? 'unknown'} is unavailable.`,
       reportedVerdictHeads(stepRow, { gateHeadSha: body.gateHeadSha, commit: body.commit }),
+      undefined,
+      { code: 'model_unavailable' },
     );
     publishStepStatus(deps, stepId);
     emitSettledStepSpan(deps, stepId);
@@ -718,7 +720,9 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       );
       return;
     }
-    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport);
+    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport, undefined, {
+      code: 'silent_no_op',
+    });
     publishStepStatus(deps, stepId);
     emitSettledStepSpan(deps, stepId);
     return;
@@ -733,7 +737,9 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   ) {
     const rounds = countMarkedRounds(db, stepRow.buildId, CI_FIX_PROMPT_HEAD);
     if (rounds >= CI_FIX_ROUNDS_MAX) {
-      applyStepFailure(deps, stepRow, deadLoopMessage(rounds), verdictReport);
+      applyStepFailure(deps, stepRow, deadLoopMessage(rounds), verdictReport, undefined, {
+        code: 'gate_rejection',
+      });
     } else {
       db.update(step).set({ status: 'done', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
       finishScheduledStep(deps, stepRow);
@@ -802,6 +808,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     outcome.errorMessage ?? `step ${outcome.status}`,
     verdictReport,
     body.preservedCommits,
+    { code: body.failureCode ?? null, detail: body.failureDetail ?? null },
   );
   publishStepStatus(deps, stepId);
   emitSettledStepSpan(deps, stepId);

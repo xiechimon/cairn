@@ -90,6 +90,8 @@ test('cutover preserves exact label identities and metadata, moved origins and s
       original.builds.map((row) => ({
         ...(row as object),
         afterStopPhase: null,
+        failureCode: null,
+        failureDetail: null,
         retryAttempt: 0,
         retryClass: null,
         retryNextAt: null,

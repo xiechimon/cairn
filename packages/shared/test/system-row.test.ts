@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
+  AUTOMATIC_RETRY_ROW_KIND,
+  automaticRetryRowContent,
   BUILD_FAILURE_ROW_KIND,
   buildFailureRowContent,
   buildReworkReuseNote,
@@ -118,5 +120,60 @@ describe('structured system rows', () => {
     expect(reworkNoteWithoutReason('返工回到本分支继续。上一轮失败原因：boom。')).toBe(
       '返工回到本分支继续。',
     );
+  });
+
+  test('automatic retry rows round-trip, redact before clipping, and parse legacy formats', () => {
+    const skKey = `sk-${'k'.repeat(28)}`;
+    const prefix = 'x'.repeat(390);
+    const content = automaticRetryRowContent({
+      attempt: 2,
+      maxAttempts: null,
+      reasonCode: 'runtime_exited',
+      failureClass: 'transient',
+      detail: { runtime: 'antigravity', exitCode: 137 },
+      priorError: `\u001b[31m${prefix}${skKey}\u001b[0m`,
+    });
+    const parsed = systemRowOf(content);
+    expect(parsed).toMatchObject({
+      kind: AUTOMATIC_RETRY_ROW_KIND,
+      attempt: 2,
+      maxAttempts: null,
+      reasonCode: 'runtime_exited',
+      failureClass: 'transient',
+      detail: { runtime: 'antigravity', exitCode: 137 },
+    });
+    if (parsed?.kind !== AUTOMATIC_RETRY_ROW_KIND) throw new Error('expected automatic-retry row');
+    expect(parsed.priorError).not.toBeNull();
+    expect(parsed.priorError?.length ?? 0).toBeLessThanOrEqual(400);
+    expect(parsed.priorError).not.toContain('sk-');
+    expect(parsed.priorError).toContain('[REDA');
+
+    expect(systemRowOf('Automatic retry after rate limit')).toEqual({
+      kind: AUTOMATIC_RETRY_ROW_KIND,
+      attempt: 0,
+      maxAttempts: null,
+      reasonCode: 'rate_limit',
+      failureClass: 'rate_limit',
+      detail: null,
+      priorError: null,
+    });
+    expect(systemRowOf('Automatic retry 2/3')).toEqual({
+      kind: AUTOMATIC_RETRY_ROW_KIND,
+      attempt: 2,
+      maxAttempts: 3,
+      reasonCode: 'unknown',
+      failureClass: 'unknown',
+      detail: null,
+      priorError: null,
+    });
+    expect(systemRowOf('Automatic retry 4')).toEqual({
+      kind: AUTOMATIC_RETRY_ROW_KIND,
+      attempt: 4,
+      maxAttempts: null,
+      reasonCode: 'unknown',
+      failureClass: 'transient',
+      detail: null,
+      priorError: null,
+    });
   });
 });

@@ -103,6 +103,9 @@ function releaseClaimedStep(
       deps,
       row,
       `crashed ${claims} times after being claimed without progress; quarantined`,
+      undefined,
+      undefined,
+      { code: 'runner_disconnect' },
     );
   } else {
     deps.db

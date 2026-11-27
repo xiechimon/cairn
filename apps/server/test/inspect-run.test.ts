@@ -1,3 +1,4 @@
+import { automaticRetryRowContent, buildFailureRowContent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   build,
@@ -253,5 +254,90 @@ describe('inspect_run', () => {
     expect(body.steps[0]?.holdReason).not.toContain('sk-');
     expect(body.recentToolCalls[0]?.arguments).toBe(`{"cmd":"${cmdPrefix}[REDACTED]"}`);
     expect(body.recentToolCalls[0]?.arguments).not.toContain('ghp_');
+  });
+
+  test('exposes structured failureCode, failureDetail, and parses structured retry and failure system rows safely', async () => {
+    const now = nowMs();
+    const skKey = `sk-${'r'.repeat(28)}`;
+    H.s.db
+      .insert(todo)
+      .values({
+        id: 'todo-structured',
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: 'structured failure inspect',
+        phaseAt: now,
+        seqNum: 7101,
+        latestBuildId: 'build-structured',
+      })
+      .run();
+    H.s.db
+      .insert(build)
+      .values({
+        id: 'build-structured',
+        todoId: 'todo-structured',
+        withPlan: false,
+        triggerSource: 'user',
+        errorMessage: 'Runtime crashed',
+        failureCode: 'runtime_exited',
+        failureDetail: { runtime: 'antigravity', exitCode: 137 },
+        createdAt: now - 10_000,
+      })
+      .run();
+    H.s.db
+      .insert(step)
+      .values({
+        id: 'step-structured',
+        buildId: 'build-structured',
+        kind: 'session',
+        status: 'failed',
+        failureCode: 'runtime_exited',
+        createdAt: now - 10_000,
+        finishedAt: now - 5_000,
+      })
+      .run();
+    H.s.db
+      .insert(message)
+      .values([
+        {
+          id: 'sys-retry-structured',
+          conversationId: 'build-structured',
+          role: 'system',
+          content: automaticRetryRowContent({
+            attempt: 1,
+            maxAttempts: null,
+            reasonCode: 'runtime_exited',
+            failureClass: 'transient',
+            detail: { runtime: 'antigravity', exitCode: 137 },
+            priorError: `exited with key=${skKey}`,
+          }),
+          createdAt: now - 4_000,
+        },
+        {
+          id: 'sys-fail-structured',
+          conversationId: 'build-structured',
+          role: 'system',
+          content: buildFailureRowContent({
+            reason: `step failed key=${skKey}`,
+            pr: null,
+          }),
+          createdAt: now - 3_000,
+        },
+      ])
+      .run();
+
+    const body = (await relay('inspect_run', { id: 'todo-structured' })) as {
+      build: { failureCode: string | null; failureDetail: unknown };
+      steps: { failureCode: string | null }[];
+      recentEvents: { text: string }[];
+    };
+    expect(body.build.failureCode).toBe('runtime_exited');
+    expect(body.build.failureDetail).toEqual({ runtime: 'antigravity', exitCode: 137 });
+    expect(body.steps[0]?.failureCode).toBe('runtime_exited');
+    expect(body.recentEvents.map((e) => e.text)).toEqual([
+      'build failure: step failed key=[REDACTED]',
+      'automatic retry (1, runtime_exited): exited with key=[REDACTED]',
+    ]);
+    expect(JSON.stringify(body)).not.toContain('sk-');
   });
 });

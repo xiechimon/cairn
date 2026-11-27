@@ -1,4 +1,4 @@
-import type { MachineDoneBody } from '@cairn/shared';
+import type { MachineDoneBody, StepFailureCode, StepFailureDetail } from '@cairn/shared';
 import { buildFailureRowContent, isBuildStepKind } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { runAfterCommit } from '../db/commit-effects.js';
@@ -69,6 +69,11 @@ export function noteDeliveredPlanResidual(
   return true;
 }
 
+export interface StepFailureMeta {
+  code?: StepFailureCode | null;
+  detail?: StepFailureDetail | null;
+}
+
 export function settleParkedStep(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
@@ -77,7 +82,8 @@ export function settleParkedStep(
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (
     !buildRow ||
-    (buildRow.retryParkReason == null && !retryIsParked(buildRow.errorMessage ?? ''))
+    (buildRow.retryParkReason == null &&
+      !retryIsParked(buildRow.errorMessage ?? '', buildRow.failureCode))
   )
     return false;
   parkFailedBuild(deps, buildRow.id);
@@ -117,6 +123,7 @@ export function applyStepFailure(
   rawErrorMessage: string,
   report?: VerdictReport,
   preservedCommits?: readonly string[],
+  failure?: StepFailureMeta,
 ): void {
   const { db } = deps;
   if (settleRetiredGateStep(deps, stepRow, { errorMessage: rawErrorMessage })) return;
@@ -134,8 +141,10 @@ export function applyStepFailure(
   releaseUnissuedMergeAdmission(db, stepRow);
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
+  const failureCode = failure?.code ?? null;
+  const failureDetail = failure?.detail ?? null;
   db.update(step)
-    .set({ status: 'failed', finishedAt: nowMs() })
+    .set({ status: 'failed', finishedAt: nowMs(), failureCode })
     .where(eq(step.id, stepRow.id))
     .run();
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
@@ -156,7 +165,10 @@ export function applyStepFailure(
     return;
   }
   finishScheduledStep(deps, stepRow, { status: 'failed', error: errorMessage });
-  db.update(build).set({ errorMessage }).where(eq(build.id, buildRow.id)).run();
+  db.update(build)
+    .set({ errorMessage, failureCode, failureDetail })
+    .where(eq(build.id, buildRow.id))
+    .run();
   if (isBuildStepKind(stepRow.kind)) {
     const changes = buildRow.changes;
     const files =
@@ -202,8 +214,9 @@ export function failStepWithEvents(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   reason: string,
+  failure?: StepFailureMeta,
 ): void {
-  applyStepFailure(deps, stepRow, reason);
+  applyStepFailure(deps, stepRow, reason, undefined, undefined, failure);
   const failedBuild = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (failedBuild) publishBuild(deps, failedBuild);
   const failedStep = deps.db.select().from(step).where(eq(step.id, stepRow.id)).get();

@@ -1,8 +1,15 @@
+import {
+  AUTOMATIC_RETRY_ROW_KIND,
+  type StepFailureCode,
+  type StepFailureDetail,
+  systemRowOf,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
   build as buildTable,
   chiefMessage as chiefMessageTable,
+  message as messageTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -102,10 +109,15 @@ function latestBuild(w: World) {
     .get();
 }
 
-function failStep(w: World, stepId: string, error: string): void {
+function failStep(
+  w: World,
+  stepId: string,
+  error: string,
+  failure?: { code?: StepFailureCode | null; detail?: StepFailureDetail | null },
+): void {
   const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
   if (row === undefined) throw new Error(`missing step ${stepId}`);
-  applyStepFailure(w.deps, row, error);
+  applyStepFailure(w.deps, row, error, undefined, undefined, failure);
 }
 
 function pendingStep(w: World, buildId: string) {
@@ -423,5 +435,91 @@ describe('classified retry policy (permanent / transient / rate_limit / unknown)
       .get()!;
     expect(afterBlocked.status).toBe('pending');
     expect(afterBlocked.holdReason).toBe('blocked-by');
+  });
+
+  test('structured failureCode overrides raw error regexes and persists across retry transcript rows', async () => {
+    const authWithTransientText = openWorld();
+    failStep(
+      authWithTransientText,
+      authWithTransientText.stepId,
+      'upstream HTTP 429 too many requests',
+      { code: 'auth', detail: { runtime: 'antigravity', exitCode: 1 } },
+    );
+    expect(latestBuild(authWithTransientText)?.failureCode).toBe('auth');
+    expect(latestBuild(authWithTransientText)?.failureDetail).toEqual({
+      runtime: 'antigravity',
+      exitCode: 1,
+    });
+    expect(getTodo(authWithTransientText.deps, authWithTransientText.todoId)?.retry).toMatchObject({
+      state: 'parked',
+      failureClass: 'permanent',
+      reasonCode: 'auth',
+    });
+
+    const missingTool = openWorld();
+    failStep(missingTool, missingTool.stepId, 'Process failed without shell error string', {
+      code: 'missing_tool',
+      detail: { runtime: 'claude-code', tool: 'claude' },
+    });
+    expect(getTodo(missingTool.deps, missingTool.todoId)?.retry).toMatchObject({
+      state: 'parked',
+      failureClass: 'permanent',
+      reasonCode: 'missing_tool',
+      detail: 'claude',
+    });
+
+    const fakeKey = `sk-${'z'.repeat(28)}`;
+    const missingToolSecret = openWorld();
+    failStep(missingToolSecret, missingToolSecret.stepId, 'Process failed', {
+      code: 'missing_tool',
+      detail: { runtime: 'claude-code', tool: `bin-${fakeKey}` },
+    });
+    const secretToolRetry = getTodo(missingToolSecret.deps, missingToolSecret.todoId)?.retry;
+    expect(secretToolRetry).toMatchObject({ state: 'parked', reasonCode: 'missing_tool' });
+    if (secretToolRetry?.state === 'parked') {
+      expect(secretToolRetry.detail).not.toContain('sk-');
+    }
+
+    const exited = openWorld();
+    failStep(exited, exited.stepId, `ACP exited (137) while holding ${fakeKey}`, {
+      code: 'runtime_exited',
+      detail: { runtime: 'antigravity', exitCode: 137 },
+    });
+    expect(getTodo(exited.deps, exited.todoId)?.retry).toMatchObject({
+      state: 'scheduled',
+      failureClass: 'transient',
+      reasonCode: 'runtime_exited',
+      attempt: 1,
+    });
+
+    exited.s.db
+      .update(todoTable)
+      .set({ phaseAt: nowMs() - 5 * 60_000 })
+      .where(eq(todoTable.id, exited.todoId))
+      .run();
+    await sweepFailedRetries(exited.deps);
+    expect(phaseOf(exited)).toBe('queued');
+    const nextBuild = latestBuild(exited);
+    expect(nextBuild?.failureCode).toBeNull();
+    expect(nextBuild?.failureDetail).toBeNull();
+
+    const retryRows = exited.s.db
+      .select()
+      .from(messageTable)
+      .where(eq(messageTable.conversationId, nextBuild?.id ?? ''))
+      .all()
+      .map((m) => systemRowOf(m.content))
+      .filter((row) => row?.kind === AUTOMATIC_RETRY_ROW_KIND);
+    expect(retryRows).toEqual([
+      {
+        kind: AUTOMATIC_RETRY_ROW_KIND,
+        attempt: 1,
+        maxAttempts: null,
+        reasonCode: 'runtime_exited',
+        failureClass: 'transient',
+        detail: { runtime: 'antigravity', exitCode: 137 },
+        priorError: 'ACP exited (137) while holding [REDACTED]',
+      },
+    ]);
   });
 });

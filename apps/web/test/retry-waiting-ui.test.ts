@@ -1,9 +1,15 @@
-import type { BuildRecord } from '@cairn/shared';
+import { automaticRetryRowContent, type BuildRecord, type RetryReasonCode } from '@cairn/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { mapTranscript } from '../src/api/mappers.js';
-import { formatRetryClock, scheduledRetryPhrase, todoRetryPhrase } from '../src/board/retry-copy.js';
+import {
+  formatRetryClock,
+  parkedRetryCopy,
+  scheduledFailureHeadline,
+  scheduledRetryPhrase,
+  todoRetryPhrase,
+} from '../src/board/retry-copy.js';
 import { glyphOf, taskRowCopy, unfinishableLead } from '../src/board/tasks-sections.js';
 import { StatusGlyph } from '../src/components/status-glyph.js';
 import { MessageScroller, MessageScrollerProvider } from '../src/components/ui/message-scroller.js';
@@ -125,5 +131,105 @@ describe('waiting-to-retry exact clock time and waiting visual treatment', () =>
     expect(parkedHtml).toContain('role="note"');
     expect(parkedHtml).not.toContain('data-waiting');
     expect(parkedHtml).toContain('环境初始化失败，已停止自动重试');
+  });
+
+  test('new retry reason codes render unified waiting headlines and missing_tool detail in zh and en', () => {
+    const newCodes: [RetryReasonCode, string, string][] = [
+      ['runtime_exited', '运行环境意外退出', 'Agent runtime exited unexpectedly'],
+      ['runtime_startup_timeout', '运行环境启动超时', 'Agent runtime startup timed out'],
+      ['stream_timeout', '模型响应超时', 'The model did not respond in time'],
+      ['silent_no_op', '本轮未返回结果', 'No output returned from this round'],
+    ];
+    for (const [code, zhText, enText] of newCodes) {
+      const headline = scheduledFailureHeadline(code);
+      expect(headline.key).toBe(zhText);
+      expect(EN[headline.key]).toBe(enText);
+      const record: TodoRecord = {
+        ...WAITING_TODO,
+        retry: {
+          state: 'scheduled',
+          failureClass: 'transient',
+          reasonCode: code,
+          attempt: 1,
+          maxAttempts: null,
+          nextRetryAt: RETRY_AT,
+          windowEndsAt: NOW + 6 * 3_600_000,
+        },
+      };
+      expect(renderTranscriptHtml(record, 'zh')).toContain(zhText);
+      expect(renderTranscriptHtml(record, 'en')).toContain(enText);
+    }
+
+    const missingTool = parkedRetryCopy({
+      state: 'parked',
+      failureClass: 'permanent',
+      reasonCode: 'missing_tool',
+      attemptsMade: 0,
+      detail: 'antigravity',
+    });
+    expect(missingTool.title).toEqual({
+      key: '缺少所需工具（{tool}），已停止自动重试',
+      params: { tool: 'antigravity' },
+    });
+    expect(EN[missingTool.title.key]).toContain('{tool}');
+  });
+
+  test('structured and legacy automatic-retry system rows render through NoticeLine with optional detail', () => {
+    const structured = automaticRetryRowContent({
+      attempt: 2,
+      maxAttempts: 3,
+      reasonCode: 'stream_timeout',
+      failureClass: 'transient',
+      detail: { runtime: 'antigravity', timeoutMs: 30_000 },
+      priorError: 'model response stream timed out after 30s',
+    });
+    const items = mapTranscript({
+      messages: [
+        { id: 'm1', role: 'user', content: '修一下', createdAt: NOW - 50_000 },
+        { id: 's1', role: 'system', content: structured, createdAt: NOW - 30_000 },
+        {
+          id: 's2',
+          role: 'system',
+          content: 'Automatic retry after rate limit',
+          createdAt: NOW - 10_000,
+        },
+      ],
+      steps: [],
+      build: { ...FAILED_BUILD, errorMessage: null },
+      todo: { ...todo(3, 'building') },
+      machineName: null,
+      userName: 'ian',
+      liveText: '',
+    });
+    const html = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(MessageScrollerProvider, {
+          children: createElement(MessageScroller, {
+            children: createElement(Transcript, { transcript: items }),
+          }),
+        }),
+      }),
+    );
+    expect(items).toContainEqual(
+      expect.objectContaining({
+        kind: 'automatic-retry',
+        attempt: 2,
+        maxAttempts: 3,
+        priorError: 'model response stream timed out after 30s',
+      }),
+    );
+    expect(items).toContainEqual(
+      expect.objectContaining({
+        kind: 'automatic-retry',
+        attempt: 0,
+        maxAttempts: null,
+        priorError: null,
+      }),
+    );
+    expect(html).toContain('data-testid="transcript-automatic-retry"');
+    expect(html).toContain('模型响应超时 · 自动重试（第 2/3 次）');
+    expect(html.match(/data-testid="failure-marker-detail"/g)).toHaveLength(1);
+    expect(html).toContain('已触发限流 · 自动重试');
   });
 });

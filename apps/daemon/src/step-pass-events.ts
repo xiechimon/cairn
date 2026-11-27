@@ -263,21 +263,19 @@ export async function consumeStepPassEvent(
       const isTrailingExit =
         (ev.error.processCrash === true || ev.error.failureCode === 'runtime_exited') &&
         s.lastError !== null;
-      if (!isTrailingExit) {
-        s.lastError = ev.error.message;
-        s.lastModelError = ev.error.message;
-        s.lastErrorWasProcessCrash = ev.error.processCrash === true;
-      }
+      logger.step(`error: ${ev.error.message} (retryable=${ev.error.retryable})`);
+      if (isTrailingExit) break;
+      s.lastError = ev.error.message;
+      s.lastModelError = ev.error.message;
+      s.lastErrorWasProcessCrash = ev.error.processCrash === true;
       if (
         ev.error.failureCode !== undefined &&
-        !isTrailingExit &&
         (s.failureCode === null ||
           (s.failureCode === 'runtime_exited' && ev.error.failureCode !== 'runtime_exited'))
       ) {
         s.failureCode = ev.error.failureCode;
         s.failureDetail = ev.error.failureDetail ?? null;
       }
-      logger.step(`error: ${ev.error.message} (retryable=${ev.error.retryable})`);
       {
         const failureKind = s.lastErrorWasProcessCrash
           ? 'other'

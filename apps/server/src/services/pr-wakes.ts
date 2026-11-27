@@ -260,7 +260,8 @@ export function settlePrWakeNotices(deps: BuildDeps, teamId: string): void {
         !current ||
         current.latestBuildId !== row.buildId ||
         currentBuild?.prNumber !== row.number ||
-        automaticRestartBlocked(currentBuild?.errorMessage ?? '') ||
+        currentBuild?.retryParkReason != null ||
+        automaticRestartBlocked(currentBuild?.errorMessage ?? '', currentBuild?.failureCode) ||
         current.archivedAt !== null ||
         current.phase === 'closed' ||
         blockingWorkerQuestions(deps.db, row.buildId).length > 0 ||
@@ -527,7 +528,8 @@ export function createPrWakes(deps: BuildDeps) {
         currentPr.repo !== row.repo ||
         currentPr.head !== row.head ||
         currentBuild?.prNumber !== row.number ||
-        automaticRestartBlocked(currentBuild?.errorMessage ?? '')
+        currentBuild?.retryParkReason != null ||
+        automaticRestartBlocked(currentBuild?.errorMessage ?? '', currentBuild?.failureCode)
       )
         return;
       const active = deps.db

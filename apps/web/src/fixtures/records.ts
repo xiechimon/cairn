@@ -469,6 +469,14 @@ export type TranscriptItem =
       vars?: Record<string, string>;
       id?: string;
     }
+  | {
+      kind: 'automatic-retry';
+      headline: { key: string; params?: Record<string, string | number> };
+      attempt: number;
+      maxAttempts: number | null;
+      priorError: string | null;
+      id?: string;
+    }
   | { kind: 'scheduled'; id?: string; stepId?: string }
   | { kind: 'scheduled-turn'; id: string; items: TranscriptItem[] }
   | { kind: 'automation-completed'; id: string }

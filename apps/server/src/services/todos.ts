@@ -390,6 +390,8 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
           .select({
             id: build.id,
             errorMessage: build.errorMessage,
+            failureCode: build.failureCode,
+            failureDetail: build.failureDetail,
             retryAttempt: build.retryAttempt,
             retryClass: build.retryClass,
             retryNextAt: build.retryNextAt,

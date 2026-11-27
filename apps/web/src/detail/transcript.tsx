@@ -64,7 +64,7 @@ const ROW_MARGIN_KINDS = new Set<TranscriptItem['kind']>([
 ]);
 
 function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): string {
-  if (prev?.kind === 'note') return 'mt-1.5';
+  if (prev?.kind === 'note' || prev?.kind === 'automatic-retry') return 'mt-1.5';
   switch (item.kind) {
     case 'robot':
     case 'streaming':
@@ -222,6 +222,35 @@ function Row({
           {t(item.text, item.vars)}
         </NoticeLine>
       );
+    case 'automatic-retry': {
+      const headline = t(item.headline.key, item.headline.params);
+      const label =
+        item.attempt > 0 && item.maxAttempts !== null
+          ? t('{reason} · 自动重试（第 {attempt}/{max} 次）', {
+              reason: headline,
+              attempt: item.attempt,
+              max: item.maxAttempts,
+            })
+          : item.attempt > 0
+            ? t('{reason} · 自动重试（第 {attempt} 次）', {
+                reason: headline,
+                attempt: item.attempt,
+              })
+            : t('{reason} · 自动重试', { reason: headline });
+      const priorError =
+        item.priorError != null && item.priorError.trim() !== '' ? item.priorError : null;
+      return (
+        <NoticeLine
+          layout="plain"
+          className="mt-5"
+          testId="transcript-automatic-retry"
+          detail={priorError !== null ? { lines: [], raw: priorError } : undefined}
+          detailTestId="automatic-retry-raw-error"
+        >
+          {label}
+        </NoticeLine>
+      );
+    }
     case 'step-prompt':
       return <StepPromptRow item={item} t={t} />;
     case 'scheduled':

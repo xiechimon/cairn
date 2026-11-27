@@ -196,7 +196,9 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     planContract,
   );
   if (gateFailure !== null) {
-    applyStepFailure(deps, stepRow, gateFailure, outcome.verdictReport);
+    applyStepFailure(deps, stepRow, gateFailure, outcome.verdictReport, undefined, {
+      code: 'gate_rejection',
+    });
     return;
   }
   deps.db

@@ -484,7 +484,13 @@ class AcpSession implements AgentSessionHandle {
           recorded !== null && !(error instanceof StepFailureError) && direct === null
             ? recorded.message
             : rawMessage;
-        const message = this.adapter ? baseMessage : acpErrorMessage(error);
+        const message = this.adapter
+          ? baseMessage
+          : acpErrorMessage(
+              recorded !== null && !(error instanceof StepFailureError) && direct === null
+                ? baseMessage
+                : error,
+            );
         const isAuth =
           this.adapter?.harness === 'antigravity'
             ? isAntigravityAuthError(error, rawMessage) ||
@@ -1368,7 +1374,7 @@ class AcpBackend implements AgentBackend {
         ? adapter.harness === 'antigravity'
           ? antigravityAcpErrorMessage(error, message)
           : message
-        : acpErrorMessage(error);
+        : acpErrorMessage(recorded !== null ? message : error);
       const finalMessage =
         recorded !== null || mapped !== message
           ? mapped

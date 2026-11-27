@@ -48,7 +48,7 @@ export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
 
 export function assertParkedBuildIdle(deps: BuildDeps, row: BuildRow): void {
   if (
-    (row.retryParkReason != null || retryIsParked(row.errorMessage ?? '')) &&
+    (row.retryParkReason != null || retryIsParked(row.errorMessage ?? '', row.failureCode)) &&
     hasActiveStep(deps, row.id)
   )
     throw new HttpError(

@@ -1,4 +1,11 @@
-import { chiefTurnErrorContentSchema, redactSecrets } from '@cairn/shared';
+import {
+  AUTOMATIC_RETRY_ROW_KIND,
+  BUILD_FAILURE_ROW_KIND,
+  chiefTurnErrorContentSchema,
+  redactSecrets,
+  type StepFailureDetail,
+  systemRowOf,
+} from '@cairn/shared';
 import {
   otelConfigEnv,
   otlpTraceIdOfBuild,
@@ -76,6 +83,8 @@ function teamBuild(db: Db, buildId: string, teamId: string) {
       title: todo.title,
       createdAt: build.createdAt,
       errorMessage: build.errorMessage,
+      failureCode: build.failureCode,
+      failureDetail: build.failureDetail,
       prNumber: build.prNumber,
       prUrl: build.prUrl,
     })
@@ -93,6 +102,17 @@ function teamThread(db: Db, threadId: string, teamId: string) {
     .get();
 }
 
+function redactedDetail(detail: StepFailureDetail | null): StepFailureDetail | null {
+  if (detail === null) return null;
+  return {
+    ...(detail.runtime !== undefined ? { runtime: clip(detail.runtime, 80) } : {}),
+    ...(detail.exitCode !== undefined ? { exitCode: detail.exitCode } : {}),
+    ...(detail.signal !== undefined ? { signal: clip(detail.signal, 80) } : {}),
+    ...(detail.tool !== undefined ? { tool: clip(detail.tool, 80) } : {}),
+    ...(detail.timeoutMs !== undefined ? { timeoutMs: detail.timeoutMs } : {}),
+  };
+}
+
 function stepLine(row: StepRow) {
   return {
     id: row.id,
@@ -106,6 +126,7 @@ function stepLine(row: StepRow) {
     claimCount: row.claimCount,
     holdCount: row.holdCount,
     holdReason: row.holdReason === null ? null : clip(row.holdReason),
+    failureCode: row.failureCode,
     quotaWait:
       row.quotaBlock === null
         ? null
@@ -214,6 +235,28 @@ function inspectBuild(
       continue;
     }
     if (m.role !== 'system' || events.length >= EVENT_LIMIT) continue;
+    const parsed = systemRowOf(m.content);
+    if (parsed?.kind === AUTOMATIC_RETRY_ROW_KIND) {
+      const count =
+        parsed.maxAttempts !== null
+          ? `${parsed.attempt}/${parsed.maxAttempts}`
+          : parsed.attempt > 0
+            ? String(parsed.attempt)
+            : 'rate-limit';
+      const detail = parsed.priorError ? `: ${parsed.priorError}` : '';
+      events.push({
+        at: iso(m.createdAt),
+        text: clip(`automatic retry (${count}, ${parsed.reasonCode})${detail}`),
+      });
+      continue;
+    }
+    if (parsed?.kind === BUILD_FAILURE_ROW_KIND) {
+      const reason = parsed.reason.trim();
+      if (reason !== '') {
+        events.push({ at: iso(m.createdAt), text: clip(`build failure: ${reason}`) });
+      }
+      continue;
+    }
     const text = messageText(m.content).trim();
     if (text === '' || text.startsWith('{')) continue;
     events.push({ at: iso(m.createdAt), text: clip(text) });
@@ -267,6 +310,8 @@ function inspectBuild(
       createdAt: iso(row.createdAt),
       prNumber: row.prNumber,
       prUrl: row.prUrl,
+      failureCode: row.failureCode,
+      failureDetail: redactedDetail(row.failureDetail),
     },
     cause,
     evidence,

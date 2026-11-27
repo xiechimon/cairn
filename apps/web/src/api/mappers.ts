@@ -23,6 +23,7 @@ import type {
 } from '@cairn/shared';
 import {
   ASK_USER_QUESTION_KIND,
+  AUTOMATIC_RETRY_ROW_KIND,
   askUserQuestionContentSchema,
   type BackgroundTask,
   BUILD_FAILURE_ROW_KIND,
@@ -96,6 +97,7 @@ import {
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
 import {
+  automaticRetryRowHeadline,
   parkedRetryCopy,
   scheduledFailureHeadline,
   scheduledRetryPhrase,
@@ -1301,6 +1303,15 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
           commits: row.commits.map((commit) => commit.slice(0, 9)),
           pr: row.pr?.number ?? null,
         },
+      };
+    case AUTOMATIC_RETRY_ROW_KIND:
+      return {
+        kind: 'automatic-retry',
+        headline: automaticRetryRowHeadline(row),
+        attempt: row.attempt,
+        maxAttempts: row.maxAttempts,
+        priorError: row.priorError,
+        id,
       };
   }
 }

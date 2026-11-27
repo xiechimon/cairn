@@ -46,7 +46,11 @@ export function sweepStalledRunningTodos(deps: BuildDeps, now: number = nowMs())
       .get();
     if (steer !== undefined) continue;
     db.update(build)
-      .set({ errorMessage: STALLED_RUN_MESSAGE })
+      .set({
+        errorMessage: STALLED_RUN_MESSAGE,
+        failureCode: 'runner_disconnect',
+        failureDetail: null,
+      })
       .where(and(eq(build.id, buildId), isNull(build.errorMessage)))
       .run();
     scheduleOrParkFailedBuild(deps, buildId, now);

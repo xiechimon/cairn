@@ -1,4 +1,4 @@
-import { WORKFLOW_PUSH_REFUSAL } from '@cairn/shared';
+import { AUTOMATIC_RETRY_ROW_KIND, systemRowOf, WORKFLOW_PUSH_REFUSAL } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -172,7 +172,14 @@ describe('automatic retry backoff and cap', () => {
         .from(message)
         .where(eq(message.conversationId, latestBuild(w)?.id ?? ''))
         .all()
-        .some((m) => String(m.content).includes('Automatic retry 1')),
+        .map((m) => systemRowOf(m.content))
+        .some(
+          (row) =>
+            row?.kind === AUTOMATIC_RETRY_ROW_KIND &&
+            row.attempt === 1 &&
+            row.reasonCode === 'network' &&
+            row.failureClass === 'transient',
+        ),
     ).toBe(true);
   });
 

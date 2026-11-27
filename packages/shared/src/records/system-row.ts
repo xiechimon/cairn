@@ -2,10 +2,20 @@ import { z } from 'zod';
 import { stripAnsiEscapes } from '../ansi.js';
 import type { GitCredentialSource } from '../git-ops.js';
 import type { WorkspaceHookNoteData } from '../protocol/executor.js';
+import { redactSecrets } from '../secret-redaction.js';
+import {
+  type RetryFailureClass,
+  type RetryReasonCode,
+  type StepFailureDetail,
+  stepFailureDetailSchema,
+} from '../task-failure.js';
+import { retryFailureClassSchema, retryReasonCodeSchema } from './todo.js';
 
 export const WORKSPACE_HOOK_ROW_KIND = 'workspace-hook';
 export const GIT_CREDENTIAL_ROW_KIND = 'git-credential-source';
 export const BUILD_FAILURE_ROW_KIND = 'build-failure';
+export const AUTOMATIC_RETRY_ROW_KIND = 'automatic-retry';
+const AUTOMATIC_RETRY_PRIOR_ERROR_MAX_CHARS = 400;
 
 const workspaceHookRowSchema = z.object({
   kind: z.literal(WORKSPACE_HOOK_ROW_KIND),
@@ -31,16 +41,61 @@ const buildFailureRowSchema = z.object({
   pr: z.object({ number: z.number().int(), url: z.string().nullable() }).nullable(),
 });
 
+const automaticRetryRowSchema = z.object({
+  kind: z.literal(AUTOMATIC_RETRY_ROW_KIND),
+  attempt: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive().nullable(),
+  reasonCode: retryReasonCodeSchema,
+  failureClass: retryFailureClassSchema,
+  detail: stepFailureDetailSchema.nullable(),
+  priorError: z.string().max(AUTOMATIC_RETRY_PRIOR_ERROR_MAX_CHARS).nullable(),
+});
+
 const systemRowSchema = z.discriminatedUnion('kind', [
   workspaceHookRowSchema,
   gitCredentialRowSchema,
   buildFailureRowSchema,
+  automaticRetryRowSchema,
 ]);
 
 export type WorkspaceHookRow = z.infer<typeof workspaceHookRowSchema>;
 export type GitCredentialRow = z.infer<typeof gitCredentialRowSchema>;
 export type BuildFailureRow = z.infer<typeof buildFailureRowSchema>;
+export type AutomaticRetryRow = z.infer<typeof automaticRetryRowSchema>;
 export type SystemRow = z.infer<typeof systemRowSchema>;
+
+function sanitizePriorError(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const cleaned = String(redactSecrets(stripAnsiEscapes(raw)).value).trim();
+  if (cleaned === '') return null;
+  if (cleaned.length <= AUTOMATIC_RETRY_PRIOR_ERROR_MAX_CHARS) return cleaned;
+  let out = '';
+  for (const ch of cleaned) {
+    if (out.length + ch.length > AUTOMATIC_RETRY_PRIOR_ERROR_MAX_CHARS - 1) break;
+    out += ch;
+  }
+  return `${out}…`;
+}
+
+export function automaticRetryRowContent(args: {
+  attempt: number;
+  maxAttempts: number | null;
+  reasonCode: RetryReasonCode;
+  failureClass: RetryFailureClass;
+  detail?: StepFailureDetail | null;
+  priorError?: string | null;
+}): string {
+  const row: AutomaticRetryRow = {
+    kind: AUTOMATIC_RETRY_ROW_KIND,
+    attempt: args.attempt,
+    maxAttempts: args.maxAttempts,
+    reasonCode: args.reasonCode,
+    failureClass: args.failureClass,
+    detail: args.detail ?? null,
+    priorError: sanitizePriorError(args.priorError),
+  };
+  return JSON.stringify(row);
+}
 
 export function workspaceHookRowContent(hook: WorkspaceHookNoteData, output = hook.output): string {
   const row: WorkspaceHookRow = {
@@ -86,6 +141,8 @@ const LEGACY_HOOK =
 const LEGACY_CREDENTIAL = /^git 凭据来源：(integration|machine)（/;
 const LEGACY_FAILURE_HEAD = '构建步兜底报告：';
 const LEGACY_REWORK_REASON = '上一轮失败原因：';
+const LEGACY_RETRY_COUNTS = /^Automatic retry (\d+)\/(\d+)$/;
+const LEGACY_RETRY_COUNT = /^Automatic retry (\d+)$/;
 
 const LEGACY_FAILURE_LABELS = ['失败原因：', '已知改动：', 'Commit: ', 'PR：', '下一步：'];
 
@@ -139,6 +196,41 @@ function legacySystemRow(text: string): SystemRow | null {
         .filter((line) => line.startsWith('- Commit: '))
         .map((line) => line.slice('- Commit: '.length).trim()),
       pr: pr === null ? null : { number: Number(pr[1]), url: pr[2] ?? null },
+    };
+  }
+  if (text === 'Automatic retry after rate limit') {
+    return {
+      kind: AUTOMATIC_RETRY_ROW_KIND,
+      attempt: 0,
+      maxAttempts: null,
+      reasonCode: 'rate_limit',
+      failureClass: 'rate_limit',
+      detail: null,
+      priorError: null,
+    };
+  }
+  const retryCounts = LEGACY_RETRY_COUNTS.exec(text);
+  if (retryCounts !== null) {
+    return {
+      kind: AUTOMATIC_RETRY_ROW_KIND,
+      attempt: Number(retryCounts[1]),
+      maxAttempts: Number(retryCounts[2]),
+      reasonCode: 'unknown',
+      failureClass: 'unknown',
+      detail: null,
+      priorError: null,
+    };
+  }
+  const retryCount = LEGACY_RETRY_COUNT.exec(text);
+  if (retryCount !== null) {
+    return {
+      kind: AUTOMATIC_RETRY_ROW_KIND,
+      attempt: Number(retryCount[1]),
+      maxAttempts: null,
+      reasonCode: 'unknown',
+      failureClass: 'transient',
+      detail: null,
+      priorError: null,
     };
   }
   return null;

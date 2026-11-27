@@ -1,13 +1,14 @@
 import {
   type BuildRecord,
   CHIEF_NOTICE_KIND,
-  classifyRetryFailure,
+  classifyRetryFailureWithCode,
   RETRY_AFTER_MAX_MS,
   RETRY_AFTER_MIN_MS,
   RETRY_PARKED_MARK,
   type RetryFailureClass,
   type RetryReasonCode,
   runtimeUpdateRequired,
+  type StepFailureCode,
   UNSTARTED_STEP_STATUSES,
   WORKFLOW_PUSH_REFUSAL,
 } from '@cairn/shared';
@@ -70,8 +71,11 @@ function workflowPushRefused(error: string): boolean {
   );
 }
 
-export function automaticRestartBlocked(error: string): boolean {
-  return workflowPushRefused(error) || retryIsParked(error);
+export function automaticRestartBlocked(
+  error: string,
+  failureCode?: StepFailureCode | null,
+): boolean {
+  return workflowPushRefused(error) || retryIsParked(error, failureCode);
 }
 
 export function assertPermanentRefusalCleared(error: string | null): void {
@@ -84,7 +88,10 @@ export function assertAutomaticRetryAllowed(deps: BuildDeps, todoId: string): vo
   if (row.phase === 'failed') parkFailedBuild(deps, row.latestBuildId);
   const latest = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
   assertPermanentRefusalCleared(latest?.errorMessage ?? null);
-  if (latest && (latest.retryParkReason != null || retryIsParked(latest.errorMessage ?? ''))) {
+  if (
+    latest &&
+    (latest.retryParkReason != null || retryIsParked(latest.errorMessage ?? '', latest.failureCode))
+  ) {
     const update = runtimeUpdateRequired(latest.errorMessage ?? '');
     throw new HttpError(
       409,
@@ -225,7 +232,7 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
   const error = row.errorMessage ?? '';
   const { failureClass, classified } = resolvedClassFor(row, now);
   const exhausted = budgetExhaustedReason(deps.db, row, now);
-  const permanentParked = retryIsParked(error);
+  const permanentParked = retryIsParked(error, row.failureCode);
   const breakerTripped = failures > FAILED_BUILDS_PER_HOUR_LIMIT;
   if (!permanentParked && exhausted === null && !breakerTripped) return false;
 
@@ -346,7 +353,7 @@ export function scheduleOrParkFailedBuild(
   if (!owner || owner.latestBuildId !== buildId || owner.archivedAt !== null) {
     return { parked: false, nextRetryAt: null };
   }
-  const classified = classifyRetryFailure(row.errorMessage ?? '', now);
+  const classified = classifyRetryFailureWithCode(row.errorMessage ?? '', row.failureCode, now);
   if (classified.failureClass === 'permanent') {
     deps.db
       .update(build)

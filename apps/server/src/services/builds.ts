@@ -253,7 +253,8 @@ export function enqueueStep(
   if (
     byPerson !== true &&
     current &&
-    (current.retryParkReason != null || automaticRestartBlocked(current.errorMessage ?? ''))
+    (current.retryParkReason != null ||
+      automaticRestartBlocked(current.errorMessage ?? '', current.failureCode))
   )
     throw new HttpError(409, current.errorMessage ?? 'Task parked');
   const id = newRecordId();

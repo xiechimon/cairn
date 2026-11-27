@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { SessionOpts, StepEvent } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { createAcpBackend } from '../src/backend/acp.js';
+import { createAcpBackend, createGeminiBackend } from '../src/backend/acp.js';
 import { SessionNotResumableError, StepFailureError } from '../src/backend/errors.js';
 
 const tempDirs: string[] = [];
@@ -329,5 +329,36 @@ describe('ACP structured failure codes (real child processes)', () => {
     const failure = caught as StepFailureError;
     expect(failure.failureCode).toBe('missing_tool');
     expect(failure.failureDetail).toEqual({ runtime: 'antigravity', tool: 'does-not-exist-agy' });
+  });
+
+  test('non-adapter Gemini preserves captured stderr message when stdout closes before exit', async () => {
+    const dir = tempDir('acp-gemini-eof-stderr');
+    const bin = writeExecutableScript(
+      dir,
+      'gemini-eof-stderr',
+      [
+        'process.stderr.write("Authentication required: not logged in\\n");',
+        'process.stdout.end();',
+        'setTimeout(() => process.exit(1), 40);',
+      ].join('\n'),
+    );
+    const backend = createGeminiBackend({
+      executablePath: bin,
+    });
+    let caught: unknown;
+    try {
+      await backend.createSession({
+        provider: { kind: 'api_key', providerId: 'google' },
+        modelId: 'gemini-2.5-pro',
+        cwd: dir,
+        prompt: 'Fix it.',
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(StepFailureError);
+    const failure = caught as StepFailureError;
+    expect(failure.failureCode).toBe('auth');
+    expect(failure.message).toContain('Authentication required: not logged in');
   });
 });
