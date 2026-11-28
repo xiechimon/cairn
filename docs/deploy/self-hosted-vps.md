@@ -14,8 +14,8 @@ Run the single-tenant Cairn server behind Caddy automatic HTTPS on any Linux VPS
 Clone the repository onto the VPS and create `deploy/vps/.env` from the example file:
 
 ```sh
-git clone https://github.com/xiechimon/cairn.git cairn
-cd cairn/deploy/vps
+git clone https://github.com/xiechimon/cairn.git ~/cairn
+cd ~/cairn/deploy/vps
 cp .env.example .env
 ```
 
@@ -106,11 +106,21 @@ All server state lives in the `cairn-data` volume, so rebuilding the image keeps
 docker compose logs -f cairn
 ```
 
-Export a whole-account archive (step 4) before an upgrade that touches storage. If the container exits instead of turning healthy, that log names the failing step; restore the volume from your snapshot, check out the previous release tag, and rebuild to get the earlier version back.
+Before upgrading, export a whole-account archive (step 4) and take a snapshot of `cairn-data` with Cairn stopped if you need to be able to roll back in place. If Cairn exits instead of turning healthy, check its logs, stop the failed deployment, restore the pre-upgrade volume snapshot, and rebuild from the previous release. Do not run the older image against a volume the new version has already migrated.
 
 ## Troubleshooting
 
 - **`cairn` container exits immediately with code 1**: `CAIRN_REQUIRE_TOKEN=1` requires non-empty `CAIRN_TOKEN` in `deploy/vps/.env` (the container never generates a default token on a non-loopback server). Check `docker compose logs cairn`.
 - **HTTPS handshake or ACME challenge fails**: verify DNS resolves `CAIRN_DOMAIN` to the VPS and host/cloud firewall allows inbound TCP `80` and `443`.
-- **Sign-in returns 403 behind your own reverse proxy or a nonstandard port**: the server compares the request's `Origin` with the public origin it was configured with. The compose template fills `CAIRN_WEB_ORIGIN` from `CAIRN_DOMAIN`, so fronting Cairn with another proxy on a different port means setting `CAIRN_WEB_ORIGIN` in `deploy/vps/.env` to the exact origin you open, port included, for example `https://cairn.example.com:8443`.
+- **Sign-in returns 403 behind your own reverse proxy or a nonstandard port**: the Compose template sets the allowed browser origin to `https://<CAIRN_DOMAIN>`. If your proxy exposes a different origin, keep `CAIRN_DOMAIN` as the hostname Caddy serves and create `deploy/vps/compose.override.yaml` next to `docker-compose.yml`:
+
+  ```yaml
+  services:
+    cairn:
+      environment:
+        CAIRN_WEB_ORIGIN: https://cairn.example.com:8443
+  ```
+
+  Replace the example with the exact origin in your browser (scheme, hostname, and non-default port, without `/app`). If you already use a Compose override file, add the setting to that file instead. Run `docker compose up -d` from `deploy/vps` to recreate Cairn with the new setting.
+
 - **Real-time task logs stall behind custom proxies**: `deploy/vps/Caddyfile` configures `flush_interval -1` for SSE responses. Keep unbuffered streaming enabled if you place another reverse proxy or CDN in front of Caddy.
