@@ -6,7 +6,7 @@ import {
   transcriptPromptRowId,
 } from '@cairn/shared';
 import { desc, eq } from 'drizzle-orm';
-import { build, plan as planTable, step } from '../db/schema.js';
+import { build, chiefMessage, message, plan as planTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
@@ -125,7 +125,25 @@ function storeTranscriptUpload(
   const conversationId = stepRow?.buildId;
   if (!conversationId) throw new NotFoundError(`step ${upload.stepId}`);
   for (const m of body.messages) {
-    if (isChiefConversation(conversationId)) {
+    const isChief = isChiefConversation(conversationId);
+    const existing = isChief
+      ? deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, m.id)).get()
+      : deps.db.select().from(message).where(eq(message.id, m.id)).get();
+    const source = existing?.fileSource;
+    const fileSource =
+      m.role === 'assistant' &&
+      existing !== undefined &&
+      upload.generation !== undefined &&
+      source?.stepId === upload.stepId &&
+      source.machineId === upload.machineId &&
+      source.generation === upload.generation &&
+      stepRow?.claimedAt === upload.generation &&
+      (isChief
+        ? 'threadId' in existing && existing.threadId === conversationId
+        : 'conversationId' in existing && existing.conversationId === conversationId)
+        ? source
+        : null;
+    if (isChief) {
       upsertChiefRow(deps, {
         id: m.id,
         threadId: conversationId,
@@ -133,6 +151,7 @@ function storeTranscriptUpload(
         content: m.content,
         createdAt: m.createdAt,
         projectId: stepScopeProjectId(stepRow),
+        fileSource,
         origin:
           m.role === 'user' && m.id === transcriptPromptRowId(body.stepId) ? 'task-prompt' : null,
       });
@@ -144,6 +163,7 @@ function storeTranscriptUpload(
       role: m.role,
       content: m.content,
       createdAt: m.createdAt,
+      fileSource,
       origin:
         m.role === 'user' && m.id === transcriptPromptRowId(body.stepId) ? 'task-prompt' : null,
     });

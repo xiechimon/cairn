@@ -7,6 +7,7 @@ import { coordinatorToolDefs } from '../src/services/coordinator-tool-defs.js';
 import { nativeFileSource, runnerFileSource } from '../src/services/file-source.js';
 import { receiveComputerFrames } from '../src/services/machine-computer.js';
 import { ownedStepRow, upsertChiefRow } from '../src/services/machine-deps.js';
+import { receiveUpload } from '../src/services/machine-uploads.js';
 import { storeTranscriptRow } from '../src/services/machines.js';
 import { WORKSPACE_CWD_UNSUPPORTED, workspaceCwdRefusal } from '../src/services/own-computer.js';
 import { bootServer, postProject, req } from './helpers.js';
@@ -393,6 +394,72 @@ test('native Coordinator provenance needs one consistent runner and workspace in
     });
     expect(nativeFileSource(s.db, owned()).machineId).toBeNull();
     void publish;
+  } finally {
+    s.dispose();
+  }
+});
+
+test('final transcript upload preserves only the same attempt’s streamed workspace authority', async () => {
+  const { s, publish, stored, history } = await world();
+  try {
+    const deps = {
+      ...s.svc,
+      box: s.secretBox,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+    };
+    const row = {
+      id: 'source-message',
+      role: 'assistant' as const,
+      createdAt: 2,
+      content: [{ type: 'text' as const, text: 'Saved `workspace-preview-wM0.md`.' }],
+    };
+    expect(
+      (await publish('source-step', 100, WORKSPACE_A, row.id, row.content[0]!.text)).status,
+    ).toBe(200);
+    receiveUpload(
+      deps,
+      {
+        stepId: 'source-step',
+        machineId: 'source-runner',
+        name: 'transcript.json',
+        generation: 100,
+      },
+      { stepId: 'source-step', messages: [row] },
+    );
+    expect(stored()?.fileSource?.workspace).toBe(WORKSPACE_A);
+    expect((await history()).messages[0]?.workspaceFilePaths).toEqual(['workspace-preview-wM0.md']);
+    s.db.update(step).set({ claimedAt: 200 }).where(eq(step.id, 'source-step')).run();
+    receiveUpload(
+      deps,
+      {
+        stepId: 'source-step',
+        machineId: 'source-runner',
+        name: 'transcript.json',
+        generation: 200,
+      },
+      { stepId: 'source-step', messages: [row] },
+    );
+    expect(stored()?.fileSource).toBeNull();
+    expect((await history()).messages[0]).not.toHaveProperty('workspaceFilePaths');
+    expect(
+      (await publish('source-step', 200, WORKSPACE_B, row.id, row.content[0]!.text)).status,
+    ).toBe(200);
+    expect(stored()?.fileSource).toBeNull();
+    receiveUpload(
+      deps,
+      {
+        stepId: 'source-step',
+        machineId: 'source-runner',
+        name: 'transcript.json',
+        generation: 200,
+      },
+      { stepId: 'source-step', messages: [{ ...row, id: 'fallback-only' }] },
+    );
+    expect(stored('fallback-only')?.fileSource).toBeNull();
+    expect(
+      (await history()).messages.find((item) => item.id === 'fallback-only'),
+    ).not.toHaveProperty('workspaceFilePaths');
   } finally {
     s.dispose();
   }
