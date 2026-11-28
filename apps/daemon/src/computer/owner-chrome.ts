@@ -400,7 +400,7 @@ async function runInOwnerTab(
   const call: OwnerChromeCaller = async (...request) => {
     const answer = await reach(...request);
     if (answer.isError) {
-      if (SUCCESSFUL_MUTATING_LINE.test(answer.text)) ran += 1;
+      if (SUCCESSFUL_MUTATING_LINE.test(machineAnswerText(answer.text))) ran += 1;
     } else if (request[1].some((command) => MUTATING_COMMAND.test(command))) {
       ran += 1;
     }
