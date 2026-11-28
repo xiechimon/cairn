@@ -2,6 +2,7 @@ import {
   CHIEF_MESSAGE_READ,
   CHIEF_REMOTE_TOOLS,
   CHIEF_TOOL_COUNT,
+  CORE_COORDINATOR_TOOLS,
   SUBAGENT_TIMEOUT_DEFAULT_SEC,
   SUBAGENT_TIMEOUT_MAX_SEC,
   SUBAGENT_TOOL_DEF,
@@ -240,12 +241,16 @@ describe('Coordinator responsiveness contracts, prompt, tools, mirror, and runti
     expect(asking).toMatch(/need itself is ambiguous/i);
     expect(asking).toMatch(/spend money.*credentials.*irreversible.*other people/i);
     expect(tools).toMatch(/recurring requests.*Cairn's schedule_todo.*deferred.*tool_search/i);
+    expect(tools).toMatch(/create the cairn schedule in that same turn/i);
+    expect(tools).toMatch(/do not ask for the list or for confirmation first/i);
     expect(tools).toMatch(/recurring brief or research.*current Coordinator thread/i);
     expect(tools).toMatch(/not in a separate task or in a provider's scheduler/i);
     expect(tools).toMatch(/a provider's own scheduler is not cairn/i);
     expect(tools).toMatch(/never create one even when the provider's skill or toolset offers it/i);
     expect(tools).toMatch(/defaults you chose in the scheduled instructions/i);
     expect(tools).toMatch(/confirm.*only after Cairn returns the schedule record/i);
+    expect(CORE_COORDINATOR_TOOLS.has('schedule_todo')).toBe(true);
+    expect(CORE_COORDINATOR_TOOLS.has('unschedule_todo')).toBe(true);
   });
 
   it('notify_user in user turns dedupes by toolCallId and relays to IM without desktop notification banners while keeping event-turn provenance and legacy fallback', async () => {

@@ -54,6 +54,8 @@ export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
   'request_secret',
   'memories',
   'skills',
+  'schedule_todo',
+  'unschedule_todo',
   'attachment',
   'user_computer_shell',
   'attach_file',
