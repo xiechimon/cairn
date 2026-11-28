@@ -1109,8 +1109,8 @@ Reach:
 
 - Web routes: `/app/resources/skills`
 - Settings: `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills)
-- Keyboard shortcuts in its code: none
-- Test ids in its code: `resource-empty`, `resource-import`, `skill-candidate`, `skill-candidate-all`, `skill-candidates`, `skill-candidates-empty`, `skill-import-source`, `skill-search-empty`
+- Keyboard shortcuts in its code: `D`
+- Test ids in its code: `resource-empty`, `resource-import`, `skill-candidate`, `skill-candidate-all`, `skill-candidates`, `skill-candidates-empty`, `skill-import-source`, `skill-row-menu`, `skill-row-menu-delete`, `skill-search-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/skills-page.md](features/skills-page.md), [.claude/skills/verify-cairn/features/skill-import.md](features/skill-import.md), [.claude/skills/verify-cairn/features/skills-injection.md](features/skills-injection.md)
 - Research: **gap**: no current note on how Amp, t3code and Claude Code manage skills across machines
 - Frontend design: [docs/spec/13-resources-view-localization.md](../../../docs/spec/13-resources-view-localization.md)

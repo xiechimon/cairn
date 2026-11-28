@@ -530,6 +530,7 @@ async function runClaimedStep(
     await failStep(deps, heartbeat, stepId, tooling.error, reapTree);
     return;
   }
+  stepCleanups.push(tooling.releaseSkills);
   const {
     teamSkillsDir,
     stepIdentity,

@@ -12,6 +12,12 @@
       "reason": "ResourceRow button form (#1416): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule (last:border-b-0 keeps the last row clean), and a divider on a rounded box would curl up at both ends, so the box stays square. The card's --radius-card corners stay the visible shape."
     },
     {
+      "file": "apps/web/src/resources/parts.tsx",
+      "anchor": "h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent",
+      "kind": "deviation",
+      "reason": "ResourceRow button form when the row carries a menu (#1416): the wrapper div draws the divider and the Button inside stays square and transparent, so its hover fill covers the row edge to edge (V21) instead of showing rounded corners over the divider. The card's --radius-card corners stay the visible shape."
+    },
+    {
       "file": "apps/web/src/board/design/design-frame.tsx",
       "anchor": "absolute top-0 left-0 block origin-top-left border-0 bg-(--page-preview)",
       "kind": "deviation",

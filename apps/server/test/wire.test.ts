@@ -92,6 +92,7 @@ const INFERRED_ROUTES = [
   'POST /api/actions/journal/{id}/undo',
   'DELETE /api/schedules/{id}',
   'POST /api/schedules/{id}/run',
+  'DELETE /api/teams/{id}/skills/{sid}',
   'DELETE /api/teams/{id}/providers/{pid}',
   'POST /api/teams/{id}/providers/{pid}/test',
   'GET /api/teams/{id}/providers/{pid}/upstream-models',

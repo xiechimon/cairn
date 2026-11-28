@@ -39,6 +39,8 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/step-env.ts:AMBIENT_GOOGLE_AUTH':
     'constant environment-variable name lookup; never mutated or populated from an instance',
   'apps/daemon/src/step-pass-events.ts:CHANGE_TOOLS': 'constant lookup table',
+  'apps/daemon/src/team-skills.ts:heldCachePaths':
+    'refcounted holds on cache views that steps in this daemon process are using; the process is the instance and every hold is released by its step cleanup',
   'apps/daemon/src/supervisor.ts:SYSTEMD_OWNED_ENV': 'constant lookup table',
   'apps/server/src/coordinator/runtime/cold-slim.ts:TOOL_RESULT_EXEMPT': 'constant lookup table',
   'apps/server/src/coordinator/runtime/failure-report.ts:counts':

@@ -2090,6 +2090,30 @@ export function useApiMutations(teamId: string | undefined) {
         ),
       onSuccess: invalidateAll,
     }),
+    deleteSkill: useMutation({
+      meta: { action: '删除技能' },
+      mutationFn: (id: string) =>
+        api.del<{ id: string; trashedTo: string; systemTrash: boolean }>(
+          `/api/teams/${teamId}/skills/${encodeURIComponent(id)}`,
+        ),
+      onMutate: async (id: string) => {
+        await qc.cancelQueries({ queryKey: ['skills'] });
+        const previous = qc.getQueryData<SkillRecord[]>(['skills', teamId]);
+        qc.setQueryData<SkillRecord[]>(['skills', teamId], (rows) =>
+          rows?.filter((row) => row.id !== id),
+        );
+        return { previous };
+      },
+      onError: (error, _id, context) => {
+        if (error instanceof ApiError && error.status === 404) return;
+        if (context?.previous !== undefined) {
+          qc.setQueryData<SkillRecord[]>(['skills', teamId], context.previous);
+        }
+      },
+      onSettled: () => {
+        void qc.invalidateQueries({ queryKey: ['skills'] });
+      },
+    }),
     importSkill: useMutation({
       meta: { action: '导入技能' },
       mutationFn: (body: ImportSkillBody) =>

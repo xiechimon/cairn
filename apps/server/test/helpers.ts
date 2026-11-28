@@ -88,6 +88,7 @@ export function bootServer(
     resolveWorkspacesDir?: () => string;
     skillImportFetch?: AppContext['skillImportFetch'];
     skillImportTimeoutMs?: number;
+    skillTrash?: AppContext['skillTrash'];
     webDir?: string | null;
     githubFetch?: AppContext['githubFetch'];
     githubBaseFetch?: AppContext['githubBaseFetch'];
@@ -244,6 +245,7 @@ export function bootServer(
       ...(opts.skillImportTimeoutMs !== undefined
         ? { skillImportTimeoutMs: opts.skillImportTimeoutMs }
         : {}),
+      ...(opts.skillTrash !== undefined ? { skillTrash: opts.skillTrash } : {}),
       reposDir,
       attachmentsDir,
       pageThumbnails: createPageThumbnails({ attachmentsDir, capture: opts.capturePage }),

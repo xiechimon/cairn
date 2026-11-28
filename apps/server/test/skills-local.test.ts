@@ -51,6 +51,16 @@ describe('the scanLocalSkills directory scan', () => {
     expect(scanLocalSkills(empty)).toEqual([]);
   });
 
+  test('S14: a missing skills directory stays an empty set even in strict mode, while an unreadable one fails the machine manifest instead of reading as empty', () => {
+    const root = makeRoot();
+    expect(scanLocalSkills(join(root, 'nope'), { strict: true })).toEqual([]);
+    const filePath = join(root, 'a-file');
+    writeFileSync(filePath, 'x');
+    expect(() => scanLocalSkills(filePath, { strict: true })).toThrow(
+      /could not read the skills directory/,
+    );
+  });
+
   test('S4: subdirectories without SKILL.md are not listed; lowercase skill.md is not recognized', () => {
     const root = makeRoot();
     mkdirSync(join(root, 'bare'));
@@ -116,12 +126,12 @@ describe('the scanLocalSkills directory scan', () => {
     expect(scanned[0]).toMatchObject({ id: 'dup', dirName: 'aaa' });
   });
 
-  test('S11: symlinked directories are listed only while their realpath stays inside the root; realpath dedupe counts one', () => {
+  test('S11: symlinked directories are listed only while their realpath stays inside the root; realpath dedupe counts one and the real folder keeps the row', () => {
     const root = makeRoot();
     const real = addSkill(root, 'real', { name: 'linked-skill' });
     symlinkSync(real, join(root, 'alias'));
     expect(scanLocalSkills(root)).toMatchObject([
-      { id: 'linked-skill', name: 'linked-skill', description: null, dirName: 'alias' },
+      { id: 'linked-skill', name: 'linked-skill', description: null, dirName: 'real' },
     ]);
     const outside = makeRoot();
     const outsideDir = addSkill(outside, 'outside-skill', { name: 'outside' });

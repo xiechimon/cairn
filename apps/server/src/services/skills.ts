@@ -24,6 +24,7 @@ import {
 } from '@cairn/shared';
 import { realpathOfNearest } from '@cairn/shared/realpath-nearest';
 import { parseSkillFrontmatter } from '@cairn/shared/skill-frontmatter';
+import { isCairnTrashPath, moveToTrash } from '@cairn/shared/trash';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { skillAudit } from '../db/schema.js';
@@ -31,6 +32,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { samePathOrInside } from '../lib/local-source.js';
 import { NotFoundError } from './builds.js';
+import { removeSkillSource } from './skill-source-store.js';
 
 export interface LocalSkill {
   id: string;
@@ -40,30 +42,46 @@ export interface LocalSkill {
   dir: string;
 }
 
-export function scanLocalSkills(skillsDir: string): LocalSkill[] {
-  return scanSkillsRoot(skillsDir, { within: skillsDir }).sort((a, b) => a.id.localeCompare(b.id));
+export function scanLocalSkills(skillsDir: string, opts: { strict?: boolean } = {}): LocalSkill[] {
+  return scanSkillsRoot(skillsDir, { within: skillsDir, strict: opts.strict }).sort((a, b) =>
+    a.id.localeCompare(b.id),
+  );
 }
 
-export function scanSkillsRoot(skillsDir: string, opts: { within?: string } = {}): LocalSkill[] {
+export function scanSkillsRoot(
+  skillsDir: string,
+  opts: { within?: string; strict?: boolean } = {},
+): LocalSkill[] {
+  const failed = (what: string, err: unknown): LocalSkill[] => {
+    if (!opts.strict) return [];
+    if ((err as NodeJS.ErrnoException | null)?.code === 'ENOENT') return [];
+    throw new HttpError(500, `could not read the skills directory (${what}): ${String(err)}`);
+  };
   let entryNames: string[];
   try {
     entryNames = readdirSync(skillsDir, { withFileTypes: true }).map((e) => e.name);
-  } catch {
-    return [];
+  } catch (err) {
+    return failed(skillsDir, err);
   }
   let boundReal: string;
   try {
     boundReal = realpathSync(opts.within ?? skillsDir);
-  } catch {
-    return [];
+  } catch (err) {
+    return failed(opts.within ?? skillsDir, err);
   }
   const dirNames: string[] = [];
+  const linked = new Set<string>();
   for (const name of entryNames) {
     try {
-      if (statSync(join(skillsDir, name)).isDirectory()) dirNames.push(name);
+      if (!statSync(join(skillsDir, name)).isDirectory()) continue;
+      if (lstatSync(join(skillsDir, name)).isSymbolicLink()) linked.add(name);
+      dirNames.push(name);
     } catch {}
   }
-  dirNames.sort((a, b) => a.localeCompare(b));
+  dirNames.sort((a, b) => {
+    const byLink = (linked.has(a) ? 1 : 0) - (linked.has(b) ? 1 : 0);
+    return byLink !== 0 ? byLink : a.localeCompare(b);
+  });
   const out: LocalSkill[] = [];
   const seenReal = new Set<string>();
   const seenId = new Set<string>();
@@ -120,6 +138,19 @@ function isInsideSharedSkillRoot(path: string): boolean {
     );
   } catch {
     return true;
+  }
+}
+
+function assertCairnOwnsEntry(path: string): void {
+  const parent = realpathOfNearest(dirname(path));
+  const shared = sharedAgentSkillRoots().some((root) =>
+    samePathOrInside(parent, realpathOfNearest(root)),
+  );
+  if (shared) {
+    throw new HttpError(
+      409,
+      `refusing to delete ${path}: it lives in a skills directory that other agent tools share (~/.agents/skills or ~/.claude/skills), which Cairn only reads`,
+    );
   }
 }
 
@@ -376,7 +407,7 @@ function insertSkillAudit(
   row: {
     skillId: string;
     actor: SkillAuditActor;
-    action: 'create' | 'update';
+    action: 'create' | 'update' | 'delete';
     bytes: number;
   },
 ): void {
@@ -501,4 +532,53 @@ export function updateLocalSkill(
     name,
     description,
   });
+}
+
+export interface DeleteSkillOpts {
+  db: Db;
+  skillsDir: string;
+  skillSourcesPath: string;
+  teamId: string;
+  actor: SkillAuditActor;
+  cairnHome?: string;
+  trash?: (path: string) => string;
+  logger?: { warn(fields: object, message: string): void };
+}
+
+export async function deleteLocalSkill(
+  opts: DeleteSkillOpts,
+  skillId: string,
+): Promise<{ id: string; trashedTo: string; systemTrash: boolean }> {
+  const resolved = resolveLocalSkill(opts.skillsDir, skillId);
+  if (!resolved) throw new NotFoundError(`skill ${skillId}`);
+  assertCairnOwnsEntry(resolved.dir);
+  const bytes = listSkillFiles(resolved.dir).reduce(
+    (total, file) =>
+      total + (statSync(join(resolved.dir, file), { throwIfNoEntry: false })?.size ?? 0),
+    0,
+  );
+  const trash = opts.trash ?? ((path: string) => moveToTrash(path, { cairnHome: opts.cairnHome }));
+  let trashedTo: string;
+  try {
+    trashedTo = trash(resolved.dir);
+  } catch (error) {
+    throw new HttpError(
+      500,
+      `could not move skill ${skillId} to the Trash: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  try {
+    await removeSkillSource(opts.skillSourcesPath, skillId);
+  } catch (error) {
+    opts.logger?.warn(
+      { skillId, error },
+      'skill delete: could not remove the import source record',
+    );
+  }
+  insertSkillAudit(opts.db, { skillId, actor: opts.actor, action: 'delete', bytes });
+  return {
+    id: skillId,
+    trashedTo,
+    systemTrash: !isCairnTrashPath(trashedTo, { cairnHome: opts.cairnHome }),
+  };
 }

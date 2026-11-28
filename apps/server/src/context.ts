@@ -96,6 +96,7 @@ export interface AppContext {
   dataDir?: string | undefined;
   skillImportFetch?: SkillImportFetch;
   skillImportTimeoutMs?: number;
+  skillTrash?: (path: string) => string;
   webDir?: string | null;
   webOrigin?: string;
   trustedProxies?: ReadonlySet<string>;

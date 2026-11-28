@@ -64,3 +64,15 @@ export function writeSkillSource(path: string, record: SkillSourceRecord): Promi
   writeChain = task.catch(() => {});
   return task;
 }
+
+export function removeSkillSource(path: string, skillId: string): Promise<void> {
+  const task = writeChain.then(() => {
+    const file = readFile(path);
+    if (file.sources[skillId] === undefined) return;
+    const sources = { ...file.sources };
+    delete sources[skillId];
+    writeFileAtomic(path, { version: 1, sources });
+  });
+  writeChain = task.catch(() => {});
+  return task;
+}

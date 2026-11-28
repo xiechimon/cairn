@@ -1,10 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
   copyFileSync,
+  type Dirent,
   existsSync,
   linkSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   renameSync,
   rmSync,
   statSync,
@@ -34,14 +36,120 @@ export interface MaterializeTeamSkillsOpts {
   maxBlobEntries?: number;
 }
 
+const heldCachePaths = new Map<string, number>();
+
+export function holdTeamSkillsCache(paths: readonly (string | null | undefined)[]): () => void {
+  const held: string[] = [];
+  for (const path of paths) {
+    if (path !== null && path !== undefined) {
+      holdPath(path);
+      held.push(path);
+    }
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    for (const path of held) releaseTeamSkillsCache(path);
+  };
+}
+
+export function releaseTeamSkillsCache(path: string): void {
+  const count = (heldCachePaths.get(path) ?? 0) - 1;
+  if (count > 0) heldCachePaths.set(path, count);
+  else heldCachePaths.delete(path);
+}
+
+function holdPath(path: string): void {
+  heldCachePaths.set(path, (heldCachePaths.get(path) ?? 0) + 1);
+}
+
+export interface PurgeTeamSkillsOpts {
+  cacheRoot: string;
+  dirNames: readonly string[];
+  keepView?: string | null;
+  log?: (msg: string) => void;
+}
+
+export function purgeTeamSkillsCopies(opts: PurgeTeamSkillsOpts): { removed: number } {
+  const keep = new Set(opts.dirNames);
+  const log = opts.log;
+  let removed = 0;
+  const copiesIn = (dir: string): Dirent[] =>
+    entriesIn(dir).filter((entry) => entry.isDirectory() && !entry.name.startsWith('.tmp-'));
+  const carriesDeletedSkill = (dir: string): boolean =>
+    copiesIn(dir).some((entry) => !keep.has(entry.name));
+  const stillUsed = (dir: string): boolean => heldCachePaths.has(dir);
+  const drop = (path: string, copies: number): void => {
+    try {
+      rmSync(path, { recursive: true, force: true });
+      removed += copies;
+    } catch (err) {
+      log?.(
+        `team-purge: could not remove ${path}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  };
+  const viewsRoot = join(opts.cacheRoot, 'views');
+  for (const entry of copiesIn(viewsRoot)) {
+    const view = join(viewsRoot, entry.name);
+    if (view === opts.keepView || stillUsed(view) || !carriesDeletedSkill(view)) continue;
+    drop(view, copiesIn(view).length);
+  }
+  const pluginsRoot = join(opts.cacheRoot, 'plugins');
+  for (const entry of copiesIn(pluginsRoot)) {
+    const plugin = join(pluginsRoot, entry.name);
+    if (stillUsed(plugin)) continue;
+    const skills = join(plugin, 'skills');
+    const names = copiesIn(skills);
+    const hasDeleted = names.some((skill) => !keep.has(skill.name));
+    const sourceView = readPluginSourceView(plugin);
+    const sourceGone = sourceView === null || !existsSync(join(viewsRoot, sourceView));
+    if (!hasDeleted || !sourceGone) continue;
+    drop(plugin, names.length);
+  }
+  if (removed > 0) {
+    log?.(
+      `team-purge: removed ${removed} cached skill cop${removed === 1 ? 'y' : 'ies'} not in the current manifest`,
+    );
+  }
+  return { removed };
+}
+
+function readPluginSourceView(plugin: string): string | null {
+  try {
+    const manifest = JSON.parse(
+      readFileSync(join(plugin, '.claude-plugin', 'plugin.json'), 'utf8'),
+    ) as { sourceView?: unknown };
+    return typeof manifest.sourceView === 'string' ? manifest.sourceView : null;
+  } catch {
+    return null;
+  }
+}
+
+function entriesIn(dir: string): Dirent[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
 export async function materializeTeamSkills(
   opts: MaterializeTeamSkillsOpts,
 ): Promise<string | null> {
   const { cacheRoot, manifest, fetchFile, log } = opts;
+  const held = (path: string): string => {
+    holdPath(path);
+    return path;
+  };
   if (manifest.skills.length === 0) {
     log?.(
       `team-manifest-empty: server distributed zero skills (selection=${manifest.selection}) — running with local skills only`,
     );
+    if (manifest.selection === 'all') {
+      purgeTeamSkillsCopies({ cacheRoot, dirNames: [], log });
+    }
     return null;
   }
   const invalid = findUnsafeEntry(manifest);
@@ -54,7 +162,15 @@ export async function materializeTeamSkills(
   if (existsSync(target)) {
     touch(target);
     log?.(`team: ${countSkills(manifest)} skill(s) cache hit → ${target}`);
-    return target;
+    if (manifest.selection === 'all') {
+      purgeTeamSkillsCopies({
+        cacheRoot,
+        dirNames: manifest.skills.map((skill) => skill.dirName),
+        keepView: target,
+        log,
+      });
+    }
+    return held(target);
   }
   mkdirSync(viewsRoot, { recursive: true });
   mkdirSync(blobsRoot, { recursive: true });
@@ -88,7 +204,7 @@ export async function materializeTeamSkills(
     if (existsSync(target)) {
       touch(target);
       log?.(`team: ${countSkills(manifest)} skill(s) cache hit → ${target}`);
-      return target;
+      return held(target);
     }
     if (err instanceof TeamSkillsError) throw err;
     throw new TeamSkillsError(
@@ -100,13 +216,21 @@ export async function materializeTeamSkills(
     `team: ${countSkills(manifest)} skill(s), ${fileTotal} file(s) materialized → ${target} ` +
       `(fetched ${fetched} file(s) / ${fetchedBytes} byte(s), reused ${reused})`,
   );
+  if (manifest.selection === 'all') {
+    purgeTeamSkillsCopies({
+      cacheRoot,
+      dirNames: manifest.skills.map((skill) => skill.dirName),
+      keepView: target,
+      log,
+    });
+  }
   pruneCache(
     cacheRoot,
     opts.maxEntries ?? TEAM_SKILLS_CACHE_MAX_ENTRIES,
     opts.maxBlobEntries ?? TEAM_SKILLS_BLOB_MAX_ENTRIES,
     log,
   );
-  return target;
+  return held(target);
 }
 
 function canonicalize(manifest: MachineSkillsManifestResponse): string {
@@ -268,6 +392,7 @@ export function ensureTeamSkillsPlugin(opts: EnsureTeamSkillsPluginOpts): string
           name: TEAM_SKILLS_PLUGIN_NAME,
           description: 'Materialized cairn team skills (native Skill discovery channel)',
           version: '0.0.0',
+          sourceView: basename(viewDir),
         },
         null,
         2,

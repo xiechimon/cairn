@@ -230,6 +230,7 @@ import {
 } from './services/skill-import.js';
 import {
   createLocalSkill,
+  deleteLocalSkill,
   listSkillFiles,
   readSkillFile,
   resolveLocalSkill,
@@ -573,6 +574,26 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       body,
     );
     return c.json(record);
+  });
+
+  app.delete('/api/teams/:id/skills/:sid', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c, 'delete skills on this machine');
+    const deleted = await deleteLocalSkill(
+      {
+        db: ctx.db,
+        skillsDir: ctx.skillsDir,
+        skillSourcesPath: ctx.skillSourcesPath,
+        teamId,
+        actor: { type: 'member', id: ctx.user.id },
+        cairnHome: ctx.homeDir,
+        trash: ctx.skillTrash,
+        logger: ctx.logger,
+      },
+      c.req.param('sid'),
+    );
+    return c.json(deleted);
   });
 
   app.get('/api/teams/:id/skills/:sid', (c) => {

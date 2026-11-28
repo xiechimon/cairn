@@ -34,12 +34,14 @@ export function ResourceRow({
   mcp = false,
   className,
   onOpen,
+  menu,
   children,
   ...rest
 }: {
   mcp?: boolean;
   className?: string;
   onOpen?: () => void;
+  menu?: ReactNode;
   children: ReactNode;
 } & Omit<ComponentProps<'div'>, 'className' | 'children' | 'onClick' | 'role'>) {
   const mark = mcp ? { 'data-mcp': '' } : {};
@@ -55,20 +57,45 @@ export function ResourceRow({
       </div>
     );
   }
+  if (menu === undefined) {
+    return (
+      <Button
+        variant="ghost"
+        data-testid="resource-row"
+        {...mark}
+        className={cn(
+          SETTINGS_ROW_CLS,
+          'h-auto w-full rounded-none border-0 border-b border-border text-left font-normal first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) last:border-b-0 hover:bg-menu-hover dark:hover:bg-menu-hover',
+          className,
+        )}
+        onClick={onOpen}
+      >
+        {children}
+      </Button>
+    );
+  }
   return (
-    <Button
-      variant="ghost"
+    <div
       data-testid="resource-row"
       {...mark}
       className={cn(
-        SETTINGS_ROW_CLS,
-        'h-auto w-full rounded-none border-0 border-b border-border text-left font-normal first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) last:border-b-0 hover:bg-menu-hover dark:hover:bg-menu-hover',
+        'flex items-center gap-1 border-b border-border pr-2 first:rounded-t-(--radius-card) last:rounded-b-(--radius-card) last:border-b-0 hover:bg-menu-hover dark:hover:bg-menu-hover',
         className,
       )}
-      onClick={onOpen}
+      {...rest}
     >
-      {children}
-    </Button>
+      <Button
+        variant="ghost"
+        className={cn(
+          SETTINGS_ROW_CLS,
+          'h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent text-left font-normal hover:bg-transparent dark:bg-transparent dark:hover:bg-transparent',
+        )}
+        onClick={onOpen}
+      >
+        {children}
+      </Button>
+      {menu}
+    </div>
   );
 }
 

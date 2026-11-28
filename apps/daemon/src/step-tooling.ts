@@ -13,7 +13,7 @@ import { type StepGitRunner, stepGitRunner } from './step-git-tools.js';
 import { assembleStepLocalTools, type StepLocalTools } from './step-local-tools.js';
 import { sessionInjectedSkills } from './step-skill-tool.js';
 import type { StepRepo } from './step-workspace.js';
-import { materializeTeamSkills } from './team-skills.js';
+import { materializeTeamSkills, releaseTeamSkillsCache } from './team-skills.js';
 
 type StepAgent = NonNullable<ClaimedStep['agent']>;
 
@@ -41,6 +41,7 @@ export interface StepToolingInput {
 
 export interface StepTooling {
   teamSkillsDir: string | null;
+  releaseSkills: () => void;
   stepIdentity: CommitIdentity;
   withStepGit: StepGitRunner;
   injectedSkills: StepAgent['injectedSkills'];
@@ -112,5 +113,14 @@ export async function prepareStepTooling(
           }
         : null,
   });
-  return { teamSkillsDir, stepIdentity, withStepGit, injectedSkills, localTools };
+  return {
+    teamSkillsDir,
+    releaseSkills: () => {
+      if (teamSkillsDir !== null) releaseTeamSkillsCache(teamSkillsDir);
+    },
+    stepIdentity,
+    withStepGit,
+    injectedSkills,
+    localTools,
+  };
 }

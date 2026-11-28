@@ -31,7 +31,8 @@
     "./host-identity": "./src/node/host-identity.ts",
     "./realpath-nearest": "./src/node/realpath-nearest.ts",
     "./shell-env": "./src/node/shell-env.ts",
-    "./plain-folder-path": "./src/node/plain-folder-path.ts"
+    "./plain-folder-path": "./src/node/plain-folder-path.ts",
+    "./trash": "./src/node/trash.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -1007,6 +1007,12 @@ export const EN: Record<string, string> = {
   记忆: 'Memory',
   记忆已更新: 'Memory updated',
   技能已更新: 'Skill updated',
+  '删除技能「{name}」？': 'Delete skill “{name}”?',
+  '技能从 Cairn 移除，文件移到废纸篓；你自己的文件夹不动。':
+    'The skill leaves Cairn and its files go to the Trash; your own folder is untouched.',
+  '副本不在废纸篓，已移到 {path}': 'The Trash would not take it, so the copy is at {path}',
+  '删除技能失败，请重试。': 'Could not delete the skill. Try again.',
+  删除技能: 'Delete skill',
   未设置: 'Not set',
   编辑: 'Edit',
   正在调用: 'Calling',

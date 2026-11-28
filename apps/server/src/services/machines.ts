@@ -1496,7 +1496,7 @@ function skillsSelection(
   deps: MachineDeps,
   row: ReturnType<typeof ownedStep>,
 ): { isChief: boolean; unrestricted: boolean; wanted: LocalSkill[] } {
-  const scanned = scanLocalSkills(deps.skillsDir);
+  const scanned = scanLocalSkills(deps.skillsDir, { strict: true });
   if (row.kind === 'chief') return { isChief: true, unrestricted: true, wanted: scanned };
   const buildRow = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
   if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
