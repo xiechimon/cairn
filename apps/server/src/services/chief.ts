@@ -1227,7 +1227,7 @@ export function submitChiefMessage(
   deps: ChiefDeps,
   teamId: string,
   body: ChiefSendBody,
-  opts: { ownerWords?: boolean } = {},
+  opts: { ownerWords?: boolean; ownerComposed?: boolean } = {},
 ): { result: ChiefSendResult; replayed: boolean } {
   const chiefRow = ensureChief(deps, teamId);
   const replay = replayedChiefSend(deps, teamId, chiefRow, body);
@@ -1286,6 +1286,7 @@ export function submitChiefMessage(
           origin,
           sentByAgent: deps.sentByAgent ?? null,
           clientMessageId: body.clientMessageId ?? null,
+          ownerComposedAt: opts.ownerComposed === true ? now : null,
           createdAt: now,
         })
         .run();
@@ -1381,9 +1382,10 @@ export function sendChiefMessageFromComposer(
   deps: ChiefDeps,
   teamId: string,
   body: ChiefSendBody,
+  opts: { ownerComposed?: boolean } = {},
 ): { result: ChiefSendResult; replayed: boolean } {
   if (body.threadId !== null) endDeadChiefTurn(deps, teamId, body.threadId);
-  const sent = submitChiefMessage(deps, teamId, body);
+  const sent = submitChiefMessage(deps, teamId, body, opts);
   if (sent.replayed) return sent;
   const steered = steerChiefMessage(
     deps,

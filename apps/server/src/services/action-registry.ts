@@ -4,6 +4,7 @@ import {
   type ActionSurface,
   type AskUserQuestion,
   type ExternalActionClass,
+  type FavoriteModelInput,
   isConnectorActionId,
   isExternalActionClass,
   type ProjectTargetInput,
@@ -11,6 +12,7 @@ import {
   projectDeleteAction,
   projectUnarchiveAction,
   SLICE1_ACTIONS,
+  settingsFavoriteModelAction,
   type TodoDeleteInput,
   todoDeleteAction,
 } from '@cairn/shared';
@@ -28,6 +30,7 @@ import {
   SEND_CHOICE,
   settlePendingProposal,
 } from './action-proposals.js';
+import { catalogModel } from './favorite-models.js';
 import { isOwnerDecider } from './instance-owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { deleteProject } from './projects.js';
@@ -240,7 +243,24 @@ function bindProjectDelete(db: Db, input: ProjectTargetInput, teamId: string): B
   };
 }
 
+function bindFavoriteModel(db: Db, input: FavoriteModelInput, teamId: string): BoundProposal {
+  const row = catalogModel(input, teamId, db);
+  return {
+    input,
+    card: [
+      {
+        header: '审批',
+        question: `把「${cardText(row.modelName, CARD_TITLE_MAX_CHARS)}」（${cardText(row.providerLabel, CARD_PROJECT_MAX_CHARS)}）加进常用模型？加进后你在聊天里为任务点名模型时，Coordinator 就能用它；你可以在 设置 · 模型 里随时移除。`,
+        options: [{ label: APPROVE_CHOICE }, { label: REFUSE_CHOICE }],
+      },
+    ],
+  };
+}
+
 function bindProposal(db: Db, entry: ActionEntry, input: unknown, teamId: string): BoundProposal {
+  if (entry.id === settingsFavoriteModelAction.id) {
+    return bindFavoriteModel(db, input as FavoriteModelInput, teamId);
+  }
   if (entry.id === todoDeleteAction.id) return bindTodoDelete(db, input as TodoDeleteInput, teamId);
   if (entry.id === projectDeleteAction.id) {
     return bindProjectDelete(db, input as ProjectTargetInput, teamId);
@@ -406,7 +426,7 @@ export function executeAction(
       return { status: 'pending', ...proposed };
     }
   }
-  if (entry.id === todoDeleteAction.id) {
+  if (entry.id === todoDeleteAction.id || entry.id === settingsFavoriteModelAction.id) {
     throw new HttpError(403, `action ${entry.id} runs only through an approved proposal`);
   }
   if (entry.scope === 'project') requireOwnedProject(deps.db, targetId, request.teamId);

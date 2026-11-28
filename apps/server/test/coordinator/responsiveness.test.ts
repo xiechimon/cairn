@@ -203,7 +203,7 @@ describe('Coordinator responsiveness contracts, prompt, tools, mirror, and runti
   it('lowers SUBAGENT_TIMEOUT_DEFAULT_SEC to 30 while preserving explicit max 300 and tool parity', () => {
     expect(SUBAGENT_TIMEOUT_DEFAULT_SEC).toBe(30);
     expect(SUBAGENT_TIMEOUT_MAX_SEC).toBe(300);
-    expect(CHIEF_TOOL_COUNT).toBe(47);
+    expect(CHIEF_TOOL_COUNT).toBe(48);
     expect(CHIEF_REMOTE_TOOLS).toHaveLength(CHIEF_TOOL_COUNT);
 
     const notifyDef = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'notify_user');

@@ -476,7 +476,13 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       );
     }
     const body = parseWith(putTopModelsBodySchema, await jsonBody(c), 'body');
-    return c.json(writeTopModels(ctx.db, id, body.models));
+    const current = readTopModels(ctx.db, id);
+    if (body.updatedAt !== undefined && body.updatedAt !== current.updatedAt) {
+      throw new HttpError(409, '常用模型已在别处改动，这次保存没有生效。刷新页面后再改一次。');
+    }
+    const written = writeTopModels(ctx.db, id, body.models);
+    ctx.hub.publish(id, () => ({ type: 'reconcile', teamId: id }));
+    return c.json(written);
   });
 
   app.patch('/api/teams/:id/routing-rules/:use', async (c) => {

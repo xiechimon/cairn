@@ -65,11 +65,23 @@ function sendFromComposer(
   deps: Parameters<typeof sendDesignComments>[0],
   teamId: string,
   body: ChiefSendMessageBody,
+  ownerComposed: boolean,
 ): ReturnType<typeof sendDesignComments> {
   const { designCommentIds, ...rest } = body;
   if (designCommentIds === undefined)
-    return Promise.resolve(sendChiefMessageFromComposer(deps, teamId, rest));
+    return Promise.resolve(sendChiefMessageFromComposer(deps, teamId, rest, { ownerComposed }));
   return sendDesignComments(deps, teamId, { ...rest, designCommentIds });
+}
+
+function ownerComposedHere(ctx: AppContext, c: Parameters<typeof pairedDeviceIdOf>[0]): boolean {
+  const ownerSession =
+    ctx.authToken === null ||
+    (c.get('ownerIdentity')?.via === 'session' && c.req.header('authorization') === undefined);
+  return (
+    ownerSession &&
+    isOwner(ctx.db, ctx.user.id) &&
+    sameOriginPageWrite(c, ctx.webOrigin, ctx.trustedProxies)
+  );
 }
 
 export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
@@ -178,7 +190,12 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       },
       'body',
     );
-    const { result, replayed } = await sendFromComposer(svc, teamId, body);
+    const { result, replayed } = await sendFromComposer(
+      svc,
+      teamId,
+      body,
+      ownerComposedHere(ctx, c),
+    );
     if (!replayed)
       ctx.convHub?.publishMessage(
         result.thread.id,
@@ -337,7 +354,12 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       },
       'body',
     );
-    const { result, replayed } = await sendFromComposer(svc, thread.teamId, body);
+    const { result, replayed } = await sendFromComposer(
+      svc,
+      thread.teamId,
+      body,
+      ownerComposedHere(ctx, c),
+    );
     if (!replayed)
       ctx.convHub?.publishMessage(
         conversationId,

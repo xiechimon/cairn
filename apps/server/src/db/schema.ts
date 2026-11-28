@@ -1394,6 +1394,7 @@ export const chiefMessage = sqliteTable(
     delivery: text('delivery').$type<ChiefMessageDelivery>(),
     origin: text('origin').$type<TranscriptUserOrigin>(),
     typedAt: epochMs('typedAt'),
+    ownerComposedAt: epochMs('ownerComposedAt'),
     sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
     clientMessageId: text('clientMessageId'),
     fileSource: json<MessageFileSource | null>('fileSource'),

@@ -1877,6 +1877,13 @@
       "when": 1795865793270,
       "tag": "0272_step_side_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 273,
+      "version": "6",
+      "when": 1795887627350,
+      "tag": "0273_watery_gideon",
+      "breakpoints": true
     }
   ]
 }

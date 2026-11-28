@@ -412,6 +412,11 @@
       "key": "CAIRN_CLOUD_URL",
       "scope": "product",
       "userScenario": "A Mac desktop user never sets it: the desktop app supplies the hosted Cairn Cloud URL automatically so signing in and subscribing work from the sidebar account popover, and self-hosted users can set off to hide cloud features."
+    },
+    {
+      "type": "setting",
+      "key": "putTopModelsBodySchema.updatedAt",
+      "userScenario": "Nothing to set: the Settings list sends the version it loaded with every save, so a model the Coordinator added in chat is never overwritten by a page that was already open."
     }
   ]
 }

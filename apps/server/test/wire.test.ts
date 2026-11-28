@@ -383,7 +383,7 @@ describe('the route surface = the 02 §6.1 vocabulary', () => {
     for (const entry of SLICE1_ACTIONS) {
       expect(entry.surfaces).not.toContain('mcp');
       expect(entry.surfaces).not.toContain('cli');
-      if (entry.surfaces.includes('coordinator')) {
+      if (entry.surfaces.includes('coordinator') && entry.toolName !== undefined) {
         const def = coordinatorDefs.find((tool) => tool.name === entry.toolName);
         expect(def?.description, `coordinator copy for ${entry.toolName}`).toBeTruthy();
         expect(

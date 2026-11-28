@@ -1846,7 +1846,8 @@ export const EN: Record<string, string> = {
   重置: 'Reset',
   '重置 {project} 的模型设置': 'Reset model settings for {project}',
   常用模型: 'Frequently used models',
-  '可在聊天中为任务点名已接入的模型。': 'You can name a connected model for a task in chat.',
+  'Coordinator 只从这里挑选任务模型；你在聊天里点名其他模型时，它会先加进这里。':
+    'The Coordinator picks task models only from this list; when you name another model in chat, it adds it here first.',
   '暂无可添加的模型。': 'No models available to add.',
   '暂无常用模型，任务默认使用 Coordinator 的模型。':
     'No frequently used models. Tasks use the Coordinator model by default.',

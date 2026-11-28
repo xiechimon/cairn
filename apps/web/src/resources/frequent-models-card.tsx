@@ -157,7 +157,11 @@ export function FrequentModelsCard({
     <SettingsSection
       testId="frequent-models"
       title={t('常用模型')}
-      {...(models.length > 0 ? { info: t('可在聊天中为任务点名已接入的模型。') } : {})}
+      {...(models.length > 0
+        ? {
+            info: t('Coordinator 只从这里挑选任务模型；你在聊天里点名其他模型时，它会先加进这里。'),
+          }
+        : {})}
       action={
         <FilterPicker
           options={addable.map((o) => {

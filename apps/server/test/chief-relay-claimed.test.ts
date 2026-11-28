@@ -3,6 +3,7 @@ import { afterAll, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import {
+  chiefMessage as chiefMessageTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   machine as machineTable,
@@ -10,8 +11,11 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
+import { newRecordId } from '../src/lib/ids.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { claimStep } from '../src/services/machines.js';
+import { createProvider } from '../src/services/providers.js';
+import { readTopModels, writeTopModels } from '../src/services/top-models.js';
 import { bootServer, issueApiKey, seedRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -123,6 +127,52 @@ describe('Coordinator tool relay runs only for the machine holding a claimed tur
   test('the claiming machine can call a Coordinator tool', async () => {
     const { s, owner } = await setup();
     expect((await relay(s, owner.token)).status).toBe(200);
+  });
+
+  test('the relayed settings call receives the marked owner message of its turn', async () => {
+    const { s, owner } = await setup();
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        createdBy: s.svc.user.id,
+        body: {
+          providerId: 'stub-doubao',
+          label: 'Doubao',
+          baseUrl: 'http://127.0.0.1:9/doubao',
+          api: 'openai-completions',
+          models: [{ id: 'auto', name: 'Auto' }],
+        },
+      },
+    );
+    writeTopModels(s.db, s.team.id, [
+      { provider: 'devin', modelId: 'swe-2-1-medium', thinkingLevel: null },
+    ]);
+    const messageId = newRecordId();
+    s.db
+      .insert(chiefMessageTable)
+      .values({
+        id: messageId,
+        threadId: 'chief-relay-thread',
+        role: 'user',
+        content: '用豆包 Auto 跑一个只读任务',
+        projectId: null,
+        origin: 'user',
+        ownerComposedAt: 1,
+        createdAt: 3,
+      })
+      .run();
+    setStep(s, { ownerMessageIds: [messageId] });
+    const response = await relay(s, owner.token, 'settings', {
+      operation: 'addFavoriteModel',
+      model: 'Auto',
+      messageId,
+      quote: '豆包 Auto',
+    });
+    expect(response.status).toBe(200);
+    expect(readTopModels(s.db, s.team.id).models).toContainEqual(
+      expect.objectContaining({ provider: 'stub-doubao', modelId: 'auto' }),
+    );
   });
 
   test('connect_repo refreshes a legacy OAuth grant through both Coordinator relays', async () => {

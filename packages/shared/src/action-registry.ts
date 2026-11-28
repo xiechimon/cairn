@@ -29,7 +29,7 @@ export const OWNER_ONLY_EXCEPTION_IDS = [
 
 export interface ActionEntry<TInput = unknown, TOutput = unknown> {
   id: string;
-  toolName: string;
+  toolName?: string;
   inputSchema: z.ZodType<TInput>;
   outputSchema: z.ZodType<TOutput>;
   scope: ActionScope;
@@ -112,11 +112,32 @@ export const todoDeleteAction: ActionEntry<TodoDeleteInput, unknown> = {
   targetOf: (input) => input.todoIds.join(','),
 };
 
+const favoriteModelInput = z
+  .object({ provider: z.string().min(1).max(80), modelId: z.string().min(1).max(200) })
+  .strict();
+export type FavoriteModelInput = z.infer<typeof favoriteModelInput>;
+const favoriteModelOutput = z
+  .object({ provider: z.string(), modelId: z.string(), added: z.boolean() })
+  .strict();
+
+export const settingsFavoriteModelAction: ActionEntry<FavoriteModelInput, unknown> = {
+  id: 'settings.favorite-model.add',
+  inputSchema: favoriteModelInput,
+  outputSchema: favoriteModelOutput,
+  scope: 'team',
+  class: 'confirm-once',
+  standingGrant: false,
+  inverse: null,
+  surfaces: ['coordinator'],
+  targetOf: (input) => `${input.provider}/${input.modelId}`,
+};
+
 export const SLICE1_ACTIONS = [
   projectArchiveAction,
   projectUnarchiveAction,
   projectDeleteAction,
   todoDeleteAction,
+  settingsFavoriteModelAction,
 ] as const;
 
 export function actionByToolName(name: string): (typeof SLICE1_ACTIONS)[number] | undefined {

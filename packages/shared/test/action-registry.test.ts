@@ -28,6 +28,7 @@ describe('slice 1 action registry', () => {
       ['web', 'coordinator'],
       ['web', 'coordinator'],
       ['coordinator'],
+      ['coordinator'],
     ]);
     expect(projectDeleteAction.standingGrant).toBe(false);
     expect(projectDeleteAction.class).toBe('confirm-once');

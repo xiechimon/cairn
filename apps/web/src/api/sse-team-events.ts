@@ -71,6 +71,7 @@ const reconciled = new Set([
   'projectBuilds',
   'search',
   'model-routing',
+  'frequent-models',
 ]);
 
 function containsLike(title: string, word: string): boolean {

@@ -1,0 +1,20 @@
+# Permission to add a frequently used model — 2026-11-28
+
+The first settings slice removed the favorites filter. The November 28 product correction replaces that behavior: an explicit task model must be an enabled favorite, and a user can authorize an addition from chat. There is no agent removal operation. The original inventory is [here](coordinator-settings-2026-11-28.md).
+
+| Source | What the current code does | Consequence |
+|---|---|---|
+| [`taskModelCandidates`](../../apps/server/src/services/providers.ts), [`createRequestTodo`](../../apps/server/src/services/coordinator-request.ts), [`readTopModels` and `writeTopModels`](../../apps/server/src/services/top-models.ts) | Measured in source: task selection and discovery share the catalog; the favorites file separately reads/writes a team list. | Keep safe configured discovery but restore a second favorites check for named task picks. Both checks must pass; a stale favorite is not available. Reuse the write service; an append is a read-modify-write transaction, never a list supplied by the agent. |
+| [Chat send HTTP routes](../../apps/server/src/routes-chief.ts), [chat storage](../../apps/server/src/services/chief.ts), [instance owner](../../apps/server/src/services/instance-owner.ts), [token auth](../../apps/server/src/lib/token-auth.ts) | Measured in source: a user-role message can be synthetic or submitted through API tooling; step message IDs do not independently prove sender identity. The owner session and same-origin check belong at ingress. | Authorize direct append only from a server-marked browser message in the same owner turn. Existing and synthetic messages do not get the marker. Model name validation operates on the trusted message itself and derives permitted display names from the catalog, not from a model-supplied alias. |
+| [Action registry](../../apps/server/src/services/action-registry.ts), [action proposal state](../../apps/server/src/services/action-proposals.ts), [existing card answer path](../../apps/server/src/routes-chief.ts) | Measured in source: existing card approval persists an immutable proposal, checks the pending card, executes a handler on acceptance, unwinds on failure and wakes the requested conversation. Existing actions have different authorization rules. | Add one typed approval action for this setting and reuse its card. Require a real authenticated owner decision for this action specifically, not the Coordinator's generic question-answer tool. Revalidate eligibility before appending. |
+| [Existing web Settings entry](../../apps/web/src/resources/frequent-models-card.tsx) and [conversation action design](../design/surfaces/conversation.md) | Measured in source: the favorite is already removable on the Settings page; the existing conversation already renders decision cards. | Reuse the card and the owner's manual removal; no new danger control or visual primitive is necessary for this slice. |
+
+The proposal path and direct path are permissions for exactly one append, not a grant to change provider credentials, money, the list order, or other settings. External product behavior was not inspected: both the authorization source and the working approval mechanism are local Cairn contracts, not a proposed third-party pattern.
+
+## Considered and not taken
+
+| Option | Why not |
+|---|---|
+| Always ask on the card, even when the owner named the model | The owner's own words carry the intent; a second click for every first use of a model is the interruption this slice removes. The card stays for the Coordinator's own suggestions. |
+| Reuse the `create_todo` message citation instead of a new message marker | `create_todo` citations prove the text came from an owner message of this turn, not that an owner browser submitted it: the same test, agent and bridge inserts can cite themselves. The marker at ingress is the only place that distinguishes a typed message, and it exists once instead of per tool. |
+| One tool per settings field | One generic `settings` tool keyed by a validated operation reuses the same checks and can grow; a tool per field passes the 50-tool budget and multiplies prompt cost. |

@@ -20,9 +20,13 @@ export const topModelsSchema = z.array(topModelSchema).superRefine((models, ctx)
   }
 });
 
-export const putTopModelsBodySchema = z.object({ models: topModelsSchema });
+export const putTopModelsBodySchema = z.object({
+  models: topModelsSchema,
+  updatedAt: z.number().nullable().optional(),
+});
 export type PutTopModelsBody = z.infer<typeof putTopModelsBodySchema>;
 
 export interface TopModelsEnvelope {
   models: TopModel[] | null;
+  updatedAt: number | null;
 }

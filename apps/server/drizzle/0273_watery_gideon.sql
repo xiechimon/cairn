@@ -1,0 +1,1 @@
+ALTER TABLE `chief_message` ADD `ownerComposedAt` integer;

@@ -16,7 +16,7 @@ import {
   profileForStep,
   routeForStep,
 } from '../src/services/routing-rules.js';
-import { readTopModels, writeTopModels } from '../src/services/top-models.js';
+import { writeTopModels } from '../src/services/top-models.js';
 import {
   AGENT2_ID,
   H,
@@ -78,19 +78,37 @@ function doubaoMachine() {
 }
 
 describe('the Coordinator picks a task model from the configured models', () => {
-  test('a named Mac mini runs a qualified Doubao model outside the sole favorite', async () => {
+  test('a named Mac mini runs a qualified Doubao model only once it is a frequent model', async () => {
     const machineId = doubaoMachine();
     createDoubaoSubscription({ db: H.s.db }, H.teamId, { label: 'Doubao', runnerId: machineId });
     frequent({ provider: 'devin', modelId: 'swe-2-1-medium' });
-    const favorites = readTopModels(H.s.db, H.teamId);
-    const catalog = (await relay('models', {})) as { provider: string; modelId: string }[];
+    const catalog = (await relay('models', {})) as {
+      provider: string;
+      modelId: string;
+      frequent?: boolean;
+    }[];
     expect(catalog).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ provider: 'doubao', modelId: 'auto', modelName: 'Auto' }),
       ]),
     );
+    expect(
+      catalog.find((row) => row.provider === 'doubao' && row.modelId === 'auto')?.frequent,
+    ).toBeUndefined();
+    await expect(
+      relay('create_todo', {
+        ...ownerTodo('在 Mac mini 上用 Doubao Auto 整理文档'),
+        machine: machineId,
+        model: 'doubao/auto',
+      }),
+    ).rejects.toThrow(/not in 常用模型/);
+    expect(H.s.db.select().from(todoTable).all()).toEqual([]);
+    frequent(
+      { provider: 'devin', modelId: 'swe-2-1-medium' },
+      { provider: 'doubao', modelId: 'auto' },
+    );
     const created = (await relay('create_todo', {
-      ...ownerTodo('在 Mac mini 上用 Doubao Auto 整理文档'),
+      ...ownerTodo('再在 Mac mini 上用 Doubao Auto 整理文档'),
       machine: machineId,
       model: 'doubao/auto',
     })) as { id: string; phase: string };
@@ -101,7 +119,6 @@ describe('the Coordinator picks a task model from the configured models', () => 
       thinkingLevel: null,
     });
     expect(todoRow(created.id).routeOverride).toEqual({ machineId });
-    expect(readTopModels(H.s.db, H.teamId)).toEqual(favorites);
   });
 
   test('a host Antigravity account retains configured models after runner logout', async () => {
@@ -159,6 +176,7 @@ describe('the Coordinator picks a task model from the configured models', () => 
     expect(rows).toContainEqual(
       expect.objectContaining({ provider: 'antigravity', modelId: 'host-model' }),
     );
+    frequent({ provider: 'antigravity', modelId: 'host-model' });
     const created = (await relay('create_todo', {
       ...ownerTodo('写文档'),
       machine: machineId,
@@ -265,6 +283,10 @@ describe('the Coordinator picks a task model from the configured models', () => 
   test('qualified names win over bare names containing a slash and preserve the full model ID', async () => {
     provider('alpha', 'shared', 'vendor/shared');
     provider('vendor', 'shared');
+    frequent(
+      { provider: 'vendor', modelId: 'shared' },
+      { provider: 'alpha', modelId: 'vendor/shared' },
+    );
     const selected = (await relay('create_todo', {
       ...ownerTodo('写文档'),
       model: 'vendor/shared',

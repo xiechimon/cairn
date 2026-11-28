@@ -25,6 +25,7 @@ import {
   SHOW_CHART_TOOL,
   SHOW_DIFF_TOOL,
   SUGGEST_REPLIES_TOOL_NAME,
+  settingsFavoriteModelAction,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
@@ -85,6 +86,12 @@ import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
 import { doubaoSubscriptionAllowsRunner } from './doubao-subscriptions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { effectDedupeKey } from './external-effects.js';
+import {
+  addFavoriteModel,
+  assertOwnerNamedModel,
+  isFavorite,
+  resolveCatalogModel,
+} from './favorite-models.js';
 import { firstFeedback } from './first-feedback.js';
 import { isGithubRepoRef, PROJECT_FILES_MAX_LIMIT, readFile, readFiles } from './git.js';
 import { assertGithubConnectionCurrent } from './github-connection.js';
@@ -484,6 +491,83 @@ export async function executeChiefTool(
         ...(frequent.has(`${row.provider}/${row.modelId}`) ? { frequent: true as const } : {}),
       }));
       return json(rows);
+    }
+    case 'settings': {
+      const operation = str(params, 'operation');
+      if (operation !== 'addFavoriteModel') {
+        throw new HttpError(
+          400,
+          `settings.${operation} is not supported: today the only operation is addFavoriteModel`,
+        );
+      }
+      const model = str(params, 'model');
+      const provider = optStr(params, 'provider');
+      const row = resolveCatalogModel(db, ctx.teamId, { model, provider });
+      if (isFavorite(db, ctx.teamId, row)) {
+        return json({
+          operation,
+          provider: row.provider,
+          modelId: row.modelId,
+          modelName: row.modelName,
+          added: false,
+          note: `「${row.modelName}」已经在常用模型里，没有重复添加；不要声称刚加了它，直接继续原来的请求。`,
+        });
+      }
+      const messageId = optStr(params, 'messageId');
+      const quote = optStr(params, 'quote');
+      if (messageId !== undefined || quote !== undefined) {
+        if (messageId === undefined || quote === undefined) {
+          throw new HttpError(
+            400,
+            'pass messageId and quote together, or omit both to ask the owner with the approval card',
+          );
+        }
+        assertOwnerNamedModel(db, {
+          threadId: ctx.threadId,
+          turnMessageIds: ctx.turnMessageIds ?? [],
+          messageId,
+          quote,
+          row,
+        });
+        const appended = addFavoriteModel(db, ctx.teamId, row);
+        if (appended.added)
+          deps.hub.publish(ctx.teamId, () => ({ type: 'reconcile', teamId: ctx.teamId }));
+        return json({
+          operation,
+          provider: row.provider,
+          modelId: row.modelId,
+          modelName: row.modelName,
+          added: appended.added,
+          note: appended.added
+            ? `已把「${appended.label}」加进常用模型（共 ${appended.count} 个）。在回复里用一句话告诉用户这件事，然后继续原来的请求。`
+            : `「${appended.label}」已经在常用模型里，没有重复添加；不要声称刚加了它。`,
+        });
+      }
+      const result = executeAction(
+        { db, reposDir: deps.reposDir },
+        {
+          id: settingsFavoriteModelAction.id,
+          input: { provider: row.provider, modelId: row.modelId },
+          actor: 'coordinator',
+          surface: 'coordinator',
+          teamId: ctx.teamId,
+          threadId: ctx.threadId,
+          scopeProjectId: ctx.turnScopeProjectId ?? null,
+        },
+      );
+      if (result.status !== 'pending') {
+        throw new HttpError(409, `settings.favorite-model.add did not park for approval`);
+      }
+      if (result.created) announceQuestion(deps, ctx.threadId, proposalCardId(result.proposalId));
+      return json({
+        operation,
+        provider: row.provider,
+        modelId: row.modelId,
+        modelName: row.modelName,
+        status: 'pending',
+        proposalId: result.proposalId,
+        note: '没有改动常用模型，也没有建任务。审批卡已经发给用户：只有用户在卡片上批准后服务端才会把模型加进常用模型，并唤醒你继续。告诉用户在等这个批准，然后结束本轮。',
+      });
     }
     case 'machines': {
       const rows = db

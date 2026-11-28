@@ -9,6 +9,7 @@ import {
   isConnectorActionId,
   isExternalActionClass,
   SLICE1_ACTIONS,
+  settingsFavoriteModelAction,
   stripAllRecommendations,
   type UserRecord,
 } from '@cairn/shared';
@@ -37,6 +38,7 @@ import {
   publishQuestion,
 } from './chief-question-store.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { addFavoriteModel, catalogModel } from './favorite-models.js';
 import {
   HOST_SHELL_ESCALATION_ACTION,
   hostShellEscalationWakePrompt,
@@ -108,7 +110,8 @@ function approvedOnlyInteractively(deps: AnswerDeps, actionId: string): boolean 
   return (
     sendsOutside(deps, actionId) ||
     actionId === BROWSER_PASSWORD_ACTION ||
-    actionId === HOST_SHELL_ESCALATION_ACTION
+    actionId === HOST_SHELL_ESCALATION_ACTION ||
+    actionId === settingsFavoriteModelAction.id
   );
 }
 
@@ -484,6 +487,12 @@ function runTodoDelete(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: n
 }
 
 function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: number) {
+  if (row.actionId === settingsFavoriteModelAction.id) {
+    const input = settingsFavoriteModelAction.inputSchema.parse(approvedArguments(row));
+    addFavoriteModel(tx, row.teamId, catalogModel(input, row.teamId, tx));
+    journal(tx, row, 'run', now);
+    return;
+  }
   if (row.actionId === BROWSER_PASSWORD_ACTION) {
     validateBrowserPasswordApproval(tx, row.teamId, JSON.parse(row.inputJson));
     journal(tx, row, 'run', now);
@@ -599,6 +608,9 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
   if (outcome.status === 'executed' && outcome.actionId === 'project.delete') {
     dispatchHostedCleanup(deps.db, deps.reposDir);
   }
+  if (outcome.status === 'executed' && outcome.actionId === settingsFavoriteModelAction.id) {
+    deps.hub.publish(input.teamId, () => ({ type: 'reconcile', teamId: input.teamId }));
+  }
   return { status: outcome.status };
 }
 
@@ -690,6 +702,16 @@ export function dispatchActionWakes(deps: ChiefDeps & { registry?: readonly Acti
       } else {
         prompt = hostShellEscalationWakePrompt(row.outcome, binding);
       }
+    } else if (actionId === settingsFavoriteModelAction.id && proposal !== undefined) {
+      const settled = settingsFavoriteModelAction.inputSchema.safeParse(
+        approvedArguments(proposal),
+      );
+      const name = settled.success
+        ? `${settled.data.provider}/${settled.data.modelId}`
+        : '用户选的模型';
+      prompt = approved
+        ? `审批 ${row.proposalId} 已由用户批准，服务端已把 ${name} 加进常用模型。继续用户原来的请求；要建任务时用 create_todo 选这个模型。`
+        : `审批 ${row.proposalId} 的结果是 ${row.outcome}：没有加进常用模型，也没有建任务。除非用户重新要求，不要再次发起同一动作。`;
     } else {
       const entry =
         actionId === undefined

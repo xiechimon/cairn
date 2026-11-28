@@ -45,7 +45,8 @@ function write(s: TestServer, models: TopModel[], headers: Record<string, string
 async function read(s: TestServer, headers: Record<string, string> = {}) {
   const res = await call(s, 'GET', path(s.team.id), { headers });
   expect(res.status).toBe(200);
-  return res.json();
+  const body = (await res.json()) as { models: unknown };
+  return { models: body.models };
 }
 
 describe('team top models API', () => {
@@ -58,7 +59,7 @@ describe('team top models API', () => {
     const s = bootServer();
     const first = await write(s, [OPUS, SOL]);
     expect(first.status).toBe(200);
-    expect(await first.json()).toEqual({ models: [OPUS, SOL] });
+    expect(await first.json()).toMatchObject({ models: [OPUS, SOL] });
     await write(s, [SOL]);
     expect(await read(s)).toEqual({ models: [SOL] });
   });
@@ -131,8 +132,8 @@ describe('team top models API', () => {
     writeTopModels(db, 'a', [OPUS]);
     writeTopModels(db, 'b', [SOL]);
     db.run(sql`DELETE FROM team WHERE id = 'a'`);
-    expect(readTopModels(db, 'a')).toEqual({ models: null });
-    expect(readTopModels(db, 'b')).toEqual({ models: [SOL] });
+    expect(readTopModels(db, 'a')).toMatchObject({ models: null });
+    expect(readTopModels(db, 'b')).toMatchObject({ models: [SOL] });
   });
 });
 
@@ -209,7 +210,7 @@ describe('only the owner page changes the list', () => {
     await write(s, [OPUS]);
     const res = await req(s.app, 'GET', path(s.team.id));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ models: [OPUS] });
+    expect(await res.json()).toMatchObject({ models: [OPUS] });
   });
 
   test('under token auth the owner token alone does not write, only the owner page does', async () => {

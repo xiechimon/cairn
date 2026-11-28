@@ -32,7 +32,7 @@ import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { taskModelCandidates } from './providers.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
-import { readTopModels } from './top-models.js';
+import { favoriteModelOf, readTopModels } from './top-models.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -438,13 +438,17 @@ export function createRequestTodo(
       );
     }
     const selected = matches[0];
-    const favorite = (readTopModels(db, ctx.teamId).models ?? []).find(
-      (row) => row.provider === selected.provider && row.modelId === selected.modelId,
-    );
+    const favorite = favoriteModelOf(readTopModels(db, ctx.teamId).models, selected);
+    if (favorite === undefined) {
+      throw new HttpError(
+        400,
+        `model ${selected.provider}/${selected.modelId} is enabled but not in 常用模型, so a task cannot use it yet and nothing was created. Add it first with settings {operation:"addFavoriteModel", model:"${selected.provider}/${selected.modelId}"}: the owner's own words in their message are the permission (pass that messageId and the exact words), and a model they did not name goes through the approval card. Then call create_todo again. Never swap in a different model on the owner's behalf.`,
+      );
+    }
     model = {
       provider: selected.provider,
       modelId: selected.modelId,
-      thinkingLevel: favorite?.thinkingLevel ?? null,
+      thinkingLevel: favorite.thinkingLevel ?? null,
     };
   }
   const messageIds = params.messageIds ?? defaultQuoteIds(db, ctx);

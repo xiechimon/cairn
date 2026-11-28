@@ -115,6 +115,7 @@ function chiefMessagesWithTurnBoundaries(
         delivery: null,
         origin: null,
         typedAt: null,
+        ownerComposedAt: null,
         sentByAgent: null,
         clientMessageId: null,
         fileSource: null,

@@ -235,11 +235,10 @@ test('adding, tuning and removing a frequently used model saves the whole list',
   const row = card.getByTestId('frequent-model-row');
   await expect(row).toContainText('GLM-5.3');
   const info = card.getByTestId('info-tip');
-  await expect(info).toHaveAccessibleName('可在聊天中为任务点名已接入的模型。');
+  const copy = 'Coordinator 只从这里挑选任务模型；你在聊天里点名其他模型时，它会先加进这里。';
+  await expect(info).toHaveAccessibleName(copy);
   await info.hover();
-  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(
-    '可在聊天中为任务点名已接入的模型。',
-  );
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(copy);
   await expect(card.locator('h2 ~ p')).toHaveCount(0);
   await row.locator('.frequent-model-level').click();
   await expect(page.getByRole('option')).toHaveText(['Default', 'Low', 'High', 'Max']);

@@ -98,6 +98,7 @@ export const CHIEF_TOOLS_ADDED = [
   'archive_todos',
   'unarchive_todos',
   'inspect_run',
+  'settings',
 ] as const;
 
 export const CHIEF_TOOL_CATEGORIES = {
@@ -123,6 +124,7 @@ export const CHIEF_TOOL_CATEGORIES = {
     'inspect_run',
   ],
   organize: [
+    'settings',
     'create_todo',
     'update_todo',
     'delete_todos',
@@ -384,9 +386,31 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'models',
     description:
-      "List the model candidates for agents as rows {provider, providerLabel, modelId, modelName, frequent?}. Read this before setting provider/modelId on a routing rule — only values from this list are valid. Rows with frequent: true are the owner's frequently used models; other rows are also valid for create_todo. Availability and credentials are checked separately at dispatch.",
+      "List the model candidates for agents as rows {provider, providerLabel, modelId, modelName, frequent?}. Read this before setting provider/modelId on a routing rule — only values from this list are valid. Rows with frequent: true are the owner's frequently used models (常用模型), and create_todo may pick only from those rows; when the owner names a model that is not marked frequent, add it with settings before creating the task. Availability and credentials are checked separately at dispatch.",
     parameters: obj({}),
     replaySafe: true,
+  },
+  {
+    name: 'settings',
+    description: `Change the one setting this release delegates: append a model to the team's 常用模型 (frequently used models) list. The only operation today is addFavoriteModel, and tasks may pick task models only from that list — so when the owner names an enabled model that is not on it, add it and then create the task. Never tell the owner to add it by hand in Settings, and never swap in a different model on their behalf.
+\n\nWhen the owner's own message in this turn names the model, pass messageId plus quote: the exact words naming it (「用豆包 Auto 跑」 → quote 「豆包 Auto」). Those words are the permission. A successful call answers added: true with the canonical label: say 「已把…加进常用模型」 in one plain sentence and continue with the task. When you yourself want a model the owner did not name, omit messageId and quote: the server posts an approval card and nothing changes; say you are waiting for that decision and end the turn, then continue only after a wake that it was approved. An offered alternative the owner did not name always goes through that card.
+\n\nPass provider/modelId from models, or a display name; an ambiguous, unknown or unqualified name is refused with the candidates, so ask which provider instead of guessing. The call appends only that one row, keeps order and unrelated entries, and adding a model that is already listed is a no-op. Removal and reordering stay the owner's, in Settings; this tool cannot do them.`,
+    parameters: obj(
+      {
+        operation: str('The setting operation. Today only "addFavoriteModel".'),
+        model: str(
+          'The model to add: provider/modelId from models, or its display name such as "Auto".',
+        ),
+        provider: str(
+          'Optional provider/source id from models that disambiguates one model name shared by two providers.',
+        ),
+        messageId: str(
+          'The id of the owner message in this turn that names this model. Pass together with quote; omit both only when you are proposing a model the owner did not name.',
+        ),
+        quote: str('Exact substring of that message containing the words that name the model.'),
+      },
+      ['operation', 'model'],
+    ),
   },
   {
     name: 'machines',
@@ -585,7 +609,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           'Task difficulty for automatic model selection: "easy" (one-file edit, typo/copy tweak, simple lookup), "standard" (typical feature, multi-file fix, moderate research), or "hard" (architecture change, ambiguous debugging, cross-module refactor, deep multi-step work). Always judge and pass this yourself without mentioning tiers or models to the user.',
         ),
         model: str(
-          'Optional model for this task, chosen from models: pass its modelId, or provider/modelId when two providers share it. Qualified IDs take precedence over bare IDs. Dispatch still requires an eligible runner and credentials. Pass this only when the user explicitly names a model for the task; omit it and Cairn picks the right model automatically for the task difficulty.',
+          'Optional model for this task, chosen from the frequent rows of models (常用模型): pass its modelId, or provider/modelId when two providers share it. Qualified IDs take precedence over bare IDs. A model outside that list is refused: add it first with settings, then create the task. Dispatch still requires an eligible runner and credentials. Pass this only when the user explicitly names a model for the task; omit it and Cairn picks the right model automatically for the task difficulty.',
         ),
         output: str(
           'Always choose the deliverable kind: "info" for a reply in the task conversation (e.g. answer 1+1, run hostname and report, or report research findings without changing files); "code" if the task asks to change any repo or file, even conditionally or along with a report (default, no merging); "report", "dataset", or "link" for separate non-code artifacts; attach the finished artifact to the task conversation. A plain answer is the deliverable for "info". For recurring requests use schedule_todo instead.',
@@ -900,7 +924,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 47;
+export const CHIEF_TOOL_COUNT = 48;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',
