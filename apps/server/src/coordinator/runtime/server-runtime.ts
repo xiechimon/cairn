@@ -15,6 +15,7 @@ import type {
   Provider,
   ProviderResponse,
 } from '@earendil-works/pi-ai';
+import type { ConversationId } from '@earendil-works/pi-durable';
 import { createRegistry, type Harness } from '@earendil-works/pi-durable';
 import type { BrowserOffer } from '../../services/coordinator-browser.js';
 import { firstFeedback } from '../../services/first-feedback.js';
@@ -23,9 +24,23 @@ import {
   coordinatorCompactionSettings,
   type MemoryFlush,
   type ModelRef,
+  summarizerOverContext,
+  type WarmSummary,
 } from './compaction.js';
-import { withRegisteredMailConversation } from './conversations.js';
+import { activeConversation, withRegisteredMailConversation } from './conversations.js';
+import {
+  type CompactionStage,
+  type FailureScope,
+  recordCompactionSuccess,
+  reportCompactionFailure,
+  taskFailure,
+} from './failure-report.js';
 import { generationTelemetryExtension } from './generation-telemetry.js';
+import {
+  type CompactionTrigger,
+  IDLE_COMPACT_TIMEOUT_MS,
+  summaryOutputBudget,
+} from './idle-compact.js';
 import { createInputReceipts, type InputReceipts } from './input-receipts.js';
 import { replayCoordinatorInputs } from './input-replay.js';
 import type { MachineApi } from './machine-api.js';
@@ -105,12 +120,32 @@ interface ThreadState {
   volatile: VolatileContext;
   responsiveness: ResponsivenessTracker;
   summary: { ref: ModelRef | null };
+  /** Summaries computed from a live context, waiting for the compaction that places them. */
+  warmSummaries: Map<ConversationId, WarmSummary>;
+  /** Compactions this runtime runs while nobody waits, which own the memory flush themselves. */
+  idleCompacting: { count: number };
   syncConnectorTools: () => void;
 }
+
+export interface IdleCompactionPlan {
+  trigger: CompactionTrigger;
+  summary: ProviderBinding;
+  /** Prompt tokens the thread's last turn measured, which the summary must fit. */
+  contextTokens: number;
+  /** Timestamp of the usage row this plan was decided from. */
+  usageCreatedAt: number;
+  /** Whether the summary model is the last turn's model, so its request reads that warm cache. */
+  warmCache: boolean;
+  /** The explicit cache mode the last turn used, absent when the provider caches on its own. */
+  cacheRetention?: 'short' | 'long';
+}
+
+export type IdleCompactionOutcome = 'compacted' | 'empty' | 'skipped' | 'failed';
 
 export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi) {
   const context = BACKGROUND_CONTEXT;
   let shuttingDown = false;
+  const shutdown = new AbortController();
   const settings = (models: CoordinatorModels) => () => ({
     steeringMode: 'all' as const,
     compaction: coordinatorCompactionSettings(
@@ -123,6 +158,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const busy = new Map<string, number>();
   const lastUsed = new Map<string, number>();
   const closing = new Map<string, Promise<void>>();
+  const compacting = new Map<string, Promise<IdleCompactionOutcome>>();
   const suggestionYields = new Map<string, AbortController>();
   const turnSignals = new Map<string, { onSteer(): void; onStop(): void }>();
   const toolRounds = new Set<string>();
@@ -152,6 +188,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     const volatile = createVolatileContext();
     const responsiveness = createResponsivenessTracker();
     const summary: ThreadState['summary'] = { ref: null };
+    const warmSummaries: ThreadState['warmSummaries'] = new Map();
+    const idleCompacting: ThreadState['idleCompacting'] = { count: 0 };
     const registry = createRegistry();
     const memoryThread = isChiefMemoryThreadId(threadId);
     const buildToolsExtension = (connectorTools: RemoteToolDef[]) =>
@@ -236,8 +274,13 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       coordinatorResponsivenessExtension(responsiveness),
       coordinatorCompactionExtension(
         () => summary.ref,
-        () => config.memoryFlush?.(threadId) ?? null,
+        () => (idleCompacting.count > 0 ? null : (config.memoryFlush?.(threadId) ?? null)),
         threadId,
+        (conversationId) => {
+          const warm = warmSummaries.get(conversationId);
+          warmSummaries.delete(conversationId);
+          return warm ?? null;
+        },
       ),
       generationTelemetryExtension(
         async (conversationId) => ({
@@ -281,6 +324,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       volatile,
       responsiveness,
       summary,
+      warmSummaries,
+      idleCompacting,
       inputs,
       syncConnectorTools,
     };
@@ -335,6 +380,122 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     },
     closeThread,
     isOpen: (threadId: string) => open.has(threadId),
+    compactWhileIdle: async (
+      threadId: string,
+      plan: IdleCompactionPlan,
+    ): Promise<IdleCompactionOutcome> => {
+      if (busy.has(threadId) || compacting.has(threadId) || closing.has(threadId)) return 'skipped';
+      const wasOpen = open.has(threadId);
+      const state = stateOf(threadId);
+      const ref: ModelRef = {
+        provider: plan.summary.config.providerId,
+        modelId: plan.summary.modelId,
+        ...(plan.summary.thinkingLevel === undefined
+          ? {}
+          : { thinkingLevel: plan.summary.thinkingLevel }),
+      };
+      const priorRef = state.summary.ref;
+      state.summary.ref = ref;
+      state.models.useProvider(plan.summary.config, plan.summary.resolveKey, plan.summary.observe);
+      state.idleCompacting.count += 1;
+      const scope: FailureScope = { threadId };
+      const stage: CompactionStage =
+        plan.trigger === 'idle' ? 'idle-compaction' : 'cache-expiry-compaction';
+      let abortCompaction: (() => Promise<void>) | null = null;
+      let expired = false;
+      const work = async (): Promise<IdleCompactionOutcome> => {
+        const harness = await state.harness;
+        const prior = config.factsFor(threadId).conversationId;
+        const conversation =
+          (await activeConversation(harness, prior, context)) ?? (await harness.root(context));
+        if ((await harness.inspect(context)).tasks.length > 0) return 'skipped';
+        const view = await conversation.context(context);
+        const compactedAt = view.head?.model?.[0]?.timestamp;
+        if (compactedAt !== undefined && compactedAt >= plan.usageCreatedAt) return 'skipped';
+        const model = state.models.models.getModel(ref.provider, ref.modelId);
+        const budget =
+          !plan.warmCache || model === undefined
+            ? null
+            : summaryOutputBudget(plan.contextTokens, model.contextWindow, model.maxTokens);
+        const startedAt = Date.now();
+        try {
+          if (budget !== null) {
+            const summary = await summarizerOverContext(
+              state.models.models,
+              ref,
+              {
+                ...scope,
+                stage,
+                timeoutMs: IDLE_COMPACT_TIMEOUT_MS,
+                maxTokens: budget,
+                signal: shutdown.signal,
+              },
+              plan.cacheRetention,
+            )(view.messages);
+            const newest = view.entries.at(-1);
+            state.warmSummaries.set(conversation.id, {
+              summary,
+              tail: newest === undefined ? null : String(newest.id),
+            });
+          }
+          const taskId = await conversation.compact(undefined, context);
+          abortCompaction = async () => {
+            await harness.abortTask(taskId, context);
+          };
+          const settled = await harness.waitForTask(taskId, context);
+          const outcome = settled.state.outcome;
+          if (outcome.status !== 'completed') {
+            reportCompactionFailure(
+              scope,
+              stage,
+              taskFailure(String(outcome.error?.message ?? 'compaction failed')),
+              startedAt,
+            );
+            return 'failed';
+          }
+          const placed =
+            outcome.result.entryId !== undefined || outcome.result.submissionId !== undefined;
+          if (!placed) return 'empty';
+          recordCompactionSuccess(scope, stage, startedAt);
+          return 'compacted';
+        } catch (error) {
+          reportCompactionFailure(scope, stage, error, startedAt);
+          return 'failed';
+        } finally {
+          state.warmSummaries.delete(conversation.id);
+        }
+      };
+      const settle = work().catch((error: unknown): IdleCompactionOutcome => {
+        if (!shuttingDown && !expired) reportCompactionFailure(scope, stage, error);
+        return 'failed';
+      });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<IdleCompactionOutcome>((resolve) => {
+        timer = setTimeout(() => {
+          expired = true;
+          resolve('failed');
+        }, IDLE_COMPACT_TIMEOUT_MS + 60_000);
+        timer.unref();
+      });
+      const run = Promise.race([settle, deadline]).then(async (outcome) => {
+        if (!expired) return outcome;
+        const abandoned = abortCompaction;
+        abortCompaction = null;
+        if (abandoned !== null) await abandoned().catch(() => {});
+        reportCompactionFailure(scope, stage, taskFailure('idle compaction ran past its deadline'));
+        return outcome;
+      });
+      compacting.set(threadId, run);
+      try {
+        return await run;
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
+        compacting.delete(threadId);
+        state.idleCompacting.count = Math.max(0, state.idleCompacting.count - 1);
+        if (state.summary.ref === ref) state.summary.ref = priorRef;
+        if (!wasOpen) await closeThread(threadId).catch(() => {});
+      }
+    },
     yieldSuggestions: (threadId: string) => suggestionYields.get(threadId)?.abort(),
     signalSteer: (threadId: string) => {
       suggestionYields.get(threadId)?.abort();
@@ -475,7 +636,9 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     },
     close: async (): Promise<void> => {
       shuttingDown = true;
+      shutdown.abort();
       const results = await Promise.allSettled([...open.keys()].map(closeThread));
+      await Promise.allSettled([...compacting.values()]);
       const failures = results.flatMap((result) =>
         result.status === 'rejected' ? [result.reason] : [],
       );

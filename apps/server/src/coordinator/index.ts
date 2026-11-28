@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   type ClaimedStep,
   type MachineDoneBody,
+  parseModelKey,
   redactSecrets,
   startTurnHeartbeat,
   type ThinkingLevel,
@@ -29,7 +30,12 @@ import {
 } from '../services/chief-turns.js';
 import { connectorToolDefsForTeam } from '../services/connector-broker.js';
 import { browserOfferFor } from '../services/coordinator-browser.js';
-import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
+import {
+  activeRouterModel,
+  contextWindowOf,
+  lastContextBearingTurnUsage,
+  lastTurnUsageForColdResume,
+} from '../services/coordinator-context.js';
 import { resolveCoordinatorRemoteTools } from '../services/coordinator-diagnostics.js';
 import { migrateUnfetchedCoordinatorInputs } from '../services/coordinator-input-upgrade.js';
 import { coordinatorInputIsLive } from '../services/coordinator-inputs.js';
@@ -40,6 +46,7 @@ import {
 } from '../services/coordinator-steps.js';
 import { captureCoordinatorClaim } from '../services/coordinator-turn-capture.js';
 import { readDeployLease } from '../services/deploy-lease.js';
+import { stepRuntimeFor } from '../services/dispatch-eligibility.js';
 import { serverTurnModel } from '../services/machine-claim.js';
 import { stageTurnAttachments, teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
@@ -58,21 +65,35 @@ import { readQuota } from '../services/step-groups/quota.js';
 import {
   type CoordinatorProviders,
   coordinatorProviders,
+  idleSummaryRoute,
   scrubProviderError,
 } from './credentials.js';
-import { createIdleMemorySweep } from './idle-memory.js';
+import {
+  createIdleMemorySweep,
+  IDLE_MEMORY_FLUSH_MS,
+  IDLE_MEMORY_FLUSH_RETRY_MS,
+  THREAD_READY,
+} from './idle-memory.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
 import { providerBinding } from './provider-binding.js';
-import { cacheTtlMsFor, isColdResume, resolveCacheRetentionTier } from './runtime/cold-slim.js';
+import {
+  cacheTtlMsFor,
+  contextResumeOf,
+  isColdResume,
+  resolveCacheRetentionTier,
+  resumeExpiresAtOf,
+} from './runtime/cold-slim.js';
 import { thrownErrorText } from './runtime/error-text.js';
 import { setFailureSink } from './runtime/failure-report.js';
+import { compactionTrigger, reusesPromptCache } from './runtime/idle-compact.js';
 import type { MachineApi } from './runtime/machine-api.js';
 import type { ReconcileFacts } from './runtime/reconcile.js';
 import type { SeedRow } from './runtime/seed.js';
 import {
   createServerRuntime,
+  type IdleCompactionOutcome,
   type ProviderBinding,
   type ServerRuntimeConfig,
 } from './runtime/server-runtime.js';
@@ -740,6 +761,120 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     },
   );
 
+  const idleCompactions = new Map<string, Promise<IdleCompactionOutcome>>();
+  const idleCompactRetryAt = new Map<string, number>();
+  const idleCompactedUsage = new Map<string, number>();
+
+  const sweepIdleCompaction = (now = nowMs()): void => {
+    if (closing || idleCompactions.size > 0) return;
+    const idleAfterMs = options.idleMemoryFlushMs ?? IDLE_MEMORY_FLUSH_MS;
+    const rows = db.all<{
+      id: string;
+      teamId: string;
+      projectId: string | null;
+      lastAt: number | null;
+    }>(sql`
+      select t.id as id, t.teamId as teamId, t.projectId as projectId,
+             (select m.createdAt from chief_message m
+              where m.threadId = t.id and m.role in ('user', 'assistant')
+                and m.id not like 'chief-digest-%' and m.id not like 'chief-report-%'
+              order by m.createdAt desc, m.rowid desc limit 1) as lastAt
+      from chief_thread t
+      where ${THREAD_READY}
+        and t.id not like 'chief-digest-%' and t.id not like 'chief-memory-%'
+      order by lastAt asc`);
+    for (const row of rows) {
+      if (idleCompactions.size > 0) break;
+      const usage = lastContextBearingTurnUsage(db, row.id);
+      if (usage === null || usage.contextTokens <= 0) continue;
+      if (stepRuntimeFor(parseModelKey(usage.model).provider) !== 'pi') continue;
+      if (idleCompactedUsage.get(row.id) === usage.createdAt) continue;
+      const backoff = idleCompactRetryAt.get(row.id);
+      if (backoff !== undefined) {
+        if (backoff > now) continue;
+        idleCompactRetryAt.delete(row.id);
+      }
+      const contextWindow = usage.contextWindow ?? contextWindowOf(db, row.teamId, usage.model);
+      const route = idleSummaryRoute(
+        { db: machine.db, box: machine.box },
+        row.teamId,
+        row.projectId,
+      );
+      if (route === null) continue;
+      const summary = providerBinding({ db: machine.db, box: machine.box }, row.teamId, route);
+      const resume = contextResumeOf({
+        lastUsage: {
+          createdAt: usage.createdAt,
+          cacheRead: usage.cacheRead,
+          input: usage.input,
+          contextTokens: usage.contextTokens,
+          model: usage.model,
+        },
+        activeModel: activeRouterModel(db, row.teamId),
+      });
+      const retention = resolveCacheRetentionTier();
+      const retentionMs = cacheTtlMsFor(retention, usage.model, {
+        total: usage.cacheWrite,
+        oneHour: usage.cacheWrite1h,
+      });
+      const cacheExpiresAt = resumeExpiresAtOf({
+        resume,
+        retentionMs,
+        lastUsageCreatedAt: usage.createdAt,
+      });
+      const warm =
+        resume === 'warm' &&
+        reusesPromptCache(`${summary.config.providerId}/${summary.modelId}`, usage.model) &&
+        (cacheExpiresAt === null ? usage.cacheRead > 0 : now < cacheExpiresAt);
+      const trigger = compactionTrigger({
+        now,
+        idleAfterMs,
+        lastActivityAt: row.lastAt,
+        contextTokens: usage.contextTokens,
+        contextWindow,
+        warm,
+        cacheExpiresAt,
+      });
+      if (trigger === null) continue;
+      idleCompactedUsage.set(row.id, usage.createdAt);
+      const run = runtime
+        .compactWhileIdle(row.id, {
+          trigger,
+          summary,
+          contextTokens: usage.contextTokens,
+          usageCreatedAt: usage.createdAt,
+          warmCache: warm,
+          ...(retentionMs === null ? {} : { cacheRetention: retention }),
+        })
+        .catch((error: unknown): IdleCompactionOutcome => {
+          logger.error(
+            {
+              threadId: row.id,
+              error: String(redactSecrets(String(error)).value),
+            },
+            'coordinator idle compaction failed',
+          );
+          return 'failed';
+        })
+        .then((outcome) => {
+          if (outcome === 'failed') {
+            idleCompactedUsage.delete(row.id);
+            idleCompactRetryAt.set(
+              row.id,
+              nowMs() + (options.idleMemoryRetryMs ?? IDLE_MEMORY_FLUSH_RETRY_MS),
+            );
+          } else {
+            logger.info({ threadId: row.id, trigger, outcome }, 'coordinator idle compaction');
+          }
+          return outcome;
+        })
+        .finally(() => {
+          idleCompactions.delete(row.id);
+        });
+      idleCompactions.set(row.id, run);
+    }
+  };
+
   const tick = (): void => {
     if (closing) return;
     for (const [threadId, lease] of leases) {
@@ -753,6 +888,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     }
     for (const threadId of liveThreads()) wake(threadId);
     idleMemory.sweep();
+    sweepIdleCompaction();
     void runtime
       .closeIdle(options.idleCloseMs ?? IDLE_CLOSE_MS)
       .then((closed) => {
@@ -776,6 +912,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       await Promise.resolve();
       while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       await idleMemory.drain();
+      while (idleCompactions.size > 0) await Promise.allSettled([...idleCompactions.values()]);
     },
     close: async (): Promise<void> => {
       closing = true;
