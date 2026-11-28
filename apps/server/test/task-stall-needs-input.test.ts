@@ -49,7 +49,7 @@ function githubProject(): string {
   return id;
 }
 
-function seedTodo(projectId = H.projectId) {
+function seedTodo(projectId = H.projectId, opts: { title?: string; spec?: string } = {}) {
   const id = `todo-${Math.random().toString(36).slice(2, 8)}`;
   H.s.db
     .insert(todo)
@@ -57,8 +57,8 @@ function seedTodo(projectId = H.projectId) {
       id,
       teamId: H.teamId,
       projectId,
-      title: 'Port the onboarding copy',
-      spec: 'Copy the onboarding text byte-for-byte.',
+      title: opts.title ?? 'Port the onboarding copy',
+      spec: opts.spec ?? 'Copy the onboarding text byte-for-byte.',
       phase: 'todo',
       phaseAt: 1,
       seqNum: 133,
@@ -67,11 +67,11 @@ function seedTodo(projectId = H.projectId) {
   return id;
 }
 
-function startSession(projectId = H.projectId) {
+function startSession(projectId = H.projectId, opts: { title?: string; spec?: string } = {}) {
   const machineId =
     H.s.db.select({ id: machine.id }).from(machine).where(eq(machine.teamId, H.s.team.id)).get()
       ?.id ?? insertMachine(H.s);
-  const todoId = seedTodo(projectId);
+  const todoId = seedTodo(projectId, opts);
   const [started] = startBuilds(deps(), { projectId, todoIds: [todoId] });
   const buildId = started!.id;
   const first = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get()!;
@@ -517,5 +517,89 @@ describe('every surface that lists work waiting on a person includes needs_input
     expect(out.skipped).toEqual([todoId]);
     expect(phaseOf(todoId)).toBe('needs_input');
     expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
+  });
+});
+
+describe('read-only and command-only tasks complete without the no-deliverable gate', () => {
+  test('explicit English no-edit / read-only request finishes done with its report and no gate question', () => {
+    const { todoId, buildId, stepRow } = startSession(githubProject(), {
+      title: 'Verify rotated runner token (read-only)',
+      spec: 'Read-only verification after runner token rotation: reply with ROTATE_TOKEN_LIVE_OK and make no edits.',
+    });
+    H.s.db
+      .update(build)
+      .set({
+        reportLine:
+          'Read-only verification complete with no edits; returning ROTATE_TOKEN_LIVE_OK.',
+      })
+      .where(eq(build.id, buildId))
+      .run();
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('done');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+    expect(H.s.db.select().from(build).where(eq(build.id, buildId)).get()?.reportLine).toBe(
+      'Read-only verification complete with no edits; returning ROTATE_TOKEN_LIVE_OK.',
+    );
+  });
+
+  test('explicit Chinese no-edit request completes even when the title mentions 修复', () => {
+    const { todoId, buildId, stepRow } = startSession(H.projectId, {
+      title: 'Notify Once 心跳修复复测 2：定时触发后直接回复完成',
+      spec: '定时触发后直接回复一句话完成，不要改任何文件。',
+    });
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('done');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+  });
+
+  test.each([
+    {
+      name: 'run hostname and report',
+      title: 'Run hostname',
+      spec: 'run hostname and report',
+    },
+    {
+      name: 'sleep 90 and echo',
+      title: 'Sleep check',
+      spec: 'sleep 90 and echo',
+    },
+    {
+      name: 'ask_user-only permission verification',
+      title: 'Stall-monitor permission wait verification',
+      spec: "Immediately call the ask_user tool to ask the user: 'Please confirm whether to continue stall-monitor verification (Yes / No)'. Do not run any other tool or finish before calling ask_user.",
+    },
+  ])('$name finishes done with hasChanges=false and no gate question', ({ title, spec }) => {
+    const { todoId, buildId, stepRow } = startSession(H.projectId, { title, spec });
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('done');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+  });
+
+  test.each([
+    {
+      name: 'forbids modifying other files while still asking to fix foo.ts',
+      title: 'Fix foo.ts',
+      spec: 'Fix foo.ts. Do not modify any other files.',
+    },
+    {
+      name: 'implements a read-only mode feature',
+      title: 'Add read-only mode',
+      spec: 'Add a read-only mode to the settings page.',
+    },
+    {
+      name: 'command writes output via shell redirect',
+      title: 'Run sleep 90 and write result file',
+      spec: 'Run the bash command "sleep 90 && echo ok > dead-turn-verify.txt" and reply ok.',
+    },
+    {
+      name: 'creates a file while forbidding merge',
+      title: 'Create dogfood-b7.md',
+      spec: '在仓库根目录新建 dogfood-b7.md，写一行「plan approval check」。不要合并。',
+    },
+  ])('negative control ($name) still triggers the no-deliverable gate', ({ title, spec }) => {
+    const { todoId, buildId, stepRow } = startSession(H.projectId, { title, spec });
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('needs_input');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBe('pending');
   });
 });

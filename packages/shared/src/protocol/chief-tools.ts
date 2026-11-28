@@ -584,7 +584,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Pick by what the task needs, for example a fast model for small edits and a stronger one for hard work. Any other model is refused. The list itself is owner-only — do not try to change it; if the model you want is not on it, ask the owner to add it in Settings > Model. Omit it and the task runs on the team task model, which follows the Coordinator model.",
         ),
         output: str(
-          'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or "info"/"report"/"dataset"/"link" for non-code/research tasks (runs normally on any Runner without committing code). Never use create_todo for recurring requests — call schedule_todo on the current conversation instead.',
+          'Optional deliverable kind: "code" (default, for tasks that edit files or deliver commits/PRs, without merging) or "info"/"report"/"dataset"/"link" for non-code, research, read-only, command-run, or verification tasks that make no file changes (runs normally on any Runner without committing code). Never use create_todo for recurring requests — call schedule_todo on the current conversation instead.',
         ),
         start: {
           type: 'boolean',

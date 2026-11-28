@@ -183,6 +183,13 @@ describe('Coordinator task text contract', () => {
       expect(tool?.description).not.toContain('first sentence');
     }
   });
+
+  it('create_todo output parameter covers read-only and command-run tasks', () => {
+    const create = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'create_todo')?.parameters as {
+      properties: Record<string, { description: string }>;
+    };
+    expect(create.properties.output?.description).toContain('read-only');
+  });
 });
 
 describe('D60 router tools', () => {
