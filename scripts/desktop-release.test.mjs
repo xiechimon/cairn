@@ -1286,6 +1286,16 @@ test('the version is decided once in decide and stamped into both builds', () =>
   }
 });
 
+test('the finalize workflow call inherits the release environment secrets', () => {
+  assert.equal(workflow.jobs.finalize.secrets, 'inherit');
+  const tokenStep = publishJob.steps.find((step) =>
+    String(step.uses ?? '').startsWith('actions/create-github-app-token@'),
+  );
+  assert.ok(tokenStep, 'publish mints its release token through the GitHub App');
+  assert.equal(tokenStep.with['app-id'], '${{ secrets.RELEASE_APP_ID }}');
+  assert.equal(tokenStep.with['private-key'], '${{ secrets.RELEASE_APP_PRIVATE_KEY }}');
+});
+
 test('publish refuses archives that disagree with the decided version', () => {
   const steps = publishJob.steps;
   const check = steps.findIndex(

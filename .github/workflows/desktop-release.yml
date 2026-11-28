@@ -679,6 +679,7 @@ jobs:
     permissions:
       contents: write
       actions: read
+    secrets: inherit
     uses: ./.github/workflows/desktop-release-finalize.yml
     with:
       sha: ${{ needs.decide.outputs.sha }}
