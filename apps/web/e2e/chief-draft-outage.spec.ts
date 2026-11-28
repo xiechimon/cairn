@@ -47,7 +47,7 @@ interface SendBody {
 }
 
 async function mockCoordinatorWithOutage(page: Page) {
-  const state = { up: true };
+  const state = { up: true, gateway: false };
   const messages: Row[] = [{ id: 'm1', role: 'user', content: 'Earlier note', createdAt: 10 }];
   const ledger = new Map<string, Row>();
   const posts: SendBody[] = [];
@@ -81,6 +81,7 @@ async function mockCoordinatorWithOutage(page: Page) {
       request.method() === 'POST'
     ) {
       const body = JSON.parse(request.postData() ?? '{}') as SendBody;
+      if (state.gateway) return route.fulfill({ status: 503, json: { error: 'Service Unavailable' } });
       posts.push(body);
       const key = body.clientMessageId ?? `unkeyed-${posts.length}`;
       let row = ledger.get(key);
@@ -183,4 +184,31 @@ test('a draft typed across a server restart survives the reconnect word for word
   await composer(page).press('Enter');
   await expect(bubbles(page).filter({ hasText: full })).toHaveCount(1);
   await expect(composer(page)).toHaveValue('');
+});
+
+test('a proxy answering 503 during a restart keeps the draft and the send, and delivers once', async ({
+  page,
+}) => {
+  const { state, posts, ledger } = await mockCoordinatorWithOutage(page);
+  await page.goto('/app');
+  await expect(bubbles(page)).toHaveCount(1);
+
+  state.gateway = true;
+  const full = '用你自己的电脑跑一下 uptime 命令，把输出原件告诉我，不要建任务。';
+  await composer(page).fill(full);
+  await composer(page).press('Enter');
+
+  await expect(composer(page)).toHaveValue('');
+  await expect(sending(page)).toHaveText(full);
+  await expect(page.getByText('发送失败，请重试。')).toHaveCount(0);
+
+  await composer(page).fill('接着补充的第二句');
+  await expect(composer(page)).toHaveValue('接着补充的第二句');
+
+  state.gateway = false;
+  await expect(bubbles(page).filter({ hasText: full })).toHaveCount(1);
+  await expect(sending(page)).toHaveCount(0);
+  await expect(composer(page)).toHaveValue('接着补充的第二句');
+  expect(ledger.size).toBe(1);
+  expect(posts.filter((post) => post.content === full)).toHaveLength(1);
 });

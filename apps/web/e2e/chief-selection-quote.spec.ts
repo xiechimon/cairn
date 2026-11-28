@@ -265,7 +265,7 @@ test('a send that fails brings every quote back with its reply', async ({ page }
     if (refused || path !== `/api/conversations/${THREAD.id}/messages`) return undefined;
     if (route.request().method() !== 'POST') return undefined;
     refused = true;
-    return json({ error: 'Submission refused' }, 503);
+    return json({ error: 'Submission refused' }, 400);
   });
   await quoteWith(page, 'm6', '第一条');
   await quoteWith(page, 'm4', '第二条');

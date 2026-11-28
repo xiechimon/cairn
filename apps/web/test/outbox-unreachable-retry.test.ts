@@ -102,3 +102,37 @@ test('an explicit server rejection still fails and hands the text back', async (
   expect(box.entries()[0]).toMatchObject({ state: 'failed' });
   expect(failures).toHaveLength(1);
 });
+
+test('a bare gateway 5xx from a restarting proxy stays pending instead of failing back', async () => {
+  let retryHint: () => void = () => {};
+  const box = outbox((retry) => {
+    retryHint = retry;
+    return () => {};
+  });
+  const { calls, deliver } = gate();
+  const failures: unknown[] = [];
+  box.enqueue(input, deliver, { onFailed: (entry, error) => failures.push(error) });
+  await flush();
+  calls[0]?.reject(new ApiError(503, 'Service Unavailable'));
+  await flush();
+  expect(box.entries()[0]).toMatchObject({ state: 'sending', text: input.text });
+  expect(failures).toEqual([]);
+  retryHint();
+  await flush();
+  expect(calls).toHaveLength(2);
+  calls[1]?.resolve({ threadId: 't1', messageId: 'm1' });
+  await flush();
+  expect(box.entries()[0]).toMatchObject({ state: 'sent', messageId: 'm1' });
+});
+
+test('a gateway 5xx that names a reason is a deliberate refusal, not an outage', async () => {
+  const box = outbox();
+  const { calls, deliver } = gate();
+  const failures: unknown[] = [];
+  box.enqueue(input, deliver, { onFailed: (entry, error) => failures.push(error) });
+  await flush();
+  calls[0]?.reject(new ApiError(503, 'no model configured', 'coordinator-not-ready'));
+  await flush();
+  expect(box.entries()[0]).toMatchObject({ state: 'failed' });
+  expect(failures).toHaveLength(1);
+});

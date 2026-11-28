@@ -224,6 +224,17 @@ function failureOf(error: unknown): OutboxFailure {
     : 'error';
 }
 
+const OUTAGE_STATUSES = new Set([502, 503, 504]);
+
+function isOutage(error: unknown): boolean {
+  if (error instanceof ServerUnreachableError) return true;
+  return (
+    error instanceof ApiError &&
+    OUTAGE_STATUSES.has(error.status) &&
+    (error.reason === undefined || error.reason === '')
+  );
+}
+
 function restoredError(failure: OutboxFailure | undefined): Error | null {
   if (failure === 'stale') return new SendStaleError();
   if (failure === 'timeout') return new SendTimeoutError();
@@ -409,7 +420,7 @@ export function createOutbox({
       );
       forget(key);
     } catch (error) {
-      if (error instanceof ServerUnreachableError && sendingEntry(key) !== null) {
+      if (isOutage(error) && sendingEntry(key) !== null) {
         await keep(entry, 'sending');
         scheduleRetry(key, lane, deliver, onFailed);
         return;

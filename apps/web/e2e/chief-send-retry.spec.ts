@@ -90,7 +90,7 @@ async function mockCoordinator(
       const body = { ...(JSON.parse(request.postData() ?? '{}') as SendBody), path };
       posts.push(body);
       if (postDelay > 0) await new Promise((resolve) => setTimeout(resolve, postDelay));
-      if (rejectFirst && posts.length === 1) return json({ error: 'Submission refused' }, 503);
+      if (rejectFirst && posts.length === 1) return json({ error: 'Submission refused' }, 400);
       const held = holdFirst !== undefined && posts.length === 1;
       if (held && holdFirst === 'before-storing') return new Promise<void>(() => {});
       const key = body.clientMessageId ?? `unkeyed-${posts.length}`;
