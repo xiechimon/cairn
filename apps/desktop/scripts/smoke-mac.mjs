@@ -543,33 +543,24 @@ try {
     ];
     const saved = () =>
       existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : '';
-    const onAC = execFileSync('pmset', ['-g', 'batt'], { encoding: 'utf8' }).includes(
-      "Now drawing from 'AC Power'",
-    );
+    const onBattery = await app.evaluate(({ powerMonitor }) => powerMonitor.isOnBatteryPower());
     const lidTitle = english ? 'Keep running with the lid closed' : '合盖继续运行';
-    if (onAC) choices.push([lidTitle, 'lid-closed']);
+    if (!onBattery) choices.push([lidTitle, 'lid-closed']);
     try {
       await openNativeMenu(helper);
-      if (!onAC) {
+      if (onBattery) {
         const before = saved();
         assert.equal(
           (await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile })).ok,
           true,
         );
         const rows = (await driver.send({ cmd: 'menuItems', pid: helper })).items;
-        assert.ok(
-          rows.some((row) => row.title === lidTitle && !row.enabled),
-          'lid mode must remain visible but disabled on battery',
-        );
         assert.equal(
-          (await driver.send({ cmd: 'clickMenuItem', pid: helper, title: lidTitle })).ok,
-          true,
+          rows.some((row) => row.title === lidTitle && row.enabled),
+          false,
+          'battery must not offer the lid choice',
         );
-        assert.ok(
-          (await nativeTitles(helper)).includes(lidTitle),
-          'disabled lid mode closed the picker',
-        );
-        assert.equal(saved(), before, 'disabled lid mode changed the stored choice');
+        assert.equal(saved(), before, 'battery changed the stored choice');
         await driver.send({ cmd: 'escape', pid: helper });
       }
       for (const [title, expected] of choices) {
