@@ -1,6 +1,7 @@
 import { conversationMessagesResponseSchema } from '@cairn/shared';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { message } from '../src/db/schema.js';
+import { build, message, project, todo } from '../src/db/schema.js';
+import { nowMs } from '../src/lib/ids.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 interface Page {
@@ -10,12 +11,54 @@ interface Page {
 }
 
 const BUILD = 'build-paged';
+const OTHER = 'build-other';
 const messagesUrl = (query = '', conversationId = BUILD) =>
   `/api/conversations/${conversationId}/messages${query}`;
 
 let s: TestServer;
 beforeEach(() => {
   s = bootServer();
+  const now = nowMs();
+  for (const [conversationId, seqNum] of [
+    [BUILD, 1],
+    [OTHER, 2],
+  ] as const) {
+    const projectId = `proj-${conversationId}`;
+    const todoId = `todo-${conversationId}`;
+    s.db
+      .insert(project)
+      .values({
+        id: projectId,
+        name: projectId,
+        teamId: s.team.id,
+        repoKind: 'github',
+        githubRepo: `a/${projectId}`,
+      })
+      .run();
+    s.db
+      .insert(todo)
+      .values({
+        id: todoId,
+        teamId: s.team.id,
+        projectId,
+        title: todoId,
+        spec: '',
+        phase: 'todo',
+        phaseAt: now,
+        seqNum,
+      })
+      .run();
+    s.db
+      .insert(build)
+      .values({
+        id: conversationId,
+        todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: now,
+      })
+      .run();
+  }
 });
 
 function seed(

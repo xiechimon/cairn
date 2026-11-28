@@ -1,6 +1,7 @@
+import { isChiefConversationId } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, project, todo } from '../db/schema.js';
+import { build, chiefThread, project, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { listedProjects } from './personal-space.js';
 
@@ -55,4 +56,34 @@ export function requireTeamBuild(db: Db, buildId: string, teamId: string) {
     .get();
   if (!owned) throw new HttpError(404, `build ${buildId}`);
   return row;
+}
+
+export function conversationTeamId(db: Db, conversationId: string): string | undefined {
+  if (isChiefConversationId(conversationId)) {
+    return db
+      .select({ teamId: chiefThread.teamId })
+      .from(chiefThread)
+      .where(eq(chiefThread.id, conversationId))
+      .get()?.teamId;
+  }
+  return db
+    .select({ teamId: todo.teamId })
+    .from(build)
+    .innerJoin(todo, eq(todo.id, build.todoId))
+    .where(eq(build.id, conversationId))
+    .get()?.teamId;
+}
+
+export function ownsConversation(db: Db, conversationId: string, teamId: string): boolean {
+  return conversationTeamId(db, conversationId) === teamId;
+}
+
+export function requireTeamConversation(db: Db, conversationId: string, teamId: string): void {
+  if (!isChiefConversationId(conversationId)) {
+    requireTeamBuild(db, conversationId, teamId);
+    return;
+  }
+  if (!ownsConversation(db, conversationId, teamId)) {
+    throw new HttpError(404, `conversation ${conversationId}`);
+  }
 }

@@ -58,6 +58,7 @@ import {
   editQueuedMessage,
   queueTaskMessage,
 } from './services/task-message-queue.js';
+import { requireTeamConversation } from './services/tool-guards.js';
 
 function sendFromComposer(
   deps: Parameters<typeof sendDesignComments>[0],
@@ -294,6 +295,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/conversations/:id/messages', async (c) => {
     const conversationId = c.req.param('id');
+    requireTeamConversation(ctx.db, conversationId, ctx.team.id);
     if (!isChiefConversation(conversationId)) {
       const body = parseWith(buildSteerBodySchema, await jsonBody(c), 'body');
       const humanSvc = { ...svc, steerOptions: { human: true } };

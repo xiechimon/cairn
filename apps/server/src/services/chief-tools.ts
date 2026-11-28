@@ -15,7 +15,6 @@ import {
   fenceReportText,
   formatAttachmentToken,
   IN_PROGRESS_PHASES,
-  isChiefConversationId,
   isComposioSecretName,
   isMailSecretName,
   isRegisteredMachine,
@@ -131,6 +130,7 @@ import {
   optStr,
   requireProjectRow,
   requireTeamBuild,
+  requireTeamConversation,
   requireTeamTodo,
   str,
 } from './tool-guards.js';
@@ -285,19 +285,6 @@ export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
 const SEARCH_QUERY_MAX_CHARS = 200;
 const SEARCH_QUERY_MAX_TERMS = 8;
 export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
-
-function requireTeamConversation(db: Db, conversationId: string, teamId: string): void {
-  if (!isChiefConversationId(conversationId)) {
-    requireTeamBuild(db, conversationId, teamId);
-    return;
-  }
-  const thread = db
-    .select({ id: chiefThread.id })
-    .from(chiefThread)
-    .where(and(eq(chiefThread.id, conversationId), eq(chiefThread.teamId, teamId)))
-    .get();
-  if (!thread) throw new HttpError(404, `conversation ${conversationId}`);
-}
 
 function trimProviderSummary<T extends { installed: boolean }>(
   report: T | undefined,

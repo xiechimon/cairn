@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { message } from '../src/db/schema.js';
-import { bootServer, req } from './helpers.js';
+import { bootServer, ownBuildConversation, req } from './helpers.js';
 
 const todoWrite = (
   id: string,
@@ -26,6 +26,7 @@ async function pageTodo(s: ReturnType<typeof bootServer>, query = '') {
 describe('messages page agent todo', () => {
   test('returns the latest persisted snapshot across steps, beyond the loaded page', async () => {
     const s = bootServer();
+    ownBuildConversation(s, 'build-1');
     s.db
       .insert(message)
       .values([
@@ -91,6 +92,7 @@ describe('messages page agent todo', () => {
 
   test('a later assistant checklist wins, and no snapshot gives null', async () => {
     const s = bootServer();
+    ownBuildConversation(s, 'build-1');
     expect(await pageTodo(s)).toBeNull();
     s.db
       .insert(message)

@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { createSerialConnection, SSE_MAX_PENDING_WRITES } from '../src/services/events.js';
-import { bootServer } from './helpers.js';
+import { bootServer, ownBuildConversation } from './helpers.js';
 
 async function headersOf(app: ReturnType<typeof bootServer>['app'], path: string) {
   const ctrl = new AbortController();
@@ -21,6 +21,7 @@ describe('SSE responses are safe behind a buffering proxy', () => {
     ['conversation stream', () => '/api/conversations/conv-a/stream'],
   ])('the %s opts out of proxy buffering and transformation', async (_name, path) => {
     const s = bootServer({ pingIntervalMs: 60_000 });
+    ownBuildConversation(s, 'conv-a');
     const headers = await headersOf(s.app, path(s.team.id));
     expect(headers.type).toContain('text/event-stream');
     expect(headers.buffering).toBe('no');

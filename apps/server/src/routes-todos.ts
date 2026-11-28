@@ -46,17 +46,22 @@ import {
   setTodoArchived,
   updateTodo,
 } from './services/todos.js';
+import { requireTeamTodo } from './services/tool-guards.js';
 
 export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
 
   app.get('/api/todos/:id/github-issue', async (c) => {
-    const echo = await readSourceIssueEcho(githubIssueDepsOf(ctx), c.req.param('id'));
+    const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
+    const echo = await readSourceIssueEcho(githubIssueDepsOf(ctx), id);
     return c.json(githubIssueEchoSchema.parse(echo));
   });
 
   app.post('/api/todos/:id/github-issue/retry', async (c) => {
-    const record = await retrySelfIssueCreate(svc, c.req.param('id'));
+    const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
+    const record = await retrySelfIssueCreate(svc, id);
     return c.json(record);
   });
 
@@ -81,13 +86,16 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/todos/:id', (c) => {
     const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
     const record = getTodo(svc, id);
     if (!record) throw notFound(`todo ${id}`);
     return c.json(record);
   });
 
   app.post('/api/todos/:id/orchestrate', (c) => {
-    const result = orchestrateTodo(svc, c.req.param('id'));
+    const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
+    const result = orchestrateTodo(svc, id);
     return c.json(result, 201);
   });
 
@@ -116,6 +124,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   app.patch('/api/todos/:id', async (c) => {
     const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
     const body = parseWith(patchTodoBodySchema, await jsonBody(c), 'body');
     if (body.assignment != null) throw new HttpError(410, AGENTS_REMOVED_MESSAGE);
     const prior = getTodo(svc, id);
@@ -182,6 +191,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/todos/:id/archive', (c) => {
     const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
     const record = setTodoArchived(svc, id, true);
     if (!record) throw notFound(`todo ${id}`);
     stopActiveStepsForArchive(svc, id, {
@@ -193,6 +203,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/todos/:id/unarchive', (c) => {
     const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
     const record = setTodoArchived(svc, id, false);
     if (!record) throw notFound(`todo ${id}`);
     return c.json(record);
@@ -200,6 +211,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/todos/:id/stop-and-done', async (c) => {
     const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
     const prior = getTodo(svc, id);
     if (!prior) throw notFound(`todo ${id}`);
     let prep: ReturnType<typeof prepareStopForDone>;
@@ -230,6 +242,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   app.delete('/api/todos/:id', (c) => {
     const id = c.req.param('id');
+    requireTeamTodo(ctx.db, id, ctx.team.id);
     if (!deleteTodo(svc, id)) throw notFound(`todo ${id}`);
     return c.body(null, 204);
   });

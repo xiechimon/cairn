@@ -20,7 +20,14 @@ import { HttpError } from '../src/lib/errors.js';
 import { registerTokenAuth } from '../src/lib/token-auth.js';
 import { AUTH_COOKIE } from '../src/services/browser-session.js';
 import { assertDeviceActive } from '../src/services/paired-devices.js';
-import { bootServer, insertGitApiKey, redeemTestPairing, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertGitApiKey,
+  ownBuildConversation,
+  redeemTestPairing,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const TOKEN = 'cairn-test-token-0123456789abcdef';
 const authHeaders = { authorization: `Bearer ${TOKEN}` };
@@ -367,6 +374,7 @@ describe('token auth: SSE uses a short ticket, not the owner token', () => {
 
   test('on + the conversation stream refuses ?token= and opens with a ticket', async () => {
     const s = bootServer({ authToken: TOKEN, pingIntervalMs: 50 });
+    ownBuildConversation(s, 'conv-probe');
     const refused = await req(s.app, 'GET', `/api/conversations/conv-probe/stream?token=${TOKEN}`);
     expect(refused.status).toBe(401);
     const ticket = await streamTicket(s);

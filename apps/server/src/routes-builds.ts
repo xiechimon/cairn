@@ -45,6 +45,7 @@ import { deviceStreamsOf, pairedDeviceExists } from './services/paired-devices.j
 import { PhaseTransitionError } from './services/phase.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
 import { listThreadPrs } from './services/thread-pr.js';
+import { requireTeamBuild, requireTeamConversation } from './services/tool-guards.js';
 
 const buildRetryNowBodySchema = z.object({
   clientMessageId: z.string().min(1).max(128).optional(),
@@ -68,6 +69,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/builds/:id', (c) => {
     const id = c.req.param('id');
+    requireTeamBuild(ctx.db, id, ctx.team.id);
     const record = getBuild(svc, id);
     if (!record) throw notFound(`build ${id}`);
     return c.json(record);
@@ -87,12 +89,13 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/builds/:id/steps', (c) => {
     const id = c.req.param('id');
-    if (!getBuild(svc, id)) throw notFound(`build ${id}`);
+    requireTeamBuild(ctx.db, id, ctx.team.id);
     return c.json(listSteps(svc, id));
   });
 
   app.get('/api/conversations/:id/messages', (c) => {
     const conversationId = c.req.param('id');
+    requireTeamConversation(ctx.db, conversationId, ctx.team.id);
     const query = parseWith(conversationMessagesQuerySchema, c.req.query(), 'query');
     if (isChiefConversation(conversationId)) {
       const thread = getChiefThread(svc, conversationId);
@@ -146,6 +149,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/conversations/:id/stream', (c) => {
     const conversationId = c.req.param('id');
+    requireTeamConversation(ctx.db, conversationId, ctx.team.id);
     return openSseStream(c, async (stream) => {
       const conn = createSerialConnection(
         (payload) => stream.writeSSE({ data: JSON.stringify(payload) }),
@@ -194,13 +198,17 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ builds }, 201);
   });
 
-  app.get('/api/builds/:id/merge-permission', (c) =>
-    c.json(buildMergePermissionSchema.parse(buildMergePermission(svc, c.req.param('id')))),
-  );
+  app.get('/api/builds/:id/merge-permission', (c) => {
+    const id = c.req.param('id');
+    requireTeamBuild(ctx.db, id, ctx.team.id);
+    return c.json(buildMergePermissionSchema.parse(buildMergePermission(svc, id)));
+  });
 
   app.post('/api/builds/:id/merge', async (c) => {
+    const id = c.req.param('id');
+    requireTeamBuild(ctx.db, id, ctx.team.id);
     try {
-      await requestMerge(svc, c.req.param('id'));
+      await requestMerge(svc, id);
       return c.json({ delegated: true }, 202);
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
@@ -209,13 +217,16 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/builds/:id/undo', (c) => {
-    enqueueLocalFolderAction(svc, c.req.param('id'), 'undo');
+    const id = c.req.param('id');
+    requireTeamBuild(ctx.db, id, ctx.team.id);
+    enqueueLocalFolderAction(svc, id, 'undo');
     return c.json({ delegated: true }, 202);
   });
 
   app.post('/api/builds/:id/steps', async (c) => {
-    const body = parseWith(buildStepActionBodySchema, await jsonBody(c), 'body');
     const buildId = c.req.param('id');
+    requireTeamBuild(ctx.db, buildId, ctx.team.id);
+    const body = parseWith(buildStepActionBodySchema, await jsonBody(c), 'body');
     if ('clientMessageId' in body) {
       const stored = findClientMessage(svc.db, buildId, body.clientMessageId);
       if (stored !== undefined) return c.json({ delegated: true }, 202);
@@ -235,6 +246,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/builds/:id/retry-now', async (c) => {
     const buildId = c.req.param('id');
+    requireTeamBuild(ctx.db, buildId, ctx.team.id);
     const raw = await jsonBody(c);
     const body = parseWith(buildRetryNowBodySchema, raw ?? {}, 'body');
     if (body.clientMessageId !== undefined) {
@@ -255,25 +267,27 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/builds/:id/stop', async (c) => {
+    const id = c.req.param('id');
+    requireTeamBuild(ctx.db, id, ctx.team.id);
     const body = parseWith(buildStopBodySchema, await jsonBody(c), 'body');
-    const result = requestStop(svc, c.req.param('id'), body, {
+    const result = requestStop(svc, id, body, {
       actor: 'person',
       reason: `stopped from the task page by ${svc.user.displayName}`,
     });
-    if (!result.delegated) await drainTaskMessageQueue(svc, c.req.param('id'));
+    if (!result.delegated) await drainTaskMessageQueue(svc, id);
     return c.json(result, result.delegated ? 202 : 200);
   });
 
   app.post('/api/builds/:id/tasks/:taskId/stop', (c) => {
     const id = c.req.param('id');
-    if (!getBuild(svc, id)) throw notFound(`build ${id}`);
+    requireTeamBuild(ctx.db, id, ctx.team.id);
     requestBackgroundTaskStop(svc, id, c.req.param('taskId'));
     return c.json({ ok: true as const }, 202);
   });
 
   app.get('/api/builds/:id/plans', (c) => {
     const id = c.req.param('id');
-    if (!getBuild(svc, id)) throw notFound(`build ${id}`);
+    requireTeamBuild(ctx.db, id, ctx.team.id);
     const rows = ctx.db
       .select()
       .from(planTable)
@@ -297,6 +311,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/builds/:id/plans/:planId/pause-auto-approve', (c) => {
     const buildId = c.req.param('id');
+    requireTeamBuild(ctx.db, buildId, ctx.team.id);
     const buildRow = getBuild(svc, buildId);
     if (!buildRow) throw notFound(`build ${buildId}`);
     const planId = c.req.param('planId');
@@ -326,23 +341,25 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     return c.json(planResponseSchema.parse({ ...row, autoApproveAt: null, autoApprovePausedAt }));
   });
 
-  app.get('/api/builds/:id/changes', async (c) =>
-    c.json(await readBuildChanges({ db: ctx.db, reposDir: ctx.reposDir }, c.req.param('id'))),
-  );
+  app.get('/api/builds/:id/changes', async (c) => {
+    const id = c.req.param('id');
+    requireTeamBuild(ctx.db, id, ctx.team.id);
+    return c.json(await readBuildChanges({ db: ctx.db, reposDir: ctx.reposDir }, id));
+  });
 
   app.get('/api/builds/:id/changes/file', async (c) => {
+    const id = c.req.param('id');
+    requireTeamBuild(ctx.db, id, ctx.team.id);
     const path = c.req.query('path');
     if (path === undefined || path === '') {
       throw new HttpError(400, 'invalid query path: required');
     }
-    return c.json(
-      await readBuildChangeFile({ db: ctx.db, reposDir: ctx.reposDir }, c.req.param('id'), path),
-    );
+    return c.json(await readBuildChangeFile({ db: ctx.db, reposDir: ctx.reposDir }, id, path));
   });
 
   app.get('/api/builds/:id/usage', (c) => {
     const id = c.req.param('id');
-    if (!getBuild(svc, id)) throw notFound(`build ${id}`);
+    requireTeamBuild(ctx.db, id, ctx.team.id);
     const rows = ctx.db.select().from(tokenUsage).where(eq(tokenUsage.buildId, id)).all();
     return c.json(rows.map((r) => tokenUsageSchema.parse(r)));
   });

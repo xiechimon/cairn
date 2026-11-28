@@ -355,6 +355,39 @@ export async function issueApiKey(s: ReturnType<typeof bootServer>): Promise<str
 
 export type TestServer = ReturnType<typeof bootServer>;
 
+export function ownBuildConversation(s: TestServer, conversationId: string, seqNum = 1): void {
+  const now = nowMs();
+  const projectId = `proj-${conversationId}`;
+  const todoId = `todo-${conversationId}`;
+  s.db
+    .insert(projectTable)
+    .values({
+      id: projectId,
+      name: projectId,
+      teamId: s.team.id,
+      repoKind: 'github',
+      githubRepo: `a/${projectId}`,
+    })
+    .run();
+  s.db
+    .insert(todoTable)
+    .values({
+      id: todoId,
+      teamId: s.team.id,
+      projectId,
+      title: todoId,
+      spec: '',
+      phase: 'todo',
+      phaseAt: now,
+      seqNum,
+    })
+    .run();
+  s.db
+    .insert(buildTable)
+    .values({ id: conversationId, todoId, withPlan: false, triggerSource: 'user', createdAt: now })
+    .run();
+}
+
 const jsonHeaders = { 'content-type': 'application/json' };
 
 let personSendStamp = 0;

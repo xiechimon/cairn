@@ -83,6 +83,7 @@ import {
 } from './services/routing-rules.js';
 import { buildServerVersionResponse, requestHostUpdate } from './services/server-version.js';
 import { filterKnownSkillIds } from './services/skills.js';
+import { conversationTeamId } from './services/tool-guards.js';
 import { readTopModels, writeTopModels } from './services/top-models.js';
 import { dailyUsage } from './services/usage-daily.js';
 
@@ -665,9 +666,13 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (body.revision === undefined && session.revision !== undefined) {
       return c.json({ error: 'revision required for this stream connection' }, 409);
     }
+    const conversationIds = body.conversationIds.filter((id) => {
+      const owner = conversationTeamId(ctx.db, id);
+      return owner === undefined || owner === session.teamId;
+    });
     const revision = streamSessions.setConversations(
       session,
-      body.conversationIds,
+      conversationIds,
       ctx.convHub,
       body.revision,
     );

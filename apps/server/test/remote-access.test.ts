@@ -23,7 +23,7 @@ import { environmentIdPathOf, loadOrCreateEnvironmentId } from '../src/lib/envir
 import { listenOnTailnetSocket } from '../src/lib/tailnet-listener.js';
 import { seedLocalMachine } from '../src/services/machines.js';
 import { createPairingBook, pairFromGrant } from '../src/services/paired-devices.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, ownBuildConversation, type TestServer } from './helpers.js';
 
 const OWNER = 'remote-access-owner-token-0123456789abcdef';
 const ENVIRONMENT_ID = '0f9d3a52-6c1e-4b7a-9d3e-5a1c2b4d6e80';
@@ -876,6 +876,7 @@ describe('F-R2 revocation reaches live state', () => {
 
   test('the conversation stream of a revoked device is closed', async () => {
     const s = bootServer({ authToken: OWNER });
+    ownBuildConversation(s, 'some-conversation');
     expect(await endsAfterRevoke(s, '/api/conversations/some-conversation/stream')).toBe(true);
   });
 
