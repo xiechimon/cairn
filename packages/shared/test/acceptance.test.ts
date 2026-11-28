@@ -45,6 +45,7 @@ function shot(overrides: Partial<AcceptanceAttachment> = {}): AcceptanceAttachme
     createdBy: 'step:step-1',
     fileName: 'live-app.png',
     mimeType: 'image/png',
+    sizeBytes: 128,
     status: 'ready',
     grantId: 'grant-1',
     createdAt: 300,
@@ -88,11 +89,14 @@ describe('evaluateStepAcceptance (Slice 2)', () => {
           toolMsg('edit', { path: 'apps/server/src/routes.ts' }, { createdAt: 100 }),
           toolMsg(
             'bash',
-            { command: 'curl -fsS http://127.0.0.1:8787/api/health' },
+            { command: 'curl -fsS http://127.0.0.1:8787/api/todos' },
             { result: '{"ok":true}', createdAt: 200 },
           ),
+          toolMsg('attach_file', { path: 'todos.json' }, { createdAt: 300 }),
         ],
-        attachments: [],
+        attachments: [
+          shot({ fileName: 'todos.json', mimeType: 'application/json', createdAt: 300 }),
+        ],
         stepIds: ['step-1'],
       }),
     ).toMatchObject({ ok: true });
@@ -110,8 +114,11 @@ describe('evaluateStepAcceptance (Slice 2)', () => {
             { command: 'node scripts/check.mjs' },
             { result: 'PASS', createdAt: 200 },
           ),
+          toolMsg('attach_file', { path: 'check-output.txt' }, { createdAt: 300 }),
         ],
-        attachments: [],
+        attachments: [
+          shot({ fileName: 'check-output.txt', mimeType: 'text/plain', createdAt: 300 }),
+        ],
         stepIds: ['step-1'],
       }),
     ).toMatchObject({ ok: true });
@@ -274,8 +281,9 @@ describe('evaluateStepAcceptance (Slice 2)', () => {
             { command: 'pnpm exec vitest run test/acceptance.test.ts' },
             { result: '1 passed', createdAt: 200 },
           ),
+          toolMsg('attach_file', { path: 'vitest.txt' }, { createdAt: 300 }),
         ],
-        attachments: [],
+        attachments: [shot({ fileName: 'vitest.txt', mimeType: 'text/plain', createdAt: 300 })],
         stepIds: ['step-1'],
       }),
     ).toMatchObject({ ok: true });
@@ -455,16 +463,17 @@ describe('evaluateStepAcceptance (Slice 2)', () => {
         output: 'code',
         repoKind: 'hosted',
         hasChanges: true,
-        editedPaths: ['apps/server/src/routes.ts'],
+        editedPaths: ['apps/server/src/health.ts'],
         messages: [
-          toolMsg('edit', { path: 'apps/server/src/routes.ts' }, { createdAt: 100 }),
+          toolMsg('edit', { path: 'apps/server/src/health.ts' }, { createdAt: 100 }),
           toolMsg(
             'bash',
             { command: 'curl -fsS http://127.0.0.1:8000/health 2>&1' },
             { result: 'ok', createdAt: 200 },
           ),
+          toolMsg('attach_file', { path: 'health.txt' }, { createdAt: 300 }),
         ],
-        attachments: [],
+        attachments: [shot({ fileName: 'health.txt', mimeType: 'text/plain', createdAt: 300 })],
         stepIds: ['step-1'],
       }),
     ).toMatchObject({ ok: true });
@@ -628,8 +637,9 @@ describe('evaluateStepAcceptance (Slice 2)', () => {
         messages: [
           toolMsg('edit', { path: 'scripts/tool.mjs' }, { createdAt: 100 }),
           toolMsg('bash', { command: 'node scripts/tool.mjs' }, { result: 'OK', createdAt: 200 }),
+          toolMsg('attach_file', { path: 'tool.txt' }, { createdAt: 300 }),
         ],
-        attachments: [],
+        attachments: [shot({ fileName: 'tool.txt', mimeType: 'text/plain', createdAt: 300 })],
         stepIds: ['step-1'],
         unpushedCommits: undefined,
       }),
@@ -656,6 +666,7 @@ describe('evaluateStepAcceptance (Slice 2)', () => {
       checksRan: ['playwright'],
       summary: 'Missing live UI screenshot.',
       missing: 'Attach a live screenshot.',
+      missingLine: 'Attach a live screenshot.',
       unblockHint: 'Run the app and call attach_file.',
     });
     expect(isAcceptanceNudgePrompt(prompt)).toBe(true);

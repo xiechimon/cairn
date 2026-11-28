@@ -3338,4 +3338,5 @@ export const EN: Record<string, string> = {
   之后已继续: 'Continued after this',
   '内容过长已截断，导出的文件里是全文': 'Shortened here; the exported file has the full text',
   步骤: 'Step',
+  '还缺：{missing}': 'Missing: {missing}',
 };

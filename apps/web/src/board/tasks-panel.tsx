@@ -281,7 +281,8 @@ function PanelTaskRow({
     entry.section === 'working' &&
     (entry.todo.retry != null ||
       entry.todo.quotaWait != null ||
-      entry.todo.waitingOn?.on === 'quota');
+      entry.todo.waitingOn?.on === 'quota' ||
+      (entry.todo.missingEvidence != null && entry.todo.missingEvidence !== ''));
   const open = () => onOpenThread(entry.todo.id);
   const unfinishable = canMarkDone(entry.todo) ? null : unfinishableLead(entry.todo);
   return (

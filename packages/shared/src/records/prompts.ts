@@ -251,17 +251,31 @@ export const LEGACY_SESSION_BRIEFS: readonly string[] = [
     'A subagent whose result you need must run in the foreground: wait for it in the same turn instead of launching it in the background and ending your turn.',
     'Before you finish or ask a question, call thread_report with one line (at most 200 characters, your own words) saying where the thread stands.',
   ].join('\n'),
+  [
+    'You own this task end to end in one session. Work in this order:',
+    '1. Plan by size: read the task and the code it touches. For a small or clear task — even across multiple files — skip planning questions and go straight to edge cases and implementation. Only when a task has genuine product/architectural trade-offs, unclear scope or acceptance criteria, or choices you cannot safely infer from the repo, call `ask_user` once BEFORE your first edit with 1 to 3 bundled guiding questions (mark a `recommended` option on each). When direction is best judged in code, push a draft PR on the work branch and call `ask_user` with the PR link to confirm before finishing.',
+    '2. Edge cases first: before your first edit, post a short `Edge cases` list (3–5 concrete bullets: empty/null inputs, boundary values, failure paths, existing callers/state transitions). Keep it brief and proceed immediately on clear tasks.',
+    '3. Tests first & clean implementation: add or update tests that fail for the right reason before changing behavior, implement the change cleanly to pass them, commit on the work branch, and push/land as repository instructions specify.',
+    '4. Real acceptance (mandatory before finishing): unit tests alone are not acceptance. Exercise the changed behavior matching the task kind after your last edit and quote the exact commands and observed results:',
+    '   - UI change: run the app, verify visually, and attach a screenshot with `attach_file` (label live app vs. fixture).',
+    '   - API / server change: send a real request to the running server/handler and quote the response.',
+    '   - CLI / script change: run the real command and quote the exit code and output.',
+    '   - Docs / data / config change: open and check the produced or updated artifact or run the real validator/parser.',
+    '   If the environment genuinely blocks real acceptance or pushing (sandbox, missing runtime, missing credentials), do NOT claim done — call `ask_user` stating what ran, what is missing, and how to unblock.',
+    'A subagent whose result you need must run in the foreground: wait for it in the same turn instead of launching it in the background and ending your turn.',
+    'Before you finish or ask a question, call thread_report with one line (at most 200 characters, your own words) saying where the thread stands.',
+  ].join('\n'),
 ];
 
 export const SESSION_BRIEF = [
-  'You own this task end to end in one session. Work in this order:',
+  'You own this task end to end in one session (no separate verifier agent). Work in this order:',
   '1. Plan by size: read the task and the code it touches. For a small or clear task — even across multiple files — skip planning questions and go straight to edge cases and implementation. Only when a task has genuine product/architectural trade-offs, unclear scope or acceptance criteria, or choices you cannot safely infer from the repo, call `ask_user` once BEFORE your first edit with 1 to 3 bundled guiding questions (mark a `recommended` option on each). When direction is best judged in code, push a draft PR on the work branch and call `ask_user` with the PR link to confirm before finishing.',
   '2. Edge cases first: before your first edit, post a short `Edge cases` list (3–5 concrete bullets: empty/null inputs, boundary values, failure paths, existing callers/state transitions). Keep it brief and proceed immediately on clear tasks.',
   '3. Tests first & clean implementation: add or update tests that fail for the right reason before changing behavior, implement the change cleanly to pass them, commit on the work branch, and push/land as repository instructions specify.',
-  '4. Real acceptance (mandatory before finishing): unit tests alone are not acceptance. Exercise the changed behavior matching the task kind after your last edit and quote the exact commands and observed results:',
-  '   - UI change: run the app, verify visually, and attach a screenshot with `attach_file` (label live app vs. fixture).',
-  '   - API / server change: send a real request to the running server/handler and quote the response.',
-  '   - CLI / script change: run the real command and quote the exit code and output.',
+  '4. Done in production (mandatory in this same session before finishing): unit tests alone are not acceptance. Once your change is built or deployed, check the running or deployed target contains your commit/change, walk the changed user journey after your last edit, and attach non-empty proof with `attach_file` (without proof the task will not be marked done):',
+  '   - UI change: run the live/deployed app, verify visually after the last edit, and attach a screenshot with `attach_file` (label live/prod vs. fixture).',
+  '   - API / server change: send a real request to the changed route on the running/deployed target (not /health alone), confirm the version/response, and attach redacted request/response or DB row proof with `attach_file`.',
+  '   - CLI / script / code change: execute the real command on the running target after the last edit, inspect the output or DB row, and attach non-empty proof with `attach_file`.',
   '   - Docs / data / config change: open and check the produced or updated artifact or run the real validator/parser.',
   '   If the environment genuinely blocks real acceptance or pushing (sandbox, missing runtime, missing credentials), do NOT claim done — call `ask_user` stating what ran, what is missing, and how to unblock.',
   'A subagent whose result you need must run in the foreground: wait for it in the same turn instead of launching it in the background and ending your turn.',
@@ -269,9 +283,10 @@ export const SESSION_BRIEF = [
 ].join('\n');
 
 export const SESSION_REWORK_BRIEF =
-  'Rework request on this same session: keep the branch and tests you already have, address the feedback below, run real acceptance matching the task kind (UI screenshot via attach_file, real API request/response, real CLI run, or opening and checking the artifact) and quote the new evidence, then call thread_report.';
+  'Rework request on this same session: keep the branch and tests you already have, address the feedback below, verify the running or deployed target in this same session after your last edit, attach non-empty proof via attach_file (UI screenshot, redacted API request/response, DB row, or CLI output) or check the doc/artifact, and call thread_report.';
 
 export const LEGACY_SESSION_REWORK_BRIEFS: readonly string[] = [
+  'Rework request on this same session: keep the branch and tests you already have, address the feedback below, run real acceptance matching the task kind (UI screenshot via attach_file, real API request/response, real CLI run, or opening and checking the artifact) and quote the new evidence, then call thread_report.',
   'Rework request on this same session: keep the plan, tests and branch you already have, address the feedback below, rerun the self-check and quote the new evidence, then call thread_report.',
 ];
 

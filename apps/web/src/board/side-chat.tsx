@@ -92,6 +92,42 @@ export const THREAD_HEAD_BUTTON =
 
 const OPEN_SURFACE = '.overlay, [role="dialog"], [role="menu"], [role="listbox"]';
 
+export function statusLineMeta({
+  todo,
+  platformWait,
+  now,
+  updates,
+  t,
+}: {
+  todo: TodoRecord;
+  platformWait: ThreadChat['platformWait'];
+  now: number;
+  updates: ThreadUpdates | null;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}): string {
+  const needsYou = threadStatus(todo) === 'needs-you';
+  const need = platformWait?.platform ?? todo.routeOverride?.requiredCapabilities?.os;
+  const needText =
+    need === undefined ? null : t('需要 {platform}', { platform: RUNNER_OS_LABELS[need] });
+  const retryPhrase = todoRetryPhrase(todo);
+  const retryText = retryPhrase === null ? null : t(retryPhrase.key, retryPhrase.params);
+  const quotaHeld = todo.quotaWait != null || todo.waitingOn?.on === 'quota';
+  const missingText =
+    (todo.phase === 'needs_input' || todo.phase === 'building' || todo.phase === 'queued') &&
+    todo.missingEvidence != null &&
+    todo.missingEvidence !== ''
+      ? t('还缺：{missing}', { missing: todo.missingEvidence })
+      : null;
+  if (platformWait !== null) {
+    return platformWait.machine !== null ? (needText ?? '') : '';
+  }
+  if (retryText !== null) return joinMeta([needText, retryText]);
+  if (quotaHeld) return joinMeta([needText, relativeTime(todo.phaseAt, now, t)]);
+  if (missingText !== null) return joinMeta([needText, missingText]);
+  if (needsYou && updates !== null) return t('{n} 条更新', { n: updates.lines.length });
+  return joinMeta([needText, relativeTime(todo.phaseAt, now, t)]);
+}
+
 function StatusLine({
   todo,
   platformWait,
@@ -107,23 +143,9 @@ function StatusLine({
 }) {
   const { t } = useI18n();
   const needsYou = threadStatus(todo) === 'needs-you';
-  const need = platformWait?.platform ?? todo.routeOverride?.requiredCapabilities?.os;
-  const needText =
-    need === undefined ? null : t('需要 {platform}', { platform: RUNNER_OS_LABELS[need] });
-  const retryPhrase = todoRetryPhrase(todo);
-  const retryText = retryPhrase === null ? null : t(retryPhrase.key, retryPhrase.params);
   const quotaHeld = todo.quotaWait != null || todo.waitingOn?.on === 'quota';
   const scheduledRetry = isWaitingToRetry(todo);
-  const meta =
-    platformWait !== null
-      ? platformWait.machine !== null
-        ? (needText ?? '')
-        : ''
-      : retryText !== null
-        ? joinMeta([needText, retryText])
-        : needsYou && updates !== null
-          ? t('{n} 条更新', { n: updates.lines.length })
-          : joinMeta([needText, relativeTime(todo.phaseAt, now, t)]);
+  const meta = statusLineMeta({ todo, platformWait, now, updates, t });
   return (
     <p
       data-testid="side-chat-status"

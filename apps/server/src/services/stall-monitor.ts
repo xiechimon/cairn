@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import {
   CHIEF_NOTICE_KIND,
+  isAcceptanceNudgePrompt,
   isBackendRuntimeId,
   isChiefSideThreadId,
   type MachineDoneBody,
   type Phase,
+  parseMissingEvidenceLine,
 } from '@cairn/shared';
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -576,6 +578,12 @@ function handleTerminalStall(
   );
 }
 
+function withAcceptanceMissingContext(row: StepRow, note: string): string {
+  if (!isAcceptanceNudgePrompt(row.prompt)) return note;
+  const missing = parseMissingEvidenceLine(row.prompt ?? '');
+  return missing === null ? note : `${note}（还缺：${missing}）`;
+}
+
 export function sweepStallMonitor(deps: BuildDeps, now: number = nowMs()): void {
   releaseExpiredRecoveryHolds(deps, now);
   const claimed = deps.db.select().from(step).where(eq(step.status, 'claimed')).all();
@@ -647,7 +655,10 @@ export function sweepStallMonitor(deps: BuildDeps, now: number = nowMs()): void 
             freshContext,
             'missing_tools',
             now,
-            '检测到 Cairn 宿主工具未挂载，已停止旧会话并新建会话重试一次。',
+            withAcceptanceMissingContext(
+              current,
+              '检测到 Cairn 宿主工具未挂载，已停止旧会话并新建会话重试一次。',
+            ),
             { freshSession: true, incrementRecovery: true, holdSettle },
           );
         } else {
@@ -657,7 +668,10 @@ export function sweepStallMonitor(deps: BuildDeps, now: number = nowMs()): void 
             freshContext,
             'missing_tools',
             now,
-            '重新发起会话后 Cairn 宿主工具仍未挂载，已停止当前运行，请检查运行器或 MCP 配置。',
+            withAcceptanceMissingContext(
+              current,
+              '重新发起会话后 Cairn 宿主工具仍未挂载，已停止当前运行，请检查运行器或 MCP 配置。',
+            ),
           );
         }
         return;
@@ -676,7 +690,10 @@ export function sweepStallMonitor(deps: BuildDeps, now: number = nowMs()): void 
             freshContext,
             'dead_turn',
             now,
-            '原运行器已失联且心跳中断，已自动重新排队继续执行。',
+            withAcceptanceMissingContext(
+              current,
+              '原运行器已失联且心跳中断，已自动重新排队继续执行。',
+            ),
             { freshSession: false, incrementRecovery: true, holdSettle: false },
           );
         } else {
@@ -686,7 +703,10 @@ export function sweepStallMonitor(deps: BuildDeps, now: number = nowMs()): void 
             freshContext,
             'dead_turn',
             now,
-            '重派后的运行器再次失联中断，已结束本轮避免循环，请检查执行机状态。',
+            withAcceptanceMissingContext(
+              current,
+              '重派后的运行器再次失联中断，已结束本轮避免循环，请检查执行机状态。',
+            ),
           );
         }
         return;
@@ -701,7 +721,10 @@ export function sweepStallMonitor(deps: BuildDeps, now: number = nowMs()): void 
           now,
           freshContext.kind === 'chief'
             ? '对话已有一段时间无新工具调用或输出，已自动停止旧回合并重启本轮。'
-            : '步骤已有一段时间无新工具调用或输出，已自动停止旧会话并新建会话重试一次。',
+            : withAcceptanceMissingContext(
+                current,
+                '步骤已有一段时间无新工具调用或输出，已自动停止旧会话并新建会话重试一次。',
+              ),
           { freshSession: true, incrementRecovery: true, holdSettle },
         );
       } else {
@@ -711,7 +734,10 @@ export function sweepStallMonitor(deps: BuildDeps, now: number = nowMs()): void 
           freshContext,
           diagnosis,
           now,
-          '自动重启后本轮仍无新进展，未继续重启，请查看当前执行状态。',
+          withAcceptanceMissingContext(
+            current,
+            '自动重启后本轮仍无新进展，未继续重启，请查看当前执行状态。',
+          ),
           false,
         );
       }

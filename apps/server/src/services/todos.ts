@@ -14,6 +14,7 @@ import type {
   UserRecord,
 } from '@cairn/shared';
 import {
+  askUserQuestionContentSchema,
   canMoveTodoProject,
   DELIVERABLES_MESSAGE_PREFIX,
   DONE_ANNOUNCEMENT,
@@ -21,11 +22,13 @@ import {
   derivePlaceholderTitle,
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
+  isAcceptanceNudgePrompt,
   isRegisteredMachine,
   missingSetupCommand,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
+  parseMissingEvidenceLine,
   renderTaskText,
   runnerOsOf,
   systemRowOf,
@@ -127,7 +130,10 @@ import { type RetryBuildSlice, todoRetryStateOf } from './retry-policy.js';
 import { profileForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
 import { insertGateAnnouncement } from './transcript.js';
-import { cancelPendingWorkerQuestions } from './worker-question-store.js';
+import {
+  ACCEPTANCE_BLOCKED_PREFIX,
+  cancelPendingWorkerQuestions,
+} from './worker-question-store.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -397,6 +403,64 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
           .all()
           .map((row) => [row.id, row]),
   );
+  const missingEvidences = new Map<string, string>();
+  const needsInputBuildIds = rows.flatMap((row) =>
+    row.phase === 'needs_input' && row.latestBuildId !== null ? [row.latestBuildId] : [],
+  );
+  if (needsInputBuildIds.length > 0) {
+    const blockedRows = db
+      .select({
+        conversationId: message.conversationId,
+        content: message.content,
+      })
+      .from(message)
+      .where(
+        and(
+          inArray(message.conversationId, needsInputBuildIds),
+          like(message.id, `${ACCEPTANCE_BLOCKED_PREFIX}%`),
+        ),
+      )
+      .orderBy(desc(message.createdAt), sql`rowid desc`)
+      .all();
+    for (const blockedRow of blockedRows) {
+      if (missingEvidences.has(blockedRow.conversationId)) continue;
+      const parsed = askUserQuestionContentSchema.safeParse(blockedRow.content);
+      if (!parsed.success || parsed.data.status !== 'pending') continue;
+      const qText = parsed.data.questions[0]?.question ?? '';
+      const line =
+        parseMissingEvidenceLine(qText) ??
+        qText
+          .split('\n')
+          .map((s) => s.trim())
+          .find((s) => s !== '')
+          ?.slice(0, 140) ??
+        null;
+      if (line !== null) missingEvidences.set(blockedRow.conversationId, line);
+    }
+  }
+  const workingBuildIds = rows.flatMap((row) =>
+    (row.phase === 'building' || row.phase === 'queued') && row.latestBuildId !== null
+      ? [row.latestBuildId]
+      : [],
+  );
+  if (workingBuildIds.length > 0) {
+    const activeSteps = db
+      .select({ buildId: step.buildId, prompt: step.prompt })
+      .from(step)
+      .where(
+        and(inArray(step.buildId, workingBuildIds), inArray(step.status, ['pending', 'claimed'])),
+      )
+      .orderBy(desc(step.createdAt), sql`rowid desc`)
+      .all();
+    const seenWorking = new Set<string>();
+    for (const activeStep of activeSteps) {
+      if (seenWorking.has(activeStep.buildId)) continue;
+      seenWorking.add(activeStep.buildId);
+      if (!isAcceptanceNudgePrompt(activeStep.prompt)) continue;
+      const line = parseMissingEvidenceLine(activeStep.prompt ?? '');
+      if (line !== null) missingEvidences.set(activeStep.buildId, line);
+    }
+  }
   return (row: TodoRow) => ({
     deliverables: row.latestBuildId === null ? undefined : deliverables.get(row.latestBuildId),
     githubLabelIds: (labels.get(row.id) ?? []).map((r) => r.labelId),
@@ -404,6 +468,8 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
     quotaWait: row.latestBuildId === null ? null : (quotaWaits.get(row.latestBuildId) ?? null),
     latestBuild: row.latestBuildId === null ? undefined : latestBuilds.get(row.latestBuildId),
     missingCommand: row.latestBuildId === null ? undefined : missingCommands.get(row.latestBuildId),
+    missingEvidence:
+      row.latestBuildId === null ? undefined : missingEvidences.get(row.latestBuildId),
     usage: usage.get(row.id),
     context: contextByTodo.get(row.id),
   });
@@ -437,6 +503,7 @@ function todoRecordOf(
     quotaWait,
     latestBuild,
     missingCommand,
+    missingEvidence,
     usage,
     context,
   }: ReturnType<ReturnType<typeof todoRelations>>,
@@ -479,6 +546,10 @@ function todoRecordOf(
     quotaWait,
     ...(retry !== null ? { retry } : {}),
     ...(row.phase === 'failed' && missingCommand !== undefined ? { missingCommand } : {}),
+    ...((row.phase === 'needs_input' || row.phase === 'building' || row.phase === 'queued') &&
+    missingEvidence !== undefined
+      ? { missingEvidence }
+      : {}),
     ...(lastProgressAt !== undefined ? { lastProgressAt } : {}),
     ...(usage !== undefined && usage.rows > 0
       ? {

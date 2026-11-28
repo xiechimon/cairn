@@ -9035,6 +9035,12 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "null",
               ],
             },
+            "missingEvidence": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
             "orderIndex": {
               "type": "number",
             },
@@ -15882,6 +15888,12 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
       ],
     },
     "missingCommand": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "missingEvidence": {
       "type": [
         "string",
         "null",

@@ -337,6 +337,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     quotaWait: w.quotaWait ?? null,
     ...(w.retry !== undefined ? { retry: w.retry } : {}),
     ...(w.missingCommand != null ? { missingCommand: w.missingCommand } : {}),
+    ...(w.missingEvidence != null ? { missingEvidence: w.missingEvidence } : {}),
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,

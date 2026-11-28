@@ -93,7 +93,15 @@ export function taskRowCopy(
       if (todo.phase === 'confirm')
         return { ...base, word: '待回答', what: { key: '计划写好了' }, where: '到任务里批准计划' };
       if (todo.phase === 'needs_input')
-        return { ...base, word: '待回答', what: { key: '在问你一个问题' }, where: '到任务里回答' };
+        return {
+          ...base,
+          word: '待回答',
+          what:
+            todo.missingEvidence != null && todo.missingEvidence !== ''
+              ? { key: '还缺：{missing}', params: { missing: todo.missingEvidence } }
+              : { key: threadCopy(todo).reason },
+          where: '到任务里回答',
+        };
       const what: Phrase =
         (todo.blockedBy?.length ?? 0) > 0
           ? { key: '已阻塞，等待你处理。' }
@@ -111,13 +119,17 @@ export function taskRowCopy(
       const what: Phrase =
         retryPhrase !== null
           ? retryPhrase
-          : todo.owner === 'coordinator'
-            ? { key: 'Coordinator 在跟进' }
-            : todo.phase === 'failed'
-              ? todo.missingCommand != null && todo.missingCommand !== ''
-                ? { key: '缺少命令 {command}', params: { command: todo.missingCommand } }
-                : { key: '即将自动重试（第 {attempt} 次）', params: { attempt: 1 } }
-              : { key: threadCopy(todo).reason };
+          : todo.quotaWait != null || todo.waitingOn?.on === 'quota'
+            ? { key: threadCopy(todo).reason }
+            : todo.missingEvidence != null && todo.missingEvidence !== ''
+              ? { key: '还缺：{missing}', params: { missing: todo.missingEvidence } }
+              : todo.owner === 'coordinator'
+                ? { key: 'Coordinator 在跟进' }
+                : todo.phase === 'failed'
+                  ? todo.missingCommand != null && todo.missingCommand !== ''
+                    ? { key: '缺少命令 {command}', params: { command: todo.missingCommand } }
+                    : { key: '即将自动重试（第 {attempt} 次）', params: { attempt: 1 } }
+                  : { key: threadCopy(todo).reason };
       return { ...base, running, word: '进行中', what, where: null };
     }
     case 'resolved': {

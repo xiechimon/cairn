@@ -142,7 +142,7 @@ export function askAcceptanceBlockedOnce(
       questions: [
         {
           header: 'Acceptance needed',
-          question: `${evaluation.summary}\nWhat ran: ${ranLine}\nMissing: ${evaluation.missing}\nHow to unblock: ${evaluation.unblockHint}`,
+          question: `${evaluation.summary}\nWhat ran: ${ranLine}\nMissing: ${evaluation.missingLine}\nHow to unblock: ${evaluation.unblockHint}`,
           options: [],
         },
       ],

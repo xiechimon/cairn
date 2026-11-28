@@ -6,6 +6,10 @@ export type AcceptanceFailureReason =
   | 'missing-ui-screenshot'
   | 'stale-ui-screenshot'
   | 'fixture-only-screenshot'
+  | 'missing-evidence'
+  | 'stale-evidence'
+  | 'stale-deployed-target'
+  | 'unverified-deployed-target'
   | 'unverified-api'
   | 'unverified-cli'
   | 'unverified-doc'
@@ -22,6 +26,7 @@ export interface AcceptanceAttachment {
   createdBy: string;
   fileName: string;
   mimeType: string;
+  sizeBytes?: number | undefined;
   status: string;
   grantId: string;
   createdAt: number;
@@ -42,6 +47,7 @@ export interface EvaluateStepAcceptanceInput {
   attachments: readonly AcceptanceAttachment[];
   stepIds: readonly string[];
   unpushedCommits?: number | null | undefined;
+  expectedCommit?: string | null | undefined;
   report?: string | undefined;
   deliverables?: { files: readonly { name: string }[] } | undefined;
 }
@@ -55,10 +61,12 @@ export type AcceptanceEvaluation =
       checksRan: string[];
       summary: string;
       missing: string;
+      missingLine: string;
       unblockHint: string;
     };
 
 const ACCEPTANCE_NUDGE_HEAD = '[cairn acceptance check]';
+const MISSING_LINE_MAX_CHARS = 140;
 
 const EDIT_TOOL_NAMES = new Set([
   'edit',
@@ -105,6 +113,21 @@ const API_ACCEPTANCE_CMD_RE =
 const FAILED_OUTPUT_RE =
   /\b(?:exit(?:ed with)? code|exit status|status)\s+[1-9]\d*|command failed|^error:\s/im;
 
+const ASSERTION_OR_HTTP5XX_RE = /\bAssertionError\b|^\s*FAIL\s+|HTTP\/[12](?:\.\d)?\s+5\d\d\b/im;
+
+const HEALTH_PATH_FILE_RE = /(?:^|\/|[-_.])(?:health|healthz|ping|ready)(?:[-_.]|\/|$)/i;
+const HTTP_URL_OR_API_PATH_RE = /https?:\/\/[^\s'"`]+|\/api\/[^\s'"`]+/gi;
+const HEALTH_ENDPOINT_RE = /\/(?:health|healthz|ping|ready)(?:[/?#]|$)/i;
+const REMOTE_URL_RE =
+  /https?:\/\/(?!(?:127\.0\.0\.1|localhost|0\.0\.0\.0|\[::1\])(?::|\/|$))[^\s'"`]+/i;
+const DEPLOY_CLAIM_RE =
+  /\b(?:verified\s+in\s+prod(?:uction)?|deployed\s+to\s+prod(?:uction)?|checked\s+deployed\s+target)\b|已在生产(?:环境)?验证/i;
+const DEPLOYED_SHA_PATTERNS = [
+  /"deployed"\s*:\s*\{[^}]*"sha"\s*:\s*"([0-9a-f]{7,64})"/gi,
+  /"(?:deployedSha|deployed_sha)"\s*:\s*"([0-9a-f]{7,64})"/gi,
+  /\bDEPLOYED_SHA\s*=\s*["']?([0-9a-f]{7,64})["']?/gi,
+];
+
 const FIXTURE_LABEL_RE = /\b(?:fixture|mock|storybook)\b/i;
 const LIVE_LABEL_RE = /\b(?:live|running|real|prod|app)\b/i;
 
@@ -119,6 +142,22 @@ interface ParsedToolCall {
   args: Record<string, unknown>;
   resultText: string;
   isError: boolean;
+}
+
+function sanitizeMissingLine(raw: string): string {
+  const collapsed = raw
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (collapsed.length <= MISSING_LINE_MAX_CHARS) return collapsed;
+  return `${collapsed.slice(0, MISSING_LINE_MAX_CHARS - 1).trimEnd()}…`;
+}
+
+export function parseMissingEvidenceLine(text: string): string | null {
+  const match = /^Missing(?:\s+real\s+acceptance)?:\s*(.+)$/im.exec(text);
+  if (match?.[1] === undefined) return null;
+  const clean = sanitizeMissingLine(match[1]);
+  return clean === '' ? null : clean;
 }
 
 function normalizedToolName(raw: string): string {
@@ -258,6 +297,31 @@ function isApiAcceptanceCommand(cmd: string): boolean {
   return API_ACCEPTANCE_CMD_RE.test(cmd);
 }
 
+function isHealthOnlyProbeCommand(cmd: string): boolean {
+  if (/\b(?:vitest|playwright|pytest|supertest|inject)\b/i.test(cmd)) return false;
+  const targets = [...cmd.matchAll(HTTP_URL_OR_API_PATH_RE)].map((m) => m[0]);
+  if (targets.length === 0) return false;
+  return targets.every((target) => HEALTH_ENDPOINT_RE.test(target));
+}
+
+function extractDeployedShas(text: string): string[] {
+  const shas: string[] = [];
+  for (const pattern of DEPLOYED_SHA_PATTERNS) {
+    pattern.lastIndex = 0;
+    for (const match of text.matchAll(pattern)) {
+      const sha = match[1]?.toLowerCase();
+      if (sha !== undefined) shas.push(sha);
+    }
+  }
+  return shas;
+}
+
+function shaMatchesExpected(observed: string, expected: string): boolean {
+  const a = observed.toLowerCase();
+  const b = expected.toLowerCase();
+  return a.startsWith(b) || b.startsWith(a);
+}
+
 function isUiPath(path: string): boolean {
   if (TEST_OR_FIXTURE_RE.test(path)) return false;
   return (
@@ -304,6 +368,29 @@ function stepScopedAttachments(
   });
 }
 
+function hasPositiveSize(att: AcceptanceAttachment): boolean {
+  return typeof att.sizeBytes === 'number' && att.sizeBytes > 0;
+}
+
+function attachmentMatchesCall(att: AcceptanceAttachment, call: ParsedToolCall): boolean {
+  const p = parsedPathsFromToolArgs(call.name, call.args)[0] ?? '';
+  const base = p.split('/').pop() ?? p;
+  return base !== '' && (base === att.fileName || att.fileName.endsWith(base));
+}
+
+function isFreshAttachment(
+  att: AcceptanceAttachment,
+  lastEditIdx: number,
+  lastEditAt: number,
+  allAttachCalls: readonly ParsedToolCall[],
+  postEditAttachCalls: readonly ParsedToolCall[],
+): boolean {
+  if (lastEditIdx === -1) return true;
+  if (postEditAttachCalls.some((c) => attachmentMatchesCall(att, c))) return true;
+  if (allAttachCalls.some((c) => attachmentMatchesCall(att, c))) return false;
+  return att.createdAt > lastEditAt;
+}
+
 function failResult(
   reason: AcceptanceFailureReason,
   retryable: boolean,
@@ -312,7 +399,16 @@ function failResult(
   missing: string,
   unblockHint: string,
 ): AcceptanceEvaluation {
-  return { ok: false, retryable, reason, checksRan, summary, missing, unblockHint };
+  return {
+    ok: false,
+    retryable,
+    reason,
+    checksRan,
+    summary,
+    missing,
+    missingLine: sanitizeMissingLine(missing),
+    unblockHint,
+  };
 }
 
 export function extractEditedPathsFromMessages(messages: readonly AcceptanceMessage[]): string[] {
@@ -337,9 +433,9 @@ export function buildAcceptanceNudgePrompt(
   return [
     ACCEPTANCE_NUDGE_HEAD,
     evaluation.summary,
-    `Missing real acceptance: ${evaluation.missing}`,
+    `Missing real acceptance: ${evaluation.missingLine}`,
     `Required next step: ${evaluation.unblockHint}`,
-    'Run the missing check matching the task kind after your last edit (or if genuinely blocked by the environment, call `ask_user` stating what ran, what is missing, and how to unblock).',
+    'Verify the running or deployed target in this same session, walk the changed behavior, and attach proof via `attach_file` (screenshot, redacted request/response, DB row, or run output). If genuinely blocked by the environment, call `ask_user` stating what ran, what is missing, and how to unblock.',
   ].join('\n\n');
 }
 
@@ -565,23 +661,81 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
   const lastPostEditCmd = postEditCmds.findLast(
     (c) => c.isError || isMeaningfulPassCommand(commandOfCall(c.args)),
   );
-  if (lastPostEditCmd?.isError) {
+  if (
+    lastPostEditCmd !== undefined &&
+    (lastPostEditCmd.isError || ASSERTION_OR_HTTP5XX_RE.test(lastPostEditCmd.resultText))
+  ) {
     return failResult(
       'failing-check',
       true,
       checksRan,
       `Post-edit command "${commandOfCall(lastPostEditCmd.args)}" failed.`,
-      'All post-edit checks must pass.',
+      'All post-edit verification checks must pass without errors or 5xx responses.',
       'Fix the failure and re-run verification after the last edit.',
     );
   }
 
+  const expectedCommit = input.expectedCommit?.trim() ?? '';
+  const hasExpectedCommit = /^[0-9a-f]{7,64}$/i.test(expectedCommit);
+  if (hasExpectedCommit) {
+    const passingPostCmds = postEditCmds.filter((c) => !c.isError);
+    const observedShas = passingPostCmds.flatMap((c) => extractDeployedShas(c.resultText));
+    if (
+      observedShas.length > 0 &&
+      !observedShas.some((sha) => shaMatchesExpected(sha, expectedCommit))
+    ) {
+      return failResult(
+        'stale-deployed-target',
+        true,
+        checksRan,
+        'The deployed target reported an older commit SHA than the task change.',
+        'Deployed target is running an older commit; wait for deploy and re-verify',
+        'Wait for the new commit to deploy, then re-verify the deployed target and attach fresh proof.',
+      );
+    }
+    const hitsRemoteOrDeployApi = passingPostCmds.some((c) => {
+      const cmd = commandOfCall(c.args);
+      return REMOTE_URL_RE.test(cmd) || /\/api\/server\/deploy\b/i.test(cmd);
+    });
+    const claimsProdVerify =
+      texts.some((t) => t.idx > lastEditIdx && DEPLOY_CLAIM_RE.test(t.text)) ||
+      attachCalls.some(
+        (c) =>
+          c.idx > lastEditIdx &&
+          typeof c.args.caption === 'string' &&
+          DEPLOY_CLAIM_RE.test(c.args.caption),
+      );
+    if (hitsRemoteOrDeployApi || claimsProdVerify) {
+      const expectedPrefix = expectedCommit.slice(0, 7).toLowerCase();
+      const observedExpected =
+        observedShas.some((sha) => shaMatchesExpected(sha, expectedCommit)) ||
+        passingPostCmds.some((c) => c.resultText.toLowerCase().includes(expectedPrefix));
+      if (!observedExpected) {
+        return failResult(
+          'unverified-deployed-target',
+          true,
+          checksRan,
+          'Deployed target verification requires observing the expected commit SHA on the target.',
+          'Claimed or probed deployed target without observing the expected commit SHA',
+          'Check the target deployed SHA (for example via `/api/server/deploy` or version endpoint) and re-run verification.',
+        );
+      }
+    }
+  }
+
+  const passingPostEditAnyCmds = postEditCmds.filter(
+    (c) => !c.isError && isMeaningfulPassCommand(commandOfCall(c.args)),
+  );
+  const passingPostEditRuntimeCmds = postEditCmds.filter(
+    (c) => !c.isError && isApiAcceptanceCommand(commandOfCall(c.args)),
+  );
+
   const scoped = stepScopedAttachments(input.attachments, input.stepIds);
+  const postEditAttachCalls = attachCalls.filter((c) => c.idx > lastEditIdx && !c.isError);
   const imageAttachments = scoped.filter((a) => a.mimeType.startsWith('image/'));
   const readyImages = imageAttachments.filter(
-    (a) => a.status === 'ready' || a.status === 'received',
+    (a) => (a.status === 'ready' || a.status === 'received') && hasPositiveSize(a),
   );
-  const postEditAttachCalls = attachCalls.filter((c) => c.idx > lastEditIdx && !c.isError);
 
   if (effectivePaths.some(isUiPath)) {
     if (readyImages.length === 0) {
@@ -592,7 +746,7 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
           false,
           checksRan,
           `Screenshot upload was blocked (${failedAttach.resultText}).`,
-          'Live UI screenshot via `attach_file`.',
+          'Non-empty live UI screenshot via `attach_file`.',
           'Unblock the runner environment and attach a live UI screenshot.',
         );
       }
@@ -600,23 +754,14 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
         'missing-ui-screenshot',
         true,
         checksRan,
-        'UI files were edited without an uploaded ready UI screenshot.',
-        'Run the app, inspect it visually, and attach a live screenshot via `attach_file`.',
+        'UI files were edited without a non-empty uploaded UI screenshot.',
+        'Run the app, inspect it visually, and attach a non-empty live screenshot via `attach_file`.',
         'Start the app, take a screenshot of the live UI, and attach it with `attach_file`.',
       );
     }
 
-    const imageMatchesCall = (img: AcceptanceAttachment, call: ParsedToolCall) => {
-      const p = parsedPathsFromToolArgs(call.name, call.args)[0] ?? '';
-      const base = p.split('/').pop() ?? p;
-      return base !== '' && (base === img.fileName || img.fileName.endsWith(base));
-    };
-
-    const freshReadyImages = readyImages.filter(
-      (img) =>
-        lastEditIdx === -1 ||
-        img.createdAt >= lastEditAt ||
-        postEditAttachCalls.some((c) => imageMatchesCall(img, c)),
+    const freshReadyImages = readyImages.filter((img) =>
+      isFreshAttachment(img, lastEditIdx, lastEditAt, attachCalls, postEditAttachCalls),
     );
     if (freshReadyImages.length === 0) {
       return failResult(
@@ -631,7 +776,7 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
 
     const passingAttachCalls = attachCalls.filter((c) => !c.isError);
     const hasFreshLiveShot = freshReadyImages.some((img) => {
-      const matchedCalls = passingAttachCalls.filter((c) => imageMatchesCall(img, c));
+      const matchedCalls = passingAttachCalls.filter((c) => attachmentMatchesCall(img, c));
       const fallbackCalls =
         matchedCalls.length > 0
           ? matchedCalls
@@ -660,24 +805,38 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
         'Run the live app (not fixture/storybook only) and attach a live screenshot via `attach_file`.',
       );
     }
+    if (passingPostEditAnyCmds.length === 0) {
+      return failResult(
+        'missing-ui-screenshot',
+        true,
+        checksRan,
+        'UI screenshot was attached without running the app or a verification check after the last edit.',
+        'Run the app or UI check after your last edit and attach a fresh live screenshot.',
+        'Exercise the updated UI after the last edit, then attach the fresh screenshot via `attach_file`.',
+      );
+    }
   }
 
-  const passingPostEditRuntimeCmds = postEditCmds.filter(
-    (c) => !c.isError && isApiAcceptanceCommand(commandOfCall(c.args)),
-  );
-  const passingPostEditAnyCmds = postEditCmds.filter(
-    (c) => !c.isError && isMeaningfulPassCommand(commandOfCall(c.args)),
-  );
-
-  if (effectivePaths.some(isApiPath) && passingPostEditRuntimeCmds.length === 0) {
-    return failResult(
-      'unverified-api',
-      true,
-      checksRan,
-      'Server/API code was edited, but only lint/typecheck or no runtime request probe ran after the last edit.',
-      'A passing HTTP/handler probe or server runtime check after the last edit.',
-      'Send a real request to the running server/handler (or run the affected integration check) after the last edit.',
-    );
+  const apiPaths = effectivePaths.filter(isApiPath);
+  if (apiPaths.length > 0) {
+    const editsNonHealthApi = apiPaths.some((p) => !HEALTH_PATH_FILE_RE.test(p));
+    const meaningfulApiProbes = editsNonHealthApi
+      ? passingPostEditRuntimeCmds.filter((c) => !isHealthOnlyProbeCommand(commandOfCall(c.args)))
+      : passingPostEditRuntimeCmds;
+    if (meaningfulApiProbes.length === 0) {
+      return failResult(
+        'unverified-api',
+        true,
+        checksRan,
+        editsNonHealthApi && passingPostEditRuntimeCmds.length > 0
+          ? 'Non-health API code was edited, but only a /health endpoint was probed.'
+          : 'Server/API code was edited without a passing runtime request probe after the last edit.',
+        editsNonHealthApi
+          ? 'A passing request probe exercising the changed route/handler (not /health only).'
+          : 'A passing HTTP/handler probe or server runtime check after the last edit.',
+        'Send a real request to the changed endpoint after the last edit and attach the proof via `attach_file`.',
+      );
+    }
   }
 
   if (effectivePaths.some(isCliPath) && passingPostEditAnyCmds.length === 0) {
@@ -687,15 +846,14 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
       checksRan,
       'CLI/daemon/script code was edited without executing it after the last edit.',
       'A passing real command run after the last edit.',
-      'Execute the edited CLI/script command after the last edit and observe exit 0.',
+      'Execute the edited CLI/script command after the last edit and attach its output via `attach_file`.',
     );
   }
 
   const docPaths = effectivePaths.filter(isDocPath);
-  if (
-    docPaths.length > 0 &&
-    effectivePaths.every((p) => isDocPath(p) || TEST_OR_FIXTURE_RE.test(p))
-  ) {
+  const docOnly =
+    docPaths.length > 0 && effectivePaths.every((p) => isDocPath(p) || TEST_OR_FIXTURE_RE.test(p));
+  if (docOnly) {
     const docChecked =
       passingPostEditAnyCmds.length > 0 ||
       readCalls.some(
@@ -716,6 +874,65 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
         'Open and verify the modified artifact (or run its validator) after your last edit.',
       );
     }
+    return { ok: true, checksRan };
+  }
+
+  if (effectivePaths.length === 0) {
+    return { ok: true, checksRan };
+  }
+
+  if (
+    !effectivePaths.some(isUiPath) &&
+    apiPaths.length === 0 &&
+    !effectivePaths.some(isCliPath) &&
+    passingPostEditAnyCmds.length === 0
+  ) {
+    return failResult(
+      'unverified-cli',
+      true,
+      checksRan,
+      'Code files were edited without a passing verification command after the last edit.',
+      'A passing verification command after the last edit.',
+      'Run the verification check after the last edit and attach proof via `attach_file`.',
+    );
+  }
+
+  const readyEvidence = scoped.filter(
+    (a) => (a.status === 'ready' || a.status === 'received') && hasPositiveSize(a),
+  );
+  const freshReadyEvidence = readyEvidence.filter((att) =>
+    isFreshAttachment(att, lastEditIdx, lastEditAt, attachCalls, postEditAttachCalls),
+  );
+  if (freshReadyEvidence.length === 0) {
+    const failedAttach = attachCalls.findLast((c) => c.isError);
+    if (failedAttach && BLOCKER_RE.test(failedAttach.resultText)) {
+      return failResult(
+        'blocked',
+        false,
+        checksRan,
+        `Evidence upload was blocked (${failedAttach.resultText}).`,
+        'Non-empty verification proof attached via `attach_file`.',
+        'Unblock the runner environment and attach verification proof via `attach_file`.',
+      );
+    }
+    if (readyEvidence.length > 0) {
+      return failResult(
+        'stale-evidence',
+        true,
+        checksRan,
+        'All attached verification evidence pre-dates the last edit.',
+        'Fresh verification proof attached AFTER the last edit via `attach_file`.',
+        'Re-run the target check after the last edit and attach fresh proof via `attach_file`.',
+      );
+    }
+    return failResult(
+      'missing-evidence',
+      true,
+      checksRan,
+      'Code changes were verified without attaching non-empty proof via `attach_file`.',
+      'Non-empty proof (screenshot, request/response, DB row, or run output) attached via `attach_file`.',
+      'Save redacted request/response, DB row, or command output after the last edit and attach it via `attach_file`.',
+    );
   }
 
   return { ok: true, checksRan };

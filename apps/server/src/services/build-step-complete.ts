@@ -61,7 +61,7 @@ import {
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planAutoConfirmation } from './plan-auto-confirm.js';
 import { finishScheduledStep } from './schedules.js';
-import { noteTaskCodeDelivered, setTodoPhase } from './todos.js';
+import { getTodo, noteTaskCodeDelivered, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -204,19 +204,50 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
       .where(eq(step.buildId, buildRow.id))
       .orderBy(asc(step.createdAt), asc(step.id))
       .all();
-    const buildStepIds = buildSteps.map((s) => s.id);
-    let rootIdx = buildSteps.findIndex((s) => s.id === stepRow.id);
-    while (rootIdx > 0 && isAcceptanceNudgePrompt(buildSteps[rootIdx]?.prompt)) {
+    const allBuildMessages = deps.db
+      .select({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        createdAt: message.createdAt,
+      })
+      .from(message)
+      .where(eq(message.conversationId, buildRow.id))
+      .orderBy(asc(message.createdAt), asc(message.id))
+      .all();
+    const currentIdx = buildSteps.findIndex((s) => s.id === stepRow.id);
+    let rootIdx = currentIdx;
+    while (rootIdx > 0) {
+      const currStep = buildSteps[rootIdx];
+      if (!currStep || currStep.scheduleId !== null) break;
       let prevIdx = rootIdx - 1;
-      let prevStep = buildSteps[prevIdx];
-      while (prevIdx > 0 && (!prevStep || !isBuildStepKind(prevStep.kind))) {
+      while (prevIdx >= 0) {
+        const candidate = buildSteps[prevIdx];
+        if (!candidate || isBuildStepKind(candidate.kind)) break;
+        if (candidate.kind === 'plan' && candidate.status === 'done') {
+          prevIdx = -1;
+          break;
+        }
         prevIdx -= 1;
-        prevStep = buildSteps[prevIdx];
       }
-      if (!prevStep || !isBuildStepKind(prevStep.kind)) break;
+      if (prevIdx < 0) break;
+      const prevStep = buildSteps[prevIdx];
+      if (!prevStep) break;
+      const continuesAttempt =
+        isAcceptanceNudgePrompt(currStep.prompt) ||
+        allBuildMessages.some((m) => m.id === `acceptance-blocked-${prevStep.id}`);
+      if (!continuesAttempt) break;
       rootIdx = prevIdx;
     }
     const attemptRoot = (rootIdx >= 0 ? buildSteps[rootIdx] : undefined) ?? stepRow;
+    const prevBeforeRoot = rootIdx > 0 ? buildSteps[rootIdx - 1] : undefined;
+    const attemptStepIds =
+      rootIdx >= 0 && currentIdx >= rootIdx
+        ? buildSteps
+            .slice(rootIdx, currentIdx + 1)
+            .filter((s) => isBuildStepKind(s.kind))
+            .map((s) => s.id)
+        : [stepRow.id];
     const lastPlanFinishedAt = buildSteps.reduce<number | null>(
       (max, s) =>
         s.kind === 'plan' && s.status === 'done' && s.finishedAt !== null
@@ -226,18 +257,20 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
           : max,
       null,
     );
-    const allBuildMessages = deps.db
-      .select({ role: message.role, content: message.content, createdAt: message.createdAt })
-      .from(message)
-      .where(eq(message.conversationId, buildRow.id))
-      .orderBy(asc(message.createdAt), asc(message.id))
-      .all();
     const buildMessages =
       attemptRoot.scheduleId !== null
         ? allBuildMessages.filter((m) => m.createdAt >= attemptRoot.createdAt)
-        : lastPlanFinishedAt === null
-          ? allBuildMessages
-          : allBuildMessages.filter((m) => m.createdAt > lastPlanFinishedAt);
+        : prevBeforeRoot !== undefined
+          ? allBuildMessages.filter(
+              (m) =>
+                m.createdAt >
+                (prevBeforeRoot.finishedAt ??
+                  (prevBeforeRoot.kind === 'plan' ? lastPlanFinishedAt : null) ??
+                  attemptRoot.createdAt),
+            )
+          : lastPlanFinishedAt === null
+            ? allBuildMessages
+            : allBuildMessages.filter((m) => m.createdAt > lastPlanFinishedAt);
     if (buildMessages.some((m) => m.role === 'assistant')) {
       const projRow = deps.db
         .select({ repoKind: project.repoKind })
@@ -250,6 +283,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
           createdBy: attachment.createdBy,
           fileName: attachment.fileName,
           mimeType: attachment.mimeType,
+          sizeBytes: attachment.sizeBytes,
           status: attachment.status,
           grantId: attachment.grantId,
           createdAt: attachment.createdAt,
@@ -258,6 +292,8 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         .where(
           and(
             eq(attachment.teamId, todoRow.teamId),
+            eq(attachment.todoId, todoRow.id),
+            eq(attachment.scope, 'message'),
             inArray(attachment.status, ['ready', 'received', 'pending', 'failed']),
           ),
         )
@@ -276,8 +312,9 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         editedPaths,
         messages: buildMessages,
         attachments: stepAttachments,
-        stepIds: buildStepIds,
+        stepIds: attemptStepIds,
         unpushedCommits: outcome.unpushedCommits,
+        expectedCommit: stepRow.checkpointCommit,
         report: outcome.report,
         deliverables: outcome.deliverables,
       });
@@ -408,6 +445,12 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         false,
         { kind: 'continue' },
       );
+      const { commitEffects, ...settled } = deps;
+      const committedDeps = { ...settled, ...commitEffects?.hubs };
+      runAfterCommit(deps, 'publishAcceptanceNudgeTodo', () => {
+        const fresh = getTodo(committedDeps, todoRow.id);
+        if (fresh !== null) committedDeps.hub.publishTodoDoc(todoRow.teamId, fresh);
+      });
       return;
     }
     askAcceptanceBlockedOnce(deps, buildRow, stepRow.id, acceptance);

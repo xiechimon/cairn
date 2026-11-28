@@ -169,6 +169,9 @@ describe('server acceptance gate on completeStep (Slice 2)', () => {
       changes: [diffFile('apps/web/src/App.tsx')],
     });
     pushToolMsg(s, okTask.buildId, 'm1', 'edit', { path: 'apps/web/src/App.tsx' }, 100);
+    pushToolMsg(s, okTask.buildId, 'm1b', 'bash', { command: 'pnpm exec playwright test' }, 150, {
+      result: '1 passed',
+    });
     pushToolMsg(
       s,
       okTask.buildId,
@@ -257,6 +260,24 @@ describe('server acceptance gate on completeStep (Slice 2)', () => {
     });
     pushToolMsg(s, legacy.buildId, 'l1', 'edit', { path: 'scripts/check.mjs' }, 100);
     pushToolMsg(s, legacy.buildId, 'l2', 'bash', { command: 'node scripts/check.mjs' }, 200);
+    pushToolMsg(s, legacy.buildId, 'l3', 'attach_file', { path: 'check.txt' }, 300);
+    s.db
+      .insert(attachment)
+      .values({
+        id: 'att-legacy',
+        todoId: legacy.todoId,
+        teamId: s.team.id,
+        createdBy: `step:${legacy.stepId}`,
+        fileName: 'check.txt',
+        mimeType: 'text/plain',
+        sizeBytes: 128,
+        storageKey: `${s.team.id}/att-legacy.txt`,
+        grantId: 'g-legacy',
+        scope: 'message',
+        status: 'ready',
+        createdAt: 300,
+      })
+      .run();
     completeStep(depsOf(s), legacy.stepId, { hasChanges: true, unpushedCommits: undefined });
     expect(getTodo(depsOf(s), legacy.todoId)?.phase).toBe('done');
   });
@@ -330,6 +351,24 @@ describe('server acceptance gate on completeStep (Slice 2)', () => {
     pushToolMsg(s, buildId, 'm3', 'bash', { command: 'node scripts/check.mjs' }, 400, {
       result: 'OK',
     });
+    pushToolMsg(s, buildId, 'm4', 'attach_file', { path: 'check.txt' }, 450);
+    s.db
+      .insert(attachment)
+      .values({
+        id: 'att-m4',
+        todoId,
+        teamId: s.team.id,
+        createdBy: `step:${step3.id}`,
+        fileName: 'check.txt',
+        mimeType: 'text/plain',
+        sizeBytes: 128,
+        storageKey: `${s.team.id}/att-m4.txt`,
+        grantId: 'g-m4',
+        scope: 'message',
+        status: 'ready',
+        createdAt: 450,
+      })
+      .run();
     completeStep(depsOf(s), step3.id, { hasChanges: true, unpushedCommits: 0 });
     expect(getTodo(depsOf(s), todoId)?.phase).toBe('done');
   });
@@ -558,6 +597,24 @@ describe('server acceptance gate on completeStep (Slice 2)', () => {
     pushToolMsg(s, task.buildId, 'c3', 'bash', { command: 'vitest run' }, 400, {
       result: '1 passed',
     });
+    pushToolMsg(s, task.buildId, 'c4', 'attach_file', { path: 'vitest.txt' }, 450);
+    s.db
+      .insert(attachment)
+      .values({
+        id: 'att-c4',
+        todoId: task.todoId,
+        teamId: s.team.id,
+        createdBy: `step:${step3.id}`,
+        fileName: 'vitest.txt',
+        mimeType: 'text/plain',
+        sizeBytes: 128,
+        storageKey: `${s.team.id}/att-c4.txt`,
+        grantId: 'g-c4',
+        scope: 'message',
+        status: 'ready',
+        createdAt: 450,
+      })
+      .run();
     completeStep(depsOf(s), step3.id, { hasChanges: true });
     expect(getTodo(depsOf(s), task.todoId)?.phase).toBe('done');
   });

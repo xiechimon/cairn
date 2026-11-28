@@ -93,6 +93,7 @@ export interface TodoRecord {
   quotaWait?: QuotaWait | null;
   retry?: TodoRetryState | null;
   missingCommand?: string | null;
+  missingEvidence?: string | null;
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
