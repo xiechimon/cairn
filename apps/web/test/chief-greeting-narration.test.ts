@@ -137,6 +137,21 @@ describe('a channel greeting shows one reply, not the model’s pre-tool narrati
     expect(robots(stream ?? []).map((item) => item.markdown)).toEqual([GREETING]);
   });
 
+  test('a meta sentence after the chips leaves the greeting as the one bubble', () => {
+    const stream = channelStream([
+      text('m-1', GREETING, NOW),
+      {
+        id: 'quick-replies-then',
+        role: 'system',
+        content: JSON.stringify({ kind: 'quick_replies', stepId: 's', replies: ['做个计划'] }),
+        createdAt: NOW + 1,
+      },
+      call('m-2', 'suggest_replies', NOW + 2),
+      text('m-3', '我已经把快捷回复放在输入框上方了；你可以直接点选。', NOW + 12),
+    ]);
+    expect(robots(stream ?? []).map((item) => item.markdown)).toEqual([GREETING]);
+  });
+
   test('a greeting written after an earlier failed attempt is still the one bubble', () => {
     const error = (id: string, at: number): MessageRow => ({
       id,

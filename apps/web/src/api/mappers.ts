@@ -57,6 +57,7 @@ import {
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
   parseAgentTodoText,
+  quickRepliesContentSchema,
   REQUEST_SECRET_TOOL,
   RETRY_PARKED_MARK,
   REVIEW_VERDICT_KIND,
@@ -2203,6 +2204,15 @@ function dropThinkingOfFailedTurns(items: ChiefStreamItem[], itemsAt: number[]):
   }
 }
 
+function isQuickRepliesRow(m: MessageRow): boolean {
+  if (m.role !== 'system' || typeof m.content !== 'string') return false;
+  try {
+    return quickRepliesContentSchema.safeParse(JSON.parse(m.content)).success;
+  } catch {
+    return false;
+  }
+}
+
 function collectChiefStream(
   messages: MessageRow[],
   pendingIds: ReadonlyMap<string, ChiefPendingMessage['state']> = new Map(),
@@ -2224,7 +2234,8 @@ function collectChiefStream(
   let pendingCards: ChiefStreamItem[] = [];
   let opening = opts.opening === true;
   let openingFailed = false;
-  let openingRobots: number[] = [];
+  let openingRobots: { index: number; at: number }[] = [];
+  let openingChipsAt: number | null = null;
   const flushCards = () => {
     items.push(...pendingCards);
     pendingCards = [];
@@ -2232,8 +2243,15 @@ function collectChiefStream(
   const finishOpening = () => {
     if (!opening) return;
     opening = false;
-    const drop = openingFailed ? openingRobots : openingRobots.slice(0, -1);
-    for (const index of [...drop].reverse()) {
+    const chipsAt = openingChipsAt;
+    const keep =
+      !openingFailed && chipsAt !== null
+        ? openingRobots.reduce((best, row) =>
+            Math.abs(row.at - chipsAt) < Math.abs(best.at - chipsAt) ? row : best,
+          )
+        : openingRobots.at(-1);
+    const drop = openingFailed ? openingRobots : openingRobots.filter((row) => row !== keep);
+    for (const index of [...drop.map((row) => row.index)].reverse()) {
       items.splice(index, 1);
       itemsAt.splice(index, 1);
     }
@@ -2497,7 +2515,10 @@ function collectChiefStream(
       });
       continue;
     }
-    if (m.role === 'system') continue;
+    if (m.role === 'system') {
+      if (opening && openingChipsAt === null && isQuickRepliesRow(m)) openingChipsAt = m.createdAt;
+      continue;
+    }
     if (RAW_API_ERROR_RE.test(rawText)) {
       if (opening) openingFailed = true;
       pendingTools = [];
@@ -2518,7 +2539,7 @@ function collectChiefStream(
       ...rowProject(m),
     });
     if (opening) {
-      openingRobots.push(items.length - 1);
+      openingRobots.push({ index: items.length - 1, at: m.createdAt });
       openingFailed = false;
     }
     pendingTools = [];
