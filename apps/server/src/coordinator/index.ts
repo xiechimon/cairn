@@ -4,6 +4,7 @@ import {
   type ClaimedStep,
   type MachineDoneBody,
   redactSecrets,
+  startTurnHeartbeat,
   type ThinkingLevel,
   thinkingLevelSchema,
   transcriptPromptRowId,
@@ -560,10 +561,10 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     const keyed = [providers?.router.provider, providers?.summary.provider].filter(
       (id): id is string => id !== undefined,
     );
-    const heartbeat = setInterval(
-      () => void api.heartbeat(row.id).catch(() => {}),
-      options.heartbeatMs ?? HEARTBEAT_MS,
-    );
+    const heartbeat = startTurnHeartbeat({
+      intervalMs: options.heartbeatMs ?? HEARTBEAT_MS,
+      beat: () => api.heartbeat(row.id),
+    });
     try {
       if (providers === null) throw new Error('Coordinator route resolves to no keyed provider');
       await hydrateMissingConnectorTools(mcpConnectorDepsOf(machine), {
@@ -600,7 +601,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         });
       }
     } finally {
-      clearInterval(heartbeat);
+      heartbeat.stop();
       freshClaims.delete(row.id);
     }
   };

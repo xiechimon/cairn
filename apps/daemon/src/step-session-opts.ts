@@ -1,5 +1,11 @@
-import type { RemoteToolDef, SessionOpts, SkillInjectionFacts } from '@cairn/shared';
-import { COORDINATOR_COMPACT_AT, WEB_RESEARCH_GUIDANCE } from '@cairn/shared';
+import {
+  agentTurnPolicyFor,
+  type RemoteToolDef,
+  type SessionOpts,
+  type SkillInjectionFacts,
+  type StepKind,
+  WEB_RESEARCH_GUIDANCE,
+} from '@cairn/shared';
 import { stepRemoteToolExecutor } from './step-remote-tools.js';
 
 type RemoteExecutorInput = Parameters<typeof stepRemoteToolExecutor>[0];
@@ -22,6 +28,8 @@ export interface StepSessionOptsInput {
   teamSkillsDir: string | null;
   isChief: boolean;
   isReview: boolean;
+  stepKind?: StepKind;
+  conversationId?: string;
   readOnly?: boolean;
   remoteToolsOnly: boolean;
   telemetry: SessionOpts['telemetry'];
@@ -31,9 +39,16 @@ export interface StepSessionOptsInput {
 
 export function composeStepSessionOpts(input: StepSessionOptsInput): SessionOpts {
   const { isChief, isReview, remoteTools, cwd } = input;
+  const policy = agentTurnPolicyFor({
+    stepKind: input.stepKind ?? (isChief ? 'chief' : isReview ? 'review' : 'build'),
+    conversationId: input.conversationId ?? (isChief ? 'chief-session' : 'build-session'),
+    isReview,
+    ...(input.readOnly === true ? { readOnly: true } : {}),
+    remoteToolsOnly: input.remoteToolsOnly,
+  });
   return {
     provider: input.provider,
-    ...(isChief ? { compactAt: COORDINATOR_COMPACT_AT } : {}),
+    ...(policy.compactAt !== undefined ? { compactAt: policy.compactAt } : {}),
     modelId: input.modelId,
     ...(input.thinkingLevel ? { thinkingLevel: input.thinkingLevel } : {}),
     systemPrompt: [input.systemPrompt, WEB_RESEARCH_GUIDANCE].filter(Boolean).join('\n\n'),
@@ -48,15 +63,17 @@ export function composeStepSessionOpts(input: StepSessionOptsInput): SessionOpts
         }
       : {}),
     ...(input.mcpServers !== null ? { mcpServers: input.mcpServers } : {}),
-    ...(isChief || input.skillsAllowlist == null ? {} : { skillsAllowlist: input.skillsAllowlist }),
-    ...(isChief || input.injectedSkills === undefined
+    ...(!policy.allowSkillLists || input.skillsAllowlist == null
+      ? {}
+      : { skillsAllowlist: input.skillsAllowlist }),
+    ...(!policy.allowSkillLists || input.injectedSkills === undefined
       ? {}
       : { injectedSkills: input.injectedSkills }),
     onSkillsResolved: input.onSkillsResolved,
     ...(input.teamSkillsDir !== null ? { teamSkillsDir: input.teamSkillsDir } : {}),
-    ...(isReview || input.readOnly === true ? { readOnly: true } : {}),
-    ...(isChief || isReview || input.remoteToolsOnly ? { lockedDown: true } : {}),
-    ...(input.remoteToolsOnly ? { remoteToolsOnly: true } : {}),
+    ...(policy.readOnly ? { readOnly: true } : {}),
+    ...(policy.lockedDown ? { lockedDown: true } : {}),
+    ...(policy.remoteToolsOnly ? { remoteToolsOnly: true } : {}),
     ...(input.telemetry !== undefined ? { telemetry: input.telemetry } : {}),
     ...(input.secrets !== undefined ? { secrets: input.secrets } : {}),
     ...(Object.keys(input.env).length > 0 ? { env: input.env } : {}),

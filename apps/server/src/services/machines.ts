@@ -58,6 +58,7 @@ import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { newMachineToken } from '../lib/keys.js';
+import { emitTurnRow, emitTurnTextDelta } from './agent-turn-kernel.js';
 import { markDelivered, receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { todoAuthorizesAttachment } from './attachment-authorization.js';
 import { readAttachmentMeta } from './attachments.js';
@@ -73,14 +74,10 @@ import {
   ownedStep,
   ownedStepRow,
   profileForStep,
-  upsertChiefRow,
-  upsertMessage,
 } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
-import { stepScopeProjectId } from './picked-project.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
-import { flushShield, shieldFor, stepClaimFacts } from './terminal-claims.js';
 
 export { claimStep, meetsMcpVersionGate } from './machine-claim.js';
 export {
@@ -1325,17 +1322,7 @@ export function reportTool(
     content: { kind: 'toolcall', call },
     createdAt: call.endedAt ?? nowMs(),
   };
-  if (isChiefConversation(row.buildId)) {
-    const rest = flushShield(deps.db, stepId);
-    if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
-    upsertChiefRow(deps, {
-      ...messageRow,
-      threadId: row.buildId,
-      projectId: stepScopeProjectId(row),
-    });
-    return;
-  }
-  upsertMessage(deps, { ...messageRow, conversationId: row.buildId });
+  emitTurnRow(deps, row, messageRow, { flushChiefShield: true });
 }
 
 export function reportBackgroundTask(
@@ -1358,17 +1345,7 @@ export function reportBackgroundTask(
     },
     createdAt: task.startedAt,
   };
-  if (isChiefConversation(row.buildId)) {
-    const rest = flushShield(deps.db, stepId);
-    if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
-    upsertChiefRow(deps, {
-      ...messageRow,
-      threadId: row.buildId,
-      projectId: stepScopeProjectId(row),
-    });
-    return;
-  }
-  upsertMessage(deps, { ...messageRow, conversationId: row.buildId });
+  emitTurnRow(deps, row, messageRow, { flushChiefShield: true });
 }
 
 export function reportTranscriptDelta(
@@ -1380,12 +1357,7 @@ export function reportTranscriptDelta(
   const row = ownedStep(deps, machineId, stepId);
   if (text === '') return;
   markProgress(deps, row);
-  if (!isChiefConversation(row.buildId)) {
-    deps.convHub?.publishTextDelta(row.buildId, text);
-    return;
-  }
-  const shielded = shieldFor(deps.db, stepId, () => stepClaimFacts(deps.db, row)).push(text);
-  if (shielded !== '') deps.convHub?.publishTextDelta(row.buildId, shielded);
+  emitTurnTextDelta(deps, row, text);
 }
 
 export function reportThinkingDelta(
@@ -1409,28 +1381,17 @@ export function storeTranscriptRow(
   markProgress(deps, owned);
   const origin =
     row.role === 'user' && row.id === transcriptPromptRowId(stepId) ? 'task-prompt' : null;
-  if (isChiefConversation(owned.buildId)) {
-    const rest = flushShield(deps.db, stepId);
-    if (rest !== '') deps.convHub?.publishTextDelta(owned.buildId, rest);
-    upsertChiefRow(deps, {
+  emitTurnRow(
+    deps,
+    owned,
+    {
       id: row.id,
-      threadId: owned.buildId,
       role: row.role,
       content: row.content,
       createdAt: row.createdAt,
-      projectId: stepScopeProjectId(owned),
-      origin,
-    });
-    return;
-  }
-  upsertMessage(deps, {
-    id: row.id,
-    conversationId: owned.buildId,
-    role: row.role,
-    content: row.content,
-    createdAt: row.createdAt,
-    origin,
-  });
+    },
+    { origin, flushChiefShield: true },
+  );
 }
 
 export function reportTranscriptRow(

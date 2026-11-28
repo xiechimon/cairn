@@ -14,12 +14,11 @@ import {
   stopPending,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
+import { releaseStallRecoveryHold, settleCoordinatorTurn } from '../services/agent-turn-kernel.js';
 import { NotFoundError } from '../services/builds.js';
 import { chiefMessageStored } from '../services/chief.js';
 import { askQuestionContentOf } from '../services/chief-question-store.js';
 import { storeQuickReplies } from '../services/chief-quick-replies.js';
-import { releaseUnconsumedSteer } from '../services/chief-turns.js';
-import { wakeCoordinator } from '../services/coordinator-context.js';
 import {
   consumeCoordinatorInput,
   coordinatorInputIsLive,
@@ -33,17 +32,14 @@ import {
   stoppedCoordinatorTurns,
 } from '../services/coordinator-inputs.js';
 import { bindCoordinatorRun, coordinatorRuns } from '../services/coordinator-runs.js';
-import { finishCoordinatorTurn, recordStepUsage } from '../services/coordinator-steps.js';
 import { stopStepComputer } from '../services/machine-computer.js';
 import {
   isChiefConversation,
   type MachineDeps,
   ownedStepRow,
-  stepTeamId,
   touchStepProgress,
   withFencedTransaction,
 } from '../services/machine-deps.js';
-import { chiefStepAgent, requeueChiefStepOnFallback } from '../services/machine-finish-step.js';
 import { executeRelayToolCall, machineAsk, relayComputerTool } from '../services/machine-relay.js';
 import {
   fetchStop,
@@ -51,7 +47,6 @@ import {
   reportTranscriptDelta,
   storeTranscriptRow,
 } from '../services/machines.js';
-import { ranModel, recordProviderOutcome } from '../services/model-fallback.js';
 import { publishStepRow } from '../services/quota-wait.js';
 import { discardShield } from '../services/terminal-claims.js';
 import { InputAuthorityError } from './runtime/input-channel.js';
@@ -225,28 +220,11 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
   ) => {
     const expectedGeneration = boundGeneration ?? body.generation;
     const strictGeneration = boundGeneration !== undefined;
-    const precheck = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-    if (
-      precheck !== undefined &&
-      precheck.status === 'pending' &&
-      precheck.holdReason === 'stall_recovery' &&
-      expectedGeneration !== undefined &&
-      expectedGeneration === precheck.claimedAt &&
-      precheck.stallState?.lastRecoveredFromMachineId === null
-    ) {
-      const released = deps.db
-        .update(step)
-        .set({ holdReason: null, holdUntil: null })
-        .where(
-          and(
-            eq(step.id, stepId),
-            eq(step.status, 'pending'),
-            eq(step.holdReason, 'stall_recovery'),
-          ),
-        )
-        .run();
-      if (released.changes > 0 && precheck.kind === 'chief') wakeCoordinator(precheck.buildId);
-    }
+    releaseStallRecoveryHold(deps, {
+      stepId,
+      machineId: null,
+      expectedGeneration,
+    });
     withFencedTransaction(deps, (txDeps) => {
       const owned = txDeps.db.select().from(step).where(eq(step.id, stepId)).get();
       if (!owned) throw new NotFoundError(`step ${stepId}`);
@@ -264,24 +242,13 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         }
         return;
       }
-      recordStepUsage(txDeps, owned, body.usage ?? []);
-      txDeps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
-      releaseUnconsumedSteer(txDeps.db, owned);
-      const chiefAgent = chiefStepAgent(txDeps, owned);
-      if (chiefAgent !== null) {
-        recordProviderOutcome(
-          stepTeamId(txDeps, owned),
-          ranModel(chiefAgent, owned).provider,
-          body,
-          false,
-        );
-      }
-      if (requeueChiefStepOnFallback(txDeps, owned, chiefAgent, body)) {
-        stopStepComputer(txDeps, stepId);
-        return;
-      }
-      finishCoordinatorTurn(txDeps, owned, body, observation);
-      stopStepComputer(txDeps, stepId);
+      settleCoordinatorTurn(txDeps, owned, body, {
+        ...(observation !== undefined ? { observation } : {}),
+        recordUsage: true,
+        clearStopPending: true,
+        deferProviderOutcome: false,
+        stopComputer: true,
+      });
     });
   };
   const baseApi: MachineApi = {

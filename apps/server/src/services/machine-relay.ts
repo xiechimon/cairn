@@ -50,6 +50,11 @@ import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStepRow } from './machines.js';
 import { mcpConnectorDepsOf } from './mcp-servers.js';
 import { stepScopeProjectId } from './picked-project.js';
+import {
+  createRelayToolRegistry,
+  type RelayToolInvocation,
+  type RelayToolNamespace,
+} from './relay-tool-registry.js';
 import { refuseRestrictedTurnTool, turnForcesOutboundApproval } from './report-turn.js';
 import {
   coordinatorMemoryOwner,
@@ -168,39 +173,34 @@ export async function relayComputerTool(
   );
 }
 
-export async function executeRelayToolCall(
-  deps: MachineDeps,
-  machineId: string | null,
-  stepId: string,
-  name: string,
-  params: Record<string, unknown>,
-  toolCallId?: string,
-  signal?: AbortSignal,
-  runnerTokenHash?: string | null,
-): Promise<string> {
-  const row = ownedStepRow(deps, machineId, stepId);
-  if (isCoordinatorComputerTool(name) && (name !== 'attach_file' || row.kind === 'chief')) {
-    return (await relayComputerTool(deps, machineId, stepId, name, params, toolCallId, signal))
-      .text;
-  }
-  refuseRestrictedTurnTool(deps.db, row.prompt, name, params, row.ownerMessageIds ?? []);
-  if (name.startsWith('user_computer_')) {
-    throw new HttpError(
-      400,
-      `unknown own-Mac tool ${name}; the own-Mac tools are ${OWN_COMPUTER_TOOL_NAMES.join(', ')}`,
-    );
-  }
-  if (isThreadScheduleTool(name)) {
-    if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {
-      throw new HttpError(400, 'schedule tools require a plan or build step');
-    }
-    if (row.status !== 'claimed') {
-      throw new HttpError(409, 'schedule tools require a currently claimed step');
-    }
-  }
-  if (row.kind !== 'chief') {
-    return executeWorkerMemoryToolCall(deps, row, name, params);
-  }
+interface RelayToolContext {
+  readonly deps: MachineDeps;
+  readonly machineId: string | null;
+  readonly stepId: string;
+  readonly row: typeof step.$inferSelect;
+  readonly toolCallId?: string | undefined;
+  readonly signal?: AbortSignal | undefined;
+  readonly runnerTokenHash?: string | null | undefined;
+}
+
+interface ChiefRelayTurn {
+  readonly threadRow: typeof chiefThread.$inferSelect;
+  readonly chiefRow: typeof chief.$inferSelect;
+  readonly assertTurnClaim: () => void;
+}
+
+interface WorkerRelayTarget {
+  readonly todoRow: typeof todo.$inferSelect;
+}
+
+function assertRestrictedToolAllowed(call: RelayToolInvocation<RelayToolContext>): void {
+  const { deps, row } = call.context;
+  refuseRestrictedTurnTool(deps.db, row.prompt, call.name, call.args, row.ownerMessageIds ?? []);
+}
+
+function resolveChiefRelayTurn(call: RelayToolInvocation<RelayToolContext>): ChiefRelayTurn {
+  assertRestrictedToolAllowed(call);
+  const { deps, machineId, stepId, row, runnerTokenHash } = call.context;
   if (!isChiefConversation(row.buildId)) {
     throw new HttpError(400, `step ${stepId} is not a chief step`);
   }
@@ -232,93 +232,294 @@ export async function executeRelayToolCall(
       throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
     }
   };
-  if (name.startsWith(CONNECTOR_TOOL_PREFIX)) {
-    return executeConnectorToolCall(
-      {
-        db: deps.db,
-        mcp: mcpConnectorDepsOf(deps),
-        hub: deps.hub,
-        user: deps.user,
-        vapidKeys: deps.vapidKeys,
-        reposDir: deps.reposDir,
-        ...(deps.mailSend !== undefined ? { sendMail: deps.mailSend } : {}),
-        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-      },
-      {
-        teamId: threadRow.teamId,
-        threadId,
-        scopeProjectId: stepScopeProjectId(row),
-        mcpGrant: row.mcpGrant,
-        assertTurnClaim,
-        ...(turnForcesOutboundApproval(deps.db, row.prompt) ? { untrustedTurn: true } : {}),
-      },
-      name,
-      params,
+  return { threadRow, chiefRow, assertTurnClaim };
+}
+
+function resolveWorkerRelayTarget(call: RelayToolInvocation<RelayToolContext>): WorkerRelayTarget {
+  assertRestrictedToolAllowed(call);
+  const { deps, row } = call.context;
+  const buildRow = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
+  if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
+  return { todoRow };
+}
+
+function requireClaimedWorkerTarget(
+  call: RelayToolInvocation<RelayToolContext>,
+): WorkerRelayTarget {
+  const target = resolveWorkerRelayTarget(call);
+  if (call.context.row.status !== 'claimed') {
+    throw new HttpError(409, 'worker tools require a currently claimed step');
+  }
+  return target;
+}
+
+const RELAY_TOOL_NAMESPACES: readonly RelayToolNamespace<RelayToolContext>[] = [
+  {
+    id: 'computer',
+    matches: (name, stepKind) =>
+      (isCoordinatorComputerTool(name) && (name !== 'attach_file' || stepKind === 'chief')) ||
+      name.startsWith('user_computer_'),
+    async execute(call) {
+      const { deps, machineId, stepId, toolCallId, signal } = call.context;
+      if (isCoordinatorComputerTool(call.name)) {
+        return (
+          await relayComputerTool(deps, machineId, stepId, call.name, call.args, toolCallId, signal)
+        ).text;
+      }
+      assertRestrictedToolAllowed(call);
+      throw new HttpError(
+        400,
+        `unknown own-Mac tool ${call.name}; the own-Mac tools are ${OWN_COMPUTER_TOOL_NAMES.join(', ')}`,
+      );
+    },
+  },
+  {
+    id: 'thread-schedule',
+    matches: (name) => isThreadScheduleTool(name),
+    async execute(call) {
+      assertRestrictedToolAllowed(call);
+      if (!isThreadScheduleTool(call.name)) {
+        throw new HttpError(400, `unknown schedule tool ${call.name}`);
+      }
+      const { deps, row } = call.context;
+      if (row.kind !== 'plan' && !isBuildStepKind(row.kind)) {
+        throw new HttpError(400, 'schedule tools require a plan or build step');
+      }
+      if (row.status !== 'claimed') {
+        throw new HttpError(409, 'schedule tools require a currently claimed step');
+      }
+      const { todoRow } = requireClaimedWorkerTarget(call);
+      return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, call.name, call.args);
+    },
+  },
+  {
+    id: 'connector',
+    matches: (name, stepKind) => stepKind === 'chief' && name.startsWith(CONNECTOR_TOOL_PREFIX),
+    async execute(call) {
+      const { deps, row, signal } = call.context;
+      const { threadRow, assertTurnClaim } = resolveChiefRelayTurn(call);
+      return executeConnectorToolCall(
+        {
+          db: deps.db,
+          mcp: mcpConnectorDepsOf(deps),
+          hub: deps.hub,
+          user: deps.user,
+          vapidKeys: deps.vapidKeys,
+          reposDir: deps.reposDir,
+          ...(deps.mailSend !== undefined ? { sendMail: deps.mailSend } : {}),
+          ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+        },
+        {
+          teamId: threadRow.teamId,
+          threadId: row.buildId,
+          scopeProjectId: stepScopeProjectId(row),
+          mcpGrant: row.mcpGrant,
+          assertTurnClaim,
+          ...(turnForcesOutboundApproval(deps.db, row.prompt) ? { untrustedTurn: true } : {}),
+        },
+        call.name,
+        call.args,
+        signal,
+      );
+    },
+  },
+  {
+    id: 'secret-request',
+    matches: (name, stepKind) => stepKind === 'chief' && name === REQUEST_SECRET_TOOL,
+    async execute(call) {
+      const { deps, stepId, signal } = call.context;
+      const { threadRow } = resolveChiefRelayTurn(call);
+      return holdSecretRequest(
+        deps.db,
+        { teamId: threadRow.teamId, stepId, params: call.args },
+        signal !== undefined ? { signal } : {},
+      );
+    },
+  },
+  {
+    id: 'chief',
+    matches: (_name, stepKind) => stepKind === 'chief',
+    async execute(call) {
+      const { deps, stepId, row, toolCallId } = call.context;
+      const { threadRow, chiefRow, assertTurnClaim } = resolveChiefRelayTurn(call);
+      const threadId = row.buildId;
+      const tool = isCaptureTool(call.name) ? call.name : undefined;
+      const captured = tool !== undefined ? existingTurnCapture(stepId) : undefined;
+      if (captured !== undefined && tool !== undefined) {
+        capturePreCallWorld(deps.db, stepId, threadRow.teamId, tool, toolCallId, call.args);
+      }
+      let result: string;
+      try {
+        result = await executeChiefTool(
+          {
+            db: deps.db,
+            hub: deps.hub,
+            machineHub: deps.machineHub,
+            box: deps.box,
+            githubAppTokenSocket: deps.githubAppTokenSocket,
+            githubAppIdentity: deps.githubAppIdentity,
+            user: deps.user,
+            vapidKeys: deps.vapidKeys,
+            reposDir: deps.reposDir,
+            workspacesDir: deps.workspacesDir,
+            attachmentsDir: deps.attachmentsDir,
+            skillsDir: deps.skillsDir,
+            ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
+            ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
+            ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+            ...(deps.githubBaseFetch !== undefined
+              ? { githubBaseFetch: deps.githubBaseFetch }
+              : {}),
+            ...(deps.oauthClient !== undefined ? { oauthClient: deps.oauthClient } : {}),
+            ...(deps.githubApp !== undefined ? { githubApp: deps.githubApp } : {}),
+          },
+          {
+            teamId: threadRow.teamId,
+            userId: threadRow.userId,
+            chiefId: chiefRow.id,
+            threadId,
+            chiefAgentId: coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
+            conversationId: threadId,
+            ...(toolCallId !== undefined ? { toolCallId } : {}),
+            stepId,
+            turnPrompt: row.prompt,
+            turnMessageIds: row.ownerMessageIds ?? [],
+            turnScopeProjectId: stepScopeProjectId(row),
+            turnScopeMixed: steeredFromAnotherScope(deps, row),
+            assertTurnClaim,
+          },
+          call.name,
+          call.args,
+        );
+      } catch (error) {
+        deps.assertClaim?.();
+        if (captured !== undefined && tool !== undefined) {
+          captureToolResult(stepId, tool, {
+            toolError: error instanceof Error ? error.message : String(error),
+          });
+        }
+        throw error;
+      }
+      deps.assertClaim?.();
+      if (captured !== undefined && tool !== undefined) captureToolResult(stepId, tool, result);
+      return result;
+    },
+  },
+  {
+    id: 'worker-session',
+    matches: (name, stepKind) =>
+      stepKind === 'session' && (name === 'thread_report' || name === 'close_as_duplicate'),
+    async execute(call) {
+      const { deps, row } = call.context;
+      const { todoRow } = resolveWorkerRelayTarget(call);
+      if (row.status !== 'claimed') {
+        throw new HttpError(409, `${call.name} requires a currently claimed step`);
+      }
+      if (call.name === 'thread_report') {
+        if (todoRow.phase === 'closed') {
+          throw new HttpError(409, 'thread_report: this task is closed');
+        }
+        return recordThreadReportLine(deps, row, call.args.line);
+      }
+      return closeThreadAsDuplicate(deps, row, todoRow, call.args);
+    },
+  },
+  {
+    id: 'worker-attachment',
+    matches: (name, stepKind) => stepKind !== 'chief' && name === 'attach_file',
+    async execute(call) {
+      const { deps, row } = call.context;
+      const { todoRow } = requireClaimedWorkerTarget(call);
+      return attachWorkerFile(deps, row, todoRow, call.args);
+    },
+  },
+  {
+    id: 'worker-task-meta',
+    matches: (name, stepKind) => stepKind !== 'chief' && name === 'set_task_meta',
+    async execute(call) {
+      const { deps, row } = call.context;
+      const { todoRow } = requireClaimedWorkerTarget(call);
+      if (!stepNamesTask(deps.db, row)) {
+        throw new HttpError(409, 'set_task_meta is reserved for the first implementation step');
+      }
+      return setTaskMeta(deps, todoRow, call.args);
+    },
+  },
+  {
+    id: 'worker-skills',
+    matches: (name, stepKind) =>
+      stepKind !== 'chief' && (name === 'create_skill' || name === 'update_skill'),
+    async execute(call) {
+      const { deps, row } = call.context;
+      const { todoRow } = requireClaimedWorkerTarget(call);
+      const profile = profileForStep(deps.db, todoRow, row.kind, row.id);
+      if (!profile) throw new HttpError(409, 'step has no routing rule — skill write has no actor');
+      return executeWorkerSkillTool(
+        deps,
+        todoRow,
+        profile,
+        call.name as 'create_skill' | 'update_skill',
+        call.args,
+      );
+    },
+  },
+  {
+    id: 'worker-memory',
+    matches: (_name, stepKind) => stepKind !== 'chief',
+    async execute(call) {
+      const { deps, row } = call.context;
+      const { todoRow } = requireClaimedWorkerTarget(call);
+      const profile = profileForStep(deps.db, todoRow, row.kind, row.id);
+      if (!profile) throw new HttpError(409, 'step has no routing rule — memory has no store');
+      return executeWorkerMemoryTool(
+        deps.db,
+        {
+          teamId: todoRow.teamId,
+          agentId: memoryOwnerOf(deps.db, todoRow.teamId, row.kind),
+          sourceName: profile.displayName,
+          teamScoped: memoryOpsAreTeamScoped(row.kind),
+          todoId: todoRow.id,
+          projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
+          buildId: row.buildId,
+          stepId: row.id,
+          attachmentsDir: deps.attachmentsDir,
+        },
+        call.name,
+        call.args,
+      );
+    },
+  },
+];
+
+export const relayToolRegistry = createRelayToolRegistry(RELAY_TOOL_NAMESPACES);
+
+export async function executeRelayToolCall(
+  deps: MachineDeps,
+  machineId: string | null,
+  stepId: string,
+  name: string,
+  params: Record<string, unknown>,
+  toolCallId?: string,
+  signal?: AbortSignal,
+  runnerTokenHash?: string | null,
+): Promise<string> {
+  const row = ownedStepRow(deps, machineId, stepId);
+  return relayToolRegistry.dispatch({
+    name,
+    args: params,
+    stepKind: row.kind,
+    context: {
+      deps,
+      machineId,
+      stepId,
+      row,
+      toolCallId,
       signal,
-    );
-  }
-  if (name === REQUEST_SECRET_TOOL)
-    return holdSecretRequest(
-      deps.db,
-      { teamId: threadRow.teamId, stepId, params },
-      signal !== undefined ? { signal } : {},
-    );
-  const tool = isCaptureTool(name) ? name : undefined;
-  const captured = tool !== undefined ? existingTurnCapture(stepId) : undefined;
-  if (captured !== undefined && tool !== undefined)
-    capturePreCallWorld(deps.db, stepId, threadRow.teamId, tool, toolCallId, params);
-  let result: string;
-  try {
-    result = await executeChiefTool(
-      {
-        db: deps.db,
-        hub: deps.hub,
-        machineHub: deps.machineHub,
-        box: deps.box,
-        githubAppTokenSocket: deps.githubAppTokenSocket,
-        githubAppIdentity: deps.githubAppIdentity,
-        user: deps.user,
-        vapidKeys: deps.vapidKeys,
-        reposDir: deps.reposDir,
-        workspacesDir: deps.workspacesDir,
-        attachmentsDir: deps.attachmentsDir,
-        skillsDir: deps.skillsDir,
-        ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-        ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
-        ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
-        ...(deps.githubBaseFetch !== undefined ? { githubBaseFetch: deps.githubBaseFetch } : {}),
-        ...(deps.oauthClient !== undefined ? { oauthClient: deps.oauthClient } : {}),
-        ...(deps.githubApp !== undefined ? { githubApp: deps.githubApp } : {}),
-      },
-      {
-        teamId: threadRow.teamId,
-        userId: threadRow.userId,
-        chiefId: chiefRow.id,
-        threadId,
-        chiefAgentId: coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
-        conversationId: threadId,
-        ...(toolCallId !== undefined ? { toolCallId } : {}),
-        stepId,
-        turnPrompt: row.prompt,
-        turnMessageIds: row.ownerMessageIds ?? [],
-        turnScopeProjectId: stepScopeProjectId(row),
-        turnScopeMixed: steeredFromAnotherScope(deps, row),
-        assertTurnClaim,
-      },
-      name,
-      params,
-    );
-  } catch (error) {
-    deps.assertClaim?.();
-    if (captured !== undefined && tool !== undefined)
-      captureToolResult(stepId, tool, {
-        toolError: error instanceof Error ? error.message : String(error),
-      });
-    throw error;
-  }
-  deps.assertClaim?.();
-  if (captured !== undefined && tool !== undefined) captureToolResult(stepId, tool, result);
-  return result;
+      runnerTokenHash,
+    },
+  });
 }
 
 export function steeredFromAnotherScope(deps: MachineDeps, row: typeof step.$inferSelect): boolean {
@@ -399,68 +600,6 @@ function closeThreadAsDuplicate(
   const label = `${source === 'github' ? 'GitHub ' : ''}#${number}`;
   recordThreadReportLine(deps, row, `与 ${label} 重复，已停`);
   return `closed as a duplicate of ${label}; end your turn now`;
-}
-
-async function executeWorkerMemoryToolCall(
-  deps: MachineDeps,
-  row: typeof step.$inferSelect,
-  name: string,
-  params: Record<string, unknown>,
-): Promise<string> {
-  const buildRow = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
-  if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  if (name === 'thread_report' && row.kind === 'session') {
-    if (row.status !== 'claimed') {
-      throw new HttpError(409, 'thread_report requires a currently claimed step');
-    }
-    if (todoRow.phase === 'closed') {
-      throw new HttpError(409, 'thread_report: this task is closed');
-    }
-    return recordThreadReportLine(deps, row, params.line);
-  }
-  if (name === 'close_as_duplicate' && row.kind === 'session') {
-    if (row.status !== 'claimed') {
-      throw new HttpError(409, 'close_as_duplicate requires a currently claimed step');
-    }
-    return closeThreadAsDuplicate(deps, row, todoRow, params);
-  }
-  if (row.status !== 'claimed') {
-    throw new HttpError(409, 'worker tools require a currently claimed step');
-  }
-  if (isThreadScheduleTool(name)) {
-    return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
-  }
-  if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
-  if (name === 'set_task_meta') {
-    if (!stepNamesTask(deps.db, row)) {
-      throw new HttpError(409, 'set_task_meta is reserved for the first implementation step');
-    }
-    return setTaskMeta(deps, todoRow, params);
-  }
-  const profile = profileForStep(deps.db, todoRow, row.kind, row.id);
-  if (name === 'create_skill' || name === 'update_skill') {
-    if (!profile) throw new HttpError(409, 'step has no routing rule — skill write has no actor');
-    return executeWorkerSkillTool(deps, todoRow, profile, name, params);
-  }
-  if (!profile) throw new HttpError(409, 'step has no routing rule — memory has no store');
-  return executeWorkerMemoryTool(
-    deps.db,
-    {
-      teamId: todoRow.teamId,
-      agentId: memoryOwnerOf(deps.db, todoRow.teamId, row.kind),
-      sourceName: profile.displayName,
-      teamScoped: memoryOpsAreTeamScoped(row.kind),
-      todoId: todoRow.id,
-      projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
-      buildId: row.buildId,
-      stepId: row.id,
-      attachmentsDir: deps.attachmentsDir,
-    },
-    name,
-    params,
-  );
 }
 
 async function executeWorkerSkillTool(

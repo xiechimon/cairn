@@ -8,6 +8,7 @@ import {
   mailSharedTranscript,
   type OtelObservation,
   SUBAGENT_TOOL_NAME,
+  startTurnHeartbeat,
   subagentToolResultSchema,
 } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
@@ -139,7 +140,10 @@ export async function runCoordinatorTurn(
   if (token.provider?.apiKey) await deps.models.setApiKey(provider, token.provider.apiKey);
   deps.setupPhase?.('token');
 
-  const heartbeat = setInterval(() => void api.heartbeat(stepId).catch(() => {}), deps.heartbeatMs);
+  const heartbeat = startTurnHeartbeat({
+    intervalMs: deps.heartbeatMs,
+    beat: () => api.heartbeat(stepId),
+  });
   deps.gate?.set(stepId);
   deps.onModel?.({ provider, modelId });
   let stopPoll: ReturnType<typeof setInterval> | undefined;
@@ -626,6 +630,6 @@ export async function runCoordinatorTurn(
       deps.volatile?.set(rootKey, null);
       deps.volatile?.setStep(rootKey, null);
     }
-    clearInterval(heartbeat);
+    heartbeat.stop();
   }
 }

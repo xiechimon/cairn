@@ -17,6 +17,8 @@ import {
   PLAN_FILE_NAME,
   type StepFailureCode,
   type StepFailureDetail,
+  startTurnHeartbeat,
+  type TurnHeartbeatHandle,
 } from '@cairn/shared';
 import { AskChannel } from './ask-channel.js';
 import { stepFailureOf } from './backend/errors.js';
@@ -172,8 +174,11 @@ export async function runStep(
     }
   });
   const provenance: MachineHeartbeatBody = {};
-  const heartbeat = setInterval(() => {
-    deps.client.heartbeat(stepId, provenance).catch((err: unknown) => {
+  const heartbeat = startTurnHeartbeat({
+    intervalMs: deps.heartbeatIntervalMs ?? 30_000,
+    unref: true,
+    beat: () => deps.client.heartbeat(stepId, provenance),
+    onError: (err: unknown) => {
       if (
         !(err instanceof MachineApiError) ||
         (err.status !== 410 && err.status !== 404 && err.status !== 409) ||
@@ -186,9 +191,8 @@ export async function runStep(
           `stop after heartbeat ${err.status} failed: ${stopErr instanceof Error ? stopErr.message : String(stopErr)}`,
         );
       });
-    });
-  }, deps.heartbeatIntervalMs ?? 30_000);
-  if (heartbeat.unref) heartbeat.unref();
+    },
+  });
   if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
   const stepCleanups: (() => void | Promise<void>)[] = [];
   const errors: unknown[] = [];
@@ -200,7 +204,7 @@ export async function runStep(
   for (const cleanup of [
     ...stepCleanups.reverse(),
     () => deps.sessionHandles?.delete(stepId),
-    () => clearInterval(heartbeat),
+    () => heartbeat.stop(),
     () => deps.stepImageSupport?.delete(stepId),
     () => deps.stepSteeringSupport?.delete(stepId),
     () => deps.stepTranscripts?.delete(stepId),
@@ -226,7 +230,7 @@ async function runClaimedStep(
   deps: RunStepDeps,
   claimed: ClaimedStep,
   opts: RunStepOptions,
-  heartbeat: ReturnType<typeof setInterval>,
+  heartbeat: TurnHeartbeatHandle,
   stop: RunStop,
   provenance: MachineHeartbeatBody,
   stepCleanups: (() => void | Promise<void>)[],
@@ -453,7 +457,7 @@ async function runClaimedStep(
           `done(stopped) report unreachable: ${err instanceof Error ? err.message : String(err)}`,
         );
       } finally {
-        clearInterval(heartbeat);
+        heartbeat.stop();
       }
       return;
     }
@@ -600,6 +604,8 @@ async function runClaimedStep(
     teamSkillsDir,
     isChief,
     isReview,
+    stepKind: claimed.step.kind,
+    conversationId: claimed.conversationId,
     ...(ws?.readonly === true ? { readOnly: true } : {}),
     remoteToolsOnly: claimed.remoteToolsOnly === true,
     telemetry,
@@ -808,7 +814,7 @@ async function runClaimedStep(
     stop,
     forgetHandle: () => deps.sessionHandles?.delete(stepId),
     stopHeartbeat: () => {
-      clearInterval(heartbeat);
+      heartbeat.stop();
     },
     headAtStart,
     stepStartMs,
@@ -851,7 +857,7 @@ async function reportCrash(
 
 async function failStep(
   deps: RunStepDeps,
-  heartbeat: ReturnType<typeof setInterval>,
+  heartbeat: TurnHeartbeatHandle,
   stepId: string,
   message: string,
   reap?: () => Promise<void>,
@@ -873,6 +879,6 @@ async function failStep(
       `done(failed) report unreachable: ${err instanceof Error ? err.message : String(err)}`,
     );
   } finally {
-    clearInterval(heartbeat);
+    heartbeat.stop();
   }
 }
