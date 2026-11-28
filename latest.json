@@ -1,20 +1,20 @@
 {
   "version": 1,
   "dataset": "cairn-eval-suite",
-  "suiteVersion": 1,
-  "date": "2026-11-28T02:34:49.953Z",
-  "sha": "338fe19b30266c2bb26b0139dfcbc5a4d57b95d0",
-  "status": "ok",
+  "suiteVersion": 2,
+  "date": "2026-11-28T09:11:49.205Z",
+  "sha": "2280bff4bb3e99ebf373329fb1d8a068013e7d9c",
+  "status": "degraded",
   "summary": {
-    "total": 96,
-    "passed": 96,
-    "failed": 0,
+    "total": 106,
+    "passed": 98,
+    "failed": 8,
     "incomplete": 0,
     "byKind": {
       "lane": {
-        "total": 10,
-        "passed": 10,
-        "failed": 0,
+        "total": 20,
+        "passed": 12,
+        "failed": 8,
         "incomplete": 0
       },
       "runtime": {
@@ -33,7 +33,7 @@
   },
   "cases": [
     {
-      "caseId": "add-config",
+      "caseId": "acp-readonly-hint",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -43,7 +43,7 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "add-fn",
+      "caseId": "agent-todo-ordinal",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -53,7 +53,7 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "add-test",
+      "caseId": "agent-todo-trailing-prose",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -63,7 +63,7 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "bump-version",
+      "caseId": "approval-card-lookalikes",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -73,7 +73,7 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "comment",
+      "caseId": "build-dispatch-atomic",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -83,7 +83,7 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "fix-bug",
+      "caseId": "cli-login-fragment-chars",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -93,7 +93,7 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "fix-typo",
+      "caseId": "computer-pinned-image",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -103,7 +103,27 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "gitignore",
+      "caseId": "coordinator-stopped-partial",
+      "kind": "lane",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "daemon-non-git-changes",
+      "kind": "lane",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "daemon-presence-offline",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -113,7 +133,7 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "rename-var",
+      "caseId": "dispatch-push-capability",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
@@ -123,11 +143,91 @@
       "model": "Devin CLI · swe-2-high"
     },
     {
-      "caseId": "write-doc",
+      "caseId": "engine-pty-subscription",
+      "kind": "lane",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "escalation-approval-order",
+      "kind": "lane",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "github-refresh-reconnect",
       "kind": "lane",
       "status": "pass",
       "passed": 1,
       "failed": 0,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "machine-grants-auth-off",
+      "kind": "lane",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "pi-retryable-errors",
+      "kind": "lane",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "run-trace-leading-blanks",
+      "kind": "lane",
+      "status": "pass",
+      "passed": 1,
+      "failed": 0,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "schedule-note-timezone",
+      "kind": "lane",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "webhook-pr-issue-events",
+      "kind": "lane",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
+      "incomplete": 0,
+      "trials": 1,
+      "model": "Devin CLI · swe-2-high"
+    },
+    {
+      "caseId": "workspace-shadow-merge",
+      "kind": "lane",
+      "status": "fail",
+      "passed": 0,
+      "failed": 1,
       "incomplete": 0,
       "trials": 1,
       "model": "Devin CLI · swe-2-high"
