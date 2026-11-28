@@ -152,7 +152,7 @@ function ChannelMirrorRow({ mirror }: { mirror: ChannelMirror }) {
     >
       <Marker variant="separator" className="gap-1.5 text-meta text-content-tertiary">
         <span className="flex min-w-0 shrink items-center gap-1.5">
-          <span className="min-w-0 shrink truncate" title={name}>
+          <span className="min-w-0 max-w-[50%] shrink-0 truncate" title={name}>
             {name}
           </span>
           <span className="flex-none" aria-hidden="true">

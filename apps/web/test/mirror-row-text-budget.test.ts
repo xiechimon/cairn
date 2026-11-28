@@ -53,6 +53,12 @@ test('a mirrored task row bounds its channel name and task title, never its stat
     `${LONG_NAME} 频道`,
     LONG_TITLE,
   ]);
+  const [name, title] = bounded;
+  expect(name?.cls, 'the name never shrinks below a short label').toMatch(/\bshrink-0\b/);
+  expect(name?.cls, 'the name clips only at a share of the row, not at a fixed width').toMatch(
+    /\bmax-w-\[[^\]]+%\]/,
+  );
+  expect(title?.cls, 'the title takes whatever the name leaves').not.toMatch(/\bshrink-0\b/);
   for (const part of bounded) {
     expect(part.cls, 'a long part may shrink below its content width').toMatch(/\bmin-w-0\b/);
     expect(part.cls, 'a long part ends in an ellipsis').toMatch(/\btruncate\b/);

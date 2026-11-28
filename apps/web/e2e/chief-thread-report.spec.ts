@@ -685,3 +685,54 @@ test('a mirrored task row keeps its status word and Open link inside a 390px vie
     );
   }
 });
+
+test('a short channel name stays whole at 390px while the task title truncates', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const channelTitle =
+    '修复定时任务运行回复按任务自身时区显示，同时处理跨时区的夏令时边界';
+  await mockLive(page, {
+    threads: [THREAD, { ...THREAD, id: 'chief-cairn', projectId: 'proj-cairn', title: 'Cairn' }],
+    projects: [{ ...PROJECT, id: 'proj-cairn', name: 'Cairn' }],
+    messages: [
+      { id: 'request', role: 'user', content: 'Fix the schedule timezone', createdAt: 10 },
+      {
+        id: 'report',
+        role: 'system',
+        content: JSON.stringify({
+          kind: 'thread-report',
+          todoId: TASK.id,
+          phase: 'done',
+          seqNum: TASK.seqNum,
+          title: channelTitle,
+          fromThreadId: 'chief-cairn',
+        }),
+        createdAt: 20,
+      },
+    ],
+    todos: [{ ...TASK, phase: 'done' }],
+  });
+  await page.goto('/app');
+  const row = page.getByTestId('home-c').getByTestId('chief-channel-mirror');
+  await expect(row).toHaveCount(1);
+  const name = row.locator('[title="Cairn 频道"]');
+  const width = await name.evaluate((node) => ({
+    client: node.clientWidth,
+    scroll: node.scrollWidth,
+  }));
+  expect(width.scroll, 'a short channel name is never abbreviated').toBe(width.client);
+  const title = row.locator(`[title="${channelTitle}"]`);
+  const titleWidth = await title.evaluate((node) => ({
+    client: node.clientWidth,
+    scroll: node.scrollWidth,
+  }));
+  expect(titleWidth.scroll, 'the long task title truncates so the row fits').toBeGreaterThan(
+    titleWidth.client,
+  );
+  const box = await row.getByRole('link').boundingBox();
+  expect(box).not.toBeNull();
+  expect(Math.round(box!.x + box!.width), 'the Open link stays inside 390px').toBeLessThanOrEqual(
+    390,
+  );
+  const line = await row.evaluate((node) => node.scrollWidth - node.clientWidth);
+  expect(line, 'the row does not overflow horizontally').toBeLessThanOrEqual(0);
+});
