@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createDecipheriv, randomBytes } from 'node:crypto';
 import { asSendError, ImSendError, sleepAbortable } from './errors.js';
 import type {
   ImAdapter,
@@ -23,6 +23,10 @@ const START_RETRY_DELAYS_MS = [250, 1_000, 3_000];
 const ILINK_APP_ID = 'bot';
 const ILINK_CLIENT_VERSION = (2 << 16) | (4 << 8) | 6;
 const ILINK_PROTOCOL_VERSION = '2.4.6';
+const CDN_BASE = 'https://novac2c.cdn.weixin.qq.com/c2c';
+const CDN_HOST = 'novac2c.cdn.weixin.qq.com';
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const IMAGE_TIMEOUT_MS = 15_000;
 
 type IlinkObject = Record<string, unknown>;
 
@@ -56,6 +60,159 @@ const objectAt = (value: IlinkObject, key: string): IlinkObject | undefined => {
     ? (inner as IlinkObject)
     : undefined;
 };
+
+const HEX_KEY = /^[0-9a-fA-F]{32}$/;
+const BASE64_KEY = /^[A-Za-z0-9+/_-]+={0,2}$/;
+const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff]);
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const GIF_MAGICS = ['GIF87a', 'GIF89a'];
+
+interface ImageFormat {
+  mimeType: string;
+  ext: string;
+}
+
+const decodeBase64Key = (value: string): Buffer | undefined => {
+  if (!BASE64_KEY.test(value)) return undefined;
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+  if (normalized.length % 4 === 1) return undefined;
+  const decoded = Buffer.from(
+    `${normalized}${'='.repeat((4 - (normalized.length % 4)) % 4)}`,
+    'base64',
+  );
+  return decoded.length > 0 ? decoded : undefined;
+};
+
+const imageKeyOf = (image: IlinkObject): Buffer | undefined => {
+  const candidates = [objectAt(image, 'media')?.aes_key, image.aes_key, image.aeskey];
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const raw = candidate.trim();
+    if (HEX_KEY.test(raw)) return Buffer.from(raw, 'hex');
+    const decoded = decodeBase64Key(raw);
+    if (decoded === undefined) continue;
+    if (decoded.length === 16) return decoded;
+    if (decoded.length === 32 && HEX_KEY.test(decoded.toString('utf8'))) {
+      return Buffer.from(decoded.toString('utf8'), 'hex');
+    }
+  }
+  return undefined;
+};
+
+const imageUrlOf = (image: IlinkObject): string | undefined => {
+  const media = objectAt(image, 'media');
+  if (media === undefined) return undefined;
+  const fullUrl = typeof media.full_url === 'string' ? media.full_url.trim() : '';
+  if (fullUrl !== '') {
+    try {
+      const url = new URL(fullUrl);
+      if (url.protocol === 'https:' && url.host === CDN_HOST) return url.toString();
+    } catch {}
+  }
+  const query = typeof media.encrypt_query_param === 'string' ? media.encrypt_query_param : '';
+  if (query === '') return undefined;
+  return `${CDN_BASE}/download?encrypted_query_param=${encodeURIComponent(query)}`;
+};
+
+const imageFormatOf = (bytes: Buffer): ImageFormat | undefined => {
+  if (bytes.subarray(0, JPEG_MAGIC.length).equals(JPEG_MAGIC)) {
+    return { mimeType: 'image/jpeg', ext: 'jpg' };
+  }
+  if (bytes.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC)) {
+    return { mimeType: 'image/png', ext: 'png' };
+  }
+  if (GIF_MAGICS.includes(bytes.subarray(0, 6).toString('latin1'))) {
+    return { mimeType: 'image/gif', ext: 'gif' };
+  }
+  if (
+    bytes.subarray(0, 4).toString('latin1') === 'RIFF' &&
+    bytes.subarray(8, 12).toString('latin1') === 'WEBP'
+  ) {
+    return { mimeType: 'image/webp', ext: 'webp' };
+  }
+  return undefined;
+};
+
+async function downloadImage(
+  fetchFn: typeof fetch,
+  url: string,
+  signal: AbortSignal,
+): Promise<Buffer | undefined> {
+  const response = await fetchFn(url, { signal });
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined);
+    return undefined;
+  }
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > IMAGE_MAX_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
+    return undefined;
+  }
+  if (response.body === null) return undefined;
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > IMAGE_MAX_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        return undefined;
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks);
+}
+
+const decryptImage = (ciphertext: Buffer, key: Buffer): Buffer | undefined => {
+  try {
+    const decipher = createDecipheriv('aes-128-ecb', key, null);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  } catch {
+    return undefined;
+  }
+};
+
+async function inboundImage(
+  image: IlinkObject,
+  index: number,
+  fetchFn: typeof fetch,
+  stopping: AbortSignal,
+): Promise<ImInboundFile> {
+  const missing: ImInboundFile = {
+    name: `wechat-image-${index}`,
+    mimeType: null,
+    dataBase64: null,
+  };
+  const url = imageUrlOf(image);
+  const key = imageKeyOf(image);
+  if (url === undefined || key === undefined) return missing;
+  let cipher: Buffer | undefined;
+  try {
+    cipher = await downloadImage(
+      fetchFn,
+      url,
+      AbortSignal.any([AbortSignal.timeout(IMAGE_TIMEOUT_MS), stopping]),
+    );
+  } catch {
+    return missing;
+  }
+  if (cipher === undefined) return missing;
+  const plain = decryptImage(cipher, key);
+  if (plain === undefined) return missing;
+  const format = imageFormatOf(plain);
+  if (format === undefined) return missing;
+  return {
+    name: `wechat-image-${index}.${format.ext}`,
+    mimeType: format.mimeType,
+    dataBase64: plain.toString('base64'),
+  };
+}
 
 const isUpdatesAnswer = (answer: IlinkObject) =>
   Array.isArray(answer.msgs) ||
@@ -318,7 +475,7 @@ export function createWechatAdapter(): ImAdapter {
       const degraded = (reason: string) =>
         handlers.onStatus(readyOnce ? 'degraded' : 'connecting', reason);
 
-      const deliver = (message: WireMessage): void => {
+      const deliver = async (message: WireMessage): Promise<void> => {
         const userId = String(message.from_user_id ?? '');
         if (userId === '') return;
         const contextToken = String(message.context_token ?? '');
@@ -337,6 +494,7 @@ export function createWechatAdapter(): ImAdapter {
         }
         const texts: string[] = [];
         const images: ImInboundFile[] = [];
+        const imageItems: { image: IlinkObject; index: number }[] = [];
         for (const raw of Array.isArray(message.item_list) ? message.item_list : []) {
           const item =
             raw !== null && typeof raw === 'object' ? (raw as IlinkObject) : ({} as IlinkObject);
@@ -345,10 +503,19 @@ export function createWechatAdapter(): ImAdapter {
             texts.push(String(objectAt(item, 'text_item')?.text));
           } else if (type === 3 && objectAt(item, 'voice_item')?.text !== undefined) {
             texts.push(String(objectAt(item, 'voice_item')?.text));
-          } else if (type === 2 && objectAt(item, 'image_item') !== undefined) {
-            images.push({ name: 'image', mimeType: null, dataBase64: null });
+          } else if (type === 2) {
+            const image = objectAt(item, 'image_item');
+            if (image !== undefined) imageItems.push({ image, index: imageItems.length + 1 });
           }
         }
+        images.push(
+          ...(await Promise.all(
+            imageItems.map(({ image, index }) =>
+              inboundImage(image, index, env.fetch, stopping.signal),
+            ),
+          )),
+        );
+        if (stopped) return;
         handlers.onMessage({
           chat: { key: userId, kind: 'direct', title: null },
           sender: { id: userId, name: null },
@@ -425,7 +592,7 @@ export function createWechatAdapter(): ImAdapter {
           for (const message of orderMessages(answer.msgs)) {
             if (stopped) return;
             try {
-              deliver(message);
+              await deliver(message);
             } catch {}
           }
           if (

@@ -1,3 +1,4 @@
+import { createCipheriv } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 import { ImSendError } from '../src/services/im/errors.js';
 import type {
@@ -249,7 +250,7 @@ describe('wechat adapter connect', () => {
       chat: { key: 'u1@im.wechat', kind: 'direct', title: null },
       sender: { id: 'u1@im.wechat', name: null },
       text: 'hello\nspoken words',
-      images: [{ name: 'image', mimeType: null, dataBase64: null }],
+      images: [{ name: 'wechat-image-1', mimeType: null, dataBase64: null }],
       files: [],
       messageId: 'c1',
       mentioned: false,
@@ -507,5 +508,487 @@ describe('wechat adapter connect', () => {
     await corruptConn.send({ chatKey: 'u50@im.wechat', text: 'fallback' });
     await corruptConn.stop();
     await corrupt.stop();
+  });
+});
+
+describe('wechat inbound images', () => {
+  const keyBytes = Buffer.from([
+    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+  ]);
+  const keyHex = keyBytes.toString('hex');
+  const fullUrl = 'https://novac2c.cdn.weixin.qq.com/c2c/download?encrypted_query_param=ABC';
+  const jpeg = Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01,
+    0x00, 0x01, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08,
+    0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0a, 0x0c, 0x14, 0x0d, 0x0c, 0x0b, 0x0b, 0x0c, 0x19, 0x12,
+    0x13, 0x0f, 0x14, 0x1d, 0x1a, 0x1f, 0x1e, 0x1d, 0x1a, 0x1c, 0x1c, 0x20, 0x24, 0x2e, 0x27, 0x20,
+    0x22, 0x2c, 0x23, 0x1c, 0x1c, 0x28, 0x37, 0x29, 0x2c, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1f, 0x27,
+    0x39, 0x3d, 0x38, 0x32, 0x3c, 0x2e, 0x33, 0x34, 0x32, 0xff, 0xd9,
+  ]);
+
+  const encryptEcb = (key: Buffer, plaintext: Buffer): Buffer => {
+    const cipher = createCipheriv('aes-128-ecb', key, null);
+    return Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  };
+
+  const encrypted = encryptEcb(keyBytes, jpeg);
+  const hexKeyBase64 = Buffer.from(keyHex, 'utf8').toString('base64');
+  const rawKeyBase64 = keyBytes.toString('base64');
+
+  const imageResponse = () => new Response(new Uint8Array(encrypted), { status: 200 });
+
+  const connectWith = async (script: Record<string, ScriptEntry[]>) => {
+    const { env, calls } = makeEnv(sequence(script));
+    const { handlers, messages } = makeHandlers();
+    const connection = await wechatAdapter.connect(FIELDS, handlers, env);
+    return { calls, messages, ...connection };
+  };
+
+  const imageMessage = (
+    clientId: string,
+    itemList: Record<string, unknown>[],
+  ): Record<string, unknown> => ({
+    from_user_id: 'u1@im.wechat',
+    context_token: 'CTX-IMG',
+    client_id: clientId,
+    message_id: `mid-${clientId}`,
+    item_list: itemList,
+  });
+
+  test('downloads and decrypts an image with a full_url and base64(hex) media key', async () => {
+    const { calls, messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-1', [
+              {
+                type: 2,
+                image_item: {
+                  aeskey: keyHex,
+                  media: {
+                    full_url: fullUrl,
+                    aes_key: hexKeyBase64,
+                    encrypt_query_param: 'ABC',
+                  },
+                  mid_size: encrypted.length,
+                },
+              },
+            ]),
+          ],
+          get_updates_buf: 'BUF-IMG',
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [imageResponse()],
+    });
+
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]?.images).toEqual([
+      {
+        name: 'wechat-image-1.jpg',
+        mimeType: 'image/jpeg',
+        dataBase64: jpeg.toString('base64'),
+      },
+    ]);
+    expect(callsTo(calls, 'novac2c.cdn.weixin.qq.com')).toHaveLength(1);
+    await stop();
+  });
+
+  test('builds the CDN download URL from encrypt_query_param and accepts a top-level hex aeskey', async () => {
+    const { calls, messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-2', [
+              {
+                type: 2,
+                image_item: {
+                  aeskey: keyHex,
+                  media: { encrypt_query_param: 'QP+/=' },
+                  mid_size: encrypted.length,
+                },
+              },
+            ]),
+          ],
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [imageResponse()],
+    });
+
+    await waitFor(() => messages.length === 1);
+    const download = callsTo(calls, 'novac2c.cdn.weixin.qq.com')[0];
+    expect(download?.url).toContain('encrypted_query_param=QP%2B%2F%3D');
+    expect(messages[0]?.images?.[0]?.dataBase64).toBe(jpeg.toString('base64'));
+    await stop();
+  });
+
+  test('accepts media.aes_key that is base64 of 16 raw key bytes', async () => {
+    const { messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-3', [
+              {
+                type: 2,
+                image_item: {
+                  media: {
+                    full_url: fullUrl,
+                    aes_key: rawKeyBase64,
+                    encrypt_query_param: 'ABC',
+                  },
+                  mid_size: encrypted.length,
+                },
+              },
+            ]),
+          ],
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [imageResponse()],
+    });
+
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]?.images?.[0]?.dataBase64).toBe(jpeg.toString('base64'));
+    await stop();
+  });
+
+  test('keeps the text and reports a failed image as missing', async () => {
+    const { calls, messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-4', [
+              { type: 1, text_item: { text: 'see this' } },
+              {
+                type: 2,
+                image_item: {
+                  media: {
+                    full_url: fullUrl,
+                    aes_key: hexKeyBase64,
+                    encrypt_query_param: 'ABC',
+                  },
+                },
+              },
+              { type: 2, image_item: { aeskey: keyHex } },
+            ]),
+          ],
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [new Response('nope', { status: 500 })],
+    });
+
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]?.text).toBe('see this');
+    expect(messages[0]?.images).toHaveLength(2);
+    expect(messages[0]?.images?.[0]?.dataBase64).toBeNull();
+    expect(messages[0]?.images?.[1]?.dataBase64).toBeNull();
+    expect(callsTo(calls, 'novac2c.cdn.weixin.qq.com').length).toBeGreaterThan(0);
+    await stop();
+  });
+
+  test('does not block a later image when one download fails', async () => {
+    const { messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-5', [
+              {
+                type: 2,
+                image_item: {
+                  media: {
+                    full_url: fullUrl,
+                    aes_key: hexKeyBase64,
+                    encrypt_query_param: 'ABC',
+                  },
+                },
+              },
+              {
+                type: 2,
+                image_item: {
+                  media: {
+                    full_url:
+                      'https://novac2c.cdn.weixin.qq.com/c2c/download?encrypted_query_param=DEF',
+                    aes_key: hexKeyBase64,
+                    encrypt_query_param: 'DEF',
+                  },
+                },
+              },
+            ]),
+          ],
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [new Response('nope', { status: 500 }), imageResponse()],
+    });
+
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]?.images).toHaveLength(2);
+    expect(messages[0]?.images?.[0]?.dataBase64).toBeNull();
+    expect(messages[0]?.images?.[1]?.dataBase64).toBe(jpeg.toString('base64'));
+    await stop();
+  });
+
+  test('never fetches a full_url on another host', async () => {
+    const { calls, messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-6', [
+              {
+                type: 2,
+                image_item: {
+                  media: {
+                    full_url: 'https://evil.example/steal',
+                    encrypt_query_param: 'QP',
+                    aes_key: rawKeyBase64,
+                  },
+                },
+              },
+            ]),
+          ],
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [imageResponse()],
+    });
+
+    await waitFor(() => messages.length === 1);
+    expect(calls.some((call) => call.url.includes('evil.example'))).toBe(false);
+    expect(callsTo(calls, 'novac2c.cdn.weixin.qq.com')[0]?.url).toContain(
+      'encrypted_query_param=QP',
+    );
+    expect(messages[0]?.images?.[0]?.dataBase64).toBe(jpeg.toString('base64'));
+    await stop();
+  });
+
+  test('drops an oversize image without reading the body', async () => {
+    const { messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-7', [
+              { type: 1, text_item: { text: 'still here' } },
+              {
+                type: 2,
+                image_item: {
+                  media: { encrypt_query_param: 'BIG', aes_key: rawKeyBase64 },
+                },
+              },
+            ]),
+          ],
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [
+        new Response('x', {
+          status: 200,
+          headers: { 'content-length': String(10 * 1024 * 1024 + 1) },
+        }),
+      ],
+    });
+
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]?.text).toBe('still here');
+    expect(messages[0]?.images?.[0]?.dataBase64).toBeNull();
+    await stop();
+  });
+
+  test('drops an image with bad padding', async () => {
+    const { messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-8', [
+              {
+                type: 2,
+                image_item: {
+                  media: { encrypt_query_param: 'PAD', aes_key: rawKeyBase64 },
+                },
+              },
+            ]),
+          ],
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [
+        new Response(new Uint8Array(Buffer.alloc(32, 7)), { status: 200 }),
+      ],
+    });
+
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]?.images?.[0]?.dataBase64).toBeNull();
+    await stop();
+  });
+
+  test('drops an image whose bytes are not a known image', async () => {
+    const notAnImage = encryptEcb(keyBytes, Buffer.from('plain text, not an image'));
+    const { messages, stop } = await connectWith({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-9', [
+              {
+                type: 2,
+                image_item: {
+                  media: { encrypt_query_param: 'TXT', aes_key: rawKeyBase64 },
+                },
+              },
+            ]),
+          ],
+        },
+      ],
+      'novac2c.cdn.weixin.qq.com': [new Response(new Uint8Array(notAnImage), { status: 200 })],
+    });
+
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]?.images?.[0]?.dataBase64).toBeNull();
+    await stop();
+  });
+
+  test('treats an aborted download as a missing image', async () => {
+    const scripted = sequence({
+      notifystart: [{}],
+      getupdates: [
+        {
+          msgs: [
+            imageMessage('c-img-10', [
+              { type: 1, text_item: { text: 'text survives' } },
+              {
+                type: 2,
+                image_item: {
+                  media: { encrypt_query_param: 'ABORT', aes_key: rawKeyBase64 },
+                },
+              },
+            ]),
+          ],
+        },
+      ],
+    });
+    const { env } = makeEnv((call) =>
+      call.url.includes('novac2c.cdn.weixin.qq.com')
+        ? Promise.reject(new DOMException('The operation was aborted', 'AbortError'))
+        : scripted(call),
+    );
+    const { handlers, messages } = makeHandlers();
+    const connection = await wechatAdapter.connect(FIELDS, handlers, env);
+
+    await waitFor(() => messages.length === 1);
+    expect(messages[0]?.text).toBe('text survives');
+    expect(messages[0]?.images?.[0]?.dataBase64).toBeNull();
+    await connection.stop();
+  });
+
+  test('delivers every message before the cursor advances', async () => {
+    const events: string[] = [];
+    const { env } = makeEnv(
+      sequence({
+        notifystart: [{}],
+        getupdates: [
+          {
+            msgs: [
+              imageMessage('c-img-11', [
+                {
+                  type: 2,
+                  image_item: {
+                    media: {
+                      full_url: fullUrl,
+                      aes_key: hexKeyBase64,
+                      encrypt_query_param: 'ABC',
+                    },
+                  },
+                },
+              ]),
+              {
+                from_user_id: 'u1@im.wechat',
+                client_id: 'c-text-12',
+                item_list: [{ type: 1, text_item: { text: 'after the photo' } }],
+              },
+            ],
+            get_updates_buf: 'BUF-ORDER',
+          },
+        ],
+        'novac2c.cdn.weixin.qq.com': [imageResponse()],
+      }),
+    );
+    const messages: ImInboundMessage[] = [];
+    const { handlers } = makeHandlers();
+    handlers.onMessage = (msg) => {
+      messages.push(msg);
+      events.push(`message:${msg.messageId}`);
+    };
+    handlers.onOffset = () => events.push('offset');
+    const connection = await wechatAdapter.connect(FIELDS, handlers, env);
+
+    await waitFor(() => events.includes('offset'));
+    expect(events).toEqual(['message:c-img-11', 'message:c-text-12', 'offset']);
+    expect(messages[0]?.images?.[0]?.dataBase64).toBe(jpeg.toString('base64'));
+    expect(messages[1]?.text).toBe('after the photo');
+    await connection.stop();
+  });
+
+  test('downloads a message images in parallel', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let polls = 0;
+    const { env } = makeEnv((call) => {
+      if (call.url.includes('novac2c.cdn.weixin.qq.com')) {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        return new Promise<ScriptEntry>((resolve) => {
+          setTimeout(() => {
+            inFlight -= 1;
+            resolve(imageResponse());
+          }, 30);
+        });
+      }
+      if (call.url.includes('notifystart')) return {};
+      if (call.url.includes('getupdates')) {
+        polls += 1;
+        return polls === 1
+          ? {
+              msgs: [
+                imageMessage('c-par-1', [
+                  {
+                    type: 2,
+                    image_item: {
+                      media: {
+                        full_url: fullUrl,
+                        aes_key: hexKeyBase64,
+                        encrypt_query_param: 'ABC',
+                      },
+                    },
+                  },
+                  {
+                    type: 2,
+                    image_item: {
+                      media: {
+                        full_url:
+                          'https://novac2c.cdn.weixin.qq.com/c2c/download?encrypted_query_param=DEF',
+                        aes_key: hexKeyBase64,
+                        encrypt_query_param: 'DEF',
+                      },
+                    },
+                  },
+                ]),
+              ],
+              get_updates_buf: 'BUF-PAR',
+            }
+          : HANG;
+      }
+      throw new Error(`unscripted fetch: ${call.url}`);
+    });
+    const { handlers, messages } = makeHandlers();
+    const connection = await wechatAdapter.connect(FIELDS, handlers, env);
+
+    await waitFor(() => messages.length === 1);
+    expect(maxInFlight).toBe(2);
+    expect(messages[0]?.images).toHaveLength(2);
+    expect(
+      messages[0]?.images?.every((image) => image.dataBase64 === jpeg.toString('base64')),
+    ).toBe(true);
+    await connection.stop();
   });
 });
