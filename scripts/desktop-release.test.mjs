@@ -694,7 +694,8 @@ const publishFixture = (t) => {
       '    *"releases?per_page=100&page=1") printf \'%s\\n\' "$RELEASES_PAGE"; exit 0 ;;',
       '    *"releases?per_page=100&page="*) printf \'[]\\n\'; exit 0 ;;',
       '    *page=2*|*page=3*) printf \'%s\\n\' "$EMPTY_PAGE"; exit 0 ;;',
-      '    *matching-refs*) printf \'%s\\n\' "$TAGS_READ"; exit 0 ;;',
+      '    *matching-refs*)',
+      '      if [ -f "$ASSETS_UPLOADED" ]; then printf \'%s\\n\' "$TAGS_READ"; else printf \'[]\\n\'; fi; exit 0 ;;',
       '    *attempts/*/jobs*) printf \'%s\\n\' "$JOBS_PAGE"; exit 0 ;;',
       '    *workflows/ci.yml/runs*) printf \'%s\\n\' "$RUNS_PAGE"; exit 0 ;;',
       '    *actions/runs/*)',
@@ -880,7 +881,10 @@ test('publish uses only its empty reserved draft and flips it by numeric ID', (t
   );
   const tipRead = callIndex(run.calls, /^api .*branches\/main/);
   const gateRead = callIndex(run.calls, /^api .*workflows\/ci\.yml\/runs/);
-  const planRead = callIndex(run.calls, /^api .*matching-refs\/tags\/desktop-v$/);
+  const planRead = run.calls
+    .trim()
+    .split('\n')
+    .findLastIndex((line) => /^api .*matching-refs\/tags\/desktop-v$/.test(line));
   const draftRead = lines.findLastIndex((line) => /^api repos\/o\/r\/releases\/123$/.test(line));
   const lastVersionRead = lines.reduce(
     (last, line, index) => (/^api .*releases\?per_page/.test(line) ? index : last),
@@ -993,7 +997,10 @@ test('a ci rerun that starts during the inventory scans aborts before the flip',
   assert.equal(run.state, 'draft');
   const create = callIndex(run.calls, /^api -X POST repos\/o\/r\/releases /);
   const tipRead = callIndex(run.calls, /^api .*branches\/main/);
-  const planRead = callIndex(run.calls, /^api .*matching-refs\/tags\/desktop-v$/);
+  const planRead = run.calls
+    .trim()
+    .split('\n')
+    .findLastIndex((line) => /^api .*matching-refs\/tags\/desktop-v$/.test(line));
   const gateRead = callIndex(run.calls, /^api .*workflows\/ci\.yml\/runs/);
   assert.ok(
     create >= 0 && tipRead > create && planRead > tipRead && gateRead > planRead,
@@ -1018,7 +1025,10 @@ test('a publish-only rerun refuses once another release already covers the commi
   assert.match(run.result.stderr, /already covers/);
   assert.equal(run.state, 'draft');
   const create = callIndex(run.calls, /^api -X POST repos\/o\/r\/releases /);
-  const planRead = callIndex(run.calls, /^api .*matching-refs\/tags\/desktop-v$/);
+  const planRead = run.calls
+    .trim()
+    .split('\n')
+    .findLastIndex((line) => /^api .*matching-refs\/tags\/desktop-v$/.test(line));
   assert.ok(create >= 0 && planRead > create, 'the coverage re-read runs after the upload');
   assert.equal(callIndex(run.calls, /-X DELETE/), -1, 'nothing is deleted');
   assert.equal(callIndex(run.calls, /^api -X PATCH /), -1);

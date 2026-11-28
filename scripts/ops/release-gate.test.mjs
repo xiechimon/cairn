@@ -730,6 +730,7 @@ test('decide reserves only an eligible unowned SHA', async () => {
   const inventory = [draft];
   let status = 'queued';
   let ownerError = false;
+  let publishedTip = false;
   let writeError = false;
   let writes = 0;
   const params = {
@@ -740,9 +741,12 @@ test('decide reserves only an eligible unowned SHA', async () => {
     revision,
     gh(args) {
       if (args[1].endsWith('releases?per_page=100&page=1')) return JSON.stringify(inventory);
+      if (args[1].endsWith('/git/matching-refs/tags/desktop-v') && publishedTip) {
+        return JSON.stringify([{ ref: 'refs/tags/desktop-v0.1.1', object: { sha: SHA } }]);
+      }
       if (args[1].includes('releases?') || args[1].includes('matching-refs/')) return '[]';
       if (args[1].endsWith('actions/runs/31')) {
-        if (ownerError) throw new Error('owner read failed');
+        if (ownerError) throw Object.assign(new Error('owner read failed'), { stderr: ownerError });
         return JSON.stringify({ id: 31, head_sha: revision, status });
       }
       assert.deepEqual(args.slice(0, 6), [
@@ -754,7 +758,7 @@ test('decide reserves only an eligible unowned SHA', async () => {
         'draft=true',
       ]);
       assert.ok(args.includes('tag_name=desktop-v0.1.2'));
-      assert.ok(args.includes('target_commitish=' + params.sha));
+      assert.ok(args.includes(`target_commitish=${params.sha}`));
       assert.ok(args.some((arg) => arg.endsWith(releaseOwner('32', revision))));
       if (writeError) throw new Error('reservation write failed');
       writes += 1;
@@ -763,7 +767,7 @@ test('decide reserves only an eligible unowned SHA', async () => {
   };
   for (status of ['queued', 'waiting', 'in_progress']) assert.equal(reserveDraft(params), null);
   assert.equal(writes, 0);
-  ownerError = true;
+  ownerError = 'gh: API temporarily unavailable (HTTP 503)';
   assert.throws(() => reserveDraft(params), /owner read failed/);
   ownerError = false;
   params.sha = '2'.repeat(40);
@@ -774,7 +778,21 @@ test('decide reserves only an eligible unowned SHA', async () => {
   assert.throws(() => reserveDraft(params), /reservation write failed/);
   writeError = false;
   assert.equal(reserveDraft(params), '576', 'a completed owner does not block a later wake');
-  assert.equal(writes, 2);
+  ownerError = 'gh: Not Found (HTTP 404)\n';
+  assert.equal(
+    reserveDraft(params),
+    '576',
+    'a removed run leaves an occupied name, not a permanent block',
+  );
+  ownerError = false;
+  inventory[0] = { ...draft, draft: false, prerelease: false };
+  publishedTip = true;
+  assert.equal(
+    reserveDraft(params),
+    null,
+    'publication between scan and reservation skips the build',
+  );
+  assert.equal(writes, 3);
 });
 
 test('replay migration only on a changed baseline', () => {

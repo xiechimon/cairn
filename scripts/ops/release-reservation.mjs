@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
-import { fetchDesktopReleases } from './last-desktop-release.mjs';
+import { fetchDesktopReleases, highestBaselineRelease } from './last-desktop-release.mjs';
+import { fetchDesktopTagTargets } from './release-plan.mjs';
 
 const OWNER = /^<!-- cairn-desktop-run:([1-9]\d*) revision:([0-9a-f]{40}) -->$/m;
 const ACTIVE = new Set(['queued', 'in_progress', 'waiting', 'requested', 'pending']);
@@ -16,7 +17,13 @@ export function activeReservation({ releases, sha, repo, gh }) {
     if (draft.draft !== true || draft.target_commitish !== sha) continue;
     const owner = OWNER.exec(draft.body ?? '');
     if (!owner) continue;
-    const run = JSON.parse(gh(['api', `repos/${repo}/actions/runs/${owner[1]}`]));
+    let run;
+    try {
+      run = JSON.parse(gh(['api', `repos/${repo}/actions/runs/${owner[1]}`]));
+    } catch (error) {
+      if (/\(HTTP 404\)\s*$/.test(String(error.stderr ?? ''))) continue;
+      throw error;
+    }
     if (String(run.id) !== owner[1] || run.head_sha !== owner[2]) {
       throw new Error('the draft owner did not match the workflow run');
     }
@@ -29,6 +36,11 @@ export function activeReservation({ releases, sha, repo, gh }) {
 export function reserveDraft({ sha, version, runId, revision, repo, gh }) {
   const releases = fetchDesktopReleases({ repo, gh });
   if (activeReservation({ releases, sha, repo, gh }) !== null) return null;
+  const baseline = highestBaselineRelease(releases);
+  if (baseline !== null) {
+    const stable = fetchDesktopTagTargets({ repo, gh }).find(({ tag }) => tag === baseline);
+    if (stable?.sha === sha) return null;
+  }
   const tag = `desktop-v${version}`;
   if (releases.some((item) => item.tag_name === tag)) {
     throw new Error(`${tag} is already held by a release`);
@@ -128,7 +140,7 @@ if (process.argv[1] && import.meta.filename === realpathSync(process.argv[1])) {
       const reserved = reserveDraft(params);
       console.log(`release=${reserved !== null}`);
       if (reserved !== null) console.log(`release_id=${reserved}`);
-      else console.error('[release-reservation] another run owns an active draft for this SHA');
+      else console.error('[release-reservation] this SHA was already released or reserved');
     } else if (action === 'verify-empty' || action === 'verify') {
       verifyDraft({ ...params, empty: action === 'verify-empty' });
     } else throw new Error(`unknown action: ${action}`);

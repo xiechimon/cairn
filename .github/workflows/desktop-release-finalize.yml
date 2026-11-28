@@ -61,7 +61,7 @@ jobs:
   publish:
     needs: [admit, replay-migration]
     if: >-
-      ${{ !cancelled() && needs.admit.result == 'success' &&
+      ${{ github.run_attempt == 1 && !cancelled() && needs.admit.result == 'success' &&
           (needs.replay-migration.result == 'success' ||
            (needs.replay-migration.result == 'skipped' &&
             needs.admit.outputs.baseline == inputs.migration_baseline)) }}

@@ -49,6 +49,14 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
 
+      - name: Ensure the resolved main tip is in the trusted checkout's history
+        env:
+          RELEASE_SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          if ! git cat-file -e "$RELEASE_SHA^{commit}"; then
+            git fetch --no-tags origin "$RELEASE_SHA"
+          fi
+
       - name: Select the newest green changed unreleased commit on main
         id: decision
         env:

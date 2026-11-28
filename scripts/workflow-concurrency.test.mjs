@@ -107,23 +107,27 @@ test('promote listens for completed ci runs on queue refs, main pushes, dispatch
   assert.equal(cancel, 'false');
 });
 
-test('desktop-release serializes every wake on one group and never cancels the running release, whatever the trigger', () => {
+test('desktop release serializes the two writers and does not evict queued finalizers', () => {
   const text = readFileSync(join(WORKFLOWS, 'desktop-release.yml'), 'utf8');
+  assert.doesNotMatch(text, /^concurrency:/m);
   assert.match(
     text,
     /workflow_run:\s*\n\s*workflows: \[ci\]\s*\n\s*types: \[completed\]\s*\n\s*branches: \[main\]/,
   );
-  const { group, cancel } = concurrencyOf('desktop-release');
-  assert.equal(group, 'desktop-release');
-  assert.equal(cancel, 'false');
-  for (const event_name of ['schedule', 'workflow_dispatch', 'workflow_run']) {
-    const run = decision('desktop-release', {
-      event_name,
-      ref: 'refs/heads/main',
-      event: {},
-    });
-    assert.equal(run.group, 'desktop-release');
-    assert.equal(run.cancel, false);
+  assert.match(text, /^ {2}schedule:\s*\n\s*- cron: '\*\/15 \* \* \* \*'/m);
+  assert.match(text, /^ {2}workflow_dispatch:/m);
+  for (const [job, group] of [
+    ['decide', 'desktop-release-reserve'],
+    ['finalize', 'desktop-release'],
+  ]) {
+    const block = new RegExp(`^  ${job}:\\n((?:^    .*\\n|^\\n)*)`, 'm').exec(text)?.[1];
+    assert.ok(block, job);
+    assert.ok(
+      block.includes(
+        `    concurrency:\n      group: ${group}\n      queue: max\n      cancel-in-progress: false\n`,
+      ),
+      job,
+    );
   }
 });
 
