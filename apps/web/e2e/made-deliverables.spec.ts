@@ -169,6 +169,7 @@ test('a page with no captured image falls back to the report lines on its card',
   const card = made.getByTestId('made-card').filter({ hasText: 'Export benchmark page' });
   await expect(card.getByTestId('made-card-excerpt')).toHaveText('Opening line of page.');
   await expect(card.getByTestId('made-card-thumb')).toHaveCount(0);
+  await expect.poll(() => thumbs.includes('att-page')).toBe(true);
   expect(thumbs).toContain('att-page');
   await expect(made.locator('iframe')).toHaveCount(0);
 });
