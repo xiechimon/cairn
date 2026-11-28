@@ -310,6 +310,30 @@ describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
     expect((outcome as ComputerRefusal).delivery).toBe('unknown');
   });
 
+  test('a page title saying abandoned does not make a non-timeout click failure unsafe to repeat', async () => {
+    const { call } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('get attr type')) return 'text';
+      if (command.startsWith('get attr autocomplete')) return '(none)';
+      if (commands.length === 2 && command.startsWith('click'))
+        return {
+          text: '✗ step 1: click e7 — element is not visible\nPage: https://shop.example.com/ — "abandoned checkout"',
+          isError: true,
+        };
+      return '✓';
+    });
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'type', ref: '@e7', text: 'hello' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('not_delivered');
+  });
+
   test('a click that succeeded before the type failed makes the batch unsafe to repeat', async () => {
     const { call, seen } = recording((commands) => {
       const command = commands[0] ?? '';

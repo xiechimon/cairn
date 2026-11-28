@@ -169,7 +169,7 @@ async function runCommands(
   if (kind === 'failed') {
     const abandonedMutation =
       commands.some((command) => MUTATING_COMMAND.test(command)) &&
-      /timed out|abandoned/i.test(answer.text);
+      /^✗ step \d+: .*?(?:timed out|abandoned).*$/im.test(answer.text);
     throw new ComputerRefusal(
       answer.text === '' ? 'Browser MCP refused this step' : answer.text,
       abandonedMutation ? 'unknown' : 'not_delivered',
