@@ -1,4 +1,3 @@
-export { machineDisplayName } from './machine-display-name.js';
 import type { MachineCapabilities } from '@cairn/shared';
 import { cn } from 'cn';
 import { Monitor } from 'lucide-react';
@@ -28,6 +27,8 @@ import {
   siZorin,
 } from 'simple-icons';
 import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
+
+export { machineDisplayName } from './machine-display-name.js';
 
 const SUFFIX_LENGTH = 4;
 const NON_ALPHANUMERIC = /[^a-z0-9]/gi;

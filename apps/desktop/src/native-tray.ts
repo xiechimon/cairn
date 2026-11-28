@@ -2,12 +2,12 @@ import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import {
   createKeepAwakeDisclosure,
-  NATIVE_TRAY_MAX_ITEMS,
   type DesktopRunnerState,
   type DesktopTrayOpen,
   KEEP_AWAKE_ITEM_IDS,
   type KeepAwakeMode,
   keepAwakeModeForItemId,
+  NATIVE_TRAY_MAX_ITEMS,
   type NativeTrayItem,
   type NativeTrayMenu,
   parseNativeTrayMenu,
@@ -165,7 +165,7 @@ export function withHostState(
     true,
     existing,
     choices,
-    header?.title,
+    header?.kind === 'header' ? header.title : undefined,
   );
   const first = menu.items.findIndex(
     (item) =>

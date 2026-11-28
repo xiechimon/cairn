@@ -354,7 +354,7 @@ test('legacy cap uses the available battery budget without dropping additional r
     const nested = trayMenuModel(input);
     const flat = trayMenuForHost(input);
     expect(flat.items).toHaveLength(200);
-    expect(nested.items.filter((item) => item.id.startsWith('many/'))).toHaveLength(available ? 188 : 189);
+    expect(nested.items.filter((item) => item.id.startsWith('many/'))).toHaveLength(191);
     expect(flat.items.at(-1)?.id).toBe('quit');
   }
 });

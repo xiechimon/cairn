@@ -2,12 +2,12 @@
 
 ## User scenario
 
-A new Mac user opens Cairn from the menu bar. Three always-visible radio rows replaced the large control in `efadf5557`; the computer header also shows the registration hostname. Restore the two-tile layout from [Native tray menu](native-tray-menu.md) with the three choices from [Keep-awake modes](keep-awake-modes.md). Owner approved on 11-28: 「做」. No setup, account, new storage or privilege. [Reference and alternatives](../research/tray-awake-button.md): reuse the Runner tile and follow the requested inline design rather than cycling or opening a side submenu.
+A new Mac user opens Cairn from the menu bar. Three always-visible radio rows replaced the large control in `efadf5557`; the computer header also shows the registration hostname. Restore the two-tile layout from [Native tray menu](native-tray-menu.md) with the three choices from [Keep-awake modes](keep-awake-modes.md). The owner approved the restore-and-disclose brief on November 28. No setup, account, new storage or privilege. [Reference and alternatives](../research/tray-awake-button.md): reuse the Runner tile and follow the requested inline design rather than cycling or opening a side submenu.
 
 ## Scope
 
-1. Below the Runner, show a round icon, “保持唤醒” / “Stay awake”, current effective mode, and a disclosure chevron. Click/VoiceOver press/Return/Right expands inline; arrows move across enabled choices; picking collapses without closing the menu. First Esc collapses and returns keyboard focus to the tile; second Esc closes the menu. Open collapsed without a focus ring. Retain “有任务运行时保持唤醒” as the accessible description even with the Runner stopped; no icon/tooltip or actual power-policy change.
-2. New Mac surfaces replace the historical *hidden on battery* choice with the explicitly requested visible *disabled on battery* choice and inline translated “需要接通电源” / “Requires AC power”. Update the historical spec's current-presentation note, native living doc and battery regression assertion. AC-only eligibility, stored-mode restoration and non-Mac Electron menu stay unchanged.
+1. Below the Runner, show a round icon, the localized “Stay awake” title, current effective mode, and a disclosure chevron. Click/VoiceOver press/Return/Right expands inline; arrows move across enabled choices; picking collapses without closing the menu. First Esc collapses and returns keyboard focus to the tile; second Esc closes the menu. Open collapsed without a focus ring. Keep “Stay awake while tasks run” in the accessible description even with the Runner stopped; no icon/tooltip or actual power-policy change.
+2. New Mac surfaces replace the historical *hidden on battery* choice with the explicitly requested visible *disabled on battery* choice and inline translated “Requires AC power”. Update the historical spec's current-presentation note, native living doc and battery regression assertion. AC-only eligibility, stored-mode restoration and non-Mac Electron menu stay unchanged.
 3. Both headers use the Computers selector `machineDisplayName` in tray grouping. Move the selector to a pure module and keep the existing component export for callers. Preserve grouping, including distinct rows for identical display names. No new product registry key.
 
 ## Edge cases
@@ -40,7 +40,7 @@ V26/C45/C25/C34 from `design-rules-for.mjs`: system chrome, accessible toggle/di
 ## Review
 
 - Verdict: PASS
-- Plan-SHA256: 0aeb938084f5a2e156833dcfc3dc9029a935ab3f9ce9e6c34c56e5130197f9fe
+- Plan-SHA256: 6df3cb6c1432e837029d010cb0d11a19e5c86fb45bb55a3352347d8b619cdf69
 - Author-Model: openai-codex/gpt-6.2-sol
 - Reviewer-Model: anthropic/claude-sonnet-5-5
 - Reviewer: Pi plan review and finding-only fix-check

@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import {
+  type NativeTrayItem,
   nativeTrayMenuSchema,
   parseNativeTrayMenu,
-  type NativeTrayItem,
 } from '@cairn/shared/desktop-shell';
 import { describe, expect, test } from 'vitest';
 import {

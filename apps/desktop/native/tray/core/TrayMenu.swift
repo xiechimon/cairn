@@ -64,7 +64,7 @@ final class TrayMenu: NSObject, NSMenuDelegate {
   private(set) var headers: [String: MachineHeader] = [:]
   private(set) var disclosureChildren: [String: [NSMenuItem]] = [:]
   private var expandedID: String?
-  private var choiceIndex = -1
+  private var selectedChoiceID: String?
   private let brand: NSImage?
   private let send: (Outgoing) -> Void
   var highlightFromKeyboard: () -> Bool = { NSApp.currentEvent?.type == .keyDown }
@@ -142,9 +142,12 @@ final class TrayMenu: NSObject, NSMenuDelegate {
         buttons[entry.id]?.content = content(entry)
         buttons[entry.id]?.help = entry.help
         if entry.kind == .disclosure {
-          if expandedID == entry.id { choiceIndex = -1 }
+          if expandedID == entry.id, let selected = selectedChoiceID,
+            (entry.enabled != true || !(entry.children ?? []).contains(where: { $0.id == selected && $0.enabled == true })) {
+            selectedChoiceID = nil
+          }
           for (item, choice) in zip(disclosureChildren[entry.id] ?? [], entry.children ?? []) {
-            (item.view as? AwakeChoice)?.keyboardFocused = false
+            (item.view as? AwakeChoice)?.keyboardFocused = expandedID == entry.id && (item.representedObject as? String) == selectedChoiceID
             item.title = choice.title ?? ""
             item.isEnabled = choice.enabled ?? false
             (item.view as? AwakeChoice)?.update(choice)
@@ -334,7 +337,7 @@ final class TrayMenu: NSObject, NSMenuDelegate {
     if let id, let button = buttons[id] {
       button.window?.makeFirstResponder(button)
     }
-    choiceIndex = -1
+    selectedChoiceID = nil
     for children in disclosureChildren.values {
       for child in children { (child.view as? AwakeChoice)?.keyboardFocused = false }
     }
@@ -366,19 +369,18 @@ final class TrayMenu: NSObject, NSMenuDelegate {
       case 125, 126:
         if !choices.isEmpty {
           buttons[id]?.keyboardFocused = false
-          if choiceIndex < 0 || choiceIndex >= choices.count {
-            choiceIndex = event.keyCode == 125 ? 0 : choices.count - 1
-          } else {
-            choiceIndex = (choiceIndex + (event.keyCode == 125 ? 1 : choices.count - 1)) % choices.count
-          }
+          let current = choices.firstIndex { $0.id == selectedChoiceID }
+          let index = current.map { ($0 + (event.keyCode == 125 ? 1 : choices.count - 1)) % choices.count }
+            ?? (event.keyCode == 125 ? 0 : choices.count - 1)
+          selectedChoiceID = choices[index].id
           for child in disclosureChildren[id] ?? [] {
-            (child.view as? AwakeChoice)?.keyboardFocused = (child.representedObject as? String) == choices[choiceIndex].id
+            (child.view as? AwakeChoice)?.keyboardFocused = (child.representedObject as? String) == selectedChoiceID
           }
         }
         return true
       case 36, 49, 76:
-        if !event.isARepeat && choiceIndex >= 0 && choiceIndex < choices.count {
-          chooseChoice(choices[choiceIndex].id, in: id, keyboard: true)
+        if !event.isARepeat, let selectedChoiceID {
+          chooseChoice(selectedChoiceID, in: id, keyboard: true)
         }
         return true
       default: return false
@@ -398,7 +400,11 @@ final class TrayMenu: NSObject, NSMenuDelegate {
 
   @objc private func pick(_ sender: NSMenuItem) {
     guard let id = sender.representedObject as? String else { return }
-    send(.action(id))
+    if model.items.first(where: { $0.id == id })?.kind == .disclosure {
+      toggleDisclosure(id)
+    } else {
+      send(.action(id))
+    }
   }
 
   func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {

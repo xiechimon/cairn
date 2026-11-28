@@ -1479,6 +1479,10 @@ html:not(.light)
   white-space: nowrap;
 }
 
+.tray-item-hint {
+  color: var(--tray-ink-2);
+}
+
 .tray-item-keep .tray-item-label {
   flex: none;
 }
@@ -1511,10 +1515,6 @@ html:not(.light)
   color: var(--tray-ink-2);
 }
 
-.tray-item-hint {
-  color: var(--tray-ink-2);
-}
-
 .tray-item:enabled:hover :is(.tray-item-glyph, .tray-item-hint),
 .tray-item:enabled:focus-visible :is(.tray-item-glyph, .tray-item-hint) {
   color: var(--tray-on-highlight);
@@ -1531,7 +1531,33 @@ html:not(.light)
 }
 
 .tray-awake-choices {
+  min-width: 0;
+  margin: 0;
+  border: 0;
   padding: 4px 0;
+}
+
+.tray-awake-choice {
+  position: relative;
+  cursor: pointer;
+}
+
+.tray-awake-choice input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.tray-awake-choice:has(input:disabled) {
+  color: var(--tray-ink-2);
+  cursor: default;
+}
+
+.tray-awake-choice:has(input:enabled):hover,
+.tray-awake-choice:has(input:focus-visible) {
+  background: var(--tray-highlight);
+  color: var(--tray-on-highlight);
 }
 
 .tray-awake-choice .tray-item-hint {

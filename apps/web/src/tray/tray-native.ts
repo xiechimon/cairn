@@ -206,12 +206,8 @@ export function trayMenuModel({
     { kind: 'row', id: 'user', title: clampText(userName), image: 'user' },
     { kind: 'command', id: 'quit', title: clampText(t('退出 Cairn')), key: 'q' },
   ];
-  const legacyExpansion = typeof rawKeepAwake === 'boolean' ? 0 : lidClosedAvailable ? 3 : 2;
-  const headBudget = Math.max(0, NATIVE_TRAY_MAX_ITEMS - controlItems.length - legacyExpansion);
-  const items = [...headItems.slice(0, headBudget), ...controlItems].slice(
-    0,
-    NATIVE_TRAY_MAX_ITEMS,
-  );
+  const headBudget = Math.max(0, NATIVE_TRAY_MAX_ITEMS - controlItems.length);
+  const items = [...headItems.slice(0, headBudget), ...controlItems];
   return { label: 'Cairn', items };
 }
 
@@ -256,6 +252,11 @@ export function trayMenuForHost(
         items.push(flat);
       }
     }
+  }
+  const overflow = Math.max(0, items.length - NATIVE_TRAY_MAX_ITEMS);
+  if (overflow > 0) {
+    const controls = items.findIndex((item) => item.id === 'controls-rule');
+    if (controls >= overflow) items.splice(controls - overflow, overflow);
   }
   return { label: menu.label, items };
 }

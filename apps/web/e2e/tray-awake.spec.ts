@@ -1,11 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive } from './chief-home-mock';
 
-async function openTray(page: Page, locale: 'en' | 'zh' = 'en', path = '/tray?scenario=home-c') {
+async function openTray(page: Page, locale: 'en' | 'zh' = 'en', path = '/tray?scenario=home-c', platform: 'mac' | 'linux' = 'mac') {
   await page.setViewportSize({ width: 320, height: 650 });
-  await page.addInitScript((language) => {
+  await page.addInitScript(({ language, platform }) => {
     localStorage.setItem('cairn.locale', language);
-    Object.defineProperty(navigator, 'userAgent', { value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X)' });
+    Object.defineProperty(navigator, 'userAgent', { value: platform === 'mac' ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X)' : 'Mozilla/5.0 (X11; Linux x86_64)' });
     const state = { runner: 'off', keepAwake: 'system', lidClosedAvailable: false, accent: null };
     const fixture = {
       state,
@@ -23,7 +23,7 @@ async function openTray(page: Page, locale: 'en' | 'zh' = 'en', path = '/tray?sc
       setRunner: async () => {}, resize: () => {}, publish: () => {}, open: () => {}, quit: () => {},
       hide: () => { fixture.hidden++; },
     } };
-  }, locale);
+  }, { language: locale, platform });
   await page.goto(path);
 }
 
@@ -108,6 +108,13 @@ test('tray updates power availability in Chinese and renders the computer displa
   await expect(tile).toHaveAttribute('aria-expanded', 'true');
   await expect(tile).toContainText('合盖继续运行');
   await expect(lid).toBeEnabled();
-  await expect(lid).toHaveAttribute('aria-checked', 'true');
+  await expect(lid).toBeChecked();
   await expect(page.getByText('需要接通电源')).toHaveCount(0);
+});
+
+test('non-Mac tray omits the unavailable lid-closed option', async ({ page }) => {
+  await openTray(page, 'en', '/tray?scenario=home-c', 'linux');
+  await page.getByRole('button', { name: 'Stay awake' }).click();
+  await expect(page.getByRole('radio', { name: /Keep running with the lid closed/ })).toHaveCount(0);
+  await expect(page.getByRole('radio')).toHaveCount(2);
 });

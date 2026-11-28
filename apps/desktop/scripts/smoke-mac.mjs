@@ -543,60 +543,122 @@ try {
     ];
     const saved = () =>
       existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : '';
-    await openNativeMenu(helper);
-    for (const [title, expected] of choices) {
-      assert.ok(!(await nativeTitles(helper)).includes(title), 'choices should begin collapsed');
-      const opened = await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile });
-      assert.equal(opened.ok, true, `disclosure click failed: ${JSON.stringify(opened)}`);
-      const deadline = Date.now() + OPEN_TIMEOUT_MS;
-      while (!(await nativeTitles(helper)).includes(title) && Date.now() < deadline) {
-        await driver.send({ cmd: 'sleep', ms: 100 });
+    const onAC = execFileSync('pmset', ['-g', 'batt'], { encoding: 'utf8' }).includes(
+      "Now drawing from 'AC Power'",
+    );
+    const lidTitle = english ? 'Keep running with the lid closed' : '合盖继续运行';
+    if (onAC) choices.push([lidTitle, 'lid-closed']);
+    try {
+      await openNativeMenu(helper);
+      if (!onAC) {
+        const before = saved();
+        assert.equal(
+          (await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile })).ok,
+          true,
+        );
+        const rows = (await driver.send({ cmd: 'menuItems', pid: helper })).items;
+        assert.ok(
+          rows.some((row) => row.title === lidTitle && !row.enabled),
+          'lid mode must remain visible but disabled on battery',
+        );
+        assert.equal(
+          (await driver.send({ cmd: 'clickMenuItem', pid: helper, title: lidTitle })).ok,
+          true,
+        );
+        assert.ok(
+          (await nativeTitles(helper)).includes(lidTitle),
+          'disabled lid mode closed the picker',
+        );
+        assert.equal(saved(), before, 'disabled lid mode changed the stored choice');
+        await driver.send({ cmd: 'escape', pid: helper });
       }
-      assert.ok((await nativeTitles(helper)).includes(title), `choice ${title} not visible`);
-      const picked = await driver.send({ cmd: 'clickMenuItem', pid: helper, title });
-      assert.equal(picked.ok, true, `choice click failed: ${JSON.stringify(picked)}`);
-      assert.equal(await waitForNativeMenu(helper, true), true, 'choice closed the menu');
-      const switchDeadline = Date.now() + OPEN_TIMEOUT_MS;
-      while (saved() !== expected && Date.now() < switchDeadline) {
-        await driver.send({ cmd: 'sleep', ms: 100 });
+      for (const [title, expected] of choices) {
+        assert.ok(!(await nativeTitles(helper)).includes(title), 'choices should begin collapsed');
+        const opened = await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile });
+        assert.equal(opened.ok, true, `disclosure click failed: ${JSON.stringify(opened)}`);
+        const deadline = Date.now() + OPEN_TIMEOUT_MS;
+        while (!(await nativeTitles(helper)).includes(title) && Date.now() < deadline) {
+          await driver.send({ cmd: 'sleep', ms: 100 });
+        }
+        assert.ok((await nativeTitles(helper)).includes(title), `choice ${title} not visible`);
+        const picked = await driver.send({ cmd: 'clickMenuItem', pid: helper, title });
+        assert.equal(picked.ok, true, `choice click failed: ${JSON.stringify(picked)}`);
+        assert.equal(await waitForNativeMenu(helper, true), true, 'choice closed the menu');
+        const switchDeadline = Date.now() + OPEN_TIMEOUT_MS;
+        while (saved() !== expected && Date.now() < switchDeadline) {
+          await driver.send({ cmd: 'sleep', ms: 100 });
+        }
+        assert.equal(saved(), expected, `choice saved ${saved()}`);
       }
-      assert.equal(saved(), expected, `choice saved ${saved()}`);
-    }
-    await closeNativeMenu(helper);
+      await closeNativeMenu(helper);
 
-    await openNativeMenu(helper);
-    let focused = false;
-    for (let i = 0; i < content.length + 3; i += 1) {
-      await driver.send({ cmd: 'key', pid: helper, code: 125 });
-      const rows = (await driver.send({ cmd: 'menuItems', pid: helper })).items;
-      if (rows.some((row) => row.selected && (row.title === tile || row.viewLabel === tile))) {
-        focused = true;
-        break;
+      await openNativeMenu(helper);
+      let focused = false;
+      for (let i = 0; i < content.length + 3; i += 1) {
+        await driver.send({ cmd: 'key', pid: helper, code: 125 });
+        const rows = (await driver.send({ cmd: 'menuItems', pid: helper })).items;
+        if (rows.some((row) => row.selected && (row.title === tile || row.viewLabel === tile))) {
+          focused = true;
+          break;
+        }
       }
+      assert.ok(focused, 'keyboard could not focus the awake tile');
+      await driver.send({ cmd: 'key', pid: helper, code: 124 });
+      const keyboardDeadline = Date.now() + OPEN_TIMEOUT_MS;
+      while (
+        !(await nativeTitles(helper)).includes(choices[0][0]) &&
+        Date.now() < keyboardDeadline
+      ) {
+        await driver.send({ cmd: 'sleep', ms: 100 });
+      }
+      assert.ok(
+        (await nativeTitles(helper)).includes(choices[0][0]),
+        'Right did not expand the tile',
+      );
+      await driver.send({ cmd: 'escape', pid: helper });
+      assert.equal(
+        await waitForNativeMenu(helper, true),
+        true,
+        'first Escape should only collapse',
+      );
+      assert.ok(!(await nativeTitles(helper)).includes(choices[0][0]), 'Escape did not collapse');
+      await driver.send({ cmd: 'key', pid: helper, code: 36 });
+      assert.ok(
+        (await nativeTitles(helper)).includes(choices[0][0]),
+        'Return did not expand the tile',
+      );
+      await driver.send({ cmd: 'key', pid: helper, code: 125 });
+      await driver.send({ cmd: 'key', pid: helper, code: 36 });
+      assert.equal(await waitForNativeMenu(helper, true), true, 'keyboard choice closed the menu');
+      const keyboardSaveDeadline = Date.now() + OPEN_TIMEOUT_MS;
+      while (saved() !== 'screen-on' && Date.now() < keyboardSaveDeadline) {
+        await driver.send({ cmd: 'sleep', ms: 100 });
+      }
+      assert.equal(saved(), 'screen-on', 'keyboard choice was not persisted');
+    } finally {
+      // Restore through the real action, even if a previous assertion failed.
+      for (let i = 0; i < 2 && (await nativeMenuOpen(helper)); i += 1) {
+        await driver.send({ cmd: 'escape', pid: helper });
+        await driver.send({ cmd: 'sleep', ms: 200 });
+      }
+      await openNativeMenu(helper);
+      assert.equal(
+        (await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile })).ok,
+        true,
+        'restore: expand tile',
+      );
+      assert.equal(
+        (await driver.send({ cmd: 'clickMenuItem', pid: helper, title: choices[1][0] })).ok,
+        true,
+        'restore: select system',
+      );
+      const restoreDeadline = Date.now() + OPEN_TIMEOUT_MS;
+      while (saved() !== 'system' && Date.now() < restoreDeadline) {
+        await driver.send({ cmd: 'sleep', ms: 100 });
+      }
+      assert.equal(saved(), 'system', 'restore: system choice was not persisted');
+      await closeNativeMenu(helper);
     }
-    assert.ok(focused, 'keyboard could not focus the awake tile');
-    await driver.send({ cmd: 'key', pid: helper, code: 124 });
-    const keyboardDeadline = Date.now() + OPEN_TIMEOUT_MS;
-    while (!(await nativeTitles(helper)).includes(choices[0][0]) && Date.now() < keyboardDeadline) {
-      await driver.send({ cmd: 'sleep', ms: 100 });
-    }
-    assert.ok((await nativeTitles(helper)).includes(choices[0][0]), 'Right did not expand the tile');
-    await driver.send({ cmd: 'escape', pid: helper });
-    assert.equal(await waitForNativeMenu(helper, true), true, 'first Escape should only collapse');
-    assert.ok(!(await nativeTitles(helper)).includes(choices[0][0]), 'Escape did not collapse');
-    await driver.send({ cmd: 'key', pid: helper, code: 36 });
-    assert.ok((await nativeTitles(helper)).includes(choices[0][0]), 'Return did not expand the tile');
-    await driver.send({ cmd: 'key', pid: helper, code: 125 });
-    await driver.send({ cmd: 'key', pid: helper, code: 36 });
-    assert.equal(await waitForNativeMenu(helper, true), true, 'keyboard choice closed the menu');
-    const keyboardSaveDeadline = Date.now() + OPEN_TIMEOUT_MS;
-    while (saved() !== 'screen-on' && Date.now() < keyboardSaveDeadline) {
-      await driver.send({ cmd: 'sleep', ms: 100 });
-    }
-    assert.equal(saved(), 'screen-on', 'keyboard choice was not persisted');
-    await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile });
-    await driver.send({ cmd: 'clickMenuItem', pid: helper, title: choices[1][0] });
-    await closeNativeMenu(helper);
 
     await popoverWindow(({ BrowserWindow }, width) => {
       for (const candidate of BrowserWindow.getAllWindows())

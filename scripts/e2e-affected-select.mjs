@@ -35,6 +35,7 @@ const BOARD = [
   'storage-unavailable',
   'mobile-narrow',
   'chief-home-',
+  'tray-awake',
   'chief-project-pick',
   'first-run-',
   'task-panel',

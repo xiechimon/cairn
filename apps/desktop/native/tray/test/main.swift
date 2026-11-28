@@ -186,6 +186,13 @@ expect(sent.last == "coordinator", "picking Coordinator sent \(sent.last ?? "not
 
 tray.menuWillOpen(menu)
 expect(tray.isOpen && sent.last == "opened", "open was not reported")
+let beforeItemPress = sent.count
+menu.performActionForItem(at: menu.index(of: tray.items["keep-awake"]!))
+expect(awake.isAccessibilityExpanded() && sent.count == beforeItemPress, "menu item activation must expand without dispatch")
+func key(_ code: UInt16) -> NSEvent {
+  NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code)!
+}
+expect(tray.handleDisclosureKey(key(125)) && tray.handleDisclosureKey(key(125)) && system.keyboardFocused, "keyboard selects system")
 var updated = fixture.items
 updated[0].status = nil
 let awakeIndex = updated.firstIndex { $0.id == "keep-awake" }!
@@ -200,6 +207,16 @@ expect(coordinator.title == "Coordinator", "the open menu did not update in plac
 expect(awake.detailLabel.stringValue == "屏幕常亮", "host update changes the tile subtitle in place")
 expect((screenOn.accessibilityValue() as? NSNumber)?.intValue == 1 && (system.accessibilityValue() as? NSNumber)?.intValue == 0, "the open mode rows did not update in place")
 expect(!lidClosed.isAccessibilityEnabled() && lidClosed.accessibilityHelp() == "需要接通电源", "disabled choice explains why")
+expect(system.keyboardFocused, "in-place refresh retains the selected child")
+expect(tray.handleDisclosureKey(key(36)) && sent.last == "keep-awake-system" && !awake.isAccessibilityExpanded(), "Return after refresh selects the same child")
+expect(awake.accessibilityPerformPress(), "reopen disclosure")
+expect(tray.handleDisclosureKey(key(126)) && system.keyboardFocused, "Up skips disabled lid choice")
+var battery = updated
+battery[awakeIndex].children![1].enabled = false
+tray.apply(TrayMenuModel(label: fixture.label, items: battery))
+let beforeDisabledReturn = sent.count
+expect(!system.keyboardFocused && tray.handleDisclosureKey(key(36)) && sent.count == beforeDisabledReturn, "disabled selection is cleared before Return")
+tray.apply(TrayMenuModel(label: fixture.label, items: updated))
 let previous = sent.last
 expect(!lidClosed.accessibilityPerformPress() && sent.last == previous, "disabled choice does not dispatch")
 

@@ -39,6 +39,7 @@ import { BrandGlyph } from '../components/brand-glyph.js';
 import { MachineIcon } from '../components/machine-label.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { desktopTray } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
@@ -143,8 +144,12 @@ function moveFocus(event: KeyboardEvent<HTMLElement>, hide: () => void) {
   const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
   if (step === 0) return;
   event.preventDefault();
-  const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:enabled')];
-  const at = items.indexOf(document.activeElement as HTMLButtonElement);
+  const items = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>(
+      'button:enabled, input[type=radio]:enabled',
+    ),
+  ];
+  const at = items.indexOf(document.activeElement as HTMLElement);
   const next = at === -1 ? (step === 1 ? 0 : items.length - 1) : at + step;
   items[(next + items.length) % items.length]?.focus();
 }
@@ -403,8 +408,7 @@ export function TrayPage() {
             )}
           </Button>
           {expanded && (
-            <div
-              role="radiogroup"
+            <fieldset
               aria-label={awake.title}
               className="tray-awake-choices"
               onKeyDown={(event) => {
@@ -418,42 +422,51 @@ export function TrayPage() {
                 event.preventDefault();
                 event.stopPropagation();
                 const choices = [
-                  ...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:enabled'),
+                  ...event.currentTarget.querySelectorAll<HTMLElement>(
+                    'button:enabled, input[type=radio]:enabled',
+                  ),
                 ];
-                const index = choices.indexOf(document.activeElement as HTMLButtonElement);
+                const index = choices.indexOf(document.activeElement as HTMLElement);
                 choices[(index + step + choices.length) % choices.length]?.focus();
               }}
             >
               {awake.children
                 .filter((child) => ON_MAC || child.id !== 'keep-awake-lid-closed')
                 .map((child) => (
-                  <Button
-                    key={child.id}
-                    variant="ghost"
-                    role="radio"
-                    aria-checked={child.on}
-                    aria-label={child.title}
-                    aria-description={child.tip}
-                    disabled={!child.enabled || bridge === null}
-                    className="tray-item tray-awake-choice"
-                    data-testid={`tray-${child.id}`}
-                    onClick={(event) => {
-                      const keyboard = event.detail === 0;
-                      const mode = keepAwakeModeForItemId(child.id);
-                      if (mode === null || !child.enabled) return;
-                      bridge?.setKeepAwake(mode);
-                      setExpanded(false);
-                      if (keyboard) awakeRef.current?.focus();
-                    }}
-                  >
+                  <label key={child.id} htmlFor={child.id} className="tray-item tray-awake-choice">
+                    <Input
+                      type="radio"
+                      id={child.id}
+                      name="tray-keep-awake"
+                      checked={child.on}
+                      aria-label={child.title}
+                      aria-description={child.tip}
+                      disabled={!child.enabled || bridge === null}
+                      data-testid={`tray-${child.id}`}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          event.currentTarget.click();
+                        }
+                      }}
+                      onClick={(event) => {
+                        const keyboard = event.detail === 0;
+                        const mode = keepAwakeModeForItemId(child.id);
+                        if (mode === null || !child.enabled) return;
+                        bridge?.setKeepAwake(mode);
+                        setExpanded(false);
+                        if (keyboard) awakeRef.current?.focus();
+                      }}
+                      onChange={() => {}}
+                    />
                     <span className="tray-item-glyph">
                       {child.on && <Check className="size-4" aria-hidden="true" />}
                     </span>
                     <span className="tray-item-label">{child.title}</span>
                     {child.tip && <span className="tray-item-hint">{child.tip}</span>}
-                  </Button>
+                  </label>
                 ))}
-            </div>
+            </fieldset>
           )}
         </div>
       )}
