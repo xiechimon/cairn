@@ -1,15 +1,16 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { createServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { chromium, expect, test } from '@playwright/test';
+import { chromium, expect, test, type Browser } from '@playwright/test';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { bootLiveServer, type LiveServer } from './live-server';
 
 let live: LiveServer;
+let browser: Browser;
 let proxy: ReturnType<typeof createServer>;
 let origin: string;
 let certificates: string;
@@ -20,7 +21,11 @@ test.beforeAll(async () => {
   const cert = join(certificates, 'cert.pem');
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '1', '-subj', '/CN=cairn.tail.example'], { stdio: 'ignore' });
   const binary = join(certificates, 'sidecar');
-  writeFileSync(binary, `#!${process.execPath}\nprocess.stdout.write(JSON.stringify({type:'ready',dnsName:'cairn.tail.example',ownerLogin:'owner@example.com',selfTagged:false})+'\\n');\nprocess.stdin.on('data',()=>process.exit(0));\n`, { mode: 0o700 });
+  writeFileSync(binary, `#!/bin/sh
+printf '%s\n' '{"type":"ready","dnsName":"cairn.tail.example","ownerLogin":"owner@example.com","selfTagged":false}'
+cat >/dev/null
+`, { mode: 0o700 });
+  browser = await chromium.launch({ args: ['--no-proxy-server'] });
   live = await bootLiveServer('tailnet-browser-test-secret', { CAIRN_TSNET: '1', CAIRN_TSNET_BINARY: binary, CAIRN_TAILSCALE_USERS: '' });
   proxy = createServer({ key: readFileSync(key), cert: readFileSync(cert) }, (incoming, outgoing) => {
     const headers = { ...incoming.headers };
@@ -34,20 +39,28 @@ test.beforeAll(async () => {
     outgoing.on('close', () => upstream.destroy());
     incoming.pipe(upstream);
   });
+  const tailnetSocket = join(live.home, 'tsnet', 'tailnet.sock');
+  const socketDeadline = Date.now() + 10_000;
+  while (!existsSync(tailnetSocket)) {
+    if (Date.now() > socketDeadline) throw new Error('tailnet socket did not become ready');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
   await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
   origin = `https://127.0.0.1:${(proxy.address() as AddressInfo).port}`;
 });
 
 test.afterAll(async () => {
   if (proxy !== undefined) await new Promise<void>((resolve) => { proxy.closeAllConnections(); proxy.close(() => resolve()); });
+  await browser?.close();
   await live?.dispose();
   if (certificates !== undefined) releaseTestTempDir(certificates);
 });
 
+test.setTimeout(60_000);
+
 for (const theme of ['light', 'dark'] as const) {
   for (const width of [1440, 390]) {
     test(`owner opens Remote access without a token, ${theme} ${width}`, async ({}, testInfo) => {
-      const browser = await chromium.launch({ args: ['--no-proxy-server'] });
       const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 900 }, colorScheme: theme });
       try {
         const page = await context.newPage();
@@ -91,7 +104,6 @@ for (const theme of ['light', 'dark'] as const) {
         await viewer.close();
       } finally {
         await context.close();
-        await browser.close();
       }
     });
   }
