@@ -26,6 +26,7 @@ import { setTodoPhase } from '../src/services/todos.js';
 import {
   bootServer,
   claimedGeneration,
+  insertClaudeSubscription,
   issueApiKey,
   machineIdByName,
   seedRoute,
@@ -261,6 +262,7 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
       },
     });
 
+    insertClaudeSubscription(w.s);
     const claimed = await w.claim();
     const tools = claimed.remoteTools ?? [];
     const modelsDef = tools.find((t) => t.name === 'models');
