@@ -1,39 +1,16 @@
 import { createHash } from 'node:crypto';
-import { CORE_COORDINATOR_TOOLS, toolCallRecordSchema } from '@cairn/shared';
-import {
-  createAssistantMessageEventStream,
-  fauxAssistantMessage,
-  fauxProvider,
-  fauxToolCall,
-} from '@earendil-works/pi-ai';
+import { toolCallRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { type Coordinator, startCoordinator } from '../../apps/server/src/coordinator/index.js';
-import { SUGGEST_REPLIES_ASK } from '../../apps/server/src/coordinator/runtime/suggest-replies.js';
-import {
-  chiefMessage,
-  chiefTurnUsage,
-  project,
-  routingRule,
-  step,
-  todo,
-} from '../../apps/server/src/db/schema.js';
+import { chiefMessage, chiefTurnUsage, project, step, todo } from '../../apps/server/src/db/schema.js';
 import {
   setCoordinatorInServer,
   setCoordinatorWake,
 } from '../../apps/server/src/services/coordinator-context.js';
-import { createProvider } from '../../apps/server/src/services/providers.js';
-import {
-  bootServer,
-  insertMachine,
-  postProject,
-  req,
-  type TestServer,
-} from '../../apps/server/test/helpers.js';
+import { bootServer, insertMachine, req, type TestServer } from '../../apps/server/test/helpers.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
+import { createScriptedArm, seedProjects, seedStubRoute } from './script.js';
 import type { RuntimeTask, TurnRecord } from './types.js';
-
-const KEY = 'sk-eval-stub-key-0123456789';
-const STUB_MODEL = 'm';
 
 export function activateInServer(): void {
   setCoordinatorInServer(true);
@@ -52,37 +29,8 @@ export async function runRuntimeTurn(task: RuntimeTask): Promise<TurnRecord> {
   let coordinator: Coordinator | undefined;
   try {
     const teamId = s.team.id;
-    createProvider(
-      { db: s.db, box: s.secretBox },
-      {
-        teamId,
-        body: {
-          providerId: 'stub',
-          label: 'Stub',
-          baseUrl: 'http://127.0.0.1:9',
-          api: 'openai-completions',
-          apiKey: KEY,
-          models: [{ id: STUB_MODEL, name: STUB_MODEL }],
-        },
-        createdBy: s.user.id,
-      },
-    );
-    s.db
-      .insert(routingRule)
-      .values({
-        id: 'rule-coordinator',
-        teamId,
-        use: 'coordinator',
-        provider: 'stub',
-        modelId: STUB_MODEL,
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    const projectIds = new Map<string, string>();
-    for (const name of task.world.projects) {
-      projectIds.set(name, await postProject(s.app, name));
-    }
+    seedStubRoute(s, teamId);
+    const projectIds = await seedProjects(s, task.world.projects);
     const content =
       task.event === undefined ? task.request : `[wake:${task.event}] ${task.request}`;
     const sent = await req(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, { content });
@@ -91,53 +39,7 @@ export async function runRuntimeTurn(task: RuntimeTask): Promise<TurnRecord> {
     const { thread } = (await sent.json()) as { thread: { id: string } };
     const stepRow = s.db.select().from(step).get();
 
-    const resolveArgs = (value: unknown): unknown => {
-      if (typeof value === 'string' && value.startsWith('@')) {
-        const resolved = projectIds.get(value.slice(1));
-        if (resolved === undefined) throw new Error(`eval: unknown project ref ${value}`);
-        return resolved;
-      }
-      if (Array.isArray(value)) return value.map(resolveArgs);
-      if (value !== null && typeof value === 'object')
-        return Object.fromEntries(
-          Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, resolveArgs(v)]),
-        );
-      return value;
-    };
-    const faux = fauxProvider({
-      provider: 'stub',
-      models: [{ id: STUB_MODEL, contextWindow: 200_000 }],
-      tokensPerSecond: 1e9,
-    });
-    const prompts: string[] = [];
-    let cursor = 0;
-    faux.setResponses(
-      Array(32).fill((c: unknown) => {
-        prompts.push(JSON.stringify(c));
-        const scripted = task.script[cursor] ?? task.script.at(-1);
-        cursor += 1;
-        if (scripted === undefined) return fauxAssistantMessage('Done.');
-        const blocks = (scripted.toolCalls ?? []).map((call) =>
-          CORE_COORDINATOR_TOOLS.has(call.name)
-            ? fauxToolCall(call.name, resolveArgs(call.args) as never)
-            : fauxToolCall('call_tool', {
-                name: call.name,
-                arguments: resolveArgs(call.args),
-              } as never),
-        );
-        if (blocks.length === 0) return fauxAssistantMessage(scripted.text ?? 'Done.');
-        const options = { stopReason: 'toolUse' as const };
-        if (scripted.text !== undefined) {
-          return fauxAssistantMessage(
-            [{ type: 'text', text: scripted.text } as never, ...blocks].flat(),
-            options,
-          );
-        }
-        return fauxAssistantMessage(blocks, options);
-      }),
-    );
-    const seenByCall = prompts;
-
+    const scripted = createScriptedArm(task.script, projectIds);
     coordinator = startCoordinator({
       machine: {
         db: s.db,
@@ -156,28 +58,7 @@ export async function runRuntimeTurn(task: RuntimeTask): Promise<TurnRecord> {
       heartbeatMs: 1_000,
       tickMs: 3_600_000,
       stopPollMs: 50,
-      fixedProviders: [
-        {
-          ...faux.provider,
-          streamSimple(model: never, context: never, options: never) {
-            if (
-              (context as { messages: { content: unknown }[] }).messages[0]?.content !==
-              SUGGEST_REPLIES_ASK
-            )
-              return faux.provider.streamSimple(model, context, options);
-            const stream = createAssistantMessageEventStream();
-            const message = {
-              ...fauxAssistantMessage('{"replies":[]}'),
-              api: (model as { api: string }).api,
-              provider: (model as { provider: string }).provider,
-              model: (model as { id: string }).id,
-            };
-            stream.push({ type: 'done', reason: 'stop', message });
-            stream.end(message);
-            return stream;
-          },
-        },
-      ],
+      fixedProviders: scripted.fixedProviders,
     });
     coordinator.wake(thread.id);
     await coordinator.idle();
