@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+import { registerWriterGeneration } from './writer-generation.mjs';
 
 const SCRIPT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const REPO = process.env.VERIFY_REPO_ROOT ?? SCRIPT_REPO;
@@ -68,6 +69,7 @@ async function sendJson(url, body, method, token, timeoutMs) {
 function db(fn, readonly = true) {
   const Database = require2('better-sqlite3');
   const d = new Database(DB_PATH, { readonly });
+  registerWriterGeneration(d);
   try {
     return fn(d);
   } finally {

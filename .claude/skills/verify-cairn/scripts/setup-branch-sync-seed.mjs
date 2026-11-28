@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { registerWriterGeneration } from './writer-generation.mjs';
 
 const SCRIPT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const REPO = process.env.VERIFY_REPO_ROOT ?? SCRIPT_REPO;
@@ -131,6 +132,7 @@ writeFileSync(join(directory, 'junk.txt'), 'untracked junk\n');
 const require2 = createRequire(join(REPO, 'apps', 'server', 'package.json'));
 const Database = require2('better-sqlite3');
 const db = new Database(DB_PATH);
+registerWriterGeneration(db);
 try {
   const info = db
     .prepare('UPDATE step SET checkpointCommit = ? WHERE buildId = ?')

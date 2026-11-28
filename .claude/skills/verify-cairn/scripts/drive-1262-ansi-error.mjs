@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+import { registerWriterGeneration } from './writer-generation.mjs';
 
 const SCRIPT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const REPO = process.env.VERIFY_REPO_ROOT ?? SCRIPT_REPO;
@@ -67,6 +68,7 @@ const buildId = `1262-${crypto.randomUUID()}`;
 {
   const Database = require2('better-sqlite3');
   const db = new Database(DB_PATH);
+  registerWriterGeneration(db);
   const now = Date.now();
   db.prepare(
     `UPDATE todo SET phase='failed', phaseAt=?, latestBuildId=?, lastRunAt=?, v=v+1 WHERE id=?`,
