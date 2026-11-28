@@ -28,13 +28,7 @@ export function nativeTrayAction(menu: NativeTrayMenu, id: unknown): NativeTrayA
   if (typeof id !== 'string') return null;
   const item = menu.items
     .flatMap<NativeTrayItem>((candidate) =>
-      candidate.kind === 'disclosure'
-        ? candidate.enabled
-          ? candidate.children
-          : []
-        : candidate.kind === 'choice'
-          ? []
-          : [candidate],
+      candidate.kind === 'disclosure' ? (candidate.enabled ? candidate.children : []) : [candidate],
     )
     .find((candidate) => candidate.id === id);
   if (item === undefined) return null;
@@ -63,7 +57,7 @@ const SKELETON_COPY: Record<
   {
     open: string;
     heading: string;
-    title: string;
+    awakeTitle: string;
     unavailable: string;
     screenOn: string;
     system: string;
@@ -74,7 +68,7 @@ const SKELETON_COPY: Record<
   zh: {
     open: '打开 Cairn',
     heading: '有任务运行时保持唤醒',
-    title: '保持唤醒',
+    awakeTitle: '保持唤醒',
     unavailable: '需要接通电源',
     screenOn: '屏幕常亮',
     system: '屏幕可熄灭',
@@ -84,7 +78,7 @@ const SKELETON_COPY: Record<
   en: {
     open: 'Open Cairn',
     heading: 'Stay awake while tasks run',
-    title: 'Stay awake',
+    awakeTitle: 'Stay awake',
     unavailable: 'Requires AC power',
     screenOn: 'Keep the screen on',
     system: 'Let the screen sleep',
@@ -108,7 +102,7 @@ function keepAwakeTile(
     existing?.children.find((choice) => choice.id === id)?.title ??
     fallback;
   return createKeepAwakeDisclosure({
-    title: existing?.title ?? copy.title,
+    title: existing?.title ?? copy.awakeTitle,
     help: existing?.help ?? help ?? copy.heading,
     titles: {
       'screen-on': titleFor(KEEP_AWAKE_ITEM_IDS['screen-on'], copy.screenOn),
