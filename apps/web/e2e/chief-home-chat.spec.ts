@@ -126,10 +126,13 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(handoff).toContainText('修复看板拖拽后计数不刷新');
     await expect(handoff).not.toContainText('#9');
     const reply = stream.getByTestId('chief-reply').first();
-    const replyLook = await reply.evaluate((el) => ({
-      fill: getComputedStyle(el).backgroundColor,
-      left: el.getBoundingClientRect().left,
-    }));
+    const replyLook = await reply.evaluate((el) => {
+      const surface = el.querySelector('[data-slot="message-bubble"]') ?? el;
+      return {
+        fill: getComputedStyle(surface).backgroundColor,
+        left: surface.getBoundingClientRect().left,
+      };
+    });
     const handoffLine = await handoff.evaluate((el) => ({
       fill: getComputedStyle(el).backgroundColor,
       left: el.getBoundingClientRect().left,

@@ -1,8 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('thread review diffs remain available after project files retirement', async ({ page }) => {
-  await page.goto('/app?scenario=home-c&thread=home-c-review');
-  await page.getByTestId('side-chat-changes-toggle').click();
+  await page.goto('/app?scenario=home-c&thread=home-c-review&view=changes');
   await expect(page.getByTestId('side-chat-changes-toggle')).toContainText('README.md');
   await expect(page.getByTestId('side-chat-changes-body').locator('[data-kind]').first()).toBeVisible();
 });

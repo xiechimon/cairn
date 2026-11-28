@@ -714,6 +714,7 @@ export type ChiefStreamItem =
       fallbackModel?: string;
       projectId?: string | null;
       report?: { todoId: string; buildId: string };
+      detailsTodoId?: string;
     }
   | {
       kind: 'thinking';

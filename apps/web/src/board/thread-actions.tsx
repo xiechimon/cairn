@@ -72,12 +72,14 @@ export function useThreadActions({
   chat,
   onGone,
   onViewPlan,
+  onViewChanges,
   engine,
 }: {
   todo: TodoRecord;
   chat: ThreadChat;
   onGone: () => void;
   onViewPlan: (() => void) | undefined;
+  onViewChanges: (() => void) | undefined;
   engine?: EngineMenu | undefined;
 }): ThreadActions {
   const { t } = useI18n();
@@ -309,6 +311,14 @@ export function useThreadActions({
               onViewPlan: () => {
                 setMenuOpen(false);
                 onViewPlan();
+              },
+            }
+          : {})}
+        {...(onViewChanges !== undefined
+          ? {
+              onViewChanges: () => {
+                setMenuOpen(false);
+                onViewChanges();
               },
             }
           : {})}

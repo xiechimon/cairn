@@ -1920,6 +1920,7 @@ export function chiefTurnErrorOfContent(content: unknown): TurnErrorFacts | null
 }
 
 const WATCH_PROVENANCE_PREFIX = 'watch:';
+const SETTLE_WAKE_MARKER = '[wake:settle]';
 
 export function askQuestionOfContent(content: unknown): {
   requestId: string;
@@ -2259,6 +2260,7 @@ function collectChiefStream(
     openingRobots = [];
   };
   let eventTurn = false;
+  let settleTurn = false;
   let sawUser = false;
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
@@ -2269,6 +2271,7 @@ function collectChiefStream(
       m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
     ) {
       eventTurn = false;
+      settleTurn = false;
       pendingTools = [];
       fallback = null;
       flushCards();
@@ -2283,12 +2286,16 @@ function collectChiefStream(
     if (m.role === 'user' && isChiefPromptEcho(m)) {
       const echo = textOfContent(m.content).trim();
       eventTurn = WAKE_MARKER_PREFIX_RE.test(echo);
+      settleTurn = echo.startsWith(SETTLE_WAKE_MARKER);
       if (eventTurn) pendingTools = [];
       if (!isChannelGreetingPrompt(echo)) finishOpening();
       continue;
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
-    if (m.role === 'user' && pendingState === undefined) eventTurn = false;
+    if (m.role === 'user' && pendingState === undefined) {
+      eventTurn = false;
+      settleTurn = false;
+    }
     if (pendingState !== undefined) {
       finishOpening();
       sawUser = true;
@@ -2387,6 +2394,12 @@ function collectChiefStream(
       const notice = chiefNoticeContentSchema.safeParse(parsed);
       if (notice.success) {
         pendingTools = [];
+        const provenance = notice.data.provenance;
+        const detailsTodoId =
+          settleTurn && provenance.startsWith(WATCH_PROVENANCE_PREFIX)
+            ? provenance.slice(WATCH_PROVENANCE_PREFIX.length)
+            : null;
+        const details = detailsTodoId === null ? {} : { detailsTodoId };
         const update = notice.data.runtimeUpdate;
         if (update === undefined) {
           const visible = visibleChiefMessageText(m);
@@ -2397,6 +2410,7 @@ function collectChiefStream(
             seconds: '',
             id: m.id,
             ...(notice.data.report !== undefined ? { report: notice.data.report } : {}),
+            ...details,
           });
           continue;
         }

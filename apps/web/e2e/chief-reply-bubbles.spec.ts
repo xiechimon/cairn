@@ -106,10 +106,13 @@ test('C31: a Coordinator reply sits in the grey reply bubble and the owner keeps
       return { background: css.backgroundColor, font: css.fontFamily, size: css.fontSize };
     };
     const coordinator = [
-      ...document.querySelectorAll(
-        '[data-testid="chief-stream"] [data-slot="message-bubble"][data-side="coordinator"]',
-      ),
-    ].map(style);
+      ...document.querySelectorAll('[data-testid="chief-stream"] [data-slot="reply-block"]'),
+    ]
+      .filter((el) => el.querySelector('.chat-para, [data-testid="md-table"]') !== null)
+      .map((el) => ({
+        ...style(el.querySelector('[data-slot="message-bubble"]') ?? el),
+        text: (el.textContent ?? '').trim().slice(0, 24),
+      }));
     const owner = [
       ...document.querySelectorAll(
         '[data-testid="chief-stream"] [data-slot="message-bubble"][data-side="owner"]',
@@ -136,7 +139,10 @@ test('C31: a Coordinator reply sits in the grey reply bubble and the owner keeps
   });
   expect(look.coordinator.length).toBeGreaterThanOrEqual(3);
   for (const said of look.coordinator) {
-    expect(said?.background, 'C31: a Coordinator reply sits in the grey reply bubble').toBe(look.grey);
+    expect(
+      said?.background,
+      `C31: the Coordinator reply "${said?.text}" sits on the grey reply surface`,
+    ).toBe(look.grey);
     expect(said?.font, 'C31: a Coordinator reply is set in the sans').toBe(look.sans);
   }
   expect(look.serifLeft, 'C31: no serif is left in the conversation').toBe(0);
@@ -466,4 +472,116 @@ test('consecutive assistant replies separated by thinking or tool calls cluster 
   expect(uGap).toBe(2);
   expect(rGap).toBe(2);
   expect(turnGap).toBe(24);
+
+  const corners = await page.evaluate(() => {
+    const radius = (el: Element | null) => {
+      const style = el === null ? null : getComputedStyle(el);
+      return style === null
+        ? null
+        : {
+            topLeft: Number.parseFloat(style.borderTopLeftRadius),
+            bottomLeft: Number.parseFloat(style.borderBottomLeftRadius),
+          };
+    };
+    const blocks = [
+      ...document.querySelectorAll(
+        '[data-testid="chief-stream"] [data-slot="message-bubble"][data-side="coordinator"]',
+      ),
+    ];
+    return { first: radius(blocks[0] ?? null), last: radius(blocks.at(-1) ?? null) };
+  });
+  expect(corners.first?.bottomLeft).toBeLessThan(corners.first?.topLeft ?? 0);
+  expect(corners.last?.topLeft).toBeLessThan(corners.last?.bottomLeft ?? 0);
+});
+
+test('Coordinator code is separate from the grey reply bubble and carries its name at the top-left', async ({
+  page,
+}) => {
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'ask', role: 'user', content: '看下 uptime 的输出', createdAt: 10 },
+      {
+        id: 'answer',
+        role: 'assistant',
+        content: [
+          'uptime 的输出如下：',
+          '',
+          '```',
+          ' 10:32:01 up 3 days,  2 users,  load average: 0.41, 0.38, 0.32',
+          '```',
+          '',
+          '源码在这里：',
+          '',
+          '```ts title="src/app.ts"',
+          'export const started = true',
+          '```',
+          '',
+          '```json',
+          '{"ok":true}',
+          '```',
+          '',
+          '| 文件 | 行数 |',
+          '| --- | --- |',
+          '| app.ts | 12 |',
+        ].join('\n'),
+        createdAt: 20,
+      },
+    ],
+    todos: [],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  const reply = stream.getByTestId('chief-msg').filter({ hasText: 'uptime 的输出如下' });
+  const bare = reply.getByTestId('md-code-block').first();
+  const named = reply.getByTestId('md-code-block').nth(1);
+  const json = reply.getByTestId('md-code-block').nth(2);
+
+  await expect(reply.getByTestId('chief-reply-bubble')).toHaveCount(2);
+  const shell = await bare.evaluate((el) => {
+    const bubble = el.closest('[data-slot="message-bubble"]');
+    const text = el.closest('[data-slot="reply-blocks"]')?.querySelector('[data-testid="chief-reply-bubble"]');
+    const box = el.getBoundingClientRect();
+    const textBox = text?.getBoundingClientRect() ?? null;
+    const block = el.closest('[data-slot="reply-block"]');
+    return {
+      shell: bubble === null ? null : getComputedStyle(bubble).backgroundColor,
+      block: block === null ? null : getComputedStyle(block).backgroundColor,
+      left: Math.round(box.left),
+      blockLeft: block === null ? null : Math.round(block.getBoundingClientRect().left),
+      textLeft: textBox === null ? null : Math.round(textBox.left),
+    };
+  });
+  expect(shell.shell).toBeNull();
+  expect(shell.block).toBe('rgba(0, 0, 0, 0)');
+  expect(shell.textLeft).not.toBeNull();
+  expect(shell.left).toBe(shell.blockLeft);
+
+  await expect(bare.getByTestId('md-code-lang')).toHaveText('代码');
+  await expect(named.getByTestId('md-code-lang')).toHaveText('src/app.ts');
+  await expect(json.getByTestId('md-code-lang')).toHaveText('json');
+  await expect(named.getByTestId('md-code-expand')).toBeVisible();
+  await expect(named.getByTestId('md-code-copy')).toBeVisible();
+  await expect(named.locator('xpath=ancestor::*[@data-slot="reply-bubble"]')).toHaveCount(0);
+
+  const painted = await reply.evaluate((el) => {
+    const table = el.querySelector('table');
+    const tableBubble = table?.closest('[data-slot="message-bubble"]') ?? null;
+    const textBubble =
+      el
+        .querySelector('[data-testid="chief-reply-bubble"]')
+        ?.closest('[data-slot="message-bubble"]') ?? null;
+    return {
+      table: tableBubble === null ? null : getComputedStyle(tableBubble).backgroundColor,
+      text: textBubble === null ? null : getComputedStyle(textBubble).backgroundColor,
+    };
+  });
+  expect(painted.table).not.toBe('rgba(0, 0, 0, 0)');
+  expect(painted.table).toBe(painted.text);
+
+  await named.getByTestId('md-code-expand').click();
+  await expect(page.getByTestId('md-code-dialog-body')).toBeVisible();
+  await expect(page.getByTestId('md-code-done')).toHaveText('完成');
+  await page.getByTestId('md-code-done').click();
+  await evidenceShot(page, 'chief-reply-code-own-surface.png');
 });

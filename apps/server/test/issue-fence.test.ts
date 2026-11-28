@@ -282,7 +282,7 @@ describe('W1-W5 chief wake prompt: issue-import task titles only inside the fenc
     const ref = `任务 [修登录按钮](todo:${id})`;
     const provenance = `provenance=watch:${id}\n`;
     expect(prompts).toContain(
-      `[wake:settle] ${provenance}${ref} 已完成（done）。请用 notify_user（provenance 填首行的 provenance= 值）用 2–4 行告诉用户任务已完成并总结结果：第一句点明 [修登录按钮](todo:${id}) 已完成，接着概括它完成了什么或验证结论，以及交付状态（done 本身不代表分支或 PR 已合并，按下方交付事实如实说明；需要更多细节可调 conversation 查）。只有同一完成结论在本对话里已经通知过用户时，才不重发、直接结束本轮。该任务的关注已自动解除。`,
+      `[wake:settle] ${provenance}${ref} 已完成（done）。请用 notify_user（provenance 填首行的 provenance= 值）告诉用户，像同事口头汇报：用 1–2 句口语，先说结果——他能拿到什么、什么地方变了；他需要做什么只在真的需要时说一句。只写他要知道的，不写文件名、分支、commit、测试数量、自查过程这类内部细节（细节留在任务记录里，他要看可以自己点开；你需要细节可调 conversation 查）。交付状态只在和结果有关时按下方交付事实说一句，done 本身不代表分支或 PR 已合并，不要写成已合并或已上线；交付事实没说清的就说不确定。只有同一完成结论在本对话里已经通知过用户时，才不重发、直接结束本轮。该任务的关注已自动解除。`,
     );
     expect(prompts).toContain(
       `[wake:failed] ${provenance}${ref} 运行失败。先核实原因（machines 等工具），然后本轮必须落一个动作：用 message_thread 让它重试或换做法，或用 update_todo 调整 blockedBy 后再用 message_thread 重启，让系统按依赖放行，或用 archive_todos 归档。本轮结束时任务若仍是同一个失败，系统会把它交给用户处理。`,

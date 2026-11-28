@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react';
 import { DiffFence } from '../components/chat/diff-glance.js';
+import type { BubbleRun } from '../components/chat/message-bubble.js';
 import { CopyIconButton } from '../components/copy-icon-button.js';
 import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -365,7 +366,11 @@ function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
       return <TaskCard items={block.items} />;
     case 'code': {
       const code = (
-        <CodeBlock {...(block.lang !== undefined ? { lang: block.lang } : {})} text={block.text} />
+        <CodeBlock
+          {...(block.lang !== undefined ? { lang: block.lang } : {})}
+          {...(block.name !== undefined ? { name: block.name } : {})}
+          text={block.text}
+        />
       );
       if (reply && (block.lang === 'diff' || block.lang === 'patch'))
         return (
@@ -453,11 +458,13 @@ function CodeLines({ lines, text }: { lines: CodeToken[][] | null; text: string 
 const CODE_BTN_CLS =
   'size-8 flex-none cursor-pointer rounded-(--radius-control) text-foreground transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
 
-function CodeBlock({ lang, text }: { lang?: string; text: string }) {
+function CodeBlock({ lang, name, text }: { lang?: string; name?: string; text: string }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const lines = useCodeTokens(text, lang);
-  const title = lang === undefined ? t('代码') : t('{lang} 代码', { lang: capitalize(lang) });
+  const label = name ?? lang ?? t('代码');
+  const title =
+    name ?? (lang === undefined ? t('代码') : t('{lang} 代码', { lang: capitalize(lang) }));
   return (
     <div
       className="w-fit min-w-48 max-w-full rounded-(--radius-code) border border-border bg-background"
@@ -467,8 +474,9 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
         <span
           className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-secondary"
           data-testid="md-code-lang"
+          title={label}
         >
-          {lang}
+          {label}
         </span>
         <IconTooltip
           label={t('展开')}
@@ -537,48 +545,66 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
 
 const REPLY_TEXT_CLS =
   'w-fit max-w-full rounded-sm text-pretty [overflow-wrap:anywhere] data-reply-highlight:bg-(--reply-bubble-highlight) data-reply-highlight:outline-4 data-reply-highlight:outline-solid data-reply-highlight:outline-(--reply-bubble-highlight)';
-const REPLY_BLOCK_CLS = 'relative w-fit max-w-full';
 
 const isDiffFence = (group: ChatBubbleGroup) =>
   group.blocks.length === 1 &&
   group.blocks[0]?.kind === 'code' &&
   (group.blocks[0].lang === 'diff' || group.blocks[0].lang === 'patch');
 
+type ReplySurface = (children: ReactNode, run: BubbleRun | undefined) => ReactNode;
+
 function ReplyGroup({
   group,
   highlighted,
   footer,
+  surface,
+  run,
 }: {
   group: ChatBubbleGroup;
   highlighted: boolean;
   footer: ReactNode;
+  surface: ReplySurface | undefined;
+  run: BubbleRun | undefined;
 }) {
+  const content = group.bubble ? (
+    <div
+      className={REPLY_TEXT_CLS}
+      data-slot="reply-bubble"
+      data-testid="chief-reply-bubble"
+      {...(highlighted ? { 'data-reply-highlight': '' } : {})}
+    >
+      <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" spaced={group.spaced} />
+      {footer}
+    </div>
+  ) : (
+    <>
+      <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" spaced={group.spaced} />
+      {footer}
+    </>
+  );
+  if (surface !== undefined && group.blocks[0]?.kind !== 'code')
+    return (
+      <div
+        className={cn(
+          'relative max-w-full',
+          group.bubble ? 'w-fit' : isDiffFence(group) ? 'w-full' : 'w-fit',
+        )}
+        data-slot="reply-block"
+        data-bubble={group.bubble ? 'true' : 'false'}
+      >
+        {surface(content, run)}
+      </div>
+    );
   return (
     <div
-      className={
-        group.bubble
-          ? REPLY_BLOCK_CLS
-          : cn('relative max-w-full', isDiffFence(group) ? 'w-full' : 'w-fit')
-      }
+      className={cn(
+        'relative max-w-full',
+        group.bubble ? 'w-fit' : isDiffFence(group) ? 'w-full' : 'w-fit',
+      )}
       data-slot="reply-block"
       data-bubble={group.bubble ? 'true' : 'false'}
     >
-      {group.bubble ? (
-        <div
-          className={REPLY_TEXT_CLS}
-          data-slot="reply-bubble"
-          data-testid="chief-reply-bubble"
-          {...(highlighted ? { 'data-reply-highlight': '' } : {})}
-        >
-          <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" spaced={group.spaced} />
-          {footer}
-        </div>
-      ) : (
-        <>
-          <MarkdownBlocks blocks={group.blocks} depth={0} flow="bubble" spaced={group.spaced} />
-          {footer}
-        </>
-      )}
+      {content}
     </div>
   );
 }
@@ -591,12 +617,16 @@ export function ChatMarkdown({
   streaming = false,
   fileMessageId,
   filePaths,
+  surface,
+  run,
 }: {
   text: string;
   fileMessageId?: string | undefined;
   filePaths?: string[] | undefined;
   streaming?: boolean;
   bubbles?: boolean;
+  surface?: ReplySurface;
+  run?: BubbleRun | undefined;
   bubbleFooter?: ReactNode;
   highlight?: (group: ChatBubbleGroup) => boolean;
 }) {
@@ -614,6 +644,22 @@ export function ChatMarkdown({
   );
   const groups = useMemo(() => (bubbles ? chatBubbleGroups(text) : null), [bubbles, text]);
   const blocks = useMemo(() => (bubbles ? null : parseChatMarkdown(text)), [bubbles, text]);
+  const painted = useMemo(
+    () =>
+      groups === null
+        ? []
+        : groups.map((group) => surface !== undefined && group.blocks[0]?.kind !== 'code'),
+    [groups, surface],
+  );
+  const firstPainted = painted.indexOf(true);
+  const lastPainted = painted.lastIndexOf(true);
+  const runOf = (index: number): BubbleRun | undefined => {
+    if (!painted[index]) return undefined;
+    if (firstPainted === lastPainted) return run;
+    if (index === firstPainted) return 'last';
+    if (index === lastPainted) return 'first';
+    return 'middle';
+  };
   const body =
     groups !== null ? (
       <div className="flex flex-col items-start gap-3" data-slot="reply-blocks">
@@ -623,6 +669,8 @@ export function ChatMarkdown({
             group={group}
             highlighted={highlight?.(group) === true}
             footer={i === groups.length - 1 ? bubbleFooter : null}
+            surface={surface}
+            run={runOf(i)}
           />
         ))}
       </div>

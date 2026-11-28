@@ -20,7 +20,7 @@ export type ChatBlock =
   | { kind: 'list'; ordered: boolean; start: number; items: ListItem[] }
   | { kind: 'tasks'; items: TaskItem[] }
   | { kind: 'quote'; blocks: ChatBlock[] }
-  | { kind: 'code'; lang?: string; text: string; open?: true }
+  | { kind: 'code'; lang?: string; name?: string; text: string; open?: true }
   | { kind: 'attachment'; name: string; key: string }
   | { kind: 'rule' }
   | {
@@ -52,6 +52,9 @@ const AGENT_PROGRESS = /^\[([~/])\]\s+/;
 const ITEM_MARKER = /^\[[ xX~/]\]\s+/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSING_FENCE = /^ {0,3}(`{3,}|~{3,})\s*$/;
+const FENCE_TITLE = /(?:^|\s)title=(?:"([^"]*)"|'([^']*)'|([^\s"'`]+))/;
+const FILE_NAME =
+  /^[A-Za-z0-9_@.~-]+(?:[/\\][A-Za-z0-9_@.~-]+)*\.[A-Za-z0-9]*[A-Za-z][A-Za-z0-9]*$/;
 const TABLE_ROW = /^\s*\|.*\|\s*$/;
 const TABLE_SEP_CELL = /^:?-{1,}:?$/;
 
@@ -391,11 +394,20 @@ function blockOf(token: Token): ChatBlock[] {
       ];
     case 'code': {
       const code = token as Tokens.Code;
-      const lang = code.lang?.trim().split(/\s+/)[0] ?? '';
+      const opener =
+        code.codeBlockStyle === 'indented'
+          ? ''
+          : (code.raw.split('\n')[0] ?? '').replace(FENCE, '').trim();
+      const words = opener.split(/\s+/).filter((word) => word !== '');
+      const lang = words[0] ?? '';
+      const titled = FENCE_TITLE.exec(opener);
+      const bare = words.slice(1).find((word) => FILE_NAME.test(word));
+      const name = titled?.[1] ?? titled?.[2] ?? titled?.[3] ?? bare;
       return [
         {
           kind: 'code',
           ...(lang !== '' ? { lang } : {}),
+          ...(name !== undefined && name.trim() !== '' ? { name: name.trim() } : {}),
           text: code.text,
           ...(fenceOpen(code) ? { open: true as const } : {}),
         },

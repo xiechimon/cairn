@@ -4,6 +4,7 @@ import {
   CircleStop,
   ClipboardList,
   Copy,
+  FileDiff,
   History,
   MessageSquare,
   Pencil,
@@ -33,6 +34,7 @@ interface MoreMenuProps {
   onRouteOverride?: () => void;
   onRename?: () => void;
   onViewPlan?: () => void;
+  onViewChanges?: () => void;
   onViewRaw?: () => void;
   onViewRun?: () => void;
   moveSub?: ReactNode;
@@ -54,6 +56,7 @@ export function MoreMenu({
   onRouteOverride,
   onRename,
   onViewPlan,
+  onViewChanges,
   onViewRaw,
   onViewRun,
   moveSub,
@@ -99,6 +102,19 @@ export function MoreMenu({
             action: 'view-plan',
             disabled: false,
             onClick: onViewPlan,
+          },
+        ]
+      : []),
+    ...(onViewChanges !== undefined
+      ? [
+          {
+            key: 'view-changes',
+            shortcut: 'F',
+            label: t('看代码改动'),
+            Icon: FileDiff,
+            action: 'view-changes',
+            disabled: false,
+            onClick: onViewChanges,
           },
         ]
       : []),
@@ -240,7 +256,9 @@ export function MoreMenu({
                 ? 'archive-task'
                 : row.key === 'discard-changes'
                   ? row.key
-                  : undefined
+                  : row.key === 'view-changes'
+                    ? 'view-task-changes'
+                    : undefined
             }
             disabled={row.disabled}
             onClick={row.onClick}

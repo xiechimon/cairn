@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive, TASK } from './chief-home-mock.js';
 
 const HOME = '/app?scenario=home-c';
 
@@ -309,15 +310,22 @@ const changesCard = (page: Page) => page.getByTestId('side-chat-changes');
 const changesToggle = (page: Page) => page.getByTestId('side-chat-changes-toggle');
 const changesBody = (page: Page) => page.getByTestId('side-chat-changes-body');
 
-test('a reviewed thread shows its changes as one card that opens in place, with no done line and no view switch', async ({
+async function askForChanges(page: Page) {
+  await sideChat(page).getByRole('button', { name: '更多操作…' }).click();
+  await page.getByRole('menuitem', { name: '看代码改动' }).click();
+}
+
+test('a reviewed thread appends no changes card until the more menu asks for it, then the card opens in place', async ({
   page,
 }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   await expect(sideChat(page).getByTestId('side-chat-changes')).toHaveCount(0);
+  await askForChanges(page);
   const card = page.getByTestId('transcript-col').getByTestId('side-chat-changes');
   await expect(card).toHaveCount(1);
   await expect(changesToggle(page)).toHaveText('改动 README.md+1');
-  await expect(changesToggle(page)).toHaveAttribute('aria-expanded', 'false');
+  await expect(changesToggle(page)).toHaveAttribute('aria-expanded', 'true');
+  await expect(changesBody(page).locator('[data-kind="add"]').first()).toBeVisible();
   await expect(page.getByTestId('transcript-note').filter({ hasText: /^已完成$/ })).toHaveCount(0);
   const place = await card.evaluate((el) => {
     const box = el.getBoundingClientRect();
@@ -331,14 +339,9 @@ test('a reviewed thread shows its changes as one card that opens in place, with 
       left: Math.round(
         box.left - column.getBoundingClientRect().left - Number.parseFloat(style.paddingLeft),
       ),
-      height: Math.round(box.height),
     };
   });
-  expect(place).toEqual({ afterWork: true, left: 0, height: 44 });
-
-  await changesToggle(page).click();
-  await expect(changesToggle(page)).toHaveAttribute('aria-expanded', 'true');
-  await expect(changesBody(page).locator('[data-kind="add"]').first()).toBeVisible();
+  expect(place).toEqual({ afterWork: true, left: 0 });
   await expect(page.getByTestId('transcript-col')).toBeVisible();
   await expect(page.getByTestId('pane-title')).toHaveCount(0);
   await expect(page.locator('[data-testid^="pane-view-"]')).toHaveCount(0);
@@ -348,49 +351,155 @@ test('a reviewed thread shows its changes as one card that opens in place, with 
   await expect(changesBody(page).getByTestId('diff-full')).toBeVisible();
 
   await changesToggle(page).click();
-  await expect(changesBody(page)).toHaveCount(0);
+  await expect(card).toHaveCount(0);
 });
 
-test('a thread without build changes has no changes card', async ({ page }) => {
+test('a delivered attachment with real changes appends no changes row; the task menu still shows the same diff', async ({
+  page,
+}) => {
+  const delivered = {
+    ...TASK,
+    phase: 'done' as const,
+    buildHistory: [{ buildId: 'build-1', createdAt: Date.now() - 100_000 }],
+    hasChanges: true,
+  };
+  await mockLive(
+    page,
+    {
+      threads: [],
+      messages: [],
+      machines: [{ id: 'machine-1', name: 'omarchy', online: true }],
+      todos: [delivered],
+    },
+    (path, _route, json) => {
+      if (path === '/api/todos/todo-1') return json(delivered);
+      if (path === '/api/builds/build-1')
+        return json({ id: 'build-1', todoId: 'todo-1', createdAt: Date.now() - 100_000, triggerSource: 'user' });
+      if (path === '/api/builds/build-1/changes')
+        return json({
+          files: [
+            {
+              path: 'q3-review.html',
+              status: 'modified',
+              additions: 130,
+              deletions: 0,
+              hunks: [{ header: '@@ -1 +1 @@', lines: ['-旧问答区', '+新问答区'] }],
+            },
+          ],
+        });
+      if (path === '/api/builds/build-1/steps') return json([]);
+      if (path === '/api/builds/build-1/usage') return json([]);
+      if (path === '/api/conversations/build-1/messages')
+        return json({
+          messages: [
+            { id: 'ask', role: 'user', content: '把 q3-review.html 的问答区改清楚些', createdAt: 1 },
+            {
+              id: 'answer',
+              role: 'assistant',
+              content: '![q3-review.html](attachment:e2e-team/att-q3-review.html)\n改好了，问答区现在是三栏。',
+              createdAt: 2,
+            },
+          ],
+          queuedMessages: [],
+        });
+      return undefined;
+    },
+  );
+  await page.goto('/app?thread=todo-1');
+  await expect(page.getByTestId('chat-artifact-card')).toBeVisible();
+  await expect(changesCard(page)).toHaveCount(0);
+  await askForChanges(page);
+  await expect(changesBody(page).locator('[data-kind]').first()).toBeVisible();
+  await expect(changesToggle(page)).toContainText('q3-review.html');
+});
+
+test('a plain-folder task keeps its undo reachable without asking for changes', async ({ page }) => {
+  const delivered = {
+    ...TASK,
+    phase: 'done' as const,
+    buildHistory: [{ buildId: 'build-1', createdAt: Date.now() - 100_000 }],
+    hasChanges: true,
+  };
+  await mockLive(
+    page,
+    {
+      threads: [],
+      messages: [],
+      machines: [{ id: 'machine-1', name: 'omarchy', online: true }],
+      todos: [delivered],
+    },
+    (path, _route, json) => {
+      if (path === '/api/todos/todo-1') return json(delivered);
+      if (path === '/api/builds/build-1')
+        return json({ id: 'build-1', todoId: 'todo-1', createdAt: Date.now() - 100_000, triggerSource: 'user' });
+      if (path === '/api/builds/build-1/changes')
+        return json({
+          files: [],
+          reported: true,
+          plainFolder: { mode: 'in-place', status: 'merged', undoable: true, undoPending: false },
+        });
+      if (path === '/api/builds/build-1/steps') return json([]);
+      if (path === '/api/builds/build-1/usage') return json([]);
+      if (path === '/api/conversations/build-1/messages')
+        return json({
+          messages: [
+            { id: 'ask', role: 'user', content: '把本地文件夹里的 notes.md 改一下', createdAt: 1 },
+            { id: 'answer', role: 'assistant', content: '改好了。', createdAt: 2 },
+          ],
+          queuedMessages: [],
+        });
+      return undefined;
+    },
+  );
+  await page.goto('/app?thread=todo-1');
+  await expect(changesCard(page)).toHaveCount(1);
+  await expect(page.getByTestId('undo-task-changes')).toBeVisible();
+});
+
+test('a thread without build changes has no changes card and no menu entry', async ({ page }) => {
   for (const id of ['home-c-idle', 'home-c-working-a', 'home-c-confirm']) {
     await page.goto(`${HOME}&thread=${id}`);
     await expect(sideChat(page), id).toBeVisible();
     await expect(changesCard(page), id).toHaveCount(0);
+    await sideChat(page).getByRole('button', { name: '更多操作…' }).click();
+    await expect(
+      page.getByRole('menuitem', { name: '看代码改动' }),
+      `${id} offers no changes entry`,
+    ).toHaveCount(0);
+    await page.keyboard.press('Escape');
   }
 });
 
 test('Escape closes the panel even with the changes open', async ({ page }) => {
-  await page.goto(`${HOME}&thread=home-c-review`);
-  await changesToggle(page).click();
+  await page.goto(`${HOME}&thread=home-c-review&view=changes`);
   await expect(changesBody(page)).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(sideChat(page)).toHaveCount(0);
 });
 
-test('the composer stays usable with the changes open, and switching threads closes them', async ({
+test('the composer stays usable with the changes open, and switching threads keeps them for that task', async ({
   page,
 }) => {
-  await page.goto(`${HOME}&thread=home-c-review`);
-  await changesToggle(page).click();
+  await page.goto(`${HOME}&thread=home-c-review&view=changes`);
   const input = page.locator('.side-panel textarea');
   await input.fill('looks good');
   await expect(input).toHaveValue('looks good');
   await expect(changesBody(page)).toBeVisible();
 
   await page.goto(`${HOME}&thread=home-c-working-a`);
+  await expect(sideChat(page).getByTestId('side-chat-changes')).toHaveCount(0);
   await expect(page.getByTestId('transcript-col')).toBeVisible();
   await page.goto(`${HOME}&thread=home-c-review`);
-  await expect(changesToggle(page)).toHaveAttribute('aria-expanded', 'false');
+  await expect(sideChat(page).getByTestId('side-chat-changes')).toHaveCount(0);
 });
 
 test.describe('phone width changes', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('the changes card is a touch target and its diff fits the screen', async ({ page }) => {
-    await page.goto(`${HOME}&thread=home-c-review`);
+    await page.goto(`${HOME}&thread=home-c-review&view=changes`);
     const box = await changesToggle(page).boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
-    await changesToggle(page).click();
     await expect(changesBody(page)).toBeVisible();
     const overflow = await page
       .locator('aside.side-panel')

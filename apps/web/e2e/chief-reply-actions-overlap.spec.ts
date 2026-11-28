@@ -125,7 +125,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await page.mouse.move(0, 0);
     await expect(stream.getByTestId('chief-time-divider'), 'no time line under an hour').toHaveCount(0);
     await expect(stream.locator('[data-slot="message-bubble"][data-side="coordinator"]')).toHaveCount(
-      RUN.length,
+      RUN.length + 1,
     );
 
     for (const [n, { id }] of RUN.entries()) {

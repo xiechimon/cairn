@@ -756,26 +756,40 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     highlightedSource !== null && highlightedSource.sourceMessageId === item.id;
   const quoted = highlightedSource?.quote ?? '';
   const actions: MessageActions = { at: item.createdAt, text: whole };
-  const bubble = (
-    <MessageBubble
-      side="coordinator"
-      run={runAttr(joinsPrev && started.length === 0, joinsNext)}
-      data-testid="chief-reply"
-      {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
-    >
-      {markdown != null ? (
+  const replyRun = runAttr(joinsPrev && started.length === 0, joinsNext);
+  const bubble =
+    markdown != null ? (
+      <div
+        data-testid="chief-reply"
+        data-run={replyRun}
+        className="relative w-fit max-w-full font-sans text-ui leading-5 text-(--foreground)"
+        {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+      >
         <ChatMarkdown
           text={markdown}
           fileMessageId={settled && item.workspaceFileLinks === true ? item.id : undefined}
           filePaths={item.workspaceFilePaths}
           streaming={!settled}
           bubbles
+          run={replyRun}
+          surface={(children, surfaceRun) => (
+            <MessageBubble side="coordinator" run={surfaceRun} className="max-w-full">
+              {children}
+            </MessageBubble>
+          )}
           bubbleFooter={<BubbleReports todoIds={reports} />}
           highlight={(group) =>
             sourceHighlighted && (group.source.includes(quoted) || quoted.includes(group.source))
           }
         />
-      ) : (
+      </div>
+    ) : (
+      <MessageBubble
+        side="coordinator"
+        run={replyRun}
+        data-testid="chief-reply"
+        {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
+      >
         <div
           data-slot="reply-bubble"
           data-testid="chief-reply-bubble"
@@ -798,9 +812,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           )}
           <BubbleReports todoIds={reports} />
         </div>
-      )}
-    </MessageBubble>
-  );
+      </MessageBubble>
+    );
   const hasBody = whole.trim() !== '' || reports.length > 0;
   return (
     <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
@@ -821,6 +834,15 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             >
               {bubble}
             </MessageMeta>
+          )}
+          {settled && item.detailsTodoId !== undefined && (
+            <ThreadLink
+              todoId={item.detailsTodoId}
+              data-testid="chief-reply-details"
+              className="mt-1 self-start text-meta text-content-tertiary no-underline hover:text-foreground hover:underline"
+            >
+              {t('详情')}
+            </ThreadLink>
           )}
           {item.typing === true && <TypingDots className="mt-1" />}
         </MessageContent>

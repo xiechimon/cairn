@@ -736,3 +736,43 @@ test('a short channel name stays whole at 390px while the task title truncates',
   const line = await row.evaluate((node) => node.scrollWidth - node.clientWidth);
   expect(line, 'the row does not overflow horizontally').toBeLessThanOrEqual(0);
 });
+
+test('a settled task offers Details beside its reply, and only for the settle echo that names it', async ({
+  page,
+}) => {
+  const notice = (id: string, provenance: string, createdAt: number) => ({
+    id,
+    role: 'system',
+    content: JSON.stringify({
+      kind: 'chief_notice',
+      message: 'Q3 复盘那页补好了，现在能直接发给客户。',
+      provenance,
+    }),
+    createdAt,
+  });
+  await mockLive(page, {
+    threads: [THREAD],
+    messages: [
+      { id: 'ask', role: 'user', content: '给周报补一页 Q3 复盘', createdAt: 10 },
+      notice('plain', 'user', 20),
+      {
+        id: 'user-wake-step',
+        role: 'user',
+        content: `[wake:settle] provenance=watch:${TASK.id}\nInternal settle instructions`,
+        createdAt: 30,
+      },
+      notice('settled', `watch:${TASK.id}`, 32),
+    ],
+    todos: [{ ...TASK, phase: 'done' }],
+  });
+  await page.goto('/app');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  const replies = stream.getByTestId('chief-msg').filter({ hasText: 'Q3 复盘那页补好了' });
+  await expect(replies).toHaveCount(2);
+  await expect(replies.first().getByTestId('chief-reply-details')).toHaveCount(0);
+  const details = replies.last().getByTestId('chief-reply-details');
+  await expect(details).toHaveText('详情');
+  await expect(details.locator('xpath=ancestor::*[@data-slot="message-bubble"]')).toHaveCount(0);
+  await details.click();
+  await expect(page).toHaveURL(new RegExp(`[?&]thread=${TASK.id}`));
+});

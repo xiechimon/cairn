@@ -47,10 +47,9 @@ async function step(page: Page) {
 
 test('a file changed during the run grows in as a row and the counts roll to their new totals', async ({ page }) => {
   const state = await setup(page);
-  await page.goto('/app?thread=todo-1');
+  await page.goto('/app?thread=todo-1&view=changes');
   const card = page.getByTestId('side-chat-changes');
   await expect(card).toBeVisible();
-  await page.getByTestId('side-chat-changes-toggle').click();
   const rows = card.getByTestId('side-chat-file');
   await expect(rows).toHaveCount(2);
   expect(await card.locator('[data-grow], .grow-digit').count()).toBe(0);
@@ -68,12 +67,10 @@ test('a file changed during the run grows in as a row and the counts roll to the
 
 test('reopening the thread shows the same changes still, with nothing growing', async ({ page }) => {
   await setup(page);
-  await page.goto('/app?thread=todo-1');
-  await page.getByTestId('side-chat-changes-toggle').click();
+  await page.goto('/app?thread=todo-1&view=changes');
   const card = page.getByTestId('side-chat-changes');
   await expect(card.getByTestId('side-chat-file')).toHaveCount(2);
   await page.reload();
-  await page.getByTestId('side-chat-changes-toggle').click();
   await expect(card.getByTestId('side-chat-file')).toHaveCount(2);
   expect(await card.locator('[data-grow], .grow-digit').count()).toBe(0);
 });

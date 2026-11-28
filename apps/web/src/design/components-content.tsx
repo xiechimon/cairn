@@ -307,8 +307,16 @@ export function ConversationSection() {
           <Message>
             <MessageContent className="max-w-[min(85%,42rem)] flex-none gap-0">
               <MessageMeta side="coordinator" actions={{ at: SPECIMEN_AT, text: SPECIMEN_REPLY }}>
-                <MessageBubble side="coordinator">
-                  <ChatMarkdown bubbles text={SPECIMEN_REPLY} />
+                <MessageBubble side="coordinator" className="bg-transparent p-0">
+                  <ChatMarkdown
+                    bubbles
+                    text={SPECIMEN_REPLY}
+                    surface={(children, run) => (
+                      <MessageBubble side="coordinator" run={run} className="max-w-full">
+                        {children}
+                      </MessageBubble>
+                    )}
+                  />
                 </MessageBubble>
               </MessageMeta>
             </MessageContent>

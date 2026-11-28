@@ -611,6 +611,19 @@ function ThreadBody({
     [chat.unsent, setDraft],
   );
   const reportThread = { title: todo.title, final: isFinalReportPhase(todo.phase) };
+  const plainFolder = chat.changes.plainFolder;
+  const autoChanges =
+    chat.changes.status === 'error' ||
+    (plainFolder !== undefined &&
+      (plainFolder.undoable ||
+        plainFolder.undoPending === true ||
+        plainFolder.status === 'conflict' ||
+        plainFolder.error !== undefined));
+  const changesShown =
+    (changesOpen || autoChanges) &&
+    (chat.changes.status === 'ready' || chat.changes.status === 'error');
+  const changesExpanded =
+    changesOpen || plainFolder?.status === 'conflict' || plainFolder?.error !== undefined;
   return (
     <>
       {chat.wire?.sourceKind != null && <SourceLine wire={chat.wire} onLeave={onClose} />}
@@ -648,10 +661,7 @@ function ThreadBody({
                 />
               }
               result={
-                engine !== undefined ||
-                pr != null ||
-                chat.changes.status === 'ready' ||
-                chat.changes.status === 'error' ? (
+                engine !== undefined || pr != null || changesShown ? (
                   <>
                     {pr}
                     {engine?.controls}
@@ -660,12 +670,12 @@ function ThreadBody({
                         <EngineQuestion run={engine.run} actions={engine.actions} />
                       </div>
                     )}
-                    {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
+                    {changesShown && (
                       <ChangesCard
                         key={todo.id}
                         changes={chat.changes}
                         buildId={chat.buildId}
-                        open={changesOpen}
+                        open={changesExpanded}
                         onOpenChange={onChangesOpen}
                         onRetry={chat.retryChanges}
                         undoSubmitting={chat.undoSubmitting === true}
@@ -920,11 +930,26 @@ function ReadyThread({
     live && chat.running && chat.buildId != null ? activityStore.get(chat.buildId) : null,
   );
   const usage = useThreadUsage(todo, liveActivity);
+  const openChanges =
+    chat.changes.status === 'none'
+      ? undefined
+      : () => {
+          onView('chat');
+          onChangesOpen(true);
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+              document
+                .querySelector('.side-panel [data-testid="side-chat-changes"]')
+                ?.scrollIntoView({ block: 'nearest' }),
+            ),
+          );
+        };
   const actions = useThreadActions({
     todo,
     chat,
     onGone: onClose,
     onViewPlan: openPlan,
+    onViewChanges: openChanges,
     engine: engine === undefined ? undefined : { onViewRaw: () => onView('raw') },
   });
   const prs = usePrs(teamId, todo.id, live);
@@ -980,19 +1005,7 @@ function ReadyThread({
             <ThreadPrPanel
               status={prs.status}
               rows={prRows}
-              onViewChanges={
-                chat.changes.status !== 'none'
-                  ? () => {
-                      onView('chat');
-                      onChangesOpen(true);
-                      requestAnimationFrame(() =>
-                        document
-                          .querySelector('.side-panel [data-testid="side-chat-changes"]')
-                          ?.scrollIntoView({ block: 'nearest' }),
-                      );
-                    }
-                  : undefined
-              }
+              onViewChanges={openChanges}
               onRetry={() => void prs.refetch()}
             />
           ) : null
