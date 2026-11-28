@@ -24,7 +24,12 @@ import { isServerHelper } from '../src/server-process.ts';
 import { TRAY_POPOVER_WIDTH } from '../src/tray-popover.ts';
 import { isTrayPage, mainWindow } from './main-window.mjs';
 import { runAntigravityRemoteAndSkewSmoke } from './smoke-remote-antigravity.mjs';
-import { matchingPopover, TrayDriver, TrayDriverStopped } from './tray-click.mjs';
+import {
+  compileTrayDriver,
+  matchingPopover,
+  TrayDriver,
+  TrayDriverStopped,
+} from './tray-click.mjs';
 
 const LAUNCH_TIMEOUT_MS = 120_000;
 const GATE_SETTLE_MS = 5_000;
@@ -33,6 +38,7 @@ const GAP_TIMEOUT_MS = 10_000;
 const FULL_SCREEN_TIMEOUT_MS = 15_000;
 const QUIT_TIMEOUT_MS = 60_000;
 const DISMISS_GAP_MS = 400;
+const SELF_CLOSE_MS = 1_000;
 const QUEUED_OPEN_MS = 2_000;
 const QUEUED_OPEN_EXPIRY_WAIT_MS = 2_250;
 const EVALUATE_TIMEOUT_MS = 15_000;
@@ -120,6 +126,9 @@ function runnerProcesses() {
 
 const serverProcesses = () =>
   matchingPids(`${appRoot}/${SERVER_ENTRY}`).filter((pid) => isServerHelper(commandOf(pid)));
+
+const trayDriverBuild = compileTrayDriver();
+trayDriverBuild.catch(() => {});
 
 const builtSnapshotDir = realpathSync(mkdtempSync(join(tmpdir(), 'cairn-built-smoke-')));
 const builtAppSnapshot = join(builtSnapshotDir, 'Cairn.app');
@@ -265,7 +274,7 @@ try {
 
   const origin = new URL(window.url()).origin;
   step('starting the tray driver');
-  driver = TrayDriver.start((line) => console.log(line));
+  driver = await TrayDriver.start(trayDriverBuild, (line) => console.log(line));
   const appPid = child.pid;
   const driverInfo = await driver.send({ cmd: 'ping' });
   assert.equal(
@@ -362,7 +371,7 @@ try {
   }
 
   async function dismiss() {
-    if ((await waitForScreen(false)).onScreen) await clickStatusItem();
+    if ((await waitForScreen(false, SELF_CLOSE_MS)).onScreen) await clickStatusItem();
     const closed = await waitForScreen(false);
     assert.equal(
       closed.onScreen,
@@ -1789,6 +1798,8 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
     '-c',
     '-k',
     '--sequesterRsrc',
+    '--zlibCompressionLevel',
+    '0',
     '--keepParent',
     nextAppBundle,
     zipPath,

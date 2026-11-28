@@ -1,9 +1,10 @@
-import { execFileSync, spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { promisify } from 'node:util';
 
 const SOURCE = new URL('./tray-driver.swift', import.meta.url);
 const RESPONSE_TIMEOUT_MS = 15_000;
@@ -19,14 +20,14 @@ export function matchingPopover(entries, bounds) {
   );
 }
 
-export function compileTrayDriver() {
+export async function compileTrayDriver() {
   const source = readFileSync(SOURCE, 'utf8');
   const digest = createHash('sha256').update(source).digest('hex').slice(0, 12);
   const binary = join(tmpdir(), `cairn-tray-driver-${digest}`);
   if (existsSync(binary)) return binary;
   const partial = `${binary}.${process.pid}`;
   try {
-    execFileSync('swiftc', ['-Onone', SOURCE.pathname, '-o', partial], {
+    await promisify(execFile)('swiftc', ['-Onone', SOURCE.pathname, '-o', partial], {
       encoding: 'utf8',
       timeout: 180_000,
     });
@@ -44,9 +45,9 @@ export class TrayDriver {
   #pending = [];
   #failure = null;
 
-  static start(log = () => {}) {
-    log('tray driver: compiling');
-    const binary = compileTrayDriver();
+  static async start(compiled, log = () => {}) {
+    log('tray driver: waiting for its build');
+    const binary = await compiled;
     log(`tray driver: ${binary}`);
     const child = spawn(binary, [], { stdio: ['pipe', 'pipe', 'inherit'] });
     const driver = new TrayDriver(child);
