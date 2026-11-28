@@ -41,20 +41,10 @@ function world(db?: Db) {
       createdAt: 1,
     })
     .run();
-  s.db
-    .insert(chiefThread)
-    .values({
-      id: 'main',
-      chiefId: 'chief',
-      teamId: s.team.id,
-      userId: s.user.id,
-      title: 'Coordinator',
-      createdAt: YESTERDAY,
-      updatedAt: YESTERDAY,
-      sessionId: '',
-      sessionOpenedAt: YESTERDAY,
-    })
-    .run();
+  s.db.run(sql`INSERT INTO chief_thread
+    (id, chiefId, teamId, userId, title, createdAt, updatedAt, sessionId, sessionOpenedAt)
+    VALUES ('main', 'chief', ${s.team.id}, ${s.user.id}, 'Coordinator',
+      ${YESTERDAY}, ${YESTERDAY}, '', ${YESTERDAY})`);
   return s;
 }
 

@@ -1267,6 +1267,8 @@ export const chiefThread = sqliteTable(
     toolResultHashes: json<Record<string, string>>('toolResultHashes').notNull().default(sql`'{}'`),
     activeRun: json<ActiveRun>('activeRun'),
     archivedAt: epochMs('archivedAt'),
+    memoryFlushedAt: epochMs('memoryFlushedAt'),
+    memoryFlushedMessageId: text('memoryFlushedMessageId'),
   },
   (t) => [
     uniqueIndex('chief_thread_coordinator_unique')
@@ -1340,7 +1342,10 @@ export const chiefMessage = sqliteTable(
     clientMessageId: text('clientMessageId'),
     createdAt: epochMs('createdAt').notNull(),
   },
-  (t) => [index('chief_message_thread_created_idx').on(t.threadId, t.createdAt)],
+  (t) => [
+    index('chief_message_thread_created_idx').on(t.threadId, t.createdAt),
+    index('chief_message_thread_insert_idx').on(t.threadId),
+  ],
 );
 
 export const attachment = sqliteTable('attachment', {

@@ -425,7 +425,7 @@ function ensureMemoryFileReference(
 }
 
 export function appendMemoryIndex(
-  db: Db,
+  db: Db | Tx,
   owner: MemoryDocumentOwner,
   title: string,
   detail: string,

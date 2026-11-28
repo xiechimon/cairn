@@ -15,6 +15,7 @@ import {
   openTurnCapture,
   sealCoordinatorTurnSnapshot,
 } from '../../src/services/coordinator-turn-capture.js';
+import { inspectRun } from '../../src/services/inspect-run.js';
 import { claimStep } from '../../src/services/machine-claim.js';
 import { finishStepForClaim } from '../helpers.js';
 import { boot, stub, type World, world } from './runner-world.js';
@@ -92,6 +93,12 @@ describe('coordinator turn snapshot writer', () => {
         .digest('hex'),
     );
     expect(row?.expiresAt).toBe((row?.capturedAt ?? 0) + 30 * 86_400_000);
+    const inspected = inspectRun(w.s.db, w.teamId, w.threadId, {}) as {
+      turns?: { snapshot?: Record<string, unknown> }[];
+    };
+    const snap = inspected.turns?.[0]?.snapshot;
+    expect(snap).toEqual({ status: 'sealed', outcome: 'success', reason: null });
+    expect(Object.keys(snap ?? {})).not.toContain('expiresAt');
   });
 
   it('captures the verbatim prompt and context inputs fed to the claim', async () => {

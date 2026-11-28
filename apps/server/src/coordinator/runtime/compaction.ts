@@ -181,7 +181,7 @@ export async function foldSummary(
 export function summarizerFor(
   models: Pick<Models, 'getModel' | 'completeSimple'>,
   ref: ModelRef | null,
-  scope: FailureScope & { stage?: string } = {},
+  scope: FailureScope & { stage?: string; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Summarize {
   const model = ref === null ? undefined : models.getModel(ref.provider, ref.modelId);
   if (model === undefined) {
@@ -202,6 +202,8 @@ export function summarizerFor(
         },
         {
           ...(reasoning === 'off' ? {} : { reasoning }),
+          ...(scope.timeoutMs === undefined ? {} : { timeoutMs: scope.timeoutMs }),
+          ...(scope.signal === undefined ? {} : { signal: scope.signal }),
           onResponse: (response) => {
             httpStatus = response.status;
           },

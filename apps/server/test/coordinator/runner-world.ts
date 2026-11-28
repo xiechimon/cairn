@@ -95,7 +95,7 @@ export async function world(
 
 export function boot(
   w: World,
-  faux: ReturnType<typeof fauxProvider>,
+  faux: Pick<ReturnType<typeof fauxProvider>, 'provider'>,
   extra: object = {},
 ): Coordinator {
   const coordinator = startCoordinator({

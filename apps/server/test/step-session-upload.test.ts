@@ -11,11 +11,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { step as stepTable } from '../src/db/schema.js';
-import {
-  ATTACHMENT_ORPHAN_GRACE_MS,
-  STEP_SESSION_RETENTION_MS,
-  sweepStepSessions,
-} from '../src/services/attachment-gc.js';
+import { ATTACHMENT_ORPHAN_GRACE_MS, sweepStepSessions } from '../src/services/attachment-gc.js';
 import { readStepSession, stepSessionPath } from '../src/services/machine-uploads.js';
 import { bootServer, issueApiKey, postProject, req, seedSessionRoute } from './helpers.js';
 
@@ -154,24 +150,27 @@ describe('session JSONL upload and per-step retrieval (#1512)', () => {
     expect(existsSync(path)).toBe(false);
   });
 
-  test('a record of a live step is deleted once it is past the retention period', async () => {
+  test('a record of a live step is kept forever, with no age-based expiry', async () => {
     const w = await setupWorld();
     expect((await putSession(w, '{"kept":true}\n')).status).toBe(200);
     const path = stepSessionPath(w.s.attachmentsDir, w.stepId);
     const now = Date.now();
     const log = { info() {}, debug() {} };
-    const recent = (now - STEP_SESSION_RETENTION_MS + 60_000) / 1000;
-    utimesSync(path, recent, recent);
-    sweepStepSessions({ db: w.s.db, attachmentsDir: w.s.attachmentsDir, logger: log }, now);
-    expect(existsSync(path)).toBe(true);
-    const old = (now - STEP_SESSION_RETENTION_MS - 1000) / 1000;
-    utimesSync(path, old, old);
+    const ancient = (now - 3650 * 86_400_000) / 1000;
+    utimesSync(path, ancient, ancient);
     const stats = sweepStepSessions(
       { db: w.s.db, attachmentsDir: w.s.attachmentsDir, logger: log },
       now,
     );
-    expect(stats.expired).toBe(1);
-    expect(existsSync(path)).toBe(false);
+    expect(stats).toEqual({ orphan: 0, reclaimedBytes: 0 });
+    expect(existsSync(path)).toBe(true);
+    expect(readStepSession(w.s.attachmentsDir, w.stepId)).toBe('{"kept":true}\n');
+    const get = await w.s.app.request(`/api/machine/session/${w.stepId}`, {
+      method: 'GET',
+      headers: { authorization: `Bearer ${w.token}` },
+    });
+    expect(get.status).toBe(200);
+    expect(await get.json()).toMatchObject({ content: '{"kept":true}\n' });
   });
 });
 

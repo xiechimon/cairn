@@ -341,7 +341,6 @@ function inspectTurns(
             status: coordinatorTurnSnapshot.status,
             outcome: coordinatorTurnSnapshot.outcome,
             reason: coordinatorTurnSnapshot.reason,
-            expiresAt: coordinatorTurnSnapshot.expiresAt,
           })
           .from(coordinatorTurnSnapshot)
           .where(inArray(coordinatorTurnSnapshot.turnId, ids))
@@ -384,7 +383,6 @@ function inspectTurns(
               status: snapshot.status,
               outcome: snapshot.outcome,
               reason: snapshot.reason,
-              expiresAt: iso(snapshot.expiresAt),
             },
       langfuseTraceId: exporting ? otlpTraceIdOfTurn(t.id) : null,
     };

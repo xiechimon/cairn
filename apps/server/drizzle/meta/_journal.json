@@ -1856,6 +1856,13 @@
       "when": 1795848572100,
       "tag": "0269_doubao_subscription",
       "breakpoints": true
+    },
+    {
+      "idx": 270,
+      "version": "6",
+      "when": 1795848572101,
+      "tag": "0270_idle_memory_forever_history",
+      "breakpoints": true
     }
   ]
 }

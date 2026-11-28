@@ -185,6 +185,30 @@
       "pattern": "确认更换令牌|更换令牌|machine-menu-rotate-token|machine-token-reauth",
       "canary": "确认更换令牌",
       "reason": "manual runner token rotation UI and reauth drawer were removed in favor of silent background auto-rotation"
+    },
+    {
+      "id": "coordinator-snapshot-sweep",
+      "pattern": "\\bsweepCoordinatorTurnSnapshots\\b",
+      "canary": "sweepCoordinatorTurnSnapshots(db, now)",
+      "reason": "turn snapshots are kept until team deletion; no expiry sweep exists"
+    },
+    {
+      "id": "snapshot-cleanup-interval",
+      "pattern": "\\bCOORDINATOR_SNAPSHOT_CLEANUP_INTERVAL_MS\\b",
+      "canary": "COORDINATOR_SNAPSHOT_CLEANUP_INTERVAL_MS",
+      "reason": "the daily snapshot cleanup interval is retired with the sweep"
+    },
+    {
+      "id": "step-session-retention",
+      "pattern": "\\bSTEP_SESSION_RETENTION_MS\\b",
+      "canary": "STEP_SESSION_RETENTION_MS",
+      "reason": "a live step's session record is kept forever; only orphans of deleted steps are reclaimed"
+    },
+    {
+      "id": "snapshot-gc-due-event",
+      "pattern": "\\bcoordinator-snapshot-gc\\b|\\bgc:coordinator-snapshots\\b",
+      "canary": "gc:coordinator-snapshots",
+      "reason": "the snapshot GC due-event is retired; the migration deletes leftover rows"
     }
   ],
   "baseline": {

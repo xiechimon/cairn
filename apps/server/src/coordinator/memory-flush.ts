@@ -1,6 +1,7 @@
 import {
   COORDINATOR_MEMORY_FLUSH_MAX,
   COORDINATOR_MEMORY_FLUSH_PROMPT_HEAD,
+  MEMORY_INDEX_ID_PREFIX,
   MEMORY_INDEX_TITLE,
 } from '@cairn/shared';
 import { z } from 'zod';
@@ -24,6 +25,13 @@ import {
   teamMemoryLines,
 } from '../services/team-memory.js';
 import type { MemoryFlush } from './runtime/compaction.js';
+
+type FlushDb = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
+interface FlushScope {
+  teamId: string;
+  threadId: string;
+  projectId?: string | null;
+}
 
 const EXISTING_MAX_CHARS = 8_000;
 export const FLUSH_SOURCE = 'compaction-flush';
@@ -74,16 +82,28 @@ export function parseFlushOutput(raw: string) {
     .slice(0, COORDINATOR_MEMORY_FLUSH_MAX);
 }
 
-export function teamFlushLines(db: Db, teamId: string): string[] {
+function existingScopes(db: FlushDb, teamId: string) {
   const agentId = coordinatorMemoryOwner(db, teamId);
-  if (agentId === undefined) return [];
-  return teamMemoryLines(
-    memoryIndexText(ensureMemoryIndex(db, { agentId, teamId, projectId: null })),
-  );
+  const scopes = new Map<string | null, { content: string; version?: string }>([
+    [null, { content: '' }],
+  ]);
+  if (agentId === undefined) return scopes;
+  for (const row of listStoredMemoryEntries(db, { agentId, teamId })) {
+    if (row.layer !== 'core') continue;
+    const scope = scopes.get(row.projectId) ?? { content: '' };
+    const index = row.id.startsWith(MEMORY_INDEX_ID_PREFIX);
+    const line = index
+      ? memoryIndexText(row)
+      : `- ${row.title.replace(/[\r\n]+/g, ' ')}：${row.content}`;
+    scope.content = [scope.content, line].filter(Boolean).join('\n');
+    if (index || scope.version === undefined) scope.version = memoryDocumentVersion(row);
+    scopes.set(row.projectId, scope);
+  }
+  return scopes;
 }
 
 function curateTeamMemory(
-  db: Db,
+  db: FlushDb,
   owner: { agentId: string; teamId: string },
   numbered: readonly string[],
   replaces: readonly number[],
@@ -120,10 +140,12 @@ function curateTeamMemory(
 }
 
 export function applyFlush(
-  db: Db,
-  scope: { teamId: string; threadId: string },
+  db: FlushDb,
+  scope: FlushScope,
   raw: string,
-  numbered: readonly string[] = teamFlushLines(db, scope.teamId),
+  numbered: readonly string[] = teamMemoryLines(
+    existingScopes(db, scope.teamId).get(null)?.content ?? '',
+  ),
 ): FlushResult {
   const result: FlushResult = { saved: 0, retired: 0, skipped: 0 };
   const agentId = coordinatorMemoryOwner(db, scope.teamId);
@@ -178,25 +200,19 @@ function numberedTeamLines(content: string) {
     .join('\n');
 }
 
-function existingLines(db: Db, scope: { teamId: string; threadId: string }): string {
-  const agentId = coordinatorMemoryOwner(db, scope.teamId);
-  if (agentId === undefined) return '(none)';
-  const owner = { agentId, teamId: scope.teamId };
-  const scopes = new Set([null, ...listStoredMemoryEntries(db, owner).map((row) => row.projectId)]);
-  const indexes = [...scopes].map((projectId) => ensureMemoryIndex(db, { ...owner, projectId }));
+function existingLines(indexes: ReturnType<typeof existingScopes>): string {
   const selected: { header: string; content: string }[] = [];
-  const noteBudget = `\n(${indexes.length} additional scopes omitted from this excerpt.)`.length;
+  const noteBudget = `\n(${indexes.size} additional scopes omitted from this excerpt.)`.length;
   let reserved = noteBudget;
-  for (const index of indexes) {
-    const header = `${index.projectId ?? 'team'} | MEMORY.md | ${memoryDocumentVersion(index)}`;
-    const content =
-      index.projectId === null ? numberedTeamLines(memoryIndexText(index)) : memoryIndexText(index);
+  for (const [projectId, index] of indexes) {
+    const header = `${projectId ?? 'team'} | MEMORY.md${index.version ? ` | ${index.version}` : ''}`;
+    const content = projectId === null ? numberedTeamLines(index.content) : index.content;
     const required = header.length + Math.min(256, content.length) + 3;
     if (reserved + required > EXISTING_MAX_CHARS) break;
     selected.push({ header, content });
     reserved += required;
   }
-  const omitted = indexes.length - selected.length;
+  const omitted = indexes.size - selected.length;
   const note = omitted > 0 ? `\n(${omitted} additional scopes omitted from this excerpt.)` : '';
   const remaining =
     EXISTING_MAX_CHARS -
@@ -212,8 +228,9 @@ function existingLines(db: Db, scope: { teamId: string; threadId: string }): str
 
 export function flushPrompt(
   db: Db,
-  scope: { teamId: string; threadId: string },
+  scope: FlushScope,
   transcript: string,
+  indexes = existingScopes(db, scope.teamId),
 ) {
   const projects = db
     .select({ id: project.id, name: project.name })
@@ -221,20 +238,26 @@ export function flushPrompt(
     .where(listedProjects(scope.teamId))
     .all()
     .map((row) => `${row.id} | ${row.name.replace(/[\r\n]+/g, ' ')}`);
-  return `${COORDINATOR_MEMORY_FLUSH_PROMPT_HEAD}\n\nExisting memories:\n${existingLines(db, scope)}\n\nProjects:\n${projects.length > 0 ? projects.join('\n') : '(none)'}\n\nMessages:\n${transcript}`;
+  const channel =
+    scope.projectId == null
+      ? ''
+      : `\n\nConversation project: ${scope.projectId}. References such as “this project” mean this project; use its projectId for its facts. Use null for team-wide facts.`;
+  return `${COORDINATOR_MEMORY_FLUSH_PROMPT_HEAD}\n\nExisting memories:\n${existingLines(indexes)}\n\nProjects:\n${projects.length > 0 ? projects.join('\n') : '(none)'}${channel}\n\nMessages:\n${transcript}`;
 }
 
 export function createMemoryFlush(
   db: Db,
-  scope: { teamId: string; threadId: string },
+  scope: FlushScope,
   report: (result: FlushResult) => void,
+  commit: (apply: (db: FlushDb) => FlushResult) => FlushResult = (apply) => apply(db),
 ): MemoryFlush {
   return {
     run: async (transcript, summarize) => {
       if (transcript.trim() === '') return;
-      const numbered = teamFlushLines(db, scope.teamId);
-      const raw = await summarize(flushPrompt(db, scope, transcript));
-      report(applyFlush(db, scope, raw, numbered));
+      const indexes = existingScopes(db, scope.teamId);
+      const numbered = teamMemoryLines(indexes.get(null)?.content ?? '');
+      const raw = await summarize(flushPrompt(db, scope, transcript, indexes));
+      report(commit((target) => applyFlush(target, scope, raw, numbered)));
     },
   };
 }

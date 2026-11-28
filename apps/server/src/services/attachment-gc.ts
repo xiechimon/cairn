@@ -8,7 +8,6 @@ import { nowMs } from '../lib/ids.js';
 
 export const ATTACHMENT_PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 export const ATTACHMENT_ORPHAN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
-export const STEP_SESSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const TEAM_ATTACHMENTS_QUOTA_BYTES = 1024 * 1024 * 1024;
 export const ATTACHMENT_GC_INTERVAL_MS = 60 * 60 * 1000;
 const UPLOAD_PART_GRACE_MS = 30 * 60 * 1000;
@@ -213,17 +212,17 @@ export function sweepUploadParts(
 export function sweepStepSessions(
   deps: { db: Db; attachmentsDir: string; logger: GcLogger },
   now: number = nowMs(),
-): { orphan: number; expired: number; reclaimedBytes: number } {
+): { orphan: number; reclaimedBytes: number } {
   const dir = join(deps.attachmentsDir, 'step-sessions');
-  const stats = { orphan: 0, expired: 0, reclaimedBytes: 0 };
+  const stats = { orphan: 0, reclaimedBytes: 0 };
   if (!existsSync(dir)) return stats;
   const orphanCutoff = now - ATTACHMENT_ORPHAN_GRACE_MS;
-  const retentionCutoff = now - STEP_SESSION_RETENTION_MS;
   for (const name of readdirSync(dir)) {
     if (!name.endsWith('.jsonl')) continue;
     const stepId = name.slice(0, -'.jsonl'.length);
     const live =
       deps.db.select({ id: step.id }).from(step).where(eq(step.id, stepId)).get() !== undefined;
+    if (live) continue;
     const abs = join(dir, name);
     let size = 0;
     let mtimeMs = now;
@@ -234,21 +233,20 @@ export function sweepStepSessions(
     } catch {
       continue;
     }
-    if (mtimeMs > (live ? retentionCutoff : orphanCutoff)) continue;
+    if (mtimeMs > orphanCutoff) continue;
     try {
       unlinkSync(abs);
     } catch (err) {
       deps.logger.info({ stepId, err: String(err) }, 'session gc unlink failed');
       continue;
     }
-    if (live) stats.expired += 1;
-    else stats.orphan += 1;
+    stats.orphan += 1;
     stats.reclaimedBytes += size;
   }
-  if (stats.orphan > 0 || stats.expired > 0) {
+  if (stats.orphan > 0) {
     deps.logger.info(
-      { orphan: stats.orphan, expired: stats.expired, reclaimedBytes: stats.reclaimedBytes },
-      `session gc: ${stats.orphan} orphan, ${stats.expired} expired, ${stats.reclaimedBytes} bytes reclaimed`,
+      { orphan: stats.orphan, reclaimedBytes: stats.reclaimedBytes },
+      `session gc: ${stats.orphan} orphan, ${stats.reclaimedBytes} bytes reclaimed`,
     );
   }
   return stats;

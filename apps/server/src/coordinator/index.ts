@@ -58,6 +58,7 @@ import {
   coordinatorProviders,
   scrubProviderError,
 } from './credentials.js';
+import { createIdleMemorySweep } from './idle-memory.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
@@ -96,6 +97,9 @@ export interface CoordinatorOptions {
   heartbeatMs?: number;
   tickMs?: number;
   idleCloseMs?: number;
+  idleMemoryFlushMs?: number;
+  idleMemoryRetryMs?: number;
+  idleMemoryTimeoutMs?: number;
   stopPollMs?: number;
   owner?: string;
 }
@@ -717,6 +721,17 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     ];
   };
 
+  const idleMemory = createIdleMemorySweep(
+    { db: machine.db, box: machine.box },
+    {
+      idleMs: options.idleMemoryFlushMs,
+      retryMs: options.idleMemoryRetryMs,
+      timeoutMs: options.idleMemoryTimeoutMs,
+      fixedProviders: options.fixedProviders,
+      logger,
+    },
+  );
+
   const tick = (): void => {
     if (closing) return;
     for (const [threadId, lease] of leases) {
@@ -729,6 +744,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       }
     }
     for (const threadId of liveThreads()) wake(threadId);
+    idleMemory.sweep();
     void runtime
       .closeIdle(options.idleCloseMs ?? IDLE_CLOSE_MS)
       .then((closed) => {
@@ -751,11 +767,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     idle: async () => {
       await Promise.resolve();
       while (draining.size > 0) await Promise.allSettled([...draining.values()]);
+      await idleMemory.drain();
     },
     close: async (): Promise<void> => {
       closing = true;
       clearInterval(timer);
       try {
+        await idleMemory.close();
         await runtime.close();
         while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       } finally {

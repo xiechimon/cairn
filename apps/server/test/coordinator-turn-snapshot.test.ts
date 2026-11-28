@@ -6,7 +6,6 @@ import { expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { type Db, MIGRATIONS_FOLDER, openMemoryDb } from '../src/db/client.js';
 import { team } from '../src/db/schema.js';
-import { sweepCoordinatorTurnSnapshots } from '../src/services/coordinator-turn-snapshot.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer } from './helpers.js';
 import { migrateAll, migrateUpTo } from './migrate-helpers.js';
@@ -28,8 +27,8 @@ function put(db: Db, id: string, capturedAt = 1, teamId = 'a', payload = '{}') {
   db.run(sql`INSERT INTO coordinator_turn_snapshot
     (turnId, teamId, sourceTraceId, schemaVersion, outcome, capturedAt, expiresAt,
      status, reason, redactionCount, payloadBytes, digest, payload)
-    VALUES (${id}, ${teamId}, ${id.padEnd(32, '0')}, 1, 'success', ${capturedAt},
-      ${capturedAt + 30 * DAY}, 'sealed', NULL, 0, ${Buffer.byteLength(payload)},
+    VALUES (${id}, ${teamId}, ${id.padEnd(32, '0')}, 1, 'success', ${capturedAt}, ${capturedAt + 30 * DAY},
+      'sealed', NULL, 0, ${Buffer.byteLength(payload)},
       ${'a'.repeat(64)}, ${payload})`);
 }
 
@@ -39,23 +38,40 @@ function ids(db: Db) {
     .map((row) => row.turnId);
 }
 
-test('snapshot upgrade follows main journal without requiring project/todo/build timestamps', () => {
+test('snapshot upgrade keeps payloads readable by both releases and removes the old GC event', () => {
   const directory = makeTestTempDir('snapshot-upgrade-');
   const sqlite = new Database(join(directory, 'db.sqlite'));
   try {
     migrateUpTo(sqlite, directory, '0144_github_label_isolation');
     sqlite.exec("INSERT INTO team (id, name, createdAt) VALUES ('a', 'A', 0)");
     sqlite.exec("INSERT INTO project (id, teamId, name) VALUES ('p', 'a', 'Before')");
-    migrateAll(sqlite);
+    migrateUpTo(sqlite, directory, '0145_coordinator_turn_snapshot');
     sqlite.exec(`INSERT INTO coordinator_turn_snapshot
       (turnId, teamId, sourceTraceId, schemaVersion, outcome, capturedAt, expiresAt,
        status, reason, redactionCount, payloadBytes, digest, payload)
       VALUES ('s', 'a', '${'1'.repeat(32)}', 1, 'success', 1, ${1 + 30 * DAY},
         'sealed', NULL, 0, 17, '${'a'.repeat(64)}', '{"name":"Before"}')`);
+    sqlite.exec(`INSERT INTO due_event (id, kind, dueAt, intervalMs, attempts, lastError)
+      VALUES ('gc:coordinator-snapshots', 'coordinator-snapshot-gc', 0, ${DAY}, 0, NULL)`);
+    migrateAll(sqlite);
     sqlite.exec("UPDATE project SET name = 'After' WHERE id = 'p'; DELETE FROM project");
-    expect(sqlite.prepare('SELECT payload FROM coordinator_turn_snapshot').get()).toEqual({
+    expect(
+      sqlite.prepare('SELECT payload, expiresAt FROM coordinator_turn_snapshot').get(),
+    ).toEqual({
       payload: '{"name":"Before"}',
+      expiresAt: 1 + 30 * DAY,
     });
+    expect(
+      sqlite
+        .prepare(`EXPLAIN QUERY PLAN SELECT id FROM chief_message
+        INDEXED BY chief_message_thread_insert_idx WHERE threadId = 't' AND rowid > 100 LIMIT 1`)
+        .all(),
+    ).toEqual([
+      expect.objectContaining({ detail: expect.stringContaining('threadId=? AND rowid>?') }),
+    ]);
+    expect(
+      sqlite.prepare("SELECT id FROM due_event WHERE id = 'gc:coordinator-snapshots'").get(),
+    ).toBeUndefined();
     const { entries } = JSON.parse(
       readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
     );
@@ -155,41 +171,57 @@ test('team deletion cascades snapshots without deleting another team history', (
   expect(ids(db)).toEqual(['b-turn']);
 });
 
-test('expiry cleanup includes its deadline and deletes at most 1000 rows per sweep', () => {
-  const db = world();
-  db.transaction(() => {
-    for (let i = 0; i < 1001; i++) put(db, `expired-${String(i).padStart(4, '0')}`);
-    put(db, 'fresh', 2);
-  });
-  expect(sweepCoordinatorTurnSnapshots(db, 1 + 30 * DAY)).toBe(1000);
-  expect(ids(db)).toEqual(['expired-1000', 'fresh']);
-  expect(sweepCoordinatorTurnSnapshots(db, 1 + 30 * DAY)).toBe(1);
-  expect(ids(db)).toEqual(['fresh']);
-});
-
-test('team cap evicts oldest sealed rows first with deterministic ties and team isolation', () => {
-  const db = world();
+test('snapshots survive a scheduler run at 256 MiB and 30 days', async () => {
+  const server = bootServer();
   const payload = JSON.stringify('x'.repeat(2 * 1024 * 1024 - 2));
-  db.transaction(() => {
-    for (let i = 0; i < 129; i++) put(db, `cap-${String(i).padStart(3, '0')}`, 10, 'a', payload);
-    put(db, 'b-turn', 10, 'b', payload);
+  const now = 3650 * DAY;
+  server.db.transaction(() => {
+    for (let i = 0; i < 129; i++)
+      put(server.db, `cap-${String(i).padStart(3, '0')}`, now - DAY, server.team.id, payload);
+    put(server.db, 'ancient', 1, server.team.id);
   });
-  expect(sweepCoordinatorTurnSnapshots(db, 10)).toBe(1);
-  expect(ids(db)).not.toContain('cap-000');
-  expect(ids(db)).toContain('cap-001');
-  expect(ids(db)).toContain('b-turn');
-  expect(
-    db.get(
-      sql`SELECT sum(payloadBytes) AS bytes FROM coordinator_turn_snapshot WHERE teamId = 'a'`,
-    ),
-  ).toEqual({ bytes: 256 * 1024 * 1024 });
-  expect(sweepCoordinatorTurnSnapshots(db, 10)).toBe(0);
+  let callback: (() => void | Promise<void>) | undefined;
+  const scheduler = createScheduler(server.svc, {
+    tickMs: DAY,
+    clock: {
+      now: () => now,
+      setTimer: (cb) => {
+        callback = cb;
+        return cb;
+      },
+      clearTimer: () => {},
+    },
+  });
+  try {
+    scheduler.start();
+    expect(
+      server.db.get(sql`SELECT id FROM due_event WHERE kind = 'coordinator-snapshot-gc'`),
+    ).toBeUndefined();
+    expect(callback).toBeDefined();
+    await callback?.();
+    expect(ids(server.db)).toHaveLength(130);
+    expect(ids(server.db)).toContain('ancient');
+    expect(ids(server.db)).toContain('cap-000');
+    expect(
+      server.db.get(
+        sql`SELECT sum(payloadBytes) AS bytes FROM coordinator_turn_snapshot WHERE teamId = ${server.team.id} AND turnId LIKE 'cap-%'`,
+      ),
+    ).toEqual({ bytes: 129 * Buffer.byteLength(payload) });
+    scheduler.stop();
+    scheduler.start();
+    expect(
+      server.db.get(sql`SELECT id FROM due_event WHERE kind = 'coordinator-snapshot-gc'`),
+    ).toBeUndefined();
+    expect(ids(server.db)).toHaveLength(130);
+  } finally {
+    scheduler.stop();
+  }
 });
 
-test('scheduler registers persistent daily cleanup, executes it and retains its deadline on restart', async () => {
+test('scheduler never registers snapshot cleanup and old snapshots survive every due callback', async () => {
   const server = bootServer();
   let callback: (() => void | Promise<void>) | undefined;
-  const now = 31 * DAY;
+  const now = 3650 * DAY;
   const scheduler = createScheduler(server.svc, {
     tickMs: DAY,
     clock: {
@@ -205,15 +237,18 @@ test('scheduler registers persistent daily cleanup, executes it and retains its 
   try {
     scheduler.start();
     expect(
-      server.db.get(sql`SELECT intervalMs FROM due_event WHERE kind = 'coordinator-snapshot-gc'`),
-    ).toEqual({ intervalMs: DAY });
+      server.db.get(sql`SELECT id FROM due_event WHERE kind = 'coordinator-snapshot-gc'`),
+    ).toBeUndefined();
     await callback?.();
-    expect(ids(server.db)).toEqual([]);
+    expect(ids(server.db)).toEqual(['old']);
     scheduler.stop();
+    server.db.run(sql`INSERT INTO due_event (id, kind, dueAt, intervalMs)
+      VALUES ('gc:coordinator-snapshots', 'coordinator-snapshot-gc', ${now}, ${DAY})`);
     scheduler.start();
     expect(
-      server.db.get(sql`SELECT dueAt FROM due_event WHERE kind = 'coordinator-snapshot-gc'`),
-    ).toEqual({ dueAt: now + DAY });
+      server.db.get(sql`SELECT id FROM due_event WHERE kind = 'coordinator-snapshot-gc'`),
+    ).toBeUndefined();
+    expect(ids(server.db)).toEqual(['old']);
   } finally {
     scheduler.stop();
   }

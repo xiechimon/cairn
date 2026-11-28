@@ -20,13 +20,13 @@ When a task finishes a step, the Runner uploads that step's session record (the 
 
 Before uploading, the Runner replaces strings that look like secrets (GitHub and `sk-` style keys, bearer tokens, `token=` values) with `[REDACTED]`. If it cannot redact a record, it skips uploading it. Source code and file contents printed by the agent are uploaded as they appear, so treat the server's disk as holding anything an agent read.
 
-The server deletes a session record 30 days after its last write, and deletes the record of a removed step after a 7-day grace period.
+The server keeps a session record for as long as its step exists; it deletes the record of a removed step after a 7-day grace period.
 
 ## What leaves your machines when configured
 
 Data is sent to external services only when you connect an integration, enable an optional service, or trigger an explicit action:
 
-- **Model providers & subscriptions (`Settings → Model`)**: Prompts, conversation context, tool results, and relevant code snippets are sent to the model providers, subscription backends, or custom endpoints you connect (such as Anthropic, OpenAI / ChatGPT subscription, Google, xAI, GitHub Copilot, Devin, Antigravity, or a custom OpenAI/Anthropic-compatible endpoint). Each provider processes requests under its own terms and privacy policy.
+- **Model providers & subscriptions (`Settings → Model`)**: Prompts, conversation context, tool results, and relevant code snippets are sent to the model providers, subscription backends, or custom endpoints you connect (such as Anthropic, OpenAI / ChatGPT subscription, Google, xAI, GitHub Copilot, Devin, Antigravity, or a custom OpenAI/Anthropic-compatible endpoint). Each provider processes requests under its own terms and privacy policy. To extract durable memories after a conversation has been idle, Cairn sends a bounded excerpt of the new messages, existing memory, and project names to the configured summary provider; it sends nothing for this purpose without a usable summary provider.
 - **GitHub**: When you connect GitHub or work on a GitHub repository, Cairn communicates with GitHub's API and Git endpoints for repository metadata, branches, pull requests, issues, checks, reviews, and OAuth or GitHub App authentication.
 - **MCP servers, Composio, and mail (`Settings → Apps`)**:
   - External MCP servers you add receive the tool calls and arguments sent to those servers.
