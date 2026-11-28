@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { copyFileSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 export const TRAY_HELPER_MIN_MACOS = '12.0';
 export const TRAY_HELPER_ARCHES = { arm64: 'arm64', x64: 'x86_64' };
@@ -24,7 +25,7 @@ export function trayHelperSources(extra = 'app') {
   return [...files('core'), ...files(extra)];
 }
 
-export function compileTrayHelper(
+export async function compileTrayHelper(
   output,
   { arch = process.arch, extra = 'app', optimize = true } = {},
 ) {
@@ -32,7 +33,7 @@ export function compileTrayHelper(
   if (triple === undefined) throw new Error(`no tray helper target for ${arch}`);
   mkdirSync(dirname(output), { recursive: true });
   const partial = `${output}.${process.pid}`;
-  execFileSync(
+  await promisify(execFile)(
     'xcrun',
     [
       'swiftc',
@@ -45,20 +46,22 @@ export function compileTrayHelper(
       '-o',
       partial,
     ],
-    { stdio: 'inherit', timeout: 300_000 },
+    { timeout: 300_000, maxBuffer: 64 * 1024 * 1024 },
   );
   renameSync(partial, output);
   return output;
 }
 
-export function buildTrayHelpers(root = join(desktopDir, 'tray-helper')) {
+export async function buildTrayHelpers(root = join(desktopDir, 'tray-helper')) {
   rmSync(root, { recursive: true, force: true });
-  for (const arch of Object.keys(TRAY_HELPER_ARCHES)) {
-    const dir = join(root, arch);
-    compileTrayHelper(join(dir, 'CairnTray'), { arch });
-    for (const icon of TRAY_HELPER_ICONS) {
-      copyFileSync(join(desktopDir, 'assets', icon), join(dir, icon));
-    }
-  }
+  await Promise.all(
+    Object.keys(TRAY_HELPER_ARCHES).map(async (arch) => {
+      const dir = join(root, arch);
+      await compileTrayHelper(join(dir, 'CairnTray'), { arch });
+      for (const icon of TRAY_HELPER_ICONS) {
+        copyFileSync(join(desktopDir, 'assets', icon), join(dir, icon));
+      }
+    }),
+  );
   return root;
 }

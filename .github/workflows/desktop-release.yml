@@ -205,8 +205,12 @@ jobs:
           ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
         working-directory: apps/desktop
         run: |
+          mkdir -p release
+          tar --numeric-owner --owner=0 --group=0 -C runner -czf "release/cairn-runner-$VERSION-darwin-$ARCH.tar.gz" . &
+          runner_archive=$!
           node build.mjs
           pnpm exec electron-builder --mac dmg zip "--$ARCH" -c.extraMetadata.version="$VERSION"
+          wait "$runner_archive"
 
       - name: Check that the update zip holds an app signed by the release certificate
         working-directory: apps/desktop
@@ -225,12 +229,6 @@ jobs:
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" \
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/server"
 
-      - name: Package the standalone Runner archive
-        working-directory: apps/desktop
-        run: |
-          mkdir -p release
-          tar --numeric-owner --owner=0 --group=0 -C runner -czf "release/cairn-runner-$VERSION-darwin-$ARCH.tar.gz" .
-
       - name: Keep the arm64 zip for verification and publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -239,6 +237,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: true
+          compression-level: 0
 
       - name: Keep the arm64 runner archive for publish
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -248,6 +247,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: true
+          compression-level: 0
 
       - name: Keep the arm64 dmg for the publish job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -257,6 +257,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: true
+          compression-level: 0
 
       - name: Remove the signing keychain
         if: always()
@@ -337,8 +338,12 @@ jobs:
           ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
         working-directory: apps/desktop
         run: |
+          mkdir -p release
+          tar --numeric-owner --owner=0 --group=0 -C runner -czf "release/cairn-runner-$VERSION-darwin-$ARCH.tar.gz" . &
+          runner_archive=$!
           node build.mjs
           pnpm exec electron-builder --mac dmg zip "--$ARCH" -c.extraMetadata.version="$VERSION"
+          wait "$runner_archive"
 
       - name: Check that the update zip holds an app signed by the release certificate
         working-directory: apps/desktop
@@ -357,12 +362,6 @@ jobs:
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" \
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/server"
 
-      - name: Package the standalone Runner archive
-        working-directory: apps/desktop
-        run: |
-          mkdir -p release
-          tar --numeric-owner --owner=0 --group=0 -C runner -czf "release/cairn-runner-$VERSION-darwin-$ARCH.tar.gz" .
-
       - name: Keep the packaged x64 files for the publish job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -374,6 +373,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: true
+          compression-level: 0
 
       - name: Remove the signing keychain
         if: always()

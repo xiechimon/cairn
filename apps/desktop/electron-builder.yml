@@ -55,6 +55,8 @@ mac:
       arch: [arm64, x64]
     - target: zip
       arch: [arm64, x64]
+dmg:
+  writeUpdateInfo: false
 win:
   artifactName: ${productName}-${version}-win-${arch}.${ext}
   icon: ../../assets/AppIcon-1024.png

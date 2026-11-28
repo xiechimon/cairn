@@ -14,12 +14,15 @@ const mac = process.platform === 'darwin';
 
 test('the native menu built from a page snapshot reads, focuses and updates right', {
   skip: !mac,
-}, () => {
+}, async () => {
   const fixtureMessage = JSON.parse(readFileSync(fixture, 'utf8'));
   nativeTrayMenuSchema.parse(fixtureMessage.menu);
   const dir = mkdtempSync(join(tmpdir(), 'cairn-tray-test-'));
   try {
-    const binary = compileTrayHelper(join(dir, 'tray-test'), { extra: 'test', optimize: false });
+    const binary = await compileTrayHelper(join(dir, 'tray-test'), {
+      extra: 'test',
+      optimize: false,
+    });
     const run = spawnSync(binary, [fixture], { encoding: 'utf8', timeout: 60_000 });
     assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
     assert.match(run.stdout, /^PASS: \d+ assertions, 0 failures/m);
@@ -40,14 +43,17 @@ test('the native menu built from a page snapshot reads, focuses and updates righ
   }
 });
 
-test('the helper builds for both Mac architectures', { skip: !mac }, () => {
+test('the helper builds for both Mac architectures', { skip: !mac }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'cairn-tray-arch-'));
   try {
     for (const [arch, expected] of [
       ['arm64', 'arm64'],
       ['x64', 'x86_64'],
     ]) {
-      const binary = compileTrayHelper(join(dir, arch, 'CairnTray'), { arch, optimize: false });
+      const binary = await compileTrayHelper(join(dir, arch, 'CairnTray'), {
+        arch,
+        optimize: false,
+      });
       assert.match(
         execFileSync('lipo', ['-archs', binary], { encoding: 'utf8' }).trim(),
         new RegExp(`^${expected}$`),

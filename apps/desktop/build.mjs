@@ -27,4 +27,4 @@ await build({
   format: 'cjs',
 });
 
-if (process.platform === 'darwin') buildTrayHelpers();
+if (process.platform === 'darwin') await buildTrayHelpers();
