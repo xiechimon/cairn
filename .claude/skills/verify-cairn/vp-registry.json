@@ -21,6 +21,10 @@
       "kind": "seed",
       "purpose": "Creates the todo/build plus a dirty git origin/target in /tmp with the step checkpoint at C2; prints ids and apiKey JSON"
     },
+    "writer-generation.mjs": {
+      "kind": "infra",
+      "purpose": "Registers the step writer generation scalar on a probe's own SQLite handle when the migrated file carries the write fence, so seeds can still write step rows."
+    },
     "setup-review-700-seed.mjs": {
       "kind": "seed",
       "purpose": "Seeds a provider pointing at stub-review-700, an agent, a project, and two todos driven to confirm phase for the verdict extraction scenarios A and B; prints the IDs and token as JSON."
