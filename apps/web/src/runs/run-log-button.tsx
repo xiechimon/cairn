@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -28,7 +28,9 @@ export function RunLogButton({
   const navigate = useNavigate();
   const linkTo = useRunLinkTo();
   const hintSeen = useRunTraceHintSeen();
+  const markRef = useRef<HTMLButtonElement>(null);
   const open = () => {
+    markRef.current?.focus({ preventScroll: true });
     markRunTraceHintSeen();
     navigate(linkTo(null, { thread: threadId, scope: null, problems: null }));
   };
@@ -38,6 +40,7 @@ export function RunLogButton({
         <TooltipTrigger
           render={
             <Button
+              ref={markRef}
               variant="ghost"
               aria-label={t('Coordinator 运行记录')}
               aria-description={state}

@@ -43,6 +43,7 @@ test('a failed turn links to its run log, which leads with the failure and folds
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/\/app\?scenario=run-trace$/);
   await expect(page.getByTestId('run-page')).toHaveCount(0);
+  await expect(markButton(page)).not.toBeFocused();
 });
 
 test('the stopped turn row links to its run log', async ({ page }) => {
@@ -69,9 +70,26 @@ test('the hint shows once, opens the run window, and stays gone after a reload',
   await expect(hint).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('run-list')).toHaveCount(0);
+  await expect(markButton(page)).toBeFocused();
   await page.reload();
   await expect(page.getByTestId('chief-turn-error')).toBeVisible();
   await expect(hint).toHaveCount(0);
+});
+
+test('keyboard opening the hint and spiral restores focus on close', async ({ page }) => {
+  await page.goto(SCENARIO);
+  const hintButton = page.getByTestId('run-trace-hint').getByRole('button', {
+    name: '点这里看每一轮做了什么',
+  });
+  await hintButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('run-list')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(markButton(page)).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('run-list')).toBeVisible();
+  await page.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(markButton(page)).toBeFocused();
 });
 
 test('closing the hint with × also retires it', async ({ page }) => {
@@ -177,6 +195,7 @@ test('export saves the run as a JSON file', async ({ page }) => {
   expect(file.suggestedFilename()).toBe('cairn-run-turn-b.json');
   await page.keyboard.press('Escape');
   await expect(page).toHaveURL(/\/app\?scenario=run-trace$/);
+  await expect(markButton(page)).not.toBeFocused();
 });
 
 test('a missing run says so in one sentence', async ({ page }) => {
