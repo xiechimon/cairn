@@ -28,6 +28,8 @@ const PAUSED_MARKER = 'The user paused Browser MCP';
 const MUTATING_COMMAND = /^(goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/;
 const SUCCESSFUL_MUTATING_LINE =
   /^✓ (?:goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/m;
+const SAFE_UNRUN_MUTATION_LINE =
+  /^✗ step \d+: .*?(?:Nothing matches|isn['’]t visible|is not visible|is disabled|is covered by|isn['’]t a checkbox|Nothing is focused|isn['’]t editable|is not editable|No option of .* matches|can't take clicks)/im;
 
 const PAGE_TEXT_TRUNCATED =
   '\n[page text truncated here; the rest of the page is not shown. Call browser_snapshot with selector (a CSS selector or an @ref) to read one section in full]';
@@ -175,14 +177,21 @@ async function runCommands(
       `${answer.text}. Ask the owner to click Resume in the Browser MCP extension's popup; nothing was opened in another browser.`,
     );
   if (kind === 'failed') {
-    const uncertainMutation =
-      commands.some((command) => MUTATING_COMMAND.test(command)) &&
-      /^✗ step \d+: .*?(?:timed out|abandoned|didn.t (?:check|uncheck) it).*$/im.test(
-        machineAnswerText(answer.text),
-      );
+    const machineText = machineAnswerText(answer.text);
+    const failedStep = /^✗ step (\d+):/m.exec(machineText)?.[1];
+    const failedCommand = failedStep === undefined ? undefined : commands[Number(failedStep) - 1];
+    const hasMutation = commands.some((command) => MUTATING_COMMAND.test(command));
+    const mutationRan = SUCCESSFUL_MUTATING_LINE.test(machineText);
+    const delivery =
+      !hasMutation ||
+      (!mutationRan &&
+        ((failedCommand !== undefined && !MUTATING_COMMAND.test(failedCommand)) ||
+          (failedCommand !== undefined && SAFE_UNRUN_MUTATION_LINE.test(machineText))))
+        ? 'not_delivered'
+        : 'unknown';
     throw new ComputerRefusal(
       answer.text === '' ? 'Browser MCP refused this step' : answer.text,
-      uncertainMutation ? 'unknown' : 'not_delivered',
+      delivery,
     );
   }
   return answer.text;

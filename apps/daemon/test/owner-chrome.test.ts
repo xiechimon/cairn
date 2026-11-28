@@ -452,6 +452,27 @@ describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
     expect((outcome as ComputerRefusal).delivery).toBe('not_delivered');
   });
 
+  test('an unrecognized failure in a mutating command is unsafe to repeat', async () => {
+    const { call } = recording((commands) =>
+      commands[0] === 'click e7'
+        ? {
+            text: '✗ step 1: click e7 — TypeError: target detached while clicking',
+            isError: true,
+          }
+        : '✓',
+    );
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'click', ref: '@e7' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('unknown');
+  });
+
   test('a successful read-only line in a failed batch does not make it unsafe to repeat', async () => {
     const { call } = recording((commands) => {
       const command = commands[0] ?? '';
