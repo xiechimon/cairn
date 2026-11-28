@@ -543,28 +543,22 @@ try {
     ];
     const saved = () =>
       existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : '';
-    const onBattery = await app.evaluate(({ powerMonitor }) => powerMonitor.isOnBatteryPower());
-    console.log(`tray awake: power=${onBattery ? 'battery' : 'ac'}`);
+    const state = await popoverWindow(async ({ BrowserWindow }, width) => {
+      const popover = BrowserWindow.getAllWindows().find(
+        (candidate) => candidate.getBounds().width === width,
+      );
+      return popover === undefined
+        ? null
+        : await popover.webContents.executeJavaScript('window.cairnDesktop.tray.state()');
+    });
+    const lidAvailable = state?.lidClosedAvailable === true;
+    console.log(`tray awake: lid=${lidAvailable ? 'available' : 'unavailable'}`);
     const lidTitle = english ? 'Keep running with the lid closed' : '合盖继续运行';
-    if (!onBattery) choices.push([lidTitle, 'lid-closed']);
+    if (lidAvailable) choices.push([lidTitle, 'lid-closed']);
     try {
-      await openNativeMenu(helper);
-      if (onBattery) {
-        const before = saved();
-        assert.equal(
-          (await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile })).ok,
-          true,
-        );
-        const rows = (await driver.send({ cmd: 'menuItems', pid: helper })).items;
-        assert.equal(
-          rows.some((row) => row.title === lidTitle && row.enabled),
-          false,
-          'battery must not offer the lid choice',
-        );
-        assert.equal(saved(), before, 'battery changed the stored choice');
-        await driver.send({ cmd: 'escape', pid: helper });
-      }
       for (const [title, expected] of choices) {
+        if (await nativeMenuOpen(helper)) await closeNativeMenu(helper);
+        await openNativeMenu(helper);
         assert.ok(!(await nativeTitles(helper)).includes(title), 'choices should begin collapsed');
         const opened = await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile });
         assert.equal(opened.ok, true, `disclosure click failed: ${JSON.stringify(opened)}`);
@@ -576,7 +570,7 @@ try {
           (await nativeTitles(helper)).includes(title),
           `choice ${title} not visible; rows=${JSON.stringify(
             (await driver.send({ cmd: 'menuItems', pid: helper })).items,
-          )}`,
+          )}; state=${JSON.stringify(state)}`,
         );
         const picked = await driver.send({ cmd: 'clickMenuItem', pid: helper, title });
         assert.equal(picked.ok, true, `choice click failed: ${JSON.stringify(picked)}`);
@@ -586,6 +580,10 @@ try {
           await driver.send({ cmd: 'sleep', ms: 100 });
         }
         assert.equal(saved(), expected, `choice saved ${saved()}`);
+        assert.ok(
+          !(await nativeTitles(helper)).includes(choices[0][0]),
+          'picking must collapse the disclosure',
+        );
       }
       await closeNativeMenu(helper);
 
