@@ -111,8 +111,11 @@ function createFixtureSnapshotRepo(baseDir: string, taskId = 'sample-fix'): Fixt
   const fixCommit = gitIn(repoRoot, ['rev-parse', 'HEAD']);
 
   const nmScopeDir = join(repoRoot, 'node_modules', '@fixture');
+  const nmExtDir = join(repoRoot, 'node_modules', 'ext-lib');
   mkdirSync(nmScopeDir, { recursive: true });
+  mkdirSync(nmExtDir, { recursive: true });
   symlinkSync(pkgDir, join(nmScopeDir, 'pkg-a'));
+  writeFileSync(join(nmExtDir, 'index.js'), 'export const VERSION = 1;\n');
 
   const task: LaneTask = {
     kind: 'lane',
@@ -286,6 +289,41 @@ describe('eval lane harness', () => {
     expect(scores.find((s) => s.name === 'lane.completed')?.value).toBe(1);
     expect(scores.find((s) => s.name === 'lane.tests_pass')?.value).toBe(0);
     expect(nopRecord.diagnostics).toContain('exit=1');
+  });
+
+  it('isolates host node_modules from work mutations and scores against clean vitest/tsconfig configs', async () => {
+    const dir = makeTestTempDir('eval-isolate-');
+    const fixture = createFixtureSnapshotRepo(dir, 'isolate-check');
+    const cfgTask: LaneTask = {
+      ...fixture.task,
+      checks: {
+        files: [],
+        commands: [
+          "node -e \"const fs = require('node:fs'); if (fs.existsSync('vitest.config.ts')) process.exit(0);\" && node --test tests/nested/regression.test.mjs existing.test.mjs",
+        ],
+      },
+    };
+    const bin = writeStubDevin(
+      dir,
+      `
+      const fs = require('node:fs');
+      fs.writeFileSync('node_modules/ext-lib/index.js', 'export const VERSION = 999;\\n');
+      fs.writeFileSync('vitest.config.ts', 'export default {};\\n');
+      fs.writeFileSync('package.json', JSON.stringify({ name: 'tampered', scripts: { test: 'true' } }));
+      `,
+    );
+    setEnv({
+      EVAL_DEVIN_BIN: bin,
+      PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
+    });
+    const record = await runLaneTask(cfgTask, fixture.examDir, { repoRoot: fixture.repoRoot });
+    expect(record.incomplete).toBeUndefined();
+    expect(
+      readFileSync(join(fixture.repoRoot, 'node_modules', 'ext-lib', 'index.js'), 'utf8'),
+    ).toBe('export const VERSION = 1;\n');
+    const scores = scoreLane(cfgTask, record);
+    expect(scores.find((s) => s.name === 'lane.completed')?.value).toBe(1);
+    expect(scores.find((s) => s.name === 'lane.tests_pass')?.value).toBe(0);
   });
 
   it('detects dependency drift as incomplete and reports missing git commits or missing blobs before Devin', async () => {

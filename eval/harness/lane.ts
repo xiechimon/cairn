@@ -5,7 +5,9 @@ import { join, resolve } from 'node:path';
 import { laneEnv, resolveDevinBin, scrubDiagnostics } from './devin-env.mjs';
 import {
   commitExists,
+  copyAllowedChangesToScorer,
   initBaselineRepo,
+  isolateDependencyDirs,
   linkDependencyDirs,
   materializeCommitTree,
   overlayCommitFiles,
@@ -17,6 +19,20 @@ const MAX_BUFFER_BYTES = 16 * 1024 * 1024;
 const COMMAND_TIMEOUT_MS = 60_000;
 const DEPENDENCY_DRIFT_RE =
   /ERR_MODULE_NOT_FOUND|Cannot find package|NODE_MODULE_VERSION|Cannot find module ['"]@/;
+
+export function isScorerProtectedPath(relPath: string): boolean {
+  return (
+    /(?:^|\/)package\.json$/.test(relPath) ||
+    relPath === 'pnpm-lock.yaml' ||
+    relPath === 'pnpm-workspace.yaml' ||
+    /(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(relPath) ||
+    /(?:^|\/)(?:vitest|vite|playwright)\.config\.[^/]+$/.test(relPath) ||
+    relPath === 'biome.json' ||
+    /^scripts\/(?:test-|vitest)/.test(relPath) ||
+    relPath.startsWith('eval/') ||
+    /(?:^|\/)tests?\/.*setup[^/]*\.(?:[cm]?[jt]sx?)$/.test(relPath)
+  );
+}
 
 function isIgnoredArtifact(relPath: string): boolean {
   return (
@@ -98,13 +114,14 @@ export async function runLaneTask(
   sweepStaleTempDirs();
   const startedAt = Date.now();
   const work = mkdtempSync(join(tmpdir(), `eval-lane-${task.id}-`));
+  const scorerWork = mkdtempSync(join(tmpdir(), `eval-lane-scorer-${task.id}-`));
   const scorerTmp = mkdtempSync(join(tmpdir(), `eval-lane-tmp-${task.id}-`));
   try {
     let baseline: string;
     try {
       materializeCommitTree(repoRoot, task.source.parentCommit, work);
       baseline = initBaselineRepo(work);
-      linkDependencyDirs(repoRoot, work);
+      isolateDependencyDirs(repoRoot, work);
     } catch (error) {
       return {
         caseId: task.id,
@@ -203,10 +220,11 @@ export async function runLaneTask(
           : '';
 
     try {
-      const hiddenTestSet = new Set(task.source.testFiles);
-      const restoreFiles = task.source.existingTestFiles.filter((p) => !hiddenTestSet.has(p));
-      overlayCommitFiles(repoRoot, task.source.parentCommit, restoreFiles, work);
-      overlayCommitFiles(repoRoot, task.source.fixCommit, task.source.testFiles, work);
+      const hiddenTestSet = new Set([...task.source.testFiles, ...task.source.existingTestFiles]);
+      materializeCommitTree(repoRoot, task.source.parentCommit, scorerWork);
+      linkDependencyDirs(repoRoot, scorerWork);
+      copyAllowedChangesToScorer(work, scorerWork, changed, hiddenTestSet, isScorerProtectedPath);
+      overlayCommitFiles(repoRoot, task.source.fixCommit, task.source.testFiles, scorerWork);
     } catch (error) {
       return {
         caseId: task.id,
@@ -220,7 +238,7 @@ export async function runLaneTask(
     }
 
     const files = task.checks.files.map((check) => {
-      const path = join(work, check.path);
+      const path = join(scorerWork, check.path);
       const ok =
         existsSync(path) &&
         (check.contains === undefined || readFileSync(path, 'utf8').includes(check.contains));
@@ -232,7 +250,7 @@ export async function runLaneTask(
     const commands = [];
     for (const command of task.checks.commands) {
       const res = spawnSync('bash', ['-c', command], {
-        cwd: work,
+        cwd: scorerWork,
         encoding: 'utf8',
         timeout: COMMAND_TIMEOUT_MS,
         maxBuffer: MAX_BUFFER_BYTES,
@@ -291,7 +309,9 @@ export async function runLaneTask(
     };
   } finally {
     rmSync(`${resolve(work)}.archive.tar`, { force: true });
+    rmSync(`${resolve(scorerWork)}.archive.tar`, { force: true });
     rmSync(work, { recursive: true, force: true });
+    rmSync(scorerWork, { recursive: true, force: true });
     rmSync(scorerTmp, { recursive: true, force: true });
   }
 }

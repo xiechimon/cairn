@@ -19,6 +19,7 @@ const DEFAULT_SCAN_LIMIT = 40;
 const VERIFY_TIMEOUT_MS = 90_000;
 const MAX_BUFFER_BYTES = 16 * 1024 * 1024;
 const SECURITY_SUBJECT_RE = /\b(?:cve|xss|csrf|ssrf|sqli|rce|exploit|auth-bypass|vuln)\b/i;
+const TEST_FAILURE_OUTPUT_RE = /(?:FAIL\b|AssertionError|✖|not ok\b|\bfailed\b)/i;
 
 export interface ScanCandidate {
   fixCommit: string;
@@ -38,22 +39,46 @@ export interface VerifyResult {
   reason?: string;
 }
 
+export interface VerifyOptions {
+  commandTimeoutMs?: number;
+}
+
+interface CommandResult {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  errorMessage: string | null;
+  output: string;
+  durationMs: number;
+}
+
 function runCommand(
   command: string,
   cwd: string,
   env: Record<string, string | undefined>,
-): { status: number; output: string; durationMs: number } {
+  timeoutMs: number,
+): CommandResult {
   const t0 = Date.now();
   const res = spawnSync('bash', ['-c', command], {
     cwd,
     encoding: 'utf8',
-    timeout: VERIFY_TIMEOUT_MS,
+    timeout: timeoutMs,
     maxBuffer: MAX_BUFFER_BYTES,
     env,
   });
   const durationMs = Date.now() - t0;
-  const output = [res.stderr, res.stdout, res.error?.message].filter(Boolean).join('\n');
-  return { status: res.error ? 1 : (res.status ?? 1), output, durationMs };
+  const errCode = (res.error as NodeJS.ErrnoException | undefined)?.code;
+  const timedOut = errCode === 'ETIMEDOUT';
+  const errorMessage = res.error ? res.error.message : null;
+  const output = [res.stderr, res.stdout, errorMessage].filter(Boolean).join('\n');
+  return {
+    status: res.status,
+    signal: res.signal,
+    timedOut,
+    errorMessage,
+    output,
+    durationMs,
+  };
 }
 
 function changedBetween(
@@ -153,7 +178,12 @@ function baselineCommandForFiles(task: LaneTask, files: string[]): string {
   return usesNodeTest ? `node --test ${quoted}` : `pnpm exec vitest run --maxWorkers=1 ${quoted}`;
 }
 
-export function verifyLaneTask(task: LaneTask, repoRoot: string): VerifyResult {
+export function verifyLaneTask(
+  task: LaneTask,
+  repoRoot: string,
+  options: VerifyOptions = {},
+): VerifyResult {
+  const commandTimeoutMs = options.commandTimeoutMs ?? VERIFY_TIMEOUT_MS;
   const { parentCommit, fixCommit, testFiles, existingTestFiles } = task.source;
   if (!commitExists(repoRoot, parentCommit)) {
     return {
@@ -194,7 +224,12 @@ export function verifyLaneTask(task: LaneTask, repoRoot: string): VerifyResult {
     prefix: string,
     prepare: (work: string) => void,
     commands: string[],
-  ): { ok: boolean; output: string; durationMs: number } => {
+  ): {
+    ok: boolean;
+    abortedReason: string | null;
+    output: string;
+    durationMs: number;
+  } => {
     const work = mkdtempSync(join(tmpdir(), prefix));
     const tmp = mkdtempSync(join(tmpdir(), `${prefix}-tmp-`));
     try {
@@ -204,13 +239,42 @@ export function verifyLaneTask(task: LaneTask, repoRoot: string): VerifyResult {
       const env = buildScorerEnv(process.env, tmp);
       let totalMs = 0;
       for (const cmd of commands) {
-        const res = runCommand(cmd, work, env);
+        const res = runCommand(cmd, work, env, commandTimeoutMs);
         totalMs += res.durationMs;
+        if (res.timedOut) {
+          return {
+            ok: false,
+            abortedReason: `command timed out after ${commandTimeoutMs}ms`,
+            output: res.output,
+            durationMs: totalMs,
+          };
+        }
+        if (res.signal !== null) {
+          return {
+            ok: false,
+            abortedReason: `command killed by signal ${res.signal}`,
+            output: res.output,
+            durationMs: totalMs,
+          };
+        }
+        if (res.errorMessage !== null) {
+          return {
+            ok: false,
+            abortedReason: `command error: ${res.errorMessage}`,
+            output: res.output,
+            durationMs: totalMs,
+          };
+        }
         if (res.status !== 0) {
-          return { ok: false, output: res.output, durationMs: totalMs };
+          return {
+            ok: false,
+            abortedReason: null,
+            output: res.output,
+            durationMs: totalMs,
+          };
         }
       }
-      return { ok: true, output: '', durationMs: totalMs };
+      return { ok: true, abortedReason: null, output: '', durationMs: totalMs };
     } finally {
       rmSync(`${resolve(work)}.archive.tar`, { force: true });
       rmSync(work, { recursive: true, force: true });
@@ -234,7 +298,7 @@ export function verifyLaneTask(task: LaneTask, repoRoot: string): VerifyResult {
           baselineMs,
           nopMs,
           oracleMs,
-          reason: `baseline failed on parentCommit: ${baseRes.output.trim().slice(-400)}`,
+          reason: `baseline failed on parentCommit${baseRes.abortedReason ? ` (${baseRes.abortedReason})` : ''}: ${baseRes.output.trim().slice(-400)}`,
         };
       }
     }
@@ -257,6 +321,16 @@ export function verifyLaneTask(task: LaneTask, repoRoot: string): VerifyResult {
         reason: 'nop unexpectedly passed on parentCommit with overlaid testFiles',
       };
     }
+    if (nopRes.abortedReason) {
+      return {
+        id: task.id,
+        ok: false,
+        baselineMs,
+        nopMs,
+        oracleMs,
+        reason: `nop ${nopRes.abortedReason}: ${nopRes.output.trim().slice(-400)}`,
+      };
+    }
     if (isDependencyDriftOutput(nopRes.output)) {
       return {
         id: task.id,
@@ -265,6 +339,16 @@ export function verifyLaneTask(task: LaneTask, repoRoot: string): VerifyResult {
         nopMs,
         oracleMs,
         reason: `nop hit dependency drift: ${nopRes.output.trim().slice(-400)}`,
+      };
+    }
+    if (!TEST_FAILURE_OUTPUT_RE.test(nopRes.output)) {
+      return {
+        id: task.id,
+        ok: false,
+        baselineMs,
+        nopMs,
+        oracleMs,
+        reason: `nop exited non-zero without test failure output: ${nopRes.output.trim().slice(-400)}`,
       };
     }
 

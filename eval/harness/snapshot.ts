@@ -1,9 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   readlinkSync,
   realpathSync,
   rmSync,
@@ -12,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 const GIT_MAX_BUFFER_BYTES = 32 * 1024 * 1024;
 const STALE_PREFIXES = ['eval-lane-', 'eval-lane-tmp-'];
@@ -140,6 +142,71 @@ function mirrorNodeModulesDir(
   }
 }
 
+const CACHE_DIR_NAMES = new Set(['.vitest-cache', '.vite', '.vite-temp']);
+
+function cloneOrCopyPath(src: string, dst: string): void {
+  const args =
+    process.platform === 'darwin' ? ['-cRP', src, dst] : ['-a', '--reflink=auto', src, dst];
+  const res = spawnSync('cp', args, { stdio: 'ignore' });
+  if (res.status === 0) return;
+  cpSync(src, dst, { recursive: true, verbatimSymlinks: true });
+}
+
+function isolateNodeModulesDir(
+  repoRoot: string,
+  srcDir: string,
+  dstDir: string,
+  destRoot: string,
+  depth = 0,
+): void {
+  mkdirSync(dstDir, { recursive: true });
+  for (const entry of readdirSync(srcDir)) {
+    if (depth === 0 && CACHE_DIR_NAMES.has(entry)) continue;
+    const srcEntry = join(srcDir, entry);
+    const dstEntry = join(dstDir, entry);
+    let alreadyExists = false;
+    try {
+      lstatSync(dstEntry);
+      alreadyExists = true;
+    } catch {}
+    if (alreadyExists) continue;
+    const stat = lstatSync(srcEntry);
+    if (stat.isSymbolicLink()) {
+      const rawTarget = resolve(srcDir, readlinkSync(srcEntry));
+      const absTarget = existsSync(rawTarget) ? realpathSync(rawTarget) : rawTarget;
+      const relTarget = relative(repoRoot, absTarget);
+      const insideRepo = relTarget !== '' && !relTarget.startsWith('..') && !isAbsolute(relTarget);
+      const isNodeModulesTarget = relTarget.split(/[\\/]/).includes('node_modules');
+      if (insideRepo && !isNodeModulesTarget && existsSync(join(destRoot, relTarget))) {
+        symlinkSync(join(destRoot, relTarget), dstEntry);
+      } else if (insideRepo && isNodeModulesTarget) {
+        symlinkSync(relative(dirname(dstEntry), join(destRoot, relTarget)), dstEntry);
+      } else {
+        cloneOrCopyPath(absTarget, dstEntry);
+      }
+      continue;
+    }
+    if (depth === 0 && entry.startsWith('@') && stat.isDirectory()) {
+      isolateNodeModulesDir(repoRoot, srcEntry, dstEntry, destRoot, 1);
+      continue;
+    }
+    cloneOrCopyPath(srcEntry, dstEntry);
+  }
+}
+
+export function isolateDependencyDirs(repoRoot: string, destDir: string): void {
+  const resolvedRoot = realpathSync(repoRoot);
+  const resolvedDest = realpathSync(destDir);
+  for (const rel of workspaceNodeModules(resolvedRoot)) {
+    isolateNodeModulesDir(
+      resolvedRoot,
+      join(resolvedRoot, rel),
+      join(resolvedDest, rel),
+      resolvedDest,
+    );
+  }
+}
+
 export function linkDependencyDirs(repoRoot: string, destDir: string): void {
   const resolvedRoot = realpathSync(repoRoot);
   const resolvedDest = realpathSync(destDir);
@@ -150,6 +217,71 @@ export function linkDependencyDirs(repoRoot: string, destDir: string): void {
       join(resolvedDest, rel),
       resolvedDest,
     );
+  }
+}
+
+function safeDeleteRelative(scorerReal: string, scorerDir: string, parts: string[]): void {
+  let current = scorerDir;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    const segment = parts[i];
+    if (!segment || segment === '.' || segment === '..') return;
+    current = join(current, segment);
+    try {
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) return;
+      const currentReal = realpathSync(current);
+      if (currentReal !== scorerReal && !currentReal.startsWith(`${scorerReal}${sep}`)) return;
+    } catch {
+      return;
+    }
+  }
+  const leaf = parts.at(-1);
+  if (!leaf || leaf === '.' || leaf === '..') return;
+  const target = join(current, leaf);
+  rmSync(target, { recursive: true, force: true });
+}
+
+export function copyAllowedChangesToScorer(
+  workDir: string,
+  scorerDir: string,
+  changedPaths: string[],
+  excludedSet: Set<string>,
+  isProtected: (relPath: string) => boolean,
+): void {
+  const workReal = realpathSync(workDir);
+  const scorerReal = realpathSync(scorerDir);
+  for (const relPath of changedPaths) {
+    if (
+      !relPath ||
+      relPath.startsWith('/') ||
+      relPath.includes('\\') ||
+      relPath.split('/').includes('..') ||
+      excludedSet.has(relPath) ||
+      isProtected(relPath)
+    ) {
+      continue;
+    }
+    const parts = relPath.split('/').filter(Boolean);
+    const leaf = parts.at(-1);
+    if (!leaf) continue;
+    const srcPath = join(workDir, relPath);
+    let stat: ReturnType<typeof lstatSync>;
+    try {
+      stat = lstatSync(srcPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        safeDeleteRelative(scorerReal, scorerDir, parts);
+        continue;
+      }
+      throw error;
+    }
+    if (stat.isSymbolicLink() || !stat.isFile()) continue;
+    const srcReal = realpathSync(srcPath);
+    if (srcReal !== workReal && !srcReal.startsWith(`${workReal}${sep}`)) continue;
+    const parentDir = ensureSafeParentDirs(scorerReal, scorerDir, parts);
+    const target = join(parentDir, leaf);
+    rmSync(target, { recursive: true, force: true });
+    writeFileSync(target, readFileSync(srcPath), { mode: stat.mode & 0o777 });
   }
 }
 

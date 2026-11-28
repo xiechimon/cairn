@@ -262,6 +262,24 @@ describe('eval/harvest-git', () => {
     expect(nopPasses.ok).toBe(false);
     expect(nopPasses.reason).toContain('nop unexpectedly passed');
 
+    const nopTimedOut = verifyLaneTask(
+      {
+        ...task,
+        checks: { ...task.checks, commands: ['node -e "setTimeout(() => {}, 5000)"'] },
+      },
+      repoRoot,
+      { commandTimeoutMs: 300 },
+    );
+    expect(nopTimedOut.ok).toBe(false);
+    expect(nopTimedOut.reason).toMatch(/timed out|signal/i);
+
+    const nopNonTestFail = verifyLaneTask(
+      { ...task, checks: { ...task.checks, commands: ['node -e "process.exit(2)"'] } },
+      repoRoot,
+    );
+    expect(nopNonTestFail.ok).toBe(false);
+    expect(nopNonTestFail.reason).toContain('without test failure output');
+
     expect(runCli(['--repo', repoRoot, '--exam', examDir, '--verify', 'does-not-exist'])).toBe(1);
     expect(() =>
       runCli([

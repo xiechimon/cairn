@@ -100,6 +100,11 @@ describe('eval suite tasks', () => {
   test('lane tasks declare valid git-snapshot sources, budget bounds, and build valid public results', () => {
     const lanes = tasks.filter((t) => t.kind === 'lane').map((t) => laneTask.parse(t));
     expect(lanes).toHaveLength(20);
+    const isShallow =
+      spawnSync('git', ['rev-parse', '--is-shallow-repository'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim() === 'true';
     let totalBudgetMs = 0;
     for (const lane of lanes) {
       expect(lane.instruction.length).toBeGreaterThan(20);
@@ -107,9 +112,10 @@ describe('eval suite tasks', () => {
       expect(lane.checks.commands).toHaveLength(1);
       expect(lane.timeoutMs).toBeLessThanOrEqual(240_000);
       totalBudgetMs += lane.timeoutMs + 60_000;
-      if (commitExists(ROOT, lane.source.fixCommit)) {
-        expect(commitExists(ROOT, lane.source.parentCommit)).toBe(true);
-        expect(parentOfCommit(ROOT, lane.source.fixCommit)).toBe(lane.source.parentCommit);
+      if (!isShallow) {
+        expect(commitExists(ROOT, lane.source.fixCommit), lane.id).toBe(true);
+        expect(commitExists(ROOT, lane.source.parentCommit), lane.id).toBe(true);
+        expect(parentOfCommit(ROOT, lane.source.fixCommit), lane.id).toBe(lane.source.parentCommit);
       }
     }
     expect(totalBudgetMs).toBeLessThanOrEqual(6_000_000);
