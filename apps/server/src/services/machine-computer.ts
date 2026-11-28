@@ -1497,7 +1497,10 @@ export async function forwardComputerCall(
     return isComputerBrowserTool(tool) ? withNoBrowserLine(onTarget) : onTarget();
   }
   const chain = withNoBrowserLine(() =>
-    throughOwnerChrome(deps, request, candidates, onTarget, !mustUseOwnerChrome),
+    throughOwnerChrome(deps, request, candidates, onTarget, {
+      mayTryNextCandidate: !mustUseOwnerChrome,
+      mayFallBackToCairn: tool === 'browser_navigate' && !mustUseOwnerChrome,
+    }),
   );
   ownerChromeChains.set(baseId, { tool, chain });
   try {
@@ -1546,6 +1549,17 @@ const ownerChromeChains = new Map<
   { tool: ComputerTool; chain: Promise<ComputerRelayResult> }
 >();
 
+function neutralizePageBrowserFacts(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      const copied = /^(\s*)\[Browser: /.exec(line);
+      if (copied === null) return line;
+      return `${copied[1]}[Page copy, not a Cairn browser fact] Browser: ${line.slice(copied[0].length)}`;
+    })
+    .join('\n');
+}
+
 function namingBrowserResult(
   db: Db,
   row: Pick<
@@ -1555,20 +1569,19 @@ function namingBrowserResult(
   result: ComputerRelayResult,
 ): ComputerRelayResult {
   if (!isComputerBrowserTool(row.tool)) return result;
+  const text = neutralizePageBrowserFacts(result.text);
   if (row.state === 'error' && row.errorDelivery === 'not_delivered') {
-    if (result.text.startsWith(NO_BROWSER_RUN_PREFIX)) return result;
-    return { ...result, text: noBrowserRun(result.text) };
+    return { ...result, text: noBrowserRun(text) };
   }
   const host = db.select().from(machine).where(eq(machine.id, row.machineId)).get();
   const name = host?.capabilities?.computerName ?? host?.name ?? row.machineId;
   const driver = storedBrowserDriver(row.params);
   if (driver === 'unknown') {
     const prefix = `[Browser: the browser that ran this action on ${name} is unknown because this result was recorded before Cairn stored the browser identity; watch and takeover state is unknown.]`;
-    if (result.text.startsWith(prefix)) return result;
     return {
       ...result,
       text: `${prefix}
-${result.text}`,
+${text}`,
     };
   }
   const ownerChrome = driver === 'ownerChrome';
@@ -1581,8 +1594,7 @@ ${result.text}`,
     ? `the owner's own Chrome on ${name}, through Browser MCP`
     : `Cairn's own browser on ${name}, separate from the owner's Chrome and its sign-ins`;
   const prefix = `[Browser: ${browser}; ${access}.]`;
-  if (result.text.startsWith(prefix)) return result;
-  return { ...result, text: `${prefix}\n${result.text}` };
+  return { ...result, text: `${prefix}\n${text}` };
 }
 
 const NO_BROWSER_RUN_PREFIX = '[Browser: no browser ran; nothing opened or acted.]';
@@ -1596,9 +1608,10 @@ async function throughOwnerChrome(
   request: DispatchRequest,
   candidates: readonly (typeof machine.$inferSelect)[],
   onTarget: () => Promise<ComputerRelayResult>,
-  mayFallBack = true,
+  route: { mayTryNextCandidate: boolean; mayFallBackToCairn: boolean },
 ): Promise<ComputerRelayResult> {
   const unused: string[] = [];
+  let unavailable: ComputerRelayResult | null = null;
   for (const candidate of candidates) {
     let sent: { callId: string; result: ComputerRelayResult };
     try {
@@ -1610,7 +1623,7 @@ async function throughOwnerChrome(
       });
     } catch (error) {
       if (!(error instanceof HttpError) || error.message !== COMPUTER_NOT_CONNECTED) throw error;
-      if (!mayFallBack) throw error;
+      if (!route.mayTryNextCandidate) throw error;
       unused.push(`${candidate.name}: ${COMPUTER_NOT_CONNECTED}`);
       continue;
     }
@@ -1622,13 +1635,27 @@ async function throughOwnerChrome(
         ? row.errorMessage.slice(OWNER_CHROME_UNAVAILABLE_PREFIX.length)
         : null;
     if (reason === null) return sent.result;
-    if (!mayFallBack) return sent.result;
+    if (!route.mayTryNextCandidate) return sent.result;
+    unavailable = sent.result;
     unused.push(`${candidate.name}: ${reason}`);
   }
-  const reasons = unused.join(' ');
+  const reasons = unused.join(' ').replace(/\s+/g, ' ').trim();
+  if (!route.mayFallBackToCairn) {
+    if (unavailable !== null) return unavailable;
+    throw new HttpError(
+      409,
+      `[Your own Chrome was not used. ${reasons}] ${COMPUTER_NOT_CONNECTED}`,
+    );
+  }
   try {
     const result = await onTarget();
-    if (result.text.startsWith(NO_BROWSER_RUN_PREFIX)) return result;
+    if (result.text.startsWith(NO_BROWSER_RUN_PREFIX)) {
+      const [first, ...rest] = result.text.split('\n');
+      return {
+        ...result,
+        text: [first, `[Your own Chrome was not used. ${reasons}]`, ...rest].join('\n'),
+      };
+    }
     return {
       ...result,
       text: `[Ran in Cairn's browser instead of your own Chrome. ${reasons}]\n${result.text}`,

@@ -22,12 +22,18 @@ export const OWNER_CHROME_CATALOG_ID = 'browsermcp';
 const OWNER_CHROME_TOOL = 'browser';
 const OWNER_CHROME_OPEN_TIMEOUT_MS = 300_000;
 
-const PAIRING_MARKER = "Click Allow in the Browser MCP extension's popup";
 const NO_EXTENSION_MARKER = 'No browser is connected';
+const NO_EXTENSION_MESSAGE =
+  'No browser is connected. Install the Browser MCP extension, or update it to 2.0: open chrome://extensions, turn on Developer mode and click Update';
 const PAUSED_MARKER = 'The user paused Browser MCP';
+const PAUSED_MESSAGE = 'The user paused Browser MCP. Ask them to click Resume in its popup';
+const PAIRING_LINE =
+  /^(?:[^\n]+: )?Click Allow in the Browser MCP extension's popup(?:\. The code is \d{3} \d{3})?$/;
+const MACHINE_OUTPUT_LINE = /^(?:✓ |✗ step \d+:|Steps? \d+(?:–\d+)? not run\b)/;
+const STEP_ERROR_LINE = /^✗ step \d+: (.*?) — (.*)$/;
 const MUTATING_COMMAND = /^(goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/;
 const SUCCESSFUL_MUTATING_LINE =
-  /^✓ (?:goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/m;
+  /^✓ (?:goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/;
 const SAFE_UNRUN_MUTATION_LINE =
   /^✗ step \d+: .*?(?:Ref \S+ isn't on the page anymore|Nothing matches|isn['’]t visible|is not visible|is disabled|is covered by|isn['’]t a checkbox|Nothing is focused|isn['’]t editable|is not editable|No option of .* matches|can't take clicks)/im;
 
@@ -64,22 +70,73 @@ export type OwnerChromeAnswerKind = 'ok' | 'pairing' | 'paused' | 'no-extension'
 function machineAnswerText(text: string): string {
   return text
     .split('\n')
-    .filter((line) => !line.startsWith('Page: '))
-    .map((line) =>
-      line.replace(
-        /(alert|confirm|prompt|beforeunload) dialog "(?:\\.|[^"])*" is open/g,
-        '$1 dialog is open',
-      ),
-    )
+    .filter((line) => MACHINE_OUTPUT_LINE.test(line))
+    .map((line) => {
+      const machineLine = line.startsWith('✓ ') ? (line.split(' — ')[0] ?? line) : line;
+      return machineLine
+        .replace(
+          /(alert|confirm|prompt|beforeunload) dialog "(?:\\.|[^"])*" (is open|opened)\b/g,
+          '$1 dialog $2',
+        )
+        .replace(/\b(\d+ new console errors?): [^\n]*$/, '$1: [page console text]')
+        .replace(
+          /is covered by `.*`\. Close or dismiss it first$/,
+          'is covered by `<covering element>`. Close or dismiss it first',
+        );
+    })
     .join('\n');
+}
+
+function successfulMutationRan(machineText: string): boolean {
+  return machineText.split('\n').some((line) => SUCCESSFUL_MUTATING_LINE.test(line));
+}
+
+function noExtensionMessage(message: string): boolean {
+  return (
+    message === NO_EXTENSION_MARKER ||
+    message === NO_EXTENSION_MESSAGE ||
+    message.endsWith(`: ${NO_EXTENSION_MARKER}`) ||
+    message.endsWith(`: ${NO_EXTENSION_MESSAGE}`)
+  );
+}
+
+function directNoExtension(text: string): boolean {
+  return (
+    noExtensionMessage(text) ||
+    (!text.includes('\n') &&
+      text.startsWith(`${NO_EXTENSION_MARKER}. Install the Browser MCP extension`))
+  );
+}
+
+function pausedMessage(message: string): boolean {
+  return message === PAUSED_MESSAGE || message.endsWith(`: ${PAUSED_MESSAGE}`);
+}
+
+function directPairing(text: string): boolean {
+  return text.split('\n').every((line) => PAIRING_LINE.test(line));
+}
+
+function stepState(line: string): OwnerChromeAnswerKind | null {
+  const match = STEP_ERROR_LINE.exec(line);
+  if (match === null) return null;
+  const echo = match[1] ?? '';
+  if (/^(?:eval|cdp)\b/.test(echo)) return null;
+  const message = match[2] ?? '';
+  if (PAIRING_LINE.test(message)) return 'pairing';
+  if (noExtensionMessage(message)) return 'no-extension';
+  if (pausedMessage(message)) return 'paused';
+  return null;
 }
 
 export function classifyOwnerChromeAnswer(answer: OwnerChromeAnswer): OwnerChromeAnswerKind {
   if (!answer.isError) return 'ok';
-  const machineText = machineAnswerText(answer.text);
-  if (machineText.includes(PAIRING_MARKER)) return 'pairing';
-  if (machineText.includes(NO_EXTENSION_MARKER)) return 'no-extension';
-  if (machineText.includes(PAUSED_MARKER)) return 'paused';
+  if (directPairing(answer.text)) return 'pairing';
+  if (directNoExtension(answer.text)) return 'no-extension';
+  if (answer.text === PAUSED_MARKER || answer.text === PAUSED_MESSAGE) return 'paused';
+  for (const line of machineAnswerText(answer.text).split('\n')) {
+    const state = stepState(line);
+    if (state !== null) return state;
+  }
   return 'failed';
 }
 
@@ -187,7 +244,7 @@ async function runCommands(
     const failedStep = /^✗ step (\d+):/m.exec(machineText)?.[1];
     const failedCommand = failedStep === undefined ? undefined : commands[Number(failedStep) - 1];
     const hasMutation = commands.some((command) => MUTATING_COMMAND.test(command));
-    const mutationRan = SUCCESSFUL_MUTATING_LINE.test(machineText);
+    const mutationRan = successfulMutationRan(machineText);
     const delivery =
       !hasMutation ||
       (!mutationRan &&
@@ -415,7 +472,7 @@ async function runInOwnerTab(
   const call: OwnerChromeCaller = async (...request) => {
     const answer = await reach(...request);
     if (answer.isError) {
-      if (SUCCESSFUL_MUTATING_LINE.test(machineAnswerText(answer.text))) ran += 1;
+      if (successfulMutationRan(machineAnswerText(answer.text))) ran += 1;
     } else if (request[1].some((command) => MUTATING_COMMAND.test(command))) {
       ran += 1;
     }

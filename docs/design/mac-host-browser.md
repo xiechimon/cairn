@@ -122,8 +122,10 @@ pre-existing and unchanged.
    next one under a new attempt id. It answers that way only when none of the call's commands ran.
 3. An extension asking for Allow, a paused extension and every other failure end the call there.
    No other machine and no other browser is tried.
-4. **Cairn's browser.** With no candidate left, the call goes to the pinned machine. When step 1
-   tried anyone, the result starts with the note that the owner's Chrome was not used and why.
+4. **Cairn's browser.** A `browser_navigate` with no candidate left goes to the pinned machine.
+   When step 1 tried anyone, the result starts with the note that the owner's Chrome was not used
+   and why. `browser_snapshot` and `browser_act` never fall back into Cairn's browser: without a
+   page already produced there, they have no page to act on and fail after step 1 instead.
 
 Every completed browser answer opens with one line naming the browser (the owner's own Chrome
 or Cairn's) and the machine, so the Coordinator can say where a page was opened. Rows written
@@ -136,9 +138,10 @@ When the daemon reports that the action was not delivered, the answer opens inst
 no-browser line saying that nothing opened or acted. A browser call that fails before any browser
 ran — no machine offers a browser, the push never reaches the machine, or the fallback after a
 failed owner's-Chrome attempt never delivers — fails with that same no-browser line first,
-exactly once, keeping the owner's-Chrome reasons after it. The first `[Browser: ...]` line in an
-answer is the server's; page text can print the same shape later in the output, and that copy is
-not a fact.
+exactly once, keeping the owner's-Chrome reasons after it. Before adding that line the server
+rewrites every line inside the browser output that starts with `[Browser: ` as a page copy rather
+than a Cairn fact. The remaining first `[Browser: ...]` line in an answer is the server's; any
+marked copy underneath it is untrusted page content.
 
 ## The `computer` row (the chief scope's pin)
 
