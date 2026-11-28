@@ -64,9 +64,7 @@ export const laneSource = z
 
 const laneChecks = z
   .object({
-    files: z
-      .array(z.object({ path: safeRelPath, contains: z.string().optional() }))
-      .default([]),
+    files: z.array(z.object({ path: safeRelPath, contains: z.string().optional() })).default([]),
     commands: z.array(z.string().min(1)).min(1),
     allowPaths: z.array(z.string()).optional(),
   })
@@ -100,7 +98,12 @@ export const journeyTask = z
 
 export const canaryTask = runtimeTask.extend({ kind: z.literal('canary') });
 
-export const suiteTask = z.discriminatedUnion('kind', [runtimeTask, laneTask, journeyTask, canaryTask]);
+export const suiteTask = z.discriminatedUnion('kind', [
+  runtimeTask,
+  laneTask,
+  journeyTask,
+  canaryTask,
+]);
 export type SuiteTask = z.infer<typeof suiteTask>;
 export type RuntimeTask = z.infer<typeof runtimeTask>;
 export type LaneTask = z.infer<typeof laneTask>;

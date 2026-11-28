@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto';
 import { toolCallRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { type Coordinator, startCoordinator } from '../../apps/server/src/coordinator/index.js';
-import { chiefMessage, chiefTurnUsage, project, step, todo } from '../../apps/server/src/db/schema.js';
+import {
+  chiefMessage,
+  chiefTurnUsage,
+  project,
+  step,
+  todo,
+} from '../../apps/server/src/db/schema.js';
 import {
   setCoordinatorInServer,
   setCoordinatorWake,
