@@ -77,6 +77,36 @@ describe('markdown blocks through the maintained parser', () => {
     expect(segs.map((s) => s.text).join('')).toContain('[a](javascript:alert(1))');
   });
 
+  it('names a local file link by its file name, never by its path', () => {
+    const link = (target: string, label = 'probe.mjs') => inlineSegments(`[${label}](${target})`);
+    expect(link('file:///Users/xmon/.cairn/workspaces/3f6a/probe.mjs')).toEqual([
+      { text: 'probe.mjs', style: 'link' },
+    ]);
+    expect(link('file:///Users/xmon/my%20notes/run%20report.md', '打开')).toEqual([
+      { text: 'run report.md', style: 'link' },
+    ]);
+    expect(link('~/notes/plan.md')).toEqual([{ text: 'plan.md', style: 'link' }]);
+    expect(link('/Users/xmon/.cairn/workspaces/3f6a/probe.mjs?plain=1#L12')).toEqual([
+      { text: 'probe.mjs', style: 'link' },
+    ]);
+    expect(link(String.raw`C:\Users\xmon\probe.mjs`)).toEqual([
+      { text: 'probe.mjs', style: 'link' },
+    ]);
+    expect(link('./scripts/check.mjs')).toEqual([{ text: 'check.mjs', style: 'link' }]);
+    expect(
+      JSON.stringify([
+        ...link('file:///Users/xmon/.cairn/workspaces/3f6a/probe.mjs'),
+        ...link('/Users/xmon/.cairn/workspaces/3f6a/deep/probe.mjs'),
+      ]),
+    ).not.toContain('/Users/');
+  });
+
+  it('keeps app routes and web links as anchors', () => {
+    expect(inlineSegments('[任务](/app/tasks/3f6a)')).toEqual([
+      { text: '任务', style: 'anchor', href: '/app/tasks/3f6a', internal: true },
+    ]);
+  });
+
   it('autolinks a bare URL', () => {
     expect(inlineSegments('见 https://example.com/a 页')).toContainEqual({
       text: 'https://example.com/a',

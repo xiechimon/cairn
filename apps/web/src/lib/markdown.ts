@@ -42,6 +42,12 @@ const md = new Marked({ gfm: true, breaks: true }, markedCjkFriendly());
 const MENTION_TARGET = /^(agent|skill|project|machine|todo):([A-Za-z0-9_-]+)$/;
 const WEB_TARGET = /^https?:\/\/\S+$/;
 const ATTACHMENT_TARGET = new RegExp(`^attachment:(${ATTACHMENT_KEY_SOURCE})$`);
+const FILE_SCHEME = /^file:/i;
+const HOME_PATH = /^~\//;
+const UNIX_PATH =
+  /^\/(?:Users|home|tmp|private|var|opt|etc|Volumes|Applications|root|srv|mnt|media|usr)\//;
+const WINDOWS_PATH = /^[A-Za-z]:[\\/]/;
+const RELATIVE_PATH = /^\.{1,2}[\\/]/;
 const AGENT_PROGRESS = /^\[([~/])\]\s+/;
 const ITEM_MARKER = /^\[[ xX~/]\]\s+/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
@@ -137,6 +143,30 @@ function withFlags(seg: DocSegment, flags: Flags): DocSegment {
   return seg;
 }
 
+function localPathOf(target: string): string | null {
+  let path: string;
+  if (FILE_SCHEME.test(target)) path = target.replace(FILE_SCHEME, '').replace(/^\/{2,}/, '/');
+  else if (
+    HOME_PATH.test(target) ||
+    UNIX_PATH.test(target) ||
+    WINDOWS_PATH.test(target) ||
+    RELATIVE_PATH.test(target)
+  )
+    path = target;
+  else return null;
+  const bare = path.replace(/[?#][\s\S]*$/, '');
+  try {
+    return decodeURIComponent(bare);
+  } catch {
+    return bare;
+  }
+}
+
+function fileNameOf(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, '');
+  return trimmed.slice(Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\')) + 1);
+}
+
 function linkSegment(target: string, label: string, raw: string, flags: Flags): DocSegment {
   const mention = MENTION_TARGET.exec(target);
   if (mention !== null && label !== '')
@@ -158,6 +188,9 @@ function linkSegment(target: string, label: string, raw: string, flags: Flags): 
       flags,
     );
   }
+  const localPath = localPathOf(target);
+  if (localPath !== null)
+    return withFlags({ text: fileNameOf(localPath) || label || '/', style: 'link' }, flags);
   if (WEB_TARGET.test(target))
     return withFlags({ text: label !== '' ? label : target, style: 'anchor', href: target }, flags);
   if (target.startsWith('/'))
