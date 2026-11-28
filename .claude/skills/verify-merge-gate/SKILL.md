@@ -57,7 +57,7 @@ Each negative control drops exactly the guard its property names, and its counte
 
 Checked against the code on 2026-11-16. The full write-ups, including the reasoning, are in `evidence/findings.md`, a snapshot taken when each was found. Numbers follow that file; F3 and F5 are no longer true and are omitted here.
 
-- **F1 (P4, live gap)**: `mergeThroughGithub` through `apiMergeGate` (`build-github-merge.ts`) merges with the checkpoint pin alone (`pull.headSha === checkpoint`, `sha: checkpoint`). Neither it nor `build-merge-request.ts` references `mergeReadiness` or any verdict, so the digest is not re-derived at merge time. `mergeReadiness` is called from `merge-gate-run.ts` and `merge-gate/harness-eval-judge.ts`. Whether a stored evaluation gates this path was not re-checked. The P4 counterexample is three verdicts, `Evaluate`, `BaseMoveInteracting`, merge: the head SHA is unchanged while the diff against the default branch is not.
+- **F1 (P4, live gap)**: `mergeThroughGithub` through `apiMergeGate` (`build-github-merge.ts`) merges with the checkpoint pin alone (`pull.headSha === checkpoint`, `sha: checkpoint`). Neither it nor `build-merge-request.ts` references `mergeReadiness` or any verdict, so the digest is not re-derived at merge time. No code calls `mergeReadiness` any more: the run entry that used to call it is deleted and the verdict settlement retired with `bce9ba43a`, so the GitHub path never consults a verdict (F3). The other blockers the model assumes satisfied are read-side inputs only. The P4 counterexample is three verdicts, `Evaluate`, `BaseMoveInteracting`, merge: the head SHA is unchanged while the diff against the default branch is not.
 - **F2 (P1H, model-only)**: dropping only the review-head equality still yields a counterexample, so the head check is load-bearing on its own. In the code both conditions are one conjunction in the same filter.
 - **F4 (local path, wired)**: `enqueueLocalMerge` (`local-merge.ts`) judges through `localGateFacts`; `landLocalMerge` (`apps/daemon/src/local-merge.ts`) calls `decideLocalMerge` before building the candidate and again before landing, then runs the `authorize` round-trip (`localMergeRecheck` in `step-local-merge.ts` -> `POST /api/machine/local-merge-recheck/:stepId` -> `localMergeRecheckAuthorization`) and lands through `landGitSquash`, which updates the ref with `git update-ref --stdin`. The earlier audit recorded that the update carries the expected old value, so the fast-forward check and the update are one step; this was not re-audited.
 - **F6 (hosted landing, not covered by P3)**: `applyMergeLanding` (`machine-merge-landing.ts`, hosted projects) awaits `isAncestor`, then several checks, then a separate `updateBranchRef`, so an intervening advance can be overwritten. The reproduction is `evidence/local-landing-race.json`. See F6 before using this model to accept a change to that path.
@@ -78,12 +78,12 @@ The server is single-process with synchronous SQLite writes, so code between two
 
 `MergeGate.tla`:
 
-- `RecordVerdict(k, outcome, head)`: a verdict row bound to `(head, dgst)`. Write side: `persistGateVerdict` (`build-gate-verdict.ts`) binds it through `bindGateVerdict` (`merge-gate/verdict.ts`) and fills its `patchDigest` from a compare read in `builds.ts`. Read side: the `at()` filter in `mergeReadiness` keeps verdicts whose `patchDigest` equals the evaluated digest; the independent-review filter also requires `headSha === head`. Recording invalidates a stored evaluation. An earlier block is never overwritten by a later pass.
+- `RecordVerdict(k, outcome, head)`: a verdict row bound to `(head, dgst)`. The write side was retired with the settlement in `bce9ba43a`: nothing writes verdict rows today, and `mergeReadiness` has no production caller, so on the GitHub path the set stays empty. The retired reader kept only verdicts whose `patchDigest` equalled the evaluated digest, and required `headSha === head` for the independent review. An earlier block was never overwritten by a later pass.
 - `PushCode`: head and digest both move; earlier verdicts stay in the table but no longer match.
 - `PushEvidence`: an evidence-only commit moves the head but not the digest, which is why the review-head rule needs its own binding.
 - `UpdateBranch`: the PR branch takes the moved base, getting a fresh head and clearing the stored evaluation. The branch does not need to be synced for readiness — the `pr-behind-base` blocker was retired with `requireUpToDate` (#5337).
 - `BaseMoveBenign` / `BaseMoveInteracting`: the default branch moves; the compare base changes, so the recomputed digest can change while the PR head stays put. A stored gate status is not rewritten by a base move.
-- `Evaluate`: `mergeReadiness` computing which digests the gate accepted. Its other blockers (required checks, evidence links, the recording requirement, rounds, availability) are per-read predicates assumed satisfied. `planGateStatusWrite` (`merge-gate/gate-status.ts`) turns the result into a status on `readiness.headSha` and refuses when `checksHeadSha !== readiness.headSha`, which the model folds into `ReadyAt`.
+- `Evaluate`: `mergeReadiness` computing which digests the gate accepted. Its other blockers (required checks, evidence links, the recording requirement, rounds, availability) are per-read predicates assumed satisfied. The status write that used to publish this onto `readiness.headSha` was retired with the settlement (`bce9ba43a`); the model folds it into `ReadyAt`.
 - `ExecuteMergeGithub`: `mergeThroughGithub` with its `sha: checkpoint` pin. `MergeRechecksDigest` says whether this action also re-derives the digest; on this path the code does not (F1).
 
 `LocalLanding.tla`:
@@ -123,15 +123,12 @@ Not in scope: scheduler and chief wiring, the CI green-wash loop, `unstable` mer
 
 ```coverage
   apps/server/src/services/merge-gate/readiness.ts
-  apps/server/src/services/merge-gate/gate-status.ts
   apps/server/src/services/merge-gate/digest.ts
-  apps/server/src/services/merge-gate/verdict.ts
   apps/server/src/services/merge-gate/github-facts.ts
   apps/server/src/services/merge-gate/github-port.ts
   apps/server/src/services/merge-gate/paths.ts
   apps/server/src/services/merge-gate/evidence-link.ts
   apps/server/src/services/merge-gate/model-identity.ts
-  apps/server/src/services/merge-gate/model-roster.ts
   apps/server/src/services/merge-gate/model-roster-data.ts
   apps/server/src/services/merge-gate-github.ts
   apps/server/src/services/builds.ts
@@ -144,7 +141,6 @@ Not in scope: scheduler and chief wiring, the CI green-wash loop, `unstable` mer
   apps/server/src/services/machine-claim.ts
   apps/server/src/services/local-merge.ts
   apps/server/src/routes-machine.ts
-  apps/server/src/services/merge-gate-run.ts
   apps/server/src/lib/github.ts
   packages/shared/src/records/project.ts
   packages/shared/src/protocol/machine-wire.ts

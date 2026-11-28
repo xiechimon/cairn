@@ -131,6 +131,24 @@
       "pattern": "\\bdeletes draft releases?\\b",
       "canary": "deletes draft releases older than 24h",
       "reason": "repo hygiene no longer deletes a release or a tag; the release workflow owns desktop-v* versions and an abandoned draft only holds its version"
+    },
+    {
+      "id": "transfer-to-cairn-cli",
+      "pattern": "\\btransfer-to-cairn\\b",
+      "canary": "node scripts/ops/transfer-to-cairn.mjs",
+      "reason": "issue intake was dropped; no CLI moves tickets or issues into Cairn"
+    },
+    {
+      "id": "ops-host-lane-scripts",
+      "pattern": "scripts/ops/host",
+      "canary": "scripts/ops/host/lanes/build-prompt.sh",
+      "reason": "the omarchy host lane scripts are deleted; lanes and heavy slots live in docs/ops/worktrees-and-ports.md and mini-test"
+    },
+    {
+      "id": "build-merge-verdict-hook",
+      "pattern": "\\bmergeVerdict\\b",
+      "canary": "BuildDeps.mergeVerdict",
+      "reason": "the unwired build dependency was removed; the retired merge-gate verdict settlement has no read-side hook on a build"
     }
   ],
   "baseline": {
