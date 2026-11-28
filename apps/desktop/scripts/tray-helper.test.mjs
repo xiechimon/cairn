@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { nativeTrayMenuSchema } from '@cairn/shared/desktop-shell';
+import { skeletonTrayMenu } from '../src/native-tray.ts';
 import { compileTrayHelper } from './build-tray-helper.mjs';
 
 const fixture = fileURLToPath(new URL('../native/tray/test/fixture-menu.json', import.meta.url));
@@ -13,12 +15,26 @@ const mac = process.platform === 'darwin';
 test('the native menu built from a page snapshot reads, focuses and updates right', {
   skip: !mac,
 }, () => {
+  const fixtureMessage = JSON.parse(readFileSync(fixture, 'utf8'));
+  nativeTrayMenuSchema.parse(fixtureMessage.menu);
   const dir = mkdtempSync(join(tmpdir(), 'cairn-tray-test-'));
   try {
     const binary = compileTrayHelper(join(dir, 'tray-test'), { extra: 'test', optimize: false });
     const run = spawnSync(binary, [fixture], { encoding: 'utf8', timeout: 60_000 });
     assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
     assert.match(run.stdout, /^PASS: \d+ assertions, 0 failures/m);
+    for (const locale of ['zh', 'en']) {
+      const skeleton = skeletonTrayMenu(locale);
+      nativeTrayMenuSchema.parse(skeleton);
+      const skeletonPath = join(dir, `skeleton-${locale}.json`);
+      writeFileSync(skeletonPath, `${JSON.stringify({ type: 'menu', menu: skeleton })}\n`, 'utf8');
+      const decoded = spawnSync(binary, ['--decode-only', skeletonPath], {
+        encoding: 'utf8',
+        timeout: 60_000,
+      });
+      assert.equal(decoded.status, 0, `${decoded.stdout}${decoded.stderr}`);
+      assert.match(decoded.stdout, /^PASS: decoded \d+ items/m);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

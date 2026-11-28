@@ -1,4 +1,9 @@
-import type { DesktopTrayOpen, DesktopTrayState } from '@cairn/shared';
+import {
+  type DesktopTrayOpen,
+  type DesktopTrayState,
+  isKeepAwakeMode,
+  type NativeTrayMenu,
+} from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { ChartColumn, Laptop, Settings } from 'lucide-react';
@@ -40,7 +45,7 @@ import {
   trayUsage,
 } from './tray-groups.js';
 import { TrayHeadMeta } from './tray-meta.js';
-import { RUNNER_WORD, trayMenuModel } from './tray-native.js';
+import { RUNNER_WORD, trayMenuForHost } from './tray-native.js';
 
 const ON_MAC = typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh');
 
@@ -178,6 +183,7 @@ export function TrayPage() {
   const { user } = useLiveData();
   const bridge = useMemo(desktopTray, []);
   const [state, setState] = useState<DesktopTrayState | null>(null);
+  const [stateReady, setStateReady] = useState(bridge === null);
   const onOpened = useCallback(
     (refresh: () => void) => bridge?.onOpened(refresh) ?? (() => {}),
     [bridge],
@@ -186,13 +192,22 @@ export function TrayPage() {
   const groups = useMemo(() => popoverGroups(allGroups), [allGroups]);
   const say = (text: TrayText) => t(text.key, text.vars);
   const rootRef = useRef<HTMLElement | null>(null);
+  const lastPublishedRef = useRef<string>('');
 
   useEffect(() => {
     if (bridge === null) return;
-    void bridge.state().then((first) => {
-      if (first !== null) setState(first);
+    void bridge
+      .state()
+      .then((first) => {
+        if (first !== null) setState(first);
+      })
+      .finally(() => {
+        setStateReady(true);
+      });
+    return bridge.subscribe((next) => {
+      setStateReady(true);
+      setState(next);
     });
-    return bridge.subscribe(setState);
   }, [bridge]);
 
   useEffect(() => {
@@ -211,7 +226,7 @@ export function TrayPage() {
 
   const menu = useMemo(
     () =>
-      trayMenuModel({
+      trayMenuForHost({
         groups: allGroups,
         usage,
         coordinatorBusy,
@@ -222,12 +237,20 @@ export function TrayPage() {
       }),
     [allGroups, usage, coordinatorBusy, state, user.displayName, now, t],
   );
-  useEffect(() => bridge?.publish(menu), [bridge, menu]);
+  useEffect(() => {
+    if (bridge === null || !stateReady) return;
+    const serialized = JSON.stringify(menu);
+    if (serialized === lastPublishedRef.current) return;
+    lastPublishedRef.current = serialized;
+    bridge.publish(menu as NativeTrayMenu);
+  }, [bridge, menu, stateReady]);
 
   const open = (target: DesktopTrayOpen) => bridge?.open(target);
   const runner = state?.runner ?? 'starting';
   const runnerOn = runner === 'on' || runner === 'starting';
-  const storedKeepAwake = state?.keepAwake ?? 'system';
+  const rawKeepAwake: unknown = state?.keepAwake;
+  const storedKeepAwake =
+    rawKeepAwake === true ? 'screen-on' : isKeepAwakeMode(rawKeepAwake) ? rawKeepAwake : 'system';
   const lidClosedAvailable = state?.lidClosedAvailable ?? false;
   const keepAwake =
     storedKeepAwake === 'lid-closed' && !lidClosedAvailable ? 'system' : storedKeepAwake;

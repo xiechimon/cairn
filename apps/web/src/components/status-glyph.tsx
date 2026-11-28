@@ -1,19 +1,8 @@
+import type { NativeTrayGlyph } from '@cairn/shared';
 import { cn } from 'cn';
 import { useId } from 'react';
 
-export type GlyphKind =
-  | 'todo'
-  | 'queued'
-  | 'ring'
-  | 'working'
-  | 'progress'
-  | 'attention'
-  | 'quarter'
-  | 'half'
-  | 'three-quarter'
-  | 'done'
-  | 'failed'
-  | 'closed';
+export type GlyphKind = NativeTrayGlyph;
 
 const RING = { cx: 7, cy: 7, r: 5.5, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 };
 

@@ -10,6 +10,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./desktop-shell": "./src/desktop-shell.ts",
     "./connect-relay": "./src/protocol/connect-relay.ts",
     "./temp-environment": "./src/node/temp-environment.ts",
     "./credential-profile": "./src/node/credential-profile.ts",

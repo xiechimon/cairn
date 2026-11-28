@@ -11,6 +11,25 @@ func expect(_ condition: Bool, _ message: @autoclosure () -> String) {
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 
+if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--decode-only" {
+  let path = CommandLine.arguments[2]
+  guard
+    let line = try? String(contentsOfFile: path, encoding: .utf8),
+    let message = Channel.decode(line.trimmingCharacters(in: .whitespacesAndNewlines)),
+    let model = message.menu
+  else {
+    fputs("failed to decode tray menu from \(path)\n", stderr)
+    exit(1)
+  }
+  let tray = TrayMenu(model, brand: nil) { _ in }
+  guard tray.menu.items.count == model.items.count else {
+    fputs("item count mismatch: \(tray.menu.items.count) vs \(model.items.count)\n", stderr)
+    exit(1)
+  }
+  print("PASS: decoded \(model.items.count) items")
+  exit(0)
+}
+
 guard CommandLine.arguments.count == 2,
   let line = try? String(contentsOfFile: CommandLine.arguments[1], encoding: .utf8),
   let message = Channel.decode(line.trimmingCharacters(in: .whitespacesAndNewlines)),

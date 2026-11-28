@@ -20,6 +20,7 @@ import type {
   DevinLocalStatus,
   DevinLoginOutcome,
   HostPermissions,
+  KeepAwakeMode,
   NativeTrayMenu,
   RemoteVersionState,
 } from '@cairn/shared';
@@ -292,8 +293,7 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     },
     open: (target: DesktopTrayOpen): void => ipcRenderer.send('desktop-tray:open', target),
     setRunner: (on: boolean): Promise<void> => ipcRenderer.invoke('desktop-tray:runner', on),
-    setKeepAwake: (mode: 'screen-on' | 'system' | 'lid-closed'): void =>
-      ipcRenderer.send('desktop-tray:keep-awake', mode),
+    setKeepAwake: (mode: KeepAwakeMode): void => ipcRenderer.send('desktop-tray:keep-awake', mode),
     resize: (height: number): void => ipcRenderer.send('desktop-tray:resize', height),
     hide: (): void => ipcRenderer.send('desktop-tray:hide'),
     quit: (): void => ipcRenderer.send('desktop-tray:quit'),

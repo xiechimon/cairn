@@ -25,7 +25,6 @@ import {
   isDesktopNotifyPayload,
   isKeepAwakeMode,
   type NativeTrayMenu,
-  nativeTrayMenuSchema,
   OWNER_CHANNEL_HEADER,
   OWNER_CHANNEL_MESSAGE,
   OWNER_CHANNEL_READY,
@@ -115,6 +114,7 @@ import {
   writePersistedDesktopLocale,
 } from './locale.js';
 import {
+  createNativeTrayMenuReceiver,
   type NativeTray,
   nativeMenuWithHostState,
   nativeTrayAction,
@@ -1143,6 +1143,7 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   let pageMenu: NativeTrayMenu | null = null;
   let sentMenu: NativeTrayMenu = skeletonTrayMenu(desktopLocale(app.getLocale()));
   let sentMenuJson = '';
+  const acceptPageMenu = createNativeTrayMenuReceiver((line) => console.error(line));
   const sendIcon = (): void => {
     native?.send({ type: 'icon', awake: keepAwake.isHolding(), tooltip });
   };
@@ -1421,12 +1422,9 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   });
   ipcMain.on('desktop-tray:menu', (event, menu: unknown) => {
     if (!fromPopover(event)) return;
-    const parsed = nativeTrayMenuSchema.safeParse(menu);
-    if (!parsed.success) {
-      console.error('Cairn tray: the page sent a menu that does not match the schema');
-      return;
-    }
-    pageMenu = parsed.data;
+    const accepted = acceptPageMenu(menu);
+    if (accepted === null) return;
+    pageMenu = accepted;
     pushMenu();
   });
   loadTray();

@@ -9,7 +9,7 @@ import { EN } from '../src/i18n/en.js';
 import type { Locale } from '../src/i18n/locale.js';
 import { translate } from '../src/i18n/translate.js';
 import type { TrayGroup } from '../src/tray/tray-groups.js';
-import { machineReading, trayMenuModel } from '../src/tray/tray-native.js';
+import { machineReading, trayMenuForHost, trayMenuModel } from '../src/tray/tray-native.js';
 
 const quotaShare = 72;
 const NOW = 1_000 * 60 * 60_000;
@@ -254,4 +254,84 @@ test('main refuses a menu that names an unknown switch or a path outside the app
     items: [{ kind: 'row', id: 'x', title: 'x', open: { kind: 'path', path: 'https://example.com' } }],
   };
   expect(nativeTrayMenuSchema.safeParse(outside).success).toBe(false);
+});
+
+test('trayMenuModel clamps oversized titles, tips, ids and item counts to stay schema-valid', () => {
+  const longText = 'x'.repeat(800);
+  const longId = 'id-'.repeat(120);
+  const manyRows = Array.from({ length: 250 }, (_, index) => ({
+    key: `${longId}-${index}`,
+    title: `${index}:${longText}`,
+    glyph: 'working' as const,
+    at: index,
+    path: `/app/t/${index}`,
+    tip: { key: longText },
+  }));
+  const oversizedGroups: TrayGroup[] = [
+    {
+      key: `machine:${longId}`,
+      label: longText,
+      literal: true,
+      machine: {
+        kind: 'online',
+        memory: 0.95,
+        cpu: 0.92,
+        load: 12.4,
+        cores: 16,
+        diskGb: 2,
+        strain: ['memory', 'cpu', 'disk'],
+      },
+      rows: manyRows,
+    },
+  ];
+  const menu = trayMenuModel({
+    groups: oversizedGroups,
+    usage: { tokens: '9.9M', quota: { key: longText } },
+    coordinatorBusy: true,
+    state: state(),
+    userName: longText,
+    now: NOW,
+    t: t('zh'),
+  });
+  expect(nativeTrayMenuSchema.parse(menu)).toEqual(menu);
+  expect(menu.items.length).toBeLessThanOrEqual(200);
+  expect(menu.items.some((item) => item.id === 'runner')).toBe(true);
+  expect(menu.items.some((item) => item.id === 'quit')).toBe(true);
+});
+
+test('trayMenuForHost emits the legacy keep-awake switch for an older desktop host and modern choices otherwise', () => {
+  const legacyState = { runner: 'on', keepAwake: true, accent: null } as unknown as DesktopTrayState;
+  const legacyMenu = trayMenuForHost({
+    groups,
+    usage: null,
+    coordinatorBusy: false,
+    state: legacyState,
+    userName: '本地用户',
+    now: NOW,
+    t: t('zh'),
+  });
+  expect(legacyMenu.items.some((item) => item.kind === 'choice')).toBe(false);
+  expect(legacyMenu.items.find((item) => item.id === 'keep-awake')).toEqual({
+    kind: 'switch',
+    id: 'keep-awake',
+    title: '屏幕常亮',
+    on: true,
+    enabled: true,
+  });
+
+  const modernMenu = trayMenuForHost({
+    groups,
+    usage: null,
+    coordinatorBusy: false,
+    state: state({ keepAwake: 'screen-on' }),
+    userName: '本地用户',
+    now: NOW,
+    t: t('zh'),
+  });
+  expect(nativeTrayMenuSchema.parse(modernMenu)).toEqual(modernMenu);
+  expect(modernMenu.items.some((item) => item.id === 'keep-awake')).toBe(false);
+  expect(modernMenu.items.find((item) => item.id === 'keep-awake-screen-on')).toMatchObject({
+    kind: 'choice',
+    on: true,
+  });
 });

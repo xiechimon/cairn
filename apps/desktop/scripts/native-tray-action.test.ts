@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { nativeTrayMenuSchema, parseNativeTrayMenu } from '@cairn/shared/desktop-shell';
 import { describe, expect, test } from 'vitest';
 import {
+  createNativeTrayMenuReceiver,
   nativeMenuWithHostState,
   nativeTrayAction,
   skeletonTrayMenu,
@@ -79,5 +82,107 @@ describe('native keep-awake mode rows', () => {
       kind: 'keep-awake',
       mode: 'lid-closed',
     });
+  });
+
+  test('skeleton menus and Swift fixture menu conform to the shared schema', () => {
+    for (const locale of ['zh', 'en'] as const) {
+      const skeleton = skeletonTrayMenu(locale);
+      expect(nativeTrayMenuSchema.parse(skeleton)).toEqual(skeleton);
+    }
+    const fixtureRaw = readFileSync(
+      new URL('../native/tray/test/fixture-menu.json', import.meta.url),
+      'utf8',
+    );
+    const fixture = JSON.parse(fixtureRaw) as { menu: unknown };
+    expect(nativeTrayMenuSchema.parse(fixture.menu)).toEqual(fixture.menu);
+  });
+
+  test('parseNativeTrayMenu preserves valid controls when skewed or unknown items appear, while rejecting unsafe or empty menus', () => {
+    const valid = skeletonTrayMenu('zh');
+    expect(parseNativeTrayMenu(valid)).toEqual({ ok: true, menu: valid, dropped: [] });
+
+    const skewed = {
+      label: 'Cairn',
+      items: [
+        {
+          kind: 'row',
+          id: 'coordinator',
+          title: 'Coordinator',
+          open: { kind: 'path', path: '/app' },
+        },
+        { kind: 'switch', id: 'runner', title: '本机执行机', on: true, enabled: true },
+        { kind: 'switch', id: 'keep-awake', title: '保持屏幕常亮', on: false, enabled: true },
+        { kind: 'banner', id: 'future-banner', title: 'Future item' },
+        {
+          kind: 'row',
+          id: 'unsafe',
+          title: 'Bad',
+          open: { kind: 'path', path: 'https://example.com' },
+        },
+        { kind: 'switch', id: 'shell', title: 'Bad switch', on: true, enabled: true },
+        { kind: 'command', id: 'settings', title: '设置', key: ',' },
+        { kind: 'command', id: 'quit', title: '退出 Cairn', key: 'q' },
+      ],
+    };
+    const parsed = parseNativeTrayMenu(skewed);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) throw new Error('expected skew-tolerant parse');
+    expect(parsed.menu.items.map((item) => item.id)).toEqual([
+      'coordinator',
+      'runner',
+      'settings',
+      'quit',
+    ]);
+    expect(parsed.dropped.length).toBe(4);
+
+    const withRestoredModes = withHostState(
+      parsed.menu,
+      { keepAwake: 'screen-on', lidClosedAvailable: true, runner: 'on' },
+      'zh',
+    );
+    expect(withRestoredModes.items.map((item) => item.id)).toEqual([
+      'coordinator',
+      'runner',
+      'keep-awake-title',
+      'keep-awake-screen-on',
+      'keep-awake-system',
+      'keep-awake-lid-closed',
+      'settings',
+      'quit',
+    ]);
+    expect(
+      withRestoredModes.items.find((item) => item.id === 'keep-awake-screen-on'),
+    ).toMatchObject({ on: true });
+
+    const allBad = {
+      label: 'Cairn',
+      items: [{ kind: 'banner', id: 'future', title: 'Nope' }],
+    };
+    expect(parseNativeTrayMenu(allBad).ok).toBe(false);
+    expect(parseNativeTrayMenu({ label: 123, items: [] }).ok).toBe(false);
+  });
+
+  test('createNativeTrayMenuReceiver logs identical schema issues once and resets after a clean menu', () => {
+    const logs: string[] = [];
+    const receive = createNativeTrayMenuReceiver((line) => logs.push(line));
+    const partial = {
+      label: 'Cairn',
+      items: [
+        { kind: 'switch', id: 'runner', title: 'Runner', on: true, enabled: true },
+        { kind: 'switch', id: 'keep-awake', title: 'Keep awake', on: false, enabled: true },
+      ],
+    };
+    expect(receive(partial)?.items.map((item) => item.id)).toEqual(['runner']);
+    expect(receive(partial)?.items.map((item) => item.id)).toEqual(['runner']);
+    expect(logs.length).toBe(1);
+    expect(logs[0]).toContain('keep-awake');
+
+    expect(receive(skeletonTrayMenu('en'))).not.toBeNull();
+    expect(receive(partial)?.items.map((item) => item.id)).toEqual(['runner']);
+    expect(logs.length).toBe(2);
+
+    expect(receive({ label: 'Cairn', items: [{ kind: 'banner', id: 'x' }] })).toBeNull();
+    expect(receive({ label: 'Cairn', items: [{ kind: 'banner', id: 'x' }] })).toBeNull();
+    expect(logs.length).toBe(3);
   });
 });

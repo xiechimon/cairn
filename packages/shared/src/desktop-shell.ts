@@ -124,7 +124,12 @@ const desktopTrayOpenSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('command'), command: z.enum(DESKTOP_MENU_COMMANDS) }),
 ]);
 
-const trayText = z.string().max(500);
+export const NATIVE_TRAY_MAX_TEXT = 500;
+export const NATIVE_TRAY_MAX_ID = 200;
+export const NATIVE_TRAY_MAX_ITEMS = 200;
+
+const trayText = z.string().max(NATIVE_TRAY_MAX_TEXT);
+const trayId = z.string().min(1).max(NATIVE_TRAY_MAX_ID);
 
 export const NATIVE_TRAY_GLYPHS = [
   'todo',
@@ -141,10 +146,12 @@ export const NATIVE_TRAY_GLYPHS = [
   'closed',
 ] as const;
 
+export type NativeTrayGlyph = (typeof NATIVE_TRAY_GLYPHS)[number];
+
 export const nativeTrayItemSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('row'),
-    id: z.string().min(1).max(200),
+    id: trayId,
     title: trayText,
     status: trayText.optional(),
     tip: trayText.optional(),
@@ -155,7 +162,7 @@ export const nativeTrayItemSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     kind: z.literal('header'),
-    id: z.string().min(1).max(200),
+    id: trayId,
     title: trayText,
     reading: z
       .strictObject({
@@ -191,16 +198,80 @@ export const nativeTrayItemSchema = z.discriminatedUnion('kind', [
     title: trayText,
     key: z.string().max(1),
   }),
-  z.strictObject({ kind: z.literal('separator'), id: z.string().min(1).max(200) }),
+  z.strictObject({ kind: z.literal('separator'), id: trayId }),
 ]);
 
 export const nativeTrayMenuSchema = z.strictObject({
   label: trayText,
-  items: z.array(nativeTrayItemSchema).max(200),
+  items: z.array(nativeTrayItemSchema).max(NATIVE_TRAY_MAX_ITEMS),
 });
 
 export type NativeTrayItem = z.infer<typeof nativeTrayItemSchema>;
 export type NativeTrayMenu = z.infer<typeof nativeTrayMenuSchema>;
+
+export type NativeTrayMenuParseResult =
+  | { ok: true; menu: NativeTrayMenu; dropped: string[] }
+  | { ok: false; issues: string[] };
+
+const nativeTrayMenuEnvelopeSchema = z.strictObject({
+  label: trayText,
+  items: z.array(z.unknown()),
+});
+
+function describeRawTrayItem(raw: unknown, index: number): string {
+  if (typeof raw !== 'object' || raw === null) return `items[${index}]`;
+  const record = raw as { kind?: unknown; id?: unknown };
+  const kind = typeof record.kind === 'string' ? record.kind : '?';
+  const id = typeof record.id === 'string' ? record.id : '?';
+  return `items[${index}] (${kind}/${id})`;
+}
+
+function summarizeTrayIssues(
+  issues: readonly { path: readonly PropertyKey[]; message: string }[],
+): string {
+  return issues
+    .slice(0, 3)
+    .map((issue) => {
+      const path = issue.path.length > 0 ? `${issue.path.map(String).join('.')}: ` : '';
+      return `${path}${issue.message}`;
+    })
+    .join(', ');
+}
+
+export function parseNativeTrayMenu(input: unknown): NativeTrayMenuParseResult {
+  const exact = nativeTrayMenuSchema.safeParse(input);
+  if (exact.success) return { ok: true, menu: exact.data, dropped: [] };
+  const envelope = nativeTrayMenuEnvelopeSchema.safeParse(input);
+  if (!envelope.success) {
+    return {
+      ok: false,
+      issues: [summarizeTrayIssues(envelope.error.issues) || 'invalid menu envelope'],
+    };
+  }
+  const valid: NativeTrayItem[] = [];
+  const dropped: string[] = [];
+  const rawItems = envelope.data.items;
+  const limit = Math.min(rawItems.length, NATIVE_TRAY_MAX_ITEMS);
+  for (let index = 0; index < limit; index += 1) {
+    const parsed = nativeTrayItemSchema.safeParse(rawItems[index]);
+    if (parsed.success) {
+      valid.push(parsed.data);
+    } else {
+      dropped.push(
+        `${describeRawTrayItem(rawItems[index], index)}: ${summarizeTrayIssues(parsed.error.issues)}`,
+      );
+    }
+  }
+  if (rawItems.length > NATIVE_TRAY_MAX_ITEMS) {
+    dropped.push(
+      `items: truncated ${rawItems.length - NATIVE_TRAY_MAX_ITEMS} items over limit ${NATIVE_TRAY_MAX_ITEMS}`,
+    );
+  }
+  if (rawItems.length > 0 && valid.length === 0) {
+    return { ok: false, issues: dropped };
+  }
+  return { ok: true, menu: { label: envelope.data.label, items: valid }, dropped };
+}
 
 export interface DesktopNotifyDialog {
   title: string;

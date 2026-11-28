@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { nativeTrayMenuSchema } from '@cairn/shared/desktop-shell';
 import {
   nativeTrayAction,
   skeletonTrayMenu,
@@ -97,6 +98,7 @@ function harness(
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 test('a ready helper gets the menu and reports opens, picks and closes', async () => {
+  nativeTrayMenuSchema.parse(menu);
   const { tray, until, seen } = harness(['ok']);
   await until((list) => list.includes('up'));
   assert.equal(tray.isUp(), true);
@@ -141,6 +143,7 @@ test('the skeleton opens Cairn, keeps the screen on and quits, in both languages
     ['en', 'Open Cairn'],
   ]) {
     const skeleton = skeletonTrayMenu(locale);
+    nativeTrayMenuSchema.parse(skeleton);
     assert.equal(skeleton.items[0].title, open);
     assert.deepEqual(nativeTrayAction(skeleton, 'open'), {
       kind: 'open',
