@@ -6,11 +6,14 @@ import { startStubProvider, useAsCoordinatorModel } from '../coordinator-journey
 // Coordinator -> real persisted reply), the Coordinator transcript UI, and the
 // click on the real `message-file-link` button.
 //
-// MOCK BOUNDARY (Playwright interception, nothing else is faked):
-//  1. GET /api/conversations/<thread>/messages: the real response is passed
-//     through, but the real reply row gets `workspaceFileLinks: true`. The
-//     server only stamps that flag when the row has a Runner file source, and a
-//     packaged walk has no Runner with a step workspace.
+// MOCK BOUNDARY (nothing else is faked):
+//  1. GET /api/conversations/<thread>/messages: the page's own fetch is wrapped
+//     so the real response, sent with the app's real credentials, comes back
+//     with `workspaceFileLinks: true` on the real reply row. The server only
+//     stamps that flag when the row has a Runner file source, and a packaged
+//     walk has no Runner with a step workspace. Re-issuing the request from
+//     Playwright would drop the owner token the desktop shell adds in local
+//     server mode.
 //  2. POST /api/conversations/<thread>/messages/<row>/file: answered by this
 //     script in place of the Runner-backed workspace read, with the same wire
 //     shapes routes-message-files.ts returns. Server-side behaviour is covered
@@ -20,6 +23,7 @@ const FILE_TEXT = '<b>Quarterly</b> adoption report\n# Not a heading\n';
 const REPLY = `Saved the write-up as ${FILE} in the step workspace.`;
 const MESSAGES = /^\/api\/conversations\/[^/]+\/messages$/;
 const FILE_ROUTE = /^\/api\/conversations\/([^/]+)\/messages\/([^/]+)\/file$/;
+const FILE_ROUTE_URL = (url) => FILE_ROUTE.test(url.pathname);
 
 function replyChunks(request) {
   const isTurn = (request.tools?.length ?? 0) > 0;
@@ -31,40 +35,51 @@ function replyChunks(request) {
   return isTurn ? [text, stop, { choices: [], usage }] : [text, stop];
 }
 
+function stampWorkspaceFileLinks({ file, messages }) {
+  const pattern = new RegExp(messages);
+  const original = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const response = await original(input, init);
+    const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+    const method = (
+      init?.method ?? (input instanceof Request ? input.method : 'GET')
+    ).toUpperCase();
+    if (method !== 'GET' || !response.ok || !pattern.test(url.pathname)) return response;
+    const json = await response.clone().json();
+    if (!Array.isArray(json?.messages)) return response;
+    const mentions = (row) =>
+      typeof row.content === 'string'
+        ? row.content.includes(file)
+        : Array.isArray(row.content) &&
+          row.content.some((block) => block?.type === 'text' && block.text?.includes(file));
+    const stamped = json.messages.map((row) =>
+      row.role === 'assistant' && mentions(row)
+        ? { ...row, workspaceFileLinks: true, workspaceFilePaths: [file] }
+        : row,
+    );
+    return new Response(JSON.stringify({ ...json, messages: stamped }), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  };
+}
+
 async function interceptWorkspaceFiles(window, answer, calls) {
-  await window.route(
-    (url) => /^\/api\/conversations\//.test(url.pathname),
-    async (route) => {
-      const request = route.request();
-      const { pathname } = new URL(request.url());
-      const file = FILE_ROUTE.exec(pathname);
-      if (file !== null && request.method() === 'POST') {
-        calls.push({ conversation: file[1], message: file[2], body: request.postDataJSON() });
-        const { status, body } = answer.current;
-        return route.fulfill({
-          status,
-          contentType: 'application/json',
-          headers: { 'cache-control': 'no-store' },
-          body: JSON.stringify(body),
-        });
-      }
-      if (request.method() !== 'GET' || !MESSAGES.test(pathname)) return route.fallback();
-      const response = await route.fetch();
-      const json = await response.json();
-      if (!Array.isArray(json?.messages)) return route.fulfill({ response, json });
-      const messages = json.messages.map((row) => {
-        const mentionsFile =
-          typeof row.content === 'string'
-            ? row.content.includes(FILE)
-            : Array.isArray(row.content) &&
-              row.content.some((block) => block?.type === 'text' && block.text?.includes(FILE));
-        return row.role === 'assistant' && mentionsFile
-          ? { ...row, workspaceFileLinks: true, workspaceFilePaths: [FILE] }
-          : row;
-      });
-      return route.fulfill({ response, json: { ...json, messages } });
-    },
-  );
+  await window.addInitScript(stampWorkspaceFileLinks, { file: FILE, messages: MESSAGES.source });
+  await window.route(FILE_ROUTE_URL, async (route) => {
+    const request = route.request();
+    if (request.method() !== 'POST') return route.fallback();
+    const file = FILE_ROUTE.exec(new URL(request.url()).pathname);
+    calls.push({ conversation: file[1], message: file[2], body: request.postDataJSON() });
+    const { status, body } = answer.current;
+    return route.fulfill({
+      status,
+      contentType: 'application/json',
+      headers: { 'cache-control': 'no-store' },
+      body: JSON.stringify(body),
+    });
+  });
 }
 
 export default async function messageWorkspaceFiles({ window, mode, evidenceDir }) {
