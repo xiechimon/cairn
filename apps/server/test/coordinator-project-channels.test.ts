@@ -19,6 +19,7 @@ import {
   sendChiefMessage,
 } from '../src/services/chief.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { readQuota } from '../src/services/step-groups/quota.js';
 import { getTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import {
@@ -137,8 +138,8 @@ describe('Coordinator project channels (docs/design/coordinator-project-channels
       status: 'pending',
       ownerMessageIds: [],
       scopeProjectId: H.projectId,
-      fallback: null,
     });
+    expect(readQuota(H.s.db, retried.id).fallback).toBeNull();
     expect(rowsOf(channel.body.id)).toEqual(before);
     expect((await retry()).status).toBe(409);
     H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, retried.id)).run();

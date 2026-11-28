@@ -1,4 +1,4 @@
-import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, eq, type SQL, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import { step, stepMemoryTrace } from '../../db/schema.js';
 
@@ -18,18 +18,6 @@ export function readMemoryTrace(db: Reader, stepId: string): StepMemoryTrace {
       .from(stepMemoryTrace)
       .where(eq(stepMemoryTrace.stepId, stepId))
       .get() ?? { memoryTrace: null }
-  );
-}
-
-export function readManyMemoryTrace(db: Reader, stepIds: string[]): Map<string, StepMemoryTrace> {
-  if (stepIds.length === 0) return new Map();
-  return new Map(
-    db
-      .select({ stepId: stepMemoryTrace.stepId, ...memoryTraceColumns })
-      .from(stepMemoryTrace)
-      .where(inArray(stepMemoryTrace.stepId, stepIds))
-      .all()
-      .map(({ stepId, ...row }) => [stepId, row]),
   );
 }
 

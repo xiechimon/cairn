@@ -1,6 +1,6 @@
-import { and, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
-import { step, stepSubscription } from '../../db/schema.js';
+import { stepSubscription } from '../../db/schema.js';
 
 export type StepSubscription = Omit<typeof stepSubscription.$inferSelect, 'stepId'>;
 export type StepSubscriptionPatch = Partial<StepSubscription>;
@@ -27,18 +27,6 @@ export function readSubscription(db: Reader, stepId: string): StepSubscription {
   );
 }
 
-export function readManySubscription(db: Reader, stepIds: string[]): Map<string, StepSubscription> {
-  if (stepIds.length === 0) return new Map();
-  return new Map(
-    db
-      .select({ stepId: stepSubscription.stepId, ...subscriptionColumns })
-      .from(stepSubscription)
-      .where(inArray(stepSubscription.stepId, stepIds))
-      .all()
-      .map(({ stepId, ...row }) => [stepId, row]),
-  );
-}
-
 export function writeSubscription(
   tx: Transaction,
   stepId: string,
@@ -62,35 +50,4 @@ export function writeSubscription(
       ),
     )
     .run();
-}
-
-export function writeSubscriptionGuarded(
-  tx: Transaction,
-  stepId: string,
-  patch: StepSubscriptionPatch,
-  guard: SQL,
-): void {
-  const assignments: SQL[] = [];
-  if (patch.claudeSubscriptionId !== undefined)
-    assignments.push(sql`"claudeSubscriptionId" = ${patch.claudeSubscriptionId}`);
-  if (patch.devinSubscriptionId !== undefined)
-    assignments.push(sql`"devinSubscriptionId" = ${patch.devinSubscriptionId}`);
-  if (patch.antigravitySubscriptionId !== undefined)
-    assignments.push(sql`"antigravitySubscriptionId" = ${patch.antigravitySubscriptionId}`);
-  if (assignments.length === 0) return;
-  const result = tx.run(
-    sql`INSERT INTO ${stepSubscription} ("stepId", "claudeSubscriptionId", "devinSubscriptionId", "antigravitySubscriptionId") SELECT ${step.id}, ${patch.claudeSubscriptionId ?? null}, ${patch.devinSubscriptionId ?? null}, ${patch.antigravitySubscriptionId ?? null} FROM ${step} WHERE ${and(eq(step.id, stepId), guard)} ON CONFLICT ("stepId") DO UPDATE SET ${sql.join(assignments, sql`, `)}`,
-  );
-  if (result.changes > 0) {
-    tx.delete(stepSubscription)
-      .where(
-        and(
-          eq(stepSubscription.stepId, stepId),
-          isNull(stepSubscription.claudeSubscriptionId),
-          isNull(stepSubscription.devinSubscriptionId),
-          isNull(stepSubscription.antigravitySubscriptionId),
-        ),
-      )
-      .run();
-  }
 }

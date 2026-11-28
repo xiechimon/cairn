@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { describe, expect, test } from 'vitest';
-import { openDbWithHandle } from '../src/db/client.js';
+import { openDbWithHandle, registerStepWriterGeneration } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import {
   agentMemory,
@@ -441,6 +441,7 @@ describe('project deletion running guard', () => {
     const opened = openDbWithHandle(file);
     const writer = new Database(file, { timeout: 0 });
     const reader = new Database(file);
+    registerStepWriterGeneration(reader);
     let attempts = 0;
     const db = drizzle(reader, {
       schema,

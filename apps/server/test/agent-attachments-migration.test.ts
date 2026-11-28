@@ -42,9 +42,13 @@ test.each(['fresh', 'upgrade'])(
       expect(
         sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name").all(),
       ).toEqual([
+        { name: 'agent_memory_require_writer_generation_layer' },
         { name: 'step_bg_task_orphan_on_release' },
         { name: 'step_git_key_revoke_on_delete' },
         { name: 'step_git_key_revoke_on_release' },
+        { name: 'step_require_writer_generation_delete' },
+        { name: 'step_require_writer_generation_insert' },
+        { name: 'step_require_writer_generation_update' },
       ]);
     } finally {
       sqlite.close();

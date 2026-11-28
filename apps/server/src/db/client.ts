@@ -104,7 +104,7 @@ export function openDbWithHandle(dbPath: string): OpenedDb {
   return { db, sqlite, close: () => sqlite.close() };
 }
 
-function registerStepWriterGeneration(sqlite: Database.Database): void {
+export function registerStepWriterGeneration(sqlite: Database.Database): void {
   sqlite.function('cairn_step_write_generation', { deterministic: true }, () => 1);
 }
 
