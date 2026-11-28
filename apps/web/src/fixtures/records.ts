@@ -815,6 +815,7 @@ export interface ChiefContent {
   noRunningTurn?: boolean;
   waitingRerun?: boolean;
   outage?: ChiefOutage;
+  outageMachines?: string[];
   fallbackModel?: string;
   hasEarlier?: boolean;
   quickReplies?: string[];

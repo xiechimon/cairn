@@ -389,7 +389,8 @@ function requeueTurn(
   const id = opts.incrementRecovery
     ? `stall-recover-${current.id}-${nextCount}`
     : `stall-recover-${current.id}-${cause}-${now}`;
-  postStallNote(deps, context, current, id, note, now, false);
+  const silentOfflineRequeue = context.kind === 'chief' && cause === 'dead_turn';
+  if (!silentOfflineRequeue) postStallNote(deps, context, current, id, note, now, false);
   emitWakeSignals(deps, context, current);
 }
 

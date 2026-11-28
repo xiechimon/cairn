@@ -80,6 +80,31 @@ describe('stop on a turn waiting for a machine targets that turn', () => {
   });
 });
 
+test('a Runner-offline outage names the machine it waits on so the transcript card owns the event', () => {
+  const chief = mapChief(
+    {
+      ...ENV,
+      outage: { reason: 'runner-offline', model: null, retryAt: null },
+    } as unknown as ChiefGetResponse,
+    {
+      threads: [
+        {
+          ...thread('u-wait'),
+          turnQueue: {
+            stepId: 'u-wait',
+            position: 1,
+            waitingFor: { machineId: 'mac-1', name: 'mac-mini' },
+            blocked: { kind: 'machine-offline', missing: [] },
+          },
+        },
+      ],
+      activeThreadId: 'chief-ttt',
+      messages: [],
+    },
+  );
+  expect(chief.outageMachines).toEqual(['mac-mini']);
+});
+
 test.each([
   ['ready', true],
   ['held', undefined],

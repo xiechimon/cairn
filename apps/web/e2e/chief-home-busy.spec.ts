@@ -55,7 +55,11 @@ const PROJECT = {
 
 type Row = { id: string; role: string; content: unknown; createdAt: number };
 type Pending = { messageId: string; state: 'steering' | 'queued' | 'held' };
-type Outage = { reason: 'quota'; model: string | null; retryAt: number | null } | null;
+type Outage = {
+  reason: 'quota' | 'capacity' | 'subscription' | 'runner-offline';
+  model: string | null;
+  retryAt: number | null;
+} | null;
 
 interface State {
   activeRun: { phase: string } | null;
@@ -68,6 +72,7 @@ interface State {
     stepId?: string;
     position: number;
     waitingFor: { machineId: string; name: string; running: number; capacity: number } | null;
+    blocked?: { kind: string; missing: string[] };
   } | null;
 }
 
@@ -233,6 +238,53 @@ test.describe('chief unavailable (T4)', () => {
     await evidenceShot(page, 'outage-desktop.png');
     await banner.getByRole('button', { name: '给 Coordinator 换模型' }).click();
     await expect(page).toHaveURL(/\/app\/settings\/routing#route-coordinator$/);
+  });
+
+  test('an offline Runner is one notice: the transcript card owns it, and no banner or queue card repeats it', async ({
+    page,
+  }) => {
+    await mockLive(page, {
+      activeRun: null,
+      pending: [],
+      fallbackModel: null,
+      outage: { reason: 'runner-offline', model: null, retryAt: null },
+      turnQueue: {
+        stepId: 'step-1',
+        position: 1,
+        waitingFor: { machineId: 'mx', name: 'mac-mini', running: 0, capacity: 1 },
+        blocked: { kind: 'machine-offline', missing: [] },
+      },
+      messages: [
+        FIRST,
+        {
+          id: 'runner-offline-mx',
+          role: 'system',
+          content: JSON.stringify({
+            kind: 'runner_offline',
+            machineId: 'mx',
+            machineName: 'mac-mini',
+            lastSeenAt: 10,
+            todos: [
+              {
+                id: 'todo-1',
+                seqNum: 9,
+                title: '修复看板拖拽后计数不刷新',
+                state: 'waiting',
+              },
+            ],
+            alternative: null,
+            backAt: null,
+            recoveredAt: null,
+          }),
+          createdAt: 11,
+        },
+      ],
+    });
+    await page.goto('/app');
+    const home = page.getByTestId('home-c');
+    await expect(home.getByTestId('chief-runner-offline')).toContainText('mac-mini 离线了');
+    await expect(home.getByTestId('chief-outage')).toHaveCount(0);
+    await expect(home.getByTestId('chief-queue-wait-card')).toHaveCount(0);
   });
 
   test('withdrawing a held message deletes it and puts the text back in the composer', async ({
