@@ -99,7 +99,8 @@ test('a stored Claude Sonnet 5.5 row resolves against the live model sources', a
   await expect(row).toContainText('Claude Code');
 
   const icon = row.getByTestId('frequent-model-mark').locator('svg');
-  await expect(icon).toHaveAttribute('viewBox', '6.2 6.2 235.6 235.6');
+  await expect(icon).toHaveAttribute('viewBox', LOBEHUB_MONO.claude.viewBox);
+  await expect(icon.locator('path').first()).toHaveAttribute('d', LOBEHUB_MONO.claude.paths[0]);
   await expect(icon.locator('path').first()).toHaveAttribute('fill', '#D97757');
 
   await expectThinkingLevels(row, 'Claude Sonnet 5.5', [

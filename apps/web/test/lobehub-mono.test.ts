@@ -2,7 +2,17 @@ import { createHash } from 'node:crypto';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ClaudeMark, DoubaoMark, GeminiMark, GrokMark, OpenAIMark } from '../src/components/brand-marks.js';
+import {
+  AnthropicMark,
+  AntigravityMark,
+  ClaudeCodeMark,
+  ClaudeMark,
+  DevinMark,
+  DoubaoMark,
+  GeminiMark,
+  GrokMark,
+  OpenAIMark,
+} from '../src/components/brand-marks.js';
 import { LOBEHUB_MONO } from '../src/icons/lobehub-mono.js';
 
 const upstream = {
@@ -63,6 +73,10 @@ describe('LobeHub mono icon provenance', () => {
     ['Claude', ClaudeMark, upstream.claude],
     ['OpenAI', OpenAIMark, upstream.openai],
     ['Grok', GrokMark, '423ea86d9b1ff2fe8c00d336fb191ed433c69f15ab617afe55bac6d4d0d45731'],
+    ['Anthropic', AnthropicMark, upstream.anthropic],
+    ['Antigravity', AntigravityMark, upstream.antigravity],
+    ['Claude Code', ClaudeCodeMark, upstream['claude-code']],
+    ['Devin', DevinMark, upstream.devin],
   ])('%s component matches its upstream brand mark', (_name, component, expected) => {
     const svg = renderToStaticMarkup(createElement(component));
     const viewBox = svg.match(/viewBox="([^"]+)"/)?.[1];
