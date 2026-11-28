@@ -96,6 +96,28 @@ describe('one browser tab per scope', () => {
     expect(tabs).toHaveLength(1);
   });
 
+  test('an invalid fill_secret ref is refused before the scoped tab is created', async () => {
+    const { provider, tabs } = sharedBrowser();
+    await expect(
+      runBrowserTool(
+        provider,
+        'browser_act',
+        {
+          actions: [
+            {
+              kind: 'fill_secret',
+              ref: 'not a ref',
+              secret: 'SITE',
+              origin: 'https://example.com',
+            },
+          ],
+        },
+        run('invalid-secret'),
+      ),
+    ).rejects.toMatchObject({ delivery: 'not_delivered' });
+    expect(tabs).toHaveLength(1);
+  });
+
   test('two scopes navigating in turn keep their own page, and a card tab closes with its step', async () => {
     const { provider, tabs } = sharedBrowser();
     await runBrowserTool(

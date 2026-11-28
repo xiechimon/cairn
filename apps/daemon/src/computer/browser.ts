@@ -382,6 +382,13 @@ function bareRef(ref: string): string {
   return ref.startsWith('@') ? ref.slice(1) : ref;
 }
 
+const SNAPSHOT_REF = /^[a-zA-Z0-9_-]+$/;
+
+function validateRefShape(kind: string, ref: string | undefined): void {
+  if (ref !== undefined && !SNAPSHOT_REF.test(bareRef(ref)))
+    throw new ComputerRefusal(`browser_act ${kind} needs a ref from browser_snapshot`);
+}
+
 function normalizeRef(ref: string): string {
   return `@${bareRef(ref)}`;
 }
@@ -425,8 +432,7 @@ async function collectExecute(
 }
 
 function actionArgv(action: z.infer<typeof actActionSchema>): string[] {
-  if (action.ref !== undefined && !/^[a-zA-Z0-9_-]+$/.test(action.ref.replace(/^@/, '')))
-    throw new ComputerRefusal(`browser_act ${action.kind} needs a ref from browser_snapshot`);
+  validateRefShape(action.kind, action.ref);
   const ref = action.ref !== undefined ? normalizeRef(action.ref) : undefined;
   switch (action.kind) {
     case 'click':
@@ -815,9 +821,9 @@ export async function runBrowserTool(
   }
   if (parsedAct?.success === true) {
     for (const action of parsedAct.data.actions) {
-      if (action.kind === 'fill_secret') continue;
       try {
-        actionArgv(action);
+        if (action.kind === 'fill_secret') validateRefShape(action.kind, action.ref);
+        else actionArgv(action);
       } catch (error) {
         if (error instanceof ComputerRefusal) refuse(error.message, started);
         throw error;

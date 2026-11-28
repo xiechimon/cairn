@@ -124,8 +124,10 @@ pre-existing and unchanged.
    No other machine and no other browser is tried.
 4. **Cairn's browser.** A `browser_navigate` with no candidate left goes to the pinned machine.
    When step 1 tried anyone, the result starts with the note that the owner's Chrome was not used
-   and why. `browser_snapshot` and `browser_act` never fall back into Cairn's browser: without a
-   page already produced there, they have no page to act on and fail after step 1 instead.
+   and why. The fallback call row stores those reasons, so replaying the same non-replay-safe
+   tool call keeps the note instead of returning only the browser facts. `browser_snapshot` and
+   `browser_act` never fall back into Cairn's browser: without a page already produced there,
+   they have no page to act on and fail after step 1 instead.
 
 Every completed browser answer opens with one line naming the browser (the owner's own Chrome
 or Cairn's) and the machine, so the Coordinator can say where a page was opened. Rows written
@@ -173,6 +175,7 @@ close it.
 | `capabilities.screenHandoff` | daemon presence report, Linux desktops only | `canHandOverScreen` (takeover, login challenge, handoff refusal), `browserOfferFor`, the screen viewer in `computer-screen.ts` | absent: no takeover is offered or opened |
 | `capabilities.stealthBrowser` | daemon presence report, Linux desktops only | `browserOfferFor` | absent: the stealth parameter and its text are not offered |
 | `ownerChrome` on a computer call | `machine-computer.ts` on the call sent to a daemon | `computer/dispatch.ts` | an old daemon strips it and treats the call as a call for its own browser |
+| `ownerChromeFallbackReasons` in a fallback call's stored params | `machine-computer.ts` when the fallback call is inserted; caller-supplied copies are stripped | `namingBrowserResult` for the first answer and a replay | absent: the call did not fall back, or it finished before this reason was stored |
 | the offered tool table | `browserOfferFor`, in the in-server runtime and in the Runner claim | the model | the in-server runtime reinstalls it when the offer changes; a Runner gets it with each claim |
 | finished browser calls (`computer_call` rows joined to their step) | the call store | `lastBrowserProducer` (candidate order and the browser that owns the current page) | none yet: the server host goes first; rows from another conversation never affect this one |
 | `CAIRN_AGENT_BROWSER` | the Mac app, in its runner's environment | `bundledAgentBrowser` | unset or not executable: unsupported |

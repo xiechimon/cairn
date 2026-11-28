@@ -1423,7 +1423,9 @@ export async function forwardComputerCall(
     stepRow,
     toolCallId: body.toolCallId,
     tool,
-    params: body.params,
+    params: isComputerBrowserTool(tool)
+      ? withoutOwnerChromeFallbackReasons(body.params)
+      : body.params,
     replaySafe: safe,
     signal: opts.signal,
   };
@@ -1530,6 +1532,7 @@ interface DispatchRequest {
   params: Record<string, unknown>;
   replaySafe: boolean;
   signal: AbortSignal | undefined;
+  ownerChromeFallbackReasons?: string;
 }
 
 type BrowserSecretRow = ReturnType<typeof requireBrowserPassword> & { browserOrigin: string };
@@ -1548,6 +1551,46 @@ const ownerChromeChains = new Map<
   string,
   { tool: ComputerTool; chain: Promise<ComputerRelayResult> }
 >();
+
+const OWNER_CHROME_FALLBACK_REASONS = 'ownerChromeFallbackReasons';
+
+function ownerChromeFallbackReasons(params: Record<string, unknown>): string | null {
+  const reasons = params[OWNER_CHROME_FALLBACK_REASONS];
+  return typeof reasons === 'string' && reasons !== '' ? reasons : null;
+}
+
+function withoutOwnerChromeFallbackReasons(
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!(OWNER_CHROME_FALLBACK_REASONS in params)) return params;
+  const stripped = { ...params };
+  delete stripped[OWNER_CHROME_FALLBACK_REASONS];
+  return stripped;
+}
+
+function cairnFallbackNote(reasons: string): string {
+  return `[Ran in Cairn's browser instead of your own Chrome. ${reasons}]`;
+}
+
+function ownerChromeUnusedNote(reasons: string): string {
+  return `[Your own Chrome was not used. ${reasons}]`;
+}
+
+function stripLeadingNote(text: string, note: string): string {
+  if (text === note) return '';
+  return text.startsWith(`${note}\n`) ? text.slice(note.length + 1) : text;
+}
+
+function prependNoteOnce(text: string, note: string): string {
+  if (text === note || text.startsWith(`${note}\n`)) return text;
+  return `${note}\n${text}`;
+}
+
+function insertNoteAfterFirstLine(text: string, note: string): string {
+  const [first = '', ...rest] = text.split('\n');
+  if (rest[0] === note) return text;
+  return [first, note, ...rest].join('\n');
+}
 
 function neutralizePageBrowserFacts(text: string): string {
   return text
@@ -1569,9 +1612,20 @@ function namingBrowserResult(
   result: ComputerRelayResult,
 ): ComputerRelayResult {
   if (!isComputerBrowserTool(row.tool)) return result;
-  const text = neutralizePageBrowserFacts(result.text);
+  const fallbackReasons = ownerChromeFallbackReasons(row.params);
+  const ranNote = fallbackReasons === null ? null : cairnFallbackNote(fallbackReasons);
+  const text = neutralizePageBrowserFacts(
+    ranNote === null ? result.text : stripLeadingNote(result.text, ranNote),
+  );
   if (row.state === 'error' && row.errorDelivery === 'not_delivered') {
-    return { ...result, text: noBrowserRun(text) };
+    const noBrowser = noBrowserRun(text);
+    return {
+      ...result,
+      text:
+        fallbackReasons === null
+          ? noBrowser
+          : insertNoteAfterFirstLine(noBrowser, ownerChromeUnusedNote(fallbackReasons)),
+    };
   }
   const host = db.select().from(machine).where(eq(machine.id, row.machineId)).get();
   const name = host?.capabilities?.computerName ?? host?.name ?? row.machineId;
@@ -1594,7 +1648,8 @@ ${text}`,
     ? `the owner's own Chrome on ${name}, through Browser MCP`
     : `Cairn's own browser on ${name}, separate from the owner's Chrome and its sign-ins`;
   const prefix = `[Browser: ${browser}; ${access}.]`;
-  return { ...result, text: `${prefix}\n${text}` };
+  const named = `${prefix}\n${text}`;
+  return { ...result, text: ranNote === null ? named : `${ranNote}\n${named}` };
 }
 
 const NO_BROWSER_RUN_PREFIX = '[Browser: no browser ran; nothing opened or acted.]';
@@ -1642,23 +1697,20 @@ async function throughOwnerChrome(
   const reasons = unused.join(' ').replace(/\s+/g, ' ').trim();
   if (!route.mayFallBackToCairn) {
     if (unavailable !== null) return unavailable;
-    throw new HttpError(
-      409,
-      `[Your own Chrome was not used. ${reasons}] ${COMPUTER_NOT_CONNECTED}`,
-    );
+    throw new HttpError(409, `${ownerChromeUnusedNote(reasons)} ${COMPUTER_NOT_CONNECTED}`);
   }
   try {
+    request.ownerChromeFallbackReasons = reasons;
     const result = await onTarget();
     if (result.text.startsWith(NO_BROWSER_RUN_PREFIX)) {
-      const [first, ...rest] = result.text.split('\n');
       return {
         ...result,
-        text: [first, `[Your own Chrome was not used. ${reasons}]`, ...rest].join('\n'),
+        text: insertNoteAfterFirstLine(result.text, ownerChromeUnusedNote(reasons)),
       };
     }
     return {
       ...result,
-      text: `[Ran in Cairn's browser instead of your own Chrome. ${reasons}]\n${result.text}`,
+      text: prependNoteOnce(result.text, cairnFallbackNote(reasons)),
     };
   } catch (error) {
     if (!(error instanceof HttpError)) throw error;
@@ -1667,7 +1719,7 @@ async function throughOwnerChrome(
       : error.message;
     throw new HttpError(
       error.status,
-      `[Your own Chrome was not used. ${reasons}] ${bare}`,
+      `${ownerChromeUnusedNote(reasons)} ${bare}`,
       error.reason,
       error.fields,
     );
@@ -1799,6 +1851,9 @@ async function dispatchComputerCall(
       ...storedParams(sanitizedParams),
       ...(browserTool
         ? { browserDriver: target.ownerChrome === true ? 'ownerChrome' : 'cairn' }
+        : {}),
+      ...(browserTool && request.ownerChromeFallbackReasons !== undefined
+        ? { [OWNER_CHROME_FALLBACK_REASONS]: request.ownerChromeFallbackReasons }
         : {}),
       ...(browserRows.length > 0
         ? {

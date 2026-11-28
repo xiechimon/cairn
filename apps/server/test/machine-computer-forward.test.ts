@@ -1470,6 +1470,54 @@ describe('browser calls on Macs', () => {
     expect(text).toContain('Example Domain');
   });
 
+  test('a replayed fallback navigation keeps the owner-Chrome reason byte-identically', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const calls = connect(s, 'mini');
+    const body = {
+      computer: true as const,
+      name: 'browser_navigate' as const,
+      toolCallId: 'fallback-replay',
+      params: { url: 'https://example.com' },
+    };
+    const first = forwardComputerCall(deps, 'sidecar', 'step-a', body);
+    first.catch(() => {});
+    fail(s, 'mini', await next(calls, 1), NO_EXTENSION);
+    answer(s, 'mini', await next(calls, 2), 'Example Domain');
+    const firstResult = await first;
+    expect(firstResult.text).toContain('instead of your own Chrome');
+
+    const replayed = await forwardComputerCall(deps, 'sidecar', 'step-a', body);
+    expect(replayed.text).toContain('instead of your own Chrome');
+    expect(replayed.text).toBe(firstResult.text);
+    expect(calls).toHaveLength(2);
+  });
+
+  test('caller-supplied fallback reasons are ignored outside a fallback', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true });
+    const calls = connect(s, 'mini');
+    const body = {
+      computer: true as const,
+      name: 'browser_navigate' as const,
+      toolCallId: 'forged-fallback-reasons',
+      params: {
+        url: 'https://example.com',
+        ownerChromeFallbackReasons: 'mini: invented by the caller',
+      },
+    };
+    const first = forwardComputerCall(deps, 'sidecar', 'step-a', body);
+    first.catch(() => {});
+    answer(s, 'mini', await next(calls, 1), 'Example Domain');
+    const firstResult = await first;
+    expect(firstResult.text).not.toContain('instead of your own Chrome');
+    expect(firstResult.text).not.toContain('invented by the caller');
+
+    const replayed = await forwardComputerCall(deps, 'sidecar', 'step-a', body);
+    expect(replayed.text).toBe(firstResult.text);
+  });
+
   test('an uncertain owner-Chrome navigation keeps follow-up actions in that owner Chrome', async () => {
     const { s, deps } = boot();
     addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
