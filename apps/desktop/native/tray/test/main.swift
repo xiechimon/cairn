@@ -22,8 +22,9 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--decode-only"
     exit(1)
   }
   let tray = TrayMenu(model, brand: nil) { _ in }
-  guard tray.menu.items.count == model.items.count else {
-    fputs("item count mismatch: \(tray.menu.items.count) vs \(model.items.count)\n", stderr)
+  let expected = model.items.count + model.items.reduce(0) { $0 + ($1.children?.count ?? 0) }
+  guard tray.menu.items.count == expected else {
+    fputs("item count mismatch: \(tray.menu.items.count) vs \(expected)\n", stderr)
     exit(1)
   }
   print("PASS: decoded \(model.items.count) items")
@@ -45,7 +46,12 @@ let tray = TrayMenu(fixture, brand: nil) { message in
 }
 let menu = tray.menu
 
-expect(menu.items.count == fixture.items.count, "menu has \(menu.items.count) items, model \(fixture.items.count)")
+guard let disclosureView = tray.buttons["keep-awake"], disclosureView.accessibilityRole() == .button else {
+  fputs("FAIL: keep-awake disclosure view missing\n", stderr)
+  exit(1)
+}
+
+expect(menu.items.count == fixture.items.count + 3, "menu includes prebuilt disclosure children")
 expect(menu.minimumWidth == BigButton.menuWidth, "menu width \(menu.minimumWidth)")
 expect(!menu.autoenablesItems, "menu auto-enables items")
 
@@ -148,12 +154,18 @@ expect(runner.accessibilityRole() == .checkBox && runner.accessibilitySubrole() 
 expect((runner.accessibilityValue() as? NSNumber)?.intValue == 1, "runner value")
 expect(runner.accessibilityLabel() == "本机执行机" && runner.accessibilityHelp() == "运行中", "runner label")
 
-let screenOn = tray.items["keep-awake-screen-on"]!
-let system = tray.items["keep-awake-system"]!
-let lidClosed = tray.items["keep-awake-lid-closed"]!
-expect(screenOn.state == .off && system.state == .on && lidClosed.state == .off, "mode checkmarks")
-expect(screenOn.isEnabled && system.isEnabled && lidClosed.isEnabled, "mode rows are disabled")
-expect(system.accessibilityLabel() == "屏幕可熄灭", "system label \(system.accessibilityLabel() ?? "nil")")
+guard let awake = tray.buttons["keep-awake"], let children = tray.disclosureChildren["keep-awake"], children.count == 3,
+  let screenOn = children[0].view as? AwakeChoice, let system = children[1].view as? AwakeChoice,
+  let lidClosed = children[2].view as? AwakeChoice else {
+  fputs("FAIL: disclosure view or children missing\n", stderr)
+  exit(1)
+}
+expect(awake.accessibilityRole() == .button && awake.accessibilitySubrole() == nil, "disclosure role")
+expect(awake.accessibilityHelp()?.contains("有任务运行时保持唤醒") == true, "disclosure help")
+expect(awake.detailLabel.stringValue == "屏幕可熄灭", "collapsed tile shows the current mode")
+expect(children.allSatisfy { $0.isHidden } && !awake.isAccessibilityExpanded(), "children initially hidden")
+expect((system.accessibilityValue() as? NSNumber)?.intValue == 1, "current choice mark")
+expect(system.accessibilityLabel() == "屏幕可熄灭", "system label")
 
 expect(!runner.acceptsFirstResponder && !runner.showsFocusRing, "a big button takes focus before any keyboard highlight")
 tray.highlightFromKeyboard = { false }
@@ -165,8 +177,9 @@ expect(runner.keyboardFocused && runner.showsFocusRing && runner.acceptsFirstRes
 tray.menu(menu, willHighlight: tray.items["settings"])
 expect(!runner.keyboardFocused, "focus stayed on a big button after leaving it")
 
-menu.performActionForItem(at: menu.index(of: lidClosed))
-expect(sent.last == "keep-awake-lid-closed", "picking lid mode sent \(sent.last ?? "nothing")")
+expect(awake.accessibilityPerformPress() && children.allSatisfy { !$0.isHidden } && awake.isAccessibilityExpanded(), "press expands children")
+expect(lidClosed.accessibilityPerformPress(), "enabled choice accepts press")
+expect(sent.last == "keep-awake-lid-closed" && children.allSatisfy { $0.isHidden }, "choice dispatches and collapses")
 
 menu.performActionForItem(at: menu.index(of: coordinator))
 expect(sent.last == "coordinator", "picking Coordinator sent \(sent.last ?? "nothing")")
@@ -175,19 +188,27 @@ tray.menuWillOpen(menu)
 expect(tray.isOpen && sent.last == "opened", "open was not reported")
 var updated = fixture.items
 updated[0].status = nil
-updated[updated.firstIndex { $0.id == "keep-awake-screen-on" }!].on = true
-updated[updated.firstIndex { $0.id == "keep-awake-system" }!].on = false
+let awakeIndex = updated.firstIndex { $0.id == "keep-awake" }!
+updated[awakeIndex].detail = "屏幕常亮"
+updated[awakeIndex].children![0].on = true
+updated[awakeIndex].children![1].on = false
+updated[awakeIndex].children![2].enabled = false
+updated[awakeIndex].children![2].tip = "需要接通电源"
 tray.apply(TrayMenuModel(label: fixture.label, items: updated))
 expect(tray.items["coordinator"] === coordinator, "an update with the same rows rebuilt the menu while open")
 expect(coordinator.title == "Coordinator", "the open menu did not update in place: \(coordinator.title)")
-expect(screenOn.state == .on && system.state == .off, "the open mode rows did not update in place")
+expect(awake.detailLabel.stringValue == "屏幕常亮", "host update changes the tile subtitle in place")
+expect((screenOn.accessibilityValue() as? NSNumber)?.intValue == 1 && (system.accessibilityValue() as? NSNumber)?.intValue == 0, "the open mode rows did not update in place")
+expect(!lidClosed.isAccessibilityEnabled() && lidClosed.accessibilityHelp() == "需要接通电源", "disabled choice explains why")
+let previous = sent.last
+expect(!lidClosed.accessibilityPerformPress() && sent.last == previous, "disabled choice does not dispatch")
 
 let shorter = Array(updated.dropFirst(2))
 tray.apply(TrayMenuModel(label: fixture.label, items: shorter))
-expect(tray.pending != nil && menu.items.count == updated.count, "rows were added or removed while the menu was open")
+expect(tray.pending != nil && menu.items.count == updated.count + 3, "rows were added or removed while the menu was open")
 tray.menuDidClose(menu)
 expect(!tray.isOpen && sent.last == "closed", "close was not reported")
-expect(tray.pending == nil && menu.items.count == shorter.count, "the deferred menu was not applied on close")
+expect(tray.pending == nil && menu.items.count == shorter.count + 3, "the deferred menu was not applied on close")
 
 let skeleton = TrayMenuModel(label: "Cairn", items: [])
 tray.apply(skeleton)

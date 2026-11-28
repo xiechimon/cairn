@@ -37,6 +37,9 @@ final class BigButton: NSView {
   let titleLabel = NSTextField(labelWithString: "")
   let detailLabel = NSTextField(labelWithString: "")
   private let choose: () -> Void
+  var disclosure = false { didSet { needsDisplay = true } }
+  var expanded = false { didSet { needsDisplay = true } }
+  var help: String?
 
   init(content: ButtonContent, choose: @escaping () -> Void) {
     self.content = content
@@ -63,7 +66,7 @@ final class BigButton: NSView {
   required init?(coder: NSCoder) { nil }
 
   override var isFlipped: Bool { true }
-  override var acceptsFirstResponder: Bool { keyboardFocused && content.enabled }
+  override var acceptsFirstResponder: Bool { content.enabled && (keyboardFocused || expanded) }
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
   var pill: NSRect { bounds.insetBy(dx: 6, dy: 2) }
@@ -142,7 +145,9 @@ final class BigButton: NSView {
 
     let ink: NSColor = content.on ? .white : (content.enabled ? .labelColor : .tertiaryLabelColor)
     draw(symbol: content.symbol, size: 13, color: ink, centeredIn: badge)
-    if content.on {
+    if disclosure {
+      draw(symbol: expanded ? "chevron.down" : "chevron.right", size: 12, color: .secondaryLabelColor, centeredIn: checkmark)
+    } else if content.on {
       draw(symbol: "checkmark", size: 12, color: .labelColor, centeredIn: checkmark)
     }
   }
@@ -206,11 +211,12 @@ final class BigButton: NSView {
   }
 
   override func isAccessibilityElement() -> Bool { true }
-  override func accessibilityRole() -> NSAccessibility.Role? { .checkBox }
-  override func accessibilitySubrole() -> NSAccessibility.Subrole? { .switch }
+  override func accessibilityRole() -> NSAccessibility.Role? { disclosure ? .button : .checkBox }
+  override func accessibilitySubrole() -> NSAccessibility.Subrole? { disclosure ? nil : .switch }
+  override func isAccessibilityExpanded() -> Bool { expanded }
   override func accessibilityLabel() -> String? { content.title }
-  override func accessibilityHelp() -> String? { content.detail }
-  override func accessibilityValue() -> Any? { NSNumber(value: content.on ? 1 : 0) }
+  override func accessibilityHelp() -> String? { disclosure ? [content.detail, help].compactMap { $0 }.joined(separator: ", ") : content.detail }
+  override func accessibilityValue() -> Any? { disclosure ? nil : NSNumber(value: content.on ? 1 : 0) }
   override func isAccessibilityEnabled() -> Bool { content.enabled }
   override func accessibilityChildren() -> [Any]? { [] }
 

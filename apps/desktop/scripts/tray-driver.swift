@@ -96,9 +96,17 @@ func openMenuItems(pid: pid_t) -> [AXUIElement] {
   return menus.flatMap { axChildren($0) }.filter { axRole($0) == kAXMenuItemRole }
 }
 
+func openMenuTargets(pid: pid_t) -> [AXUIElement] {
+  func descendants(_ element: AXUIElement, depth: Int) -> [AXUIElement] {
+    guard depth < 5 else { return [] }
+    return axChildren(element).flatMap { [$0] + descendants($0, depth: depth + 1) }
+  }
+  return openMenuItems(pid: pid).flatMap { [$0] + descendants($0, depth: 0) }
+}
+
 func describeMenuItem(_ element: AXUIElement) -> [String: Any] {
   var entry: [String: Any] = [
-    "title": axString(element, kAXTitleAttribute) ?? "",
+    "title": axString(element, kAXTitleAttribute) ?? axString(element, kAXDescriptionAttribute) ?? "",
     "label": axString(element, kAXDescriptionAttribute) ?? "",
     "enabled": axBool(element, kAXEnabledAttribute),
     "selected": axBool(element, kAXSelectedAttribute),
@@ -529,13 +537,13 @@ func run(_ step: [String: Any]) -> [String: Any] {
     }
     return ["ok": true]
   case "menuItems":
-    return ["ok": true, "items": openMenuItems(pid: pid).map(describeMenuItem)]
+    return ["ok": true, "items": openMenuTargets(pid: pid).map(describeMenuItem)]
   case "clickMenuItem":
     guard let title = step["title"] as? String else { return ["ok": false, "error": "no title"] }
     var found: CGRect?
     let deadline = ProcessInfo.processInfo.systemUptime + 2
     repeat {
-      if let element = openMenuItems(pid: pid).first(where: { matchesMenuItem($0, title) }),
+      if let element = openMenuTargets(pid: pid).first(where: { matchesMenuItem($0, title) }),
         let rect = axRect(element), !rect.isEmpty
       {
         found = rect

@@ -15,6 +15,7 @@ import {
 } from '@cairn/shared';
 import { glyphOf, isWaiting, type TaskEntry, type TasksView } from '../board/tasks-sections.js';
 import { threadHref } from '../board/thread-copy.js';
+import { machineDisplayName } from '../components/machine-display-name.js';
 import type { GlyphKind } from '../components/status-glyph.js';
 import type { TVars } from '../i18n/translate.js';
 import { formatTokens } from '../usage/usage-model.js';
@@ -229,7 +230,7 @@ function machineGroup(machine: TrayMachine, now: number): TrayGroup {
   }
   return {
     key: `machine:${machine.id}`,
-    label: machine.name,
+    label: machineDisplayName(machine),
     literal: true,
     os: machine.capabilities,
     meta: machineMeta(machine),

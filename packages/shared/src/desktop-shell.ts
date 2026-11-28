@@ -148,7 +148,60 @@ export const NATIVE_TRAY_GLYPHS = [
 
 export type NativeTrayGlyph = (typeof NATIVE_TRAY_GLYPHS)[number];
 
+const trayChoiceSchema = z.strictObject({
+  kind: z.literal('choice'),
+  id: z.enum(['keep-awake-screen-on', 'keep-awake-system', 'keep-awake-lid-closed']),
+  title: trayText,
+  on: z.boolean(),
+  enabled: z.boolean(),
+  tip: trayText.optional(),
+});
+
+export const keepAwakeDisclosureSchema = z.strictObject({
+  kind: z.literal('disclosure'),
+  id: z.literal('keep-awake'),
+  title: trayText,
+  detail: trayText,
+  enabled: z.boolean(),
+  help: trayText.optional(),
+  children: z.tuple([
+    trayChoiceSchema.extend({ id: z.literal('keep-awake-screen-on') }),
+    trayChoiceSchema.extend({ id: z.literal('keep-awake-system') }),
+    trayChoiceSchema.extend({ id: z.literal('keep-awake-lid-closed') }),
+  ]),
+});
+
+export function createKeepAwakeDisclosure(input: {
+  title: string;
+  help: string;
+  titles: Record<KeepAwakeMode, string>;
+  unavailable: string;
+  mode: KeepAwakeMode;
+  enabled: boolean;
+  lidClosedAvailable: boolean;
+}): z.infer<typeof keepAwakeDisclosureSchema> {
+  const mode = input.mode === 'lid-closed' && !input.lidClosedAvailable ? 'system' : input.mode;
+  const choice = <M extends KeepAwakeMode>(key: M) => ({
+    kind: 'choice' as const,
+    id: KEEP_AWAKE_ITEM_IDS[key],
+    title: input.titles[key],
+    on: input.enabled && mode === key,
+    enabled: input.enabled && (key !== 'lid-closed' || input.lidClosedAvailable),
+    ...(key === 'lid-closed' && !input.lidClosedAvailable ? { tip: input.unavailable } : {}),
+  });
+  return {
+    kind: 'disclosure',
+    id: 'keep-awake',
+    title: input.title,
+    detail: input.titles[mode],
+    enabled: input.enabled,
+    help: input.help,
+    children: [choice('screen-on'), choice('system'), choice('lid-closed')],
+  };
+}
+
 export const nativeTrayItemSchema = z.discriminatedUnion('kind', [
+  keepAwakeDisclosureSchema,
   z.strictObject({
     kind: z.literal('row'),
     id: trayId,

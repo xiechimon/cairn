@@ -1,6 +1,8 @@
 import { PROBE_TOOL_CALL_LABEL, PROBE_TOOL_PILLS } from '../fixtures/core.js';
 
 export const EN: Record<string, string> = {
+  保持唤醒: 'Stay awake',
+  需要接通电源: 'Requires AC power',
   这里: 'this channel',
   '{channel} 频道': '{channel} channel',
   去看: 'Open',

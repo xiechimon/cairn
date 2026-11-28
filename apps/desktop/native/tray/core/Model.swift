@@ -19,7 +19,7 @@ struct Reading: Decodable, Equatable {
 }
 
 enum ItemKind: String, Decodable {
-  case row, header, `switch`, choice, command, separator
+  case row, header, `switch`, disclosure, choice, command, separator
 }
 
 struct TrayItem: Decodable, Equatable {
@@ -37,6 +37,8 @@ struct TrayItem: Decodable, Equatable {
   var on: Bool?
   var enabled: Bool?
   var key: String?
+  var help: String?
+  var children: [TrayItem]?
 
   init(kind: ItemKind, id: String) {
     self.kind = kind
@@ -50,7 +52,9 @@ struct TrayMenuModel: Decodable, Equatable {
   let label: String
   let items: [TrayItem]
 
-  var shape: [String] { items.map { "\($0.kind.rawValue):\($0.id)" } }
+  var shape: [String] { items.map { item in
+    "\(item.kind.rawValue):\(item.id):" + (item.children ?? []).map { "\($0.kind.rawValue):\($0.id)" }.joined(separator: ",")
+  } }
 }
 
 struct IconModel: Decodable, Equatable {

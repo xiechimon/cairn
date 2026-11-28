@@ -17,6 +17,9 @@ final class Helper: NSObject, NSApplicationDelegate {
     let tray = TrayMenu(TrayMenuModel(label: "Cairn", items: []), brand: idle) { [weak self] message in
       self?.forward(message)
     }
+    (NSApp as? TrayApplication)?.disclosureKey = { [weak tray] event in
+      tray?.handleDisclosureKey(event) ?? false
+    }
     let status = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     status.button?.image = idle
     status.button?.setAccessibilityLabel("Cairn")
@@ -75,7 +78,7 @@ guard arguments.count == 2 else {
   Channel.log("usage: CairnTray <assets directory>")
   exit(64)
 }
-let app = NSApplication.shared
+let app = TrayApplication.shared
 app.setActivationPolicy(.accessory)
 let helper = Helper(assets: arguments[1])
 app.delegate = helper

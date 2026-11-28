@@ -1,12 +1,20 @@
 import {
   type DesktopTrayOpen,
   type DesktopTrayState,
-  isKeepAwakeMode,
+  keepAwakeModeForItemId,
   type NativeTrayMenu,
 } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
-import { ChartColumn, Laptop, Settings } from 'lucide-react';
+import {
+  ChartColumn,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Coffee,
+  Laptop,
+  Settings,
+} from 'lucide-react';
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -29,7 +37,6 @@ import { tasksFromQuery } from '../board/tasks-sections.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { MachineIcon } from '../components/machine-label.js';
-import { SegmentedRadio } from '../components/segmented.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
@@ -45,7 +52,7 @@ import {
   trayUsage,
 } from './tray-groups.js';
 import { TrayHeadMeta } from './tray-meta.js';
-import { RUNNER_WORD, trayMenuForHost } from './tray-native.js';
+import { RUNNER_WORD, trayMenuForHost, trayMenuModel } from './tray-native.js';
 
 const ON_MAC = typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh');
 
@@ -194,6 +201,8 @@ export function TrayPage() {
   const say = (text: TrayText) => t(text.key, text.vars);
   const rootRef = useRef<HTMLElement | null>(null);
   const lastPublishedRef = useRef<string>('');
+  const [expanded, setExpanded] = useState(false);
+  const awakeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (bridge === null) return;
@@ -220,24 +229,29 @@ export function TrayPage() {
   }, [bridge]);
 
   useEffect(() => {
-    const forget = () => (document.activeElement as HTMLElement | null)?.blur();
+    const forget = () => {
+      setExpanded(false);
+      (document.activeElement as HTMLElement | null)?.blur();
+    };
     window.addEventListener('blur', forget);
     return () => window.removeEventListener('blur', forget);
   }, []);
 
-  const menu = useMemo(
-    () =>
-      trayMenuForHost({
-        groups: allGroups,
-        usage,
-        coordinatorBusy,
-        state,
-        userName: user.displayName,
-        now,
-        t,
-      }),
+  const input = useMemo(
+    () => ({
+      groups: allGroups,
+      usage,
+      coordinatorBusy,
+      state,
+      userName: user.displayName,
+      now,
+      t,
+    }),
     [allGroups, usage, coordinatorBusy, state, user.displayName, now, t],
   );
+  const model = useMemo(() => trayMenuModel(input), [input]);
+  const menu = useMemo(() => trayMenuForHost(input, model), [input, model]);
+  const awake = model.items.find((item) => item.kind === 'disclosure' && item.id === 'keep-awake');
   useEffect(() => {
     if (bridge === null || !stateReady) return;
     const serialized = JSON.stringify(menu);
@@ -249,37 +263,7 @@ export function TrayPage() {
   const open = (target: DesktopTrayOpen) => bridge?.open(target);
   const runner = state?.runner ?? 'starting';
   const runnerOn = runner === 'on' || runner === 'starting';
-  const rawKeepAwake: unknown = state?.keepAwake;
-  const storedKeepAwake =
-    rawKeepAwake === true ? 'screen-on' : isKeepAwakeMode(rawKeepAwake) ? rawKeepAwake : 'system';
-  const lidClosedAvailable = state?.lidClosedAvailable ?? false;
-  const keepAwake =
-    storedKeepAwake === 'lid-closed' && !lidClosedAvailable ? 'system' : storedKeepAwake;
   const accent = state?.accent == null ? {} : { '--tray-accent': state.accent };
-  const keepAwakeOptions = [
-    {
-      value: 'screen-on' as const,
-      label: t('屏幕常亮'),
-      testId: 'tray-keep-awake-screen-on',
-      disabled: bridge === null,
-    },
-    {
-      value: 'system' as const,
-      label: t('屏幕可熄灭'),
-      testId: 'tray-keep-awake-system',
-      disabled: bridge === null,
-    },
-    ...(lidClosedAvailable
-      ? [
-          {
-            value: 'lid-closed' as const,
-            label: t('合盖继续运行'),
-            testId: 'tray-keep-awake-lid-closed',
-            disabled: bridge === null,
-          },
-        ]
-      : []),
-  ];
 
   return (
     <section
@@ -288,7 +272,15 @@ export function TrayPage() {
       data-testid="tray-popover"
       className={cn('tray-pop', !ON_MAC && 'tray-pop-opaque')}
       style={accent as CSSProperties}
-      onKeyDown={(event) => moveFocus(event, () => bridge?.hide())}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && expanded) {
+          event.preventDefault();
+          setExpanded(false);
+          awakeRef.current?.focus();
+          return;
+        }
+        moveFocus(event, () => bridge?.hide());
+      }}
     >
       <div data-testid="tray-rows" className="flex flex-col">
         <TrayItem
@@ -298,7 +290,11 @@ export function TrayPage() {
           onClick={() => open({ kind: 'path', path: '/app' })}
         />
         {groups.map((group) => (
-          <section key={group.key} aria-label={t(group.label)} className="flex flex-col">
+          <section
+            key={group.key}
+            aria-label={group.literal ? group.label : t(group.label)}
+            className="flex flex-col"
+          >
             <h2 className="tray-head">
               <span className="tray-head-name">
                 {group.os !== undefined && (
@@ -374,19 +370,93 @@ export function TrayPage() {
         </Button>
       </div>
 
-      <div className="flex flex-col">
-        <h2 className="tray-head">
-          <span className="tray-head-name">{t('有任务运行时保持唤醒')}</span>
-        </h2>
-        <SegmentedRadio
-          value={keepAwake}
-          options={keepAwakeOptions}
-          label={t('有任务运行时保持唤醒')}
-          className="h-auto w-full flex-col items-stretch"
-          optionHandle="w-full justify-start"
-          onChange={(mode) => bridge?.setKeepAwake(mode)}
-        />
-      </div>
+      {awake !== undefined && (
+        <div className="tray-awake">
+          <Button
+            ref={awakeRef}
+            variant="ghost"
+            className="tray-tile tray-awake-tile"
+            aria-label={awake.title}
+            aria-description={[awake.detail, awake.help].filter(Boolean).join('. ')}
+            aria-expanded={expanded}
+            disabled={!awake.enabled || bridge === null}
+            onClick={() => setExpanded((value) => !value)}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowRight' && !expanded) {
+                event.preventDefault();
+                event.stopPropagation();
+                setExpanded(true);
+              }
+            }}
+          >
+            <span className="tray-badge">
+              <Coffee className="size-4" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="tray-tile-title">{awake.title}</span>
+              <span className="tray-tile-sub">{awake.detail}</span>
+            </span>
+            {expanded ? (
+              <ChevronDown className="size-4" aria-hidden="true" />
+            ) : (
+              <ChevronRight className="size-4" aria-hidden="true" />
+            )}
+          </Button>
+          {expanded && (
+            <div
+              role="radiogroup"
+              aria-label={awake.title}
+              className="tray-awake-choices"
+              onKeyDown={(event) => {
+                const step =
+                  event.key === 'ArrowDown' || event.key === 'ArrowRight'
+                    ? 1
+                    : event.key === 'ArrowUp' || event.key === 'ArrowLeft'
+                      ? -1
+                      : 0;
+                if (!step) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const choices = [
+                  ...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:enabled'),
+                ];
+                const index = choices.indexOf(document.activeElement as HTMLButtonElement);
+                choices[(index + step + choices.length) % choices.length]?.focus();
+              }}
+            >
+              {awake.children
+                .filter((child) => ON_MAC || child.id !== 'keep-awake-lid-closed')
+                .map((child) => (
+                  <Button
+                    key={child.id}
+                    variant="ghost"
+                    role="radio"
+                    aria-checked={child.on}
+                    aria-label={child.title}
+                    aria-description={child.tip}
+                    disabled={!child.enabled || bridge === null}
+                    className="tray-item tray-awake-choice"
+                    data-testid={`tray-${child.id}`}
+                    onClick={(event) => {
+                      const keyboard = event.detail === 0;
+                      const mode = keepAwakeModeForItemId(child.id);
+                      if (mode === null || !child.enabled) return;
+                      bridge?.setKeepAwake(mode);
+                      setExpanded(false);
+                      if (keyboard) awakeRef.current?.focus();
+                    }}
+                  >
+                    <span className="tray-item-glyph">
+                      {child.on && <Check className="size-4" aria-hidden="true" />}
+                    </span>
+                    <span className="tray-item-label">{child.title}</span>
+                    {child.tip && <span className="tray-item-hint">{child.tip}</span>}
+                  </Button>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="tray-rule" aria-hidden="true" />
       <div className="flex flex-col">

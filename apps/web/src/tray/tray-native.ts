@@ -5,8 +5,8 @@ import type {
   NativeTrayMenu,
 } from '@cairn/shared';
 import {
+  createKeepAwakeDisclosure,
   isKeepAwakeMode,
-  KEEP_AWAKE_ITEM_IDS,
   NATIVE_TRAY_MAX_ID,
   NATIVE_TRAY_MAX_ITEMS,
   NATIVE_TRAY_MAX_TEXT,
@@ -176,13 +176,18 @@ export function trayMenuModel({
   const storedMode =
     rawKeepAwake === true ? 'screen-on' : isKeepAwakeMode(rawKeepAwake) ? rawKeepAwake : 'system';
   const lidClosedAvailable = state?.lidClosedAvailable ?? false;
-  const effectiveMode = storedMode === 'lid-closed' && !lidClosedAvailable ? 'system' : storedMode;
-  const choice = (mode: keyof typeof KEEP_AWAKE_ITEM_IDS, title: string): NativeTrayItem => ({
-    kind: 'choice',
-    id: KEEP_AWAKE_ITEM_IDS[mode],
-    title: clampText(title),
-    on: state !== null && effectiveMode === mode,
+  const disclosure = createKeepAwakeDisclosure({
+    title: clampText(t('保持唤醒')),
+    help: clampText(t('有任务运行时保持唤醒')),
+    titles: {
+      'screen-on': clampText(t('屏幕常亮')),
+      system: clampText(t('屏幕可熄灭')),
+      'lid-closed': clampText(t('合盖继续运行')),
+    },
+    unavailable: clampText(t('需要接通电源')),
+    mode: storedMode,
     enabled: state !== null,
+    lidClosedAvailable,
   });
   const controlItems: NativeTrayItem[] = [
     { kind: 'separator', id: 'controls-rule' },
@@ -195,16 +200,14 @@ export function trayMenuModel({
       on: runner === 'on' || runner === 'starting',
       enabled: state !== null && runner !== 'starting',
     },
-    { kind: 'header', id: 'keep-awake-title', title: clampText(t('有任务运行时保持唤醒')) },
-    choice('screen-on', t('屏幕常亮')),
-    choice('system', t('屏幕可熄灭')),
-    ...(lidClosedAvailable ? [choice('lid-closed', t('合盖继续运行'))] : []),
+    disclosure,
     { kind: 'command', id: 'settings', title: clampText(t('设置')), key: ',' },
     { kind: 'separator', id: 'account-rule' },
     { kind: 'row', id: 'user', title: clampText(userName), image: 'user' },
     { kind: 'command', id: 'quit', title: clampText(t('退出 Cairn')), key: 'q' },
   ];
-  const headBudget = Math.max(0, NATIVE_TRAY_MAX_ITEMS - controlItems.length);
+  const legacyExpansion = typeof rawKeepAwake === 'boolean' ? 0 : lidClosedAvailable ? 3 : 2;
+  const headBudget = Math.max(0, NATIVE_TRAY_MAX_ITEMS - controlItems.length - legacyExpansion);
   const items = [...headItems.slice(0, headBudget), ...controlItems].slice(
     0,
     NATIVE_TRAY_MAX_ITEMS,
@@ -225,27 +228,34 @@ export interface LegacyCompatibleTrayMenu {
   items: Array<NativeTrayItem | LegacyKeepAwakeSwitchItem>;
 }
 
-export function trayMenuForHost(input: TrayMenuInput): NativeTrayMenu | LegacyCompatibleTrayMenu {
-  const menu = trayMenuModel(input);
+export function trayMenuForHost(
+  input: TrayMenuInput,
+  menu = trayMenuModel(input),
+): NativeTrayMenu | LegacyCompatibleTrayMenu {
   const rawKeepAwake: unknown = input.state?.keepAwake;
-  if (typeof rawKeepAwake !== 'boolean') return menu;
   const items: Array<NativeTrayItem | LegacyKeepAwakeSwitchItem> = [];
-  let inserted = false;
   for (const item of menu.items) {
-    if (item.id === 'keep-awake-title' || item.kind === 'choice') {
-      if (!inserted) {
-        inserted = true;
-        items.push({
-          kind: 'switch',
-          id: 'keep-awake',
-          title: clampText(input.t('屏幕常亮')),
-          on: rawKeepAwake,
-          enabled: true,
-        });
-      }
+    if (item.kind !== 'disclosure') {
+      items.push(item);
       continue;
     }
-    items.push(item);
+    if (typeof rawKeepAwake === 'boolean') {
+      items.push({
+        kind: 'switch',
+        id: 'keep-awake',
+        title: clampText(input.t('屏幕常亮')),
+        on: rawKeepAwake,
+        enabled: true,
+      });
+    } else {
+      items.push({ kind: 'header', id: 'keep-awake-title', title: item.help ?? '' });
+      for (const child of item.children) {
+        if (child.id === 'keep-awake-lid-closed' && input.state?.lidClosedAvailable !== true)
+          continue;
+        const { tip: _tip, ...flat } = child;
+        items.push(flat);
+      }
+    }
   }
   return { label: menu.label, items };
 }

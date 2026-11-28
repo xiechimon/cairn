@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { nativeTrayMenuSchema, parseNativeTrayMenu } from '@cairn/shared/desktop-shell';
+import {
+  nativeTrayMenuSchema,
+  parseNativeTrayMenu,
+  type NativeTrayItem,
+} from '@cairn/shared/desktop-shell';
 import { describe, expect, test } from 'vitest';
 import {
   createNativeTrayMenuReceiver,
@@ -8,6 +12,13 @@ import {
   skeletonTrayMenu,
   withHostState,
 } from '../src/native-tray.js';
+
+const itemById = (menu: ReturnType<typeof skeletonTrayMenu>, id: string) =>
+  menu.items
+    .flatMap<NativeTrayItem>((item) =>
+      item.kind === 'disclosure' ? [item, ...item.children] : [item],
+    )
+    .find((item) => item.id === id);
 
 describe('native keep-awake mode rows', () => {
   test('skeleton mode rows map to mode actions', () => {
@@ -30,9 +41,9 @@ describe('native keep-awake mode rows', () => {
       lidClosedAvailable: false,
       runner: 'on',
     });
-    expect(menu.items.some((item) => item.id === 'keep-awake-lid-closed')).toBe(false);
-    expect(menu.items.find((item) => item.id === 'keep-awake-system')).toMatchObject({ on: true });
-    expect(menu.items.find((item) => item.id === 'keep-awake-screen-on')).toMatchObject({
+    expect(itemById(menu, 'keep-awake-lid-closed')).toMatchObject({ enabled: false });
+    expect(itemById(menu, 'keep-awake-system')).toMatchObject({ on: true });
+    expect(itemById(menu, 'keep-awake-screen-on')).toMatchObject({
       on: false,
     });
   });
@@ -43,10 +54,10 @@ describe('native keep-awake mode rows', () => {
       lidClosedAvailable: true,
       runner: 'on',
     });
-    expect(menu.items.find((item) => item.id === 'keep-awake-lid-closed')).toMatchObject({
+    expect(itemById(menu, 'keep-awake-lid-closed')).toMatchObject({
       on: true,
     });
-    expect(menu.items.find((item) => item.id === 'keep-awake-system')).toMatchObject({
+    expect(itemById(menu, 'keep-awake-system')).toMatchObject({
       on: false,
     });
   });
@@ -57,13 +68,13 @@ describe('native keep-awake mode rows', () => {
       lidClosedAvailable: false,
       runner: 'on',
     });
-    expect(battery.items.some((item) => item.id === 'keep-awake-lid-closed')).toBe(false);
+    expect(itemById(battery, 'keep-awake-lid-closed')).toMatchObject({ enabled: false });
     const ac = nativeMenuWithHostState(null, 'zh', {
       keepAwake: 'lid-closed',
       lidClosedAvailable: true,
       runner: 'on',
     });
-    expect(ac.items.find((item) => item.id === 'keep-awake-lid-closed')).toMatchObject({
+    expect(itemById(ac, 'keep-awake-lid-closed')).toMatchObject({
       on: true,
     });
   });
@@ -143,16 +154,11 @@ describe('native keep-awake mode rows', () => {
     expect(withRestoredModes.items.map((item) => item.id)).toEqual([
       'coordinator',
       'runner',
-      'keep-awake-title',
-      'keep-awake-screen-on',
-      'keep-awake-system',
-      'keep-awake-lid-closed',
+      'keep-awake',
       'settings',
       'quit',
     ]);
-    expect(
-      withRestoredModes.items.find((item) => item.id === 'keep-awake-screen-on'),
-    ).toMatchObject({ on: true });
+    expect(itemById(withRestoredModes, 'keep-awake-screen-on')).toMatchObject({ on: true });
 
     const allBad = {
       label: 'Cairn',
@@ -184,5 +190,35 @@ describe('native keep-awake mode rows', () => {
     expect(receive({ label: 'Cairn', items: [{ kind: 'banner', id: 'x' }] })).toBeNull();
     expect(receive({ label: 'Cairn', items: [{ kind: 'banner', id: 'x' }] })).toBeNull();
     expect(logs.length).toBe(3);
+  });
+});
+
+test('host upgrades missing legacy lid choice and rejects disabled actions', () => {
+  const legacy = {
+    label: 'Cairn',
+    items: [
+      { kind: 'header' as const, id: 'keep-awake-title', title: 'Help' },
+      {
+        kind: 'choice' as const,
+        id: 'keep-awake-system' as const,
+        title: 'System',
+        on: true,
+        enabled: true,
+      },
+    ],
+  };
+  const menu = withHostState(
+    legacy,
+    { keepAwake: 'lid-closed', lidClosedAvailable: false, runner: 'off' },
+    'zh',
+  );
+  expect(menu.items.find((item) => item.id === 'keep-awake')).toMatchObject({
+    kind: 'disclosure',
+    children: [{}, { title: 'System', on: true }, { enabled: false, tip: '需要接通电源' }],
+  });
+  expect(nativeTrayAction(menu, 'keep-awake-lid-closed')).toBeNull();
+  expect(nativeTrayAction(menu, 'keep-awake-system')).toEqual({
+    kind: 'keep-awake',
+    mode: 'system',
   });
 });

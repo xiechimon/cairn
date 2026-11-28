@@ -63,3 +63,7 @@ Tray bridge state changes from `keepAwake: boolean` to `keepAwake: KeepAwakeMode
 - Reviewer: confirm-only independent pass
 - Reviewer-Model: openai-codex/gpt-6.2-sol
 - Findings: 0 blocking; confirm-only pass verified the prior findings were addressed
+
+## Current Mac menu presentation
+
+[Restore the keep-awake tile](tray-awake-button.md) supersedes the historical presentation above: the picker explains the AC requirement in a disabled row rather than hiding the mode on battery. The power policy is unchanged.

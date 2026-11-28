@@ -1,3 +1,4 @@
+export { machineDisplayName } from './machine-display-name.js';
 import type { MachineCapabilities } from '@cairn/shared';
 import { cn } from 'cn';
 import { Monitor } from 'lucide-react';
@@ -111,16 +112,6 @@ export function MachineIcon({
       )}
     </span>
   );
-}
-
-export function machineDisplayName(machine: {
-  name: string;
-  capabilities?: { computerName?: string; hostname?: string } | null;
-}): string {
-  const reported = machine.capabilities;
-  return reported?.computerName !== undefined && reported.hostname === machine.name
-    ? reported.computerName
-    : machine.name;
 }
 
 export function machineSecondary(

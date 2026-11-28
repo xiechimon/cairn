@@ -1,6 +1,8 @@
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import {
+  createKeepAwakeDisclosure,
+  NATIVE_TRAY_MAX_ITEMS,
   type DesktopRunnerState,
   type DesktopTrayOpen,
   KEEP_AWAKE_ITEM_IDS,
@@ -24,7 +26,17 @@ export type NativeTrayAction =
 
 export function nativeTrayAction(menu: NativeTrayMenu, id: unknown): NativeTrayAction | null {
   if (typeof id !== 'string') return null;
-  const item = menu.items.find((candidate) => candidate.id === id);
+  const item = menu.items
+    .flatMap<NativeTrayItem>((candidate) =>
+      candidate.kind === 'disclosure'
+        ? candidate.enabled
+          ? candidate.children
+          : []
+        : candidate.kind === 'choice'
+          ? []
+          : [candidate],
+    )
+    .find((candidate) => candidate.id === id);
   if (item === undefined) return null;
   switch (item.kind) {
     case 'row':
@@ -51,6 +63,8 @@ const SKELETON_COPY: Record<
   {
     open: string;
     heading: string;
+    title: string;
+    unavailable: string;
     screenOn: string;
     system: string;
     lidClosed: string;
@@ -60,6 +74,8 @@ const SKELETON_COPY: Record<
   zh: {
     open: '打开 Cairn',
     heading: '有任务运行时保持唤醒',
+    title: '保持唤醒',
+    unavailable: '需要接通电源',
     screenOn: '屏幕常亮',
     system: '屏幕可熄灭',
     lidClosed: '合盖继续运行',
@@ -68,6 +84,8 @@ const SKELETON_COPY: Record<
   en: {
     open: 'Open Cairn',
     heading: 'Stay awake while tasks run',
+    title: 'Stay awake',
+    unavailable: 'Requires AC power',
     screenOn: 'Keep the screen on',
     system: 'Let the screen sleep',
     lidClosed: 'Keep running with the lid closed',
@@ -75,42 +93,33 @@ const SKELETON_COPY: Record<
   },
 };
 
-function keepAwakeChoices(
+function keepAwakeTile(
   locale: DesktopLocale,
+  mode: KeepAwakeMode,
   lidClosedAvailable: boolean,
-  includeTitle: boolean,
-): NativeTrayItem[] {
+  enabled: boolean,
+  existing?: Extract<NativeTrayItem, { kind: 'disclosure' }>,
+  choices: Extract<NativeTrayItem, { kind: 'choice' }>[] = [],
+  help?: string,
+): Extract<NativeTrayItem, { kind: 'disclosure' }> {
   const copy = SKELETON_COPY[locale];
-  return [
-    ...(includeTitle
-      ? [{ kind: 'header' as const, id: 'keep-awake-title', title: copy.heading }]
-      : []),
-    {
-      kind: 'choice',
-      id: KEEP_AWAKE_ITEM_IDS['screen-on'],
-      title: copy.screenOn,
-      on: false,
-      enabled: true,
+  const titleFor = (id: string, fallback: string) =>
+    choices.find((choice) => choice.id === id)?.title ??
+    existing?.children.find((choice) => choice.id === id)?.title ??
+    fallback;
+  return createKeepAwakeDisclosure({
+    title: existing?.title ?? copy.title,
+    help: existing?.help ?? help ?? copy.heading,
+    titles: {
+      'screen-on': titleFor(KEEP_AWAKE_ITEM_IDS['screen-on'], copy.screenOn),
+      system: titleFor(KEEP_AWAKE_ITEM_IDS.system, copy.system),
+      'lid-closed': titleFor(KEEP_AWAKE_ITEM_IDS['lid-closed'], copy.lidClosed),
     },
-    {
-      kind: 'choice',
-      id: KEEP_AWAKE_ITEM_IDS.system,
-      title: copy.system,
-      on: true,
-      enabled: true,
-    },
-    ...(lidClosedAvailable
-      ? [
-          {
-            kind: 'choice' as const,
-            id: KEEP_AWAKE_ITEM_IDS['lid-closed'],
-            title: copy.lidClosed,
-            on: false,
-            enabled: true,
-          },
-        ]
-      : []),
-  ];
+    unavailable: copy.unavailable,
+    mode,
+    enabled,
+    lidClosedAvailable,
+  });
 }
 
 export function skeletonTrayMenu(locale: DesktopLocale): NativeTrayMenu {
@@ -126,7 +135,7 @@ export function skeletonTrayMenu(locale: DesktopLocale): NativeTrayMenu {
         open: { kind: 'path', path: '/app' },
       },
       { kind: 'separator', id: 'controls-rule' },
-      ...keepAwakeChoices(locale, true, true),
+      keepAwakeTile(locale, 'system', true, true),
       { kind: 'separator', id: 'account-rule' },
       { kind: 'command', id: 'quit', title: copy.quit, key: 'q' },
     ],
@@ -142,50 +151,52 @@ export function withHostState(
   },
   locale: DesktopLocale = 'en',
 ): NativeTrayMenu {
-  const effective =
-    state.keepAwake === 'lid-closed' && !state.lidClosedAvailable ? 'system' : state.keepAwake;
+  const existing = menu.items.find((item) => item.kind === 'disclosure');
+  const choices = menu.items.filter(
+    (item): item is Extract<NativeTrayItem, { kind: 'choice' }> => item.kind === 'choice',
+  );
+  const header = menu.items.find(
+    (item) => item.kind === 'header' && item.id === 'keep-awake-title',
+  );
+  const tile = keepAwakeTile(
+    locale,
+    state.keepAwake,
+    state.lidClosedAvailable,
+    true,
+    existing,
+    choices,
+    header?.title,
+  );
+  const first = menu.items.findIndex(
+    (item) =>
+      item.kind === 'disclosure' ||
+      item.kind === 'choice' ||
+      (item.kind === 'header' && item.id === 'keep-awake-title'),
+  );
   const filtered = menu.items.filter(
     (item) =>
-      item.kind !== 'choice' ||
-      item.id !== KEEP_AWAKE_ITEM_IDS['lid-closed'] ||
-      state.lidClosedAvailable,
+      item.kind !== 'disclosure' &&
+      item.kind !== 'choice' &&
+      !(item.kind === 'header' && item.id === 'keep-awake-title'),
   );
-  const hasChoices = filtered.some(
-    (item) => item.kind === 'choice' && keepAwakeModeForItemId(item.id) !== null,
-  );
-  let items = filtered;
-  if (!hasChoices) {
-    const hasTitle = filtered.some(
-      (item) => item.kind === 'header' && item.id === 'keep-awake-title',
+  let index = first;
+  if (index < 0) {
+    const runner = filtered.findIndex((item) => item.kind === 'switch' && item.id === 'runner');
+    const tail = filtered.findIndex(
+      (item) => item.id === 'settings' || item.id === 'account-rule' || item.id === 'quit',
     );
-    const synthesized = keepAwakeChoices(locale, state.lidClosedAvailable, !hasTitle);
-    const runnerIndex = filtered.findIndex(
-      (item) => item.kind === 'switch' && item.id === 'runner',
-    );
-    if (runnerIndex >= 0) {
-      items = [
-        ...filtered.slice(0, runnerIndex + 1),
-        ...synthesized,
-        ...filtered.slice(runnerIndex + 1),
-      ];
-    } else {
-      const tailIndex = filtered.findIndex(
-        (item) => item.id === 'settings' || item.id === 'account-rule' || item.id === 'quit',
-      );
-      items =
-        tailIndex >= 0
-          ? [...filtered.slice(0, tailIndex), ...synthesized, ...filtered.slice(tailIndex)]
-          : [...filtered, ...synthesized];
-    }
+    index = runner >= 0 ? runner + 1 : tail >= 0 ? tail : filtered.length;
   }
-  return {
-    ...menu,
-    items: items.map((item) => {
-      if (item.kind !== 'choice') return item;
-      const mode = keepAwakeModeForItemId(item.id);
-      return mode === null ? item : { ...item, on: mode === effective };
-    }),
-  };
+  filtered.splice(Math.min(index, filtered.length), 0, tile);
+  if (filtered.length > NATIVE_TRAY_MAX_ITEMS) {
+    const removable = filtered.findIndex(
+      (item) =>
+        item !== tile && item.id !== 'settings' && item.id !== 'quit' && item.id !== 'account-rule',
+    );
+    const indexToRemove = removable >= 0 ? removable : filtered.findIndex((item) => item !== tile);
+    if (indexToRemove >= 0) filtered.splice(indexToRemove, filtered.length - NATIVE_TRAY_MAX_ITEMS);
+  }
+  return { ...menu, items: filtered };
 }
 
 export function nativeMenuWithHostState(

@@ -12,9 +12,16 @@ import { compileTrayHelper } from './build-tray-helper.mjs';
 const fixture = fileURLToPath(new URL('../native/tray/test/fixture-menu.json', import.meta.url));
 const mac = process.platform === 'darwin';
 
-test('the native menu built from a page snapshot reads, focuses and updates right', {
+test('keep-awake disclosure exposes current mode and inline children', {
   skip: !mac,
 }, async () => {
+  const tile = skeletonTrayMenu('zh').items.find((item) => item.id === 'keep-awake');
+  assert.equal(tile?.kind, 'disclosure');
+  assert.equal(tile.detail, '屏幕可熄灭');
+  assert.deepEqual(
+    tile.children.map((item) => item.title),
+    ['屏幕常亮', '屏幕可熄灭', '合盖继续运行'],
+  );
   const fixtureMessage = JSON.parse(readFileSync(fixture, 'utf8'));
   nativeTrayMenuSchema.parse(fixtureMessage.menu);
   const dir = mkdtempSync(join(tmpdir(), 'cairn-tray-test-'));

@@ -8,7 +8,7 @@ import { expect, test } from 'vitest';
 import { EN } from '../src/i18n/en.js';
 import type { Locale } from '../src/i18n/locale.js';
 import { translate } from '../src/i18n/translate.js';
-import type { TrayGroup } from '../src/tray/tray-groups.js';
+import { trayGroups, type TrayMachine, type TrayGroup } from '../src/tray/tray-groups.js';
 import { machineReading, trayMenuForHost, trayMenuModel } from '../src/tray/tray-native.js';
 
 const quotaShare = 72;
@@ -60,7 +60,7 @@ const model = (locale: Locale, extra: Partial<Parameters<typeof trayMenuModel>[0
   });
 
 const byId = (menu: NativeTrayMenu, id: string): NativeTrayItem => {
-  const item = menu.items.find((candidate) => candidate.id === id);
+  const item = menu.items.flatMap<NativeTrayItem>((candidate) => candidate.kind === 'disclosure' ? [candidate, ...candidate.children] : [candidate]).find((candidate) => candidate.id === id);
   if (item === undefined) throw new Error(`no item ${id}`);
   return item;
 };
@@ -79,10 +79,7 @@ test('the native menu carries the tray content in order and passes the schema ma
     'usage',
     'controls-rule',
     'runner',
-    'keep-awake-title',
-    'keep-awake-screen-on',
-    'keep-awake-system',
-    'keep-awake-lid-closed',
+    'keep-awake',
     'settings',
     'account-rule',
     'user',
@@ -129,7 +126,7 @@ test('the menu speaks the app language through the same t() strings', () => {
   const menu = model('en');
   expect(byId(menu, 'coordinator')).toMatchObject({ status: 'Replying' });
   expect(byId(menu, 'runner')).toMatchObject({ title: 'Runner', detail: 'Running' });
-  expect(byId(menu, 'keep-awake-title')).toMatchObject({ title: 'Stay awake while tasks run' });
+  expect(byId(menu, 'keep-awake')).toMatchObject({ title: 'Stay awake', help: 'Stay awake while tasks run' });
   expect(byId(menu, 'keep-awake-screen-on')).toMatchObject({ title: 'Keep the screen on' });
   expect(byId(menu, 'keep-awake-system')).toMatchObject({ title: 'Let the screen sleep' });
   expect(byId(menu, 'keep-awake-lid-closed')).toMatchObject({ title: 'Keep running with the lid closed' });
@@ -196,10 +193,7 @@ test('with nothing waiting and no usage the menu says so and keeps the controls'
     'empty',
     'controls-rule',
     'runner',
-    'keep-awake-title',
-    'keep-awake-screen-on',
-    'keep-awake-system',
-    'keep-awake-lid-closed',
+    'keep-awake',
     'settings',
     'account-rule',
     'user',
@@ -223,11 +217,11 @@ test('the Runner switch follows every Runner state, and nothing toggles before m
   expect(byId(model('zh', { state: state({ keepAwake: 'screen-on' }) }), 'keep-awake-system')).toMatchObject({ on: false, enabled: true });
 });
 
-test('battery hides lid-closed and checks the effective system fallback', () => {
+test('battery disables lid-closed and checks the effective system fallback', () => {
   const menu = model('zh', {
     state: state({ keepAwake: 'lid-closed', lidClosedAvailable: false }),
   });
-  expect(menu.items.some((item) => item.id === 'keep-awake-lid-closed')).toBe(false);
+  expect(byId(menu, 'keep-awake-lid-closed')).toMatchObject({ enabled: false, tip: '需要接通电源' });
   expect(byId(menu, 'keep-awake-system')).toMatchObject({ on: true, enabled: true });
   expect(byId(menu, 'keep-awake-screen-on')).toMatchObject({ on: false, enabled: true });
   expect(nativeTrayMenuSchema.parse(menu)).toEqual(menu);
@@ -334,4 +328,44 @@ test('trayMenuForHost emits the legacy keep-awake switch for an older desktop ho
     kind: 'choice',
     on: true,
   });
+});
+
+ test('disclosure shows battery fallback and preserves flat host wire', () => {
+  const input = { groups: [], usage: null, coordinatorBusy: false, state: state({ keepAwake: 'lid-closed', lidClosedAvailable: false, runner: 'off' }), userName: 'User', now: NOW, t: t('zh') };
+  const tile = trayMenuModel(input).items.find((item) => item.id === 'keep-awake');
+  expect(tile).toMatchObject({ kind: 'disclosure', title: '保持唤醒', detail: '屏幕可熄灭', help: '有任务运行时保持唤醒', children: [{ on: false }, { on: true }, { enabled: false, tip: '需要接通电源' }] });
+  expect(trayMenuForHost(input).items).toContainEqual({ kind: 'choice', id: 'keep-awake-system', title: '屏幕可熄灭', on: true, enabled: true });
+});
+
+test('legacy null state omits lid and keeps both choices unchecked', () => {
+  const input = { groups: [], usage: null, coordinatorBusy: false, state: null, userName: 'User', now: NOW, t: t('zh') };
+  const wire = trayMenuForHost(input);
+  expect(wire.items.some((item) => item.id === 'keep-awake-lid-closed')).toBe(false);
+  for (const id of ['keep-awake-screen-on', 'keep-awake-system']) {
+    expect(wire.items.find((item) => item.id === id)).toMatchObject({ on: false, enabled: false });
+  }
+});
+
+test('legacy cap uses the available battery budget without dropping additional rows', () => {
+  const rows = Array.from({ length: 250 }, (_, n) => ({ key: String(n), title: String(n), glyph: 'working' as const, at: n, path: '/app' }));
+  const base = { groups: [{ key: 'many', label: 'Many', rows }], usage: null, coordinatorBusy: false, userName: 'User', now: NOW, t: t('zh') };
+  for (const available of [false, true]) {
+    const input = { ...base, state: state({ lidClosedAvailable: available }) };
+    const nested = trayMenuModel(input);
+    const flat = trayMenuForHost(input);
+    expect(flat.items).toHaveLength(200);
+    expect(nested.items.filter((item) => item.id.startsWith('many/'))).toHaveLength(available ? 188 : 189);
+    expect(flat.items.at(-1)?.id).toBe('quit');
+  }
+});
+
+test('tray groups and native headers use the Computers display name', () => {
+  const base = { id: 'one', name: 'host', kind: 'remote', online: true, running: [], queued: [], strain: [], capabilities: { hostname: 'host', computerName: 'My Mac' } } as unknown as TrayMachine;
+  const machines = [base, { ...base, id: 'two' }, { ...base, id: 'three', name: 'Custom' }, { ...base, id: 'four', capabilities: null }];
+  const grouped = trayGroups({ questions: [], entries: [] }, machines, NOW);
+  expect(grouped.map((group) => [group.key, group.label])).toEqual([['machine:one', 'My Mac'], ['machine:two', 'My Mac'], ['machine:three', 'Custom'], ['machine:four', 'host']]);
+  const menu = model('zh', { groups: grouped });
+  for (const [index, title] of ['My Mac', 'My Mac', 'Custom', 'host'].entries()) {
+    expect(byId(menu, grouped[index]!.key)).toMatchObject({ title });
+  }
 });

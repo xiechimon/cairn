@@ -447,7 +447,7 @@ try {
     (await driver.send({ cmd: 'menuItems', pid })).items.map((item) => item.title);
 
   const nativeMenu = {
-    name: 'native menu: skeleton while the page loads, content, keyboard, keep-awake modes, Esc and Settings',
+    name: 'native menu: keep-awake disclosure stays open through click and keyboard selection',
     result: 'red',
     detail: '',
   };
@@ -535,53 +535,68 @@ try {
       await app.evaluate(({ app: electronApp }) => electronApp.getPath('userData')),
       'keep-awake',
     );
-    const screenOnTitle = content.includes('Keep the screen on')
-      ? 'Keep the screen on'
-      : '屏幕常亮';
-    const systemTitle = content.includes('Let the screen sleep')
-      ? 'Let the screen sleep'
-      : '屏幕可熄灭';
-    const lidTitle = content.includes('Keep running with the lid closed')
-      ? 'Keep running with the lid closed'
-      : '合盖继续运行';
+    const tile = content.includes('Stay awake') ? 'Stay awake' : '保持唤醒';
+    const english = tile === 'Stay awake';
     const choices = [
-      [screenOnTitle, 'screen-on'],
-      [lidTitle, 'lid-closed'],
-      [systemTitle, 'system'],
+      [english ? 'Keep the screen on' : '屏幕常亮', 'screen-on'],
+      [english ? 'Let the screen sleep' : '屏幕可熄灭', 'system'],
     ];
+    const saved = () =>
+      existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : '';
+    await openNativeMenu(helper);
     for (const [title, expected] of choices) {
-      if (!content.includes(title)) continue;
-      await openNativeMenu(helper);
-      const switched = await driver.send({
-        cmd: 'clickMenuItem',
-        pid: helper,
-        title,
-        hoverMs: 300,
-      });
-      assert.equal(
-        switched.ok,
-        true,
-        `the ${expected} menu row got no click: ${JSON.stringify(switched)}`,
-      );
-      assert.equal(
-        await waitForNativeMenu(helper, false),
-        true,
-        `clicking the ${expected} menu row left the menu open`,
-      );
-      const saved = () =>
-        existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : '';
+      assert.ok(!(await nativeTitles(helper)).includes(title), 'choices should begin collapsed');
+      const opened = await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile });
+      assert.equal(opened.ok, true, `disclosure click failed: ${JSON.stringify(opened)}`);
+      const deadline = Date.now() + OPEN_TIMEOUT_MS;
+      while (!(await nativeTitles(helper)).includes(title) && Date.now() < deadline) {
+        await driver.send({ cmd: 'sleep', ms: 100 });
+      }
+      assert.ok((await nativeTitles(helper)).includes(title), `choice ${title} not visible`);
+      const picked = await driver.send({ cmd: 'clickMenuItem', pid: helper, title });
+      assert.equal(picked.ok, true, `choice click failed: ${JSON.stringify(picked)}`);
+      assert.equal(await waitForNativeMenu(helper, true), true, 'choice closed the menu');
       const switchDeadline = Date.now() + OPEN_TIMEOUT_MS;
       while (saved() !== expected && Date.now() < switchDeadline) {
         await driver.send({ cmd: 'sleep', ms: 100 });
       }
-      assert.equal(saved(), expected, `clicking the ${expected} menu row saved ${saved()}`);
-      await driver.send({ cmd: 'sleep', ms: DISMISS_GAP_MS });
+      assert.equal(saved(), expected, `choice saved ${saved()}`);
     }
-    assert.equal(
-      readFileSync(keepAwakeChoice, 'utf8').trim(),
-      'system',
-      'the mode rows did not finish back on the default system mode',
-    );
+    await closeNativeMenu(helper);
+
+    await openNativeMenu(helper);
+    let focused = false;
+    for (let i = 0; i < content.length + 3; i += 1) {
+      await driver.send({ cmd: 'key', pid: helper, code: 125 });
+      const rows = (await driver.send({ cmd: 'menuItems', pid: helper })).items;
+      if (rows.some((row) => row.selected && (row.title === tile || row.viewLabel === tile))) {
+        focused = true;
+        break;
+      }
+    }
+    assert.ok(focused, 'keyboard could not focus the awake tile');
+    await driver.send({ cmd: 'key', pid: helper, code: 124 });
+    const keyboardDeadline = Date.now() + OPEN_TIMEOUT_MS;
+    while (!(await nativeTitles(helper)).includes(choices[0][0]) && Date.now() < keyboardDeadline) {
+      await driver.send({ cmd: 'sleep', ms: 100 });
+    }
+    assert.ok((await nativeTitles(helper)).includes(choices[0][0]), 'Right did not expand the tile');
+    await driver.send({ cmd: 'escape', pid: helper });
+    assert.equal(await waitForNativeMenu(helper, true), true, 'first Escape should only collapse');
+    assert.ok(!(await nativeTitles(helper)).includes(choices[0][0]), 'Escape did not collapse');
+    await driver.send({ cmd: 'key', pid: helper, code: 36 });
+    assert.ok((await nativeTitles(helper)).includes(choices[0][0]), 'Return did not expand the tile');
+    await driver.send({ cmd: 'key', pid: helper, code: 125 });
+    await driver.send({ cmd: 'key', pid: helper, code: 36 });
+    assert.equal(await waitForNativeMenu(helper, true), true, 'keyboard choice closed the menu');
+    const keyboardSaveDeadline = Date.now() + OPEN_TIMEOUT_MS;
+    while (saved() !== 'screen-on' && Date.now() < keyboardSaveDeadline) {
+      await driver.send({ cmd: 'sleep', ms: 100 });
+    }
+    assert.equal(saved(), 'screen-on', 'keyboard choice was not persisted');
+    await driver.send({ cmd: 'clickMenuItem', pid: helper, title: tile });
+    await driver.send({ cmd: 'clickMenuItem', pid: helper, title: choices[1][0] });
+    await closeNativeMenu(helper);
 
     await popoverWindow(({ BrowserWindow }, width) => {
       for (const candidate of BrowserWindow.getAllWindows())
@@ -644,7 +659,7 @@ try {
       await reopen(`${label} first`);
       await pause(800);
       const titles = await nativeTitles(pid);
-      const awake = titles.find((title) => title === 'Keep the screen on' || title === '屏幕常亮');
+      const awake = titles.find((title) => title === 'Stay awake' || title === '保持唤醒');
       for (const title of titles.filter(Boolean).slice(0, 6)) {
         await driver.send({ cmd: 'clickMenuItem', pid, title, hoverOnly: true, hoverMs: 450 });
       }
@@ -652,7 +667,6 @@ try {
       if (awake !== undefined) {
         await driver.send({ cmd: 'clickMenuItem', pid, title: awake, hoverMs: 400 });
         await pause(1_000);
-        await reopen(`${label} after the switch`);
         await pause(600);
         shot(`${label}-keep-awake-on`);
         for (let press = 0; press < 3; press += 1) {
