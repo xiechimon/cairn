@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createTodoRow, mockLive, TASK, THREAD } from './chief-home-mock';
+import { createTodoRow, mockLive, PROJECT, TASK, THREAD } from './chief-home-mock';
 
 for (const [label, phase, verified] of [
   ['done', 'done', false],
@@ -623,4 +623,65 @@ test('C27: a research report copies as its Markdown source from the artifact pan
   await expect(copy).toHaveAttribute('data-copied', '');
   await expect(copy).toHaveAccessibleName('已复制');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(source);
+});
+
+test('a mirrored task row keeps its status word and Open link inside a 390px viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const longName = 'no-deliverable-verify-1795835635071';
+  const channelTitle = 'Repair board counts across every column and the empty state';
+  await mockLive(page, {
+    threads: [
+      THREAD,
+      { ...THREAD, id: 'chief-long', projectId: 'proj-long', title: longName },
+    ],
+    projects: [{ ...PROJECT, id: 'proj-long', name: longName }],
+    messages: [
+      { id: 'request', role: 'user', content: 'Repair the board counts', createdAt: 10 },
+      {
+        id: 'report',
+        role: 'system',
+        content: JSON.stringify({
+          kind: 'thread-report',
+          todoId: TASK.id,
+          phase: 'done',
+          seqNum: TASK.seqNum,
+          title: channelTitle,
+          fromThreadId: 'chief-long',
+        }),
+        createdAt: 20,
+      },
+    ],
+    todos: [{ ...TASK, phase: 'done' }],
+  });
+  await page.goto('/app');
+  const row = page.getByTestId('home-c').getByTestId('chief-channel-mirror');
+  await expect(row).toHaveCount(1);
+  const open = row.getByRole('link');
+  await expect(open, 'one Open link on the row').toHaveText('去看');
+  const box = await open.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x, 'the Open link starts inside the row').toBeGreaterThan(0);
+  expect(
+    Math.round(box!.x + box!.width),
+    'the Open link stays inside the 390px viewport',
+  ).toBeLessThanOrEqual(390);
+  await expect(row).toContainText('已完成');
+  const titled = await row
+    .locator('[title]')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('title')));
+  expect(titled, 'the name and the title carry their full text').toEqual([
+    `${longName} 频道`,
+    channelTitle,
+  ]);
+  for (const span of await row.locator('[title]').all()) {
+    const width = await span.evaluate((node) => ({
+      client: node.clientWidth,
+      scroll: node.scrollWidth,
+    }));
+    expect(width.scroll, 'the long parts truncate instead of overflowing the row').toBeGreaterThan(
+      width.client,
+    );
+  }
 });
