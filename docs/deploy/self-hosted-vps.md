@@ -14,7 +14,8 @@ Run the single-tenant Cairn server behind Caddy automatic HTTPS on any Linux VPS
 Clone the repository onto the VPS and create `deploy/vps/.env` from the example file:
 
 ```sh
-cd deploy/vps
+git clone https://github.com/xiechimon/cairn.git cairn
+cd cairn/deploy/vps
 cp .env.example .env
 ```
 
@@ -89,16 +90,27 @@ All server state lives in the named Docker volume `cairn-data` mounted at `/data
 
 ## 5. Upgrade cleanly
 
-From the repository root on the VPS:
+From the repository checkout on the VPS, the `cairn` directory you cloned in step 1:
 
 ```sh
+cd ~/cairn
 git pull --ff-only
 cd deploy/vps
 docker compose up -d --build
+docker compose ps
 ```
+
+All server state lives in the `cairn-data` volume, so rebuilding the image keeps your account, and the server applies any pending schema migrations itself on start. Watch the first start of a new version until both services are healthy:
+
+```sh
+docker compose logs -f cairn
+```
+
+Export a whole-account archive (step 4) before an upgrade that touches storage. If the container exits instead of turning healthy, that log names the failing step; restore the volume from your snapshot, check out the previous release tag, and rebuild to get the earlier version back.
 
 ## Troubleshooting
 
 - **`cairn` container exits immediately with code 1**: `CAIRN_REQUIRE_TOKEN=1` requires non-empty `CAIRN_TOKEN` in `deploy/vps/.env` (the container never generates a default token on a non-loopback server). Check `docker compose logs cairn`.
 - **HTTPS handshake or ACME challenge fails**: verify DNS resolves `CAIRN_DOMAIN` to the VPS and host/cloud firewall allows inbound TCP `80` and `443`.
+- **Sign-in returns 403 behind your own reverse proxy or a nonstandard port**: the server compares the request's `Origin` with the public origin it was configured with. The compose template fills `CAIRN_WEB_ORIGIN` from `CAIRN_DOMAIN`, so fronting Cairn with another proxy on a different port means setting `CAIRN_WEB_ORIGIN` in `deploy/vps/.env` to the exact origin you open, port included, for example `https://cairn.example.com:8443`.
 - **Real-time task logs stall behind custom proxies**: `deploy/vps/Caddyfile` configures `flush_interval -1` for SSE responses. Keep unbuffered streaming enabled if you place another reverse proxy or CDN in front of Caddy.
