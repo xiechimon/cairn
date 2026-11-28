@@ -4,11 +4,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { journeyPassed } from '../scorers/journey-checks.js';
-import { runJourneyTask, type JourneyArm } from './journey.js';
-import { decide, discordance, powerAt, type Decision, type Pair } from './paired.js';
+import { type CliModel, cliModelFromEnv, runCliCase } from './cli-arm.js';
+import { type JourneyArm, runJourneyTask } from './journey.js';
+import { type Decision, decide, discordance, type Pair, powerAt } from './paired.js';
 import { ReservationLedger } from './reserve.js';
 import { writeScorecard } from './scorecard.js';
-import { brokeredModelFromEnv, type BrokeredModel } from './script.js';
+import { type BrokeredModel, brokeredModelFromEnv } from './script.js';
 import type { JourneyTask, ScriptStep } from './types.js';
 
 export const CALIBRATION_CAP = { maxStarts: 64, maxWallMinutes: 30 };
@@ -33,7 +34,7 @@ const CASE_FAMILIES = [
     id: 'slug',
     title: '修好 slug',
     file: 'src/slug.mjs',
-    broken: "export const slug = (s) => s;\n",
+    broken: 'export const slug = (s) => s;\n',
     fixed: "export const slug = (s) => s.trim().toLowerCase().replace(/\\s+/g, '-');\n",
     check: "replace(/\\s+/g, '-')",
     test: [
@@ -49,13 +50,88 @@ const CASE_FAMILIES = [
     title: '修好 parse',
     file: 'src/parse.mjs',
     broken: 'export const parse = (v) => Number(v);\n',
-    fixed: "export const parse = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);\n",
+    fixed: 'export const parse = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);\n',
     check: 'isFinite',
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
       "import { parse } from '../src/parse.mjs';",
       "test('parse', () => assert.equal(parse('nope'), null));",
+      '',
+    ].join('\n'),
+  },
+  {
+    id: 'capitalize',
+    title: '修好首字母大写',
+    file: 'src/capitalize.mjs',
+    broken: 'export const capitalize = (s) => s;\n',
+    fixed: 'export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);\n',
+    check: 'toUpperCase',
+    test: [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import { capitalize } from '../src/capitalize.mjs';",
+      "test('capitalize', () => assert.equal(capitalize('hello'), 'Hello'));",
+      '',
+    ].join('\n'),
+  },
+  {
+    id: 'clamp',
+    title: '修好 clamp',
+    file: 'src/clamp.mjs',
+    broken: 'export const clamp = (n) => n;\n',
+    fixed: 'export const clamp = (n) => Math.min(10, Math.max(0, n));\n',
+    check: 'Math.min(10',
+    test: [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import { clamp } from '../src/clamp.mjs';",
+      "test('clamp', () => assert.equal(clamp(-1), 0));",
+      '',
+    ].join('\n'),
+  },
+  {
+    id: 'unique',
+    title: '修好去重',
+    file: 'src/unique.mjs',
+    broken: 'export const unique = (xs) => xs;\n',
+    fixed: 'export const unique = (xs) => [...new Set(xs)];\n',
+    check: 'new Set',
+    test: [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import { unique } from '../src/unique.mjs';",
+      "test('unique', () => assert.deepEqual(unique([1, 1, 2]), [1, 2]));",
+      '',
+    ].join('\n'),
+  },
+  {
+    id: 'count',
+    title: '修好计数',
+    file: 'src/count.mjs',
+    broken: 'export const count = (s, ch) => 0;\n',
+    fixed: 'export const count = (s, ch) => s.split(ch).length - 1;\n',
+    check: 'split(ch).length',
+    test: [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import { count } from '../src/count.mjs';",
+      "test('count', () => assert.equal(count('aba', 'a'), 2));",
+      '',
+    ].join('\n'),
+  },
+  {
+    id: 'trim',
+    title: '修好去空格',
+    file: 'src/trim.mjs',
+    broken: 'export const trim = (s) => s;\n',
+    fixed: 'export const trim = (s) => s.trim();\n',
+    check: 's.trim()',
+    test: [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      "import { trim } from '../src/trim.mjs';",
+      "test('trim', () => assert.equal(trim(' x '), 'x'));",
       '',
     ].join('\n'),
   },
@@ -71,7 +147,15 @@ const tempRoots: string[] = [];
 function git(cwd: string, args: string[]): string {
   return execFileSync(
     'git',
-    ['-c', 'user.email=eval@cairn.dev', '-c', 'user.name=eval', '-c', 'commit.gpgsign=false', ...args],
+    [
+      '-c',
+      'user.email=eval@cairn.dev',
+      '-c',
+      'user.name=eval',
+      '-c',
+      'commit.gpgsign=false',
+      ...args,
+    ],
     { cwd, encoding: 'utf8' },
   ).trim();
 }
@@ -138,9 +222,17 @@ export interface ScenarioRow {
   power: number;
 }
 
+export interface LaunchRow {
+  caseId: string;
+  arm: JourneyArm;
+  wallMs: number;
+  passed: boolean;
+  exitCode: number | null;
+}
+
 export interface PilotResult {
   topic: string;
-  mode: 'scripted' | 'brokered';
+  mode: 'scripted' | 'cli' | 'brokered';
   model: string;
   startedAt: string;
   finishedAt: string;
@@ -151,6 +243,7 @@ export interface PilotResult {
   capProof: { attempted: number; admitted: number; refused: string };
   cases: number;
   arms: ArmSummary[];
+  launches: LaunchRow[];
   aa: Decision;
   damage: Decision;
   aaDiscordance: number;
@@ -165,32 +258,64 @@ export interface PilotResult {
   missing: string | null;
 }
 
+type PilotModel =
+  | { kind: 'scripted' }
+  | { kind: 'cli'; config: CliModel }
+  | { kind: 'brokered'; config: BrokeredModel };
+
+interface ArmRun {
+  arm: JourneyArm;
+  outcomes: Map<string, boolean>;
+  launches: LaunchRow[];
+}
+
 async function runArm(
   cases: readonly PilotCase[],
   arm: JourneyArm,
   ledger: ReservationLedger,
-  model: { kind: 'scripted' } | { kind: 'brokered'; config: BrokeredModel },
-): Promise<{ arm: JourneyArm; outcomes: Map<string, boolean> }> {
+  model: PilotModel,
+): Promise<ArmRun> {
   const outcomes = new Map<string, boolean>();
+  const launches: LaunchRow[] = [];
   for (const item of cases) {
     const started = Date.now();
-    const reservation = ledger.open(`${arm}/${item.task.id}`, started);
-    if (!reservation.ok) {
+    const reserve = model.kind === 'cli' ? arm !== 'nopatch' : true;
+    const reservation = reserve ? ledger.open(`${arm}/${item.task.id}`, started) : null;
+    if (reservation !== null && !reservation.ok) {
       outcomes.set(item.task.id, false);
       continue;
     }
-    const options =
-      model.kind === 'brokered'
-        ? { repoRoot: item.repoRoot, arm, model: 'brokered' as const, brokered: model.config }
-        : { repoRoot: item.repoRoot, arm };
     try {
-      const result = await runJourneyTask(item.task, options);
-      outcomes.set(item.task.id, result.record.incomplete === undefined && journeyPassed(item.task, result.record));
+      let passed = false;
+      if (model.kind === 'cli') {
+        const result = await runCliCase(item.task, {
+          repoRoot: item.repoRoot,
+          model: model.config,
+          launch: arm !== 'nopatch',
+        });
+        passed = result.passed;
+        if (result.launch !== undefined)
+          launches.push({
+            caseId: item.task.id,
+            arm,
+            wallMs: result.launch.wallMs,
+            passed: result.passed,
+            exitCode: result.launch.exitCode,
+          });
+      } else {
+        const journeyOptions =
+          model.kind === 'brokered'
+            ? { repoRoot: item.repoRoot, arm, model: 'brokered' as const, brokered: model.config }
+            : { repoRoot: item.repoRoot, arm };
+        const result = await runJourneyTask(item.task, journeyOptions);
+        passed = result.record.incomplete === undefined && journeyPassed(item.task, result.record);
+      }
+      outcomes.set(item.task.id, passed);
     } finally {
-      ledger.charge(reservation.id, Date.now() - started);
+      if (reservation?.ok) ledger.charge(reservation.id, Date.now() - started);
     }
   }
-  return { arm, outcomes };
+  return { arm, outcomes, launches };
 }
 
 function toPairs(baseline: Map<string, boolean>, candidate: Map<string, boolean>): Pair[] {
@@ -224,7 +349,12 @@ function powerProfile(): PilotResult['power'] {
   for (const pairs of [24, 32, 40, 48]) {
     for (const d of [0.3, 0.5, 0.8]) {
       for (const share of [0.65, 0.8]) {
-        rows.push({ pairs, discordance: d, candidateShare: share, power: powerAt(pairs, d, share) });
+        rows.push({
+          pairs,
+          discordance: d,
+          candidateShare: share,
+          power: powerAt(pairs, d, share),
+        });
       }
     }
   }
@@ -246,21 +376,32 @@ function powerProfile(): PilotResult['power'] {
   };
 }
 
-export async function runPilot(
-  options: { brokered?: BrokeredModel | null; cases?: number } = {},
-): Promise<PilotResult> {
-  const startedAt = new Date().toISOString();
+export interface PilotOptions {
+  /** Runs the approved model behind its own CLI; the scripted arm is chosen when absent. */
+  cli?: CliModel | null;
+  brokered?: BrokeredModel | null;
+  cases?: number;
+}
+
+function pilotModel(options: PilotOptions): PilotModel {
+  const cli = options.cli === undefined ? cliModelFromEnv() : options.cli;
+  if (cli !== null) return { kind: 'cli', config: cli };
   const brokered = options.brokered === undefined ? brokeredModelFromEnv() : options.brokered;
+  return brokered === null ? { kind: 'scripted' } : { kind: 'brokered', config: brokered };
+}
+
+export async function runPilot(options: PilotOptions = {}): Promise<PilotResult> {
+  const startedAt = new Date().toISOString();
+  const model = pilotModel(options);
   const families = CASE_FAMILIES.slice(0, options.cases ?? CASE_FAMILIES.length);
   const cases = families.map((family) => makeCase(family));
   const ledger = new ReservationLedger(CALIBRATION_CAP);
   const arms: ArmSummary[] = [];
+  const launches: LaunchRow[] = [];
   let aa: Decision = decide([]);
   let damage: Decision = decide([]);
   let aaDiscordance = 0;
   try {
-    const model =
-      brokered === null ? ({ kind: 'scripted' } as const) : ({ kind: 'brokered', config: brokered } as const);
     const first = await runArm(cases, 'none', ledger, model);
     const second = await runArm(cases, 'none', ledger, model);
     const control = await runArm(cases, 'nopatch', ledger, model);
@@ -270,21 +411,28 @@ export async function runPilot(
         passed: [...run.outcomes.values()].filter(Boolean).length,
         graded: run.outcomes.size,
       });
+      launches.push(...run.launches);
     }
     const aaPairs = toPairs(first.outcomes, second.outcomes);
     aaDiscordance = discordance(aaPairs);
     aa = decide(aaPairs);
     damage = decide(toPairs(first.outcomes, control.outcomes));
     const snapshot = ledger.snapshot();
-    const mode = model.kind === 'brokered' ? 'brokered' : 'scripted';
     const conclusion =
-      mode === 'scripted'
+      model.kind === 'scripted'
         ? 'Machinery only: scripted arms carry no model noise, so this measures the harness, the cap and the decision rule, not the model.'
-        : 'Paired decision measured on the approved model.';
+        : model.kind === 'cli'
+          ? 'The approved model ran each case as its own agent in a runner-shaped checkout; a separate grader took only the allowed patch and ran the hidden test.'
+          : 'Paired decision measured on the approved model through its chat endpoint.';
     return {
       topic: 'harness-self-improve',
-      mode,
-      model: model.kind === 'brokered' ? brokered?.modelId ?? '' : 'stub/m',
+      mode: model.kind,
+      model:
+        model.kind === 'cli'
+          ? model.config.modelId
+          : model.kind === 'brokered'
+            ? model.config.modelId
+            : 'stub/m',
       startedAt,
       finishedAt: new Date().toISOString(),
       wallMs: snapshot.wallMs,
@@ -294,14 +442,15 @@ export async function runPilot(
       capProof: capProof(CALIBRATION_CAP),
       cases: cases.length,
       arms,
+      launches,
       aa,
       damage,
       aaDiscordance,
       power: powerProfile(),
       conclusion,
       missing:
-        mode === 'scripted'
-          ? 'A real-model A/A needs the approved model behind EVAL_ARM_BASE_URL/EVAL_ARM_MODEL/EVAL_ARM_API_KEY; none is provisioned in this environment.'
+        model.kind === 'scripted'
+          ? 'A real-model arm needs the approved model behind EVAL_ARM_CLI/EVAL_ARM_MODEL_ID (CLI) or EVAL_ARM_BASE_URL/EVAL_ARM_MODEL/EVAL_ARM_API_KEY (endpoint); none is provisioned in this environment.'
           : null,
     };
   } finally {
@@ -317,7 +466,8 @@ function arg(name: string): string | undefined {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const out = arg('out') ?? join('eval', 'pilot-result.json');
   const card = arg('scorecard');
-  const result = await runPilot();
+  const limit = arg('cases');
+  const result = await runPilot(limit === undefined ? {} : { cases: Number(limit) });
   mkdirSync(dirname(resolve(out)), { recursive: true });
   writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
   if (card !== undefined) writeScorecard(card, result);

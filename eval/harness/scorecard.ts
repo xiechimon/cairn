@@ -27,7 +27,15 @@ export function renderScorecard(result: PilotResult): string {
     <tr><td>${row.pairs}</td><td>${pct(row.discordance)}</td><td>${pct(row.candidateShare)}</td><td>${pct(row.power)}</td></tr>`,
     )
     .join('');
-  const stops = result.stopReason === null ? 'not stopped by a cap' : escapeHtml(result.stopReason);
+  const stops =
+    result.stopReason === null ? 'completed below both caps' : escapeHtml(result.stopReason);
+  const launchRows = result.launches
+    .map(
+      (row) => `
+    <tr><td>${escapeHtml(row.caseId)}</td><td>${escapeHtml(row.arm)}</td><td>${(row.wallMs / 1000).toFixed(1)}s</td><td>${row.passed ? 'pass' : 'fail'}</td><td>${row.exitCode === null ? 'no exit' : row.exitCode}</td></tr>`,
+    )
+    .join('');
+  const launchTotal = result.launches.reduce((sum, row) => sum + row.wallMs, 0);
   const missing =
     result.missing === null
       ? ''
@@ -70,6 +78,13 @@ ${missing}
 <table>
   <tr><th>Arm</th><th>Passed</th><th>Graded</th></tr>
   ${result.arms.map((arm) => `<tr><td>${escapeHtml(arm.arm)}</td><td>${arm.passed}</td><td>${arm.graded}</td></tr>`).join('\n  ')}
+</table>
+
+<h2>Model launches</h2>
+<p class="meta">${result.launches.length} launches, ${(launchTotal / 60_000).toFixed(1)} min of model wall time. A release is one CLI start, not a billed token count.</p>
+<table>
+  <tr><th>Case</th><th>Arm</th><th>Wall</th><th>Result</th><th>Exit</th></tr>
+  ${launchRows === '' ? '<tr><td>—</td><td>scripted</td><td>0.0s</td><td>—</td><td>—</td></tr>' : launchRows}
 </table>
 
 <h2>Paired decisions</h2>

@@ -90,6 +90,29 @@ export function initBaselineRepo(destDir: string): string {
   }).trim();
 }
 
+/** Paths a working tree changed against its baseline commit, deletions included. */
+export function workspaceChanges(workDir: string): string[] {
+  const committed = spawnSync('git', ['diff', '--name-only', '-z', 'HEAD'], {
+    cwd: workDir,
+    encoding: 'utf8',
+  });
+  const dirty = spawnSync('git', ['status', '--porcelain', '-z'], {
+    cwd: workDir,
+    encoding: 'utf8',
+  });
+  const names = new Set<string>();
+  for (const name of committed.stdout.split('\0')) if (name !== '') names.add(name);
+  const entries = dirty.stdout.split('\0');
+  for (let i = 0; i < entries.length; i += 1) {
+    const line = entries[i];
+    if (line === undefined || line === '') continue;
+    if (line.startsWith('R ') || line.startsWith('C ')) i += 1;
+    const name = line.slice(3);
+    if (name !== '') names.add(name);
+  }
+  return [...names];
+}
+
 function workspaceNodeModules(repoRoot: string): string[] {
   const candidates = ['node_modules'];
   for (const top of ['apps', 'packages']) {
