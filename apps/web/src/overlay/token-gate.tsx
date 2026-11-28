@@ -322,7 +322,7 @@ export function TokenGate() {
       onBackdropClick={stayOpen}
       zIndex="var(--z-gate)"
       title={showClerk ? t('登录 Cairn') : t('配对这台电脑')}
-      width="100vw"
+      width="auto"
       height="100dvh"
       className="desktop-titlebar-overlay inset-0! top-0! left-0! max-h-none! translate-x-0! translate-y-0! animate-none! items-center justify-center rounded-none! bg-background! pb-[env(safe-area-inset-bottom)] shadow-none! duration-0!"
     >

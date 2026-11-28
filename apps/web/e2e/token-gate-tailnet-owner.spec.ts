@@ -64,7 +64,7 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(page.locator('.token-gate-title')).toHaveText('Pair this computer');
         await expect(page.getByTestId('tailnet-owner-identity')).toHaveCount(0);
         expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
         await page.screenshot({ path: testInfo.outputPath(`pair-${theme}-${width}.png`), fullPage: true });
         const remoteRoutes = await page.evaluate(async () => {
           const response = await fetch('/api/remote/routes');
