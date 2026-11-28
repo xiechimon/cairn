@@ -8,6 +8,7 @@ export const scriptStep = z
       .optional(),
   })
   .refine((s) => s.text !== undefined || (s.toolCalls?.length ?? 0) > 0);
+export type ScriptStep = z.infer<typeof scriptStep>;
 
 export const worldSeed = z
   .object({
@@ -61,6 +62,16 @@ export const laneSource = z
   })
   .strict();
 
+const laneChecks = z
+  .object({
+    files: z
+      .array(z.object({ path: safeRelPath, contains: z.string().optional() }))
+      .default([]),
+    commands: z.array(z.string().min(1)).min(1),
+    allowPaths: z.array(z.string()).optional(),
+  })
+  .strict();
+
 export const laneTask = z
   .object({
     kind: z.literal('lane'),
@@ -68,30 +79,37 @@ export const laneTask = z
     instruction: z.string().min(1),
     timeoutMs: z.number().int().min(10_000).max(240_000).default(240_000),
     source: laneSource,
-    checks: z
-      .object({
-        files: z
-          .array(z.object({ path: safeRelPath, contains: z.string().optional() }))
-          .default([]),
-        commands: z.array(z.string().min(1)).min(1),
-        allowPaths: z.array(z.string()).optional(),
-      })
-      .strict(),
+    checks: laneChecks,
+    gate: z.boolean().default(true),
+  })
+  .strict();
+
+export const journeyTask = z
+  .object({
+    kind: z.literal('journey'),
+    id: taskId,
+    request: z.string().min(1),
+    world: worldSeed,
+    script: z.array(scriptStep).min(1),
+    expected: expected,
+    source: laneSource,
+    checks: laneChecks,
     gate: z.boolean().default(true),
   })
   .strict();
 
 export const canaryTask = runtimeTask.extend({ kind: z.literal('canary') });
 
-export const suiteTask = z.discriminatedUnion('kind', [runtimeTask, laneTask, canaryTask]);
+export const suiteTask = z.discriminatedUnion('kind', [runtimeTask, laneTask, journeyTask, canaryTask]);
 export type SuiteTask = z.infer<typeof suiteTask>;
 export type RuntimeTask = z.infer<typeof runtimeTask>;
 export type LaneTask = z.infer<typeof laneTask>;
+export type JourneyTask = z.infer<typeof journeyTask>;
 
 export const turnRecord = z
   .object({
     caseId: z.string(),
-    kind: z.enum(['runtime', 'canary', 'lane']),
+    kind: z.enum(['runtime', 'canary', 'lane', 'journey']),
     incomplete: z.string().optional(),
     stepStatus: z.string().optional(),
     decision: z.enum(['route', 'ask', 'answer', 'mixed', 'failed']).optional(),
@@ -114,9 +132,26 @@ export const turnRecord = z
         costUsd: z.number().optional(),
       })
       .optional(),
+    journey: z
+      .object({
+        routed: z.boolean(),
+        todoId: z.string().nullable(),
+        todoTitle: z.string().nullable(),
+        buildId: z.string().nullable(),
+        stepId: z.string().nullable(),
+        claimed: z.boolean(),
+        claimedMachine: z.string().nullable(),
+        delivered: z.boolean(),
+        acceptanceBlocked: z.boolean(),
+        changedFiles: z.array(z.string()),
+        fileChecks: z.array(z.object({ path: z.string(), ok: z.boolean() })),
+        commandChecks: z.array(z.object({ command: z.string(), ok: z.boolean() })),
+      })
+      .optional(),
   })
   .strict();
 export type TurnRecord = z.infer<typeof turnRecord>;
+export type JourneyRecord = NonNullable<TurnRecord['journey']>;
 
 export interface CheckResult {
   name: string;

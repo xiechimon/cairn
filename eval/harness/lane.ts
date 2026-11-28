@@ -72,7 +72,7 @@ export function isDependencyDriftOutput(output: string): boolean {
   return DEPENDENCY_DRIFT_RE.test(output);
 }
 
-async function runIsolatedCommand(
+export async function runIsolatedCommand(
   command: string,
   options: {
     cwd: string;
