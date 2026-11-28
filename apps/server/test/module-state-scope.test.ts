@@ -104,8 +104,6 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/report-turn.ts:REPORT_OPEN_TOOLS': 'constant lookup table',
   'apps/server/src/services/report-turn.ts:REPORT_REF_TOOLS': 'constant lookup table',
   'apps/server/src/services/thread-pr.ts:PASSING_CONCLUSIONS': 'constant lookup table',
-  'apps/server/src/services/todos.ts:selfIssueInFlight':
-    'in-flight self-issue promises keyed on unique todoIds',
   'apps/server/src/vendor-open-design/document-preview.ts:TAG_NAME_END': 'constant lookup table',
 };
 

@@ -8,7 +8,6 @@ import {
   orchestratedTodoIdOf,
   type Phase,
   PLACEHOLDER_TITLE_FALLBACK,
-  parseGithubIssueSourceRef,
   quoteSegments,
   RequestQuoteError,
   type RouteOverride,
@@ -28,7 +27,6 @@ import { nowMs } from '../lib/ids.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
 import { taskLink } from './chief.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-question-store.js';
-import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { taskModelCandidates } from './providers.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
@@ -304,7 +302,7 @@ function requireUncoveredRequest(
   params: { projectId: string; sourceTodoId?: string },
   cited: readonly CitedSegment[],
   segments: readonly TaskSegment[],
-): { predecessors: TodoRow[]; donor: TodoRow | null } {
+): { predecessors: TodoRow[] } {
   const twins = requestTwins(db, ctx.teamId);
   const live = twins.filter(
     ({ row }) =>
@@ -355,29 +353,7 @@ function requireUncoveredRequest(
         twinSegments.every((inner) => continuedCovered(inner, newCover)),
     )
     .map(({ row }) => row);
-  const repo = githubRepoOfProject(
-    projectOfTodo(db, { projectId: params.projectId, teamId: ctx.teamId }),
-  );
-  const donor =
-    twins
-      .filter(
-        ({ row, segments: twinSegments }) =>
-          !(row.archivedAt === null && LIVE_REQUEST_PHASES.includes(row.phase)) &&
-          row.sourceKind === 'github-issue-self' &&
-          row.sourceRef !== null &&
-          twinSegments.every((inner) => continuedCovered(inner, newCover)),
-      )
-      .sort((a, b) => b.row.seqNum - a.row.seqNum)
-      .map(({ row }) => row)
-      .find((row) => {
-        if (repo === null || row.sourceRef === null) return false;
-        const ref = parseGithubIssueSourceRef(row.sourceRef);
-        return (
-          ref !== null &&
-          `${ref.owner}/${ref.repo}`.toLowerCase() === `${repo.owner}/${repo.repo}`.toLowerCase()
-        );
-      }) ?? null;
-  return { predecessors, donor };
+  return { predecessors };
 }
 
 const CANDIDATE_PREVIEW_CHARS = 80;
@@ -420,7 +396,7 @@ export function createRequestTodo(
   deps: TodoDeps,
   ctx: RequestCtx,
   params: CoordinatorCreateTodoParams & { projectId: string },
-  provenance: { createdBy: string | null; ownerId: string; withoutSelfIssue?: boolean },
+  provenance: { createdBy: string | null; ownerId: string },
 ): TodoRecord & { uncovered?: string[]; continued?: ContinuedRequest } {
   const { db } = deps;
   let model: TaskRequest['model'];
@@ -460,7 +436,7 @@ export function createRequestTodo(
   if (params.quotes === undefined && params.sourceTodoId === undefined) {
     requireUnboundMessages(db, ctx, segments);
   }
-  const { predecessors, donor } = requireUncoveredRequest(db, ctx, params, cited, segments);
+  const { predecessors } = requireUncoveredRequest(db, ctx, params, cited, segments);
   requireTeamTodos(db, ctx.teamId, params.dependsOn ?? []);
   const keys = new Set(cited.map((c) => segmentKey(c.quoteSource)));
   const siblings = params.quotes === undefined ? [] : splitSiblings(db, ctx.teamId, keys);
@@ -498,14 +474,6 @@ export function createRequestTodo(
     createdBy: provenance.createdBy,
     ownerId: provenance.ownerId,
     orchestration: { threadId: ctx.threadId },
-    ...(provenance.withoutSelfIssue === true ? { withoutSelfIssue: true } : {}),
-    ...(donor !== null && donor.sourceRef !== null
-      ? {
-          sourceKind: 'github-issue-self' as const,
-          sourceRef: donor.sourceRef,
-          ...(donor.issueState !== null ? { issueState: donor.issueState } : {}),
-        }
-      : {}),
     request,
     userSpecAttachmentIds: ownerGrants(segments, ctx.teamId),
     ...(params.dependsOn !== undefined || params.blockedBy !== undefined
@@ -523,7 +491,7 @@ export function createRequestTodo(
       .run();
   }
   const { marked, notices } =
-    predecessors.length === 0 && donor === null
+    predecessors.length === 0
       ? { marked: [], notices: [] }
       : db.transaction(() => {
           const superseded: TodoRow[] = [];
@@ -535,20 +503,12 @@ export function createRequestTodo(
               .run();
             if (changed.changes === 1) superseded.push(row);
           }
-          if (donor !== null && donor.sourceRef !== null) {
-            db.update(todo)
-              .set({ sourceRef: null, issueState: null, v: donor.v + 1 })
-              .where(and(eq(todo.id, donor.id), eq(todo.sourceRef, donor.sourceRef)))
-              .run();
-          }
           const notices = superseded.map((row) => ({
             id: `request-twin-${record.id}-${row.id}`,
             role: 'system' as const,
             content: JSON.stringify({
               kind: CHIEF_NOTICE_KIND,
-              message: `${taskLink(record.id, record.title)} continues ${taskLink(row.id, row.title)}: the earlier card ${row.phase}, so its request was re-issued on a new card. The earlier card is superseded${
-                donor?.id === row.id ? ' and its GitHub issue moves to the new card' : ''
-              }.`,
+              message: `${taskLink(record.id, record.title)} continues ${taskLink(row.id, row.title)}: the earlier card ${row.phase}, so its request was re-issued on a new card. The earlier card is superseded.`,
               provenance: `request-twin:${row.id}`,
             }),
             projectId: record.projectId,

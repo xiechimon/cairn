@@ -283,9 +283,6 @@ describe('#127 task routes: a foreign task is 404 and untouched', () => {
     const detail = await req(s.app, 'GET', `/api/todos/${TODO_B}`);
     expect(detail.status).toBe(404);
     expect(await errorOf(detail)).toBe(`todo ${TODO_B}`);
-    const issue = await req(s.app, 'GET', `/api/todos/${TODO_B}/github-issue`);
-    expect(issue.status).toBe(404);
-    expect(await errorOf(issue)).toBe(`todo ${TODO_B}`);
     const own = await req(s.app, 'GET', `/api/todos/${TODO_A}`);
     expect(own.status).toBe(200);
   });
@@ -302,8 +299,6 @@ describe('#127 task routes: a foreign task is 404 and untouched', () => {
     expect(unarchive.status).toBe(404);
     const stopDone = await req(s.app, 'POST', `/api/todos/${TODO_B}/stop-and-done`);
     expect(stopDone.status).toBe(404);
-    const retryIssue = await req(s.app, 'POST', `/api/todos/${TODO_B}/github-issue/retry`);
-    expect(retryIssue.status).toBe(404);
     const del = await req(s.app, 'DELETE', `/api/todos/${TODO_B}`);
     expect(del.status).toBe(404);
     const row = s.db.select().from(todoTable).where(eq(todoTable.id, TODO_B)).get();

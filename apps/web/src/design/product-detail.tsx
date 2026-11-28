@@ -230,28 +230,7 @@ export function ProductDetailSection() {
               sourceKind: 'orchestration',
               sourceRef: 'chief:thread-1',
             })}
-            onRetry={() => {}}
-            retryPending={false}
             onOpenThread={(id) => setLast(`open thread ${id}`)}
-          />
-        </Cell>
-        <Cell label="GitHub issue not created yet">
-          <SourceIssueLine
-            todo={sharedTodo({ title: 'x', sourceKind: 'github-issue', sourceRef: null })}
-            onRetry={() => setLast('retry issue')}
-            retryPending={false}
-          />
-        </Cell>
-        <Cell label="Linked issue whose title drifted">
-          <SourceIssueLine
-            todo={sharedTodo({
-              id: 'gallery-echo',
-              title: 'Badge shows the wrong branch',
-              sourceKind: 'github-issue',
-              sourceRef: 'xiechimon/cairn#1182',
-            })}
-            onRetry={() => {}}
-            retryPending={false}
           />
         </Cell>
       </Specimen>

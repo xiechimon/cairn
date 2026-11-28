@@ -7,7 +7,7 @@ The legacy `tag`/`todo_tag` tables and `tagIds` wire fields are removed. Ordinar
 - Ordinary naming: the first implementation step receives title-only metadata schema/instructions; `tag`/`tags`/`tagIds` arguments are rejected before mutation, including through the real Claude Code SDK host bridge.
 - Data removal: the migration backfills `correction` membership into `todo.correctionRequired`, drops `tag`/`todo_tag`, preserves every `todo` row and all `github_label`/`todo_github_label` state, and rolls back on failure.
 - Protocol removal: shared records, tool schemas and REST/Coordinator/MCP surfaces expose no `tagIds`; stale `tagIds` arguments are ignored or rejected before writes per surface.
-- GitHub label classification: correction membership and the `correction`-name GitHub label drive `correctionRequired` and orchestration bug routing.
+- GitHub label classification: correction membership and the `correction`-name GitHub label drive `correctionRequired`.
 
 ## How to get to it (user POV)
 
@@ -22,7 +22,7 @@ Preconditions: use an isolated server, an enrolled test machine and a first impl
 3. Run `apps/server/test/task-meta.test.ts`: claim, naming, stale metadata keys and full-state atomicity for ordinary and sealed-owner tasks.
 4. Run `apps/daemon/test/task-meta-prompt.test.ts` and `worker-meta-sdk.test.ts`: title-only prompt/schema and real SDK argument forwarding to canonical validation.
 5. Run `apps/server/test/retire-tag-tables-migration.test.ts` and `correction-classification.test.ts`: backfill, table drops, rollback and dedicated-label classification.
-6. Run `apps/server/test/github-issues.test.ts` and `github-writeback.test.ts`: dedicated label selection and imported-title finality remain intact.
+6. Run `apps/server/test/github-label-state.test.ts` and `correction-classification.test.ts`: dedicated label selection and correction classification remain intact.
 7. Run `apps/daemon/test/tag-tool.test.ts` and `runner-create-tag.test.ts` for the unrelated Git release tool.
 
 For a complete scoped run, pass the named files explicitly without `--changed`. For the changed subset, put `--changed` last: `vitest run <files> --changed`; otherwise its optional since-ref can consume the first filename. Confirm a non-empty reported test count before calling either run green.

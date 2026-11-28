@@ -28,8 +28,6 @@ There is no general outbox. Most effects are inline calls after separate autocom
 | 18 | Push digest | `pushDigestItem` insert | daily batched push | No | Items deleted only after delivery: at least once; no producer found | Dup if delivered and killed before the delete | Mixed results |
 | 19 | Feishu | none | none | n/a | The server holds binding CRUD only; no outbound sender found in `apps/` or `packages/` | n/a | n/a |
 | 20 | GitHub merge (`mergeThroughGithub`) | `claimAutonomousMerge` write-ahead | `githubMergePull` with `sha` pin, settle, `finishTodoDone` | Claim atomic with its marker | Admission stays `pending`; `recoverAutonomousMerges` reads the PR (not lost) | The `sha` pin makes a double PUT harmless | `autonomous-merge.test.ts` |
-| 21 | Self-issue create | `external_effect` `github-issue-create` row plus todo `sourceRef` | probe (`GET` issue by marker) then `githubCreateIssue`, then `sourceRef` update | Yes (fixed) | Durable intent with replay-safe probe: a crash after POST re-probes by the body marker before deciding | Marker match on body makes a re-created issue dedupe-safe | `external-effects.test.ts`, `github-writeback.test.ts` |
-| 22 | Other issue create and close | `taskIssueClose` tombstone rows; intake re-derives from GitHub | GitHub PATCH or POST | Yes | Moved-todo close writes a durable `taskIssueClose` row the sync sweep consumes; intake close re-derives each sweep | Mismatch issue body carries a dedupe marker; `ci-corrections` checks first (safe) | `task-issue-sync` tests |
 | 23 | PR creation and comments | n/a | n/a | n/a | Neither side creates PRs in orchestration code: the agent runs `gh` inside its own session, and daemon push/merge outcomes re-derive from git refs (the same replay-safe probe as rows 20 and 24) | n/a | n/a |
 | 24 | Local merge | one transaction: claim, restore, enqueue | daemon git merge, then `applyLocalMergeReport` | Claim yes | Safe | The git merge precedes the server record: a kill loses the notice and wake; a re-report is a no-op | Title only |
 | 25 | Schedule fire | `nextRunAt` advanced last | `startBuilds` or `sendBuildSteer` first | No (act, then mark) | n/a | Re-fires on restart; the active-step guard skips it while the first step is live | None |
@@ -42,7 +40,7 @@ None is general: `pushDelivery` (must-reach alerts, drained every tick), `pushDi
 
 ## Per-kind failure counting
 
-None for effects. Nearest: the in-memory `ProviderHealthTracker` (degraded after 3, open after 5; resets on restart), `step.holdCount`, `chiefReport.attempts`. Several effect failures are swallowed with no count: `dispatchSplitChildren` and `advanceSplitWaves` (`catch {}`), push errors, moved-todo close.
+None for effects. Nearest: the in-memory `ProviderHealthTracker` (degraded after 3, open after 5; resets on restart), `step.holdCount`, `chiefReport.attempts`. Several effect failures are swallowed with no count: `dispatchSplitChildren` and `advanceSplitWaves` (`catch {}`), push errors.
 
 ## Ranked by plausibility and user impact — resolution record
 
@@ -58,7 +56,7 @@ Daemon behavior on repeated claim after a lost wake, and `ci-loop.ts` reconcile 
 
 ## Fix slices (one problem per PR)
 
-1. ~~`effect` outbox table, after-commit executor, sweeper and per-kind failure counter~~ Done: `external_effect` ledger (`docs/design/external-effects-ledger.md`), `im-send`, `web-push` and `github-issue-create` wired; a kind is reported after three consecutive failures and `no-subscription`/`all-expired` do not count.
+1. ~~`effect` outbox table, after-commit executor, sweeper and per-kind failure counter~~ Done: `external_effect` ledger (`docs/design/external-effects-ledger.md`), `im-send`, `web-push`, `away-push` and `mail-send` wired; a kind is reported after three consecutive failures and `no-subscription`/`all-expired` do not count.
 2. ~~Atomic hops~~ Done: rows 2, 3, 4, 5 and 7.
 3. ~~Idempotency keys for Coordinator tool effects~~ Done: rows 1, 6 and 8 (MCP `clientMessageId`).
 4. ~~Durable steer and stop re-fetch (rows 10 to 12)~~ Done: `docs/design/durable-steer-stop.md`.

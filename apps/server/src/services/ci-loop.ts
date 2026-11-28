@@ -11,7 +11,6 @@ import {
   latestCompletedCheckRuns,
   verdictOfCheckRuns,
 } from './ci-check-verdict.js';
-import { drainCiCorrections } from './ci-corrections.js';
 import {
   buildCiFixPrompt,
   buildMergeConflictPrompt,
@@ -162,14 +161,6 @@ export function createCiPoller(
           'ci pr-checks poll candidate failed (sweep continues)',
         );
       }
-    }
-    try {
-      await drainCiCorrections(deps, run.githubFetch);
-    } catch (err) {
-      run.logger?.info(
-        { err: err instanceof Error ? err.message : String(err) },
-        'ci correction deferred',
-      );
     }
     reviews.begin(reviewCandidates);
     for (const cand of reviewCandidates) {

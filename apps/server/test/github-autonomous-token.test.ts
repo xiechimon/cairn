@@ -19,9 +19,8 @@ import * as app from '../src/services/github-app-token.js';
 import { autonomousToken, githubReadToken } from '../src/services/github-autonomous-token.js';
 import { pauseTeamGithubRepos } from '../src/services/github-autonomy-brake.js';
 import * as connection from '../src/services/github-connection.js';
-import { createTodo, flushSelfIssueWrites } from '../src/services/todos.js';
 import { stubGithubApp } from './github-identity-fixture.js';
-import { bootServer, deliverCodeStep, req } from './helpers.js';
+import { bootServer, req } from './helpers.js';
 
 const repo = { owner: 'octo', repo: 'alpha' };
 afterEach(() => vi.restoreAllMocks());
@@ -131,13 +130,12 @@ test.each([autonomousToken, githubReadToken])(
 );
 
 test('human service entry points resolve UserToken internally with App available', async () => {
-  const writes: { self: boolean; user: boolean }[] = [];
+  const writes: boolean[] = [];
   const githubFetch: typeof fetch = async (input, init) => {
     if (init?.method === 'POST')
-      writes.push({
-        self: String(init.body ?? '').includes('cairn:todo'),
-        user: new Headers(init.headers).get('authorization') === 'Bearer service-human-fixture',
-      });
+      writes.push(
+        new Headers(init.headers).get('authorization') === 'Bearer service-human-fixture',
+      );
     return Response.json(String(input).includes('/issues?') ? [] : { number: 1 });
   };
   const home = makeTestTempDir('human-identity-');
@@ -161,22 +159,9 @@ test('human service entry points resolve UserToken internally with App available
     );
     stubGithubApp(null);
     const deps = { ...s.svc, box: s.secretBox, githubFetch };
-    const task = createTodo(deps, {
-      teamId: s.team.id,
-      projectId: 'human-service-project',
-      title: 'human task',
-      spec: 'spec',
-      createdBy: s.user.id,
-      ownerId: s.user.id,
-    });
-    deliverCodeStep({ ...deps, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir }, task.id);
-    await flushSelfIssueWrites();
     await pauseTeamGithubRepos(deps, s.team.id);
-    const selfCreates = writes.filter((w) => w.self);
-    const serviceWrites = writes.filter((w) => !w.self);
-    expect(selfCreates).toHaveLength(1);
-    expect(serviceWrites.length).toBeGreaterThan(0);
-    expect(serviceWrites.every((w) => w.user)).toBe(true);
+    expect(writes.length).toBeGreaterThan(0);
+    expect(writes.every(Boolean)).toBe(true);
   } finally {
     s.dispose();
     vi.unstubAllEnvs();

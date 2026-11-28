@@ -10,7 +10,7 @@ import {
 } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
-import { BRANCHES, FS_ROOT, fsListing, ISSUE_ECHO } from './product-fixtures.js';
+import { BRANCHES, FS_ROOT, fsListing } from './product-fixtures.js';
 
 function fixtureFor(key: QueryKey): unknown {
   switch (key[0]) {
@@ -18,8 +18,6 @@ function fixtureFor(key: QueryKey): unknown {
       return fsListing(typeof key[1] === 'string' ? key[1] : FS_ROOT);
     case 'memories':
       return [];
-    case 'github-issue-echo':
-      return ISSUE_ECHO;
     case 'project-branches':
       return BRANCHES;
     default:

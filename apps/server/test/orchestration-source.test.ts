@@ -25,10 +25,9 @@ import { composeChiefSystemPrompt, rewatchCreatingThread } from '../src/services
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { executeThreadMcpTool } from '../src/services/mcp-threads.js';
-import { flushSelfIssueWrites, getTodo, updateAutonomousTodo } from '../src/services/todos.js';
+import { createTodo, getTodo, updateAutonomousTodo } from '../src/services/todos.js';
 import {
   bootServer,
-  deliverCodeStep,
   insertMachine,
   postProject,
   req,
@@ -178,7 +177,7 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
     expect(created.sourceBuildId).toBe(chiefId);
   });
 
-  test('A2 GitHub-connected project -> the mirror slot wins (github-issue-self), zero outbound regression', async () => {
+  test('A2 GitHub-connected project -> the orchestration source slot wins, zero outbound', async () => {
     upsertGithubConnection(
       { db: s.db, box: s.secretBox },
       { teamId, login: 'octo', accessToken: 'ghp_orch_token', scope: 'repo' },
@@ -190,26 +189,19 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
     });
     expect(res.status).toBe(201);
     const ghProject = ((await res.json()) as { id: string }).id;
+    const outbound: string[] = [];
+    const watching: FetchLike = async (input, init) => {
+      outbound.push(`${init?.method ?? 'GET'} ${String(input)}`);
+      return ghFetch(input, init);
+    };
     const created = (await relay(
       'create_todo',
       ownerTodo('写贡献指南', ghProject),
-      ghFetch,
+      watching,
     )) as TodoWire;
-    expect(created.sourceKind).toBe('github-issue-self');
-    expect(created.sourceRef).toBeNull();
-    deliverCodeStep(
-      {
-        ...s.svc,
-        box: s.secretBox,
-        reposDir: s.reposDir,
-        attachmentsDir: s.attachmentsDir,
-        githubFetch: ghFetch,
-      },
-      created.id,
-    );
-    await flushSelfIssueWrites();
-    const row = s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get();
-    expect(row?.sourceRef).toBe(`github:${REPO}#5`);
+    expect(created.sourceKind).toBe('orchestration');
+    expect(created.sourceRef).toBe(orchestrationSourceRef(threadId));
+    expect(outbound).toEqual([]);
   });
 
   test('A2c github-issue-self todos created by a Coordinator thread remain traceable for rewatchCreatingThread and thread_pull_requests', async () => {
@@ -224,23 +216,30 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
     });
     expect(res.status).toBe(201);
     const ghProject = ((await res.json()) as { id: string }).id;
-    const created = (await relay(
-      'create_todo',
-      ownerTodo('修复自开发着陆', ghProject),
-      ghFetch,
-    )) as TodoWire;
-    expect(created.sourceKind).toBe('github-issue-self');
-    deliverCodeStep(
-      {
-        ...s.svc,
-        box: s.secretBox,
-        reposDir: s.reposDir,
-        attachmentsDir: s.attachmentsDir,
-        githubFetch: ghFetch,
+    const created = createTodo(s.svc, {
+      teamId,
+      projectId: ghProject,
+      title: '修复自开发着陆',
+      spec: '修复自开发着陆',
+      createdBy: AGENT_ID,
+      ownerId: userId,
+      sourceKind: 'github-issue-self',
+      sourceRef: `github:${REPO}#5`,
+      request: {
+        segments: [
+          {
+            source: { kind: 'chat', threadId, messageId: 'msg-legacy-self', span: 'whole' },
+            author: 'owner',
+            sourceRef: null,
+            text: '修复自开发着陆',
+          },
+        ],
+        siblings: [],
+        difficulty: null,
+        titleSource: 'owner',
+        titleSourceRef: null,
       },
-      created.id,
-    );
-    await flushSelfIssueWrites();
+    });
     s.db.update(chiefTable).set({ watches: [] }).where(eq(chiefTable.id, chiefId)).run();
     const record = getTodo(s.svc, created.id);
     expect(record?.sourceRef).toBe(`github:${REPO}#5`);
@@ -323,7 +322,6 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
       ownerTodo('写贡献指南', ghProject),
     );
     const created = JSON.parse(text) as TodoWire;
-    await flushSelfIssueWrites();
     expect(created.sourceKind).toBe('orchestration');
     expect(posts).toEqual([]);
   });
@@ -412,28 +410,6 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
     expect(builds).toHaveLength(0);
     const row = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
     expect(row?.phase).toBe('todo');
-  });
-
-  test('D2 bug routing follows dedicated GitHub labels', async () => {
-    s.db.run(sql`INSERT INTO github_label
-      (id, projectId, name, color) VALUES ('bug-label', ${projectId}, 'BuG', '#b60205')`);
-    const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
-      title: 'Save failure',
-      spec: 'Open settings and save.',
-    });
-    expect(res.status).toBe(201);
-    const todoId = ((await res.json()) as { id: string }).id;
-    s.db.run(sql`INSERT INTO todo_github_label
-      (todoId, labelId) VALUES (${todoId}, 'bug-label')`);
-    s.db
-      .update(todoTable)
-      .set({ sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#8' })
-      .where(eq(todoTable.id, todoId))
-      .run();
-    const orchestrated = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
-    expect(orchestrated.status).toBe(201);
-    const body = (await orchestrated.json()) as { message: { content: string } };
-    expect(body.message.content.includes('先完成复现步骤，再开始实现')).toBe(true);
   });
 
   test('Coordinator generic updates cannot replace dedicated correction labels', async () => {

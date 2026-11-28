@@ -10,16 +10,14 @@ An isolated run on 2026-11-15 reproduced it: the owner wrote "prepare the deleti
 
 | Action | Entry the model reaches | Undoable | Today |
 |---|---|---|---|
-| Delete tasks (`delete_todos`) | Coordinator tool | No: builds, steps and schedules go; a self-issue gets a not-planned close queued | Executes directly. **Gap; this change.** |
+| Delete tasks (`delete_todos`) | Coordinator tool | No: builds, steps and schedules go | Executes directly. **Gap; this change.** |
 | Delete project (`project.delete`) | none: kept off the Coordinator | No | confirm-once proposal; no surface answered it until this change |
 | Delete or overwrite a secret (`delete_secrets`, `set_secret`) | Coordinator tool | No: the old value is gone | Executes directly. On the frozen owner-only list, but the earlier design left the Coordinator tool as an owner decision. **Next slice, needs that decision.** |
 | Merge a build (`merge_builds`) | Coordinator, MCP | No | Coordinator returns a rejection, MCP 403; merge is a person's click (`routes-builds.ts`) |
 | Job application submit | Coordinator via job flow | No, external | Own gate: server-authored card, owner-only answer, preview hash, 15-minute expiry, `unknown` delivery blocks resubmit (`job-applications.ts`) |
 | Browser actions on real sites (`browser_act`) | Coordinator computer tools | Depends on the site | Password and one-time-code fields refused in the daemon; any other click runs. **Out of scope: needs its own design, like job submit.** |
 | Confirm a plan from an agent client (MCP `confirm_builds`) | MCP | Starts work | Executes |
-| Create a task's GitHub self-issue | Coordinator `create_todo` | Closable | Fired after the insert without an idempotency key |
 | Remove a task's schedules (`unschedule_todo`) | Coordinator, MCP | Recreatable | Executes |
-| Close / reopen a task's GitHub issue (Coordinator `archive_todos`, `unarchive_todos`; MCP `close_todos`, `reopen_todos`) | Coordinator, MCP | Yes, reopen | Executes; outbox reads issue state before writing |
 | Stop or cancel work (`stop_thread`, `cancel_builds`) | Coordinator, MCP | Work can be restarted | Executes |
 | Git push from a task | Daemon worker | Branch push only; merge stays a person's click | Command gate asks on destructive shell shapes |
 | Send mail, calendar writes | none | — | Not in the code: mail is read-only intake and a mail turn refuses every tool (`refuseMailTurnTool`); no calendar connector exists |

@@ -58,7 +58,6 @@ class GithubMock {
   requests: string[] = [];
   authorizations: string[] = [];
   notModified = 0;
-  bodyEdits: { key: string; body: string }[] = [];
   fetch = vi.fn(
     (
       input: string | URL,
@@ -100,12 +99,6 @@ class GithubMock {
         const key = `${(pull[1] ?? '').toLowerCase()}#${pull[2]}`;
         const spec = this.pulls.get(key);
         if (this.failing.has(key) || spec === undefined) return send(500, { message: 'boom' });
-        if (init?.method === 'PATCH') {
-          const edited = (JSON.parse(init.body ?? '{}') as { body: string }).body;
-          this.bodyEdits.push({ key, body: edited });
-          this.pulls.set(key, { ...spec, body: edited });
-          return send(200, { number: Number(pull[2]), body: edited });
-        }
         return send(200, {
           body: spec.body ?? '## What\n\nA change.',
           state: spec.state ?? 'open',
@@ -158,8 +151,6 @@ function seedThread(
     repo?: string;
     archived?: boolean;
     phase?: 'review' | 'done';
-    sourceKind?: 'github-issue' | 'github-issue-self' | null;
-    sourceRef?: string | null;
   } = {},
 ) {
   counter += 1;
@@ -190,8 +181,6 @@ function seedThread(
       seqNum: counter,
       latestBuildId: buildId,
       archivedAt: opts.archived === true ? 5 : null,
-      sourceKind: opts.sourceKind ?? null,
-      sourceRef: opts.sourceRef ?? null,
     })
     .run();
   s.db
@@ -1044,161 +1033,6 @@ describe('F8 GET /api/prs', () => {
   });
 });
 
-describe('F8 the PR body carries a closing keyword for the task issue', () => {
-  test('a self-issue task PR without the keyword gets one Closes line at the top, once', async () => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, {
-      prNumber: 1010,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#77',
-    });
-    mock.pulls.set('octo/demo#1010', { body: '## What\n\nRefs #7 and #770, fixes #7700.' });
-    const watch = watchFor(s, mock);
-    await watch.sweep(1_000);
-    await watch.sweep(70_000);
-    expect(mock.bodyEdits).toEqual([
-      { key: 'octo/demo#1010', body: 'Closes #77\n\n## What\n\nRefs #7 and #770, fixes #7700.' },
-    ]);
-  });
-
-  test('a worker rewrite that drops the line gets it back on the next sweep', async () => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, {
-      prNumber: 1015,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#78',
-    });
-    mock.pulls.set('octo/demo#1015', { body: 'first' });
-    const watch = watchFor(s, mock);
-    await watch.sweep(1_000);
-    mock.pulls.set('octo/demo#1015', { body: 'rewritten' });
-    await watch.sweep(70_000);
-    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([
-      'Closes #78\n\nfirst',
-      'Closes #78\n\nrewritten',
-    ]);
-  });
-
-  test.each([
-    'closes #77',
-    'Fixes: #77.',
-    'RESOLVED octo/demo#77',
-    'This pull request fixes #77 for real.',
-  ])('a body that already says %s is left alone', async (line) => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, {
-      prNumber: 1020,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#77',
-    });
-    mock.pulls.set('octo/demo#1020', { body: `## What\n\n${line}` });
-    await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits).toEqual([]);
-  });
-
-  test.each([
-    ['a fenced code block', '```\nCloses #77\n```'],
-    ['an HTML comment', '<!-- Closes #77 -->'],
-    ['an inline code span', 'run `closes #77` later'],
-  ])('a keyword only inside %s does not count, so the line is added', async (_name, inert) => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, {
-      prNumber: 1025,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#77',
-    });
-    mock.pulls.set('octo/demo#1025', { body: inert });
-    await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([`Closes #77\n\n${inert}`]);
-  });
-
-  test('the edit builds on the body as it is now, not on the body the sweep read earlier', async () => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, {
-      prNumber: 1027,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#79',
-    });
-    mock.pulls.set('octo/demo#1027', { body: 'old' });
-    let reads = 0;
-    const inner = mock.fetch.getMockImplementation();
-    mock.fetch.mockImplementation((input, init) => {
-      if (init?.method !== 'PATCH' && String(input).endsWith('/pulls/1027')) {
-        reads += 1;
-        if (reads === 2) mock.pulls.set('octo/demo#1027', { body: 'edited meanwhile' });
-      }
-      return inner!(input, init);
-    });
-    await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['Closes #79\n\nedited meanwhile']);
-  });
-
-  test.each([
-    ['an unclosed fence', '## What\n\n```text\nlog output'],
-    ['an unclosed HTML comment', '## What\n\n<!-- note'],
-  ])('a body ending in %s converges after one edit', async (_name, open) => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, {
-      prNumber: 1029,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#81',
-    });
-    mock.pulls.set('octo/demo#1029', { body: open });
-    const watch = watchFor(s, mock);
-    await watch.sweep(1_000);
-    await watch.sweep(70_000);
-    await watch.sweep(140_000);
-    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual([`Closes #81\n\n${open}`]);
-  });
-
-  test('an imported issue from the same repo is closed the same way', async () => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, { prNumber: 1030, sourceKind: 'github-issue', sourceRef: 'github:octo/demo#5' });
-    mock.pulls.set('octo/demo#1030', { body: 'x' });
-    await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits.map((edit) => edit.body)).toEqual(['Closes #5\n\nx']);
-  });
-
-  test.each([
-    ['no issue', null, null],
-    ['an issue still being created', 'github-issue-self', null],
-    ['an issue in another repo', 'github-issue', 'github:octo/other#5'],
-  ] as const)('a task with %s gets no closing line', async (_name, sourceKind, sourceRef) => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, { prNumber: 1040, sourceKind, sourceRef });
-    mock.pulls.set('octo/demo#1040', { body: 'x' });
-    await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits).toEqual([]);
-  });
-
-  test('a merged or closed PR body is never edited', async () => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, {
-      prNumber: 1050,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#9',
-    });
-    seedThread(s, {
-      prNumber: 1051,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#10',
-    });
-    mock.pulls.set('octo/demo#1050', { state: 'closed', merged: true, body: 'x' });
-    mock.pulls.set('octo/demo#1051', { state: 'closed', merged: false, body: 'x' });
-    await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits).toEqual([]);
-  });
-});
-
 describe('the PR watch token policy', () => {
   const policies = () => {
     const seen: string[] = [];
@@ -1220,20 +1054,5 @@ describe('the PR watch token policy', () => {
     await watchFor(s, mock).sweep(1_000);
     expect(mock.count(`/pulls/${t.prNumber}`)).toBe(1);
     expect(seen).toEqual(['server-read']);
-  });
-
-  test('a missing closing line asks for a write grant at the write, not for the reads', async () => {
-    const s = boot();
-    const mock = new GithubMock();
-    seedThread(s, {
-      prNumber: 1010,
-      sourceKind: 'github-issue-self',
-      sourceRef: 'github:octo/demo#77',
-    });
-    mock.pulls.set('octo/demo#1010', { body: '## What\n\nNo keyword.' });
-    const seen = policies();
-    await watchFor(s, mock).sweep(1_000);
-    expect(mock.bodyEdits).toHaveLength(1);
-    expect(seen).toEqual(['server-read', 'server-write']);
   });
 });

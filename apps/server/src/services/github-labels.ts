@@ -1,53 +1,7 @@
-import { GITHUB_LABEL_DEFAULT_COLOR } from '@cairn/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { githubLabel, todoGithubLabel } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { newRecordId, nowMs } from '../lib/ids.js';
-
-export function normalizeGithubLabelColor(color: string | null | undefined): string {
-  if (typeof color === 'string') {
-    if (/^[0-9a-fA-F]{6}$/.test(color)) return `#${color.toLowerCase()}`;
-    if (/^#[0-9a-fA-F]{6}$/.test(color)) return color.toLowerCase();
-  }
-  return GITHUB_LABEL_DEFAULT_COLOR;
-}
-
-export function syncGithubLabels(
-  db: Db,
-  projectId: string,
-  labels: readonly { name: string; color: string | null }[],
-): { inserted: number; updated: number } {
-  return db.transaction((tx) => {
-    let inserted = 0;
-    let updated = 0;
-    for (const label of labels) {
-      const color = normalizeGithubLabelColor(label.color);
-      const existing = tx
-        .select()
-        .from(githubLabel)
-        .where(and(eq(githubLabel.projectId, projectId), eq(githubLabel.name, label.name)))
-        .get();
-      if (existing === undefined) {
-        tx.insert(githubLabel)
-          .values({
-            id: newRecordId(),
-            projectId,
-            name: label.name,
-            color,
-            createdAt: nowMs(),
-            v: 1,
-          })
-          .run();
-        inserted++;
-      } else if (existing.color !== color) {
-        tx.update(githubLabel).set({ color }).where(eq(githubLabel.id, existing.id)).run();
-        updated++;
-      }
-    }
-    return { inserted, updated };
-  });
-}
 
 export function listProjectGithubLabelVocab(db: Db, projectId: string): { name: string }[] {
   return db

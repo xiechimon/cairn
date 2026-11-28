@@ -2,7 +2,6 @@ import type {
   ChatChart,
   DiffGlance,
   FsListResult,
-  GithubIssueEcho,
   ProjectRecord,
   TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
@@ -393,12 +392,6 @@ export const QUESTION_CANCELLED: ChiefQuestionItem = {
   ...QUESTION_PENDING,
   requestId: 'req-3',
   status: 'cancelled',
-};
-
-export const ISSUE_ECHO: GithubIssueEcho = {
-  number: 1182,
-  title: 'Branch badge shows a stale name',
-  state: 'open',
 };
 
 export const BRANCHES = {

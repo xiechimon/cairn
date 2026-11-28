@@ -8,6 +8,7 @@ import type { Db } from '../db/client.js';
 import { project, todo } from '../db/schema.js';
 import { HttpError, notFound, parseWith } from '../lib/errors.js';
 import {
+  type FetchLike,
   type GithubListFailure,
   type GithubListResult,
   githubListIssues,
@@ -20,7 +21,6 @@ import { githubAppRegistration } from './github-app-registration.js';
 import { githubReadToken } from './github-autonomous-token.js';
 import { refreshingGithubFetch, teamUserToken } from './github-connection.js';
 import { githubConnectionInstallUrl } from './github-connection-device.js';
-import type { GithubIssueFaceDeps } from './github-issues.js';
 import { listedProjects } from './personal-space.js';
 
 export const GITHUB_READ_TIMEOUT_MS = 6_000;
@@ -30,7 +30,12 @@ const TEXT_MAX = 100;
 
 export type GithubReadToolName = keyof typeof githubReadToolParamsSchemas;
 
-export type GithubReadDeps = GithubIssueFaceDeps;
+export interface GithubReadDeps {
+  db: Db;
+  githubFetch?: FetchLike;
+  githubBaseFetch?: FetchLike;
+  githubApp?: Readonly<{ clientId: string; slug: string }> | null | undefined;
+}
 
 export function cleanGithubText(value: string, max: number): string {
   const flat = value

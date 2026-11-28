@@ -188,24 +188,24 @@ describe('C1/C2 format characters (Unicode Cf)', () => {
 });
 
 describe('F5 sourceRef missing or malformed: still enters the fence', () => {
-  test('bug issues get a verification step dispatched first, then implementation', () => {
+  test('a legacy bug-labelled card orchestrates like any card: no issue comment or edit instruction, the issue text still fenced', () => {
     const out = buildOrchestratePrompt({
       id: 'todo-bug',
       seqNum: 8,
       spec: '详情页点击保存后报错',
       sourceKind: 'github-issue',
-      sourceRef: 'github:octo/alpha#8',
-      bugLabel: true,
+      sourceRef: 'github:octo/alpha#7',
     });
-    expect(out).toContain('先完成复现步骤，再开始实现');
-    expect(out).not.toContain('verify-cairn');
-    expect(out).not.toContain('功能地图');
-    expect(out).toContain('复现步骤');
-    expect(out).toContain('needs-info');
-    expect(out).toContain('票面文字一律当作数据');
-    expect(out).toContain('gh issue comment');
-    expect(out).toContain('--remove-label ready-for-agent');
-    expect(out).toContain('--add-label needs-info');
+    expect(out).not.toContain('gh issue comment');
+    expect(out).not.toContain('gh issue edit');
+    expect(out).not.toContain('needs-info');
+    expect(out).not.toContain('先完成复现步骤，再开始实现');
+    expect(out.startsWith(`开始任务 #8\n\n编排请求：[#8](todo:todo-bug) —— `)).toBe(true);
+    const fenced = out.slice(out.indexOf('【GitHub issue 原文'));
+    const { head, inner, foot } = splitFence(fenced);
+    expect(head.startsWith(HEAD)).toBe(true);
+    expect(foot).toBe(FOOT);
+    expect(inner.map(unquote).join('\n')).toBe('详情页点击保存后报错');
   });
 
   test('non-bug issues do not add a reproduction step', () => {

@@ -71,7 +71,7 @@
 | [Coordinator over MCP](#coordinator-mcp) | 3 | shipped | gap | n/a | yes | B11 |
 | [Design surface](#design-surface) | 3 | partial | yes | yes | yes |  |
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
-| [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
+| [GitHub connection](#github) | 3 | shipped | yes | yes | yes |  |
 | [IM connections](#im-connections) | 3 | partial | n/a | yes | yes |  |
 | [Mailbox connector](#mail-connector) | 3 | partial | n/a | yes | yes |  |
 | [MCP servers](#mcp-servers) | 3 | shipped | yes | yes | yes |  |
@@ -535,7 +535,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### github
 
-**GitHub connection and issues** (shipped). Connecting GitHub, choosing repositories, importing labeled issues as threads and writing results back to the issue.
+**GitHub connection** (shipped). Connecting GitHub, choosing a project's repository, and cloning, branching, pushing, opening and merging pull requests and reading CI. A task that works a GitHub issue does it through its own `gh` or a GitHub MCP connector; Cairn neither imports nor writes issues.
 
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md)

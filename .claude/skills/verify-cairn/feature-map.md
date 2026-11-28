@@ -415,7 +415,7 @@ Reach:
 
 - Web routes: `/app/todo/:id`
 - Keyboard shortcuts in its code: `A`
-- Test ids in its code: `agent-text`, `agent-todo`, `artifact-diagram`, `artifact-diagram-notice`, `automation-completed`, `bg-task`, `bg-task-detail`, `bg-task-running-dot`, `bg-task-stop`, `bg-tasks`, `chat-artifact-card`, `chat-artifact-image`, `chat-artifact-meta`, `chat-artifact-video`, `chat-artifact-video-open`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `info-report`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-mermaid`, `md-mermaid-diagram`, `md-mermaid-notice`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-task-note`, `md-tasks`, `message-file-link`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `task-mention`, `task-mention-tip`, `thinking-body`, `tool-output`, `transcript-automatic-retry`, `transcript-col`, `transcript-fail`, `transcript-note`, `transcript-question`, `transcript-quota-wait`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `user-msg-sending`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-say-line`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `workspace-file-body`, `workspace-file-notice`, `workspace-file-text`
+- Test ids in its code: `agent-text`, `agent-todo`, `artifact-diagram`, `artifact-diagram-notice`, `automation-completed`, `bg-task`, `bg-task-detail`, `bg-task-running-dot`, `bg-task-stop`, `bg-tasks`, `chat-artifact-card`, `chat-artifact-image`, `chat-artifact-meta`, `chat-artifact-video`, `chat-artifact-video-open`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `info-report`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-mermaid`, `md-mermaid-diagram`, `md-mermaid-notice`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-task-note`, `md-tasks`, `message-file-link`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skills-summary`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `task-mention`, `task-mention-tip`, `thinking-body`, `tool-output`, `transcript-automatic-retry`, `transcript-col`, `transcript-fail`, `transcript-note`, `transcript-question`, `transcript-quota-wait`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `user-msg-sending`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-say-line`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `workspace-file-body`, `workspace-file-notice`, `workspace-file-text`
 - Verify recipes: [.claude/skills/verify-cairn/features/board-new-task.md](features/board-new-task.md), [.claude/skills/verify-cairn/features/agent-detail.md](features/agent-detail.md)
 - Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
@@ -852,23 +852,23 @@ Reach:
 
 ### github
 
-**GitHub connection and issues** (shipped, centrality 3). Connecting GitHub, choosing repositories, importing labeled issues as threads and writing results back to the issue.
+**GitHub connection** (shipped, centrality 3). Connecting GitHub, choosing a project's repository, and cloning, branching, pushing, opening and merging pull requests and reading CI. A task that works a GitHub issue does it through its own `gh` or a GitHub MCP connector; Cairn neither imports nor writes issues.
 
-States: Not connected, connected with a repository picker, an issue imported as a thread, and the write-back pending, done, drifted or failed with retry.
+States: Not connected, connected with a repository picker, a project cloning, branching and pushing over the connection, and a pull request with its checks and merge.
 
 Reach:
 
-1. `open /app/todo/<id of a thread listed by the todos API>`
-2. `click testid:source-issue-retry`
+1. `open /app/project/new`
+2. `click testid:github-picker`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`
+- Test ids in its code: none
 - Verify recipes: [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/github-emulator.md](features/github-emulator.md), [.claude/skills/verify-cairn/features/github-auth-emulator.md](features/github-auth-emulator.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
-- Evidence: `apps/web/e2e/github-issue-writeback.spec.ts`, `apps/server/test/github-issues.test.ts`, `apps/server/test/github-connection.test.ts`
+- Evidence: `apps/server/test/github-connection.test.ts`
 
 ### im-connections
 

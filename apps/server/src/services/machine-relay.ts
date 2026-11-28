@@ -67,7 +67,7 @@ import { holdSecretRequest } from './secret-requests.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { stepNamesTask } from './task-naming.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
-import { updateAutonomousTodo, writebackSelfIssueTitle } from './todos.js';
+import { updateAutonomousTodo } from './todos.js';
 import { askWorkerQuestion, recordThreadReportLine } from './worker-questions.js';
 
 export async function machineAsk(
@@ -673,11 +673,11 @@ function normalizedMetaTitle(raw: unknown): string {
   return title;
 }
 
-async function setTaskMetaGithubForm(
+function setTaskMetaGithubForm(
   deps: MachineDeps,
   todoRow: typeof todo.$inferSelect,
   params: Record<string, unknown>,
-): Promise<string> {
+): string {
   let title: string | undefined;
   if (params.title !== undefined) {
     if (todoRow.sourceKind === 'github-issue' || todoRow.request !== null) {
@@ -719,19 +719,11 @@ async function setTaskMetaGithubForm(
     githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const record = updateAutonomousTodo(
-    todoDeps,
-    todoRow.id,
-    {
-      ...(title !== undefined ? { title } : {}),
-      ...(githubLabelIds !== undefined ? { githubLabelIds } : {}),
-    },
-    { issueTitleWriteback: true },
-  );
+  const record = updateAutonomousTodo(todoDeps, todoRow.id, {
+    ...(title !== undefined ? { title } : {}),
+    ...(githubLabelIds !== undefined ? { githubLabelIds } : {}),
+  });
   if (!record) throw new NotFoundError(`todo ${todoRow.id}`);
-  if (title !== undefined && record.sourceKind === 'github-issue-self') {
-    await writebackSelfIssueTitle(todoDeps, todoRow.id, record.title).catch(() => undefined);
-  }
   return JSON.stringify({
     todoId: record.id,
     title: record.title,

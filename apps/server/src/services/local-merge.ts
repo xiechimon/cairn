@@ -6,7 +6,6 @@ import {
   localMergeCommandSchema,
   type MachineLocalMergeRecheckBody,
   type MachineLocalMergeRecheckResponse,
-  parseGithubIssueSourceRef,
   parseLocalMergeInstruction,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -50,7 +49,6 @@ export async function enqueueLocalMerge(
   const patchDigest = computePatchDigest(files).patchDigest;
   if (patchDigest === null) throw conflict('Local merge requires a readable delivered patch');
   const required = [...projectMergeConfigOf(projectRow).localChecks];
-  const source = todoRow.sourceRef ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
   const command = localMergeCommandSchema.parse({
     projectId: todoRow.projectId,
     buildId,
@@ -60,10 +58,7 @@ export async function enqueueLocalMerge(
     judgedPatchDigest: patchDigest,
     workBranch: conversationBranch(buildId),
     localChecks: required,
-    message:
-      source === null
-        ? todoRow.title
-        : `${todoRow.title}\n\nCloses ${source.owner}/${source.repo}#${source.issueNumber}`,
+    message: todoRow.title,
     identity: softwareCommitIdentity(deps) ?? localCommitIdentity(deps.user.displayName),
   });
   deps.db.transaction(() => {

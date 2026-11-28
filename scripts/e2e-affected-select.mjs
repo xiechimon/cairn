@@ -207,7 +207,6 @@ const PAGES = [
   'menu-keys',
   'project-',
   'file-viewer',
-  'github-issue-writeback',
   'segmented-',
   'dialog-',
   'schedules-',

@@ -36,8 +36,7 @@ import { teamUserToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { assertPhaseTransition } from './phase.js';
-import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
-import { selfIssueCreatePending, setTodoPhase } from './todos.js';
+import { setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
 type BuildRow = typeof build.$inferSelect;
@@ -219,21 +218,6 @@ export async function mergeThroughGithub(
     }
     const titled = `${pull.title} (#${prNumber})`;
     await assertMergeRequiredChecks(fetchImpl, token, repoRef, pull.baseRef, checkpoint);
-    await selfIssueCreatePending(row.todoId);
-    const closing = apiMergeGate(deps, row);
-    await ensurePullClosesTaskIssue(
-      fetchImpl,
-      () => Promise.resolve(token),
-      repoRef,
-      prNumber,
-      closing.todoRow,
-      pull.body,
-    ).catch((error: unknown) => {
-      throw new HttpError(
-        409,
-        `PR #${prNumber} 的描述里补不上关闭本任务 issue 的那一行（${error instanceof Error ? githubText(error.message) : '未知错误'}），没有发起合并：请稍后重试。`,
-      );
-    });
     const current = apiMergeGate(deps, row);
     const currentProject = projectOfTodo(deps.db, current.todoRow);
     if (

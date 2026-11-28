@@ -1,7 +1,6 @@
 import type { todo } from '../db/schema.js';
 import { type BuildDeps, enqueueStep, finishTodoDone } from './builds.js';
 import type { CiCheckFailure } from './ci-check-verdict.js';
-import { CI_FIX_GREEN_EVENT } from './ci-corrections.js';
 import {
   buildCiFixPrompt,
   CI_FIX_ROUNDS_MAX,
@@ -11,7 +10,7 @@ import {
 import type { KnownRows } from './ci-known-rows.js';
 import { failWithMessage } from './ci-loop-rows.js';
 import { holdLastCiFixForResearch } from './research-stuck.js';
-import { CI_FIX_PROMPT_HEAD, retryLessonsOf } from './retry-lessons.js';
+import { CI_FIX_GREEN_EVENT, CI_FIX_PROMPT_HEAD, retryLessonsOf } from './retry-lessons.js';
 
 type Cand = { buildId: string; todoId: string };
 

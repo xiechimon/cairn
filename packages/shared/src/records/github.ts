@@ -26,8 +26,6 @@ export const githubConnectionStatusSchema = z.object({
   login: z.string().optional(),
   scope: z.string().optional(),
   disconnectReason: z.string().optional(),
-  webhookMasked: z.string().optional(),
-  webhookLastUsedAt: z.number().optional(),
 });
 export type GithubConnectionStatus = z.infer<typeof githubConnectionStatusSchema>;
 
@@ -48,15 +46,3 @@ export const githubConnectionDevicePollSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('failed') }),
 ]);
 export type GithubConnectionDevicePoll = z.infer<typeof githubConnectionDevicePollSchema>;
-
-export const importGithubIssueBodySchema = z.object({
-  number: z.number().int().positive(),
-});
-export type ImportGithubIssueBody = z.infer<typeof importGithubIssueBodySchema>;
-
-export const githubIssueEchoSchema = z.object({
-  number: z.number(),
-  title: z.string(),
-  state: z.enum(['open', 'closed']),
-});
-export type GithubIssueEcho = z.infer<typeof githubIssueEchoSchema>;

@@ -47,7 +47,6 @@ import type {
   GithubConnectorAvailability,
   GithubConnectorDevicePoll,
   GithubConnectorDeviceStart,
-  GithubIssueEcho,
   GithubReposResponse,
   ImConnectionRecord,
   ImPairingRequestRecord,
@@ -740,16 +739,6 @@ export const useFsList = (dir: string | null, enabled: boolean) =>
     staleTime: 0,
   });
 
-export function useGithubIssueEcho(todoId: string | undefined, enabled: boolean) {
-  return useQuery({
-    queryKey: ['github-issue-echo', todoId],
-    queryFn: () => api.get<GithubIssueEcho>(`/api/todos/${todoId}/github-issue`),
-    enabled: enabled && todoId !== undefined,
-    retry: false,
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-}
-
 export const useSecrets = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['secrets', teamId],
@@ -1313,12 +1302,6 @@ export function useApiMutations(teamId: string | undefined) {
           spec: input.spec,
           ...(input.machineId != null ? { machineId: input.machineId } : {}),
         }),
-      onSuccess: invalidateAll,
-    }),
-    retryGithubIssue: useMutation({
-      meta: { action: '重试同步 GitHub issue' },
-      mutationFn: (todoId: string) =>
-        api.post<TodoRecord>(`/api/todos/${todoId}/github-issue/retry`, {}),
       onSuccess: invalidateAll,
     }),
     patchTodo: useMutation({

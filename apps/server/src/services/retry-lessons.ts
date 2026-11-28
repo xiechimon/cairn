@@ -28,7 +28,8 @@ import {
   plan,
   step,
 } from '../db/schema.js';
-import { CI_FIX_GREEN_EVENT } from './ci-corrections.js';
+
+export const CI_FIX_GREEN_EVENT = '[correction:ci-fix-green] CI 修复后转绿，待归因。';
 
 export const CI_FIX_PROMPT_HEAD = '[ci-fix]';
 export const CI_FIX_FAILURES_HEAD = '失败的检查：';

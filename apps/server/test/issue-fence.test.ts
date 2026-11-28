@@ -21,7 +21,7 @@ import {
 } from '../src/services/chief.js';
 import { executeChiefTool, executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { getTodo } from '../src/services/todos.js';
+import { createTodo, getTodo } from '../src/services/todos.js';
 import {
   bootServer,
   issueApiKey,
@@ -126,12 +126,17 @@ afterEach(() => {
   s.dispose();
 });
 
-async function importIssue(): Promise<string> {
-  const res = await call(s.app, 'POST', `/api/projects/${ghProjectId}/github/issues/import`, {
-    body: { number: 7 },
-  });
-  expect(res.status).toBe(201);
-  return ((await res.json()) as { id: string }).id;
+function importIssue(): string {
+  return createTodo(s.svc, {
+    teamId: s.team.id,
+    projectId: ghProjectId,
+    title: ISSUE_TITLE,
+    spec: ISSUE_BODY,
+    createdBy: s.user.id,
+    ownerId: s.user.id,
+    sourceKind: 'github-issue',
+    sourceRef: `github:${REPO}#7`,
+  }).id;
 }
 
 async function claim() {

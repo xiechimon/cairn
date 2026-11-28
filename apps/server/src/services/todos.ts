@@ -20,14 +20,12 @@ import {
   DONE_ANNOUNCEMENT,
   deliverablesMessageSchema,
   derivePlaceholderTitle,
-  githubIssueSourceRef,
   IN_PROGRESS_PHASES,
   isAcceptanceNudgePrompt,
   isRegisteredMachine,
   missingSetupCommand,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
-  parseGithubIssueSourceRef,
   parseMissingEvidenceLine,
   renderTaskText,
   runnerOsOf,
@@ -46,7 +44,6 @@ import {
   like,
   max,
   min,
-  or,
   sql,
 } from 'drizzle-orm';
 import { cacheTtlMsFor, resolveCacheRetentionTier } from '../coordinator/runtime/cold-slim.js';
@@ -61,7 +58,6 @@ import {
   stepQuota,
   stepUsage,
   stopPending,
-  taskIssueClose,
   todo,
   todoGithubLabel,
   todoTransition,
@@ -69,7 +65,6 @@ import {
 } from '../db/schema.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { githubCreateIssue, githubListIssues, githubUpdateIssueTitle } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
@@ -91,24 +86,8 @@ import {
 } from './dispatch-eligibility.js';
 import { enabledDoubaoSubscriptionId } from './doubao-subscriptions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import {
-  claimEffect,
-  type EffectProbeVerdict,
-  type EffectRow,
-  effectAttemptOutcome,
-  effectDedupeKey,
-  effectRegistry,
-  failEffect,
-  markEffectAttempt,
-  markEffectDelivered,
-  recordEffect,
-  retryEffect,
-  runEffectRow,
-  settleEffectRow,
-} from './external-effects.js';
-import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { autonomousToken, githubReadToken } from './github-autonomous-token.js';
-import { hasGithubConnection, userTokenOrNull } from './github-connection.js';
+import { projectOfTodo } from './git.js';
+import { userTokenOrNull } from './github-connection.js';
 import {
   assertGithubLabelsInProject,
   correctionFromGithubLabels,
@@ -766,7 +745,6 @@ export function createAutonomousTodo(
     sourceKind?: TodoSourceKind;
     sourceRef?: string;
     issueState?: 'open' | 'closed';
-    withoutSelfIssue?: boolean;
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
     userSpecAttachmentIds?: string[];
@@ -799,10 +777,6 @@ export function createAutonomousTodo(
       : checkBlockedBy(db, { id, teamId: input.teamId, latestBuildId: null }, input.blockedBy);
   const title =
     input.title.trim() || derivePlaceholderTitle(input.spec) || PLACEHOLDER_TITLE_FALLBACK;
-  const selfIssue =
-    input.sourceKind === undefined && input.withoutSelfIssue !== true
-      ? planSelfIssue(deps, input.teamId, input.projectId, input.output ?? 'code')
-      : null;
   db.transaction((tx) => {
     tx.insert(todo)
       .values({
@@ -827,15 +801,10 @@ export function createAutonomousTodo(
         ownerId: input.ownerId,
         sourceBuildId: null,
         sourceKind:
-          input.sourceKind ??
-          (selfIssue !== null
-            ? 'github-issue-self'
-            : input.orchestration !== undefined
-              ? 'orchestration'
-              : null),
+          input.sourceKind ?? (input.orchestration !== undefined ? 'orchestration' : null),
         sourceRef:
           input.sourceRef ??
-          (selfIssue === null && input.orchestration !== undefined
+          (input.orchestration !== undefined
             ? orchestrationSourceRef(input.orchestration.threadId)
             : null),
         issueState: input.issueState ?? null,
@@ -891,7 +860,6 @@ export function updateAutonomousTodo(
     manualPhase?: boolean;
     userSpecAttachmentIds?: string[];
     textWriter?: TodoTextWriter;
-    issueTitleWriteback?: boolean;
   } = {},
 ): TodoRecord | null {
   const { db, hub } = deps;
@@ -1008,14 +976,6 @@ export function updateAutonomousTodo(
         .run();
       if (githubLabelIds === undefined)
         tx.delete(todoGithubLabel).where(eq(todoGithubLabel.todoId, id)).run();
-      if (move.closeIssueRef !== null) {
-        queueIssueClose(
-          db,
-          row.teamId,
-          move.closeIssueRef,
-          `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
-        );
-      }
     }
     if (githubLabelIds !== undefined) {
       tx.delete(todoGithubLabel).where(eq(todoGithubLabel.todoId, id)).run();
@@ -1029,15 +989,6 @@ export function updateAutonomousTodo(
       row.latestBuildId !== null
     ) {
       insertGateAnnouncement(deps, row.latestBuildId, DONE_ANNOUNCEMENT, deps.user.displayName);
-    }
-    if (
-      opts.issueTitleWriteback === true &&
-      patch.title !== undefined &&
-      row.sourceKind === 'github-issue-self' &&
-      row.sourceRef !== null
-    ) {
-      const parsed = parseGithubIssueSourceRef(row.sourceRef);
-      if (parsed !== null) recordSelfIssueTitle(deps, row, parsed, patch.title);
     }
   });
 
@@ -1055,10 +1006,7 @@ export function updateAutonomousTodo(
 }
 
 interface ProjectMove {
-  sets: Pick<TodoRow, 'projectId' | 'orderIndex'> &
-    Partial<Pick<TodoRow, 'sourceKind' | 'sourceRef'>>;
-  closeIssueRef: string | null;
-  targetName: string;
+  sets: Pick<TodoRow, 'projectId' | 'orderIndex'>;
 }
 
 function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): ProjectMove {
@@ -1074,37 +1022,15 @@ function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): Proje
         : '这张卡已经开始了，不能换项目',
     );
   }
-  if (selfIssueInFlight.has(row.id)) {
-    throw new HttpError(409, '正在给这张卡开 GitHub issue，稍后再换项目');
-  }
   const orderRow = deps.db
     .select({ n: max(todo.orderIndex) })
     .from(todo)
     .where(and(eq(todo.projectId, target.id), eq(todo.phase, 'todo')))
     .get();
-  const sets: ProjectMove['sets'] = { projectId: target.id, orderIndex: (orderRow?.n ?? -1) + 1 };
-  const targetOpensIssues = planSelfIssue(deps, row.teamId, target.id, row.output) !== null;
-  const dropsIssue = row.sourceKind === 'github-issue-self' && !targetOpensIssues;
-  if (dropsIssue) {
-    sets.sourceKind = null;
-    sets.sourceRef = null;
-  } else if (row.sourceKind === null && targetOpensIssues) {
-    sets.sourceKind = 'github-issue-self';
-  }
   return {
-    sets,
-    closeIssueRef: dropsIssue ? row.sourceRef : null,
-    targetName: target.name,
+    sets: { projectId: target.id, orderIndex: (orderRow?.n ?? -1) + 1 },
   };
 }
-
-export function queueIssueClose(db: Db, teamId: string, sourceRef: string, comment: string): void {
-  db.insert(taskIssueClose)
-    .values({ id: newRecordId(), teamId, sourceRef, comment, createdAt: nowMs() })
-    .run();
-}
-
-export const DELETED_TASK_ISSUE_COMMENT = 'Cairn：这个任务已删除，这里的 issue 关闭（未计划）。';
 
 function recordTransition(
   db: Db,
@@ -1218,8 +1144,7 @@ export function settleSplitOnDone(deps: TodoDeps, childId: string): void {
 
 export function deleteTodo(deps: TodoDeps, id: string): boolean {
   const { db } = deps;
-  const row = getRow(deps, id);
-  if (!row) return false;
+  if (!getRow(deps, id)) return false;
   db.transaction(() => {
     const buildIds = db
       .select({ id: build.id })
@@ -1232,393 +1157,9 @@ export function deleteTodo(deps: TodoDeps, id: string): boolean {
       db.delete(step).where(inArray(step.buildId, buildIds)).run();
       db.delete(memoryCorrection).where(inArray(memoryCorrection.buildId, buildIds)).run();
     }
-    if (row.sourceKind === 'github-issue-self' && row.sourceRef !== null) {
-      queueIssueClose(db, row.teamId, row.sourceRef, DELETED_TASK_ISSUE_COMMENT);
-    }
     db.delete(schedule).where(eq(schedule.todoId, id)).run();
     retireTodoDeliverables(db, [id]);
     db.delete(todo).where(eq(todo.id, id)).run();
   });
   return true;
-}
-
-const selfIssueInFlight = new Map<string, Promise<unknown>>();
-
-export async function flushSelfIssueWrites(): Promise<void> {
-  await Promise.all([...selfIssueInFlight.values()]);
-}
-
-function planSelfIssue(
-  deps: TodoDeps,
-  teamId: string,
-  projectId: string,
-  output: TodoOutputKind,
-): GithubRepoRef | null {
-  if (output !== 'code') return null;
-  if (deps.box === undefined) return null;
-  const ref = githubRepoOfProject(projectOfTodo(deps.db, { projectId, teamId }));
-  if (ref === null) return null;
-  if (!hasGithubConnection(deps.db, teamId)) return null;
-  return ref;
-}
-
-function scheduleSelfIssueCreate(deps: TodoDeps, todoId: string): void {
-  const pending = runSelfIssueCreate(deps, todoId)
-    .catch((error: unknown) => {
-      console.error(
-        `self issue create failed for todo ${todoId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    })
-    .finally(() => {
-      if (selfIssueInFlight.get(todoId) === pending) selfIssueInFlight.delete(todoId);
-    });
-  selfIssueInFlight.set(todoId, pending);
-}
-
-export function selfIssueCreateInFlight(todoId: string): boolean {
-  return selfIssueInFlight.has(todoId);
-}
-
-export function selfIssueCreatePending(todoId: string): Promise<unknown> | undefined {
-  return selfIssueInFlight.get(todoId);
-}
-
-export function noteTaskCodeDelivered(deps: TodoDeps, todoId: string): void {
-  const row = getRow(deps, todoId);
-  if (row?.sourceKind !== 'github-issue-self') return;
-  scheduleSelfIssueCreate(deps, todoId);
-}
-
-function taskDeliveredCode(db: Db, row: TodoRow): boolean {
-  if (row.hasChanges) return true;
-  return (
-    db
-      .select({ id: build.id })
-      .from(build)
-      .where(and(eq(build.todoId, row.id), or(isNotNull(build.prNumber), isNotNull(build.prUrl))))
-      .get() !== undefined
-  );
-}
-
-const selfIssueMarker = (todoId: string) => `<!-- cairn:todo ${todoId} -->`;
-
-interface SelfIssuePayload {
-  todoId: string;
-  owner: string;
-  repo: string;
-  title: string;
-  body: string;
-}
-
-function selfIssuePayloadOf(row: EffectRow): SelfIssuePayload | null {
-  const p = row.payload as Record<string, unknown> | null;
-  if (p === null) return null;
-  if (
-    typeof p.todoId !== 'string' ||
-    typeof p.owner !== 'string' ||
-    typeof p.repo !== 'string' ||
-    typeof p.title !== 'string' ||
-    typeof p.body !== 'string'
-  )
-    return null;
-  return { todoId: p.todoId, owner: p.owner, repo: p.repo, title: p.title, body: p.body };
-}
-
-function issueNumberOfReceipt(receipt: unknown): number | null {
-  if (typeof receipt !== 'object' || receipt === null) return null;
-  const n = (receipt as { number?: unknown }).number;
-  return typeof n === 'number' ? n : null;
-}
-
-function applyCreatedIssue(
-  deps: TodoDeps,
-  row: TodoRow,
-  repoRef: GithubRepoRef,
-  number: number,
-): TodoRecord | null {
-  const { db, hub } = deps;
-  const ref = githubIssueSourceRef(repoRef.owner, repoRef.repo, number);
-  const fresh = getRow(deps, row.id);
-  if (!fresh) {
-    queueIssueClose(db, row.teamId, ref, DELETED_TASK_ISSUE_COMMENT);
-    return null;
-  }
-  if (fresh.sourceRef !== row.sourceRef) return null;
-  db.transaction(() => {
-    db.update(todo)
-      .set({ sourceRef: ref, issueState: 'open', v: fresh.v + 1 })
-      .where(eq(todo.id, row.id))
-      .run();
-    if (row.sourceRef !== null && parseGithubIssueSourceRef(row.sourceRef) !== null) {
-      queueIssueClose(
-        db,
-        row.teamId,
-        row.sourceRef,
-        `Cairn：这个任务挪到了 ${repoRef.owner}/${repoRef.repo}#${number}，这里的 issue 关闭。`,
-      );
-    }
-  });
-  const record = getTodo(deps, row.id);
-  if (record) hub.publishTodoDoc(record.teamId, record);
-  return record;
-}
-
-async function sendSelfIssueEffect(
-  deps: TodoDeps,
-  effectRow: EffectRow,
-): Promise<{ number: number }> {
-  const p = selfIssuePayloadOf(effectRow);
-  if (p === null) throw failEffect('github-issue-create payload is malformed');
-  const row = getRow(deps, p.todoId);
-  if (row === undefined) throw failEffect('github-issue-create scope is gone');
-  const repoRef = { owner: p.owner, repo: p.repo };
-  const token = await autonomousToken(deps, row.teamId, repoRef);
-  if (token === null) throw retryEffect('github connection not found');
-  const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, token, p.owner, p.repo, {
-    title: row.title,
-    body: `${row.spec}\n\n${selfIssueMarker(p.todoId)}`,
-  });
-  applyCreatedIssue(deps, row, repoRef, number);
-  return { number };
-}
-
-async function probeSelfIssueCreated(
-  deps: TodoDeps,
-  effectRow: EffectRow,
-): Promise<EffectProbeVerdict> {
-  const p = selfIssuePayloadOf(effectRow);
-  if (p === null) return { verdict: 'unknown' };
-  const token = await githubReadToken(deps, effectRow.teamId, { owner: p.owner, repo: p.repo });
-  if (token === null) return { verdict: 'unknown' };
-  const marker = selfIssueMarker(p.todoId);
-  for (let page = 1; ; page += 1) {
-    const res = await githubListIssues(deps.githubFetch ?? fetch, token, p.owner, p.repo, {
-      state: 'all',
-      page,
-      perPage: 100,
-      timeoutMs: 15_000,
-    });
-    if (!res.ok) return { verdict: 'unknown' };
-    for (const issue of res.items) {
-      if (issue.body?.includes(marker)) {
-        return { verdict: 'delivered', receipt: { number: issue.number } };
-      }
-    }
-    if (!res.hasMore) break;
-  }
-  return { verdict: 'unsent' };
-}
-
-function registerSelfIssueCreateKind(deps: TodoDeps): void {
-  effectRegistry.set('github-issue-create', {
-    policy: 'probe',
-    scopeGone: (_db, effectRow) => {
-      const p = selfIssuePayloadOf(effectRow);
-      return p === null || getRow(deps, p.todoId) === undefined;
-    },
-    probe: (effectRow) => probeSelfIssueCreated(deps, effectRow),
-    send: (effectRow) => sendSelfIssueEffect(deps, effectRow),
-  });
-}
-
-async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoRecord | null> {
-  const { db, box } = deps;
-  const row = getRow(deps, todoId);
-  if (row?.sourceKind !== 'github-issue-self') return null;
-  const repoRef = githubRepoOfProject(projectOfTodo(db, row));
-  const replaced = row.sourceRef === null ? null : parseGithubIssueSourceRef(row.sourceRef);
-  const replacesOtherRepo =
-    replaced !== null &&
-    repoRef !== null &&
-    `${replaced.owner}/${replaced.repo}`.toLowerCase() !==
-      `${repoRef.owner}/${repoRef.repo}`.toLowerCase();
-  if (row.sourceRef !== null && !replacesOtherRepo) return null;
-  if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
-  if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
-  registerSelfIssueCreateKind(deps);
-  const body = `${row.spec}\n\n${selfIssueMarker(todoId)}`;
-  const intent = recordEffect(db, {
-    teamId: row.teamId,
-    scopeKind: 'todo',
-    scopeId: todoId,
-    kind: 'github-issue-create',
-    dedupeKey: effectDedupeKey(
-      'github-issue-create',
-      row.teamId,
-      todoId,
-      repoRef.owner,
-      repoRef.repo,
-    ),
-    payload: { todoId, owner: repoRef.owner, repo: repoRef.repo, title: row.title, body },
-  });
-  const token = await (
-    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
-  )(row.teamId, repoRef);
-  if (token === null) throw new HttpError(404, 'github connection not found');
-  const settled = await settleEffectRow(db, effectRegistry, intent.row);
-  if (settled.state === 'delivered') {
-    const number = issueNumberOfReceipt(settled.receipt);
-    return number === null ? null : applyCreatedIssue(deps, row, repoRef, number);
-  }
-  if (settled.state !== 'pending') return null;
-  const claimed = claimEffect(db, settled.id);
-  if (claimed === null) return null;
-  try {
-    const { number } = await githubCreateIssue(
-      deps.githubFetch ?? fetch,
-      token,
-      repoRef.owner,
-      repoRef.repo,
-      {
-        title: row.title,
-        body,
-      },
-    );
-    markEffectDelivered(db, claimed.id, claimed.claimFence ?? nowMs(), { number });
-    return applyCreatedIssue(deps, row, repoRef, number);
-  } catch (err) {
-    markEffectAttempt(
-      db,
-      claimed.id,
-      claimed.claimFence ?? nowMs(),
-      effectAttemptOutcome(err, claimed.attempts, nowMs()),
-    );
-    throw err;
-  }
-}
-
-export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoRecord> {
-  const row = getRow(deps, todoId);
-  if (!row) throw new HttpError(404, `todo ${todoId}`);
-  if (row.sourceKind !== 'github-issue-self') {
-    throw new HttpError(404, 'todo has no self-created github issue');
-  }
-  if (selfIssueInFlight.has(todoId)) {
-    throw new HttpError(409, 'github issue creation already in flight');
-  }
-  if (githubRepoOfProject(projectOfTodo(deps.db, row)) === null) {
-    throw new HttpError(404, 'project is not github-backed');
-  }
-  if (row.sourceRef === null && !taskDeliveredCode(deps.db, row)) {
-    throw new HttpError(
-      409,
-      'the task has not delivered any code yet; its issue opens when a leg reports commits or a PR',
-    );
-  }
-  const raw = runSelfIssueCreate(
-    { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
-    todoId,
-  );
-  const guarded = raw
-    .catch(() => undefined)
-    .finally(() => {
-      if (selfIssueInFlight.get(todoId) === guarded) selfIssueInFlight.delete(todoId);
-    });
-  selfIssueInFlight.set(todoId, guarded);
-  const record = await raw;
-  if (!record) throw new HttpError(409, 'github issue already created');
-  return record;
-}
-
-interface SelfIssueTitlePayload {
-  todoId: string;
-  owner: string;
-  repo: string;
-  issueNumber: number;
-  title: string;
-}
-
-function selfIssueTitlePayloadOf(row: EffectRow): SelfIssueTitlePayload | null {
-  const p = row.payload as Record<string, unknown> | null;
-  if (p === null) return null;
-  if (
-    typeof p.todoId !== 'string' ||
-    typeof p.owner !== 'string' ||
-    typeof p.repo !== 'string' ||
-    typeof p.issueNumber !== 'number' ||
-    typeof p.title !== 'string'
-  )
-    return null;
-  return {
-    todoId: p.todoId,
-    owner: p.owner,
-    repo: p.repo,
-    issueNumber: p.issueNumber,
-    title: p.title,
-  };
-}
-
-function recordSelfIssueTitle(
-  deps: TodoDeps,
-  row: TodoRow,
-  parsed: { owner: string; repo: string; issueNumber: number },
-  title: string,
-): EffectRow {
-  registerSelfIssueTitleKind(deps);
-  return recordEffect(deps.db, {
-    teamId: row.teamId,
-    scopeKind: 'todo',
-    scopeId: row.id,
-    kind: 'github-issue-title',
-    dedupeKey: effectDedupeKey('github-issue-title', row.teamId, row.id, row.sourceRef, title),
-    payload: {
-      todoId: row.id,
-      owner: parsed.owner,
-      repo: parsed.repo,
-      issueNumber: parsed.issueNumber,
-      title,
-    },
-  }).row;
-}
-
-async function sendSelfIssueTitleEffect(
-  deps: TodoDeps,
-  effectRow: EffectRow,
-): Promise<{ title: string }> {
-  const p = selfIssueTitlePayloadOf(effectRow);
-  if (p === null) throw failEffect('github-issue-title payload is malformed');
-  const row = getRow(deps, p.todoId);
-  if (row === undefined || row.teamId !== effectRow.teamId)
-    throw failEffect('github-issue-title scope is gone');
-  const token = await (
-    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
-  )(row.teamId, { owner: p.owner, repo: p.repo });
-  if (token === null) throw retryEffect('github connection not found');
-  await githubUpdateIssueTitle(
-    deps.githubFetch ?? fetch,
-    token,
-    p.owner,
-    p.repo,
-    p.issueNumber,
-    p.title,
-  );
-  return { title: p.title };
-}
-
-function registerSelfIssueTitleKind(deps: TodoDeps): void {
-  effectRegistry.set('github-issue-title', {
-    policy: 'replay-safe',
-    scopeGone: (_db, effectRow) => {
-      const p = selfIssueTitlePayloadOf(effectRow);
-      return p === null || getRow(deps, p.todoId) === undefined;
-    },
-    send: (effectRow) => sendSelfIssueTitleEffect(deps, effectRow),
-  });
-}
-
-export async function writebackSelfIssueTitle(
-  deps: TodoDeps,
-  todoId: string,
-  title: string,
-): Promise<void> {
-  const { db, box } = deps;
-  if (!box) return;
-  const row = getRow(deps, todoId);
-  if (row?.sourceKind !== 'github-issue-self' || row.sourceRef === null) return;
-  const parsed = parseGithubIssueSourceRef(row.sourceRef);
-  if (parsed === null) return;
-  const intent = recordSelfIssueTitle(deps, row, parsed, title);
-  const settled = await settleEffectRow(db, effectRegistry, intent);
-  if (settled.state !== 'pending') return;
-  await runEffectRow(db, effectRegistry, settled.id);
 }

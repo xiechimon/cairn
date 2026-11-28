@@ -64,7 +64,7 @@ import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planAutoConfirmation } from './plan-auto-confirm.js';
 import { finishScheduledStep } from './schedules.js';
 import { readSchedule } from './step-groups/schedule.js';
-import { getTodo, noteTaskCodeDelivered, setTodoPhase } from './todos.js';
+import { getTodo, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -375,7 +375,6 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
 
   const deliveredCode =
     outcome.hasChanges === true || buildRow.prNumber !== null || buildRow.prUrl !== null;
-  if (isBuildStepKind(stepRow.kind) && deliveredCode) noteTaskCodeDelivered(deps, todoRow.id);
 
   if (
     receivesAnswers(stepRow.kind) &&

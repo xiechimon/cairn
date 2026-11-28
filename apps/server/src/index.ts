@@ -83,6 +83,7 @@ import { seedOwnerCheckpoints } from './services/owner.js';
 import { capturePageOver, createPageThumbnails, parentPortOf } from './services/page-thumbnails.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { createReleaseWatcher } from './services/release-watcher.js';
+import { retireGithubIssueEffects } from './services/retired-effects.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import { createScheduler } from './services/scheduler.js';
 import { maybeRetriggerIdleHostUpdate } from './services/server-version.js';
@@ -521,6 +522,7 @@ const computerScreens = computerScreensOf({
 });
 computerScreens.recover();
 sweepComputerHandoffs(db, Date.now());
+retireGithubIssueEffects(db, effectRegistry);
 void reconcileEffects(db, effectRegistry)
   .then(() => drainEffects(db, effectRegistry))
   .catch((error: unknown) => {

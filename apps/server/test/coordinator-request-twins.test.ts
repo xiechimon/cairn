@@ -15,10 +15,8 @@ import { createRequestTodo } from '../src/services/coordinator-request.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { sweepFailedRetries } from '../src/services/needs-you.js';
 import { ownershipOf } from '../src/services/owner.js';
-import { createTaskIssueSync } from '../src/services/task-issue-sync.js';
-import { flushSelfIssueWrites, retrySelfIssueCreate } from '../src/services/todos.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
-import { deliverCodeStep, req } from './helpers.js';
+import { req } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
 
 registerChiefHarness();
@@ -36,14 +34,11 @@ function unstarted(params: Parameters<typeof createRequestTodo>[2]) {
 
 const TOKEN = 'ghp_twins_token';
 const REPO = 'octo/alpha';
-const ISSUES_PATH = `/repos/${REPO}/issues`;
-const issuePath = (n: number) => `${ISSUES_PATH}/${n}`;
 
 interface GhCall {
   method: string;
   url: string;
   headers: Record<string, string>;
-  body: string | undefined;
 }
 
 function ghMock(initial: Record<string, { status?: number; body: unknown }> = {}) {
@@ -52,7 +47,7 @@ function ghMock(initial: Record<string, { status?: number; body: unknown }> = {}
   const impl: FetchLike = async (input, init) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
-    calls.push({ method, url, headers: { ...(init?.headers ?? {}) }, body: init?.body });
+    calls.push({ method, url, headers: { ...(init?.headers ?? {}) } });
     const route = routes.get(`${method} ${new URL(url).pathname}`) as
       | { status?: number; body: unknown }
       | undefined;
@@ -68,8 +63,6 @@ function ghMock(initial: Record<string, { status?: number; body: unknown }> = {}
   return {
     impl,
     calls,
-    callsTo: (method: string, path: string) =>
-      calls.filter((c) => c.method === method && new URL(c.url).pathname === path),
   };
 }
 
@@ -85,10 +78,6 @@ async function githubProject(): Promise<string> {
   });
   if (res.status !== 201) throw new Error(`github project: ${res.status}`);
   return ((await res.json()) as { id: string }).id;
-}
-
-function deliverCode(deps: BuildDeps, todoId: string, hasChanges = true): void {
-  deliverCodeStep(deps, todoId, { hasChanges });
 }
 
 function notices(): { message: string }[] {
@@ -181,118 +170,6 @@ describe('one live card per covered request (#5386)', () => {
   });
 });
 
-describe('a continued task inherits the request issue instead of opening another (#5387)', () => {
-  test('a failed card continued verbatim hands its issue to the successor', async () => {
-    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
-    const projectId = await githubProject();
-    const deps = { ...toolDeps(), githubFetch: mock.impl };
-    const first = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, messageIds: [message(LONG_WORDS)] },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    deliverCode(deps, first.id);
-    await flushSelfIssueWrites();
-    expect(row(first.id).sourceRef).toBe(`github:${REPO}#101`);
-    expect(row(first.id).issueState).toBe('open');
-    H.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, first.id)).run();
-    const continued = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, sourceTodoId: first.id },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    await flushSelfIssueWrites();
-    expect(row(continued.id).sourceRef).toBe(`github:${REPO}#101`);
-    expect(row(continued.id).issueState).toBe('open');
-    expect(row(first.id).sourceRef).toBeNull();
-    expect(row(first.id).supersededBy).toBe(continued.id);
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
-  });
-
-  test('an archived card re-created by the same words reuses its issue, reopening it', async () => {
-    const mock = ghMock({
-      [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } },
-      [`POST ${issuePath(101)}/comments`]: { status: 201, body: { id: 1 } },
-      [`PATCH ${issuePath(101)}`]: { status: 200, body: { state: 'open' } },
-    });
-    const projectId = await githubProject();
-    const deps = { ...toolDeps(), githubFetch: mock.impl };
-    const first = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, messageIds: [message(LONG_WORDS)] },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    deliverCode(deps, first.id);
-    await flushSelfIssueWrites();
-    H.s.db
-      .update(todoTable)
-      .set({ archivedAt: nowMs(), issueState: 'closed' })
-      .where(eq(todoTable.id, first.id))
-      .run();
-    const continued = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, messageIds: [message(LONG_WORDS)] },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    await flushSelfIssueWrites();
-    expect(row(continued.id).sourceRef).toBe(`github:${REPO}#101`);
-    expect(row(first.id).sourceRef).toBeNull();
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
-    await createTaskIssueSync(
-      { ...deps, convHub: H.s.convHub },
-      { githubFetch: mock.impl },
-    ).sweep();
-    const reopen = mock.callsTo('PATCH', issuePath(101));
-    expect(reopen).toHaveLength(1);
-    expect(JSON.parse(reopen[0]!.body!)).toEqual({ state: 'open', state_reason: 'reopened' });
-  });
-
-  test('a superseded card whose issue lands late is closed by the sweep naming the successor', async () => {
-    const mock = ghMock({
-      [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } },
-      [`POST ${issuePath(101)}/comments`]: { status: 201, body: { id: 1 } },
-      [`PATCH ${issuePath(101)}`]: { status: 200, body: { state: 'closed' } },
-    });
-    const projectId = await githubProject();
-    const deps = { ...toolDeps(), githubFetch: mock.impl };
-    const first = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, messageIds: [message(LONG_WORDS)] },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    deliverCode(deps, first.id);
-    await flushSelfIssueWrites();
-    H.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, first.id)).run();
-    const continued = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, messageIds: [message(LONG_WORDS)] },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    expect(row(first.id).sourceRef).toBeNull();
-    expect(row(continued.id).sourceRef).toBe(`github:${REPO}#101`);
-    H.s.db
-      .update(todoTable)
-      .set({ sourceRef: `github:${REPO}#101`, issueState: 'open' })
-      .where(eq(todoTable.id, first.id))
-      .run();
-    await createTaskIssueSync(
-      { ...deps, convHub: H.s.convHub },
-      { githubFetch: mock.impl },
-    ).sweep();
-    const close = mock.callsTo('PATCH', issuePath(101));
-    expect(close).toHaveLength(1);
-    expect(JSON.parse(close[0]!.body!)).toEqual({ state: 'closed', state_reason: 'not_planned' });
-    expect(mock.callsTo('POST', `${issuePath(101)}/comments`)[0]!.body).toContain('#101');
-    expect(row(first.id).issueState).toBe('closed');
-  });
-});
-
 describe('a superseded failed card leaves the retry and needs-you paths', () => {
   function seedFailedTodo(supersededBy: string | null): { todoId: string } {
     const projectId = `proj-${newRecordId(8)}`;
@@ -365,9 +242,9 @@ describe('a superseded failed card leaves the retry and needs-you paths', () => 
   });
 });
 
-describe('a Coordinator task opens its GitHub issue only when it delivers code', () => {
-  test('a one-off install request never reaches GitHub, even marked for a self issue', async () => {
-    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
+describe('a Coordinator task never reaches GitHub through its card', () => {
+  test('a one-off install request never reaches GitHub', async () => {
+    const mock = ghMock();
     const projectId = await githubProject();
     const deps = { ...toolDeps(), githubFetch: mock.impl };
     const created = createRequestTodo(
@@ -376,14 +253,13 @@ describe('a Coordinator task opens its GitHub issue only when it delivers code',
       { projectId, messageIds: [message('帮我安装 cloakbrowser')] },
       { createdBy: H.userId, ownerId: H.userId },
     );
-    await flushSelfIssueWrites();
-    expect(row(created.id).sourceKind).toBe('github-issue-self');
-    expect(row(created.id).sourceRef).toBeNull();
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
+    expect(row(created.id).sourceKind).toBe('orchestration');
+    expect(row(created.id).sourceRef).toBe(orchestrationSourceRef(H.threadId));
+    expect(mock.calls).toEqual([]);
   });
 
-  test('a research request opens no issue and carries no self-issue mark', async () => {
-    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
+  test('a research request carries no self-issue mark', async () => {
+    const mock = ghMock();
     const projectId = await githubProject();
     const deps = { ...toolDeps(), githubFetch: mock.impl };
     const created = createRequestTodo(
@@ -392,70 +268,8 @@ describe('a Coordinator task opens its GitHub issue only when it delivers code',
       { projectId, output: 'report', messageIds: [message('调研一下 ampcode')] },
       { createdBy: H.userId, ownerId: H.userId },
     );
-    await flushSelfIssueWrites();
     expect(row(created.id).sourceKind).toBe('orchestration');
     expect(row(created.id).sourceRef).toBe(orchestrationSourceRef(H.threadId));
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
-  });
-
-  test('a code task opens exactly one issue on the first leg that reports changes', async () => {
-    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
-    const projectId = await githubProject();
-    const deps = { ...toolDeps(), githubFetch: mock.impl };
-    const created = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, messageIds: [message(LONG_WORDS)] },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    await flushSelfIssueWrites();
-    expect(row(created.id).sourceRef).toBeNull();
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
-    deliverCode(deps, created.id);
-    await flushSelfIssueWrites();
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
-    expect(row(created.id).sourceRef).toBe(`github:${REPO}#101`);
-    expect(row(created.id).issueState).toBe('open');
-  });
-
-  test('a successful leg that reports no changes opens no issue', async () => {
-    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
-    const projectId = await githubProject();
-    const deps = { ...toolDeps(), githubFetch: mock.impl };
-    const created = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, messageIds: [message(LONG_WORDS)] },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    deliverCode(deps, created.id, false);
-    await flushSelfIssueWrites();
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
-    expect(row(created.id).sourceRef).toBeNull();
-  });
-
-  test('a later leg still opens the issue once, and retry then answers 409', async () => {
-    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
-    const projectId = await githubProject();
-    const deps = { ...toolDeps(), githubFetch: mock.impl };
-    const created = createRequestTodo(
-      deps,
-      ctx(),
-      { projectId, messageIds: [message(LONG_WORDS)] },
-      { createdBy: H.userId, ownerId: H.userId },
-    );
-    await expect(retrySelfIssueCreate(deps, created.id)).rejects.toMatchObject({
-      status: 409,
-    });
-    deliverCode(deps, created.id, false);
-    deliverCode(deps, created.id);
-    await flushSelfIssueWrites();
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
-    deliverCode(deps, created.id);
-    await flushSelfIssueWrites();
-    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
-    await expect(retrySelfIssueCreate(deps, created.id)).rejects.toMatchObject({
-      status: 409,
-    });
+    expect(mock.calls).toEqual([]);
   });
 });

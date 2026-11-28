@@ -10,5 +10,3 @@ export const githubLabelRecordSchema = z.object({
   v: z.number().int(),
 });
 export type GithubLabelRecord = z.infer<typeof githubLabelRecordSchema>;
-
-export const GITHUB_LABEL_DEFAULT_COLOR = '#6366f1';

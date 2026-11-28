@@ -27,7 +27,6 @@ Cairn runs AI agents that execute code on machines you register. By design an ag
 
 - reaching protected `/api/*` without a valid access token, paired-device token, authorized owner identity on the private tailnet listener or an owner-uid loopback browser, or with a revoked API key;
 - one team reading or changing another team's data, secrets or machines;
-- a webhook or issue intake importing work from a user below triage permission;
 - a merge landing without the human gates (plan and diff approval, AI review verdict) it was configured to pass;
 - secrets leaving encrypted storage other than through a recorded, permitted fetch.
 

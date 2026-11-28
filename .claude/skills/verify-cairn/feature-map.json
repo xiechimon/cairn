@@ -1713,33 +1713,26 @@
     },
     {
       "id": "github",
-      "name": "GitHub connection and issues",
-      "summary": "Connecting GitHub, choosing repositories, importing labeled issues as threads and writing results back to the issue.",
-      "states": "Not connected, connected with a repository picker, an issue imported as a thread, and the write-back pending, done, drifted or failed with retry.",
+      "name": "GitHub connection",
+      "summary": "Connecting GitHub, choosing a project's repository, and cloning, branching, pushing, opening and merging pull requests and reading CI. A task that works a GitHub issue does it through its own `gh` or a GitHub MCP connector; Cairn neither imports nor writes issues.",
+      "states": "Not connected, connected with a repository picker, a project cloning, branching and pushing over the connection, and a pull request with its checks and merge.",
       "centrality": 3,
       "status": "shipped",
       "code": {
-        "web": [
-          "apps/web/src/detail/source-issue.tsx"
-        ],
+        "web": [],
         "server": [
-          "apps/server/src/services/github-connection.ts",
-          "apps/server/src/services/github-issues.ts",
-          "apps/server/src/services/github-webhook.ts"
+          "apps/server/src/services/github-connection.ts"
         ]
       },
       "routes": {
         "server": [
           "/api/teams/:id/github/**",
-          "/api/github/repos",
-          "/api/projects/:id/github/issues/import",
-          "/api/todos/:id/github-issue**",
-          "/api/webhook/github/:token"
+          "/api/github/repos"
         ]
       },
       "reach": [
-        "open /app/todo/<id of a thread listed by the todos API>",
-        "click testid:source-issue-retry"
+        "open /app/project/new",
+        "click testid:github-picker"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/github-oauth-picker.md",
@@ -1756,8 +1749,6 @@
         "docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md"
       ],
       "evidence": [
-        "apps/web/e2e/github-issue-writeback.spec.ts",
-        "apps/server/test/github-issues.test.ts",
         "apps/server/test/github-connection.test.ts"
       ]
     },

@@ -148,7 +148,6 @@ import {
   startGithubConnectionDevice,
 } from './services/github-connection-device.js';
 import { adoptGithubProfile } from './services/github-profile.js';
-import { mintGithubWebhook, revokeGithubWebhook } from './services/github-webhook.js';
 import { isOwner } from './services/instance-owner.js';
 import { pendingComputerOutputRelease } from './services/machine-computer.js';
 import {
@@ -1401,25 +1400,6 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     deleteGithubConnection({ db: ctx.db, box: ctx.secretBox }, teamId);
-    return c.body(null, 204);
-  });
-
-  app.post('/api/teams/:id/github/webhook', (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    const minted = mintGithubWebhook({ db: ctx.db }, teamId);
-    if (minted === null) throw notFound('github connection');
-    return c.json({
-      webhookUrl: `${requestOrigin(c)}/api/webhook/github/${minted.token}`,
-      token: minted.token,
-      masked: minted.masked,
-    });
-  });
-
-  app.delete('/api/teams/:id/github/webhook', (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    if (!revokeGithubWebhook({ db: ctx.db }, teamId)) throw notFound('github connection');
     return c.body(null, 204);
   });
 

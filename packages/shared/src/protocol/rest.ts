@@ -387,11 +387,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     query: ['code', 'state', 'error'],
     note: '#231 [设计]：收码 → token 密封落 provider 行（02 §8）→ 302 回 providers 页',
   },
-  {
-    method: 'POST',
-    path: '/api/webhook/github/{token}',
-    note: 'seq-32：GitHub webhook——只做投递去重，事件不消费；202 一律，未知 token 401',
-  },
 ];
 
 export const DELETE_FACE = {

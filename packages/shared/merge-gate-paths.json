@@ -65,8 +65,6 @@
     "apps/server/src/lib/webhook-token.ts",
     "apps/server/src/services/schedule-webhook.ts",
     "apps/server/src/routes-schedule-webhook.ts",
-    "apps/server/src/services/github-webhook.ts",
-    "apps/server/src/routes-github-webhook.ts",
     "apps/server/src/routes-design-share.ts",
     "apps/server/src/db/client.ts",
     "eval/**"
@@ -106,8 +104,6 @@
       "apps/server/src/lib/webhook-token.ts",
       "apps/server/src/services/schedule-webhook.ts",
       "apps/server/src/routes-schedule-webhook.ts",
-      "apps/server/src/services/github-webhook.ts",
-      "apps/server/src/routes-github-webhook.ts",
       "apps/server/src/routes-design-share.ts"
     ],
     "dataDestruction": [

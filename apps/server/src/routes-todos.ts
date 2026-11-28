@@ -1,6 +1,5 @@
 import {
   createTodoBodySchema,
-  githubIssueEchoSchema,
   IN_PROGRESS_PHASES,
   isStartedTodo,
   needsYouQuerySchema,
@@ -15,7 +14,6 @@ import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import {
-  githubIssueDepsOf,
   jsonBody,
   patchTodoBodySchema,
   requireProject,
@@ -28,7 +26,6 @@ import {
   stopActiveStepsAfterExit,
   stopActiveStepsForArchive,
 } from './services/builds.js';
-import { readSourceIssueEcho } from './services/github-issues.js';
 import { listNeedsYou } from './services/needs-you.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
@@ -42,7 +39,6 @@ import {
   deleteTodo,
   getTodo,
   listTodos,
-  retrySelfIssueCreate,
   setTodoArchived,
   updateTodo,
 } from './services/todos.js';
@@ -50,20 +46,6 @@ import { requireTeamTodo } from './services/tool-guards.js';
 
 export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
-
-  app.get('/api/todos/:id/github-issue', async (c) => {
-    const id = c.req.param('id');
-    requireTeamTodo(ctx.db, id, ctx.team.id);
-    const echo = await readSourceIssueEcho(githubIssueDepsOf(ctx), id);
-    return c.json(githubIssueEchoSchema.parse(echo));
-  });
-
-  app.post('/api/todos/:id/github-issue/retry', async (c) => {
-    const id = c.req.param('id');
-    requireTeamTodo(ctx.db, id, ctx.team.id);
-    const record = await retrySelfIssueCreate(svc, id);
-    return c.json(record);
-  });
 
   app.get('/api/todos', conditionalGet(), (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;

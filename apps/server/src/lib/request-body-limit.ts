@@ -20,8 +20,6 @@ function budgetOf(c: Context): number {
   }
 
   switch (routePath(c, -1)) {
-    case '/api/webhook/github/:token':
-      return 256 * KIB;
     case '/api/teams/:teamId/computers/:computerId/screen':
     case '/api/teams/:teamId/computers/:computerId/control':
       return 4 * KIB;

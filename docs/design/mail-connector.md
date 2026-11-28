@@ -111,7 +111,7 @@ Which tools are outbound, from the registry:
 | Tool | In a mail turn |
 |---|---|
 | Read tools (`CHIEF_TOOL_CATEGORIES.read` except `secrets`), `browser_snapshot`, `computer_observe`, `desktop_snapshot` | run as in an owner turn |
-| `create_todo` | creates the task but starts no build, adds no Coordinator watch and opens no GitHub self-issue (that issue is a public write of whatever the turn read); the result says only the owner starts it (a started task is a worker with a shell and network, an outbound channel) |
+| `create_todo` | creates the task but starts no build and adds no Coordinator watch (the result says only the owner starts it: a started task is a worker with a shell and network, an outbound channel) |
 | Connector tools (`connector_<slug>__<tool>`) with `readOnlyHint: true` | run as in an owner turn |
 | Every other connector tool, whether Gmail send, reply, forward, Slack post or an IM message: an unknown action is outbound unless its tool says it is read-only | confirmation card, class `send` (`destructiveHint` is `submit`) |
 | `shell`, `browser_navigate`, `browser_act`, `computer_act`, `desktop_act` (`COMPUTER_DIRECT_TOOLS`) | run as in an owner turn, no card |

@@ -191,7 +191,6 @@ describe('paired devices hold full owner rights', () => {
         ['POST', '/api/design-shares', {}],
         ['POST', '/api/todos/t1/design/index.html/share'],
         ['DELETE', `/api/teams/${s.team.id}/github/connection`],
-        ['POST', `/api/teams/${s.team.id}/github/webhook`],
         ['POST', '/api/computers', {}],
         ['DELETE', `/api/projects/${projectId}`],
         ['GET', '/api/server/deploy/lease'],

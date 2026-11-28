@@ -19,7 +19,6 @@ import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { type ResolvedGitAuth, resolveGitAuth } from './services/credentials.js';
-import type { GithubIssueFaceDeps } from './services/github-issues.js';
 import { assertDeviceActive } from './services/paired-devices.js';
 import { isPersonalSpace } from './services/personal-space.js';
 
@@ -131,17 +130,5 @@ export function svcOf(ctx: AppContext) {
     box: ctx.secretBox,
     oauthClient: ctx.oauthClient,
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
-  };
-}
-
-export function githubIssueDepsOf(ctx: AppContext): GithubIssueFaceDeps {
-  return {
-    ...githubAppOf(ctx),
-    db: ctx.db,
-    box: ctx.secretBox,
-    oauthClient: ctx.oauthClient,
-    ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
-    ...(ctx.githubBaseFetch !== undefined ? { githubBaseFetch: ctx.githubBaseFetch } : {}),
-    ...(ctx.mcpGithubApp !== undefined ? { githubApp: ctx.mcpGithubApp } : {}),
   };
 }

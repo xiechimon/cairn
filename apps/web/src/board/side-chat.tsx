@@ -20,7 +20,7 @@ import {
 } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { activityStore } from '../api/activity.js';
-import { useApiMutations, useProviders, usePrs } from '../api/hooks.js';
+import { useProviders, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { dismissNotificationForEntity } from '../api/sse.js';
 import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
@@ -272,19 +272,10 @@ function SourceLine({
   wire: NonNullable<ThreadChat['wire']>;
   onLeave: () => void;
 }) {
-  const { t } = useI18n();
-  const { teamId } = useLiveData();
-  const mutations = useApiMutations(teamId);
   const openChiefThread = useOpenCoordinatorThread();
   return (
     <SourceIssueLine
       todo={wire}
-      onRetry={() =>
-        mutations.retryGithubIssue.mutate(wire.id, {
-          onError: (error) => toastError(t('重试失败，请稍后重试。'), error),
-        })
-      }
-      retryPending={mutations.retryGithubIssue.isPending}
       onOpenThread={(threadId) => {
         onLeave();
         openChiefThread(threadId);

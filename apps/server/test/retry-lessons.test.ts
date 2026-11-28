@@ -28,9 +28,9 @@ import {
   type BuildDeps,
   startBuilds,
 } from '../src/services/builds.js';
-import { CI_FIX_GREEN_EVENT } from '../src/services/ci-corrections.js';
 import { buildCiFixPrompt } from '../src/services/ci-loop.js';
 import { claimStep } from '../src/services/machines.js';
+import { CI_FIX_GREEN_EVENT } from '../src/services/retry-lessons.js';
 import { bootServer, insertMachine, seedSessionRoute, type TestServer } from './helpers.js';
 
 const TITLE = '导出报表';

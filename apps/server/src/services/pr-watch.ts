@@ -13,10 +13,8 @@ import type { BuildDeps } from './builds.js';
 import { CI_CLOSED_CONFIRM_MS } from './ci-loop.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken, githubReadToken } from './github-autonomous-token.js';
-import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { createPrWakes, settlePrWakeNotices } from './pr-wakes.js';
 import { type CheckTally, checkTallyOf, FINISHED_PR_STATES, mergeStateOf } from './thread-pr.js';
-import { selfIssueCreateInFlight } from './todos.js';
 
 export const PR_WATCH_INTERVAL_MS = 60_000;
 
@@ -294,22 +292,6 @@ export function createPrWatch(
     if (state === null) return;
     const finished = FINISHED_PR_STATES.includes(state);
     const head = pull.headSha ?? '';
-    const task = deps.db.select().from(todo).where(eq(todo.id, target.threadId)).get();
-    if (pull.state === 'open' && task !== undefined && !selfIssueCreateInFlight(task.id)) {
-      try {
-        const body = await ensurePullClosesTaskIssue(
-          fetchImpl,
-          resolveToken,
-          target,
-          target.prNumber,
-          task,
-          pull.body,
-        );
-        if (body !== null) pulls.set(key, { etag: null, pull: { ...pull, body } });
-      } catch {
-        run.logger?.info({ buildId: target.buildId }, 'PR closing line deferred');
-      }
-    }
     let counted: CheckTally | null = null;
     if (!finished && head !== '') {
       counted = await readChecks(fetchImpl, token, target, key, head, tally);

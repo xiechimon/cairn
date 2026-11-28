@@ -2,7 +2,6 @@ import {
   createProjectBodySchema,
   type FsListResult,
   type FsPickResult,
-  importGithubIssueBodySchema,
   patchProjectBodySchema,
 } from '@cairn/shared';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
@@ -13,7 +12,6 @@ import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import {
   githubAppOf,
-  githubIssueDepsOf,
   jsonBody,
   requestOrigin,
   requireProject,
@@ -27,7 +25,6 @@ import { releaseParkedCoordinatorSteps } from './services/chief.js';
 import { listDir } from './services/fs-list.js';
 import { pickFolder } from './services/fs-pick.js';
 import { readBranches, readFiles, toProjectRecord } from './services/git.js';
-import { importGithubIssue } from './services/github-issues.js';
 import { isOwner } from './services/instance-owner.js';
 import { listedProjects } from './services/personal-space.js';
 import { createProject, updateProject } from './services/projects.js';
@@ -76,13 +73,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     if (todoIds.length === 0) return c.json([]);
     const builds = ctx.db.select().from(build).where(inArray(build.todoId, todoIds)).all();
     return c.json(builds.map(toBuildRecord));
-  });
-
-  app.post('/api/projects/:id/github/issues/import', async (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    const body = parseWith(importGithubIssueBodySchema, await jsonBody(c), 'body');
-    const record = await importGithubIssue({ ...svc, ...githubIssueDepsOf(ctx) }, row, body.number);
-    return c.json(record, 201);
   });
 
   app.get('/api/projects/:id/files', async (c) => {

@@ -77,7 +77,6 @@ import {
   workerScheduleRunHistory,
 } from './schedules.js';
 import { sweepStallMonitor } from './stall-monitor.js';
-import { createTaskIssueSync } from './task-issue-sync.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
 import { sweepWorkerWatchdog } from './worker-watchdog.js';
 
@@ -127,7 +126,6 @@ export function createScheduler(
         })
       : null;
   const prWatch = ci ? createPrWatch(deps, ci) : null;
-  const taskIssueSync = ci ? createTaskIssueSync(deps, ci) : null;
   let prSweep: Promise<void> | null = null;
   let prSweepAt = Number.NEGATIVE_INFINITY;
   function watchPrs() {
@@ -644,7 +642,6 @@ export function createScheduler(
       },
       'pr-watch': async () => {
         await watchPrs();
-        await taskIssueSync?.sweep();
       },
       [MACHINE_TOKEN_ROTATION_EVENT_KIND]: (event, now) => {
         if (deps.machineHub === undefined) return { rescheduleAt: null };

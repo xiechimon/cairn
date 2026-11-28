@@ -1,19 +1,9 @@
-import { setTimeout as sleep } from 'node:timers/promises';
-import {
-  acquireGithubCreateSlot,
-  GithubCreateGateNotWritableError,
-  parseGithubCreateRateLimit,
-} from '@cairn/shared/github-create-gate';
+import { parseGithubCreateRateLimit } from '@cairn/shared/github-create-gate';
 import { RULESETS_NOT_ON_PLAN } from '../services/merge-gate/github-rules.js';
 // Node fetch ignores http_proxy/https_proxy unless the server starts with NODE_USE_ENV_PROXY=1 (Node >= 24.5).
 import { HttpError } from './errors.js';
 import { githubApiBaseUrl } from './github-api-base.js';
-import {
-  type AutonomousToken,
-  type GithubWriteToken,
-  githubTokenFetch,
-  type UserToken,
-} from './github-token.js';
+import { type AutonomousToken, githubTokenFetch, type UserToken } from './github-token.js';
 
 export type FetchLike = (
   input: string | URL,
@@ -33,15 +23,6 @@ export type FetchLike = (
 }>;
 
 const FETCH_TIMEOUT_MS = 15_000;
-const CREATE_RETRY_MAX_WAIT_MS = 60_000;
-
-export type GithubCreateGate = () => Promise<unknown>;
-
-let githubCreateGate: GithubCreateGate = acquireGithubCreateSlot;
-
-export function setGithubCreateGate(gate: GithubCreateGate): void {
-  githubCreateGate = gate;
-}
 
 const API_HEADERS = {
   accept: 'application/vnd.github+json',
@@ -627,14 +608,6 @@ export interface GithubIssueSummary {
   labels: GithubLabel[];
 }
 
-export interface GithubIssueDetail extends GithubIssueSummary {
-  body: string | null;
-}
-
-const ISSUES_PER_PAGE = 30;
-
-const LABELS_PER_PAGE = 100;
-
 function repoPath(owner: string, repo: string): string {
   return `repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
 }
@@ -665,48 +638,6 @@ function projectIssue(raw: Record<string, unknown>): GithubIssueSummary | null {
     title: raw.title,
     state: raw.state,
     labels: parseLabels(raw.labels),
-  };
-}
-
-export async function githubRepoIssues(
-  fetchImpl: FetchLike,
-  token: string,
-  owner: string,
-  repo: string,
-  opts: { state: 'open' | 'closed' | 'all'; page: number },
-): Promise<{ issues: GithubIssueSummary[]; hasMore: boolean }> {
-  const url =
-    `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues` +
-    `?state=${opts.state}&page=${opts.page}&per_page=${ISSUES_PER_PAGE}`;
-  const { data, getHeader } = await readJsonFull(fetchImpl, url, authHeaders(token));
-  if (!Array.isArray(data)) {
-    throw new HttpError(502, 'github issues response not an array');
-  }
-  const issues: GithubIssueSummary[] = [];
-  for (const raw of data as Array<Record<string, unknown>>) {
-    const projected = projectIssue(raw);
-    if (projected) issues.push(projected);
-  }
-  const link = getHeader('link');
-  return { issues, hasMore: (link ?? '').includes('rel="next"') };
-}
-
-export async function githubRepoIssue(
-  fetchImpl: FetchLike,
-  token: string,
-  owner: string,
-  repo: string,
-  issueNumber: number,
-): Promise<GithubIssueDetail> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  const data = (await readJson(fetchImpl, url, authHeaders(token))) as Record<string, unknown>;
-  const projected = projectIssue(data);
-  if (!projected) {
-    throw new HttpError(502, `github issue response malformed: ${url}`);
-  }
-  return {
-    ...projected,
-    body: typeof data.body === 'string' ? data.body : null,
   };
 }
 
@@ -921,24 +852,6 @@ export async function githubListWorkflowRuns(
   );
 }
 
-export async function githubRepoLabels(
-  fetchImpl: FetchLike,
-  token: string,
-  owner: string,
-  repo: string,
-): Promise<GithubLabel[]> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/labels?per_page=${LABELS_PER_PAGE}`;
-  const data = await readJson(fetchImpl, url, authHeaders(token));
-  if (!Array.isArray(data)) {
-    throw new HttpError(502, 'github labels response not an array');
-  }
-  return parseLabels(data);
-}
-
-export type GithubConditionalRead<T> =
-  | { notModified: true }
-  | { notModified: false; etag: string | null; data: T };
-
 async function intakeGet(
   fetchImpl: FetchLike,
   url: string,
@@ -975,19 +888,6 @@ async function intakeGet(
   }
 }
 
-async function intakeConditionalGet(
-  fetchImpl: FetchLike,
-  url: string,
-  token: string,
-  etag: string | null | undefined,
-): Promise<GithubConditionalRead<{ link: string | null; body: unknown }> | null> {
-  const got = await intakeGet(fetchImpl, url, token, etag);
-  if (got === null) return null;
-  if (got.status === 304) return etag != null ? { notModified: true } : null;
-  if (got.status < 200 || got.status >= 300) return null;
-  return { notModified: false, etag: got.etag, data: { link: got.link, body: got.data } };
-}
-
 export interface GithubRepoPermission {
   permission: string;
   roleName: string | null;
@@ -1021,22 +921,6 @@ export async function githubCollaboratorPermission(
   };
 }
 
-export async function githubIssueState(
-  fetchImpl: FetchLike,
-  token: string,
-  owner: string,
-  repo: string,
-  issueNumber: number,
-  opts: { etag?: string | null } = {},
-): Promise<GithubConditionalRead<{ state: 'open' | 'closed' }> | null> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
-  if (got === null || got.notModified) return got;
-  const state = (got.data.body as { state?: unknown } | null | undefined)?.state;
-  if (state !== 'open' && state !== 'closed') return null;
-  return { notModified: false, etag: got.etag, data: { state } };
-}
-
 async function writeJson(
   fetchImpl: FetchLike,
   method: 'POST' | 'PATCH',
@@ -1066,97 +950,6 @@ async function writeJson(
   } catch {
     throw new HttpError(502, `github response not json: ${url}`);
   }
-}
-
-export async function githubCreateIssue(
-  fetchImpl: FetchLike,
-  token: GithubWriteToken,
-  owner: string,
-  repo: string,
-  input: { title: string; body: string; labels?: string[] },
-): Promise<{ number: number }> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues`;
-  let data: Record<string, unknown>;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await githubCreateGate();
-    } catch (error) {
-      if (error instanceof GithubCreateGateNotWritableError)
-        throw new HttpError(503, error.message);
-      throw error;
-    }
-    try {
-      data = (await writeJson(fetchImpl, 'POST', url, token, input)) as Record<string, unknown>;
-      break;
-    } catch (error) {
-      if (!(error instanceof GithubRateLimitedError) || attempt >= 3) throw error;
-      const delay =
-        Math.max(1000, (error.retryAt(Date.now()) ?? Date.now() + 60000) - Date.now()) *
-        2 ** attempt;
-      if (delay > CREATE_RETRY_MAX_WAIT_MS) throw error;
-      console.warn(`GitHub create rate limited; retrying in ${delay}ms`);
-      await sleep(delay);
-    }
-  }
-  if (typeof data.number !== 'number') {
-    throw new HttpError(502, `github create issue response missing number: ${url}`);
-  }
-  return { number: data.number };
-}
-
-export async function githubUpdateIssueTitle(
-  fetchImpl: FetchLike,
-  token: GithubWriteToken,
-  owner: string,
-  repo: string,
-  issueNumber: number,
-  title: string,
-): Promise<void> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  await writeJson(fetchImpl, 'PATCH', url, token, { title });
-}
-
-export async function githubCloseIssue(
-  fetchImpl: FetchLike,
-  token: GithubWriteToken,
-  owner: string,
-  repo: string,
-  issueNumber: number,
-  opts: { stateReason: 'completed' | 'not_planned'; comment?: string },
-): Promise<void> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  if (opts.comment !== undefined) {
-    await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: opts.comment });
-  }
-  await writeJson(fetchImpl, 'PATCH', url, token, {
-    state: 'closed',
-    state_reason: opts.stateReason,
-  });
-}
-
-export async function githubReopenIssue(
-  fetchImpl: FetchLike,
-  token: GithubWriteToken,
-  owner: string,
-  repo: string,
-  issueNumber: number,
-  comment: string,
-): Promise<void> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}`;
-  await writeJson(fetchImpl, 'POST', `${url}/comments`, token, { body: comment });
-  await writeJson(fetchImpl, 'PATCH', url, token, { state: 'open', state_reason: 'reopened' });
-}
-
-export async function githubUpdatePullBody(
-  fetchImpl: FetchLike,
-  token: GithubWriteToken,
-  owner: string,
-  repo: string,
-  prNumber: number,
-  body: string,
-): Promise<void> {
-  const url = `${githubApiBaseUrl()}/${repoPath(owner, repo)}/pulls/${prNumber}`;
-  await writeJson(fetchImpl, 'PATCH', url, token, { body });
 }
 
 export type GithubMergeResult =

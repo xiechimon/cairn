@@ -17,7 +17,6 @@ import { type BuildDeps, completeStep } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { flushSelfIssueWrites } from '../src/services/todos.js';
 import { type Answer, mergeGithubFake, type PullFake, type Recorded } from './fakes/github.js';
 import { stubGithubApp } from './github-identity-fixture.js';
 import {
@@ -47,7 +46,6 @@ interface WorldOpts {
   checkpoint?: string | null;
   buildStepStatus?: 'done' | 'failed';
   connected?: boolean;
-  source?: { kind: 'github-issue' | 'github-issue-self' | 'orchestration'; ref: string } | null;
   pendingVerify?: boolean;
   pull?: Partial<PullFake>;
 }
@@ -111,8 +109,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       phaseAt: base,
       seqNum: 1,
       hasChanges: true,
-      sourceKind: opts.source?.kind ?? null,
-      sourceRef: opts.source?.ref ?? null,
     })
     .run();
   s.db
@@ -447,92 +443,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   });
 
   test.each([
-    [
-      'an issue of the same repository',
-      { kind: 'github-issue', ref: 'github:octo/demo#77' },
-      'Closes #77',
-    ],
-    [
-      'a self-created issue, owner and repo in another case',
-      { kind: 'github-issue-self', ref: 'github:Octo/DEMO#78' },
-      'Closes #78',
-    ],
-    ['an issue of another repository', { kind: 'github-issue', ref: 'github:other/demo#77' }, null],
-    [
-      'an orchestration source',
-      { kind: 'orchestration', ref: 'chief:0190f0f0-0000-7000-8000-000000000000' },
-      null,
-    ],
-    [
-      'an orchestration source holding an issue-shaped ref',
-      { kind: 'orchestration', ref: 'github:octo/demo#79' },
-      null,
-    ],
-    ['a malformed issue ref', { kind: 'github-issue', ref: 'github:octo/demo#x' }, null],
-    ['no source', null, null],
-  ] as const)(
-    '[2b-D2] closing line for %s goes into the PR body before the merge, never the commit',
-    async (_name, source, line) => {
-      const w = makeWorld({ source });
-      await requestMerge(w.deps, w.buildId);
-      const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
-        string,
-        unknown
-      >;
-      expect(body.commit_message).toBe(PLAIN_BODY);
-      expect(w.fake.bodyEdits()).toEqual(
-        line === null ? [] : [`${line}\n\n## What\n\nThe change.`],
-      );
-      const order = w.fake.requests
-        .map((r) => r.method)
-        .filter((m) => m === 'PATCH' || m === 'PUT');
-      expect(order).toEqual(line === null ? ['PUT'] : ['PATCH', 'PUT']);
-    },
-  );
-
-  test('[2b-D2b] a PR body that already closes the task issue is not edited', async () => {
-    const w = makeWorld({
-      source: { kind: 'github-issue-self', ref: 'github:octo/demo#77' },
-      pull: { body: 'Fixes: #77' },
-    });
-    await requestMerge(w.deps, w.buildId);
-    expect(w.fake.bodyEdits()).toEqual([]);
-    expect(w.fake.puts()).toHaveLength(1);
-  });
-
-  test('[2b-D2d] the task is cancelled while the body edit is in flight → refused, no merge PUT', async () => {
-    const w = makeWorld({ source: { kind: 'github-issue-self', ref: 'github:octo/demo#77' } });
-    w.deps.githubFetch = async (input, init) => {
-      const res = await w.fake.fetch(input, init);
-      if (init?.method === 'PATCH') {
-        w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
-      }
-      return res;
-    };
-    await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow('closed -> done');
-    expect(w.fake.bodyEdits()).toHaveLength(1);
-    expect(w.fake.puts()).toHaveLength(0);
-  });
-
-  test('[2b-D2c] the body edit fails → 409, no merge PUT', async () => {
-    const w = makeWorld({ source: { kind: 'github-issue-self', ref: 'github:octo/demo#77' } });
-    w.deps.githubFetch = async (input, init) =>
-      init?.method === 'PATCH'
-        ? {
-            ok: false,
-            status: 502,
-            headers: { get: () => null },
-            json: async () => ({}),
-            text: async () => '',
-          }
-        : w.fake.fetch(input, init);
-    const err = await refusal(requestMerge(w.deps, w.buildId));
-    expect(err.status).toBe(409);
-    expect(w.fake.puts()).toHaveLength(0);
-    expectUntouched(w);
-  });
-
-  test.each([
     ['a same-repository reference', 'Tidy up, closes #9'],
     ['upper case with a colon and another repository', 'FIXES: octo/other#9 in the parser'],
     ['an issue URL', 'Resolved https://github.com/octo/demo/issues/9'],
@@ -542,10 +452,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   ])(
     '[2b-D41] a PR title with a closing keyword and a reference (%s) → the commit title is cairn’s own',
     async (_name, title) => {
-      const w = makeWorld({
-        pull: { title },
-        source: { kind: 'github-issue', ref: 'github:octo/demo#77' },
-      });
+      const w = makeWorld({ pull: { title } });
       await requestMerge(w.deps, w.buildId);
       const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
         string,
@@ -577,98 +484,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       expect(body.commit_title).toBe(`${title} (#201)`);
     },
   );
-
-  test('[2b-D43] the self-created issue is recorded while the PR read is in flight → the closing line names it', async () => {
-    const w = makeWorld();
-    w.s.db
-      .update(todoTable)
-      .set({ sourceKind: 'github-issue-self', sourceRef: null })
-      .where(eq(todoTable.id, w.todoId))
-      .run();
-    w.fake.onGet = () => {
-      w.s.db
-        .update(todoTable)
-        .set({ sourceRef: 'github:octo/demo#88' })
-        .where(eq(todoTable.id, w.todoId))
-        .run();
-    };
-    await requestMerge(w.deps, w.buildId);
-    expect(w.fake.bodyEdits()).toEqual(['Closes #88\n\n## What\n\nThe change.']);
-  });
-
-  test('[2b-D44] a merge waits on the in-flight self-issue create so the PR body can close the late issue', async () => {
-    const w = makeWorld({ phase: 'building' });
-    w.s.db
-      .update(todoTable)
-      .set({ sourceKind: 'github-issue-self', sourceRef: null })
-      .where(eq(todoTable.id, w.todoId))
-      .run();
-    let release = (): void => undefined;
-    let entered = (): void => undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const posted = new Promise<void>((resolve) => {
-      entered = resolve;
-    });
-    let issuePosts = 0;
-    w.deps.githubFetch = async (input, init) => {
-      if (
-        init?.method === 'POST' &&
-        new URL(String(input)).pathname === '/repos/octo/demo/issues'
-      ) {
-        issuePosts += 1;
-        entered();
-        await gate;
-        return {
-          ok: true,
-          status: 201,
-          headers: { get: () => null },
-          json: async () => ({ number: 101 }),
-          text: async () => '',
-        };
-      }
-      return w.fake.fetch(input, init);
-    };
-    const deliverStepId = `step-deliver-${w.buildId}`;
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: deliverStepId,
-        buildId: w.buildId,
-        kind: 'session',
-        status: 'claimed',
-        checkpointCommit: CP,
-        createdAt: Date.now(),
-      })
-      .run();
-    completeStep(w.deps, deliverStepId, { hasChanges: true });
-    const mergePromise = requestMerge(w.deps, w.buildId);
-    await posted;
-    await vi.waitFor(() =>
-      expect(w.fake.requests.some((r) => r.url.includes('/check-runs'))).toBe(true),
-    );
-    await new Promise((r) => setTimeout(r, 50));
-    expect(w.fake.puts()).toEqual([]);
-    release();
-    const outcome = await mergePromise;
-    await flushSelfIssueWrites();
-    expect(outcome.state).toBe('merged');
-    expect(issuePosts).toBe(1);
-    expect(w.fake.bodyEdits()).toEqual(['Closes #101\n\n## What\n\nThe change.']);
-    const row = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
-    expect(row?.sourceRef).toBe('github:octo/demo#101');
-  });
-
-  test('[2b-D42] no closing line → commit_message is still sent (cairn’s own line), so the repository default (the PR body) is not used', async () => {
-    const w = makeWorld({ source: { kind: 'github-issue', ref: 'github:other/demo#77' } });
-    await requestMerge(w.deps, w.buildId);
-    const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
-      string,
-      unknown
-    >;
-    expect(body).toHaveProperty('commit_message', PLAIN_BODY);
-  });
 
   test('[2b-D3] no GitHub connection → 409 asking to connect GitHub; no request, no row, no step', async () => {
     const w = makeWorld({ connected: false });

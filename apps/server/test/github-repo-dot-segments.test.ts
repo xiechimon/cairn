@@ -16,7 +16,6 @@ import { completeStep } from '../src/services/builds.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { flushSelfIssueWrites, writebackSelfIssueTitle } from '../src/services/todos.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const TOKEN = 'ghp_dot_segment_token';
@@ -272,67 +271,17 @@ describe('#1466 write surface: . / .. segment refusal (W1-W4)', () => {
 });
 
 describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zero outbound (R1-R8)', () => {
-  test.each(STORED_BAD_REFS)('R1/R2 issue import -> 404, zero outbound (%s)', async (bad) => {
+  test.each(STORED_BAD_REFS)('R3 建任务：零出站（%s）', async (bad) => {
     const rec = recorder();
     const s = boot(rec);
     const projectId = insertGithubProject(s, bad);
-    const imported = await req(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
-      number: 7,
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+      title: 't',
+      spec: 's',
     });
-    expect(imported.status).toBe(404);
-    expect(rec.calls).toEqual([]);
-    expect(s.db.select().from(todoTable).all()).toHaveLength(0);
-  });
-
-  test.each(STORED_BAD_REFS)(
-    'R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（%s）',
-    async (bad) => {
-      const rec = recorder();
-      const s = boot(rec);
-      const projectId = insertGithubProject(s, bad);
-      const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
-        title: 't',
-        spec: 's',
-      });
-      expect(res.status).toBe(201);
-      const record = (await res.json()) as { sourceKind: string | null; sourceRef: string | null };
-      expect(record.sourceKind).toBeNull();
-      expect(record.sourceRef).toBeNull();
-      await flushSelfIssueWrites();
-      expect(rec.calls).toEqual([]);
-    },
-  );
-
-  test.each(STORED_BAD_REFS)('R4 not-yet-created retry -> 404, zero outbound (%s)', async (bad) => {
-    const rec = recorder();
-    const s = boot(rec);
-    const projectId = insertGithubProject(s, bad);
-    const todoId = insertTodo(s, projectId, { sourceKind: 'github-issue-self', sourceRef: null });
-    const res = await req(s.app, 'POST', `/api/todos/${todoId}/github-issue/retry`);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(201);
     expect(rec.calls).toEqual([]);
   });
-
-  test.each(STORED_BAD_REFS)(
-    'R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（%s）',
-    async (bad) => {
-      const rec = recorder();
-      const s = boot(rec);
-      const projectId = insertGithubProject(s, VALID_REPO);
-      const todoId = insertTodo(s, projectId, {
-        sourceKind: 'github-issue-self',
-        sourceRef: `github:${bad}#3`,
-      });
-      const echo = await req(s.app, 'GET', `/api/todos/${todoId}/github-issue`);
-      expect(echo.status).toBe(404);
-      await writebackSelfIssueTitle(
-        { ...s.svc, box: s.secretBox, githubFetch: rec.impl },
-        todoId,
-        '新标题',
-      );
-      expect(rec.calls).toEqual([]);
-    },
-  );
 
   test.each(STORED_BAD_REFS)(
     'R7 PR delivery completes without outbound CI polling or repair steps (%s)',

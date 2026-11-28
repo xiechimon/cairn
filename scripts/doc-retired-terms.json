@@ -257,6 +257,42 @@
       "pattern": "\\borb executor\\b|CAIRN_EXECUTOR=orb|apps/daemon/src/orb",
       "canary": "CAIRN_EXECUTOR=orb",
       "reason": "the orb executor and its nspawn provider were removed; agents run as the operator's OS user in a per-task worktree, with no container boundary"
+    },
+    {
+      "id": "github-issue-import",
+      "pattern": "\\bimportGithubIssue\\b|/github/issues/import|github-issues\\.ts",
+      "canary": "importGithubIssue",
+      "reason": "GitHub issue import was retired; a task enters from the Coordinator or a person, and an agent that works an issue uses gh or a GitHub MCP connector"
+    },
+    {
+      "id": "github-webhook-receiver",
+      "pattern": "\\breceiveGithubWebhook\\b|/webhook/github/|github-webhook",
+      "canary": "receiveGithubWebhook",
+      "reason": "Cairn answers no GitHub webhook; only the schedule webhook remains"
+    },
+    {
+      "id": "task-issue-sync",
+      "pattern": "\\bcreateTaskIssueSync\\b|task-issue-sync",
+      "canary": "createTaskIssueSync",
+      "reason": "issue state sync was retired; a task's state changes locally only and Cairn never comments on, renames or closes a GitHub issue"
+    },
+    {
+      "id": "self-issue-writeback",
+      "pattern": "\\bwritebackSelfIssueTitle\\b|\\bissueTitleWriteback\\b|\\bretrySelfIssueCreate\\b",
+      "canary": "writebackSelfIssueTitle",
+      "reason": "Cairn opens no issue per task and writes no issue title; a rename lands locally only"
+    },
+    {
+      "id": "pr-closing-line",
+      "pattern": "\\bensurePullClosesTaskIssue\\b|pr-closing-line",
+      "canary": "ensurePullClosesTaskIssue",
+      "reason": "no pull request body is edited and a merge commit carries no closing line for a task issue"
+    },
+    {
+      "id": "ci-fix-correction-ticket",
+      "pattern": "纠错待归因",
+      "canary": "纠错待归因",
+      "reason": "a green ci-fix opens no correction ticket; the event is still recorded and read by retry lessons"
     }
   ],
   "baseline": {
@@ -290,7 +326,7 @@
     },
     "pr-evidence-gate": {
       ".claude/skills/verify-merge-gate/SKILL.md": 1,
-      "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 4
+      "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 3
     },
     "manual-queue-main": {
       "AGENTS.md": 3
