@@ -2,7 +2,21 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 
 export default async function cloudAccount({ window, mode, evidenceDir }) {
+  const created = await window.evaluate(async () => {
+    const response = await fetch('/api/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'packaged cloud account', repoKind: 'hosted' }),
+    });
+    return { status: response.status, body: await response.text() };
+  });
+  assert.ok(
+    created.status >= 200 && created.status < 300,
+    `seed project ${created.status}: ${created.body}`,
+  );
+
   await window.goto(new URL('/app', window.url()).toString());
+  await window.getByTestId('home-c').waitFor({ timeout: 15_000 });
   const trigger = window.getByTestId('sidebar-account');
   await trigger.waitFor({ timeout: 15_000 });
 
