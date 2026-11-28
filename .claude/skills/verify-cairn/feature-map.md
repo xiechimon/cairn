@@ -689,7 +689,7 @@ Reach:
 - Test ids in its code: none
 - Verify recipes: [.claude/skills/verify-cairn/features/theme.md](features/theme.md)
 - Research: [docs/research/ai-frontend-quality-2026-11-06.md](../../../docs/research/ai-frontend-quality-2026-11-06.md) (not on main), [docs/research/serif-typography-2026-11-08.md](../../../docs/research/serif-typography-2026-11-08.md) (not on main)
-- Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/settings](../../../docs/design/references/settings), [docs/spec/base-ui-theme.md](../../../docs/spec/base-ui-theme.md)
+- Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/settings](../../../docs/design/references/settings), [apps/web/DESIGN.md](../../../apps/web/DESIGN.md)
 - Backend design: n/a: a client setting with no server state
 - Evidence: `apps/web/e2e/theme-toggle.spec.ts`, `apps/web/test/anti-slop-foundations.test.ts`
 

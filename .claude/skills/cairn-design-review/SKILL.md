@@ -1,33 +1,27 @@
 ---
 name: cairn-design-review
 disable-model-invocation: true
-description: Manually invoked cross-domain interface review of a Cairn surface or a UI diff — accessibility, layout, copy, type, colour, polish and motion — returned as one report ranked by user impact, with every finding keyed to a DESIGN.md rule id. Read-only; run only when a whole-surface review or a change-scoped interface review is asked for. Building UI goes through design-cairn.
+description: Manually invoked cross-domain interface and motion review of a Cairn surface or UI diff — accessibility, layout, copy, type, colour, polish and motion — returned as one report ranked by user impact, keyed to DESIGN.md rule ids. Read-only; run only when a surface review, diff interface review, or motion audit is asked for. Building UI goes through design-cairn.
 ---
 
 # cairn-design-review
 
-A review is two of Jakub Krehel's skills, vendored verbatim at `jakubkrehel/skills@672ae44ace6aaed65b86cbb1e2fd6fbea0e79578` (MIT, `upstream/LICENSE`), with Cairn's domains and rule ids in place of his generic routing. Each upstream `SKILL.md` is vendored as `README.md`; links inside the vendored files that say `SKILL.md` point at that sibling `README.md`.
+A review is two of Jakub Krehel's skills, vendored verbatim at `jakubkrehel/skills@672ae44ace6aaed65b86cbb1e2fd6fbea0e79578` (MIT, `upstream/LICENSE`), with Cairn's rule docs and ids in place of generic routing. Each upstream `SKILL.md` is vendored as `README.md`; links inside vendored files saying `SKILL.md` point at that sibling `README.md`.
 
 | The request | Read | It owns |
 |---|---|---|
-| Review a whole surface, panel or flow | `upstream/better-interface/README.md` + `review-format.md` | Scope resolution, the domain order, escalation triggers, severity, consolidation, the cap and the verdict |
-| Review a change before it lands | `upstream/interface-review/README.md` + `scope-resolution.md` + `removed-signals.md` | The scope block, blast radius, reading removed lines, `Introduced` / `Regression` / `Pre-existing` |
+| Review a whole surface, panel or flow | `upstream/better-interface/README.md` + `review-format.md` | Scope resolution, domain order, escalation triggers, severity, consolidation, cap and verdict |
+| Review a change before it lands | `upstream/interface-review/README.md` + `scope-resolution.md` + `removed-signals.md` | Scope block, blast radius, reading removed lines, `Introduced` / `Regression` / `Pre-existing` |
 
 A change review hands its findings to the surface review's severity scale, cap and format; it never invents its own.
 
 ## Cairn overrides
 
-Where the vendored workflow names something Cairn does not have, this table replaces it. An entry not listed applies as written.
-
-- **The domains are Cairn's wrappers, in this order.** Accessibility `cairn-a11y`, layout and colour `cairn-polish`, copy `cairn-copy`, type `cairn-type`, polish `cairn-polish`, motion `cairn-motion`. Load each one and read the vendored upstream it routes to; a domain whose wrapper never loaded is `Not reviewed`, with its name, not `Clear`.
-- **Every finding names a rule id.** Each finding carries the id it breaks from the `## Rules` sections of `apps/web/DESIGN.md` and `docs/design/surfaces/*.md` (`node scripts/design-rules-for.mjs --ids` lists them all), or `no rule` as a candidate for a new `M` row. The id is what a lane fixes and what the brief lists.
-- **Escalation triggers keep their ids.** A control with no accessible name is C4; a keyboard-reachable control with no visible ring, or a pointer-only path, or motion that ignores reduced motion is A2; content clipped at 390px is R1; a failing contrast pair is A3 with V28 for the dark layer; meaning carried by colour alone is V5; a destructive action with no confirmation, undo or distinct treatment is C25; truncated content with no way to the full value is L4; an error that names no recovery is C5; a state change carried by motion alone is V24. A trigger is HIGH on sight and exempt from the cap, exactly as upstream says.
-- **A change scope is a git range, not a pull request.** Cairn lands through `scripts/ops/push-queue.mjs` and has no PRs, so accept a branch, a commit range, `uncommitted`, or a range the owner names. With nothing named, use `git merge-base origin/main HEAD`..HEAD plus the uncommitted changes and record the base commit in the scope block.
-- **Read-only means the tree too.** Never `git checkout`, `git switch`, `git stash` or `git reset --hard` — those rewrite files another lane may be holding. Read another ref with `git show`, and render a diff in an isolated `git worktree add` when a rendered check is asked for.
-- **Evidence is the live stack.** A visual finding cites a screenshot from a `verify-cairn` stack at 1440 and 390, light and dark; a fixture screenshot is labelled `fixture` and never stands in for the live one. A claim you could not render is `Not verified`.
-- **The cap is 15 findings, with at most three pre-existing ones** as courtesy, and one row per root cause with every confirmed location in it. A report that finds nothing is a complete report.
-- **Read-only by default.** Fixing is a separate change; when the owner asks for the fix, the consolidated report is the scope and the relevant specs run again afterward.
-
-## Before wrap-up
-
-Report in the vendored format: the scope block for a change review, then the coverage table, the findings table with rule ids, verification and the verdict. An `Approve` means every domain actually ran and every claimed check actually ran; anything else is `Not reviewed` or `Not verified`, spelled out.
+- **Read the living rule docs directly (in order).** Start at `apps/web/DESIGN.md` (process rules `P1`–`P7`, token frontmatter, component table), then `docs/design/surfaces/foundation.md` (accessibility, layout, colour, copy, type, polish), the touched surface file(s) under `docs/design/surfaces/`, and `docs/design/surfaces/motion.md`. Run `node scripts/design-rules-for.mjs <paths>` to pull every scoped row. Any unverified area is reported as `Not reviewed`, never `Clear`.
+- **Motion audit.** When asked to audit motion (animations to remove/reduce, missing motion, or motion craft in a diff), judge strictly against `docs/design/surfaces/motion.md` (`V24`, `A2`, `C23`, `C24`, `A4`, `R1`): no motion library, bounce `0`, flat instant press tint (only labelled `Button` variants scale to `0.97`), no entry animation on chat messages/list rows/board cards outside `grow-*` and first-run, and check `src/styles/motion.css`, `src/styles/shadcn.css`, and `tw-animate-css`. Claims about feel require replaying a recording at ~0.1x, otherwise mark `Not verified`.
+- **Every finding names a rule id.** Key every finding to an id from `node scripts/design-rules-for.mjs --ids`, or `no rule` as a candidate for a new `M` row.
+- **Escalation triggers keep their ids.** Missing accessible name `C4`; missing keyboard focus ring, pointer-only path, or ignored reduced motion `A2`; clipped at 390px `R1`; failing contrast `A3` (plus `V28` dark layer); colour-only state `V5`; destructive action without confirm/undo `C25`; truncation without full text access `L4`; error without recovery `C5`; state change by motion alone `V24`. Triggers are HIGH on sight and exempt from the cap.
+- **Change scope is a git range, not a PR.** Cairn lands via `scripts/ops/push-queue.mjs`, so accept a branch, commit range, `uncommitted`, or default to `git merge-base origin/main HEAD`..HEAD plus uncommitted changes, recording the base commit.
+- **Read-only means the tree too.** Never `git checkout`, `git switch`, `git stash` or `git reset --hard`. Read other refs with `git show`, and render diffs in an isolated worktree if needed.
+- **Evidence is the live stack.** Visual findings cite `verify-cairn` live screenshots at 1440 and 390, light and dark (`P7`); fixture shots are labelled `fixture`. Anything unrendered is `Not verified`.
+- **Cap and verdict.** At most 15 findings (at most 3 `Pre-existing`), one row per root cause with all confirmed locations. Report in the vendored format (scope block, coverage table, findings table with rule ids, verification, verdict). `Approve` requires every domain and claimed check to have actually run; otherwise spell out `Not reviewed` / `Not verified`.

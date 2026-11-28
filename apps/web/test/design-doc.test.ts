@@ -108,3 +108,24 @@ describe('docChecks', () => {
     expect(checks.some((c) => c.key === 'rounded.full')).toBe(false);
   });
 });
+
+describe('V33 radii scale with component size', () => {
+  it('orders DESIGN.md rounded tokens monotonically from controls to full pills', () => {
+    const doc = parseFrontmatter(
+      readFileSync(join(import.meta.dirname, '..', 'DESIGN.md'), 'utf8'),
+    );
+    const px = (key: string) => {
+      const raw = doc.rounded?.[key];
+      expect(raw, `missing rounded.${key}`).toBeDefined();
+      return Number.parseFloat(String(raw));
+    };
+    expect(px('field')).toBe(px('control'));
+    expect(px('control')).toBe(px('menu-item'));
+    expect(px('control')).toBeLessThan(px('card'));
+    expect(px('card')).toBeLessThanOrEqual(px('sheet'));
+    expect(px('card')).toBeLessThan(px('menu'));
+    expect(px('menu')).toBe(px('composer'));
+    expect(px('menu')).toBeLessThan(px('bubble'));
+    expect(px('bubble')).toBeLessThan(px('full'));
+  });
+});

@@ -15,18 +15,32 @@ const ids = (blocks) => blocks.flatMap((block) => block.rows.map((row) => row.id
 test('a Coordinator chat file gets the conversation, shared and process rows only', () => {
   const blocks = selectBlocks(['apps/web/src/chief/chief-question.tsx']);
   const got = ids(blocks);
-  for (const id of ['P1', 'V3', 'C14', 'C11', 'A3', 'R1', 'T1']) {
+  for (const id of ['P1', 'P7', 'V3', 'V33', 'T8', 'C14', 'C11', 'A3', 'R1', 'T1']) {
     assert.ok(got.includes(id), `${id} should apply to apps/web/src/chief/`);
   }
-  for (const id of ['C20', 'C22', 'L1', 'L9', 'C9', 'V26']) {
+  for (const id of ['C20', 'C22', 'C48', 'L1', 'L9', 'C9', 'V26']) {
     assert.ok(!got.includes(id), `${id} should not apply to apps/web/src/chief/`);
   }
 });
 
 test('a settings file gets the settings rows and not the conversation ones', () => {
   const got = ids(selectBlocks(['apps/web/src/resources/providers-page.tsx']));
-  for (const id of ['C20', 'C22', 'V5', 'T4', 'P3']) assert.ok(got.includes(id), `${id} missing`);
-  for (const id of ['C8', 'C14', 'C16', 'L1', 'C9']) assert.ok(!got.includes(id), `${id} leaked`);
+  for (const id of ['C20', 'C22', 'V5', 'T4', 'P3', 'P7', 'T8', 'V33']) {
+    assert.ok(got.includes(id), `${id} missing`);
+  }
+  for (const id of ['C8', 'C14', 'C16', 'C48', 'L1', 'C9']) {
+    assert.ok(!got.includes(id), `${id} leaked`);
+  }
+});
+
+test('menu and overlay files get chrome rule C48', () => {
+  for (const file of [
+    'apps/web/src/components/menu-keys.tsx',
+    'apps/web/src/board/sidebar-project-menu.tsx',
+  ]) {
+    const got = ids(selectBlocks([file]));
+    assert.ok(got.includes('C48'), `C48 should apply to ${file}`);
+  }
 });
 
 test('a sidebar file gets the L rows; a tray file gets V26', () => {

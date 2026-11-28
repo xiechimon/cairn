@@ -2,6 +2,14 @@
 
 The global furniture every surface shares: buttons, the `SidePanel`, empty states, dialogs, menus, the ⌘K palette and the composer pickers. Rows, tabs, menus and empty states inside a side panel come from the tasks/sidebar family (`docs/design/surfaces/tasks.md`, `docs/design/surfaces/sidebar.md`).
 
+## Rules
+
+Scope: `apps/web/src/components/` `apps/web/src/overlay/` `apps/web/src/board/sidebar-project-menu` `apps/web/src/board/task-move-menu` `apps/web/e2e/menu-`
+
+| Id | Rule | Check |
+|---|---|---|
+| C48 | Desktop submenus use `DropdownMenuSub` with open/close hover delay and a pointer safe triangle so diagonal travel to the submenu does not dismiss it. | H; G `test/menu-keys-source.test.ts` |
+
 ## Buttons
 
 - Primary button: shadcn Button default tier, `primary` background, 8px radius (`rounded-lg` = `--radius-control`), 32px tall. `DIALOG_PRIMARY_BUTTON` in dialogs, forms and empty states uses the same 8px (`rounded-md`). Ochre is never the primary-button background (V5); one screen has one primary action (V6).
@@ -35,9 +43,9 @@ Piece: `EmptyState` in `src/components/empty-state.tsx` (the base is the registr
 - **Used on**: list pages with no data (API keys, schedules, skills, MCP, keys…). The copy is translated by the caller before being passed in.
 - Do: a bare icon + title + one sentence. Do not: an icon tile with a colored background (neither orange nor beige), a `size="sm"` small button, two side-by-side primary buttons, or a "View docs" external link.
 
-## Dialogs and menus
+## Dialogs, menus, and toasts
 
-Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIALOG_*` pieces, `DialogFootRow`, `dialogWidth`), `alert-dialog-shell.tsx` (confirm surfaces), `dropdown-menu.tsx` / `popover.tsx` (menus and floating surfaces). `dialog.tsx` / `alert-dialog.tsx` / `select.tsx` are pristine registry pieces; their skin lives in the `[data-slot=…]` rules and tokens of `styles/app.css`.
+Pieces: `src/components/ui/dialog-shell.tsx` (`DialogShell` + the exported `DIALOG_*` pieces, `DialogFootRow`, `dialogWidth`), `alert-dialog-shell.tsx` (confirm surfaces), `dropdown-menu.tsx` / `popover.tsx` (menus and floating surfaces), `components/ui/toaster.tsx` (`toastSuccess`, `toastError`). Action and error toasts stay visible until dismissed; surfaces with an in-surface error canon keep errors in-surface and do not stack a toast on top. `dialog.tsx` / `alert-dialog.tsx` / `select.tsx` are pristine registry pieces; their skin lives in the `[data-slot=…]` rules and tokens of `styles/app.css`.
 
 - **Backdrop**: one layer of black dim `--dialog-backdrop` (40% light, 50% dark, claude.ai), no blur. All dialogs, confirm surfaces, and ⌘K share this layer; there is no dark curtain.
 - **Surface**: `--dialog-surface` (the sidebar layer in dark, white in light), 12px radius (`--edge-radius`), `--dialog-shadow` (= `--e3`: two soft shadows and a 5% ring).

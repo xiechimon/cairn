@@ -8,11 +8,18 @@ const SKILLS = join(ROOT, '.claude/skills');
 const JAKUB = '672ae44ace6aaed65b86cbb1e2fd6fbea0e79578';
 const EMIL = '64eb3deb9a5fbfa041faf783e0bc3fd635872e9c';
 
+const designMd = readFileSync(join(ROOT, 'apps/web/DESIGN.md'), 'utf8');
+const surfaceFiles = readdirSync(join(ROOT, 'docs/design/surfaces'))
+  .filter((name) => name.endsWith('.md'))
+  .sort();
+const referenceFolders = readdirSync(join(ROOT, 'docs/design/references'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
 const ruleDocs = [
-  readFileSync(join(ROOT, 'apps/web/DESIGN.md'), 'utf8'),
-  ...readdirSync(join(ROOT, 'docs/design/surfaces'))
-    .filter((name) => name.endsWith('.md'))
-    .map((name) => readFileSync(join(ROOT, 'docs/design/surfaces', name), 'utf8')),
+  designMd,
+  ...surfaceFiles.map((name) => readFileSync(join(ROOT, 'docs/design/surfaces', name), 'utf8')),
 ];
 const ruleIds = new Set(
   ruleDocs
@@ -35,29 +42,14 @@ function walk(dir: string): string[] {
   });
 }
 
-function wrapperText(skill: string): string {
+function skillText(skill: string): string {
   return readFileSync(join(SKILLS, skill, 'SKILL.md'), 'utf8');
 }
 
-const designCairn = wrapperText('design-cairn');
-const routing = section(designCairn, '## Skill routing');
-const routed = [
-  ...new Set([...routing.matchAll(/`?(cairn-[a-z0-9-]+)`?/g)].map((match) => match[1] ?? '')),
-];
+const designCairn = skillText('design-cairn');
 
 describe('no second SKILL.md is discoverable under a vendored tree', () => {
-  test.each([
-    'design-cairn',
-    'cairn-motion',
-    'cairn-polish',
-    'cairn-type',
-    'cairn-a11y',
-    'cairn-copy',
-    'cairn-design-review',
-    'cairn-motion-audit',
-    'options-prototype-cairn',
-    'retro-cairn',
-  ])(
+  test.each(['design-cairn', 'cairn-design-review', 'options-prototype-cairn', 'retro-cairn'])(
     '%s',
     (skill) => {
       const dir = join(SKILLS, skill);
@@ -70,102 +62,72 @@ describe('no second SKILL.md is discoverable under a vendored tree', () => {
   );
 });
 
-describe('the design-cairn routing table', () => {
-  test('names the domain skills and the audit', () => {
-    expect(routed).toEqual(
-      expect.arrayContaining([
-        'cairn-motion',
-        'cairn-polish',
-        'cairn-type',
-        'cairn-a11y',
-        'cairn-copy',
-        'cairn-motion-audit',
-        'cairn-design-review',
-      ]),
-    );
+describe('retired rule-wrapper skills and obsolete design docs are removed', () => {
+  test.each([
+    'cairn-a11y',
+    'cairn-copy',
+    'cairn-motion',
+    'cairn-motion-audit',
+    'cairn-polish',
+    'cairn-type',
+  ])('%s skill directory is deleted', (skill) => {
+    expect(existsSync(join(SKILLS, skill))).toBe(false);
+    expect(designCairn).not.toContain(skill);
   });
 
-  test.each(routed)('%s exists as a skill', (name) => {
-    expect(existsSync(join(SKILLS, name, 'SKILL.md'))).toBe(true);
-  });
+  test.each(['docs/design/rule-ab.md', 'docs/spec/base-ui-theme.md'])(
+    '%s is deleted',
+    (relPath) => {
+      expect(existsSync(join(ROOT, relPath))).toBe(false);
+    },
+  );
 });
 
-const VENDORED: Record<
-  string,
-  { sha: string; repo: string; upstreamName: string; entry: string }
-> = {
-  'cairn-motion': {
-    sha: JAKUB,
-    repo: 'jakubkrehel/skills',
-    upstreamName: 'better-motion',
-    entry: 'upstream/README.md',
-  },
-  'cairn-polish': {
-    sha: JAKUB,
-    repo: 'jakubkrehel/skills',
-    upstreamName: 'better-ui',
-    entry: 'upstream/README.md',
-  },
-  'cairn-type': {
-    sha: JAKUB,
-    repo: 'jakubkrehel/skills',
-    upstreamName: 'better-typography',
-    entry: 'upstream/README.md',
-  },
-  'cairn-a11y': {
-    sha: JAKUB,
-    repo: 'jakubkrehel/skills',
-    upstreamName: 'better-accessibility',
-    entry: 'upstream/README.md',
-  },
-  'cairn-copy': {
-    sha: JAKUB,
-    repo: 'jakubkrehel/skills',
-    upstreamName: 'better-writing',
-    entry: 'upstream/README.md',
-  },
-};
+describe('one-hop entry from apps/web/DESIGN.md', () => {
+  const surfaces = section(designMd, '## Surfaces');
 
-describe('vendored upstream skills', () => {
-  for (const [skill, pin] of Object.entries(VENDORED)) {
-    const dir = join(SKILLS, skill);
-    const wrapper = wrapperText(skill);
+  test('links every surface file and every reference screenshot folder in one hop', () => {
+    expect(designMd).toContain('/design.html');
+    expect(designMd).toContain('scripts/design-rules-for.mjs');
+    for (const file of surfaceFiles) {
+      expect(surfaces, `DESIGN.md missing docs/design/surfaces/${file}`).toContain(
+        `docs/design/surfaces/${file}`,
+      );
+    }
+    for (const folder of referenceFolders) {
+      expect(surfaces, `DESIGN.md missing docs/design/references/${folder}/`).toContain(
+        `docs/design/references/${folder}/`,
+      );
+    }
+  });
 
-    describe(skill, () => {
-      test('carries the upstream LICENSE beside the vendored files', () => {
-        expect(readFileSync(join(dir, 'upstream/LICENSE'), 'utf8')).toContain('MIT License');
-      });
+  test('design-cairn routes to the procedure skills only', () => {
+    const related = section(designCairn, '## Related procedures');
+    expect(related).toContain('options-prototype-cairn');
+    expect(related).toContain('cairn-design-review');
+    expect(existsSync(join(SKILLS, 'options-prototype-cairn/SKILL.md'))).toBe(true);
+    expect(existsSync(join(SKILLS, 'cairn-design-review/SKILL.md'))).toBe(true);
+    expect(designCairn).toContain('apps/web/DESIGN.md');
+    expect(designCairn).not.toContain('rule-ab.md');
+  });
 
-      test('notes the upstream repo and commit', () => {
-        expect(wrapper).toContain(`${pin.repo}@${pin.sha}`);
-      });
+  test('repo entry docs and reference README point to DESIGN.md in one hop', () => {
+    const rootAgents = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
+    const webAgents = readFileSync(join(ROOT, 'apps/web/AGENTS.md'), 'utf8');
+    const refReadme = readFileSync(join(ROOT, 'docs/design/references/README.md'), 'utf8');
+    expect(rootAgents).toContain('apps/web/DESIGN.md');
+    expect(rootAgents).toContain('/design.html');
+    expect(webAgents).toContain('apps/web/DESIGN.md');
+    expect(webAgents).toContain('scripts/design-rules-for.mjs');
+    expect(refReadme).toContain('apps/web/DESIGN.md');
+    for (const folder of referenceFolders) {
+      expect(refReadme).toContain(`## ${folder}`);
+    }
+  });
 
-      test('the vendored entry file is the real upstream SKILL.md', () => {
-        expect(readFileSync(join(dir, pin.entry), 'utf8')).toContain(`name: ${pin.upstreamName}`);
-      });
-
-      test('the override table names only rule ids that exist in the DESIGN.md rule index', () => {
-        const overrides = section(wrapper, '## Cairn overrides');
-        expect(overrides).toContain('|---|');
-        const ids = new Set(
-          [...overrides.matchAll(/\b([PCVTARL]\d+)\b/g)].map((match) => match[1] ?? ''),
-        );
-        expect(ids.size).toBeGreaterThan(0);
-        expect([...ids].filter((id) => !ruleIds.has(id))).toEqual([]);
-      });
-    });
-  }
-
-  test('cairn-motion carries the emil reference files, license and pin', () => {
-    const dir = join(SKILLS, 'cairn-motion');
-    expect(wrapperText('cairn-motion')).toContain(`emilkowalski/skills@${EMIL}`);
-    expect(readFileSync(join(dir, 'references/LICENSE'), 'utf8')).toContain('MIT License');
-    for (const file of [
-      'references/choreograph/README.md',
-      'references/choreograph/RECIPES.md',
-      'references/animation-performance/README.md',
-    ]) {
-      expect(existsSync(join(dir, file)), file).toBe(true);
+  test('converged rule files register the owner-principle rule ids', () => {
+    for (const id of ['P7', 'T8', 'V33', 'C48', 'V4', 'V5', 'V3', 'V8', 'C3', 'V24']) {
+      expect(ruleIds.has(id), `${id} missing from rule index`).toBe(true);
     }
   });
 });
@@ -175,12 +137,13 @@ const TREES: Record<
   { pins: string[]; licenses: string[]; entries: string[]; files: string[] }
 > = {
   'design-cairn': {
-    pins: [`jakubkrehel/skills@${JAKUB}`],
-    licenses: ['upstream/LICENSE', 'references/LICENSE'],
+    pins: [`jakubkrehel/skills@${JAKUB}`, `emilkowalski/skills@${EMIL}`],
+    licenses: ['upstream/LICENSE', 'upstream/break-ui/LICENSE', 'references/LICENSE'],
     entries: [
       'upstream/build-design/README.md',
       'upstream/explain-interface/README.md',
       'upstream/break/README.md',
+      'upstream/break-ui/README.md',
       'references/pick-ui-library/README.md',
     ],
     files: [
@@ -190,6 +153,7 @@ const TREES: Record<
       'upstream/explain-interface/from-an-image.md',
       'upstream/explain-interface/no-browser.md',
       'upstream/break/scenarios.md',
+      'upstream/break-ui/CATALOG.md',
     ],
   },
   'cairn-design-review': {
@@ -201,30 +165,6 @@ const TREES: Record<
       'upstream/interface-review/scope-resolution.md',
       'upstream/interface-review/removed-signals.md',
     ],
-  },
-  'cairn-motion': {
-    pins: [`emilkowalski/skills@${EMIL}`],
-    licenses: ['references/LICENSE'],
-    entries: [
-      'references/emil-design-eng/README.md',
-      'references/animate/README.md',
-      'references/animation-vocabulary/README.md',
-      'references/apple-design/README.md',
-      'references/gestures/README.md',
-      'references/choreograph/README.md',
-      'references/animation-performance/README.md',
-    ],
-    files: [
-      'references/animate/RECIPES.md',
-      'references/choreograph/RECIPES.md',
-      'references/performance-cheatsheet.md',
-    ],
-  },
-  'cairn-polish': {
-    pins: [`emilkowalski/skills@${EMIL}`],
-    licenses: ['references/LICENSE'],
-    entries: ['references/mobile-native/README.md', 'references/ask-sonner/README.md'],
-    files: ['references/ask-sonner/API.md', 'references/ui-cheatsheet.md'],
   },
   'options-prototype-cairn': {
     pins: [`jakubkrehel/skills@${JAKUB}`, `emilkowalski/skills@${EMIL}`],
@@ -251,7 +191,7 @@ const TREES: Record<
 describe('vendored reading trees', () => {
   for (const [skill, tree] of Object.entries(TREES)) {
     const dir = join(SKILLS, skill);
-    const wrapper = wrapperText(skill);
+    const wrapper = skillText(skill);
 
     describe(skill, () => {
       test('notes the upstream repo and commit for every author it vendors', () => {
@@ -278,10 +218,12 @@ describe('vendored reading trees', () => {
 });
 
 describe('cairn-design-review', () => {
-  const review = wrapperText('cairn-design-review');
+  const review = skillText('cairn-design-review');
 
-  test('stays manually invoked', () => {
+  test('stays manually invoked and includes motion audit', () => {
     expect(review).toContain('disable-model-invocation: true');
+    expect(review).toContain('Motion audit');
+    expect(review).toContain('docs/design/surfaces/motion.md');
   });
 
   test('names only rule ids that exist in the DESIGN.md rule index', () => {
@@ -291,43 +233,10 @@ describe('cairn-design-review', () => {
   });
 });
 
-describe('cairn-motion-audit', () => {
-  const dir = join(SKILLS, 'cairn-motion-audit');
-  const audit = wrapperText('cairn-motion-audit');
-
-  test('stays manually invoked', () => {
-    expect(audit).toContain('disable-model-invocation: true');
-  });
-
-  test('vendors the four emil review skills verbatim with LICENSE and pin', () => {
-    expect(audit).toContain(`emilkowalski/skills@${EMIL}`);
-    expect(readFileSync(join(dir, 'upstream/LICENSE'), 'utf8')).toContain('MIT License');
-    for (const file of [
-      'upstream/remove-animations/README.md',
-      'upstream/find-animation-opportunities/README.md',
-      'upstream/improve-animations/README.md',
-      'upstream/improve-animations/AUDIT.md',
-      'upstream/improve-animations/PLAN-TEMPLATE.md',
-      'upstream/review-animations/README.md',
-      'upstream/review-animations/STANDARDS.md',
-    ]) {
-      expect(existsSync(join(dir, file)), file).toBe(true);
-    }
-  });
-
-  test('names only existing rule ids', () => {
-    const ids = new Set([...audit.matchAll(/\b([PCVTARL]\d+)\b/g)].map((match) => match[1] ?? ''));
-    expect(ids.size).toBeGreaterThan(0);
-    expect([...ids].filter((id) => !ruleIds.has(id))).toEqual([]);
-  });
-});
-
-describe('design-cairn vendored sources', () => {
+describe('design-cairn vendored catalog', () => {
   const dir = join(SKILLS, 'design-cairn');
 
-  test('the extreme-data catalog is vendored verbatim with LICENSE and pin', () => {
-    expect(designCairn).toContain(`emilkowalski/skills@${EMIL}`);
-    expect(readFileSync(join(dir, 'upstream/break-ui/LICENSE'), 'utf8')).toContain('MIT License');
+  test('the extreme-data catalog is vendored verbatim', () => {
     const catalog = readFileSync(join(dir, 'upstream/break-ui/CATALOG.md'), 'utf8');
     expect(catalog).toContain('Worst-Case Catalog');
     expect(catalog).toContain('bartholomew.fitzgerald@northwind-industries-holdings.example.com');

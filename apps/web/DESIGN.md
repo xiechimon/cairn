@@ -27,27 +27,27 @@ spacing:
 
 # Cairn web design
 
-The single entry for UI work. The gallery (`pnpm --filter @cairn/web dev`, `/design.html`) renders this frontmatter on the real tokens and its Doc check compares it with `src/styles/shadcn.css` in both themes; `scripts/ui-page-style-gate.mjs` (prepush) rejects palette colours, arbitrary colour values and inline type outside the design files, and `scripts/ui-debt-gate.mjs` only lets arbitrary sizes shrink. The design direction lives in `docs/design/surfaces/foundation.md`; the reusable-component inventory lives next to the code at `src/components/ui/INVENTORY.md`.
+The single entry for UI work. `/design.html` (`pnpm --filter @cairn/web dev`) is the living style guide rendering this frontmatter on the real tokens (`src/styles/shadcn.css`); `scripts/ui-page-style-gate.mjs` rejects palette colours, arbitrary colour values and inline type outside design files, and `scripts/ui-debt-gate.mjs` only lets arbitrary sizes shrink. Run `node scripts/design-rules-for.mjs <paths>` to print all applicable rules (`DESIGN.md` + `foundation.md` + `motion.md` + the touched surface file). Procedures live in three skills: `.claude/skills/design-cairn/SKILL.md` (UI brief & build workflow), `.claude/skills/options-prototype-cairn/SKILL.md` (grayscale options for owner pick), and `.claude/skills/cairn-design-review/SKILL.md` (read-only surface, diff & motion review). The machine-checked primitive manifest lives at `src/components/ui/INVENTORY.md`.
 
 ## Surfaces
 
-- `docs/design/surfaces/foundation.md` — direction, colors, typography, layout, icons, brand mark, card radius, dark.
-- `docs/design/surfaces/conversation.md` — the Coordinator home: shell and status mark, channels, bubbles, composer, trace, questions, approvals, narrow layout.
-- `docs/design/surfaces/tasks.md` — the Tasks panel, task thread panel, task detail page, engine run.
-- `docs/design/surfaces/sidebar.md` — the sidebar tree, rows, menus, archived page, collapsed and peek, the shell.
-- `docs/design/surfaces/settings.md` — the settings list, forms, segmented controls, model routing, pickers, diagnostics.
-- `docs/design/surfaces/computers.md` — the computers panel, fleet badge, tray page.
-- `docs/design/surfaces/first-run.md` — the first-run setup page (C9).
-- `docs/design/surfaces/chrome.md` — buttons, SidePanel, empty state, dialogs, menus, ⌘K, slash and @ lists.
-- `docs/design/surfaces/motion.md` — the motion table, reduced motion, texture.
+| Surface | Rules & spec | Reference shots | Owns |
+|---|---|---|---|
+| Foundation | `docs/design/surfaces/foundation.md` | — | direction, colors, type, spacing, icons, brand, copy, a11y, dark |
+| Coordinator chat | `docs/design/surfaces/conversation.md` | `docs/design/references/coordinator-chat/` (Claude.ai, Claude Duet) | home shell, status mark, channels, bubbles, composer, trace, questions, approvals, narrow |
+| Tasks & thread | `docs/design/surfaces/tasks.md` | `docs/design/references/thread-review/` (t3code, Amp) | Tasks panel, task thread panel, task detail, engine run |
+| Sidebar & shell | `docs/design/surfaces/sidebar.md` | `docs/design/references/thread-list-sidebar/` (t3code, Amp) & `docs/design/references/archived-projects/` (Claude.ai, Linear) | sidebar tree, rows, menus, archived page, peek, shell |
+| Settings & models | `docs/design/surfaces/settings.md` | `docs/design/references/settings/` (Amp, t3code) | settings list, forms, segmented controls, routing, pickers, diagnostics |
+| Computers & tray | `docs/design/surfaces/computers.md` | `docs/design/references/settings/` | computers panel, fleet badge, `/tray` |
+| First run | `docs/design/surfaces/first-run.md` | `docs/design/references/first-run/` (Amp) | two-step setup before first project (C9) |
+| Chrome & menus | `docs/design/surfaces/chrome.md` | — | buttons, SidePanel, empty state, dialogs, menus, submenus, ⌘K, slash/@ |
+| Motion & texture | `docs/design/surfaces/motion.md` | — | motion table, reduced motion, growth, texture |
 
 ## Rules
 
 Scope: `apps/web/`
 
-Short, checkable rules for any change under `apps/web/`; name the ids you checked. Check: `M` an assertion or measurement, `G` an existing gate or test, `H` a human check against the reference shots. A rule enters through the A/B check in `docs/design/rule-ab.md` or by copying a measured value; one that stops changing output is deleted.
-
-The rows below are the process rules; the rows for a surface live in the `## Rules` section of the surface file that owns them under `docs/design/surfaces/` (each section opens with the `Scope:` prefixes that load it), and `foundation.md` holds the shared visual, copy and accessibility rows. `node scripts/design-rules-for.mjs <paths>` prints only the rows the given files need — briefs paste that block instead of pointing at the whole table. No row appears twice; `apps/web/test/anti-slop-foundations.test.ts` pins the format, the per-row checks and the scope prefixes.
+Short, checkable rules for any change under `apps/web/`; name the ids you checked. Check: `M` an assertion or measurement, `G` an existing gate or test, `H` a human check against reference shots. A rule enters from a real audit finding or measured value and stays only while it changes output. Process rows live below; surface and shared rows live in `## Rules` under `docs/design/surfaces/` and print via `node scripts/design-rules-for.mjs <paths>`.
 
 | Id | Rule | Check |
 |---|---|---|
@@ -57,6 +57,7 @@ The rows below are the process rules; the rows for a surface live in the `## Rul
 | P4 | Drafts and fixtures use real copy and real-looking data, never lorem ipsum or `Item 1`. | H |
 | P5 | Fixture screenshots (`?scenario=`) are labelled as fixture evidence and never stand in for the live stack. | H |
 | P6 | Before code, the brief answers the design-cairn craft questions: what grows, which states, which finishing rules, which spec measures each answer. | H |
+| P7 | Accept visual changes by real rendered pixels (before/after screenshots and `e2e/visual-baseline.spec.ts`), never by computed styles or source reading alone. | M `e2e/visual-baseline.spec.ts`; G `visual-baseline-gate`; H |
 
 ## Which component to use
 
@@ -69,38 +70,35 @@ The rows below are the process rules; the rows for a surface live in the `## Rul
 | Count / label pill | `components/ui/badge.tsx` (the status color family) | The five task states go through `status-chip.tsx`; do not mix the two vehicles |
 | Empty state | `components/ui/empty.tsx` | Do not hand-write an empty-state copy block per site |
 | Confirm / regular dialog | `components/ui/alert-dialog-shell.tsx` / `components/ui/dialog-shell.tsx` | Do not hand-roll `OverlayMount` + `useEscClose` |
-| Anchored floating surface (dropdown / menu / popover) | `dropdown-menu.tsx` (menu family) / `popover.tsx` (panel family, cross-component anchoring via the Content's `anchor`) / `dialog.tsx` (centered modal family) | Do not build a homemade positioning shell (floating-shell.tsx was deleted with #1010) |
-| Single-select dropdown (pick one value) | `components/ui/select.tsx` (registry compound family, #1010) | Do not use the native `<select>` (pops the system menu), do not hand-write trigger-button + popup per surface |
-| Checkbox | `components/ui/checkbox.tsx` | Do not place a bare `<input type="checkbox">` — the browser's built-in box is a different family from the in-repo checkbox row |
-| Resting box (a card / settings block sitting still on a page) | `components/settings-list.tsx` (`SettingsCard` + `SettingsRow`; `CARD_RADIUS_CLS` for other card-like surfaces) | Do not start a new hand-written `.xxx-card` class — card skin is `bg-card` + `--radius-card` + `--e1` |
-| Layout block (a container that wants its own skin) | `components/ui/card.tsx` (the shadcn layout shell; consumers self-override `ring-0` / `py-0` / radius) | Do not use it as a visual primitive — its `ring-1` + `rounded-xl` + `bg-card` mismatches in-repo needs; a real card is a per-face class family |
-| Avatar | `components/ui/seeded-avatar.tsx` (picture, else the name's tinted initial, else the fallback image; sizes via SeededAvatar's `className="size-N"`) | Do not use the `avatar.tsx` trio directly — the seed/fallback semantics would be copied apart |
-| Form row composition | `components/ui/field.tsx` (FieldGroup + Field + FieldLabel) | Do not hand-arrange forms with `div` + `space-y-*` / `grid gap-*` |
+| Anchored floating surface (dropdown / menu / popover) | `dropdown-menu.tsx` (menu family) / `popover.tsx` (panel family, cross-component anchoring via the Content's `anchor`) / `dialog.tsx` (centered modal family) | Do not build a homemade positioning shell |
+| Single-select dropdown (pick one value) | `components/ui/select.tsx` (registry compound family) | Do not use the native `<select>`, do not hand-write trigger-button + popup per surface |
+| Checkbox | `components/ui/checkbox.tsx` | Do not place a bare `<input type="checkbox">` |
+| Resting box (card / settings block) | `components/settings-list.tsx` (`SettingsCard` + `SettingsRow`; `CARD_RADIUS_CLS` for other card-like surfaces) | Do not start a new hand-written `.xxx-card` class — card skin is `bg-card` + `--radius-card` + `--e1` |
+| Layout block (container wanting its own skin) | `components/ui/card.tsx` (layout shell; consumers override `ring-0` / `py-0` / radius) | Do not use it as a visual primitive; a real card is a per-face class family |
+| Avatar | `components/ui/seeded-avatar.tsx` (picture, else tinted initial, else fallback; sizes via `className="size-N"`) | Do not use `avatar.tsx` directly |
+| Form row composition | `components/ui/field.tsx` (`FieldGroup` + `Field` + `FieldLabel`) | Do not hand-arrange forms with `div` + `space-y-*` / `grid gap-*` |
 | Hover info bubble / divider | `components/ui/tooltip.tsx` / `components/ui/separator.tsx` | Do not use `<hr>` / `border-t` divs for a divider |
-| Shortcut hint chip | the `tooltip.tsx` + `kbd.tsx` composition assembled at the consumer (Kbd inside TooltipContent, the #1008/#983 ruling) | Do not hand-write absolute positioning + show/hide; the key caps in doc body text use `kbd.tsx` directly |
-| Toast / lightweight failure feedback | `toast.*` (imperative; `components/ui/toaster.tsx` is already mounted at the App root) | Do not silently swallow mutation errors; surfaces with an in-surface scoped red-line canon (XMON-80/P2) keep going in-surface and do not stack toast on top |
+| Shortcut hint chip | `tooltip.tsx` + `kbd.tsx` (`Kbd` inside `TooltipContent`) | Do not hand-write absolute positioning + show/hide; key caps in body text use `kbd.tsx` |
+| Toast / lightweight failure feedback | `toast.*` (`components/ui/toaster.tsx` at App root) | Do not swallow mutation errors; surfaces with an in-surface error canon keep going in-surface and do not stack toast |
 
 ## Performance
 
-Cairn adopts Google's [Core Web Vitals](https://web.dev/articles/vitals) as its single performance standard measured per surface on the fixture stack, keeps two stricter additions (`CLS = 0` on transient status/hints/validation/loading per the owner's rule so transient chrome never shifts content below, and zero main-thread long tasks over `50 ms` while typing as the INP diagnostic), and measures/reports supporting Web Vitals (`FCP`, `TTFB`) without gating.
+Cairn adopts [Core Web Vitals](https://web.dev/articles/vitals) per surface on the fixture stack, with `CLS = 0` on transient status/hints/validation/loading (`C34`) and zero main-thread long tasks `> 50 ms` while typing (`C36`), plus supporting `FCP` and `TTFB` reporting:
 
-| Metric | Standard threshold | Cairn threshold | Spec |
-|---|---|---|---|
-| [LCP](https://web.dev/articles/lcp) | ≤ 2.5 s (good) | ≤ 2.5 s per surface & thread switch (`C37`) | `e2e/web-vitals-perf.spec.ts` |
-| [INP](https://web.dev/articles/inp) | ≤ 200 ms (good) | ≤ 200 ms p98; pending state paints ≤ 200 ms on 400 ms slow network (`C35`) | `e2e/web-vitals-perf.spec.ts` |
-| [CLS](https://web.dev/articles/cls) | ≤ 0.1 (good) | ≤ 0.1 per surface load (`C37`); `= 0` on transient hints/status (`C34`, owner rule) | `e2e/web-vitals-perf.spec.ts`, `e2e/no-layout-shift.spec.ts` |
-| [Long tasks](https://web.dev/articles/tbt) | > 50 ms (INP diagnostic, not CWV-gated) | 0 tasks `> 50 ms` while typing in Coordinator composer / add-task (`C36`, INP diagnostic) | `e2e/web-vitals-perf.spec.ts` |
-| [FCP](https://web.dev/articles/fcp) | ≤ 1.8 s (good, supporting) | Measured & reported per surface (not gated) | `e2e/web-vitals-perf.spec.ts` |
-| [TTFB](https://web.dev/articles/ttfb) | ≤ 0.8 s (good, supporting) | Measured & reported per surface (not gated) | `e2e/web-vitals-perf.spec.ts` |
+| Metric | Cairn threshold | Spec |
+|---|---|---|
+| [LCP](https://web.dev/articles/lcp) | ≤ 2.5 s per surface & thread switch (`C37`) | `e2e/web-vitals-perf.spec.ts` |
+| [INP](https://web.dev/articles/inp) | ≤ 200 ms p98; pending state paints ≤ 200 ms on 400 ms slow network (`C35`); 0 typing tasks > 50 ms (`C36`) | `e2e/web-vitals-perf.spec.ts` |
+| [CLS](https://web.dev/articles/cls) | ≤ 0.1 per surface load (`C37`); `= 0` on transient hints/status (`C34`) | `e2e/web-vitals-perf.spec.ts`, `e2e/no-layout-shift.spec.ts` |
 
 ## Adopted standards
 
-Cairn adopts the published standards audited in [ui-guidelines-adoption-2026-11-27.md](../../docs/research/ui-guidelines-adoption-2026-11-27.md), preferring newcomer calm when a source conflicts with Cairn's UX:
+Audited in [ui-guidelines-adoption-2026-11-27.md](../../docs/research/ui-guidelines-adoption-2026-11-27.md), preferring newcomer calm on conflicts:
 
 | Standard | Surface scope | Enforcement |
 |---|---|---|
 | Vercel Web Interface Guidelines & Rauno `interfaces.rauno.me` | `foundation.md` (`C38`–`C42`, `C44`, `A7`, `T6`, `V31`) | `test/ui-guidelines-static.test.ts`, `e2e/design-rules-measure.spec.ts` |
-| W3C WCAG 2.2 AA (`target-size`, `focus`, dragging, `error`, `labels`) | `foundation.md` (`A3`, `A8`–`A10`), `settings.md` | `e2e/a11y-axe.spec.ts` (`wcag22aa`), `e2e/providers-order.spec.ts`, `e2e/design-rules-guidelines.spec.ts` |
+| W3C WCAG 2.2 AA (`target-size`, `focus`, dragging, `error`, `labels`) | `foundation.md` (`A3`, `A8`–`A10`), `settings.md` | `e2e/a11y-axe.spec.ts`, `e2e/providers-order.spec.ts`, `e2e/design-rules-guidelines.spec.ts` |
 | Apple macOS HIG (window, menu, tray, notifications, offline) | `computers.md` (`V26`, `C45`) | `test/ui-guidelines-static.test.ts`, `apps/desktop/scripts/app-menu.test.mjs` |
 | W3C `clreq` & Chinese Copywriting Guidelines (`T1`, `T7`) | `foundation.md`, `apps/web/src/i18n/en.ts` | `test/ui-guidelines-static.test.ts`, `test/unslop-signs.test.ts` |
 | Emil Kowalski & Jakub Krehel craft skills | `motion.md` (`V24`), `apps/web/src/` | `e2e/design-rules-measure.spec.ts` |

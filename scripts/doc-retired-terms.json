@@ -107,6 +107,24 @@
       "pattern": "\\b(?:info-card-runner|info-card-guard|info-card-tools|info-repo-snapshot|infoCardPlan|infoCardTodoOf|closeInfoCardTab|INFO_HOST_SUBMIT_REPORT_DEF)\\b",
       "canary": "info-card-runner",
       "reason": "the dedicated info-card execution pipeline was retired; scheduled work runs directly in Coordinator threads or ordinary tasks"
+    },
+    {
+      "id": "rule-ab-doc",
+      "pattern": "\\brule-ab\\.md\\b",
+      "canary": "docs/design/rule-ab.md",
+      "reason": "docs/design/rule-ab.md was retired; rules enter from real audit findings or measured values and stay only while they change output"
+    },
+    {
+      "id": "base-ui-theme-spec",
+      "pattern": "\\bbase-ui-theme\\.md\\b",
+      "canary": "docs/spec/base-ui-theme.md",
+      "reason": "docs/spec/base-ui-theme.md was a superseded 2026-10-04 Herdr-purple draft and was retired; current tokens live in apps/web/DESIGN.md and docs/design/surfaces/foundation.md"
+    },
+    {
+      "id": "retired-design-rule-skills",
+      "pattern": "\\bcairn-(?:a11y|copy|motion|motion-audit|polish|type)\\b",
+      "canary": "cairn-polish",
+      "reason": "domain design-rule wrapper skills were folded into apps/web/DESIGN.md, docs/design/surfaces/*.md and cairn-design-review"
     }
   ],
   "baseline": {
@@ -134,8 +152,7 @@
       "docs/spec/22-color-and-geometry-token-scale-canonical-table.md": 4,
       "docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md": 5,
       "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 28,
-      "docs/spec/29-evaluation-and-data-loop.md": 7,
-      "docs/spec/base-ui-theme.md": 4
+      "docs/spec/29-evaluation-and-data-loop.md": 7
     },
     "pr-evidence-gate": {
       ".claude/skills/verify-merge-gate/SKILL.md": 1,
@@ -156,7 +173,11 @@
     "hash-task-picker": {},
     "one-page-design": {},
     "eval-weekly-workflow": {},
+    "plan-verification-rule": {},
     "coordinator-in-server-env": {},
-    "info-card-pipeline": {}
+    "info-card-pipeline": {},
+    "rule-ab-doc": {},
+    "base-ui-theme-spec": {},
+    "retired-design-rule-skills": {}
   }
 }

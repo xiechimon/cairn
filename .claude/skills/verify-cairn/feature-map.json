@@ -2447,7 +2447,7 @@
       "frontendDesign": [
         "docs/design/claude-ai-spec.md",
         "docs/design/references/settings",
-        "docs/spec/base-ui-theme.md"
+        "apps/web/DESIGN.md"
       ],
       "backendDesign": {
         "na": "a client setting with no server state"

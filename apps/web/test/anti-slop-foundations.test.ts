@@ -131,6 +131,15 @@ describe('the rule index carries the anti-slop rules', () => {
     },
   );
 
+  test.each(['V4', 'T8', 'V5', 'V3', 'V8', 'V33', 'C3', 'C48', 'P7'])(
+    '%s converged owner principle is registered with a valid check',
+    (id) => {
+      const row = rules.split('\n').find((line) => line.startsWith(`| ${id} |`));
+      expect(row).toBeDefined();
+      expect(row).toMatch(/\| (M|G|H)/);
+    },
+  );
+
   test('V3 and V16 grant the user bubble no gradient exception', () => {
     for (const id of ['V3', 'V16']) {
       const row = rules.split('\n').find((line) => line.startsWith(`| ${id} |`));

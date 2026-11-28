@@ -1,3 +1,3 @@
 # Cairn web
 
-UI work follows `apps/web/DESIGN.md` (tokens, the which-component table, the process rules). Design rule rows live in the `## Rules` section of each `docs/design/surfaces/*.md`; before editing under `src/`, run `node scripts/design-rules-for.mjs <the paths you will touch>` from the repo root and keep the printed rows. Harnesses with the `design-cairn` skill invoke it first.
+UI work starts at `apps/web/DESIGN.md` (tokens, surface & reference map, component table, process rules), `/design.html` (living style guide), and `.claude/skills/design-cairn/SKILL.md` (build workflow). Before editing under `src/`, run `node scripts/design-rules-for.mjs <the paths you will touch>` from the repo root to print all applicable rules from `DESIGN.md` and `docs/design/surfaces/*.md`.

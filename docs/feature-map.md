@@ -463,7 +463,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **Appearance and visual system** (shipped). Theme, type and the visual language every page follows.
 
 - Research: [docs/research/ai-frontend-quality-2026-11-06.md](research/ai-frontend-quality-2026-11-06.md) (not on main), [docs/research/serif-typography-2026-11-08.md](research/serif-typography-2026-11-08.md) (not on main)
-- Frontend design: [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/references/settings](design/references/settings), [docs/spec/base-ui-theme.md](spec/base-ui-theme.md)
+- Frontend design: [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/references/settings](design/references/settings), [apps/web/DESIGN.md](../apps/web/DESIGN.md)
 - Backend design: n/a: a client setting with no server state
 
 ### attachments
