@@ -27,6 +27,24 @@ test('macOS release jobs use fast Deflate', () => {
   }
 });
 
+test('a push to main runs the desktop unit tests and leaves packaging to the release', () => {
+  const mac = parse(
+    readFileSync(new URL('../.github/workflows/desktop-mac.yml', import.meta.url), 'utf8'),
+  );
+  const runs = (job) => job.steps.map((step) => step.run ?? '').join('\n');
+  assert.equal(mac.jobs['unit-tests'].if, undefined);
+  assert.match(runs(mac.jobs['unit-tests']), /node --test apps\/desktop\/scripts\//);
+  assert.match(runs(mac.jobs['unit-tests']), /seatbelt-tls\.test\.ts/);
+  assert.equal(mac.jobs.package.if, "github.event_name != 'push'");
+  assert.match(runs(mac.jobs.package), /packaged-journey\.mjs/);
+  const releaseRuns = Object.values(workflow.jobs)
+    .flatMap((job) => job.steps ?? [])
+    .map((step) => step.run ?? '')
+    .join('\n');
+  assert.match(releaseRuns, /packaged-journey\.mjs/);
+  assert.match(releaseRuns, /scripts\/smoke-mac\.mjs/);
+});
+
 const finalize = parse(
   readFileSync(
     new URL('../.github/workflows/desktop-release-finalize.yml', import.meta.url),

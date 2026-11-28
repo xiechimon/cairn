@@ -179,7 +179,7 @@ test('efficiency & safety invariant: failed-only rerun binds to exact sha/run/at
     'composite save action must not guard itself with if: failure() because caller step owns failure condition',
   );
   const mac = read('.github/workflows/desktop-mac.yml');
-  for (const jobName of ['update-signature', 'package']) {
+  for (const jobName of ['update-signature', 'unit-tests', 'package']) {
     const block = mac.split(`\n  ${jobName}:`)[1]?.split(/\n {2}[a-z][\w-]*:/)[0] ?? '';
     assert.match(
       block,
