@@ -60,6 +60,7 @@ import {
   enabledDevinSubscriptionModels,
   hasActiveDevinSubscription,
 } from './devin-subscriptions.js';
+import { stepRuntimeFor } from './dispatch-eligibility.js';
 import { activeDoubaoSource, DEFAULT_DOUBAO_FALLBACK_MODELS } from './doubao-subscriptions.js';
 import { getModelLiveness } from './model-liveness.js';
 import {
@@ -502,11 +503,26 @@ export function getModelSources(deps: CatalogDeps, teamId: string): ModelSources
 export function taskModelCandidates(deps: CatalogDeps, teamId: string) {
   const claudeActive = hasActiveClaudeSubscription(deps, teamId);
   const devinActive = hasActiveDevinSubscription(deps, teamId);
-  const antigravityActive = activeAntigravitySource(deps.db, teamId).kind !== 'none';
+  const antigravity = activeAntigravitySource(deps.db, teamId);
+  const antigravityActive = antigravity.kind !== 'none';
   const seen = new Set<string>();
   const rows: { provider: string; providerLabel: string; modelId: string; modelName: string }[] =
     [];
-  for (const source of getModelSources(deps, teamId).sources) {
+  const sources: Pick<ModelSource, 'runtime' | 'provider' | 'providerLabel' | 'models'>[] =
+    getModelSources(deps, teamId).sources;
+  if (antigravity.kind === 'host' && antigravity.login.status !== 'ok') {
+    sources.push({
+      runtime: 'antigravity',
+      models: antigravity.models,
+    });
+  }
+  for (const source of sources) {
+    if (
+      source.runtime === 'pi' &&
+      source.provider !== undefined &&
+      stepRuntimeFor(source.provider) !== 'pi'
+    )
+      continue;
     if (source.runtime === 'claude-code' && !claudeActive) continue;
     if (source.runtime === 'devin' && !devinActive) continue;
     if (source.runtime === 'antigravity' && !antigravityActive) continue;

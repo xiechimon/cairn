@@ -4,9 +4,9 @@
 
 After installing Cairn, a newcomer can ask in the same chat where they start work: “Run a read-only task with Doubao Auto on my Mac mini” or “Switch to dark appearance.” They need an enabled model source and a runner capable of using it, but no additional account, payment or key for settings chat. A one-time model pick does not change their defaults or favorites. A successful settings edit shows what changed and **Undo** in the conversation, even after reload. A protected request shows **Open Settings** for the corresponding page. Nothing sensitive is handled in chat. Invalid input leaves Settings unchanged and says what to correct.
 
-> Agent不能自己操控自己的设置。。。我觉得我的coordinator应该有自己的设置的所有权限吧？我们是AI native，除了极个别的
+> An agent cannot control its own settings… I think my Coordinator should have full access to its own settings. We are AI-native, with very few exceptions.
 
-Owner decision (November 28; original quotation, not product copy): broaden control over Settings, with narrowly defined exceptions. [Inventory and root cause](../research/coordinator-settings-2026-11-28.md): task creation currently mistakes a shortlist for authorization, and the tool contract repeats that mistake.
+Owner decision (November 28; translated from the original chat): broaden control over Settings, with narrowly defined exceptions. [Inventory and root cause](../research/coordinator-settings-2026-11-28.md): task creation currently mistakes a shortlist for authorization, and the tool contract repeats that mistake.
 
 ## Scope
 
@@ -41,8 +41,9 @@ In the existing Coordinator transcript, reuse its action-card treatment (plain l
 ## Review
 
 - Verdict: PASS
-- Plan-SHA256: a835c98eea8b4b21ac1e3fef3d4b53ba0ad9ef402ee2bec52cfecffb8ff27a09
+- Fix-check: PASS
+- Plan-SHA256: cb65853cf1afd3cf15f7daa207714159d7a12d9f2e6ca934fc9489a1a2700497
 - Author-Model: openai-codex/gpt-6.2-sol
 - Reviewer: independent Pi plan review
 - Reviewer-Model: anthropic/claude-sonnet-5-5
-- Findings: eight high-effort findings addressed or explicitly scoped to later slices; one low-effort confirm-only pass approves only the model-selection slice.
+- Findings: eight high-effort findings addressed or explicitly scoped to later slices; the confirm-only checks approve only the model-selection slice and verify that the English translation does not change its scope.

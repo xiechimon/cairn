@@ -157,11 +157,7 @@ export function FrequentModelsCard({
     <SettingsSection
       testId="frequent-models"
       title={t('常用模型')}
-      {...(models.length > 0
-        ? {
-            info: t('Coordinator 派活时按任务难度从这里挑一个。'),
-          }
-        : {})}
+      {...(models.length > 0 ? { info: t('可在聊天中为任务点名已接入的模型。') } : {})}
       action={
         <FilterPicker
           options={addable.map((o) => {
@@ -210,8 +206,8 @@ export function FrequentModelsCard({
             className={cn(SETTINGS_ROW_CLS, 'm-0 text-meta text-pretty text-content-tertiary')}
           >
             {addable.length === 0
-              ? t('暂无常用模型。先接入服务商，再返回添加。')
-              : t('暂无常用模型，所有任务都使用 Coordinator 的模型。')}
+              ? t('暂无可添加的模型。')
+              : t('暂无常用模型，任务默认使用 Coordinator 的模型。')}
           </p>
         ) : models.length === 1 ? (
           models.map((model, index) => (

@@ -1,16 +1,21 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { routingRule, todo as todoTable } from '../src/db/schema.js';
+import {
+  antigravitySubscription,
+  machine,
+  routingRule,
+  todo as todoTable,
+} from '../src/db/schema.js';
+import {
+  createDoubaoSubscription,
+  disableDoubaoSubscription,
+} from '../src/services/doubao-subscriptions.js';
+import { createProvider, getModelSources } from '../src/services/providers.js';
 import {
   listRoutingSettings,
   profileForStep,
   routeForStep,
 } from '../src/services/routing-rules.js';
-import {
-  createDoubaoSubscription,
-  disableDoubaoSubscription,
-} from '../src/services/doubao-subscriptions.js';
-import { createProvider } from '../src/services/providers.js';
 import { readTopModels, writeTopModels } from '../src/services/top-models.js';
 import {
   AGENT2_ID,
@@ -99,6 +104,73 @@ describe('the Coordinator picks a task model from the configured models', () => 
     expect(readTopModels(H.s.db, H.teamId)).toEqual(favorites);
   });
 
+  test('a host Antigravity account retains configured models after runner logout', async () => {
+    const machineId = insertMachine(H.s, {
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        executor: 'host',
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [{ id: 'host-model', name: 'Host model' }],
+        },
+      },
+    });
+    const now = Date.now();
+    H.s.db
+      .insert(antigravitySubscription)
+      .values({
+        id: 'host-sub',
+        teamId: H.teamId,
+        label: 'Host',
+        runnerId: machineId,
+        tokenCipher: null,
+        enabledAt: now,
+        createdAt: now,
+        models: [{ id: 'host-model', name: 'Host model' }],
+      })
+      .run();
+    H.s.db.update(machine).set({ online: true }).where(eq(machine.id, machineId)).run();
+    expect(
+      getModelSources({ db: H.s.db }, H.teamId).sources.some(
+        (source) => source.runtime === 'antigravity',
+      ),
+    ).toBe(true);
+    H.s.db
+      .update(machine)
+      .set({
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          executor: 'host',
+          antigravity: { installed: true, authenticated: false, models: [] },
+        },
+      })
+      .where(eq(machine.id, machineId))
+      .run();
+    expect(
+      getModelSources({ db: H.s.db }, H.teamId).sources.some(
+        (source) => source.runtime === 'antigravity',
+      ),
+    ).toBe(false);
+    const rows = (await relay('models', {})) as { provider: string; modelId: string }[];
+    expect(JSON.stringify(rows)).not.toContain('tokenCipher');
+    expect(rows).toContainEqual(
+      expect.objectContaining({ provider: 'antigravity', modelId: 'host-model' }),
+    );
+    const created = (await relay('create_todo', {
+      ...ownerTodo('写文档'),
+      machine: machineId,
+      model: 'antigravity/host-model',
+    })) as { id: string };
+    expect(todoRow(created.id).request?.model).toEqual({
+      provider: 'antigravity',
+      modelId: 'host-model',
+      thinkingLevel: null,
+    });
+  });
+
   test('create_todo with a frequent model stores it on the request and every session step runs it', async () => {
     provider('stub-gw', 'fast-model');
     provider('strong-gw', 'deep-model');
@@ -154,8 +226,24 @@ describe('the Coordinator picks a task model from the configured models', () => 
     frequent({ provider: 'stub-gw', modelId: 'fast-model' });
     await expect(
       relay('create_todo', { ...ownerTodo('写文档'), model: 'other-model' }),
-    ).rejects.toThrow(/other-model/);
+    ).rejects.toThrow(/model other-model is not a configured model/);
     expect(H.s.db.select().from(todoTable).all()).toEqual([]);
+  });
+
+  test('reserved runtimes are not offered as custom gateways, while Codex remains routable through pi', async () => {
+    for (const id of ['claude-code', 'gemini', 'devin', 'antigravity', 'doubao', 'openai-codex']) {
+      provider(id, `${id}-custom-model`);
+    }
+    const rows = (await relay('models', {})) as { provider: string; modelId: string }[];
+    for (const id of ['claude-code', 'gemini', 'devin', 'antigravity', 'doubao']) {
+      expect(rows.some((row) => row.modelId === `${id}-custom-model`)).toBe(false);
+      await expect(
+        relay('create_todo', { ...ownerTodo('写文档'), model: `${id}/${id}-custom-model` }),
+      ).rejects.toThrow(/not a configured model/);
+    }
+    expect(rows).toContainEqual(
+      expect.objectContaining({ provider: 'openai-codex', modelId: 'openai-codex-custom-model' }),
+    );
   });
 
   test('configured providers with the same bare model are both discoverable; bare selection is ambiguous', async () => {
@@ -211,7 +299,7 @@ describe('the Coordinator picks a task model from the configured models', () => 
         machine: machineId,
         model: 'doubao/auto',
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/model doubao\/auto is not a configured model/);
     expect(H.s.db.select().from(todoTable).all()).toEqual([]);
   });
 

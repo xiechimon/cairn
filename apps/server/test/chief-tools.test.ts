@@ -7,7 +7,7 @@ import { antigravitySubscription, chiefMessage, machine, message } from '../src/
 import { HttpError } from '../src/lib/errors.js';
 import { nowMs } from '../src/lib/ids.js';
 import { H, registerChiefHarness, relay, seedMachineReport } from './chief-harness.js';
-import { req, startLegacyBuild } from './helpers.js';
+import { insertClaudeSubscription, req, startLegacyBuild } from './helpers.js';
 
 registerChiefHarness();
 
@@ -39,6 +39,7 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
       ],
     });
     expect(provRes.status).toBe(201);
+    insertClaudeSubscription(H.s);
     seedMachineReport('exec-1', {
       installed: true,
       hostname: 'exec-host-1',
@@ -54,8 +55,8 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
       modelName: string;
     }[];
     expect(rows).toEqual([
-      { provider: 'pi', providerLabel: 'pi', modelId: 'model-a', modelName: '模型甲' },
-      { provider: 'pi', providerLabel: 'pi', modelId: 'model-b', modelName: 'model-b' },
+      { provider: 'gw-a', providerLabel: '网关甲', modelId: 'model-a', modelName: '模型甲' },
+      { provider: 'gw-a', providerLabel: '网关甲', modelId: 'model-b', modelName: 'model-b' },
       {
         provider: 'claude-code',
         providerLabel: 'Claude Code',
@@ -74,6 +75,7 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
       models: [{ id: 'm-cc', name: '同名行' }],
     });
     expect(provRes.status).toBe(201);
+    insertClaudeSubscription(H.s);
     seedMachineReport('exec-1', {
       installed: true,
       hostname: 'exec-host-1',
@@ -86,7 +88,6 @@ describe('51-vocabulary relay execution surface (02 section 4.3)', () => {
       modelName: string;
     }[];
     expect(rows).toEqual([
-      { provider: 'pi', providerLabel: 'pi', modelId: 'm-cc', modelName: '同名行' },
       { provider: 'claude-code', providerLabel: 'Claude Code', modelId: 'm-cc', modelName: 'm-cc' },
     ]);
   });

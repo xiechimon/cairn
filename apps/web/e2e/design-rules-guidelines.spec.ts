@@ -74,7 +74,7 @@ test('C7: disabled controls sit beside clear explanatory context', async ({ page
   await page.goto('/app/settings/routing');
   await expect(page.getByTestId('frequent-models-add')).toBeDisabled();
   await expect(page.getByTestId('frequent-models-empty')).toHaveText(
-    '暂无常用模型。先接入服务商，再返回添加。',
+    '暂无可添加的模型。',
   );
 });
 
