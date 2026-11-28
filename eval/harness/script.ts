@@ -16,7 +16,36 @@ export const STUB_PROVIDER_ID = 'stub';
 export const STUB_MODEL_ID = 'm';
 const STUB_KEY = 'stub-key';
 
+export interface BrokeredModel {
+  providerId: string;
+  label: string;
+  baseUrl: string;
+  api: 'openai-completions' | 'openai-responses' | 'anthropic-messages';
+  apiKey: string;
+  modelId: string;
+}
+
+function seedCoordinatorRoute(
+  s: TestServer,
+  teamId: string,
+  route: { providerId: string; modelId: string },
+): void {
+  s.db
+    .insert(routingRule)
+    .values({
+      id: 'rule-coordinator',
+      teamId,
+      use: 'coordinator',
+      provider: route.providerId,
+      modelId: route.modelId,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    .run();
+}
+
 export function seedStubRoute(s: TestServer, teamId: string): void {
+  seedCoordinatorRoute(s, teamId, { providerId: STUB_PROVIDER_ID, modelId: STUB_MODEL_ID });
   createProvider(
     { db: s.db, box: s.secretBox },
     {
@@ -32,18 +61,47 @@ export function seedStubRoute(s: TestServer, teamId: string): void {
       createdBy: s.user.id,
     },
   );
-  s.db
-    .insert(routingRule)
-    .values({
-      id: 'rule-coordinator',
+}
+
+/**
+ * One approved model endpoint, registered from the harness's own environment
+ * so the arm never reads a key from a candidate or a checked-in file.
+ */
+export function seedBrokeredRoute(s: TestServer, teamId: string, model: BrokeredModel): void {
+  seedCoordinatorRoute(s, teamId, { providerId: model.providerId, modelId: model.modelId });
+  createProvider(
+    { db: s.db, box: s.secretBox },
+    {
       teamId,
-      use: 'coordinator',
-      provider: STUB_PROVIDER_ID,
-      modelId: STUB_MODEL_ID,
-      createdAt: 1,
-      updatedAt: 1,
-    })
-    .run();
+      body: {
+        providerId: model.providerId,
+        label: model.label,
+        baseUrl: model.baseUrl,
+        api: model.api,
+        apiKey: model.apiKey,
+        models: [{ id: model.modelId, name: model.modelId }],
+      },
+      createdBy: s.user.id,
+    },
+  );
+}
+
+export function brokeredModelFromEnv(env: NodeJS.ProcessEnv = process.env): BrokeredModel | null {
+  const baseUrl = env.EVAL_ARM_BASE_URL?.trim() ?? '';
+  const apiKey = env.EVAL_ARM_API_KEY?.trim() ?? '';
+  const modelId = env.EVAL_ARM_MODEL?.trim() ?? '';
+  if (baseUrl === '' || apiKey === '' || modelId === '') return null;
+  const api = env.EVAL_ARM_API?.trim() ?? 'openai-completions';
+  if (api !== 'openai-completions' && api !== 'openai-responses' && api !== 'anthropic-messages')
+    throw new Error(`eval: unsupported EVAL_ARM_API ${api}`);
+  return {
+    providerId: env.EVAL_ARM_PROVIDER?.trim() || 'arm',
+    label: 'Arm model',
+    baseUrl,
+    api,
+    apiKey,
+    modelId,
+  };
 }
 
 export async function seedProjects(
