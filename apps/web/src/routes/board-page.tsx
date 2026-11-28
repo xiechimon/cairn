@@ -343,6 +343,7 @@ export function BoardPage() {
                 todos={todos}
                 now={now}
                 projectId={homeProjectName === null ? null : homeProjectId}
+                draftProjectId={homeProjectId}
                 projectName={homeProjectName}
                 banner={homeBanner}
                 machines={machines}

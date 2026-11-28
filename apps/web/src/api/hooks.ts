@@ -1156,6 +1156,8 @@ export const useSkillImportCandidates = (teamId: string | undefined, enabled: bo
       api.get<SkillImportCandidatesResponse>(`/api/teams/${teamId}/skills/import-candidates`),
     enabled: enabled && teamId !== undefined,
     retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
 export const useSkillFile = (
