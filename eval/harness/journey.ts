@@ -44,7 +44,7 @@ const ACCEPTANCE_BLOCK_PREFIX = 'acceptance-blocked-';
  * arm; the others are negative controls that must turn the case red although
  * the patch, the claim and the report all look right in isolation.
  */
-export type JourneyArm = 'none' | 'nopatch' | 'unsent';
+export type JourneyArm = 'none' | 'nopatch' | 'unsent' | 'cheat';
 
 export interface JourneyOptions {
   /** Git checkout that holds the case's parent and fix commits. */
@@ -112,6 +112,18 @@ function applyFixPatch(
     }
     writeBlob(repoRoot, task.source.fixCommit, file.path, workDir);
     written.push(file.path);
+  }
+  return written;
+}
+
+/** A runner that "fixes" the exam instead of the product: the grader must ignore it. */
+function writeTrivialTests(workDir: string, hidden: ReadonlySet<string>): string[] {
+  const written: string[] = [];
+  for (const path of hidden) {
+    const target = join(workDir, path);
+    spawnSync('mkdir', ['-p', join(target, '..')]);
+    writeFileSync(target, "import { test } from 'node:test';\ntest('ok', () => {});\n");
+    written.push(path);
   }
   return written;
 }
@@ -262,7 +274,12 @@ export async function runJourneyTask(
 
     materializeCommitTree(options.repoRoot, task.source.parentCommit, workDir);
     const baseline = initBaselineRepo(workDir);
-    const written = arm === 'nopatch' ? [] : applyFixPatch(options.repoRoot, task, workDir, hidden);
+    const written =
+      arm === 'nopatch'
+        ? []
+        : arm === 'cheat'
+          ? writeTrivialTests(workDir, hidden)
+          : applyFixPatch(options.repoRoot, task, workDir, hidden);
     journey.changedFiles = written;
     journey.fileChecks = task.checks.files.map((check) => {
       const path = join(workDir, check.path);

@@ -135,6 +135,20 @@ describe('cairn journey arm', () => {
   );
 
   test(
+    'a runner that rewrites the hidden test cannot turn the case green',
+    { timeout: 120_000 },
+    async () => {
+      const result = await runJourneyTask(caseFor(fixture), {
+        repoRoot: fixture.repoRoot,
+        arm: 'cheat',
+      });
+      const checks = scoreJourney(caseFor(fixture), result.record);
+      expect(result.record.journey?.delivered).toBe(true);
+      expect(checks.find((c) => c.name === 'journey.tests_pass')?.value).toBe(0);
+    },
+  );
+
+  test(
     'a coordinator that answers instead of dispatching never claims a step',
     { timeout: 120_000 },
     async () => {
