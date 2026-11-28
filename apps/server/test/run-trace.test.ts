@@ -412,6 +412,24 @@ describe('run trace', () => {
     );
   });
 
+  test('a reply or thought that starts with blank lines reads without the leading gap', async () => {
+    seedTurns();
+    H.s.db
+      .insert(chiefMessage)
+      .values(
+        chiefRow('msg-turn-a-gap', T0 + 400, 'assistant', [
+          { type: 'thinking', thinking: '\n\n先想一下' },
+          { type: 'text', text: '\n\n无法直接执行。\n' },
+        ]),
+      )
+      .run();
+    const page = await getJson<RunTrace>(`/api/teams/${H.teamId}/runs/turn-a`);
+    const texts = page.items
+      .filter((i) => i.id.startsWith('msg-turn-a-gap'))
+      .map((i) => (i.kind === 'reply' || i.kind === 'thinking' ? i.text : null));
+    expect(texts).toEqual(['先想一下', '无法直接执行。']);
+  });
+
   test('export downloads the same run as a JSON file', async () => {
     seedTurns();
     const res = await H.s.app.request(`/api/teams/${H.teamId}/runs/turn-b?download=1`);

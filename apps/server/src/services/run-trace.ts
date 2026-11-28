@@ -99,9 +99,9 @@ function assistantItems(row: Row, cap: boolean): RunTraceItem[] {
       typeof block.thinking === 'string' &&
       block.thinking.trim() !== ''
     )
-      return [{ kind: 'thinking', id, at: row.createdAt, text: block.thinking }];
+      return [{ kind: 'thinking', id, at: row.createdAt, text: block.thinking.trim() }];
     if (block?.type === 'text' && typeof block.text === 'string' && block.text.trim() !== '')
-      return [{ kind: 'reply', id, at: row.createdAt, text: block.text }];
+      return [{ kind: 'reply', id, at: row.createdAt, text: block.text.trim() }];
     return [];
   });
 }
