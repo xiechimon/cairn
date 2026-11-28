@@ -7,6 +7,7 @@ import { journeyPassed } from '../scorers/journey-checks.js';
 import { runJourneyTask, type JourneyArm } from './journey.js';
 import { decide, discordance, powerAt, type Decision, type Pair } from './paired.js';
 import { ReservationLedger } from './reserve.js';
+import { writeScorecard } from './scorecard.js';
 import { brokeredModelFromEnv, type BrokeredModel } from './script.js';
 import type { JourneyTask, ScriptStep } from './types.js';
 
@@ -315,8 +316,12 @@ function arg(name: string): string | undefined {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const out = arg('out') ?? join('eval', 'pilot-result.json');
+  const card = arg('scorecard');
   const result = await runPilot();
   mkdirSync(dirname(resolve(out)), { recursive: true });
   writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
-  console.log(`pilot: ${result.mode}, ${result.starts} starts, ${result.cases} cases -> ${out}`);
+  if (card !== undefined) writeScorecard(card, result);
+  console.log(
+    `pilot: ${result.mode}, ${result.starts} starts, ${result.cases} cases -> ${out}${card === undefined ? '' : ` + ${card}`}`,
+  );
 }
