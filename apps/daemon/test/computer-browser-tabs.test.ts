@@ -85,6 +85,14 @@ describe('one browser tab per scope', () => {
     await expect(
       runBrowserTool(provider, 'browser_act', { actions: [{ kind: 'click' }] }, run('invalid-act')),
     ).rejects.toMatchObject({ delivery: 'not_delivered' });
+    await expect(
+      runBrowserTool(
+        provider,
+        'browser_act',
+        { actions: [{ kind: 'click', ref: 'not a ref' }] },
+        run('invalid-act'),
+      ),
+    ).rejects.toMatchObject({ delivery: 'not_delivered' });
     expect(tabs).toHaveLength(1);
   });
 

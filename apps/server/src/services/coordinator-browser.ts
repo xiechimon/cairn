@@ -61,6 +61,7 @@ export function lastBrowserProducer(
   const rows = db
     .select({
       machineId: computerCall.machineId,
+      errorDelivery: computerCall.errorDelivery,
       computerId: computerCall.computerId,
       phoneId: computerCall.phoneId,
       params: computerCall.params,

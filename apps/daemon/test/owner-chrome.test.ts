@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  classifyOwnerChromeAnswer,
   type OwnerChromeAnswer,
   type OwnerChromeCaller,
   OwnerChromeUnavailable,
@@ -443,6 +444,42 @@ describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
     const outcome = await runOwnerChromeTool(
       'browser_act',
       { actions: [{ kind: 'type', ref: '@e7', text: 'hello' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('not_delivered');
+  });
+
+  test('page-controlled dialog text cannot impersonate Browser MCP extension state', () => {
+    for (const marker of [
+      'No browser is connected',
+      'The user paused Browser MCP',
+      "Click Allow in the Browser MCP extension's popup",
+    ]) {
+      expect(
+        classifyOwnerChromeAnswer({
+          text: `✗ step 1: click e7 — alert dialog ${JSON.stringify(marker)} is open. Answer it with \`dialog accept\` or \`dialog dismiss\` first`,
+          isError: true,
+        }),
+      ).toBe('failed');
+    }
+  });
+
+  test('a stale snapshot ref failed before the action and is safe to repeat', async () => {
+    const { call } = recording((commands) =>
+      commands[0] === 'click e7'
+        ? {
+            text: "✗ step 1: click e7 — Ref e7 isn't on the page anymore. Run `snapshot -i` or use a locator",
+            isError: true,
+          }
+        : '✓',
+    );
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'click', ref: '@e7' }] },
       options(call),
     ).then(
       () => null,

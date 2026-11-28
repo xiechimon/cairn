@@ -29,7 +29,7 @@ const MUTATING_COMMAND = /^(goto|click|fill|type|press|hover|select|check|unchec
 const SUCCESSFUL_MUTATING_LINE =
   /^✓ (?:goto|click|fill|type|press|hover|select|check|uncheck|scroll)\b/m;
 const SAFE_UNRUN_MUTATION_LINE =
-  /^✗ step \d+: .*?(?:Nothing matches|isn['’]t visible|is not visible|is disabled|is covered by|isn['’]t a checkbox|Nothing is focused|isn['’]t editable|is not editable|No option of .* matches|can't take clicks)/im;
+  /^✗ step \d+: .*?(?:Ref \S+ isn't on the page anymore|Nothing matches|isn['’]t visible|is not visible|is disabled|is covered by|isn['’]t a checkbox|Nothing is focused|isn['’]t editable|is not editable|No option of .* matches|can't take clicks)/im;
 
 const PAGE_TEXT_TRUNCATED =
   '\n[page text truncated here; the rest of the page is not shown. Call browser_snapshot with selector (a CSS selector or an @ref) to read one section in full]';
@@ -65,6 +65,12 @@ function machineAnswerText(text: string): string {
   return text
     .split('\n')
     .filter((line) => !line.startsWith('Page: '))
+    .map((line) =>
+      line.replace(
+        /(alert|confirm|prompt|beforeunload) dialog "(?:\\.|[^"])*" is open/g,
+        '$1 dialog is open',
+      ),
+    )
     .join('\n');
 }
 

@@ -425,6 +425,8 @@ async function collectExecute(
 }
 
 function actionArgv(action: z.infer<typeof actActionSchema>): string[] {
+  if (action.ref !== undefined && !/^[a-zA-Z0-9_-]+$/.test(action.ref.replace(/^@/, '')))
+    throw new ComputerRefusal(`browser_act ${action.kind} needs a ref from browser_snapshot`);
   const ref = action.ref !== undefined ? normalizeRef(action.ref) : undefined;
   switch (action.kind) {
     case 'click':

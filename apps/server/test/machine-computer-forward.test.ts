@@ -1498,6 +1498,94 @@ describe('browser calls on Macs', () => {
     expect(mini).toHaveLength(1);
   });
 
+  test('an uncertain Cairn-browser navigation does not move follow-ups to another machine', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true });
+    addMac(s, 'air', { browser: true });
+    const mini = connect(s, 'mini');
+    const air = connect(s, 'air');
+    const opened = navigate(deps, 'uncertain-cairn-navigation');
+    opened.catch(() => {});
+    failUnknown(s, 'mini', await next(mini, 1), 'Timed out after 45 s; the step was abandoned');
+    await opened;
+    s.db
+      .update(machineTable)
+      .set({ capabilities: { mcpServers: [], skills: [] } })
+      .where(eq(machineTable.id, 'mini'))
+      .run();
+
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'browser_act',
+        toolCallId: 'after-uncertain-cairn-navigation',
+        params: { actions: [{ kind: 'press', text: 'Enter' }] },
+      }),
+    ).rejects.toThrow(/not connected|no browser ran/i);
+    expect(mini).toHaveLength(1);
+    expect(air).toEqual([]);
+  });
+
+  test('an uncertain Cairn-browser page pulls follow-ups back to its original machine', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true });
+    addMac(s, 'air', { browser: true });
+    const mini = connect(s, 'mini');
+    const air = connect(s, 'air');
+    const opened = navigate(deps, 'uncertain-cairn-original-machine');
+    opened.catch(() => {});
+    failUnknown(s, 'mini', await next(mini, 1), 'Timed out after 45 s; the step was abandoned');
+    await opened;
+    s.db
+      .update(computerTable)
+      .set({ machineId: 'air' })
+      .where(eq(computerTable.teamId, s.team.id))
+      .run();
+
+    const acting = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_act',
+      toolCallId: 'return-to-uncertain-cairn-machine',
+      params: { actions: [{ kind: 'press', text: 'Enter' }] },
+    });
+    acting.catch(() => {});
+    const followup = await next(mini, 2);
+    expect(followup.ownerChrome).toBeUndefined();
+    answer(s, 'mini', followup, 'pressed');
+    await acting;
+    expect(air).toEqual([]);
+  });
+
+  test('a cancelled Cairn-browser navigation still keeps follow-ups out of the owner’s Chrome', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    browserMcp(s);
+    const mini = connect(s, 'mini');
+    const opened = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_navigate',
+      toolCallId: 'cancelled-cairn-navigation',
+      params: { url: 'https://example.com', stealth: true },
+    });
+    opened.catch(() => {});
+    const first = await next(mini, 1);
+    expect(first.ownerChrome).toBeUndefined();
+    stopStepComputer(deps, 'step-a');
+    await opened;
+
+    const acting = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_act',
+      toolCallId: 'after-cancelled-cairn-navigation',
+      params: { actions: [{ kind: 'press', text: 'Enter' }] },
+    });
+    acting.catch(() => {});
+    const followup = await next(mini, 2);
+    expect(followup.ownerChrome).toBeUndefined();
+    answer(s, 'mini', followup, 'pressed');
+    await acting;
+  });
+
   test('after a navigate fell back to Cairn’s browser, browser_act stays in that browser', async () => {
     const { s, deps } = boot();
     addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });

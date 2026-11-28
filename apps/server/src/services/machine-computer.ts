@@ -334,7 +334,7 @@ export function receiveComputerFrames(
         .get();
       if (owner && owner.status !== 'claimed') {
         tx.update(computerCall)
-          .set({ state: 'cancelled' })
+          .set({ state: 'cancelled', errorDelivery: 'unknown' })
           .where(eq(computerCall.id, callId))
           .run();
         row.state = 'cancelled';
@@ -533,7 +533,7 @@ export function stopStepComputer(
     .all();
   if (open.length > 0) {
     db.update(computerCall)
-      .set({ state: 'cancelled' })
+      .set({ state: 'cancelled', errorDelivery: 'unknown' })
       .where(
         and(
           eq(computerCall.stepId, stepId),
@@ -596,13 +596,24 @@ function selectTarget(
   teamId: string,
   chiefId: string,
   tool: ComputerTool,
+  forceMachineId?: string,
 ): { machineId: string; computerId: string; scopeKey: string } {
   const { db, machineHub } = deps;
   const accepting = teamMachines(db, teamId).filter((row) => machineAcceptsTool(row, tool));
-  const live = accepting.find((row) => machineHub.isConnected(row.id));
+  const forced =
+    forceMachineId === undefined ? undefined : accepting.find((row) => row.id === forceMachineId);
+  const live = forced ?? accepting.find((row) => machineHub.isConnected(row.id));
 
   const scopeKey = `chief:${chiefId}`;
   const existing = db.select().from(computer).where(eq(computer.scopeKey, scopeKey)).get();
+  if (forceMachineId !== undefined) {
+    if (forced === undefined || !machineHub.isConnected(forced.id))
+      throw new HttpError(409, COMPUTER_NOT_CONNECTED);
+    if (existing && existing.machineId !== forced.id) {
+      movePin(db, existing, forced);
+      return { machineId: forced.id, computerId: existing.id, scopeKey };
+    }
+  }
   const pinned = existing && accepting.find((row) => row.id === existing.machineId);
   if (existing && pinned) {
     if (!machineHub.isConnected(existing.machineId)) {
@@ -1429,7 +1440,11 @@ export async function forwardComputerCall(
         computerId: null,
         hostTool: true,
       }).then((sent) => sent.result);
-    const target = selectTarget(deps, thread.teamId, thread.chiefId, tool);
+    const pinnedCairn =
+      followsCurrentPage && pageProducer?.ownerChrome === false
+        ? pageProducer.machineId
+        : undefined;
+    const target = selectTarget(deps, thread.teamId, thread.chiefId, tool, pinnedCairn);
     const authorized = authorizeSecretFills(deps, request, target.machineId, secretActions);
     if (authorized.kind === 'pending') return Promise.resolve({ text: authorized.text });
     return dispatchComputerCall(deps, request, {
