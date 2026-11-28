@@ -35,7 +35,7 @@ const CASE_FAMILIES = [
     file: 'src/slug.mjs',
     broken: "export const slug = (s) => s;\n",
     fixed: "export const slug = (s) => s.trim().toLowerCase().replace(/\\s+/g, '-');\n",
-    check: "replace(/\\\\s+/g, '-')",
+    check: "replace(/\\s+/g, '-')",
     test: [
       "import { test } from 'node:test';",
       "import assert from 'node:assert/strict';",
