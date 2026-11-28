@@ -26,7 +26,6 @@ import {
 import { Link, type NavigateFunction, type To, useLocation, useNavigate } from 'react-router';
 import { CoordinatorGlyph } from '../chief/chief-status-mark.js';
 import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
-import { BrandGlyph } from '../components/brand-glyph.js';
 import { Disclosure } from '../components/disclosure.js';
 import { FeedbackDialog } from '../components/feedback-dialog.js';
 import { createdHere, useArrivals } from '../components/growth.js';
@@ -52,6 +51,7 @@ import { SETTINGS_HREF } from '../settings/settings-href.js';
 import { DesktopUpdateButton } from './desktop-update.js';
 import { coordinatorSearch } from './open-composer.js';
 import { isArchivedProject } from './project-archive.js';
+import { SidebarAccount } from './sidebar-account.js';
 import {
   ProjectFilterMenu,
   SidebarArchivedProjectMenu,
@@ -652,13 +652,7 @@ export function BoardSidebar({
         className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
         <div className="flex min-w-0 flex-1 items-center">
-          <span
-            data-testid="sidebar-footer-brand"
-            className="sidebar-footer-brand hidden min-w-0 items-center gap-2 pl-2 text-foreground"
-          >
-            <BrandGlyph className={ICON} />
-            <span className="truncate voice-title text-brand">{BRAND.manifestName}</span>
-          </span>
+          <SidebarAccount />
         </div>
         <div className="flex flex-none items-center gap-0.5">
           <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />

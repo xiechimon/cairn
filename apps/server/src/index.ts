@@ -383,6 +383,8 @@ const app = createApp(
             issuer: config.clerkAuth.issuer,
             verify: createClerkVerifier(config.clerkAuth),
           },
+    cloudUrl: config.cloudUrl,
+    cloudPkceStates: new Map(),
     mcpConfigPath: config.mcpConfigPath,
     logger,
   },

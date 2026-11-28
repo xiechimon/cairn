@@ -85,7 +85,20 @@ describe('resident host and ownership lock', () => {
       expect(xml).toContain('<key>HOST</key>\n    <string>127.0.0.1</string>');
       expect(xml).not.toContain('0.0.0.0');
       expect(xml).toContain('<key>CAIRN_MANAGED_BY</key>\n    <string>launchd</string>');
+      expect(xml).toContain(
+        '<key>CAIRN_CLOUD_URL</key>\n    <string>https://cairn-cloud-portal.fly.dev</string>',
+      );
     }
+    const disabledPlist = buildResidentPlist({
+      homeDir: home,
+      executablePath: '/Applications/Cairn.app/Contents/MacOS/Cairn',
+      serverEntry: '/Applications/Cairn.app/Contents/Resources/server/dist/index.mjs',
+      cairnHome: join(home, '.cairn-server'),
+      port: 8787,
+      logDir: join(home, 'logs'),
+      cloudUrl: null,
+    });
+    expect(disabledPlist).not.toContain('CAIRN_CLOUD_URL');
     expect(calls.some((args) => args[0] === 'bootstrap')).toBe(true);
 
     await uninstallResidentHost({ homeDir: home, uid: 501, runLaunchctl });

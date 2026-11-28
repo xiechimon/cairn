@@ -422,6 +422,25 @@ Reach:
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
 
+### cloud-account
+
+**In-app Cairn Cloud account & billing** (shipped, centrality 2). Bottom-left sidebar account identity and upward popover (`SidebarAccount`): shows local user display name by default, connects via Clerk PKCE on Cairn Cloud to display Clerk avatar and name, launches hosted Creem subscription checkout and Customer Billing Portal, opens or switches to the ready Cloud workspace, links to local backup migration, and disconnects cleanly.
+
+States: Unlinked local display name, upward unlinked popover (Sign in / Account settings), linked Clerk avatar and display name (Free with Subscribe vs Active subscription with Billing Portal), Cloud workspace readiness and Open/Switch actions, offline reachable fallback, and signed-out reset.
+
+Reach:
+
+1. `open /app`
+2. `click testid:sidebar-account`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `cloud-account-settings`, `cloud-account-subtitle`, `cloud-billing-portal`, `cloud-migrate-data`, `cloud-open-workspace`, `cloud-sign-in`, `cloud-sign-out`, `cloud-subscribe`, `cloud-subscribed-badge`, `cloud-switch-local`, `cloud-workspace-status`, `sidebar-account`, `sidebar-account-popover`, `sidebar-archived-empty`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-feedback`, `sidebar-footer`, `sidebar-pinned`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
+- Research: n/a: the binding contract is docs/design/in-app-cloud-account.md and the owner-selected Direction 1 prototype
+- Frontend design: [docs/design/surfaces/sidebar.md](../../../docs/design/surfaces/sidebar.md)
+- Backend design: [docs/design/in-app-cloud-account.md](../../../docs/design/in-app-cloud-account.md)
+- Evidence: `apps/server/test/cloud-account.test.ts`, `apps/web/test/sidebar-account.test.ts`, `apps/web/e2e/desktop-update.spec.ts`, `apps/web/e2e/sidebar-visual.spec.ts`
+
 ### desktop-app
 
 **Desktop app** (planned, centrality 2). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
@@ -1052,7 +1071,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-empty`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-feedback`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-empty`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-feedback`, `sidebar-footer`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

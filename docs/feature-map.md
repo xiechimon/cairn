@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 56 |
-| status shipped | 46 |
+| Features | 57 |
+| status shipped | 47 |
 | status partial | 8 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 30 |
+| research, frontend design and backend design all present or not applicable | 31 |
 | Research gaps | 12 |
 | Frontend design gaps | 13 |
 | Backend design gaps | 17 |
@@ -49,6 +49,7 @@
 | [Thread PR panel and auto-fix](#thread-pr-panel) | 1 | shipped | yes | yes | yes |  |
 | [Thread transcript and work trace](#thread-transcript) | 1 | shipped | yes | yes | yes |  |
 | [Threads](#threads) | 1 | shipped | yes | yes | yes |  |
+| [In-app Cairn Cloud account & billing](#cloud-account) | 2 | shipped | n/a | yes | yes |  |
 | [Desktop app](#desktop-app) | 2 | planned | yes (not on main) | gap | gap | B6 |
 | [First run](#first-run) | 2 | shipped | yes (not on main) | yes | gap | B6 |
 | [Machine enrollment](#machine-enrollment) | 2 | shipped | yes | gap | gap | B5 |
@@ -354,6 +355,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: [docs/research/r12-save-and-start-behavior.md](research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
+
+### cloud-account
+
+**In-app Cairn Cloud account & billing** (shipped). Bottom-left sidebar account identity and upward popover (`SidebarAccount`): shows local user display name by default, connects via Clerk PKCE on Cairn Cloud to display Clerk avatar and name, launches hosted Creem subscription checkout and Customer Billing Portal, opens or switches to the ready Cloud workspace, links to local backup migration, and disconnects cleanly.
+
+- Research: n/a: the binding contract is docs/design/in-app-cloud-account.md and the owner-selected Direction 1 prototype
+- Frontend design: [docs/design/surfaces/sidebar.md](design/surfaces/sidebar.md)
+- Backend design: [docs/design/in-app-cloud-account.md](design/in-app-cloud-account.md)
 
 ### desktop-app
 

@@ -103,6 +103,9 @@ export function bootServer(
     ownerChannel?: AppContext['ownerChannel'];
     accessVerifier?: AppContext['accessVerifier'];
     clerkAuth?: AppContext['clerkAuth'];
+    cloudUrl?: AppContext['cloudUrl'];
+    cloudFetch?: AppContext['cloudFetch'];
+    cloudPkceStates?: AppContext['cloudPkceStates'];
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
     trustedProxies?: AppContext['trustedProxies'];
@@ -255,6 +258,9 @@ export function bootServer(
       ownerChannel: opts.ownerChannel,
       accessVerifier: opts.accessVerifier ?? null,
       clerkAuth: opts.clerkAuth ?? null,
+      ...(opts.cloudUrl !== undefined ? { cloudUrl: opts.cloudUrl } : {}),
+      ...(opts.cloudFetch !== undefined ? { cloudFetch: opts.cloudFetch } : {}),
+      ...(opts.cloudPkceStates !== undefined ? { cloudPkceStates: opts.cloudPkceStates } : {}),
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
       ...(opts.mcpFetch !== undefined ? { mcpFetch: opts.mcpFetch } : {}),
       ...(opts.composioFetch !== undefined ? { composioFetch: opts.composioFetch } : {}),

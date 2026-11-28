@@ -10,6 +10,7 @@ import { HttpError } from './lib/errors.js';
 import { limitApiRequestBody } from './lib/request-body-limit.js';
 import { registerTokenAuth } from './lib/token-auth.js';
 import { registerRoutes } from './routes.js';
+import { registerCloudRoutes } from './routes-cloud.js';
 import { registerMachineAuth, registerMachineRoutes } from './routes-machine.js';
 import { registerRemoteRoutes } from './routes-remote.js';
 import {
@@ -151,6 +152,7 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
   registerRoutes(app, ctx);
   registerMachineRoutes(app, ctx);
   registerRemoteRoutes(app, ctx);
+  registerCloudRoutes(app, ctx);
   if (ctx.webDir) registerStaticSpa(app, ctx.webDir);
 
   app.notFound((c) => c.json({ error: 'Not found' }, 404));

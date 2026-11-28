@@ -43,7 +43,7 @@ export interface LiveData {
   teamsQuery: { isError: boolean; isFetching: boolean; refetch: () => unknown } | undefined;
 }
 
-const LiveDataContext = createContext<LiveData>({
+export const LiveDataContext = createContext<LiveData>({
   live: false,
   teamId: undefined,
   userName: '我',

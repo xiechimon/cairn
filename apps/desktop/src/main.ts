@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
+  CLOUD_URL_ENV,
   createDesktopShellDescriptor,
   DESKTOP_SHELL_USER_AGENT,
   DESKTOP_TRAY_PATH,
@@ -31,6 +32,7 @@ import {
   PAGE_CAPTURE_RESULT,
   parseAccessTokenFile,
   type RemoteVersionState,
+  resolveDesktopCloudUrl,
   serverVersionResponseSchema,
 } from '@cairn/shared';
 import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
@@ -521,6 +523,13 @@ async function answerPageCapture(
   }
 }
 
+function resolvedDesktopCloudUrl(shellEnv: ShellEnvironmentPatch): string | null {
+  if (process.env[CLOUD_URL_ENV] !== undefined) {
+    return resolveDesktopCloudUrl(process.env);
+  }
+  return resolveDesktopCloudUrl(shellEnv);
+}
+
 function startServer(
   port: number,
   otelFile: string | null,
@@ -541,6 +550,12 @@ function startServer(
   );
   applyShellEnvironment(env, shellEnv, process.platform);
   env[SHELL_ENV_RESOLVED_VAR] = '1';
+  const cloudUrl = resolvedDesktopCloudUrl(shellEnv);
+  if (cloudUrl === null) {
+    delete env[CLOUD_URL_ENV];
+  } else {
+    env[CLOUD_URL_ENV] = cloudUrl;
+  }
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
   delete env[ENV_VARS.apiKey];
@@ -2235,6 +2250,7 @@ async function boot(): Promise<void> {
             serverEntry: join(bundledRoot('server'), 'dist', 'index.mjs'),
             cairnHome: cairnHome(),
             logDir: join(userData, 'logs'),
+            cloudUrl: resolvedDesktopCloudUrl(desktopShellEnv),
             versionChanged: bundleVersionChanged,
             updatedAt: residentUpdatedAt,
             probe: (home) => probeResidentServer(home),
@@ -2246,6 +2262,7 @@ async function boot(): Promise<void> {
                 serverEntry: join(bundledRoot('server'), 'dist', 'index.mjs'),
                 cairnHome: cairnHome(),
                 logDir: join(userData, 'logs'),
+                cloudUrl: resolvedDesktopCloudUrl(desktopShellEnv),
               }),
             kickstart: () => kickstartResidentHost({ homeDir: homedir() }),
           }).catch((error: unknown) => {
@@ -2529,6 +2546,7 @@ async function boot(): Promise<void> {
                 serverEntry: join(bundledRoot('server'), 'dist', 'index.mjs'),
                 cairnHome: cairnHome(),
                 logDir: join(userData, 'logs'),
+                cloudUrl: resolvedDesktopCloudUrl(desktopShellEnv),
               }),
             uninstall: () => uninstallResidentHost({ homeDir: homedir() }),
             waitForHealthy: () =>

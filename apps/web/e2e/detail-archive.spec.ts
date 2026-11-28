@@ -105,6 +105,17 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
       return route.fulfill({ json: { content: '', updatedAt: null } });
     const responses: Record<string, unknown> = {
       '/api/user/me': { id: 'user-archive', displayName: 'Owner', avatarUrl: null },
+      '/api/cloud/status': {
+        configured: false,
+        linked: false,
+        cloudReachable: true,
+        user: null,
+        subscribed: false,
+        hasBillingCustomer: false,
+        subscriptionStatus: null,
+        currentPeriodEnd: null,
+        workspace: null,
+      },
       '/api/teams': [
         { id: 'team-archive', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null },
       ],

@@ -396,6 +396,12 @@
       "type": "runner-device-field",
       "key": "machine.pendingTokenHash",
       "userScenario": "Nothing to set: holds the hashed replacement Runner token in SQLite during an online token rotation so a server restart between claim and ack recovers cleanly without split-brain credentials."
+    },
+    {
+      "type": "env",
+      "key": "CAIRN_CLOUD_URL",
+      "scope": "product",
+      "userScenario": "A Mac desktop user never sets it: the desktop app supplies the hosted Cairn Cloud URL automatically so signing in and subscribing work from the sidebar account popover, and self-hosted users can set off to hide cloud features."
     }
   ]
 }

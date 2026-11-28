@@ -27,6 +27,10 @@
     "coordinator-turn-failure": {
       "features": ["coordinator-chat", "run-log"],
       "modes": ["local-server", "remote-server"]
+    },
+    "cloud-account": {
+      "features": ["cloud-account"],
+      "modes": ["local-server", "remote-server"]
     }
   }
 }

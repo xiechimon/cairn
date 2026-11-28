@@ -115,6 +115,18 @@ export interface AppContext {
   ownerChannel?: OwnerChannel;
   accessVerifier?: AccessVerifier | null;
   clerkAuth?: ClerkAuthContext | null;
+  cloudUrl?: string | null;
+  cloudFetch?: typeof fetch;
+  cloudPkceStates?: Map<
+    string,
+    {
+      verifier: string;
+      returnTo: string;
+      origin: string;
+      shell: 'browser' | 'desktop';
+      createdAt: number;
+    }
+  >;
   mcpConfigPath: string;
   mcpFetch?: typeof fetch;
   composioFetch?: typeof fetch;

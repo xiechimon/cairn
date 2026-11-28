@@ -10,6 +10,7 @@ import {
   BRAND,
   CLAIM_POLL_INTERVAL_MS,
   CLAUDE_CONFIG_FILE_NAME,
+  CLOUD_URL_ENV,
   ENV_VARS,
   formatAccessTokenFile,
   parseAccessTokenFile,
@@ -65,6 +66,25 @@ export const serverConfigSchema = z.object({
       );
     })
     .transform((value) => new URL(value).origin),
+  cloudUrl: z
+    .string()
+    .url()
+    .refine((value) => {
+      const url = new URL(value);
+      const loopbackHttp =
+        url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+      return (
+        (url.protocol === 'https:' || loopbackHttp) &&
+        url.username === '' &&
+        url.password === '' &&
+        url.pathname === '/' &&
+        url.search === '' &&
+        url.hash === ''
+      );
+    })
+    .transform((value) => new URL(value).origin)
+    .nullable()
+    .default(null),
   apns: z.object({
     keyPath: z.string().nullable(),
     keyId: z.string().nullable(),
@@ -340,6 +360,12 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
   }
   const githubAppTokenSocket = envStr('CAIRN_APP_TOKEN_SOCKET');
   const explicitWebOrigin = envStr('CAIRN_WEB_ORIGIN');
+  const rawCloudUrl = envStr(CLOUD_URL_ENV);
+  const disabledCloudValues = new Set(['off', 'false', 'none', '0']);
+  const explicitCloudUrl =
+    rawCloudUrl === null || disabledCloudValues.has(rawCloudUrl.trim().toLowerCase())
+      ? null
+      : rawCloudUrl.trim();
   return serverConfigSchema.parse({
     port: envPort() ?? 8787,
     homeDir: home,
@@ -350,6 +376,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     vapidKeysPath: join(dataDir, 'vapid.json'),
     vapidSubject: envStr('CAIRN_VAPID_SUBJECT') ?? 'mailto:push@cairn.dev',
     webOrigin: explicitWebOrigin ?? 'https://cairn.local',
+    cloudUrl: explicitCloudUrl,
     apns: {
       keyPath: envStr('CAIRN_APNS_KEY_PATH'),
       keyId: envStr('CAIRN_APNS_KEY_ID'),

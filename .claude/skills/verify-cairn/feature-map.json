@@ -2912,6 +2912,58 @@
         "apps/server/test/mail-imap.test.ts",
         "apps/server/test/mail-connector.test.ts"
       ]
+    },
+    {
+      "id": "cloud-account",
+      "name": "In-app Cairn Cloud account & billing",
+      "summary": "Bottom-left sidebar account identity and upward popover (`SidebarAccount`): shows local user display name by default, connects via Clerk PKCE on Cairn Cloud to display Clerk avatar and name, launches hosted Creem subscription checkout and Customer Billing Portal, opens or switches to the ready Cloud workspace, links to local backup migration, and disconnects cleanly.",
+      "states": "Unlinked local display name, upward unlinked popover (Sign in / Account settings), linked Clerk avatar and display name (Free with Subscribe vs Active subscription with Billing Portal), Cloud workspace readiness and Open/Switch actions, offline reachable fallback, and signed-out reset.",
+      "centrality": 2,
+      "status": "shipped",
+      "code": {
+        "web": [
+          "apps/web/src/board/sidebar-account.tsx",
+          "apps/web/src/board/sidebar.tsx"
+        ],
+        "server": [
+          "apps/server/src/services/cloud-account.ts",
+          "apps/server/src/routes-cloud.ts"
+        ],
+        "other": [
+          "packages/shared/src/remote-access.ts",
+          "apps/desktop/src/main.ts",
+          "apps/desktop/src/resident-host.ts"
+        ]
+      },
+      "routes": {
+        "server": [
+          "/api/cloud/status",
+          "/api/cloud/connect/start",
+          "/api/cloud/callback",
+          "/api/cloud/checkout",
+          "/api/cloud/billing-portal",
+          "/api/cloud/disconnect"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "click testid:sidebar-account"
+      ],
+      "research": {
+        "na": "the binding contract is docs/design/in-app-cloud-account.md and the owner-selected Direction 1 prototype"
+      },
+      "frontendDesign": [
+        "docs/design/surfaces/sidebar.md"
+      ],
+      "backendDesign": [
+        "docs/design/in-app-cloud-account.md"
+      ],
+      "evidence": [
+        "apps/server/test/cloud-account.test.ts",
+        "apps/web/test/sidebar-account.test.ts",
+        "apps/web/e2e/desktop-update.spec.ts",
+        "apps/web/e2e/sidebar-visual.spec.ts"
+      ]
     }
   ]
 }

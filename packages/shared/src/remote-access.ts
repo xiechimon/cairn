@@ -37,6 +37,7 @@ export function isBrowserAuthExempt(pathname: string): boolean {
     pathname.startsWith('/api/webhook/') ||
     pathname === '/api/mcp' ||
     pathname === '/api/oauth/callback' ||
+    pathname === '/api/cloud/callback' ||
     pathname === '/api/auth/access' ||
     pathname === '/api/auth/clerk/config' ||
     pathname === '/api/auth/clerk' ||
@@ -259,3 +260,61 @@ export function parsePairFragment(hash: string): { code: string; environmentId: 
   if (code === null || code === '' || environmentId === null || environmentId === '') return null;
   return { code, environmentId };
 }
+
+export const CLOUD_URL_ENV = 'CAIRN_CLOUD_URL';
+export const DEFAULT_CAIRN_CLOUD_URL = 'https://cairn-cloud-portal.fly.dev';
+
+const DISABLED_CLOUD_URL_VALUES = new Set(['off', 'false', 'none', '0']);
+
+export function resolveDesktopCloudUrl(env: Record<string, string | undefined>): string | null {
+  const raw = env[CLOUD_URL_ENV]?.trim();
+  if (raw === undefined || raw === '') return DEFAULT_CAIRN_CLOUD_URL;
+  return DISABLED_CLOUD_URL_VALUES.has(raw.toLowerCase()) ? null : raw;
+}
+
+export const cloudUserProfileSchema = z.object({
+  sub: z.string().min(1),
+  name: z.string().nullable(),
+  email: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
+});
+export type CloudUserProfile = z.infer<typeof cloudUserProfileSchema>;
+
+export const cloudWorkspaceViewSchema = z.object({
+  appName: z.string().min(1),
+  url: z.string().nullable(),
+  status: z.string().min(1),
+  region: z.string().nullable().optional(),
+});
+export type CloudWorkspaceView = z.infer<typeof cloudWorkspaceViewSchema>;
+
+export const cloudStatusResponseSchema = z.object({
+  configured: z.boolean(),
+  linked: z.boolean(),
+  cloudReachable: z.boolean(),
+  user: cloudUserProfileSchema.nullable(),
+  subscribed: z.boolean(),
+  hasBillingCustomer: z.boolean(),
+  subscriptionStatus: z.string().nullable(),
+  currentPeriodEnd: z.string().nullable(),
+  workspace: cloudWorkspaceViewSchema.nullable(),
+});
+export type CloudStatusResponse = z.infer<typeof cloudStatusResponseSchema>;
+
+export const cloudConnectStartBodySchema = z
+  .object({
+    returnTo: z.string().min(1).max(512).optional(),
+    shell: z.enum(['browser', 'desktop']).optional(),
+  })
+  .strict();
+export type CloudConnectStartBody = z.infer<typeof cloudConnectStartBodySchema>;
+
+export const cloudConnectStartResponseSchema = z.object({
+  authorizationUrl: z.string().url(),
+});
+export type CloudConnectStartResponse = z.infer<typeof cloudConnectStartResponseSchema>;
+
+export const cloudExternalUrlResponseSchema = z.object({
+  url: z.string().url(),
+});
+export type CloudExternalUrlResponse = z.infer<typeof cloudExternalUrlResponseSchema>;

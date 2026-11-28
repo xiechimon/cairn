@@ -11,6 +11,10 @@ import type {
   ChiefMemoryUsageResponse,
   ChiefThread,
   ClerkAuthConfigResponse,
+  CloudConnectStartBody,
+  CloudConnectStartResponse,
+  CloudExternalUrlResponse,
+  CloudStatusResponse,
   CodexDevicePollResponse,
   CodexDeviceStartResponse,
   ComposioApps,
@@ -2394,6 +2398,72 @@ export function useDesignMutations(todoId: string, fileName: string) {
       onMutate: (id) => changeComments((rows) => rows.filter((row) => row.id !== id)),
       onError: rollback,
       onSettled: refresh,
+    }),
+  };
+}
+
+const UNLINKED_CLOUD_STATUS: CloudStatusResponse = {
+  configured: false,
+  linked: false,
+  cloudReachable: true,
+  user: null,
+  subscribed: false,
+  hasBillingCustomer: false,
+  subscriptionStatus: null,
+  currentPeriodEnd: null,
+  workspace: null,
+};
+
+const CLOUD_ACTIVE_POLL_MS = 1_500;
+
+export async function fetchCloudStatus(): Promise<CloudStatusResponse> {
+  try {
+    return await api.get<CloudStatusResponse>('/api/cloud/status');
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+      return UNLINKED_CLOUD_STATUS;
+    }
+    throw err;
+  }
+}
+
+export function useCloudStatus(enabled: boolean, options?: { activePoll?: boolean }) {
+  return useQuery({
+    queryKey: ['cloudStatus'],
+    queryFn: fetchCloudStatus,
+    enabled,
+    retry: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: options?.activePoll ? CLOUD_ACTIVE_POLL_MS : false,
+  });
+}
+
+export function useCloudAccountMutations() {
+  const queryClient = useQueryClient();
+  return {
+    startConnect: useMutation({
+      meta: { action: '启动 Cairn 账号登录' },
+      mutationFn: (body: CloudConnectStartBody) =>
+        api.post<CloudConnectStartResponse>('/api/cloud/connect/start', body),
+    }),
+    startCheckout: useMutation({
+      meta: { action: '打开订阅结账页面' },
+      mutationFn: () => api.post<CloudExternalUrlResponse>('/api/cloud/checkout', {}),
+    }),
+    openBillingPortal: useMutation({
+      meta: { action: '打开订阅与发票管理页' },
+      mutationFn: () => api.post<CloudExternalUrlResponse>('/api/cloud/billing-portal', {}),
+    }),
+    disconnect: useMutation({
+      meta: { action: '退出 Cairn 账号' },
+      mutationFn: () => api.post<{ ok: boolean }>('/api/cloud/disconnect', {}),
+      onSuccess: () => {
+        queryClient.setQueryData<CloudStatusResponse>(['cloudStatus'], (prev) => ({
+          ...UNLINKED_CLOUD_STATUS,
+          configured: prev?.configured ?? true,
+        }));
+        void queryClient.invalidateQueries({ queryKey: ['cloudStatus'] });
+      },
     }),
   };
 }

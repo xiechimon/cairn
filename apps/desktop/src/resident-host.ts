@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
+import { resolveDesktopCloudUrl } from '@cairn/shared';
 
 const execFileAsync = promisify(execFile);
 
@@ -116,10 +117,13 @@ export function buildResidentPlist(opts: {
   port: number;
   logDir: string;
   host?: string;
+  cloudUrl?: string | null;
 }): string {
   const outLog = join(opts.logDir, 'resident-host.out.log');
   const errLog = join(opts.logDir, 'resident-host.err.log');
   const host = opts.host ?? DEFAULT_RESIDENT_HOST;
+  const cloudUrl =
+    opts.cloudUrl !== undefined ? opts.cloudUrl : resolveDesktopCloudUrl(process.env);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
@@ -144,6 +148,9 @@ export function buildResidentPlist(opts: {
     `    <string>${escapeXml(opts.cairnHome)}</string>`,
     `    <key>${RESIDENT_MANAGED_BY_ENV}</key>`,
     `    <string>${RESIDENT_MANAGED_BY_VALUE}</string>`,
+    ...(cloudUrl !== null
+      ? ['    <key>CAIRN_CLOUD_URL</key>', `    <string>${escapeXml(cloudUrl)}</string>`]
+      : []),
     '  </dict>',
     '  <key>RunAtLoad</key>',
     '  <true/>',
@@ -176,6 +183,7 @@ export function residentPlistNeedsUpdate(opts: {
   logDir: string;
   port?: number;
   host?: string;
+  cloudUrl?: string | null;
 }): boolean {
   const path = residentPlistPath(opts.homeDir);
   if (!existsSync(path)) return false;
@@ -188,6 +196,7 @@ export function residentPlistNeedsUpdate(opts: {
       port: opts.port ?? DEFAULT_RESIDENT_PORT,
       logDir: opts.logDir,
       host: opts.host,
+      cloudUrl: opts.cloudUrl,
     });
     return current !== expected;
   } catch {
@@ -207,6 +216,7 @@ export async function installResidentHost(opts: {
   logDir: string;
   port?: number;
   host?: string;
+  cloudUrl?: string | null;
   uid?: number;
   runLaunchctl?: (args: string[]) => Promise<void>;
 }): Promise<InstallResidentResult> {
@@ -226,6 +236,7 @@ export async function installResidentHost(opts: {
       port,
       logDir: opts.logDir,
       host: opts.host,
+      cloudUrl: opts.cloudUrl,
     }),
     'utf8',
   );
@@ -745,6 +756,7 @@ export async function resolveResidentAtBoot(opts: {
   logDir: string;
   port?: number;
   host?: string;
+  cloudUrl?: string | null;
   versionChanged: boolean;
   updatedAt: number | null;
   probe: (cairnHome: string) => Promise<ServerOwnerRecord | null>;
@@ -762,6 +774,7 @@ export async function resolveResidentAtBoot(opts: {
       logDir: opts.logDir,
       port: opts.port,
       host: opts.host,
+      cloudUrl: opts.cloudUrl,
     })
   ) {
     const installed = await opts.install();

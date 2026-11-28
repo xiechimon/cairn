@@ -1614,10 +1614,6 @@ html:not(.light)
   visibility: hidden;
 }
 
-:root[data-shell="mac-desktop"]:not([data-fullscreen]) .sidebar-footer-brand {
-  display: flex;
-}
-
 :root[data-shell="mac-desktop"]:not([data-fullscreen]) .sidebar-team-row :is(button, a) {
   -webkit-app-region: no-drag;
 }

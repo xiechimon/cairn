@@ -63,15 +63,15 @@ function boxesOverlap(
 test.describe('desktop shell', () => {
   test.use({ userAgent: `Mozilla/5.0 ${DESKTOP_SHELL_USER_AGENT}` });
 
-  test('the footer shows the brand at the left and hides desktop-update for routine states, showing it on error/installing/restarting before usage and settings', async ({
+  test('the footer shows the user account at the left and hides desktop-update for routine states, showing it on error/installing/restarting before usage and settings', async ({
     page,
   }) => {
     await fakeBridge(page);
     await page.goto('/app?scenario=providers-fleet');
     const footer = page.getByTestId('sidebar-footer');
-    const brand = footer.getByTestId('sidebar-footer-brand');
-    await expect(brand).toBeVisible();
-    await expect(brand).toHaveText('Cairn');
+    const account = footer.getByTestId('sidebar-account');
+    await expect(account.locator('[data-slot="avatar-initial"]')).toHaveText('X');
+    await expect(account.locator('span.truncate')).toHaveText('Xmon Dai');
     const update = footer.getByTestId('desktop-update');
     await expect(update).toHaveCount(0);
 
@@ -106,8 +106,8 @@ test.describe('desktop shell', () => {
     await update.hover();
     await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('更新失败，点击重试');
     const x = async (id: string) => (await footer.getByTestId(id).boundingBox())?.x ?? -1;
-    const brandX = (await brand.boundingBox())?.x ?? -1;
-    expect(brandX).toBeLessThan(await x('desktop-update'));
+    const accountX = (await account.boundingBox())?.x ?? -1;
+    expect(accountX).toBeLessThan(await x('desktop-update'));
     expect(await x('desktop-update')).toBeLessThan(await x('sidebar-usage'));
     expect(await x('sidebar-usage')).toBeLessThan(await x('sidebar-settings'));
   });
@@ -425,10 +425,11 @@ test.describe('desktop shell', () => {
   });
 });
 
-test('in the browser the footer has no brand and no update button', async ({ page }) => {
+test('in the browser the footer shows the user account and has no update button', async ({ page }) => {
   await page.goto('/app?scenario=providers-fleet');
   const footer = page.getByTestId('sidebar-footer');
   await expect(footer.getByTestId('sidebar-settings')).toBeVisible();
-  await expect(footer.getByTestId('sidebar-footer-brand')).toBeHidden();
+  await expect(footer.getByTestId('sidebar-account').locator('span.truncate')).toHaveText('Xmon Dai');
+  await expect(footer.getByTestId('sidebar-footer-brand')).toHaveCount(0);
   await expect(footer.getByTestId('desktop-update')).toHaveCount(0);
 });

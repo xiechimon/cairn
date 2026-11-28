@@ -70,6 +70,8 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/chief-tools.ts:PROJECT_WRITE_TOOLS': 'constant lookup table',
   'apps/server/src/services/ci-check-verdict.ts:FIXABLE': 'constant lookup table',
   'apps/server/src/services/ci-check-verdict.ts:BLOCKING_UNREQUIRED': 'constant lookup table',
+  'apps/server/src/services/cloud-account.ts:accountFileLocks':
+    'write serialization keyed on cloud-account.enc file path; coordinates a filesystem resource',
   'apps/server/src/services/computer-call-store.ts:pendingCalls':
     'in-flight computer calls keyed on unique callIds; dropComputerWaiters is the process-wide test cleanup seam',
   'apps/server/src/services/coordinator-turn-capture.ts:liveCaptures':
