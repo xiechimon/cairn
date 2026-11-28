@@ -28,13 +28,13 @@ Cairn runs your coding agents on your own machines, with your own subscriptions,
 
 ## What you get
 
-- **It remembers your corrections.** A correction worth keeping becomes memory the Coordinator brings back when it matters, and a failed run writes its lessons into the next attempt.
-- **A mistake you correct twice becomes a check.** The second time you correct the same thing, the Coordinator points at the saved rule and offers to add a repository check as a task. It never installs one unasked.
-- **It is measured on an exam it cannot edit.** Recorded Coordinator turns, real coding tasks and canaries run daily; the cases and scorers are a protected path read from the merge base, so an agent change cannot rewrite the exam it is judged by ([eval/](./eval/README.md), [public results](https://cairn.xmon.me/eval/)).
-- **Improvements are kept only after they pass (being built).** A change to prompts, skills, routing or tool use is kept only when it beats the current harness on that exam, with guards for delivery and your interruptions. That loop is a plan today, not shipped ([plan](./docs/design/harness-self-improve.md)).
-- **Research, then build.** Before it changes anything, a thread reads how strong open-source projects solved the problem, then decides the details itself.
-- **Your machines, your subscriptions.** One Runner per machine runs threads in their own git worktree, on your ChatGPT / Codex subscription, Claude Code, or an API key. Cairn resells no compute, and code and credentials stay on your machines.
-- **Nothing irreversible without your yes.** Merges, sends, deletes and credential changes wait for you.
+- **It remembers your corrections.** A correction worth keeping becomes memory the Coordinator brings back when it matters, and a failed run writes its lessons into the next attempt. <!-- claim: memory -->
+- **A mistake you correct twice becomes a check.** The second time you correct the same thing, the Coordinator points at the saved rule and offers to add a repository check as a task. It never installs one unasked. <!-- claim: repeat-check -->
+- **It is measured on an exam it cannot edit.** Recorded Coordinator turns, real coding tasks and canaries run daily; the cases and scorers are a protected path read from the merge base, so an agent change cannot rewrite the exam it is judged by ([eval/](./eval/README.md), [public results](https://cairn.xmon.me/eval/)). <!-- claim: eval-exam -->
+- **Improvements are kept only after they pass (being built).** A change to prompts, skills, routing or tool use is kept only when it beats the current harness on that exam, with guards for delivery and your interruptions. That loop is a plan today, not shipped ([plan](./docs/design/harness-self-improve.md)). <!-- claim: keep-rule -->
+- **Research, then build.** Before it changes anything, a thread reads how strong open-source projects solved the problem, then decides the details itself. <!-- claim: research-first -->
+- **Your machines, your subscriptions.** One Runner per machine runs threads in their own git worktree, on your ChatGPT / Codex subscription, Claude Code, or an API key. Cairn resells no compute, and code and credentials stay on your machines. <!-- claim: own-machines -->
+- **Nothing irreversible without your yes.** Merges, sends, deletes and credential changes wait for you. <!-- claim: irreversible-approval -->
 
 What ships today is the learning itself, not the promise: memory, the repeat-mistake check proposal, retry lessons, and the exam with its protected scorers. The keep-only-if-better rule is being built. Mail, calendar and job search as projects with no repository are still planned.
 

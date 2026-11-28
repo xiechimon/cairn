@@ -88,6 +88,7 @@ export const copy = {
         },
         {
           title: '自己的 worktree 里先查后改',
+          claim: 'research-first',
           img: 'work',
           alt: '任务执行过程截图',
         },
@@ -103,27 +104,33 @@ export const copy = {
       items: [
         {
           title: '记住你纠正过的事',
+          claim: 'memory',
           body: '值得留下的纠正会存成记忆，之后相关的时候会被带回来；失败那一轮的教训也会写进下一次重试。',
         },
         {
           title: '同一个错再犯，就加一道检查',
+          claim: 'repeat-check',
           body: '你第二次纠正同一个错时，Coordinator 会指回那条已存的规则，提议建一个仓库检查任务；你不点头，它不会自己装。',
         },
         {
           title: '用一套它改不了的评测量自己',
+          claim: 'eval-exam',
           body: 'Coordinator 回合回放、真实编码任务和哨兵用例每天跑一遍；题目和评分代码是受保护路径，运行时从合并基点读取，agent 改不了自己要被考的那张卷子。',
         },
         {
           title: '得分更高，才留下',
+          claim: 'keep-rule',
           tag: '正在做',
           body: '提示词、技能、路由和工具用法上的改动，要在这套评测上赢过现在的 harness，并守住交付和打扰次数，才会被保留。这一步还在建；今天真正在用的是记忆、检查和重试。',
         },
         {
           title: '你的机器，你的订阅',
+          claim: 'own-machines',
           body: '每台机器一个 Runner，每件事在自己的 git worktree 里干；ChatGPT / Codex、Claude Code 订阅或任意 API key 直接用。Cairn 不转售算力。',
         },
         {
           title: '撤不回的事，先停下来问你',
+          claim: 'irreversible-approval',
           body: '合并、发送、删除和改凭据，都等你点头。',
         },
       ],
@@ -258,6 +265,7 @@ export const copy = {
         },
         {
           title: 'Research, then build in its worktree',
+          claim: 'research-first',
           img: 'work',
           alt: 'Thread work trace screenshot',
         },
@@ -273,27 +281,33 @@ export const copy = {
       items: [
         {
           title: 'Remembers what you correct',
+          claim: 'memory',
           body: 'A correction worth keeping becomes memory, brought back when it matters; a failed run writes its lessons into the next attempt.',
         },
         {
           title: 'A repeat mistake becomes a check',
+          claim: 'repeat-check',
           body: 'The second time you correct the same thing, the Coordinator points at the saved rule and offers to add a repository check as a task. It never installs one unasked.',
         },
         {
           title: 'Measured on an exam it cannot edit',
+          claim: 'eval-exam',
           body: 'Recorded Coordinator turns, real coding tasks and canaries run daily; the cases and scorers are a protected path read from the merge base, so an agent change cannot rewrite the exam it is judged by.',
         },
         {
           title: 'Kept only when it scores better',
+          claim: 'keep-rule',
           tag: 'Being built',
           body: 'Changes to prompts, skills, routing or tool use are kept only when they beat the current harness on that exam while delivery and interruption guards hold. That step is being built; memory, checks and retries are what work today.',
         },
         {
           title: 'On your machines, with your subscriptions',
+          claim: 'own-machines',
           body: 'One Runner per machine, each task in its own git worktree, on your ChatGPT / Codex subscription, Claude Code or an API key. Cairn resells no compute.',
         },
         {
           title: 'Nothing irreversible without your yes',
+          claim: 'irreversible-approval',
           body: 'Merges, sends, deletes and credential changes wait for you.',
         },
       ],

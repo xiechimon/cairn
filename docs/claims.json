@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "notes": "Each capability claim in the README, the site home and spec 18 carries a marker and points here; scripts/claim-proof-gate.mjs fails when a pointer or marker stops resolving.",
+  "claims": [
+    {
+      "id": "memory",
+      "statement": "A correction worth keeping becomes memory the Coordinator brings back when it matters, and a failed run writes its lessons into the next attempt.",
+      "anchors": [
+        { "file": "README.md", "text": "It remembers your corrections." },
+        { "file": "README.zh.md", "text": "记住你纠正过的事。" },
+        { "file": "site/src/components/copy.ts", "text": "Remembers what you correct" },
+        {
+          "file": "docs/spec/18-positioning-and-differentiation.md",
+          "text": "what you correct becomes memory"
+        }
+      ],
+      "proof": [
+        "feature:memory",
+        "apps/server/src/services/memory-documents.ts",
+        "apps/server/src/services/retry-lessons.ts"
+      ]
+    },
+    {
+      "id": "repeat-check",
+      "statement": "The second time the user corrects the same thing, the Coordinator points at the saved rule and offers to add a repository check as a task; it never installs one unasked.",
+      "anchors": [
+        { "file": "README.md", "text": "A mistake you correct twice becomes a check." },
+        { "file": "README.zh.md", "text": "同一个错再犯，就加一道检查。" },
+        { "file": "site/src/components/copy.ts", "text": "A repeat mistake becomes a check" },
+        {
+          "file": "docs/spec/18-positioning-and-differentiation.md",
+          "text": "a mistake that repeats becomes a check"
+        }
+      ],
+      "proof": [
+        "apps/server/src/services/memory-corrections.ts",
+        "apps/server/src/services/chief.ts"
+      ]
+    },
+    {
+      "id": "eval-exam",
+      "statement": "Recorded Coordinator turns, coding tasks and canaries run daily against a task set and scorers kept in a protected path and read from the merge base, so an agent change cannot rewrite the exam it is judged by.",
+      "anchors": [
+        { "file": "README.md", "text": "It is measured on an exam it cannot edit." },
+        { "file": "README.zh.md", "text": "用一套它改不了的评测量自己。" },
+        { "file": "site/src/components/copy.ts", "text": "Measured on an exam it cannot edit" },
+        {
+          "file": "docs/spec/18-positioning-and-differentiation.md",
+          "text": "An eval ruler the agents cannot edit"
+        }
+      ],
+      "proof": [
+        "eval/README.md",
+        "packages/shared/merge-gate-paths.json",
+        "docs/ops/eval-daily.md",
+        "test:scripts/ops/eval-daily.test.mjs"
+      ]
+    },
+    {
+      "id": "keep-rule",
+      "statement": "A change to prompts, skills, routing or tool use is kept only when it beats the current harness on that exam with delivery and interruption guards; this rule is being built, not shipped.",
+      "anchors": [
+        {
+          "file": "README.md",
+          "text": "Improvements are kept only after they pass (being built)."
+        },
+        { "file": "README.zh.md", "text": "得分更高，才留下（正在做）。" },
+        { "file": "site/src/components/copy.ts", "text": "Kept only when it scores better" },
+        {
+          "file": "docs/spec/18-positioning-and-differentiation.md",
+          "text": "The keep rule is being built"
+        }
+      ],
+      "proof": ["docs/design/harness-self-improve.md"]
+    },
+    {
+      "id": "research-first",
+      "statement": "Before changing anything, a thread reads how strong open-source projects solved the problem, then decides the details itself.",
+      "anchors": [
+        { "file": "README.md", "text": "Research, then build." },
+        { "file": "README.zh.md", "text": "先研究，再动手。" },
+        { "file": "site/src/components/copy.ts", "text": "Research, then build in its worktree" }
+      ],
+      "proof": ["feature:research-loop", "test:apps/server/test/research-trigger.test.ts"]
+    },
+    {
+      "id": "own-machines",
+      "statement": "Threads run on the user's own machines, one Runner per machine and a git worktree per task, on the user's own ChatGPT / Codex, Claude Code or API-key subscription; Cairn resells no compute.",
+      "anchors": [
+        { "file": "README.md", "text": "Your machines, your subscriptions." },
+        { "file": "README.zh.md", "text": "你的机器，你的订阅。" },
+        { "file": "site/src/components/copy.ts", "text": "On your machines, with your subscriptions" },
+        {
+          "file": "docs/spec/18-positioning-and-differentiation.md",
+          "text": "on your own machines and with your own subscriptions"
+        },
+        {
+          "file": "docs/spec/18-positioning-and-differentiation.md",
+          "text": "Each build edits and verifies in its own git worktree"
+        }
+      ],
+      "proof": ["feature:machines", "apps/daemon/src/runner.ts", "apps/daemon/src/workspace.ts"]
+    },
+    {
+      "id": "evidence-gate",
+      "statement": "A merge verdict counts only for the patch it judged: it binds to the patch digest and the reviewed head, and the gate's TLA+ models are checked with negative controls.",
+      "anchors": [
+        {
+          "file": "docs/spec/18-positioning-and-differentiation.md",
+          "text": "An evidence-bound merge gate, model-checked"
+        }
+      ],
+      "proof": [
+        "feature:merge-gate",
+        "apps/server/src/services/merge-gate/digest.ts",
+        ".claude/skills/verify-merge-gate"
+      ]
+    },
+    {
+      "id": "irreversible-approval",
+      "statement": "Merges, sends, deletes and credential changes wait for the user's yes.",
+      "anchors": [
+        { "file": "README.md", "text": "Nothing irreversible without your yes." },
+        { "file": "README.zh.md", "text": "撤不回的事，先停下来问你。" },
+        {
+          "file": "site/src/components/copy.ts",
+          "text": "Nothing irreversible without your yes"
+        },
+        {
+          "file": "docs/spec/18-positioning-and-differentiation.md",
+          "text": "Anything that cannot be undone"
+        }
+      ],
+      "proof": ["feature:merge-gate", "feature:plans-and-review", "apps/server/src/services/action-registry.ts"]
+    }
+  ]
+}
