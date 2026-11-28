@@ -738,7 +738,9 @@ test('site build script, prepush plan, single analytics beacon, robots, and EN/Z
   const homeAstro = readFileSync(join(repoRoot, 'site/src/components/Home.astro'), 'utf8');
   assert.ok(homeAstro.includes('<style>'));
   assert.ok(homeAstro.includes('Cairn Mac desktop app'));
-  assert.equal((homeAstro.match(/cloudflareinsights\.com/g) ?? []).length, 1);
+  assert.equal((homeAstro.match(/<CloudflareBeacon \/>/g) ?? []).length, 1);
+  const beacon = readFileSync(join(repoRoot, 'site/src/components/CloudflareBeacon.astro'), 'utf8');
+  assert.equal((beacon.match(/cloudflareinsights\.com/g) ?? []).length, 1);
   assert.equal(/@vercel\/analytics/.test(homeAstro), false);
 
   const realResult = validateGeoSite({ repoRoot });
