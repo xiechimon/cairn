@@ -307,6 +307,7 @@ export function bootServer(
     }
     return {
       app,
+      ctx: appContext,
       db,
       hub,
       machineHub,

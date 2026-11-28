@@ -115,6 +115,7 @@ async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 're
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    if (path === '/api/auth/stream-ticket') return route.fulfill({ status: 404 });
     if (path === '/api/teams') return route.fulfill({ json: [{ id: 'team-1', name: 'Team' }] });
     if (path === '/api/user/me')
       return route.fulfill({ json: { id: 'user-1', displayName: 'Owner', avatarUrl: null } });

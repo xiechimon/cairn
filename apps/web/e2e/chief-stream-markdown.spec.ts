@@ -100,6 +100,7 @@ function mockChiefLiveApi(
   });
   return page.route('**/api/**', (route) => {
     const p = new URL(route.request().url()).pathname;
+    if (p === '/api/auth/stream-ticket') return route.fulfill({ status: 404 });
     if (p === '/api/teams') return route.fulfill(json([TEAM]));
     if (p === '/api/user/me') return route.fulfill(json(USER));
     if (p === '/api/teams/t1/notifications')

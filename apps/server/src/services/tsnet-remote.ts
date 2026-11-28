@@ -9,7 +9,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { request } from 'node:http';
+import { request, type Server } from 'node:http';
 import { dirname, join } from 'node:path';
 import type { TailnetAccess, TailnetErrorKind } from '@cairn/shared';
 import type { Hono } from 'hono';
@@ -51,6 +51,7 @@ export interface StartTsnetRemoteInput {
   parentEnv?: NodeJS.ProcessEnv;
   spawnProcess?: SpawnSidecar;
   readLocalStatus?: () => Promise<unknown>;
+  attachSockets?: (server: Server) => () => void;
 }
 
 export interface TailnetRemote {
@@ -386,6 +387,7 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
     logger.error({ error: message }, 'tsnet remote access is enabled but could not start');
     return failedRemote(message);
   }
+  const stopSockets = input.attachSockets?.(listener.server) ?? (() => {});
   if (settings.mode === 'socket') {
     const timer = setInterval(() => {
       void refreshSystemStatus();
@@ -398,7 +400,9 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
         stopped = true;
         clearInterval(timer);
         socketStatus = { ...socketStatus, state: 'stopped', ownerLogin: null };
-        await listener.close();
+        const closing = listener.close();
+        stopSockets();
+        await closing;
       },
     };
   }
@@ -424,11 +428,17 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
       logger,
       ...(input.spawnProcess !== undefined ? { spawnProcess: input.spawnProcess } : {}),
       onStatus: (status) => {
-        if (status.state === 'failed') void listener.close();
+        if (status.state === 'failed') {
+          const closing = listener.close();
+          stopSockets();
+          void closing;
+        }
       },
     });
   } catch (error) {
-    await listener.close();
+    const closing = listener.close();
+    stopSockets();
+    await closing;
     const message = error instanceof Error ? error.message : String(error);
     logger.error({ error: message }, 'tsnet remote access supervisor could not start');
     return failedRemote(message);
@@ -437,8 +447,10 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
   return {
     status: running.status,
     stop: async () => {
+      const closing = listener.close();
+      stopSockets();
       await running.stop();
-      await listener.close();
+      await closing;
     },
   };
 }

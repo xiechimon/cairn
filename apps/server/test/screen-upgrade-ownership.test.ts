@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import WebSocket from 'ws';
 import { chief, computer, machine } from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
+import { closeUnclaimedUpgrades } from '../src/lib/upgrade-claims.js';
 import { ComputerScreenGateway } from '../src/services/computer-screen.js';
 import { bootServer, type TestServer } from './helpers.js';
 
@@ -96,10 +97,11 @@ afterEach(async () => {
 });
 
 describe('screen upgrade ownership', () => {
-  test('the gateway answers its own paths and destroys every other upgrade', () => {
+  test('screen upgrades reach their gateway and unclaimed upgrades close', () => {
     boot();
     const server = new EventEmitter();
     computerGateway.attach(server);
+    closeUnclaimedUpgrades(server);
     for (const path of SCREEN_PATHS) {
       const probe = fakeSocket();
       upgrade(server, path, probe.socket);

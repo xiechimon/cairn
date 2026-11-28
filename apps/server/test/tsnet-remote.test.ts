@@ -287,7 +287,7 @@ describe('enabled', () => {
     const home = freshHome();
     const s = bootServer({ authToken: TOKEN });
     const remote = await startTsnetRemote({
-      settings: settings(home, { mode: 'socket' }),
+      settings: settings(home, { mode: 'socket', allowedLogins: ['owner@example.com'] }),
       homeDir: home,
       app: s.app,
       authToken: TOKEN,
@@ -914,5 +914,37 @@ describe('POST /api/remote/tailnet', () => {
     const deviceHeaders = { authorization: `Bearer ${token}` };
     expect((await callTailnet(s, { enabled: true }, deviceHeaders)).status).toBe(404);
     expect((await callTailnet(s, { enabled: false }, deviceHeaders)).status).toBe(404);
+  });
+});
+
+describe('task stream over the tailnet socket wiring', () => {
+  test('the tailnet listener hands its server to the stream gateways and releases them on stop', async () => {
+    const home = makeTestTempDir('tn-wire-');
+    const release = vi.fn();
+    const attached: unknown[] = [];
+    const remote = await startTsnetRemote({
+      settings: settings(home, { mode: 'socket' }),
+      homeDir: home,
+      app: { fetch: async () => new Response('ok') } as never,
+      authToken: TOKEN,
+      logger: silentLogger,
+      readLocalStatus: async () => ({
+        BackendState: 'Running',
+        Self: { UserID: 7, DNSName: 'cairn.tail.example.', TailscaleIPs: ['100.64.0.7'] },
+        TailscaleIPs: ['100.64.0.7'],
+        User: { '7': { LoginName: 'owner@example.com' } },
+      }),
+      attachSockets: (server) => {
+        attached.push(server);
+        return release;
+      },
+    });
+    expect(remote).not.toBeNull();
+    if (remote === null) return;
+    expect(attached).toHaveLength(1);
+    expect(attached[0]).toHaveProperty('on');
+    await remote.stop();
+    expect(release).toHaveBeenCalledTimes(1);
+    releaseTestTempDir(home);
   });
 });

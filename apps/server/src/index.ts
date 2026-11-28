@@ -24,6 +24,7 @@ import {
   warnIgnoredTailscaleUsers,
   warnInsecureBind,
 } from './config.js';
+import type { AppContext } from './context.js';
 import { warnTeamsWithoutCoordinatorRule } from './coordinator/boot-guard.js';
 import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
@@ -36,6 +37,7 @@ import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environmen
 import { createServerLogger } from './lib/logger.js';
 import { listenOwnerChannel, ownerChannelFromEnv } from './lib/owner-channel.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
+import { closeUnclaimedUpgrades } from './lib/upgrade-claims.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
@@ -56,7 +58,6 @@ import { computerScreensOf } from './services/computer-screen.js';
 import { setCoordinatorInServer, setCoordinatorWake } from './services/coordinator-context.js';
 import { setCoordinatorSignal } from './services/coordinator-signal.js';
 import { runDataMigrationOnce } from './services/data-migrations.js';
-
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { drainEffects, effectRegistry, reconcileEffects } from './services/external-effects.js';
 import { killInFlightPick } from './services/fs-pick.js';
@@ -88,8 +89,10 @@ import { createScheduler } from './services/scheduler.js';
 import { maybeRetriggerIdleHostUpdate } from './services/server-version.js';
 import { pathsOverlap, sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
+import { drainThenReleaseStreams } from './services/stream-drain.js';
 import { fillSystemAvatar } from './services/system-avatar.js';
 import { createTailscaleServe } from './services/tailscale-serve.js';
+import { attachTeamStreamSockets } from './services/team-stream-socket.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
 import { backfillTranscriptOrigins } from './services/transcript-origin-backfill.js';
 import { createTsnetRemote } from './services/tsnet-remote.js';
@@ -280,6 +283,14 @@ const tailnet = createTsnetRemote({
   app: () => app,
   authToken: config.authToken,
   logger,
+  attachSockets: (listener) => {
+    const stopSockets = attachTeamStreamSockets(listener, ctx);
+    const stopUnclaimed = closeUnclaimedUpgrades(listener);
+    return () => {
+      stopSockets();
+      stopUnclaimed();
+    };
+  },
 });
 const ownerChannel = ownerChannelFromEnv(process.env);
 listenOwnerChannel(ownerChannel);
@@ -318,78 +329,76 @@ const releaseWatcher = createReleaseWatcher({
 });
 
 const mcpOAuthState = newMcpOAuthState();
-const app = createApp(
-  {
-    remote: {
-      environmentId,
-      listenHost: config.host,
-      listenPort: config.port,
-      tailnetStatus: () => tailnet.status(),
-      tailnet,
-      tailscale,
-    },
-    db,
-    hub,
-    machineHub,
-    convHub,
-    secretBox,
-    vapidKeys,
-    user: seeded.user,
-    team: seeded.team,
-    im,
-    imBridge,
-    mail,
-    pingIntervalMs: config.pingIntervalMs,
-    claimHoldMs: config.claimHoldMs,
-    uploads: new Map(),
-    streamTickets: createStreamTicketBook(),
-    enrollments: new Map(),
-    oauthStates: new Map(),
-    xaiDeviceStates: new Map(),
-    codexDeviceStates: new Map(),
-    githubConnectionDeviceStates: new Map(),
-    mcpOAuthState,
-    oauthClient: config.githubOauth,
-    githubAppTokenSocket: config.githubAppTokenSocket,
-    githubAppIdentity: config.githubAppIdentity,
-    githubFetch,
-    githubBaseFetch: globalThis.fetch,
-    reposDir,
-    get workspacesDir() {
-      return workspacesDirOf();
-    },
-    attachmentsDir,
-    pageThumbnails,
-    backupStatusPath: backupStatusPathOf(config),
-    backupService,
-    deployRecordPath: deployRecordPathOf(config),
-    releaseWatcher,
-    skillsDir: config.skillsDir,
-    skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
-    homeDir: config.homeDir,
-    dataDir: config.dataDir,
-    webDir: config.webDir,
-    webOrigin: config.webOrigin,
-    trustedProxies: new Set(config.trustedProxies),
-    authToken: config.authToken,
-    ownerChannel,
-    accessVerifier:
-      config.cloudflareAccess === null ? null : createAccessVerifier(config.cloudflareAccess),
-    clerkAuth:
-      config.clerkAuth === null
-        ? null
-        : {
-            publishableKey: config.clerkAuth.publishableKey,
-            issuer: config.clerkAuth.issuer,
-            verify: createClerkVerifier(config.clerkAuth),
-          },
-    cloudUrl: config.cloudUrl,
-    cloudPkceStates: new Map(),
-    mcpConfigPath: config.mcpConfigPath,
-    logger,
+const ctx: AppContext = {
+  remote: {
+    environmentId,
+    listenHost: config.host,
+    listenPort: config.port,
+    tailnetStatus: () => tailnet.status(),
+    tailnet,
+    tailscale,
   },
+  db,
+  hub,
+  machineHub,
+  convHub,
+  secretBox,
+  vapidKeys,
+  user: seeded.user,
+  team: seeded.team,
+  im,
+  imBridge,
+  mail,
+  pingIntervalMs: config.pingIntervalMs,
+  claimHoldMs: config.claimHoldMs,
+  uploads: new Map(),
+  streamTickets: createStreamTicketBook(),
+  enrollments: new Map(),
+  oauthStates: new Map(),
+  xaiDeviceStates: new Map(),
+  codexDeviceStates: new Map(),
+  githubConnectionDeviceStates: new Map(),
+  mcpOAuthState,
+  oauthClient: config.githubOauth,
+  githubAppTokenSocket: config.githubAppTokenSocket,
+  githubAppIdentity: config.githubAppIdentity,
+  githubFetch,
+  githubBaseFetch: globalThis.fetch,
+  reposDir,
+  get workspacesDir() {
+    return workspacesDirOf();
+  },
+  attachmentsDir,
+  pageThumbnails,
+  backupStatusPath: backupStatusPathOf(config),
+  backupService,
+  deployRecordPath: deployRecordPathOf(config),
+  releaseWatcher,
+  skillsDir: config.skillsDir,
+  skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
+  homeDir: config.homeDir,
+  dataDir: config.dataDir,
+  webDir: config.webDir,
+  webOrigin: config.webOrigin,
+  trustedProxies: new Set(config.trustedProxies),
+  authToken: config.authToken,
+  ownerChannel,
+  accessVerifier:
+    config.cloudflareAccess === null ? null : createAccessVerifier(config.cloudflareAccess),
+  clerkAuth:
+    config.clerkAuth === null
+      ? null
+      : {
+          publishableKey: config.clerkAuth.publishableKey,
+          issuer: config.clerkAuth.issuer,
+          verify: createClerkVerifier(config.clerkAuth),
+        },
+  cloudUrl: config.cloudUrl,
+  cloudPkceStates: new Map(),
+  mcpConfigPath: config.mcpConfigPath,
   logger,
-);
+};
+const app = createApp(ctx, logger);
 
 adoptGithubConnectorGrants({ db, box: secretBox });
 void hydrateMissingConnectorTools({
@@ -520,6 +529,8 @@ void reconcileEffects(db, effectRegistry)
     logger.warn({ err: error }, 'external effects could not be reconciled');
   });
 computerScreens.attach(server);
+const stopTeamStreams = attachTeamStreamSockets(server, ctx);
+const stopUnclaimedUpgrades = closeUnclaimedUpgrades(server);
 
 if (config.authToken !== null) {
   void tailscale.reapply().catch((error: unknown) => {
@@ -580,7 +591,14 @@ async function shutdown(): Promise<void> {
   backupService?.stop();
   scheduler.stop();
   killInFlightPick();
-  computerScreens.close();
+  const drained = drainThenReleaseStreams({
+    drain: drainHttp,
+    release: () => {
+      computerScreens.close();
+      stopTeamStreams();
+      stopUnclaimedUpgrades();
+    },
+  });
   await Promise.race([
     tailscale.withdraw().catch(() => {}),
     waitTimeout(TAILSCALE_WITHDRAW_MS, undefined, { ref: false }),
@@ -589,7 +607,7 @@ async function shutdown(): Promise<void> {
     coordinator.close(),
     waitTimeout(COORDINATOR_CLOSE_MS, undefined, { ref: false }),
   ]);
-  await drainHttp();
+  await drained;
   await Promise.race([
     Promise.allSettled([tailnetReady.then(() => tailnet.stop()), im.shutdown(), mail.shutdown()]),
     waitTimeout(SHUTDOWN_STEP_MS, undefined, { ref: false }),

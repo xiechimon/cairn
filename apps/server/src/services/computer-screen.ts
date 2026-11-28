@@ -18,6 +18,7 @@ import { computer, machine as machineTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { forwardedOrigin } from '../lib/forwarded-origin.js';
 import { forwardedHostFor, isTrustedProxyAddress } from '../lib/request-origin.js';
+import { claimUpgrade } from '../lib/upgrade-claims.js';
 import { ownedPrivateComputer } from './computer-access.js';
 import {
   acquireComputerControl,
@@ -290,10 +291,8 @@ export class ComputerScreenGateway {
         return;
       }
       const path = screenUpgradePath(url.pathname);
-      if (path === null || path.gateway !== 'computer') {
-        if (path === null) socket.destroy();
-        return;
-      }
+      if (path === null || path.gateway !== 'computer') return;
+      claimUpgrade(request);
       const viewer = path.side === 'viewer';
       const channel = this.channels.get(path.channelId);
       let authorized =

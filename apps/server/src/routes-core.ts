@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import {
@@ -55,7 +54,7 @@ import {
 import { releaseParkedCoordinatorSteps } from './services/chief.js';
 import { coordinatorRunsOnPi } from './services/coordinator-context.js';
 import { readDeployStatus } from './services/deploy-status.js';
-import { createSerialConnection, StreamSessionRegistry } from './services/events.js';
+import { createSerialConnection } from './services/events.js';
 import {
   openAutonomyPauses,
   pauseTeamGithubRepos,
@@ -69,11 +68,7 @@ import {
   markNotificationRead,
   markNotificationUnread,
 } from './services/notifications.js';
-import {
-  deviceStreamsOf,
-  pairedDeviceExists,
-  pairedDeviceIdOfToken,
-} from './services/paired-devices.js';
+import { pairedDeviceIdOfToken } from './services/paired-devices.js';
 import { routingRuleIssues } from './services/routing-rule-issues.js';
 import {
   coordinatorProfile,
@@ -83,13 +78,12 @@ import {
 } from './services/routing-rules.js';
 import { buildServerVersionResponse, requestHostUpdate } from './services/server-version.js';
 import { filterKnownSkillIds } from './services/skills.js';
+import { startTeamStreamSession, streamSessionsOf } from './services/team-stream-session.js';
 import { conversationTeamId } from './services/tool-guards.js';
 import { readTopModels, writeTopModels } from './services/top-models.js';
 import { dailyUsage } from './services/usage-daily.js';
 
 const deliveryFailedBodySchema = z.object({ deliveryId: z.string().min(1).max(128) }).strict();
-
-const TEAM_PING = JSON.stringify({ type: 'ping' });
 
 const ACCESS_REFUSALS = {
   invalid: { status: 401, error: 'Unauthorized' },
@@ -104,7 +98,7 @@ const CLERK_REFUSALS = {
 } as const;
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
-  const streamSessions = new StreamSessionRegistry();
+  const streamSessions = streamSessionsOf(ctx);
   app.get('/api/auth/session', (c) => c.body(null, 204));
 
   app.post('/api/auth/session', (c) => {
@@ -258,7 +252,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
           : { kind: 'owner', deviceId: null },
     );
     c.header('cache-control', 'no-store');
-    return c.json(ticket);
+    return c.json({ ...ticket, transport: 'websocket' });
   });
 
   app.get('/api/user/me', (c) => c.json(ctx.user));
@@ -619,40 +613,20 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return openSseStream(c, async (stream) => {
-      const conn = createSerialConnection(
-        (data: string, seq) => stream.writeSSE({ data, id: String(seq) }),
+      const conn = createSerialConnection<string>(
+        (data, seq) => stream.writeSSE({ data, id: String(seq) }),
         { onOverflow: () => stream.abort() },
       );
-      const unsubscribe = ctx.hub.subscribe(
-        teamId,
-        { send: (_payload, encoded) => conn.send(encoded) },
-        ctx.user.id,
-      );
-      const deviceId = pairedDeviceIdOf(c);
-      const connectionId = randomUUID();
-      const closeSession = streamSessions.open(connectionId, { conn, teamId, deviceId });
-      const timer = setInterval(() => {
-        if (deviceId !== null && !pairedDeviceExists(ctx.db, deviceId)) {
-          stream.abort();
-          return;
-        }
-        void conn.send(TEAM_PING);
-      }, ctx.pingIntervalMs);
-      let release: () => void = () => {};
       const held = new Promise<void>((resolve) => {
-        release = resolve;
+        stream.onAbort(() => resolve());
       });
-      const unbindDevice = deviceStreamsOf(ctx.db).bind(deviceId, () => stream.abort());
-      stream.onAbort(() => {
-        clearInterval(timer);
-        unsubscribe();
-        closeSession();
-        unbindDevice();
-        release();
+      const stop = startTeamStreamSession(ctx, {
+        teamId,
+        deviceId: pairedDeviceIdOf(c),
+        conn,
+        abort: () => stream.abort(),
       });
-      void conn.send(JSON.stringify({ type: 'hello', connectionId, followRevision: true }));
-      await conn.send(TEAM_PING);
-      await held;
+      await held.finally(stop);
     });
   });
 

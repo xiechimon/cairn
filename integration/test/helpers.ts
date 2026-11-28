@@ -20,6 +20,7 @@ import {
 import { SCRAPLING_VERSION, webToolsBin } from '../../apps/daemon/src/web-tools.js';
 import { offlineDaemonRuntimeOpts } from '../../apps/daemon/test/runtime-stubs.js';
 import { createApp } from '../../apps/server/src/app.js';
+import type { AppContext } from '../../apps/server/src/context.js';
 import { openDbWithHandle, openMemoryDb } from '../../apps/server/src/db/client.js';
 import {
   build as buildTable,
@@ -39,6 +40,7 @@ import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/serv
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 import { newMcpOAuthState } from '../../apps/server/src/services/mcp-servers.js';
 import { createScheduler } from '../../apps/server/src/services/scheduler.js';
+import { attachTeamStreamSockets } from '../../apps/server/src/services/team-stream-socket.js';
 import { setTodoPhase } from '../../apps/server/src/services/todos.js';
 import { stampPersonSendBody } from '../../apps/server/test/helpers.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
@@ -242,7 +244,7 @@ export async function bootRealServer(opts: {
   };
   pendingReleases.add(releaseOwned);
   try {
-    const app = createApp({
+    const ctx: AppContext = {
       db,
       hub,
       machineHub,
@@ -270,7 +272,8 @@ export async function bootRealServer(opts: {
       authToken: null,
       mcpConfigPath,
       providerTestFetch: opts.providerTestFetch ?? defaultProviderTestFetch,
-    });
+    };
+    const app = createApp(ctx);
     const scheduler = opts.scheduler
       ? createScheduler({ db, hub, user, convHub }, { tickMs: 60_000 })
       : null;
@@ -323,6 +326,7 @@ export async function bootRealServer(opts: {
     };
 
     const server = serve({ fetch: fetchImpl, port: opts.port ?? 0 });
+    const closeTeamStreams = attachTeamStreamSockets(server, ctx);
     await new Promise<void>((resolve) => server.once('listening', resolve));
     const port = (server.address() as AddressInfo).port;
     const url = `http://127.0.0.1:${port}`;
@@ -386,6 +390,7 @@ export async function bootRealServer(opts: {
       scheduler?.stop();
       liveServers.delete(close);
       try {
+        closeTeamStreams();
         (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
         await new Promise<void>((resolve, reject) => {
           server.close((err) => (err ? reject(err) : resolve()));

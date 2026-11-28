@@ -44,20 +44,20 @@ import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
 import { textOfContent, thinkingOfContent } from './mappers.js';
 import { cacheUserMessage, trackQueueConfirmations } from './message-cache.js';
-import { connect, SSE_SILENCE_WATCHDOG_MS } from './sse-connection.js';
+import { connect, SSE_SILENCE_WATCHDOG_MS, type StreamTarget } from './sse-connection.js';
 import { hasInFlightWork } from './sse-guards.js';
+import { streamTargetOf } from './stream-target.js';
 import { applyTeamStreamEvent } from './team-stream-cache.js';
 
-async function streamUrl(path: string): Promise<string> {
+async function streamUrl(path: string): Promise<string | StreamTarget> {
   if (DEMO_MODE) return path;
   const res = await fetchWithSession('/api/auth/stream-ticket', {
     method: 'POST',
     signal: AbortSignal.timeout(SSE_SILENCE_WATCHDOG_MS),
   });
-  if (!res.ok) return path;
-  const body = (await res.json()) as { ticket?: string };
-  if (body.ticket === undefined || body.ticket === '') return path;
-  return `${path}?ticket=${encodeURIComponent(body.ticket)}`;
+  if (res.status === 404 || res.status === 405) return path;
+  if (!res.ok) throw new Error(`Stream ticket request failed: ${res.status}`);
+  return streamTargetOf(path, await res.json());
 }
 
 function withTicket(path: string, ticket: string | null): string {
@@ -89,7 +89,7 @@ export function startTeamStream(
   qc: QueryClient,
   generation = 0,
   ticket: string | null = null,
-  resolvePath: (() => Promise<string>) | null = null,
+  resolvePath: (() => Promise<string | StreamTarget>) | null = null,
   onReconnecting?: (reconnecting: boolean) => void,
 ): () => void {
   const connection = connectionStore.attach();

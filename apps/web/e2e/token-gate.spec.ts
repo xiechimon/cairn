@@ -1,30 +1,16 @@
 import { expect, type APIRequestContext, type Page, test } from '@playwright/test';
 import { bootLiveServer, type LiveServer } from './live-server';
 
-declare global {
-  interface Window {
-    __esUrls?: string[];
-  }
-}
-
 const GATE_TOKEN = 'cairn-e2e-gate-token-0123456789abcdef';
 const FORGED_TAILSCALE_LOGIN = 'xiechimon@github';
 
-async function recordEventSourceUrls(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const urls: string[] = [];
-    (window as Window).__esUrls = urls;
-    const Native = window.EventSource;
-    const Patched = function (url: string | URL, init?: EventSourceInit) {
-      urls.push(String(url));
-      return new Native(url, init);
-    } as unknown as typeof EventSource;
-    window.EventSource = Patched;
+function recordStreamUrls(page: Page): string[] {
+  const urls: string[] = [];
+  page.on('websocket', (socket) => urls.push(socket.url()));
+  page.on('request', (request) => {
+    if (request.resourceType() === 'eventsource') urls.push(request.url());
   });
-}
-
-async function streamUrls(page: Page): Promise<string[]> {
-  return page.evaluate(() => window.__esUrls ?? []);
+  return urls;
 }
 
 async function issuePairingCode(request: APIRequestContext, base: string): Promise<string> {
@@ -84,7 +70,7 @@ test('auth on, loopback: the gate blocks the board until a pairing code opens it
   page,
   request,
 }) => {
-  await recordEventSourceUrls(page);
+  const urls = recordStreamUrls(page);
   await page.goto(`${authed.base}/app`);
   await expect(page.locator('.token-gate')).toBeVisible();
 
@@ -96,15 +82,13 @@ test('auth on, loopback: the gate blocks the board until a pairing code opens it
   ).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
   await expect
-    .poll(async () =>
-      (await streamUrls(page)).some((url) => url.includes('/stream?') && url.includes('ticket=')),
-    )
+    .poll(() => urls.some((url) => url.includes('/stream?') && url.includes('ticket=')))
     .toBe(true);
-  for (const url of await streamUrls(page)) expect(url).not.toContain('token=');
+  for (const url of urls) expect(url).not.toContain('token=');
 });
 
 test('auth on: a stored owner token is cleared and is not sent', async ({ page, request }) => {
-  await recordEventSourceUrls(page);
+  const urls = recordStreamUrls(page);
   await page.addInitScript(() => localStorage.setItem('cairn.token', 'stale-bad-token'));
   await page.goto(`${authed.base}/app`);
   await expect(page.locator('.token-gate')).toBeVisible();
@@ -114,11 +98,12 @@ test('auth on: a stored owner token is cleared and is not sent', async ({ page, 
   await expect(
     page.locator('.board-sidebar, [data-testid="first-run-setup"]'),
   ).toBeVisible();
-  for (const url of await streamUrls(page)) expect(url).not.toContain('stale-bad-token');
+  await expect.poll(() => urls.some((url) => url.includes('/stream'))).toBe(true);
+  for (const url of urls) expect(url).not.toContain('stale-bad-token');
 });
 
 test('auth off: zero gate page, zero token attached, behavior unchanged', async ({ page }) => {
-  await recordEventSourceUrls(page);
+  const urls = recordStreamUrls(page);
   const firstLoad = page.waitForResponse((res) => res.url().endsWith('/api/teams'));
   await page.goto(`${openServer.base}/app`);
 
@@ -129,10 +114,8 @@ test('auth off: zero gate page, zero token attached, behavior unchanged', async 
   const res = await firstLoad;
   expect(res.status()).toBe(200);
   expect(res.request().headers().authorization).toBeUndefined();
-  await expect
-    .poll(async () => (await streamUrls(page)).some((url) => url.includes('/stream')))
-    .toBe(true);
-  for (const url of await streamUrls(page)) {
+  await expect.poll(() => urls.some((url) => url.includes('/stream'))).toBe(true);
+  for (const url of urls) {
     expect(url).not.toContain('token=');
   }
 });
