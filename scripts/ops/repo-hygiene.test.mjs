@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { renameSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
@@ -11,7 +11,6 @@ import {
   classifyIssue,
   classifyPreflightRef,
   classifyPullRequest,
-  classifyRelease,
   classifyScheduledRun,
   closesCommitsFor,
   liveChecks,
@@ -481,17 +480,17 @@ test('board plan adds missing open issues, marks closed Done, removes duplicate 
   );
 });
 
-test('draft release tags can be deleted only when their absence from live refs is verified', () => {
-  assert.equal(classifyRelease({ isDraft: false, ageDays: 100, tagDisposition: 'delete' }), 'keep');
-  assert.equal(classifyRelease({ isDraft: true, ageDays: 0.5, tagDisposition: 'delete' }), 'keep');
-  assert.equal(classifyRelease({ isDraft: true, ageDays: 2, tagDisposition: 'delete' }), 'delete');
-  assert.equal(classifyRelease({ isDraft: true, ageDays: 2, tagDisposition: 'unknown' }), 'report');
-  for (const tagDisposition of ['absent', 'keep']) {
-    assert.equal(
-      classifyRelease({ isDraft: true, ageDays: 2, tagDisposition }),
-      'delete-release-only',
-    );
-  }
+test('repo hygiene cannot delete a release or a tag', async () => {
+  const source = readFileSync(join(import.meta.dirname, 'repo-hygiene.mjs'), 'utf8');
+  const module = await import('./repo-hygiene.mjs');
+  assert.equal(module.classifyRelease, undefined, 'no draft-release deletion planner is exported');
+  assert.equal(
+    module.DRAFT_RELEASE_AGE_DAYS,
+    undefined,
+    'no draft-release age threshold is exported',
+  );
+  assert.doesNotMatch(source, /release'[,\s]*'delete'/);
+  assert.doesNotMatch(source, /refs\/tags/, 'hygiene never resolves a tag ref it could delete');
 });
 
 test('caches on deleted refs are pruned; caches on live refs kept', () => {

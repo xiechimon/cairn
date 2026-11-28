@@ -1,9 +1,11 @@
 name: repo-hygiene
 
 # Daily deterministic maintenance over every repository surface: landed PRs,
-# closed-by-commit issues, dead branches, the roadmap board,
-# draft releases, actions caches and settings drift. The schedule runs for
-# real; workflow_dispatch defaults to dry so it can be rehearsed on any ref.
+# closed-by-commit issues, dead branches, the roadmap board, failed
+# desktop-release publishes, actions caches and settings drift. The schedule runs
+# for real; workflow_dispatch defaults to dry so it can be rehearsed on any ref.
+# It never deletes a release or a tag: the release workflow owns desktop-v*
+# versions and an abandoned draft only holds its version.
 # Judgement items are written to the one pinned "Repo hygiene report" issue.
 
 on:

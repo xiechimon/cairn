@@ -15,7 +15,6 @@ import { evaluateCoverage, manifestIssues } from '../issue-coverage.mjs';
 export const REPORT_TITLE = 'Repo hygiene report';
 export const PROTECTED_REFS = new Set(['main', 'queue/main', 'queue-state/main']);
 export const PREFLIGHT_AGE_DAYS = 7;
-export const DRAFT_RELEASE_AGE_DAYS = 1;
 export const STALE_ISSUE_DAYS = 14;
 const DAY_MS = 86400000;
 const REPOSITORY = 'xiechimon/cairn';
@@ -186,13 +185,6 @@ export function planBoard({ openIssues, closedIssueTitles = [], boardItems }) {
     else plan.reportDraft.push(item);
   }
   return plan;
-}
-
-export function classifyRelease({ isDraft, ageDays, tagDisposition }) {
-  if (!isDraft || !Number.isFinite(ageDays) || ageDays <= DRAFT_RELEASE_AGE_DAYS) return 'keep';
-  if (tagDisposition === 'delete') return 'delete';
-  if (tagDisposition === 'keep' || tagDisposition === 'absent') return 'delete-release-only';
-  return 'report';
 }
 
 export function classifyCache({ ref, liveRefs }) {
@@ -718,7 +710,6 @@ async function main() {
   const boardNumber = Number(process.env.HYGIENE_BOARD_NUMBER ?? 2);
 
   exec('git', ['fetch', '--quiet', '--prune', 'origin', 'main'], { cwd: root });
-  exec('git', ['fetch', '--quiet', 'origin', 'refs/tags/*:refs/tags/*'], { cwd: root });
   const actions = [`repo-hygiene mode=${mode} main=${mainRef}`];
   const state = {};
 
@@ -856,68 +847,12 @@ async function main() {
     }
   }
 
-  // 5. releases ------------------------------------------------------------------
+  // 5. releases ----------------------------------------------------------------
+  // Report only: the desktop-release workflow owns `desktop-v*` versions and never
+  // deletes a release or a tag, so an abandoned draft keeps its version and is
+  // left alone here too.
   {
-    const releases =
-      ghJson(['release', 'list', '--limit', '1000', '--json', 'tagName,isDraft,createdAt']) ?? [];
-    state.releases = { deleted: [], deletedReleaseOnly: [], report: [] };
-    const now = Date.now();
-    const draftReleases = releases.filter(
-      (rel) => rel.isDraft && (now - Date.parse(rel.createdAt)) / DAY_MS > DRAFT_RELEASE_AGE_DAYS,
-    );
-    const tagRows = draftReleases.length > 0 ? git(['ls-remote', '--tags', 'origin']) : null;
-    const tags = new Map(
-      (tagRows ?? '')
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => line.split('\t').reverse()),
-    );
-    const liveHeadShas = new Set([mainRef, ...heads.map((head) => head.sha)]);
-    for (const rel of draftReleases) {
-      const ref = `refs/tags/${rel.tagName}`;
-      const tagOid = tags.get(ref);
-      let tagDisposition = 'unknown';
-      if (tagRows !== null && !tagOid) tagDisposition = 'absent';
-      if (tagOid) {
-        const commit = git(['rev-parse', '--verify', `${tagOid}^{commit}`]);
-        if (commit !== null) {
-          const otherTagPointsToCommit = [...tags].some(
-            ([name, sha]) => name !== ref && name !== `${ref}^{}` && sha === commit,
-          );
-          const ancestry = [...liveHeadShas].map((headSha) =>
-            execCode('git', ['merge-base', '--is-ancestor', commit, headSha]),
-          );
-          if (otherTagPointsToCommit || ancestry.includes(0)) tagDisposition = 'keep';
-          else if (ancestry.every((code) => code === 1)) tagDisposition = 'delete';
-        }
-      }
-      const verdict = classifyRelease({
-        isDraft: true,
-        ageDays: (now - Date.parse(rel.createdAt)) / DAY_MS,
-        tagDisposition,
-      });
-      if (verdict === 'keep') continue;
-      if (verdict === 'report') {
-        state.releases.report.push(`draft ${rel.tagName}: tag ancestry unreadable — left in place`);
-        continue;
-      }
-      const target =
-        verdict === 'delete' ? state.releases.deleted : state.releases.deletedReleaseOnly;
-      target.push(rel.tagName);
-      act(
-        mode,
-        actions,
-        `delete draft release ${rel.tagName}${verdict === 'delete' ? ' and its tag' : ' (release only)'}`,
-        () => {
-          const draft = ghJson(['release', 'view', '--json', 'isDraft', '--', rel.tagName]);
-          if (draft?.isDraft !== true) throw new Error('release no longer verifiably a draft');
-          gh(['release', 'delete', '--yes', '--', rel.tagName]);
-          if (verdict === 'delete' && deleteRefWithLease(ref, tagOid) === null)
-            throw new Error(`tag ${rel.tagName} could not be deleted`);
-        },
-      );
-    }
-    // failed desktop-release publishes
+    state.releases = { report: [] };
     const failed = ghJson([
       'run',
       'list',

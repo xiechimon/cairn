@@ -125,6 +125,12 @@
       "pattern": "\\bcairn-(?:a11y|copy|motion|motion-audit|polish|type)\\b",
       "canary": "cairn-polish",
       "reason": "domain design-rule wrapper skills were folded into apps/web/DESIGN.md, docs/design/surfaces/*.md and cairn-design-review"
+    },
+    {
+      "id": "hygiene-draft-release-deletion",
+      "pattern": "\\bdeletes draft releases?\\b",
+      "canary": "deletes draft releases older than 24h",
+      "reason": "repo hygiene no longer deletes a release or a tag; the release workflow owns desktop-v* versions and an abandoned draft only holds its version"
     }
   ],
   "baseline": {
@@ -178,6 +184,7 @@
     "info-card-pipeline": {},
     "rule-ab-doc": {},
     "base-ui-theme-spec": {},
-    "retired-design-rule-skills": {}
+    "retired-design-rule-skills": {},
+    "hygiene-draft-release-deletion": {}
   }
 }
