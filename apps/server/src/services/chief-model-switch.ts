@@ -11,6 +11,7 @@ import { nowMs } from '../lib/ids.js';
 import { type MachineDeps, upsertChiefRow } from './machine-deps.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { coordinatorProfile } from './routing-rules.js';
+import { readQuota } from './step-groups/quota.js';
 
 export const MODEL_SWITCH_QUIET_MS = 15 * 60_000;
 
@@ -74,7 +75,7 @@ export function announcePrimaryRestored(
   deps: MachineDeps,
   stepRow: typeof step.$inferSelect,
 ): void {
-  if (stepRow.fallback != null) return;
+  if (readQuota(deps.db, stepRow.id).fallback != null) return;
   if (toldModel(deps.db, stepRow.buildId).fallbackTo === null) return;
   const thread = deps.db
     .select({ teamId: chiefThread.teamId, projectId: chiefThread.projectId })

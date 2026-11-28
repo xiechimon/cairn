@@ -13,6 +13,7 @@ import {
 } from '../src/db/schema.js';
 import { providerHealth } from '../src/services/provider-health.js';
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
+import { readQuota, writeQuota } from '../src/services/step-groups/quota.js';
 import {
   bootServer,
   claimedGeneration,
@@ -172,7 +173,10 @@ function quotaDone(providerId: string): Record<string, unknown> {
 }
 
 function stepRow(w: World, stepId: string) {
-  return w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+  return {
+    ...w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!,
+    ...readQuota(w.s.db, stepId),
+  };
 }
 
 describe('model fallback chain (#1493)', () => {
@@ -619,23 +623,26 @@ describe('model fallback chain (#1493)', () => {
       const w = await setupWorld();
       const buildId = await startBuild(w);
       const first = await claim(w);
-      w.s.db
-        .insert(stepTable)
-        .values({
-          id: 'fallback-probe-sibling',
-          buildId,
-          kind: 'session',
-          status: 'claimed',
-          machineId: stepRow(w, first.stepId).machineId,
-          claimedAt: Date.now(),
-          createdAt: Date.now(),
+      w.s.db.transaction((tx) => {
+        tx.insert(stepTable)
+          .values({
+            id: 'fallback-probe-sibling',
+            buildId,
+            kind: 'session',
+            status: 'claimed',
+            machineId: stepRow(w, first.stepId).machineId,
+            claimedAt: Date.now(),
+            createdAt: Date.now(),
+          })
+          .run();
+        writeQuota(tx, 'fallback-probe-sibling', {
           fallback: {
             model: { provider: 'relay-b', modelId: 'model-b' },
             tried: ['relay-a/model-a', 'relay-b/model-b'],
             zeroUsageRetried: false,
           },
-        })
-        .run();
+        });
+      });
       await done(w, first.stepId, { status: 'failed', errorMessage: 'model_not_found: model-a' });
       const reason = w.s.db
         .select()

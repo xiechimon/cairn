@@ -23,6 +23,7 @@ import {
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
@@ -138,7 +139,7 @@ async function startBuild(s: TestServer, projectId: string, todoId: string): Pro
 }
 
 function stepRow(s: TestServer, stepId: string) {
-  return s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+  return readStepFixture(s.db, stepId)!;
 }
 
 type StepsRestRow = {

@@ -20,6 +20,7 @@ import {
   plan as planTable,
   project,
   step,
+  stepSchedule,
   stopPending,
   todo,
 } from '../db/schema.js';
@@ -62,6 +63,7 @@ import {
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planAutoConfirmation } from './plan-auto-confirm.js';
 import { finishScheduledStep } from './schedules.js';
+import { readSchedule } from './step-groups/schedule.js';
 import { getTodo, noteTaskCodeDelivered, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
@@ -197,12 +199,13 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         id: step.id,
         kind: step.kind,
         status: step.status,
-        scheduleId: step.scheduleId,
+        scheduleId: stepSchedule.scheduleId,
         createdAt: step.createdAt,
         finishedAt: step.finishedAt,
         prompt: step.prompt,
       })
       .from(step)
+      .leftJoin(stepSchedule, eq(stepSchedule.stepId, step.id))
       .where(eq(step.buildId, buildRow.id))
       .orderBy(asc(step.createdAt), asc(step.id))
       .all();
@@ -241,7 +244,10 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
       if (!continuesAttempt) break;
       rootIdx = prevIdx;
     }
-    const attemptRoot = (rootIdx >= 0 ? buildSteps[rootIdx] : undefined) ?? stepRow;
+    const attemptRoot = (rootIdx >= 0 ? buildSteps[rootIdx] : undefined) ?? {
+      ...stepRow,
+      ...readSchedule(deps.db, stepRow.id),
+    };
     const prevBeforeRoot = rootIdx > 0 ? buildSteps[rootIdx - 1] : undefined;
     const attemptStepIds =
       rootIdx >= 0 && currentIdx >= rootIdx

@@ -23,6 +23,7 @@ import { newMcpOAuthState } from '../src/services/mcp-servers.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule } from '../src/services/schedules.js';
 import { createSecret } from '../src/services/secrets.js';
+import { readSchedule } from '../src/services/step-groups/schedule.js';
 import {
   flushSelfIssueWrites,
   updateAutonomousTodo,
@@ -174,7 +175,11 @@ describe('schedule fire act and mark are one commit', () => {
     });
     const scheduler = createScheduler(s.svc, { tickMs: 15_000 });
     await scheduler.tick();
-    const fired = s.db.select().from(step).where(eq(step.scheduleId, record.id)).all();
+    const fired = s.db
+      .select()
+      .from(step)
+      .all()
+      .filter((row) => readSchedule(s.db, row.id).scheduleId === record.id);
     const row = s.db.select().from(scheduleTable).where(eq(scheduleTable.id, record.id)).get();
     expect(fired).toHaveLength(1);
     expect(row?.lastRunStepId).toBe(fired[0]?.id);
@@ -226,7 +231,11 @@ describe('schedule fire act and mark are one commit', () => {
         },
       },
     );
-    const fired = s.db.select().from(step).where(eq(step.scheduleId, record.id)).all();
+    const fired = s.db
+      .select()
+      .from(step)
+      .all()
+      .filter((row) => readSchedule(s.db, row.id).scheduleId === record.id);
     const row = s.db.select().from(scheduleTable).where(eq(scheduleTable.id, record.id)).get();
     expect(fired).toHaveLength(1);
     expect(row?.lastRunStepId).toBe(fired[0]?.id);

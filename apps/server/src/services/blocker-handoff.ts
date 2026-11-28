@@ -9,7 +9,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, message, step, todo } from '../db/schema.js';
+import { build, message, step, stepBlockerHandoff, todo } from '../db/schema.js';
 import { type FetchLike, githubPull } from '../lib/github.js';
 import { readAttachmentMeta } from './attachments.js';
 import { extractText } from './chief.js';
@@ -37,10 +37,11 @@ export async function blockerHandoffForClaim(
   if (stepRow.kind !== 'plan' && !isBuildStepKind(stepRow.kind)) return null;
   const blockerIds = todoRow.blockedBy ?? [];
   const snapshots = deps.db
-    .select({ blockerHandoff: step.blockerHandoff })
+    .select({ blockerHandoff: stepBlockerHandoff.blockerHandoff })
     .from(step)
-    .where(and(eq(step.buildId, stepRow.buildId), isNotNull(step.blockerHandoff)))
-    .orderBy(asc(step.createdAt), sql`rowid`)
+    .innerJoin(stepBlockerHandoff, eq(stepBlockerHandoff.stepId, step.id))
+    .where(eq(step.buildId, stepRow.buildId))
+    .orderBy(asc(step.createdAt), sql`${step}.rowid`)
     .all();
   for (const snapshot of snapshots) {
     const handoff = snapshot.blockerHandoff;

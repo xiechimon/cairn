@@ -10,6 +10,7 @@ import { attachWorkerFile } from '../src/services/agent-attachments.js';
 import { markDelivered } from '../src/services/answer-delivery.js';
 import { completeStep, startBuilds } from '../src/services/builds.js';
 import { sweepStallMonitor } from '../src/services/stall-monitor.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import { getTodo } from '../src/services/todos.js';
 import { backfillTranscriptOrigins } from '../src/services/transcript-origin-backfill.js';
 import { pendingWorkerQuestions } from '../src/services/worker-question-store.js';
@@ -351,10 +352,12 @@ describe('done-in-prod server lifecycle & stall-monitor integration', () => {
         machineId,
         claimedAt,
         lastProgressAt: claimedAt,
-        ranModel: { provider: 'antigravity', modelId: 'm' },
       })
       .where(eq(step.id, nudgeStep.id))
       .run();
+    s.db.transaction((tx) =>
+      writeQuota(tx, nudgeStep.id, { ranModel: { provider: 'antigravity', modelId: 'm' } }),
+    );
 
     sweepStallMonitor(depsOf(s), claimedAt + 7 * 60_000);
     const note1 = s.db
@@ -371,10 +374,12 @@ describe('done-in-prod server lifecycle & stall-monitor integration', () => {
         machineId,
         claimedAt: claimedAt + 8 * 60_000,
         lastProgressAt: claimedAt + 8 * 60_000,
-        ranModel: { provider: 'antigravity', modelId: 'm' },
       })
       .where(eq(step.id, nudgeStep.id))
       .run();
+    s.db.transaction((tx) =>
+      writeQuota(tx, nudgeStep.id, { ranModel: { provider: 'antigravity', modelId: 'm' } }),
+    );
     sweepStallMonitor(depsOf(s), claimedAt + 16 * 60_000);
     const updatedNudge = s.db.select().from(step).where(eq(step.id, nudgeStep.id)).get()!;
     expect(updatedNudge.status).toBe('claimed');

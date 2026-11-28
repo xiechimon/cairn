@@ -58,6 +58,7 @@ import {
   message,
   schedule,
   step,
+  stepQuota,
   stepUsage,
   stopPending,
   taskIssueClose,
@@ -289,8 +290,9 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
     latestBuildIds.length === 0
       ? []
       : db
-          .select({ buildId: step.buildId, block: step.quotaBlock })
+          .select({ buildId: step.buildId, block: stepQuota.quotaBlock })
           .from(step)
+          .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
           .where(and(inArray(step.buildId, latestBuildIds), eq(step.status, 'waiting_quota')))
           .all();
   for (const waiting of waitingSteps) {
@@ -589,10 +591,12 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
   if (!(IN_PROGRESS_PHASES as readonly string[]).includes(row.phase) || row.latestBuildId === null)
     return undefined;
   const pendingSteps = deps.db
-    .select()
+    .select({ step, fallback: stepQuota.fallback })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .where(and(eq(step.buildId, row.latestBuildId), eq(step.status, 'pending')))
     .all()
+    .map(({ step: core, fallback }) => ({ ...core, fallback }))
     .filter((s) => s.holdReason !== BLOCKED_BY_HOLD);
   if (pendingSteps.length === 0) return undefined;
   const held = pendingSteps.find((s) => s.holdReason === 'quota');

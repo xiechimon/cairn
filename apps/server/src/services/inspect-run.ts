@@ -32,6 +32,7 @@ import {
 } from '../reliability-report.js';
 import { messageText } from './conversation-page.js';
 import { resolveRunTarget, type TeamBuild, type TeamThread } from './run-target.js';
+import { readManyQuota, type StepQuota } from './step-groups/quota.js';
 
 export const INSPECT_RUN_MAX_OUTPUT_BYTES = 24 * 1024;
 const LINE_MAX_CHARS = 400;
@@ -42,7 +43,18 @@ const EVENT_LIMIT = 5;
 const TOOL_CALL_LIMIT = 8;
 const MESSAGE_SCAN_LIMIT = 200;
 
-type StepRow = typeof step.$inferSelect;
+type StepRow = typeof step.$inferSelect & StepQuota;
+
+function withQuota(db: Db, rows: (typeof step.$inferSelect)[]): StepRow[] {
+  const groups = readManyQuota(
+    db,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => ({
+    ...row,
+    ...(groups.get(row.id) ?? { quotaBlock: null, fallback: null, ranModel: null }),
+  }));
+}
 
 interface Evidence {
   source: string;
@@ -131,12 +143,15 @@ function toolCallOf(content: unknown) {
 
 function inspectBuild(db: Db, row: TeamBuild, focusStepId: string | null, env: NodeJS.ProcessEnv) {
   const now = nowMs();
-  const steps = db
-    .select()
-    .from(step)
-    .where(eq(step.buildId, row.id))
-    .orderBy(asc(step.createdAt), asc(step.id))
-    .all();
+  const steps = withQuota(
+    db,
+    db
+      .select()
+      .from(step)
+      .where(eq(step.buildId, row.id))
+      .orderBy(asc(step.createdAt), asc(step.id))
+      .all(),
+  );
   const residual = failedStepResidualText(
     db,
     steps.filter((s) => s.status === 'failed').map((s) => s.id),
@@ -317,7 +332,8 @@ function inspectTurns(
 ) {
   const now = nowMs();
   const exporting = traceExportConfigured(env);
-  const turns =
+  const turns = withQuota(
+    db,
     focusStepId === null
       ? db
           .select()
@@ -326,7 +342,8 @@ function inspectTurns(
           .orderBy(desc(step.createdAt), desc(step.id))
           .limit(TURN_LIMIT)
           .all()
-      : db.select().from(step).where(eq(step.id, focusStepId)).all();
+      : db.select().from(step).where(eq(step.id, focusStepId)).all(),
+  );
   const ids = turns.map((t) => t.id);
   const usageRows =
     ids.length === 0

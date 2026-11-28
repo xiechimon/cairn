@@ -21,6 +21,7 @@ import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { stepToken } from '../src/services/machine-step-token.js';
 import { createProvider } from '../src/services/providers.js';
 import { createSecret } from '../src/services/secrets.js';
+import { writeSubscription } from '../src/services/step-groups/subscription.js';
 import {
   bootServer,
   insertMachine,
@@ -249,11 +250,11 @@ describe('subscription credential dispatch', () => {
     const saved = await req(s.app, 'POST', path, { label: 'Personal', token });
     expect(saved.status).toBe(201);
     const buildStep = addStep(s, s.buildId, 'build');
-    s.db
-      .update(stepTable)
-      .set({ claudeSubscriptionId: s.db.select().from(claudeSubscription).get()?.id ?? null })
-      .where(eq(stepTable.id, buildStep))
-      .run();
+    s.db.transaction((tx) =>
+      writeSubscription(tx, buildStep, {
+        claudeSubscriptionId: tx.select().from(claudeSubscription).get()?.id ?? null,
+      }),
+    );
     expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBeUndefined();
     setSessionProvider(s, 'claude-code');
     expect(resolveStepCredentials(s.keysvc, buildStep).claudeSubscriptionToken).toBe(token);
@@ -286,7 +287,11 @@ test('a review route on a pi provider cannot receive the session subscription', 
   setSessionProvider(s, 'claude-code');
   seedRoute(s, 'review', { provider: 'r3-gw', modelId: 'stub-model' });
   const enabledId = s.db.select().from(claudeSubscription).get()?.id ?? null;
-  s.db.update(stepTable).set({ claudeSubscriptionId: enabledId }).run();
+  s.db.transaction((tx) => {
+    for (const row of tx.select({ id: stepTable.id }).from(stepTable).all()) {
+      writeSubscription(tx, row.id, { claudeSubscriptionId: enabledId });
+    }
+  });
   expect(resolveStepCredentials(s.keysvc, s.stepId).claudeSubscriptionToken).toBeDefined();
   const reviewStep = addStep(s, s.buildId, 'review');
   expect(resolveStepCredentials(s.keysvc, reviewStep).claudeSubscriptionToken).toBeUndefined();

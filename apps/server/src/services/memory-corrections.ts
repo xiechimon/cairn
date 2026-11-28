@@ -48,6 +48,8 @@ import {
   type MemoryDocumentOwner,
   memoryDocumentRows,
 } from './memory-documents.js';
+import { readMemoryTrace } from './step-groups/memory-trace.js';
+import { readSubscription } from './step-groups/subscription.js';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type Row = typeof agentMemory.$inferSelect;
@@ -413,7 +415,11 @@ function savedBy(time: number, entry: Entry, versions: readonly Row[]): boolean 
 }
 
 function promptMayNotBeResent(tx: Tx, turn: StepRow): boolean {
-  if (turn.antigravitySubscriptionId === null && turn.doubaoSubscriptionId === null) return false;
+  if (
+    readSubscription(tx, turn.id).antigravitySubscriptionId === null &&
+    turn.doubaoSubscriptionId === null
+  )
+    return false;
   if (turn.sessionId !== null) return true;
   return (
     tx
@@ -434,9 +440,10 @@ function promptMayNotBeResent(tx: Tx, turn: StepRow): boolean {
 function inAttachedIndex(tx: Tx, teamId: string, turn: StepRow, entry: Entry): boolean | null {
   if (entry.file !== MEMORY_INDEX_TITLE) return false;
   if (promptMayNotBeResent(tx, turn)) return null;
+  const { memoryTrace } = readMemoryTrace(tx, turn.id);
   const attached = [
-    ...(turn.memoryTrace?.teamMemoryIds ?? []),
-    ...(turn.memoryTrace?.projectMemoryIds ?? []),
+    ...(memoryTrace?.teamMemoryIds ?? []),
+    ...(memoryTrace?.projectMemoryIds ?? []),
   ];
   return tx
     .select()

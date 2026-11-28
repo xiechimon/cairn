@@ -18,6 +18,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { insertStepFixture, readStepFixture } from './step-groups-fixture.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -100,7 +101,7 @@ describe('Coordinator rule that selects Devin', () => {
     expect(claimed?.step).toMatchObject({ id: 's1', machineId });
     expect(claimed?.agent).toMatchObject({ provider: 'devin', modelId: 'swe-2-high' });
 
-    const row = s.db.select().from(stepTable).where(eq(stepTable.id, 's1')).get();
+    const row = readStepFixture(s.db, 's1');
     expect(row?.devinSubscriptionId).toBe(subscriptionId);
 
     const tokenRes = await stepToken(
@@ -161,20 +162,17 @@ describe('Coordinator rule that selects Devin', () => {
       .set({ sessionId: 'devin-sess-1', sessionRuntime: 'devin' })
       .where(eq(chiefThreadTable.id, 'chief-t1'))
       .run();
-    s.db
-      .insert(stepTable)
-      .values({
-        id: 's1',
-        buildId: 'chief-t1',
-        kind: 'chief',
-        status: 'done',
-        machineId,
-        claimedAt: 3,
-        sessionId: 'devin-sess-1',
-        devinSubscriptionId: subscriptionId,
-        createdAt: 3,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: 's1',
+      buildId: 'chief-t1',
+      kind: 'chief',
+      status: 'done',
+      machineId,
+      claimedAt: 3,
+      sessionId: 'devin-sess-1',
+      devinSubscriptionId: subscriptionId,
+      createdAt: 3,
+    });
     s.db
       .insert(chiefTurnUsageTable)
       .values({

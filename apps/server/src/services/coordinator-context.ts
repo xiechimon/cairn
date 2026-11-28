@@ -21,7 +21,15 @@ import {
 import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import { catalogContextWindow, DEFAULT_CONTEXT_WINDOW } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
-import { chiefThread, chiefTurnUsage, machine, provider, step, tokenUsage } from '../db/schema.js';
+import {
+  chiefThread,
+  chiefTurnUsage,
+  machine,
+  provider,
+  step,
+  stepQuota,
+  tokenUsage,
+} from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { stepRuntimeFor } from './dispatch-eligibility.js';
 import { loadTeamModelCatalog, resolveTeamModelEntry } from './model-catalog.js';
@@ -338,12 +346,13 @@ export function channelUsageSummary(
       claimedAt: step.claimedAt,
       createdAt: step.createdAt,
       finishedAt: step.finishedAt,
-      ranModel: step.ranModel,
+      ranModel: stepQuota.ranModel,
       machineId: step.machineId,
       machineName: machine.name,
       machineCapabilities: machine.capabilities,
     })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .leftJoin(machine, and(eq(machine.id, step.machineId), eq(machine.teamId, chiefRow.teamId)))
     .where(and(inArray(step.buildId, threadIds), eq(step.kind, 'chief')))
     .orderBy(asc(step.claimedAt), asc(step.createdAt))

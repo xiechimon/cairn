@@ -96,6 +96,8 @@ import {
 import { effectiveModel, modelKey } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { coordinatorProfile, type RouteProfile, routeForStep } from './routing-rules.js';
+import { readQuota, type StepQuota } from './step-groups/quota.js';
+import { readSubscription, type StepSubscription } from './step-groups/subscription.js';
 import {
   acquireWorkerStepLease,
   heartbeatStep,
@@ -121,7 +123,7 @@ export {
 };
 
 interface ClaimCandidate {
-  stepRow: typeof step.$inferSelect;
+  stepRow: typeof step.$inferSelect & StepQuota & StepSubscription;
   buildRow: typeof build.$inferSelect;
   todoRow: typeof todo.$inferSelect;
 }
@@ -143,7 +145,14 @@ function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string):
     )
     .orderBy(asc(step.createdAt))
     .all();
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    stepRow: {
+      ...row.stepRow,
+      ...readQuota(deps.db, row.stepRow.id),
+      ...readSubscription(deps.db, row.stepRow.id),
+    },
+  }));
 }
 
 function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: string) {
@@ -164,7 +173,15 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     .all()
     .flatMap((row) => {
       const agentRow = coordinatorProfile(deps.db, teamId, row.threadRow.projectId);
-      return agentRow === null ? [] : [{ ...row, agentRow }];
+      return agentRow === null
+        ? []
+        : [
+            {
+              ...row,
+              stepRow: { ...row.stepRow, ...readQuota(deps.db, row.stepRow.id) },
+              agentRow,
+            },
+          ];
     })
     .filter((row) => !serverTakesTurn(deps.db, teamId, row.stepRow));
 }
@@ -176,7 +193,7 @@ export function serverTurnModel(
 ): StepRanModel | null {
   if (!coordinatorInServerEnabled() || stepRow.kind !== 'chief') return null;
   const route = coordinatorRoute(db, teamId, chiefThreadProject(db, stepRow.buildId));
-  const pin = stepRow.fallback?.model ?? null;
+  const pin = readQuota(db, stepRow.id).fallback?.model ?? null;
   const model = pin ?? route;
   if (
     model === null ||
@@ -222,7 +239,8 @@ async function buildChiefClaim(
   failover?: { fromMachineId: string; reason: 'offline' | 'busy' },
 ): Promise<ClaimedStep | null> {
   if (!stillAuthorized() || !agentRow.modelId) return null;
-  const model = effectiveModel(agentRow, stepRow);
+  const quota = readQuota(deps.db, stepRow.id);
+  const model = effectiveModel(agentRow, quota);
   const runtime = stepRuntimeFor(model.provider);
   if (
     runtime === 'doubao' &&
@@ -259,7 +277,7 @@ async function buildChiefClaim(
       ? { runtime, teamId: threadRow.teamId }
       : null;
   const routeSwitch =
-    stepRow.fallback === null &&
+    quota.fallback === null &&
     agentRow.switchedFrom !== undefined &&
     model.provider !== null &&
     model.modelId !== null
@@ -288,7 +306,7 @@ async function buildChiefClaim(
             provider: model.provider,
             modelId: model.modelId,
             thinkingLevel:
-              stepRow.fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
+              quota.fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
           },
     ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
     mcpGrant: chiefMcp ?? null,
@@ -788,7 +806,14 @@ async function tryClaim(
             },
             model.provider,
           );
-          if (accountHeld(cand.stepRow, fresh, boundId)) return false;
+          if (
+            accountHeld(
+              { ...cand.stepRow, ...readSubscription(tx, cand.stepRow.id) },
+              fresh,
+              boundId,
+            )
+          )
+            return false;
         }
         if (claimRuntimeIsDevin && boundDevinId !== enabledDevinId) return false;
         if (
@@ -868,27 +893,32 @@ async function tryClaim(
             ? repoResolution.error
             : false;
         }
-        const lease = acquireWorkerStepLease(tx, cand.stepRow, {
-          machineId,
-          claimedAt,
-          claimedRepo: claimRepo === null ? null : `${claimRepo.owner}/${claimRepo.repo}`,
-          claimedRepoId: repoResolution.id,
-          skillInjection,
-          blockerHandoff,
-          claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
-          devinSubscriptionId: claimRuntimeIsDevin ? boundDevinId : null,
-          antigravitySubscriptionId: claimRuntimeIsAntigravity ? boundAntigravityId : null,
-          doubaoSubscriptionId: claimRuntimeIsDoubao ? boundDoubaoId : null,
-          ranModel: pinnedModel,
-          ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
-          mcpGrant: workerMcp ?? null,
-          ...(resolution.failover !== undefined
-            ? {
-                routedFromMachineId: resolution.failover.fromMachineId,
-                routedReason: resolution.failover.reason,
-              }
-            : {}),
-        });
+        // withFencedTransaction holds this connection in a transaction but types it as Db.
+        const lease = acquireWorkerStepLease(
+          tx as Parameters<typeof acquireWorkerStepLease>[0],
+          cand.stepRow,
+          {
+            machineId,
+            claimedAt,
+            claimedRepo: claimRepo === null ? null : `${claimRepo.owner}/${claimRepo.repo}`,
+            claimedRepoId: repoResolution.id,
+            skillInjection,
+            blockerHandoff,
+            claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
+            devinSubscriptionId: claimRuntimeIsDevin ? boundDevinId : null,
+            antigravitySubscriptionId: claimRuntimeIsAntigravity ? boundAntigravityId : null,
+            doubaoSubscriptionId: claimRuntimeIsDoubao ? boundDoubaoId : null,
+            ranModel: pinnedModel,
+            ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
+            mcpGrant: workerMcp ?? null,
+            ...(resolution.failover !== undefined
+              ? {
+                  routedFromMachineId: resolution.failover.fromMachineId,
+                  routedReason: resolution.failover.reason,
+                }
+              : {}),
+          },
+        );
         if (lease === null) return false;
         if (switchedFallback !== null && routeSwitch !== null && pinnedModel !== null) {
           upsertMessage(settleDeps, {

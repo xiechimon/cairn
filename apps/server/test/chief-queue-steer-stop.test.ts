@@ -27,6 +27,7 @@ import {
   subscriptionClaudeReport,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
 
@@ -234,7 +235,7 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
       expect(res.status).toBe(200);
     },
     stepRow(id: string) {
-      return s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();
+      return readStepFixture(s.db, id);
     },
   };
 }

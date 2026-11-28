@@ -39,9 +39,13 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { settleMemoryEditTurn } from './memory-edit-turns.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
-import { publishStepRow } from './quota-wait.js';
+import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { coordinatorMemoryOwner } from './routing-rules.js';
 import { settleScheduledStepOutcome } from './schedules.js';
+import { writeMemoryTrace, writeMemoryTraceGuarded } from './step-groups/memory-trace.js';
+import { readQuota, type StepQuota } from './step-groups/quota.js';
+import { readSchedule } from './step-groups/schedule.js';
+import { readSkillInjection, type StepSkillInjection } from './step-groups/skill-injection.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -151,7 +155,8 @@ export function chiefModelLabel(model: {
 }
 
 export function chiefThreadFallbackModel(db: Db, threadId: string): string | null {
-  const model = liveChiefSteps(db, threadId)[0]?.fallback?.model;
+  const first = liveChiefSteps(db, threadId)[0];
+  const model = first === undefined ? null : readQuota(db, first.id).fallback?.model;
   return model == null ? null : chiefModelLabel(model);
 }
 
@@ -205,6 +210,29 @@ export function waitingStepOf(db: Db, threadId: string, messageId: string): Step
 
 const READ_ALREADY = 'message already read by the running turn (Coordinator 已经读到这条了)';
 
+type RetiredStepRow = StepRow & StepQuota & StepSkillInjection;
+
+function snapshotRetiredStep(db: Db, row: StepRow): RetiredStepRow {
+  return { ...row, ...readQuota(db, row.id), ...readSkillInjection(db, row.id) };
+}
+
+// Side rows cascade on deletion, so publish from the pre-delete snapshot.
+function publishRetiredStep(deps: ChiefTurnDeps, row: RetiredStepRow): void {
+  deps.convHub?.publishStep(row.buildId, {
+    id: row.id,
+    buildId: row.buildId,
+    kind: row.kind,
+    machineId: row.machineId,
+    createdAt: row.createdAt,
+    status: row.status,
+    checkpointCommit: row.checkpointCommit,
+    skillInjection: row.skillInjection,
+    ...(row.status === 'waiting_quota' && row.quotaBlock !== null
+      ? { quotaWait: toQuotaWait(row.quotaBlock) }
+      : {}),
+  });
+}
+
 function deleteWaitingMessage(
   deps: ChiefTurnDeps,
   threadId: string,
@@ -213,13 +241,15 @@ function deleteWaitingMessage(
   extra: () => void = () => {},
 ): void {
   const message = requireUserMessage(deps.db, threadId, messageId);
-  deps.db.transaction(() => {
+  const retired = deps.db.transaction(() => {
     extra();
+    const snapshot = snapshotRetiredStep(deps.db, row);
     deps.db.delete(step).where(eq(step.id, row.id)).run();
     deps.db.delete(chiefMessage).where(eq(chiefMessage.id, messageId)).run();
+    return snapshot;
   });
   settleChiefActiveRun(deps.db, threadId);
-  publishStepRow(deps, row);
+  publishRetiredStep(deps, retired);
   deps.convHub?.publishMessage(threadId, message);
 }
 
@@ -282,7 +312,8 @@ export async function withdrawChiefMessage(
       .run();
     throw new HttpError(409, READ_ALREADY, CHIEF_MESSAGE_READ);
   }
-  deps.db.transaction(() => {
+  const retired = deps.db.transaction(() => {
+    const snapshot = snapshotRetiredStep(deps.db, row);
     deps.db
       .update(coordinatorInput)
       .set({ state: 'released', successorStepId: null })
@@ -290,26 +321,31 @@ export async function withdrawChiefMessage(
       .run();
     deps.db.delete(step).where(eq(step.id, row.id)).run();
     deps.db.delete(chiefMessage).where(eq(chiefMessage.id, messageId)).run();
+    return snapshot;
   });
   settleChiefActiveRun(deps.db, threadId);
-  publishStepRow(deps, row);
+  publishRetiredStep(deps, retired);
   deps.convHub?.publishMessage(threadId, message);
   return { ok: true };
 }
 
 function stageSteeredMemory(db: Db, waitingId: string, memoryIds: readonly string[]): void {
-  db.update(step)
-    .set({
-      memoryTrace: {
-        teamMemoryIds: [],
-        teamMemoriesOmitted: 0,
-        projectMemoryIds: [...memoryIds],
-        projectMemoriesOmitted: 0,
-        recalledMemoryIds: [],
+  db.transaction((tx) => {
+    writeMemoryTraceGuarded(
+      tx,
+      waitingId,
+      {
+        memoryTrace: {
+          teamMemoryIds: [],
+          teamMemoriesOmitted: 0,
+          projectMemoryIds: [...memoryIds],
+          projectMemoriesOmitted: 0,
+          recalledMemoryIds: [],
+        },
       },
-    })
-    .where(eq(step.id, waitingId))
-    .run();
+      sql`1`,
+    );
+  });
 }
 
 function steerContent(
@@ -595,21 +631,43 @@ export function ackChiefSteer(
       (messageIds === undefined || messageIds.includes(row.id)),
   );
   const now = nowMs();
-  for (const row of sent) {
-    traceDeliveredSteer(deps.db, running.id, row);
-    deps.db.delete(step).where(eq(step.id, row.id)).run();
-    deps.db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, row.id)).run();
-    deps.db
-      .update(chiefMessage)
-      .set({
-        createdAt: now,
-        typedAt: sql`coalesce(${chiefMessage.typedAt}, ${chiefMessage.createdAt})`,
-      })
-      .where(eq(chiefMessage.id, row.id))
-      .run();
-    const message = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, row.id)).get();
+  const retired = deps.db.transaction(() =>
+    sent.flatMap((row) => {
+      const current = deps.db
+        .select()
+        .from(step)
+        .where(
+          and(
+            eq(step.id, row.id),
+            eq(step.status, 'pending'),
+            eq(step.holdReason, STEER_SENT_HOLD),
+          ),
+        )
+        .get();
+      if (current === undefined) return [];
+      const snapshot = snapshotRetiredStep(deps.db, current);
+      traceDeliveredSteer(deps.db, running.id, current);
+      deps.db.delete(step).where(eq(step.id, current.id)).run();
+      deps.db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, current.id)).run();
+      deps.db
+        .update(chiefMessage)
+        .set({
+          createdAt: now,
+          typedAt: sql`coalesce(${chiefMessage.typedAt}, ${chiefMessage.createdAt})`,
+        })
+        .where(eq(chiefMessage.id, current.id))
+        .run();
+      const message = deps.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, current.id))
+        .get();
+      return [{ snapshot, message }];
+    }),
+  );
+  for (const { snapshot, message } of retired) {
     if (message) deps.convHub?.publishMessage(threadId, message);
-    publishStepRow(deps, row);
+    publishRetiredStep(deps, snapshot);
   }
   const next = deps.db
     .select()
@@ -620,30 +678,41 @@ export function ackChiefSteer(
 }
 
 export function releaseUnconsumedSteer(db: Db, finished: StepRow): void {
-  db.delete(steerPending)
-    .where(
-      and(eq(steerPending.conversationId, finished.buildId), eq(steerPending.stepId, finished.id)),
-    )
-    .run();
-  const unread = and(
-    eq(step.buildId, finished.buildId),
-    eq(step.status, 'pending'),
-    inArray(step.holdReason, STEER_HOLDS),
-    notInArray(
-      step.id,
-      db
-        .select({ id: coordinatorInput.id })
-        .from(coordinatorInput)
-        .where(eq(coordinatorInput.state, 'pending')),
-    ),
-  );
-  const owners = db.select().from(step).where(unread).all().flatMap(stepOwners);
-  if (owners.length > 0)
-    db.update(chiefMessage)
-      .set({ delivery: 'steer_missed' })
-      .where(inArray(chiefMessage.id, owners))
+  db.transaction((tx) => {
+    db.delete(steerPending)
+      .where(
+        and(
+          eq(steerPending.conversationId, finished.buildId),
+          eq(steerPending.stepId, finished.id),
+        ),
+      )
       .run();
-  db.update(step).set({ holdReason: null, memoryTrace: null }).where(unread).run();
+    const unread = and(
+      eq(step.buildId, finished.buildId),
+      eq(step.status, 'pending'),
+      inArray(step.holdReason, STEER_HOLDS),
+      notInArray(
+        step.id,
+        db
+          .select({ id: coordinatorInput.id })
+          .from(coordinatorInput)
+          .where(eq(coordinatorInput.state, 'pending')),
+      ),
+    );
+    const owners = db.select().from(step).where(unread).all().flatMap(stepOwners);
+    if (owners.length > 0)
+      db.update(chiefMessage)
+        .set({ delivery: 'steer_missed' })
+        .where(inArray(chiefMessage.id, owners))
+        .run();
+    const cleared = db
+      .update(step)
+      .set({ holdReason: null })
+      .where(unread)
+      .returning({ id: step.id })
+      .all();
+    for (const { id } of cleared) writeMemoryTrace(tx, id, { memoryTrace: null });
+  });
 }
 
 export function endDeadChiefTurn(
@@ -776,8 +845,9 @@ export function endChiefStepAsStopped(
   settleChiefActiveRun(deps.db, threadId);
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);
-  if (stopped && stopped.scheduleId !== null) {
-    settleScheduledStepOutcome(deps.db, stopped, 'stopped');
+  if (stopped) {
+    const scheduled = { ...stopped, ...readSchedule(deps.db, stopped.id) };
+    if (scheduled.scheduleId !== null) settleScheduledStepOutcome(deps.db, scheduled, 'stopped');
   }
   recordChiefStop(deps, head);
   cancelPendingQuestions(deps, threadId, CHIEF_TURN_END_REASON, { includeParked: true });

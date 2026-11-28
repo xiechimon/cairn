@@ -32,14 +32,17 @@ import { ranModel } from './model-fallback.js';
 import { notifyQuotaWait } from './notifications.js';
 import { publishStepRow } from './quota-wait.js';
 import { coordinatorProfile, profileForStep, type RouteProfile } from './routing-rules.js';
+import { readQuota, type StepQuota, writeQuota } from './step-groups/quota.js';
+import { readSubscription, type StepSubscription } from './step-groups/subscription.js';
 import { getTodo } from './todos.js';
 
 type StepRow = typeof step.$inferSelect;
+type RoutedStepRow = StepRow & StepQuota & StepSubscription;
 type AgentRow = RouteProfile;
 
 function usesClaudeCode(
   agentRow: Pick<AgentRow, 'provider' | 'modelId'>,
-  stepRow: Pick<StepRow, 'ranModel' | 'fallback'>,
+  stepRow: Pick<StepQuota, 'ranModel' | 'fallback'>,
 ): boolean {
   return stepRuntimeFor(ranModel(agentRow, stepRow).provider) === 'claude-code';
 }
@@ -73,26 +76,30 @@ function writeClaudeQuota(
     | { status: 'pending'; quotaBlock: null }
     | { status: 'waiting_quota'; quotaBlock: QuotaWaitRow },
 ): boolean {
-  const res = deps.db
-    .update(step)
-    .set({
-      status: next.status,
-      machineId: null,
-      quotaBlock: next.quotaBlock,
-      holdReason: null,
-      holdUntil: null,
-      mcpGrant: null,
-    })
-    .where(
-      and(
-        eq(step.id, stepId),
-        next.status === 'waiting_quota'
-          ? or(eq(step.status, 'pending'), eq(step.status, 'waiting_quota'))
-          : eq(step.status, 'waiting_quota'),
-      ),
-    )
-    .run();
-  if (res.changes === 0) return false;
+  const fresh = deps.db.transaction((tx) => {
+    const winner = tx
+      .update(step)
+      .set({
+        status: next.status,
+        machineId: null,
+        holdReason: null,
+        holdUntil: null,
+        mcpGrant: null,
+      })
+      .where(
+        and(
+          eq(step.id, stepId),
+          next.status === 'waiting_quota'
+            ? or(eq(step.status, 'pending'), eq(step.status, 'waiting_quota'))
+            : eq(step.status, 'waiting_quota'),
+        ),
+      )
+      .returning()
+      .get();
+    if (winner) writeQuota(tx, winner.id, { quotaBlock: next.quotaBlock });
+    return winner;
+  });
+  if (!fresh) return false;
   if (todoId !== null) {
     const changed = deps.db
       .select({ buildId: step.buildId })
@@ -101,8 +108,7 @@ function writeClaudeQuota(
       .get();
     if (changed !== undefined) holdBlockedBuild(deps.db, changed.buildId);
   }
-  const fresh = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-  if (fresh !== undefined) publishStepRow(deps, fresh);
+  publishStepRow(deps, fresh);
   if (todoId !== null) {
     const record = getTodo(deps, todoId);
     if (record) deps.hub.publishTodoDoc(record.teamId, record);
@@ -120,7 +126,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
   const enabledDevinId = enabledDevinSubscriptionId(deps, teamId);
   const enabledAntigravityId = enabledAntigravitySubscriptionId(deps, teamId);
   const consider = (
-    stepRow: StepRow,
+    stepRow: RoutedStepRow,
     agentRow: AgentRow,
     todoRow: typeof todo.$inferSelect | null,
     buildRow: Pick<typeof build.$inferSelect, 'prevPhase' | 'withPlan' | 'planDocId'> | null,
@@ -218,7 +224,17 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     .all();
   for (const row of workers) {
     const agentRow = profileForStep(deps.db, row.todo, row.step.kind, row.step.id);
-    if (agentRow) consider(row.step, agentRow, row.todo, row.build);
+    if (agentRow)
+      consider(
+        {
+          ...row.step,
+          ...readQuota(deps.db, row.step.id),
+          ...readSubscription(deps.db, row.step.id),
+        },
+        agentRow,
+        row.todo,
+        row.build,
+      );
   }
   const chiefs = deps.db
     .select({ step, projectId: chiefThread.projectId })
@@ -234,7 +250,17 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
     .all();
   for (const row of chiefs) {
     const coordinator = coordinatorProfile(deps.db, teamId, row.projectId);
-    if (coordinator !== null) consider(row.step, coordinator, null, null);
+    if (coordinator !== null)
+      consider(
+        {
+          ...row.step,
+          ...readQuota(deps.db, row.step.id),
+          ...readSubscription(deps.db, row.step.id),
+        },
+        coordinator,
+        null,
+        null,
+      );
   }
   if (changed) deps.machineHub.wake(teamId);
 }
@@ -262,12 +288,14 @@ function attributeQuotaWindows(
 ): void {
   if (body.stepId === undefined) return;
   const stepRow = deps.db
-    .select({ machineId: step.machineId, claudeSubscriptionId: step.claudeSubscriptionId })
+    .select({ machineId: step.machineId })
     .from(step)
     .where(eq(step.id, body.stepId))
     .get();
-  if (stepRow?.machineId !== machineRow.id || stepRow.claudeSubscriptionId === null) return;
-  recordClaudeQuotaNotices(deps, machineRow.teamId, stepRow.claudeSubscriptionId, [body]);
+  if (stepRow?.machineId !== machineRow.id) return;
+  const { claudeSubscriptionId } = readSubscription(deps.db, body.stepId);
+  if (claudeSubscriptionId === null) return;
+  recordClaudeQuotaNotices(deps, machineRow.teamId, claudeSubscriptionId, [body]);
 }
 
 function handBackClaimed(deps: MachineDeps, stepId: string): boolean {
@@ -312,7 +340,8 @@ export function recoverClaudeRateLimitFailure(
       : undefined;
     agentPick = todoRow ? profileForStep(deps.db, todoRow, stepRow.kind, stepRow.id) : null;
   }
-  const claude = agentPick !== null && usesClaudeCode(agentPick, stepRow);
+  const quotaBefore = readQuota(deps.db, stepRow.id);
+  const claude = agentPick !== null && usesClaudeCode(agentPick, quotaBefore);
   const teamId = stepTeamId(deps, stepRow);
   if (block && claude) {
     if (!handBackClaimed(deps, stepRow.id)) return false;
@@ -329,13 +358,13 @@ export function recoverClaudeRateLimitFailure(
     until: retry !== null ? now + retry : null,
     subscription: outcome.quotaBlock.label ?? CLAUDE_SUBSCRIPTION_PROVIDER_ID,
   };
-  const quota = claudeQuotaRow(stepRow.quotaBlock, synthetic, now, outcome.quotaBlock.reason);
+  const quota = claudeQuotaRow(quotaBefore.quotaBlock, synthetic, now, outcome.quotaBlock.reason);
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   const wrote = writeClaudeQuota(deps, stepRow.id, buildRow?.todoId ?? null, {
     status: 'waiting_quota',
     quotaBlock: quota,
   });
-  if (wrote && stepRow.quotaBlock?.source !== 'claude_rate_limit' && buildRow) {
+  if (wrote && quotaBefore.quotaBlock?.source !== 'claude_rate_limit' && buildRow) {
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
     if (todoRow) notifyQuotaWait(deps, todoRow, quota);
   }

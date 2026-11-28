@@ -5,7 +5,7 @@ import {
 } from '@cairn/shared';
 import { and, eq, gt, isNotNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { message, step } from '../db/schema.js';
+import { message, step, stepSchedule } from '../db/schema.js';
 import type { ConversationStreamHub } from './events.js';
 
 export interface StoreDeps {
@@ -182,10 +182,11 @@ export function coordinatorAcceptanceBlockedExhausted(db: Db, buildId: string): 
     db
       .select({ id: step.id })
       .from(step)
+      .innerJoin(stepSchedule, eq(stepSchedule.stepId, step.id))
       .where(
         and(
           eq(step.buildId, buildId),
-          isNotNull(step.scheduleId),
+          isNotNull(stepSchedule.scheduleId),
           gt(step.createdAt, lastCoordAnswerAt),
         ),
       )

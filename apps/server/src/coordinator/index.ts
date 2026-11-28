@@ -53,6 +53,8 @@ import { ownComputerOffered, ownComputerWorkspaceOffered } from '../services/own
 import { offeredPhoneNames } from '../services/phone-computer.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
 import { markProviderModelTextOnly } from '../services/providers.js';
+import { writeMemoryTraceGuarded } from '../services/step-groups/memory-trace.js';
+import { readQuota } from '../services/step-groups/quota.js';
 import {
   type CoordinatorProviders,
   coordinatorProviders,
@@ -490,19 +492,22 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             },
       activeModel: routerModel,
     });
-    const memoryTraceUpdate = db
-      .update(step)
-      .set({ memoryTrace: context.memoryTrace })
-      .where(
-        and(
-          eq(step.id, row.id),
-          eq(step.status, 'claimed'),
-          isNull(step.machineId),
-          row.claimedAt === null ? isNull(step.claimedAt) : eq(step.claimedAt, row.claimedAt),
-        ),
-      )
-      .run();
-    if (memoryTraceUpdate.changes === 0) return null;
+    const traceGuard = and(
+      eq(step.status, 'claimed'),
+      isNull(step.machineId),
+      row.claimedAt === null ? isNull(step.claimedAt) : eq(step.claimedAt, row.claimedAt),
+    )!;
+    const traceWritten = db.transaction((tx) => {
+      const owned = tx
+        .select({ id: step.id })
+        .from(step)
+        .where(and(eq(step.id, row.id), traceGuard))
+        .get();
+      if (owned === undefined) return false;
+      writeMemoryTraceGuarded(tx, row.id, { memoryTrace: context.memoryTrace }, traceGuard);
+      return true;
+    });
+    if (!traceWritten) return null;
     logger.info(
       {
         threadId: row.buildId,
@@ -570,11 +575,12 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const runStep = async (row: StepRow): Promise<void> => {
     const teamId = threadTeam(row.buildId);
     if (teamId === null) return;
+    const quota = readQuota(db, row.id);
     const providers = coordinatorProviders(
       { db, box: machine.box },
       teamId,
       threadProject(row.buildId),
-      row.ranModel ?? row.fallback?.model ?? null,
+      quota.ranModel ?? quota.fallback?.model ?? null,
     );
     const keyed = [providers?.router.provider, providers?.summary.provider].filter(
       (id): id is string => id !== undefined,

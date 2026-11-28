@@ -12,7 +12,15 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefThread, machine, step, todo } from '../db/schema.js';
+import {
+  build,
+  chiefThread,
+  machine,
+  step,
+  stepQuota,
+  stepSubscription,
+  todo,
+} from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import { BLOCKED_BY_HOLD, unmetBlockerTitles } from './blockers.js';
@@ -117,16 +125,18 @@ export function stepQueueProjector(db: Db, teamId: string) {
       createdAt: step.createdAt,
       kind: step.kind,
       prompt: step.prompt,
-      fallback: step.fallback,
+      fallback: stepQuota.fallback,
       buildId: step.buildId,
       freshSession: step.freshSession,
       byPerson: step.byPerson,
-      claudeSubscriptionId: step.claudeSubscriptionId,
+      claudeSubscriptionId: stepSubscription.claudeSubscriptionId,
       holdUntil: step.holdUntil,
       buildRow: build,
       todoRow: todo,
     })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
+    .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(and(eq(step.status, 'pending'), eq(todo.teamId, teamId)))

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import {
@@ -9,6 +10,7 @@ import {
   formatExpectedServerVersion,
   overlapsTrafficLights,
   parseArgs,
+  seedEveryTable,
   smokableBundle,
 } from './post-install.mjs';
 
@@ -93,6 +95,79 @@ test('buildStartTaskSeedPrompt formats synthetic orchestration payload cleanly',
   const text = buildStartTaskSeedPrompt({ id: 'todo-42', seqNum: 42, spec: 'Check echo' });
   assert.match(text, /^开始任务 #42\n\n编排请求：\[#42\]\(todo:todo-42\)/);
   assert.match(text, /> Check echo$/);
+});
+
+test('seedEveryTable seeds a fenced step and each present side group', () => {
+  const scratch = makeTestTempDir('post-install-step-');
+  const path = join(scratch, 'server.db');
+  try {
+    const db = new DatabaseSync(path);
+    db.exec(`
+      CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL);
+      CREATE TRIGGER step_require_writer_generation_insert BEFORE INSERT ON step
+      BEGIN SELECT CASE WHEN cairn_step_write_generation() IS NOT 1
+        THEN RAISE(ABORT, 'incompatible step writer generation') END; END;
+      CREATE TRIGGER step_require_writer_generation_update BEFORE UPDATE ON step
+      BEGIN SELECT CASE WHEN cairn_step_write_generation() IS NOT 1
+        THEN RAISE(ABORT, 'incompatible step writer generation') END; END;
+      CREATE TABLE step_quota (stepId TEXT PRIMARY KEY REFERENCES step(id), quotaBlock TEXT);
+      CREATE TABLE step_subscription (stepId TEXT PRIMARY KEY REFERENCES step(id), claudeSubscriptionId TEXT);
+      CREATE TABLE step_schedule (stepId TEXT PRIMARY KEY REFERENCES step(id), scheduleId TEXT);
+      CREATE TABLE step_memory_trace (stepId TEXT PRIMARY KEY REFERENCES step(id), memoryTrace TEXT NOT NULL);
+      CREATE TABLE step_skill_injection (stepId TEXT PRIMARY KEY REFERENCES step(id), skillInjection TEXT NOT NULL);
+      CREATE TABLE step_blocker_handoff (stepId TEXT PRIMARY KEY REFERENCES step(id), blockerHandoff TEXT NOT NULL);
+    `);
+    db.close();
+    const result = seedEveryTable(path, 'fixture');
+    assert.equal(result.seeded, 7);
+    assert.deepEqual(result.skipped, []);
+    const check = new DatabaseSync(path, { readOnly: true });
+    try {
+      for (const [table, column] of [
+        ['step_quota', 'quotaBlock'],
+        ['step_subscription', 'claudeSubscriptionId'],
+        ['step_schedule', 'scheduleId'],
+        ['step_memory_trace', 'memoryTrace'],
+        ['step_skill_injection', 'skillInjection'],
+        ['step_blocker_handoff', 'blockerHandoff'],
+      ]) {
+        assert.equal(
+          check.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${column} IS NOT NULL`).get().n,
+          1,
+        );
+      }
+    } finally {
+      check.close();
+    }
+  } finally {
+    releaseTestTempDir(scratch);
+  }
+});
+
+test('seedEveryTable supports unmarked steps but never skips a failed step insert', () => {
+  const scratch = makeTestTempDir('post-install-old-step-');
+  try {
+    const path = join(scratch, 'server.db');
+    const db = new DatabaseSync(path);
+    db.exec('CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL)');
+    db.close();
+    assert.equal(seedEveryTable(path, 'old').seeded, 1);
+    const blocked = new DatabaseSync(path);
+    blocked.exec(
+      `CREATE TRIGGER unrelated BEFORE INSERT ON step BEGIN SELECT RAISE(ABORT, 'blocked'); END`,
+    );
+    blocked.close();
+    assert.throws(() => seedEveryTable(path, 'blocked'), /blocked/);
+    const unmarked = join(scratch, 'unmarked.db');
+    const fenced = new DatabaseSync(unmarked);
+    fenced.exec(`CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL);
+      CREATE TRIGGER other_insert BEFORE INSERT ON step
+      BEGIN SELECT cairn_step_write_generation(); END;`);
+    fenced.close();
+    assert.throws(() => seedEveryTable(unmarked, 'unmarked'), /cairn_step_write_generation/);
+  } finally {
+    releaseTestTempDir(scratch);
+  }
 });
 
 test('--help prints usage and exits without touching an app', () => {

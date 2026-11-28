@@ -16,6 +16,7 @@ import {
   req,
   type TestServer,
 } from './helpers.js';
+import { insertStepFixture, type StepFixtureInsert } from './step-groups-fixture.js';
 
 const TOKEN =
   'sk-ant-oat01-subscription-test-private-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
@@ -549,18 +550,15 @@ describe('switching the enabled Claude subscription', () => {
       .map((row) => row.id);
 
   function runningStep(s: TestServer, subscriptionId: string, id = 'run-1') {
-    s.db
-      .insert(stepTable)
-      .values({
-        id,
-        buildId: `b-${id}`,
-        kind: 'build',
-        status: 'claimed',
-        claimedAt: 5,
-        createdAt: 4,
-        claudeSubscriptionId: subscriptionId,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id,
+      buildId: `b-${id}`,
+      kind: 'build',
+      status: 'claimed',
+      claimedAt: 5,
+      createdAt: 4,
+      claudeSubscriptionId: subscriptionId,
+    });
   }
 
   test('a verified account becomes the only enabled one, the list shows it and no response carries a token', async () => {
@@ -823,55 +821,53 @@ describe('the subscription list wire carries quota windows and usage stats', () 
       })
       .where(eq(claudeSubscription.id, id))
       .run();
-    s.db
-      .insert(stepTable)
-      .values([
-        {
-          id: 's-old',
-          buildId: 'b1',
-          kind: 'build',
-          status: 'done',
-          claimedAt: now - 30 * 3_600_000,
-          createdAt: 1,
-          claudeSubscriptionId: id,
-        },
-        {
-          id: 's-done',
-          buildId: 'b2',
-          kind: 'build',
-          status: 'done',
-          claimedAt: now - 2 * 3_600_000,
-          createdAt: 2,
-          claudeSubscriptionId: id,
-        },
-        {
-          id: 's-run',
-          buildId: 'b3',
-          kind: 'build',
-          status: 'claimed',
-          claimedAt: now - 60_000,
-          createdAt: 3,
-          claudeSubscriptionId: id,
-        },
-        {
-          id: 's-queued',
-          buildId: 'b4',
-          kind: 'build',
-          status: 'pending',
-          createdAt: 4,
-          claudeSubscriptionId: id,
-        },
-        {
-          id: 's-elsewhere',
-          buildId: 'b5',
-          kind: 'build',
-          status: 'done',
-          claimedAt: now - 1_000,
-          createdAt: 5,
-          claudeSubscriptionId: 'other-subscription',
-        },
-      ])
-      .run();
+    const steps: StepFixtureInsert[] = [
+      {
+        id: 's-old',
+        buildId: 'b1',
+        kind: 'build',
+        status: 'done',
+        claimedAt: now - 30 * 3_600_000,
+        createdAt: 1,
+        claudeSubscriptionId: id,
+      },
+      {
+        id: 's-done',
+        buildId: 'b2',
+        kind: 'build',
+        status: 'done',
+        claimedAt: now - 2 * 3_600_000,
+        createdAt: 2,
+        claudeSubscriptionId: id,
+      },
+      {
+        id: 's-run',
+        buildId: 'b3',
+        kind: 'build',
+        status: 'claimed',
+        claimedAt: now - 60_000,
+        createdAt: 3,
+        claudeSubscriptionId: id,
+      },
+      {
+        id: 's-queued',
+        buildId: 'b4',
+        kind: 'build',
+        status: 'pending',
+        createdAt: 4,
+        claudeSubscriptionId: id,
+      },
+      {
+        id: 's-elsewhere',
+        buildId: 'b5',
+        kind: 'build',
+        status: 'done',
+        claimedAt: now - 1_000,
+        createdAt: 5,
+        claudeSubscriptionId: 'other-subscription',
+      },
+    ];
+    for (const row of steps) insertStepFixture(s.db, row);
     const [row] = await list(s);
     expect(row).toMatchObject({
       id,

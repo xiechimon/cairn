@@ -37,9 +37,25 @@ test('current schema snapshot and journal retire the binding without rewriting h
     .filter((value) => is(value, SQLiteTable))
     .map((table) => getTableConfig(table as SQLiteTable));
   expect(Object.keys(snapshot.tables).sort()).toEqual(tables.map((table) => table.name).sort());
+  const retainedStepColumns = [
+    'antigravitySubscriptionId',
+    'blockerHandoff',
+    'claudeSubscriptionId',
+    'devinSubscriptionId',
+    'fallback',
+    'memoryTrace',
+    'quotaBlock',
+    'ranModel',
+    'scheduleId',
+    'scheduledBy',
+    'skillInjection',
+  ];
   for (const table of tables)
     expect(Object.keys(snapshot.tables[table.name]?.columns ?? {}).sort()).toEqual(
-      table.columns.map((column) => column.name).sort(),
+      [
+        ...table.columns.map((column) => column.name),
+        ...(table.name === 'step' ? retainedStepColumns : []),
+      ].sort(),
     );
   expect(snapshot.tables).not.toHaveProperty('feishu_binding');
   expect(schema).not.toHaveProperty('feishuBinding');

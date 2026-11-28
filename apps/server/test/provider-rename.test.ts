@@ -19,8 +19,10 @@ import {
 import { HttpError } from '../src/lib/errors.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { createProvider, openProviderKey, updateProvider } from '../src/services/providers.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import { writeTopModels } from '../src/services/top-models.js';
 import { bootServer, postProject, req, seedRoute, type TestServer } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const servers: TestServer[] = [];
 afterAll(() => {
@@ -168,9 +170,8 @@ describe('provider PATCH rename rewrites every stored reference', () => {
     const pid = addProvider(s, 'relay-old');
     const projectId = await postProject(s.app, 'rename-proj');
     const { stepId } = seedBuildScope(s, projectId);
-    s.db
-      .update(step)
-      .set({
+    s.db.transaction((tx) =>
+      writeQuota(tx, stepId, {
         fallback: {
           model: { provider: 'relay-old', modelId: 'glm' },
           tried: ['relay-old/glm', 'other-provider/m', 'relay-old-x/sub'],
@@ -187,9 +188,8 @@ describe('provider PATCH rename rewrites every stored reference', () => {
           attempts: 1,
           probeAt: 1,
         },
-      })
-      .where(eq(step.id, stepId))
-      .run();
+      }),
+    );
     s.db
       .insert(stepRoute)
       .values({
@@ -205,7 +205,7 @@ describe('provider PATCH rename rewrites every stored reference', () => {
       })
       .run();
     updateProvider(deps, s.team.id, pid, { providerId: 'relay-new' });
-    const stored = s.db.select().from(step).where(eq(step.id, stepId)).get()!;
+    const stored = readStepFixture(s.db, stepId)!;
     expect(stored.fallback?.model).toEqual({ provider: 'relay-new', modelId: 'glm' });
     expect(stored.fallback?.tried).toEqual([
       'relay-new/glm',

@@ -30,6 +30,7 @@ import { providerHealth } from '../src/services/provider-health.js';
 import { createProvider, writeProviderOrder } from '../src/services/providers.js';
 import { retryQuotaWaitNow, sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { profileForStep } from '../src/services/routing-rules.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import { writeTopModels } from '../src/services/top-models.js';
 import {
   bootServer,
@@ -46,6 +47,7 @@ import {
 } from './helpers.js';
 import { rejectingGithubFetch } from './network-guard.js';
 import { ownerTodoParams } from './owner-message.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const servers: TestServer[] = [];
 afterAll(() => {
@@ -289,15 +291,11 @@ describe('one source with 1, 2, or many models across API, Antigravity, Claude C
     expect(cEasy?.agent?.modelId).toBe('claude-haiku-5-5');
     expect(cMid?.agent?.modelId).toBe('claude-sonnet-5-5');
     expect(cHard?.agent?.modelId).toBe('claude-opus-5-5');
-    expect(
-      w3.s.db.select().from(stepTable).where(eq(stepTable.id, cEasy!.step.id)).get()?.ranModel,
-    ).toEqual({
+    expect(readStepFixture(w3.s.db, cEasy!.step.id)?.ranModel).toEqual({
       provider: 'anthropic-ultra',
       modelId: 'claude-haiku-5-5',
     });
-    expect(
-      w3.s.db.select().from(stepTable).where(eq(stepTable.id, cHard!.step.id)).get()?.ranModel,
-    ).toEqual({
+    expect(readStepFixture(w3.s.db, cHard!.step.id)?.ranModel).toEqual({
       provider: 'anthropic-ultra',
       modelId: 'claude-opus-5-5',
     });
@@ -563,10 +561,7 @@ describe('Coordinator difficulty and fallback lifecycle', () => {
     await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/providers/${p1.id}`, {
       providerId: 'renamed-gw',
     });
-    expect(
-      w.s.db.select().from(stepTable).where(eq(stepTable.id, c1!.step.id)).get()?.ranModel
-        ?.provider,
-    ).toBe('renamed-gw');
+    expect(readStepFixture(w.s.db, c1!.step.id)?.ranModel?.provider).toBe('renamed-gw');
     expect(
       w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, c1!.step.id)).get()?.provider,
     ).toBe('renamed-gw');
@@ -633,11 +628,7 @@ describe('Coordinator difficulty and fallback lifecycle', () => {
       errorMessage: '402 quota',
       quotaBlock: { kind: 'quota', providerId: 'gw-b', reason: 'exhausted' },
     });
-    const stalePending = w.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, zeroRetry!.step.id))
-      .get()!;
+    const stalePending = readStepFixture(w.s.db, zeroRetry!.step.id)!;
     if (stalePending.status === 'pending' && stalePending.fallback?.model) {
       w.s.db
         .update(providerTable)
@@ -660,22 +651,20 @@ describe('Coordinator difficulty and fallback lifecycle', () => {
     });
     const waiting = qw.s.db.select().from(stepTable).where(eq(stepTable.id, qc!.step.id)).get()!;
     expect(waiting.status).toBe('waiting_quota');
-    qw.s.db
-      .update(stepTable)
-      .set({
+    qw.s.db.transaction((tx) =>
+      writeQuota(tx, waiting.id, {
         fallback: {
           model: { provider: 'only-q', modelId: 'q-1' },
           tried: ['only-q/q-1'],
           zeroUsageRetried: false,
         },
-      })
-      .where(eq(stepTable.id, waiting.id))
-      .run();
+      }),
+    );
     retryQuotaWaitNow(
       { db: qw.s.db, hub: qw.s.hub, machineHub: qw.s.machineHub, user: qw.s.user },
       qBuild,
     );
-    const resetRow = qw.s.db.select().from(stepTable).where(eq(stepTable.id, waiting.id)).get()!;
+    const resetRow = readStepFixture(qw.s.db, waiting.id)!;
     expect(resetRow.status).toBe('pending');
     expect(resetRow.fallback?.tried).toEqual([]);
     expect(resetRow.fallback?.model).toBeNull();
@@ -804,17 +793,15 @@ describe('Coordinator difficulty and fallback lifecycle', () => {
       .from(stepTable)
       .where(eq(stepTable.buildId, pinnedStale.buildId))
       .get()!;
-    w.s.db
-      .update(stepTable)
-      .set({
+    w.s.db.transaction((tx) =>
+      writeQuota(tx, staleStep.id, {
         fallback: {
           model: { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
           tried: ['tiered/m-pro', 'claude-code/claude-sonnet-5-5'],
           zeroUsageRetried: false,
         },
-      })
-      .where(eq(stepTable.id, staleStep.id))
-      .run();
+      }),
+    );
     const notEscaped = await claim(w);
     expect(notEscaped).toBeNull();
 

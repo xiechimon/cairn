@@ -22,6 +22,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const CLAUDE_REPORT = {
   installed: true,
@@ -120,7 +121,7 @@ async function done(s: TestServer, token: string, stepId: string, body: Record<s
 }
 
 function stepRow(s: TestServer, stepId: string) {
-  return s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+  return readStepFixture(s.db, stepId)!;
 }
 
 function errorFacts(s: TestServer, stepId: string): Record<string, unknown> {

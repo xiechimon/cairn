@@ -51,12 +51,15 @@ import { ackSteer, fetchSteer, finishStep as finishRunnerStep } from '../src/ser
 import { injectMemoryDocuments, memoryDocumentVersion } from '../src/services/memory.js';
 import { executeMemoryToolForStep } from '../src/services/memory-corrections.js';
 import { executeMemoryDocumentTool } from '../src/services/memory-documents.js';
+import { readMemoryTrace, writeMemoryTrace } from '../src/services/step-groups/memory-trace.js';
+import { writeSubscription } from '../src/services/step-groups/subscription.js';
 import { deliverQueuedMessage, drainTaskMessageQueue } from '../src/services/task-message-queue.js';
 import { answerTaskQuestion } from '../src/services/thread-message.js';
 import { writeWorkerQuestion } from '../src/services/worker-question-store.js';
 import { AGENT_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { claimedGeneration, issueApiKey, req, seedSessionRoute } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
+import { insertStepFixture } from './step-groups-fixture.js';
 
 registerChiefHarness();
 
@@ -107,11 +110,8 @@ async function turn(
     thread,
     AGENT_ID,
   );
-  H.s.db
-    .update(step)
-    .set({ status: 'claimed', claimedAt, memoryTrace })
-    .where(eq(step.id, stepId))
-    .run();
+  H.s.db.update(step).set({ status: 'claimed', claimedAt }).where(eq(step.id, stepId)).run();
+  H.s.db.transaction((tx) => writeMemoryTrace(tx, stepId, { memoryTrace }));
   await tick();
   const over: Partial<ChiefToolCtx> = { stepId, turnMessageIds: ownerMessageIds };
   return {
@@ -234,10 +234,7 @@ test('a rule file only the correcting message recalled was not in the attached i
     content: 'staging deploy freeze starts every friday afternoon',
   });
   const correction = await turn('You deployed during the staging deploy freeze on friday again');
-  expect(
-    H.s.db.select().from(step).where(eq(step.id, correction.stepId)).get()!.memoryTrace!
-      .recalledMemoryIds,
-  ).toHaveLength(1);
+  expect(readMemoryTrace(H.s.db, correction.stepId).memoryTrace!.recalledMemoryIds).toHaveLength(1);
   await correction.call('update_memory', {
     scope: 'team',
     file: 'freeze.md',
@@ -472,9 +469,7 @@ test('a worker turn records its trace and a follow-up correction, never the task
     tool(stepId, 'memories', { scope: H.projectId, file: 'MEMORY.md' });
 
   const first = await claim();
-  expect(
-    H.s.db.select().from(step).where(eq(step.id, first.id)).get()!.memoryTrace?.projectMemoryIds,
-  ).toHaveLength(1);
+  expect(readMemoryTrace(H.s.db, first.id).memoryTrace?.projectMemoryIds).toHaveLength(1);
   const saved = await tool(first.id, 'update_memory', {
     scope: H.projectId,
     file: 'MEMORY.md',
@@ -590,24 +585,21 @@ function workStep(id: string, claimedAt: number, buildId = 'build-1') {
     ...teamOwner(),
     teamScoped: true,
   });
-  H.s.db
-    .insert(step)
-    .values({
-      id,
-      buildId,
-      kind: 'session',
-      status: 'claimed',
-      claimedAt,
-      createdAt: claimedAt,
-      memoryTrace: {
-        teamMemoryIds: indexes.map((index) => index.id),
-        teamMemoriesOmitted: 0,
-        projectMemoryIds: [],
-        projectMemoriesOmitted: 0,
-        recalledMemoryIds: [],
-      },
-    })
-    .run();
+  insertStepFixture(H.s.db, {
+    id,
+    buildId,
+    kind: 'session',
+    status: 'claimed',
+    claimedAt,
+    createdAt: claimedAt,
+    memoryTrace: {
+      teamMemoryIds: indexes.map((index) => index.id),
+      teamMemoriesOmitted: 0,
+      projectMemoryIds: [],
+      projectMemoriesOmitted: 0,
+      recalledMemoryIds: [],
+    },
+  });
 }
 
 function said(
@@ -1102,11 +1094,9 @@ test('a resumed Antigravity turn does not claim the index was attached', async (
   await tick();
   said('user', Date.now());
   workStep('s-resumed', Date.now());
-  H.s.db
-    .update(step)
-    .set({ antigravitySubscriptionId: 'sub-1' })
-    .where(eq(step.id, 's-resumed'))
-    .run();
+  H.s.db.transaction((tx) =>
+    writeSubscription(tx, 's-resumed', { antigravitySubscriptionId: 'sub-1' }),
+  );
   workerRepeat('s-resumed');
   expect(rows()).toMatchObject([{ pointedRule: RULE, inTurnIndex: null }]);
 });
@@ -1166,11 +1156,10 @@ test('a first Antigravity step claimed again does not claim the index was attach
   await tick();
   said('user', Date.now());
   workStep('s-parked', Date.now());
-  H.s.db
-    .update(step)
-    .set({ antigravitySubscriptionId: 'sub-1', sessionId: 'ag-session-1' })
-    .where(eq(step.id, 's-parked'))
-    .run();
+  H.s.db.transaction((tx) => {
+    tx.update(step).set({ sessionId: 'ag-session-1' }).where(eq(step.id, 's-parked')).run();
+    writeSubscription(tx, 's-parked', { antigravitySubscriptionId: 'sub-1' });
+  });
   workerRepeat('s-parked');
   expect(rows()).toMatchObject([{ pointedRule: RULE, inTurnIndex: null }]);
 });

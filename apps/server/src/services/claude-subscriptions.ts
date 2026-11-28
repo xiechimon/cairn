@@ -23,7 +23,7 @@ import {
 } from '@cairn/shared';
 import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { claudeSubscription, machine, step } from '../db/schema.js';
+import { claudeSubscription, machine, step, stepSubscription } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -91,7 +91,10 @@ function runningStepCount(db: Pick<Db, 'select'>, subscriptionId: string): numbe
     db
       .select({ n: count() })
       .from(step)
-      .where(and(eq(step.status, 'claimed'), eq(step.claudeSubscriptionId, subscriptionId)))
+      .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
+      .where(
+        and(eq(step.status, 'claimed'), eq(stepSubscription.claudeSubscriptionId, subscriptionId)),
+      )
       .get()?.n ?? 0
   );
 }
@@ -272,7 +275,7 @@ export function listClaudeSubscriptions(deps: Deps, teamId: string): ClaudeSubsc
   const now = nowMs();
   const usage = subscriptionUsageStats(
     deps.db,
-    step.claudeSubscriptionId,
+    stepSubscription.claudeSubscriptionId,
     rows.map((row) => row.id),
     now - DAY_MS,
   );

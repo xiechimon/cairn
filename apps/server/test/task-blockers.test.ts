@@ -14,9 +14,11 @@ import { claimStep, heartbeatStep } from '../src/services/machines.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { applyQuotaWaitStep, sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { RETRY_PARKED_MARK } from '../src/services/retry-parking.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
 import { H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { req, seedRoute, seedSessionRoute } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 registerChiefHarness();
 
@@ -373,12 +375,10 @@ describe('blockedBy holds a task until its blockers are satisfied', () => {
       providerId: 'stub-gw',
       reason: 'subscription-only',
     });
-    const quotaBlock = sessions(id)[0]!.quotaBlock!;
-    H.s.db
-      .update(step)
-      .set({ quotaBlock: { ...quotaBlock, source: 'subscription_policy' } })
-      .where(eq(step.id, session!.id))
-      .run();
+    const quotaBlock = readStepFixture(H.s.db, session!.id)!.quotaBlock!;
+    H.s.db.transaction((tx) => {
+      writeQuota(tx, session!.id, { quotaBlock: { ...quotaBlock, source: 'subscription_policy' } });
+    });
     await relay('update_todo', { todoId: id, blockedBy: [blocker] });
     H.s.db.update(todo).set({ routeOverride: null }).where(eq(todo.id, id)).run();
     refreshClaudeRateParks(

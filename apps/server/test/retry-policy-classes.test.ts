@@ -18,8 +18,10 @@ import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { applyStepFailure, type BuildDeps } from '../src/services/builds.js';
 import { sweepFailedRetries } from '../src/services/needs-you.js';
 import { applyQuotaWaitStep } from '../src/services/quota-wait.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import { getTodo } from '../src/services/todos.js';
 import { bootServer, insertMachine, req, seedSessionRoute, type TestServer } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -187,7 +189,7 @@ describe('classified retry policy (permanent / transient / rate_limit / unknown)
       reason: '429 Too Many Requests; Retry-After: 5400',
       retryAfterMs: ninetyMinMs,
     });
-    const waited = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+    const waited = readStepFixture(w.s.db, w.stepId)!;
     expect(waited.quotaBlock?.probeAt ?? 0).toBeGreaterThanOrEqual(before + ninetyMinMs - 1_000);
 
     const w2 = openWorld();
@@ -298,11 +300,7 @@ describe('classified retry policy (permanent / transient / rate_limit / unknown)
     const res3 = await req(quota.s.app, 'POST', `/api/builds/${quota.buildId}/retry-now`, {});
     expect(res3.status).toBe(202);
     expect(await res3.json()).toMatchObject({ delegated: true, mode: 'quota_resumed' });
-    const released = quota.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, quota.stepId))
-      .get()!;
+    const released = readStepFixture(quota.s.db, quota.stepId)!;
     expect(released.status).toBe('pending');
     expect(released.quotaBlock).toBeNull();
   });
@@ -330,11 +328,7 @@ describe('classified retry policy (permanent / transient / rate_limit / unknown)
       reason: '429',
       retryAfterMs: 1,
     });
-    const qAfter1 = quotaFloor.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, quotaFloor.stepId))
-      .get()!;
+    const qAfter1 = readStepFixture(quotaFloor.s.db, quotaFloor.stepId)!;
     expect(
       (qAfter1.quotaBlock?.probeAt ?? 0) - (qAfter1.quotaBlock?.lastAt ?? 0),
     ).toBeGreaterThanOrEqual(1);
@@ -345,11 +339,7 @@ describe('classified retry policy (permanent / transient / rate_limit / unknown)
       reason: '429',
       retryAfterMs: 1,
     });
-    const qAfter2 = quotaFloor.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, quotaFloor.stepId))
-      .get()!;
+    const qAfter2 = readStepFixture(quotaFloor.s.db, quotaFloor.stepId)!;
     expect(
       (qAfter2.quotaBlock?.probeAt ?? 0) - (qAfter2.quotaBlock?.lastAt ?? 0),
     ).toBeGreaterThanOrEqual(120_000);
@@ -391,21 +381,17 @@ describe('classified retry policy (permanent / transient / rate_limit / unknown)
     expect(await staleRes.json()).toMatchObject({ reason: 'conflict' });
 
     const quotaReplay = openWorld();
-    const quotaStepRow = quotaReplay.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, quotaReplay.stepId))
-      .get()!;
+    const quotaBlock = readStepFixture(quotaReplay.s.db, quotaReplay.stepId)!.quotaBlock;
     quotaReplay.s.db
       .update(stepTable)
       .set({
         status: 'waiting_quota',
         holdReason: 'quota',
         holdUntil: nowMs() + 120_000,
-        quotaBlock: quotaStepRow.quotaBlock,
       })
       .where(eq(stepTable.id, quotaReplay.stepId))
       .run();
+    quotaReplay.s.db.transaction((tx) => writeQuota(tx, quotaReplay.stepId, { quotaBlock }));
     expect(
       (
         await req(quotaReplay.s.app, 'POST', `/api/builds/${quotaReplay.buildId}/retry-now`, {

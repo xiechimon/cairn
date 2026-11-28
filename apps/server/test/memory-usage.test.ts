@@ -3,9 +3,11 @@ import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { chiefThread, step } from '../src/db/schema.js';
 import { enqueueChiefStep } from '../src/services/chief.js';
+import { writeMemoryTrace } from '../src/services/step-groups/memory-trace.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
+import { insertStepFixture } from './step-groups-fixture.js';
 
 registerChiefHarness();
 
@@ -39,18 +41,16 @@ test('returns usage null when no traced turn exists', async () => {
 
 test('returns the trace stored on the latest chief step', async () => {
   const stepId = tracedStep('deploy to the linux box');
-  H.s.db
-    .update(step)
-    .set({
+  H.s.db.transaction((tx) =>
+    writeMemoryTrace(tx, stepId, {
       memoryTrace: trace({
         teamMemoryIds: ['mem-1'],
         teamMemoriesOmitted: 2,
         projectMemoryIds: ['mem-2'],
         recalledMemoryIds: ['mem-3'],
       }),
-    })
-    .where(eq(step.id, stepId))
-    .run();
+    }),
+  );
   const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/memory-usage`);
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({
@@ -70,16 +70,12 @@ test('returns the trace stored on the latest chief step', async () => {
 test('picks the newest traced step over an older one', async () => {
   const older = tracedStep('first question', 1);
   const newer = tracedStep('second question', 2);
-  H.s.db
-    .update(step)
-    .set({ memoryTrace: trace({ teamMemoryIds: ['old'] }) })
-    .where(eq(step.id, older))
-    .run();
-  H.s.db
-    .update(step)
-    .set({ memoryTrace: trace({ teamMemoryIds: ['new'], recalledMemoryIds: ['hit'] }) })
-    .where(eq(step.id, newer))
-    .run();
+  H.s.db.transaction((tx) => {
+    writeMemoryTrace(tx, older, { memoryTrace: trace({ teamMemoryIds: ['old'] }) });
+    writeMemoryTrace(tx, newer, {
+      memoryTrace: trace({ teamMemoryIds: ['new'], recalledMemoryIds: ['hit'] }),
+    });
+  });
   const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/memory-usage`);
   const body = (await res.json()) as ChiefMemoryUsageResponse;
   expect(body.usage?.stepId).toBe(newer);
@@ -101,17 +97,14 @@ test('a traced step on another team is not returned', async () => {
       updatedAt: 1,
     })
     .run();
-  H.s.db
-    .insert(step)
-    .values({
-      id: 'step-foreign',
-      buildId: 'chief-foreign-thread',
-      kind: 'chief',
-      status: 'done',
-      createdAt: 9,
-      memoryTrace: trace({ teamMemoryIds: ['secret'] }),
-    })
-    .run();
+  insertStepFixture(H.s.db, {
+    id: 'step-foreign',
+    buildId: 'chief-foreign-thread',
+    kind: 'chief',
+    status: 'done',
+    createdAt: 9,
+    memoryTrace: trace({ teamMemoryIds: ['secret'] }),
+  });
   const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/memory-usage`);
   expect(((await res.json()) as ChiefMemoryUsageResponse).usage).toBeNull();
 });

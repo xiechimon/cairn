@@ -6,6 +6,7 @@ import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { devinSubscription, step as stepTable } from '../src/db/schema.js';
 import { bootServer, req, type TestServer } from './helpers.js';
+import { insertStepFixture, type StepFixtureInsert } from './step-groups-fixture.js';
 
 const TOKEN = `wsk-test-private-subscription-token-${'z'.repeat(64)}`;
 
@@ -224,18 +225,15 @@ describe('switching the enabled Devin subscription', () => {
       .map((row) => row.id);
 
   function runningStep(s: TestServer, subscriptionId: string, id = 'run-1') {
-    s.db
-      .insert(stepTable)
-      .values({
-        id,
-        buildId: `b-${id}`,
-        kind: 'build',
-        status: 'claimed',
-        claimedAt: 5,
-        createdAt: 4,
-        devinSubscriptionId: subscriptionId,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id,
+      buildId: `b-${id}`,
+      kind: 'build',
+      status: 'claimed',
+      claimedAt: 5,
+      createdAt: 4,
+      devinSubscriptionId: subscriptionId,
+    });
   }
 
   test('a verified account becomes the only enabled one and no response carries a token', async () => {
@@ -357,37 +355,35 @@ describe('the devin subscription list wire carries usage stats', () => {
     const created = await req(s.app, 'POST', path, { label: 'Devin', token: TOKEN });
     const { id } = (await created.json()) as { id: string };
     const now = Date.now();
-    s.db
-      .insert(stepTable)
-      .values([
-        {
-          id: 'd-old',
-          buildId: 'b1',
-          kind: 'build',
-          status: 'done',
-          claimedAt: now - 30 * 3_600_000,
-          createdAt: 1,
-          devinSubscriptionId: id,
-        },
-        {
-          id: 'd-recent',
-          buildId: 'b2',
-          kind: 'build',
-          status: 'claimed',
-          claimedAt: now - 60_000,
-          createdAt: 2,
-          devinSubscriptionId: id,
-        },
-        {
-          id: 'd-queued',
-          buildId: 'b3',
-          kind: 'build',
-          status: 'pending',
-          createdAt: 3,
-          devinSubscriptionId: id,
-        },
-      ])
-      .run();
+    const steps: StepFixtureInsert[] = [
+      {
+        id: 'd-old',
+        buildId: 'b1',
+        kind: 'build',
+        status: 'done',
+        claimedAt: now - 30 * 3_600_000,
+        createdAt: 1,
+        devinSubscriptionId: id,
+      },
+      {
+        id: 'd-recent',
+        buildId: 'b2',
+        kind: 'build',
+        status: 'claimed',
+        claimedAt: now - 60_000,
+        createdAt: 2,
+        devinSubscriptionId: id,
+      },
+      {
+        id: 'd-queued',
+        buildId: 'b3',
+        kind: 'build',
+        status: 'pending',
+        createdAt: 3,
+        devinSubscriptionId: id,
+      },
+    ];
+    for (const row of steps) insertStepFixture(s.db, row);
     const rows = (await (await req(s.app, 'GET', path)).json()) as Record<string, unknown>[];
     const row = rows.find((entry) => entry.id === id)!;
     expect(row.lastUsedAt).toBe(now - 60_000);

@@ -17,6 +17,7 @@ import {
   postProject,
   seedSessionRoute,
 } from './helpers.js';
+import { insertStepFixture, readStepFixture } from './step-groups-fixture.js';
 
 const HOUR = 60 * 60 * 1000;
 
@@ -119,7 +120,7 @@ async function claim(s: ReturnType<typeof bootServer>, token: string): Promise<C
 function stepOfBuild(s: ReturnType<typeof bootServer>, buildId: string) {
   const row = s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).get();
   if (!row) throw new Error(`no step for ${buildId}`);
-  return row;
+  return readStepFixture(s.db, row.id)!;
 }
 
 async function report(
@@ -590,19 +591,16 @@ describe('subscription quota attribution', () => {
       status?: 'pending' | 'claimed' | 'done' | 'failed' | 'stopped';
     },
   ) {
-    s.db
-      .insert(stepTable)
-      .values({
-        id: row.id,
-        buildId: `b-${row.id}`,
-        kind: 'build',
-        status: row.status ?? 'claimed',
-        machineId: row.machineId,
-        claudeSubscriptionId: row.subscriptionId,
-        claimedAt: 10,
-        createdAt: 1,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: row.id,
+      buildId: `b-${row.id}`,
+      kind: 'build',
+      status: row.status ?? 'claimed',
+      machineId: row.machineId,
+      claudeSubscriptionId: row.subscriptionId,
+      claimedAt: 10,
+      createdAt: 1,
+    });
   }
 
   test('a report for a claimed bound step writes the subscription quota windows beside the machine windows', async () => {

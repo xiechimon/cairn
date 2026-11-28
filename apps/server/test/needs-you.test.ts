@@ -40,6 +40,7 @@ import {
 } from '../src/services/retry-parking.js';
 import { todoRetryStateOf } from '../src/services/retry-policy.js';
 import { createScheduler } from '../src/services/scheduler.js';
+import { writeSchedule } from '../src/services/step-groups/schedule.js';
 import {
   drainTaskMessageQueue,
   queueTaskMessage,
@@ -819,11 +820,9 @@ describe('needs you (#1800)', () => {
 
   test('a transient failure of a scheduled continuation is not retried and enters the current group', async () => {
     const w = openWorld();
-    w.s.db
-      .update(stepTable)
-      .set({ scheduleId: 'once', scheduledBy: w.s.user.id })
-      .where(eq(stepTable.id, w.stepId))
-      .run();
+    w.s.db.transaction((tx) =>
+      writeSchedule(tx, w.stepId, { scheduleId: 'once', scheduledBy: w.s.user.id }),
+    );
     w.s.db.update(buildTable).set({ prevPhase: 'done' }).where(eq(buildTable.id, w.buildId)).run();
     const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
     if (step === undefined) throw new Error('missing step');

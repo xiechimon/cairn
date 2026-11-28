@@ -14,6 +14,7 @@ import {
   message,
   project,
   step,
+  stepQuota,
   team,
   todo,
   tokenUsage,
@@ -440,10 +441,13 @@ describe('run trace', () => {
     const rows = Array.from({ length: 45 }, (_, i) =>
       chiefStep(`t${String(i).padStart(2, '0')}`, T0 + (i === 24 ? 25 : i) * 1_000, {
         status: i % 9 === 0 ? 'failed' : i % 9 === 1 ? 'stopped' : 'done',
-        ...(i === 44 ? { quotaBlock: { reason: 'quota', retryAt: T0 } as never } : {}),
       }),
     );
     H.s.db.insert(step).values(rows).run();
+    H.s.db
+      .insert(stepQuota)
+      .values({ stepId: 't44', quotaBlock: { reason: 'quota', retryAt: T0 } as never })
+      .run();
     H.s.db
       .insert(chiefMessage)
       .values(chiefRow('owner-t44', T0 + 44_000, 'user', '最后一条\n第二行'))

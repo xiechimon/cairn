@@ -46,6 +46,7 @@ import * as machineClaimPayload from '../src/services/machine-claim-payload.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
 import * as machines from '../src/services/machines.js';
 import { createProvider } from '../src/services/providers.js';
+import { readMemoryTrace, writeMemoryTrace } from '../src/services/step-groups/memory-trace.js';
 import * as stepLease from '../src/services/step-lease.js';
 import {
   bootServer,
@@ -555,9 +556,12 @@ describe('machine-claim split: protocol, lease kernel, and payload builder', () 
     const newerClaimedAt = w.stepRow().claimedAt! + 500;
     w.s.db
       .update(stepTable)
-      .set({ claimedAt: newerClaimedAt, memoryTrace: sentinelTrace })
+      .set({ claimedAt: newerClaimedAt })
       .where(eq(stepTable.id, claimed.step.id))
       .run();
+    w.s.db.transaction((tx) =>
+      writeMemoryTrace(tx, claimed.step.id, { memoryTrace: sentinelTrace }),
+    );
 
     const threadRow = w.s.db
       .select()
@@ -595,7 +599,7 @@ describe('machine-claim split: protocol, lease kernel, and payload builder', () 
       mcpServers: ['alpha', 'linear', 'notion'],
       hasMcpServers: true,
     });
-    expect(w.stepRow().memoryTrace).toEqual(sentinelTrace);
+    expect(readMemoryTrace(w.s.db, claimed.step.id).memoryTrace).toEqual(sentinelTrace);
   });
 
   test('in-server Coordinator fences memoryTrace write by claimed status, machineId = null, and claimedAt after awaiting README', async () => {
@@ -703,16 +707,15 @@ describe('machine-claim split: protocol, lease kernel, and payload builder', () 
       .set({
         status: 'stopped',
         claimedAt: (current.claimedAt ?? 1) + 500,
-        memoryTrace: sentinelTrace,
       })
       .where(eq(stepTable.id, current.id))
       .run();
+    s.db.transaction((tx) => writeMemoryTrace(tx, current.id, { memoryTrace: sentinelTrace }));
 
     readmeRelease.resolve(new Response('Not found', { status: 404 }));
     await coordinator.idle();
 
-    const after = s.db.select().from(stepTable).where(eq(stepTable.id, current.id)).get()!;
-    expect(after.memoryTrace).toEqual(sentinelTrace);
+    expect(readMemoryTrace(s.db, current.id).memoryTrace).toEqual(sentinelTrace);
   });
 
   test('heartbeatStep advances lastHeartbeatAt, throws 410 on deleted step, and throws NotFoundError on unowned/pending step', async () => {

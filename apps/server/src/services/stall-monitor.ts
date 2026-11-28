@@ -42,6 +42,7 @@ import { notifyWatchdogFlag } from './notifications.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { applyQuotaWaitStep, publishStepRow, QUOTA_PROBE_BASE_MS } from './quota-wait.js';
 import { coordinatorProfile, profileForStep, type RouteProfile } from './routing-rules.js';
+import { readQuota, type StepQuota, writeQuota } from './step-groups/quota.js';
 import { pendingPermissionWaitIds } from './step-permission-wait.js';
 
 export { isStepWaitingPermission, pendingPermissionWaitIds } from './step-permission-wait.js';
@@ -115,7 +116,7 @@ function stepProgressAt(row: StepRow): number {
   return row.lastProgressAt ?? row.claimedAt ?? row.createdAt;
 }
 
-function runtimeWindowKey(row: StepRow): RuntimeWindowKey {
+function runtimeWindowKey(row: StepRow & StepQuota): RuntimeWindowKey {
   const provider = row.ranModel?.provider ?? row.fallback?.model?.provider ?? null;
   if (provider === null || provider === '' || provider === 'unknown') return 'default';
   if (provider === 'antigravity') return 'antigravity';
@@ -126,7 +127,7 @@ function runtimeWindowKey(row: StepRow): RuntimeWindowKey {
   return runtime === 'gemini' ? 'default' : runtime;
 }
 
-function quietWindowFor(row: StepRow, kind: 'worker' | 'chief'): number {
+function quietWindowFor(row: StepRow & StepQuota, kind: 'worker' | 'chief'): number {
   const key = runtimeWindowKey(row);
   return kind === 'chief' ? CHIEF_QUIET_MS[key] : WORKER_QUIET_MS[key];
 }
@@ -189,7 +190,7 @@ function diagnoseStep(
   now: number,
 ): Diagnosis | null {
   const progressAt = stepProgressAt(row);
-  const quietMs = quietWindowFor(row, context.kind);
+  const quietMs = quietWindowFor({ ...row, ...readQuota(deps.db, row.id) }, context.kind);
   const waitIds = pendingPermissionWaitIds(deps.db, row);
   if (waitIds.length > 0) {
     return now - progressAt >= quietMs ? { cause: 'permission_wait', waitIds, progressAt } : null;
@@ -343,7 +344,7 @@ function requeueTurn(
   opts: {
     freshSession: boolean;
     incrementRecovery: boolean;
-    fallback?: StepRow['fallback'];
+    fallback?: StepQuota['fallback'];
     holdSettle: boolean;
   },
 ): void {
@@ -364,11 +365,9 @@ function requeueTurn(
       status: 'pending',
       machineId: null,
       sessionId: null,
-      ranModel: null,
       mcpGrant: null,
       lastProgressAt: null,
       freshSession: opts.freshSession || current.freshSession,
-      ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
       holdReason: opts.holdSettle ? STALL_RECOVERY_HOLD_REASON : null,
       holdUntil: opts.holdSettle ? now + STALL_STOP_SETTLE_MS : null,
       stallState: nextMeta,
@@ -376,6 +375,12 @@ function requeueTurn(
     .where(claimedMatchPredicate(current))
     .run();
   if (updated.changes === 0) return;
+  deps.db.transaction((tx) =>
+    writeQuota(tx, current.id, {
+      ranModel: null,
+      ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
+    }),
+  );
   const fresh = deps.db.select().from(step).where(eq(step.id, current.id)).get();
   if (fresh !== undefined) publishStepRow(deps, fresh);
   if (opts.holdSettle || cause === 'missing_tools' || cause === 'quota') {
@@ -431,7 +436,8 @@ function handleQuotaDiagnosis(
   now: number,
   holdSettle: boolean,
 ): void {
-  const currentModel = current.ranModel ?? current.fallback?.model;
+  const quota = readQuota(txDeps.db, current.id);
+  const currentModel = quota.ranModel ?? quota.fallback?.model;
   const providerId = currentModel?.provider ?? context.agentRow?.provider ?? 'unknown';
   const outcome: MachineDoneBody = {
     status: 'failed',
@@ -443,7 +449,7 @@ function handleQuotaDiagnosis(
       reason: diagnosis.detail ?? diagnosis.signal,
     },
   };
-  const fallback = planModelFallback(txDeps, current, context.agentRow, outcome);
+  const fallback = planModelFallback(txDeps, { ...current, ...quota }, context.agentRow, outcome);
   if (fallback !== null) {
     requeueTurn(txDeps, current, context, 'quota', now, fallback.note, {
       freshSession: true,
@@ -465,13 +471,13 @@ function handleQuotaDiagnosis(
       .set({
         machineId: null,
         sessionId: null,
-        ranModel: null,
         mcpGrant: null,
         stallState: nextMeta,
       })
       .where(claimedMatchPredicate(current))
       .run();
     if (claimedCas.changes === 0) return;
+    txDeps.db.transaction((tx) => writeQuota(tx, current.id, { ranModel: null }));
     emitStopSignals(txDeps, context, current);
     applyQuotaWaitStep(
       txDeps,
@@ -479,7 +485,6 @@ function handleQuotaDiagnosis(
         ...current,
         machineId: null,
         sessionId: null,
-        ranModel: null,
         mcpGrant: null,
         stallState: nextMeta,
       },
@@ -507,7 +512,6 @@ function handleQuotaDiagnosis(
       status: 'pending',
       machineId: null,
       sessionId: null,
-      ranModel: null,
       mcpGrant: null,
       holdReason: QUOTA_HOLD_REASON,
       holdUntil,
@@ -519,6 +523,7 @@ function handleQuotaDiagnosis(
     .where(claimedMatchPredicate(current))
     .run();
   if (parked.changes === 0) return;
+  txDeps.db.transaction((tx) => writeQuota(tx, current.id, { ranModel: null }));
   const fresh = txDeps.db.select().from(step).where(eq(step.id, current.id)).get();
   if (fresh !== undefined) publishStepRow(txDeps, fresh);
   emitStopSignals(txDeps, context, current);

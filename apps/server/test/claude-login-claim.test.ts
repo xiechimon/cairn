@@ -17,6 +17,7 @@ import { hasActiveClaudeSubscription } from '../src/services/claude-subscription
 import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { claimStep, markPresence } from '../src/services/machines.js';
 import { createProvider } from '../src/services/providers.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import {
   bootServer,
   insertClaudeSubscription,
@@ -27,6 +28,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -473,17 +475,15 @@ describe('subscription login takes precedence over expired machine login', () =>
       });
       expect(denied.status).toBe(404);
       expect(await denied.text()).not.toContain(token);
-      s.db
-        .update(stepTable)
-        .set({
+      s.db.transaction((tx) =>
+        writeQuota(tx, stepId, {
           fallback: {
             model: { provider: 'stub-gw', modelId: 'stub-model' },
             tried: [],
             zeroUsageRetried: false,
           },
-        })
-        .where(eq(stepTable.id, stepId))
-        .run();
+        }),
+      );
       const piCredentials = await s.app.request(
         `/api/machine/token/${stepId}?generation=${claimed?.step.generation}`,
         { headers: { authorization: `Bearer ${machineToken}` } },
@@ -584,7 +584,7 @@ describe('several stored subscriptions, one enabled', () => {
   }
 
   function stepRow(s: TestServer, id: string) {
-    return s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();
+    return readStepFixture(s.db, id);
   }
 
   function credentialsOf(s: TestServer, machineId: string, stepId: string) {
@@ -774,6 +774,14 @@ describe('several stored subscriptions, one enabled', () => {
       .filter((statement) => /^\s*UPDATE/i.test(statement));
     expect(statements).toHaveLength(2);
     for (const statement of statements) s.db.run(sql.raw(statement));
+    const subscriptionBackfill = readFileSync(
+      new URL('../drizzle/0272_step_side_tables.sql', import.meta.url),
+      'utf8',
+    )
+      .split('--> statement-breakpoint')
+      .find((statement) => /^\s*INSERT INTO `step_subscription`/i.test(statement));
+    expect(subscriptionBackfill).toBeDefined();
+    s.db.run(sql.raw(subscriptionBackfill!));
     expect(
       rows(s)
         .filter((row) => row.enabledAt !== null)

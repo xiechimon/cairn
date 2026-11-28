@@ -34,6 +34,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { insertStepFixture } from './step-groups-fixture.js';
 
 function attachLiveVerifier(
   s: TestServer,
@@ -827,18 +828,15 @@ describe('antigravity subscriptions REST & model sources', () => {
         createdAt: 10,
       })
       .run();
-    s.db
-      .insert(stepTable)
-      .values({
-        id: 's-ag',
-        buildId: 'b-ag',
-        kind: 'build',
-        status: 'claimed',
-        claimedAt: 11,
-        antigravitySubscriptionId: sub.id,
-        createdAt: 11,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: 's-ag',
+      buildId: 'b-ag',
+      kind: 'build',
+      status: 'claimed',
+      claimedAt: 11,
+      antigravitySubscriptionId: sub.id,
+      createdAt: 11,
+    });
 
     const conflictDisable = await req(
       s.app,

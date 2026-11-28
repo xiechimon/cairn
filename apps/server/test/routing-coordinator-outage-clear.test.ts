@@ -10,6 +10,7 @@ import {
 import { nowMs } from '../src/lib/ids.js';
 import { setCoordinatorWake } from '../src/services/coordinator-context.js';
 import { createProvider } from '../src/services/providers.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import {
   bootServer,
   insertMachine,
@@ -19,6 +20,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { insertStepFixture, readStepFixture } from './step-groups-fixture.js';
 
 function seedProvider(s: TestServer, providerId: string, modelId: string): void {
   createProvider(
@@ -114,81 +116,76 @@ describe('switching Coordinator model clears parked quota outage and wakes Coord
     });
 
     const now = nowMs();
-    s.db
-      .insert(stepTable)
-      .values([
-        {
-          id: 'step-waiting-quota',
-          buildId: mainThread,
-          kind: 'chief',
-          machineId,
-          status: 'waiting_quota',
-          holdReason: null,
-          holdUntil: null,
-          holdCount: 2,
-          quotaBlock: {
-            kind: 'capacity',
-            providerId: 'devin',
-            label: 'Devin',
-            reason: 'overloaded',
-            retryAfterMs: 60_000,
-            firstSeenAt: now - 10_000,
-            lastAt: now,
-            attempts: 2,
-            probeAt: now + 60_000,
-          },
-          ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
-          fallback: {
-            model: { provider: 'devin', modelId: 'swe-2-1-medium' },
-            tried: ['devin/swe-2-1-medium'],
-            zeroUsageRetried: false,
-          },
-          routedReason: 'busy',
-          prompt: 'hello',
-          createdAt: now,
-        },
-        {
-          id: 'step-hold-quota',
-          buildId: heldThread,
-          kind: 'chief',
-          machineId,
-          status: 'pending',
-          holdReason: 'quota',
-          holdUntil: now + 120_000,
-          holdCount: 3,
-          ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
-          fallback: {
-            model: { provider: 'devin', modelId: 'swe-2-1-medium' },
-            tried: ['devin/swe-2-1-medium'],
-            zeroUsageRetried: false,
-          },
-          routedReason: 'offline',
-          prompt: 'hello 2',
-          createdAt: now - 1_000,
-        },
-        {
-          id: 'step-overridden-project',
-          buildId: overriddenThread,
-          kind: 'chief',
-          machineId,
-          status: 'waiting_quota',
-          quotaBlock: {
-            kind: 'quota',
-            providerId: 'devin',
-            label: 'Devin',
-            reason: 'overloaded',
-            retryAfterMs: 60_000,
-            firstSeenAt: now - 10_000,
-            lastAt: now,
-            attempts: 1,
-            probeAt: now + 60_000,
-          },
-          ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
-          prompt: 'project hello',
-          createdAt: now - 2_000,
-        },
-      ])
-      .run();
+    insertStepFixture(s.db, {
+      id: 'step-waiting-quota',
+      buildId: mainThread,
+      kind: 'chief',
+      machineId,
+      status: 'waiting_quota',
+      holdReason: null,
+      holdUntil: null,
+      holdCount: 2,
+      quotaBlock: {
+        kind: 'capacity',
+        providerId: 'devin',
+        label: 'Devin',
+        reason: 'overloaded',
+        retryAfterMs: 60_000,
+        firstSeenAt: now - 10_000,
+        lastAt: now,
+        attempts: 2,
+        probeAt: now + 60_000,
+      },
+      ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
+      fallback: {
+        model: { provider: 'devin', modelId: 'swe-2-1-medium' },
+        tried: ['devin/swe-2-1-medium'],
+        zeroUsageRetried: false,
+      },
+      routedReason: 'busy',
+      prompt: 'hello',
+      createdAt: now,
+    });
+    insertStepFixture(s.db, {
+      id: 'step-hold-quota',
+      buildId: heldThread,
+      kind: 'chief',
+      machineId,
+      status: 'pending',
+      holdReason: 'quota',
+      holdUntil: now + 120_000,
+      holdCount: 3,
+      ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
+      fallback: {
+        model: { provider: 'devin', modelId: 'swe-2-1-medium' },
+        tried: ['devin/swe-2-1-medium'],
+        zeroUsageRetried: false,
+      },
+      routedReason: 'offline',
+      prompt: 'hello 2',
+      createdAt: now - 1_000,
+    });
+    insertStepFixture(s.db, {
+      id: 'step-overridden-project',
+      buildId: overriddenThread,
+      kind: 'chief',
+      machineId,
+      status: 'waiting_quota',
+      quotaBlock: {
+        kind: 'quota',
+        providerId: 'devin',
+        label: 'Devin',
+        reason: 'overloaded',
+        retryAfterMs: 60_000,
+        firstSeenAt: now - 10_000,
+        lastAt: now,
+        attempts: 1,
+        probeAt: now + 60_000,
+      },
+      ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
+      prompt: 'project hello',
+      createdAt: now - 2_000,
+    });
 
     const beforeRes = await req(s.app, 'GET', `/api/teams/${s.team.id}/chief`);
     expect(beforeRes.status).toBe(200);
@@ -222,11 +219,7 @@ describe('switching Coordinator model clears parked quota outage and wakes Coord
       );
       expect(switchRes.status).toBe(200);
 
-      const releasedMain = s.db
-        .select()
-        .from(stepTable)
-        .where(eq(stepTable.id, 'step-waiting-quota'))
-        .get();
+      const releasedMain = readStepFixture(s.db, 'step-waiting-quota');
       expect(releasedMain).toMatchObject({
         status: 'pending',
         holdReason: null,
@@ -239,11 +232,7 @@ describe('switching Coordinator model clears parked quota outage and wakes Coord
         routedReason: null,
       });
 
-      const releasedHeld = s.db
-        .select()
-        .from(stepTable)
-        .where(eq(stepTable.id, 'step-hold-quota'))
-        .get();
+      const releasedHeld = readStepFixture(s.db, 'step-hold-quota');
       expect(releasedHeld).toMatchObject({
         status: 'pending',
         holdReason: null,
@@ -292,53 +281,48 @@ describe('switching Coordinator model clears parked quota outage and wakes Coord
     const threadB = seedChiefWithThread(s, { id: 'chief-proj-b', projectId: projB });
 
     const now = nowMs();
-    s.db
-      .insert(stepTable)
-      .values([
-        {
-          id: 'step-a',
-          buildId: threadA,
-          kind: 'chief',
-          machineId,
-          status: 'waiting_quota',
-          quotaBlock: {
-            kind: 'capacity',
-            providerId: 'devin',
-            label: 'Devin',
-            reason: 'overloaded',
-            retryAfterMs: 60_000,
-            firstSeenAt: now - 5_000,
-            lastAt: now,
-            attempts: 1,
-            probeAt: now + 60_000,
-          },
-          ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
-          prompt: 'project a',
-          createdAt: now,
-        },
-        {
-          id: 'step-b',
-          buildId: threadB,
-          kind: 'chief',
-          machineId,
-          status: 'waiting_quota',
-          quotaBlock: {
-            kind: 'capacity',
-            providerId: 'devin',
-            label: 'Devin',
-            reason: 'overloaded',
-            retryAfterMs: 60_000,
-            firstSeenAt: now - 5_000,
-            lastAt: now,
-            attempts: 1,
-            probeAt: now + 60_000,
-          },
-          ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
-          prompt: 'project b',
-          createdAt: now - 1_000,
-        },
-      ])
-      .run();
+    insertStepFixture(s.db, {
+      id: 'step-a',
+      buildId: threadA,
+      kind: 'chief',
+      machineId,
+      status: 'waiting_quota',
+      quotaBlock: {
+        kind: 'capacity',
+        providerId: 'devin',
+        label: 'Devin',
+        reason: 'overloaded',
+        retryAfterMs: 60_000,
+        firstSeenAt: now - 5_000,
+        lastAt: now,
+        attempts: 1,
+        probeAt: now + 60_000,
+      },
+      ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
+      prompt: 'project a',
+      createdAt: now,
+    });
+    insertStepFixture(s.db, {
+      id: 'step-b',
+      buildId: threadB,
+      kind: 'chief',
+      machineId,
+      status: 'waiting_quota',
+      quotaBlock: {
+        kind: 'capacity',
+        providerId: 'devin',
+        label: 'Devin',
+        reason: 'overloaded',
+        retryAfterMs: 60_000,
+        firstSeenAt: now - 5_000,
+        lastAt: now,
+        attempts: 1,
+        probeAt: now + 60_000,
+      },
+      ranModel: { provider: 'devin', modelId: 'swe-2-1-medium' },
+      prompt: 'project b',
+      createdAt: now - 1_000,
+    });
 
     const beforeRes = await req(s.app, 'GET', `/api/teams/${s.team.id}/chief`);
     expect(((await beforeRes.json()) as ChiefGetResponse).outage).toMatchObject({
@@ -362,7 +346,7 @@ describe('switching Coordinator model clears parked quota outage and wakes Coord
       });
       expect(patchRes.status).toBe(200);
 
-      const stepA = s.db.select().from(stepTable).where(eq(stepTable.id, 'step-a')).get();
+      const stepA = readStepFixture(s.db, 'step-a');
       expect(stepA).toMatchObject({
         status: 'pending',
         holdReason: null,
@@ -393,6 +377,11 @@ describe('switching Coordinator model clears parked quota outage and wakes Coord
         .set({
           status: 'waiting_quota',
           holdReason: null,
+        })
+        .where(eq(stepTable.id, 'step-a'))
+        .run();
+      s.db.transaction((tx) =>
+        writeQuota(tx, 'step-a', {
           ranModel: { provider: 'antigravity-proxy', modelId: 'gemini-4-hydrogen' },
           quotaBlock: {
             kind: 'quota',
@@ -405,9 +394,8 @@ describe('switching Coordinator model clears parked quota outage and wakes Coord
             attempts: 1,
             probeAt: now + 60_000,
           },
-        })
-        .where(eq(stepTable.id, 'step-a'))
-        .run();
+        }),
+      );
       const clearOverrideRes = await req(s.app, 'PATCH', `/api/projects/${projA}`, {
         modelOverrides: { coordinator: null },
       });

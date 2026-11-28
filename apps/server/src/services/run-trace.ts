@@ -38,6 +38,7 @@ import {
   message,
   project,
   step,
+  stepQuota,
   todo,
   tokenUsage,
 } from '../db/schema.js';
@@ -169,8 +170,14 @@ function turnWindow(db: Db, row: StepRow) {
 }
 
 function turnTrace(db: Db, thread: TeamThread, stepId: string, capResults: boolean): RunTrace {
-  const row = db.select().from(step).where(eq(step.id, stepId)).get();
-  if (row === undefined) throw new HttpError(404, `run ${stepId}`);
+  const found = db
+    .select({ row: step, quotaBlock: stepQuota.quotaBlock })
+    .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
+    .where(eq(step.id, stepId))
+    .get();
+  if (found === undefined) throw new HttpError(404, `run ${stepId}`);
+  const row = { ...found.row, quotaBlock: found.quotaBlock };
   const { start, end } = turnWindow(db, row);
   const owners = new Set(row.ownerMessageIds ?? []);
   const rows = db
@@ -274,11 +281,13 @@ function systemItem(row: Row): RunTraceItem | null {
 
 function buildTrace(db: Db, owner: TeamBuild, capResults: boolean): RunTrace {
   const steps = db
-    .select()
+    .select({ row: step, quotaBlock: stepQuota.quotaBlock })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .where(eq(step.buildId, owner.id))
     .orderBy(asc(step.createdAt), asc(step.id))
-    .all();
+    .all()
+    .map(({ row, quotaBlock }) => ({ ...row, quotaBlock }));
   const rows = db
     .select({
       id: message.id,
@@ -374,7 +383,9 @@ function turnError(db: Db, stepId: string): string | null {
   return row === undefined ? null : turnErrorText(row.content);
 }
 
-function turnStatus(db: Db, row: StepRow): RunStatus {
+type StepWithQuotaBlock = StepRow & { quotaBlock: typeof stepQuota.$inferSelect.quotaBlock };
+
+function turnStatus(db: Db, row: StepWithQuotaBlock): RunStatus {
   if (row.quotaBlock !== null || row.status === 'waiting_quota') return 'quota';
   if (row.status === 'stopped') return 'stopped';
   if (row.status === 'failed') {
@@ -404,7 +415,7 @@ const VISIBLE_THREAD = and(
 
 const stepOf = (column: AnySQLiteColumn) =>
   sql`select 1 from ${step} where ${step.buildId} = ${column}`;
-const BUILD_QUOTA = sql`exists (${stepOf(build.id)} and (${step.status} = 'waiting_quota' or ${step.quotaBlock} is not null))`;
+const BUILD_QUOTA = sql`exists (select 1 from ${step} left join ${stepQuota} on ${stepQuota.stepId} = ${step.id} where ${step.buildId} = ${build.id} and (${step.status} = 'waiting_quota' or ${stepQuota.quotaBlock} is not null))`;
 const BUILD_STOPPED = sql`(${build.stop} is not null or exists (${stepOf(build.id)} and ${step.status} = 'stopped'))`;
 const BUILD_RUNNING = sql`exists (${stepOf(build.id)} and ${step.status} in ('pending', 'claimed'))`;
 const BUILD_FAILED = sql`((${build.errorMessage} is not null and ${build.errorMessage} <> '') or exists (${stepOf(build.id)} and ${step.status} = 'failed'))`;
@@ -435,20 +446,21 @@ function turnRows(
     conditions.push(
       or(
         inArray(step.status, ['failed', 'stopped', 'waiting_quota']),
-        isNotNull(step.quotaBlock),
+        isNotNull(stepQuota.quotaBlock),
       ) as SQL,
     );
   if (cursor !== null) conditions.push(olderThan(step.createdAt, step.id, cursor));
   const rows = db
-    .select({ row: step, source: project.name })
+    .select({ row: step, quotaBlock: stepQuota.quotaBlock, source: project.name })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .innerJoin(chiefThread, eq(chiefThread.id, step.buildId))
     .leftJoin(project, eq(project.id, chiefThread.projectId))
     .where(and(...conditions))
     .orderBy(desc(step.createdAt), desc(step.id))
     .limit(query.limit + 1)
     .all();
-  return rows.map(({ row, source }) => {
+  return rows.map(({ row, quotaBlock, source }) => {
     const threadId = row.buildId;
     const { start, end } = turnWindow(db, row);
     const ownerId = row.ownerMessageIds?.[0] ?? row.id;
@@ -475,7 +487,7 @@ function turnRows(
       kind: 'coordinator',
       threadId,
       at: row.createdAt,
-      status: turnStatus(db, row),
+      status: turnStatus(db, { ...row, quotaBlock }),
       firstLine: firstLineOf(
         redactSecrets(owner === undefined ? '' : textOf(owner.content)).value as string,
       ),
@@ -489,7 +501,7 @@ function turnRows(
 }
 
 function buildStatus(
-  steps: readonly StepRow[],
+  steps: readonly StepWithQuotaBlock[],
   owner: { stop: unknown; errorMessage: string | null },
 ): RunStatus {
   if (steps.some((s) => s.status === 'waiting_quota' || s.quotaBlock !== null)) return 'quota';
@@ -529,7 +541,13 @@ function taskRows(
     .limit(query.limit + 1)
     .all();
   return rows.map((row) => {
-    const steps = db.select().from(step).where(eq(step.buildId, row.id)).all();
+    const steps = db
+      .select({ row: step, quotaBlock: stepQuota.quotaBlock })
+      .from(step)
+      .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
+      .where(eq(step.buildId, row.id))
+      .all()
+      .map(({ row: stepRow, quotaBlock }) => ({ ...stepRow, quotaBlock }));
     const claims = steps.flatMap((s) => (s.claimedAt === null ? [] : [s.claimedAt]));
     const finished = steps.length > 0 && steps.every((s) => s.finishedAt !== null);
     const toolCount =

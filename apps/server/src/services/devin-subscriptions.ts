@@ -11,7 +11,7 @@ import type {
 } from '@cairn/shared';
 import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { devinSubscription, step } from '../db/schema.js';
+import { devinSubscription, step, stepSubscription } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -93,7 +93,10 @@ function runningStepCount(db: Pick<Db, 'select'>, subscriptionId: string): numbe
     db
       .select({ n: count() })
       .from(step)
-      .where(and(eq(step.status, 'claimed'), eq(step.devinSubscriptionId, subscriptionId)))
+      .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
+      .where(
+        and(eq(step.status, 'claimed'), eq(stepSubscription.devinSubscriptionId, subscriptionId)),
+      )
       .get()?.n ?? 0
   );
 }
@@ -219,7 +222,7 @@ export function listDevinSubscriptions(deps: Deps, teamId: string): DevinSubscri
     .all();
   const usage = subscriptionUsageStats(
     deps.db,
-    step.devinSubscriptionId,
+    stepSubscription.devinSubscriptionId,
     rows.map((row) => row.id),
     nowMs() - DAY_MS,
   );

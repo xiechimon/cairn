@@ -26,7 +26,15 @@ import {
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, or } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
-import { antigravitySubscription, build, chiefThread, machine, step, todo } from '../db/schema.js';
+import {
+  antigravitySubscription,
+  build,
+  chiefThread,
+  machine,
+  step,
+  stepSubscription,
+  todo,
+} from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -208,7 +216,13 @@ function runningStepCount(db: Pick<Db, 'select'>, subscriptionId: string): numbe
     db
       .select({ n: count() })
       .from(step)
-      .where(and(eq(step.status, 'claimed'), eq(step.antigravitySubscriptionId, subscriptionId)))
+      .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
+      .where(
+        and(
+          eq(step.status, 'claimed'),
+          eq(stepSubscription.antigravitySubscriptionId, subscriptionId),
+        ),
+      )
       .get()?.n ?? 0
   );
 }
@@ -583,12 +597,13 @@ export function listAntigravitySubscriptionSteps(
   const rows = deps.db
     .select({ stepRow: step, todoRow: todo, threadRow: chiefThread })
     .from(step)
+    .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
     .leftJoin(build, eq(step.buildId, build.id))
     .leftJoin(todo, eq(build.todoId, todo.id))
     .leftJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .where(
       and(
-        eq(step.antigravitySubscriptionId, id),
+        eq(stepSubscription.antigravitySubscriptionId, id),
         isNotNull(step.claimedAt),
         inArray(step.status, ['claimed', 'done', 'failed', 'stopped']),
       ),
@@ -634,7 +649,7 @@ export function listAntigravitySubscriptions(
   const now = nowMs();
   const usage = subscriptionUsageStats(
     deps.db,
-    step.antigravitySubscriptionId,
+    stepSubscription.antigravitySubscriptionId,
     rows.map((row) => row.id),
     now - DAY_MS,
   );

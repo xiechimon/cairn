@@ -29,6 +29,7 @@ import {
   profileForStep,
   upsertRoutingRule,
 } from '../src/services/routing-rules.js';
+import { writeMemoryTrace } from '../src/services/step-groups/memory-trace.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
@@ -38,6 +39,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { insertStepFixture, readStepFixture } from './step-groups-fixture.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -185,11 +187,7 @@ describe('Doubao routing, multi-runner QR login, claim, and fallback', () => {
     expect(await claim(s, miniId)).toBeNull();
     const claimedWorker = await claim(s, mbpId);
     expect(claimedWorker?.step.id).toBe(workerStep.id);
-    const workerRowAfter = s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, workerStep.id))
-      .get()!;
+    const workerRowAfter = readStepFixture(s.db, workerStep.id)!;
     expect(workerRowAfter.doubaoSubscriptionId).toBe(sub.id);
     expect(workerRowAfter.ranModel?.provider).toBe('doubao');
 
@@ -439,7 +437,7 @@ describe('Doubao routing, multi-runner QR login, claim, and fallback', () => {
       status: 'failed',
       errorMessage: 'authentication_failed',
     });
-    const afterFallback = s.db.select().from(stepTable).where(eq(stepTable.id, s1.id)).get()!;
+    const afterFallback = readStepFixture(s.db, s1.id)!;
     expect(afterFallback.fallback?.model?.provider).toBe('claude-code');
     expect(afterFallback.status).toBe('pending');
     const claimedFallback = await claim(s, runnerA);
@@ -752,7 +750,7 @@ describe('Doubao routing, multi-runner QR login, claim, and fallback', () => {
         createdAt: Date.now() + 1,
       })
       .run();
-    const raceStep2Row = s.db.select().from(stepTable).where(eq(stepTable.id, raceStep2Id)).get()!;
+    const raceStep2Row = readStepFixture(s.db, raceStep2Id)!;
     const priorCheck = priorSessionOf(
       s.db,
       raceStep2Row,
@@ -863,17 +861,18 @@ describe('Doubao routing, multi-runner QR login, claim, and fallback', () => {
         origin: 'user',
       })
       .run();
-    s.db
-      .update(stepTable)
-      .set({
-        status: 'claimed',
-        claimedAt: now + 5,
-        doubaoSubscriptionId: sub.id,
-        sessionId: 'db-worker-mem-sess',
-        memoryTrace,
-      })
-      .where(eq(stepTable.id, workerStep.id))
-      .run();
+    s.db.transaction((tx) => {
+      tx.update(stepTable)
+        .set({
+          status: 'claimed',
+          claimedAt: now + 5,
+          doubaoSubscriptionId: sub.id,
+          sessionId: 'db-worker-mem-sess',
+        })
+        .where(eq(stepTable.id, workerStep.id))
+        .run();
+      writeMemoryTrace(tx, workerStep.id, { memoryTrace });
+    });
 
     executeMemoryToolForStep(s.db, owner, workerStep.id, 'update_memory', {
       scope: 'team',
@@ -912,22 +911,19 @@ describe('Doubao routing, multi-runner QR login, claim, and fallback', () => {
         createdAt: now + 10,
       })
       .run();
-    s.db
-      .insert(stepTable)
-      .values({
-        id: 'chief-mem-step',
-        buildId: 'thread-mem',
-        kind: 'chief',
-        status: 'claimed',
-        claimedAt: now + 20,
-        createdAt: now + 15,
-        prompt: 'Always answer concisely.',
-        ownerMessageIds: ['chief-mem-user'],
-        doubaoSubscriptionId: sub.id,
-        sessionId: 'db-chief-mem-sess',
-        memoryTrace,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: 'chief-mem-step',
+      buildId: 'thread-mem',
+      kind: 'chief',
+      status: 'claimed',
+      claimedAt: now + 20,
+      createdAt: now + 15,
+      prompt: 'Always answer concisely.',
+      ownerMessageIds: ['chief-mem-user'],
+      doubaoSubscriptionId: sub.id,
+      sessionId: 'db-chief-mem-sess',
+      memoryTrace,
+    });
 
     const latestDoc = executeMemoryDocumentTool(s.db, owner, 'memories', {
       scope: 'team',

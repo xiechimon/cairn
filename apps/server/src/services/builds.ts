@@ -11,7 +11,15 @@ import { ACTIVE_STEP_STATUSES, isBuildStepKind } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import type { CommitEffects } from '../db/commit-effects.js';
-import { build, steerPending, step, todo } from '../db/schema.js';
+import {
+  build,
+  steerPending,
+  step,
+  stepBlockerHandoff,
+  stepQuota,
+  stepSkillInjection,
+  todo,
+} from '../db/schema.js';
 import { HttpError, NotFoundError } from '../lib/errors.js';
 import type { systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
@@ -34,6 +42,9 @@ import type { Replacement } from './queued-send.js';
 import { toQuotaWait } from './quota-wait.js';
 import { automaticRestartBlocked } from './retry-parking.js';
 import { profileForStep } from './routing-rules.js';
+import { blockerHandoffColumns } from './step-groups/blocker-handoff.js';
+import { type StepSchedulePatch, writeSchedule } from './step-groups/schedule.js';
+import { skillInjectionColumns } from './step-groups/skill-injection.js';
 import { stepQueueProjector } from './step-queue.js';
 import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
 import type { QuestionAnswer } from './worker-questions.js';
@@ -244,6 +255,8 @@ export function enqueueStep(
   freshSession?: boolean,
   byPerson?: boolean,
   promptOrigin?: StepPromptOrigin,
+  scheduleAttribution?: StepSchedulePatch,
+  afterCommit?: (() => void)[],
 ): StepRecord {
   const current = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (
@@ -259,38 +272,44 @@ export function enqueueStep(
     current === undefined || !BLOCKED_STEP_KINDS.includes(kind)
       ? undefined
       : deps.db.select().from(todo).where(eq(todo.id, current.todoId)).get();
-  deps.db
-    .insert(step)
-    .values({
-      id,
-      buildId,
-      kind,
-      machineId: null,
-      status: 'pending',
-      prompt: prompt ?? null,
-      promptOrigin: promptOrigin ?? null,
-      freshSession: freshSession === true,
-      byPerson: byPerson === true,
-      createdAt,
-      ...(owner !== undefined && blockedNow(deps.db, owner) ? blockedHold() : {}),
-    })
-    .run();
+  deps.db.transaction((tx) => {
+    tx.insert(step)
+      .values({
+        id,
+        buildId,
+        kind,
+        machineId: null,
+        status: 'pending',
+        prompt: prompt ?? null,
+        promptOrigin: promptOrigin ?? null,
+        freshSession: freshSession === true,
+        byPerson: byPerson === true,
+        createdAt,
+        ...(owner !== undefined && blockedNow(deps.db, owner) ? blockedHold() : {}),
+      })
+      .run();
+    if (scheduleAttribution !== undefined) writeSchedule(tx, id, scheduleAttribution);
+  });
   clearStop(deps.db, buildId);
   settleAfterStopPhase(deps, buildId);
   if (isBuildStepKind(kind)) {
     deps.db.update(build).set({ reportLine: null }).where(eq(build.id, buildId)).run();
   }
-  deps.machineHub?.wake(teamId);
-  deps.convHub?.publishStep(buildId, {
-    id,
-    buildId,
-    kind,
-    machineId: null,
-    createdAt,
-    status: 'pending',
-    checkpointCommit: null,
-    skillInjection: null,
-  });
+  const notify = () => {
+    deps.machineHub?.wake(teamId);
+    deps.convHub?.publishStep(buildId, {
+      id,
+      buildId,
+      kind,
+      machineId: null,
+      createdAt,
+      status: 'pending',
+      checkpointCommit: null,
+      skillInjection: null,
+    });
+  };
+  if (afterCommit !== undefined) afterCommit.push(notify);
+  else notify();
   return { id, buildId, kind, machineId: null, createdAt };
 }
 
@@ -301,8 +320,27 @@ export function getBuild(deps: BuildDeps, id: string): BuildRecord | null {
 
 export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
   const rows = deps.db
-    .select()
+    .select({
+      id: step.id,
+      buildId: step.buildId,
+      kind: step.kind,
+      machineId: step.machineId,
+      createdAt: step.createdAt,
+      status: step.status,
+      checkpointCommit: step.checkpointCommit,
+      holdReason: step.holdReason,
+      holdUntil: step.holdUntil,
+      promptOrigin: step.promptOrigin,
+      claimedAt: step.claimedAt,
+      finishedAt: step.finishedAt,
+      ...skillInjectionColumns,
+      ...blockerHandoffColumns,
+      quotaBlock: stepQuota.quotaBlock,
+    })
     .from(step)
+    .leftJoin(stepSkillInjection, eq(stepSkillInjection.stepId, step.id))
+    .leftJoin(stepBlockerHandoff, eq(stepBlockerHandoff.stepId, step.id))
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .where(eq(step.buildId, buildId))
     .orderBy(asc(step.createdAt))
     .all();

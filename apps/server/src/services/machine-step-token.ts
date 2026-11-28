@@ -36,6 +36,8 @@ import {
 } from './machine-deps.js';
 import { mcpConnectorDepsOf, stepConnectorEndpoints } from './mcp-servers.js';
 import { coordinatorProfile } from './routing-rules.js';
+import { readQuota } from './step-groups/quota.js';
+import { readSubscription } from './step-groups/subscription.js';
 import { materializeXaiAccessToken } from './xai-device-login.js';
 
 export async function stepToken(
@@ -97,7 +99,8 @@ async function workerStepToken(
   refresh: boolean,
 ): Promise<MachineTokenResponse> {
   const bundle = resolveStepCredentials({ db: deps.db, box: deps.box }, stepId);
-  const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  const core = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  const stepRow = core === undefined ? undefined : { ...core, ...readQuota(deps.db, stepId) };
   const buildRow = stepRow
     ? deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get()
     : undefined;
@@ -322,7 +325,15 @@ async function chiefStepToken(
   claimed: boolean,
 ): Promise<MachineTokenResponse> {
   const threadId = conversationId;
-  const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  const core = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  const stepRow =
+    core === undefined
+      ? undefined
+      : {
+          ...core,
+          ...readQuota(deps.db, stepId),
+          ...readSubscription(deps.db, stepId),
+        };
   const bundle = resolveChiefStepCredentials(
     { db: deps.db, box: deps.box },
     threadId,

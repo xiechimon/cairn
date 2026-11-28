@@ -8,7 +8,7 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, gte, inArray, isNotNull, isNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefMessage, machine, step, todo } from '../db/schema.js';
+import { build, chiefMessage, machine, step, stepQuota, todo } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
@@ -28,6 +28,7 @@ import {
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { profileForStep } from './routing-rules.js';
+import type { StepQuota } from './step-groups/quota.js';
 import { stepQueueProjector } from './step-queue.js';
 
 export const RUNNER_OFFLINE_NOTICE_MS = 2 * 60_000;
@@ -36,7 +37,7 @@ const NOTICE_PREFIX = 'runner-offline-';
 
 type MachineRow = typeof machine.$inferSelect;
 interface PendingRow {
-  stepRow: typeof step.$inferSelect;
+  stepRow: typeof step.$inferSelect & Pick<StepQuota, 'fallback'>;
   buildRow: typeof build.$inferSelect;
   todoRow: typeof todo.$inferSelect;
 }
@@ -63,12 +64,14 @@ function canonicalNotice(group: NoticeRow[], machineId: string): NoticeRow {
 
 function waitingByMachine(db: Db): Map<string, Map<string, PendingRow>> {
   const rows = db
-    .select({ stepRow: step, buildRow: build, todoRow: todo })
+    .select({ stepRow: step, fallback: stepQuota.fallback, buildRow: build, todoRow: todo })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(and(eq(step.status, 'pending'), isNull(todo.archivedAt)))
-    .all();
+    .all()
+    .map(({ stepRow, fallback, ...rest }) => ({ ...rest, stepRow: { ...stepRow, fallback } }));
   const projectors = new Map<string, ReturnType<typeof stepQueueProjector>>();
   const waiting = new Map<string, Map<string, PendingRow>>();
   for (const row of rows) {
@@ -368,12 +371,14 @@ export function runnerOverrideFor(
     .get();
   if (target === undefined) throw notFound(`machine ${machineId}`);
   const pending = db
-    .select({ stepRow: step, buildRow: build, todoRow: todo })
+    .select({ stepRow: step, fallback: stepQuota.fallback, buildRow: build, todoRow: todo })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(and(eq(build.todoId, todoRow.id), eq(step.status, 'pending')))
-    .all();
+    .all()
+    .map(({ stepRow, fallback, ...rest }) => ({ ...rest, stepRow: { ...stepRow, fallback } }));
   const first = pending[0];
   if (first === undefined) throw conflict('这个任务已经开工，换执行机请新开任务');
   if (projectOfTodo(db, first.todoRow)?.repoKind === 'local') {

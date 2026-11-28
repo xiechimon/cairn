@@ -37,6 +37,7 @@ import { modelKey, planModelFallback, ranModel, recordProviderOutcome } from './
 import { markModelDead } from './model-liveness.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { coordinatorProfile, type RouteProfile } from './routing-rules.js';
+import { readQuota, writeQuota } from './step-groups/quota.js';
 import { flushShield, shieldFor, stepClaimFacts } from './terminal-claims.js';
 
 type StepRow = typeof step.$inferSelect;
@@ -185,7 +186,7 @@ export function recordTurnProviderOutcome(
   deferred = true,
 ): void {
   const teamId = stepTeamId(deps, stepRow);
-  const { provider } = ranModel(agent, stepRow);
+  const { provider } = ranModel(agent, readQuota(deps.db, stepRow.id));
   if (deferred) {
     runAfterCommit(deps, 'recordProviderOutcome', () =>
       recordProviderOutcome(teamId, provider, outcome, silent),
@@ -201,19 +202,21 @@ export function requeueTurnStep(
   fallback: StepFallbackRow,
   note: { id: string; content: string },
 ): void {
-  deps.db
-    .update(step)
-    .set({
-      status: 'pending',
-      machineId: null,
-      sessionId: null,
-      fallback,
-      holdReason: null,
-      holdUntil: null,
-      mcpGrant: null,
-    })
-    .where(eq(step.id, stepRow.id))
-    .run();
+  deps.db.transaction((tx) => {
+    const updated = tx
+      .update(step)
+      .set({
+        status: 'pending',
+        machineId: null,
+        sessionId: null,
+        holdReason: null,
+        holdUntil: null,
+        mcpGrant: null,
+      })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    if (updated.changes > 0) writeQuota(tx, stepRow.id, { fallback });
+  });
   emitTurnRow(deps, stepRow, {
     id: note.id,
     role: 'system',
@@ -240,7 +243,12 @@ export function requeueChiefStepOnFallback(
   outcome: MachineDoneBody,
 ): boolean {
   if (agentRow === null) return false;
-  const plan = planModelFallback(deps, stepRow, agentRow, outcome);
+  const plan = planModelFallback(
+    deps,
+    { ...stepRow, ...readQuota(deps.db, stepRow.id) },
+    agentRow,
+    outcome,
+  );
   if (plan === null) return false;
   if (plan.trigger === 'model_unavailable') markTurnModelDead(deps, stepRow, plan.from);
   const content: ChiefModelFallbackContent = {

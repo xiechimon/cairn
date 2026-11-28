@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
-import { build, chiefThread, doubaoSubscription, provider, step } from '../src/db/schema.js';
+import { build, chiefThread, doubaoSubscription, provider } from '../src/db/schema.js';
 import {
   bootServer,
   insertDevinSubscription,
@@ -8,6 +8,7 @@ import {
   req,
   type TestServer,
 } from './helpers.js';
+import { insertStepFixture } from './step-groups-fixture.js';
 
 const HOUR = 3_600_000;
 const NOW = Date.UTC(2026, 10, 28, 4);
@@ -116,22 +117,21 @@ test.each(['devin', 'doubao'] as const)(
       claimedAt: now - hours * HOUR,
       ...(kind === 'devin' ? { devinSubscriptionId: account } : { doubaoSubscriptionId: account }),
     });
-    s.db
-      .insert(step)
-      .values([
-        {
-          ...claimed('recent', 1),
-          status: 'failed',
-          failureCode: 'rate_limit',
-          finishedAt: now - HOUR / 2,
-        },
-        { ...claimed('yesterday', 24), status: 'done' },
-        { ...claimed('old', 170), status: 'done' },
-        { ...claimed('other', 1, 'other'), status: 'done' },
-        { ...claimed('future', -1), status: 'done' },
-        { ...claimed('unclaimed', 1), status: 'pending', claimedAt: null },
-      ])
-      .run();
+    for (const row of [
+      {
+        ...claimed('recent', 1),
+        status: 'failed' as const,
+        failureCode: 'rate_limit' as const,
+        finishedAt: now - HOUR / 2,
+      },
+      { ...claimed('yesterday', 24), status: 'done' as const },
+      { ...claimed('old', 170), status: 'done' as const },
+      { ...claimed('other', 1, 'other'), status: 'done' as const },
+      { ...claimed('future', -1), status: 'done' as const },
+      { ...claimed('unclaimed', 1), status: 'pending' as const, claimedAt: null },
+    ]) {
+      insertStepFixture(s.db, row);
+    }
     const res = await req(s.app, 'GET', endpoint(s, kind, id));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
@@ -159,23 +159,57 @@ test('recorded activity shows an explicit reset from the attributable Devin fail
     })
     .where(eq(build.id, 'quota-build'))
     .run();
-  s.db
-    .insert(step)
-    .values({
-      id: 'quota-step',
-      buildId: 'quota-build',
-      kind: 'build',
-      status: 'failed',
-      createdAt: now - 2000,
-      claimedAt: now - 1500,
-      finishedAt: now - 1000,
-      failureCode: 'rate_limit',
-      devinSubscriptionId: id,
-    })
-    .run();
+  insertStepFixture(s.db, {
+    id: 'quota-step',
+    buildId: 'quota-build',
+    kind: 'build',
+    status: 'failed',
+    createdAt: now - 2000,
+    claimedAt: now - 1500,
+    finishedAt: now - 1000,
+    failureCode: 'rate_limit',
+    devinSubscriptionId: id,
+  });
   const res = await req(s.app, 'GET', endpoint(s, 'devin', id));
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ activity: { resetsAt: now + 59_000 } });
+});
+
+test('recorded quota block supplies the latest limit and reset from the side table', async () => {
+  const s = bootServer();
+  const id = insertDevinSubscription(s);
+  const now = Date.now();
+  insertStepFixture(s.db, {
+    id: 'blocked-step',
+    buildId: 'blocked-build',
+    kind: 'build',
+    status: 'waiting_quota',
+    createdAt: now - 2000,
+    claimedAt: now - 1500,
+    devinSubscriptionId: id,
+    quotaBlock: {
+      kind: 'quota',
+      providerId: 'claude-subscription',
+      label: 'max',
+      reason: 'rejected',
+      retryAfterMs: 60_000,
+      firstSeenAt: now - 1000,
+      lastAt: now - 1000,
+      attempts: 1,
+      probeAt: now,
+      source: 'claude_rate_limit',
+    },
+  });
+  const res = await req(s.app, 'GET', endpoint(s, 'devin', id));
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({
+    windows: [],
+    activity: {
+      fiveHour: { runs: 1, limited: 1 },
+      sevenDay: { runs: 1, limited: 1 },
+      resetsAt: now + 59_000,
+    },
+  });
 });
 
 test('ChatGPT counts both tasks and Coordinator turns from the selected team', async () => {
@@ -203,18 +237,15 @@ test('ChatGPT counts both tasks and Coordinator turns from the selected team', a
       .run();
   }
   for (const buildId of ['quota-task', 'local-chief', 'foreign-chief']) {
-    s.db
-      .insert(step)
-      .values({
-        id: buildId,
-        buildId,
-        kind: buildId === 'quota-task' ? 'build' : 'chief',
-        status: 'done',
-        claimedAt: now,
-        createdAt: now,
-        ranModel: { provider: 'openai-codex', modelId: 'fixture' },
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: buildId,
+      buildId,
+      kind: buildId === 'quota-task' ? 'build' : 'chief',
+      status: 'done',
+      claimedAt: now,
+      createdAt: now,
+      ranModel: { provider: 'openai-codex', modelId: 'fixture' },
+    });
   }
   const res = await req(s.app, 'GET', endpoint(s, 'codex', 'chatgpt'));
   expect(res.status).toBe(200);

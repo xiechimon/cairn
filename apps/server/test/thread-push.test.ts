@@ -24,6 +24,7 @@ import { AUTOMATIC_RETRY_LIMIT } from '../src/services/retry-parking.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createTodo, setTodoPhase } from '../src/services/todos.js';
 import { bootServer, req } from './helpers.js';
+import { insertStepFixture } from './step-groups-fixture.js';
 
 function world(
   input: { triggerSource?: TriggerSource; sourceKind?: TodoSourceKind; userStarted?: boolean } = {},
@@ -141,17 +142,14 @@ describe('terminal thread push routing (#1784: push only when a human is needed)
   test('a failure another member scheduled does not push to this user', () => {
     const s = world();
     exhaustRetries(s);
-    s.db
-      .insert(step)
-      .values({
-        id: 'other',
-        buildId: 'build',
-        kind: 'build',
-        status: 'failed',
-        scheduledBy: 'someone-else',
-        createdAt: Date.now(),
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: 'other',
+      buildId: 'build',
+      kind: 'build',
+      status: 'failed',
+      scheduledBy: 'someone-else',
+      createdAt: Date.now(),
+    });
     const send = vi
       .spyOn(webpush, 'sendNotification')
       .mockResolvedValue({ statusCode: 201, body: '', headers: {} });

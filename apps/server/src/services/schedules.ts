@@ -27,6 +27,7 @@ import {
   project,
   schedule,
   step,
+  stepSchedule,
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -37,6 +38,7 @@ import { projectOfTodo } from './git.js';
 import { notifyScheduleRun } from './notifications.js';
 import { outsideArchivedProject } from './project-visibility.js';
 import type { VapidKeys } from './push.js';
+import { readSchedule } from './step-groups/schedule.js';
 
 export interface ScheduleDeps extends CommitEffects {
   db: Db;
@@ -714,7 +716,8 @@ export function workerScheduleRunHistory(
     .select({ createdAt: step.createdAt })
     .from(step)
     .innerJoin(build, eq(step.buildId, build.id))
-    .where(and(eq(build.todoId, todoId), isNotNull(step.scheduledBy)))
+    .innerJoin(stepSchedule, eq(stepSchedule.stepId, step.id))
+    .where(and(eq(build.todoId, todoId), isNotNull(stepSchedule.scheduledBy)))
     .orderBy(desc(step.createdAt), desc(step.id))
     .limit(WORKER_SCHEDULE_RUN_LIMIT)
     .all();
@@ -831,9 +834,10 @@ function dispatchEventScheduleClaims(deps: ScheduleDeps, stepRow: typeof step.$i
     .all();
   if (candidates.length === 0) return;
   const routineStep = deps.db
-    .select({ scheduleId: step.scheduleId })
+    .select({ scheduleId: stepSchedule.scheduleId })
     .from(step)
-    .where(and(eq(step.buildId, buildRow.id), isNotNull(step.scheduleId)))
+    .innerJoin(stepSchedule, eq(stepSchedule.stepId, step.id))
+    .where(and(eq(step.buildId, buildRow.id), isNotNull(stepSchedule.scheduleId)))
     .all();
   const ownRunIds = new Set(
     routineStep.map((r) => r.scheduleId).filter((id): id is string => id !== null),
@@ -858,11 +862,12 @@ export function settleScheduledStepOutcome(
   stepRow: typeof step.$inferSelect,
   status: 'completed' | 'stopped',
 ): void {
-  if (stepRow.scheduleId === null) return;
+  const { scheduleId } = readSchedule(db, stepRow.id);
+  if (scheduleId === null) return;
   const row = db
     .select()
     .from(schedule)
-    .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
+    .where(and(eq(schedule.id, scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
     .get();
   if (!row || FINISHED_RUN_STATUSES.has(row.lastRunStatus ?? '')) return;
   db.update(schedule)
@@ -971,11 +976,12 @@ export function finishScheduledStep(
   },
 ): void {
   if (stepRow.kind !== 'chief') dispatchEventScheduleClaims(deps, stepRow);
-  if (stepRow.scheduleId === null) return;
+  const { scheduleId } = readSchedule(deps.db, stepRow.id);
+  if (scheduleId === null) return;
   const row = deps.db
     .select()
     .from(schedule)
-    .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
+    .where(and(eq(schedule.id, scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
     .get();
   if (!row || FINISHED_RUN_STATUSES.has(row.lastRunStatus ?? '')) return;
   if (outcome.status !== 'stopped') {

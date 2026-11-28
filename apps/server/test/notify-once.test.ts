@@ -32,6 +32,7 @@ import type { ImAdapter, ImOutboundMessage } from '../src/services/im/types.js';
 import { notifyChiefMessage, sweepIdleChiefUnread } from '../src/services/notifications.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule } from '../src/services/schedules.js';
+import { writeSchedule } from '../src/services/step-groups/schedule.js';
 import { isDesktopActive } from '../src/services/thread-presence.js';
 import { createTodo, setTodoPhase } from '../src/services/todos.js';
 import {
@@ -43,6 +44,7 @@ import {
   seedSessionRoute,
   startLegacyBuild,
 } from './helpers.js';
+import { insertStepFixture } from './step-groups-fixture.js';
 
 const cleanups: Array<() => void> = [];
 
@@ -488,20 +490,17 @@ describe('notify-once presence routing', () => {
       { allowAnyMinute: true },
     );
     const stepId = newRecordId();
-    s.db
-      .insert(step)
-      .values({
-        id: stepId,
-        buildId: threadId,
-        kind: 'chief',
-        status: 'claimed',
-        prompt: '<cairn_trigger>user</cairn_trigger>\nCheck CI status',
-        scheduleId: sched.id,
-        scheduledBy: s.user.id,
-        claimedAt: now,
-        createdAt: now,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: stepId,
+      buildId: threadId,
+      kind: 'chief',
+      status: 'claimed',
+      prompt: '<cairn_trigger>user</cairn_trigger>\nCheck CI status',
+      scheduleId: sched.id,
+      scheduledBy: s.user.id,
+      claimedAt: now,
+      createdAt: now,
+    });
     s.db
       .update(schedule)
       .set({ lastRunStepId: stepId, lastRunStatus: 'started' })
@@ -580,7 +579,7 @@ describe('notify-once presence routing', () => {
       .set({ lastRunStepId: todoStep.id, lastRunStatus: 'started' })
       .where(eq(schedule.id, todoSched.id))
       .run();
-    s.db.update(step).set({ scheduleId: todoSched.id }).where(eq(step.id, todoStep.id)).run();
+    s.db.transaction((tx) => writeSchedule(tx, todoStep.id, { scheduleId: todoSched.id }));
     s.db
       .insert(message)
       .values({

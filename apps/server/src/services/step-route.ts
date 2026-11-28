@@ -16,7 +16,7 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { machine, routingRule, step, stepRoute, type todo } from '../db/schema.js';
+import { machine, routingRule, step, stepQuota, stepRoute, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { antigravitySubscriptionAllowsRunner } from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
@@ -226,9 +226,10 @@ export function routeIsReleasable(db: Pick<Db, 'select'>, stepId: string): boole
       status: step.status,
       sessionId: step.sessionId,
       checkpointCommit: step.checkpointCommit,
-      fallback: step.fallback,
+      fallback: stepQuota.fallback,
     })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
     .where(eq(step.id, stepId))
     .get();
   return (

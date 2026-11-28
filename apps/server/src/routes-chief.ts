@@ -52,6 +52,7 @@ import { isChiefConversation } from './services/machines.js';
 import { listMemoryCorrections } from './services/memory-corrections.js';
 import { effectiveModel } from './services/model-fallback.js';
 import { coordinatorProfile } from './services/routing-rules.js';
+import { readQuota } from './services/step-groups/quota.js';
 import {
   cancelQueuedMessage,
   deliverQueuedMessage,
@@ -387,7 +388,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     }
     const agentRow = coordinatorProfile(ctx.db, threadRow.teamId, threadRow.projectId);
     if (agentRow !== null && agentRow.modelId != null) {
-      const model = effectiveModel(agentRow, stepRow);
+      const model = effectiveModel(agentRow, readQuota(ctx.db, stepRow.id));
       if (chiefIneligibility(ctx.db, target, agentRow, model.provider, nowMs()) !== null) {
         throw new HttpError(409, 'target machine cannot run this step');
       }

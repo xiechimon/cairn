@@ -42,6 +42,7 @@ import {
   provider,
   routingRule,
   step,
+  stepQuota,
   stepRoute,
   stepUsage,
   team,
@@ -798,11 +799,12 @@ function renameProviderReferences(db: Db, teamId: string, from: string, to: stri
     const steps = db
       .select({
         id: step.id,
-        fallback: step.fallback,
-        quotaBlock: step.quotaBlock,
-        ranModel: step.ranModel,
+        fallback: stepQuota.fallback,
+        quotaBlock: stepQuota.quotaBlock,
+        ranModel: stepQuota.ranModel,
       })
       .from(step)
+      .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
       .where(inArray(step.buildId, scopeIds))
       .all();
     for (const row of steps) {
@@ -827,13 +829,13 @@ function renameProviderReferences(db: Db, teamId: string, from: string, to: stri
           ? { ...row.ranModel, provider: to }
           : undefined;
       if (fallback === undefined && quotaBlock === undefined && ranModel === undefined) continue;
-      db.update(step)
+      db.update(stepQuota)
         .set({
           ...(fallback !== undefined ? { fallback } : {}),
           ...(quotaBlock !== undefined ? { quotaBlock } : {}),
           ...(ranModel !== undefined ? { ranModel } : {}),
         })
-        .where(eq(step.id, row.id))
+        .where(eq(stepQuota.stepId, row.id))
         .run();
     }
 

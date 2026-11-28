@@ -26,6 +26,7 @@ import {
   seedRoute,
   seedSessionRoute,
 } from './helpers.js';
+import { insertStepFixture, readStepFixture } from './step-groups-fixture.js';
 
 test('a Runner Claude login and its rate windows are no routing connection; a stored subscription is', async () => {
   const s = bootServer();
@@ -269,7 +270,7 @@ test('a non-Claude model using Anthropic messages stays runnable under subscript
     attachmentsDir: s.attachmentsDir,
   };
   refreshClaudeRateParks(deps, s.team.id);
-  expect(s.db.select().from(step).where(eq(step.id, 'pending')).get()).toMatchObject({
+  expect(readStepFixture(s.db, 'pending')).toMatchObject({
     status: 'pending',
     quotaBlock: null,
   });
@@ -418,10 +419,13 @@ test.each([
             zeroUsageRetried: false,
           }
         : null;
-    s.db
-      .insert(step)
-      .values({ id: 'pending', buildId: 'run', kind: 'build', createdAt: 1, fallback })
-      .run();
+    insertStepFixture(s.db, {
+      id: 'pending',
+      buildId: 'run',
+      kind: 'build',
+      createdAt: 1,
+      fallback,
+    });
     s.db
       .insert(step)
       .values({
@@ -456,16 +460,13 @@ test.each([
         sessionOpenedAt: 1,
       })
       .run();
-    s.db
-      .insert(step)
-      .values({
-        id: 'coordinator-step',
-        buildId: 'chief:thread',
-        kind: 'chief',
-        createdAt: 3,
-        fallback,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: 'coordinator-step',
+      buildId: 'chief:thread',
+      kind: 'chief',
+      createdAt: 3,
+      fallback,
+    });
     const deps = {
       ...s.svc,
       box: s.secretBox,
@@ -475,7 +476,7 @@ test.each([
     const claimed = await claimStep(deps, claimant, s.team.id, 0, 'http://localhost');
     if (mode === 'takeover') {
       expect(claimed).toBeNull();
-      expect(s.db.select().from(step).where(eq(step.id, 'pending')).get()).toMatchObject({
+      expect(readStepFixture(s.db, 'pending')).toMatchObject({
         status: 'waiting_quota',
         machineId: null,
         quotaBlock: {

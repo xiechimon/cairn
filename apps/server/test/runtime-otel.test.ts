@@ -26,6 +26,8 @@ import {
   flushRuntimeOtel,
   shutdownRuntimeOtel,
 } from '../src/runtime-otel.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
+import { writeSchedule } from '../src/services/step-groups/schedule.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 interface CapturedOtlp {
@@ -312,17 +314,15 @@ describe('emitRuntimeStepSpan', () => {
     expect(attrs['cairn.runtime']).toBeUndefined();
     expect(attrs['cairn.error_message']).toBeUndefined();
     expect(span.status?.code ?? 0).toBe(0);
-    s.db
-      .update(stepTable)
-      .set({
+    s.db.transaction((tx) =>
+      writeQuota(tx, stepId, {
         fallback: {
           model: { provider: 'anthropic', modelId: 'fallback-model' },
           tried: [],
           zeroUsageRetried: false,
         },
-      })
-      .where(eq(stepTable.id, stepId))
-      .run();
+      }),
+    );
     emitRuntimeStepSpan(s.db, stepId, env);
     await flushRuntimeOtel();
     span = captured[1]!.body.resourceSpans[0]!.scopeSpans[0]!.spans[0]!;
@@ -357,11 +357,7 @@ describe('emitRuntimeStepSpan', () => {
         lastRunError: 'step reason',
       })
       .run();
-    s.db
-      .update(stepTable)
-      .set({ scheduleId: 'otel-schedule' })
-      .where(eq(stepTable.id, stepId))
-      .run();
+    s.db.transaction((tx) => writeSchedule(tx, stepId, { scheduleId: 'otel-schedule' }));
     const captured = capture();
     emitRuntimeStepSpan(s.db, stepId, env);
     await flushRuntimeOtel();

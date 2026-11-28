@@ -14,6 +14,7 @@ import {
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { insertStepFixture } from './step-groups-fixture.js';
 
 registerChiefHarness();
 
@@ -45,22 +46,19 @@ function seedFailedBuild(teamId: string, projectId: string, suffix: string) {
       createdAt: now - 60_000,
     })
     .run();
-  H.s.db
-    .insert(step)
-    .values({
-      id: `step-${suffix}`,
-      buildId: `build-${suffix}`,
-      kind: 'build',
-      status: 'failed',
-      createdAt: now - 60_000,
-      finishedAt: now - 30_000,
-      fallback: {
-        model: { provider: 'relay', modelId: 'glm-5.3' },
-        tried: ['vani/sonnet', 'relay/glm-5.3'],
-        zeroUsageRetried: false,
-      },
-    })
-    .run();
+  insertStepFixture(H.s.db, {
+    id: `step-${suffix}`,
+    buildId: `build-${suffix}`,
+    kind: 'build',
+    status: 'failed',
+    createdAt: now - 60_000,
+    finishedAt: now - 30_000,
+    fallback: {
+      model: { provider: 'relay', modelId: 'glm-5.3' },
+      tried: ['vani/sonnet', 'relay/glm-5.3'],
+      zeroUsageRetried: false,
+    },
+  });
   H.s.db
     .insert(message)
     .values({

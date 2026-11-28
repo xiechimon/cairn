@@ -1,6 +1,6 @@
-import { and, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { step } from '../db/schema.js';
+import { step, stepSubscription } from '../db/schema.js';
 
 const USED_STATUSES = ['claimed', 'done', 'failed', 'stopped'] as const;
 
@@ -12,9 +12,9 @@ export interface SubscriptionUsage {
 export function subscriptionUsageStats(
   db: Pick<Db, 'select'>,
   column:
-    | typeof step.claudeSubscriptionId
-    | typeof step.devinSubscriptionId
-    | typeof step.antigravitySubscriptionId
+    | typeof stepSubscription.claudeSubscriptionId
+    | typeof stepSubscription.devinSubscriptionId
+    | typeof stepSubscription.antigravitySubscriptionId
     | typeof step.doubaoSubscriptionId,
   ids: readonly string[],
   since: number,
@@ -28,6 +28,7 @@ export function subscriptionUsageStats(
       stepsLast24h: sql<number>`sum(case when ${step.claimedAt} >= ${since} then 1 else 0 end)`,
     })
     .from(step)
+    .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
     .where(
       and(
         inArray(column, [...ids]),

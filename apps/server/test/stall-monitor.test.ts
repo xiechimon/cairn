@@ -35,9 +35,11 @@ import {
   STALL_STOP_SETTLE_MS,
   sweepStallMonitor,
 } from '../src/services/stall-monitor.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import { writeWorkerQuestion } from '../src/services/worker-question-store.js';
 import { sweepWorkerWatchdog } from '../src/services/worker-watchdog.js';
 import { bootServer, seedRoute, seedSessionRoute, type TestServer } from './helpers.js';
+import { insertStepFixture, readStepFixture } from './step-groups-fixture.js';
 
 const MINUTE = 60_000;
 let s: TestServer;
@@ -166,28 +168,25 @@ function seedWorkerStep(
       createdAt: claimedAt,
     })
     .run();
-  server.db
-    .insert(stepTable)
-    .values({
-      id: stepId,
-      buildId,
-      kind: opts.kind ?? 'session',
-      machineId: opts.machineId === undefined ? null : opts.machineId,
-      status: opts.status ?? 'claimed',
-      claimedAt,
-      lastHeartbeatAt: opts.lastHeartbeatAt === undefined ? claimedAt : opts.lastHeartbeatAt,
-      lastProgressAt: opts.lastProgressAt === undefined ? claimedAt : opts.lastProgressAt,
-      prompt: opts.prompt ?? 'do work',
-      ranModel:
-        opts.ranModel === undefined
-          ? opts.provider
-            ? { provider: opts.provider, modelId: 'm1' }
-            : null
-          : opts.ranModel,
-      createdAt: claimedAt,
-      ...(opts.stallState !== undefined ? { stallState: opts.stallState as never } : {}),
-    })
-    .run();
+  insertStepFixture(server.db, {
+    id: stepId,
+    buildId,
+    kind: opts.kind ?? 'session',
+    machineId: opts.machineId === undefined ? null : opts.machineId,
+    status: opts.status ?? 'claimed',
+    claimedAt,
+    lastHeartbeatAt: opts.lastHeartbeatAt === undefined ? claimedAt : opts.lastHeartbeatAt,
+    lastProgressAt: opts.lastProgressAt === undefined ? claimedAt : opts.lastProgressAt,
+    prompt: opts.prompt ?? 'do work',
+    ranModel:
+      opts.ranModel === undefined
+        ? opts.provider
+          ? { provider: opts.provider, modelId: 'm1' }
+          : null
+        : opts.ranModel,
+    createdAt: claimedAt,
+    ...(opts.stallState !== undefined ? { stallState: opts.stallState as never } : {}),
+  });
   return { todoId, buildId, stepId, claimedAt };
 }
 
@@ -246,33 +245,30 @@ function seedChiefStep(
     })
     .onConflictDoNothing()
     .run();
-  server.db
-    .insert(stepTable)
-    .values({
-      id: stepId,
-      buildId: threadId,
-      kind: 'chief',
-      machineId: opts.machineId === undefined ? null : opts.machineId,
-      status: 'claimed',
-      claimedAt,
-      lastHeartbeatAt: opts.lastHeartbeatAt === undefined ? claimedAt : opts.lastHeartbeatAt,
-      lastProgressAt: opts.lastProgressAt === undefined ? claimedAt : opts.lastProgressAt,
-      prompt: opts.prompt ?? '[wake:user] provenance=user\nhi',
-      ranModel:
-        opts.ranModel === undefined
-          ? opts.provider
-            ? { provider: opts.provider, modelId: 'm1' }
-            : null
-          : opts.ranModel,
-      createdAt: claimedAt,
-      ...(opts.stallState !== undefined ? { stallState: opts.stallState as never } : {}),
-    })
-    .run();
+  insertStepFixture(server.db, {
+    id: stepId,
+    buildId: threadId,
+    kind: 'chief',
+    machineId: opts.machineId === undefined ? null : opts.machineId,
+    status: 'claimed',
+    claimedAt,
+    lastHeartbeatAt: opts.lastHeartbeatAt === undefined ? claimedAt : opts.lastHeartbeatAt,
+    lastProgressAt: opts.lastProgressAt === undefined ? claimedAt : opts.lastProgressAt,
+    prompt: opts.prompt ?? '[wake:user] provenance=user\nhi',
+    ranModel:
+      opts.ranModel === undefined
+        ? opts.provider
+          ? { provider: opts.provider, modelId: 'm1' }
+          : null
+        : opts.ranModel,
+    createdAt: claimedAt,
+    ...(opts.stallState !== undefined ? { stallState: opts.stallState as never } : {}),
+  });
   return { chiefId, threadId, stepId, claimedAt };
 }
 
 function getStep(server: TestServer, stepId: string) {
-  return server.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+  return readStepFixture(server.db, stepId)!;
 }
 
 function taskSystemMessages(server: TestServer, buildId: string) {
@@ -773,12 +769,14 @@ describe('stall-monitor', () => {
         claimedAt: now + 10_000,
         lastHeartbeatAt: now + 10_000,
         lastProgressAt: now + 10_000,
-        ranModel: { provider: 'antigravity', modelId: 'm1' },
         holdReason: null,
         holdUntil: null,
       })
       .where(eq(stepTable.id, agyW.stepId))
       .run();
+    s.db.transaction((tx) =>
+      writeQuota(tx, agyW.stepId, { ranModel: { provider: 'antigravity', modelId: 'm1' } }),
+    );
     const again = now + 7 * MINUTE;
     s.db
       .update(stepTable)

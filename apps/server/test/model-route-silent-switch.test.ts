@@ -18,6 +18,7 @@ import {
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { createProvider } from '../src/services/providers.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import {
   bootServer,
   insertAntigravitySubscription,
@@ -28,6 +29,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const servers: TestServer[] = [];
 afterAll(() => {
@@ -200,11 +202,7 @@ describe('silent model switch and explicit model preservation', () => {
     expect(claimed!.agent?.provider).toBe('claude-code');
     expect(claimed!.agent?.modelId).toBe('claude-opus-5-5');
 
-    const stepRow = w.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, claimed!.step.id))
-      .get()!;
+    const stepRow = readStepFixture(w.s.db, claimed!.step.id)!;
     expect(stepRow.ranModel).toEqual({ provider: 'claude-code', modelId: 'claude-opus-5-5' });
     expect(stepRow.fallback).toBeNull();
     expect(stepRow.claudeSubscriptionId).not.toBeNull();
@@ -259,11 +257,7 @@ describe('silent model switch and explicit model preservation', () => {
     expect(claimed!.agent?.provider).toBe('vani');
     expect(claimed!.agent?.modelId).toBe('m1');
 
-    const stepRow = w.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, claimed!.step.id))
-      .get()!;
+    const stepRow = readStepFixture(w.s.db, claimed!.step.id)!;
     expect(stepRow.ranModel).toEqual({ provider: 'vani', modelId: 'm1' });
     expect(stepRow.fallback?.model).toEqual({ provider: 'vani', modelId: 'm1' });
 
@@ -295,11 +289,7 @@ describe('silent model switch and explicit model preservation', () => {
     expect(claimed!.agent?.provider).toBe('openai-codex');
     expect(claimed!.agent?.modelId).toBe('gpt-6.1-sol');
 
-    const stepRow = w.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, claimed!.step.id))
-      .get()!;
+    const stepRow = readStepFixture(w.s.db, claimed!.step.id)!;
     expect(stepRow.fallback?.model).toEqual({ provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
 
     const sysMsgs = w.s.db
@@ -331,17 +321,15 @@ describe('silent model switch and explicit model preservation', () => {
       .from(stepTable)
       .where(eq(stepTable.buildId, buildId))
       .get()!;
-    w.s.db
-      .update(stepTable)
-      .set({
+    w.s.db.transaction((tx) =>
+      writeQuota(tx, pendingStep.id, {
         fallback: {
           model: { provider: 'vani', modelId: 'm1' },
           tried: ['claude-code/claude-opus-5-5', 'vani/m1'],
           zeroUsageRetried: false,
         },
-      })
-      .where(eq(stepTable.id, pendingStep.id))
-      .run();
+      }),
+    );
 
     const claimed = await claim(w);
     expect(claimed).not.toBeNull();
@@ -395,11 +383,7 @@ describe('silent model switch and explicit model preservation', () => {
     expect(claimed!.agent?.provider).toBe('claude-code');
     expect(claimed!.agent?.modelId).toBe('claude-opus-5-5');
 
-    const stepRow = w.s.db
-      .select()
-      .from(stepTable)
-      .where(eq(stepTable.id, claimed!.step.id))
-      .get()!;
+    const stepRow = readStepFixture(w.s.db, claimed!.step.id)!;
     expect(stepRow.fallback?.model).toEqual({
       provider: 'claude-code',
       modelId: 'claude-opus-5-5',

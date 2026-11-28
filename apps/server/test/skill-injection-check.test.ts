@@ -13,6 +13,7 @@ import {
 import { nowMs } from '../src/lib/ids.js';
 import type { MachineDeps } from '../src/services/machines.js';
 import { bootServer, finishStepForClaim, seedSessionRoute, type TestServer } from './helpers.js';
+import { insertStepFixture } from './step-groups-fixture.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -98,18 +99,15 @@ function makeWorld(opts: {
       createdAt: base,
     })
     .run();
-  s.db
-    .insert(stepTable)
-    .values({
-      id: stepId,
-      buildId,
-      kind: 'build',
-      status: 'claimed',
-      machineId,
-      createdAt: base,
-      skillInjection: opts.skillInjection,
-    })
-    .run();
+  insertStepFixture(s.db, {
+    id: stepId,
+    buildId,
+    kind: 'build',
+    status: 'claimed',
+    machineId,
+    createdAt: base,
+    skillInjection: opts.skillInjection,
+  });
   if (opts.toolContent !== undefined) {
     s.db
       .insert(messageTable)

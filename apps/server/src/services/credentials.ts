@@ -20,6 +20,8 @@ import { openDevinSubscription } from './devin-subscriptions.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
 import { coordinatorProfile, profileForStep } from './routing-rules.js';
 import { type HttpSecretRow, openSecretGrants, type SecretDeps } from './secrets.js';
+import { readQuota } from './step-groups/quota.js';
+import { readSubscription } from './step-groups/subscription.js';
 
 export interface CredentialsDeps {
   db: Db;
@@ -147,8 +149,9 @@ export function resolveStepCredentials(
   deps: CredentialsDeps,
   stepId: string,
 ): StepCredentialBundle {
-  const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-  if (!stepRow) throw notFound(`step ${stepId}`);
+  const core = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+  if (!core) throw notFound(`step ${stepId}`);
+  const stepRow = { ...core, ...readQuota(deps.db, stepId), ...readSubscription(deps.db, stepId) };
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) throw notFound(`build ${stepRow.buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();

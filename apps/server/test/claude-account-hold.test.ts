@@ -12,6 +12,8 @@ import {
 import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
 import { claimStep } from '../src/services/machines.js';
 import { createProvider } from '../src/services/providers.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
+import { writeSubscription } from '../src/services/step-groups/subscription.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
@@ -21,6 +23,11 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import {
+  insertStepFixture,
+  readStepFixture,
+  type StepFixtureInsert,
+} from './step-groups-fixture.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -124,7 +131,7 @@ interface StepSeed {
   sessionId?: string | null;
   status?: 'pending' | 'done' | 'waiting_quota';
   machineId?: string | null;
-  quotaBlock?: typeof stepTable.$inferInsert.quotaBlock;
+  quotaBlock?: StepFixtureInsert['quotaBlock'];
 }
 
 function newBuild(s: TestServer, projectId: string): { buildId: string } {
@@ -162,27 +169,24 @@ function newBuild(s: TestServer, projectId: string): { buildId: string } {
 function addStep(s: TestServer, buildId: string, seed: StepSeed): string {
   seq += 1;
   const id = `step-hold-${seq}`;
-  s.db
-    .insert(stepTable)
-    .values({
-      id,
-      buildId,
-      kind: seed.kind ?? 'build',
-      machineId: seed.machineId ?? null,
-      status: seed.status ?? 'pending',
-      sessionId: seed.sessionId ?? null,
-      byPerson: seed.byPerson ?? false,
-      claudeSubscriptionId: seed.claudeSubscriptionId ?? null,
-      quotaBlock: seed.quotaBlock ?? null,
-      freshSession: false,
-      createdAt: seq,
-    })
-    .run();
+  insertStepFixture(s.db, {
+    id,
+    buildId,
+    kind: seed.kind ?? 'build',
+    machineId: seed.machineId ?? null,
+    status: seed.status ?? 'pending',
+    sessionId: seed.sessionId ?? null,
+    byPerson: seed.byPerson ?? false,
+    claudeSubscriptionId: seed.claudeSubscriptionId ?? null,
+    quotaBlock: seed.quotaBlock ?? null,
+    freshSession: false,
+    createdAt: seq,
+  });
   return id;
 }
 
 function stepRow(s: TestServer, id: string) {
-  return s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();
+  return readStepFixture(s.db, id);
 }
 
 function blockedKind(s: TestServer, id: string, machineId: string): string | undefined {
@@ -416,20 +420,17 @@ describe('a Coordinator turn after a switch', () => {
         sessionRuntime: 'claude-code',
       })
       .run();
-    s.db
-      .insert(stepTable)
-      .values({
-        id: 'chief-prior',
-        buildId: 'thread-hold',
-        kind: 'chief',
-        status: 'done',
-        machineId,
-        claimedAt: 10,
-        sessionId: 'chief-session',
-        claudeSubscriptionId: priorAccount === 'first' ? first : null,
-        createdAt: 3,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: 'chief-prior',
+      buildId: 'thread-hold',
+      kind: 'chief',
+      status: 'done',
+      machineId,
+      claimedAt: 10,
+      sessionId: 'chief-session',
+      claudeSubscriptionId: priorAccount === 'first' ? first : null,
+      createdAt: 3,
+    });
     s.db
       .insert(stepTable)
       .values({
@@ -454,19 +455,16 @@ describe('a Coordinator turn after a switch', () => {
 
   test('a failed turn on the new account that reported no session does not hide the old session', async () => {
     const { s, machineId, second } = await chiefWorld('first');
-    s.db
-      .insert(stepTable)
-      .values({
-        id: 'chief-failed',
-        buildId: 'thread-hold',
-        kind: 'chief',
-        status: 'failed',
-        machineId,
-        claimedAt: 15,
-        claudeSubscriptionId: second,
-        createdAt: 15,
-      })
-      .run();
+    insertStepFixture(s.db, {
+      id: 'chief-failed',
+      buildId: 'thread-hold',
+      kind: 'chief',
+      status: 'failed',
+      machineId,
+      claimedAt: 15,
+      claudeSubscriptionId: second,
+      createdAt: 15,
+    });
     enableOnly(s, second);
     const claimed = await claimAs(s, machineId);
     expect(claimed?.session).toMatchObject({ action: 'new', sessionId: null });
@@ -482,11 +480,13 @@ describe('a Coordinator turn after a switch', () => {
 
   test('a parked turn bound to the old account is released after a switch, not held', async () => {
     const { s, first, second } = await chiefWorld('first');
-    s.db
-      .update(stepTable)
-      .set({
-        status: 'waiting_quota',
-        claudeSubscriptionId: first,
+    s.db.transaction((tx) => {
+      tx.update(stepTable)
+        .set({ status: 'waiting_quota' })
+        .where(eq(stepTable.id, 'chief-next'))
+        .run();
+      writeSubscription(tx, 'chief-next', { claudeSubscriptionId: first });
+      writeQuota(tx, 'chief-next', {
         quotaBlock: {
           kind: 'quota',
           providerId: 'claude-subscription',
@@ -499,9 +499,8 @@ describe('a Coordinator turn after a switch', () => {
           probeAt: 1,
           source: 'claude_rate_limit',
         },
-      })
-      .where(eq(stepTable.id, 'chief-next'))
-      .run();
+      });
+    });
     enableOnly(s, second);
     refreshClaudeRateParks(
       {

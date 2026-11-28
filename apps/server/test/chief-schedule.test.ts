@@ -22,6 +22,7 @@ import { runScheduleNow } from '../src/services/schedule-run.js';
 import { fireScheduleWebhook } from '../src/services/schedule-webhook.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule, serverTimezone } from '../src/services/schedules.js';
+import { readSchedule, writeSchedule } from '../src/services/step-groups/schedule.js';
 import {
   bootServer,
   insertMachine,
@@ -272,8 +273,8 @@ describe('Coordinator-thread scheduling', () => {
       .all();
     expect(runNowSteps).toHaveLength(1);
     const step1 = runNowSteps[0]!;
-    expect(step1.scheduleId).toBe(created.id);
-    expect(step1.scheduledBy).toBe(s.user.id);
+    expect(readSchedule(s.db, step1.id).scheduleId).toBe(created.id);
+    expect(readSchedule(s.db, step1.id).scheduledBy).toBe(s.user.id);
     expect(step1.prompt).toContain('每天早上 9 点帮我总结竞品新功能');
     const msgsAfterRunNow = s.db
       .select()
@@ -356,7 +357,7 @@ describe('Coordinator-thread scheduling', () => {
       .from(step)
       .where(and(eq(step.buildId, threadRow.id), eq(step.kind, 'chief')))
       .get()!;
-    expect(firstStep.scheduleId).toBe(once.id);
+    expect(readSchedule(s.db, firstStep.id).scheduleId).toBe(once.id);
 
     s.db
       .update(step)
@@ -647,40 +648,32 @@ describe('Coordinator-thread scheduling', () => {
     const stepRow = steps[0]!;
     const machineRow = s.db.select().from(machine).where(eq(machine.teamId, s.team.id)).get()!;
 
-    const shanghaiCtx = chiefTurnContext(
-      deps,
-      { ...stepRow, scheduleId: shanghai.id },
-      threadRow,
-      null,
-    );
+    const originalSchedule = readSchedule(s.db, stepRow.id);
+    s.db.transaction((tx) => writeSchedule(tx, stepRow.id, { scheduleId: shanghai.id }));
+    const shanghaiCtx = chiefTurnContext(deps, stepRow, threadRow, null);
     expect(shanghaiCtx.instruction).toContain('Now: 2026-11-27 09:00, Friday (Asia/Shanghai)');
 
-    const laCtx = chiefTurnContext(deps, { ...stepRow, scheduleId: la.id }, threadRow, null);
+    s.db.transaction((tx) => writeSchedule(tx, stepRow.id, { scheduleId: la.id }));
+    const laCtx = chiefTurnContext(deps, stepRow, threadRow, null);
     expect(laCtx.instruction).toContain('Now: 2026-11-26 17:00, Thursday (America/Los_Angeles)');
 
-    const unscheduledCtx = chiefTurnContext(
-      deps,
-      { ...stepRow, scheduleId: null },
-      threadRow,
-      null,
-    );
+    s.db.transaction((tx) => writeSchedule(tx, stepRow.id, { scheduleId: null }));
+    const unscheduledCtx = chiefTurnContext(deps, stepRow, threadRow, null);
     expect(unscheduledCtx.instruction).toContain(`(${serverTimezone()})`);
 
-    const missingCtx = chiefTurnContext(
-      deps,
-      { ...stepRow, scheduleId: 'missing-schedule-id' },
-      threadRow,
-      null,
-    );
+    s.db.transaction((tx) => writeSchedule(tx, stepRow.id, { scheduleId: 'missing-schedule-id' }));
+    const missingCtx = chiefTurnContext(deps, stepRow, threadRow, null);
     expect(missingCtx.instruction).toContain(`(${serverTimezone()})`);
 
     s.db.update(schedule).set({ tz: 'Invalid/Timezone' }).where(eq(schedule.id, la.id)).run();
-    const invalidCtx = chiefTurnContext(deps, { ...stepRow, scheduleId: la.id }, threadRow, null);
+    s.db.transaction((tx) => writeSchedule(tx, stepRow.id, { scheduleId: la.id }));
+    const invalidCtx = chiefTurnContext(deps, stepRow, threadRow, null);
     expect(invalidCtx.instruction).toContain(`(${serverTimezone()})`);
 
+    s.db.transaction((tx) => writeSchedule(tx, stepRow.id, originalSchedule));
     const claimed = await claimStep(deps, machineRow.id, s.team.id, 10, 'http://localhost');
     expect(claimed?.instruction).toContain(
-      stepRow.scheduleId === shanghai.id
+      originalSchedule.scheduleId === shanghai.id
         ? 'Now: 2026-11-27 09:00, Friday (Asia/Shanghai)'
         : `(${serverTimezone()})`,
     );

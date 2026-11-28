@@ -219,11 +219,6 @@ export async function sendBuildSteer(
         if (wake.createdBy.startsWith('worker:') && isWaitingPhase(todoRow?.phase ?? '')) {
           throw new HttpError(409, 'Worker schedule is waiting at a confirmation or review gate');
         }
-        cancelPendingWorkerQuestions(
-          deps,
-          conversationId,
-          'A new scheduled run started before an answer.',
-        );
       }
       const queued =
         body.queuedMessageId === undefined
@@ -369,10 +364,12 @@ export async function sendBuildSteer(
             .run();
           const nextPhase =
             todoRow.phase === 'building' || todoRow.phase === 'planning' ? todoRow.phase : 'queued';
-          setTodoPhase(deps, todoRow.id, nextPhase, {
-            lastRunAt: now,
-            latestBuildId: targetBuildId,
-          });
+          if (!continuationOptions.schedule) {
+            setTodoPhase(deps, todoRow.id, nextPhase, {
+              lastRunAt: now,
+              latestBuildId: targetBuildId,
+            });
+          }
           const previousWork = db
             .select({ kind: step.kind })
             .from(step)
@@ -397,13 +394,16 @@ export async function sendBuildSteer(
             false,
             human && !continuationOptions.schedule,
             answered ? { kind: 'continue' } : undefined,
+            continuationOptions.schedule === undefined
+              ? undefined
+              : {
+                  scheduleId: continuationOptions.schedule.id,
+                  scheduledBy: continuationOptions.schedule.createdBy,
+                },
+            continuationOptions.schedule === undefined ? undefined : afterCommit,
           );
           if (continuationOptions.schedule) {
             const wake = continuationOptions.schedule;
-            db.update(step)
-              .set({ scheduleId: wake.id, scheduledBy: wake.createdBy })
-              .where(eq(step.id, continuedStep.id))
-              .run();
             insertMessageRow(transcriptDeps, targetBuildId, {
               id: `schedule-wake-${continuedStep.id}`,
               role: 'system',
@@ -447,6 +447,15 @@ export async function sendBuildSteer(
                 .run().changes;
               if (queued === 0) throw new HttpError(409, 'Scheduled wake is no longer due');
             }
+            cancelPendingWorkerQuestions(
+              deps,
+              conversationId,
+              'A new scheduled run started before an answer.',
+            );
+            setTodoPhase(deps, todoRow.id, nextPhase, {
+              lastRunAt: now,
+              latestBuildId: targetBuildId,
+            });
           }
           const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
           if (continued) publishBuild(deps, continued);

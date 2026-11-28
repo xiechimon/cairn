@@ -162,6 +162,10 @@ import {
   coordinatorProfile,
   type RouteProfile,
 } from './routing-rules.js';
+import { readQuota, writeQuota } from './step-groups/quota.js';
+import { writeSchedule } from './step-groups/schedule.js';
+import { readSkillInjection } from './step-groups/skill-injection.js';
+import { writeSubscription } from './step-groups/subscription.js';
 import { releaseStepLease } from './step-lease.js';
 import { isStepWaitingPermission } from './step-permission-wait.js';
 import { stepQueueProjector } from './step-queue.js';
@@ -358,7 +362,7 @@ function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
   const chiefRow = db.select().from(chief).where(eq(chief.id, chiefId)).get();
   const parked = unstarted.find((row) => isParkedChiefStep(row.stepRow, now));
   if (parked !== undefined) {
-    const latest = parked.stepRow;
+    const latest = { ...parked.stepRow, ...readQuota(db, parked.stepRow.id) };
     const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId, parked.projectId) : null;
     const ran = latest.ranModel ??
       latest.fallback?.model ?? {
@@ -539,20 +543,16 @@ export function releaseParkedCoordinatorSteps(
       .where(and(inArray(step.buildId, threadIds), eq(step.kind, 'chief'), parkedCondition))
       .all()
       .map((row) => row.id);
+    let releasedIds: string[] = [];
     if (parked.length > 0) {
-      tx.update(step)
+      releasedIds = tx
+        .update(step)
         .set({
           status: 'pending',
           holdReason: null,
           holdUntil: null,
           holdCount: 0,
-          quotaBlock: null,
-          ranModel: null,
-          fallback: null,
           machineId: null,
-          claudeSubscriptionId: null,
-          devinSubscriptionId: null,
-          antigravitySubscriptionId: null,
           doubaoSubscriptionId: null,
           mcpGrant: null,
           targetMachineId: null,
@@ -560,7 +560,17 @@ export function releaseParkedCoordinatorSteps(
           routedReason: null,
         })
         .where(and(inArray(step.id, parked), parkedCondition))
-        .run();
+        .returning({ id: step.id })
+        .all()
+        .map((row) => row.id);
+      for (const id of releasedIds) {
+        writeQuota(tx, id, { quotaBlock: null, ranModel: null, fallback: null });
+        writeSubscription(tx, id, {
+          claudeSubscriptionId: null,
+          devinSubscriptionId: null,
+          antigravitySubscriptionId: null,
+        });
+      }
     }
     const pendingThreadIds = tx
       .select({ buildId: step.buildId })
@@ -571,7 +581,7 @@ export function releaseParkedCoordinatorSteps(
       .all()
       .map((row) => row.buildId);
     return {
-      releasedIds: parked,
+      releasedIds,
       wakeThreadIds: [...new Set(pendingThreadIds)],
     };
   });
@@ -586,7 +596,7 @@ export function releaseParkedCoordinatorSteps(
         createdAt: fresh.createdAt,
         status: fresh.status,
         checkpointCommit: fresh.checkpointCommit,
-        skillInjection: fresh.skillInjection ?? null,
+        skillInjection: readSkillInjection(deps.db, fresh.id).skillInjection,
       });
     }
   }
@@ -1447,34 +1457,33 @@ export function enqueueChiefStep(
     opts.trigger === 'user'
       ? opts.prompt
       : `${WAKE_PROMPT_PREFIX}${opts.trigger}] provenance=${opts.provenance}\n${opts.prompt}`;
-  deps.db
-    .insert(step)
-    .values({
-      id,
-      buildId: threadId,
-      kind: 'chief',
-      machineId: null,
-      status: 'pending',
-      prompt,
-      scopeProjectId: threadRow.projectId ?? opts.scopeProjectId ?? null,
-      ownerMessageIds: opts.ownerMessageIds,
-      createdAt: nowMs(),
-      ...(opts.scheduleId !== undefined ? { scheduleId: opts.scheduleId } : {}),
-      ...(opts.scheduledBy !== undefined ? { scheduledBy: opts.scheduledBy } : {}),
-      ...(opts.trigger !== 'user' &&
-      (opts.provenance.startsWith('mail:') ||
-        opts.provenance.startsWith('im:') ||
-        isChiefMemoryThreadId(threadId))
-        ? { freshSession: true }
-        : {}),
-    })
-    .run();
-  const activeRun = { phase: 'chief' } satisfies ActiveRun;
-  deps.db
-    .update(chiefThread)
-    .set({ activeRun, updatedAt: nowMs() })
-    .where(eq(chiefThread.id, threadId))
-    .run();
+  deps.db.transaction((tx) => {
+    tx.insert(step)
+      .values({
+        id,
+        buildId: threadId,
+        kind: 'chief',
+        machineId: null,
+        status: 'pending',
+        prompt,
+        scopeProjectId: threadRow.projectId ?? opts.scopeProjectId ?? null,
+        ownerMessageIds: opts.ownerMessageIds,
+        createdAt: nowMs(),
+        ...(opts.trigger !== 'user' &&
+        (opts.provenance.startsWith('mail:') ||
+          opts.provenance.startsWith('im:') ||
+          isChiefMemoryThreadId(threadId))
+          ? { freshSession: true }
+          : {}),
+      })
+      .run();
+    writeSchedule(tx, id, { scheduleId: opts.scheduleId, scheduledBy: opts.scheduledBy });
+    const activeRun = { phase: 'chief' } satisfies ActiveRun;
+    tx.update(chiefThread)
+      .set({ activeRun, updatedAt: nowMs() })
+      .where(eq(chiefThread.id, threadId))
+      .run();
+  });
   if (opts.deferWake !== true) {
     deps.machineHub?.wake(threadRow.teamId);
     wakeCoordinator(threadId);
@@ -2868,7 +2877,7 @@ export function sweepAbandonedChiefSteps(
       createdAt: row.createdAt,
       status: 'pending',
       checkpointCommit: row.checkpointCommit,
-      skillInjection: row.skillInjection ?? null,
+      skillInjection: readSkillInjection(deps.db, row.id).skillInjection,
     });
     deps.machineHub?.wake(thread.teamId);
     cancelPendingQuestions(deps, thread.id, CHIEF_TURN_END_REASON);

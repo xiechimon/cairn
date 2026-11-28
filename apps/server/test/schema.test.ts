@@ -12,12 +12,22 @@ import { MIGRATIONS_FOLDER, openMemoryDb } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 
+const SCHEMA_TABLES = [
+  ...DB_TABLES,
+  'step_blocker_handoff',
+  'step_memory_trace',
+  'step_quota',
+  'step_schedule',
+  'step_skill_injection',
+  'step_subscription',
+];
+
 describe('the schema and migration journal (the 01 §6 list)', () => {
-  test('the drizzle schema table-name set = DB_TABLES', () => {
+  test('the drizzle schema table-name set includes DB_TABLES and step side tables', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
-    expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(DB_TABLES.length);
+    expect(names).toEqual([...SCHEMA_TABLES].sort());
+    expect(names).toHaveLength(SCHEMA_TABLES.length);
     expect(names).toContain('autonomous_merge_admission');
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
@@ -40,7 +50,7 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
     const allSql = journal.entries
       .map((entry) => readFileSync(resolve(MIGRATIONS_FOLDER, `${entry.tag}.sql`), 'utf8'))
       .join('\n');
-    for (const table of DB_TABLES) {
+    for (const table of SCHEMA_TABLES) {
       expect(allSql, `missing CREATE TABLE \`${table}\``).toContain(`CREATE TABLE \`${table}\``);
     }
   });

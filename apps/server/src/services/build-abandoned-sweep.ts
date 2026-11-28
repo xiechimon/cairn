@@ -5,6 +5,7 @@ import { nowMs } from '../lib/ids.js';
 import { applyStoppedStep, stopStepKeepPhase } from './build-stop.js';
 import { applyStepFailure, type BuildDeps } from './builds.js';
 import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
+import { readSkillInjection } from './step-groups/skill-injection.js';
 import { releaseStepLease } from './step-lease.js';
 import { isStepWaitingPermission } from './step-permission-wait.js';
 
@@ -130,7 +131,7 @@ function releaseClaimedStep(
       createdAt: released.createdAt,
       status: released.status,
       checkpointCommit: released.checkpointCommit,
-      skillInjection: released.skillInjection ?? null,
+      skillInjection: readSkillInjection(deps.db, released.id).skillInjection,
     });
   }
   deps.machineHub?.wake(todoRow.teamId);

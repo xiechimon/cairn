@@ -12,6 +12,9 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { readMemoryTrace, writeMemoryTrace } from './step-groups/memory-trace.js';
+import { readQuota, type StepQuota, writeQuota } from './step-groups/quota.js';
+import { readSkillInjection, type StepSkillInjection } from './step-groups/skill-injection.js';
 
 export const STEER_WITHDRAW_HOLD = 'steer_withdraw';
 
@@ -90,18 +93,17 @@ export function inputForRequestId(
 }
 
 export function traceDeliveredSteer(db: Db, runningId: string, waiting: StepRow): void {
-  const delivered = waiting.memoryTrace?.projectMemoryIds ?? [];
-  const trace = db.select().from(step).where(eq(step.id, runningId)).get()?.memoryTrace;
-  if (!trace || delivered.length === 0) return;
-  db.update(step)
-    .set({
+  db.transaction((tx) => {
+    const delivered = readMemoryTrace(tx, waiting.id).memoryTrace?.projectMemoryIds ?? [];
+    const trace = readMemoryTrace(tx, runningId).memoryTrace;
+    if (!trace || delivered.length === 0) return;
+    writeMemoryTrace(tx, runningId, {
       memoryTrace: {
         ...trace,
         projectMemoryIds: [...new Set([...trace.projectMemoryIds, ...delivered])],
       },
-    })
-    .where(eq(step.id, runningId))
-    .run();
+    });
+  });
 }
 
 export function queueCoordinatorInput(
@@ -319,7 +321,7 @@ export function consumeCoordinatorInput(
   conversationId: string,
   entryId: string,
   placedAt?: number,
-): { placed: ChiefMessageRow[]; retired: StepRow | undefined } {
+): { placed: ChiefMessageRow[]; retired: (StepRow & StepQuota & StepSkillInjection) | undefined } {
   const unchanged = { placed: [], retired: undefined };
   const { batch, stale } = inputForRequestId(db, requestId);
   if (batch === undefined || stale) return unchanged;
@@ -382,6 +384,8 @@ export function consumeCoordinatorInput(
       .where(eq(coordinatorInput.id, batch.id))
       .run();
     if (batch.kind !== 'steer') return { placed, retired: undefined };
+    // RETURNING cannot join side tables; snapshot event fields before cascade.
+    const retiredGroups = { ...readQuota(db, batch.id), ...readSkillInjection(db, batch.id) };
     const retired = db
       .delete(step)
       .where(and(eq(step.id, batch.id), inArray(step.status, ['pending', 'waiting_quota'])))
@@ -390,7 +394,10 @@ export function consumeCoordinatorInput(
     if (retired !== undefined) {
       db.delete(imTurnOrigin).where(eq(imTurnOrigin.stepId, batch.id)).run();
     }
-    return { placed, retired };
+    return {
+      placed,
+      retired: retired === undefined ? undefined : { ...retired, ...retiredGroups },
+    };
   });
 }
 
@@ -404,7 +411,7 @@ export function releaseCoordinatorInput(
   if (batch.conversationId !== conversationId)
     throw new HttpError(409, 'Coordinator input release has the wrong conversation');
   if (conversationId !== null) requireCoordinatorConversation(db, batch.threadId, conversationId);
-  db.transaction(() => {
+  db.transaction((tx) => {
     let successorStepId: string | null = null;
     if (batch.kind === 'steer') {
       const waiting = db.select().from(step).where(eq(step.id, batch.id)).get();
@@ -457,7 +464,6 @@ export function releaseCoordinatorInput(
             buildId: batch.threadId,
             kind: 'chief',
             status: waiting.status,
-            quotaBlock: waiting.quotaBlock,
             prompt: batch.content,
             ownerMessageIds: surviving,
             ownerSaid: waiting.ownerSaid,
@@ -466,6 +472,7 @@ export function releaseCoordinatorInput(
             createdAt: waiting.createdAt,
           })
           .run();
+        writeQuota(tx, successorStepId, { quotaBlock: readQuota(tx, waiting.id).quotaBlock });
         if (imOrigin !== undefined) {
           db.insert(imTurnOrigin)
             .values({

@@ -16,6 +16,8 @@ import {
   doubaoSubscription,
   provider,
   step,
+  stepQuota,
+  stepSubscription,
   todo,
 } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
@@ -24,9 +26,9 @@ import { readCodexQuotaCredential } from './codex-device-login.js';
 
 const HOUR = 3_600_000;
 const subscriptions = {
-  claude: [claudeSubscription, step.claudeSubscriptionId],
-  antigravity: [antigravitySubscription, step.antigravitySubscriptionId],
-  devin: [devinSubscription, step.devinSubscriptionId],
+  claude: [claudeSubscription, stepSubscription.claudeSubscriptionId],
+  antigravity: [antigravitySubscription, stepSubscription.antigravitySubscriptionId],
+  devin: [devinSubscription, stepSubscription.devinSubscriptionId],
   doubao: [doubaoSubscription, step.doubaoSubscriptionId],
 } as const;
 
@@ -70,13 +72,13 @@ export async function getSubscriptionQuota(
   } else if (!account) {
     throw notFound('subscription');
   }
-  const limited = sql`coalesce(${step.failureCode} in ('rate_limit', 'quota') or json_extract(${step.quotaBlock}, '$.source') = 'claude_rate_limit', 0)`;
+  const limited = sql`coalesce(${step.failureCode} in ('rate_limit', 'quota') or json_extract(${stepQuota.quotaBlock}, '$.source') = 'claude_rate_limit', 0)`;
   const scope = and(
     local
       ? eq(local[1], id)
       : and(
           or(eq(todo.teamId, teamId), eq(chiefThread.teamId, teamId)),
-          sql`json_extract(${step.ranModel}, '$.provider') = ${CODEX_PROVIDER_ID}`,
+          sql`json_extract(${stepQuota.ranModel}, '$.provider') = ${CODEX_PROVIDER_ID}`,
         ),
     between(step.claimedAt, now - 7 * 24 * HOUR, now),
   );
@@ -89,6 +91,8 @@ export async function getSubscriptionQuota(
       limits7d: sql<number>`coalesce(sum(${limited}), 0)`,
     })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
+    .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
     .leftJoin(build, eq(step.buildId, build.id))
     .leftJoin(todo, eq(build.todoId, todo.id))
     .leftJoin(chiefThread, and(eq(step.kind, 'chief'), eq(chiefThread.id, step.buildId)))
@@ -98,7 +102,7 @@ export async function getSubscriptionQuota(
     .select({
       at: step.finishedAt,
       code: step.failureCode,
-      block: step.quotaBlock,
+      block: stepQuota.quotaBlock,
       error: sql<
         string | null
       >`case when ${build.failureCode} = ${step.failureCode} and not exists (
@@ -106,12 +110,14 @@ export async function getSubscriptionQuota(
     ) then ${build.errorMessage} end`,
     })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
+    .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
     .leftJoin(build, eq(step.buildId, build.id))
     .leftJoin(todo, eq(build.todoId, todo.id))
     .leftJoin(chiefThread, and(eq(step.kind, 'chief'), eq(chiefThread.id, step.buildId)))
     .where(and(scope, limited))
     .orderBy(
-      sql`coalesce(json_extract(${step.quotaBlock}, '$.lastAt'), ${step.finishedAt}, ${step.claimedAt}) desc`,
+      sql`coalesce(json_extract(${stepQuota.quotaBlock}, '$.lastAt'), ${step.finishedAt}, ${step.claimedAt}) desc`,
       step.id,
     )
     .limit(1)

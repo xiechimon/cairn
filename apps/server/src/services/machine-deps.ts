@@ -30,6 +30,7 @@ import type { McpOAuthState } from './mcp-servers.js';
 import type { OAuthClientConfig } from './oauth.js';
 import type { VapidKeys } from './push.js';
 import { profileForStep as profileForStepRoute } from './routing-rules.js';
+import { readSkillInjection } from './step-groups/skill-injection.js';
 
 export function isChiefConversation(id: string): boolean {
   return isChiefConversationId(id);
@@ -104,7 +105,7 @@ export function publishStepStatus(deps: MachineDeps, stepId: string): void {
     createdAt: row.createdAt,
     status: row.status,
     checkpointCommit: row.checkpointCommit,
-    skillInjection: row.skillInjection ?? null,
+    skillInjection: readSkillInjection(deps.db, row.id).skillInjection,
   });
 }
 

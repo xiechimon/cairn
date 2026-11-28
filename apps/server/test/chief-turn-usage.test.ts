@@ -22,10 +22,10 @@ import {
   setCoordinatorInServer,
 } from '../src/services/coordinator-context.js';
 import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
-
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { finishStepForClaim, insertMachine } from './helpers.js';
+import { insertStepFixture, type StepFixtureInsert } from './step-groups-fixture.js';
 
 registerChiefHarness();
 beforeEach(() => setCoordinatorInServer(true));
@@ -40,27 +40,20 @@ function deps() {
   };
 }
 
-function claimedStep(
-  machineId: string,
-  id: string,
-  over: Partial<typeof stepTable.$inferInsert> = {},
-): void {
+function claimedStep(machineId: string, id: string, over: Partial<StepFixtureInsert> = {}): void {
   const now = Date.now();
-  H.s.db
-    .insert(stepTable)
-    .values({
-      id,
-      buildId: H.threadId,
-      kind: 'chief',
-      prompt: 'hello',
-      status: 'claimed',
-      machineId,
-      claimedAt: now,
-      lastHeartbeatAt: now,
-      createdAt: now,
-      ...over,
-    })
-    .run();
+  insertStepFixture(H.s.db, {
+    buildId: H.threadId,
+    kind: 'chief',
+    prompt: 'hello',
+    status: 'claimed',
+    machineId,
+    claimedAt: now,
+    lastHeartbeatAt: now,
+    createdAt: now,
+    ...over,
+    id,
+  });
 }
 
 function reclaim(machineId: string, id: string): void {

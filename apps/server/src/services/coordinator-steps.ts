@@ -24,6 +24,7 @@ import {
   type StepRanModel,
   schedule,
   step,
+  stepMemoryTrace,
   stepUsage,
   todo,
   tokenUsage,
@@ -70,6 +71,9 @@ import { reportAnsweredIn, reportRefCurrent, reportRefOfPrompt } from './report-
 import { coordinatorProfile } from './routing-rules.js';
 import { finishScheduledStep, isValidTimezone, serverTimezone } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
+import { readMemoryTrace, writeMemoryTrace } from './step-groups/memory-trace.js';
+import { readQuota } from './step-groups/quota.js';
+import { readSchedule } from './step-groups/schedule.js';
 import { acquireChiefStepLease, nextClaimGeneration } from './step-lease.js';
 import { setTodoPhase } from './todos.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
@@ -105,7 +109,7 @@ export function claimPendingChiefStep(
       : (options.bind ?? null);
   if (options.model?.provider === 'antigravity' && bind?.runtime !== 'antigravity') return null;
   if (options.model?.provider === 'doubao' && bind?.runtime !== 'doubao') return null;
-  const claimed = db.transaction(() => {
+  const claimed = db.transaction((tx) => {
     const claimedAt = nextClaimGeneration(stepRow, nowMs());
     if (options.stillAuthorized !== undefined && !options.stillAuthorized()) return null;
     const antigravitySubscriptionId =
@@ -130,7 +134,7 @@ export function claimPendingChiefStep(
     ) {
       return null;
     }
-    const lease = acquireChiefStepLease(db, stepRow, {
+    const lease = acquireChiefStepLease(tx, stepRow, {
       machineId: options.machineId,
       claimedAt,
       bind,
@@ -181,7 +185,7 @@ function foldQueuedChiefSteps(db: MachineDeps['db'], head: StepRow, now: number)
     const foldable =
       row.status === 'pending' &&
       row.prompt !== null &&
-      row.scheduleId === null &&
+      readSchedule(db, row.id).scheduleId === null &&
       (row.ownerMessageIds ?? []).length > 0 &&
       row.holdReason === null &&
       (row.holdUntil === null || row.holdUntil <= now) &&
@@ -237,7 +241,7 @@ function turnStateSection(
 ): string {
   return [
     TURN_STATE_OPEN,
-    nowNote(at, scheduleTimeZoneOfStep(deps.db, stepRow.scheduleId)),
+    nowNote(at, scheduleTimeZoneOfStep(deps.db, readSchedule(deps.db, stepRow.id).scheduleId)),
     coordinatorTurnState(deps, threadRow.teamId, threadRow.projectId),
     '</turn_state>',
   ].join('\n');
@@ -473,16 +477,17 @@ export function latestChiefMemoryUsage(db: Db, teamId: string) {
       stepId: step.id,
       threadId: step.buildId,
       createdAt: step.createdAt,
-      memoryTrace: step.memoryTrace,
+      memoryTrace: stepMemoryTrace.memoryTrace,
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
+    .innerJoin(stepMemoryTrace, eq(stepMemoryTrace.stepId, step.id))
     .where(
       and(
         eq(chiefThread.teamId, teamId),
         eq(step.kind, 'chief'),
         notLike(chiefThread.id, 'chief-memory-%'),
-        isNotNull(step.memoryTrace),
+        isNotNull(stepMemoryTrace.memoryTrace),
         or(isNull(step.holdReason), notLike(step.holdReason, 'steer%')),
       ),
     )
@@ -522,6 +527,8 @@ export function finishCoordinatorTurn(
   observation?: OtelObservation,
 ): void {
   const { db } = deps;
+  const { ranModel: claimedModel } = readQuota(db, stepRow.id);
+  const { scheduleId } = readSchedule(db, stepRow.id);
   try {
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null)
@@ -552,9 +559,9 @@ export function finishCoordinatorTurn(
     deps,
     stepRow.buildId,
     { ...outcome, sessionId: reportedSessionId },
-    stepRuntimeFor(stepRow.ranModel?.provider ?? null),
+    stepRuntimeFor(claimedModel?.provider ?? null),
   );
-  if (stepRow.scheduleId !== null) {
+  if (scheduleId !== null) {
     finishScheduledStep(
       { db: deps.db, hub: deps.hub, user: deps.user, vapidKeys: deps.vapidKeys },
       stepRow,
@@ -573,7 +580,7 @@ export function finishCoordinatorTurn(
   );
   if (outcome.status === 'success') settleNotifiedReportTurn(deps, stepRow);
   if (outcome.status === 'success') announcePrimaryRestored(deps, stepRow);
-  if (outcome.status === 'success' && stepRow.scheduleId === null)
+  if (outcome.status === 'success' && scheduleId === null)
     notifyChiefTurn(
       deps,
       stepRow.buildId,
@@ -617,7 +624,7 @@ function turnErrorFacts(deps: MachineDeps, stepRow: StepRow) {
       .where(eq(chiefThread.id, stepRow.buildId))
       .get()?.projectId ?? null;
   const profile = coordinatorProfile(deps.db, teamId, projectId);
-  const ran = ranModel(profile, stepRow);
+  const ran = ranModel(profile, readQuota(deps.db, stepRow.id));
   if (ran.provider === null) return elapsed;
   const row = deps.db
     .select({ id: provider.id, label: provider.label, models: provider.models })
@@ -775,20 +782,16 @@ export function recordStepUsage(
 }
 
 export function recordReusedInstructions(db: Db, stepId: string, sentBy: string): void {
-  const traceOf = (id: string) =>
-    db.select({ memoryTrace: step.memoryTrace }).from(step).where(eq(step.id, id)).get()
-      ?.memoryTrace;
-  const current = traceOf(stepId);
-  const sent = traceOf(sentBy);
-  if (!current || !sent) return;
-  db.update(step)
-    .set({
+  db.transaction((tx) => {
+    const current = readMemoryTrace(tx, stepId).memoryTrace;
+    const sent = readMemoryTrace(tx, sentBy).memoryTrace;
+    if (!current || !sent) return;
+    writeMemoryTrace(tx, stepId, {
       memoryTrace: {
         ...current,
         teamMemoryIds: sent.teamMemoryIds,
         teamMemoriesOmitted: sent.teamMemoriesOmitted,
       },
-    })
-    .where(eq(step.id, stepId))
-    .run();
+    });
+  });
 }

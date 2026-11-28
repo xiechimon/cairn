@@ -18,6 +18,7 @@ import { completeStep, finishTodoDone, startBuilds } from '../src/services/build
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import { updateTodo } from '../src/services/todos.js';
 import { bootServer, insertMachine, type TestServer } from './helpers.js';
 
@@ -1479,11 +1480,13 @@ describe('#1403 PR reconcile for review-phase builds', () => {
 
   test('[49] the reconcile finishes the card: the done card is published without the quota wait of the verify step it stopped', async () => {
     const w = makeWorld({ connected: true, inflight: 'waiting_quota', inflightKind: 'verify' });
-    w.s.db
-      .update(stepTable)
-      .set({ quotaBlock: QUOTA_BLOCK })
+    for (const row of w.s.db
+      .select()
+      .from(stepTable)
       .where(eq(stepTable.buildId, w.buildId))
-      .run();
+      .all()) {
+      w.s.db.transaction((tx) => writeQuota(tx, row.id, { quotaBlock: QUOTA_BLOCK }));
+    }
     w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
     const hub = w.s.svc.hub;
     const docs: Parameters<typeof hub.publishTodoDoc>[1][] = [];

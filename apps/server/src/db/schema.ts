@@ -358,13 +358,8 @@ export const step = sqliteTable(
       .notNull()
       .default('pending'),
     archiveStop: text('archiveStop').$type<'requested' | 'acknowledged' | null>(),
-    quotaBlock: json<QuotaWaitRow>('quotaBlock'),
-    fallback: json<StepFallbackRow>('fallback'),
-    ranModel: json<StepRanModel>('ranModel'),
     stallState: json<StepStallMeta>('stallState'),
     sessionId: text('sessionId'),
-    scheduleId: text('scheduleId'),
-    scheduledBy: text('scheduledBy'),
     checkpointCommit: text('checkpointCommit'),
     claimedAt: epochMs('claimedAt'),
     lastHeartbeatAt: epochMs('lastHeartbeatAt'),
@@ -376,13 +371,8 @@ export const step = sqliteTable(
     ownerMessageIds: json<string[]>('ownerMessageIds'),
     ownerSaid: text('ownerSaid'),
     byPerson: bool('byPerson').notNull().default(false),
-    claudeSubscriptionId: text('claudeSubscriptionId'),
-    devinSubscriptionId: text('devinSubscriptionId'),
-    antigravitySubscriptionId: text('antigravitySubscriptionId'),
     doubaoSubscriptionId: text('doubaoSubscriptionId'),
     freshSession: bool('freshSession').notNull().default(false),
-    skillInjection: json<SkillInjectionRecord>('skillInjection'),
-    blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff'),
     holdReason: text('holdReason'),
     holdUntil: epochMs('holdUntil'),
     holdCount: integer('holdCount').notNull().default(0),
@@ -394,7 +384,6 @@ export const step = sqliteTable(
     targetMachineId: text('targetMachineId'),
     routedFromMachineId: text('routedFromMachineId'),
     routedReason: text('routedReason').$type<'offline' | 'busy' | 'manual-switch' | null>(),
-    memoryTrace: json<ChiefMemoryTrace>('memoryTrace'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [
@@ -404,6 +393,59 @@ export const step = sqliteTable(
     index('step_merge_finished_idx').on(t.kind, t.status, t.finishedAt),
   ],
 );
+
+export const stepQuota = sqliteTable('step_quota', {
+  stepId: text('stepId')
+    .primaryKey()
+    .notNull()
+    .references(() => step.id, { onDelete: 'cascade' }),
+  quotaBlock: json<QuotaWaitRow>('quotaBlock'),
+  fallback: json<StepFallbackRow>('fallback'),
+  ranModel: json<StepRanModel>('ranModel'),
+});
+
+export const stepSubscription = sqliteTable('step_subscription', {
+  stepId: text('stepId')
+    .primaryKey()
+    .notNull()
+    .references(() => step.id, { onDelete: 'cascade' }),
+  claudeSubscriptionId: text('claudeSubscriptionId'),
+  devinSubscriptionId: text('devinSubscriptionId'),
+  antigravitySubscriptionId: text('antigravitySubscriptionId'),
+});
+
+export const stepSchedule = sqliteTable('step_schedule', {
+  stepId: text('stepId')
+    .primaryKey()
+    .notNull()
+    .references(() => step.id, { onDelete: 'cascade' }),
+  scheduleId: text('scheduleId'),
+  scheduledBy: text('scheduledBy'),
+});
+
+export const stepMemoryTrace = sqliteTable('step_memory_trace', {
+  stepId: text('stepId')
+    .primaryKey()
+    .notNull()
+    .references(() => step.id, { onDelete: 'cascade' }),
+  memoryTrace: json<ChiefMemoryTrace>('memoryTrace').notNull(),
+});
+
+export const stepSkillInjection = sqliteTable('step_skill_injection', {
+  stepId: text('stepId')
+    .primaryKey()
+    .notNull()
+    .references(() => step.id, { onDelete: 'cascade' }),
+  skillInjection: json<SkillInjectionRecord>('skillInjection').notNull(),
+});
+
+export const stepBlockerHandoff = sqliteTable('step_blocker_handoff', {
+  stepId: text('stepId')
+    .primaryKey()
+    .notNull()
+    .references(() => step.id, { onDelete: 'cascade' }),
+  blockerHandoff: json<BlockerHandoffRecord>('blockerHandoff').notNull(),
+});
 
 export const message = sqliteTable(
   'message',

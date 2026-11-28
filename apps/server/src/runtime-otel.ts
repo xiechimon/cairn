@@ -39,6 +39,8 @@ import { build, chiefMessage, machine, message, schedule, step, todo } from './d
 import { githubUnattributedCounts } from './lib/github-token.js';
 import { parseChiefTrigger } from './services/chief.js';
 import { stepRuntimeFor } from './services/dispatch-eligibility.js';
+import { readQuota } from './services/step-groups/quota.js';
+import { readSchedule } from './services/step-groups/schedule.js';
 import { storedStepRoute } from './services/step-route.js';
 
 const SCOPE = 'cairn.server';
@@ -98,11 +100,12 @@ function stepFailureReason(db: Db, row: typeof step.$inferSelect): string | unde
       return undefined;
     }
   }
-  if (row.scheduleId === null) return undefined;
+  const { scheduleId } = readSchedule(db, row.id);
+  if (scheduleId === null) return undefined;
   const recorded = db
     .select()
     .from(schedule)
-    .where(and(eq(schedule.id, row.scheduleId), eq(schedule.lastRunStepId, row.id)))
+    .where(and(eq(schedule.id, scheduleId), eq(schedule.lastRunStepId, row.id)))
     .get();
   return otelErrorMessage(recorded?.lastRunError);
 }
@@ -208,7 +211,8 @@ export function emitRuntimeStepSpan(
     !isTurn && row.machineId !== null
       ? db.select({ name: machine.name }).from(machine).where(eq(machine.id, row.machineId)).get()
       : undefined;
-  const model = isTurn ? undefined : (row.ranModel ?? row.fallback?.model);
+  const quota = isTurn ? undefined : readQuota(db, row.id);
+  const model = quota?.ranModel ?? quota?.fallback?.model;
   const errorMessage =
     row.status === 'failed'
       ? (stepFailureReason(db, row) ?? otelErrorMessage(buildRow?.errorMessage))

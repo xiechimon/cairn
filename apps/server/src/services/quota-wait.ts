@@ -14,6 +14,8 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyQuotaWait } from './notifications.js';
 import type { VapidKeys } from './push.js';
+import { readQuota, writeQuota } from './step-groups/quota.js';
+import { readSkillInjection } from './step-groups/skill-injection.js';
 import { getTodo } from './todos.js';
 
 export interface QuotaWaitDeps {
@@ -50,8 +52,11 @@ function probeWindowMs(retryAfterMs: number | null | undefined, attempts: number
   return backoff;
 }
 
-export function publishStepRow(deps: Pick<QuotaWaitDeps, 'convHub'>, row: StepRow): void {
-  deps.convHub?.publishStep(row.buildId, {
+export function publishStepRow(deps: Pick<QuotaWaitDeps, 'db' | 'convHub'>, row: StepRow): void {
+  if (!deps.convHub) return;
+  const { quotaBlock } = readQuota(deps.db, row.id);
+  const { skillInjection } = readSkillInjection(deps.db, row.id);
+  deps.convHub.publishStep(row.buildId, {
     id: row.id,
     buildId: row.buildId,
     kind: row.kind,
@@ -59,36 +64,43 @@ export function publishStepRow(deps: Pick<QuotaWaitDeps, 'convHub'>, row: StepRo
     createdAt: row.createdAt,
     status: row.status,
     checkpointCommit: row.checkpointCommit,
-    skillInjection: row.skillInjection ?? null,
-    ...(row.status === 'waiting_quota' && row.quotaBlock !== null
-      ? { quotaWait: toQuotaWait(row.quotaBlock) }
+    skillInjection,
+    ...(row.status === 'waiting_quota' && quotaBlock !== null
+      ? { quotaWait: toQuotaWait(quotaBlock) }
       : {}),
   });
 }
 
 export function applyQuotaWaitStep(deps: QuotaWaitDeps, stepRow: StepRow, block: QuotaBlock): void {
   const now = nowMs();
-  const prev = stepRow.quotaBlock;
-  const sameLane = prev !== null && prev.providerId === block.providerId;
-  const attempts = sameLane ? prev.attempts + 1 : 1;
-  const row: QuotaWaitRow = {
-    kind: block.kind,
-    providerId: block.providerId,
-    label: block.label ?? null,
-    reason: block.reason,
-    retryAfterMs: block.retryAfterMs ?? null,
-    firstSeenAt: sameLane ? prev.firstSeenAt : now,
-    lastAt: now,
-    attempts,
-    probeAt: now + probeWindowMs(block.retryAfterMs, attempts),
-  };
-  deps.db
-    .update(step)
-    .set({ status: 'waiting_quota', quotaBlock: row })
-    .where(eq(step.id, stepRow.id))
-    .run();
-  const fresh = deps.db.select().from(step).where(eq(step.id, stepRow.id)).get();
-  if (fresh !== undefined) publishStepRow(deps, fresh);
+  const result = deps.db.transaction((tx) => {
+    const prev = readQuota(tx, stepRow.id).quotaBlock;
+    const sameLane = prev !== null && prev.providerId === block.providerId;
+    const attempts = sameLane ? prev.attempts + 1 : 1;
+    const row: QuotaWaitRow = {
+      kind: block.kind,
+      providerId: block.providerId,
+      label: block.label ?? null,
+      reason: block.reason,
+      retryAfterMs: block.retryAfterMs ?? null,
+      firstSeenAt: sameLane ? prev.firstSeenAt : now,
+      lastAt: now,
+      attempts,
+      probeAt: now + probeWindowMs(block.retryAfterMs, attempts),
+    };
+    const winner = tx
+      .update(step)
+      .set({ status: 'waiting_quota' })
+      .where(eq(step.id, stepRow.id))
+      .returning()
+      .get();
+    if (!winner) return undefined;
+    writeQuota(tx, winner.id, { quotaBlock: row });
+    return { winner, row, attempts };
+  });
+  if (!result) return;
+  const { winner, row, attempts } = result;
+  publishStepRow(deps, winner);
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (buildRow !== undefined) {
     const record = getTodo(deps, buildRow.todoId);
@@ -114,8 +126,9 @@ export function sweepQuotaWaitSteps(deps: QuotaWaitDeps, now: number = nowMs()):
   const rows = deps.db.select().from(step).where(eq(step.status, 'waiting_quota')).all();
   let released = 0;
   for (const row of rows) {
-    if (row.quotaBlock?.source === 'subscription_policy') continue;
-    if ((row.quotaBlock?.probeAt ?? 0) > now) continue;
+    const quota = readQuota(deps.db, row.id);
+    if (quota.quotaBlock?.source === 'subscription_policy') continue;
+    if ((quota.quotaBlock?.probeAt ?? 0) > now) continue;
     const task = deps.db
       .select({ sourceKind: todo.sourceKind })
       .from(build)
@@ -126,23 +139,28 @@ export function sweepQuotaWaitSteps(deps: QuotaWaitDeps, now: number = nowMs()):
       continue;
     const keepFallbackModel = row.sessionId !== null || row.checkpointCommit !== null;
     const resetFallback =
-      row.fallback === null
+      quota.fallback === null
         ? null
         : {
-            model: keepFallbackModel ? row.fallback.model : null,
+            model: keepFallbackModel ? quota.fallback.model : null,
             tried: [],
-            zeroUsageRetried: row.fallback.zeroUsageRetried,
+            zeroUsageRetried: quota.fallback.zeroUsageRetried,
           };
-    deps.db
-      .update(step)
-      .set({ status: 'pending', machineId: null, mcpGrant: null, fallback: resetFallback })
-      .where(eq(step.id, row.id))
-      .run();
+    const fresh = deps.db.transaction((tx) => {
+      const winner = tx
+        .update(step)
+        .set({ status: 'pending', machineId: null, mcpGrant: null })
+        .where(eq(step.id, row.id))
+        .returning()
+        .get();
+      if (winner) writeQuota(tx, winner.id, { fallback: resetFallback });
+      return winner;
+    });
+    if (!fresh) continue;
     released += 1;
     const teamId = teamOfStep(deps.db, row);
     if (teamId !== null) deps.machineHub?.wake(teamId);
-    const fresh = deps.db.select().from(step).where(eq(step.id, row.id)).get();
-    if (fresh !== undefined) publishStepRow(deps, fresh);
+    publishStepRow(deps, fresh);
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
     if (buildRow !== undefined) {
       const record = getTodo(deps, buildRow.todoId);
@@ -157,11 +175,10 @@ export function retryQuotaWaitNow(
   buildId: string,
   clientMessageId?: string,
 ): boolean {
-  const releasedIds = deps.db.transaction(() => {
-    const held = deps.db
+  const releasedIds = deps.db.transaction((tx) => {
+    const held = tx
       .select({
         id: step.id,
-        fallback: step.fallback,
         sessionId: step.sessionId,
         checkpointCommit: step.checkpointCommit,
       })
@@ -183,25 +200,24 @@ export function retryQuotaWaitNow(
     });
     const updated: string[] = [];
     for (const row of held) {
+      const { fallback } = readQuota(tx, row.id);
       const keepFallbackModel = row.sessionId !== null || row.checkpointCommit !== null;
       const resetFallback =
-        row.fallback === null
+        fallback === null
           ? null
           : {
-              model: keepFallbackModel ? row.fallback.model : null,
+              model: keepFallbackModel ? fallback.model : null,
               tried: [],
-              zeroUsageRetried: row.fallback.zeroUsageRetried,
+              zeroUsageRetried: fallback.zeroUsageRetried,
             };
-      const res = deps.db
+      const res = tx
         .update(step)
         .set({
           status: 'pending',
-          quotaBlock: null,
           holdReason: null,
           holdUntil: null,
           machineId: null,
           mcpGrant: null,
-          fallback: resetFallback,
         })
         .where(
           and(
@@ -213,7 +229,10 @@ export function retryQuotaWaitNow(
           ),
         )
         .run();
-      if (res.changes > 0) updated.push(row.id);
+      if (res.changes > 0) {
+        writeQuota(tx, row.id, { quotaBlock: null, fallback: resetFallback });
+        updated.push(row.id);
+      }
     }
     if (updated.length > 0) holdBlockedBuild(deps.db, buildId);
     return updated;

@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { build, notification, schedule, step, todo } from '../src/db/schema.js';
 import * as builds from '../src/services/builds.js';
 import { createSchedule } from '../src/services/schedules.js';
+import { writeSchedule } from '../src/services/step-groups/schedule.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import {
   bootServer,
@@ -138,7 +139,7 @@ describe('a scheduled run finishing upserts an unread notification', () => {
         : { kind, at: Math.ceil((Date.now() + 900_000) / 900_000) * 900_000 }),
     });
     w.db.update(schedule).set({ lastRunStepId: stepRow.id }).where(eq(schedule.id, saved.id)).run();
-    w.db.update(step).set({ scheduleId: saved.id }).where(eq(step.id, stepRow.id)).run();
+    w.db.transaction((tx) => writeSchedule(tx, stepRow.id, { scheduleId: saved.id }));
     return { w, stepId: stepRow.id };
   }
 

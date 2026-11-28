@@ -1,7 +1,8 @@
 import { and, desc, eq, isNotNull, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { step } from '../db/schema.js';
+import { step, stepSubscription } from '../db/schema.js';
 import type { priorSessionOf } from './machine-routing.js';
+import type { StepSubscription } from './step-groups/subscription.js';
 
 export function chiefLastRanOnOtherMachine(
   db: Pick<Db, 'select'>,
@@ -29,7 +30,8 @@ export function chiefLastRanOnOtherMachine(
 }
 
 export function accountHeld(
-  stepRow: Pick<typeof step.$inferSelect, 'byPerson' | 'claudeSubscriptionId'>,
+  stepRow: Pick<typeof step.$inferSelect, 'byPerson'> &
+    Pick<StepSubscription, 'claudeSubscriptionId'>,
   prior: ReturnType<typeof priorSessionOf>,
   enabledSubscriptionId: string | null,
 ): boolean {
@@ -51,17 +53,18 @@ export function chiefLastRanOnOtherAccount(
 ): boolean {
   const column =
     runtime === 'devin'
-      ? step.devinSubscriptionId
+      ? stepSubscription.devinSubscriptionId
       : runtime === 'antigravity'
-        ? step.antigravitySubscriptionId
+        ? stepSubscription.antigravitySubscriptionId
         : runtime === 'doubao'
           ? step.doubaoSubscriptionId
-          : step.claudeSubscriptionId;
+          : stepSubscription.claudeSubscriptionId;
   const chiefSteps = and(eq(step.buildId, threadId), eq(step.kind, 'chief'), ne(step.id, stepId));
   const last =
     db
       .select({ subscriptionId: column })
       .from(step)
+      .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
       .where(and(chiefSteps, isNotNull(step.sessionId)))
       .orderBy(desc(step.createdAt))
       .limit(1)
@@ -69,6 +72,7 @@ export function chiefLastRanOnOtherAccount(
     db
       .select({ subscriptionId: column })
       .from(step)
+      .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
       .where(and(chiefSteps, isNotNull(step.claimedAt)))
       .orderBy(desc(step.claimedAt))
       .limit(1)

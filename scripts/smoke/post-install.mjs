@@ -342,7 +342,17 @@ function checkLiterals(sql) {
   return values;
 }
 
+const STEP_GROUP_SAMPLES = {
+  step_quota: { quotaBlock: '{}' },
+  step_subscription: { claudeSubscriptionId: 'smoke-subscription' },
+  step_schedule: { scheduleId: 'smoke-schedule' },
+  step_memory_trace: { memoryTrace: '{}' },
+  step_skill_injection: { skillInjection: '{"hits":[]}' },
+  step_blocker_handoff: { blockerHandoff: '{}' },
+};
+
 const SEED_OVERRIDES = {
+  ...STEP_GROUP_SAMPLES,
   coordinator_turn_snapshot: {
     schemaVersion: 1,
     outcome: 'success',
@@ -379,6 +389,12 @@ export function seedEveryTable(dbPath, label = `smoke-${Date.now()}`) {
   const db = new DatabaseSync(dbPath);
   try {
     db.exec('PRAGMA foreign_keys = ON');
+    const marker = db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'step' AND name = ?",
+      )
+      .get('step_require_writer_generation_update');
+    if (marker) db.function('cairn_step_write_generation', { deterministic: true }, () => 1);
     const all = db.prepare("SELECT name, sql FROM sqlite_master WHERE type='table'").all();
     const fts = new Set(all.filter((r) => /using fts5/i.test(r.sql ?? '')).map((r) => r.name));
     const shadow = new Set(
@@ -471,7 +487,22 @@ export function seedEveryTable(dbPath, label = `smoke-${Date.now()}`) {
           const row = db.prepare(sqlText).get(...colNames.map((c) => values.get(c)));
           inserted.set(name, new Map(Object.entries(row ?? {})));
         } catch (error) {
+          if (name === 'step' || Object.hasOwn(STEP_GROUP_SAMPLES, name)) {
+            throw new Error(`required smoke sample ${name}: ${error.message}`, { cause: error });
+          }
           skipped.push(`${name}: ${error.message}`);
+        }
+      }
+      for (const [name, sample] of Object.entries(STEP_GROUP_SAMPLES)) {
+        if (!info.has(name)) continue;
+        const row = inserted.get(name);
+        for (const [column, value] of Object.entries(sample)) {
+          if (
+            info.get(name).cols.some((col) => col.name === column) &&
+            row?.get(column) !== value
+          ) {
+            throw new Error(`required smoke sample ${name}.${column} missing or changed`);
+          }
         }
       }
       db.exec('COMMIT');

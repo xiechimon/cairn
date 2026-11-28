@@ -19,6 +19,7 @@ import {
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 async function call(
   app: Hono,
@@ -136,10 +137,10 @@ describe('quota hold (#1261)', () => {
       const { stepId } = await claim(w);
       await done(w, stepId, { status: 'failed', quotaBlock: QUOTA_BLOCK });
       w.s.db.update(todoTable).set({ sourceKind }).where(eq(todoTable.id, w.todoId)).run();
-      const before = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+      const before = readStepFixture(w.s.db, stepId)!;
 
       expect(sweepQuotaWaitSteps(w.s.svc, before.quotaBlock!.probeAt + 1)).toBe(0);
-      expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()).toEqual(before);
+      expect(readStepFixture(w.s.db, stepId)).toEqual(before);
 
       w.s.db
         .update(stepTable)
@@ -202,14 +203,14 @@ describe('quota hold (#1261)', () => {
       errorMessage: '429: rate limited',
       quotaBlock: { ...QUOTA_BLOCK, kind: 'capacity', retryAfterMs: 60_000 },
     });
-    let stepRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    let stepRow = readStepFixture(w.s.db, stepId)!;
     expect(stepRow.status).toBe('waiting_quota');
     const probeAtBefore = (stepRow.quotaBlock as { probeAt: number }).probeAt;
     sweepQuotaWaitSteps(w.s.svc, at + 1_000);
-    stepRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    stepRow = readStepFixture(w.s.db, stepId)!;
     expect(stepRow.status).toBe('waiting_quota');
     sweepQuotaWaitSteps(w.s.svc, probeAtBefore + 1);
-    stepRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    stepRow = readStepFixture(w.s.db, stepId)!;
     expect(stepRow.status).toBe('pending');
     expect(stepRow.machineId).toBeNull();
     const todosRes = await call(w.s.app, 'GET', '/api/todos');
@@ -227,7 +228,7 @@ describe('quota hold (#1261)', () => {
       errorMessage: '402 again',
       quotaBlock: QUOTA_BLOCK,
     });
-    const first = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    const first = readStepFixture(w.s.db, stepId)!;
     const b1 = first.quotaBlock as {
       probeAt: number;
       firstSeenAt: number;
@@ -247,7 +248,7 @@ describe('quota hold (#1261)', () => {
       errorMessage: '402 again',
       quotaBlock: QUOTA_BLOCK,
     });
-    const second = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    const second = readStepFixture(w.s.db, stepId)!;
     const b2 = second.quotaBlock as {
       probeAt: number;
       firstSeenAt: number;

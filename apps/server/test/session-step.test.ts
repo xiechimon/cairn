@@ -9,6 +9,7 @@ import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { insertMachine } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 registerChiefHarness();
 
@@ -175,7 +176,10 @@ describe('session steps share the build-step paths', () => {
       .all()
       .find((r) => r.status === 'pending')!;
     expect(
-      priorSessionOf(H.s.db, next, buildRow, { claude: null, devin: null }).priorSessionId,
+      priorSessionOf(H.s.db, readStepFixture(H.s.db, next.id)!, buildRow, {
+        claude: null,
+        devin: null,
+      }).priorSessionId,
     ).toBe('impl-session');
   });
 
@@ -192,7 +196,7 @@ describe('session steps share the build-step paths', () => {
       .run();
     H.s.db.update(build).set({ prevPhase: 'review' }).where(eq(build.id, buildId)).run();
     const buildRow = H.s.db.select().from(build).where(eq(build.id, buildId)).get()!;
-    const next = H.s.db.select().from(step).where(eq(step.id, 'fb-build')).get()!;
+    const next = readStepFixture(H.s.db, 'fb-build')!;
     expect(
       priorSessionOf(H.s.db, next, buildRow, { claude: null, devin: null }).priorSessionId,
     ).toBe('impl-session');
@@ -228,7 +232,7 @@ describe('session steps share the build-step paths', () => {
       .run();
     H.s.db.update(build).set({ prevPhase: 'building' }).where(eq(build.id, buildId)).run();
     const buildRow = H.s.db.select().from(build).where(eq(build.id, buildId)).get()!;
-    const next = H.s.db.select().from(step).where(eq(step.id, 'idle-building-next')).get()!;
+    const next = readStepFixture(H.s.db, 'idle-building-next')!;
     expect(
       priorSessionOf(H.s.db, next, buildRow, { claude: null, devin: null }).priorSessionId,
     ).toBe('impl-session');

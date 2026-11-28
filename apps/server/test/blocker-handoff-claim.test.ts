@@ -26,6 +26,7 @@ import {
   startLegacyBuild,
   type TestServer,
 } from './helpers.js';
+import { insertStepFixture, readStepFixture } from './step-groups-fixture.js';
 
 const HEAD_B = 'b'.repeat(40);
 
@@ -267,7 +268,7 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
     await startChild(w, '独立卡', []);
     const got = await claim(w);
     expect(got.todo?.blockerHandoff).toBeUndefined();
-    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, got.step.id)).get();
+    const row = readStepFixture(w.s.db, got.step.id);
     expect(row?.blockerHandoff).toBeNull();
     expect(w.mock.requests).toEqual([CLAIM_PIN_PROBE]);
   });
@@ -284,7 +285,7 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
     });
     await startChild(w, '后置', [a]);
     const got = await claim(w);
-    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, got.step.id)).get();
+    const row = readStepFixture(w.s.db, got.step.id);
     expect(blockerHandoffSchema.parse(row?.blockerHandoff)).toEqual(got.todo?.blockerHandoff);
     const rest = await req(w.s.app, 'GET', `/api/builds/${got.step.buildId}/steps`);
     const steps = (await rest.json()) as { id: string; blockerHandoff?: unknown }[];
@@ -428,17 +429,14 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
         },
       ],
     };
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: 'step-first',
-        buildId: childBuild!,
-        kind: 'plan',
-        status: 'done',
-        blockerHandoff: snapshot,
-        createdAt: 1,
-      })
-      .run();
+    insertStepFixture(w.s.db, {
+      id: 'step-first',
+      buildId: childBuild!,
+      kind: 'plan',
+      status: 'done',
+      blockerHandoff: snapshot,
+      createdAt: 1,
+    });
     const got = await claim(w);
     expect(got.todo?.blockerHandoff).toEqual(snapshot);
     expect(w.mock.requests).toEqual([CLAIM_PIN_PROBE]);
@@ -460,29 +458,26 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
     const childId = await startChild(w, '后置', [a]);
     const childBuild = w.s.db.select().from(todoTable).where(eq(todoTable.id, childId)).get()!
       .latestBuildId!;
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: 'step-first',
-        buildId: childBuild,
-        kind: 'plan',
-        status: 'done',
-        blockerHandoff: {
-          blockers: [
-            {
-              todoId: a,
-              title: '旧前置快照',
-              phase: 'done' as const,
-              delivery: null,
-              changedFiles: [],
-              omittedFiles: 0,
-              summary: null,
-            },
-          ],
-        },
-        createdAt: 1,
-      })
-      .run();
+    insertStepFixture(w.s.db, {
+      id: 'step-first',
+      buildId: childBuild,
+      kind: 'plan',
+      status: 'done',
+      blockerHandoff: {
+        blockers: [
+          {
+            todoId: a,
+            title: '旧前置快照',
+            phase: 'done' as const,
+            delivery: null,
+            changedFiles: [],
+            omittedFiles: 0,
+            summary: null,
+          },
+        ],
+      },
+      createdAt: 1,
+    });
     updateAutonomousTodo(w.s.svc, childId, { blockedBy: [b] });
     const got = await claim(w);
     expect(got.todo?.blockerHandoff?.blockers.map((e) => e.todoId)).toEqual([b]);
@@ -514,29 +509,26 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
     const childId = await startChild(w, '后置', [a]);
     const childBuild = w.s.db.select().from(todoTable).where(eq(todoTable.id, childId)).get()!
       .latestBuildId!;
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: 'step-first',
-        buildId: childBuild,
-        kind: 'plan',
-        status: 'done',
-        blockerHandoff: {
-          blockers: [
-            {
-              todoId: a,
-              title: '旧前置快照',
-              phase: 'done' as const,
-              delivery: null,
-              changedFiles: [],
-              omittedFiles: 0,
-              summary: null,
-            },
-          ],
-        },
-        createdAt: 1,
-      })
-      .run();
+    insertStepFixture(w.s.db, {
+      id: 'step-first',
+      buildId: childBuild,
+      kind: 'plan',
+      status: 'done',
+      blockerHandoff: {
+        blockers: [
+          {
+            todoId: a,
+            title: '旧前置快照',
+            phase: 'done' as const,
+            delivery: null,
+            changedFiles: [],
+            omittedFiles: 0,
+            summary: null,
+          },
+        ],
+      },
+      createdAt: 1,
+    });
     updateAutonomousTodo(w.s.svc, childId, { blockedBy: [] });
     const got = await claim(w);
     expect(got.todo?.blockerHandoff).toBeUndefined();
@@ -567,17 +559,14 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
         },
       ],
     };
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: 'step-first',
-        buildId: childBuild,
-        kind: 'plan',
-        status: 'done',
-        blockerHandoff: snapshot,
-        createdAt: 1,
-      })
-      .run();
+    insertStepFixture(w.s.db, {
+      id: 'step-first',
+      buildId: childBuild,
+      kind: 'plan',
+      status: 'done',
+      blockerHandoff: snapshot,
+      createdAt: 1,
+    });
     updateAutonomousTodo(w.s.svc, childId, { blockedBy: [a] });
     const got = await claim(w);
     expect(got.todo?.blockerHandoff).toEqual(snapshot);

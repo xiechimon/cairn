@@ -65,6 +65,7 @@ export function migrateDatabase(
   sqlite: Database.Database,
   migrationsFolder = MIGRATIONS_FOLDER,
 ): void {
+  registerStepWriterGeneration(sqlite);
   const foreignKeysOn = sqlite.pragma('foreign_keys', { simple: true }) === 1;
   if (foreignKeysOn) sqlite.pragma('foreign_keys = OFF');
   const before = foreignKeyViolations(sqlite);
@@ -103,8 +104,13 @@ export function openDbWithHandle(dbPath: string): OpenedDb {
   return { db, sqlite, close: () => sqlite.close() };
 }
 
+function registerStepWriterGeneration(sqlite: Database.Database): void {
+  sqlite.function('cairn_step_write_generation', { deterministic: true }, () => 1);
+}
+
 function openConnection(source: string | Buffer): Database.Database {
   const sqlite = new Database(source);
+  registerStepWriterGeneration(sqlite);
   sqlite.pragma('busy_timeout = 10000');
   sqlite.pragma('journal_mode = WAL');
   sqlite.pragma('cache_size = -131072');

@@ -24,6 +24,7 @@ import {
   subscriptionClaudeReport,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
 const HEAD = 'ab'.repeat(20);
@@ -159,7 +160,7 @@ async function chiefWorld(
       return (await res.json()) as { provider: { providerId: string } | null };
     },
     stepRow(id: string) {
-      return s.db.select().from(stepTable).where(eq(stepTable.id, id)).get();
+      return readStepFixture(s.db, id);
     },
     threadRow() {
       return s.db

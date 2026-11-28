@@ -11,6 +11,10 @@ import {
 } from '../db/schema.js';
 import { HttpError, NotFoundError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { writeBlockerHandoff } from './step-groups/blocker-handoff.js';
+import { writeQuota } from './step-groups/quota.js';
+import { writeSkillInjection } from './step-groups/skill-injection.js';
+import { writeSubscription } from './step-groups/subscription.js';
 
 export function pendingClaimPredicate(
   stepRow: Pick<typeof step.$inferSelect, 'id' | 'claimedAt'>,
@@ -31,6 +35,8 @@ export function nextClaimGeneration(
   return Math.max(now, (stepRow.claimedAt ?? 0) + 1);
 }
 
+type Transaction = Parameters<Parameters<Db['transaction']>[0]>[0];
+
 export interface WorkerStepLeaseInput {
   machineId: string;
   claimedAt: number;
@@ -50,7 +56,7 @@ export interface WorkerStepLeaseInput {
 }
 
 export function acquireWorkerStepLease(
-  tx: Db,
+  tx: Transaction,
   stepRow: Pick<typeof step.$inferSelect, 'id' | 'claimedAt'>,
   input: WorkerStepLeaseInput,
 ): { claimedAt: number } | null {
@@ -63,16 +69,9 @@ export function acquireWorkerStepLease(
       claimedRepo: input.claimedRepo,
       claimedRepoId: input.claimedRepoId,
       lastHeartbeatAt: input.claimedAt,
-      skillInjection: input.skillInjection,
-      blockerHandoff: input.blockerHandoff,
-      claudeSubscriptionId: input.claudeSubscriptionId,
-      devinSubscriptionId: input.devinSubscriptionId,
-      antigravitySubscriptionId: input.antigravitySubscriptionId,
       doubaoSubscriptionId: input.doubaoSubscriptionId,
       holdReason: null,
       holdUntil: null,
-      ranModel: input.ranModel,
-      ...(input.fallback !== undefined ? { fallback: input.fallback } : {}),
       mcpGrant: input.mcpGrant,
       ...(input.routedFromMachineId !== undefined
         ? { routedFromMachineId: input.routedFromMachineId }
@@ -81,7 +80,16 @@ export function acquireWorkerStepLease(
     })
     .where(pendingClaimPredicate(stepRow, input.claimedAt))
     .run();
-  return res.changes > 0 ? { claimedAt: input.claimedAt } : null;
+  if (res.changes === 0) return null;
+  writeSubscription(tx, stepRow.id, {
+    claudeSubscriptionId: input.claudeSubscriptionId,
+    devinSubscriptionId: input.devinSubscriptionId,
+    antigravitySubscriptionId: input.antigravitySubscriptionId,
+  });
+  writeQuota(tx, stepRow.id, { ranModel: input.ranModel, fallback: input.fallback });
+  writeSkillInjection(tx, stepRow.id, { skillInjection: input.skillInjection });
+  writeBlockerHandoff(tx, stepRow.id, { blockerHandoff: input.blockerHandoff });
+  return { claimedAt: input.claimedAt };
 }
 
 export interface ChiefStepLeaseInput {
@@ -98,7 +106,7 @@ export interface ChiefStepLeaseInput {
 }
 
 export function acquireChiefStepLease(
-  tx: Db,
+  tx: Transaction,
   stepRow: Pick<typeof step.$inferSelect, 'id' | 'claimedAt'>,
   input: ChiefStepLeaseInput,
 ): { claimedAt: number } | null {
@@ -107,26 +115,11 @@ export function acquireChiefStepLease(
     .set({
       status: 'claimed',
       machineId: input.machineId,
-      claudeSubscriptionId:
-        input.bind?.runtime === 'claude-code'
-          ? sql<
-              string | null
-            >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${input.bind.teamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${input.claimedAt}))`
-          : null,
-      devinSubscriptionId:
-        input.bind?.runtime === 'devin'
-          ? sql<
-              string | null
-            >`(select ${devinSubscription.id} from ${devinSubscription} where ${devinSubscription.teamId} = ${input.bind.teamId} and ${devinSubscription.enabledAt} is not null and (${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${input.claimedAt}))`
-          : null,
-      antigravitySubscriptionId: input.antigravitySubscriptionId,
       doubaoSubscriptionId: input.doubaoSubscriptionId,
       claimedAt: input.claimedAt,
       lastHeartbeatAt: input.claimedAt,
       holdReason: null,
       holdUntil: null,
-      ranModel: input.model,
-      ...(input.fallback !== undefined ? { fallback: input.fallback } : {}),
       mcpGrant: input.mcpGrant,
       ...(input.routedFromMachineId !== undefined
         ? { routedFromMachineId: input.routedFromMachineId }
@@ -146,7 +139,42 @@ export function acquireChiefStepLease(
       ),
     )
     .run();
-  return res.changes > 0 ? { claimedAt: input.claimedAt } : null;
+  if (res.changes === 0) return null;
+  const claudeSubscriptionId =
+    input.bind?.runtime === 'claude-code'
+      ? (tx
+          .select({ id: claudeSubscription.id })
+          .from(claudeSubscription)
+          .where(
+            and(
+              eq(claudeSubscription.teamId, input.bind.teamId),
+              sql`${claudeSubscription.enabledAt} is not null`,
+              sql`(${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${input.claimedAt})`,
+            ),
+          )
+          .get()?.id ?? null)
+      : null;
+  const devinSubscriptionId =
+    input.bind?.runtime === 'devin'
+      ? (tx
+          .select({ id: devinSubscription.id })
+          .from(devinSubscription)
+          .where(
+            and(
+              eq(devinSubscription.teamId, input.bind.teamId),
+              sql`${devinSubscription.enabledAt} is not null`,
+              sql`(${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${input.claimedAt})`,
+            ),
+          )
+          .get()?.id ?? null)
+      : null;
+  writeSubscription(tx, stepRow.id, {
+    claudeSubscriptionId,
+    devinSubscriptionId,
+    antigravitySubscriptionId: input.antigravitySubscriptionId,
+  });
+  writeQuota(tx, stepRow.id, { ranModel: input.model, fallback: input.fallback });
+  return { claimedAt: input.claimedAt };
 }
 
 export function heartbeatStep<T extends { db: Db; assertClaim?: () => void }>(

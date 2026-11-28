@@ -32,6 +32,7 @@ import { doubaoSubscriptionAllowsRunner } from './doubao-subscriptions.js';
 import { getModelLiveness, mergedCatalogModels } from './model-liveness.js';
 import { providerHealth } from './provider-health.js';
 import { antigravityQuotaExhausted, isKeylessEndpoint } from './source-tiers.js';
+import type { StepQuota } from './step-groups/quota.js';
 
 interface AgentRow {
   teamId: string;
@@ -40,7 +41,7 @@ interface AgentRow {
   modelId: string | null;
   fallbackModels: (typeof routingRule.$inferSelect)['fallbackModels'];
 }
-type StepRow = typeof step.$inferSelect;
+type StepRow = typeof step.$inferSelect & Pick<StepQuota, 'fallback' | 'ranModel'>;
 
 export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build', 'session'];
 

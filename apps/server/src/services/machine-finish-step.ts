@@ -95,6 +95,8 @@ import { notifyModelFallback } from './notifications.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
 import type { RouteProfile } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
+import { readQuota } from './step-groups/quota.js';
+import { readSkillInjection } from './step-groups/skill-injection.js';
 import { drainTaskMessageQueue } from './task-message-queue.js';
 
 function emitSettledStepSpan(deps: MachineDeps, stepId: string): void {
@@ -163,10 +165,11 @@ function recordSkillInjectionCheck(
     if (agentRow == null) return;
     skillsAllowlist = agentRow.skillsAllowlist ?? null;
     defaultSkill = agentRow.defaultSkill;
-    if (stepRow.skillInjection == null) {
+    const { skillInjection } = readSkillInjection(deps.db, stepRow.id);
+    if (skillInjection == null) {
       requested = undefined;
     } else {
-      const ids = stepRow.skillInjection.hits.map((h) => h.id);
+      const ids = skillInjection.hits.map((h) => h.id);
       requested =
         defaultSkill == null || defaultSkill === ''
           ? ids
@@ -423,8 +426,8 @@ interface StepReport {
 
 function applyStepReport(deps: MachineDeps, report: StepReport): void {
   const { db } = deps;
-  const { stepRow, body, changeFiles, priorMerged, landingSkipped, landingError, spaceNote } =
-    report;
+  const { body, changeFiles, priorMerged, landingSkipped, landingError, spaceNote } = report;
+  const stepRow = { ...report.stepRow, ...readQuota(db, report.stepRow.id) };
   const stepId = stepRow.id;
   {
     const teamId = stepTeamId(deps, stepRow);

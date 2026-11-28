@@ -13,7 +13,7 @@ import {
 } from '@cairn/shared';
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, step, type todo } from '../db/schema.js';
+import { build, step, stepSchedule, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -159,8 +159,13 @@ function lastStepScheduledBuildIds(db: Db, buildIds: string[]): Set<string> {
   if (buildIds.length === 0) return new Set();
   const latestByBuild = new Map<string, { scheduleId: string | null; createdAt: number }>();
   for (const row of db
-    .select({ buildId: step.buildId, scheduleId: step.scheduleId, createdAt: step.createdAt })
+    .select({
+      buildId: step.buildId,
+      scheduleId: stepSchedule.scheduleId,
+      createdAt: step.createdAt,
+    })
     .from(step)
+    .leftJoin(stepSchedule, eq(stepSchedule.stepId, step.id))
     .where(inArray(step.buildId, buildIds))
     .all()) {
     const seen = latestByBuild.get(row.buildId);

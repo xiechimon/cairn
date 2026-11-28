@@ -25,6 +25,7 @@ import {
   assertWorkerScheduleInterval,
   workerScheduleRunHistory,
 } from '../src/services/schedules.js';
+import { readSchedule } from '../src/services/step-groups/schedule.js';
 import { setTodoArchived, setTodoPhase } from '../src/services/todos.js';
 import {
   bootServer,
@@ -236,7 +237,7 @@ describe('worker thread schedule tools', () => {
       expect(runs).toHaveLength(1);
       const fired = s.db.select().from(step).all().at(-1)!;
       expect(fired.prompt).toBe(`Scheduled follow-up you set earlier:\n\n${prompt}`);
-      expect(fired.scheduledBy).toBe(`worker:${s.claimed.step.id}`);
+      expect(readSchedule(s.db, fired.id).scheduledBy).toBe(`worker:${s.claimed.step.id}`);
       const claimed = await s.claim();
       expect(claimed.instruction).toContain(prompt);
       expect(claimed.todo?.id).toBe(s.todoId);

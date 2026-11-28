@@ -16,6 +16,7 @@ import { canTransitionPhase } from './phase.js';
 import { publishStepRow } from './quota-wait.js';
 import { parkFailedBuild, retryIsParked, scheduleOrParkFailedBuild } from './retry-parking.js';
 import { finishScheduledStep } from './schedules.js';
+import { readSkillInjection } from './step-groups/skill-injection.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -213,7 +214,7 @@ export function failStepWithEvents(
       createdAt: failedStep.createdAt,
       status: failedStep.status,
       checkpointCommit: failedStep.checkpointCommit,
-      skillInjection: failedStep.skillInjection ?? null,
+      skillInjection: readSkillInjection(deps.db, failedStep.id).skillInjection,
     });
   }
 }

@@ -12,6 +12,7 @@ import {
 import { devinUsable } from '../src/services/dispatch-eligibility.js';
 import { claimStep } from '../src/services/machines.js';
 import { listDevinSources } from '../src/services/providers.js';
+import { writeQuota } from '../src/services/step-groups/quota.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
@@ -21,6 +22,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -113,7 +115,7 @@ function insertBuildStep(s: TestServer, projectId: string): string {
 }
 
 function stepRow(s: TestServer, stepId: string) {
-  return s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
+  return readStepFixture(s.db, stepId);
 }
 
 function credentialsOf(s: TestServer, machineId: string, stepId: string) {
@@ -224,18 +226,16 @@ describe('claimStep and the Devin subscription', () => {
       expect(finishedBody).not.toHaveProperty('devinToken');
       expect(JSON.stringify(finishedBody)).not.toContain(token);
     }
-    s.db
-      .update(stepTable)
-      .set({
-        status: 'claimed',
+    s.db.transaction((tx) => {
+      tx.update(stepTable).set({ status: 'claimed' }).where(eq(stepTable.id, stepId)).run();
+      writeQuota(tx, stepId, {
         fallback: {
           model: { provider: 'stub-gw', modelId: 'stub-model' },
           tried: [],
           zeroUsageRetried: false,
         },
-      })
-      .where(eq(stepTable.id, stepId))
-      .run();
+      });
+    });
     const piCredentials = await credentialsOf(s, machineId, stepId);
     expect(piCredentials.status).toBe(200);
     const piBody = machineTokenResponseSchema.parse(await piCredentials.json());

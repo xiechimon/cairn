@@ -6,7 +6,7 @@ import {
   SESSION_BRIEF,
 } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
-import { build, machine, project, schedule, step } from '../db/schema.js';
+import { build, machine, project, schedule } from '../db/schema.js';
 import { HttpError, taskArchived } from '../lib/errors.js';
 import { newUuidv7, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep, NotFoundError, publishBuild } from './builds.js';
@@ -213,14 +213,11 @@ export function startBuilds(
         undefined,
         undefined,
         { kind: 'first-task' },
+        input.schedule === undefined ? undefined : { scheduleId: input.schedule.id },
+        input.schedule === undefined ? undefined : afterCommit,
       );
       if (input.schedule !== undefined) {
         const wake = input.schedule;
-        deps.db
-          .update(step)
-          .set({ scheduleId: wake.id })
-          .where(eq(step.id, scheduledStep.id))
-          .run();
         insertMessageRow({ ...deps, afterCommit }, id, {
           id: `schedule-wake-${scheduledStep.id}`,
           role: 'system',

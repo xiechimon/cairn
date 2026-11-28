@@ -5,6 +5,7 @@ import { completeStep, enqueueStep, listSteps, startBuilds } from '../src/servic
 import { fireScheduleWebhook } from '../src/services/schedule-webhook.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule, deleteSchedule, setScheduleEnabled } from '../src/services/schedules.js';
+import { readSchedule } from '../src/services/step-groups/schedule.js';
 import { executeThreadScheduleTool } from '../src/services/thread-schedule-tools.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
@@ -42,7 +43,11 @@ function stored(s: TestServer, id: string) {
 }
 
 function routineSteps(s: TestServer, scheduleId: string) {
-  return s.db.select().from(step).where(eq(step.scheduleId, scheduleId)).all();
+  return s.db
+    .select()
+    .from(step)
+    .all()
+    .filter((row) => readSchedule(s.db, row.id).scheduleId === scheduleId);
 }
 
 function quarterAligned(ms: number): number {

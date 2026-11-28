@@ -10,7 +10,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { type build, machine, step, team } from '../db/schema.js';
+import { type build, machine, step, stepQuota, stepSubscription, team } from '../db/schema.js';
 import {
   activeAntigravitySource,
   antigravitySubscriptionAllowsRunner,
@@ -31,6 +31,7 @@ import {
 } from './dispatch-eligibility.js';
 import { activeDoubaoSource, doubaoRunnerEligibility } from './doubao-subscriptions.js';
 import type { RouteProfile } from './routing-rules.js';
+import type { StepQuota } from './step-groups/quota.js';
 
 type MachineRow = typeof machine.$inferSelect;
 
@@ -158,10 +159,8 @@ export function targetUnavailable(
 
 export function priorSessionOf(
   db: Pick<Db, 'select'>,
-  stepRow: Pick<
-    typeof step.$inferSelect,
-    'buildId' | 'kind' | 'fallback' | 'freshSession' | 'byPerson'
-  >,
+  stepRow: Pick<typeof step.$inferSelect, 'buildId' | 'kind' | 'freshSession' | 'byPerson'> &
+    Pick<StepQuota, 'fallback'>,
   buildRow: Pick<typeof build.$inferSelect, 'prevPhase' | 'withPlan' | 'planDocId'>,
   enabledSubscriptionIds: {
     claude: string | null;
@@ -182,16 +181,18 @@ export function priorSessionOf(
     .select({
       sessionId: step.sessionId,
       machineId: step.machineId,
-      fallback: step.fallback,
-      ranModel: step.ranModel,
+      fallback: stepQuota.fallback,
+      ranModel: stepQuota.ranModel,
       createdAt: step.createdAt,
       claimedAt: step.claimedAt,
-      subscriptionId: step.claudeSubscriptionId,
-      devinSubscriptionId: step.devinSubscriptionId,
-      antigravitySubscriptionId: step.antigravitySubscriptionId,
+      subscriptionId: stepSubscription.claudeSubscriptionId,
+      devinSubscriptionId: stepSubscription.devinSubscriptionId,
+      antigravitySubscriptionId: stepSubscription.antigravitySubscriptionId,
       doubaoSubscriptionId: step.doubaoSubscriptionId,
     })
     .from(step)
+    .leftJoin(stepQuota, eq(stepQuota.stepId, step.id))
+    .leftJoin(stepSubscription, eq(stepSubscription.stepId, step.id))
     .where(
       and(
         eq(step.buildId, stepRow.buildId),

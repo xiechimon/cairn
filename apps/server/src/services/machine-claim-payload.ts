@@ -66,6 +66,9 @@ import {
   type RouteProfile,
 } from './routing-rules.js';
 import { scanLocalSkills } from './skills.js';
+import { writeMemoryTraceGuarded } from './step-groups/memory-trace.js';
+import { readQuota } from './step-groups/quota.js';
+import { readSubscription } from './step-groups/subscription.js';
 import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { turnProvenance } from './turn-provenance.js';
@@ -165,18 +168,22 @@ function injectWorkerStepMemories(
   const teamIndexes = indexes.filter((index) => index.projectId === null);
   const projectIndexes = indexes.filter((index) => index.projectId !== null);
   const total = (rows: typeof indexes) => rows.reduce((sum, index) => sum + index.omitted, 0);
-  db.update(step)
-    .set({
-      memoryTrace: {
-        teamMemoryIds: teamIndexes.map((index) => index.id),
-        teamMemoriesOmitted: total(teamIndexes),
-        projectMemoryIds: projectIndexes.map((index) => index.id),
-        projectMemoriesOmitted: total(projectIndexes),
-        recalledMemoryIds: [],
+  db.transaction((tx) =>
+    writeMemoryTraceGuarded(
+      tx,
+      stepId,
+      {
+        memoryTrace: {
+          teamMemoryIds: teamIndexes.map((index) => index.id),
+          teamMemoriesOmitted: total(teamIndexes),
+          projectMemoryIds: projectIndexes.map((index) => index.id),
+          projectMemoriesOmitted: total(projectIndexes),
+          recalledMemoryIds: [],
+        },
       },
-    })
-    .where(and(eq(step.id, stepId), eq(step.status, 'claimed'), eq(step.claimedAt, claimedAt)))
-    .run();
+      and(eq(step.status, 'claimed'), eq(step.claimedAt, claimedAt))!,
+    ),
+  );
   return memories.map(({ title, content }) => ({ title, content }));
 }
 
@@ -204,7 +211,8 @@ export function buildChiefClaimPayload(
 ): ClaimedStep {
   const { machineId, stepRow, threadRow, agentRow, readmeSection, stagedUploads, machineRow } =
     input;
-  const model = effectiveModel(agentRow, stepRow);
+  const { fallback } = readQuota(deps.db, stepRow.id);
+  const model = effectiveModel(agentRow, { fallback });
   const { trigger, systemPrompt, memories, instruction, sections, memoryTrace } = chiefTurnContext(
     deps,
     stepRow,
@@ -221,37 +229,29 @@ export function buildChiefClaimPayload(
       : baseInstruction !== null && baseInstruction !== ''
         ? `${baseInstruction}\n\n${stagedUploads}`
         : stagedUploads;
-  deps.db
-    .update(step)
-    .set({ memoryTrace })
-    .where(
+  deps.db.transaction((tx) =>
+    writeMemoryTraceGuarded(
+      tx,
+      stepRow.id,
+      { memoryTrace },
       and(
-        eq(step.id, stepRow.id),
         eq(step.status, 'claimed'),
         stepRow.claimedAt === null ? isNull(step.claimedAt) : eq(step.claimedAt, stepRow.claimedAt),
-      ),
-    )
-    .run();
+      )!,
+    ),
+  );
   const runtime = stepRuntimeFor(model.provider);
+  const subscription =
+    runtime === 'claude-code' || runtime === 'devin' || runtime === 'antigravity'
+      ? readSubscription(deps.db, stepRow.id)
+      : null;
   const boundSubscriptionId =
     runtime === 'claude-code'
-      ? (deps.db
-          .select({ id: step.claudeSubscriptionId })
-          .from(step)
-          .where(eq(step.id, stepRow.id))
-          .get()?.id ?? null)
+      ? subscription!.claudeSubscriptionId
       : runtime === 'devin'
-        ? (deps.db
-            .select({ id: step.devinSubscriptionId })
-            .from(step)
-            .where(eq(step.id, stepRow.id))
-            .get()?.id ?? null)
+        ? subscription!.devinSubscriptionId
         : runtime === 'antigravity'
-          ? (deps.db
-              .select({ id: step.antigravitySubscriptionId })
-              .from(step)
-              .where(eq(step.id, stepRow.id))
-              .get()?.id ?? null)
+          ? subscription!.antigravitySubscriptionId
           : runtime === 'doubao'
             ? (deps.db
                 .select({ id: step.doubaoSubscriptionId })
@@ -313,7 +313,7 @@ export function buildChiefClaimPayload(
     memories: memories.map((m) => `- ${m.title}：${m.content}`),
     provider: model.provider ?? '',
     modelId: model.modelId ?? '',
-    thinkingLevel: stepRow.fallback?.model ? null : (agentRow.thinkingLevel ?? null),
+    thinkingLevel: fallback?.model ? null : (agentRow.thinkingLevel ?? null),
     volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
   });
   const locked = chiefTurnLocked(stepRow);
@@ -353,7 +353,7 @@ export function buildChiefClaimPayload(
       description: agentRow.description,
       provider: model.provider,
       modelId: model.modelId,
-      thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
+      thinkingLevel: fallback?.model ? null : agentRow.thinkingLevel,
       memories,
     },
     chief: {
@@ -439,6 +439,7 @@ export function buildWorkerClaimPayload(
         sessionId: priorSessionId,
         ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
       };
+  const fallback = switchedFallback === null ? readQuota(db, stepRow.id).fallback : null;
   const repoRef = projectRepoRef(projectRow, origin);
   const mergeTarget = stepRow.kind === 'merge' ? parseHostedMergeInstruction(stepRow.prompt) : null;
   const repo =
@@ -522,8 +523,7 @@ export function buildWorkerClaimPayload(
       description: agentRow.description,
       provider: model.provider,
       modelId: model.modelId,
-      thinkingLevel:
-        stepRow.fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
+      thinkingLevel: fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
       memories: injectWorkerStepMemories(db, stepRow.id, claimedAt, {
         agentId: memoryOwnerOf(db, teamId, stepRow.kind),
         teamId,

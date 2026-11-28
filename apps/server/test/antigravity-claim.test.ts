@@ -27,6 +27,7 @@ import {
   seedRoute,
   type TestServer,
 } from './helpers.js';
+import { readStepFixture } from './step-groups-fixture.js';
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -201,7 +202,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       });
     await expect(claim(s, authMachine)).resolves.toBeNull();
     expect(beforeExpiry).toHaveBeenCalled();
-    expect(s.db.select().from(stepTable).where(eq(stepTable.id, 's1')).get()).toMatchObject({
+    expect(readStepFixture(s.db, 's1')).toMatchObject({
       status: 'pending',
       antigravitySubscriptionId: null,
     });
@@ -217,9 +218,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       provider: 'antigravity',
       modelId: 'gemini-3.8-flash',
     });
-    expect(
-      s.db.select().from(stepTable).where(eq(stepTable.id, 's1')).get()?.antigravitySubscriptionId,
-    ).toBe(subId);
+    expect(readStepFixture(s.db, 's1')?.antigravitySubscriptionId).toBe(subId);
 
     const tokenRes = await stepToken(
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
@@ -356,9 +355,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       provider: 'antigravity',
       modelId: 'gemini-4-carbon',
     });
-    expect(
-      s.db.select().from(stepTable).where(eq(stepTable.id, 'cs1')).get()?.antigravitySubscriptionId,
-    ).toBe(subA);
+    expect(readStepFixture(s.db, 'cs1')?.antigravitySubscriptionId).toBe(subA);
 
     const firstToken = await stepToken(
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
@@ -503,10 +500,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       provider: 'antigravity',
       modelId: 'gemini-3.8-flash',
     });
-    expect(
-      s.db.select().from(stepTable).where(eq(stepTable.id, 's-port')).get()
-        ?.antigravitySubscriptionId,
-    ).toBe(subId);
+    expect(readStepFixture(s.db, 's-port')?.antigravitySubscriptionId).toBe(subId);
 
     const workerGeneration =
       s.db.select().from(stepTable).where(eq(stepTable.id, 's-port')).get()?.claimedAt ?? undefined;
