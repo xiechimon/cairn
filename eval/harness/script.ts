@@ -5,9 +5,9 @@ import {
   fauxProvider,
   fauxToolCall,
 } from '@earendil-works/pi-ai';
-import { routingRule } from '../../apps/server/src/db/schema.js';
 import type { startCoordinator } from '../../apps/server/src/coordinator/index.js';
 import { SUGGEST_REPLIES_ASK } from '../../apps/server/src/coordinator/runtime/suggest-replies.js';
+import { routingRule } from '../../apps/server/src/db/schema.js';
 import { createProvider } from '../../apps/server/src/services/providers.js';
 import { postProject, type TestServer } from '../../apps/server/test/helpers.js';
 import type { ScriptStep } from './types.js';
@@ -132,9 +132,7 @@ function resolveArgs(value: unknown, projects: Map<string, string>): unknown {
 
 export interface ScriptedArm {
   /** Fixed coordinator provider: replays the case's script, answers the reply-suggestion turn empty. */
-  fixedProviders: NonNullable<
-    Parameters<typeof startCoordinator>[0]['fixedProviders']
-  >;
+  fixedProviders: NonNullable<Parameters<typeof startCoordinator>[0]['fixedProviders']>;
   /** Every prompt the coordinator sent, in order. */
   prompts: string[];
 }
@@ -144,7 +142,10 @@ export interface ScriptedArm {
  * `startCoordinator` run: only the model behind it is scripted, so the
  * dispatch, claim and delivery code paths stay the product's own.
  */
-export function createScriptedArm(script: readonly ScriptStep[], projects: Map<string, string>): ScriptedArm {
+export function createScriptedArm(
+  script: readonly ScriptStep[],
+  projects: Map<string, string>,
+): ScriptedArm {
   const faux = fauxProvider({
     provider: STUB_PROVIDER_ID,
     models: [{ id: STUB_MODEL_ID, contextWindow: 200_000 }],
@@ -180,7 +181,10 @@ export function createScriptedArm(script: readonly ScriptStep[], projects: Map<s
   const provider = {
     ...faux.provider,
     streamSimple(model: never, context: never, options: never) {
-      if ((context as { messages: { content: unknown }[] }).messages[0]?.content !== SUGGEST_REPLIES_ASK)
+      if (
+        (context as { messages: { content: unknown }[] }).messages[0]?.content !==
+        SUGGEST_REPLIES_ASK
+      )
         return faux.provider.streamSimple(model, context, options);
       const stream = createAssistantMessageEventStream();
       const message = {
