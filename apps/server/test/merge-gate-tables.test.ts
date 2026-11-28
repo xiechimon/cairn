@@ -140,9 +140,15 @@ function seedGateRows(
   insert(sqlite, 'gate_state', stateRow(buildId, stateOver));
 }
 
+// Fixture rows stand in for the running server, so they carry its writer generation.
+function allowStepWrites(sqlite: Database.Database): void {
+  sqlite.function('cairn_step_write_generation', { deterministic: true }, () => 1);
+}
+
 function memory(): { db: Db; sqlite: Database.Database; teamId: string } {
   const sqlite = new Database(':memory:');
   sqlite.pragma('foreign_keys = ON');
+  allowStepWrites(sqlite);
   const db = drizzle(sqlite, { schema });
   migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
   const { team } = seed(db);
@@ -218,6 +224,7 @@ describe('F1 / F16 legacy db upgrade: a db from main catches up on this migratio
 
     const upgraded = new Database(dbPath);
     upgraded.pragma('foreign_keys = ON');
+    allowStepWrites(upgraded);
     migrate(drizzle(upgraded), { migrationsFolder: MIGRATIONS_FOLDER });
     expect(tableNames(upgraded).sort()).toEqual([...GATE_TABLES].sort());
     expect(upgraded.prepare('SELECT id, todoId FROM build').all()).toEqual([
@@ -676,6 +683,7 @@ describe('F17 / F18 / F19 gate rows are deleted only with the build', () => {
     const { journal, index } = findGateEntry();
     const sqlite = new Database(':memory:');
     sqlite.pragma('foreign_keys = ON');
+    allowStepWrites(sqlite);
     const db = drizzle(sqlite);
     migrate(db, { migrationsFolder: migrationsUpTo(journal, index + 1) });
     const a = seedBuild(sqlite, seedTeam(sqlite), 'a');
