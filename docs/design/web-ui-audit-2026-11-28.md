@@ -53,8 +53,8 @@ The gate added by this change, `scripts/ui-guidelines-gate.mjs` C5, keeps classe
 | detail/source-issue.tsx:56 | "Retry" as a link button inside the issue card | V6 | conforms: card action |
 | pages/project-new-page.tsx:437 | "Disconnect" as a link button on the connected-account line | V6 | conforms: card action |
 | detail/attachment-chip.tsx:68 | `<a href>` whose click opens the in-app preview | A7 | conforms: a real link to the file, so the context menu can open or copy it; a plain click opens the in-app preview |
-| routes/usage-page.tsx:431 | heatmap day cells as `Button variant="link" size="icon"` | Button | follow-up 3 |
-| overlay/search-panel.tsx:410 | bare `<button>` with its own classes for the remove-context × | Button (icon) | follow-up 3 |
+| routes/usage-page.tsx:431 | heatmap day cells as `Button variant="link" size="icon"` | Button | conforms: already a Button toggle with `aria-pressed` |
+| overlay/search-panel.tsx:410 | bare `<button>` with its own classes for the remove-context × | Button (icon) | follow-up 3: fixed, ghost `icon-xs` Button |
 | components/ui/toaster.tsx:14 | `toastError` always put server text in the body (root of every toast) | C5 | this change |
 | resources/providers-page.tsx:526 | toast title = `describeError(err)` | C5 | this change |
 | chief/announce-unsent.ts:21 | toast body = `describeError` | C5 | this change |

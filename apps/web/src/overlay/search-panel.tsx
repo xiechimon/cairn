@@ -407,9 +407,10 @@ export function SearchPanel({
               <IconTooltip
                 label={t('移除上下文')}
                 trigger={
-                  <button
-                    type="button"
-                    className="flex size-4.5 flex-none items-center justify-center rounded-sm text-content-tertiary hover:bg-(--menu-hover) hover:text-foreground"
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="size-4.5 flex-none rounded-sm text-content-tertiary hover:text-foreground"
                     onClick={dropContext}
                   />
                 }
