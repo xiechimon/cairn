@@ -90,8 +90,6 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/memory-edit.ts:CONTINUABLE_STATUSES': 'constant lookup table',
   'apps/server/src/services/memory-import.ts:IMPORT_BASENAMES': 'constant lookup table',
   'apps/server/src/services/merge-gate/readiness.ts:PASSING_CONCLUSIONS': 'constant lookup table',
-  'apps/server/src/services/merge-gate/readiness.ts:ORDER': 'constant lookup table',
-  'apps/server/src/services/merge-gate/readiness.ts:META': 'constant lookup table',
   'apps/server/src/services/model-liveness.ts:catalogCache':
     'probe cache keyed on teamId+provider; teamIds are unique per database',
   'apps/server/src/services/model-liveness.ts:minProbeCache': 'same teamId-keyed probe cache',

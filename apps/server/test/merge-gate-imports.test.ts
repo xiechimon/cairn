@@ -265,7 +265,7 @@ describe('merge-gate sources import only from the gate own sources', () => {
         .map((name) => `${relative(GATE_DIR, file)}: ${name}`),
     );
     expect(foreign).toEqual([]);
-    expect(gateJs.flatMap(({ js }) => sharedNames(js))).toContain('MERGE_BLOCKERS');
+    expect(gateJs.flatMap(({ js }) => sharedNames(js))).toContain('MERGE_GATE_STATUS_CONTEXT');
   });
 
   test('no symlink inside merge-gate/ points elsewhere (any extension, directories included)', () => {

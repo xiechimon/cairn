@@ -22,8 +22,6 @@ export const PATCH_DIGEST_VERSION = 'pd2';
 
 export const EVIDENCE_PREFIX = 'docs/verify/';
 
-export const RECORDING_EXTENSION = /(\.gif|\.webm|\.mp4)$/i;
-
 export { MOTION_TOKEN_PATHS, RECORDING_EXTENSIONS, RECORDING_MAX_BYTES, recordingRequirements };
 
 export const EVIDENCE_EXECUTABLE_EXTENSIONS = [

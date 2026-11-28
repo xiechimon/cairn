@@ -17,15 +17,3 @@ export function canonicalModelId(model: string): string {
 export function modelVendor(model: string): string | null {
   return MODEL_VENDORS[canonicalModelId(model)] ?? null;
 }
-
-const CODE_REVIEW_VENDOR = 'OpenAI';
-
-export function isCodexReviewModel(reviewerModel: string): boolean {
-  return modelVendor(reviewerModel) === CODE_REVIEW_VENDOR;
-}
-
-export function codexReviewDetail(reviewerModel: string): string[] {
-  const vendor = modelVendor(reviewerModel);
-  if (vendor === null) return ['reviewer vendor unknown'];
-  return vendor === CODE_REVIEW_VENDOR ? [] : [`reviewer vendor ${vendor} is not Codex`];
-}
