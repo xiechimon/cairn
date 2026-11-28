@@ -8,8 +8,9 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { databaseIdentity } from '../db/identity.js';
-import { dueEvent, externalEffect, notification } from '../db/schema.js';
+import { dueEvent, externalEffect, notification, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { pendingQuestionInThread, questionNoticeText } from './chief-question-store.js';
 import type { TeamStreamHub } from './events.js';
 import {
   cancelPendingEffects,
@@ -22,7 +23,6 @@ import {
   runEffectRow,
 } from './external-effects.js';
 import { imHasActiveOrigin, imSendAwayNotice } from './im/runtime.js';
-import { pendingQuestionInThread } from './chief-question-store.js';
 import { canDeliverNotification } from './project-visibility.js';
 import { type PushMessage, sendPushToUser, type VapidKeys } from './push.js';
 import { evaluatePresenceRouting } from './thread-presence.js';
@@ -111,34 +111,56 @@ export function notificationDisplayText(record: NotificationRecord): {
   }
 }
 
-const AWAY_STATE_HEADLINE: Partial<Record<NotificationRecord['type'], (title: string) => string>> = {
-  todo_done: (title) => `任务「${title}」已完成`,
-  todo_failed: (title) => `任务「${title}」运行失败`,
-  schedule_run: (title) => `任务「${title}」计划运行结束`,
-  build_review: (title) => `任务「${title}」等你审核`,
-  plan_ready: (title) => `任务「${title}」的方案等你确认`,
-  coordinator_handoff: (title) => `任务「${title}」交给你处理`,
-  watchdog_flag: (title) => `任务「${title}」需要你处理`,
-  no_machine: (title) => `任务「${title}」没有可用的执行机`,
-  quota_wait: (title) => `任务「${title}」在等额度`,
-  model_fallback: (title) => `任务「${title}」换用了备用模型`,
-};
+const AWAY_STATE_HEADLINE: Partial<Record<NotificationRecord['type'], (title: string) => string>> =
+  {
+    todo_done: (title) => `任务「${title}」已完成`,
+    todo_failed: (title) => `任务「${title}」运行失败`,
+    schedule_run: (title) => `任务「${title}」计划运行结束`,
+    build_review: (title) => `任务「${title}」等你审核`,
+    plan_ready: (title) => `任务「${title}」的方案等你确认`,
+    coordinator_handoff: (title) => `任务「${title}」交给你处理`,
+    watchdog_flag: (title) => `任务「${title}」需要你处理`,
+    no_machine: (title) => `任务「${title}」没有可用的执行机`,
+    quota_wait: (title) => `任务「${title}」在等额度`,
+    model_fallback: (title) => `任务「${title}」换用了备用模型`,
+  };
 
-const IN_APP_ONLY = 'in_app';
+const TODO_LINK_RE = /todo:([A-Za-z0-9_-]+)/;
 
-function awayHeadline(record: NotificationRecord): string {
-  const title = record.entityRef.title || record.agent.name || '任务';
+function awaySubject(record: NotificationRecord): string | null {
+  if (record.type !== 'chief_message') return record.entityId;
+  return TODO_LINK_RE.exec(record.snippet ?? '')?.[1] ?? null;
+}
+
+function awayHeadline(
+  deps: NotificationRoutingDeps,
+  record: NotificationRecord,
+  question: ReturnType<typeof pendingQuestionInThread>,
+): string {
+  const subject = awaySubject(record);
+  const taskTitle = subject === null ? null : todoTitle(deps, subject);
+  const title = (taskTitle ?? record.entityRef.title) || record.agent.name || '任务';
+  if (record.type === 'chief_message') {
+    return question === null ? `任务「${title}」有新消息` : `「${title}」需要你回答`;
+  }
   const line = AWAY_STATE_HEADLINE[record.type];
-  return line === undefined ? `「${title}」需要你回答` : line(title);
+  return line === undefined ? `任务「${title}」有新消息` : line(title);
+}
+
+function todoTitle(deps: NotificationRoutingDeps, todoId: string): string | null {
+  return (
+    deps.db.select({ title: todo.title }).from(todo).where(eq(todo.id, todoId)).get()?.title ?? null
+  );
 }
 
 function awayQuestion(
   deps: NotificationRoutingDeps,
   record: NotificationRecord,
 ): ReturnType<typeof pendingQuestionInThread> {
-  return record.type === 'chief_message'
-    ? pendingQuestionInThread(deps.db, record.entityId)
-    : null;
+  if (record.type !== 'chief_message') return null;
+  const question = pendingQuestionInThread(deps.db, record.entityId);
+  if (question === null) return null;
+  return questionNoticeText(question.questions) === record.snippet ? question : null;
 }
 
 interface AwayPushPayload {
@@ -251,6 +273,10 @@ export function cancelPendingNotificationDelivery(
   deliveryId?: string | null,
 ): void {
   deleteAwayDueEvent(db, notificationId);
+  cancelPendingEffects(
+    databaseIdentity(db),
+    sql`json_extract(${externalEffect.payload}, '$.notice.notificationId') = ${notificationId}`,
+  );
   if (deliveryId !== undefined && deliveryId !== null && deliveryId !== '') {
     cancelPendingEffects(
       databaseIdentity(db),
@@ -266,14 +292,16 @@ function dispatchAwayInsideTx(
   question: ReturnType<typeof pendingQuestionInThread>,
 ): string | null {
   if (!canDeliverNotification(deps.db, record.id)) return null;
-  if (record.type === 'chief_message' && question === null) return IN_APP_ONLY;
   const { title, body, href } = notificationDisplayText(record);
+  const subject = awaySubject(record);
   const imResult = imSendAwayNotice(
     {
       teamId: record.teamId,
       entityId: record.entityId,
       type: record.type,
-      title: awayHeadline(record),
+      notificationId: record.id,
+      ...(subject !== null ? { subjectId: subject } : {}),
+      title: awayHeadline(deps, record, question),
       body: record.snippet ?? '',
       href,
       deliveryId,
@@ -434,7 +462,7 @@ export function routeNotificationDelivery(
       .update(notification)
       .set({
         deliveryId,
-        deliveryStatus: target === IN_APP_ONLY ? 'suppressed' : 'away',
+        deliveryStatus: 'away',
         deliveryTarget: target,
         deliveryDueAt: null,
       })
@@ -604,23 +632,6 @@ function promotePendingRowToLiveOrAway(
   }
 
   const question = awayQuestion(deps, record);
-  if (record.type === 'chief_message' && question === null) {
-    rootDb
-      .update(notification)
-      .set({ deliveryStatus: 'suppressed', deliveryTarget: IN_APP_ONLY, deliveryDueAt: null })
-      .where(
-        and(
-          eq(notification.id, row.id),
-          eq(notification.deliveryStatus, 'pending_away'),
-          eq(notification.deliveryId, deliveryId),
-          isNull(notification.readAt),
-        ),
-      )
-      .run();
-    deleteAwayDueEvent(deps.db, row.id);
-    return { rescheduleAt: null };
-  }
-
   const claimed = withTxEffects(deps, (txDeps) => {
     const claimRes = rootDb
       .update(notification)
@@ -643,7 +654,6 @@ function promotePendingRowToLiveOrAway(
       .update(notification)
       .set({
         deliveryTarget: target,
-        ...(target === IN_APP_ONLY ? { deliveryStatus: 'suppressed' } : {}),
       })
       .where(and(eq(notification.id, row.id), eq(notification.deliveryId, deliveryId)))
       .run();
@@ -735,7 +745,6 @@ export function handleDeliveryFailed(
       .update(notification)
       .set({
         deliveryTarget: target,
-        ...(target === IN_APP_ONLY ? { deliveryStatus: 'suppressed' } : {}),
       })
       .where(and(eq(notification.id, row.id), eq(notification.deliveryId, deliveryId)))
       .run();

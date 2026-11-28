@@ -18,6 +18,7 @@ import {
   SHOW_DIFF_TOOL,
 } from '@cairn/shared';
 import { and, asc, desc, eq, gte, inArray, isNull, ne, sql } from 'drizzle-orm';
+import type { Db } from '../../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../../db/commit-effects.js';
 import {
   attachment,
@@ -28,6 +29,7 @@ import {
   imPairingRequest,
   imSeenInbound,
   imTurnOrigin,
+  notification,
   step,
 } from '../../db/schema.js';
 import { HttpError } from '../../lib/errors.js';
@@ -171,6 +173,38 @@ function imSendConnId(payload: unknown): string | null {
   return typeof connId === 'string' ? connId : null;
 }
 
+function imSendNotice(payload: unknown): { notificationId: string } | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const notice = (payload as Record<string, unknown>).notice;
+  if (typeof notice !== 'object' || notice === null) return null;
+  const notificationId = (notice as Record<string, unknown>).notificationId;
+  return typeof notificationId === 'string' ? { notificationId } : null;
+}
+
+function awaySubjectSeen(db: Db, subject: string, type: string, snippet: string): boolean {
+  const recent = db
+    .select({
+      type: sql<string | null>`json_extract(${externalEffect.payload}, '$.notice.type')`,
+      snippet: sql<string | null>`json_extract(${externalEffect.payload}, '$.notice.snippet')`,
+    })
+    .from(externalEffect)
+    .where(
+      and(
+        eq(externalEffect.kind, 'im-send'),
+        gte(externalEffect.createdAt, nowMs() - AWAY_NOTICE_WINDOW_MS),
+        inArray(externalEffect.state, ['pending', 'sending', 'delivered']),
+        sql`json_extract(${externalEffect.payload}, '$.notice.subject') = ${subject}`,
+      ),
+    )
+    .all();
+  return recent.some((row) => {
+    if (type === 'chief_message') {
+      return row.type === type ? (row.snippet ?? '') === snippet : row.type !== 'chief_message';
+    }
+    return row.type === type && (row.snippet ?? '') === snippet;
+  });
+}
+
 function imSendButtons(raw: unknown): { label: string; value: string }[][] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const rows: { label: string; value: string }[][] = [];
@@ -297,9 +331,18 @@ export function createImService(deps: ImServiceDeps): ImService {
       const connId = imSendConnId(effectRow.payload);
       return connId === null || connRow(connId) === undefined;
     },
-    send: async (effectRow) => {
+    send: async (effectRow, db) => {
       const msg = imSendPayload(effectRow.payload);
       if (msg === null) throw failEffect('im-send payload is malformed');
+      const notice = imSendNotice(effectRow.payload);
+      if (notice !== null) {
+        const seen = db
+          .select({ readAt: notification.readAt })
+          .from(notification)
+          .where(eq(notification.id, notice.notificationId))
+          .get();
+        if (seen === undefined || seen.readAt !== null) return { skipped: 'seen' };
+      }
       const outcome = await deliverOnce(msg.connId, msg.message);
       if (outcome === 'delivered') return { sent: true };
       if (outcome === 'offline') throw waitEffect('im session offline');
@@ -322,6 +365,12 @@ export function createImService(deps: ImServiceDeps): ImService {
       requestId?: string;
       owned?: string[];
       deliveryId?: string;
+      notice?: {
+        subject: string;
+        type: string;
+        notificationId: string;
+        snippet: string;
+      };
       defer?: CommitEffects;
     },
   ): void => {
@@ -352,6 +401,7 @@ export function createImService(deps: ImServiceDeps): ImService {
         requestId: scope?.requestId ?? null,
         owned: scope?.owned ?? null,
         deliveryId: scope?.deliveryId ?? null,
+        notice: scope?.notice ?? null,
       },
     });
     if (row.state !== 'pending') return;
@@ -1191,7 +1241,12 @@ export function createImService(deps: ImServiceDeps): ImService {
         }
       },
 
-      notice(threadId: string, text: string, card?: { requestId: string }): void {
+      notice(
+        threadId: string,
+        text: string,
+        card?: { requestId: string },
+        opts?: { final?: boolean },
+      ): void {
         const content = card === undefined ? null : readQuestion(deps.db, threadId, card.requestId);
         const outbound =
           card !== undefined && content?.status === 'pending'
@@ -1202,7 +1257,8 @@ export function createImService(deps: ImServiceDeps): ImService {
             ? undefined
             : { ...outbound, owned: [outbound.requestId, ...(content.askedFor ?? [])] };
         for (const { row, origin } of noticeOrigins(threadId)) {
-          if (cardSend === undefined && stepAlreadySentToIm(row.id)) continue;
+          if (cardSend === undefined && opts?.final === true && stepAlreadySentToIm(row.id))
+            continue;
           sendToOrigin(origin, cardSend?.text ?? text, row, cardSend);
         }
       },
@@ -1243,25 +1299,43 @@ export function createImService(deps: ImServiceDeps): ImService {
               sender.chatKey !== null && sender.chatKey !== '',
           );
           if (recipient === undefined) continue;
+          const subject =
+            input.subjectId === undefined ? `thread:${input.entityId}` : `todo:${input.subjectId}`;
+          if (
+            input.question === undefined &&
+            awaySubjectSeen(deps.db, subject, input.type, input.body)
+          ) {
+            return { sent: true, connectionId: row.id };
+          }
           const card =
             input.question === undefined
               ? undefined
               : questionCard(input.question.requestId, input.question.questions);
           const body = card?.text ?? input.body;
           const text = body.trim() === '' ? input.title : `${input.title}\n${body}`;
-          const slot =
+          const dedupe =
             input.question === undefined
-              ? `notify-away:${input.entityId}:${input.type}:${Math.floor(nowMs() / AWAY_NOTICE_WINDOW_MS)}`
+              ? `notify-away:${input.deliveryId}`
               : `card:${input.entityId}:${input.question.requestId}`;
           enqueueSend(
             row.id,
-            { chatKey: recipient.chatKey, text, ...(card !== undefined ? { buttons: card.buttons } : {}) },
+            {
+              chatKey: recipient.chatKey,
+              text,
+              ...(card !== undefined ? { buttons: card.buttons } : {}),
+            },
             {
               kind: 'imConnection',
               id: row.id,
-              dedupe: slot,
-              slot,
+              dedupe,
+              slot: dedupe,
               deliveryId: input.deliveryId,
+              notice: {
+                subject,
+                type: input.type,
+                notificationId: input.notificationId,
+                snippet: input.body,
+              },
               ...(input.question !== undefined
                 ? { requestId: input.question.requestId, owned: input.question.owned }
                 : {}),

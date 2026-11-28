@@ -10,6 +10,8 @@ export interface ImAwayNoticeInput {
   teamId: string;
   entityId: string;
   type: NotificationRecord['type'];
+  notificationId: string;
+  subjectId?: string;
   title: string;
   body: string;
   href: string;
@@ -24,7 +26,12 @@ export interface ImRuntimeHooks {
     requestId: string,
     questions: readonly AskUserQuestion[],
   ): void;
-  notice(threadId: string, text: string, card?: { requestId: string }): void;
+  notice(
+    threadId: string,
+    text: string,
+    card?: { requestId: string },
+    opts?: { final?: boolean },
+  ): void;
   turnFinished(stepRow: ImStepRow): void;
   hasActiveOrigin?(threadId: string): boolean;
   sendAwayNotice?(input: ImAwayNoticeInput): { sent: boolean; connectionId?: string };
@@ -65,8 +72,9 @@ export function imNotice(
   text: string,
   card?: { requestId: string },
   db?: Db,
+  opts?: { final?: boolean },
 ): void {
-  resolveHooks(db)?.notice(threadId, text, card);
+  resolveHooks(db)?.notice(threadId, text, card, opts);
 }
 
 export function imTurnFinished(stepRow: ImStepRow, db?: Db): void {

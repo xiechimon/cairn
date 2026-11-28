@@ -352,6 +352,7 @@ export function notifyChiefMessage(
     card?: { requestId: string };
     projectId?: string | null;
     skipAwayDispatch?: boolean;
+    final?: boolean;
   },
 ): NotificationRecord {
   const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, input.threadId)).get();
@@ -384,7 +385,13 @@ export function notifyChiefMessage(
   );
   if (canDeliverNotification(deps.db, record.id)) {
     runAfterCommit(deps, 'imNotice', () =>
-      imNotice(input.threadId, input.message, input.card, deps.db),
+      imNotice(
+        input.threadId,
+        input.message,
+        input.card,
+        deps.db,
+        input.final === true ? { final: true } : undefined,
+      ),
     );
   }
   return record;

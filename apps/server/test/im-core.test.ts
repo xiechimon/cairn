@@ -1607,12 +1607,44 @@ describe('one message per chat turn', () => {
       {
         threadId: turn.buildId,
         message: '已通过 notify_user 回复，本轮结束。',
+        final: true,
         agent: { name: 'Coordinator', avatarUrl: null },
       },
     );
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(session.sent).toHaveLength(1);
     expect(session.sent[0]?.text).toBe('收到，我看一下这个附件。');
+  });
+
+  test('two explicit messages from one turn both reach the chat', async () => {
+    await connectAndPair('55');
+    const session = sessions[0]!;
+    session.handlers.onMessage(inbound('55', 'handle this attachment'));
+    const turn = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, turn.id))
+      .run();
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId: turn.buildId,
+        message: '收到，我看一下这个附件。',
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await vi.waitFor(() => expect(session.sent).toHaveLength(1));
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId: turn.buildId,
+        message: '附件第 3 页的数字不对：应为 42。',
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await vi.waitFor(() => expect(session.sent).toHaveLength(2));
+    expect(session.sent[1]?.text).toBe('附件第 3 页的数字不对：应为 42。');
   });
 
   test('a question card already in the chat is not repeated by the thread notification that follows it', async () => {
@@ -1631,7 +1663,11 @@ describe('one message per chat turn', () => {
         threadId: turn.buildId,
         requestId: 'ask-dup-1',
         questions: [
-          { header: 'Pick', question: '选哪一项', options: [{ label: '选项 A' }, { label: '选项 B' }] },
+          {
+            header: 'Pick',
+            question: '选哪一项',
+            options: [{ label: '选项 A' }, { label: '选项 B' }],
+          },
         ],
         askedFor: [],
       },

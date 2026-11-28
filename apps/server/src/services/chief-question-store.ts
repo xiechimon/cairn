@@ -73,6 +73,15 @@ export function readQuestion(
   return row === undefined ? null : askQuestionContentOf(row.content);
 }
 
+export function questionNoticeText(questions: readonly AskUserQuestion[]): string {
+  return questions
+    .map((question) => {
+      const options = question.options.map((option) => option.label).join(' / ');
+      return options.length > 0 ? `${question.question}（${options}）` : question.question;
+    })
+    .join('\n');
+}
+
 export function pendingQuestionInThread(
   db: Db,
   threadId: string,
@@ -85,7 +94,8 @@ export function pendingQuestionInThread(
     .all();
   for (const row of rows) {
     const content = askQuestionContentOf(row.content);
-    if (content === null || content.status !== 'pending' || content.questions.length === 0) continue;
+    if (content === null || content.status !== 'pending' || content.questions.length === 0)
+      continue;
     return {
       requestId: row.id,
       questions: content.questions,

@@ -2824,6 +2824,7 @@ export function notifyChiefTurn(
     threadId,
     message: text,
     projectId: last?.projectId ?? null,
+    final: true,
     agent: agentRow
       ? { name: agentRow.displayName, avatarUrl: null }
       : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },

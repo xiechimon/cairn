@@ -23,6 +23,7 @@ import {
   proposalIdOfCard,
   publishQuestion,
   questionAskedAt,
+  questionNoticeText,
   questionsAnsweredBy,
   readQuestion,
   writeQuestion,
@@ -96,15 +97,11 @@ function notifyQuestion(
       ? undefined
       : deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   const agentRow = chiefRow === undefined ? null : coordinatorProfile(deps.db, chiefRow.teamId);
-  const questionLines = questions.map((q) => {
-    const options = q.options.map((o) => o.label).join(' / ');
-    return options.length > 0 ? `${q.question}（${options}）` : q.question;
-  });
   notifyChiefMessage(
     { ...deps, hub: deps.hub, user: deps.user },
     {
       threadId,
-      message: questionLines.join('\n'),
+      message: questionNoticeText(questions),
       ...(agentRow
         ? { agent: { name: agentRow.displayName, avatarUrl: null } }
         : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),

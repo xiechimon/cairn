@@ -29,11 +29,13 @@ import {
 } from '../src/services/external-effects.js';
 import { createImService } from '../src/services/im/core.js';
 import { ImSendError } from '../src/services/im/errors.js';
-import { setImRuntime } from '../src/services/im/runtime.js';
+import { imSendAwayNotice, setImRuntime } from '../src/services/im/runtime.js';
 import type { ImAdapter, ImOutboundMessage } from '../src/services/im/types.js';
 import {
+  markNotificationRead,
   notifyChiefMessage,
   notifyScheduleRun,
+  notifyTodo,
   sweepIdleChiefUnread,
 } from '../src/services/notifications.js';
 import { createScheduler } from '../src/services/scheduler.js';
@@ -1088,10 +1090,7 @@ describe('notify-once presence routing', () => {
   });
 });
 
-function seedChiefThread(
-  s: Awaited<ReturnType<typeof setupWorld>>,
-  title = '',
-): string {
+function seedChiefThread(s: Awaited<ReturnType<typeof setupWorld>>, title = ''): string {
   const thread = coordinatorThreadRow(s.svc, ensureChief(s.svc, s.team.id));
   const current = s.db.select().from(chiefThread).where(eq(chiefThread.id, thread.id)).get();
   if (current === undefined) {
@@ -1116,7 +1115,7 @@ describe('one WeChat message per task state change', () => {
       { db: s.db, hub: s.hub, user: s.user },
       {
         threadId,
-        message: '任务 [Daily digest check](todo:test-todo) 已进入待审核，等你确认。',
+        message: `任务 [Daily digest check](todo:${s.todoId}) 已进入待审核，等你确认。`,
         agent: { name: 'Coordinator', avatarUrl: null },
       },
     );
@@ -1138,9 +1137,60 @@ describe('one WeChat message per task state change', () => {
     };
     notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished');
     await vi.waitFor(() => expect(sent).toHaveLength(1));
-    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished again');
+    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished');
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(sent).toHaveLength(1);
+  });
+
+  test('a repeat of the same state carrying new text reaches the chat', async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    const source = {
+      id: s.todoId,
+      teamId: s.team.id,
+      title: 'Daily digest check',
+      projectId: s.projectId,
+      seqNum: 1,
+    };
+    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished');
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run two failed to upload');
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+  });
+
+  test('reading a task whose message is still queued cancels it even after a later fold', async () => {
+    const s = await setupWorld();
+    const delivered: ImOutboundMessage[] = [];
+    let holding = true;
+    await setupImConnection(s, 'telegram', 'chat-owner-1', {
+      onSend: async (msg) => {
+        if (holding) throw new ImSendError('retry', 'connection busy', { retryAfterMs: 0 });
+        delivered.push(msg);
+      },
+    });
+    const source = {
+      id: s.todoId,
+      teamId: s.team.id,
+      title: 'Daily digest check',
+      projectId: s.projectId,
+      seqNum: 1,
+    };
+    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished');
+    await vi.waitFor(() =>
+      expect(
+        s.db.select().from(externalEffect).where(eq(externalEffect.kind, 'im-send')).all(),
+      ).toHaveLength(1),
+    );
+    await vi.waitFor(() =>
+      expect(
+        s.db.select().from(externalEffect).where(eq(externalEffect.kind, 'im-send')).get()?.state,
+      ).not.toBe('sending'),
+    );
+    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished');
+    markNotificationRead({ db: s.db, hub: s.hub, user: s.user }, s.team.id, s.todoId);
+    holding = false;
+    await drainEffects(s.db, effectRegistry, { now: nowMs() + 120_000 });
+    expect(delivered).toHaveLength(0);
   });
 
   test('a message whose notification was read on the Mac before delivery sends nothing', async () => {
@@ -1155,7 +1205,14 @@ describe('one WeChat message per task state change', () => {
     });
     moveToReview(s.svc, s.todoId);
     await vi.waitFor(() =>
-      expect(s.db.select().from(externalEffect).where(eq(externalEffect.kind, 'im-send')).all()).toHaveLength(1),
+      expect(
+        s.db.select().from(externalEffect).where(eq(externalEffect.kind, 'im-send')).all(),
+      ).toHaveLength(1),
+    );
+    await vi.waitFor(() =>
+      expect(
+        s.db.select().from(externalEffect).where(eq(externalEffect.kind, 'im-send')).get()?.state,
+      ).toBe('pending'),
     );
     s.db
       .update(notification)
@@ -1165,6 +1222,196 @@ describe('one WeChat message per task state change', () => {
     holding = false;
     await drainEffects(s.db, effectRegistry, { now: nowMs() + 120_000 });
     expect(delivered).toHaveLength(0);
+  });
+
+  test('a Coordinator line about a task nobody announced arrives with the task in its first line', async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    const threadId = seedChiefThread(s, '调研频道');
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId,
+        message: `任务 [Daily digest check](todo:${s.todoId}) 有新进展：报告写好了。`,
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]?.msg.text.split('\n')[0]).toBe('任务「Daily digest check」有新消息');
+  });
+
+  test('two different state changes of one task inside the window both reach the chat', async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    const source = {
+      id: s.todoId,
+      teamId: s.team.id,
+      title: 'Daily digest check',
+      projectId: s.projectId,
+      seqNum: 1,
+    };
+    notifyScheduleRun({ db: s.db, hub: s.hub, user: s.user }, source, 'run one finished');
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    notifyTodo({ db: s.db, hub: s.hub, user: s.user }, source, 'build_review', 'waiting for you');
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]?.msg.text.split('\n')[0]).toBe('任务「Daily digest check」等你审核');
+  });
+
+  test('an answer to a chat-originated turn reaches that chat once and its narration is not repeated', async () => {
+    const s = await setupWorld();
+    const { conn, sent } = await setupImConnection(s);
+    const threadId = seedChiefThread(s, 'IM thread');
+    const stepId = newRecordId();
+    s.db
+      .insert(step)
+      .values({
+        id: stepId,
+        buildId: threadId,
+        kind: 'chief',
+        status: 'claimed',
+        ownerMessageIds: [],
+        createdAt: nowMs(),
+      })
+      .run();
+    s.db
+      .insert(imTurnOrigin)
+      .values({
+        stepId,
+        connId: conn.id,
+        chatKey: 'chat-owner-1',
+        senderId: 'sender-1',
+        threadId,
+        createdAt: nowMs(),
+      })
+      .run();
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId,
+        message: '附件第 3 页的数字是 42。',
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId,
+        message: '已通过 notify_user 回复，本轮结束。',
+        final: true,
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.msg.text).toBe('附件第 3 页的数字是 42。');
+  });
+
+  test('two different Coordinator lines in one thread both arrive', async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    const threadId = seedChiefThread(s, '调研频道');
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      { threadId, message: '第一段调研已完成。', agent: { name: 'Coordinator', avatarUrl: null } },
+    );
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      { threadId, message: '第二段还需要一天。', agent: { name: 'Coordinator', avatarUrl: null } },
+    );
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+  });
+
+  test("a Coordinator line linking a task does not swallow that task's own state change", async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    const threadId = seedChiefThread(s, '调研频道');
+    notifyChiefMessage(
+      { db: s.db, hub: s.hub, user: s.user },
+      {
+        threadId,
+        message: `已在 [Daily digest check](todo:${s.todoId}) 上动手。`,
+        agent: { name: 'Coordinator', avatarUrl: null },
+      },
+    );
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    const source = {
+      id: s.todoId,
+      teamId: s.team.id,
+      title: 'Daily digest check',
+      projectId: s.projectId,
+      seqNum: 1,
+    };
+    notifyTodo({ db: s.db, hub: s.hub, user: s.user }, source, 'build_review', 'waiting for you');
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]?.msg.text.split('\n')[0]).toBe('任务「Daily digest check」等你审核');
+  });
+
+  test('re-dispatching the same delivery does not send a second message', async () => {
+    const s = await setupWorld();
+    const { sent } = await setupImConnection(s);
+    const source = {
+      id: s.todoId,
+      teamId: s.team.id,
+      title: 'Daily digest check',
+      projectId: s.projectId,
+      seqNum: 1,
+    };
+    notifyTodo({ db: s.db, hub: s.hub, user: s.user }, source, 'build_review', 'waiting for you');
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    const deliveryId = s.db
+      .select()
+      .from(notification)
+      .where(eq(notification.entityId, s.todoId))
+      .get()?.deliveryId;
+    if (deliveryId === null || deliveryId === undefined) throw new Error('missing delivery id');
+    imSendAwayNotice(
+      {
+        teamId: s.team.id,
+        entityId: s.todoId,
+        type: 'build_review',
+        notificationId: `${s.user.id}:${s.todoId}`,
+        subjectId: s.todoId,
+        title: '任务「Daily digest check」等你审核',
+        body: 'waiting for you',
+        href: `/app/todo/${s.todoId}`,
+        deliveryId,
+      },
+      s.db,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sent).toHaveLength(1);
+  });
+
+  test('a message queued while the chat is offline is delivered once after it reconnects', async () => {
+    const s = await setupWorld();
+    const delivered: ImOutboundMessage[] = [];
+    let offline = true;
+    const { sent } = await setupImConnection(s, 'telegram', 'chat-owner-1', {
+      onSend: async (msg) => {
+        if (offline) throw new ImSendError('retry', 'offline', { retryAfterMs: 0 });
+        delivered.push(msg);
+      },
+    });
+    moveToReview(s.svc, s.todoId);
+    await vi.waitFor(() =>
+      expect(
+        s.db.select().from(externalEffect).where(eq(externalEffect.kind, 'im-send')).all(),
+      ).toHaveLength(1),
+    );
+    offline = false;
+    await vi.waitFor(() =>
+      expect(
+        s.db.select().from(externalEffect).where(eq(externalEffect.kind, 'im-send')).get()?.state,
+      ).not.toBe('sending'),
+    );
+    await drainEffects(s.db, effectRegistry, { now: nowMs() + 120_000 });
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]?.text.split('\n')[0]).toBe('任务「Daily digest check」等你审核');
+    await drainEffects(s.db, effectRegistry, { now: nowMs() + 240_000 });
+    expect(delivered).toHaveLength(1);
+    expect(sent).toHaveLength(0);
   });
 
   test('a question waiting for the owner arrives once, with its buttons and one line saying what it is', async () => {
@@ -1177,7 +1424,11 @@ describe('one WeChat message per task state change', () => {
         threadId,
         requestId: 'ask-away-1',
         questions: [
-          { header: 'Pick', question: '选哪一项', options: [{ label: '选项 A' }, { label: '选项 B' }] },
+          {
+            header: 'Pick',
+            question: '选哪一项',
+            options: [{ label: '选项 A' }, { label: '选项 B' }],
+          },
         ],
         askedFor: [],
       },
