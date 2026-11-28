@@ -212,17 +212,20 @@ export async function runJourneyTask(
     journey.todoId = todo.id;
     journey.todoTitle = todo.title;
 
-    const [started] = startBuilds(s.svc, {
-      projectId: todo.projectId,
-      todoIds: [todo.id],
-      triggerSource: 'user',
-    });
-    if (started === undefined) {
+    const buildId =
+      todo.latestBuildId ??
+      startBuilds(s.svc, {
+        projectId: todo.projectId,
+        todoIds: [todo.id],
+        triggerSource: 'user',
+      })[0]?.id ??
+      null;
+    if (buildId === null) {
       record.incomplete = 'no build';
       record.durationMs = Date.now() - startedAt;
       return { record };
     }
-    journey.buildId = started.id;
+    journey.buildId = buildId;
 
     const machineDeps = {
       ...s.svc,
@@ -255,7 +258,7 @@ export async function runJourneyTask(
     const diff = git(workDir, ['diff', '--no-color', baseline]);
 
     if (arm !== 'unsent') {
-      insertMessageRow({ db: s.db, convHub: s.convHub }, started.id, {
+      insertMessageRow({ db: s.db, convHub: s.convHub }, buildId, {
         id: `${stepId}-final`,
         role: 'assistant',
         content: `Fixed ${written.join(', ') || '(nothing)'} and ran the checks.`,
@@ -273,7 +276,7 @@ export async function runJourneyTask(
     const buildMessages = s.db
       .select()
       .from(messageTable)
-      .where(eq(messageTable.conversationId, started.id))
+      .where(eq(messageTable.conversationId, buildId))
       .all();
     journey.delivered =
       (stepRow?.status ?? '') === 'done' && buildMessages.some((row) => row.role === 'assistant');
