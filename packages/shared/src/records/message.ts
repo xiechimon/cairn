@@ -281,6 +281,14 @@ export const chiefNoticeContentSchema = z.object({
 });
 export type ChiefNoticeContent = z.infer<typeof chiefNoticeContentSchema>;
 
+export const CHIEF_ACK_KIND = 'chief_ack';
+export const chiefAckContentSchema = z.object({
+  kind: z.literal(CHIEF_ACK_KIND),
+  message: z.string(),
+  provenance: provenanceSchema,
+});
+export type ChiefAckContent = z.infer<typeof chiefAckContentSchema>;
+
 export const REPORT_ACK_KIND = 'report_ack';
 export const reportAckContentSchema = z.object({
   kind: z.literal(REPORT_ACK_KIND),

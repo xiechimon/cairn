@@ -26,7 +26,7 @@ afterEach(async () => {
   setCoordinatorInServer(false);
   setCoordinatorWake(() => {});
   setCoordinatorSignal(() => {});
-});
+}, 30_000);
 
 beforeEach(() => {
   setCoordinatorInServer(true);

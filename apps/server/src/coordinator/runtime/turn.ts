@@ -26,6 +26,7 @@ import {
   type Submission,
   ToolResultEntry,
 } from '@earendil-works/pi-durable';
+import { firstFeedback } from '../../services/first-feedback.js';
 import { steerWithdrawals } from '../steer-withdrawals.js';
 import { compactionWindow, type ModelRef } from './compaction.js';
 import { activeConversation, type Conversation } from './conversations.js';
@@ -237,17 +238,28 @@ export async function runCoordinatorTurn(
     );
     const newest = (await root.entries({}, 1, undefined, context)).items[0]?.id;
     const threadId = claimed.chief.threadId;
+    firstFeedback.noteResponse(threadId);
     const mirror = createTurnMirror(
       {
         ...api,
         transcriptRow: async (...args) => {
           if (mailTurn) return;
+          const row = args[1];
+          const blocks: { type?: string; text?: string }[] = Array.isArray(row.content)
+            ? (row.content as { type?: string; text?: string }[])
+            : [];
+          if (
+            row.role === 'assistant' &&
+            blocks.some((block) => block.type === 'text' && (block.text ?? '').trim() !== '')
+          )
+            firstFeedback.settleBeforeResponse(threadId);
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptRow(...args);
         },
         transcriptDelta: async (...args) => {
           if (mailTurn) return;
+          if (args[1] !== '') firstFeedback.settleBeforeResponse(threadId);
           await deps.inputs?.barrier();
           await api.inputs?.assertConversation(threadId, conversationKey);
           await api.transcriptDelta(...args);
@@ -381,8 +393,17 @@ export async function runCoordinatorTurn(
       steerPoll = setInterval(scheduleSteerDrain, deps.stopPollMs ?? STOP_POLL_MS);
     }
     watch = await root.watch(context);
+    let liveResponseAt: number | undefined;
     watch.start(async (call) => {
       if (call.kind !== 'value') return;
+      const live = call.value.docs['pi.live'] as
+        | { generation?: { message?: { timestamp?: number } } }
+        | undefined;
+      const at = live?.generation?.message?.timestamp;
+      if (at !== undefined && at !== liveResponseAt) {
+        liveResponseAt = at;
+        firstFeedback.noteResponse(threadId);
+      }
       reportLiveCompactionFailure({ threadId, stepId }, call.value.docs['pi.live']);
       await mirror.onView(call.value);
     });
@@ -623,6 +644,7 @@ export async function runCoordinatorTurn(
     steerWithdrawals.delete(stepId);
     clearInterval(stopPoll);
     clearInterval(steerPoll);
+    firstFeedback.settleBeforeResponse(claimed.chief.threadId);
     deps.gate?.set(null);
     if (rootKey !== null) {
       deps.responsiveness?.endTurn(rootKey);

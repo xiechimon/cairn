@@ -4,6 +4,7 @@ import type {
   AgentRecord,
   AskUserAnswer,
   AskUserQuestionContent,
+  ChiefAckContent,
   ChiefGetResponse,
   ChiefOrchestration,
   ChiefOutage,
@@ -20,6 +21,7 @@ import type {
 import {
   ACTIVE_STEP_STATUSES,
   CHANNEL_GREETING_OPEN,
+  CHIEF_ACK_KIND,
   CHIEF_WATCH_REASON_DISPATCH,
   COORDINATOR_NOT_READY,
   chiefDigestThreadId,
@@ -139,6 +141,7 @@ import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-tim
 import { activeDoubaoSource } from './doubao-subscriptions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { resolveFileSource } from './file-source.js';
+import { firstFeedback } from './first-feedback.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoryDocuments } from './memory.js';
@@ -1328,6 +1331,52 @@ export function sendChiefMessage(
   return submitChiefMessage(deps, teamId, body, opts).result;
 }
 
+function armFirstFeedback(
+  deps: ChiefDeps,
+  threadId: string,
+  message: { id: string; content: string; createdAt: number },
+  steered: boolean,
+): void {
+  const projectId =
+    deps.db
+      .select({ projectId: chiefMessage.projectId })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, message.id))
+      .get()?.projectId ?? null;
+  firstFeedback.arm(threadId, {
+    messageId: message.id,
+    text: message.content,
+    steered,
+    publish: (line) => {
+      const answered = deps.db
+        .select({ id: chiefMessage.id })
+        .from(chiefMessage)
+        .where(
+          and(
+            eq(chiefMessage.threadId, threadId),
+            eq(chiefMessage.role, 'assistant'),
+            sql`${chiefMessage.createdAt} > ${message.createdAt}`,
+          ),
+        )
+        .get();
+      if (answered !== undefined) return;
+      const stored = insertChiefMessageOnce(deps.db, {
+        id: `ack-${message.id}`,
+        threadId,
+        role: 'system',
+        content: JSON.stringify({
+          kind: CHIEF_ACK_KIND,
+          message: line,
+          provenance: 'user',
+        } satisfies ChiefAckContent),
+        createdAt: nowMs(),
+        projectId,
+      });
+      if (stored !== null) deps.convHub?.publishMessage(threadId, stored);
+    },
+  });
+}
+
 export function sendChiefMessageFromComposer(
   deps: ChiefDeps,
   teamId: string,
@@ -1336,7 +1385,13 @@ export function sendChiefMessageFromComposer(
   if (body.threadId !== null) endDeadChiefTurn(deps, teamId, body.threadId);
   const sent = submitChiefMessage(deps, teamId, body);
   if (sent.replayed) return sent;
-  steerChiefMessage(deps, teamId, sent.result.thread.id, sent.result.message.id);
+  const steered = steerChiefMessage(
+    deps,
+    teamId,
+    sent.result.thread.id,
+    sent.result.message.id,
+  ).steered;
+  armFirstFeedback(deps, sent.result.thread.id, sent.result.message, steered);
   return sent;
 }
 
@@ -2474,7 +2529,7 @@ export const COORDINATOR_SYSTEM_PROMPT = `You are the Coordinator, the user's st
 
 <responsiveness>
 - Direct questions you can answer without calling tools: reply immediately with the answer and no filler.
-- Any user request that needs tools (lookups, subagents, shell, or creating tasks): ALWAYS start your very first model response with a brief, natural one-sentence short acknowledgement in the user's Reply language — either plain text immediately before your first tool calls OR notify_user (omitting provenance) alongside your first tool calls. NEVER begin a user turn with silent tool calls alone, and never repeat that acknowledgement in your final answer.
+- Any user request that needs tools: start with a brief, natural acknowledgement in the user's Reply language (plain text, or notify_user omitting provenance alongside your first tool calls), unless the web chat has already shown its own receipt line for this message — then do not repeat it. Never restate the request in your final answer, and never open with a plan instead of an answer.
 - Mid-work interjections: address any newly arrived user message first at the next step — if they cancel, stop and confirm; if they replace or redirect, switch at once; if they ask a side question while earlier work finishes, answer it briefly first (plain text or notify_user omitting provenance) and then continue the remaining work.
 </responsiveness>
 

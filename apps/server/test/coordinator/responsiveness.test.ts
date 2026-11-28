@@ -223,7 +223,7 @@ describe('Coordinator responsiveness contracts, prompt, tools, mirror, and runti
   it('updates COORDINATOR_SYSTEM_PROMPT for ack-first, ~30s delegation keeping inline host file jobs, and all interjection intents', () => {
     expect(COORDINATOR_SYSTEM_PROMPT).toMatch(/consecutive user messages/i);
     expect(COORDINATOR_SYSTEM_PROMPT).toMatch(/corrects or replaces/i);
-    expect(COORDINATOR_SYSTEM_PROMPT).toMatch(/acknowledge|short acknowledgement/i);
+    expect(COORDINATOR_SYSTEM_PROMPT).toMatch(/receipt line/i);
     expect(COORDINATOR_SYSTEM_PROMPT).toMatch(/notify_user/);
     expect(COORDINATOR_SYSTEM_PROMPT).toMatch(/~?30\s*s|30 seconds/i);
     expect(COORDINATOR_SYSTEM_PROMPT).toMatch(/cancel|replace|side question/i);

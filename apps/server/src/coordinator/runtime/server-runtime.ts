@@ -17,6 +17,7 @@ import type {
 } from '@earendil-works/pi-ai';
 import { createRegistry, type Harness } from '@earendil-works/pi-durable';
 import type { BrowserOffer } from '../../services/coordinator-browser.js';
+import { firstFeedback } from '../../services/first-feedback.js';
 import {
   coordinatorCompactionExtension,
   coordinatorCompactionSettings,
@@ -304,6 +305,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     open.delete(threadId);
     lastUsed.delete(threadId);
     const shutdown = (async () => {
+      firstFeedback.settle(threadId);
       state.responsiveness.clear();
       const harness = await state.harness.catch(() => null);
       state.inputs?.stop();

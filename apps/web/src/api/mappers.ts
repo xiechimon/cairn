@@ -31,6 +31,7 @@ import {
   CHIEF_TURN_ERROR_KIND,
   CONFIRM_ANNOUNCEMENT,
   chatBlockSchema,
+  chiefAckContentSchema,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
   chiefModelRestoredContentSchema,
@@ -2367,6 +2368,19 @@ function collectChiefStream(
           text: '主模型 {model} 恢复了，这轮起改回 {model}',
           vars: { model: restored.data.model },
           id: m.id,
+        });
+        continue;
+      }
+      const firstAck = chiefAckContentSchema.safeParse(parsed);
+      if (firstAck.success) {
+        if (firstAck.data.message.trim() === '') continue;
+        pendingTools = [];
+        items.push({
+          kind: 'robot',
+          markdown: firstAck.data.message,
+          seconds: '',
+          id: m.id,
+          ...rowProject(m),
         });
         continue;
       }

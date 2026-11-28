@@ -35,6 +35,7 @@ import {
 import { signalCoordinator } from './coordinator-signal.js';
 import { claimIsDead, isClaimedStepDead } from './dispatch-timeouts.js';
 import type { ConversationStreamHub } from './events.js';
+import { firstFeedback } from './first-feedback.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { settleMemoryEditTurn } from './memory-edit-turns.js';
 import { stepScopeProjectId } from './picked-project.js';
@@ -249,6 +250,7 @@ function deleteWaitingMessage(
     return snapshot;
   });
   settleChiefActiveRun(deps.db, threadId);
+  firstFeedback.settle(threadId, messageId);
   publishRetiredStep(deps, retired);
   deps.convHub?.publishMessage(threadId, message);
 }
@@ -324,6 +326,7 @@ export async function withdrawChiefMessage(
     return snapshot;
   });
   settleChiefActiveRun(deps.db, threadId);
+  firstFeedback.settle(threadId, messageId);
   publishRetiredStep(deps, retired);
   deps.convHub?.publishMessage(threadId, message);
   return { ok: true };
@@ -843,6 +846,7 @@ export function endChiefStepAsStopped(
   deps.machineHub?.stopSignal(thread.teamId, head.id);
   runAfterCommit(deps, 'chiefStopCoordinator', () => signalCoordinator(threadId, 'stop'));
   settleChiefActiveRun(deps.db, threadId);
+  firstFeedback.settle(threadId);
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);
   if (stopped) {

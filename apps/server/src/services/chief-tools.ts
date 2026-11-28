@@ -85,6 +85,7 @@ import { createRequestTodo, updateRequestTodo } from './coordinator-request.js';
 import { doubaoSubscriptionAllowsRunner } from './doubao-subscriptions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { effectDedupeKey } from './external-effects.js';
+import { firstFeedback } from './first-feedback.js';
 import { isGithubRepoRef, PROJECT_FILES_MAX_LIMIT, readFile, readFiles } from './git.js';
 import { assertGithubConnectionCurrent } from './github-connection.js';
 import { executeGithubReadTool } from './github-reads.js';
@@ -1305,6 +1306,7 @@ export async function executeChiefTool(
         provenance,
         askedFor: [...(ctx.turnMessageIds ?? [])],
       });
+      firstFeedback.settle(ctx.threadId);
       if (!created) announceQuestion(questionDeps, ctx.threadId, requestId);
       return json({
         status: content.status,
@@ -1353,6 +1355,7 @@ export async function executeChiefTool(
         } satisfies ChiefNoticeContent),
         createdAt: nowMs(),
       };
+      firstFeedback.settle(ctx.threadId);
       const stored = insertChiefMessageOnce(db, notice);
       if (stored === null) {
         const existing = db.select().from(chiefMessage).where(eq(chiefMessage.id, noticeId)).get();
