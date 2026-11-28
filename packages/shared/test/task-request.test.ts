@@ -124,6 +124,7 @@ describe('Coordinator tools that write todo text take no task text', () => {
         'replaceMessageIds',
         'blockedBy',
         'platform',
+        'difficulty',
       ].sort(),
     );
   });

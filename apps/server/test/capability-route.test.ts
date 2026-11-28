@@ -196,7 +196,7 @@ async function claim(w: World): Promise<ClaimedStep | null> {
 }
 
 describe('one path decides what a dispatched step runs on', () => {
-  test('easy work goes to Haiku, hard work to Codex, on the same rule row', async () => {
+  test('easy work goes to Haiku, hard work to Opus, on the same rule row', async () => {
     const w = await setupWorld();
     equipMachine(w, { claude: true, codex: true });
     const easy = await buildTodo(w, 'rename one label');
@@ -206,8 +206,8 @@ describe('one path decides what a dispatched step runs on', () => {
     });
     const hard = await buildTodo(w, `difficulty:hard ${'migrate the queue '.repeat(10)}`);
     expect(profileForStep(w.s.db, hard, 'build')).toMatchObject({
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
+      provider: 'claude-code',
+      modelId: 'claude-opus-5-5',
     });
   });
 
@@ -289,8 +289,8 @@ describe('the router agrees with what dispatch can execute', () => {
       .run();
     const checker = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoRow.id)).get()!;
     expect(profileForStep(w.s.db, checker, 'build')).toMatchObject({
-      provider: 'openai-codex',
-      modelId: 'gpt-6.1-sol',
+      provider: 'claude-code',
+      modelId: 'claude-opus-5-5',
     });
   });
 
@@ -347,7 +347,7 @@ describe('a routed model only runs on a machine that can host it', () => {
 
   test('Codex runs on any online machine once the team has the openai-codex row, never on an offline one', async () => {
     const w = await setupWorld();
-    equipMachine(w, { claude: true, codex: true });
+    equipMachine(w, { claude: true, codex: true, weeklyUtilization: 0.8 });
     const other = 'claude-only-box';
     w.s.db
       .insert(machineTable)
@@ -571,7 +571,7 @@ describe('the decision is recorded at claim and never changes in flight', () => 
       modelId: 'claude-haiku-5-5',
       difficulty: 'easy',
       machineId: w.machineId,
-      reason: 'easy: claude-haiku-5-5 ranked first',
+      reason: 'easy: claude-code/claude-haiku-5-5 (tier easy)',
     });
   });
 
@@ -710,8 +710,10 @@ describe('claim-time routes are reconsidered only while pending without continui
       machineId: w.machineId,
       difficulty: 'standard',
       reason:
-        're-routed: claude-sonnet-5-5 no longer runnable (quota); standard: gpt-6.1-sol ranked 2, higher ranks unavailable',
-      rejected: [{ modelId: 'claude-sonnet-5-5', machineId: w.machineId, why: 'quota' }],
+        're-routed: claude-sonnet-5-5 no longer runnable (quota); standard: openai-codex/gpt-6.1-sol (tier fallback)',
+      rejected: expect.arrayContaining([
+        { modelId: 'claude-sonnet-5-5', machineId: w.machineId, why: 'quota' },
+      ]),
     });
     expect(recorded.decidedAt).toBeGreaterThan(1);
     w.s.db
@@ -785,7 +787,7 @@ describe('claim-time routes are reconsidered only while pending without continui
       }),
     ).toMatchObject({
       chosen: { provider: 'claude-code', modelId: 'claude-sonnet-5-5' },
-      reason: 'standard: claude-sonnet-5-5 ranked first',
+      reason: 'standard: claude-code/claude-sonnet-5-5 (tier standard)',
     });
     expect((await claim(w))?.agent?.modelId).toBe('claude-sonnet-5-5');
     expect(w.s.db.select().from(stepRoute).where(eq(stepRoute.stepId, stepRow.id)).get()).toEqual(

@@ -1,18 +1,36 @@
 import {
   classifyStepFailure,
+  claudeCodeUpdateRequired,
+  claudeRateBlock,
   isProviderAuthFailure,
   isProviderOutage,
   type MachineDoneBody,
   type ModelRef,
   type StepKind,
 } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
-import { machine, type routingRule, type StepFallbackRow, type step } from '../db/schema.js';
-import { antigravityUsesHostLogin, runtimeGatePasses } from './dispatch-eligibility.js';
-import { getModelLiveness } from './model-liveness.js';
+import {
+  machine,
+  provider,
+  type routingRule,
+  type StepFallbackRow,
+  type step,
+} from '../db/schema.js';
+import { nowMs } from '../lib/ids.js';
+import { antigravitySubscriptionAllowsRunner } from './antigravity-subscriptions.js';
+import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { hasActiveDevinSubscription } from './devin-subscriptions.js';
+import {
+  antigravityUsesHostLogin,
+  homeMachineRejectReason,
+  runtimeGatePasses,
+  stepRuntimeFor,
+} from './dispatch-eligibility.js';
+import { getModelLiveness, mergedCatalogModels } from './model-liveness.js';
 import { providerHealth } from './provider-health.js';
+import { antigravityQuotaExhausted, isKeylessEndpoint } from './source-tiers.js';
 
 interface AgentRow {
   teamId: string;
@@ -158,10 +176,53 @@ export function planModelFallback(
   const tried = new Set(stepRow.fallback?.tried ?? [modelKey(primary)]);
   tried.add(modelKey(from));
   const antigravityHostLogin = antigravityUsesHostLogin(deps.db, agentRow.teamId);
+  const now = nowMs();
+  const catalog = mergedCatalogModels(agentRow.teamId);
+  const claudeSubOk = hasActiveClaudeSubscription({ db: deps.db }, agentRow.teamId);
+  const devinSubOk = hasActiveDevinSubscription({ db: deps.db }, agentRow.teamId);
+  const antigravityBlocked = antigravityQuotaExhausted(deps.db, agentRow.teamId, now);
+  const accountQuotaExhausted = outcome.quotaBlock?.kind === 'quota';
+  const piProviders = new Map(
+    deps.db
+      .select({
+        providerId: provider.providerId,
+        models: provider.models,
+        keyed: sql<number>`${provider.apiKeyCipher} is not null`,
+      })
+      .from(provider)
+      .where(eq(provider.teamId, agentRow.teamId))
+      .all()
+      .map((row) => [row.providerId, row] as const),
+  );
+  const canHostRun = (host: (typeof hosts)[number], m: ModelRef) => {
+    if (!runtimeGatePasses(host, m.provider, antigravityHostLogin)) return false;
+    const runtime = stepRuntimeFor(m.provider);
+    if (runtime === 'claude-code') {
+      return (
+        claudeSubOk &&
+        claudeRateBlock(host.claudeRateLimits ?? [], now) === null &&
+        claudeCodeUpdateRequired(m.modelId, host.claudeCodeReport?.bin?.version) === null &&
+        (agentRow.machineId === host.id || homeMachineRejectReason(host, m, catalog) === null)
+      );
+    }
+    if (runtime === 'antigravity') {
+      return (
+        !antigravityBlocked &&
+        antigravitySubscriptionAllowsRunner(deps.db, agentRow.teamId, host.id, host.capabilities)
+      );
+    }
+    if (runtime === 'devin') return devinSubOk;
+    if (runtime === 'pi') {
+      const pRow = piProviders.get(m.provider);
+      return pRow !== undefined && (pRow.keyed === 1 || isKeylessEndpoint(m.provider));
+    }
+    return true;
+  };
   const to = chain.find(
     (m) =>
       !tried.has(modelKey(m)) &&
-      hosts.some((host) => runtimeGatePasses(host, m.provider, antigravityHostLogin)) &&
+      !(accountQuotaExhausted && m.provider === from.provider) &&
+      hosts.some((host) => canHostRun(host, m)) &&
       getModelLiveness(agentRow.teamId, m.provider, m.modelId) !== 'dead' &&
       providerHealth.canAcquire(`${agentRow.teamId}/${m.provider}`),
   );

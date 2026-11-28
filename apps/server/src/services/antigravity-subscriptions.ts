@@ -1492,7 +1492,7 @@ export function activeAntigravitySource(db: Pick<Db, 'select'>, teamId: string) 
 }
 
 export function antigravitySubscriptionAllowsRunner(
-  db: RunnerDb,
+  db: Pick<Db, 'select'>,
   teamId: string,
   runnerId: string,
   capabilities?: MachineCapabilities | null,

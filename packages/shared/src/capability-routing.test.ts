@@ -38,38 +38,90 @@ const build = (difficulty: RouteWorkRequest['difficulty']): RouteWorkRequest => 
   difficulty,
 });
 
-describe('implementation routing by difficulty', () => {
-  const all = [...claudeOn('m1'), codexOn('m1')];
+describe('implementation routing across caller-ordered tier candidates', () => {
+  test('primary source serves all tiers when healthy and secondary takes over on outage', () => {
+    const orderedForHard: CapabilityCandidate[] = [
+      {
+        harness: 'pi',
+        provider: 'primary-api',
+        modelId: 'primary-pro',
+        machineId: 'm1',
+        available: true,
+        weeklyUsedPercent: null,
+      },
+      {
+        harness: 'pi',
+        provider: 'primary-api',
+        modelId: 'primary-mid',
+        machineId: 'm1',
+        available: true,
+        weeklyUsedPercent: null,
+      },
+      codexOn('m1'),
+    ];
+    const healthy = routeWork(build('hard'), orderedForHard);
+    expect(healthy.chosen).toMatchObject({ provider: 'primary-api', modelId: 'primary-pro' });
+    expect(healthy.desired).toEqual({ provider: 'primary-api', modelId: 'primary-pro' });
+    expect(healthy.fellBack).toBe(false);
 
-  test('hard work goes to the strongest available model', () => {
-    const decision = routeWork(build('hard'), all);
-    expect(decision.chosen).toMatchObject({ modelId: 'gpt-6.1-sol', harness: 'pi' });
-    expect(decision.reason).toBe('hard: gpt-6.1-sol ranked first');
+    const degraded = routeWork(build('hard'), [
+      { ...orderedForHard[0]!, available: false },
+      { ...orderedForHard[1]!, available: false },
+      codexOn('m1'),
+    ]);
+    expect(degraded.chosen).toMatchObject({ provider: 'openai-codex', modelId: 'gpt-6.1-sol' });
+    expect(degraded.desired).toEqual({ provider: 'primary-api', modelId: 'primary-pro' });
+    expect(degraded.fellBack).toBe(true);
   });
 
-  test('standard work goes to Sonnet', () => {
-    expect(routeWork(build('standard'), all).chosen?.modelId).toBe('claude-sonnet-5-5');
-  });
+  test('standard and easy respect the ordered tier list passed in', () => {
+    const standardOrder: CapabilityCandidate[] = [
+      {
+        harness: 'claude-code',
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+        machineId: 'm1',
+        available: true,
+        weeklyUsedPercent: null,
+      },
+      codexOn('m1'),
+    ];
+    expect(routeWork(build('standard'), standardOrder).chosen?.modelId).toBe('claude-sonnet-5-5');
 
-  test('easy work goes to Haiku', () => {
-    expect(routeWork(build('easy'), all).chosen?.modelId).toBe('claude-haiku-5-5');
+    const easyOrder: CapabilityCandidate[] = [
+      {
+        harness: 'claude-code',
+        provider: 'claude-code',
+        modelId: 'claude-haiku-5-5',
+        machineId: 'm1',
+        available: true,
+        weeklyUsedPercent: null,
+      },
+      ...standardOrder,
+    ];
+    expect(routeWork(build('easy'), easyOrder).chosen?.modelId).toBe('claude-haiku-5-5');
   });
 
   test('a banned model is never chosen even if a machine offers it', () => {
     const banned: CapabilityCandidate = { ...codexOn('m1'), modelId: 'gpt-6-astra' };
     const decision = routeWork(build('hard'), [banned, ...claudeOn('m1')]);
     expect(decision.chosen?.modelId).toBe('claude-opus-5-5');
+    expect(decision.fellBack).toBe(true);
   });
 });
 
 describe('failure modes', () => {
-  test('no Codex connection: hard work falls to Opus and the decision says why', () => {
-    const decision = routeWork(build('hard'), claudeOn('m1'));
+  test('primary source unavailable: falls back to secondary tier/source and records rejection', () => {
+    const decision = routeWork(build('hard'), [
+      codexOn('m1', { available: false }),
+      ...claudeOn('m1'),
+    ]);
     expect(decision.chosen?.modelId).toBe('claude-opus-5-5');
+    expect(decision.fellBack).toBe(true);
     expect(decision.rejected).toContainEqual({
       modelId: 'gpt-6.1-sol',
-      machineId: null,
-      why: 'no-candidate',
+      machineId: 'm1',
+      why: 'unavailable',
     });
   });
 
@@ -88,8 +140,23 @@ describe('failure modes', () => {
 
   test('harness missing on the machine: the candidate is rejected with a harness reason', () => {
     const decision = routeWork(build('standard'), [
-      ...claudeOn('m1', { available: false, unavailableWhy: 'harness-missing' }),
-      ...claudeOn('m2'),
+      {
+        harness: 'claude-code',
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+        machineId: 'm1',
+        available: false,
+        unavailableWhy: 'harness-missing',
+        weeklyUsedPercent: null,
+      },
+      {
+        harness: 'claude-code',
+        provider: 'claude-code',
+        modelId: 'claude-sonnet-5-5',
+        machineId: 'm2',
+        available: true,
+        weeklyUsedPercent: null,
+      },
     ]);
     expect(decision.chosen).toMatchObject({ modelId: 'claude-sonnet-5-5', machineId: 'm2' });
     expect(decision.rejected).toContainEqual({

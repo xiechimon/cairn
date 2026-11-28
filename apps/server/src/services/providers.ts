@@ -14,6 +14,7 @@ import {
   PROVIDER_PRESET_IDS,
   PROVIDER_XAI_PRESET,
   type ProviderCompat,
+  type ProviderModel,
   type ProviderPreset,
   type ProviderRecord,
   type SecretBox,
@@ -105,7 +106,14 @@ export interface ProviderBody {
   api: ProviderRecord['api'];
   authHeader?: boolean;
   compat?: ProviderCompat;
-  models?: { id: string; name: string }[];
+  models?: {
+    id: string;
+    name: string;
+    contextWindow?: number;
+    maxTokens?: number;
+    input?: ProviderModel['input'];
+    cost?: { input: number; output: number; cacheRead?: number; cacheWrite?: number };
+  }[];
   apiKey?: string | null;
 }
 
@@ -440,6 +448,26 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
   };
 }
 
+function normalizeProviderModels(models: NonNullable<ProviderBody['models']>): ProviderModel[] {
+  return models.map((m) => ({
+    id: m.id,
+    name: m.name,
+    ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
+    ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
+    ...(m.input !== undefined ? { input: m.input } : {}),
+    ...(m.cost !== undefined
+      ? {
+          cost: {
+            input: m.cost.input,
+            output: m.cost.output,
+            cacheRead: m.cost.cacheRead ?? 0,
+            cacheWrite: m.cost.cacheWrite ?? 0,
+          },
+        }
+      : {}),
+  }));
+}
+
 export function createProvider(
   deps: ProviderDeps,
   input: { teamId: string; body: ProviderBody; createdBy: string },
@@ -463,7 +491,7 @@ export function createProvider(
         body.compat ?? { supportsDeveloperRole: false },
         body.apiKey ? deps.box.seal(body.apiKey) : null,
       ),
-      models: body.models ?? [],
+      models: normalizeProviderModels(body.models ?? []),
       createdBy: input.createdBy,
       createdAt: now,
       updatedAt: now,
@@ -673,7 +701,12 @@ function renameProviderReferences(db: Db, teamId: string, from: string, to: stri
   ].map((row) => row.id);
   if (scopeIds.length > 0) {
     const steps = db
-      .select({ id: step.id, fallback: step.fallback, quotaBlock: step.quotaBlock })
+      .select({
+        id: step.id,
+        fallback: step.fallback,
+        quotaBlock: step.quotaBlock,
+        ranModel: step.ranModel,
+      })
       .from(step)
       .where(inArray(step.buildId, scopeIds))
       .all();
@@ -694,11 +727,16 @@ function renameProviderReferences(db: Db, teamId: string, from: string, to: stri
         row.quotaBlock !== null && row.quotaBlock.providerId === from
           ? { ...row.quotaBlock, providerId: to }
           : undefined;
-      if (fallback === undefined && quotaBlock === undefined) continue;
+      const ranModel =
+        row.ranModel !== null && row.ranModel.provider === from
+          ? { ...row.ranModel, provider: to }
+          : undefined;
+      if (fallback === undefined && quotaBlock === undefined && ranModel === undefined) continue;
       db.update(step)
         .set({
           ...(fallback !== undefined ? { fallback } : {}),
           ...(quotaBlock !== undefined ? { quotaBlock } : {}),
+          ...(ranModel !== undefined ? { ranModel } : {}),
         })
         .where(eq(step.id, row.id))
         .run();
@@ -750,7 +788,7 @@ export function updateProvider(
         ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl } : {}),
         ...(patch.api !== undefined ? { api: patch.api } : {}),
         ...(patch.authHeader !== undefined ? { authHeader: patch.authHeader } : {}),
-        ...(patch.models !== undefined ? { models: patch.models } : {}),
+        ...(patch.models !== undefined ? { models: normalizeProviderModels(patch.models) } : {}),
         ...(patch.apiKey !== undefined
           ? replaceProviderCredential(
               patch.compat ?? row.compat,

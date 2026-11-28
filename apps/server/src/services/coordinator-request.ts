@@ -593,8 +593,11 @@ export function updateRequestTodo(
   const citedIds = params.replaceMessageIds ?? params.addMessageIds;
   const added =
     citedIds === undefined ? null : citedMessages(db, ctx, citedIds).map((c) => c.segment);
+  const row =
+    added !== null || params.difficulty !== undefined
+      ? appendableRow(db, ctx, params.todoId)
+      : null;
   if (added !== null) {
-    appendableRow(db, ctx, params.todoId);
     requireUnboundMessages(
       db,
       ctx,
@@ -607,7 +610,7 @@ export function updateRequestTodo(
   if (params.title !== undefined && summaryTitle === '') {
     throw new HttpError(400, 'invalid params.title: expected non-empty summary');
   }
-  if (summaryTitle !== undefined) {
+  if (summaryTitle !== undefined && row === null) {
     const existing = db
       .select({ id: todo.id, request: todo.request })
       .from(todo)
@@ -621,36 +624,64 @@ export function updateRequestTodo(
       );
     }
   }
-  const routed = updateAutonomousTodo(
-    deps,
-    params.todoId,
-    {
-      ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
-      ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
-      ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
-    },
-    summaryTitle !== undefined ? { textWriter: 'coordinator-title' } : {},
-  );
-  if (added === null || routed === null) return routed;
-  const row = appendableRow(db, ctx, params.todoId);
   const replacing = params.replaceMessageIds !== undefined;
-  const request: TaskRequest = {
-    ...row.request,
-    segments: replacing ? added : [...row.request.segments, ...added],
-  };
-  const grants = [
-    ...new Set([
-      ...(replacing ? [] : row.userSpecAttachmentIds),
-      ...ownerGrants(added, ctx.teamId),
-    ]),
-  ];
+  const segments =
+    row === null
+      ? null
+      : added === null
+        ? row.request.segments
+        : replacing
+          ? added
+          : [...row.request.segments, ...added];
+  const difficulty =
+    row === null
+      ? null
+      : params.difficulty !== undefined
+        ? params.difficulty
+        : added !== null
+          ? null
+          : row.request.difficulty;
+  const request: TaskRequest | null =
+    row === null || segments === null
+      ? null
+      : {
+          ...row.request,
+          segments,
+          difficulty,
+        };
+  const grants =
+    row === null || added === null
+      ? undefined
+      : [
+          ...new Set([
+            ...(replacing ? [] : row.userSpecAttachmentIds),
+            ...ownerGrants(added, ctx.teamId),
+          ]),
+        ];
   return db.transaction(() => {
-    db.update(todo).set({ request }).where(eq(todo.id, row.id)).run();
+    if (row !== null && request !== null) {
+      db.update(todo).set({ request }).where(eq(todo.id, row.id)).run();
+    }
     return updateAutonomousTodo(
       deps,
-      row.id,
-      { spec: renderTaskText(request) },
-      { userSpecAttachmentIds: grants, textWriter: 'request-service' },
+      params.todoId,
+      {
+        ...(summaryTitle !== undefined ? { title: summaryTitle } : {}),
+        ...(params.blockedBy !== undefined ? { blockedBy: params.blockedBy } : {}),
+        ...(params.projectId !== undefined ? { projectId: params.projectId } : {}),
+        ...(added !== null && request !== null ? { spec: renderTaskText(request) } : {}),
+      },
+      summaryTitle !== undefined
+        ? {
+            textWriter: 'coordinator-title',
+            ...(grants !== undefined ? { userSpecAttachmentIds: grants } : {}),
+          }
+        : row !== null
+          ? {
+              textWriter: 'request-service',
+              ...(grants !== undefined ? { userSpecAttachmentIds: grants } : {}),
+            }
+          : {},
     );
   });
 }

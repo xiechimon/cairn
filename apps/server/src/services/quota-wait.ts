@@ -124,9 +124,18 @@ export function sweepQuotaWaitSteps(deps: QuotaWaitDeps, now: number = nowMs()):
       .get();
     if (task?.sourceKind === 'research-intake' || task?.sourceKind === 'research-citation-check')
       continue;
+    const keepFallbackModel = row.sessionId !== null || row.checkpointCommit !== null;
+    const resetFallback =
+      row.fallback === null
+        ? null
+        : {
+            model: keepFallbackModel ? row.fallback.model : null,
+            tried: [],
+            zeroUsageRetried: row.fallback.zeroUsageRetried,
+          };
     deps.db
       .update(step)
-      .set({ status: 'pending', machineId: null, mcpGrant: null })
+      .set({ status: 'pending', machineId: null, mcpGrant: null, fallback: resetFallback })
       .where(eq(step.id, row.id))
       .run();
     released += 1;
@@ -150,7 +159,12 @@ export function retryQuotaWaitNow(
 ): boolean {
   const releasedIds = deps.db.transaction(() => {
     const held = deps.db
-      .select({ id: step.id })
+      .select({
+        id: step.id,
+        fallback: step.fallback,
+        sessionId: step.sessionId,
+        checkpointCommit: step.checkpointCommit,
+      })
       .from(step)
       .where(
         and(
@@ -169,6 +183,15 @@ export function retryQuotaWaitNow(
     });
     const updated: string[] = [];
     for (const row of held) {
+      const keepFallbackModel = row.sessionId !== null || row.checkpointCommit !== null;
+      const resetFallback =
+        row.fallback === null
+          ? null
+          : {
+              model: keepFallbackModel ? row.fallback.model : null,
+              tried: [],
+              zeroUsageRetried: row.fallback.zeroUsageRetried,
+            };
       const res = deps.db
         .update(step)
         .set({
@@ -178,6 +201,7 @@ export function retryQuotaWaitNow(
           holdUntil: null,
           machineId: null,
           mcpGrant: null,
+          fallback: resetFallback,
         })
         .where(
           and(

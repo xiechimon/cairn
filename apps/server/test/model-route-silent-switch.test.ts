@@ -168,11 +168,32 @@ async function claim(w: World): Promise<ClaimedStep | null> {
 }
 
 describe('silent model switch and explicit model preservation', () => {
-  test('T1: explicitly configured claude-opus-5-5 keeps Opus on a small front-end task instead of silently downgrading to Haiku', async () => {
+  test('T1: explicitly pinned task model stays on Opus on a small task while unpinned small task tiers to Haiku', async () => {
     const w = await setupWorld();
     equipClaudeMachine(w);
     seedRoute(w.s, 'session', { provider: 'claude-code', modelId: 'claude-opus-5-5' });
-    await buildTodo(w, '把按钮间距从 8px 调成 12px');
+    const { todoRow } = await buildTodo(w, '把按钮间距从 8px 调成 12px');
+    w.s.db
+      .update(todoTable)
+      .set({
+        request: {
+          segments: [
+            {
+              source: { kind: 'chat', threadId: 't1', messageId: 'm1', span: 'whole' },
+              author: 'owner',
+              sourceRef: null,
+              text: '把按钮间距从 8px 调成 12px',
+            },
+          ],
+          siblings: [],
+          difficulty: 'easy',
+          titleSource: 'owner',
+          titleSourceRef: null,
+          model: { provider: 'claude-code', modelId: 'claude-opus-5-5', thinkingLevel: null },
+        },
+      })
+      .where(eq(todoTable.id, todoRow.id))
+      .run();
 
     const claimed = await claim(w);
     expect(claimed).not.toBeNull();
@@ -196,6 +217,11 @@ describe('silent model switch and explicit model preservation', () => {
     expect(routeRow.provider).toBe('claude-code');
     expect(routeRow.modelId).toBe('claude-opus-5-5');
     expect(routeRow.reason).toBe('configured model');
+
+    await buildTodo(w, '把按钮间距从 8px 调成 12px');
+    const tiered = await claim(w);
+    expect(tiered?.agent?.provider).toBe('claude-code');
+    expect(tiered?.agent?.modelId).toBe('claude-haiku-5-5');
   });
 
   test('T2: non-routed antigravity session rule records configured model instead of misleading availability-changed reason', async () => {
@@ -208,7 +234,7 @@ describe('silent model switch and explicit model preservation', () => {
     const claimed = await claim(w);
     expect(claimed).not.toBeNull();
     expect(claimed!.agent?.provider).toBe('antigravity');
-    expect(claimed!.agent?.modelId).toBe('gemini-4-hydrogen');
+    expect(claimed!.agent?.modelId).toBe('gemini-3.8-flash');
 
     const routeRow = w.s.db
       .select()
@@ -216,8 +242,8 @@ describe('silent model switch and explicit model preservation', () => {
       .where(eq(stepRoute.stepId, claimed!.step.id))
       .get()!;
     expect(routeRow.provider).toBe('antigravity');
-    expect(routeRow.modelId).toBe('gemini-4-hydrogen');
-    expect(routeRow.reason).toBe('configured model');
+    expect(routeRow.modelId).toBe('gemini-3.8-flash');
+    expect(routeRow.reason).toBe('easy: antigravity/gemini-3.8-flash (tier easy)');
     expect(routeRow.reason).not.toContain('availability changed during the claim');
   });
 

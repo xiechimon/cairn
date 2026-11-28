@@ -253,6 +253,7 @@ export const coordinatorUpdateTodoParamsSchema = z
     addMessageIds: ownerMessageIdListSchema.optional(),
     replaceMessageIds: ownerMessageIdListSchema.optional(),
     blockedBy: todoIdListSchema.optional(),
+    difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).optional(),
     platform: z.enum([...RUNNER_OS, 'any']).optional(),
   })
   .strict()
@@ -578,10 +579,10 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         dependsOn: idArr('Optional todo ids that must be done before this one starts.'),
         priority: str('Optional "first" (top of the project queue) or "normal" (default).'),
         difficulty: str(
-          'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
+          'Task difficulty for automatic model selection: "easy" (one-file edit, typo/copy tweak, simple lookup), "standard" (typical feature, multi-file fix, moderate research), or "hard" (architecture change, ambiguous debugging, cross-module refactor, deep multi-step work). Always judge and pass this yourself without mentioning tiers or models to the user.',
         ),
         model: str(
-          "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Pick by what the task needs, for example a fast model for small edits and a stronger one for hard work. Any other model is refused. The list itself is owner-only — do not try to change it; if the model you want is not on it, ask the owner to add it in Settings > Model. Omit it and the task runs on the team task model, which follows the Coordinator model.",
+          "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Any other model is refused. The list itself is owner-only — do not try to change it; if the model you want is not on it, ask the owner to add it in Settings > Model. Pass this only when the user explicitly names a model for the task; omit it and Cairn picks the right model automatically for the task difficulty.",
         ),
         output: str(
           'Optional deliverable kind: "code" (default, for tasks that edit files or deliver commits/PRs, without merging) or "info"/"report"/"dataset"/"link" for non-code, research, read-only, command-run, or verification tasks that make no file changes (runs normally on any Runner without committing code). Never use create_todo for recurring requests — call schedule_todo on the current conversation instead.',
@@ -629,6 +630,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         ),
         replaceMessageIds: idArr(
           'Optional unique ids of owner messages in this Coordinator thread that replace the whole quoted request of the todo, verbatim and in this order. Use it to fix a wrong quote instead of archiving the todo and creating another; list every message the task should quote. Only for a todo that has not started.',
+        ),
+        difficulty: str(
+          'Optional updated task difficulty ("easy", "standard", or "hard") when editing an unstarted task.',
         ),
         platform: str(
           `Optional "macos", "windows" or "linux" to set the operating system the task needs, or "any" to remove it. Refused with 409 once the task has a session. ${PLATFORM_DOC}`,

@@ -89,7 +89,10 @@ async function setupWorld(
   const s = bootServer({ claimHoldMs: 200, pingIntervalMs: 3_600_000 });
   disposables.push(() => s.dispose());
   const key = await issueApiKey(s);
-  for (const p of ['relay-a', 'relay-b', 'relay-c']) insertProvider(s, p);
+  const providers = new Set(['relay-a', ...(fallbackModels ?? []).map((m) => m.provider)]);
+  for (const p of providers) {
+    if (p !== 'claude-code') insertProvider(s, p);
+  }
   const enrollRes = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: key,
     body: readyMachine({ teamId: s.team.id, name: 'fallback-box', cliVersion: '0.1.0' }),

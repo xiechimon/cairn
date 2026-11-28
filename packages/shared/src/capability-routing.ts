@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { StepKind } from './records/step.js';
 import type { TaskRequest } from './records/task-request.js';
+import { isBannedModelId } from './tier-selection.js';
 
 export const DIFFICULTIES = ['easy', 'standard', 'hard'] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
@@ -40,6 +41,8 @@ export interface RouteChoice {
 
 export interface RouteWorkDecision {
   chosen: RouteChoice | null;
+  desired?: { provider: string; modelId: string } | null;
+  fellBack?: boolean;
   difficulty: Difficulty;
   reason: string;
   rejected: RouteRejection[];
@@ -47,14 +50,6 @@ export interface RouteWorkDecision {
 
 export const CODEX_MODEL = { provider: 'openai-codex', modelId: 'gpt-6.1-sol' } as const;
 export const QUOTA_REJECT_PERCENT = 70;
-
-const RANKING: Record<Difficulty, readonly string[]> = {
-  hard: ['gpt-6.1-sol', 'claude-opus-5-5', 'claude-sonnet-5-5'],
-  standard: ['claude-sonnet-5-5', 'gpt-6.1-sol'],
-  easy: ['claude-haiku-5-5', 'claude-sonnet-5-5', 'gpt-6.1-sol'],
-};
-
-const BANNED_PREFIXES = ['gpt-5.6', 'gpt-6-astra', 'minimax-m3', 'deepseek-v4-flash'];
 
 const DIFFICULTY_MARKER = /difficulty:(easy|standard|hard)\b/i;
 const HARD_SPEC_CHARS = 3000;
@@ -73,10 +68,6 @@ export function classifyDifficulty(todo: {
   if (length >= HARD_SPEC_CHARS) return 'hard';
   if (length < EASY_SPEC_CHARS) return 'easy';
   return 'standard';
-}
-
-function banned(modelId: string): boolean {
-  return BANNED_PREFIXES.some((prefix) => modelId.startsWith(prefix));
 }
 
 function rejectionOf(candidate: CapabilityCandidate): CandidateRejection | null {
@@ -116,44 +107,64 @@ export function routeWork(
         modelId,
         machineId,
       },
+      desired: { provider, modelId },
+      fellBack: false,
       difficulty,
       reason: 'in-flight: keeps recorded model',
       rejected: [],
     };
   }
-  const ranking = RANKING[difficulty];
-  const rejected: RouteRejection[] = [];
-  for (const modelId of ranking) {
-    const pool = candidates.filter(
-      (candidate) => candidate.modelId === modelId && !banned(candidate.modelId),
-    );
-    if (pool.length === 0) {
-      rejected.push({ modelId, machineId: null, why: 'no-candidate' });
-      continue;
+
+  const groups: Array<{ provider: string; modelId: string; pool: CapabilityCandidate[] }> = [];
+  const byKey = new Map<
+    string,
+    { provider: string; modelId: string; pool: CapabilityCandidate[] }
+  >();
+  for (const candidate of candidates) {
+    const key = `${candidate.provider}\0${candidate.modelId}`;
+    let group = byKey.get(key);
+    if (group === undefined) {
+      group = { provider: candidate.provider, modelId: candidate.modelId, pool: [] };
+      byKey.set(key, group);
+      groups.push(group);
     }
-    const usable = pool
+    group.pool.push(candidate);
+  }
+
+  const first = groups[0];
+  const desired = first === undefined ? null : { provider: first.provider, modelId: first.modelId };
+  const rejected: RouteRejection[] = [];
+
+  for (const [groupIndex, group] of groups.entries()) {
+    if (isBannedModelId(group.modelId)) continue;
+    const usable = group.pool
       .filter((candidate) => {
         const why = rejectionOf(candidate);
-        if (why !== null) rejected.push({ modelId, machineId: candidate.machineId, why });
+        if (why !== null)
+          rejected.push({ modelId: group.modelId, machineId: candidate.machineId, why });
         return why === null;
       })
       .sort((a, b) => (a.weeklyUsedPercent ?? 0) - (b.weeklyUsedPercent ?? 0));
     const best = usable[0];
     if (best !== undefined) {
-      const rank = ranking.indexOf(modelId);
+      const fellBack = groupIndex > 0;
       return {
         chosen: choiceOf(best),
+        desired,
+        fellBack,
         difficulty,
-        reason:
-          rank === 0
-            ? `${difficulty}: ${modelId} ranked first`
-            : `${difficulty}: ${modelId} ranked ${rank + 1}, higher ranks unavailable`,
+        reason: fellBack
+          ? `${difficulty}: ${best.provider}/${best.modelId} (tier fallback)`
+          : `${difficulty}: ${best.provider}/${best.modelId} (tier ${difficulty})`,
         rejected,
       };
     }
   }
+
   return {
     chosen: null,
+    desired,
+    fellBack: false,
     difficulty,
     reason: `${difficulty}: no available candidate`,
     rejected,

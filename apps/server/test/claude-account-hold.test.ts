@@ -11,6 +11,7 @@ import {
 } from '../src/db/schema.js';
 import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
 import { claimStep } from '../src/services/machines.js';
+import { createProvider } from '../src/services/providers.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
@@ -89,6 +90,24 @@ async function world(provider = 'claude-code'): Promise<World> {
   const machineId = insertMachine(s, { name: 'hold', claudeCodeReport: REPORT });
   const first = await save(s, 'First', 'a');
   const second = await save(s, 'Second', 'b');
+  if (provider !== 'claude-code') {
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        createdBy: s.user.id,
+        body: {
+          providerId: provider,
+          label: provider,
+          api: 'openai-completions',
+          baseUrl: 'http://127.0.0.1:9/stub-gw',
+          authHeader: true,
+          compat: { supportsDeveloperRole: false },
+          models: [{ id: 'stub-model', name: 'stub-model' }],
+        },
+      },
+    );
+  }
   seedRoute(s, 'session', {
     provider,
     modelId: 'stub-model',

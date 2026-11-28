@@ -215,7 +215,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
     const claimed = await claim(s, authMachine);
     expect(claimed?.agent).toMatchObject({
       provider: 'antigravity',
-      modelId: 'gemini-4-carbon',
+      modelId: 'gemini-3.8-flash',
     });
     expect(
       s.db.select().from(stepTable).where(eq(stepTable.id, 's1')).get()?.antigravitySubscriptionId,
@@ -501,7 +501,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
     const workerClaim = await claim(s, unauthMachine);
     expect(workerClaim?.agent).toMatchObject({
       provider: 'antigravity',
-      modelId: 'gemini-4-carbon',
+      modelId: 'gemini-3.8-flash',
     });
     expect(
       s.db.select().from(stepTable).where(eq(stepTable.id, 's-port')).get()

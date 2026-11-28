@@ -365,21 +365,23 @@ test.each([
         },
       });
     }
-    createProvider(
-      { db: s.db, box: s.secretBox },
-      {
-        teamId: s.team.id,
-        createdBy: s.user.id,
-        body: {
-          providerId: 'anthropic',
-          label: 'Claude key',
-          api: 'anthropic-messages',
-          baseUrl: 'http://localhost:9',
-          apiKey: 'test-key',
-          models: [{ id: 'claude-sonnet-5-5', name: 'Sonnet' }],
+    if (mode !== 'takeover') {
+      createProvider(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: s.team.id,
+          createdBy: s.user.id,
+          body: {
+            providerId: 'anthropic',
+            label: 'Claude key',
+            api: 'anthropic-messages',
+            baseUrl: 'http://localhost:9',
+            apiKey: 'test-key',
+            models: [{ id: 'claude-sonnet-5-5', name: 'Sonnet' }],
+          },
         },
-      },
-    );
+      );
+    }
     const workerRoute = {
       provider:
         mode === 'native' || mode === 'takeover'

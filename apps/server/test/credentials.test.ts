@@ -42,6 +42,20 @@ function setSessionProvider(s: TestServer, provider: string): void {
     .set({ provider })
     .where(and(eq(routingRule.teamId, s.team.id), eq(routingRule.use, 'session')))
     .run();
+  if (provider === 'claude-code') {
+    s.db
+      .update(machineTable)
+      .set({
+        claudeCodeReport: {
+          installed: true,
+          hostname: 'test',
+          models: [{ id: 'claude-sonnet-5', name: 'Sonnet 5' }],
+          auth: { state: 'logged-in', method: 'claude.ai', provider: 'firstParty' },
+        },
+      })
+      .where(eq(machineTable.teamId, s.team.id))
+      .run();
+  }
 }
 
 async function withRoutedStack(

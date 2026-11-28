@@ -148,6 +148,24 @@ function toCostRates(entry: Model<Api> | undefined): ModelCostRates | undefined 
   };
 }
 
+export function catalogModelMetadata(
+  providerId: string,
+  modelId: string,
+  api?: string,
+):
+  | { cost?: ModelCostRates; contextWindow?: number; maxTokens?: number; reasoning?: boolean }
+  | undefined {
+  const entry = catalogModel(providerId, modelId, false, api);
+  const cost = toCostRates(entry) ?? catalogModelCost(providerId, modelId, api);
+  if (entry === undefined && cost === undefined) return undefined;
+  return {
+    ...(cost !== undefined ? { cost } : {}),
+    ...(entry?.contextWindow !== undefined ? { contextWindow: entry.contextWindow } : {}),
+    ...(entry?.maxTokens !== undefined ? { maxTokens: entry.maxTokens } : {}),
+    ...(entry?.reasoning !== undefined ? { reasoning: entry.reasoning } : {}),
+  };
+}
+
 export function catalogModelCost(
   providerId: string,
   modelId: string,

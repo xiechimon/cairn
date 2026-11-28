@@ -549,7 +549,6 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     emitSettledStepSpan(deps, stepId);
     return;
   }
-  if (recoverClaudeRateLimitFailure(deps, stepRow, outcome)) return;
   const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
   if (worker?.agentRow) {
     recordTurnProviderOutcome(deps, stepRow, worker.agentRow, outcome, zeroUsage);
@@ -560,6 +559,22 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     recordTurnProviderOutcome(deps, stepRow, chiefAgent, outcome, false);
   }
   if (requeueChiefStepOnFallback(deps, stepRow, chiefAgent, outcome)) return;
+  const modelUnavailable =
+    outcome.status === 'failed' &&
+    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable';
+  if (worker !== null && (!modelUnavailable || worker.agentRow?.routed === true)) {
+    const plan = planModelFallback(deps, stepRow, worker.agentRow, outcome);
+    if (plan !== null) {
+      if (plan.trigger === 'model_unavailable') markTurnModelDead(deps, stepRow, plan.from);
+      requeueTurnStep(deps, stepRow, plan.row, {
+        id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
+        content: plan.note,
+      });
+      notifyModelFallback(deps, worker.todoRow, worker.agentRow, plan.note);
+      return;
+    }
+  }
+  if (recoverClaudeRateLimitFailure(deps, stepRow, outcome)) return;
   if (
     worker !== null &&
     outcome.status === 'failed' &&
@@ -580,18 +595,6 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     publishStepStatus(deps, stepId);
     emitSettledStepSpan(deps, stepId);
     return;
-  }
-  if (worker !== null) {
-    const plan = planModelFallback(deps, stepRow, worker.agentRow, outcome);
-    if (plan !== null) {
-      if (plan.trigger === 'model_unavailable') markTurnModelDead(deps, stepRow, plan.from);
-      requeueTurnStep(deps, stepRow, plan.row, {
-        id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
-        content: plan.note,
-      });
-      notifyModelFallback(deps, worker.todoRow, worker.agentRow, plan.note);
-      return;
-    }
   }
   if (outcome.status === 'failed' && outcome.quotaBlock !== undefined) {
     applyQuotaWaitStep(deps, stepRow, outcome.quotaBlock);

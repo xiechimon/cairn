@@ -16,6 +16,7 @@ import {
 import { hasActiveClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { claimStep, markPresence } from '../src/services/machines.js';
+import { createProvider } from '../src/services/providers.js';
 import {
   bootServer,
   insertClaudeSubscription,
@@ -723,6 +724,22 @@ describe('several stored subscriptions, one enabled', () => {
     const { s, projectId } = await world();
     const machineId = insertMachine(s, { name: 'pi-runtime', claudeCodeReport: report() });
     await save(s, 'First', 'a');
+    createProvider(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        createdBy: s.user.id,
+        body: {
+          providerId: 'stub-gw',
+          label: 'stub-gw',
+          api: 'openai-completions',
+          baseUrl: 'http://127.0.0.1:9/stub-gw',
+          authHeader: true,
+          compat: { supportsDeveloperRole: false },
+          models: [{ id: 'stub-model', name: 'stub-model' }],
+        },
+      },
+    );
     routeSession(s, { machineId, provider: 'stub-gw' });
     const stepId = insertBuildStep(s, projectId);
     const claimed = await claimAs(s, machineId);

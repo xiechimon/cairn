@@ -9,7 +9,6 @@ import {
   type PatchRoutingRuleBody,
   type PatchWorkPolicyBody,
   type PolicyUse,
-  PROVIDER_PRESET_IDS,
   type ProjectModelChoice,
   type ProjectModelUse,
   type RemoteToolDef,
@@ -24,12 +23,13 @@ import {
   type StepKind,
   type TaskRequest,
   type TeamRoutingSettings,
+  type TodoOutputKind,
   type TodoSourceKind,
   type WorkPolicyRecord,
   withPlatform,
 } from '@cairn/shared';
 import { and, asc, eq, isNotNull, ne, or, sql } from 'drizzle-orm';
-import { builtinModelIds, isBuiltinProvider } from '../coordinator/runtime/provider.js';
+import { builtinModelIds } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -53,10 +53,12 @@ import {
   claudeCodeUsable,
   devinUsable,
   machineRuntimeAvailable,
+  requiredGithubPushRepoForStep,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import { DEFAULT_SESSION_MODEL, DEFAULT_SESSION_PROVIDER } from './routing-migration.js';
-import { decideStepRoute } from './step-route.js';
+import { isKeylessEndpoint, listConnectedTierSources, tierFallbackChain } from './source-tiers.js';
+import { decideStepRoute, primarySourceOnlyOffline } from './step-route.js';
 
 type RoutingRuleRow = typeof routingRule.$inferSelect;
 type WorkPolicyRow = typeof workPolicy.$inferSelect;
@@ -83,6 +85,7 @@ export interface RouteProfile {
 export interface RoutedTodo {
   teamId: string;
   projectId?: string | null;
+  output?: TodoOutputKind | null;
   sourceKind?: TodoSourceKind | null;
   sourceRef?: string | null;
   routeOverride?: RouteOverride | null;
@@ -107,10 +110,7 @@ const COORDINATOR_MODEL_PREFERENCE = [/haiku/i, /sonnet/i];
 const CLAUDE_CODE_COORDINATOR_MODEL = 'claude-sonnet-5-5';
 const ANTHROPIC_API_HOST = 'api.anthropic.com';
 
-export function keylessEndpoint(providerId: string): boolean {
-  const presets: readonly string[] = PROVIDER_PRESET_IDS;
-  return !presets.includes(providerId) && !isBuiltinProvider(providerId);
-}
+export const keylessEndpoint = isKeylessEndpoint;
 
 function servingProviders(
   db: Pick<Db, 'select'>,
@@ -560,60 +560,114 @@ export function profileForStep(
   const base = ruleProfileForStep(db, todoRow, kind);
   if (base === null) return null;
   const route = routeForStep(db, todoRow, kind);
-  if (route?.use !== 'session') return base;
+  if (route?.use !== 'session' || !isSessionStepKind(kind)) return base;
   if (taskModelChoice(todoRow) !== null) return base;
-  if (!isAutoRoutedSessionRule({ provider: base.provider, modelId: base.modelId })) return base;
-  const decision = decideStepRoute(db, todoRow, kind, stepId, {
-    machineId: base.machineId,
-    required: base.requiredCapabilities,
+  const sources = listConnectedTierSources(db, todoRow.teamId, base.provider, base.modelId);
+  const stepProject =
+    todoRow.projectId == null
+      ? undefined
+      : db
+          .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
+          .from(project)
+          .where(and(eq(project.id, todoRow.projectId), eq(project.teamId, todoRow.teamId)))
+          .get();
+  const stepPrompt =
+    stepId !== null && kind === 'verify'
+      ? (db.select({ prompt: step.prompt }).from(step).where(eq(step.id, stepId)).get()?.prompt ??
+        null)
+      : null;
+  const githubPushRepo = requiredGithubPushRepoForStep({
+    project: stepProject,
+    step: { kind, prompt: stepPrompt },
+    todo: { output: todoRow.output ?? 'code' },
+    agentTools: base.tools,
   });
-  if (decision.chosen === null) {
-    const stockSeed =
-      base.provider === DEFAULT_SESSION_PROVIDER && base.modelId === DEFAULT_SESSION_MODEL;
-    const choice =
-      stockSeed && !claudeCodeUsable(db, todoRow.teamId)
-        ? providerSessionChoice(db, todoRow.teamId)
-        : null;
-    if (choice === null) return base;
-    return {
-      ...base,
-      ...choice,
-      ...(base.provider !== null &&
-      base.modelId !== null &&
-      (choice.provider !== base.provider || choice.modelId !== base.modelId)
-        ? {
-            switchedFrom: {
-              provider: base.provider,
-              modelId: base.modelId,
-              reason: 'Claude Code 不可用',
-            },
-          }
-        : {}),
-    };
+  const decision = decideStepRoute(
+    db,
+    todoRow,
+    kind,
+    stepId,
+    {
+      machineId: base.machineId,
+      required: base.requiredCapabilities,
+    },
+    {
+      primaryProvider: base.provider,
+      preferredModelId: base.modelId,
+      githubPushRepo,
+    },
+  );
+  const fallbacks =
+    base.fallbackModels === null
+      ? tierFallbackChain(sources, decision.difficulty, null)
+      : base.fallbackModels;
+  const fallbackModels = fallbacks.length > 0 ? fallbacks : base.fallbackModels;
+  const primarySource =
+    base.provider === null ? undefined : sources.find((s) => s.provider === base.provider);
+  const uncataloguedCustomModel =
+    primarySource !== undefined &&
+    primarySource.runtime === 'pi' &&
+    primarySource.tiers.ordered.length === 1 &&
+    base.modelId !== null &&
+    !primarySource.models.some((m) => m.id === base.modelId);
+  if (decision.chosen === null || uncataloguedCustomModel) {
+    return { ...base, fallbackModels };
   }
-  const switched =
-    decision.chosen.provider !== base.provider || decision.chosen.modelId !== base.modelId;
-  const rejectWhy = switched
-    ? decision.rejected.find((r) => r.modelId === base.modelId)?.why
-    : undefined;
+  if (
+    base.provider !== null &&
+    decision.chosen.provider !== base.provider &&
+    primarySourceOnlyOffline(
+      db,
+      todoRow.teamId,
+      base.provider,
+      { machineId: base.machineId, required: base.requiredCapabilities },
+      {
+        preferredModelId: base.modelId,
+        difficulty: decision.difficulty,
+        githubPushRepo,
+      },
+    )
+  ) {
+    return { ...base, fallbackModels };
+  }
+  const primaryConnected =
+    base.provider !== null && sources.some((source) => source.provider === base.provider);
+  const switchedProvider = base.provider !== null && decision.chosen.provider !== base.provider;
+  const isFallback = decision.fellBack === true || (switchedProvider && !primaryConnected);
+  const fromRef =
+    decision.fellBack === true && decision.desired != null
+      ? decision.desired
+      : base.provider !== null && base.modelId !== null
+        ? { provider: base.provider, modelId: base.modelId }
+        : null;
+  const rejectWhy =
+    fromRef === null
+      ? undefined
+      : decision.rejected.find((r) => r.modelId === fromRef.modelId)?.why;
   const switchReason =
     rejectWhy === 'quota'
       ? '额度达到上限'
       : rejectWhy === 'harness-missing'
         ? '执行机未安装对应运行环境'
-        : rejectWhy === 'unavailable'
-          ? '模型不可用'
-          : decision.reason;
+        : !primaryConnected && base.provider !== null
+          ? '服务商不可用'
+          : rejectWhy === 'unavailable'
+            ? '模型不可用'
+            : decision.reason;
+  const sameAsBase =
+    decision.chosen.provider === base.provider && decision.chosen.modelId === base.modelId;
   return {
     ...base,
     provider: decision.chosen.provider,
     modelId: decision.chosen.modelId,
+    thinkingLevel: sameAsBase ? base.thinkingLevel : null,
+    fallbackModels,
     routed: true,
-    ...(switched && base.provider !== null && base.modelId !== null
+    ...(isFallback && fromRef !== null
       ? {
           switchedFrom: {
-            provider: base.provider,
-            modelId: base.modelId,
+            provider: fromRef.provider,
+            modelId: fromRef.modelId,
             reason: switchReason,
           },
         }

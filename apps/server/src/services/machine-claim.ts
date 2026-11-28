@@ -90,7 +90,7 @@ import {
 } from './mcp-servers.js';
 import { effectiveModel, modelKey } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
-import { coordinatorProfile, type RouteProfile } from './routing-rules.js';
+import { coordinatorProfile, type RouteProfile, routeForStep } from './routing-rules.js';
 import {
   acquireWorkerStepLease,
   heartbeatStep,
@@ -98,7 +98,7 @@ import {
   pendingClaimPredicate,
   releaseStepLease,
 } from './step-lease.js';
-import { recordStepRoute, routedModelRunsOn } from './step-route.js';
+import { decideStepRoute, recordStepRoute, routedModelRunsOn } from './step-route.js';
 import { setTodoPhase } from './todos.js';
 import { turnProvenance } from './turn-provenance.js';
 
@@ -524,7 +524,110 @@ async function tryClaim(
       continue;
     }
     if (!agentRow.modelId) continue;
-    const model = effectiveModel(agentRow, cand.stepRow);
+    const baseModel = effectiveModel(agentRow, cand.stepRow);
+    let model = baseModel;
+    let advancedFallback: StepFallbackRow | null = null;
+    if (
+      cand.stepRow.fallback?.model != null &&
+      cand.stepRow.sessionId === null &&
+      cand.stepRow.checkpointCommit === null
+    ) {
+      const onlineHosts = db
+        .select()
+        .from(machine)
+        .where(and(eq(machine.teamId, teamId), eq(machine.online, true), isNull(machine.retiredAt)))
+        .all();
+      const baseProject = projectOfTodo(db, cand.todoRow);
+      const baseRunnable =
+        onlineHosts.length === 0 ||
+        onlineHosts.some(
+          (host) =>
+            workerIneligibility(
+              db,
+              host,
+              {
+                agentRow,
+                model: baseModel,
+                localProject: baseProject?.repoKind === 'local',
+                localMerge: localMerge !== null || localFolderAction !== null,
+                githubPushRepo: requiredGithubPushRepoForStep({
+                  project: baseProject,
+                  step: cand.stepRow,
+                  todo: cand.todoRow,
+                  agentTools: agentRow.tools,
+                }),
+              },
+              catalog,
+              nowMs(),
+            ) === null &&
+            (!agentRow.routed || routedModelRunsOn(db, host, baseModel)),
+        );
+      if (!baseRunnable) {
+        const tried = new Set(cand.stepRow.fallback.tried);
+        if (baseModel.provider !== null && baseModel.modelId !== null) {
+          tried.add(modelKey({ provider: baseModel.provider, modelId: baseModel.modelId }));
+        }
+        const fromChain = (agentRow.fallbackModels ?? []).find(
+          (candidate) =>
+            !tried.has(modelKey(candidate)) &&
+            onlineHosts.some(
+              (host) =>
+                workerIneligibility(
+                  db,
+                  host,
+                  {
+                    agentRow,
+                    model: candidate,
+                    localProject: baseProject?.repoKind === 'local',
+                    localMerge: localMerge !== null || localFolderAction !== null,
+                    githubPushRepo: requiredGithubPushRepoForStep({
+                      project: baseProject,
+                      step: cand.stepRow,
+                      todo: cand.todoRow,
+                      agentTools: agentRow.tools,
+                    }),
+                  },
+                  catalog,
+                  nowMs(),
+                ) === null &&
+                (!agentRow.routed || routedModelRunsOn(db, host, candidate)),
+            ),
+        );
+        const nextChoice =
+          fromChain ??
+          (agentRow.routed
+            ? decideStepRoute(
+                db,
+                cand.todoRow,
+                cand.stepRow.kind,
+                null,
+                { machineId: agentRow.machineId, required: agentRow.requiredCapabilities },
+                {
+                  primaryProvider:
+                    routeForStep(db, cand.todoRow, cand.stepRow.kind)?.provider ?? null,
+                  preferredModelId:
+                    routeForStep(db, cand.todoRow, cand.stepRow.kind)?.modelId ?? null,
+                  excludedKeys: tried,
+                  githubPushRepo: requiredGithubPushRepoForStep({
+                    project: baseProject,
+                    step: cand.stepRow,
+                    todo: cand.todoRow,
+                    agentTools: agentRow.tools,
+                  }),
+                },
+              ).chosen
+            : null);
+        if (nextChoice != null) {
+          const picked = { provider: nextChoice.provider, modelId: nextChoice.modelId };
+          model = picked;
+          advancedFallback = {
+            model: picked,
+            tried: [...tried, modelKey(picked)],
+            zeroUsageRetried: cand.stepRow.fallback.zeroUsageRetried,
+          };
+        }
+      }
+    }
     const pinnedModel =
       model.provider !== null && model.modelId !== null
         ? { provider: model.provider, modelId: model.modelId }
@@ -534,13 +637,14 @@ async function tryClaim(
         ? agentRow.switchedFrom
         : null;
     const switchedFallback: StepFallbackRow | null =
-      routeSwitch === null || pinnedModel === null
+      advancedFallback ??
+      (routeSwitch === null || pinnedModel === null
         ? null
         : {
             model: pinnedModel,
             tried: [modelKey(routeSwitch), modelKey(pinnedModel)],
             zeroUsageRetried: false,
-          };
+          });
     const now = nowMs();
     const todoProject = projectOfTodo(db, cand.todoRow);
     const facts: WorkerStepFacts = {
@@ -741,15 +845,19 @@ async function tryClaim(
           });
         }
         if (cand.stepRow.kind !== 'review') {
+          const baseRule = routeForStep(tx, cand.todoRow, cand.stepRow.kind);
           recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, {
             provider: model.provider,
             modelId: model.modelId,
             machineId: agentRow.machineId,
             requiredCapabilities: agentRow.requiredCapabilities,
+            primaryProvider: baseRule?.provider ?? null,
+            preferredModelId: baseRule?.modelId ?? null,
+            githubPushRepo: txGithubPushRepo,
             routed: agentRow.routed && !fallbackActive,
             ...(routeSwitch !== null
               ? { switchReason: routeSwitch.reason }
-              : cand.stepRow.fallback?.model != null
+              : cand.stepRow.fallback?.model != null || advancedFallback !== null
                 ? { switchReason: 'declared fallback' }
                 : {}),
           });
