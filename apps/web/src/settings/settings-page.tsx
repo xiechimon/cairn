@@ -348,7 +348,7 @@ export function SettingsDialog({
       zIndex="var(--z-panel-low)"
       initialFocus={focusRef}
       returnFocusTo={opener}
-      width={tabs ? '100vw' : 'var(--settings-w)'}
+      width={tabs ? 'auto' : 'var(--settings-w)'}
       height={tabs ? '100dvh' : 'var(--settings-h)'}
       className={
         tabs
