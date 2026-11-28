@@ -176,6 +176,7 @@ import {
 } from './runner.js';
 import { runnerStepsInFlight } from './runner-activity.js';
 import { localRunnerHome, migrateRunnerHome, runnerHomeFor } from './runner-home.js';
+import { type BootServer, createBootWaiter } from './server-boot.js';
 import { createServerExitHandler } from './server-exit.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
 import { addLiquidGlass } from './tray-glass.js';
@@ -623,7 +624,13 @@ async function restartServer(dead: RunningServer): Promise<void> {
   }
 }
 
-async function waitUntilServing(running: RunningServer): Promise<void> {
+const waitForBootServer = createBootWaiter({
+  current: () => server,
+  waitReady: (candidate) => waitUntilServing(candidate),
+  timeoutMs: READY_TIMEOUT_MS,
+});
+
+async function waitUntilServing(running: BootServer): Promise<void> {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (running.exitCode !== null) {
@@ -2376,7 +2383,7 @@ async function boot(): Promise<void> {
       } else {
         const port = await serverPort();
         server = startServer(port, otelFile, serverExited, desktopShellEnv);
-        await waitUntilServing(server);
+        await waitForBootServer();
         writeServerOwner(cairnHome(), {
           pid: process.pid,
           port,
