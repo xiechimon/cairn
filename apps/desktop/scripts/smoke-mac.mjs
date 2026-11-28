@@ -544,6 +544,7 @@ try {
     const saved = () =>
       existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : '';
     const onBattery = await app.evaluate(({ powerMonitor }) => powerMonitor.isOnBatteryPower());
+    console.log(`tray awake: power=${onBattery ? 'battery' : 'ac'}`);
     const lidTitle = english ? 'Keep running with the lid closed' : '合盖继续运行';
     if (!onBattery) choices.push([lidTitle, 'lid-closed']);
     try {
@@ -571,7 +572,12 @@ try {
         while (!(await nativeTitles(helper)).includes(title) && Date.now() < deadline) {
           await driver.send({ cmd: 'sleep', ms: 100 });
         }
-        assert.ok((await nativeTitles(helper)).includes(title), `choice ${title} not visible`);
+        assert.ok(
+          (await nativeTitles(helper)).includes(title),
+          `choice ${title} not visible; rows=${JSON.stringify(
+            (await driver.send({ cmd: 'menuItems', pid: helper })).items,
+          )}`,
+        );
         const picked = await driver.send({ cmd: 'clickMenuItem', pid: helper, title });
         assert.equal(picked.ok, true, `choice click failed: ${JSON.stringify(picked)}`);
         assert.equal(await waitForNativeMenu(helper, true), true, 'choice closed the menu');
