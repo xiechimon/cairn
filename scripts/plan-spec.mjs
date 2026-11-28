@@ -103,15 +103,13 @@ export function scanPlan(content) {
       fence = mark[1];
       continue;
     }
-    const h = /^ {0,3}##[ \t]+(.+?)[ \t]*$/.exec(line);
-    const setext = /^ {0,3}[^\s#>|*+`~-]/.test(line) && /^ {0,3}-+[ \t]*$/.test(lines[i + 1] ?? '');
-    if (h || setext) {
-      const name = (h ? h[1].replace(/[ \t]+#+[ \t]*$/, '') : line.trim()).toLowerCase();
+    const h = /^##[ \t]+(.+?)[ \t]*$/.exec(line);
+    if (h) {
+      const name = h[1].toLowerCase();
       headings.push(name);
       if (revAt === -1 && name === 'review') revAt = i;
       cur = [];
       sections.set(name, cur);
-      if (!h) i += 1;
       continue;
     }
     if (cur) cur.push(line);
@@ -235,11 +233,10 @@ export function validatePlanContent(content) {
     if (!hm) errors.push('## Review missing 64-char Plan-SHA256');
     else if (verdict === 'PASS' && hm[1].toLowerCase() !== expectedHash)
       errors.push(`Plan-SHA256 mismatch (expected ${expectedHash})`);
-    const fixCheck = field('Fix-check').trim().toUpperCase();
-    if (fields.has('fix-check') && fixCheck !== 'PASS' && fixCheck !== 'FAIL')
-      errors.push('## Review Fix-check must be PASS or FAIL');
-    if (['CONCERNS', 'BLOCK', 'FAIL'].includes(verdict)) {
-      if (fixCheck !== 'PASS') errors.push('## Review must record Fix-check: PASS');
+    const needsFixCheck = ['CONCERNS', 'BLOCK', 'FAIL'].includes(verdict);
+    if (needsFixCheck || fields.has('fix-check') || fields.has('fix-check-plan-sha256')) {
+      if (field('Fix-check').trim().toUpperCase() !== 'PASS')
+        errors.push('## Review must record Fix-check: PASS');
       const fixHash = /^([0-9a-f]{64})$/i.exec(field('Fix-check-Plan-SHA256').trim());
       if (!fixHash) errors.push('## Review missing 64-char Fix-check-Plan-SHA256');
       else if (fixHash[1].toLowerCase() !== expectedHash)

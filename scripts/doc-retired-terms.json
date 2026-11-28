@@ -1,6 +1,12 @@
 {
   "terms": [
     {
+      "id": "plan-pass-only",
+      "pattern": "(?:with `Verdict: PASS` and matching `Plan-SHA256`|`Verdict: PASS`, matching `Plan-SHA256`)",
+      "canary": "with `Verdict: PASS` and matching `Plan-SHA256`",
+      "reason": "plans may retain a non-PASS review with a current passing fix-check"
+    },
+    {
       "id": "plan-full-re-review",
       "pattern": "`?Plan-SHA256`?[^\\n]*until re-reviewed",
       "canary": "Editing invalidates `Plan-SHA256` until re-reviewed.",

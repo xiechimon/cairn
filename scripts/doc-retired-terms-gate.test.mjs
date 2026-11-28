@@ -239,6 +239,28 @@ test('retired plan re-review wording is rejected in living docs', (t) => {
   assert.match(r.check(), /docs\/ops\/a\.md.*plan-full-re-review/);
 });
 
+test('PASS-only plan instructions are retired without matching the current template', (t) => {
+  const committed = JSON.parse(
+    readFileSync(resolve(import.meta.dirname, '..', REGISTRY_REL), 'utf8'),
+  );
+  const planTerm = committed.terms.find((entry) => entry.id === 'plan-pass-only');
+  assert.ok(planTerm, 'registry must retire both old PASS-only instructions');
+  const r = repo(
+    t,
+    { 'docs/ops/a.md': 'Current guidance.\n' },
+    { terms: [planTerm], baseline: {} },
+  );
+  for (const wording of [
+    'with `Verdict: PASS` and matching `Plan-SHA256` recorded',
+    '(`Reviewer-Model` != `Author-Model`, `Verdict: PASS`, matching `Plan-SHA256`)',
+  ]) {
+    r.write({ 'docs/ops/a.md': `${wording}\n` });
+    assert.match(r.check(), /plan-pass-only/);
+  }
+  r.write({ 'docs/ops/a.md': '- Verdict: PASS\n- Plan-SHA256: <hash>\n' });
+  assert.equal(r.check(), '');
+});
+
 test('the committed registry keeps the four retired mechanisms', () => {
   const { terms } = JSON.parse(
     readFileSync(resolve(import.meta.dirname, '..', REGISTRY_REL), 'utf8'),

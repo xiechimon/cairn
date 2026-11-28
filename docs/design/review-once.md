@@ -2,7 +2,7 @@
 
 ## User scenario
 
-A contributor with a Cairn worktree runs the existing plan review before coding. Today a finding forces them to replace the verdict with a fresh review, which can uncover another round of small issues. The approved change (「照这个改」) lets them fix the original findings and proceed with a narrow check from the same reviewer model. It adds no accounts, credentials, or paid steps.
+A contributor with a Cairn worktree runs the existing plan review before coding. Today a finding forces them to replace the verdict with a fresh review, which can uncover another round of small issues. The change approved by the owner on November 28 lets them fix the original findings and proceed with a narrow check from the same reviewer model. It adds no accounts, credentials, or paid steps.
 
 ## Scope
 
@@ -33,8 +33,17 @@ A contributor with a Cairn worktree runs the existing plan review before coding.
 - Verdict: CONCERNS
 - Plan-SHA256: bfd1ef59aac4b458bb4dcf01d75fa50dbedc75670365aa664135377a70d67f94
 - Fix-check: PASS
-- Fix-check-Plan-SHA256: 3606744c2b894d282f8de811f4a31a571bd31245e4562df1bae8c568b74207ca
+- Fix-check-Plan-SHA256: 1f3590f20f6e36e92c7b3ce180bb968e2acc60570a6d643c71a1ab5c52ab3926
 - Author-Model: openai-codex/gpt-6.2-sol
 - Reviewer: Pi fresh-context plan review
 - Reviewer-Model: anthropic/claude-sonnet-5-5
 - Findings: 1 original hash and trust; 2 duplicate metadata and headings; 3 unhashed suffix; 4 red tests and controls; 5 entry-point coverage; 6 living docs and canary; 7 severity and coverage limits; 8 input and wrapper boundaries. Notes 9–11 concern precedent, trust, callers, and the review record.
+
+1. Preserve the original review hash and make the trust limit explicit when a later check binds the edited body.
+2. Reject duplicate verdicts, metadata fields, and required headings rather than choosing one.
+3. Reject level-two sections after Review so required content cannot move outside the hash.
+4. Prove the new path with red-first tests and positive and negative controls.
+5. Cover file, commit, and range entry points, including later changes.
+6. Update living instructions and add a retirement canary for the obsolete rule.
+7. State that hashes do not establish finding severity, coverage, or reviewer identity.
+8. Specify input handling and the wrapper's confirmation boundary.

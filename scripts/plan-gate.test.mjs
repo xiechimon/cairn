@@ -49,6 +49,31 @@ const expectReview = (plan, ok, label) => {
   assert.equal(result.ok, ok, `${label}: ${result.errors.join('; ') || 'unexpectedly accepted'}`);
 };
 
+test('PASS rejects contradictory or unbound fix-checks', () => {
+  expectReview(reviewWith('PASS', '\n- Fix-check: FAIL'), false, 'failed fix-check');
+  expectReview(reviewWith('PASS', '\n- Fix-check: PASS'), false, 'missing fix hash');
+  expectReview(
+    reviewWith('PASS', currentFixCheck.replace('\n- Fix-check: PASS', '')),
+    false,
+    'fix hash without fix-check',
+  );
+  expectReview(
+    reviewWith('PASS', currentFixCheck.replace(computePlanHash(BODY), 'a'.repeat(64))),
+    false,
+    'stale fix hash',
+  );
+  expectReview(reviewWith('PASS', currentFixCheck), true, 'current fix-check');
+});
+
+test('ordinary separators and Review text retain the parent ATX hash', () => {
+  const body = `---\ntitle: example\n---\nReview\n------\n\n${BODY}`;
+  assert.equal(
+    computePlanHash(body),
+    'c2e4fd2d857e60134cd02c79db33529c4d444f139c5607fe2abfeaca23f086ed',
+  );
+  expectReview(sign(body), true, 'ATX plan with front matter and separator');
+});
+
 test('CONCERNS with a passing fix-check bound to the current plan is accepted', () => {
   expectReview(reviewWith('CONCERNS', currentFixCheck), true, 'current CONCERNS fix-check');
 });
@@ -129,7 +154,7 @@ for (const heading of ['User scenario', 'Scope', 'Edge cases', 'Out of scope']) 
 
 test('a level-two section after Review is rejected', () => {
   expectReview(`${sign()}\n## Appendix\nUnhashed content.\n`, false, 'unhashed suffix');
-  expectReview(`${sign()}\nAppendix\n--------\nUnhashed content.\n`, false, 'setext suffix');
+  expectReview(`${sign()}\nAppendix\n--------\nText.\n`, true, 'setext is ordinary review text');
 });
 
 test('PASS stays valid; unknown and empty verdicts are rejected', () => {
