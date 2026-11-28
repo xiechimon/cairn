@@ -342,13 +342,25 @@ function checkLiterals(sql) {
   return values;
 }
 
-const STEP_GROUP_SAMPLES = {
-  step_quota: { quotaBlock: '{}' },
-  step_subscription: { claudeSubscriptionId: 'smoke-subscription' },
-  step_schedule: { scheduleId: 'smoke-schedule' },
-  step_memory_trace: { memoryTrace: '{}' },
+export const STEP_GROUP_SAMPLES = {
+  step_quota: {
+    quotaBlock:
+      '{"kind":"quota","providerId":"smoke","label":null,"reason":"smoke","retryAfterMs":null,"firstSeenAt":0,"lastAt":0,"attempts":0,"probeAt":4102444800000}',
+    fallback: '{"model":null,"tried":[],"zeroUsageRetried":false}',
+    ranModel: null,
+  },
+  step_subscription: {
+    claudeSubscriptionId: 'smoke-subscription',
+    devinSubscriptionId: '',
+    antigravitySubscriptionId: null,
+  },
+  step_schedule: { scheduleId: '', scheduledBy: 'smoke-scheduler' },
+  step_memory_trace: {
+    memoryTrace:
+      '{"teamMemoryIds":[],"teamMemoriesOmitted":0,"projectMemoryIds":[],"projectMemoriesOmitted":0,"recalledMemoryIds":[]}',
+  },
   step_skill_injection: { skillInjection: '{"hits":[]}' },
-  step_blocker_handoff: { blockerHandoff: '{}' },
+  step_blocker_handoff: { blockerHandoff: '{"blockers":[]}' },
 };
 
 const SEED_OVERRIDES = {
@@ -365,7 +377,8 @@ const SEED_OVERRIDES = {
 
 function placeholderValue(col, tableName, checks, seq, now, label) {
   const override = SEED_OVERRIDES[tableName]?.[col.name];
-  if (override !== undefined) return typeof override === 'function' ? override(now) : override;
+  if (Object.hasOwn(SEED_OVERRIDES[tableName] ?? {}, col.name))
+    return typeof override === 'function' ? override(now) : override;
   if (checks.has(col.name)) return checks.get(col.name);
   const type = (col.type ?? '').toUpperCase();
   if (type.includes('INT')) {
@@ -417,6 +430,15 @@ export function seedEveryTable(dbPath, label = `smoke-${Date.now()}`) {
         checks: checkLiterals(t.sql ?? ''),
       });
     }
+    // A marker distinguishes expanded databases from legacy ones, not table presence.
+    for (const [name, sample] of Object.entries(STEP_GROUP_SAMPLES)) {
+      const table = marker ? name : 'step';
+      const columns = info.get(table)?.cols.map((col) => col.name) ?? [];
+      for (const column of marker ? ['stepId', ...Object.keys(sample)] : Object.keys(sample)) {
+        if (!columns.includes(column))
+          throw new Error(`required smoke column ${table}.${column} missing`);
+      }
+    }
     const deps = new Map(
       [...info.keys()].map((n) => [
         n,
@@ -458,7 +480,7 @@ export function seedEveryTable(dbPath, label = `smoke-${Date.now()}`) {
         for (const c of cols) {
           if (fks.some((f) => f.from === c.name)) continue;
           const ownPk = c.pk > 0;
-          const forced = SEED_OVERRIDES[name]?.[c.name] !== undefined;
+          const forced = Object.hasOwn(SEED_OVERRIDES[name] ?? {}, c.name);
           if (!ownPk && !forced && (c.notnull === 0 || c.dflt_value !== null)) continue;
           values.set(
             c.name,
@@ -478,6 +500,11 @@ export function seedEveryTable(dbPath, label = `smoke-${Date.now()}`) {
             placeholderValue(c, name, checks, seq, now, label);
           values.set(c.name, v);
         }
+        if (name === 'step' && !marker) {
+          for (const sample of Object.values(STEP_GROUP_SAMPLES)) {
+            for (const [column, value] of Object.entries(sample)) values.set(column, value);
+          }
+        }
         const colNames = [...values.keys()];
         const sqlText =
           colNames.length === 0
@@ -493,8 +520,7 @@ export function seedEveryTable(dbPath, label = `smoke-${Date.now()}`) {
           skipped.push(`${name}: ${error.message}`);
         }
       }
-      for (const [name, sample] of Object.entries(STEP_GROUP_SAMPLES)) {
-        if (!info.has(name)) continue;
+      for (const [name, sample] of Object.entries(marker ? STEP_GROUP_SAMPLES : {})) {
         const row = inserted.get(name);
         for (const [column, value] of Object.entries(sample)) {
           if (
@@ -505,12 +531,47 @@ export function seedEveryTable(dbPath, label = `smoke-${Date.now()}`) {
           }
         }
       }
+      const step = inserted.get('step');
+      if (!step?.get('id')) throw new Error('required smoke step missing');
+      const absentId = `${step.get('id')}-absent`;
+      const stepCols = info.get('step').cols;
+      const cloneCols = stepCols.filter((col) => col.name !== 'id');
+      const legacyColumns = new Set(Object.values(STEP_GROUP_SAMPLES).flatMap(Object.keys));
+      db.prepare(
+        `INSERT INTO step (id${cloneCols.map((c) => `, ${JSON.stringify(c.name)}`).join('')}) SELECT ?${cloneCols.map((c) => `, ${!marker && legacyColumns.has(c.name) ? 'NULL' : JSON.stringify(c.name)}`).join('')} FROM step WHERE id = ?`,
+      ).run(absentId, step.get('id'));
+      inserted.set('__step_samples', { presentId: step.get('id'), absentId });
       db.exec('COMMIT');
     } catch (error) {
       db.exec('ROLLBACK');
       throw error;
     }
-    return { seeded: inserted.size, skipped };
+    return { seeded: inserted.size - 1, skipped, stepSamples: inserted.get('__step_samples') };
+  } finally {
+    db.close();
+  }
+}
+
+// Compare raw SQLite values, not decoded domain objects, for each fixture step.
+export function assertStepSamples(dbPath, samples) {
+  if (!samples?.presentId || !samples?.absentId) throw new Error('missing step smoke expectations');
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    for (const [table, values] of Object.entries(STEP_GROUP_SAMPLES)) {
+      const columns = Object.keys(values);
+      const query = db.prepare(
+        `SELECT ${columns.map((c) => JSON.stringify(c)).join(', ')} FROM ${JSON.stringify(table)} WHERE stepId = ?`,
+      );
+      const row = query.get(samples.presentId);
+      assert.ok(row, `missing ${table} for ${samples.presentId}`);
+      for (const column of columns)
+        assert.equal(row[column], values[column], `${table}.${column} changed`);
+      assert.equal(
+        query.get(samples.absentId),
+        undefined,
+        `unexpected ${table} for ${samples.absentId}`,
+      );
+    }
   } finally {
     db.close();
   }
@@ -1345,6 +1406,7 @@ async function connectApp(appPath, prevAppPath) {
   }
   await seedTsnet(scratch);
   let seededTables;
+  let stepSamples;
   if (prevAppPath !== null) {
     const prevRoot = smokableBundle(prevAppPath);
     const prevExecutable = join(prevRoot, 'Contents', 'MacOS', 'Cairn');
@@ -1369,6 +1431,7 @@ async function connectApp(appPath, prevAppPath) {
     const dbPath = join(scratch, 'home', 'server', 'server.db');
     const seeded = seedEveryTable(dbPath);
     seededTables = seeded.seeded;
+    stepSamples = seeded.stepSamples;
     console.log(
       `seed: ${seeded.seeded} tables populated` +
         (seeded.skipped.length > 0 ? `; skipped: ${seeded.skipped.join('; ')}` : ''),
@@ -1416,6 +1479,7 @@ async function connectApp(appPath, prevAppPath) {
     launchedAt,
     scratch,
     seededTables,
+    stepSamples,
     lang: 'zh',
   };
 }
@@ -1469,6 +1533,10 @@ async function main() {
   ctx.cleanup = [];
   const results = [];
   try {
+    if (ctx.stepSamples) {
+      await waitForServerUp(ctx.base, SERVER_WAIT_MS);
+      assertStepSamples(join(ctx.userData, 'home', 'server', 'server.db'), ctx.stepSamples);
+    }
     const teams = await api(ctx, 'GET', '/api/teams');
     ctx.teamId = teams[0].id;
     if (selectedChecks.some((check) => check.id === 'runner')) {

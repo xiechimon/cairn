@@ -28,6 +28,12 @@ async function api<T>(path: string, body?: unknown, method = 'POST', token?: str
 function serverDb(): DatabaseSync {
   const db = new DatabaseSync(join(server.home, 'server', 'server.db'));
   db.exec('PRAGMA busy_timeout = 5000');
+  const marker = db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'step' AND name = ?",
+    )
+    .get('step_require_writer_generation_update');
+  if (marker) db.function('cairn_step_write_generation', { deterministic: true }, () => 1);
   return db;
 }
 

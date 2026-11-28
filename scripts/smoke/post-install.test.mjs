@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, realpathSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
+import * as smoke from './post-install.mjs';
 import {
   buildStartTaskSeedPrompt,
   formatExpectedServerVersion,
@@ -110,15 +111,16 @@ test('seedEveryTable seeds a fenced step and each present side group', () => {
       CREATE TRIGGER step_require_writer_generation_update BEFORE UPDATE ON step
       BEGIN SELECT CASE WHEN cairn_step_write_generation() IS NOT 1
         THEN RAISE(ABORT, 'incompatible step writer generation') END; END;
-      CREATE TABLE step_quota (stepId TEXT PRIMARY KEY REFERENCES step(id), quotaBlock TEXT);
-      CREATE TABLE step_subscription (stepId TEXT PRIMARY KEY REFERENCES step(id), claudeSubscriptionId TEXT);
-      CREATE TABLE step_schedule (stepId TEXT PRIMARY KEY REFERENCES step(id), scheduleId TEXT);
+      CREATE TABLE step_quota (stepId TEXT PRIMARY KEY REFERENCES step(id), quotaBlock TEXT, fallback TEXT, ranModel TEXT);
+      CREATE TABLE step_subscription (stepId TEXT PRIMARY KEY REFERENCES step(id), claudeSubscriptionId TEXT, devinSubscriptionId TEXT, antigravitySubscriptionId TEXT);
+      CREATE TABLE step_schedule (stepId TEXT PRIMARY KEY REFERENCES step(id), scheduleId TEXT, scheduledBy TEXT);
       CREATE TABLE step_memory_trace (stepId TEXT PRIMARY KEY REFERENCES step(id), memoryTrace TEXT NOT NULL);
       CREATE TABLE step_skill_injection (stepId TEXT PRIMARY KEY REFERENCES step(id), skillInjection TEXT NOT NULL);
       CREATE TABLE step_blocker_handoff (stepId TEXT PRIMARY KEY REFERENCES step(id), blockerHandoff TEXT NOT NULL);
     `);
     db.close();
     const result = seedEveryTable(path, 'fixture');
+    smoke.assertStepSamples(path, result.stepSamples);
     assert.equal(result.seeded, 7);
     assert.deepEqual(result.skipped, []);
     const check = new DatabaseSync(path, { readOnly: true });
@@ -149,7 +151,9 @@ test('seedEveryTable supports unmarked steps but never skips a failed step inser
   try {
     const path = join(scratch, 'server.db');
     const db = new DatabaseSync(path);
-    db.exec('CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL)');
+    db.exec(
+      `CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL, quotaBlock TEXT, fallback TEXT, ranModel TEXT, claudeSubscriptionId TEXT, devinSubscriptionId TEXT, antigravitySubscriptionId TEXT, scheduleId TEXT, scheduledBy TEXT, memoryTrace TEXT, skillInjection TEXT, blockerHandoff TEXT)`,
+    );
     db.close();
     assert.equal(seedEveryTable(path, 'old').seeded, 1);
     const blocked = new DatabaseSync(path);
@@ -160,7 +164,7 @@ test('seedEveryTable supports unmarked steps but never skips a failed step inser
     assert.throws(() => seedEveryTable(path, 'blocked'), /blocked/);
     const unmarked = join(scratch, 'unmarked.db');
     const fenced = new DatabaseSync(unmarked);
-    fenced.exec(`CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL);
+    fenced.exec(`CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL, quotaBlock TEXT, fallback TEXT, ranModel TEXT, claudeSubscriptionId TEXT, devinSubscriptionId TEXT, antigravitySubscriptionId TEXT, scheduleId TEXT, scheduledBy TEXT, memoryTrace TEXT, skillInjection TEXT, blockerHandoff TEXT);
       CREATE TRIGGER other_insert BEFORE INSERT ON step
       BEGIN SELECT cairn_step_write_generation(); END;`);
     fenced.close();
@@ -176,4 +180,58 @@ test('--help prints usage and exits without touching an app', () => {
   assert.match(result.stdout, /Usage: node scripts\/smoke\/post-install\.mjs/);
   assert.match(result.stdout, /--app/);
   assert.match(result.stdout, /--checks/);
+});
+
+test('legacy step samples survive migration exactly, including absent groups', () => {
+  const scratch = makeTestTempDir('post-install-legacy-');
+  const path = join(scratch, 'server.db');
+  try {
+    const db = new DatabaseSync(path);
+    db.exec(`CREATE TABLE agent_memory (layer TEXT);
+      CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL,
+      quotaBlock TEXT, fallback TEXT, ranModel TEXT,
+      claudeSubscriptionId TEXT, devinSubscriptionId TEXT, antigravitySubscriptionId TEXT,
+      scheduleId TEXT, scheduledBy TEXT, memoryTrace TEXT, skillInjection TEXT, blockerHandoff TEXT)`);
+    db.close();
+    const seeded = seedEveryTable(path, 'legacy');
+    const before = new DatabaseSync(path, { readOnly: true });
+    assert.equal(
+      before.prepare('SELECT quotaBlock FROM step WHERE id = ?').get('legacy-step').quotaBlock,
+      smoke.STEP_GROUP_SAMPLES.step_quota.quotaBlock,
+    );
+    before.close();
+    const upgraded = new DatabaseSync(path);
+    upgraded.exec(
+      readFileSync(
+        new URL('../../apps/server/drizzle/0272_step_side_tables.sql', import.meta.url),
+        'utf8',
+      ),
+    );
+    upgraded.close();
+    smoke.assertStepSamples(path, seeded.stepSamples);
+    const changed = new DatabaseSync(path);
+    changed.exec("UPDATE step_quota SET fallback = 'altered'");
+    changed.close();
+    assert.throws(() => smoke.assertStepSamples(path, seeded.stepSamples));
+    const missing = new DatabaseSync(path);
+    missing.exec(
+      'DELETE FROM step_quota; DELETE FROM step_subscription; DELETE FROM step_schedule; DELETE FROM step_memory_trace; DELETE FROM step_skill_injection; DELETE FROM step_blocker_handoff',
+    );
+    missing.close();
+    assert.throws(() => smoke.assertStepSamples(path, seeded.stepSamples));
+    const dropped = new DatabaseSync(path);
+    dropped.exec('DROP TABLE step_schedule');
+    dropped.close();
+    assert.throws(() => smoke.assertStepSamples(path, seeded.stepSamples));
+    const incompletePath = join(scratch, 'incomplete.db');
+    const incomplete = new DatabaseSync(incompletePath);
+    incomplete.exec('CREATE TABLE step (id TEXT PRIMARY KEY NOT NULL)');
+    incomplete.close();
+    assert.throws(
+      () => seedEveryTable(incompletePath, 'incomplete'),
+      /required smoke column step\.quotaBlock missing/,
+    );
+  } finally {
+    releaseTestTempDir(scratch);
+  }
 });
