@@ -22,7 +22,13 @@ import {
 } from '../../apps/server/test/helpers.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import { isScorerProtectedPath, runIsolatedCommand } from './lane.js';
-import { createScriptedArm, seedProjects, seedStubRoute } from './script.js';
+import {
+  type BrokeredModel,
+  createScriptedArm,
+  seedBrokeredRoute,
+  seedProjects,
+  seedStubRoute,
+} from './script.js';
 import {
   copyAllowedChangesToScorer,
   initBaselineRepo,
@@ -46,6 +52,10 @@ export interface JourneyOptions {
   arm?: JourneyArm;
   /** Ceiling for one grading command. */
   commandTimeoutMs?: number;
+  /** `stub` replays the case script; `brokered` sends its request to the approved model. */
+  model?: 'stub' | 'brokered';
+  /** Required when `model` is `brokered`. */
+  brokered?: BrokeredModel;
 }
 
 export interface ChangedFile {
@@ -165,9 +175,15 @@ export async function runJourneyTask(
     activateInServer();
     const teamId = s.team.id;
     const machineId = insertMachine(s, { name: 'bench' });
-    seedStubRoute(s, teamId);
+    if (options.model === 'brokered') {
+      if (options.brokered === undefined)
+        throw new Error('journey: brokered arm needs an approved model endpoint');
+      seedBrokeredRoute(s, teamId, options.brokered);
+    } else {
+      seedStubRoute(s, teamId);
+    }
     const projects = await seedProjects(s, task.world.projects);
-    const scripted = createScriptedArm(task.script, projects);
+    const scripted = options.model === 'brokered' ? null : createScriptedArm(task.script, projects);
     coordinator = startCoordinator({
       machine: {
         db: s.db,
@@ -186,7 +202,7 @@ export async function runJourneyTask(
       heartbeatMs: 1_000,
       tickMs: 3_600_000,
       stopPollMs: 50,
-      fixedProviders: scripted.fixedProviders,
+      ...(scripted === null ? {} : { fixedProviders: scripted.fixedProviders }),
     });
     const sent = await req(s.app, 'POST', `/api/teams/${teamId}/chief/threads`, {
       content: task.request,
