@@ -1,0 +1,5 @@
+{$CAIRN_DOMAIN} {
+	reverse_proxy cairn:8787 {
+		flush_interval -1
+	}
+}

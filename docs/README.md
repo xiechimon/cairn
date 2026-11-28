@@ -13,6 +13,7 @@ The change that retires a mechanism, path or rule updates or deletes every livin
 |---|---|
 | `spec/` | Numbered specs that still govern current behavior. The numbering skips retired volumes; `docs/spec/README.md` lists what was removed and where the live contract moved |
 | `getting-started.md` | Run the server, enroll a machine, Docker, deploy publicly, build from source |
+| `deploy/self-hosted-vps.md` | Single-tenant Linux VPS deployment using `deploy/vps/docker-compose.yml` (`Caddy` automatic HTTPS + `Cairn`) |
 | `configuration.md` | Every server and daemon environment variable |
 | `privacy.md` | What Cairn stores locally, how task session records are handled, and what configured integrations or optional services send |
 | `community/welcome.md` | Discussion categories, where bugs and security reports go, and how to post a first-PR write-up |

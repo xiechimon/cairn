@@ -1,0 +1,62 @@
+services:
+  cairn:
+    image: ${CAIRN_IMAGE:-cairn:local}
+    build:
+      context: ../..
+    restart: unless-stopped
+    stop_grace_period: 30s
+    expose:
+      - "8787"
+    environment:
+      CAIRN_REQUIRE_TOKEN: "1"
+      CAIRN_TOKEN: ${CAIRN_TOKEN:?Set CAIRN_TOKEN in .env}
+      CAIRN_WEB_ORIGIN: https://${CAIRN_DOMAIN:?Set CAIRN_DOMAIN in .env}
+      CAIRN_VAPID_SUBJECT: ${CAIRN_VAPID_SUBJECT:-mailto:push@cairn.dev}
+      CAIRN_LITESTREAM_BUCKET: ${CAIRN_LITESTREAM_BUCKET:-}
+      CAIRN_LITESTREAM_ENDPOINT: ${CAIRN_LITESTREAM_ENDPOINT:-}
+      CAIRN_LITESTREAM_PATH: ${CAIRN_LITESTREAM_PATH:-}
+      CAIRN_LITESTREAM_REGION: ${CAIRN_LITESTREAM_REGION:-}
+      LITESTREAM_ACCESS_KEY_ID: ${LITESTREAM_ACCESS_KEY_ID:-}
+      LITESTREAM_SECRET_ACCESS_KEY: ${LITESTREAM_SECRET_ACCESS_KEY:-}
+      CAIRN_CLERK_PUBLISHABLE_KEY: ${CAIRN_CLERK_PUBLISHABLE_KEY:-}
+      CAIRN_CLERK_ISSUER: ${CAIRN_CLERK_ISSUER:-}
+      CAIRN_CLERK_JWKS_URL: ${CAIRN_CLERK_JWKS_URL:-}
+      CAIRN_CLERK_OWNER_SUBS: ${CAIRN_CLERK_OWNER_SUBS:-}
+      CAIRN_CLERK_OWNER_EMAILS: ${CAIRN_CLERK_OWNER_EMAILS:-}
+      CAIRN_CLERK_AUTHORIZED_PARTIES: ${CAIRN_CLERK_AUTHORIZED_PARTIES:-}
+    volumes:
+      - cairn-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8787/app').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      cairn:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      CAIRN_DOMAIN: ${CAIRN_DOMAIN:?Set CAIRN_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  cairn-data:
+  caddy-data:
+  caddy-config:
