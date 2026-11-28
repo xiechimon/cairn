@@ -248,6 +248,7 @@ export interface PilotResult {
   };
   conclusion: string;
   missing: string | null;
+  incomplete: string | null;
 }
 
 type PilotModel =
@@ -259,6 +260,7 @@ interface ArmRun {
   arm: JourneyArm;
   outcomes: Map<string, boolean>;
   launches: LaunchRow[];
+  refused: number;
 }
 
 async function runArm(
@@ -269,12 +271,13 @@ async function runArm(
 ): Promise<ArmRun> {
   const outcomes = new Map<string, boolean>();
   const launches: LaunchRow[] = [];
+  let refused = 0;
   for (const item of cases) {
     const started = Date.now();
     const reserve = model.kind === 'cli' ? arm !== 'nopatch' : true;
     const reservation = reserve ? ledger.open(`${arm}/${item.task.id}`, started) : null;
     if (reservation !== null && !reservation.ok) {
-      outcomes.set(item.task.id, false);
+      refused += 1;
       continue;
     }
     try {
@@ -307,7 +310,7 @@ async function runArm(
       if (reservation?.ok) ledger.charge(reservation.id, Date.now() - started);
     }
   }
-  return { arm, outcomes, launches };
+  return { arm, outcomes, launches, refused };
 }
 
 function toPairs(baseline: Map<string, boolean>, candidate: Map<string, boolean>): Pair[] {
@@ -407,15 +410,45 @@ export async function runPilot(options: PilotOptions = {}): Promise<PilotResult>
     }
     const aaPairs = toPairs(first.outcomes, second.outcomes);
     aaDiscordance = discordance(aaPairs);
-    aa = decide(aaPairs);
-    damage = decide(toPairs(first.outcomes, control.outcomes));
+    const refused = first.refused + second.refused + control.refused;
+    const incomplete =
+      refused === 0
+        ? null
+        : `arm incomplete: the cap refused ${refused} reservations, so the comparison is inconclusive`;
+    aa =
+      incomplete === null
+        ? decide(aaPairs)
+        : {
+            kind: 'invalid',
+            n: aaPairs.length,
+            wins: 0,
+            losses: 0,
+            ties: aaPairs.length,
+            effect: 0,
+            p: 1,
+            reason: incomplete,
+          };
+    const damagePairs = toPairs(first.outcomes, control.outcomes);
+    damage =
+      incomplete === null
+        ? decide(damagePairs)
+        : {
+            kind: 'invalid',
+            n: damagePairs.length,
+            wins: 0,
+            losses: 0,
+            ties: damagePairs.length,
+            effect: 0,
+            p: 1,
+            reason: incomplete,
+          };
     const snapshot = ledger.snapshot();
     const conclusion =
       model.kind === 'scripted'
         ? 'Machinery only: scripted arms carry no model noise, so this measures the harness, the cap and the decision rule, not the model.'
         : model.kind === 'cli'
           ? 'The approved model ran each case as its own agent in a runner-shaped checkout; a separate grader took only the allowed patch and ran the hidden test.'
-          : 'Paired decision measured on the approved model through its chat endpoint.';
+          : 'Routing measured with the approved model; the runner leg is the harness patched checkout, so this run does not measure how well that model fixes code.';
     return {
       topic: 'harness-self-improve',
       mode: model.kind,
@@ -443,7 +476,10 @@ export async function runPilot(options: PilotOptions = {}): Promise<PilotResult>
       missing:
         model.kind === 'scripted'
           ? 'A real-model arm needs the approved model behind EVAL_ARM_CLI/EVAL_ARM_MODEL_ID (CLI) or EVAL_ARM_BASE_URL/EVAL_ARM_MODEL/EVAL_ARM_API_KEY (endpoint); none is provisioned in this environment.'
-          : null,
+          : model.kind === 'brokered'
+            ? 'The brokered arm starts from the harness patch; model code-fixing is not measured.'
+            : null,
+      incomplete,
     };
   } finally {
     for (const dir of tempRoots.splice(0)) rmSync(dir, { recursive: true, force: true });

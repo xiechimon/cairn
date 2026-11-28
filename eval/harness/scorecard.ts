@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import type { PilotResult } from './pilot.js';
 
@@ -40,6 +40,10 @@ export function renderScorecard(result: PilotResult): string {
     result.missing === null
       ? ''
       : `<p class="warn"><strong>Not measured:</strong> ${escapeHtml(result.missing)}</p>`;
+  const incomplete =
+    result.incomplete === null
+      ? ''
+      : `<p class="warn"><strong>Inconclusive:</strong> ${escapeHtml(result.incomplete)}</p>`;
 
   return `<!doctype html>
 <html lang="zh">
@@ -66,6 +70,7 @@ export function renderScorecard(result: PilotResult): string {
 <h2>What this run measured</h2>
 <p>${escapeHtml(result.conclusion)}</p>
 ${missing}
+${incomplete}
 
 <h2>Budget</h2>
 <table>
@@ -127,5 +132,6 @@ export function writeScorecard(path: string, result: PilotResult, mode = 0o600):
   const target = resolve(path);
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, renderScorecard(result), { mode });
+  chmodSync(target, mode);
   return target;
 }

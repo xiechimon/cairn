@@ -90,10 +90,10 @@ export function changedFilesBetween(repoRoot: string, from: string, to: string):
 function writeBlob(repoRoot: string, sha: string, path: string, destDir: string): void {
   const res = spawnSync('git', ['show', `${sha}:${path}`], {
     cwd: repoRoot,
-    encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
   });
-  if (res.status !== 0) throw new Error(`git show ${sha}:${path}: ${res.stderr.trim()}`);
+  if (res.status !== 0)
+    throw new Error(`git show ${sha}:${path}: ${String(res.stderr ?? '').trim()}`);
   const target = join(destDir, path);
   spawnSync('mkdir', ['-p', join(target, '..')]);
   writeFileSync(target, res.stdout);
@@ -217,7 +217,9 @@ export async function runJourneyTask(
     const wantedId = wanted === undefined ? undefined : projects.get(wanted);
     const todos = s.db.select().from(todoTable).all();
     const todo =
-      todos.find((row) => row.projectId !== null && row.projectId === wantedId) ?? todos[0];
+      wantedId === undefined
+        ? todos.find((row) => row.projectId !== null)
+        : todos.find((row) => row.projectId === wantedId);
     if (todo === undefined || todo.projectId === null) {
       record.durationMs = Date.now() - startedAt;
       return { record };
