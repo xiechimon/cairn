@@ -53,6 +53,7 @@ export function createStepPassControls(input: StepPassControlsInput): StepPassCo
     agentTodo: input.agentTodo,
     now: input.now,
     log,
+    leadingFirstDelta: input.stepKind === 'chief',
   });
   input.sessionOpts.onClaudeRateLimit = (notice) => {
     forwardClaudeRateLimit(input.client, input.machineId, input.stepId, notice, log);

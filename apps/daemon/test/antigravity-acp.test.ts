@@ -5,6 +5,7 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -12,12 +13,15 @@ import { join } from 'node:path';
 import type { ClaimedStep, RemoteToolDef, SessionOpts, StepEvent } from '@cairn/shared';
 import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { ANTIGRAVITY_ACP_ARGS } from '@cairn/shared/antigravity-install';
+import { acquireDeterministicCredentialProfile } from '@cairn/shared/credential-profile';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createAcpBackend } from '../src/backend/acp.js';
+import { computeAcpToolsDigest } from '../src/backend/acp-tools.js';
 import { SessionNotResumableError } from '../src/backend/errors.js';
 import { clearCredentials, pushCredential } from '../src/credentials.js';
 import { StepJournal, TranscriptBuffer } from '../src/journal.js';
+import { STEP_TREE_ENV } from '../src/process-tree.js';
 import { prepareStepEnv } from '../src/step-env.js';
 import { agentStepRefusal, antigravitySubscriptionMissingMessage } from '../src/step-preflight.js';
 import { StepSessionOpener } from '../src/step-session-opener.js';
@@ -1487,5 +1491,471 @@ describe('antigravity ACP runtime and credentials', () => {
       | undefined;
     expect(JSON.parse(msg?.message.content ?? '[]')).not.toContain('session/set_config_option');
     expect(learned).toContain('gemini-4-hydrogen');
+  });
+});
+
+describe('warm Antigravity Coordinator session pool', () => {
+  function writeWarmMock(
+    dir: string,
+    logFile: string,
+    opts: { sessionIdPrefix?: string } = {},
+  ): string {
+    const agent = join(dir, 'agy-warm-mock.sh');
+    const prefix = opts.sessionIdPrefix ?? 'warm-sess';
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { spawn } from 'node:child_process';",
+          "import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';",
+          "import { createInterface } from 'node:readline';",
+          `const logFile = ${JSON.stringify(logFile)};`,
+          'const record = (ev) => appendFileSync(logFile, JSON.stringify({ pid: process.pid, ...ev }) + "\\n");',
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'record({ kind: "spawn", stepTree: process.env.CAIRN_STEP_TREE ?? null, tmpdir: process.env.TMPDIR ?? null });',
+          'let mcpChild = null;',
+          'let mcpRpc = null;',
+          'let activeSid = null;',
+          'let spawnSeq = Number(process.env.CAIRN_TEST_SEQ ?? 0);',
+          'function connectMcp(server) {',
+          '  if (!server || mcpChild) return;',
+          '  mcpChild = spawn(server.command, server.args, { stdio: ["pipe", "pipe", "pipe"] });',
+          '  const waiters = new Map();',
+          '  createInterface({ input: mcpChild.stdout }).on("line", (line) => {',
+          '    if (!line.trim()) return;',
+          '    const msg = JSON.parse(line);',
+          '    const w = waiters.get(msg.id);',
+          '    if (w) { waiters.delete(msg.id); w(msg); }',
+          '  });',
+          '  let nextId = 1;',
+          '  mcpRpc = (method, params = {}) => new Promise((resolve) => {',
+          '    const id = nextId++;',
+          '    waiters.set(id, resolve);',
+          '    mcpChild.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\\n");',
+          '  });',
+          '}',
+          'process.on("SIGTERM", () => {',
+          '  record({ kind: "sigterm", sid: activeSid });',
+          '  try { mcpChild?.kill("SIGTERM"); } catch {}',
+          '  process.exit(0);',
+          '});',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} }, promptCapabilities: { image: false } } } });',
+          '  } else if (msg.method === "session/new" || msg.method === "session/resume") {',
+          `    activeSid = msg.params.sessionId ?? ${JSON.stringify(prefix)} + "-" + String(process.pid);`,
+          '    record({ kind: msg.method, sid: activeSid });',
+          '    const cairnSrv = (msg.params.mcpServers ?? []).find((s) => s.name === "cairn");',
+          '    connectMcp(cairnSrv);',
+          '    if (mcpRpc) await mcpRpc("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "mock", version: "1" } });',
+          '    if (mcpRpc) await mcpRpc("tools/list");',
+          '    send({ id: msg.id, result: { sessionId: activeSid, modes: { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }, { id: "auto", name: "Auto" }] }, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-hydrogen", options: [{ value: "gemini-4-hydrogen", name: "Gemini 4 Hydrogen" }, { value: "gemini-4-neon", name: "Gemini 4 Neon" }] }, { id: "thought_level", name: "Thinking", category: "thought_level", type: "select", currentValue: "medium", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
+          '  } else if (msg.method === "session/set_config_option" || msg.method === "session/set_mode") {',
+          '    record({ kind: msg.method, value: msg.params.value ?? msg.params.modeId });',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          '    const promptText = msg.params.prompt?.[0]?.text ?? "";',
+          '    record({ kind: "prompt", sid: activeSid, text: promptText });',
+          '    if (promptText.includes("CALL_TODOS") && mcpRpc) {',
+          '      const res = await mcpRpc("tools/call", { name: "todos", arguments: { q: promptText } });',
+          '      send({ method: "session/update", params: { sessionId: activeSid, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "tool:" + (res.result?.content?.[0]?.text ?? "") } } } });',
+          '      send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '    } else if (promptText.includes("STRAY_WHILE_PARKED") && mcpRpc) {',
+          '      send({ method: "session/update", params: { sessionId: activeSid, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "done-before-stray" } } } });',
+          '      send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '      setTimeout(async () => {',
+          '        const stray = await mcpRpc("tools/call", { name: "todos", arguments: {} });',
+          '        record({ kind: "stray_call", isError: Boolean(stray.result?.isError), text: stray.result?.content?.[0]?.text ?? "" });',
+          '      }, 60);',
+          '    } else if (promptText.includes("LATE_NOTIFY_WHILE_PARKED")) {',
+          '      send({ method: "session/update", params: { sessionId: activeSid, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "done-before-notify" } } } });',
+          '      send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '      setTimeout(() => {',
+          '        send({ method: "session/update", params: { sessionId: activeSid, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "unsolicited" } } } });',
+          '      }, 60);',
+          '    } else if (promptText.includes("INFLIGHT_AT_END_TURN") && mcpRpc) {',
+          '      const pendingCall = mcpRpc("tools/call", { name: "todos", arguments: { slow: true } });',
+          '      setTimeout(() => {',
+          '        send({ method: "session/update", params: { sessionId: activeSid, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "ended-early" } } } });',
+          '        send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '        void pendingCall;',
+          '      }, 40);',
+          '    } else if (promptText.includes("TRIGGER_AUTH_ERROR")) {',
+          '      send({ id: msg.id, error: { code: -32000, message: "Authentication required" } });',
+          '    } else if (promptText.includes("HANG_UNTIL_CANCEL")) {',
+          '      record({ kind: "hanging" });',
+          '    } else if (promptText.includes("EXIT_AFTER_DONE")) {',
+          '      send({ method: "session/update", params: { sessionId: activeSid, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "bye-soon" } } } });',
+          '      send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '      setTimeout(() => process.exit(0), 60);',
+          '    } else {',
+          '      send({ method: "session/update", params: { sessionId: activeSid, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "ok:" + promptText + ":" + process.pid } } } });',
+          '      send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '    }',
+          '  } else if (msg.method === "session/cancel") {',
+          '    if (msg.id !== undefined) send({ id: msg.id, result: null });',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+    return agent;
+  }
+
+  function readLog(logFile: string): Array<Record<string, unknown>> {
+    if (!existsSync(logFile)) return [];
+    return readFileSync(logFile, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+  }
+
+  function baseChiefOpts(dir: string, overrides: Partial<SessionOpts> = {}): SessionOpts {
+    return {
+      cwd: dir,
+      provider: { kind: 'api_key', providerId: 'antigravity' },
+      modelId: 'gemini-4-hydrogen',
+      compactAt: 150_000,
+      lockedDown: true,
+      remoteToolsOnly: true,
+      systemPrompt: 'COORDINATOR_SYS',
+      prompt: 'hi',
+      remoteTools: [{ name: 'todos', description: 'List todos' }],
+      executeRemoteTool: async () => '[]',
+      ...overrides,
+    };
+  }
+
+  test('reuses warm process across consecutive turns on same sessionId and rebinds Turn 2 host tool executor', async () => {
+    const dir = tempDir('ag-warm-reuse-');
+    const logFile = join(dir, 'events.jsonl');
+    const agent = writeWarmMock(dir, logFile);
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 30_000,
+    });
+
+    const turn1Calls: string[] = [];
+    const turn2Calls: string[] = [];
+    const s1 = await backend.createSession(
+      baseChiefOpts(dir, {
+        prompt: 'CALL_TODOS_1',
+        executeRemoteTool: async (name) => {
+          turn1Calls.push(name);
+          return 'from-turn-1';
+        },
+      }),
+    );
+    const ev1 = await collect(s1.events);
+    expect(ev1).toContainEqual({
+      type: 'message_end',
+      message: { role: 'assistant', content: 'tool:from-turn-1' },
+    });
+
+    const s2 = await backend.continueSession(
+      s1.sessionId,
+      baseChiefOpts(dir, {
+        prompt: 'CALL_TODOS_2',
+        executeRemoteTool: async (name) => {
+          turn2Calls.push(name);
+          return 'from-turn-2';
+        },
+      }),
+    );
+    const ev2 = await collect(s2.events);
+    expect(ev2).toContainEqual({
+      type: 'message_end',
+      message: { role: 'assistant', content: 'tool:from-turn-2' },
+    });
+
+    const entries = readLog(logFile);
+    const spawns = entries.filter((e) => e.kind === 'spawn');
+    expect(spawns).toHaveLength(1);
+    expect(turn1Calls).toEqual(['todos']);
+    expect(turn2Calls).toEqual(['todos']);
+    backend.close?.();
+  });
+
+  test('terminates parked warm session on stray MCP call, late notification, or in-flight tool at end_turn', async () => {
+    const dir = tempDir('ag-warm-stray-');
+    const logFile = join(dir, 'events.jsonl');
+    const agent = writeWarmMock(dir, logFile);
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 30_000,
+    });
+
+    const s1 = await backend.createSession(baseChiefOpts(dir, { prompt: 'STRAY_WHILE_PARKED' }));
+    await collect(s1.events);
+    await new Promise((r) => setTimeout(r, 150));
+
+    const entriesAfterStray = readLog(logFile);
+    const stray = entriesAfterStray.find((e) => e.kind === 'stray_call');
+    expect(stray?.isError).toBe(true);
+    expect(String(stray?.text)).toContain('unbound');
+
+    const s2 = await backend.continueSession(
+      s1.sessionId,
+      baseChiefOpts(dir, { prompt: 'LATE_NOTIFY_WHILE_PARKED' }),
+    );
+    await collect(s2.events);
+    await new Promise((r) => setTimeout(r, 150));
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(2);
+
+    let releaseSlowTool!: () => void;
+    const s3 = await backend.continueSession(
+      s2.sessionId,
+      baseChiefOpts(dir, {
+        prompt: 'INFLIGHT_AT_END_TURN',
+        executeRemoteTool: () =>
+          new Promise<string>((resolve) => {
+            releaseSlowTool = () => resolve('late-done');
+          }),
+      }),
+    );
+    await collect(s3.events);
+    releaseSlowTool?.();
+    await new Promise((r) => setTimeout(r, 50));
+
+    const s4 = await backend.continueSession(s3.sessionId, baseChiefOpts(dir, { prompt: 'after' }));
+    await collect(s4.events);
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(4);
+    backend.close?.();
+  });
+
+  test('evicts and terminates warm session on compatibility mismatch or createSession on same cwd', async () => {
+    const dir = tempDir('ag-warm-compat-');
+    const logFile = join(dir, 'events.jsonl');
+    const agent = writeWarmMock(dir, logFile);
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 30_000,
+    });
+
+    const optsA = baseChiefOpts(dir, { modelId: 'gemini-4-hydrogen', prompt: 't1' });
+    const optsB = baseChiefOpts(dir, {
+      modelId: 'gemini-4-hydrogen',
+      prompt: 't2',
+      remoteTools: [
+        { name: 'todos', description: 'List todos' },
+        { name: 'docs', description: 'Read docs' },
+      ],
+    });
+    expect(computeAcpToolsDigest(optsA, { maxToolBytes: 950, deferTools: true })).not.toBe(
+      computeAcpToolsDigest(optsB, { maxToolBytes: 950, deferTools: true }),
+    );
+
+    const s1 = await backend.createSession(optsA);
+    await collect(s1.events);
+    const s1Warm = await backend.continueSession(s1.sessionId, optsA);
+    await collect(s1Warm.events);
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(1);
+
+    const s2 = await backend.continueSession(s1.sessionId, optsB);
+    await collect(s2.events);
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(2);
+
+    const s3 = await backend.continueSession(
+      s2.sessionId,
+      baseChiefOpts(dir, { modelId: 'gemini-4-neon', prompt: 't3' }),
+    );
+    await collect(s3.events);
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(3);
+
+    const s4 = await backend.createSession(baseChiefOpts(dir, { prompt: 'fresh' }));
+    await collect(s4.events);
+    const logEntries = readLog(logFile);
+    expect(logEntries.filter((e) => e.kind === 'spawn')).toHaveLength(4);
+    expect(logEntries.filter((e) => e.kind === 'sigterm').length).toBeGreaterThanOrEqual(3);
+    backend.close?.();
+  });
+
+  test('evicts warm session on stop, error, auth failure, unsupported image, or idle child exit', async () => {
+    const dir = tempDir('ag-warm-evict-');
+    const logFile = join(dir, 'events.jsonl');
+    const agent = writeWarmMock(dir, logFile);
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 30_000,
+    });
+
+    const s1 = await backend.createSession(baseChiefOpts(dir, { prompt: 't1' }));
+    await collect(s1.events);
+    const s1Warm = await backend.continueSession(
+      s1.sessionId,
+      baseChiefOpts(dir, { prompt: 't1b' }),
+    );
+    await collect(s1Warm.events);
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(1);
+
+    const sAuth = await backend.continueSession(
+      s1.sessionId,
+      baseChiefOpts(dir, { prompt: 'TRIGGER_AUTH_ERROR' }),
+    );
+    const authEvents = await collect(sAuth.events);
+    expect(authEvents.some((e) => e.type === 'error')).toBe(true);
+
+    const s2 = await backend.continueSession(
+      s1.sessionId,
+      baseChiefOpts(dir, { prompt: 'HANG_UNTIL_CANCEL' }),
+    );
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(2);
+    const s2Collect = collect(s2.events);
+    await new Promise((r) => setTimeout(r, 50));
+    await s2.stop();
+    await s2Collect;
+
+    const s3 = await backend.continueSession(
+      s1.sessionId,
+      baseChiefOpts(dir, { prompt: 'EXIT_AFTER_DONE' }),
+    );
+    await collect(s3.events);
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(3);
+    await new Promise((r) => setTimeout(r, 150));
+
+    const s4 = await backend.continueSession(
+      s1.sessionId,
+      baseChiefOpts(dir, { prompt: 'after-exit' }),
+    );
+    await collect(s4.events);
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(4);
+    backend.close?.();
+  });
+
+  test('terminates parked sessions on idle TTL, LRU cap, and backend.close without clobbering external hooks', async () => {
+    const dir1 = tempDir('ag-warm-ttl-1-');
+    const dir2 = tempDir('ag-warm-ttl-2-');
+    const dir3 = tempDir('ag-warm-ttl-3-');
+    const logFile = join(dir1, 'events.jsonl');
+    const agent = writeWarmMock(dir1, logFile);
+
+    mkdirSync(join(dir1, '.agents'), { recursive: true });
+    writeFileSync(join(dir1, '.agents/hooks.json'), JSON.stringify({ existingKey: { ok: true } }));
+
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 120,
+    });
+
+    const s1 = await backend.createSession(baseChiefOpts(dir1, { prompt: 'one' }));
+    await collect(s1.events);
+    const duringPark = JSON.parse(readFileSync(join(dir1, '.agents/hooks.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    writeFileSync(
+      join(dir1, '.agents/hooks.json'),
+      JSON.stringify({ ...duringPark, externalKey: { addedWhileParked: true } }),
+    );
+
+    await new Promise((r) => setTimeout(r, 260));
+    const hooksAfterTtl = JSON.parse(
+      readFileSync(join(dir1, '.agents/hooks.json'), 'utf8'),
+    ) as Record<string, unknown>;
+    expect(hooksAfterTtl).toHaveProperty('existingKey');
+    expect(hooksAfterTtl).toHaveProperty('externalKey');
+    expect(hooksAfterTtl).not.toHaveProperty('cairn-relay-guard');
+
+    const longBackend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 30_000,
+    });
+    const a = await longBackend.createSession(baseChiefOpts(dir1, { prompt: 'a' }));
+    await collect(a.events);
+    const b = await longBackend.createSession(baseChiefOpts(dir2, { prompt: 'b' }));
+    await collect(b.events);
+    const c = await longBackend.createSession(baseChiefOpts(dir3, { prompt: 'c' }));
+    await collect(c.events);
+    await new Promise((r) => setTimeout(r, 80));
+    expect(readLog(logFile).filter((e) => e.kind === 'sigterm').length).toBeGreaterThanOrEqual(2);
+    expect(typeof longBackend.close).toBe('function');
+    longBackend.close?.();
+    await new Promise((r) => setTimeout(r, 80));
+    expect(readLog(logFile).filter((e) => e.kind === 'sigterm').length).toBeGreaterThanOrEqual(4);
+  });
+
+  test('strips CAIRN_STEP_TREE and isolates warm TMPDIR so per-step cleanup does not break warm reuse', async () => {
+    const dir = tempDir('ag-warm-env-');
+    const cairnHome = tempDir('ag-warm-cairnhome-');
+    const logFile = join(dir, 'events.jsonl');
+    const agent = writeWarmMock(dir, logFile);
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+      sessionResume: true,
+      warmSessionIdleMs: 30_000,
+    });
+
+    const profile1 = acquireDeterministicCredentialProfile(cairnHome, 'ag-key-1');
+    const stepTmpDir = tempDir('step-tmp-');
+    const s1 = await backend.createSession(
+      baseChiefOpts(dir, {
+        prompt: 'step1',
+        env: {
+          ...profile1.env,
+          [STEP_TREE_ENV]: 'step-1-tree-marker',
+          TMPDIR: stepTmpDir,
+        },
+      }),
+    );
+    await collect(s1.events);
+
+    profile1.cleanup();
+    rmSync(stepTmpDir, { recursive: true, force: true });
+
+    expect(existsSync(profile1.home)).toBe(true);
+
+    const spawns = readLog(logFile).filter((e) => e.kind === 'spawn');
+    expect(spawns).toHaveLength(1);
+    expect(spawns[0]?.stepTree).toBeNull();
+    expect(spawns[0]?.tmpdir).not.toBe(stepTmpDir);
+
+    const profile2 = acquireDeterministicCredentialProfile(cairnHome, 'ag-key-1');
+    const s2 = await backend.continueSession(
+      s1.sessionId,
+      baseChiefOpts(dir, {
+        prompt: 'step2',
+        env: {
+          ...profile2.env,
+          [STEP_TREE_ENV]: 'step-2-tree-marker',
+        },
+      }),
+    );
+    await collect(s2.events);
+    profile2.cleanup();
+    expect(readLog(logFile).filter((e) => e.kind === 'spawn')).toHaveLength(1);
+
+    backend.close?.();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(existsSync(profile1.home)).toBe(false);
   });
 });

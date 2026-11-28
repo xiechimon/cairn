@@ -4,7 +4,7 @@ import {
   type SpawnOptionsWithoutStdio,
   spawn,
 } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { Readable, Writable } from 'node:stream';
@@ -47,7 +47,13 @@ import {
   CLAUDE_TODO_STATUS_STATES,
   isInternalAntigravityModelId,
 } from '@cairn/shared';
+import {
+  isDeterministicCredentialProfileHome,
+  retainDeterministicCredentialProfile,
+} from '@cairn/shared/credential-profile';
+import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { readJsonObject, writeJsonObject } from '../agent-config.js';
+import { STEP_TREE_ENV } from '../process-tree.js';
 import { DAEMON_VERSION } from '../version.js';
 import {
   type AcpToolCall,
@@ -61,6 +67,7 @@ import {
 import {
   type AcpStdioBridge,
   bridgeHttpMcpToStdio,
+  computeAcpToolsDigest,
   type HttpMcpToolsCache,
   type HttpMcpToolsResult,
   openAcpTools,
@@ -341,6 +348,7 @@ class AcpSession implements AgentSessionHandle {
   private readonly usageRows: ModelUsage[] = [];
   private promptStarted = false;
   private cancelled = false;
+  private cleanEndTurn = false;
   private text = '';
   private rejectedCount = 0;
   private missingHostToolsError: string | null = null;
@@ -357,7 +365,7 @@ class AcpSession implements AgentSessionHandle {
     private readonly prompt: string | undefined,
     private readonly images: readonly ContentBlock[],
     private readonly imageCapability: boolean,
-    private readonly cleanup: () => void,
+    private readonly onFinish: (keepWarm: boolean) => void,
     private readonly adapter?: AcpBackendOptions,
     private readonly modelId = 'unknown',
     private readonly compactAt?: number,
@@ -497,6 +505,7 @@ class AcpSession implements AgentSessionHandle {
             break;
           }
           this.recordPromptUsage(result.usage);
+          this.cleanEndTurn = true;
           this.push({ type: 'done', usage: this.usageRows });
         } else
           this.push({
@@ -568,7 +577,11 @@ class AcpSession implements AgentSessionHandle {
     if (this.stopped) return;
     clearTimeout(this.cancelTimer);
     this.stopped = true;
-    this.cleanup();
+    const canKeepWarm =
+      this.cleanEndTurn &&
+      !this.cancelled &&
+      (!this.adapter || [...this.calls.values()].every((call) => call.result !== undefined));
+    this.onFinish(canKeepWarm);
     for (const waiter of this.waiters.splice(0)) waiter({ done: true, value: undefined });
   }
 
@@ -836,9 +849,44 @@ export interface GeminiBackendOptions {
 }
 
 const HTTP_MCP_TOOLS_CACHE_TTL_MS = 5 * 60_000;
+const MAX_WARM_SESSIONS = 2;
+const CWD_TERMINATE_WAIT_MS = 1_500;
+
+type WarmEntryState = 'opening' | 'active' | 'parked' | 'terminating' | 'terminated';
+
+interface WarmAcpEntry {
+  sessionId: string;
+  cwd: string;
+  policy: AcpTurnPolicy;
+  isRestricted: boolean;
+  modelId: string;
+  thinkingLevel: string | null;
+  authKey: string;
+  toolDigest: string;
+  externalMcpDigest: string;
+  imageCapability: boolean;
+  connection: ReturnType<ReturnType<typeof client>['connect']>;
+  hostTools: AcpStdioBridge | null;
+  hostToolNames: readonly string[];
+  settleUnexpectedClose: () => Promise<AcpTerminalFailure | null>;
+  state: WarmEntryState;
+  idleTimer?: ReturnType<typeof setTimeout>;
+  activeSession: AcpSession | null;
+  terminated: Promise<void>;
+  isAlive(): boolean;
+  terminate(): void;
+}
+
+function digestValue(value: unknown): string {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
 
 class AcpBackend implements AgentBackend {
   private readonly imageSupport = new Map<string, boolean>();
+  private closed = false;
+  private readonly warmPool = new Map<string, WarmAcpEntry>();
+  private readonly activeWarm = new Set<WarmAcpEntry>();
+  private readonly cwdOwners = new Map<string, WarmAcpEntry>();
   private readonly httpMcpToolsCache = new Map<
     string,
     { value: HttpMcpToolsResult; expiresAt: number }
@@ -913,6 +961,80 @@ class AcpBackend implements AgentBackend {
     }
   }
 
+  close(): void {
+    this.closed = true;
+    for (const entry of [...this.warmPool.values()]) entry.terminate();
+    for (const entry of [...this.activeWarm]) entry.terminate();
+  }
+
+  private parkWarm(entry: WarmAcpEntry, idleMs: number): void {
+    if (
+      this.closed ||
+      entry.state !== 'active' ||
+      !entry.isAlive() ||
+      entry.hostTools?.hasInFlightCalls?.() === true
+    ) {
+      entry.terminate();
+      return;
+    }
+    entry.activeSession = null;
+    this.activeWarm.delete(entry);
+    entry.hostTools?.unbind?.();
+    entry.state = 'parked';
+    while (this.warmPool.size >= MAX_WARM_SESSIONS) {
+      const oldest = this.warmPool.values().next().value;
+      if (oldest === undefined) break;
+      this.warmPool.delete(oldest.sessionId);
+      oldest.terminate();
+    }
+    this.warmPool.set(entry.sessionId, entry);
+    entry.idleTimer = setTimeout(() => {
+      if (this.warmPool.get(entry.sessionId) === entry && entry.state === 'parked') {
+        this.warmPool.delete(entry.sessionId);
+        entry.terminate();
+      }
+    }, idleMs);
+    entry.idleTimer.unref?.();
+  }
+
+  private takeWarm(
+    resumeId: string,
+    opts: SessionOpts,
+    policy: AcpTurnPolicy,
+    isRestricted: boolean,
+    authKey: string,
+    toolDigest: string,
+    externalMcpDigest: string,
+  ): WarmAcpEntry | null {
+    const entry = this.warmPool.get(resumeId);
+    if (entry === undefined) return null;
+    this.warmPool.delete(resumeId);
+    if (entry.idleTimer !== undefined) {
+      clearTimeout(entry.idleTimer);
+      entry.idleTimer = undefined;
+    }
+    const compatible =
+      !this.closed &&
+      entry.state === 'parked' &&
+      entry.isAlive() &&
+      entry.hostTools?.hasInFlightCalls?.() !== true &&
+      entry.cwd === opts.cwd &&
+      entry.policy === policy &&
+      entry.isRestricted === isRestricted &&
+      entry.modelId === opts.modelId &&
+      entry.thinkingLevel === (opts.thinkingLevel ?? null) &&
+      entry.authKey === authKey &&
+      entry.toolDigest === toolDigest &&
+      entry.externalMcpDigest === externalMcpDigest;
+    if (!compatible) {
+      entry.terminate();
+      return null;
+    }
+    entry.state = 'active';
+    this.activeWarm.add(entry);
+    return entry;
+  }
+
   async modelSupportsImages(provider: ProviderConfig, modelId: string): Promise<boolean | null> {
     if (isLearnedNoVision(provider.providerId, modelId)) return false;
     return this.imageSupport.get(`${provider.providerId}/${modelId}`) ?? null;
@@ -942,27 +1064,124 @@ class AcpBackend implements AgentBackend {
         'ACP mcpServers policy is unsupported: adapter host MCP configuration is not isolated',
       );
     const policy = acpTurnPolicy(opts);
+    const isRestricted = policy !== 'normal' || opts.lockedDown === true;
+    const runtime = adapter?.harness ?? 'gemini';
+    const warmIdleMs = adapter?.warmSessionIdleMs ?? 0;
+    const warmEligible =
+      adapter?.harness === 'antigravity' &&
+      adapter.sessionResume === true &&
+      warmIdleMs > 0 &&
+      opts.compactAt !== undefined &&
+      !this.closed;
+    const authKey = digestValue([
+      opts.env?.HOME ?? '',
+      opts.env?.CAIRN_ANTIGRAVITY_AUTH_MODE ?? '',
+      opts.env?.GEMINI_API_KEY ?? '',
+    ]);
+    const acpToolsOptions =
+      adapter?.harness === 'antigravity' ? { maxToolBytes: 950, deferTools: true } : undefined;
+    const toolDigest = computeAcpToolsDigest(opts, acpToolsOptions);
+    const externalMcpAllowed = (!adapter || adapter.allowHostMcp === true) && !isRestricted;
+    const externalMcpDigest = externalMcpAllowed ? digestValue(opts.mcpServers ?? []) : '';
+
     const validated = validateGeminiSession({
       cwd: opts.cwd,
       modelId: opts.modelId,
       ...(resumeId !== undefined ? { resumeId } : {}),
       ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
     });
-    const hostTools = await openAcpTools(
-      opts,
-      adapter?.harness === 'antigravity' ? { maxToolBytes: 950, deferTools: true } : undefined,
-    );
+
+    if (warmEligible && resumeId !== undefined) {
+      const warm = this.takeWarm(
+        resumeId,
+        opts,
+        policy,
+        isRestricted,
+        authKey,
+        toolDigest,
+        externalMcpDigest,
+      );
+      if (warm !== null) {
+        if ((opts.promptImages?.length ?? 0) > 0 && !warm.imageCapability) {
+          warm.terminate();
+          throw new Error(`${adapter.harness} ACP backend: image capability is not advertised`);
+        }
+        warm.hostTools?.rebind?.(opts);
+        const session = new AcpSession(
+          warm.sessionId,
+          warm.connection,
+          validated.prompt,
+          (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
+          warm.imageCapability,
+          (keepWarm) => {
+            if (keepWarm) this.parkWarm(warm, warmIdleMs);
+            else warm.terminate();
+          },
+          adapter,
+          opts.modelId,
+          opts.compactAt,
+          warm.settleUnexpectedClose,
+          warm.hostTools
+            ? {
+                toolNames: warm.hostToolNames,
+                hasListedTools: warm.hostTools.hasListedTools,
+                runtime,
+              }
+            : undefined,
+        );
+        warm.activeSession = session;
+        return session;
+      }
+    }
+
+    if (resumeId !== undefined) {
+      const parkedById = this.warmPool.get(resumeId);
+      if (parkedById !== undefined) {
+        this.warmPool.delete(resumeId);
+        parkedById.terminate();
+      }
+    }
+    const existingCwdOwner = this.cwdOwners.get(opts.cwd);
+    if (
+      existingCwdOwner !== undefined &&
+      (existingCwdOwner.state === 'parked' || existingCwdOwner.state === 'terminating')
+    ) {
+      if (this.warmPool.get(existingCwdOwner.sessionId) === existingCwdOwner) {
+        this.warmPool.delete(existingCwdOwner.sessionId);
+      }
+      existingCwdOwner.terminate();
+      await Promise.race([
+        existingCwdOwner.terminated,
+        new Promise<void>((resolveWait) => setTimeout(resolveWait, CWD_TERMINATE_WAIT_MS)),
+      ]);
+    }
+    const hostTools = await openAcpTools(opts, acpToolsOptions);
     const hostToolNames =
       hostTools?.toolNames ??
       [...(opts.remoteTools ?? []), ...(opts.localTools ?? [])].map((tool) => tool.name);
+    const liveCwdOwner = this.cwdOwners.get(opts.cwd);
+    const skipHookMutation = liveCwdOwner !== undefined;
+    let registerWarm = warmEligible && liveCwdOwner === undefined;
+    let releaseProfile: (() => void) | undefined;
+    if (registerWarm) {
+      const home = opts.env?.HOME;
+      if (home !== undefined && isDeterministicCredentialProfileHome(home)) {
+        const retained = retainDeterministicCredentialProfile(home);
+        if (retained === null) {
+          registerWarm = false;
+        } else {
+          releaseProfile = retained;
+        }
+      }
+    }
     const mcpBridges: AcpStdioBridge[] = [];
     const spawnProcess = this.options.spawnProcess ?? spawn;
     const resolver = adapter?.resolveLaunch ?? this.options.resolveLaunch;
     const resolvedLaunch = resolver !== undefined ? resolver() : null;
-    const runtime = adapter?.harness ?? 'gemini';
     const releaseLaunch = resolvedLaunch?.release;
     const command = resolvedLaunch?.command ?? adapter?.command ?? this.options.executablePath;
     if (resolver !== undefined && resolvedLaunch === null) {
+      releaseProfile?.();
       hostTools?.close();
       throw new StepFailureError(
         `${runtime} managed runtime binary is unavailable or failed integrity verification`,
@@ -971,6 +1190,7 @@ class AcpBackend implements AgentBackend {
       );
     }
     if (command === undefined) {
+      releaseProfile?.();
       releaseLaunch?.();
       hostTools?.close();
       throw new StepFailureError(
@@ -981,6 +1201,7 @@ class AcpBackend implements AgentBackend {
     }
     const releaseRuntime = adapter?.acquireRuntime?.();
     let cleanupHooks: (() => void) | undefined;
+    let warmTemp: ReturnType<typeof createTempEnvironment> | undefined;
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {
       const rawArgs =
@@ -996,6 +1217,11 @@ class AcpBackend implements AgentBackend {
           ? [...rawArgs, '--include-default-customizations=false']
           : rawArgs;
       const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
+      if (registerWarm) {
+        delete sessionEnv[STEP_TREE_ENV];
+        warmTemp = createTempEnvironment(sessionEnv);
+        Object.assign(sessionEnv, warmTemp.env);
+      }
       const geminiHome = sessionEnv.GEMINI_CLI_HOME;
       if (!adapter && opts.compactAt !== undefined && geminiHome !== undefined) {
         sessionEnv.GEMINI_CLI_SYSTEM_SETTINGS_PATH = geminiCompressionSettingsPath(
@@ -1012,7 +1238,7 @@ class AcpBackend implements AgentBackend {
       if (adapter?.harness === 'antigravity') {
         sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
         syncAntigravityToolPermission(sessionEnv.HOME, policy);
-        cleanupHooks = installAntigravityTurnHooks(opts.cwd, policy);
+        if (!skipHookMutation) cleanupHooks = installAntigravityTurnHooks(opts.cwd, policy);
       }
       const env = runtimeChildEnv(sessionEnv);
       child = spawnProcess(command, args, {
@@ -1023,6 +1249,8 @@ class AcpBackend implements AgentBackend {
       });
     } catch (error) {
       cleanupHooks?.();
+      warmTemp?.cleanup();
+      releaseProfile?.();
       releaseRuntime?.();
       releaseLaunch?.();
       hostTools?.close();
@@ -1040,10 +1268,18 @@ class AcpBackend implements AgentBackend {
     let stderr = '';
     const app = client({ name: 'cairn' });
     const gateOptions = this.options.gate;
+    let session: AcpSession | null = null;
+    let warmEntry: WarmAcpEntry | null = null;
+    const currentSession = () => (warmEntry !== null ? warmEntry.activeSession : session);
     app.onRequest(methods.client.session.requestPermission, ({ params }) => {
+      if (warmEntry?.state === 'parked') {
+        warmEntry.terminate();
+        return { outcome: { outcome: 'cancelled' } };
+      }
+      const active = currentSession();
       const accepting =
-        session?.acceptingPermissions === true && params.sessionId === session.sessionId;
-      const toolCall = session ? session.describeToolCall(params.toolCall) : params.toolCall;
+        active?.acceptingPermissions === true && params.sessionId === active.sessionId;
+      const toolCall = active ? active.describeToolCall(params.toolCall) : params.toolCall;
       const decision = accepting
         ? decideAcpPermission({
             policy,
@@ -1061,7 +1297,7 @@ class AcpBackend implements AgentBackend {
           };
       const allow = decision.allow;
       if (!allow) {
-        session?.recordRejection(toolCall, decision.reason);
+        active?.recordRejection(toolCall, decision.reason);
         gateOptions?.log?.(`reject: policy=${policy} ${decision.reason}`);
       }
       const option = params.options
@@ -1073,10 +1309,14 @@ class AcpBackend implements AgentBackend {
           : { outcome: 'cancelled' },
       };
     });
-    let session: AcpSession | null = null;
     app.onNotification(methods.client.session.update, ({ params }) => {
-      if (session && (!adapter || params.sessionId === session.sessionId))
-        session.onAcpUpdate(params.update);
+      if (warmEntry?.state === 'parked') {
+        warmEntry.terminate();
+        return;
+      }
+      const active = currentSession();
+      if (active && (!adapter || params.sessionId === active.sessionId))
+        active.onAcpUpdate(params.update);
     });
     const stream = ndJsonStream(
       Writable.toWeb(child.stdin),
@@ -1086,6 +1326,7 @@ class AcpBackend implements AgentBackend {
     let interactiveAuthDetected = false;
     let exited = false;
     let cleanedUp = false;
+    let intentionalExit = false;
     let stdoutEnded = false;
     let terminalFailure: AcpTerminalFailure | null = null;
     child.stdout.once('end', () => {
@@ -1105,7 +1346,11 @@ class AcpBackend implements AgentBackend {
       return terminalFailure;
     };
     const captureChildExit = (code: number | null, signal: NodeJS.Signals | null) => {
-      if (cleanedUp || session?.isStopping === true) return;
+      if (cleanedUp || intentionalExit || currentSession()?.isStopping === true) return;
+      if (warmEntry?.state === 'parked') {
+        warmEntry.terminate();
+        return;
+      }
       const exitLabel = signal !== null && code === null ? signal : String(code);
       const detail: StepFailureDetail = {
         runtime,
@@ -1121,7 +1366,7 @@ class AcpBackend implements AgentBackend {
     };
     const settleUnexpectedClose = async (): Promise<AcpTerminalFailure | null> => {
       if (terminalFailure !== null) return terminalFailure;
-      if (cleanedUp || session?.isStopping === true) return null;
+      if (cleanedUp || intentionalExit || currentSession()?.isStopping === true) return null;
       const proc = child as { exitCode?: number | null; signalCode?: NodeJS.Signals | null };
       if (
         (proc.exitCode === undefined || proc.exitCode === null) &&
@@ -1164,6 +1409,7 @@ class AcpBackend implements AgentBackend {
           { runtime },
         );
         connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
+        if (warmEntry?.state === 'parked') warmEntry.terminate();
         return;
       }
       stderr = (stderr + text).slice(-8192);
@@ -1175,13 +1421,47 @@ class AcpBackend implements AgentBackend {
           tool: boundedToolName(command),
         });
         connection.close(new StepFailureError(recorded.message, recorded.code, recorded.detail));
+        if (warmEntry?.state === 'parked') warmEntry.terminate();
         return;
       }
       connection.close(error);
+      if (warmEntry?.state === 'parked') warmEntry.terminate();
     });
     child.once('exit', (code, signal) => captureChildExit(code, signal));
     let killTimer: ReturnType<typeof setTimeout> | undefined;
     let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+    let resourcesReleased = false;
+    let resolveTerminated!: () => void;
+    const terminated = new Promise<void>((resolve) => {
+      resolveTerminated = resolve;
+    });
+    const finishWarmRelease = () => {
+      if (resourcesReleased) return;
+      resourcesReleased = true;
+      clearTimeout(releaseTimer);
+      try {
+        cleanupHooks?.();
+      } catch {}
+      try {
+        warmTemp?.cleanup();
+      } catch {}
+      try {
+        releaseProfile?.();
+      } catch {}
+      try {
+        releaseRuntime?.();
+      } catch {}
+      try {
+        releaseLaunch?.();
+      } catch {}
+      if (warmEntry !== null && this.cwdOwners.get(opts.cwd) === warmEntry) {
+        this.cwdOwners.delete(opts.cwd);
+      }
+      if (warmEntry !== null) {
+        warmEntry.state = 'terminated';
+      }
+      resolveTerminated();
+    };
     const releaseOnce = () => {
       clearTimeout(releaseTimer);
       releaseLaunch?.();
@@ -1189,7 +1469,21 @@ class AcpBackend implements AgentBackend {
     child.once('close', () => {
       exited = true;
       if (groupPid === undefined) clearTimeout(killTimer);
-      if (cleanedUp) releaseOnce();
+      if (warmEntry !== null) {
+        if (warmEntry.sessionId !== '' && this.warmPool.get(warmEntry.sessionId) === warmEntry) {
+          this.warmPool.delete(warmEntry.sessionId);
+        }
+        this.activeWarm.delete(warmEntry);
+        warmEntry.activeSession = null;
+        clearTimeout(warmEntry.idleTimer);
+        warmEntry.idleTimer = undefined;
+        hostTools?.close();
+        for (const bridge of mcpBridges) bridge.close();
+        mcpBridges.length = 0;
+        finishWarmRelease();
+      } else if (cleanedUp) {
+        releaseOnce();
+      }
     });
     const terminate = (signal: NodeJS.Signals) => {
       if (groupPid !== undefined) {
@@ -1204,6 +1498,8 @@ class AcpBackend implements AgentBackend {
       if (cleanedUp) return;
       cleanedUp = true;
       cleanupHooks?.();
+      warmTemp?.cleanup();
+      releaseProfile?.();
       releaseRuntime?.();
       hostTools?.close();
       for (const bridge of mcpBridges) bridge.close();
@@ -1220,6 +1516,69 @@ class AcpBackend implements AgentBackend {
         killTimer = setTimeout(() => terminate('SIGKILL'), 1_000);
       }
     };
+    if (registerWarm) {
+      const entry: WarmAcpEntry = {
+        sessionId: resumeId ?? '',
+        cwd: opts.cwd,
+        policy,
+        isRestricted,
+        modelId: opts.modelId,
+        thinkingLevel: opts.thinkingLevel ?? null,
+        authKey,
+        toolDigest,
+        externalMcpDigest,
+        imageCapability: false,
+        connection,
+        hostTools,
+        hostToolNames,
+        settleUnexpectedClose,
+        state: 'opening',
+        activeSession: null,
+        terminated,
+        isAlive: () => {
+          const proc = child as { exitCode?: number | null; signalCode?: NodeJS.Signals | null };
+          return (
+            !exited &&
+            !stdoutEnded &&
+            (proc.exitCode === undefined || proc.exitCode === null) &&
+            (proc.signalCode === undefined || proc.signalCode === null)
+          );
+        },
+        terminate: () => {
+          if (entry.state === 'terminated' || entry.state === 'terminating') return;
+          if (entry.sessionId !== '' && this.warmPool.get(entry.sessionId) === entry) {
+            this.warmPool.delete(entry.sessionId);
+          }
+          this.activeWarm.delete(entry);
+          clearTimeout(entry.idleTimer);
+          entry.idleTimer = undefined;
+          entry.activeSession = null;
+          entry.state = 'terminating';
+          intentionalExit = true;
+          hostTools?.close();
+          for (const bridge of mcpBridges) bridge.close();
+          mcpBridges.length = 0;
+          connection.close();
+          terminate('SIGTERM');
+          if (exited) {
+            finishWarmRelease();
+          } else {
+            releaseTimer = setTimeout(finishWarmRelease, 2_000);
+            releaseTimer.unref?.();
+            if (adapter && (groupPid !== undefined || !exited)) {
+              killTimer = setTimeout(() => terminate('SIGKILL'), 1_000);
+              killTimer.unref?.();
+            }
+          }
+        },
+      };
+      warmEntry = entry;
+      this.cwdOwners.set(opts.cwd, entry);
+      this.activeWarm.add(entry);
+      hostTools?.setOnStrayCall?.(() => {
+        entry.terminate();
+      });
+    }
     const initializeTimeoutMs = adapter?.initializeTimeoutMs ?? 30_000;
     const initializeTimer = adapter
       ? setTimeout(() => {
@@ -1258,8 +1617,6 @@ class AcpBackend implements AgentBackend {
       if (adapter && resumeId && !caps?.sessionCapabilities?.resume && !caps?.loadSession) {
         throw new Error('ACP resume is unsupported by this adapter');
       }
-      const isRestricted = policy !== 'normal' || opts.lockedDown === true;
-      const externalMcpAllowed = (!adapter || adapter.allowHostMcp === true) && !isRestricted;
       const externalMcpServers: McpServer[] = [];
       if (externalMcpAllowed) {
         for (const endpoint of opts.mcpServers ?? []) {
@@ -1463,13 +1820,24 @@ class AcpBackend implements AgentBackend {
           : combinedSystemPrompt && validated.prompt !== undefined
             ? `${combinedSystemPrompt}\n\n${validated.prompt}`
             : validated.prompt;
+      const onSessionFinish = warmEntry
+        ? (keepWarm: boolean) => {
+            if (keepWarm && !this.closed && warmEntry.state === 'active') {
+              this.parkWarm(warmEntry, warmIdleMs);
+            } else {
+              warmEntry.terminate();
+            }
+          }
+        : () => {
+            cleanup();
+          };
       session = new AcpSession(
         sessionId,
         connection,
         sessionPrompt,
         (opts.promptImages ?? []).map((image) => ({ type: 'image', ...image })),
         caps?.promptCapabilities?.image === true,
-        cleanup,
+        onSessionFinish,
         adapter,
         opts.modelId,
         opts.compactAt,
@@ -1478,13 +1846,20 @@ class AcpBackend implements AgentBackend {
           ? { toolNames: hostToolNames, hasListedTools: hostTools.hasListedTools, runtime }
           : undefined,
       );
+      if (warmEntry !== null) {
+        warmEntry.sessionId = sessionId;
+        warmEntry.imageCapability = caps?.promptCapabilities?.image === true;
+        warmEntry.activeSession = session;
+        warmEntry.state = 'active';
+      }
       return session;
     } catch (error) {
       const recorded =
         acpErrorCode(error) !== undefined || error instanceof SessionNotResumableError
           ? null
           : await settleUnexpectedClose();
-      cleanup();
+      if (warmEntry !== null) warmEntry.terminate();
+      else cleanup();
       if (error instanceof SessionNotResumableError) throw error;
       const rawMessage = error instanceof Error ? error.message : String(error);
       const message = recorded !== null ? recorded.message : rawMessage;
@@ -1559,6 +1934,7 @@ export interface AcpBackendOptions {
   createUpdateNormalizer?: () => (update: SessionUpdate) => AcpUpdateNormalization;
   initializeTimeoutMs?: number;
   cancelTimeoutMs?: number;
+  warmSessionIdleMs?: number;
   acquireRuntime?: () => () => void;
   spawnProcess?: GeminiBackendOptions['spawnProcess'];
 }

@@ -8,11 +8,15 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function relay(send: (text: string) => Promise<unknown> | undefined = async () => {}) {
+function relay(
+  send: (text: string) => Promise<unknown> | undefined = async () => {},
+  leading = false,
+) {
   const sent: string[] = [];
   const errors: unknown[] = [];
   const subject = new DeltaRelay({
     flushMs: 250,
+    ...(leading ? { leading: true } : {}),
     send: (text) => {
       sent.push(text);
       return send(text);
@@ -84,4 +88,62 @@ test('a relay with no sender still clears its buffer', async () => {
   await subject.flushNow();
   expect(sent).toEqual(['a']);
   expect(errors).toEqual([]);
+});
+
+test('leading mode sends first delta immediately, serializes flushNow, and recovers on failure', async () => {
+  const gate: { resolveFirst?: () => void } = {};
+  let failNext = false;
+  const events: string[] = [];
+  const subject = new DeltaRelay({
+    flushMs: 250,
+    leading: true,
+    send: (text) => {
+      events.push(`send:${text}`);
+      if (failNext) {
+        failNext = false;
+        return Promise.reject(new Error('leading down'));
+      }
+      if (text === 'a') {
+        return new Promise<void>((resolve) => {
+          gate.resolveFirst = () => {
+            events.push(`done:${text}`);
+            resolve();
+          };
+        });
+      }
+      events.push(`done:${text}`);
+      return Promise.resolve();
+    },
+    onError: (err) => events.push(`err:${err instanceof Error ? err.message : String(err)}`),
+  });
+
+  subject.push('a');
+  expect(events).toEqual(['send:a']);
+
+  subject.push('b');
+  subject.push('c');
+  expect(events).toEqual(['send:a']);
+
+  let flushed = false;
+  const flushPromise = subject.flushNow().then(() => {
+    flushed = true;
+    events.push('flushed');
+  });
+  await Promise.resolve();
+  expect(flushed).toBe(false);
+
+  gate.resolveFirst?.();
+  await flushPromise;
+  expect(events).toEqual(['send:a', 'done:a', 'send:bc', 'done:bc', 'flushed']);
+
+  await vi.advanceTimersByTimeAsync(250);
+  failNext = true;
+  subject.push('d');
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(events).toContain('err:leading down');
+
+  await vi.advanceTimersByTimeAsync(250);
+  subject.push('e');
+  expect(events.at(-2)).toBe('send:e');
 });

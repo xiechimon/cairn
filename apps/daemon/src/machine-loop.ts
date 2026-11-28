@@ -797,6 +797,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     };
   };
 
+  const ANTIGRAVITY_WARM_IDLE_MS = 5 * 60_000;
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
   let devinBackend: AgentBackend | null = null;
@@ -813,6 +814,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       }
       const runtimeKey = JSON.stringify([install.binPath, install.args]);
       if (antigravityBackend === null || antigravityBackend.key !== runtimeKey) {
+        antigravityBackend?.backend.close?.();
         const runtimeVersion = install.version;
         antigravityBackend = {
           key: runtimeKey,
@@ -822,6 +824,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             args: install.args,
             permissions: 'allow-once',
             sessionResume: true,
+            warmSessionIdleMs: ANTIGRAVITY_WARM_IDLE_MS,
             allowHostMcp: true,
             usageEvents: true,
             skills: { skillsDir: config.skillsDir, cwd: config.home },
@@ -2191,6 +2194,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     await computerDispatcher.close();
     await closeOwnerChrome();
     hostDesktops?.close();
+    antigravityBackend?.backend.close?.();
   }
 
   return {

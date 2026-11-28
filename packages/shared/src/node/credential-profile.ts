@@ -152,6 +152,34 @@ export function createCredentialProfile(appData: string) {
   return profileHandle(home, () => removeProfile(dir));
 }
 
+function releaseDeterministicProfile(dir: string): void {
+  const next = (activeDeterministicProfiles.get(dir) ?? 1) - 1;
+  if (next > 0) {
+    activeDeterministicProfiles.set(dir, next);
+    return;
+  }
+  activeDeterministicProfiles.delete(dir);
+  removeProfile(dir);
+}
+
+export function isDeterministicCredentialProfileHome(home: string): boolean {
+  return basename(home) === 'home' && DETERMINISTIC_PROFILE.test(basename(dirname(home)));
+}
+
+export function retainDeterministicCredentialProfile(home: string): (() => void) | null {
+  if (!isDeterministicCredentialProfileHome(home)) return null;
+  const dir = dirname(home);
+  const activeCount = activeDeterministicProfiles.get(dir) ?? 0;
+  if (activeCount <= 0) return null;
+  activeDeterministicProfiles.set(dir, activeCount + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    releaseDeterministicProfile(dir);
+  };
+}
+
 export function acquireDeterministicCredentialProfile(appData: string, key: string) {
   const owner = currentOwner();
   const hash = createHash('sha256').update(key).digest('hex').slice(0, 12);
@@ -192,13 +220,7 @@ export function acquireDeterministicCredentialProfile(appData: string, key: stri
   return profileHandle(home, () => {
     if (released) return;
     released = true;
-    const next = (activeDeterministicProfiles.get(dir) ?? 1) - 1;
-    if (next > 0) {
-      activeDeterministicProfiles.set(dir, next);
-      return;
-    }
-    activeDeterministicProfiles.delete(dir);
-    removeProfile(dir);
+    releaseDeterministicProfile(dir);
   });
 }
 

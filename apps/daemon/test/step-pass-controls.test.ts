@@ -1,18 +1,31 @@
-import type { AgentSessionHandle, SessionOpts } from '@cairn/shared';
-import { describe, expect, it, vi } from 'vitest';
+import type { AgentSessionHandle, ClaimedStep, SessionOpts } from '@cairn/shared';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AskChannel } from '../src/ask-channel.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { createStepPassControls } from '../src/step-pass-controls.js';
 import { newStepPassState } from '../src/step-pass-events.js';
 
-function controls(machineId: string | null = 'm1') {
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+function controls(
+  machineId: string | null = 'm1',
+  stepKind: ClaimedStep['step']['kind'] = 'build',
+) {
   const askChannel = { keepAlive: null, abort: vi.fn() } as unknown as AskChannel;
   const sessionOpts = {} as SessionOpts;
   const passState = newStepPassState();
   const reportClaudeRateLimit = vi.fn(async () => {});
-  const client = { reportClaudeRateLimit } as unknown as MachineApi;
+  const transcriptDelta = vi.fn(async () => {});
+  const thinkingDelta = vi.fn(async () => {});
+  const client = {
+    reportClaudeRateLimit,
+    transcriptDelta,
+    thinkingDelta,
+  } as unknown as MachineApi;
   const built = createStepPassControls({
-    stepKind: 'build',
+    stepKind,
     machineId,
     streamTimeouts: undefined,
     streamDurationCapMs: undefined,
@@ -28,7 +41,16 @@ function controls(machineId: string | null = 'm1') {
   });
   const stopSession = vi.fn(async () => {});
   built.session.current = { stop: stopSession } as unknown as AgentSessionHandle;
-  return { built, askChannel, sessionOpts, passState, reportClaudeRateLimit, stopSession };
+  return {
+    built,
+    askChannel,
+    sessionOpts,
+    passState,
+    reportClaudeRateLimit,
+    transcriptDelta,
+    thinkingDelta,
+    stopSession,
+  };
 }
 
 describe('createStepPassControls', () => {
@@ -62,5 +84,29 @@ describe('createStepPassControls', () => {
     expect(passState.quotaTrip).toBeNull();
     expect(stopSession).not.toHaveBeenCalled();
     built.watchdog.stop();
+  });
+
+  it('enables leading-edge first delta only for chief steps', async () => {
+    vi.useFakeTimers();
+    const chief = controls('m1', 'chief');
+    chief.built.stream.pushThinking('plan');
+    chief.built.stream.pushText('hello');
+    expect(chief.thinkingDelta).toHaveBeenCalledWith('s1', 'plan');
+    expect(chief.transcriptDelta).toHaveBeenCalledWith('s1', 'hello');
+    chief.built.stream.pushText(' world');
+    expect(chief.transcriptDelta).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(chief.transcriptDelta).toHaveBeenCalledWith('s1', ' world');
+    chief.built.watchdog.stop();
+
+    const build = controls('m1', 'build');
+    build.built.stream.pushThinking('plan');
+    build.built.stream.pushText('hello');
+    expect(build.thinkingDelta).not.toHaveBeenCalled();
+    expect(build.transcriptDelta).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(build.thinkingDelta).toHaveBeenCalledWith('s1', 'plan');
+    expect(build.transcriptDelta).toHaveBeenCalledWith('s1', 'hello');
+    build.built.watchdog.stop();
   });
 });

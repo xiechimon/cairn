@@ -217,6 +217,7 @@ export interface AgentBackend {
   readonly brief?: BriefChannel;
   createSession(opts: SessionOpts): Promise<AgentSessionHandle>;
   continueSession(id: string, opts: SessionOpts): Promise<AgentSessionHandle>;
+  close?(): void;
   adaptProviderCompat?(provider: ProviderConfig, errorMessage: string): ProviderConfig | null;
   modelSupportsImages?(provider: ProviderConfig, modelId: string): Promise<boolean | null>;
   rememberNoVision?(provider: ProviderConfig, modelId: string): void;

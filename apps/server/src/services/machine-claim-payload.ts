@@ -40,7 +40,7 @@ import {
 } from '../db/schema.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import { chiefHistoryFor } from './chief-claim-history.js';
-import { chiefLastRanOnOtherAccount } from './claude-account-hold.js';
+import { chiefLastRanOnOtherAccount, chiefLastRanOnOtherMachine } from './claude-account-hold.js';
 import { rotatesPastCompaction } from './coordinator-context.js';
 import { resolveCoordinatorRemoteTools } from './coordinator-diagnostics.js';
 import { chiefTurnContext } from './coordinator-steps.js';
@@ -249,11 +249,20 @@ export function buildChiefClaimPayload(
               .where(eq(step.id, stepRow.id))
               .get()?.id ?? null)
           : null;
+  const localDiskSessionRuntime =
+    runtime === 'antigravity' ||
+    runtime === 'claude-code' ||
+    runtime === 'devin' ||
+    runtime === 'gemini';
   const continuesSession =
     !stepRow.freshSession &&
     threadRow.sessionId !== '' &&
     threadRow.sessionRuntime === runtime &&
     !rotatesPastCompaction(deps.db, threadRow.id, runtime) &&
+    !(
+      localDiskSessionRuntime &&
+      chiefLastRanOnOtherMachine(deps.db, threadRow.id, threadRow.sessionId, stepRow.id, machineId)
+    ) &&
     (runtime !== 'claude-code' && runtime !== 'devin' && runtime !== 'antigravity'
       ? true
       : !chiefLastRanOnOtherAccount(

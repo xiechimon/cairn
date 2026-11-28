@@ -1,7 +1,32 @@
-import { and, desc, eq, isNotNull, ne } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { step } from '../db/schema.js';
 import type { priorSessionOf } from './machine-routing.js';
+
+export function chiefLastRanOnOtherMachine(
+  db: Pick<Db, 'select'>,
+  threadId: string,
+  sessionId: string,
+  stepId: string,
+  machineId: string,
+): boolean {
+  if (sessionId === '') return false;
+  const last = db
+    .select({ machineId: step.machineId })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, threadId),
+        eq(step.kind, 'chief'),
+        eq(step.sessionId, sessionId),
+        ne(step.id, stepId),
+      ),
+    )
+    .orderBy(desc(step.createdAt), desc(sql`rowid`))
+    .limit(1)
+    .get();
+  return last?.machineId != null && last.machineId !== machineId;
+}
 
 export function accountHeld(
   stepRow: Pick<typeof step.$inferSelect, 'byPerson' | 'claudeSubscriptionId'>,

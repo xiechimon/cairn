@@ -7,6 +7,9 @@ type RestrictedPolicy = Exclude<AcpTurnPolicy, 'normal'>;
 interface HookLeaseState {
   hadAgentsDir: boolean;
   hadHooksFile: boolean;
+  hadPriorGroup: boolean;
+  priorGroupValue: unknown;
+  writtenGroupJson: string;
   leases: Map<symbol, RestrictedPolicy>;
 }
 
@@ -81,31 +84,50 @@ function writeGuard(
   agentsDir: string,
   base: Record<string, unknown>,
   policy: RestrictedPolicy,
-): void {
+): string {
   const command = `${shQuote(process.execPath)} -e ${shQuote(buildHookScript(policy))}`;
+  const guardValue = {
+    PreToolUse: [
+      {
+        matcher: '.*',
+        hooks: [{ type: 'command', command }],
+      },
+    ],
+  };
   const next = {
     ...base,
-    [HOOK_GROUP_KEY]: {
-      PreToolUse: [
-        {
-          matcher: '.*',
-          hooks: [{ type: 'command', command }],
-        },
-      ],
-    },
+    [HOOK_GROUP_KEY]: guardValue,
   };
   mkdirSync(agentsDir, { recursive: true });
   writeFileSync(hooksPath, JSON.stringify(next), { mode: 0o600 });
+  return JSON.stringify(guardValue);
 }
 
 function stripGuardKey(
   hooksPath: string,
   agentsDir: string,
-  options: { keepEmptyFile: boolean; removeEmptyAgentsDir: boolean },
+  options: {
+    keepEmptyFile: boolean;
+    removeEmptyAgentsDir: boolean;
+    expectedGuardJson?: string;
+    restorePriorGroup?: boolean;
+    priorGroupValue?: unknown;
+  },
 ): void {
   try {
     const parsed = readHooksObject(hooksPath, false);
     if (parsed === null || !Object.hasOwn(parsed, HOOK_GROUP_KEY)) return;
+    if (
+      options.expectedGuardJson !== undefined &&
+      JSON.stringify(parsed[HOOK_GROUP_KEY]) !== options.expectedGuardJson
+    ) {
+      return;
+    }
+    if (options.restorePriorGroup) {
+      const next = { ...parsed, [HOOK_GROUP_KEY]: options.priorGroupValue };
+      writeFileSync(hooksPath, JSON.stringify(next), { mode: 0o600 });
+      return;
+    }
     const { [HOOK_GROUP_KEY]: _removed, ...rest } = parsed;
     if (Object.keys(rest).length > 0) {
       writeFileSync(hooksPath, JSON.stringify(rest), { mode: 0o600 });
@@ -141,9 +163,13 @@ export function installAntigravityTurnHooks(cwd: string, policy: AcpTurnPolicy):
   let entry = activeHooks.get(key);
   const createdEntry = entry === undefined;
   if (entry === undefined) {
+    const hadPriorGroup = Object.hasOwn(base, HOOK_GROUP_KEY);
     entry = {
       hadAgentsDir: existsSync(agentsDir),
       hadHooksFile: existsSync(hooksPath),
+      hadPriorGroup,
+      priorGroupValue: hadPriorGroup ? base[HOOK_GROUP_KEY] : undefined,
+      writtenGroupJson: '',
       leases: new Map(),
     };
     activeHooks.set(key, entry);
@@ -151,7 +177,7 @@ export function installAntigravityTurnHooks(cwd: string, policy: AcpTurnPolicy):
   const token = Symbol();
   entry.leases.set(token, policy);
   try {
-    writeGuard(hooksPath, agentsDir, base, strictestPolicy(entry.leases));
+    entry.writtenGroupJson = writeGuard(hooksPath, agentsDir, base, strictestPolicy(entry.leases));
   } catch (error) {
     entry.leases.delete(token);
     if (createdEntry && entry.leases.size === 0) activeHooks.delete(key);
@@ -168,7 +194,12 @@ export function installAntigravityTurnHooks(cwd: string, policy: AcpTurnPolicy):
     if (current.leases.size > 0) {
       try {
         const curBase = readHooksObject(hooksPath, true) ?? {};
-        writeGuard(hooksPath, agentsDir, curBase, strictestPolicy(current.leases));
+        current.writtenGroupJson = writeGuard(
+          hooksPath,
+          agentsDir,
+          curBase,
+          strictestPolicy(current.leases),
+        );
       } catch {}
       return;
     }
@@ -176,6 +207,10 @@ export function installAntigravityTurnHooks(cwd: string, policy: AcpTurnPolicy):
     stripGuardKey(hooksPath, agentsDir, {
       keepEmptyFile: current.hadHooksFile,
       removeEmptyAgentsDir: !current.hadAgentsDir,
+      expectedGuardJson: current.writtenGroupJson,
+      ...(current.hadPriorGroup
+        ? { restorePriorGroup: true, priorGroupValue: current.priorGroupValue }
+        : {}),
     });
   };
 }

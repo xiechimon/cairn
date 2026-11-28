@@ -45,8 +45,13 @@ export interface AcpStdioBridge {
   port: number;
   token: string;
   toolNames: readonly string[];
+  toolDigest?: string;
   systemPromptAppendix?: string;
   hasListedTools: () => boolean;
+  rebind?: (opts: SessionOpts) => void;
+  unbind?: () => void;
+  hasInFlightCalls?: () => boolean;
+  setOnStrayCall?: (fn: (() => void) | undefined) => void;
   close: () => void;
 }
 
@@ -417,10 +422,31 @@ function searchDeferredTools(
   return `Call any matching tool via ${CALL_TOOL_NAME} with { name, arguments }:\n\n${body}`;
 }
 
-export async function openAcpTools(
+interface ResolvedAcpTools {
+  locked: boolean;
+  local: NonNullable<SessionOpts['localTools']>;
+  eagerRemote: RemoteToolDef[];
+  deferredRemote: RemoteToolDef[];
+  names: string[];
+  definitions: McpToolDefinition[];
+  systemPromptAppendix: string | undefined;
+  digest: string;
+}
+
+function splitRemoteTools(
+  remote: readonly RemoteToolDef[],
+  deferTools: boolean,
+): { eagerRemote: RemoteToolDef[]; deferredRemote: RemoteToolDef[] } {
+  return {
+    eagerRemote: deferTools ? remote.filter((tool) => tool.deferred !== true) : [...remote],
+    deferredRemote: deferTools ? remote.filter((tool) => tool.deferred === true) : [],
+  };
+}
+
+function resolveAcpTools(
   opts: SessionOpts,
   options?: OpenAcpToolsOptions,
-): Promise<AcpStdioBridge | null> {
+): ResolvedAcpTools | null {
   const remote = opts.remoteTools ?? [];
   const local = opts.localTools ?? [];
   if (remote.length === 0 && local.length === 0) return null;
@@ -430,8 +456,7 @@ export async function openAcpTools(
     throw new Error('ACP host tool names must be unique');
   }
   const deferTools = options?.deferTools === true;
-  const eagerRemote = deferTools ? remote.filter((tool) => tool.deferred !== true) : remote;
-  const deferredRemote = deferTools ? remote.filter((tool) => tool.deferred === true) : [];
+  const { eagerRemote, deferredRemote } = splitRemoteTools(remote, deferTools);
   const locked = acpTurnPolicy(opts) !== 'normal';
   const annotations = locked ? { readOnlyHint: true } : undefined;
 
@@ -439,8 +464,7 @@ export async function openAcpTools(
     ...eagerRemote,
     ...local,
   ];
-  const hasDeferred = deferredRemote.length > 0;
-  if (hasDeferred) {
+  if (deferredRemote.length > 0) {
     const toolSearchSchema: Record<string, unknown> = {
       type: 'object',
       properties: {
@@ -533,51 +557,143 @@ export async function openAcpTools(
           .join('\n\n')}`
       : undefined;
 
+  const digest = createHash('sha256')
+    .update(
+      JSON.stringify({
+        locked,
+        definitions,
+        deferred: deferredRemote.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters ?? EMPTY_INPUT_SCHEMA,
+        })),
+      }),
+    )
+    .digest('hex');
+
+  return {
+    locked,
+    local: [...local],
+    eagerRemote,
+    deferredRemote,
+    names,
+    definitions,
+    systemPromptAppendix,
+    digest,
+  };
+}
+
+export function computeAcpToolsDigest(opts: SessionOpts, options?: OpenAcpToolsOptions): string {
+  const remote = opts.remoteTools ?? [];
+  const local = opts.localTools ?? [];
+  if (remote.length === 0 && local.length === 0) return 'none';
+  const resolved = resolveAcpTools(
+    {
+      ...opts,
+      ...(remote.length > 0 && opts.executeRemoteTool === undefined
+        ? { executeRemoteTool: async () => '' }
+        : {}),
+    },
+    options,
+  );
+  return resolved?.digest ?? 'none';
+}
+
+export async function openAcpTools(
+  opts: SessionOpts,
+  options?: OpenAcpToolsOptions,
+): Promise<AcpStdioBridge | null> {
+  const resolved = resolveAcpTools(opts, options);
+  if (resolved === null) return null;
+  const deferTools = options?.deferTools === true;
+  const turnState: {
+    bound: boolean;
+    local: NonNullable<SessionOpts['localTools']>;
+    eagerRemote: RemoteToolDef[];
+    deferredRemote: RemoteToolDef[];
+    executeRemoteTool: SessionOpts['executeRemoteTool'];
+  } = {
+    bound: true,
+    local: resolved.local,
+    eagerRemote: resolved.eagerRemote,
+    deferredRemote: resolved.deferredRemote,
+    executeRemoteTool: opts.executeRemoteTool,
+  };
   let listedTools = false;
-  const bridge = await openStdioMcpListener('cairn', names, (server) => {
+  let inFlightCalls = 0;
+  let tainted = false;
+  let onStrayCall: (() => void) | undefined;
+  const bridge = await openStdioMcpListener('cairn', resolved.names, (server) => {
     server.setRequestHandler(ListToolsRequestSchema, () => {
       listedTools = true;
-      return { tools: definitions };
+      return { tools: resolved.definitions };
     });
     server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
-      const args =
-        typeof params.arguments === 'object' &&
-        params.arguments !== null &&
-        !Array.isArray(params.arguments)
-          ? (params.arguments as Record<string, unknown>)
-          : {};
-      if (hasDeferred && params.name === TOOL_SEARCH_NAME) {
+      if (!turnState.bound) {
+        tainted = true;
+        setTimeout(() => onStrayCall?.(), 15).unref?.();
         return {
-          content: [
-            {
-              type: 'text',
-              text: searchDeferredTools(deferredRemote, args.query, args.limit),
-            },
-          ],
+          content: [{ type: 'text', text: 'ACP host tools are unbound between turns' }],
+          isError: true,
         };
       }
-      if (hasDeferred && params.name === CALL_TOOL_NAME) {
-        const targetName = typeof args.name === 'string' ? args.name : '';
-        const deferredTool = deferredRemote.find((tool) => tool.name === targetName);
-        if (!deferredTool) {
+      inFlightCalls += 1;
+      try {
+        const args =
+          typeof params.arguments === 'object' &&
+          params.arguments !== null &&
+          !Array.isArray(params.arguments)
+            ? (params.arguments as Record<string, unknown>)
+            : {};
+        if (turnState.deferredRemote.length > 0 && params.name === TOOL_SEARCH_NAME) {
           return {
             content: [
               {
                 type: 'text',
-                text: `${targetName || '(missing)'} is not an available deferred Cairn tool; find one with ${TOOL_SEARCH_NAME}.`,
+                text: searchDeferredTools(turnState.deferredRemote, args.query, args.limit),
               },
             ],
-            isError: true,
           };
         }
-        const rawToolArgs = args.arguments;
-        const toolArgs =
-          typeof rawToolArgs === 'object' && rawToolArgs !== null && !Array.isArray(rawToolArgs)
-            ? (rawToolArgs as Record<string, unknown>)
-            : {};
+        if (turnState.deferredRemote.length > 0 && params.name === CALL_TOOL_NAME) {
+          const targetName = typeof args.name === 'string' ? args.name : '';
+          const deferredTool = turnState.deferredRemote.find((tool) => tool.name === targetName);
+          if (!deferredTool) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `${targetName || '(missing)'} is not an available deferred Cairn tool; find one with ${TOOL_SEARCH_NAME}.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          const rawToolArgs = args.arguments;
+          const toolArgs =
+            typeof rawToolArgs === 'object' && rawToolArgs !== null && !Array.isArray(rawToolArgs)
+              ? (rawToolArgs as Record<string, unknown>)
+              : {};
+          try {
+            const text = await turnState.executeRemoteTool?.(deferredTool.name, toolArgs);
+            return { content: hostToolContent(deferredTool.name, text ?? '') };
+          } catch (error) {
+            return {
+              content: [
+                { type: 'text', text: error instanceof Error ? error.message : String(error) },
+              ],
+              isError: true,
+            };
+          }
+        }
+        const localTool = turnState.local.find((tool) => tool.name === params.name);
+        const remoteTool = turnState.eagerRemote.find((tool) => tool.name === params.name);
+        if (!localTool && !remoteTool) throw new Error('Undeclared ACP host tool');
         try {
-          const text = await opts.executeRemoteTool?.(deferredTool.name, toolArgs);
-          return { content: hostToolContent(deferredTool.name, text ?? '') };
+          const text = localTool
+            ? await localTool.execute(params.arguments ?? {})
+            : await turnState.executeRemoteTool?.(params.name, params.arguments ?? {});
+          return { content: hostToolContent(params.name, text ?? '') };
         } catch (error) {
           return {
             content: [
@@ -586,28 +702,38 @@ export async function openAcpTools(
             isError: true,
           };
         }
-      }
-      const localTool = local.find((tool) => tool.name === params.name);
-      const remoteTool = eagerRemote.find((tool) => tool.name === params.name);
-      if (!localTool && !remoteTool) throw new Error('Undeclared ACP host tool');
-      try {
-        const text = localTool
-          ? await localTool.execute(params.arguments ?? {})
-          : await opts.executeRemoteTool?.(params.name, params.arguments ?? {});
-        return { content: hostToolContent(params.name, text ?? '') };
-      } catch (error) {
-        return {
-          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-          isError: true,
-        };
+      } finally {
+        inFlightCalls -= 1;
       }
     });
   });
 
   return {
     ...bridge,
+    toolDigest: resolved.digest,
     hasListedTools: () => listedTools,
-    ...(systemPromptAppendix !== undefined ? { systemPromptAppendix } : {}),
+    hasInFlightCalls: () => inFlightCalls > 0 || tainted,
+    setOnStrayCall: (fn) => {
+      onStrayCall = fn;
+    },
+    rebind: (nextOpts) => {
+      const split = splitRemoteTools(nextOpts.remoteTools ?? [], deferTools);
+      turnState.local = [...(nextOpts.localTools ?? [])];
+      turnState.eagerRemote = split.eagerRemote;
+      turnState.deferredRemote = split.deferredRemote;
+      turnState.executeRemoteTool = nextOpts.executeRemoteTool;
+      turnState.bound = true;
+    },
+    unbind: () => {
+      turnState.bound = false;
+      turnState.local = [];
+      turnState.eagerRemote = [];
+      turnState.deferredRemote = [];
+      turnState.executeRemoteTool = undefined;
+    },
+    ...(resolved.systemPromptAppendix !== undefined
+      ? { systemPromptAppendix: resolved.systemPromptAppendix }
+      : {}),
   };
 }
 

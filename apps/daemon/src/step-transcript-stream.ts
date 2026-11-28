@@ -14,6 +14,7 @@ export interface StepTranscriptStreamOptions {
   agentTodo: Pick<AgentTodoReporter, 'report'>;
   now: () => number;
   log: (line: string) => void;
+  leadingFirstDelta?: boolean;
 }
 
 export class StepTranscriptStream {
@@ -24,14 +25,16 @@ export class StepTranscriptStream {
   private lastRowCreatedAt = 0;
 
   constructor(private readonly options: StepTranscriptStreamOptions) {
-    const { client, stepId, log } = options;
+    const { client, stepId, log, leadingFirstDelta } = options;
     this.textDeltas = new DeltaRelay({
       flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
+      ...(leadingFirstDelta === true ? { leading: true } : {}),
       send: (text) => client.transcriptDelta(stepId, text),
       onError: (err) => log(`transcript delta relay failed: ${errorMessage(err)}`),
     });
     this.thinkingDeltas = new DeltaRelay({
       flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
+      ...(leadingFirstDelta === true ? { leading: true } : {}),
       send: (text) => client.thinkingDelta?.(stepId, text),
       onError: (err) => log(`thinking delta relay failed: ${errorMessage(err)}`),
     });
