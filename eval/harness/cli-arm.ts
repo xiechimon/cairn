@@ -15,7 +15,8 @@ import type { JourneyTask } from './types.js';
 /**
  * The approved model behind its own CLI, the way a Cairn runner starts it.
  * The harness reads the launcher from its own environment, never from a
- * candidate or a checked-in file.
+ * candidate or a checked-in file. `launchCliAgent` sends the flags the
+ * approved Doubao CLI documents; a different launcher needs its own adapter.
  */
 export interface CliModel {
   command: string;
@@ -31,12 +32,15 @@ export function cliModelFromEnv(env: NodeJS.ProcessEnv = process.env): CliModel 
   const command = env.EVAL_ARM_CLI?.trim() ?? '';
   const modelId = (env.EVAL_ARM_MODEL_ID ?? env.EVAL_ARM_MODEL)?.trim() ?? '';
   if (command === '' || modelId === '') return null;
+  const timeoutMs = Number(env.EVAL_ARM_TIMEOUT_MS ?? 180_000);
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
+    throw new Error('eval: EVAL_ARM_TIMEOUT_MS must be a positive number of milliseconds');
   return {
     command,
     modelId,
     effort: env.EVAL_ARM_EFFORT?.trim() || 'low',
     permissionMode: env.EVAL_ARM_PERMISSION?.trim() || 'always_allow',
-    timeoutMs: Number(env.EVAL_ARM_TIMEOUT_MS ?? 180_000),
+    timeoutMs,
   };
 }
 
@@ -72,17 +76,37 @@ export function launchCliAgent(
     const child = spawn(model.command, args, { cwd: workDir, stdio: ['ignore', 'pipe', 'pipe'] });
     let stderr = '';
     let timedOut = false;
+    let settled = false;
+    let termTimer: NodeJS.Timeout | undefined;
+    let killTimer: NodeJS.Timeout | undefined;
+    let giveUpTimer: NodeJS.Timeout | undefined;
+    const settle = (launch: CliLaunch) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(termTimer);
+      clearTimeout(killTimer);
+      clearTimeout(giveUpTimer);
+      resolve(launch);
+    };
     child.stdout.resume();
     child.stderr.on('data', (chunk: Buffer) => {
       stderr = `${stderr}${chunk.toString()}`.slice(-4000);
     });
-    const timer = setTimeout(() => {
+    termTimer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
+      killTimer = setTimeout(() => child.kill('SIGKILL'), 5_000);
     }, model.timeoutMs);
+    giveUpTimer = setTimeout(() => {
+      settle({
+        exitCode: null,
+        timedOut: true,
+        wallMs: Date.now() - started,
+        detail: 'launcher did not exit after SIGKILL',
+      });
+    }, model.timeoutMs + 15_000);
     child.on('error', (error) => {
-      clearTimeout(timer);
-      resolve({
+      settle({
         exitCode: null,
         timedOut: false,
         wallMs: Date.now() - started,
@@ -90,8 +114,7 @@ export function launchCliAgent(
       });
     });
     child.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({
+      settle({
         exitCode: code,
         timedOut,
         wallMs: Date.now() - started,

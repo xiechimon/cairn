@@ -50,6 +50,7 @@ const result: PilotResult = {
   },
   conclusion: 'Machinery only.',
   missing: 'A real-model A/A needs the approved model behind EVAL_ARM_BASE_URL.',
+  incomplete: null,
 };
 
 describe('scorecard', () => {
@@ -69,6 +70,15 @@ describe('scorecard', () => {
     const mode = statSync(path).mode & 0o777;
     expect(mode).toBe(0o600);
     expect(readFileSync(path, 'utf8')).toContain('Harness self-improvement');
+  });
+
+  test('an incomplete arm is shown as inconclusive, never as a verdict', () => {
+    const html = renderScorecard({
+      ...result,
+      incomplete: 'arm incomplete: the cap refused 2 reservations',
+    });
+    expect(html).toContain('Inconclusive');
+    expect(html).toContain('the cap refused 2 reservations');
   });
 
   test('escapes text it prints', () => {

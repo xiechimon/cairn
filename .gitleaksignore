@@ -1,4 +1,4 @@
 32af37e36cedda23f64c701a5e16db0e17048725:apps/daemon/test/runner-secret-redaction.test.ts:generic-api-key:26
 59493f0ca3b2df949785a705d418736b7c2d2e25:site/src/components/CloudflareBeacon.astro:generic-api-key:1
 56130a160076f925e52a0c570a2045b0c9cb5982:site/src/components/CloudflareBeacon.astro:generic-api-key:1
-4623c7e36cc5096d43d56dc02560f0c86d7d36f7:eval/harness/script.ts:generic-api-key:17
+e18339e31bdebc5fe5819b07bf10e17064694b8d:eval/harness/world.ts:generic-api-key:35

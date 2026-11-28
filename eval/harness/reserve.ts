@@ -15,9 +15,7 @@ export interface BudgetCap {
   maxWallMinutes: number;
 }
 
-export type Reservation =
-  | { ok: true; id: string; starts: number }
-  | { ok: false; reason: string };
+export type Reservation = { ok: true; id: string; starts: number } | { ok: false; reason: string };
 
 export interface LedgerSnapshot {
   starts: number;
@@ -35,11 +33,13 @@ export class ReservationLedger {
   private closed = false;
   private stopReason: string | null = null;
   private seq = 0;
+  private readonly startedAt: number;
 
-  constructor(cap: BudgetCap) {
+  constructor(cap: BudgetCap, startedAt = Date.now()) {
     if (cap.maxStarts < 0 || cap.maxWallMinutes < 0)
       throw new Error('reservation cap must not be negative');
     this.cap = cap;
+    this.startedAt = startedAt;
   }
 
   stop(reason: string): void {
@@ -54,7 +54,10 @@ export class ReservationLedger {
       this.stop(`start cap ${this.cap.maxStarts} reached`);
       return { ok: false, reason: this.stopReason ?? 'start cap reached' };
     }
-    if (this.wallMs >= this.cap.maxWallMinutes * 60_000) {
+    if (
+      this.wallMs >= this.cap.maxWallMinutes * 60_000 ||
+      now - this.startedAt >= this.cap.maxWallMinutes * 60_000
+    ) {
       this.stop(`wall cap ${this.cap.maxWallMinutes} minutes reached`);
       return { ok: false, reason: this.stopReason ?? 'wall cap reached' };
     }

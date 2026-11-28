@@ -29,6 +29,12 @@ describe('reservation ledger', () => {
     expect(ledger.snapshot().stopReason).toContain('wall cap 30');
   });
 
+  test('the wall cap also counts time in flight, not only settled charges', () => {
+    const ledger = new ReservationLedger({ maxStarts: 64, maxWallMinutes: 30 }, 0);
+    expect(ledger.open('a', 31 * 60_000).ok).toBe(false);
+    expect(ledger.snapshot().stopReason).toContain('wall cap 30');
+  });
+
   test('an unsettled reservation is still charged as a start', () => {
     const ledger = new ReservationLedger({ maxStarts: 1, maxWallMinutes: 30 });
     expect(ledger.open('a').ok).toBe(true);

@@ -160,6 +160,7 @@ describe('cli arm', () => {
     expect(result.damage.kind).toBe('discard');
     expect(result.capProof).toMatchObject({ admitted: 64, attempted: 65 });
     expect(result.missing).toBeNull();
+    expect(result.incomplete).toBeNull();
   });
 });
 
@@ -173,5 +174,15 @@ describe('cli model from the environment', () => {
       effort: 'low',
       permissionMode: 'always_allow',
     });
+  });
+
+  test('a timeout that is not a positive number is refused, never read as zero', () => {
+    expect(() =>
+      cliModelFromEnv({
+        EVAL_ARM_CLI: '/bin/true',
+        EVAL_ARM_MODEL_ID: 'm',
+        EVAL_ARM_TIMEOUT_MS: 'soon',
+      }),
+    ).toThrow('positive number');
   });
 });
