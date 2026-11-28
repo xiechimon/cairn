@@ -99,6 +99,7 @@ describe('cairn journey arm', () => {
     { timeout: 120_000 },
     async () => {
       const result = await runJourneyTask(caseFor(fixture), { repoRoot: fixture.repoRoot });
+      console.log('DEBUG', JSON.stringify({ record: result.record, checks: scoreJourney(caseFor(fixture), result.record), diagnostics: result.diagnostics }, null, 2));
       expect(result.record.incomplete).toBeUndefined();
       expect(journeyPassed(caseFor(fixture), result.record)).toBe(true);
       expect(result.record.journey?.claimedMachine).not.toBeNull();
