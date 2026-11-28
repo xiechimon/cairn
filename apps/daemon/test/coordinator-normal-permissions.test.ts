@@ -304,7 +304,13 @@ describe('normal Coordinator permissions across runtimes', () => {
     expect(sdkOptions.disallowedTools).toContain('AskUserQuestion');
     expect(sdkOptions.settingSources).toEqual(['user', 'project', 'local']);
 
-    expect(claudeAcpSessionMeta(acpTurnPolicy(claudeOpts))).toBeUndefined();
+    expect(claudeAcpSessionMeta(acpTurnPolicy(claudeOpts))).toMatchObject({
+      claudeCode: {
+        options: {
+          disallowedTools: expect.arrayContaining(['CronCreate', 'ScheduleWakeup']),
+        },
+      },
+    });
 
     const bashCall = JSON.stringify([
       {

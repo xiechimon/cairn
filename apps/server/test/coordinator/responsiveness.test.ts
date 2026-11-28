@@ -242,6 +242,8 @@ describe('Coordinator responsiveness contracts, prompt, tools, mirror, and runti
     expect(tools).toMatch(/recurring requests.*Cairn's schedule_todo.*deferred.*tool_search/i);
     expect(tools).toMatch(/recurring brief or research.*current Coordinator thread/i);
     expect(tools).toMatch(/not in a separate task or in a provider's scheduler/i);
+    expect(tools).toMatch(/a provider's own scheduler is not cairn/i);
+    expect(tools).toMatch(/never create one even when the provider's skill or toolset offers it/i);
     expect(tools).toMatch(/defaults you chose in the scheduled instructions/i);
     expect(tools).toMatch(/confirm.*only after Cairn returns the schedule record/i);
   });

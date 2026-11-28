@@ -63,15 +63,27 @@ export function restrictiveAcpMode(modes: {
   );
 }
 
+export const UNMANAGED_PROVIDER_ACTIONS = [
+  'CronCreate',
+  'CronDelete',
+  'CronList',
+  'ScheduleWakeup',
+  'RemoteTrigger',
+  'Workflow',
+] as const;
+
 export function claudeAcpSessionMeta(policy: AcpTurnPolicy): Record<string, unknown> | undefined {
-  if (policy === 'normal') return undefined;
   return {
     claudeCode: {
       options: {
-        disallowedTools:
-          policy === 'relay-only'
+        disallowedTools: [
+          ...UNMANAGED_PROVIDER_ACTIONS,
+          ...(policy === 'relay-only'
             ? [...CLAUDE_BUILTIN_WRITE_TOOLS, ...CLAUDE_BUILTIN_READ_TOOLS]
-            : CLAUDE_BUILTIN_WRITE_TOOLS,
+            : policy === 'read-only'
+              ? CLAUDE_BUILTIN_WRITE_TOOLS
+              : []),
+        ],
         allowDangerouslySkipPermissions: false,
       },
     },

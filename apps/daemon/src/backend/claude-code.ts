@@ -47,6 +47,7 @@ import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-aut
 import { stepCredentialRedactor } from '../credential-output.js';
 import { ProcessTree, SESSION_TREE_ENV } from '../process-tree.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
+import { UNMANAGED_PROVIDER_ACTIONS } from './acp-permission-gate.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
 import { BackgroundTaskRows } from './claude-background-tasks.js';
 import { type ClaudeTelemetryCapture, captureClaudeTelemetry } from './claude-telemetry.js';
@@ -81,14 +82,6 @@ const USAGE_MODEL_PREFIX = 'claude-code';
 const EFFORT_LEVELS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 const SDK_WORKSPACE_ACTIONS = ['Bash', 'PowerShell', 'Edit', 'Write', 'NotebookEdit'] as const;
-const SDK_UNMANAGED_ACTIONS = [
-  'CronCreate',
-  'CronDelete',
-  'CronList',
-  'ScheduleWakeup',
-  'RemoteTrigger',
-  'Workflow',
-] as const;
 const SDK_ASK_TOOL = 'AskUserQuestion';
 
 function isRetryableError(message: string): boolean {
@@ -1548,7 +1541,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       : { permissionMode: 'bypassPermissions' as const }),
     disallowedTools: [
       ...parts.disallowedTools,
-      ...SDK_UNMANAGED_ACTIONS,
+      ...UNMANAGED_PROVIDER_ACTIONS,
       ...(locked ? ['Bash', 'Agent'] : []),
     ],
     tools: parts.builtinTools ?? [
