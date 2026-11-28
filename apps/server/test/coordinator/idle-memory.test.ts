@@ -6,9 +6,12 @@ import {
 import { desc, eq, SQL, sql } from 'drizzle-orm';
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { idleSummaryRoute } from '../../src/coordinator/credentials.js';
 import {
   compactionFailureCounts,
   resetCompactionFailureCounts,
+  setFailureSink,
+  startSummaryCall,
 } from '../../src/coordinator/runtime/failure-report.js';
 import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-replies.js';
 import {
@@ -18,12 +21,15 @@ import {
   coordinatorInput,
   project,
   provider,
+  routingRule,
   step,
 } from '../../src/db/schema.js';
+import * as runtimeOtel from '../../src/runtime-otel.js';
 import { buildChiefSystemPrompt } from '../../src/services/chief.js';
 import { ensureMemoryIndex, listMemoryEntries } from '../../src/services/memory.js';
 import { appendMemoryIndex, memoryDocumentVersion } from '../../src/services/memory-documents.js';
 import { projectTurnContext } from '../../src/services/project-instructions.js';
+import { createProvider } from '../../src/services/providers.js';
 import { coordinatorProfile } from '../../src/services/routing-rules.js';
 import { req } from '../helpers.js';
 import { boot, type World, world } from './runner-world.js';
@@ -141,6 +147,400 @@ async function until(check: () => boolean, ms = 8_000) {
 beforeEach(() => resetCompactionFailureCounts());
 
 describe('idle memory extraction', () => {
+  it('skips an older invalid default before a valid HTTP candidate', async () => {
+    const w = await world('Remember: use amber labels.');
+    w.s.db
+      .update(routingRule)
+      .set({ provider: 'devin', modelId: 'runner' })
+      .where(eq(routingRule.teamId, w.teamId))
+      .run();
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        createdBy: w.s.user.id,
+        body: {
+          providerId: 'devin',
+          label: 'Runner',
+          baseUrl: 'http://127.0.0.1:9',
+          api: 'openai-completions',
+          apiKey: 'synthetic-key',
+          models: [{ id: 'runner', name: 'runner' }],
+        },
+      },
+    );
+    w.s.db.update(provider).set({ createdAt: 1 }).where(eq(provider.providerId, 'devin')).run();
+    expect(idleSummaryRoute({ db: w.s.db, box: w.s.secretBox }, w.teamId, null)?.provider).toBe(
+      'stub',
+    );
+  });
+
+  it('keeps a current LAN keyless HTTP route', async () => {
+    const w = await world('Remember: use amber labels.');
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        createdBy: w.s.user.id,
+        body: {
+          providerId: 'lan',
+          label: 'LAN',
+          baseUrl: 'http://192.168.1.2:8000',
+          api: 'openai-completions',
+          models: [{ id: 'local-model', name: 'local-model' }],
+        },
+      },
+    );
+    w.s.db
+      .update(routingRule)
+      .set({ provider: 'lan', modelId: 'local-model' })
+      .where(eq(routingRule.teamId, w.teamId))
+      .run();
+    expect(idleSummaryRoute({ db: w.s.db, box: w.s.secretBox }, w.teamId, null)?.provider).toBe(
+      'lan',
+    );
+  });
+
+  it('falls through a compaction credential that cannot be decrypted', async () => {
+    const w = await world('Remember: use amber labels.');
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        createdBy: w.s.user.id,
+        body: {
+          providerId: 'broken',
+          label: 'Broken',
+          baseUrl: 'https://example.invalid',
+          api: 'openai-completions',
+          apiKey: 'synthetic-key',
+          models: [{ id: 'broken-model', name: 'broken-model' }],
+        },
+      },
+    );
+    w.s.db
+      .update(provider)
+      .set({ apiKeyCipher: 'invalid' })
+      .where(eq(provider.providerId, 'broken'))
+      .run();
+    w.s.db
+      .insert(routingRule)
+      .values({
+        id: 'summary-rule',
+        teamId: w.teamId,
+        use: 'compaction',
+        provider: 'broken',
+        modelId: 'broken-model',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    expect(idleSummaryRoute({ db: w.s.db, box: w.s.secretBox }, w.teamId, null)?.provider).toBe(
+      'stub',
+    );
+  });
+
+  it('uses the team HTTP default for subscription chat', async () => {
+    const w = await world('Remember: use amber labels.');
+    w.s.db
+      .update(routingRule)
+      .set({ provider: 'devin', modelId: 'swe-2-1-medium' })
+      .where(eq(routingRule.teamId, w.teamId))
+      .run();
+    w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, w.stepId)).run();
+    backdateMessages(w, 11 * MINUTE);
+    const { faux, calls } = countingFaux(() =>
+      fauxAssistantMessage(factJson('Labels', 'Use amber.')),
+    );
+    const coordinator = boot(w, faux, { idleMemoryFlushMs: 10 * MINUTE });
+    coordinator.tick();
+    await coordinator.idle();
+    expect(calls()).toBe(1);
+    expect(memoryRows(w).map((r) => r.content)).toEqual(['- Labels：Use amber.']);
+    expect(watermark(w)).toBeGreaterThan(0);
+  });
+
+  it('honors an explicit compaction model for subscription chat', async () => {
+    const w = await world('Remember: use amber labels.');
+    w.s.db
+      .update(routingRule)
+      .set({ provider: 'devin', modelId: 'swe-2-1-medium' })
+      .where(eq(routingRule.teamId, w.teamId))
+      .run();
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        createdBy: w.s.user.id,
+        body: {
+          providerId: 'summary',
+          label: 'Summary',
+          baseUrl: 'http://127.0.0.1:9',
+          api: 'openai-completions',
+          apiKey: 'synthetic-summary-key',
+          models: [{ id: 'chosen', name: 'chosen' }],
+        },
+      },
+    );
+    w.s.db
+      .insert(routingRule)
+      .values({
+        id: 'summary-rule',
+        teamId: w.teamId,
+        use: 'compaction',
+        provider: 'summary',
+        modelId: 'chosen',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, w.stepId)).run();
+    backdateMessages(w, 11 * MINUTE);
+    const { faux, calls } = countingFaux(() =>
+      fauxAssistantMessage(factJson('Wrong', 'Wrong model.')),
+    );
+    const selected = fauxProvider({
+      provider: 'summary',
+      models: [{ id: 'chosen', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    const selectedCalls = vi.fn(() => fauxAssistantMessage(factJson('Labels', 'Use amber.')));
+    selected.setResponses([selectedCalls]);
+    const coordinator = boot(w, faux, {
+      idleMemoryFlushMs: 10 * MINUTE,
+      fixedProviders: [faux.provider, selected.provider],
+    });
+    coordinator.tick();
+    await coordinator.idle();
+    expect(calls()).toBe(0);
+    expect(selectedCalls).toHaveBeenCalledTimes(1);
+    expect(memoryRows(w).map((r) => r.content)).toEqual(['- Labels：Use amber.']);
+    expect(watermark(w)).toBeGreaterThan(0);
+  });
+
+  it('scrubs the idle fallback credential on failure', async () => {
+    const w = await world('Remember: use amber labels.', 'synthetic-idle-credential');
+    w.s.db
+      .update(routingRule)
+      .set({ provider: 'devin', modelId: 'swe-2-1-medium' })
+      .where(eq(routingRule.teamId, w.teamId))
+      .run();
+    w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, w.stepId)).run();
+    backdateMessages(w, 11 * MINUTE);
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            error: { message: 'synthetic-idle-credential', type: 'invalid_request_error' },
+          }),
+          { status: 400, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+    const logs: object[] = [];
+    const summary = vi.spyOn(runtimeOtel, 'emitSummaryCallSpan');
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const { faux } = countingFaux(() => fauxAssistantMessage('unused'));
+      const coordinator = boot(w, faux, { idleMemoryFlushMs: 10 * MINUTE, fixedProviders: [] });
+      setFailureSink({
+        log: (fields) => logs.push(fields),
+        stepOf: () => null,
+        scrub: (_thread, message) => message,
+      });
+      coordinator.tick();
+      await coordinator.idle();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(compactionFailureCounts()['idle-memory-flush']).toBe(1);
+      expect(logs.length).toBe(1);
+      expect(summary).toHaveBeenCalled();
+      expect(JSON.stringify(logs).includes('synthetic-idle-credential')).toBe(false);
+      expect(JSON.stringify(summary.mock.calls).includes('synthetic-idle-credential')).toBe(false);
+      expect(watermark(w)).toBeNull();
+      expect(memoryRows(w)).toEqual([]);
+      coordinator.tick();
+      await coordinator.idle();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+      summary.mockRestore();
+      setFailureSink(null);
+    }
+  });
+  it('scrubs escaped credentials from diagnostic fields before serialization', () => {
+    const key = 'synthetic-quote"slash\\credential';
+    const summary = vi.spyOn(runtimeOtel, 'emitSummaryCallSpan');
+    try {
+      const finish = startSummaryCall(
+        { scrub: (text) => text.split(key).join('[redacted]') },
+        'idle-memory-flush',
+        { provider: 'stub', id: 'm' },
+      );
+      finish(
+        {
+          ...fauxAssistantMessage(''),
+          diagnostics: [
+            {
+              type: 'provider_transport_failure',
+              timestamp: Date.now(),
+              error: { message: `failure ${key}`, code: 42 },
+              details: { configuredTransport: { nested: [key, 4, true, null] } },
+            },
+          ],
+        },
+        undefined,
+        undefined,
+      );
+      const diagnostics = summary.mock.calls[0]?.[0].diagnostics;
+      expect(diagnostics).toContain('[redacted]');
+      const diagnostic = JSON.parse(diagnostics!).at(0);
+      expect(diagnostic.message.includes(key)).toBe(false);
+      expect(diagnostic.code).toBe(42);
+      expect(diagnostic.configuredTransport.nested).toEqual(['[redacted]', 4, true, null]);
+    } finally {
+      summary.mockRestore();
+    }
+  });
+
+  it('allows a configured keyless loopback model', async () => {
+    const w = await world('Remember: use amber labels.');
+    w.s.db
+      .update(routingRule)
+      .set({ provider: 'devin', modelId: 'swe-2-1-medium' })
+      .where(eq(routingRule.teamId, w.teamId))
+      .run();
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        createdBy: w.s.user.id,
+        body: {
+          providerId: 'local-test',
+          label: 'Local',
+          baseUrl: 'http://127.0.0.1:9',
+          api: 'openai-completions',
+          models: [{ id: 'local-model', name: 'local-model' }],
+        },
+      },
+    );
+    w.s.db
+      .insert(routingRule)
+      .values({
+        id: 'summary-rule',
+        teamId: w.teamId,
+        use: 'compaction',
+        provider: 'local-test',
+        modelId: 'local-model',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+    w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, w.stepId)).run();
+    backdateMessages(w, 11 * MINUTE);
+    const { faux } = countingFaux(() => fauxAssistantMessage('unused'));
+    expect(idleSummaryRoute({ db: w.s.db, box: w.s.secretBox }, w.teamId, null)?.provider).toBe(
+      'local-test',
+    );
+    const local = fauxProvider({
+      provider: 'local-test',
+      models: [{ id: 'local-model', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    const called = vi.fn(() => fauxAssistantMessage(factJson('Labels', 'Use amber.')));
+    local.setResponses([called]);
+    const coordinator = boot(w, faux, {
+      idleMemoryFlushMs: 10 * MINUTE,
+      fixedProviders: [local.provider],
+    });
+    coordinator.tick();
+    await coordinator.idle();
+    expect(called).toHaveBeenCalledTimes(1);
+    expect(watermark(w)).toBeGreaterThan(0);
+  });
+
+  it.each(['runner', 'missing-model'] as const)(
+    'falls through an unusable explicit %s route',
+    async (kind) => {
+      const w = await world('Remember: use amber labels.');
+      w.s.db
+        .update(routingRule)
+        .set({ provider: 'devin', modelId: 'swe-2-1-medium' })
+        .where(eq(routingRule.teamId, w.teamId))
+        .run();
+      if (kind === 'runner')
+        createProvider(
+          { db: w.s.db, box: w.s.secretBox },
+          {
+            teamId: w.teamId,
+            createdBy: w.s.user.id,
+            body: {
+              providerId: 'devin',
+              label: 'Runner',
+              baseUrl: 'http://127.0.0.1:9',
+              api: 'openai-completions',
+              apiKey: 'synthetic-runner-key',
+              models: [{ id: 'swe-2-1-medium', name: 'runner' }],
+            },
+          },
+        );
+      w.s.db
+        .insert(routingRule)
+        .values({
+          id: 'summary-rule',
+          teamId: w.teamId,
+          use: 'compaction',
+          provider: kind === 'runner' ? 'devin' : 'stub',
+          modelId: kind === 'runner' ? 'swe-2-1-medium' : 'missing',
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .run();
+      w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, w.stepId)).run();
+      backdateMessages(w, 11 * MINUTE);
+      const { faux, calls } = countingFaux(() =>
+        fauxAssistantMessage(factJson('Labels', 'Use amber.')),
+      );
+      const coordinator = boot(w, faux, { idleMemoryFlushMs: 10 * MINUTE });
+      coordinator.tick();
+      await coordinator.idle();
+      expect(calls()).toBe(1);
+      expect(watermark(w)).toBeGreaterThan(0);
+    },
+  );
+
+  it('skips an automatic unkeyed remote instead of sending to it', async () => {
+    const w = await world('Remember: use amber labels.');
+    w.s.db
+      .update(routingRule)
+      .set({ provider: 'devin', modelId: 'swe-2-1-medium' })
+      .where(eq(routingRule.teamId, w.teamId))
+      .run();
+    createProvider(
+      { db: w.s.db, box: w.s.secretBox },
+      {
+        teamId: w.teamId,
+        createdBy: w.s.user.id,
+        body: {
+          providerId: 'remote',
+          label: 'Remote',
+          baseUrl: 'https://example.invalid',
+          api: 'openai-completions',
+          models: [{ id: 'remote-model', name: 'remote-model' }],
+        },
+      },
+    );
+    w.s.db.update(provider).set({ createdAt: 1 }).where(eq(provider.providerId, 'remote')).run();
+    w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, w.stepId)).run();
+    backdateMessages(w, 11 * MINUTE);
+    const { faux, calls } = countingFaux(() =>
+      fauxAssistantMessage(factJson('Labels', 'Use amber.')),
+    );
+    const coordinator = boot(w, faux, { idleMemoryFlushMs: 10 * MINUTE });
+    coordinator.tick();
+    await coordinator.idle();
+    expect(calls()).toBe(1);
+    expect(watermark(w)).toBeGreaterThan(0);
+  });
+
   it('extracts facts from an idle conversation through the existing flush', async () => {
     const w = await world('Remember: ian wants squash merges only.');
     const prompts: string[] = [];

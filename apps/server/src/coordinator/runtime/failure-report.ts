@@ -11,6 +11,7 @@ export type CompactionStage =
 export interface FailureScope {
   threadId?: string;
   stepId?: string;
+  scrub?: (message: string) => string;
 }
 
 export interface FailureSink {
@@ -66,12 +67,13 @@ export function startSummaryCall(
     scope.stepId ?? (scope.threadId === undefined ? null : sink.stepOf(scope.threadId));
   return (reply: AssistantMessage | undefined, error: unknown, httpStatus: number | undefined) => {
     try {
+      const scrubSecrets = (text: string) =>
+        scope.threadId === undefined
+          ? (scope.scrub?.(text) ?? text)
+          : sink.scrub(scope.threadId, scope.scrub?.(text) ?? text);
       const scrub = (text: string) =>
         otelErrorMessage(
-          (scope.threadId === undefined ? text : sink.scrub(scope.threadId, text)).replace(
-            /(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s"'<>]+/gi,
-            '<url>',
-          ),
+          scrubSecrets(text).replace(/(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s"'<>]+/gi, '<url>'),
         );
       const diagnostics = reply?.diagnostics?.slice(-8).map((item) => ({
         type: item.type,
@@ -106,7 +108,15 @@ export function startSummaryCall(
               errorMessage: message,
               errorClass: scrub(error instanceof Error ? error.name : typeof error),
             }),
-        ...(diagnostics === undefined ? {} : { diagnostics: scrub(JSON.stringify(diagnostics)) }),
+        ...(diagnostics === undefined
+          ? {}
+          : {
+              diagnostics: scrub(
+                JSON.stringify(diagnostics, (_key, value: unknown) =>
+                  typeof value === 'string' ? scrubSecrets(value) : value,
+                ),
+              ),
+            }),
         ...(httpStatus === undefined ? {} : { httpStatus }),
       });
     } catch {}
@@ -121,8 +131,10 @@ export function reportCompactionFailure(
 ): void {
   const count = (counts.get(stage) ?? 0) + 1;
   counts.set(stage, count);
-  const errorClass = error instanceof Error ? error.name : typeof error;
-  const raw = error instanceof Error ? error.message : String(error);
+  const rawClass = error instanceof Error ? error.name : typeof error;
+  const errorClass = scope.scrub?.(rawClass) ?? rawClass;
+  const original = error instanceof Error ? error.message : String(error);
+  const raw = scope.scrub?.(original) ?? original;
   const message = otelErrorMessage(
     scope.threadId === undefined ? raw : sink.scrub(scope.threadId, raw),
   );

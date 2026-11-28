@@ -286,8 +286,9 @@ function isAnthropicApi(baseUrl: string): boolean {
 export function anthropicCoordinatorChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
+  eligible: (provider: string, modelId: string) => boolean = () => true,
 ): { provider: string; modelId: string } | null {
-  const source = db
+  const sources = db
     .select({ providerId: provider.providerId, models: provider.models, baseUrl: provider.baseUrl })
     .from(provider)
     .where(
@@ -298,22 +299,25 @@ export function anthropicCoordinatorChoice(
       ),
     )
     .orderBy(asc(provider.createdAt), asc(provider.id))
-    .all()
-    .find((row) => isAnthropicApi(row.baseUrl) && row.models.length > 0);
-  if (source === undefined) return null;
-  const ids = source.models.map((m) => m.id);
-  const modelId =
-    COORDINATOR_MODEL_PREFERENCE.map((re) => ids.find((id) => re.test(id))).find(
-      (id) => id !== undefined,
-    ) ?? ids[0];
-  return modelId === undefined ? null : { provider: source.providerId, modelId };
+    .all();
+  for (const source of sources) {
+    if (!isAnthropicApi(source.baseUrl)) continue;
+    const ids = source.models.map((m) => m.id).filter((id) => eligible(source.providerId, id));
+    const modelId =
+      COORDINATOR_MODEL_PREFERENCE.map((re) => ids.find((id) => re.test(id))).find(
+        (id) => id !== undefined,
+      ) ?? ids[0];
+    if (modelId !== undefined) return { provider: source.providerId, modelId };
+  }
+  return null;
 }
 
 export function defaultCoordinatorChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
+  eligible: (provider: string, modelId: string) => boolean = () => true,
 ): (CoordinatorDefault & { provider: string; modelId: string }) | null {
-  const anthropic = anthropicCoordinatorChoice(db, teamId);
+  const anthropic = anthropicCoordinatorChoice(db, teamId, eligible);
   if (anthropic !== null) return { reason: 'anthropic-key', ...anthropic };
   const rows = db
     .select({
@@ -327,7 +331,7 @@ export function defaultCoordinatorChoice(
     .all();
   for (const row of rows) {
     if (row.keyed !== 1 && !keylessEndpoint(row.providerId)) continue;
-    const model = row.models.find((m) => m.id !== '');
+    const model = row.models.find((m) => m.id !== '' && eligible(row.providerId, m.id));
     if (model !== undefined) {
       return { reason: 'provider', provider: row.providerId, modelId: model.id };
     }

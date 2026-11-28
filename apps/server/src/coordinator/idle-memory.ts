@@ -4,11 +4,15 @@ import type { Db } from '../db/client.js';
 import { nowMs } from '../lib/ids.js';
 import { listStoredMemoryEntries, memoryDocumentVersion } from '../services/memory.js';
 import { coordinatorMemoryOwner } from '../services/routing-rules.js';
-import { coordinatorProviders } from './credentials.js';
+import { idleSummaryRoute } from './credentials.js';
 import { createMemoryFlush } from './memory-flush.js';
 import { providerBinding } from './provider-binding.js';
 import { flushTranscript, summarizerFor } from './runtime/compaction.js';
-import { recordCompactionSuccess, reportCompactionFailure } from './runtime/failure-report.js';
+import {
+  type FailureScope,
+  recordCompactionSuccess,
+  reportCompactionFailure,
+} from './runtime/failure-report.js';
 import { createCoordinatorModels } from './runtime/models.js';
 import { type SeedRow, seedMessageText } from './runtime/seed.js';
 import type { ServerRuntimeConfig } from './runtime/server-runtime.js';
@@ -127,17 +131,32 @@ export function createIdleMemorySweep(
     prepared: NonNullable<ReturnType<typeof prepareTranscript>>,
     controller: AbortController,
     now: number,
+    scope: FailureScope,
   ): Promise<void> {
     const { id, teamId, projectId } = candidate;
     const { rows, last, transcript } = prepared;
-    const providers = coordinatorProviders(deps, teamId, projectId);
-    if (providers === null) {
+    const route = idleSummaryRoute(deps, teamId, projectId);
+    if (route === null) {
       retryAt.set(id, now + retryMs);
       return;
     }
-    const binding = providerBinding(deps, teamId, providers.summary);
+    const binding = providerBinding(deps, teamId, route);
     const models = createCoordinatorModels(options.fixedProviders);
-    models.useProvider(binding.config, binding.resolveKey, binding.observe);
+    const keys = new Set<string>();
+    scope.scrub = (message) => {
+      let result = message;
+      for (const key of keys) result = result.split(key).join('[redacted]');
+      return result;
+    };
+    models.useProvider(
+      binding.config,
+      async () => {
+        const key = await binding.resolveKey();
+        if (key) keys.add(key);
+        return key;
+      },
+      binding.observe,
+    );
     const memoryState = (db: Parameters<typeof listStoredMemoryEntries>[0]) => {
       const agentId = coordinatorMemoryOwner(db, teamId);
       return agentId === undefined
@@ -156,7 +175,7 @@ export function createIdleMemorySweep(
         modelId: binding.modelId,
         thinkingLevel: binding.thinkingLevel ?? null,
       },
-      { threadId: id, stage: 'idle-memory-flush', timeoutMs, signal: controller.signal },
+      { ...scope, stage: 'idle-memory-flush', timeoutMs, signal: controller.signal },
     );
     const signal = controller.signal;
     let capturedMemory: ReturnType<typeof memoryState>;
@@ -239,11 +258,12 @@ export function createIdleMemorySweep(
       const prepared = prepareTranscript(candidate);
       if (prepared === null) continue;
       const controller = new AbortController();
-      const task = flushCandidate(candidate, prepared, controller, now)
+      const scope: FailureScope = { threadId: candidate.id };
+      const task = flushCandidate(candidate, prepared, controller, now, scope)
         .catch((error) => {
           if (error instanceof IdleFlushStale) return;
           if (closing) return;
-          reportCompactionFailure({ threadId: candidate.id }, 'idle-memory-flush', error, now);
+          reportCompactionFailure(scope, 'idle-memory-flush', error, now);
           retryAt.set(candidate.id, nowMs() + retryMs);
         })
         .finally(() => {

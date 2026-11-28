@@ -1,10 +1,16 @@
 import { type ProviderConfig, redactSecrets, type SecretBox } from '@cairn/shared';
+import { isLoopbackHost } from '@cairn/shared/loopback';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { routingRule } from '../db/schema.js';
 import { coordinatorRoute } from '../services/coordinator-route.js';
+import { stepRuntimeFor } from '../services/dispatch-eligibility.js';
 import { openProviderKey } from '../services/providers.js';
-import { resolveRuleProvider } from '../services/routing-rules.js';
+import {
+  defaultCoordinatorChoice,
+  keylessEndpoint,
+  resolveRuleProvider,
+} from '../services/routing-rules.js';
 
 export interface CoordinatorModelRoute {
   provider: string;
@@ -32,6 +38,15 @@ export function routeOf(
 ): CoordinatorModelRoute | null {
   const opened = openProviderKey(deps, teamId, provider);
   if (opened === null) return null;
+  return routeFromOpened(opened, provider, modelId, thinkingLevel);
+}
+
+function routeFromOpened(
+  opened: NonNullable<ReturnType<typeof openProviderKey>>,
+  provider: string,
+  modelId: string,
+  thinkingLevel: string | null,
+): CoordinatorModelRoute {
   return {
     provider,
     modelId,
@@ -47,6 +62,68 @@ export function routeOf(
       models: opened.row.models,
     },
   };
+}
+
+function explicitCompactionRule(db: Db, teamId: string) {
+  const stored = db
+    .select()
+    .from(routingRule)
+    .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'compaction')))
+    .get();
+  return stored === undefined ? null : resolveRuleProvider(db, stored, true);
+}
+
+export function idleSummaryRoute(
+  deps: CredentialDeps,
+  teamId: string,
+  projectId: string | null,
+): CoordinatorModelRoute | null {
+  const openedByProvider = new Map<string, ReturnType<typeof openProviderKey>>();
+  const usable = (
+    provider: string,
+    modelId: string,
+    thinkingLevel: string | null,
+    automatic = false,
+  ): CoordinatorModelRoute | null => {
+    if (stepRuntimeFor(provider) !== 'pi' || modelId === '') return null;
+    if (!openedByProvider.has(provider)) {
+      try {
+        openedByProvider.set(provider, openProviderKey(deps, teamId, provider));
+      } catch {
+        openedByProvider.set(provider, null);
+      }
+    }
+    const opened = openedByProvider.get(provider);
+    if (!opened?.row.models.some((model) => model.id === modelId)) return null;
+    if (!opened.apiKey) {
+      if (!keylessEndpoint(provider)) return null;
+      if (automatic) {
+        try {
+          if (!isLoopbackHost(new URL(opened.row.baseUrl).hostname)) return null;
+        } catch {
+          return null;
+        }
+      }
+    }
+    return routeFromOpened(opened, provider, modelId, thinkingLevel);
+  };
+  const rule = explicitCompactionRule(deps.db, teamId);
+  if (rule !== null) {
+    const explicit = usable(rule.provider, rule.modelId, rule.thinkingLevel ?? null);
+    if (explicit !== null) return explicit;
+  }
+  const chat = coordinatorRoute(deps.db, teamId, projectId);
+  const current = chat === null ? null : usable(chat.provider, chat.modelId, null);
+  if (current !== null) return current;
+  const fallback = defaultCoordinatorChoice(
+    deps.db,
+    teamId,
+    (provider, modelId) => usable(provider, modelId, null, true) !== null,
+  );
+  return fallback !== null &&
+    (fallback.reason === 'anthropic-key' || fallback.reason === 'provider')
+    ? usable(fallback.provider, fallback.modelId, null, true)
+    : null;
 }
 
 export function coordinatorProviders(
@@ -69,25 +146,17 @@ export function coordinatorProviders(
         ? null
         : routeOf(deps, teamId, rule.provider, rule.modelId, rule.thinkingLevel ?? null);
   if (router === null) return null;
-  const storedCompaction = deps.db
-    .select()
-    .from(routingRule)
-    .where(and(eq(routingRule.teamId, teamId), eq(routingRule.use, 'compaction')))
-    .get();
-  const compaction =
-    storedCompaction === undefined
-      ? undefined
-      : resolveRuleProvider(deps.db, storedCompaction, true);
+  const compaction = explicitCompactionRule(deps.db, teamId);
   const compactionRoute =
-    compaction !== undefined
-      ? routeOf(
+    compaction === null
+      ? null
+      : routeOf(
           deps,
           teamId,
           compaction.provider,
           compaction.modelId,
           compaction.thinkingLevel ?? null,
-        )
-      : null;
+        );
   const summary = compactionRoute ?? { ...router, thinkingLevel: null };
   return { router, summary };
 }
