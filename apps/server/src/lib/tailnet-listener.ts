@@ -19,17 +19,9 @@ export interface TailnetIdentity {
   name: string | null;
 }
 
-export interface TailnetOwnerPolicy {
-  ownerLogin: string | null;
-  selfTagged: boolean;
-  allowedLogins: readonly string[];
-  selfAddresses: readonly string[] | null;
-}
-
 interface TailnetListenerEnv {
   kind: typeof TAILNET_LISTENER;
   dnsName: () => string | null;
-  ownerPolicy: () => TailnetOwnerPolicy;
 }
 
 export interface TailnetListener {
@@ -118,12 +110,6 @@ export async function listenOnTailnetSocket(
   app: Hono,
   socketPath: string,
   dnsName: () => string | null = () => null,
-  ownerPolicy: () => TailnetOwnerPolicy = () => ({
-    ownerLogin: null,
-    selfTagged: false,
-    allowedLogins: [],
-    selfAddresses: [],
-  }),
 ): Promise<TailnetListener> {
   const parent = lstatSync(dirname(socketPath));
   if (
@@ -141,7 +127,6 @@ export async function listenOnTailnetSocket(
         [LISTENER_ENV_KEY]: {
           kind: TAILNET_LISTENER,
           dnsName,
-          ownerPolicy,
         } satisfies TailnetListenerEnv,
       }),
     ),

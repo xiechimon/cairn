@@ -56,7 +56,6 @@ export const ENV_VARS = {
   token: 'CAIRN_TOKEN',
   requireToken: 'CAIRN_REQUIRE_TOKEN',
   auth: 'CAIRN_AUTH',
-  tailscaleUsers: 'CAIRN_TAILSCALE_USERS',
   tsnet: 'CAIRN_TSNET',
   tsnetBinary: 'CAIRN_TSNET_BINARY',
   tsnetHostname: 'CAIRN_TSNET_HOSTNAME',

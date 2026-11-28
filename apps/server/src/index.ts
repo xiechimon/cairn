@@ -21,7 +21,6 @@ import {
   loadConfig,
   logTokenAuthStartup,
   reposDirOf,
-  warnIgnoredTailscaleUsers,
   warnInsecureBind,
 } from './config.js';
 import type { AppContext } from './context.js';
@@ -418,7 +417,6 @@ void hydrateMissingConnectorTools({
 });
 
 warnInsecureBind(logger, config);
-warnIgnoredTailscaleUsers(logger);
 logTokenAuthStartup(logger, config);
 
 const scheduler = createScheduler(

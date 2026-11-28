@@ -22,26 +22,14 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
 });
 
-async function setup(
-  policy = {
-    ownerLogin: LOGIN as string | null,
-    selfTagged: false,
-    allowedLogins: [] as string[],
-    selfAddresses: [] as string[],
-  },
-) {
+async function setup() {
   const s = bootServer({ authToken: TOKEN });
   const dir = makeTestTempDir('owner-');
   dirs.push(dir);
   const socketPath = join(dir, 'tailnet.sock');
-  const listener = await listenOnTailnetSocket(
-    s.app,
-    socketPath,
-    () => 'cairn.tail.example',
-    () => policy,
-  );
+  const listener = await listenOnTailnetSocket(s.app, socketPath, () => 'cairn.tail.example');
   closers.push(() => listener.close());
-  return { ...s, socketPath, listener, policy };
+  return { ...s, socketPath, listener };
 }
 
 function call(
@@ -168,24 +156,6 @@ test('Bearer authentication is exempt from ambient CSRF', async () => {
   ).toBe(201);
 });
 
-test('A6: missing owner metadata fails closed, explicit allowlist is fallback, owner metadata takes priority', async () => {
-  const s = await setup({
-    ownerLogin: null,
-    selfTagged: false,
-    allowedLogins: [],
-    selfAddresses: [],
-  });
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
-  s.policy.allowedLogins.push(LOGIN);
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
-  s.policy.ownerLogin = 'different@example.com';
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
-  s.policy.selfTagged = true;
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
-  s.policy.allowedLogins.length = 0;
-  expect((await call(s.socketPath, '/api/teams')).status).toBe(401);
-});
-
 test('A7: an existing socket with widened mode is refused, never repaired or replaced', async () => {
   const s = await setup();
   chmodSync(s.socketPath, 0o660);
@@ -246,7 +216,6 @@ test('A9: Funnel headers never grant ambient admission', async () => {
       cairnListener: {
         kind: 'funnel',
         dnsName: () => 'cairn.tail.example',
-        ownerPolicy: () => s.policy,
       },
     },
   );

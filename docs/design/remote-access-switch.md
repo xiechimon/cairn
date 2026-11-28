@@ -35,8 +35,8 @@ Readers and writers of the persisted flag:
 
 `CAIRN_TSNET` keeps a role as a **boot override for tests and packaged
 deployments**, never the user path: when it is set it decides the boot state
-(`1|true|yes` embedded, `socket` system-tailscaled mode, anything else off),
-ignoring the record; when unset the record decides. The switch still starts and
+(`1|true|yes` embedded, anything else off), ignoring the record; when unset
+the record decides. The switch still starts and
 stops the node at runtime either way. `CAIRN_AUTH=off` refuses enabling: the
 tailnet socket requires the access token (unchanged rule).
 
@@ -73,7 +73,6 @@ enable while failed ──▶ fresh start (retry)
 | state dir not private / socket path too long / socket in use | `failed/unavailable` | no spawn |
 | spawn error or sidecar exits | `restarting` with backoff, then `failed/crashed` after the supervisor gives up | supervisor backoff unchanged |
 | node needs (re-)login | `needs-login` + `authUrl` | sidecar keeps polling; `ready` on login |
-| system tailscaled unreadable (socket mode) | `ready` with `error: unavailable` | unchanged socket-mode semantics |
 | server shutdown | `stopped` → `off` | graceful sidecar shutdown as today |
 
 ## API

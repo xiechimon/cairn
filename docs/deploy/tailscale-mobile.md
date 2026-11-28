@@ -34,7 +34,7 @@ tailscale serve status
 
 If Serve prints an enablement link, open it, enable Serve, and run the command again. Copy the HTTPS address printed by Serve, for example `https://<machine>.<tailnet>.ts.net`. The target should be the running Cairn server on loopback. Do not use Funnel: that publishes a service to the internet. Do not run `tailscale serve reset`, which removes unrelated Serve configuration.
 
-This is the simplest supported setup. Existing `CAIRN_TSNET=socket` private-socket and `CAIRN_TSNET=1` embedded-sidecar installations can remain as they are; neither is required for this guide. Do not restart or reconfigure an already working server just to follow this guide.
+This is the simplest supported setup. An existing `CAIRN_TSNET=1` embedded-sidecar installation can remain as it is; it is not required for this guide. Do not restart or reconfigure an already working server just to follow this guide.
 
 ## 3. Pair your phone or another browser
 

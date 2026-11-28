@@ -24,8 +24,6 @@ const TSNET_HOSTNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
 
 export const tsnetSettingsSchema = z.object({
   enabled: z.boolean(),
-  mode: z.enum(['socket']).optional(),
-  allowedLogins: z.array(z.string().min(1)).optional(),
   binaryPath: z.string().min(1),
   hostname: z.string().regex(TSNET_HOSTNAME_PATTERN),
   uploadLogs: z.boolean(),
@@ -402,16 +400,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     host: envStr('HOST') ?? DEFAULT_HOST,
     trustedProxies: envTrustedProxies(),
     tsnet: {
-      enabled: envFlag(ENV_VARS.tsnet) || envStr(ENV_VARS.tsnet) === 'socket',
-      ...(envStr(ENV_VARS.tsnet) === 'socket' ? { mode: 'socket' } : {}),
-      ...(envStr(ENV_VARS.tailscaleUsers) === null
-        ? {}
-        : {
-            allowedLogins: envStr(ENV_VARS.tailscaleUsers)
-              ?.split(',')
-              .map((login) => login.trim())
-              .filter(Boolean),
-          }),
+      enabled: envFlag(ENV_VARS.tsnet),
       binaryPath: envStr(ENV_VARS.tsnetBinary) ?? defaultTsnetBinaryPath(home),
       hostname: envStr(ENV_VARS.tsnetHostname) ?? DEFAULT_TSNET_HOSTNAME,
       uploadLogs: envFlag(ENV_VARS.tsnetUploadLogs),
@@ -438,12 +427,6 @@ export function insecureBindWarning(config: ServerConfig): string | null {
     return `${ENV_VARS.auth}=off — token auth is disabled, so every process on this machine and every web page open in a local browser can call the API; unset ${ENV_VARS.auth} to require the generated token`;
   }
   return null;
-}
-
-export function ignoredTailscaleUsersWarning(env: NodeJS.ProcessEnv = process.env): string | null {
-  const raw = env[ENV_VARS.tailscaleUsers];
-  if (raw === undefined || raw.trim() === '') return null;
-  return `${ENV_VARS.tailscaleUsers} is ignored and does not grant access; Tailscale is only a route, sign in with a pairing code`;
 }
 
 export function authOffRefusal(config: ServerConfig): string | null {
@@ -520,11 +503,6 @@ export function logTokenAuthStartup(
 
 export function warnInsecureBind(logger: { warn(msg: string): void }, config: ServerConfig): void {
   const message = insecureBindWarning(config);
-  if (message !== null) logger.warn(message);
-}
-
-export function warnIgnoredTailscaleUsers(logger: { warn(msg: string): void }): void {
-  const message = ignoredTailscaleUsersWarning();
   if (message !== null) logger.warn(message);
 }
 

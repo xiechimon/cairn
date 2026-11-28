@@ -451,7 +451,6 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       token,
       requireToken,
       auth,
-      tailscaleUsers,
       tsnet,
       tsnetBinary,
       tsnetHostname,
@@ -485,7 +484,6 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(token).toBe('CAIRN_TOKEN');
     expect(requireToken).toBe('CAIRN_REQUIRE_TOKEN');
     expect(auth).toBe('CAIRN_AUTH');
-    expect(tailscaleUsers).toBe('CAIRN_TAILSCALE_USERS');
     expect(tsnet).toBe('CAIRN_TSNET');
     expect(tsnetBinary).toBe('CAIRN_TSNET_BINARY');
     expect(tsnetHostname).toBe('CAIRN_TSNET_HOSTNAME');

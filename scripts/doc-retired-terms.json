@@ -215,9 +215,28 @@
       "pattern": "\\bcoordinator-snapshot-gc\\b|\\bgc:coordinator-snapshots\\b",
       "canary": "gc:coordinator-snapshots",
       "reason": "the snapshot GC due-event is retired; the migration deletes leftover rows"
+    },
+    {
+      "id": "tailscale-users-env",
+      "pattern": "\\bCAIRN_TAILSCALE_USERS\\b",
+      "canary": "CAIRN_TAILSCALE_USERS",
+      "reason": "Tailscale identity never grants Cairn access; remote devices sign in with pairing codes"
+    },
+    {
+      "id": "tailnet-allowed-logins",
+      "pattern": "\\ballowedLogins\\b",
+      "canary": "allowedLogins",
+      "reason": "the tailnet identity allowlist is retired; Tailscale identity never grants Cairn access"
+    },
+    {
+      "id": "tsnet-socket-mode",
+      "pattern": "\\bCAIRN_TSNET=socket\\b",
+      "canary": "CAIRN_TSNET=socket",
+      "reason": "the system-tailscaled socket mode is retired; remote access uses the embedded tsnet sidecar or tailscale serve"
     }
   ],
   "baseline": {
+    "desktop-release-whole-run-lock": {},
     "adr-number": {
       ".claude/skills/verify-cairn/features/agent-detail.md": 2,
       ".claude/skills/verify-cairn/features/attachments.md": 1,
@@ -241,12 +260,12 @@
       "docs/spec/18-positioning-and-differentiation.md": 22,
       "docs/spec/22-color-and-geometry-token-scale-canonical-table.md": 4,
       "docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md": 5,
-      "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 28,
+      "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 26,
       "docs/spec/29-evaluation-and-data-loop.md": 7
     },
     "pr-evidence-gate": {
       ".claude/skills/verify-merge-gate/SKILL.md": 1,
-      "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 5
+      "docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md": 4
     },
     "manual-queue-main": {
       "AGENTS.md": 3
@@ -270,10 +289,23 @@
     "base-ui-theme-spec": {},
     "retired-design-rule-skills": {},
     "hygiene-draft-release-deletion": {},
+    "transfer-to-cairn-cli": {},
+    "ops-host-lane-scripts": {},
+    "omarchy-unit-templates": {},
+    "omarchy-backup-wrapper": {},
+    "single-candidate-promote-cli": {},
+    "build-merge-verdict-hook": {},
     "merge-gate-verdict-evaluator": {
       ".claude/skills/verify-merge-gate/evidence/findings.md": 5
     },
     "run-turn-list": {},
-    "machine-rotate-token-ui": {}
+    "machine-rotate-token-ui": {},
+    "coordinator-snapshot-sweep": {},
+    "snapshot-cleanup-interval": {},
+    "step-session-retention": {},
+    "snapshot-gc-due-event": {},
+    "tailscale-users-env": {},
+    "tailnet-allowed-logins": {},
+    "tsnet-socket-mode": {}
   }
 }

@@ -26,7 +26,7 @@ printf '%s\n' '{"type":"ready","dnsName":"cairn.tail.example","ownerLogin":"owne
 cat >/dev/null
 `, { mode: 0o700 });
   browser = await chromium.launch({ args: ['--no-proxy-server'] });
-  live = await bootLiveServer('tailnet-browser-test-secret', { CAIRN_TSNET: '1', CAIRN_TSNET_BINARY: binary, CAIRN_TAILSCALE_USERS: '' });
+  live = await bootLiveServer('tailnet-browser-test-secret', { CAIRN_TSNET: '1', CAIRN_TSNET_BINARY: binary });
   proxy = createServer({ key: readFileSync(key), cert: readFileSync(cert) }, (incoming, outgoing) => {
     const headers = { ...incoming.headers };
     for (const name of Object.keys(headers)) if (name.startsWith('tailscale-')) delete headers[name];

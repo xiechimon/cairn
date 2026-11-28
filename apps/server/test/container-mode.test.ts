@@ -55,7 +55,6 @@ async function boot(
       CAIRN_TOKEN: undefined,
       CAIRN_REQUIRE_TOKEN: undefined,
       CAIRN_AUTH: undefined,
-      CAIRN_TAILSCALE_USERS: undefined,
       HOST: '127.0.0.1',
       PORT: '0',
       ...env,
@@ -279,15 +278,14 @@ describe('#2057 safe bare-server defaults on a real process', () => {
     expect(existsSync(join(booted.home, ACCESS_TOKEN_FILE_NAME))).toBe(false);
   });
 
-  test('a forged Tailscale-User-Login from loopback grants nothing and the allowlist is reported ignored', async () => {
-    const booted = await boot({ CAIRN_TAILSCALE_USERS: 'owner@example.com' });
+  test('a forged Tailscale-User-Login from loopback grants nothing', async () => {
+    const booted = await boot({});
     await untilOnline(booted);
     const base = `http://127.0.0.1:${booted.port}`;
     const res = await fetch(`${base}/api/user/me`, {
       headers: { 'tailscale-user-login': 'owner@example.com' },
     });
     expect(res.status).toBe(401);
-    expect(booted.output()).toMatch(/CAIRN_TAILSCALE_USERS/);
   });
 
   test('the generated token still opens the SSE stream via ?token= and the exempt surfaces stay reachable', async () => {

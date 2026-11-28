@@ -11,7 +11,6 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import {
   authStartupRefusal,
   ensureAccessToken,
-  ignoredTailscaleUsersWarning,
   insecureBindWarning,
   isLoopbackHost,
   loadConfig,
@@ -283,13 +282,5 @@ describe('#2057 the Tailscale identity header grants nothing', () => {
       ),
     );
     expect(res.status).toBe(401);
-  });
-
-  test('CAIRN_TAILSCALE_USERS is ignored and does not grant access', () => {
-    expect(ignoredTailscaleUsersWarning({})).toBeNull();
-    expect(ignoredTailscaleUsersWarning({ CAIRN_TAILSCALE_USERS: '' })).toBeNull();
-    expect(ignoredTailscaleUsersWarning({ CAIRN_TAILSCALE_USERS: 'a@github' })).toMatch(
-      /CAIRN_TAILSCALE_USERS is ignored and does not grant access/,
-    );
   });
 });
