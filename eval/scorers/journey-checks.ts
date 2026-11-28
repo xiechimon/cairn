@@ -12,7 +12,9 @@ const fail = (name: string, comment: string, gate: boolean): CheckResult => ({
 export function scoreJourney(task: JourneyTask, record: TurnRecord): CheckResult[] {
   const gate = task.gate;
   if (record.incomplete !== undefined || record.journey === undefined)
-    return [{ name: 'incomplete', value: 0, comment: record.incomplete ?? 'no journey record', gate }];
+    return [
+      { name: 'incomplete', value: 0, comment: record.incomplete ?? 'no journey record', gate },
+    ];
   const journey = record.journey;
   const results: CheckResult[] = [
     journey.routed
