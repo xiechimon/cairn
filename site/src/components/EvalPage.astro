@@ -1,0 +1,130 @@
+---
+import '../styles/fonts.css';
+import '../styles/tokens.css';
+import '../styles/base.css';
+import CloudflareBeacon from './CloudflareBeacon.astro';
+import EvalProof from './EvalProof.astro';
+import SiteFooter from './SiteFooter.astro';
+import SiteHeader from './SiteHeader.astro';
+import { copy, type Lang } from './copy';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const site = 'https://cairn.xmon.me';
+---
+
+<!doctype html>
+<html lang={t.htmlLang} data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{t.evalPage.title}</title>
+    <meta name="description" content={t.evalPage.description} />
+    <link rel="canonical" href={`${site}${t.eval}`} />
+    <link rel="alternate" hreflang="en" href={`${site}${lang === 'zh' ? t.otherEval : t.eval}`} />
+    <link rel="alternate" hreflang="zh-CN" href={`${site}${lang === 'zh' ? t.eval : t.otherEval}`} />
+    <link rel="alternate" hreflang="x-default" href={`${site}${lang === 'zh' ? t.otherEval : t.eval}`} />
+    <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+    <meta name="color-scheme" content="light dark" />
+    <meta property="og:title" content={t.evalPage.title} />
+    <meta property="og:description" content={t.evalPage.description} />
+    <meta property="og:url" content={`${site}${t.eval}`} />
+    <meta property="og:image" content={`${site}/img/share-card-en.png`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={`${site}/img/share-card-en.png`} />
+    <CloudflareBeacon />
+    <link rel="preload" href="/fonts/source-serif-4-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/instrument-sans-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+    <script is:inline define:vars={{ lang, otherEval: t.otherEval }}>
+      (() => {
+        let stored = null;
+        let langPref = null;
+        try {
+          stored = localStorage.getItem('starlight-theme');
+          langPref = localStorage.getItem('cairn-lang');
+        } catch {}
+        const theme =
+          stored === 'light' || stored === 'dark'
+            ? stored
+            : matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+        document.documentElement.dataset.theme = theme;
+        const browserZh = (navigator.language || '').toLowerCase().startsWith('zh');
+        if (lang === 'en' && langPref !== 'en' && (langPref === 'zh' || browserZh)) {
+          location.replace(`${otherEval}${location.search}${location.hash}`);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{t.skipToContent}</a>
+    <SiteHeader lang={lang} />
+    <main id="main" class="eval-main wrap">
+      <a class="eval-back" href={t.home}>← {t.evalPage.back}</a>
+      <h1 id="eval-title">{t.proof.label}</h1>
+      <p class="eval-lede">{t.evalPage.lede}</p>
+      <section class="eval-proof" aria-labelledby="eval-title">
+        <EvalProof lang={lang} />
+      </section>
+    </main>
+    <SiteFooter lang={lang} />
+  </body>
+</html>
+
+<style>
+  .eval-main {
+    padding-top: 72px;
+    padding-bottom: 8px;
+  }
+  .eval-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    color: var(--ink-3);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .eval-back:hover {
+    color: var(--ink);
+  }
+  h1 {
+    max-width: 860px;
+    margin: 16px 0 0;
+    font-family: var(--font-serif);
+    font-size: clamp(1.75rem, 3.4vw, 2.5rem);
+    font-weight: 400;
+    line-height: 1.15;
+  }
+  :lang(zh-CN) h1 {
+    font-weight: 500;
+  }
+  .eval-lede {
+    max-width: 680px;
+    margin: 16px 0 0;
+    color: var(--ink-2);
+    font-size: 18px;
+    line-height: 1.65;
+    text-wrap: pretty;
+  }
+  .eval-proof {
+    margin-top: 40px;
+  }
+  @media (max-width: 640px) {
+    .eval-main {
+      padding-top: 48px;
+    }
+    .eval-lede {
+      font-size: 16px;
+    }
+    h1 {
+      font-size: 1.75rem;
+    }
+  }
+</style>

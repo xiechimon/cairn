@@ -19,6 +19,8 @@ export const copy = {
     docs: '/zh-cn/docs/intro/',
     installHref: '/zh-cn/docs/install/',
     firstTask: '/zh-cn/docs/first-task/',
+    eval: '/zh-cn/eval/',
+    otherEval: '/eval/',
     other: { href: '/', label: 'EN', name: 'English' },
     skipToContent: '跳到正文',
     navLabel: '主导航',
@@ -63,6 +65,13 @@ export const copy = {
         fail: '失败',
         incomplete: '未完成',
       },
+    },
+    evalPage: {
+      title: '「变好」怎么量 · Cairn 公开评测',
+      description:
+        'Cairn 的公开评测：固定用例、每轮全部试验与最新一轮逐题结果，题目和评分代码都在仓库 eval/ 目录。',
+      lede: '这一页只放公开的固定用例：每轮评测跑完全部试验，结果逐题列出，不做挑选。',
+      back: '回到首页',
     },
     start: '下载桌面应用',
     copy: '复制',
@@ -167,6 +176,7 @@ export const copy = {
     footer: {
       tagline: 'Cairn 由 Cairn 自己开发。',
       docs: '文档',
+      eval: '评测',
       discussions: '讨论区',
       issues: '问题反馈',
       security: '安全',
@@ -179,6 +189,8 @@ export const copy = {
     docs: '/docs/intro/',
     installHref: '/docs/install/',
     firstTask: '/docs/first-task/',
+    eval: '/eval/',
+    otherEval: '/zh-cn/eval/',
     other: { href: '/zh-cn/', label: '中文', name: '简体中文' },
     skipToContent: 'Skip to content',
     navLabel: 'Primary',
@@ -223,6 +235,13 @@ export const copy = {
         fail: 'Fail',
         incomplete: 'Incomplete',
       },
+    },
+    evalPage: {
+      title: 'How “better” is measured · Cairn eval',
+      description:
+        'Cairn’s public eval: fixed cases, every trial of each run, and the latest per-case results; the tasks and scorers live in eval/ in the repository.',
+      lede: 'This page holds the fixed public cases only: each run plays every trial and lists results per case, with no cherry-picking.',
+      back: 'Back to the homepage',
     },
     start: 'Download desktop app',
     copy: 'Copy',
@@ -327,6 +346,7 @@ export const copy = {
     footer: {
       tagline: 'Cairn is built with Cairn.',
       docs: 'Docs',
+      eval: 'Eval',
       discussions: 'Discussions',
       issues: 'Issues',
       security: 'Security',

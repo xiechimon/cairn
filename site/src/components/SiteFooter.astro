@@ -1,0 +1,102 @@
+---
+import Mark from './Mark.astro';
+import { copy, links, type Lang } from './copy';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+const onEvalPage = Astro.url.pathname.replace(/\/+$/, '') === t.eval.replace(/\/+$/, '');
+---
+
+<footer class="footer wrap">
+  <div class="foot-brand">
+    <a class="brand" href={t.home}>
+      <Mark size={20} />
+      <span>Cairn</span>
+    </a>
+    <p>{t.footer.tagline}</p>
+  </div>
+  <nav class="foot-links" aria-label={t.footerNavLabel}>
+    <a href={t.docs}>{t.footer.docs}</a>
+    {!onEvalPage && <a href={t.eval} class="eval-link">{t.footer.eval}</a>}
+    <a href={links.repo}>GitHub</a>
+    <a href={links.discussions}>{t.footer.discussions}</a>
+    <a href={links.issues}>{t.footer.issues}</a>
+    <a href={links.security}>{t.footer.security}</a>
+    <a href={links.license}>{t.footer.license}</a>
+  </nav>
+</footer>
+
+<style>
+  .footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 128px;
+    padding-top: 32px;
+    padding-bottom: 48px;
+    border-top: 1px solid var(--line);
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 4px 0;
+    text-decoration: none;
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .brand svg {
+    width: 20px;
+    height: 20px;
+  }
+  .foot-brand p {
+    max-width: 420px;
+    margin: 12px 0 0;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+  .foot-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    font-size: 14px;
+  }
+  .foot-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 0;
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+  .foot-links a:hover {
+    color: var(--ink);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  @media (pointer: coarse) {
+    .foot-links a {
+      min-width: 44px;
+      min-height: 44px;
+    }
+  }
+  @media (max-width: 640px) {
+    .footer {
+      margin-top: 88px;
+    }
+    .foot-links a {
+      min-width: 44px;
+      min-height: 44px;
+    }
+  }
+</style>

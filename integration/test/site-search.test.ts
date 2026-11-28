@@ -139,6 +139,8 @@ test('all public pages load one deferred Cloudflare beacon with the site token',
     const paths = [
       '/',
       '/zh-cn/',
+      '/eval/',
+      '/zh-cn/eval/',
       ...docs.flatMap((slug) => [`/docs/${slug}/`, `/zh-cn/docs/${slug}/`]),
       '/missing-page/',
     ];
@@ -161,6 +163,44 @@ test('all public pages load one deferred Cloudflare beacon with the site token',
 });
 
 const evalResultsUrl = 'https://raw.githubusercontent.com/xiechimon/cairn/eval-results/latest.json';
+
+test.each([
+  { name: 'English', path: '/', evalPath: '/eval/', locale: 'en-US', linkText: 'Eval' },
+  {
+    name: 'Chinese',
+    path: '/zh-cn/',
+    evalPath: '/zh-cn/eval/',
+    locale: 'zh-CN',
+    linkText: '评测',
+  },
+])(
+  'homepage keeps the eval proof on its own page, linked once: $name',
+  async ({ path, evalPath, locale, linkText }) => {
+    const context = await browser.newContext({ locale });
+    try {
+      await context.route('https://static.cloudflareinsights.com/**', (route) =>
+        route.fulfill({ contentType: 'application/javascript', body: '' }),
+      );
+      let requestedResults = false;
+      await context.route(evalResultsUrl, (route) => {
+        requestedResults = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+      });
+      const page = await context.newPage();
+      await page.goto(`${baseUrl}${path}`);
+      await browserExpect(page.locator('.proof-card')).toHaveCount(0);
+      await browserExpect(page.locator('#eval-live')).toHaveCount(0);
+      await browserExpect(page.locator('#eval-history-chart')).toHaveCount(0);
+      expect(requestedResults).toBe(false);
+      const links = page.locator(`a[href="${evalPath}"]`);
+      await browserExpect(links).toHaveCount(1);
+      await browserExpect(links.first()).toBeVisible();
+      await browserExpect(links.first()).toHaveText(linkText);
+    } finally {
+      await context.close();
+    }
+  },
+);
 
 function publicEvalPayload(date = new Date().toISOString()) {
   return {
@@ -219,7 +259,7 @@ function publicEvalPayload(date = new Date().toISOString()) {
 test.each([
   {
     name: 'English',
-    path: '/',
+    path: '/eval/',
     locale: 'en-US',
     latest: 'Latest daily eval',
     kindScore: 'Real coding 1/1',
@@ -230,7 +270,7 @@ test.each([
   },
   {
     name: 'Chinese',
-    path: '/zh-cn/',
+    path: '/zh-cn/eval/',
     locale: 'zh-CN',
     latest: '最新每日评测',
     kindScore: '真实编码 1/1',
@@ -406,7 +446,7 @@ test('keeps neutral fallback when public results unavailable', async () => {
         return scenario.respond(route);
       });
       const page = await context.newPage();
-      await page.goto(`${baseUrl}/`);
+      await page.goto(`${baseUrl}/eval/`);
       for (let attempt = 0; attempt < 60 && !requested; attempt += 1) await setTimeout(50);
       expect(requested, scenario.name).toBe(true);
       await setTimeout(150);
@@ -423,7 +463,7 @@ test('keeps neutral fallback when public results unavailable', async () => {
   const noJs = await browser.newContext({ locale: 'en-US', javaScriptEnabled: false });
   try {
     const page = await noJs.newPage();
-    await page.goto(`${baseUrl}/`);
+    await page.goto(`${baseUrl}/eval/`);
     await browserExpect(page.locator('#eval-empty')).toContainText(
       'Public eval results are unavailable',
     );
@@ -445,7 +485,7 @@ test('marks stale public eval results', async () => {
       }),
     );
     const page = await context.newPage();
-    await page.goto(`${baseUrl}/`);
+    await page.goto(`${baseUrl}/eval/`);
     await browserExpect(page.locator('#eval-live')).toBeVisible();
     await browserExpect(page.locator('#eval-date')).toContainText('Latest daily eval');
     await browserExpect(page.locator('#eval-stale')).toContainText('This snapshot may be stale');
@@ -465,7 +505,7 @@ test('normalizes cached fauxProvider replay labels to user-facing copy', async (
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(legacy) }),
     );
     const page = await context.newPage();
-    await page.goto(`${baseUrl}/zh-cn/`);
+    await page.goto(`${baseUrl}/zh-cn/eval/`);
     await browserExpect(page.locator('#eval-live')).toBeVisible();
     await page.locator('#eval-details summary').click();
     await browserExpect(page.locator('#eval-case-rows tr').nth(1)).toContainText('录制回放');

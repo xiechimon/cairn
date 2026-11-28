@@ -1,0 +1,181 @@
+---
+import Mark from './Mark.astro';
+import { copy, links, type Lang } from './copy';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = copy[lang];
+---
+
+<header class="nav wrap">
+  <a class="brand" href={t.home}>
+    <Mark size={24} />
+    <span>Cairn</span>
+  </a>
+  <nav class="nav-links" aria-label={t.navLabel}>
+    <a href={t.docs}>{t.nav.docs}</a>
+    <a href={links.repo} class="gh">{t.nav.github}</a>
+    <a
+      href={t.other.href}
+      class="lang"
+      data-lang={lang === 'zh' ? 'en' : 'zh'}
+      hreflang={lang === 'zh' ? 'en' : 'zh-CN'}
+      title={t.other.name}
+      data-home={t.home}
+    >{t.other.label}</a>
+    <button
+      type="button"
+      class="icon-btn"
+      id="theme-toggle"
+      aria-label={t.nav.theme}
+      title={t.nav.theme}
+      data-to-dark={t.nav.themeToDark}
+      data-to-light={t.nav.themeToLight}
+    >
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"
+        ><circle cx="12" cy="12" r="4"></circle><path
+          d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+        ></path></svg
+      >
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"
+        ><path
+          d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"
+        ></path></svg
+      >
+    </button>
+  </nav>
+</header>
+
+<script is:inline>
+  (() => {
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('theme-toggle');
+    const syncThemeLabel = () => {
+      if (!themeToggle) return;
+      const nextLabel =
+        root.dataset.theme === 'dark' ? themeToggle.dataset.toLight : themeToggle.dataset.toDark;
+      if (nextLabel) {
+        themeToggle.setAttribute('aria-label', nextLabel);
+        themeToggle.setAttribute('title', nextLabel);
+      }
+    };
+    syncThemeLabel();
+    themeToggle?.addEventListener('click', () => {
+      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
+      syncThemeLabel();
+      try {
+        localStorage.setItem('starlight-theme', next);
+      } catch {}
+    });
+    document.querySelectorAll('a.lang').forEach((link) => {
+      link.addEventListener('click', () => {
+        try {
+          localStorage.setItem('cairn-lang', link.dataset.lang ?? '');
+        } catch {}
+      });
+    });
+  })();
+</script>
+
+<style>
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 4px 0;
+    text-decoration: none;
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .nav-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 8px 12px;
+    border-radius: var(--radius-control);
+    color: var(--ink-2);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .nav-links a:hover,
+  .icon-btn:hover {
+    background: var(--hover);
+    color: var(--ink);
+  }
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+  .icon-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  @media (pointer: coarse) {
+    .brand {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .nav-links a {
+      min-width: 44px;
+      min-height: 44px;
+      justify-content: center;
+    }
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+    }
+  }
+  @media (max-width: 640px) {
+    .brand {
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .nav-links .gh {
+      display: none;
+    }
+    .nav-links a {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px 12px;
+      justify-content: center;
+    }
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+    }
+  }
+</style>
+
+<style is:global>
+  html[data-theme="dark"] .icon-btn .moon,
+  html:not([data-theme="dark"]) .icon-btn .sun {
+    display: none;
+  }
+</style>

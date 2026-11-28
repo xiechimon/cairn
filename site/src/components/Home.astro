@@ -1,9 +1,12 @@
 ---
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import '../styles/fonts.css';
 import '../styles/tokens.css';
-import Mark from './Mark.astro';
+import '../styles/base.css';
+import CloudflareBeacon from './CloudflareBeacon.astro';
+import SiteFooter from './SiteFooter.astro';
+import SiteHeader from './SiteHeader.astro';
 import { copy, type Lang, links } from './copy';
 
 interface Props {
@@ -16,29 +19,6 @@ const site = 'https://cairn.xmon.me';
 const hasPromoVideo =
   existsSync(resolve(process.cwd(), 'public/media/promo.mp4')) ||
   existsSync(resolve(process.cwd(), 'site/public/media/promo.mp4'));
-const evalRoot = [resolve(process.cwd(), '../eval'), resolve(process.cwd(), 'eval')].find((dir) =>
-  existsSync(join(dir, 'suite.json')),
-);
-if (!evalRoot) throw new Error('The homepage eval card reads eval/suite.json from the repository; it was not found.');
-const suite: { repeats: Record<'runtime' | 'lane' | 'canary', number> } = JSON.parse(
-  readFileSync(join(evalRoot, 'suite.json'), 'utf8'),
-);
-const evalKinds = (['runtime', 'lane', 'canary'] as const).map((kind) => {
-  const entries = readdirSync(join(evalRoot, 'tasks', kind), { withFileTypes: true });
-  const count = entries.filter((entry) => (kind === 'lane' ? entry.isDirectory() : entry.name.endsWith('.json'))).length;
-  return { kind, count, trials: count * suite.repeats[kind] };
-});
-const evalCases = evalKinds.reduce((sum, row) => sum + row.count, 0);
-const evalTrials = evalKinds.reduce((sum, row) => sum + row.trials, 0);
-const evalResultsUrl = 'https://raw.githubusercontent.com/xiechimon/cairn/eval-results/latest.json';
-const evalClientCopy = {
-  locale: t.htmlLang,
-  latestRun: t.proof.latestRun,
-  stale: t.proof.stale,
-  recordedReplay: t.proof.recordedReplay,
-  shortKinds: t.proof.shortKinds,
-  status: t.proof.status,
-};
 const heroShot = (theme: 'light' | 'dark') => `/img/placeholder-hero-${theme}.svg`;
 const stepShot = (name: string, theme: 'light' | 'dark') =>
   name === 'ios-home'
@@ -104,7 +84,7 @@ const jsonLd = {
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content={`${site}/img/share-card-en.png`} />
-    <script is:inline defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"a2f5ef9618404d5ea00a0820a8a1fba3"}'></script>
+    <CloudflareBeacon />
     <link rel="preload" href="/fonts/source-serif-4-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/instrument-sans-latin-var.woff2" as="font" type="font/woff2" crossorigin />
     <script is:inline define:vars={{ lang }}>
@@ -145,29 +125,7 @@ const jsonLd = {
         <feComposite in="rough" in2="holes" operator="in"></feComposite>
       </filter>
     </svg>
-    <header class="nav wrap">
-      <a class="brand" href={t.home}>
-        <Mark size={24} />
-        <span>Cairn</span>
-      </a>
-      <nav class="nav-links" aria-label={t.navLabel}>
-        <a href={t.docs}>{t.nav.docs}</a>
-        <a href={links.repo} class="gh">{t.nav.github}</a>
-        <a href={t.other.href} class="lang" data-lang={lang === 'zh' ? 'en' : 'zh'} hreflang={lang === 'zh' ? 'en' : 'zh-CN'} title={t.other.name}>{t.other.label}</a>
-        <button
-          type="button"
-          class="icon-btn"
-          id="theme-toggle"
-          aria-label={t.nav.theme}
-          title={t.nav.theme}
-          data-to-dark={t.nav.themeToDark}
-          data-to-light={t.nav.themeToLight}
-        >
-          <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
-          <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path></svg>
-        </button>
-      </nav>
-    </header>
+    <SiteHeader lang={lang} />
 
     <main id="main">
       <section class="hero wrap">
@@ -194,62 +152,6 @@ const jsonLd = {
               <path class="spiral" d="M-7 0 A7 7 0 0 1 7 0 A22 22 0 0 1 -37 0 A37 37 0 0 1 37 0 A52 52 0 0 1 -67 0 A67 67 0 0 1 67 0 A82 82 0 0 1 47.816 52.709"></path>
             </g>
           </svg>
-        </div>
-      </section>
-
-      <section class="proof wrap" aria-labelledby="proof-title">
-        <div class="proof-card">
-          <div class="proof-suite">
-            <h2 class="proof-label" id="proof-title">{t.proof.label}</h2>
-            <p class="proof-total"><span class="proof-n">{evalCases}</span> {t.proof.cases}</p>
-            <ul class="proof-kinds">
-              {
-                evalKinds.map((row) => (
-                  <li>
-                    <span class="proof-count">{row.count}</span>
-                    {t.proof.kinds[row.kind]}
-                  </li>
-                ))
-              }
-            </ul>
-            <p class="proof-meta">
-              {t.proof.trials(evalTrials)} · <a href={links.eval}>{t.proof.source}</a>
-            </p>
-          </div>
-          <figure class="proof-chart">
-            <figcaption>{t.proof.chart}</figcaption>
-            <svg id="eval-history-chart" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-              <path class="grid" d="M0 0.5H400M0 40.5H400M0 80.5H400"></path>
-              <path class="axis" d="M0 119.5H400"></path>
-            </svg>
-            <p class="proof-empty" id="eval-empty">{t.proof.empty}</p>
-            <div class="proof-live" id="eval-live" hidden>
-              <p class="proof-date">
-                <span id="eval-date"></span>
-                <span class="proof-stale" id="eval-stale" hidden></span>
-              </p>
-              <p class="proof-score" id="eval-score"></p>
-            </div>
-          </figure>
-          <details class="proof-details" id="eval-details" hidden>
-            <summary>{t.proof.details}</summary>
-            <div class="proof-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t.proof.table.case}</th>
-                    <th>{t.proof.table.kind}</th>
-                    <th>{t.proof.table.passed}</th>
-                    <th>{t.proof.table.failed}</th>
-                    <th>{t.proof.table.incomplete}</th>
-                    <th>{t.proof.table.status}</th>
-                    <th>{t.proof.table.model}</th>
-                  </tr>
-                </thead>
-                <tbody id="eval-case-rows"></tbody>
-              </table>
-            </div>
-          </details>
         </div>
       </section>
 
@@ -374,53 +276,10 @@ const jsonLd = {
       </section>
     </main>
 
-    <footer class="footer wrap">
-      <div class="foot-brand">
-        <a class="brand" href={t.home}>
-          <Mark size={20} />
-          <span>Cairn</span>
-        </a>
-        <p>{t.footer.tagline}</p>
-      </div>
-      <nav class="foot-links" aria-label={t.footerNavLabel}>
-        <a href={t.docs}>{t.footer.docs}</a>
-        <a href={links.repo}>GitHub</a>
-        <a href={links.discussions}>{t.footer.discussions}</a>
-        <a href={links.issues}>{t.footer.issues}</a>
-        <a href={links.security}>{t.footer.security}</a>
-        <a href={links.license}>{t.footer.license}</a>
-      </nav>
-    </footer>
+    <SiteFooter lang={lang} />
     <span class="sr-only" aria-live="polite" id="live-status"></span>
 
-    <script is:inline define:vars={{ hasPromoVideo, evalResultsUrl, evalClientCopy }}>
-      const root = document.documentElement;
-      const themeToggle = document.getElementById('theme-toggle');
-      const syncThemeLabel = () => {
-        if (!themeToggle) return;
-        const nextLabel =
-          root.dataset.theme === 'dark' ? themeToggle.dataset.toLight : themeToggle.dataset.toDark;
-        if (nextLabel) {
-          themeToggle.setAttribute('aria-label', nextLabel);
-          themeToggle.setAttribute('title', nextLabel);
-        }
-      };
-      syncThemeLabel();
-      themeToggle?.addEventListener('click', () => {
-        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-        root.dataset.theme = next;
-        syncThemeLabel();
-        try {
-          localStorage.setItem('starlight-theme', next);
-        } catch {}
-      });
-      document.querySelectorAll('a.lang').forEach((link) => {
-        link.addEventListener('click', () => {
-          try {
-            localStorage.setItem('cairn-lang', link.dataset.lang ?? '');
-          } catch {}
-        });
-      });
+    <script is:inline define:vars={{ hasPromoVideo }}>
       const liveStatus = document.getElementById('live-status');
       const writeClipboard = async (text) => {
         try {
@@ -495,347 +354,12 @@ const jsonLd = {
           .catch(() => {});
       }
 
-      const evalLive = document.getElementById('eval-live');
-      const evalEmpty = document.getElementById('eval-empty');
-      const evalDate = document.getElementById('eval-date');
-      const evalStale = document.getElementById('eval-stale');
-      const evalScore = document.getElementById('eval-score');
-      const evalDetails = document.getElementById('eval-details');
-      const evalRows = document.getElementById('eval-case-rows');
-      const evalChart = document.getElementById('eval-history-chart');
-      const formatEvalModel = (raw) =>
-        raw === 'Recorded replay' || raw === 'fauxProvider replay'
-          ? evalClientCopy.recordedReplay
-          : raw;
-      const evalKinds = ['lane', 'runtime', 'canary'];
-      const validCount = (bucket) =>
-        bucket &&
-        ['total', 'passed', 'failed', 'incomplete'].every((key) =>
-          Number.isInteger(bucket[key]) && bucket[key] >= 0,
-        ) &&
-        bucket.passed + bucket.failed + bucket.incomplete === bucket.total;
-      const consistentEvalData = (data) => {
-        const sums = Object.fromEntries(
-          evalKinds.map((kind) => [kind, { total: 0, passed: 0, failed: 0, incomplete: 0 }]),
-        );
-        for (const row of data.cases) {
-          const bucket = sums[row.kind];
-          bucket.total += row.trials;
-          bucket.passed += row.passed;
-          bucket.failed += row.failed;
-          bucket.incomplete += row.incomplete;
-        }
-        return (
-          evalKinds.every((kind) =>
-            ['total', 'passed', 'failed', 'incomplete'].every(
-              (key) => sums[kind][key] === data.summary.byKind[kind][key],
-            ),
-          ) &&
-          ['total', 'passed', 'failed', 'incomplete'].every(
-            (key) =>
-              data.summary[key] ===
-              evalKinds.reduce((sum, kind) => sum + data.summary.byKind[kind][key], 0),
-          )
-        );
-      };
-      const validEvalData = (data) =>
-        data &&
-        data.version === 1 &&
-        typeof data.dataset === 'string' &&
-        data.dataset.length > 0 &&
-        Number.isInteger(data.suiteVersion) &&
-        data.suiteVersion >= 1 &&
-        typeof data.sha === 'string' &&
-        /^[0-9a-f]{7,64}$/i.test(data.sha) &&
-        ['ok', 'degraded', 'incomplete', 'failed'].includes(data.status) &&
-        typeof data.date === 'string' &&
-        !Number.isNaN(Date.parse(data.date)) &&
-        Date.parse(data.date) <= Date.now() + 10 * 60 * 1000 &&
-        validCount(data.summary) &&
-        data.summary.byKind &&
-        evalKinds.every((kind) => validCount(data.summary.byKind[kind])) &&
-        Array.isArray(data.cases) &&
-        data.cases.length > 0 &&
-        data.cases.every(
-          (row) =>
-            row &&
-            typeof row.caseId === 'string' &&
-            evalKinds.includes(row.kind) &&
-            ['pass', 'partial', 'fail', 'incomplete'].includes(row.status) &&
-            Number.isInteger(row.passed) &&
-            row.passed >= 0 &&
-            Number.isInteger(row.failed) &&
-            row.failed >= 0 &&
-            Number.isInteger(row.incomplete) &&
-            row.incomplete >= 0 &&
-            Number.isInteger(row.trials) &&
-            row.trials >= 1 &&
-            row.passed + row.failed + row.incomplete === row.trials &&
-            typeof row.model === 'string',
-        ) &&
-        consistentEvalData(data);
-      const appendSvg = (parent, name, attrs) => {
-        const node = document.createElementNS('http://www.w3.org/2000/svg', name);
-        for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
-        parent.appendChild(node);
-        return node;
-      };
-      const renderEvalData = (data) => {
-        if (!evalLive || !evalEmpty || !evalDate || !evalScore || !evalRows || !evalChart) return;
-        const timestamp = Date.parse(data.date);
-        const dateText = new Intl.DateTimeFormat(evalClientCopy.locale, {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        }).format(new Date(timestamp));
-        evalDate.textContent = `${evalClientCopy.latestRun} · ${dateText}`;
-        if (evalStale) {
-          evalStale.hidden = Date.now() - timestamp <= 48 * 3600 * 1000;
-          evalStale.textContent = evalClientCopy.stale;
-        }
-        const parts = evalKinds.map((kind) => {
-          const counts = data.summary.byKind[kind];
-          const label = evalClientCopy.shortKinds[kind] ?? kind;
-          return `${label} ${counts.passed}/${counts.total}`;
-        });
-        evalScore.textContent = parts.join(' · ');
-
-        for (const node of [...evalChart.querySelectorAll('[data-eval-bar]')]) node.remove();
-        evalKinds.forEach((kind, index) => {
-          const counts = data.summary.byKind[kind];
-          const ratio = counts.total > 0 ? counts.passed / counts.total : 0;
-          const y = 8 + index * 40;
-          const label = evalClientCopy.shortKinds[kind] ?? kind;
-          const text = appendSvg(evalChart, 'text', {
-            x: 0,
-            y: y + 13,
-            class: 'eval-bar-label',
-            'data-eval-bar': 'label',
-          });
-          text.textContent = label;
-          appendSvg(evalChart, 'rect', {
-            x: 108,
-            y,
-            width: 224,
-            height: 16,
-            rx: 8,
-            class: 'eval-bar-track',
-            'data-eval-bar': 'track',
-          });
-          const fill = appendSvg(evalChart, 'rect', {
-            x: 108,
-            y,
-            width: Math.max(0, Math.min(1, ratio)) * 224,
-            height: 16,
-            rx: 8,
-            class: 'eval-bar-fill',
-            'data-eval-bar': 'fill',
-            'data-eval-bar-fill': kind,
-          });
-          const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-          title.textContent = `${label} ${counts.passed}/${counts.total}`;
-          fill.appendChild(title);
-          const countText = appendSvg(evalChart, 'text', {
-            x: 396,
-            y: y + 13,
-            'text-anchor': 'end',
-            class: 'eval-bar-count',
-            'data-eval-bar': 'count',
-          });
-          countText.textContent = `${counts.passed}/${counts.total}`;
-        });
-
-        evalRows.replaceChildren();
-        for (const row of data.cases.slice(0, 100)) {
-          const tr = document.createElement('tr');
-          const addCell = (text) => {
-            const td = document.createElement('td');
-            td.textContent = text;
-            tr.appendChild(td);
-            return td;
-          };
-          addCell(row.caseId);
-          addCell(evalClientCopy.shortKinds[row.kind] ?? row.kind);
-          addCell(`${row.passed}/${row.trials}`);
-          addCell(String(row.failed));
-          addCell(String(row.incomplete));
-          const statusCell = document.createElement('td');
-          const badge = document.createElement('span');
-          badge.className = `eval-status eval-status-${row.status}`;
-          badge.textContent = evalClientCopy.status[row.status] ?? row.status;
-          statusCell.appendChild(badge);
-          tr.appendChild(statusCell);
-          addCell(formatEvalModel(row.model));
-          evalRows.appendChild(tr);
-        }
-        evalEmpty.hidden = true;
-        evalLive.hidden = false;
-        if (evalDetails) evalDetails.hidden = false;
-      };
-      if (evalLive && evalEmpty) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        fetch(evalResultsUrl, { signal: controller.signal, cache: 'no-store' })
-          .then((response) => (response.ok ? response.json() : null))
-          .then((data) => {
-            if (validEvalData(data)) renderEvalData(data);
-          })
-          .catch(() => {})
-          .finally(() => clearTimeout(timeout));
-      }
     </script>
   </body>
 </html>
 
-<style is:global>
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
-  html {
-    background: var(--sheet);
-    color-scheme: light;
-  }
-  html[data-theme="dark"] {
-    color-scheme: dark;
-  }
-  body {
-    margin: 0;
-    background: var(--sheet);
-    color: var(--ink);
-    font-family: var(--font-sans);
-    font-size: 16px;
-    line-height: 1.6;
-  }
-  code,
-  pre {
-    font-family: var(--font-mono);
-  }
-  figure {
-    margin: 0;
-  }
-  a {
-    color: inherit;
-  }
-  img {
-    display: block;
-    max-width: 100%;
-    height: auto;
-  }
-  html[data-theme="dark"] .for-light,
-  html:not([data-theme="dark"]) .for-dark {
-    display: none;
-  }
-  :focus-visible {
-    outline: 2.4px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-  }
-  .skip-link {
-    position: fixed;
-    top: -100px;
-    left: 16px;
-    z-index: 100;
-    padding: 8px 16px;
-    border-radius: var(--radius-control);
-    background: var(--primary);
-    color: var(--on-primary);
-    font-size: 14px;
-    font-weight: 400;
-    text-decoration: none;
-  }
-  .skip-link:focus-visible {
-    top: 16px;
-  }
-</style>
 
 <style>
-  .wrap {
-    width: 100%;
-    max-width: 1152px;
-    margin: 0 auto;
-    padding: 0 24px;
-  }
-
-  .nav {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 64px;
-  }
-  .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 36px;
-    padding: 4px 0;
-    text-decoration: none;
-    color: var(--ink);
-    font-family: var(--font-serif);
-    font-size: 18px;
-    font-weight: 500;
-    line-height: 1;
-  }
-  .nav-links {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .nav-links a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 36px;
-    padding: 8px 12px;
-    border-radius: var(--radius-control);
-    color: var(--ink-2);
-    font-size: 14px;
-    text-decoration: none;
-  }
-  .nav-links a:hover,
-  .icon-btn:hover {
-    background: var(--hover);
-    color: var(--ink);
-  }
-  .icon-btn {
-    display: inline-grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-control);
-    background: none;
-    color: var(--ink-2);
-    cursor: pointer;
-  }
-  svg {
-    width: 20px;
-    height: 20px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.75;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-  .cairn-mark {
-    stroke: none;
-  }
-  html[data-theme="dark"] .icon-btn .moon,
-  html:not([data-theme="dark"]) .icon-btn .sun {
-    display: none;
-  }
-
   .hero {
     padding-top: 88px;
     text-align: center;
@@ -962,15 +486,13 @@ const jsonLd = {
     background: var(--hover);
     color: var(--ink);
   }
-  .copy .i-check,
-  .copy.done .i-copy {
+  .copy .i-check, .copy.done .i-copy {
     display: none;
   }
   .copy.done .i-check {
     display: block;
     color: var(--running-ink);
   }
-
   .defs {
     position: absolute;
     width: 0;
@@ -990,8 +512,7 @@ const jsonLd = {
     .hero .actions {
       justify-content: flex-start;
     }
-    .hero h1,
-    .hero .lede {
+    .hero h1, .hero .lede {
       margin-left: 0;
     }
     .hero-spiral {
@@ -1013,220 +534,11 @@ const jsonLd = {
   .hero-spiral .spiral {
     stroke-width: 9;
   }
-
-  .proof {
-    margin-top: 56px;
-  }
-  .proof-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-    gap: 24px 48px;
-    padding: 32px;
-    border-radius: var(--radius-panel);
-    background: var(--card);
-    box-shadow: inset 0 0 0 1px var(--line);
-  }
-  .proof .proof-label {
-    margin: 0;
-    color: var(--ink-3);
-    font-family: var(--font-sans);
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 1.4;
-  }
-  .proof-total {
-    margin: 8px 0 0;
-    color: var(--ink);
-    font-size: 18px;
-  }
-  .proof-n {
-    font-family: var(--font-serif);
-    font-size: 40px;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-  .proof-kinds {
-    margin: 16px 0 0;
-    padding: 0;
-    list-style: none;
-    color: var(--ink-2);
-    font-size: 15px;
-  }
-  .proof-kinds li {
-    padding: 4px 0;
-  }
-  .proof-count {
-    display: inline-block;
-    min-width: 32px;
-    color: var(--ink);
-    font-family: var(--font-mono);
-    font-size: 14px;
-    font-variant-numeric: tabular-nums;
-  }
-  .proof-meta {
-    margin: 16px 0 0;
-    color: var(--ink-3);
-    font-size: 14px;
-  }
-  .proof-meta a {
-    color: var(--accent-ink);
-    text-underline-offset: 0.2em;
-  }
-  .proof-chart {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  .proof-chart figcaption {
-    color: var(--ink-3);
-    font-size: 14px;
-    font-weight: 500;
-  }
-  .proof-chart svg {
-    flex: 0 0 auto;
-    width: 100%;
-    height: auto;
-    min-height: 120px;
-    margin-top: 16px;
-    stroke-width: 1;
-  }
-  .proof-chart .grid {
-    stroke: var(--line);
-    stroke-dasharray: 4 4;
-  }
-  .proof-chart .axis {
-    stroke: var(--ink-4);
-  }
-  .proof-empty {
-    position: absolute;
-    inset: 32px 0 0;
-    display: grid;
-    place-items: center;
-    margin: 0;
-    color: var(--ink-3);
-    font-size: 14px;
-  }
-  .proof-empty[hidden],
-  .proof-live[hidden],
-  .proof-stale[hidden],
-  .proof-details[hidden] {
-    display: none;
-  }
-  .proof-live {
-    margin-top: 10px;
-  }
-  .proof-date {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: 13px;
-  }
-  .proof-stale {
-    display: inline-block;
-    margin-left: 8px;
-    padding: 1px 7px;
-    border-radius: 999px;
-    background: var(--accent-soft);
-    color: var(--accent-ink);
-    font-size: 12px;
-  }
-  .proof-score {
-    margin: 6px 0 0;
-    color: var(--ink);
-    font-family: var(--font-mono);
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
-  }
-  .proof-chart :global(.eval-bar-label),
-  .proof-chart :global(.eval-bar-count) {
-    fill: var(--ink-3);
-    stroke: none;
-    font-family: var(--font-mono);
-    font-size: 11px;
-  }
-  .proof-chart :global(.eval-bar-track) {
-    fill: var(--hover);
-    stroke: none;
-  }
-  .proof-chart :global(.eval-bar-fill) {
-    fill: var(--accent);
-    stroke: none;
-  }
-  .proof-details {
-    grid-column: 1 / -1;
-    margin-top: 0;
-    padding-top: 16px;
-    border-top: 1px solid var(--line);
-  }
-  .proof-details summary {
-    min-height: 32px;
-    color: var(--accent-ink);
-    cursor: pointer;
-    font-size: 14px;
-  }
-  .proof-table-wrap {
-    overflow-x: auto;
-    margin-top: 6px;
-  }
-  .proof-details table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  .proof-details th,
-  .proof-details :global(td) {
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--line);
-    text-align: left;
-    white-space: nowrap;
-  }
-  .proof-details :global(td:nth-child(3)),
-  .proof-details :global(td:nth-child(4)),
-  .proof-details :global(td:nth-child(5)) {
-    font-variant-numeric: tabular-nums;
-  }
-  .proof-details :global(td:last-child) {
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-  .proof-details th {
-    color: var(--ink-3);
-    font-weight: 500;
-  }
-  .proof-details :global(.eval-status) {
-    display: inline-block;
-    padding: 1px 7px;
-    border-radius: 999px;
-    background: var(--hover);
-    color: var(--ink-2);
-    font-size: 12px;
-  }
-  .proof-details :global(.eval-status-pass) {
-    background: var(--running-soft, var(--hover));
-    color: var(--running-ink, var(--ink-2));
-  }
-  .proof-details :global(.eval-status-fail),
-  .proof-details :global(.eval-status-incomplete) {
-    background: var(--accent-soft);
-    color: var(--accent-ink);
-  }
-  @media (max-width: 760px) {
-    .proof-card {
-      grid-template-columns: 1fr;
-      gap: 32px;
-      padding: 24px;
-    }
-    .proof-chart svg {
-      min-height: 96px;
-    }
-  }
-
   .hero-shot {
     margin-top: 64px;
     margin-bottom: 0;
   }
-  .hero-shot img,
-  .hero-shot video {
+  .hero-shot img, .hero-shot video {
     width: 100%;
   }
   .hero-shot.has-video img {
@@ -1237,7 +549,6 @@ const jsonLd = {
     border-radius: var(--radius-panel);
     background: #000;
   }
-
   .section {
     padding-top: 128px;
   }
@@ -1275,7 +586,6 @@ const jsonLd = {
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
-
   .steps {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1284,10 +594,7 @@ const jsonLd = {
     padding: 0;
     list-style: none;
   }
-  .steps li,
-  .points li,
-  .fit > div,
-  .install li {
+  .steps li, .points li, .fit > div, .install li {
     min-width: 0;
   }
   .phone {
@@ -1307,14 +614,12 @@ const jsonLd = {
     max-width: 100%;
     object-fit: contain;
   }
-  .points p,
-  .install p {
+  .points p, .install p {
     margin: 8px 0 0;
     color: var(--ink-2);
     font-size: 16px;
     line-height: 1.65;
   }
-
   .points {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1339,7 +644,6 @@ const jsonLd = {
     line-height: 20px;
     vertical-align: 1px;
   }
-
   .fit {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1393,7 +697,6 @@ const jsonLd = {
     color: var(--accent-ink);
     text-underline-offset: 0.2em;
   }
-
   .selling {
     max-width: 820px;
     margin: 0 auto;
@@ -1410,7 +713,6 @@ const jsonLd = {
     font-size: 18px;
     line-height: 1.7;
   }
-
   .install {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1455,58 +757,7 @@ const jsonLd = {
     justify-content: flex-start;
     margin-top: 48px;
   }
-
-  .footer {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 24px;
-    margin-top: 128px;
-    padding-top: 32px;
-    padding-bottom: 48px;
-    border-top: 1px solid var(--line);
-  }
-  .foot-brand p {
-    max-width: 420px;
-    margin: 12px 0 0;
-    color: var(--ink-3);
-    font-size: 14px;
-  }
-  .foot-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 20px;
-    font-size: 14px;
-  }
-  .foot-links a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 28px;
-    padding: 4px 0;
-    color: var(--ink-2);
-    text-decoration: none;
-  }
-  .foot-links a:hover {
-    color: var(--ink);
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-  }
-
   @media (pointer: coarse) {
-    .brand {
-      min-width: 44px;
-      min-height: 44px;
-    }
-    .nav-links a {
-      min-width: 44px;
-      min-height: 44px;
-      justify-content: center;
-    }
-    .icon-btn {
-      width: 44px;
-      height: 44px;
-    }
     .cmd {
       padding: 0 0 0 16px;
     }
@@ -1525,15 +776,9 @@ const jsonLd = {
       min-width: 44px;
       min-height: 44px;
     }
-    .foot-links a {
-      min-width: 44px;
-      min-height: 44px;
-    }
   }
-
   @media (max-width: 900px) {
-    .steps,
-    .install {
+    .steps, .install {
       grid-template-columns: 1fr;
       gap: 48px;
     }
@@ -1550,46 +795,21 @@ const jsonLd = {
       gap: 32px;
     }
   }
-
   @media (max-width: 640px) {
-    .wrap {
-      padding: 0 16px;
-    }
-    .brand {
-      min-width: 44px;
-      min-height: 44px;
-    }
-    .nav-links .gh {
-      display: none;
-    }
-    .nav-links a {
-      min-width: 44px;
-      min-height: 44px;
-      padding: 8px 12px;
-      justify-content: center;
-    }
-    .icon-btn {
-      width: 44px;
-      height: 44px;
-    }
     .hero {
       padding-top: 48px;
     }
-    .lede,
-    .section-head p,
-    .selling p {
+    .lede, .section-head p, .selling p {
       font-size: 16px;
     }
-    h2,
-    :lang(zh-CN) h2 {
+    h2, :lang(zh-CN) h2 {
       font-size: 1.75rem;
     }
     .actions {
       flex-direction: column;
       align-items: stretch;
     }
-    .btn,
-    .cmd {
+    .btn, .cmd {
       justify-content: center;
     }
     .cmd {
@@ -1607,10 +827,6 @@ const jsonLd = {
       right: 4px;
     }
     .alt a {
-      min-width: 44px;
-      min-height: 44px;
-    }
-    .foot-links a {
       min-width: 44px;
       min-height: 44px;
     }
@@ -1631,9 +847,6 @@ const jsonLd = {
     }
     .selling {
       padding: 40px 24px;
-    }
-    .footer {
-      margin-top: 88px;
     }
   }
 </style>
