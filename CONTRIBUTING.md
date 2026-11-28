@@ -56,7 +56,7 @@ A maintainer reviews every pull request, and an AI reviewer may also comment. A 
 
 ## Releases
 
-Contributors do nothing to release: there are no changesets and no version bumps in a pull request. The shipped product is the Mac desktop app. The [`desktop-release` workflow](./.github/workflows/desktop-release.yml) publishes it from `main` by itself: it picks the newest unreleased commit with green CI whose app sources changed since the last stable release, allocates the next `desktop-v*` version, and verifies the build before publishing. The rules are in [docs/design/tested-sha-landing.md](./docs/design/tested-sha-landing.md#desktop-release).
+Contributors do nothing to release: there are no changesets and no version bumps in a pull request. The shipped product is the Mac desktop app. The [`desktop-release` workflow](./.github/workflows/desktop-release.yml) publishes it from `main` by itself: it picks the newest unreleased commit with green CI whose app sources changed since the last stable release, reserves a fresh `desktop-v*` version, and verifies the build before publishing. Different candidates can build in parallel; the final update-channel write is serialized. The rules are in [docs/design/tested-sha-landing.md](./docs/design/tested-sha-landing.md#desktop-release).
 
 ## License
 

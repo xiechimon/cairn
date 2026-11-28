@@ -20,6 +20,28 @@ const workflow = parse(
   readFileSync(new URL('../.github/workflows/desktop-release.yml', import.meta.url), 'utf8'),
 );
 
+test('macOS release jobs use fast Deflate', () => {
+  for (const name of ['package-arm64', 'package-x64']) {
+    const packageApp = workflow.jobs[name].steps.find((step) => step.name === 'Package the app');
+    assert.equal(packageApp.env.ELECTRON_BUILDER_COMPRESSION_LEVEL, '1');
+  }
+});
+
+const finalize = parse(
+  readFileSync(
+    new URL('../.github/workflows/desktop-release-finalize.yml', import.meta.url),
+    'utf8',
+  ),
+);
+const migration = parse(
+  readFileSync(
+    new URL('../.github/workflows/desktop-release-migration.yml', import.meta.url),
+    'utf8',
+  ),
+);
+const publishJob = finalize.jobs.publish;
+const migrationJob = migration.jobs['verify-arm64-post-install'];
+
 const rel = (tag_name, draft = false, prerelease = false) => ({ tag_name, draft, prerelease });
 const releases = (...entries) => JSON.stringify(entries);
 const filler = (count) => Array.from({ length: count }, (_, i) => rel(`web-v${i}`));
@@ -342,7 +364,7 @@ test('the decide step diffs shipped sources against the paginated stable-release
 });
 
 test('the migration smoke downloads the previous release through the same query', () => {
-  const step = workflow.jobs['verify-arm64-post-install'].steps.find(
+  const step = migrationJob.steps.find(
     (entry) => entry.name === 'Download the previous release for the migration smoke',
   );
   assert.ok(step);
@@ -521,9 +543,7 @@ test('the baseline script keeps paging past ten full pages without a cap', async
 });
 
 const repoRoot = resolve(import.meta.dirname, '..');
-const publishScript = workflow.jobs.publish.steps.find(
-  (entry) => entry.name === 'Publish the release',
-).run;
+const publishScript = publishJob.steps.find((entry) => entry.name === 'Publish the release').run;
 
 const greenCi = (sha) => ({
   id: 7,
@@ -602,7 +622,7 @@ const publishFixture = (t) => {
       '  case "$*" in',
       '    *"-X PATCH"*)',
       '      id=$(release_id "$url") || exit 1',
-      '      [ "$id" = "$(cat "$RELEASE_ID" 2>/dev/null)" ] || exit 1',
+      '      [ "$id" = "$(cat "$RELEASE_ID_FILE" 2>/dev/null)" ] || exit 1',
       '      [ "$state" = "draft" ] || exit 1',
       '      case "$*" in *"-F draft=false"*) ;; *) exit 1 ;; esac',
       '      case "$*" in *"make_latest=true"*) ;; *) exit 1 ;; esac',
@@ -617,8 +637,9 @@ const publishFixture = (t) => {
       '      case "$url" in',
       '        */releases/[0-9]*/assets*)',
       '          id=$(release_id "$url") || exit 1',
-      '          [ "$id" = "$(cat "$RELEASE_ID" 2>/dev/null)" ] || exit 1',
+      '          [ "$id" = "$(cat "$RELEASE_ID_FILE" 2>/dev/null)" ] || exit 1',
       '          [ "$state" = "draft" ] || exit 1',
+      '          : > "$ASSETS_UPLOADED"',
       '          [ -z "$RETARGET_SHA" ] || printf \'%s\' "$RETARGET_SHA" > "$RELEASE_TARGET"',
       '          [ -z "$RETARGET_TAG" ] || printf \'%s\' "$RETARGET_TAG" > "$RELEASE_TAG"',
       '          printf \'{\\"id\\":1,"state":"uploaded"}\\n\'',
@@ -634,7 +655,7 @@ const publishFixture = (t) => {
       '          fi',
       '          id_out=123',
       '          [ -z "$BAD_ID" ] || id_out=RE_abc123',
-      '          printf \'%s\' "$id_out" > "$RELEASE_ID"',
+      '          printf \'%s\' "$id_out" > "$RELEASE_ID_FILE"',
       '          printf \'%s\' "$tag_name" > "$RELEASE_TAG"',
       '          printf \'%s\' "$target" > "$RELEASE_TARGET"',
       '          printf \'draft\' > "$RELEASE_STATE"',
@@ -647,6 +668,11 @@ const publishFixture = (t) => {
       '      exit 1 ;;',
       '  esac',
       '  case "$url" in',
+      '    *matching-refs/tags/desktop-v?*)',
+      '      name=$(basename "$url")',
+      '      if git --git-dir="$TAG_REMOTE" show-ref --verify --quiet "refs/tags/$name"; then',
+      '        printf \'[{"ref":"refs/tags/%s"}]\n\' "$name"',
+      "      else printf '[]\n'; fi; exit 0 ;;",
       '    *git/ref/tags/*)',
       '      ref=${url##*git/ref/tags/}',
       '      sha=$(git --git-dir="$TAG_REMOTE" rev-parse --verify --quiet "refs/tags/$ref") || {',
@@ -657,14 +683,13 @@ const publishFixture = (t) => {
       '      exit 0 ;;',
       '    *releases/[0-9]*)',
       '      id=$(release_id "$url") || exit 1',
-      '      [ "$id" = "$(cat "$RELEASE_ID" 2>/dev/null)" ] || exit 1',
-      '      [ -z "$DRAFT_GONE" ] || { printf \'gh: Not Found\\n\' >&2; exit 1; }',
+      '      [ "$id" = "$(cat "$RELEASE_ID_FILE" 2>/dev/null)" ] || exit 1',
+      '      [ -z "$DRAFT_GONE" ] || [ ! -f "$ASSETS_UPLOADED" ] || { printf \'gh: Not Found\\n\' >&2; exit 1; }',
       '      is_draft=false; [ "$state" = "draft" ] && is_draft=true',
-      '      [ -z "$STEAL_PUBLISH" ] || is_draft=false',
-      '      case "$*" in',
-      '        *--jq*) printf \'%s %s %s\\n\' "$is_draft" "$(cat "$RELEASE_TAG")" "$(cat "$RELEASE_TARGET")" ;;',
-      '        *) printf \'{\\"id\\":%s,\\"draft\\":%s,\\"tag_name\\":\\"%s\\",\\"target_commitish\\":\\"%s\\"}\\n\' "$id" "$is_draft" "$(cat "$RELEASE_TAG")" "$(cat "$RELEASE_TARGET")" ;;',
-      '      esac',
+      '      [ -z "$STEAL_PUBLISH" ] || [ ! -f "$ASSETS_UPLOADED" ] || is_draft=false',
+      '      assets="[]"; [ -z "$PARTIAL_ASSETS" ] || assets="[{}]"',
+      '      owner=$GITHUB_RUN_ID; [ -z "$CHANGED_OWNER" ] || [ ! -f "$ASSETS_UPLOADED" ] || owner=9999',
+      '      printf \'{"id":%s,"draft":%s,"tag_name":"%s","target_commitish":"%s","assets":%s,"body":"<!-- cairn-desktop-run:%s revision:%s -->"}\\n\' "$id" "$is_draft" "$(cat "$RELEASE_TAG")" "$(cat "$RELEASE_TARGET")" "$assets" "$owner" "$GITHUB_SHA"',
       '      exit 0 ;;',
       '    *"releases?per_page=100&page=1") printf \'%s\\n\' "$RELEASES_PAGE"; exit 0 ;;',
       '    *"releases?per_page=100&page="*) printf \'[]\\n\'; exit 0 ;;',
@@ -679,6 +704,7 @@ const publishFixture = (t) => {
       '        printf \'%s\\n\' "$RUN_READ"',
       '      fi',
       '      exit 0 ;;',
+      '    *compare/desktop-v*) printf \'%s\\n\' "$BASELINE_COMPARE_READ"; exit 0 ;;',
       '    *compare/*) printf \'%s\\n\' "$COMPARE_READ"; exit 0 ;;',
       '    *branches/main*)',
       '      [ -z "$RERUN_ARMED" ] || : > "$RERUN_ARMED"',
@@ -710,40 +736,54 @@ const publishFixture = (t) => {
     writeFileSync(callsFile, '');
     writeFileSync(tagLogFile, '');
     const ci = greenCi(built);
-    const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', publishScript], {
-      cwd: root,
-      encoding: 'utf8',
-      timeout: 120_000,
-      env: {
-        ...process.env,
-        RELEASE_SHA: built,
-        VERSION: '0.1.2',
-        PATH: `${bin}:${process.env.PATH}`,
-        GH_CALLS: callsFile,
-        RELEASE_STATE: stateFile,
-        RELEASE_ID: idFile,
-        RELEASE_TAG: tagFile,
-        RELEASE_TARGET: targetFile,
-        TAG_LOG: tagLogFile,
-        DRAFTS_FILE: draftsFile,
-        TAG_REMOTE: remote,
-        GH_TOKEN: 'fixture-token',
-        GITHUB_REPOSITORY: 'o/r',
-        GITHUB_WORKSPACE: repoRoot,
-        RUNS_PAGE: JSON.stringify({ workflow_runs: [ci] }),
-        RUN_READ: JSON.stringify(ci),
-        JOBS_PAGE: JSON.stringify({ jobs: greenJobs() }),
-        EMPTY_PAGE: JSON.stringify({ jobs: [], workflow_runs: [] }),
-        BRANCH_READ: JSON.stringify({ commit: { sha: built } }),
-        COMPARE_READ: JSON.stringify({
-          status: 'ahead',
-          merge_base_commit: { sha: git('merge-base', built, tip) },
-        }),
-        RELEASES_PAGE: '[]',
-        TAGS_READ: '[]',
-        ...over,
-      },
+    const env = {
+      ...process.env,
+      RELEASE_SHA: built,
+      VERSION: '0.1.2',
+      PATH: `${bin}:${process.env.PATH}`,
+      GH_CALLS: callsFile,
+      RELEASE_STATE: stateFile,
+      RELEASE_ID_FILE: idFile,
+      RELEASE_TAG: tagFile,
+      RELEASE_TARGET: targetFile,
+      TAG_LOG: tagLogFile,
+      DRAFTS_FILE: draftsFile,
+      TAG_REMOTE: remote,
+      GH_TOKEN: 'fixture-token',
+      GITHUB_REPOSITORY: 'o/r',
+      GITHUB_WORKSPACE: repoRoot,
+      RUNS_PAGE: JSON.stringify({ workflow_runs: [ci] }),
+      RUN_READ: JSON.stringify(ci),
+      JOBS_PAGE: JSON.stringify({ jobs: greenJobs() }),
+      EMPTY_PAGE: JSON.stringify({ jobs: [], workflow_runs: [] }),
+      BRANCH_READ: JSON.stringify({ commit: { sha: built } }),
+      COMPARE_READ: JSON.stringify({
+        status: 'ahead',
+        merge_base_commit: { sha: git('merge-base', built, tip) },
+      }),
+      RELEASES_PAGE: releases(rel('desktop-v0.1.1')),
+      GITHUB_RUN_ID: '123456',
+      GITHUB_SHA: tip,
+      BASELINE: 'desktop-v0.1.1',
+      BASELINE_COMPARE_READ: JSON.stringify({ status: 'ahead' }),
+      ASSETS_UPLOADED: join(root, 'assets-uploaded'),
+      TAGS_READ: '[]',
+      ...over,
+    };
+    const options = { cwd: root, encoding: 'utf8', timeout: 120_000, env };
+    const reserve = workflow.jobs.decide.steps.find((step) => step.id === 'reserve');
+    const output = join(root, 'reservation-output');
+    writeFileSync(output, '');
+    const reserved = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', reserve.run], {
+      ...options,
+      cwd: repoRoot,
+      env: { ...env, GITHUB_OUTPUT: output },
     });
+    env.RELEASE_ID = /^release_id=(\d+)$/m.exec(readFileSync(output, 'utf8'))?.[1];
+    const result =
+      reserved.status === 0
+        ? spawnSync('bash', ['-e', '-o', 'pipefail', '-c', publishScript], options)
+        : reserved;
     return {
       result,
       calls: readFileSync(callsFile, 'utf8'),
@@ -777,18 +817,15 @@ const ASSETS = [
 ];
 
 test('the publish step never creates, pushes or adopts a tag', () => {
-  const step = workflow.jobs.publish.steps.find((entry) => entry.name === 'Publish the release');
+  const step = publishJob.steps.find((entry) => entry.name === 'Publish the release');
   assert.equal(step.env.RELEASE_REMOTE, undefined);
   assert.doesNotMatch(publishScript, /git push|ls-remote|RELEASE_REMOTE/);
   assert.doesNotMatch(publishScript, /gh release (create|view|upload|edit|delete|list)/);
   assert.match(publishScript, /git\/ref\/tags\/\$tag/, 'the tag probe reads the git ref endpoint');
   const probes = publishScript.match(/require_free_tag$/gm) ?? [];
   assert.equal(probes.length, 2, 'the tag is probed before the draft and again before the flip');
-  assert.match(publishScript, /-X POST "repos\/\$GITHUB_REPOSITORY\/releases"/);
-  assert.match(publishScript, /-F draft=true/);
-  assert.match(publishScript, /-f tag_name="\$tag"/);
-  assert.match(publishScript, /-f target_commitish="\$RELEASE_SHA"/);
-  assert.match(publishScript, /--jq \.id/);
+  assert.doesNotMatch(publishScript, /-F draft=true/);
+  assert.match(publishScript, /release-reservation\.mjs" verify-empty/);
   assert.match(
     publishScript,
     /uploads\.github\.com\/repos\/\$GITHUB_REPOSITORY\/releases\/\$release_id\/assets\?name=\$asset/,
@@ -805,7 +842,7 @@ test('the publish step never creates, pushes or adopts a tag', () => {
   assert.doesNotMatch(publishScript, /cairn-release-draft/, 'no workflow marker exists to copy');
 });
 
-test('the publish step stages a draft by its numeric id, uploads the assets and flips it published', (t) => {
+test('publish uses only its empty reserved draft and flips it by numeric ID', (t) => {
   const { git, publish, built } = publishFixture(t);
   const run = publish();
   assert.equal(run.result.status, 0, run.result.stderr);
@@ -826,7 +863,7 @@ test('the publish step stages a draft by its numeric id, uploads the assets and 
       : [],
   );
   assert.equal(tagProbes.length, 2, 'the tag is probed before the draft and before the flip');
-  assert.ok(tagProbes[0] < create, 'the free-tag probe precedes the draft create');
+  assert.ok(create < tagProbes[0], 'publication probes the tag after its independent reservation');
   assert.match(lines[create], /-F draft=true/);
   assert.match(lines[create], /-f tag_name=desktop-v0\.1\.2/);
   assert.match(lines[create], new RegExp(`-f target_commitish=${built}`));
@@ -843,8 +880,8 @@ test('the publish step stages a draft by its numeric id, uploads the assets and 
   );
   const tipRead = callIndex(run.calls, /^api .*branches\/main/);
   const gateRead = callIndex(run.calls, /^api .*workflows\/ci\.yml\/runs/);
-  const planRead = callIndex(run.calls, /^api .*matching-refs/);
-  const draftRead = callIndex(run.calls, /^api repos\/o\/r\/releases\/123 --jq/);
+  const planRead = callIndex(run.calls, /^api .*matching-refs\/tags\/desktop-v$/);
+  const draftRead = lines.findLastIndex((line) => /^api repos\/o\/r\/releases\/123$/.test(line));
   const lastVersionRead = lines.reduce(
     (last, line, index) => (/^api .*releases\?per_page/.test(line) ? index : last),
     -1,
@@ -956,7 +993,7 @@ test('a ci rerun that starts during the inventory scans aborts before the flip',
   assert.equal(run.state, 'draft');
   const create = callIndex(run.calls, /^api -X POST repos\/o\/r\/releases /);
   const tipRead = callIndex(run.calls, /^api .*branches\/main/);
-  const planRead = callIndex(run.calls, /^api .*matching-refs/);
+  const planRead = callIndex(run.calls, /^api .*matching-refs\/tags\/desktop-v$/);
   const gateRead = callIndex(run.calls, /^api .*workflows\/ci\.yml\/runs/);
   assert.ok(
     create >= 0 && tipRead > create && planRead > tipRead && gateRead > planRead,
@@ -981,7 +1018,7 @@ test('a publish-only rerun refuses once another release already covers the commi
   assert.match(run.result.stderr, /already covers/);
   assert.equal(run.state, 'draft');
   const create = callIndex(run.calls, /^api -X POST repos\/o\/r\/releases /);
-  const planRead = callIndex(run.calls, /^api .*matching-refs/);
+  const planRead = callIndex(run.calls, /^api .*matching-refs\/tags\/desktop-v$/);
   assert.ok(create >= 0 && planRead > create, 'the coverage re-read runs after the upload');
   assert.equal(callIndex(run.calls, /-X DELETE/), -1, 'nothing is deleted');
   assert.equal(callIndex(run.calls, /^api -X PATCH /), -1);
@@ -995,6 +1032,39 @@ test('a publish-only rerun refuses once another release already covers the commi
     built,
     'the published release tag is never touched',
   );
+});
+
+test('publication advances the stable SHA as well as the version', (t) => {
+  const { publish } = publishFixture(t);
+  const older = publish({ BASELINE_COMPARE_READ: JSON.stringify({ status: 'behind' }) });
+  assert.notEqual(older.result.status, 0);
+  assert.match(older.result.stderr, /not a strict successor/);
+  assert.equal(callIndex(older.calls, /^api -X PATCH /), -1);
+  assert.equal(callIndex(older.calls, /-X DELETE/), -1);
+});
+
+test('publish refuses a moved migration baseline', (t) => {
+  const { publish } = publishFixture(t);
+  const stale = publish({ BASELINE: 'desktop-v0.1.0' });
+  assert.notEqual(stale.result.status, 0);
+  assert.match(stale.result.stderr, /tested migration baseline moved/);
+  assert.equal(callIndex(stale.calls, /^api -X PATCH /), -1);
+});
+
+test('publish does not resume partial assets or use a changed owner marker', async (t) => {
+  await t.test('partial assets', (caseTest) => {
+    const { publish } = publishFixture(caseTest);
+    const partial = publish({ PARTIAL_ASSETS: '1' });
+    assert.match(partial.result.stderr, /not empty/);
+    assert.equal(callIndex(partial.calls, /^api -X POST https:\/\/uploads/), -1);
+  });
+  await t.test('owner marker changed after uploads', (caseTest) => {
+    const { publish } = publishFixture(caseTest);
+    const moved = publish({ CHANGED_OWNER: '1' });
+    assert.match(moved.result.stderr, /no longer holds/);
+    assert.equal(callIndex(moved.calls, /^api -X PATCH /), -1);
+    assert.equal(callIndex(moved.calls, /-X DELETE/), -1);
+  });
 });
 
 test('a version no longer above the highest published release refuses and leaves the draft', (t) => {
@@ -1025,6 +1095,7 @@ test('a superseded version refuses while a version above every release publishes
   writeFileSync(stateFile, 'none');
   const high = publish({
     VERSION: '0.1.703',
+    BASELINE: 'desktop-v0.1.702',
     RELEASES_PAGE: releases(rel('desktop-v0.1.700'), rel('desktop-v0.1.702')),
   });
   assert.equal(high.result.status, 0, high.result.stderr);
@@ -1095,7 +1166,7 @@ test('a leftover draft holding the tag name refuses the create and is never touc
   writeFileSync(draftsFile, '999\tdesktop-v0.1.2\n');
   const run = publish();
   assert.notEqual(run.result.status, 0);
-  assert.match(run.result.stderr, /could not be created/);
+  assert.match(run.result.stderr, /release-reservation/);
   assert.equal(run.state, 'none', 'nothing was staged');
   assert.equal(
     callIndex(run.calls, /releases\/999/),
@@ -1115,7 +1186,7 @@ test('a draft that cannot be staged leaves nothing behind', (t) => {
   const { git, publish } = publishFixture(t);
   const run = publish({ CREATE_FAIL: '1' });
   assert.notEqual(run.result.status, 0);
-  assert.match(run.result.stderr, /could not be created/);
+  assert.match(run.result.stderr, /release-reservation/);
   assert.equal(run.state, 'none');
   assert.equal(callIndex(run.calls, /-X DELETE/), -1, 'no draft existed to delete');
   assert.equal(git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.2'), '');
@@ -1137,7 +1208,7 @@ test('a draft retargeted during the upload is refused, never renamed back', (t) 
   assert.notEqual(run.result.status, 0);
   assert.match(run.result.stderr, /no longer holds/);
   assert.equal(run.state, 'draft', 'the refused draft is left behind for an operator');
-  const draftRead = callIndex(run.calls, /^api repos\/o\/r\/releases\/123 --jq/);
+  const draftRead = callIndex(run.calls, /^api repos\/o\/r\/releases\/123$/);
   assert.ok(draftRead >= 0, 'the draft was re-read by numeric id before the flip');
   assert.equal(callIndex(run.calls, /^api -X PATCH /), -1, 'nothing is published');
   assert.equal(callIndex(run.calls, /-X DELETE/), -1, 'nothing is deleted');
@@ -1183,7 +1254,9 @@ test('the version is decided once in decide and stamped into both builds', () =>
   );
   const jobText = (name) =>
     new RegExp(`^ {2}${name}:\\n([\\s\\S]*?)(?=^ {2}\\w|$(?![\\s\\S]))`, 'm').exec(text)[1];
-  for (const name of ['package-arm64', 'package-x64', 'publish']) {
+  assert.equal(workflow.jobs.finalize.with.version, `\${{ needs.decide.outputs.version }}`);
+  assert.equal(publishJob.env.VERSION, `\${{ inputs.version }}`);
+  for (const name of ['package-arm64', 'package-x64']) {
     assert.equal(
       workflow.jobs[name].env?.VERSION,
       `\${{ needs.decide.outputs.version }}`,
@@ -1204,7 +1277,7 @@ test('the version is decided once in decide and stamped into both builds', () =>
 });
 
 test('publish refuses archives that disagree with the decided version', () => {
-  const steps = workflow.jobs.publish.steps;
+  const steps = publishJob.steps;
   const check = steps.findIndex(
     (step) => step.name === 'Check the packaged builds carry the decided version',
   );
@@ -1259,7 +1332,7 @@ test('both architectures are packaged in parallel and arm64 verify starts withou
     assert.equal(job.env?.ARCH, arch);
     assert.equal(job.env?.VERSION, `\${{ needs.decide.outputs.version }}`);
   }
-  assert.deepEqual(workflow.jobs.publish.needs, [
+  assert.deepEqual(workflow.jobs.finalize.needs, [
     'decide',
     'package-arm64',
     'package-x64',
@@ -1273,11 +1346,7 @@ test('both architectures are packaged in parallel and arm64 verify starts withou
   for (const jobName of ['package-win', 'package-linux']) {
     assert.deepEqual(workflow.jobs[jobName].needs, ['decide']);
   }
-  for (const jobName of [
-    'verify-arm64-smoke',
-    'verify-arm64-journeys',
-    'verify-arm64-post-install',
-  ]) {
+  for (const jobName of ['verify-arm64-smoke', 'verify-arm64-journeys']) {
     assert.deepEqual(workflow.jobs[jobName].needs, ['decide', 'package-arm64']);
     assert.equal(workflow.jobs[jobName].environment, undefined);
     assert.equal(workflow.jobs[jobName].permissions, undefined);
@@ -1288,7 +1357,14 @@ test('both architectures are packaged in parallel and arm64 verify starts withou
     assert.ok(download, `${jobName} downloads the arm64 zip artifact`);
     assert.equal(download.with?.name, 'desktop-arm64-zip');
   }
-  const publishDownload = workflow.jobs.publish.steps.find((step) =>
+  const migrationCall = workflow.jobs['verify-arm64-post-install'];
+  assert.deepEqual(migrationCall.needs, ['decide', 'package-arm64']);
+  assert.equal(migrationCall.with.version, `\${{ needs.decide.outputs.version }}`);
+  const migrationDownload = migrationJob.steps.find((step) =>
+    String(step.uses ?? '').startsWith('actions/download-artifact@'),
+  );
+  assert.equal(migrationDownload.with.name, 'desktop-arm64-zip');
+  const publishDownload = publishJob.steps.find((step) =>
     String(step.uses ?? '').startsWith('actions/download-artifact@'),
   );
   assert.equal(publishDownload?.with?.pattern, 'desktop-*');
@@ -1297,7 +1373,7 @@ test('both architectures are packaged in parallel and arm64 verify starts withou
     'local-server',
     'remote-server',
   ]);
-  assert.equal(workflow.jobs.publish.permissions.contents, 'write');
+  assert.equal(publishJob.permissions.contents, 'write');
   assert.equal(workflow.jobs['package-linux']['runs-on'], 'ubuntu-latest');
   assert.equal(workflow.jobs['package-linux'].permissions, undefined);
   const linuxPackageStep = workflow.jobs['package-linux'].steps.find(
@@ -1315,33 +1391,24 @@ test('both architectures are packaged in parallel and arm64 verify starts withou
   assert.ok(linuxUpload);
   assert.equal(linuxUpload.with.name, 'desktop-linux-x64');
   assert.equal(linuxUpload.with.overwrite, true);
-  assert.match(publishScript, /-f name="Cairn \$VERSION"/);
-  assert.doesNotMatch(publishScript, /Cairn for Mac/);
-  const versionCheck = workflow.jobs.publish.steps.find(
+  const versionCheck = publishJob.steps.find(
     (step) => step.name === 'Check the packaged builds carry the decided version',
   );
   assert.match(versionCheck.run, /Cairn-\*-mac-arm64\.zip/);
   assert.match(versionCheck.run, /Cairn-\*-mac-x64\.zip/);
   assert.match(versionCheck.run, /Cairn-\*-linux-x64\.tar\.gz/);
-  assert.match(
-    publishScript,
-    /\| macOS \(Apple Silicon\) \| `Cairn-__VERSION__-mac-arm64\.dmg` \|/,
-  );
-  assert.match(publishScript, /\| macOS \(Intel\) \| `Cairn-__VERSION__-mac-x64\.dmg` \|/);
-  assert.match(
-    publishScript,
-    /\| Windows \(64-bit Installer\) \| `Cairn-__VERSION__-win-x64\.exe` \|/,
-  );
-  assert.match(
-    publishScript,
-    /\| Windows \(64-bit Portable ZIP\) \| `Cairn-__VERSION__-win-x64\.zip` \|/,
-  );
-  assert.match(publishScript, /\| Linux \(64-bit\) \| `Cairn-__VERSION__-linux-x64\.tar\.gz` \|/);
-  assert.match(
-    publishScript,
-    /`-mac-\*\.zip` and `desktop-latest\.json` are for in-app auto-updates/,
-  );
-  assert.match(publishScript, /right-click, Open/);
+  const notes = readFileSync(new URL('./ops/release-reservation.mjs', import.meta.url), 'utf8');
+  for (const artifact of [
+    'mac-arm64.dmg',
+    'mac-x64.dmg',
+    'win-x64.exe',
+    'win-x64.zip',
+    'linux-x64.tar.gz',
+  ]) {
+    assert.ok(notes.includes(`Cairn-\${version}-${artifact}`));
+  }
+  assert.match(notes, /desktop-latest\.json/);
+  assert.match(notes, /right-click, Open/);
 });
 
 test('the package upload overwrites so a rerun replaces only its own architecture', () => {
@@ -1620,13 +1687,8 @@ test('package-linux uses pigz when present, enforces portable root headers, and 
 });
 
 test('publish never renames or re-versions the decided build', () => {
-  const text = readFileSync(
-    new URL('../.github/workflows/desktop-release.yml', import.meta.url),
-    'utf8',
-  );
-  const publishJob = /^ {2}publish:\n([\s\S]*?)(?=^ {2}\w|$(?![\s\S]))/m.exec(text)[1];
   assert.doesNotMatch(
-    publishJob,
+    publishJob.steps.map((step) => step.run ?? '').join('\n'),
     /\bmv\b|GITHUB_ENV/,
     'nothing in publish renames archives or overrides VERSION',
   );
@@ -1648,7 +1710,7 @@ test('a leftover draft holding the decided name refuses the staging instead of a
   const page = releases(rel('desktop-v0.1.2', true));
   const run = publish({ RELEASES_PAGE: page });
   assert.notEqual(run.result.status, 0);
-  assert.match(run.result.stderr, /could not be created/);
+  assert.match(run.result.stderr, /already held by a release/);
   for (const suffix of ['mac-arm64.dmg', 'mac-x64.dmg', 'mac-arm64.zip', 'mac-x64.zip']) {
     assert.ok(
       existsSync(join(releaseDir, `Cairn-0.1.2-${suffix}`)),

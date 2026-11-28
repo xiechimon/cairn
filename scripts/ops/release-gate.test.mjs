@@ -462,6 +462,15 @@ const workflow = readFileSync(
   'utf8',
 );
 const parsed = parse(workflow);
+const reusable = (name) =>
+  parse(
+    readFileSync(
+      join(import.meta.dirname, `../../.github/workflows/desktop-release-${name}.yml`),
+      'utf8',
+    ),
+  );
+const finalize = () => reusable('finalize');
+const migration = () => reusable('migration');
 
 const jobBlock = (name) => {
   const match = new RegExp(`^ {2}${name}:\\n([\\s\\S]*?)(?=^ {2}\\w|$(?![\\s\\S]))`, 'm').exec(
@@ -485,10 +494,10 @@ test('desktop-release wakes on every completed main ci run, a fifteen-minute sch
 });
 
 test('a manual dispatch runs the decide job only when it names the main ref', () => {
-  assert.equal(parsed.jobs.decide.if, "github.ref == 'refs/heads/main'");
+  assert.equal(parsed.jobs.decide.if, "github.ref == 'refs/heads/main' && github.run_attempt == 1");
 });
 
-test('decide resolves the current main tip and checks it out, not the triggering push', () => {
+test('decide resolves current main, but runs control code from the trusted revision', () => {
   const decide = jobBlock('decide');
   const sha =
     /id: sha[\s\S]*?gh api "repos\/\$GATE_REPO\/branches\/main" --jq \.commit\.sha[\s\S]*?echo "sha=\$tip" >> "\$GITHUB_OUTPUT"/.exec(
@@ -496,12 +505,12 @@ test('decide resolves the current main tip and checks it out, not the triggering
     );
   assert.ok(sha, 'the released sha is the main tip read when the run holds the slot');
   const checkout =
-    /actions\/checkout@[^\n]*\n\s*with:\n\s*fetch-depth: 0\n\s*persist-credentials: false\n\s*ref: \$\{\{ steps\.sha\.outputs\.sha \}\}/.exec(
+    /actions\/checkout@[^\n]*\n\s*with:\n\s*fetch-depth: 0\n\s*persist-credentials: false\n\s*ref: \$\{\{ github\.sha \}\}/.exec(
       decide,
     );
   assert.ok(
     checkout,
-    'decide checks out the resolved main tip without persisting its write-scoped token',
+    'decide checks out the trusted revision with full main history and no persisted write token',
   );
   assert.ok(sha.index < checkout.index, 'the tip is resolved before the checkout');
 });
@@ -519,7 +528,7 @@ test('the decide job resolves the tip, then one step emits release and version w
   assert.ok(decision, 'one decision step runs release-decide on the resolved tip');
   assert.ok(sha.index < decision.index, 'the decision follows the tip resolution');
   assert.doesNotMatch(decide, /--wait|GITHUB_EVENT_NAME|workflow_dispatch/);
-  assert.equal(parsed.jobs.decide.outputs.release, `\${{ steps.decision.outputs.release }}`);
+  assert.equal(parsed.jobs.decide.outputs.release, `\${{ steps.reserve.outputs.release }}`);
   assert.equal(parsed.jobs.decide.outputs.version, `\${{ steps.decision.outputs.version }}`);
 });
 
@@ -630,10 +639,11 @@ test('the decide cli releases a green changed untagged tip and skips a released 
 });
 
 test('the publish job rechecks CI and main ancestry before releasing', () => {
-  const publish = jobBlock('publish');
-  assert.match(publish, /actions: read/);
+  const job = finalize().jobs.publish;
+  const publish = JSON.stringify(job.steps).replaceAll('\\n', '\n').replaceAll('\\"', '"');
+  assert.equal(job.permissions.actions, 'read');
   const gateThenTipThenPublish =
-    /release-gate\.mjs "\$RELEASE_SHA"[\s\S]*?id: tip[\s\S]*?release-tip\.mjs "\$RELEASE_SHA" >> "\$GITHUB_OUTPUT"[\s\S]*?- name: Publish the release\s*\n\s*if: steps\.tip\.outputs\.on_main == 'true'/.exec(
+    /release-gate\.mjs "\$RELEASE_SHA"[\s\S]*?release-tip\.mjs "\$RELEASE_SHA" >> "\$GITHUB_OUTPUT"[\s\S]*?Publish the release[^}]*?steps\.tip\.outputs\.on_main == 'true'/.exec(
       publish,
     );
   assert.ok(
@@ -642,14 +652,20 @@ test('the publish job rechecks CI and main ancestry before releasing', () => {
   );
 });
 
-test('the whole run serializes on one workflow-level group so every tick judges the current tip', () => {
-  assert.deepEqual(parsed.concurrency, {
-    group: 'desktop-release',
-    'cancel-in-progress': false,
-  });
+test('builds overlap; only reservation and finalization queue', () => {
+  assert.equal(parsed.concurrency, undefined);
+  const groups = {
+    decide: 'desktop-release-reserve',
+    finalize: 'desktop-release',
+  };
   for (const [name, job] of Object.entries(parsed.jobs)) {
-    assert.equal(job.concurrency, undefined, `${name} has no job-level group`);
+    assert.deepEqual(
+      job.concurrency,
+      groups[name] ? { group: groups[name], queue: 'max', 'cancel-in-progress': false } : undefined,
+      name,
+    );
   }
+  assert.ok(parsed.jobs.finalize, 'the publish lock spans the reusable workflow call');
   for (const name of ['live-verify', 'package-arm64', 'package-x64']) {
     assert.equal(
       parsed.jobs[name].if,
@@ -670,8 +686,6 @@ test('every job builds, verifies and publishes the resolved release commit', () 
     'package-linux',
     'verify-arm64-smoke',
     'verify-arm64-journeys',
-    'verify-arm64-post-install',
-    'publish',
   ]) {
     const checkouts = (parsed.jobs[name].steps ?? []).filter(
       (step) => typeof step.uses === 'string' && step.uses.startsWith('actions/checkout@'),
@@ -680,12 +694,112 @@ test('every job builds, verifies and publishes the resolved release commit', () 
     for (const checkout of checkouts) {
       assert.equal(
         checkout.with?.ref,
-        name === 'publish' ? `\${{ github.sha }}` : pinned,
+        pinned,
         `${name} pins application sources or trusted release control`,
       );
     }
   }
-  assert.ok(parsed.jobs.publish.needs.includes('decide'));
+  assert.ok(parsed.jobs.finalize.needs.includes('decide'));
+  assert.equal(
+    finalize().jobs.publish.steps.find((step) => step.uses?.startsWith('actions/checkout@')).with
+      .ref,
+    `\${{ github.sha }}`,
+  );
+  assert.equal(
+    migration().jobs['verify-arm64-post-install'].steps.find((step) =>
+      step.uses?.startsWith('actions/checkout@'),
+    ).with.ref,
+    `\${{ inputs.sha }}`,
+  );
+});
+
+test('decide reserves only an eligible unowned SHA', async () => {
+  const { reserveDraft, releaseOwner } = await import('./release-reservation.mjs');
+  assert.equal(
+    parsed.jobs.decide.steps.find((step) => step.id === 'reserve').if,
+    "steps.decision.outputs.release == 'true'",
+  );
+  assert.match(parsed.jobs.finalize.if, /github\.run_attempt == 1/);
+  const revision = 'f'.repeat(40);
+  const draft = {
+    draft: true,
+    tag_name: 'desktop-v0.1.1',
+    target_commitish: SHA,
+    body: releaseOwner('31', revision),
+  };
+  const inventory = [draft];
+  let status = 'queued';
+  let ownerError = false;
+  let writeError = false;
+  let writes = 0;
+  const params = {
+    repo: 'o/r',
+    sha: SHA,
+    version: '0.1.2',
+    runId: '32',
+    revision,
+    gh(args) {
+      if (args[1].endsWith('releases?per_page=100&page=1')) return JSON.stringify(inventory);
+      if (args[1].includes('releases?') || args[1].includes('matching-refs/')) return '[]';
+      if (args[1].endsWith('actions/runs/31')) {
+        if (ownerError) throw new Error('owner read failed');
+        return JSON.stringify({ id: 31, head_sha: revision, status });
+      }
+      assert.deepEqual(args.slice(0, 6), [
+        'api',
+        '-X',
+        'POST',
+        'repos/o/r/releases',
+        '-F',
+        'draft=true',
+      ]);
+      assert.ok(args.includes('tag_name=desktop-v0.1.2'));
+      assert.ok(args.includes('target_commitish=' + params.sha));
+      assert.ok(args.some((arg) => arg.endsWith(releaseOwner('32', revision))));
+      if (writeError) throw new Error('reservation write failed');
+      writes += 1;
+      return '576';
+    },
+  };
+  for (status of ['queued', 'waiting', 'in_progress']) assert.equal(reserveDraft(params), null);
+  assert.equal(writes, 0);
+  ownerError = true;
+  assert.throws(() => reserveDraft(params), /owner read failed/);
+  ownerError = false;
+  params.sha = '2'.repeat(40);
+  assert.equal(reserveDraft(params), '576', 'a different SHA need not wait for the active owner');
+  params.sha = SHA;
+  status = 'completed';
+  writeError = true;
+  assert.throws(() => reserveDraft(params), /reservation write failed/);
+  writeError = false;
+  assert.equal(reserveDraft(params), '576', 'a completed owner does not block a later wake');
+  assert.equal(writes, 2);
+});
+
+test('replay migration only on a changed baseline', () => {
+  const call = parsed.jobs.finalize;
+  assert.equal(
+    call.with.migration_baseline,
+    `\${{ needs.verify-arm64-post-install.outputs.baseline }}`,
+  );
+  const initial = parsed.jobs['verify-arm64-post-install'];
+  const jobs = finalize().jobs;
+  assert.equal(initial.uses, jobs['replay-migration'].uses);
+  assert.equal(jobs['replay-migration'].with.baseline, `\${{ needs.admit.outputs.baseline }}`);
+  assert.equal(
+    jobs['replay-migration'].if,
+    'needs.admit.outputs.baseline != inputs.migration_baseline',
+  );
+  assert.deepEqual(jobs.publish.needs, ['admit', 'replay-migration']);
+  assert.match(jobs.publish.if, /replay-migration\.result == 'success' \|\|/);
+  assert.match(
+    jobs.publish.if,
+    /replay-migration\.result == 'skipped' &&\s+needs\.admit\.outputs\.baseline == inputs\.migration_baseline/,
+  );
+  assert.equal(jobs.publish.environment, 'desktop-release');
+  assert.equal(jobs['replay-migration'].secrets, undefined);
+  assert.equal(migration().jobs['verify-arm64-post-install'].environment, undefined);
 });
 
 test('a live-verify job drives the new-task journey on an isolated stack', () => {
@@ -783,7 +897,7 @@ test('the new-task probe names its row, api and sqlite assertions', () => {
 });
 
 test('the publish ancestry step skips a diverged candidate and accepts the main tip', (t) => {
-  const step = parsed.jobs.publish.steps.find((entry) => entry.id === 'tip');
+  const step = finalize().jobs.publish.steps.find((entry) => entry.id === 'tip');
   assert.ok(step, 'publish re-reads the main tip before staging');
   const root = makeTestTempDir('release-tip-step-');
   t.after(() => releaseTestTempDir(root));

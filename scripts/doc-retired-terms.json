@@ -1,6 +1,12 @@
 {
   "terms": [
     {
+      "id": "desktop-release-whole-run-lock",
+      "pattern": "one workflow-level concurrency (?:group|slot)",
+      "canary": "desktop-release uses one workflow-level concurrency group",
+      "reason": "desktop release builds overlap; allocation and finalization have separate job groups"
+    },
+    {
       "id": "adr-number",
       "pattern": "\\b[Aa][Dd][Rr][Ss]?[-_ /]?#?\\d{3,4}\\b",
       "canary": "ADR 0026",

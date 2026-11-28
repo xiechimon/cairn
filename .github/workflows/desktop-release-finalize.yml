@@ -1,0 +1,202 @@
+name: desktop-release-finalize
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      release_id:
+        required: true
+        type: string
+      migration_baseline:
+        required: true
+        type: string
+
+jobs:
+  admit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      baseline: ${{ steps.guard.outputs.baseline }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Admit only an eligible successor of the current stable release
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ inputs.sha }}
+        run: |
+          [ "$(node scripts/ops/release-tip.mjs "$RELEASE_SHA")" = on_main=true ]
+          node scripts/ops/release-gate.mjs "$RELEASE_SHA"
+          node scripts/ops/release-version.mjs "$VERSION" "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
+  replay-migration:
+    needs: admit
+    if: needs.admit.outputs.baseline != inputs.migration_baseline
+    uses: ./.github/workflows/desktop-release-migration.yml
+    permissions:
+      contents: read
+    with:
+      sha: ${{ inputs.sha }}
+      version: ${{ inputs.version }}
+      baseline: ${{ needs.admit.outputs.baseline }}
+
+  publish:
+    needs: [admit, replay-migration]
+    if: >-
+      ${{ !cancelled() && needs.admit.result == 'success' &&
+          (needs.replay-migration.result == 'success' ||
+           (needs.replay-migration.result == 'skipped' &&
+            needs.admit.outputs.baseline == inputs.migration_baseline)) }}
+    runs-on: ubuntu-latest
+    environment: desktop-release
+    permissions:
+      contents: write
+      actions: read
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: apps/desktop/release
+
+      - name: Check the packaged builds carry the decided version
+        working-directory: apps/desktop/release
+        run: |
+          arm64=$(ls Cairn-*-mac-arm64.zip | sed -n 's/^Cairn-\(.*\)-mac-arm64\.zip$/\1/p')
+          x64=$(ls Cairn-*-mac-x64.zip | sed -n 's/^Cairn-\(.*\)-mac-x64\.zip$/\1/p')
+          win=$(ls Cairn-*-win-x64.zip | sed -n 's/^Cairn-\(.*\)-win-x64\.zip$/\1/p')
+          linux=$(ls Cairn-*-linux-x64.tar.gz | sed -n 's/^Cairn-\(.*\)-linux-x64\.tar\.gz$/\1/p')
+          if [ "$arm64" != "$VERSION" ] || [ "$x64" != "$VERSION" ] || [ "$win" != "$VERSION" ] || [ "$linux" != "$VERSION" ]; then
+            echo "the packaged archives carry arm64=${arm64:-none} x64=${x64:-none} win-x64=${win:-none} linux-x64=${linux:-none}, not the decided $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Write the update manifest
+        working-directory: apps/desktop
+        run: node scripts/release-manifest.mjs "$VERSION" release
+
+      - name: Refuse to publish when the SHA's green evidence moved
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ inputs.sha }}
+          GATE_REPO: ${{ github.repository }}
+        run: node scripts/ops/release-gate.mjs "$RELEASE_SHA"
+
+      - name: Publish only while the candidate is still on main
+        id: tip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ inputs.sha }}
+          GATE_REPO: ${{ github.repository }}
+        run: node scripts/ops/release-tip.mjs "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        if: steps.tip.outputs.on_main == 'true'
+        working-directory: apps/desktop/release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_SHA: ${{ inputs.sha }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          BASELINE: ${{ needs.admit.outputs.baseline }}
+        run: |
+          tag="desktop-v$VERSION"
+          bail() {
+            echo "publish aborted: $1" >&2
+            exit 1
+          }
+          require_free_tag() {
+            local probe
+            if probe=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" 2>&1); then
+              bail "$tag already exists; an occupied tag is never adopted, the next poll allocates a fresh version"
+            fi
+            printf '%s' "$probe" | grep -qi 'not found' || \
+              bail "the tag $tag could not be read: $probe"
+          }
+          require_free_tag
+          release_id=$RELEASE_ID
+          node "$GITHUB_WORKSPACE/scripts/ops/release-reservation.mjs" verify-empty || \
+            bail "the reserved draft could not be validated before upload"
+          upload_pids=()
+          upload_assets=()
+          for asset in \
+            Cairn-"$VERSION"-mac-arm64.dmg Cairn-"$VERSION"-mac-x64.dmg \
+            Cairn-"$VERSION"-mac-arm64.zip Cairn-"$VERSION"-mac-x64.zip \
+            Cairn-"$VERSION"-win-x64.exe Cairn-"$VERSION"-win-x64.zip \
+            Cairn-"$VERSION"-linux-x64.tar.gz \
+            cairn-runner-"$VERSION"-darwin-arm64.tar.gz \
+            cairn-runner-"$VERSION"-darwin-x64.tar.gz \
+            cairn-runner-"$VERSION"-win-x64.zip \
+            cairn-runner-"$VERSION"-linux-x64.tar.gz \
+            desktop-latest.json \
+            runner-latest.json
+          do
+            gh api -X POST \
+              "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$asset" \
+              -H "Content-Type: application/octet-stream" \
+              --input "$asset" --silent &
+            upload_pids+=("$!")
+            upload_assets+=("$asset")
+          done
+          failed_asset=""
+          for i in "${!upload_pids[@]}"; do
+            if ! wait "${upload_pids[$i]}"; then
+              failed_asset="${upload_assets[$i]}"
+            fi
+          done
+          [ -z "$failed_asset" ] || bail "the asset $failed_asset could not be uploaded"
+          tip=$(node "$GITHUB_WORKSPACE/scripts/ops/release-tip.mjs" "$RELEASE_SHA") || \
+            bail "main ancestry could not be re-read"
+          [ "$tip" = "on_main=true" ] || bail "$RELEASE_SHA is no longer on main"
+          plan=$(node "$GITHUB_WORKSPACE/scripts/ops/release-plan.mjs" "$RELEASE_SHA") || \
+            bail "the desktop-v* releases and tags could not be re-read"
+          if [ "$(printf '%s\n' "$plan" | sed -n 's/^released=//p')" = "true" ]; then
+            bail "a published desktop-v* release already covers $RELEASE_SHA"
+          fi
+          current=$(node "$GITHUB_WORKSPACE/scripts/ops/release-version.mjs" "$VERSION" "$RELEASE_SHA") || \
+            bail "the stable release check failed"
+          [ "$current" = "baseline=$BASELINE" ] || bail "the tested migration baseline moved"
+          require_free_tag
+          node "$GITHUB_WORKSPACE/scripts/ops/release-reservation.mjs" verify || \
+            bail "the reserved draft could not be re-read before the flip"
+          node "$GITHUB_WORKSPACE/scripts/ops/release-gate.mjs" "$RELEASE_SHA" || \
+            bail "the ci evidence for $RELEASE_SHA moved"
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            -F draft=false -f make_latest=true || \
+            bail "the draft $tag could not be published"

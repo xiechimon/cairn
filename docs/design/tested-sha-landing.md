@@ -169,109 +169,49 @@ would not wake `desktop-release`.
 
 ## Desktop release
 
-`desktop-release` is
-a level-triggered poller, not a push reaction: it is woken by a
-`workflow_run` on every `ci` run completed on `main`, by a 15-minute
-`schedule` backstop — GitHub's schedule trigger is best-effort and can
-delay or drop ticks for hours — and by `workflow_dispatch` to `main`
-only, so trusted `main` code still runs it. The wake is still
-level-triggered: the run scans current `main` history rather than
-trusting the event's SHA. Runs serialize on one workflow-level concurrency
-group that never cancels the running release (`desktop-release`,
-`cancel-in-progress: false`); GitHub keeps only the newest pending run,
-so a later wake or dispatch replaces an earlier pending one and a run
-that finds the slot busy waits. Nothing retries a failed or replaced run
-as such: a later wake scans current `main` again, and no re-dispatch job
-exists. Each run resolves main through the branches API and checks out its
-full history. `scripts/ops/release-decide.mjs` scans newest first, excluding
-ancestors of the highest-version published stable `desktop-v*` release.
-It selects the newest unreleased commit whose own push-to-main CI's latest
-attempt completed `success` with green `check`/`pack-smoke`/`e2e-gate`
-(`scripts/ops/release-gate.mjs`) and whose shipped app sources moved since
-that stable release. Pending or red CI on the tip does not block an older
-eligible commit. No eligible candidate means a successful skip; manual
-dispatch follows the identical rule without a source-diff bypass.
-Both builds and live verification pin the selected SHA, while publish
-control scripts come from the trusted workflow revision so selecting an
-older candidate cannot restore an obsolete release gate. Nothing is staged or resumed: a releasing run
-always allocates a fresh version once, at decide time — the first
-`desktop-v*` name held by no tag and no release, published,
-prerelease or draft. Drafts reach the deciding token because the
-job's `contents` scope is `write`, the only scope GitHub answers
-with drafts; the checkout drops it (`persist-credentials: false`).
-A draft only ever occupies its own name — it never raises the base
-version, counts as a release, a baseline or the bar for `latest`. A
-prerelease still counts for the allocation base but for nothing
-else, and releases created by hand are outside the workflow
-entirely. `publish` runs with the release-app credential, which sees
-drafts too — and the workflow never deletes a release or a tag, so a
-leftover draft just occupies its version, which `decide` already
-skipped; an abandoned draft can never block a later poll, and an
-operator who wants the number back deletes the stale draft by hand.
-The source-diff
-and migration baselines are the highest-version published stable
-release, chosen by semver and never by list order, so a backfilled
-older release cannot lower them. `decide` picks the version once
-and passes it to both architectures and to `publish`; nothing renames
-or bumps it afterwards — the packaged app, the assets, the manifest
-and the tag all carry the decided version. The ci-completion wake and the
-fifteen-minute backstop are polling cadence, not
-a bound on release latency — the price of removing the edge-triggered
-races: a wake that finds the slot busy queues behind the active build,
-and the tip can be superseded while it packages. `publish`
-re-reads the evidence: the run's latest attempt must have ended
-`success` with green jobs inside `runs/{id}/attempts/{attempt}/jobs`,
-and an attempt that started or moved between the jobs read and the run
-re-read blocks it, as does a newer still-running, failed or cancelled
-attempt. The publish step never creates or pushes a tag itself: it
-first refuses when `refs/tags/desktop-v$VERSION` already exists
-(`GET .../git/ref/tags/`), whatever it points at — an occupied tag is
-never adopted and the next poll allocates a fresh version above it.
-`POST /repos/{o}/{r}/releases` then stages a fresh draft owned by
-this run, never resumed from an existing one: `draft: true`,
-`tag_name` set to the decided tag and `target_commitish` pinned to
-the release SHA — a draft creates no tag, so nothing on the remote
-carries the version yet — and the response's numeric `id` is the
-only handle used from there on. Every asset is uploaded to
-`releases/{id}/assets`. With the upload done the evidence is re-read
-one last time — the candidate must remain an ancestor of current `main`
-(`scripts/ops/release-tip.mjs`); main advancing during packaging is allowed,
-whether a published stable `desktop-v*` release's tag
-already covers the SHA (`scripts/ops/release-plan.mjs`), and the
-version still above the highest published stable release
-(`scripts/ops/release-version.mjs`) — the tag is probed once more and
-the ci attempt's green evidence is re-read last
-(`scripts/ops/release-gate.mjs`), so a rerun that started during the
-scans still blocks it; the draft itself is re-read by numeric id and the
-publish refuses unless it still is a draft holding the decided tag and
-the checked SHA, and only then does a single `PATCH /releases/{id}`
-send `draft: false` and `make_latest: true` and nothing else — a draft
-retargeted during the upload is abandoned, never renamed back, and
-GitHub creates the tag at the `target_commitish` the draft still holds. Any of those re-checks
-failing aborts the step and leaves the staged draft — no tag exists
-to clean: a candidate outside `main`, ci that turned, a stable release that
-appeared over the same commit, a higher version that landed during
-the upload or a tag that appeared in it each refuse the publish. A
-publish-only rerun of an old run can therefore never release the same
-SHA twice — the coverage read catches the stable release a later run
-already published. A failed or killed publish can leave its draft
-behind: the workflow deletes nothing, the draft only occupies its
-name — `decide` steps past it on the next poll — and an operator
-deletes it by hand if they want the number back. The window that remains is accepted, not
-defended by another read: between the final tag probe and the
-flip — seconds — a tag created in it is adopted by the publish, and
-a `main` push or a ci rerun that lands can still
-publish the checked state, and the next release then publishes the
-newer tip and moves `latest` to it. Closing the window entirely would
-need the release write coordinated with main promotion and ci reruns
-rather than separate API reads. A red or pending tip does not delay an
-older eligible green ancestor. `publish`
-also waits on the `live-verify` job, which drives the new-task journey
-on an isolated stack and archives the evidence as an artifact.
+Each completed CI run on `main` wakes the level-triggered poller; the
+fifteen-minute schedule and manual dispatch to `main` are backstops, not
+a latency bound. The poller scans current `main` history newest first,
+excluding ancestors of the highest-version published stable desktop
+release. A candidate needs its own completed push-to-main CI attempt
+with green `check`, `pack-smoke` and `e2e-gate`, and changed shipped
+sources. Pending or red tip CI does not block an older eligible SHA.
 
-On rollout of a change to the poller, cancel every `desktop-release` run started
-on the previous workflow and never rerun one: GitHub reruns a workflow at its
-original revision, so such a rerun publishes without the current gate.
+The short `desktop-release-reserve` job group serializes selection and
+allocation. The trusted workflow revision reserves the first version not
+held by a tag or release in a new empty draft at the selected SHA. Drafts
+occupy names but do not raise the version base. Prereleases are not
+migration or publication baselines. A draft whose owner is still active
+suppresses only an identical candidate; its owner is the recorded
+workflow run and workflow revision. Finished owners and their drafts
+do not prevent a new attempt at that SHA using a fresh version.
+
+Versions are built in, never renamed. Distinct candidates package in
+parallel. Signed ARM64 smoke, both journey modes and migration verify
+the same run's update ZIP independently. Publication requires all
+platform packages, those verifiers and the isolated `live-verify`
+new-task journey, which archives its evidence.
+
+The `desktop-release` group serializes finalization. Admission checks
+exact-SHA CI and main ancestry and requires a newer version and a strict
+descendant of the highest stable release. If the baseline moved since
+migration passed, the finalizer replays that check against the new
+baseline. Migration does not get the release App credentials. The
+trusted workflow revision alone writes through the App token: it reads
+the reserved draft by ID, confirms the owner, SHA and tag and that it is
+empty, uploads assets to that numeric ID, then rechecks main ancestry,
+existing stable coverage, stable version/ancestry and migration baseline,
+the free tag, the draft and, last, exact-SHA CI. A single PATCH flips it
+public and latest; the flip, not a separate tag write, creates the tag.
+First-party finalizers cannot interleave; external API changes after the
+last read can still race the flip.
+
+Nothing deletes a release or a tag. An interrupted build or publish
+can leave an occupied draft; a fresh trigger reserves a new draft,
+never reusing partial assets. Operators can delete abandoned drafts
+manually if needed. Use a fresh dispatch rather than a job rerun.
+When changing the poller, cancel unfinished runs at older workflow
+revisions and do not rerun one: GitHub reruns its original definition.
 
 ## Tests
 
@@ -290,31 +230,9 @@ original revision, so such a rerun publishes without the current gate.
 - `promote-queue.test.mjs`: the helpers the live queue imports from
   `promote-queue.mjs`: owner trailer, issue closing, and the push to `main` with
   its retry on ruleset check lag.
-- `release-gate.test.mjs`: the release gate waits on a missing or running
-  `ci` run, re-reads the run around the pinned jobs so a superseded attempt
-  cannot publish, blocks a red or cancelled latest attempt, and releases
-  only while the candidate is still on `main` (`release-tip.mjs`);
-  the decide CLI scans past pending tip CI to select an older green ancestor;
-  `decideRelease` releases a green, changed, unreleased candidate and skips a
-  pending, red, unchanged or already released one, holding a manual
-  dispatch to the same rule; `planRelease` picks the first `desktop-v*`
-  version held by no tag and no release — a published stable release on
-  the tip ends the run, drafts and prereleases each occupy their
-  version, and a run of occupied names is skipped without a cap;
-  `publish` refuses any existing
-  `desktop-v*` tag, stages the release as a draft through the REST
-  `POST` and keeps its numeric id, uploads the assets to that id,
-  re-reads the tip, the stable-release coverage of the
-  SHA and the `latest` decision (`release-version.mjs`), probes the tag
-  once more, re-reads the draft by numeric id and refuses unless it still
-  is a draft at the decided tag and SHA, re-reads the ci attempt as the
-  last check, then flips the draft published sending only `draft: false`
-  and `make_latest: true`, so a draft retargeted during the upload is
-  abandoned rather than renamed back — a failed re-check aborts the step and leaves
-  the draft for an operator to delete by hand, the step never deleting
-  a release or a tag, and a
-  rerun that finds the SHA
-  already covered or the version occupied refuses; the workflow
-  shape is a `ci`-on-`main` `workflow_run` wake plus `schedule` and
-  `main`-only dispatch on one concurrency group that never cancels the running release, with
-  no re-dispatch path.
+- `release-gate.test.mjs` and `release-plan.test.mjs`: exact-SHA CI and
+  stable coverage, allocation around occupied names, same-SHA reservation
+  deduplication, wake triggers, and the verification and finalization DAG.
+- `desktop-release.test.mjs`: packaged inputs, stable ancestry and migration
+  baseline, draft and asset identity, final guard ordering, and no tag or
+  release deletion.
