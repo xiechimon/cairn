@@ -49,9 +49,14 @@ const expectReview = (plan, ok, label) => {
   assert.equal(result.ok, ok, `${label}: ${result.errors.join('; ') || 'unexpectedly accepted'}`);
 };
 
-test('PASS rejects contradictory or unbound fix-checks', () => {
+test('PASS accepts legacy bare fix-check only with current ordinary hash', () => {
+  expectReview(reviewWith('PASS', '\n- Fix-check: PASS'), true, 'legacy bare fix-check');
+  expectReview(
+    reviewWith('PASS', '\n- Fix-check: PASS').replace(computePlanHash(BODY), 'a'.repeat(64)),
+    false,
+    'legacy bare fix-check with stale ordinary hash',
+  );
   expectReview(reviewWith('PASS', '\n- Fix-check: FAIL'), false, 'failed fix-check');
-  expectReview(reviewWith('PASS', '\n- Fix-check: PASS'), false, 'missing fix hash');
   expectReview(
     reviewWith('PASS', currentFixCheck.replace('\n- Fix-check: PASS', '')),
     false,
@@ -87,6 +92,7 @@ test('a second Verdict is rejected even when unbulleted and the first is valid',
 test('BLOCK and legacy FAIL need a current passing fix-check', () => {
   for (const verdict of ['BLOCK', 'FAIL']) {
     expectReview(reviewWith(verdict), false, `${verdict}: missing fix-check`);
+    expectReview(reviewWith(verdict, '\n- Fix-check: PASS'), false, `${verdict}: missing fix hash`);
     expectReview(
       reviewWith(verdict, currentFixCheck.replace('Fix-check: PASS', 'Fix-check: FAIL')),
       false,

@@ -237,6 +237,8 @@ export function validatePlanContent(content) {
     if (needsFixCheck || fields.has('fix-check') || fields.has('fix-check-plan-sha256')) {
       if (field('Fix-check').trim().toUpperCase() !== 'PASS')
         errors.push('## Review must record Fix-check: PASS');
+    }
+    if (needsFixCheck || fields.has('fix-check-plan-sha256')) {
       const fixHash = /^([0-9a-f]{64})$/i.exec(field('Fix-check-Plan-SHA256').trim());
       if (!fixHash) errors.push('## Review missing 64-char Fix-check-Plan-SHA256');
       else if (fixHash[1].toLowerCase() !== expectedHash)
