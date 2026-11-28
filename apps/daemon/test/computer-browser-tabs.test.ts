@@ -77,6 +77,17 @@ describe('one browser tab per scope', () => {
     expect(tabs).toHaveLength(1);
   });
 
+  test('an invalid browser action is refused before the scoped tab is created', async () => {
+    const { provider, tabs } = sharedBrowser();
+    await expect(
+      runBrowserTool(provider, 'browser_act', { actions: [] }, run('invalid-act')),
+    ).rejects.toMatchObject({ delivery: 'not_delivered' });
+    await expect(
+      runBrowserTool(provider, 'browser_act', { actions: [{ kind: 'click' }] }, run('invalid-act')),
+    ).rejects.toMatchObject({ delivery: 'not_delivered' });
+    expect(tabs).toHaveLength(1);
+  });
+
   test('two scopes navigating in turn keep their own page, and a card tab closes with its step', async () => {
     const { provider, tabs } = sharedBrowser();
     await runBrowserTool(

@@ -387,7 +387,7 @@ describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
     const { call } = recording((commands) =>
       commands[0] === 'check e7'
         ? {
-            text: '✗ step 1: check e7 — Clicking e7 didn’t check it',
+            text: '✗ step 1: check e7 — Clicking e7 didn’t check it\nPage: https://shop.example.com/ — "No browser is connected"',
             isError: true,
           }
         : '✓',
@@ -402,6 +402,30 @@ describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
     );
     expect(outcome).toBeInstanceOf(ComputerRefusal);
     expect((outcome as ComputerRefusal).delivery).toBe('unknown');
+  });
+
+  test('timeout words in a page title do not make an ordinary click failure unsafe to repeat', async () => {
+    const { call } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('get attr type')) return 'text';
+      if (command.startsWith('get attr autocomplete')) return '(none)';
+      if (commands.length === 2 && command.startsWith('click'))
+        return {
+          text: '✗ step 1: click e7 — element is not visible\nPage: https://shop.example.com/ — "Timed out after 45 s; the step was abandoned"',
+          isError: true,
+        };
+      return '✓';
+    });
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'type', ref: '@e7', text: 'hello' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('not_delivered');
   });
 
   test('a successful read-only line in a failed batch does not make it unsafe to repeat', async () => {

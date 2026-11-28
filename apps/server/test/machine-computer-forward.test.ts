@@ -1298,6 +1298,12 @@ describe('browser calls on Macs', () => {
     ]);
   }
 
+  function failUnknown(s: TestServer, machineId: string, call: ComputerCall, message: string) {
+    receiveComputerFrames(s.db, s.hub, machineId, call.callId, [
+      { kind: 'error', seq: 1, message, delivery: 'unknown' },
+    ]);
+  }
+
   const NO_EXTENSION = "Owner's Chrome unavailable: no Chrome is connected to Browser MCP";
 
   function pin(s: TestServer, chiefId: string, machineId: string) {
@@ -1462,6 +1468,34 @@ describe('browser calls on Macs', () => {
     expect(text).toContain('instead of your own Chrome');
     expect(text).toContain('no Chrome is connected to Browser MCP');
     expect(text).toContain('Example Domain');
+  });
+
+  test('an uncertain owner-Chrome navigation keeps follow-up actions in that owner Chrome', async () => {
+    const { s, deps } = boot();
+    addMac(s, 'mini', { browser: true, ownerChrome: true }, { kind: 'local' });
+    addMac(s, 'air', { ownerChrome: true });
+    browserMcp(s);
+    const mini = connect(s, 'mini');
+    const air = connect(s, 'air');
+    const opened = navigate(deps, 'uncertain-owner-navigation');
+    opened.catch(() => {});
+    fail(s, 'mini', await next(mini, 1), NO_EXTENSION);
+    failUnknown(s, 'air', await next(air, 1), 'Timed out after 45 s; the step was abandoned');
+    const openedResult = await opened;
+    expect(openedResult.text).toContain('may have partially run');
+
+    const acting = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_act',
+      toolCallId: 'after-uncertain-owner-navigation',
+      params: { actions: [{ kind: 'press', text: 'Enter' }] },
+    });
+    acting.catch(() => {});
+    const followup = await next(air, 2);
+    expect(followup.ownerChrome).toBe('browsermcp');
+    answer(s, 'air', followup, 'pressed');
+    await acting;
+    expect(mini).toHaveLength(1);
   });
 
   test('after a navigate fell back to Cairn’s browser, browser_act stays in that browser', async () => {

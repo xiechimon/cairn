@@ -59,11 +59,19 @@ export type OwnerChromeCaller = (
 
 export type OwnerChromeAnswerKind = 'ok' | 'pairing' | 'paused' | 'no-extension' | 'failed';
 
+function machineAnswerText(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => !line.startsWith('Page: '))
+    .join('\n');
+}
+
 export function classifyOwnerChromeAnswer(answer: OwnerChromeAnswer): OwnerChromeAnswerKind {
   if (!answer.isError) return 'ok';
-  if (answer.text.includes(PAIRING_MARKER)) return 'pairing';
-  if (answer.text.includes(NO_EXTENSION_MARKER)) return 'no-extension';
-  if (answer.text.includes(PAUSED_MARKER)) return 'paused';
+  const machineText = machineAnswerText(answer.text);
+  if (machineText.includes(PAIRING_MARKER)) return 'pairing';
+  if (machineText.includes(NO_EXTENSION_MARKER)) return 'no-extension';
+  if (machineText.includes(PAUSED_MARKER)) return 'paused';
   return 'failed';
 }
 
@@ -169,7 +177,9 @@ async function runCommands(
   if (kind === 'failed') {
     const uncertainMutation =
       commands.some((command) => MUTATING_COMMAND.test(command)) &&
-      /^✗ step \d+: .*?(?:timed out|abandoned|didn.t (?:check|uncheck) it).*$/im.test(answer.text);
+      /^✗ step \d+: .*?(?:timed out|abandoned|didn.t (?:check|uncheck) it).*$/im.test(
+        machineAnswerText(answer.text),
+      );
     throw new ComputerRefusal(
       answer.text === '' ? 'Browser MCP refused this step' : answer.text,
       uncertainMutation ? 'unknown' : 'not_delivered',

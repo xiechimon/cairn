@@ -1,5 +1,5 @@
 import { COMPUTER_BROWSER_TOOLS } from '@cairn/shared';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { computerCall, machine, step } from '../db/schema.js';
 import { browserScopeFor, type ComputerThread, computerThreadOf } from './computer-thread.js';
@@ -72,7 +72,7 @@ export function lastBrowserProducer(
     .where(
       and(
         eq(computerCall.teamId, thread.teamId),
-        eq(computerCall.state, 'done'),
+        or(eq(computerCall.state, 'done'), eq(computerCall.errorDelivery, 'unknown')),
         inArray(computerCall.tool, [...COMPUTER_BROWSER_TOOLS]),
       ),
     )

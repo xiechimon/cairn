@@ -807,6 +807,21 @@ export async function runBrowserTool(
     }
     validatedNavigateUrl = address.href;
   }
+  const parsedAct = tool === 'browser_act' ? actParams.safeParse(params) : null;
+  if (parsedAct !== null && !parsedAct.success) {
+    refuse('browser_act needs a non-empty actions list', started);
+  }
+  if (parsedAct?.success === true) {
+    for (const action of parsedAct.data.actions) {
+      if (action.kind === 'fill_secret') continue;
+      try {
+        actionArgv(action);
+      } catch (error) {
+        if (error instanceof ComputerRefusal) refuse(error.message, started);
+        throw error;
+      }
+    }
+  }
   if (options.tabScope !== undefined) await selectScopeTab(options.tabScope);
   await blockCairn(tool);
   const boundTab = cairnOrigins.length === 0 ? null : await activeTab();
@@ -891,12 +906,9 @@ export async function runBrowserTool(
     };
   }
 
-  const parsed = actParams.safeParse(params);
-  if (!parsed.success) {
-    refuse('browser_act needs a non-empty actions list', started);
-  }
+  if (parsedAct === null || !parsedAct.success) throw new Error('browser_act was not validated');
   const lines: string[] = [];
-  for (const action of parsed.data.actions) {
+  for (const action of parsedAct.data.actions) {
     await refuseOnCairn(`browser_act ${action.kind}`);
     if (action.ref !== undefined) {
       const snap = await read([...prefix, 'snapshot', '-i']);
