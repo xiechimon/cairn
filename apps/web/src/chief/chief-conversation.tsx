@@ -68,6 +68,7 @@ import { QuestionArrivals, useQuestionPending } from './chief-question.js';
 import { foldTaskCards, placeReportCards, todoGlanceOf } from './chief-task-refs.js';
 import { serverDraftBinding } from './composer-binding.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
+import { resolveCoordinatorNotice } from './coordinator-outage.js';
 import type { UnsentSends } from './outbox.js';
 import { type LateArrival, withoutReturnedText } from './outbox.js';
 import { awaitingStream } from './question-lifecycle.js';
@@ -576,6 +577,23 @@ export function ChiefConversation({
     if (waitNow === null) setDismissedWait(null);
   }, [waitNow]);
   const queueWait = waitNow !== null && waitNow.kind !== dismissedWait ? waitNow : null;
+  const offlineCards = useMemo(
+    () =>
+      (chief.stream ?? []).flatMap((item) =>
+        item.kind === 'runner-offline'
+          ? [{ machineName: item.notice.machineName, backAt: item.notice.backAt }]
+          : [],
+      ),
+    [chief.stream],
+  );
+  const shownNotice = resolveCoordinatorNotice(
+    chief.outage ?? null,
+    queueWait,
+    offlineCards,
+    chief.outageMachines ?? [],
+  );
+  const shownOutage = shownNotice.outage;
+  const shownQueueWait = shownNotice.queueWait;
   const cardFailure =
     connected && chief.outage == null && queueWait === null ? (failure?.id ?? null) : null;
   const dayEarlier = day?.earlier ?? 0;
@@ -833,14 +851,14 @@ export function ChiefConversation({
         </>
       )}
 
-      {chief.outage != null ? (
-        <ChiefOutageBanner outage={chief.outage} onSettings={onSettings} />
-      ) : queueWait !== null ? (
+      {shownOutage != null ? (
+        <ChiefOutageBanner outage={shownOutage} onSettings={onSettings} />
+      ) : shownQueueWait !== null ? (
         <QueueWaitCard
-          key={queueWait.kind}
-          wait={queueWait}
+          key={shownQueueWait.kind}
+          wait={shownQueueWait}
           className={BANNER_CLS}
-          onDismiss={() => setDismissedWait(queueWait.kind)}
+          onDismiss={() => setDismissedWait(shownQueueWait.kind)}
           onSwitchMachine={handleSwitchMachine}
           switching={switchChiefStepMachine.isPending}
         />

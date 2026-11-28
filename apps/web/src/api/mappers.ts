@@ -2708,6 +2708,19 @@ export function mapChief(
           running: active.activeRun != null,
           runningStepId: opts.activity?.stepId ?? null,
         });
+  const outageMachines =
+    env.outage?.reason === 'runner-offline'
+      ? [
+          ...new Set(
+            opts.threads.flatMap((thread) =>
+              thread.turnQueue?.blocked?.kind === 'machine-offline' &&
+              thread.turnQueue.waitingFor != null
+                ? [thread.turnQueue.waitingFor.name]
+                : [],
+            ),
+          ),
+        ]
+      : [];
   return {
     bound,
     ...(bound && env.agentActor
@@ -2743,6 +2756,7 @@ export function mapChief(
     ...(active?.waitingRerun != null ? { waitingRerun: true } : {}),
     ...(opts.draft !== undefined ? { draft: opts.draft } : {}),
     ...(env.outage != null ? { outage: env.outage } : {}),
+    ...(outageMachines.length > 0 ? { outageMachines } : {}),
     ...(active?.fallbackModel != null ? { fallbackModel: active.fallbackModel } : {}),
     ...(quickReplies.length > 0 ? { quickReplies } : {}),
   };

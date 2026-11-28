@@ -700,6 +700,29 @@ describe('stall-monitor', () => {
     expect(getStep(s, w.stepId).status).toBe('failed');
   });
 
+  test('a Coordinator turn requeued from an offline Runner leaves the offline card and banner as its only notices', () => {
+    s = bootServer();
+    setupProjectAndProvider(s);
+    const now = Date.now();
+    const machine = seedMachine(s, { id: 'm-dead-chief', name: 'mac', online: false });
+    const c = seedChiefStep(s, {
+      suffix: 'dead-chief',
+      threadId: 'chief-dead-chief',
+      machineId: machine.id,
+      provider: 'antigravity',
+      claimedAt: now - 30_000,
+      lastHeartbeatAt: now - 30_000,
+      lastProgressAt: now - 30_000,
+    });
+
+    sweepStallMonitor(s.svc, now + DEAD_RUNNER_GRACE_MS);
+
+    const requeued = getStep(s, c.stepId);
+    expect(requeued.status).toBe('pending');
+    expect(requeued.stallState?.recoveryCount).toBe(1);
+    expect(chiefSystemMessages(s, c.threadId)).toEqual([]);
+  });
+
   test('silent_turn: runtime-specific windows, in-server Coordinator restart, cap at 1 restart, and progress clears dedupe', () => {
     s = bootServer();
     setupProjectAndProvider(s);
