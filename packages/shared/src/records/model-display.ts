@@ -12,7 +12,8 @@ const BUILTIN_MODEL_NAMES = new Map<string, string>(
 
 const CLAUDE_FAMILY_RE =
   /^claude-(opus|sonnet|haiku|fable)-(\d+)(?:-(\d+))?(?:-(thinking))?(?:-\d{8})?(?:\[1m\])?$/i;
-const SWE_MODEL_RE = /^swe-(\d+)(?:-(\d+))?(?:-(flash))?(?:-(?:low|medium|high|max))?$/i;
+const SWE_MODEL_RE =
+  /^swe-(\d+)(?:-(\d+))?(?:-(flash))?(?:-(?:none|off|minimal|low|medium|high|xhigh|max))?$/i;
 const DEEPSEEK_V_RE = /^deepseek-v(\d+(?:\.\d+)?)(?:-(flash|chat|reasoner))?$/i;
 
 function titleWord(word: string): string {

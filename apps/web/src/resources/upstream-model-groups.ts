@@ -1,6 +1,13 @@
 import type { UpstreamOption } from './upstream-model-picker.js';
 
-const NATIVE_IDS = new Set(['adaptive', 'swe-2-high', 'swe-2-flash-medium']);
+const NATIVE_IDS = new Set([
+  'adaptive',
+  'swe-2',
+  'swe-2-flash',
+  'swe-2-1',
+  'swe-2-high',
+  'swe-2-flash-medium',
+]);
 
 const VENDOR_LABELS: [RegExp, string][] = [
   [/^(swe|devin)-|^adaptive/, 'Devin 原生'],
