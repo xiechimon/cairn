@@ -19,6 +19,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import * as builds from '../src/services/builds.js';
+import { coordinatorThreadRow, ensureChief } from '../src/services/chief.js';
 import { announceQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import { finishCoordinatorTurn } from '../src/services/coordinator-steps.js';
 import {
@@ -1090,31 +1091,16 @@ describe('notify-once presence routing', () => {
 function seedChiefThread(
   s: Awaited<ReturnType<typeof setupWorld>>,
   title = '',
-  id: string | null = null,
 ): string {
-  const threadId = id ?? `chief-${newUuidv7()}`;
-  const chiefId = `chief-${s.user.id}-${s.team.id}`;
-  const now = nowMs();
-  s.db
-    .insert(chief)
-    .values({ id: chiefId, teamId: s.team.id, userId: s.user.id, createdAt: now })
-    .onConflictDoNothing()
-    .run();
-  s.db
-    .insert(chiefThread)
-    .values({
-      id: threadId,
-      chiefId,
-      userId: s.user.id,
-      teamId: s.team.id,
-      title,
-      createdAt: now,
-      updatedAt: now,
-      sessionId: newUuidv7(),
-      sessionOpenedAt: now,
-    })
-    .run();
-  return threadId;
+  const thread = coordinatorThreadRow(s.svc, ensureChief(s.svc, s.team.id));
+  const current = s.db.select().from(chiefThread).where(eq(chiefThread.id, thread.id)).get();
+  if (current === undefined) {
+    s.db.insert(chiefThread).values(thread).run();
+  }
+  if (title !== '') {
+    s.db.update(chiefThread).set({ title }).where(eq(chiefThread.id, thread.id)).run();
+  }
+  return thread.id;
 }
 
 describe('one WeChat message per task state change', () => {

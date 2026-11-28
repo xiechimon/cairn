@@ -1,4 +1,4 @@
-import type { AskUserQuestion } from '@cairn/shared';
+import type { AskUserQuestion, NotificationRecord } from '@cairn/shared';
 import type { Db } from '../../db/client.js';
 import type { CommitEffects } from '../../db/commit-effects.js';
 import { databaseIdentity } from '../../db/identity.js';
@@ -9,10 +9,12 @@ export type ImStepRow = typeof step.$inferSelect;
 export interface ImAwayNoticeInput {
   teamId: string;
   entityId: string;
+  type: NotificationRecord['type'];
   title: string;
   body: string;
   href: string;
   deliveryId: string;
+  question?: { requestId: string; questions: AskUserQuestion[]; owned: string[] };
   effects?: CommitEffects;
 }
 

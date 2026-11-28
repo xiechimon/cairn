@@ -6,7 +6,7 @@ import {
   askUserQuestionContentSchema,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@cairn/shared';
-import { and, eq, gt, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, chiefThread, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -71,6 +71,28 @@ export function readQuestion(
     .where(and(eq(chiefMessage.id, requestId), eq(chiefMessage.threadId, threadId)))
     .get();
   return row === undefined ? null : askQuestionContentOf(row.content);
+}
+
+export function pendingQuestionInThread(
+  db: Db,
+  threadId: string,
+): { requestId: string; questions: AskUserQuestion[]; owned: string[] } | null {
+  const rows = db
+    .select()
+    .from(chiefMessage)
+    .where(eq(chiefMessage.threadId, threadId))
+    .orderBy(desc(chiefMessage.createdAt))
+    .all();
+  for (const row of rows) {
+    const content = askQuestionContentOf(row.content);
+    if (content === null || content.status !== 'pending' || content.questions.length === 0) continue;
+    return {
+      requestId: row.id,
+      questions: content.questions,
+      owned: [row.id, ...(content.askedFor ?? [])],
+    };
+  }
+  return null;
 }
 
 function askingTurnProjectId(db: Db, threadId: string): string | null {

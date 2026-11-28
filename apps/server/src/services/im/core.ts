@@ -134,6 +134,7 @@ const PAIRING_REQUESTED_TEXT =
 const PAIRING_APPROVED_TEXT = '已通过配对：现在可以直接在这里和 Cairn 对话。';
 const TURN_FAILED_TEXT = '本轮处理失败，请稍后重试。';
 const SEND_ATTEMPTS = 4;
+const AWAY_NOTICE_WINDOW_MS = 10 * 60 * 1000;
 
 interface Origin {
   connId: string;
@@ -317,6 +318,7 @@ export function createImService(deps: ImServiceDeps): ImService {
       stepId?: string;
       claimGeneration?: number;
       dedupe: string;
+      slot?: string;
       requestId?: string;
       owned?: string[];
       deliveryId?: string;
@@ -337,9 +339,9 @@ export function createImService(deps: ImServiceDeps): ImService {
         connId,
         msg.chatKey,
         scope?.dedupe ?? '',
-        msg.text,
-        msg.replyToMessageId ?? '',
-        JSON.stringify(msg.buttons ?? null),
+        ...(scope?.slot !== undefined
+          ? [scope.slot]
+          : [msg.text, msg.replyToMessageId ?? '', JSON.stringify(msg.buttons ?? null)]),
       ),
       payload: {
         connId,
@@ -1200,6 +1202,7 @@ export function createImService(deps: ImServiceDeps): ImService {
             ? undefined
             : { ...outbound, owned: [outbound.requestId, ...(content.askedFor ?? [])] };
         for (const { row, origin } of noticeOrigins(threadId)) {
+          if (cardSend === undefined && stepAlreadySentToIm(row.id)) continue;
           sendToOrigin(origin, cardSend?.text ?? text, row, cardSend);
         }
       },
@@ -1240,15 +1243,28 @@ export function createImService(deps: ImServiceDeps): ImService {
               sender.chatKey !== null && sender.chatKey !== '',
           );
           if (recipient === undefined) continue;
-          const text = input.body.trim() === '' ? input.title : `${input.title}\n${input.body}`;
+          const card =
+            input.question === undefined
+              ? undefined
+              : questionCard(input.question.requestId, input.question.questions);
+          const body = card?.text ?? input.body;
+          const text = body.trim() === '' ? input.title : `${input.title}\n${body}`;
+          const slot =
+            input.question === undefined
+              ? `notify-away:${input.entityId}:${input.type}:${Math.floor(nowMs() / AWAY_NOTICE_WINDOW_MS)}`
+              : `card:${input.entityId}:${input.question.requestId}`;
           enqueueSend(
             row.id,
-            { chatKey: recipient.chatKey, text },
+            { chatKey: recipient.chatKey, text, ...(card !== undefined ? { buttons: card.buttons } : {}) },
             {
               kind: 'imConnection',
               id: row.id,
-              dedupe: `notify-away:${input.deliveryId}`,
+              dedupe: slot,
+              slot,
               deliveryId: input.deliveryId,
+              ...(input.question !== undefined
+                ? { requestId: input.question.requestId, owned: input.question.owned }
+                : {}),
               defer: input.effects,
             },
           );
