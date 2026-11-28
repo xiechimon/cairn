@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "run-trace-leading-blanks",
+  "instruction": "In apps/server/src/services/run-trace.ts, assistant reply and thinking blocks in run traces keep leading and trailing blank lines/whitespace from model output, leaving a visible gap at the top of replies and thoughts in the run-log view. Trim leading and trailing whitespace on assistant reply and thinking text blocks when building run trace items.",
+  "timeoutMs": 180000,
+  "source": {
+    "parentCommit": "28c72654b9da03831422b9a441eefcceb1c2bd31",
+    "fixCommit": "0a6530adaf693e0d763016ba6041bf6d4b736b6c",
+    "testFiles": [
+      "apps/server/test/run-trace.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/run-trace.test.ts"
+    ]
+  },
+  "gate": true
+}

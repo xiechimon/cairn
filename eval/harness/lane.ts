@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -70,6 +70,82 @@ function changedFiles(dir: string, baseline: string): string[] | null {
 
 export function isDependencyDriftOutput(output: string): boolean {
   return DEPENDENCY_DRIFT_RE.test(output);
+}
+
+async function runIsolatedCommand(
+  command: string,
+  options: {
+    cwd: string;
+    env: Record<string, string | undefined>;
+    timeoutMs: number;
+    maxBufferBytes: number;
+  },
+): Promise<{
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  error?: Error;
+  stdout: string;
+  stderr: string;
+}> {
+  return new Promise((resolvePromise) => {
+    const child = spawn('bash', ['-c', command], {
+      cwd: options.cwd,
+      env: options.env,
+      detached: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const outChunks: Buffer[] = [];
+    const errChunks: Buffer[] = [];
+    let outLen = 0;
+    let errLen = 0;
+    const appendChunk = (chunks: Buffer[], len: number, chunk: Buffer): number => {
+      if (len >= options.maxBufferBytes) return len;
+      const room = options.maxBufferBytes - len;
+      chunks.push(chunk.length > room ? chunk.subarray(0, room) : chunk);
+      return len + Math.min(chunk.length, room);
+    };
+    child.stdout?.on('data', (chunk: Buffer) => {
+      outLen = appendChunk(outChunks, outLen, chunk);
+    });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      errLen = appendChunk(errChunks, errLen, chunk);
+    });
+    let timedOut = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const killGroup = (sig: NodeJS.Signals) => {
+      if (child.pid === undefined) return;
+      try {
+        process.kill(-child.pid, sig);
+      } catch {}
+    };
+    const timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      killGroup('SIGTERM');
+      killTimer = setTimeout(() => killGroup('SIGKILL'), 1_500);
+      killTimer.unref?.();
+    }, options.timeoutMs);
+    timeoutTimer.unref?.();
+
+    let settled = false;
+    const finish = (status: number | null, signal: NodeJS.Signals | null, error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutTimer);
+      if (killTimer !== undefined) clearTimeout(killTimer);
+      killGroup('SIGKILL');
+      resolvePromise({
+        status,
+        signal,
+        timedOut,
+        ...(error ? { error } : {}),
+        stdout: Buffer.concat(outChunks).toString('utf8'),
+        stderr: Buffer.concat(errChunks).toString('utf8'),
+      });
+    };
+    child.once('error', (error) => finish(null, null, error));
+    child.once('close', (status, signal) => finish(status, signal));
+  });
 }
 
 export function buildScorerEnv(
@@ -249,12 +325,11 @@ export async function runLaneTask(
     const commandDiagParts: string[] = [];
     const commands = [];
     for (const command of task.checks.commands) {
-      const res = spawnSync('bash', ['-c', command], {
+      const res = await runIsolatedCommand(command, {
         cwd: scorerWork,
-        encoding: 'utf8',
-        timeout: COMMAND_TIMEOUT_MS,
-        maxBuffer: MAX_BUFFER_BYTES,
         env: commandEnv,
+        timeoutMs: COMMAND_TIMEOUT_MS,
+        maxBufferBytes: MAX_BUFFER_BYTES,
       });
       const cmdOutput = [res.stderr, res.stdout].filter(Boolean).join('\n');
       if (isDependencyDriftOutput(cmdOutput)) {
@@ -265,12 +340,13 @@ export async function runLaneTask(
           incomplete: scrubDiagnostics(`dependency drift: ${cmdOutput}`, extraPaths),
         };
       }
-      const cmdErrCode = (res.error as NodeJS.ErrnoException | undefined)?.code;
-      const cmdTimedOut = cmdErrCode === 'ETIMEDOUT' || res.signal !== null;
-      const ok = res.error === undefined && res.status === 0;
+      const ok =
+        !res.timedOut && res.signal === null && res.error === undefined && res.status === 0;
       if (!ok) {
-        if (cmdTimedOut) {
+        if (res.timedOut) {
           commandDiagParts.push(`command timeout after ${COMMAND_TIMEOUT_MS}ms: ${command}`);
+        } else if (res.signal !== null) {
+          commandDiagParts.push(`command killed by signal ${res.signal}: ${command}`);
         } else if (res.error !== undefined) {
           commandDiagParts.push(`command error (${res.error.message}): ${command}`);
         } else {

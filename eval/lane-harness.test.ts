@@ -326,6 +326,37 @@ describe('eval lane harness', () => {
     expect(scores.find((s) => s.name === 'lane.tests_pass')?.value).toBe(0);
   });
 
+  it('isolates scorer commands in their own process group so child SIGTERM to pgid 0 does not kill the runner', async () => {
+    const dir = makeTestTempDir('eval-pgid-');
+    const fixture = createFixtureSnapshotRepo(dir, 'pgid-check');
+    const sigTask: LaneTask = {
+      ...fixture.task,
+      checks: {
+        files: [],
+        commands: ['node -e "process.kill(0, \'SIGTERM\')"'],
+      },
+    };
+    const bin = writeStubDevin(
+      dir,
+      `require('node:fs').writeFileSync('packages/pkg-a/index.js', 'export function add(a, b) { return Number(a) + Number(b); }\\n');`,
+    );
+    setEnv({
+      EVAL_DEVIN_BIN: bin,
+      PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
+    });
+    const beforeDirs = new Set(readdirSync(tmpdir()).filter((n) => n.startsWith('eval-lane-')));
+    const record = await runLaneTask(sigTask, fixture.examDir, { repoRoot: fixture.repoRoot });
+    const afterDirs = readdirSync(tmpdir()).filter(
+      (n) => n.startsWith('eval-lane-') && !beforeDirs.has(n),
+    );
+    expect(afterDirs).toEqual([]);
+    expect(record.incomplete).toBeUndefined();
+    expect(record.diagnostics).toContain('SIGTERM');
+    const scores = scoreLane(sigTask, record);
+    expect(scores.find((s) => s.name === 'lane.completed')?.value).toBe(1);
+    expect(scores.find((s) => s.name === 'lane.tests_pass')?.value).toBe(0);
+  });
+
   it('detects dependency drift as incomplete and reports missing git commits or missing blobs before Devin', async () => {
     const dir = makeTestTempDir('eval-missing-');
     const fixture = createFixtureSnapshotRepo(dir, 'missing-check');
