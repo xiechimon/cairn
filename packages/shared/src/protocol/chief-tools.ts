@@ -585,7 +585,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Any other model is refused. The list itself is owner-only — do not try to change it; if the model you want is not on it, ask the owner to add it in Settings > Model. Pass this only when the user explicitly names a model for the task; omit it and Cairn picks the right model automatically for the task difficulty.",
         ),
         output: str(
-          'Optional deliverable kind: "code" (default, for tasks that edit files or deliver commits/PRs, without merging) or "info"/"report"/"dataset"/"link" for non-code, research, read-only, command-run, or verification tasks that make no file changes (runs normally on any Runner without committing code). Never use create_todo for recurring requests — call schedule_todo on the current conversation instead.',
+          'Always choose the deliverable kind: "info" for a reply in the task conversation (e.g. answer 1+1, run hostname and report, or report research findings without changing files); "code" if the task asks to change any repo or file, even conditionally or along with a report (default, no merging); "report", "dataset", or "link" for separate non-code artifacts; attach the finished artifact to the task conversation. A plain answer is the deliverable for "info". For recurring requests use schedule_todo instead.',
         ),
         start: {
           type: 'boolean',

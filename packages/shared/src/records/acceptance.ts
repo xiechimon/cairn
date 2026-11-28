@@ -427,6 +427,22 @@ export function extractEditedPathsFromMessages(messages: readonly AcceptanceMess
   return out;
 }
 
+export function hasFinalTextAnswer(
+  messages: readonly AcceptanceMessage[],
+  stepStart: number,
+): boolean {
+  const lastAssistant = messages.findLast((m) => m.role === 'assistant');
+  if (
+    !lastAssistant ||
+    lastAssistant.createdAt < stepStart ||
+    !messageTextOf(lastAssistant.content).trim()
+  )
+    return false;
+  const { calls } = parseCallsAndText(messages);
+  if (calls.some((call) => call.name === 'attach_file' || isMutatingCall(call))) return false;
+  return calls.findLast((call) => COMMAND_TOOL_NAMES.has(call.name))?.isError !== true;
+}
+
 export function buildAcceptanceNudgePrompt(
   evaluation: Exclude<AcceptanceEvaluation, { ok: true }>,
 ): string {

@@ -184,11 +184,14 @@ describe('Coordinator task text contract', () => {
     }
   });
 
-  it('create_todo output parameter covers read-only and command-run tasks', () => {
+  it('create_todo distinguishes a reply, a file change and a standalone attachment', () => {
     const create = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'create_todo')?.parameters as {
       properties: Record<string, { description: string }>;
     };
-    expect(create.properties.output?.description).toContain('read-only');
+    const output = create.properties.output?.description;
+    expect(output).toMatch(/"info" for a reply.*run hostname/);
+    expect(output).toMatch(/"code" if the task asks to change any repo or file/);
+    expect(output).toMatch(/"report", "dataset", or "link".*attach the finished artifact/);
   });
 });
 

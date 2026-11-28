@@ -5,6 +5,7 @@ import {
   buildPlanRewritePrompt,
   evaluateStepAcceptance,
   extractEditedPathsFromMessages,
+  hasFinalTextAnswer,
   isAcceptanceNudgePrompt,
   isBuildStepKind,
   isInfoOutput,
@@ -185,6 +186,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
   const blockedByAnswers =
     receivesAnswers(stepRow.kind) && undeliveredAnswers(deps.db, stepRow.buildId).length > 0;
   let acceptance: AcceptanceEvaluation | null = null;
+  let deliveredNonCode = false;
   if (
     isBuildStepKind(stepRow.kind) &&
     pendingWorkerQuestions(deps.db, buildRow.id).length === 0 &&
@@ -305,19 +307,39 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         recordedChanges.length > 0
           ? recordedChanges.map((f) => f.path)
           : extractEditedPathsFromMessages(buildMessages);
-      acceptance = evaluateStepAcceptance({
-        output: todoRow.output,
-        repoKind: projRow?.repoKind ?? null,
-        hasChanges: outcome.hasChanges,
-        editedPaths,
-        messages: buildMessages,
-        attachments: stepAttachments,
-        stepIds: attemptStepIds,
-        unpushedCommits: outcome.unpushedCommits,
-        expectedCommit: stepRow.checkpointCommit,
-        report: outcome.report,
-        deliverables: outcome.deliverables,
-      });
+      const workerAttachments = stepAttachments.filter((row) =>
+        attemptStepIds.some((id) => row.createdBy === `step:${id}`),
+      );
+      const attachedResult =
+        isInfoOutput(todoRow.output) &&
+        workerAttachments.some((row) => row.status === 'ready' && row.sizeBytes > 0);
+      const answeredInText =
+        todoRow.output === 'info' &&
+        todoRow.request !== null &&
+        outcome.hasChanges === false &&
+        editedPaths.length === 0 &&
+        buildRow.reportAttachmentId === null &&
+        buildRow.prNumber === null &&
+        buildRow.prUrl === null &&
+        outcome.report === undefined &&
+        outcome.deliverables === undefined &&
+        workerAttachments.length === 0 &&
+        hasFinalTextAnswer(buildMessages, stepRow.createdAt);
+      deliveredNonCode = attachedResult || answeredInText;
+      if (!attachedResult)
+        acceptance = evaluateStepAcceptance({
+          output: todoRow.output,
+          repoKind: projRow?.repoKind ?? null,
+          hasChanges: outcome.hasChanges,
+          editedPaths,
+          messages: buildMessages,
+          attachments: stepAttachments,
+          stepIds: attemptStepIds,
+          unpushedCommits: outcome.unpushedCommits,
+          expectedCommit: stepRow.checkpointCommit,
+          report: outcome.report,
+          deliverables: outcome.deliverables,
+        });
     }
   }
   if (acceptance !== null && !acceptance.ok && !acceptance.retryable) {
@@ -470,7 +492,8 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         manifest: outcome.deliverables,
       });
     }
-    setTodoPhase(deps, todoRow.id, 'review', { hasChanges: false });
+    if (deliveredNonCode) finishTodoDone(deps, todoRow.id, buildRow.id, { hasChanges: false });
+    else setTodoPhase(deps, todoRow.id, 'review', { hasChanges: false });
     return;
   }
   if (isBuildStepKind(stepRow.kind)) {

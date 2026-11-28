@@ -1,7 +1,19 @@
 import { ANSWERS_CONTINUE_PROMPT } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { build, machine, message, project, steerPending, step, todo } from '../src/db/schema.js';
+import {
+  attachment,
+  build,
+  machine,
+  message,
+  project,
+  steerPending,
+  step,
+  todo,
+} from '../src/db/schema.js';
+import { attachWorkerFile } from '../src/services/agent-attachments.js';
+import { blockerHandoffForClaim } from '../src/services/blocker-handoff.js';
+import { blockedNow } from '../src/services/blockers.js';
 import { applyStepFailure, completeStep, startBuilds } from '../src/services/builds.js';
 import { transitionTodos } from '../src/services/chief-tools.js';
 import { ackSteer, claimStep, fetchSteer } from '../src/services/machines.js';
@@ -9,7 +21,7 @@ import { listNeedsYou, sweepFailedRetries } from '../src/services/needs-you.js';
 import { messageThreadAsUser } from '../src/services/thread-message.js';
 import { getTodo } from '../src/services/todos.js';
 import { askWorkerQuestion } from '../src/services/worker-questions.js';
-import { H, registerChiefHarness, relay } from './chief-harness.js';
+import { H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 import { insertMachine } from './helpers.js';
 
 registerChiefHarness();
@@ -517,6 +529,256 @@ describe('every surface that lists work waiting on a person includes needs_input
     expect(out.skipped).toEqual([todoId]);
     expect(phaseOf(todoId)).toBe('needs_input');
     expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
+  });
+});
+
+async function startCoordinatorTask(
+  spec: string,
+  output: 'info' | 'code' | 'report' = 'info',
+  blockedBy?: string[],
+) {
+  const { id: todoId, buildId } = (await relay('create_todo', {
+    ...ownerTodo(spec),
+    title: 'Read-only check',
+    output,
+    difficulty: 'easy',
+    blockedBy,
+  })) as { id: string; buildId: string };
+  const first = H.s.db.select().from(step).where(eq(step.buildId, buildId)).get()!;
+  const machineId = H.s.db.select().from(machine).where(eq(machine.teamId, H.teamId)).get()!.id;
+  H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+  H.s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, first.id)).run();
+  const stepRow = H.s.db.select().from(step).where(eq(step.id, first.id)).get()!;
+  return { todoId, buildId, stepRow };
+}
+
+function assistantMessage(buildId: string, id: string, content: unknown, createdAt = Date.now()) {
+  H.s.db
+    .insert(message)
+    .values({ id, conversationId: buildId, role: 'assistant', content, createdAt })
+    .run();
+}
+
+function reply(buildId: string, text: string) {
+  const content = [{ type: 'text', text }];
+  assistantMessage(buildId, 'answer', content);
+  return content;
+}
+
+function uploadDeck(stepRow: typeof step.$inferSelect, todoId: string) {
+  const todoRow = H.s.db.select().from(todo).where(eq(todo.id, todoId)).get()!;
+  return JSON.parse(
+    attachWorkerFile({ ...toolDeps(), convHub: H.s.convHub }, stepRow, todoRow, {
+      fileName: 'q3-review.html',
+      contentBase64: Buffer.from(
+        '<!doctype html><title>Q3 review</title><h1>Q3 review</h1>',
+      ).toString('base64'),
+    }),
+  ) as { id: string; token: string };
+}
+
+function toolCall(name: string, args: object = {}, isError = false) {
+  return { kind: 'toolcall', call: { name, arguments: args, isError } };
+}
+
+describe('Coordinator tasks use the requested delivery kind', () => {
+  test.each([
+    ['运行 hostname 并汇报主机名', '主机名是 test-runner。'],
+    ['请用一句中文回答：一加一等于几？', '一加一等于二。'],
+  ])('finishes without a commit when it answers: %s', async (spec, answer) => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask(spec);
+    const content = reply(buildId, answer);
+    if (spec.includes('hostname'))
+      assistantMessage(
+        buildId,
+        'hostname',
+        toolCall('bash', { command: 'hostname' }),
+        stepRow.createdAt,
+      );
+    endStep(stepRow.id, { hasChanges: false });
+    expect(getTodo(deps(), todoId)).toMatchObject({ phase: 'done', hasChanges: false });
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
+    expect(H.s.db.select().from(message).where(eq(message.id, 'answer')).get()?.content).toEqual(
+      content,
+    );
+  });
+
+  test('a dependent task is released with the original textual answer in its handoff', async () => {
+    const parent = await startCoordinatorTask('Tell me the hostname.');
+    const child = await startCoordinatorTask('Use the hostname from the previous task.', 'info', [
+      parent.todoId,
+    ]);
+    const childRow = H.s.db.select().from(todo).where(eq(todo.id, child.todoId)).get()!;
+    expect(blockedNow(H.s.db, childRow)).toBe(true);
+    reply(parent.buildId, 'The hostname is test-runner.');
+    endStep(parent.stepRow.id, { hasChanges: false });
+    expect(blockedNow(H.s.db, childRow)).toBe(false);
+    const handoff = await blockerHandoffForClaim(
+      { ...deps(), reposDir: H.s.reposDir, attachmentsDir: H.s.attachmentsDir },
+      child.stepRow,
+      childRow,
+    );
+    expect(handoff?.blockers[0]).toMatchObject({
+      phase: 'done',
+      summary: 'The hostname is test-runner.',
+    });
+  });
+
+  test('a code request that only reports still needs input', async () => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask(
+      'Fix the typo in README.md. Do not edit any files outside the repo. Reply with the result.',
+      'code',
+    );
+    uploadDeck(stepRow, todoId);
+    reply(buildId, 'The typo is on line 11. I changed nothing.');
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('needs_input');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBe('pending');
+  });
+
+  test('a worker question still takes precedence over a partial answer', async () => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask('Check the onboarding copy.');
+    reply(buildId, 'I can check one copy.');
+    await ask(stepRow, REQUEST_A);
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('needs_input');
+    expect(questionStatus(buildId, REQUEST_A)).toBe('pending');
+  });
+
+  test('a failed answer-only turn does not become done', async () => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask('Run hostname and report.');
+    reply(buildId, 'Checking the hostname.');
+    applyStepFailure(deps(), stepRow, 'agent crashed');
+    expect(phaseOf(todoId)).toBe('failed');
+  });
+
+  test('a blank reply does not complete an info task', async () => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask('Run hostname and report.');
+    reply(buildId, ' \n ');
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('review');
+  });
+
+  test.each(['report', 'info'] as const)(
+    'a separate %s artifact still enters review',
+    async (kind) => {
+      const { todoId, buildId, stepRow } = await startCoordinatorTask(
+        'Write a separate report.',
+        kind,
+      );
+      reply(buildId, 'Here is the report.');
+      completeStep(deps(), stepRow.id, { hasChanges: false, report: '# Results' });
+      expect(phaseOf(todoId)).toBe('review');
+    },
+  );
+
+  test.each([
+    ['narration then a tool-only end', undefined, toolCall('bash', { command: 'hostname' })],
+    ['failed command then narration', toolCall('bash', { command: 'hostname' }, true), undefined],
+    ['a file is attached', toolCall('attach_file', { path: 'results.txt' }), undefined],
+    ['a file was edited', toolCall('edit_file', { path: 'notes.txt' }), undefined],
+  ])('info still enters review with %s', async (_label, before, after) => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask('Run hostname and report.');
+    const at = Date.now();
+    if (before !== undefined) assistantMessage(buildId, 'before', before, at);
+    assistantMessage(buildId, 'answer', 'Checking the hostname.', at + 1);
+    if (after !== undefined) assistantMessage(buildId, 'after', after, at + 2);
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('review');
+  });
+
+  test.each([true, undefined])(
+    'info still enters review with hasChanges=%s',
+    async (hasChanges) => {
+      const { todoId, buildId, stepRow } = await startCoordinatorTask('Run hostname and report.');
+      reply(buildId, 'The hostname is test-runner.');
+      endStep(stepRow.id, { hasChanges });
+      expect(phaseOf(todoId)).toBe('review');
+    },
+  );
+
+  test('an uploaded non-code HTML deck completes despite legacy read-back checks', async () => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask(
+      'Build a four-slide Q3 review deck and attach the HTML.',
+      'report',
+    );
+    assistantMessage(
+      buildId,
+      'write',
+      toolCall('write_file', { path: 'q3-review.html' }),
+      stepRow.createdAt,
+    );
+    const { id, token } = uploadDeck(stepRow, todoId);
+    reply(buildId, 'The deck is attached.');
+    endStep(stepRow.id, { hasChanges: false });
+    expect(getTodo(deps(), todoId)).toMatchObject({ phase: 'done', hasChanges: false });
+    expect(H.s.db.select().from(attachment).where(eq(attachment.id, id)).get()).toMatchObject({
+      status: 'ready',
+      fileName: 'q3-review.html',
+    });
+    expect(
+      H.s.db
+        .select()
+        .from(message)
+        .where(eq(message.id, `attachment-output-${stepRow.id}`))
+        .get()?.content,
+    ).toBe(token);
+  });
+
+  test('an older message attachment cannot deliver the current attempt', async () => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask('Report the results.');
+    assistantMessage(
+      buildId,
+      'attach-call',
+      toolCall('attach_file', { path: 'results.txt' }),
+      stepRow.createdAt,
+    );
+    reply(buildId, 'The results are attached.');
+    H.s.db
+      .insert(attachment)
+      .values({
+        id: 'attachment',
+        todoId,
+        teamId: H.teamId,
+        createdBy: 'step:previous-attempt',
+        fileName: 'results.txt',
+        mimeType: 'text/plain',
+        sizeBytes: 12,
+        storageKey: 'results.txt',
+        grantId: 'grant',
+        scope: 'message',
+        status: 'ready',
+        createdAt: Date.now(),
+      })
+      .run();
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('review');
+  });
+
+  test('the info artifact acceptance nudge still takes precedence over a text reply', async () => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask('Write and verify report.md.');
+    assistantMessage(
+      buildId,
+      'write',
+      toolCall('write_file', { path: 'report.md' }),
+      stepRow.createdAt,
+    );
+    reply(buildId, 'The report is ready.');
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('building');
+    expect(pendingWork(buildId)[0]?.prompt).toContain('[cairn acceptance check]');
+  });
+
+  test('text from a prior step is not a new answer', async () => {
+    const { todoId, buildId, stepRow } = await startCoordinatorTask('Run hostname and report.');
+    assistantMessage(
+      buildId,
+      'old-reply',
+      'The old hostname was previous-runner.',
+      stepRow.createdAt - 1,
+    );
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('review');
   });
 });
 

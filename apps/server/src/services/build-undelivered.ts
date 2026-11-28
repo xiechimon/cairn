@@ -80,7 +80,7 @@ export function undeliveredEnd(
 ): Undelivered | null {
   if (!isBuildStepKind(stepRow.kind) || isInfoOutput(todoRow.output)) return null;
   if (outcome.hasChanges !== false) return null;
-  return requestExpectsNoFileChanges(todoRow) ? null : 'no-commits';
+  return todoRow.request === null && requestExpectsNoFileChanges(todoRow) ? null : 'no-commits';
 }
 
 function spokenText(content: unknown): string {
