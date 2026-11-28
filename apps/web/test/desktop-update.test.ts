@@ -81,12 +81,16 @@ describe('desktop update button presentation', () => {
     };
 
     await updateDesktopNow();
-    expect(errorSpy).toHaveBeenCalledWith('更新包签名验证未通过，无法安装', undefined);
+    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(errorSpy.mock.calls[0]?.[0]).toBe('更新包签名验证未通过，无法安装');
+    expect(errorSpy.mock.calls[0]?.[1]?.description).toBeUndefined();
 
     errorSpy.mockClear();
     currentState = { status: 'offline' };
     await updateDesktopNow();
-    expect(errorSpy).toHaveBeenCalledWith('无法连接网络，未能检查更新', undefined);
+    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(errorSpy.mock.calls[0]?.[0]).toBe('无法连接网络，未能检查更新');
+    expect(errorSpy.mock.calls[0]?.[1]?.description).toBeUndefined();
   });
 
   it('shouldShowSidebarDesktopUpdate hides routine states and surfaces attention/active states only', () => {

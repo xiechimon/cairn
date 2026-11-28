@@ -8,7 +8,6 @@ import {
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -17,7 +16,7 @@ import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toast, toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';

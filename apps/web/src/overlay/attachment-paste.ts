@@ -1,6 +1,6 @@
 import { attachmentExtOf } from '@cairn/shared';
-import { toast } from 'sonner';
 import { AttachmentError, attachFile } from '../api/attachments.js';
+import { toast } from '../components/ui/toaster.js';
 
 export interface ClipboardFileItem {
   kind: string;

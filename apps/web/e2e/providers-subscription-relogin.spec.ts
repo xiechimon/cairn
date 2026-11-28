@@ -111,7 +111,7 @@ test('expired Antigravity card shows primary Sign in again, starts Google sign-i
   await signInBtn.click();
   const dialog = page.getByRole('dialog', { name: '重新登录 Antigravity' });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('已在浏览器中打开 Antigravity 登录页');
+  await expect(dialog.getByTestId('sign-in-view').getByRole('status')).toContainText('已在浏览器中打开 Antigravity 登录页');
   await expect(dialog.getByRole('textbox')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '保存', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => (window as Window & { __agRelogin?: AntigravityCalls }).__agRelogin?.signInCalls)).toBe(1);
@@ -148,14 +148,14 @@ test('a failed Antigravity re-sign-in says why and retries from the same dialog'
   await page.goto('/app/settings/routing?item=subscription:ag-exp-1');
   await page.getByTestId('subscription-sign-in-again').click();
   const dialog = page.getByRole('dialog', { name: '重新登录 Antigravity' });
-  await expect(dialog).toContainText('已在浏览器中打开 Antigravity 登录页');
+  await expect(dialog.getByTestId('sign-in-view').getByRole('status')).toContainText('已在浏览器中打开 Antigravity 登录页');
   await page.evaluate(() => {
     const w = window as Window & { __agRelogin?: AntigravityCalls };
     w.__agRelogin?.resolve?.({ ok: false, reason: 'timeout' });
   });
   await expect(dialog.getByRole('alert')).toHaveText('等待 Antigravity 登录超时。请重试。');
   await dialog.getByTestId('antigravity-relogin-start').click();
-  await expect(dialog).toContainText('已在浏览器中打开 Antigravity 登录页');
+  await expect(dialog.getByTestId('sign-in-view').getByRole('status')).toContainText('已在浏览器中打开 Antigravity 登录页');
   expect(await page.evaluate(() => (window as Window & { __agRelogin?: AntigravityCalls }).__agRelogin?.signInCalls)).toBe(2);
   await page.evaluate(() => {
     const w = window as Window & { __agRelogin?: AntigravityCalls };
@@ -245,7 +245,7 @@ test('Coordinator Antigravity banner opens the same re-sign-in directly and clea
   await reloginBtn.click();
   const dialog = page.getByRole('dialog', { name: '重新登录 Antigravity' });
   await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('已在浏览器中打开 Antigravity 登录页');
+  await expect(dialog.getByTestId('sign-in-view').getByRole('status')).toContainText('已在浏览器中打开 Antigravity 登录页');
 
   await page.evaluate(() => {
     const w = window as Window & { __agRelogin?: AntigravityCalls };
@@ -357,14 +357,16 @@ test('other expired or unauthenticated subscription cards (Claude, Devin, Codex)
   await page.getByTestId('subscription-sign-in-again').click();
   const devinDialog = page.getByRole('dialog', { name: '重新登录 Devin' });
   await expect(devinDialog).toBeVisible();
-  await expect(devinDialog).toContainText('已在浏览器中打开 Devin 登录页');
+  await expect(devinDialog.getByTestId('sign-in-view').getByRole('status')).toContainText('已在浏览器中打开 Devin 登录页');
   await expect(devinDialog.getByTestId('devin-subscription-label')).toHaveCount(0);
   await devinDialog.getByRole('button', { name: '取消', exact: true }).last().click();
   await expect(devinDialog).not.toBeVisible();
 
   await page.locator('[data-instance-id="provider:prov-codex"]').click();
   await page.getByTestId('provider-sign-in-again').click();
-  await expect(page.getByTestId('codex-device-login')).toContainText('ABCD-1234');
+  await expect(
+    page.getByRole('dialog', { name: '登录 ChatGPT' }).getByTestId('sign-in-code'),
+  ).toHaveText('ABCD-1234');
   expect(codexDeviceStarted).toBe(1);
 });
 
@@ -424,7 +426,7 @@ test('a device login the server lost on restart shows one expired state, not a r
 
   await page.goto('/app/settings/routing?item=provider:prov-codex');
   await page.getByTestId('provider-sign-in-again').click();
-  await expect(page.getByTestId('codex-device-login')).toContainText('ABCD-1234');
+  await expect(page.getByRole('dialog', { name: '登录 ChatGPT' }).getByTestId('sign-in-code')).toHaveText('ABCD-1234');
 
   await expect(page.getByText('登录已过期，请重新开始')).toBeVisible();
   await expect(page.getByText('Codex device login not found')).toHaveCount(0);

@@ -283,6 +283,7 @@ test('cancelling browser login returns to the login button without creating anyt
   });
   await dialog.getByTestId('antigravity-local-login').click();
   await expect(dialog).toContainText('已在浏览器中打开 Antigravity 登录页');
+  await expect(dialog.getByTestId('sign-in-view').getByRole('status')).toContainText('已在浏览器中打开 Antigravity 登录页');
   await dialog.getByTestId('antigravity-local-login-cancel').click();
   await expect(dialog.getByTestId('antigravity-local-login')).toBeVisible();
   expect(calls.created).toEqual([]);
@@ -425,6 +426,10 @@ test('a host-keyring subscription detail offers re-login and verifies green afte
   const relogin = detail.getByTestId('antigravity-relogin');
   await expect(relogin).toBeVisible();
   await detail.getByTestId('antigravity-detail-login').click();
+  await expect(relogin.getByTestId('sign-in-view').getByRole('status')).toContainText(
+    '已在浏览器中打开 Antigravity 登录页',
+  );
+  await expect(relogin.getByTestId('antigravity-relogin-cancel')).toBeVisible();
   await page.evaluate(() => {
     const w = window as Window & { __antigravity?: AntigravityCalls };
     w.__antigravity?.resolve?.({ ok: true });

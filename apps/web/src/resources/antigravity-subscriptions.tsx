@@ -21,6 +21,7 @@ import { UpdateCairnNotice } from '../board/desktop-update.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { InfoTip } from '../components/info-tip.js';
 import { withCodeSpans } from '../components/notice-banner.js';
+import { SignInView } from '../components/sign-in-view.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
@@ -257,14 +258,13 @@ export function AntigravityReloginDialog({
               {t('这台电脑无法安装 Antigravity。')}
             </p>
           ) : loginActive ? (
-            <div className="flex min-h-8 items-center gap-2">
-              <RingSpinner className="size-4 flex-none" />
-              <span role="status" className="min-w-0 flex-1 text-meta text-content-secondary">
-                {login.phase === 'installing'
+            <SignInView
+              waiting={
+                login.phase === 'installing'
                   ? t('正在下载安装 Antigravity，完成后会打开浏览器登录。')
-                  : t('已在浏览器中打开 Antigravity 登录页，完成后会自动继续。')}
-              </span>
-            </div>
+                  : t('已在浏览器中打开 Antigravity 登录页，完成后会自动继续。')
+              }
+            />
           ) : login.phase === 'failed' ? (
             <p role="alert" className="m-0 text-meta text-content-secondary">
               {loginFailCopy(login.failReason, t, false)}
@@ -396,23 +396,15 @@ export function AddAntigravitySubscriptionDialog({
           />
         </div>
       ) : loginActive ? (
-        <div className="flex min-h-8 items-center gap-2 pointer-coarse:min-h-11">
-          <RingSpinner className="size-4 flex-none" />
-          <span className="min-w-0 flex-1 text-meta text-content-secondary">
-            {login.phase === 'installing'
+        <SignInView
+          waiting={
+            login.phase === 'installing'
               ? t('正在下载安装 Antigravity，完成后会打开浏览器登录。')
-              : t('已在浏览器中打开 Antigravity 登录页，完成后会自动继续。')}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-none pointer-coarse:h-11"
-            data-testid="antigravity-local-login-cancel"
-            onClick={login.cancel}
-          >
-            {t('取消')}
-          </Button>
-        </div>
+              : t('已在浏览器中打开 Antigravity 登录页，完成后会自动继续。')
+          }
+          onCancel={login.cancel}
+          cancelTestId="antigravity-local-login-cancel"
+        />
       ) : local.loggedIn && !importFailed ? (
         <div className="flex h-8 min-w-0 items-center justify-between gap-2 pointer-coarse:h-11">
           <span className="min-w-0 truncate text-meta text-content-secondary" title={loggedInNote}>
@@ -592,56 +584,47 @@ export function AntigravityRelogin({
       : t('登录完成后会重新验证。');
   return (
     <div data-testid="antigravity-relogin" className="-mt-3 flex flex-col gap-1">
-      <p className="m-0 flex items-center gap-2">
-        {loginActive ? (
-          <>
-            <RingSpinner className="size-4" />
-            <span className="min-w-0 flex-1 text-meta text-content-tertiary">
-              {login.phase === 'installing'
-                ? t('正在下载安装 Antigravity，完成后会打开浏览器登录。')
-                : t('已在浏览器中打开 Antigravity 登录页，完成后会自动继续。')}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              data-testid="antigravity-relogin-cancel"
-              onClick={login.cancel}
-            >
-              {t('取消')}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              data-testid="antigravity-detail-login"
-              onClick={() => {
-                if (canUseExistingLocal) {
-                  onLoggedIn(local.runnerId);
-                  return;
-                }
-                void login
-                  .start((credential) =>
-                    saveAntigravitySignIn(teamId, credential, { attachTo: subscription.id }),
-                  )
-                  .then((outcome) => {
-                    if (!outcome.ok) return;
-                    refresh();
-                    onLoggedIn();
-                  });
-              }}
-            >
-              {canUseExistingLocal
-                ? t('使用这台 Mac 的登录')
-                : local.installed
-                  ? t('在这台 Mac 上登录 Antigravity')
-                  : t('安装并登录 Antigravity')}
-            </Button>
-            <span className="min-w-0 flex-1 text-meta text-content-tertiary">{helperCopy}</span>
-          </>
-        )}
-      </p>
+      {loginActive ? (
+        <SignInView
+          waiting={
+            login.phase === 'installing'
+              ? t('正在下载安装 Antigravity，完成后会打开浏览器登录。')
+              : t('已在浏览器中打开 Antigravity 登录页，完成后会自动继续。')
+          }
+          onCancel={login.cancel}
+          cancelTestId="antigravity-relogin-cancel"
+        />
+      ) : (
+        <p className="m-0 flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="antigravity-detail-login"
+            onClick={() => {
+              if (canUseExistingLocal) {
+                onLoggedIn(local.runnerId);
+                return;
+              }
+              void login
+                .start((credential) =>
+                  saveAntigravitySignIn(teamId, credential, { attachTo: subscription.id }),
+                )
+                .then((outcome) => {
+                  if (!outcome.ok) return;
+                  refresh();
+                  onLoggedIn();
+                });
+            }}
+          >
+            {canUseExistingLocal
+              ? t('使用这台 Mac 的登录')
+              : local.installed
+                ? t('在这台 Mac 上登录 Antigravity')
+                : t('安装并登录 Antigravity')}
+          </Button>
+          <span className="min-w-0 flex-1 text-meta text-content-tertiary">{helperCopy}</span>
+        </p>
+      )}
       {login.phase === 'failed' && (
         <p role="alert" className="m-0 text-meta text-content-tertiary">
           {loginFailCopy(login.failReason, t, false)}

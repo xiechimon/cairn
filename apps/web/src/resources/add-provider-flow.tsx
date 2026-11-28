@@ -1,15 +1,13 @@
-import { type UseMutationResult, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useCreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
 import { useCreateClaudeSubscription } from '../api/claude-subscriptions.js';
-import { ApiError } from '../api/client.js';
 import { useCreateDevinSubscription } from '../api/devin-subscriptions.js';
 import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { describeError } from '../lib/error-copy.js';
-import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import {
   AddAntigravitySubscriptionDialog,
   AntigravityReloginDialog,
@@ -17,11 +15,13 @@ import {
 } from './antigravity-subscriptions.js';
 import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
 import type { CreateProviderDialog as CreateProviderDialogModule } from './create-provider-dialog.js';
+import { type DeviceSignInKind, useDeviceSignIn } from './device-sign-in.js';
 import { AddDevinSubscriptionDialog } from './devin-subscriptions.js';
 
 export type AddProviderView =
   | 'closed'
   | 'picker'
+  | 'codex-sign-in'
   | 'subscription'
   | 'devin-subscription'
   | 'antigravity-subscription';
@@ -35,89 +35,6 @@ export type SubscriptionRelogin =
   | { source: 'devin'; id: string; label: string }
   | ({ source: 'antigravity' } & AntigravityReloginTarget);
 
-interface DeviceLogin {
-  state: string;
-  userCode: string;
-  verificationUri: string;
-  intervalSeconds: number;
-}
-
-type DevicePoll = UseMutationResult<
-  { status: 'pending' | 'complete' | 'superseded' | 'denied' | 'expired' },
-  Error,
-  string
->;
-
-function useDeviceLogin({
-  active,
-  poll,
-  onComplete,
-  messages,
-}: {
-  active: boolean;
-  poll: DevicePoll;
-  onComplete: () => void;
-  messages: { denied: string; superseded: string; expired: string; gone: string; failed: string };
-}) {
-  const [device, setDevice] = useState<DeviceLogin | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef(poll);
-  pollRef.current = poll;
-  const completeRef = useRef(onComplete);
-  completeRef.current = onComplete;
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
-
-  useEffect(() => {
-    if (!active || device === null) return;
-    let stopped = false;
-    const timer = setInterval(() => {
-      void pollRef.current.mutateAsync(device.state).then(
-        (result) => {
-          if (stopped || result.status === 'pending') return;
-          setDevice(null);
-          if (result.status === 'complete') {
-            setError(null);
-            completeRef.current();
-          } else {
-            setError(messagesRef.current[result.status]);
-          }
-        },
-        (error) => {
-          if (stopped) return;
-          markErrorSurfaced(error);
-          if (error instanceof ApiError && error.status === 404) {
-            setDevice(null);
-            setError(messagesRef.current.gone);
-            return;
-          }
-          setError(messagesRef.current.failed);
-        },
-      );
-    }, device.intervalSeconds * 1000);
-    return () => {
-      stopped = true;
-      clearInterval(timer);
-    };
-  }, [active, device]);
-
-  return {
-    device,
-    error,
-    reset: () => {
-      setDevice(null);
-      setError(null);
-    },
-    begin: (start: UseMutationResult<DeviceLogin, Error, void>) => {
-      setError(null);
-      start.mutate(undefined, {
-        onSuccess: setDevice,
-        onError: () => setError(messagesRef.current.failed),
-      });
-    },
-  };
-}
-
 export function AddProviderFlow({
   teamId,
   live,
@@ -127,8 +44,6 @@ export function AddProviderFlow({
   onConnectError,
   onSubscriptionCreated,
   relogin = null,
-  autoStartCodex = false,
-  onCodexStarted,
   inline = false,
   testId,
   lead,
@@ -141,8 +56,6 @@ export function AddProviderFlow({
   onConnectError: (message: string | null) => void;
   onSubscriptionCreated?: (created: CreatedSubscription, source: SubscriptionSource) => void;
   relogin?: SubscriptionRelogin | null;
-  autoStartCodex?: boolean;
-  onCodexStarted?: () => void;
   inline?: boolean;
   testId?: string;
   lead?: ReactNode;
@@ -157,29 +70,26 @@ export function AddProviderFlow({
   const [CreateProviderDialog, setCreateProviderDialog] = useState<
     typeof CreateProviderDialogModule | null
   >(null);
-  const pickerOpen = inline || view === 'picker';
-  const xai = useDeviceLogin({
-    active: pickerOpen,
-    poll: mutations.pollXaiDevice,
-    onComplete: () => onViewChange('closed'),
-    messages: {
-      denied: t('xAI 登录被拒绝。'),
-      superseded: t('已有更新的 xAI 凭证，这次登录没有覆盖它。'),
-      expired: t('验证码已过期，请重试。'),
-      gone: t('登录已过期，请重新开始'),
-      failed: t('xAI 登录失败，请重试。'),
+  const pickerOpen = inline || view === 'picker' || view === 'codex-sign-in';
+  const [picked, setPicked] = useState<DeviceSignInKind | null>(null);
+  const signInKind: DeviceSignInKind | null = !live
+    ? null
+    : view === 'codex-sign-in'
+      ? 'codex'
+      : pickerOpen
+        ? picked
+        : null;
+  const signIn = useDeviceSignIn({
+    kind: signInKind,
+    start: { codex: mutations.startCodexDevice, xai: mutations.startXaiDevice },
+    poll: { codex: mutations.pollCodexDevice, xai: mutations.pollXaiDevice },
+    onComplete: () => {
+      setPicked(null);
+      onViewChange('closed');
     },
-  });
-  const codex = useDeviceLogin({
-    active: pickerOpen,
-    poll: mutations.pollCodexDevice,
-    onComplete: () => onViewChange('closed'),
-    messages: {
-      denied: t('ChatGPT 订阅登录被拒绝。'),
-      superseded: t('已有更新的 ChatGPT 订阅凭证，这次登录没有覆盖它。'),
-      expired: t('验证码已过期，请重试。'),
-      gone: t('登录已过期，请重新开始'),
-      failed: t('ChatGPT 订阅登录失败，请重试。'),
+    onCancel: () => {
+      setPicked(null);
+      if (view === 'codex-sign-in') onViewChange('closed');
     },
   });
 
@@ -192,19 +102,6 @@ export function AddProviderFlow({
       mounted = false;
     };
   }, []);
-
-  const codexBeginRef = useRef(codex.begin);
-  codexBeginRef.current = codex.begin;
-  const startCodexDeviceRef = useRef(mutations.startCodexDevice);
-  startCodexDeviceRef.current = mutations.startCodexDevice;
-  const onCodexStartedRef = useRef(onCodexStarted);
-  onCodexStartedRef.current = onCodexStarted;
-
-  useEffect(() => {
-    if (!live || !pickerOpen || !autoStartCodex) return;
-    codexBeginRef.current(startCodexDeviceRef.current);
-    onCodexStartedRef.current?.();
-  }, [live, pickerOpen, autoStartCodex]);
 
   const finishSubscription = (created: CreatedSubscription, source: SubscriptionSource) => {
     onViewChange('closed');
@@ -227,17 +124,11 @@ export function AddProviderFlow({
           onClose={() => {
             onViewChange('closed');
             onConnectError(null);
-            xai.reset();
-            codex.reset();
+            setPicked(null);
           }}
-          onXaiSignIn={live ? () => xai.begin(mutations.startXaiDevice) : undefined}
-          xaiSignInPending={mutations.startXaiDevice.isPending}
-          xaiDevice={xai.device}
-          xaiDeviceError={xai.error}
-          onCodexSignIn={live ? () => codex.begin(mutations.startCodexDevice) : undefined}
-          codexSignInPending={mutations.startCodexDevice.isPending}
-          codexDevice={codex.device}
-          codexDeviceError={codex.error}
+          onXaiSignIn={live ? () => setPicked('xai') : undefined}
+          onCodexSignIn={live ? () => setPicked('codex') : undefined}
+          signIn={signIn}
           pending={mutations.createProvider.isPending}
           onCreate={
             live

@@ -9,7 +9,6 @@ import {
 import { Ban, Mail, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { toast } from 'sonner';
 import { ApiError } from '../api/client.js';
 import {
   useApiMutations,
@@ -26,7 +25,7 @@ import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toast, toastError } from '../components/ui/toaster.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';

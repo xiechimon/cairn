@@ -1,13 +1,12 @@
 import { ArrowUp, Check, Clock, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { ApiError } from '../api/client.js';
 import { useI18n } from '../i18n/provider.js';
 import { useArrivals } from './growth.js';
 import { IconTooltip } from './icon-tooltip.js';
 import { Button } from './ui/button.js';
 import { Input } from './ui/input.js';
-import { toastError } from './ui/toaster.js';
+import { toast, toastError } from './ui/toaster.js';
 
 export interface QueuedCapsule {
   id: string;

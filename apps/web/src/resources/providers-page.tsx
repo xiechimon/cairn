@@ -75,7 +75,6 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { describeError } from '../lib/error-copy.js';
 import {
   AddProviderFlow,
   type AddProviderView,
@@ -300,7 +299,6 @@ export function ProvidersSection() {
   } | null>(null);
   const [addView, setAddView] = useState<AddProviderView>('closed');
   const [reloginTarget, setReloginTarget] = useState<SubscriptionRelogin | null>(null);
-  const [autoStartCodex, setAutoStartCodex] = useState(false);
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
   );
@@ -515,15 +513,13 @@ export function ProvidersSection() {
         ? {
             onSignInAgain: () => {
               if (record.providerId === PROVIDER_CODEX_PRESET.id) {
-                setAutoStartCodex(true);
-                setAddView('picker');
+                setAddView('codex-sign-in');
                 return;
               }
               setConnectError(null);
               mutations.startProviderOAuth.mutate(record.providerId, {
                 onSuccess: (data) => window.location.assign(data.authorizationUrl),
-                onError: (err) =>
-                  toastError(describeError(err, t) ?? t('无法发起登录，请重试。'), err),
+                onError: (err) => toastError(t('无法发起登录，请重试。'), err),
               });
             },
             signingInAgain:
@@ -881,14 +877,9 @@ export function ProvidersSection() {
         view={addView}
         onViewChange={(next) => {
           setAddView(next);
-          if (next === 'closed') {
-            setReloginTarget(null);
-            setAutoStartCodex(false);
-          }
+          if (next === 'closed') setReloginTarget(null);
         }}
         relogin={reloginTarget}
-        autoStartCodex={autoStartCodex}
-        onCodexStarted={() => setAutoStartCodex(false)}
         connectError={connectError}
         onConnectError={setConnectError}
         onSubscriptionCreated={(created, source) => {

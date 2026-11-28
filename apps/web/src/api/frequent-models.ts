@@ -18,6 +18,7 @@ export function useFrequentModelsMutations(teamId: string | undefined) {
   const store = (data: TopModelsEnvelope) => client.setQueryData(key, data);
   return {
     put: useMutation({
+      meta: { action: '保存常用模型' },
       mutationFn: (models: TopModel[]) =>
         api.put<TopModelsEnvelope>(`/api/teams/${teamId}/top-models`, { models }),
       onMutate: async (models) => {

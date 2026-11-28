@@ -44,7 +44,7 @@ describe('pick 2: RingSpinner is the loading.dev Ring', () => {
       'overlay/token-gate.tsx',
       'pages/project-settings-page.tsx',
       'resources/antigravity-subscriptions.tsx',
-      'resources/devin-subscriptions.tsx',
+      'components/sign-in-view.tsx',
       'resources/provider-editors.tsx',
       'resources/upstream-model-picker.tsx',
     ];

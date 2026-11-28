@@ -7,7 +7,7 @@ import { useApiMutations, useStopBackgroundTask } from '../src/api/hooks.js';
 import { useChiefSurface } from '../src/chief/use-chief-surface.js';
 import { toastError } from '../src/components/ui/toaster.js';
 import { I18nProvider } from '../src/i18n/provider.js';
-import { describeErrorDefault } from '../src/lib/error-copy.js';
+import { describeErrorForToast } from '../src/lib/error-copy.js';
 
 vi.mock('react', async (original) => {
   const react = await original<typeof import('react')>();
@@ -101,7 +101,7 @@ test.each(REFUSAL_COPY)('the stop refusal %s has its own Chinese line', async (r
     () => null,
     (error: unknown) => error,
   );
-  expect(describeErrorDefault(failure)).toBe(copy);
+  expect(describeErrorForToast(failure)).toBe(copy);
 });
 
 test.each(['Coordinator turn', 'task run', 'memory edit', 'background task'] as const)(
@@ -122,7 +122,7 @@ test.each(['Coordinator turn', 'task run', 'memory edit', 'background task'] as 
     if (name === 'background task') task.mutate({ buildId: 'build', taskId: 'task' }, left);
     await vi.waitFor(() => expect(toastError).toHaveBeenCalledOnce());
     expect(viewHandler).not.toHaveBeenCalled();
-    expect(describeErrorDefault(vi.mocked(toastError).mock.calls[0]?.[1])).toBe(
+    expect(describeErrorForToast(vi.mocked(toastError).mock.calls[0]?.[1])).toBe(
       '服务暂时异常，请稍后重试。',
     );
   },
@@ -163,7 +163,7 @@ test.each([
   await expect(withdrawOnce()).rejects.toThrow();
   const [shownTitle, shownError] = vi.mocked(toastError).mock.calls[0] ?? [];
   expect(shownTitle).toBe(title);
-  expect(shownError === null ? null : describeErrorDefault(shownError)).toBe(line);
+  expect(shownError === null ? null : describeErrorForToast(shownError)).toBe(line);
 });
 
 test('a withdraw of a message whose turn already ended stays quiet and keeps it sent', async () => {

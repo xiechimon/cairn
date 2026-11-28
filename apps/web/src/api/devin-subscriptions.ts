@@ -48,6 +48,7 @@ export function useDevinSubscriptions(teamId: string | undefined, live: boolean)
 
 export function useCreateDevinSubscription(teamId: string | undefined) {
   return useMutation({
+    meta: { action: '添加 Devin 订阅' },
     mutationFn: (body: CreateDevinSubscription) =>
       api.post<DevinSubscription>(`/api/teams/${teamId}/devin-subscriptions`, body),
     gcTime: 0,
@@ -57,6 +58,7 @@ export function useCreateDevinSubscription(teamId: string | undefined) {
 export function useDeleteDevinSubscription(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '移除 Devin 订阅' },
     mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/devin-subscriptions/${id}`),
     onSuccess: () => client.invalidateQueries({ queryKey: ['devin-subscriptions', teamId] }),
   });
@@ -65,6 +67,7 @@ export function useDeleteDevinSubscription(teamId: string | undefined) {
 export function useRenameDevinSubscription(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '重命名订阅' },
     mutationFn: (input: { id: string; label: string }) =>
       api.patch<DevinSubscription>(`/api/teams/${teamId}/devin-subscriptions/${input.id}`, {
         label: input.label,
@@ -89,6 +92,7 @@ export function fetchDevinUpstreamModels(
 export function useUpdateDevinSubscriptionModels(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '更新订阅模型' },
     mutationFn: (input: { id: string; models: SubscriptionModel[] }) =>
       api.patch<DevinSubscription>(`/api/teams/${teamId}/devin-subscriptions/${input.id}`, {
         models: input.models,

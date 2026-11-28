@@ -513,6 +513,7 @@ export function useBackupMutations() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ['server-backup'] });
   return {
     runNow: useMutation({
+      meta: { action: '立即备份' },
       mutationFn: () =>
         api.post<{ snapshot: BackupSnapshotSummary; health: BackupHealth }>(
           '/api/server/backup/run',
@@ -523,6 +524,7 @@ export function useBackupMutations() {
       onSettled: invalidate,
     }),
     restore: useMutation({
+      meta: { action: '恢复备份' },
       mutationFn: (snapshotId: string) =>
         api.post<BackupRestoreResult>(
           `/api/server/backup/${encodeURIComponent(snapshotId)}/restore`,
@@ -530,6 +532,7 @@ export function useBackupMutations() {
       onSettled: invalidate,
     }),
     importArchive: useMutation({
+      meta: { action: '导入备份' },
       mutationFn: async (input: {
         file: File;
         onProgress?: (percent: number) => void;
@@ -610,6 +613,7 @@ export const useProviders = (teamId: string | undefined, enabled: boolean) =>
 export function useSaveProviderOrder(teamId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
+    meta: { action: '保存服务商顺序' },
     mutationFn: (order: string[]) =>
       api.put<{ order: string[] }>(`/api/teams/${teamId}/provider-order`, { order }),
     onMutate: async (order) => {
@@ -678,6 +682,7 @@ export const useModelSources = (teamId: string | undefined, enabled: boolean) =>
 export function useUpdateRuntime(teamId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
+    meta: { action: '更新运行时' },
     mutationFn: (runtime: ManagedUpdateRuntime) =>
       api.post<{ ok: true; machines: string[] }>(
         `/api/teams/${teamId}/providers/runtimes/${runtime}/update`,
@@ -792,6 +797,7 @@ export const useClerkAuthConfig = (enabled: boolean) =>
 export function useSetTailnetAccess() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { action: '切换局域网访问' },
     mutationFn: (enabled: boolean) => api.post<TailnetAccess>('/api/remote/tailnet', { enabled }),
     onMutate: (enabled) => {
       const previous = queryClient.getQueryData<RemoteRoutesResponse>(['remoteRoutes']);
@@ -826,6 +832,7 @@ export function useSetTailnetAccess() {
 
 export function useSubmitFeedback() {
   return useMutation({
+    meta: { action: '发送反馈' },
     mutationFn: (input: { message: string; route?: string; errorSummary?: string }) =>
       api.post<FeedbackSubmitResponse>('/api/feedback', input),
   });
@@ -856,6 +863,7 @@ export const useTailscaleAccess = (enabled: boolean) =>
 export function useEnableTailscaleAccess() {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { action: '开启 Tailscale 访问' },
     mutationFn: () => api.post<TailscaleAccess>('/api/remote/tailscale', {}),
     onSuccess: (access) => queryClient.setQueryData(['tailscaleAccess'], access),
   });
@@ -864,6 +872,7 @@ export function useEnableTailscaleAccess() {
 export function useApproveMachineEnrollment(teamId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
+    meta: { action: '批准电脑接入' },
     mutationFn: (code: string) => api.post('/api/machine/enroll/confirm', { code }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['machines', teamId] }),
   });
@@ -893,18 +902,22 @@ export function useRemoteMutations() {
   const queryClient = useQueryClient();
   return {
     createPairingCode: useMutation({
+      meta: { action: '生成配对码' },
       mutationFn: () => api.post<PairingCodeResponse>('/api/remote/pairing', {}),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
     }),
     revokeDevice: useMutation({
+      meta: { action: '移除设备' },
       mutationFn: (id: string) => api.del<void>(`/api/remote/devices/${encodeURIComponent(id)}`),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['remoteDevices'] }),
     }),
     revokePairingCode: useMutation({
+      meta: { action: '作废配对码' },
       mutationFn: (id: string) => api.del<void>(`/api/remote/pairing/${encodeURIComponent(id)}`),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
     }),
     decidePairRequest: useMutation({
+      meta: { action: '处理配对请求' },
       mutationFn: ({ id, decision }: { id: string; decision: 'approve' | 'deny' }) =>
         api.post<void>(`/api/remote/pairing-requests/${encodeURIComponent(id)}/${decision}`, {}),
       onMutate: async ({ id }) => {
@@ -986,6 +999,7 @@ export function useImMutations(teamId: string | undefined) {
   };
   return {
     connectTelegram: useMutation({
+      meta: { action: '连接 Telegram' },
       mutationFn: (botToken: string) =>
         api.post<{ connection: ImConnectionRecord }>(`/api/teams/${teamId}/im/telegram`, {
           botToken,
@@ -993,11 +1007,13 @@ export function useImMutations(teamId: string | undefined) {
       onSuccess: invalidate,
     }),
     connectSlack: useMutation({
+      meta: { action: '连接 Slack' },
       mutationFn: (fields: { appToken: string; botToken: string }) =>
         api.post<{ connection: ImConnectionRecord }>(`/api/teams/${teamId}/im/slack`, fields),
       onSuccess: invalidate,
     }),
     connectImessage: useMutation({
+      meta: { action: '连接 iMessage' },
       mutationFn: (machineId: string) =>
         api.post<{ connection: ImConnectionRecord }>(`/api/teams/${teamId}/im/imessage`, {
           machineId,
@@ -1005,14 +1021,17 @@ export function useImMutations(teamId: string | undefined) {
       onSuccess: invalidate,
     }),
     startWechatLogin: useMutation({
+      meta: { action: '开始微信登录' },
       mutationFn: () => api.post<ImWechatLoginStart>(`/api/teams/${teamId}/im/wechat/login`, {}),
     }),
     deleteConnection: useMutation({
+      meta: { action: '移除连接' },
       mutationFn: (id: string) =>
         api.del<void>(`/api/teams/${teamId}/im/connections/${encodeURIComponent(id)}`),
       onSuccess: invalidate,
     }),
     reconnectConnection: useMutation({
+      meta: { action: '重新连接' },
       mutationFn: (id: string) =>
         api.post<{ connection: ImConnectionRecord }>(
           `/api/teams/${teamId}/im/connections/${encodeURIComponent(id)}/reconnect`,
@@ -1021,6 +1040,7 @@ export function useImMutations(teamId: string | undefined) {
       onSuccess: invalidate,
     }),
     decidePairing: useMutation({
+      meta: { action: '处理配对请求' },
       mutationFn: ({ id, decision }: { id: string; decision: 'approved' | 'rejected' }) =>
         api.post<{ request: ImPairingRequestRecord }>(
           `/api/teams/${teamId}/im/pairing-requests/${encodeURIComponent(id)}/${
@@ -1051,15 +1071,18 @@ export function useMailMutations(teamId: string | undefined) {
   };
   return {
     connect: useMutation({
+      meta: { action: '连接邮箱' },
       mutationFn: (body: MailAccountCreateBody) =>
         api.post<{ account: MailAccountRecord }>(base, body),
       onSuccess: invalidate,
     }),
     remove: useMutation({
+      meta: { action: '移除邮箱' },
       mutationFn: (id: string) => api.del<void>(`${base}/${encodeURIComponent(id)}`),
       onSuccess: invalidate,
     }),
     setWakeMode: useMutation({
+      meta: { action: '保存邮件唤醒方式' },
       mutationFn: ({ id, wakeMode }: { id: string; wakeMode: MailWakeMode }) =>
         api.patch<{ account: MailAccountRecord }>(`${base}/${encodeURIComponent(id)}`, {
           wakeMode,
@@ -1067,16 +1090,19 @@ export function useMailMutations(teamId: string | undefined) {
       onSuccess: invalidate,
     }),
     addRule: useMutation({
+      meta: { action: '添加邮件规则' },
       mutationFn: ({ id, rule }: { id: string; rule: MailRuleCreateBody }) =>
         api.post<{ account: MailAccountRecord }>(`${base}/${encodeURIComponent(id)}/rules`, rule),
       onSuccess: invalidate,
     }),
     removeRule: useMutation({
+      meta: { action: '删除邮件规则' },
       mutationFn: ({ id, ruleId }: { id: string; ruleId: string }) =>
         api.del<void>(`${base}/${encodeURIComponent(id)}/rules/${encodeURIComponent(ruleId)}`),
       onSuccess: invalidate,
     }),
     retry: useMutation({
+      meta: { action: '重试邮箱连接' },
       mutationFn: (id: string) =>
         api.post<{ ok: true }>(`${base}/${encodeURIComponent(id)}/retry`, {}),
       onSuccess: invalidate,
@@ -1205,6 +1231,7 @@ export const useProjectFiles = (projectId: string | undefined, enabled: boolean)
 export function usePatchProject(teamId: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
+    meta: { action: '保存项目' },
     mutationFn: (input: { id: string; body: PatchProjectBody }) =>
       api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
     onSuccess: (record) => {
@@ -1219,6 +1246,7 @@ export function usePatchProject(teamId: string | undefined) {
 export function useStopBackgroundTask() {
   const qc = useQueryClient();
   return useMutation({
+    meta: { action: '停止后台任务' },
     mutationFn: (input: { buildId: string; taskId: string }) =>
       stopIfRunning(
         api.post<{ ok: true }>(
@@ -1258,12 +1286,14 @@ export function useApiMutations(teamId: string | undefined) {
   };
   return {
     patchUser: useMutation({
+      meta: { action: '保存个人资料' },
       mutationFn: (body: PatchUserBody) => api.patch<UserRecord>('/api/user/me', body),
       onSuccess: () => {
         void qc.invalidateQueries({ queryKey: ['session'] });
       },
     }),
     patchTeam: useMutation({
+      meta: { action: '保存团队设置' },
       mutationFn: (body: PatchTeamBody) =>
         api.patch<TeamRecord>(`/api/teams/${encodeURIComponent(teamId ?? '')}`, body),
       onSuccess: () => {
@@ -1271,6 +1301,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     createTodo: useMutation({
+      meta: { action: '创建任务' },
       mutationFn: (input: { projectId: string; spec: string; machineId?: string | null }) =>
         api.post<TodoRecord>(`/api/projects/${input.projectId}/todos`, {
           title: '',
@@ -1280,11 +1311,13 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     retryGithubIssue: useMutation({
+      meta: { action: '重试同步 GitHub issue' },
       mutationFn: (todoId: string) =>
         api.post<TodoRecord>(`/api/todos/${todoId}/github-issue/retry`, {}),
       onSuccess: invalidateAll,
     }),
     patchTodo: useMutation({
+      meta: { action: '保存任务' },
       mutationFn: (input: {
         id: string;
         body: {
@@ -1313,11 +1346,13 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     runTodoOn: useMutation({
+      meta: { action: '切换运行电脑' },
       mutationFn: (input: { todoId: string; machineId: string }) =>
         api.post<TodoRecord>(`/api/todos/${input.todoId}/runner`, { machineId: input.machineId }),
       onSuccess: invalidateAll,
     }),
     stopAndDoneTodo: useMutation({
+      meta: { action: '标记完成' },
       mutationFn: (id: string) =>
         api.post<{ state: 'stopping' | 'done'; todo: TodoRecord }>(
           `/api/todos/${id}/stop-and-done`,
@@ -1343,6 +1378,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     setTodoArchived: useMutation({
+      meta: { action: '归档任务' },
       mutationFn: (input: { id: string; archived: boolean }) =>
         api.post<TodoRecord>(`/api/todos/${input.id}/${input.archived ? 'archive' : 'unarchive'}`),
       onMutate: (input) =>
@@ -1363,6 +1399,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     deleteTodo: useMutation({
+      meta: { action: '删除任务' },
       mutationFn: (id: string) => api.del<void>(`/api/todos/${id}`),
       onSuccess: (_data, id) => {
         acknowledgeTaskFailed(id);
@@ -1370,6 +1407,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     setThreadRead: useMutation({
+      meta: { action: '标记已读' },
       mutationFn: (input: { id: string; read: boolean }) =>
         api
           .post<NotificationRecord>(
@@ -1399,6 +1437,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     orchestrateTodo: useMutation({
+      meta: { action: '交给 Coordinator' },
       mutationFn: (id: string) =>
         api.post<{
           thread: ChiefThread;
@@ -1407,6 +1446,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     stepAction: useMutation({
+      meta: { action: '提交步骤操作' },
       mutationFn: (input: {
         buildId: string;
         body:
@@ -1417,6 +1457,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     stopBuild: useMutation({
+      meta: { action: '停止运行' },
       mutationFn: (input: { buildId: string; discard: boolean }) =>
         stopIfRunning(
           api.post<{ delegated: boolean }>(`/api/builds/${input.buildId}/stop`, {
@@ -1427,6 +1468,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSettled: invalidateAll,
     }),
     retryBuildNow: useMutation({
+      meta: { action: '立即重试' },
       mutationFn: (input: { buildId: string; clientMessageId?: string }) =>
         api.post<{ delegated: true; mode: 'quota_resumed' | 'restarted' }>(
           `/api/builds/${encodeURIComponent(input.buildId)}/retry-now`,
@@ -1436,6 +1478,7 @@ export function useApiMutations(teamId: string | undefined) {
       onError: invalidateAll,
     }),
     createSchedule: useMutation({
+      meta: { action: '创建定时任务' },
       mutationFn: (body: CreateScheduleBody) =>
         api.post<ScheduleRecord & { webhookToken?: string; webhookUrl?: string }>(
           '/api/schedules',
@@ -1444,6 +1487,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     updateSchedule: useMutation({
+      meta: { action: '保存定时任务' },
       mutationFn: (input: { id: string; body: UpdateScheduleBody }) =>
         api.put<ScheduleRecord & { webhookToken?: string; webhookUrl?: string }>(
           `/api/schedules/${encodeURIComponent(input.id)}`,
@@ -1452,20 +1496,24 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     patchSchedule: useMutation({
+      meta: { action: '保存定时任务' },
       mutationFn: (input: { id: string; body: PatchScheduleBody }) =>
         api.patch<ScheduleRecord>(`/api/schedules/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
     deleteSchedule: useMutation({
+      meta: { action: '删除定时任务' },
       mutationFn: (id: string) => api.del<void>(`/api/schedules/${id}`),
       onSuccess: invalidateAll,
     }),
     runSchedule: useMutation({
+      meta: { action: '运行定时任务' },
       mutationFn: (id: string) => api.post<ScheduleRecord>(`/api/schedules/${id}/run`, {}),
       onSuccess: invalidateAll,
       onError: invalidateAll,
     }),
     patchMachine: useMutation({
+      meta: { action: '保存电脑设置' },
       mutationFn: (input: { id: string; body: PatchMachineBody }) =>
         api.patch<MachineRecord>(`/api/machines/${input.id}`, input.body),
       onMutate: (input) => {
@@ -1497,6 +1545,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     deleteMachine: useMutation({
+      meta: { action: '移除电脑' },
       mutationFn: (id: string) => api.del<void>(`/api/machines/${encodeURIComponent(id)}`),
       onSuccess: () => {
         void qc.invalidateQueries({ queryKey: ['machines', teamId] });
@@ -1506,6 +1555,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     rotateMachineToken: useMutation({
+      meta: { action: '更换电脑令牌' },
       mutationFn: (id: string) =>
         api.post<RotateMachineTokenResponse>(
           `/api/machines/${encodeURIComponent(id)}/rotate-token`,
@@ -1515,6 +1565,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     switchChiefStepMachine: useMutation({
+      meta: { action: '切换运行电脑' },
       mutationFn: (input: { stepId: string; machineId: string }) =>
         api.post<{ ok: true; machineId: string; name: string }>(
           `/api/chief/steps/${encodeURIComponent(input.stepId)}/switch-machine`,
@@ -1523,6 +1574,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     pairPhone: useMutation({
+      meta: { action: '配对手机' },
       mutationFn: (input: {
         machineId: string;
         body:
@@ -1538,6 +1590,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     retryPairPhone: useMutation({
+      meta: { action: '重新配对手机' },
       mutationFn: (input: {
         machineId: string;
         phoneId: string;
@@ -1552,6 +1605,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     forgetPhone: useMutation({
+      meta: { action: '移除手机' },
       mutationFn: (input: { machineId: string; phoneId: string }) =>
         api.del<{ outcome: string }>(
           `/api/machines/${encodeURIComponent(input.machineId)}/phones/${encodeURIComponent(input.phoneId)}`,
@@ -1561,6 +1615,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     handbackPhone: useMutation({
+      meta: { action: '交还手机' },
       mutationFn: (input: { machineId: string; phoneId: string }) =>
         api.post<{ ok: boolean }>(
           `/api/machines/${encodeURIComponent(input.machineId)}/phones/${encodeURIComponent(input.phoneId)}/handback`,
@@ -1571,15 +1626,18 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     createProject: useMutation({
+      meta: { action: '创建项目' },
       mutationFn: (body: CreateProjectBody) =>
         api.post<ProjectRecord>('/api/projects', { ...body, ...(teamId ? { teamId } : {}) }),
       onSuccess: invalidateAll,
     }),
     patchProject: usePatchProject(teamId),
     pickLocalFolder: useMutation({
+      meta: { action: '选择文件夹' },
       mutationFn: () => api.post<FsPickResult>('/api/fs/pick'),
     }),
     setProjectArchived: useMutation({
+      meta: { action: '归档项目' },
       mutationFn: (input: { id: string; archived: boolean }) =>
         api.post<ProjectRecord>(
           `/api/projects/${input.id}/${input.archived ? 'archive' : 'unarchive'}`,
@@ -1604,6 +1662,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     chiefSend: useMutation({
+      meta: { action: '发送消息' },
       mutationFn: (input: {
         threadId: string | null;
         content: string;
@@ -1646,6 +1705,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     chiefOpenChannel: useMutation({
+      meta: { action: '打开项目频道' },
       mutationFn: (projectId: string) =>
         api.post<ChiefThread>(`/api/teams/${teamId}/chief/channels/${projectId}`, {}),
       onSuccess: (thread) => {
@@ -1659,6 +1719,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     chiefRetryGreeting: useMutation({
+      meta: { action: '重试问候' },
       mutationFn: (input: { threadId: string; stepId: string }) =>
         api.post<ChiefThread>(
           `/api/teams/${teamId}/chief/threads/${input.threadId}/retry-greeting/${input.stepId}`,
@@ -1674,6 +1735,7 @@ export function useApiMutations(teamId: string | undefined) {
       onError: invalidateAll,
     }),
     chiefRewind: useMutation({
+      meta: { action: '回到这条消息' },
       mutationFn: (input: { threadId: string; messageId: string }) =>
         api.post<{ deletedCount: number; thread: ChiefThread }>(
           `/api/teams/${teamId}/chief/threads/${input.threadId}/rewind`,
@@ -1682,6 +1744,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     chiefWithdraw: useMutation({
+      meta: { action: '撤回消息' },
       mutationFn: (input: { threadId: string; messageId: string }) =>
         withoutServerText(
           api.del<{ ok: boolean }>(
@@ -1692,6 +1755,7 @@ export function useApiMutations(teamId: string | undefined) {
       onError: invalidateAll,
     }),
     chiefStop: useMutation({
+      meta: { action: '停止回复' },
       mutationFn: (input: { threadId: string; messageId?: string }) =>
         stopIfRunning(
           api.post<{ delegated: boolean }>(
@@ -1703,6 +1767,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSettled: invalidateAll,
     }),
     chiefAnswerQuestion: useMutation({
+      meta: { action: '提交回答' },
       mutationFn: (input: { threadId: string; requestId: string; answers: AskUserAnswer[] }) =>
         api.post<AskUserQuestionContent>(
           `/api/teams/${teamId}/chief/threads/${input.threadId}/questions/${input.requestId}/answer`,
@@ -1711,6 +1776,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     chiefCancelQuestion: useMutation({
+      meta: { action: '取消问题' },
       mutationFn: (input: { threadId: string; requestId: string }) =>
         api.post<{ ok: boolean }>(
           `/api/teams/${teamId}/chief/threads/${input.threadId}/questions/${input.requestId}/cancel`,
@@ -1719,11 +1785,13 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: () => qc.invalidateQueries(),
     }),
     createProvider: useMutation({
+      meta: { action: '添加服务商' },
       mutationFn: (body: CreateProviderBody) =>
         api.post<ProviderRecord>(`/api/teams/${teamId}/providers`, body),
       onSuccess: invalidateAll,
     }),
     startProviderOAuth: useMutation({
+      meta: { action: '发起登录' },
       mutationFn: (presetId: string) =>
         api.post<OAuthAuthorizeResponse>(
           `/api/teams/${teamId}/providers/oauth/${presetId}/authorize`,
@@ -1731,10 +1799,12 @@ export function useApiMutations(teamId: string | undefined) {
         ),
     }),
     startXaiDevice: useMutation({
+      meta: { action: '登录 xAI' },
       mutationFn: () =>
         api.post<XaiDeviceStartResponse>(`/api/teams/${teamId}/providers/oauth/xai/device`, {}),
     }),
     pollXaiDevice: useMutation({
+      meta: { action: '登录 xAI' },
       mutationFn: (state: string) =>
         api.post<XaiDevicePollResponse>(`/api/teams/${teamId}/providers/oauth/xai/device/poll`, {
           state,
@@ -1744,6 +1814,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     startCodexDevice: useMutation({
+      meta: { action: '登录 ChatGPT 订阅' },
       mutationFn: () =>
         api.post<CodexDeviceStartResponse>(
           `/api/teams/${teamId}/providers/oauth/openai-codex/device`,
@@ -1751,6 +1822,7 @@ export function useApiMutations(teamId: string | undefined) {
         ),
     }),
     pollCodexDevice: useMutation({
+      meta: { action: '登录 ChatGPT 订阅' },
       mutationFn: (state: string) =>
         api.post<CodexDevicePollResponse>(
           `/api/teams/${teamId}/providers/oauth/openai-codex/device/poll`,
@@ -1761,14 +1833,17 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     startGithubOAuth: useMutation({
+      meta: { action: '连接 GitHub' },
       mutationFn: () =>
         api.post<OAuthAuthorizeResponse>(`/api/teams/${teamId}/github/oauth/authorize`, {}),
     }),
     startGithubConnectionDevice: useMutation({
+      meta: { action: '连接 GitHub' },
       mutationFn: () =>
         api.post<GithubConnectionDeviceStart>(`/api/teams/${teamId}/github/connection/device`, {}),
     }),
     pollGithubConnectionDevice: useMutation({
+      meta: { action: '连接 GitHub' },
       mutationFn: (attemptId: string) =>
         api.post<GithubConnectionDevicePoll>(
           `/api/teams/${teamId}/github/connection/device/${attemptId}`,
@@ -1779,28 +1854,34 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     cancelGithubConnectionDevice: useMutation({
+      meta: { action: '取消连接 GitHub' },
       mutationFn: (attemptId: string) =>
         api.del<void>(`/api/teams/${teamId}/github/connection/device/${attemptId}`),
     }),
     disconnectGithub: useMutation({
+      meta: { action: '断开 GitHub' },
       mutationFn: () => api.del<void>(`/api/teams/${teamId}/github/connection`),
       onSuccess: invalidateAll,
     }),
     deleteProvider: useMutation({
+      meta: { action: '移除服务商' },
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/providers/${id}`),
       onSuccess: invalidateAll,
     }),
     testProvider: useMutation({
+      meta: { action: '测试连接' },
       mutationFn: (input: { id: string; model: string }) =>
         api.post<TeamProviderTestResult>(`/api/teams/${teamId}/providers/${input.id}/test`, {
           model: input.model,
         }),
     }),
     upstreamModels: useMutation({
+      meta: { action: '读取模型列表' },
       mutationFn: (id: string) =>
         api.get<UpstreamModelsResult>(`/api/teams/${teamId}/providers/${id}/upstream-models`),
     }),
     patchProvider: useMutation({
+      meta: { action: '保存服务商' },
       mutationFn: (input: { id: string; body: PatchProviderBody }) =>
         api.patch<ProviderRecord>(`/api/teams/${teamId}/providers/${input.id}`, input.body),
       onSuccess: (record) => {
@@ -1818,11 +1899,13 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     createMcpConnector: useMutation({
+      meta: { action: '添加连接器' },
       mutationFn: (body: CreateMcpConnectorBody) =>
         api.post<McpConnectorRecord>(`/api/teams/${teamId}/mcp-connectors`, body),
       onSuccess: invalidateAll,
     }),
     patchMcpConnector: useMutation({
+      meta: { action: '保存连接器' },
       mutationFn: (input: { id: string; body: PatchMcpConnectorBody }) =>
         api.patch<McpConnectorRecord>(
           `/api/teams/${teamId}/mcp-connectors/${input.id}`,
@@ -1831,6 +1914,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     startMcpConnectorOAuth: useMutation({
+      meta: { action: '发起连接器登录' },
       mutationFn: (body: StartMcpConnectorOAuthBody) =>
         api.post<{ authorizationUrl: string }>(
           `/api/teams/${teamId}/mcp-connectors/oauth/start`,
@@ -1838,6 +1922,7 @@ export function useApiMutations(teamId: string | undefined) {
         ),
     }),
     bindGithubConnector: useMutation({
+      meta: { action: '连接 GitHub' },
       mutationFn: (connectorId: string | undefined) =>
         api.post<McpConnectorRecord>(
           `/api/teams/${teamId}/mcp-connectors/github/bind`,
@@ -1846,6 +1931,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     startGithubDevice: useMutation({
+      meta: { action: '连接 GitHub' },
       mutationFn: (connectorId: string | undefined) =>
         api.post<GithubConnectorDeviceStart>(
           `/api/teams/${teamId}/mcp-connectors/github/device`,
@@ -1853,6 +1939,7 @@ export function useApiMutations(teamId: string | undefined) {
         ),
     }),
     pollGithubDevice: useMutation({
+      meta: { action: '连接 GitHub' },
       mutationFn: (attemptId: string) =>
         api.post<GithubConnectorDevicePoll>(
           `/api/teams/${teamId}/mcp-connectors/github/device/${attemptId}`,
@@ -1863,10 +1950,12 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     cancelGithubDevice: useMutation({
+      meta: { action: '取消连接 GitHub' },
       mutationFn: (attemptId: string) =>
         api.del<void>(`/api/teams/${teamId}/mcp-connectors/github/device/${attemptId}`),
     }),
     githubInstallations: useMutation({
+      meta: { action: '检查 GitHub 仓库授权' },
       mutationFn: (connectorId: string) =>
         api.post<{ installed: boolean }>(
           `/api/teams/${teamId}/mcp-connectors/${connectorId}/github/installations`,
@@ -1874,29 +1963,35 @@ export function useApiMutations(teamId: string | undefined) {
         ),
     }),
     checkMcpConnector: useMutation({
+      meta: { action: '检查连接器' },
       mutationFn: (id: string) =>
         api.post<McpConnectorRecord>(`/api/teams/${teamId}/mcp-connectors/${id}/check`, {}),
       onSuccess: invalidateAll,
     }),
     deleteMcpConnector: useMutation({
+      meta: { action: '移除连接器' },
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/mcp-connectors/${id}`),
       onSuccess: invalidateAll,
     }),
     saveComposioKey: useMutation({
+      meta: { action: '保存 Composio 密钥' },
       mutationFn: (body: ComposioKeyBody) =>
         api.put<ComposioConfigured>(`/api/teams/${teamId}/mcp-connectors/composio/key`, body),
       onSuccess: invalidateAll,
     }),
     deleteComposioKey: useMutation({
+      meta: { action: '移除 Composio 密钥' },
       mutationFn: () => api.del<void>(`/api/teams/${teamId}/mcp-connectors/composio/key`),
       onSuccess: invalidateAll,
     }),
     connectComposioApp: useMutation({
+      meta: { action: '连接应用' },
       mutationFn: (body: ComposioConnectBody) =>
         api.post<McpConnectorRecord>(`/api/teams/${teamId}/mcp-connectors/composio/toolkits`, body),
       onSuccess: invalidateAll,
     }),
     authorizeComposioApp: useMutation({
+      meta: { action: '授权应用' },
       mutationFn: (connectorId: string) =>
         api.post<ComposioAuthorizeResponse>(
           `/api/teams/${teamId}/mcp-connectors/composio/${connectorId}/authorize`,
@@ -1905,6 +2000,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     reconnectComposioApp: useMutation({
+      meta: { action: '重新连接应用' },
       mutationFn: (connectorId: string) =>
         api.post<ComposioAuthorizeResponse>(
           `/api/teams/${teamId}/mcp-connectors/composio/${connectorId}/reconnect`,
@@ -1913,6 +2009,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     pollComposioApp: useMutation({
+      meta: { action: '检查应用连接' },
       mutationFn: (connectorId: string) =>
         api.post<McpConnectorRecord>(
           `/api/teams/${teamId}/mcp-connectors/composio/${connectorId}/poll`,
@@ -1921,6 +2018,7 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     revokeComposioApp: useMutation({
+      meta: { action: '断开应用' },
       mutationFn: (connectorId: string) =>
         api.post<McpConnectorRecord>(
           `/api/teams/${teamId}/mcp-connectors/composio/${connectorId}/revoke`,
@@ -1929,11 +2027,13 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     createSecret: useMutation({
+      meta: { action: '保存密钥' },
       mutationFn: (body: SetSecretBody) =>
         api.post<SecretRecord>(`/api/teams/${teamId}/secrets`, body),
       onSuccess: invalidateAll,
     }),
     updateSecret: useMutation({
+      meta: { action: '保存密钥' },
       mutationFn: (input: {
         id: string;
         body: {
@@ -1947,20 +2047,24 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     deleteSecret: useMutation({
+      meta: { action: '删除密钥' },
       mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/secrets/${id}`),
       onSuccess: invalidateAll,
     }),
     revokeBrowserPasswordGrant: useMutation({
+      meta: { action: '撤销浏览器密码授权' },
       mutationFn: (grantId: string) =>
         api.del<void>(`/api/teams/${teamId}/browser-password-grants/${grantId}`),
       onSuccess: invalidateAll,
     }),
     answerSecretRequest: useMutation({
+      meta: { action: '提交密钥' },
       mutationFn: (body: SecretRequestAnswer) =>
         api.post<SecretRequestAnswered>(`/api/teams/${teamId}/secret-requests`, body),
       onSuccess: invalidateAll,
     }),
     createApiKey: useMutation({
+      meta: { action: '创建 API 密钥' },
       mutationFn: (body: {
         name: string | null;
         gitAccess: boolean;
@@ -1971,16 +2075,19 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     deleteApiKey: useMutation({
+      meta: { action: '删除 API 密钥' },
       mutationFn: (id: string) =>
         api.del<void>(`/api/teams/${teamId}/api-keys/${encodeURIComponent(id)}`),
       onSettled: invalidateAll,
     }),
     createSkill: useMutation({
+      meta: { action: '创建技能' },
       mutationFn: (body: CreateSkillBody) =>
         api.post<SkillRecord>(`/api/skills?teamId=${teamId}`, body),
       onSuccess: invalidateAll,
     }),
     updateSkill: useMutation({
+      meta: { action: '保存技能' },
       mutationFn: (input: { id: string; body: UpdateSkillBody }) =>
         api.put<SkillRecord>(
           `/api/teams/${teamId}/skills/${encodeURIComponent(input.id)}`,
@@ -1989,11 +2096,13 @@ export function useApiMutations(teamId: string | undefined) {
       onSuccess: invalidateAll,
     }),
     importSkill: useMutation({
+      meta: { action: '导入技能' },
       mutationFn: (body: ImportSkillBody) =>
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({
+      meta: { action: '删除记忆' },
       mutationFn: (input: { memoryId: string }) =>
         api.del<void>(`/api/teams/${teamId}/memories/${input.memoryId}`),
       onSuccess: (_data, input) => {
@@ -2004,6 +2113,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     updateMemory: useMutation({
+      meta: { action: '保存记忆' },
       mutationFn: (input: { memoryId: string; body: PatchMemoryBody }) =>
         api.patch<MemoryRecord>(`/api/teams/${teamId}/memories/${input.memoryId}`, input.body),
       onSuccess: (record, input) => {
@@ -2014,6 +2124,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     submitMemoryEdit: useMutation({
+      meta: { action: '提交记忆修改' },
       mutationFn: (body: MemoryEditBody) =>
         api.post<MemoryEditRecord>(`/api/teams/${teamId}/memory-edits`, body),
       onSuccess: (record) => {
@@ -2022,6 +2133,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     stopMemoryEdit: useMutation({
+      meta: { action: '停止记忆修改' },
       mutationFn: (input: { editId: string; attempt?: number }) =>
         stopIfRunning<MemoryEditRecord | null>(
           api.post<MemoryEditRecord>(
@@ -2037,6 +2149,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     importMemoryFile: useMutation({
+      meta: { action: '导入记忆文件' },
       mutationFn: (body: MemoryImportBody) =>
         api.post<{ result: unknown }>(`/api/teams/${teamId}/memory-imports`, body),
       onSuccess: (_data, body) => {
@@ -2051,6 +2164,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     sendSteer: useMutation({
+      meta: { action: '发送消息' },
       mutationFn: (input: {
         conversationId: string;
         content: string;
@@ -2093,6 +2207,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     messageThread: useMutation({
+      meta: { action: '发送消息' },
       mutationFn: (input: {
         todoId: string;
         content: string;
@@ -2115,6 +2230,7 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     undoBuildChanges: useMutation({
+      meta: { action: '撤销改动' },
       mutationFn: (buildId: string) =>
         api.post<{ delegated: true }>(`/api/builds/${encodeURIComponent(buildId)}/undo`, {}),
       onSuccess: (_data, buildId) => {
@@ -2224,6 +2340,7 @@ export function useDesignMutations(todoId: string, fileName: string) {
     `${designPath(todoId)}/comments/${encodeURIComponent(commentId)}`;
   return {
     restore: useMutation({
+      meta: { action: '恢复版本' },
       mutationFn: (versionId: string) =>
         api.post<DesignVersionRecord>(
           `${designPath(todoId)}/versions/${encodeURIComponent(versionId)}/restore`,
@@ -2231,6 +2348,7 @@ export function useDesignMutations(todoId: string, fileName: string) {
       onSuccess: refresh,
     }),
     saveVersion: useMutation({
+      meta: { action: '保存版本' },
       mutationFn: (content: string) =>
         api.post<DesignVersionRecord>(
           `${designPath(todoId)}/${encodeURIComponent(fileName)}/versions`,
@@ -2239,6 +2357,7 @@ export function useDesignMutations(todoId: string, fileName: string) {
       onSuccess: refresh,
     }),
     createComment: useMutation({
+      meta: { action: '添加评论' },
       mutationFn: (input: DesignCommentCreate) =>
         api.post<DesignCommentRecord>(`${designPath(todoId)}/comments`, input),
       onSuccess: (row) => {
@@ -2247,6 +2366,7 @@ export function useDesignMutations(todoId: string, fileName: string) {
       },
     }),
     patchComment: useMutation({
+      meta: { action: '保存评论' },
       mutationFn: ({ id, patch }: { id: string; patch: DesignCommentPatch }) =>
         api.patch<DesignCommentRecord>(commentPath(id), patch),
       onMutate: ({ id, patch }) =>
@@ -2265,18 +2385,22 @@ export function useDesignMutations(todoId: string, fileName: string) {
       onSettled: refresh,
     }),
     createShare: useMutation({
+      meta: { action: '创建分享链接' },
       mutationFn: () => api.post<DesignShareRecord>(sharePath),
       onSettled: refresh,
     }),
     stopShare: useMutation({
+      meta: { action: '停止分享' },
       mutationFn: () => api.del<void>(sharePath),
       onSettled: refresh,
     }),
     saveMark: useMutation({
+      meta: { action: '保存标注' },
       mutationFn: (pngBase64: string) =>
         api.post<{ attachmentId: string }>(`${designPath(todoId)}/marks`, { pngBase64 }),
     }),
     deleteComment: useMutation({
+      meta: { action: '删除评论' },
       mutationFn: (id: string) => api.del<void>(commentPath(id)),
       onMutate: (id) => changeComments((rows) => rows.filter((row) => row.id !== id)),
       onError: rollback,

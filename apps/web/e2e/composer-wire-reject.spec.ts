@@ -215,12 +215,11 @@ test('chief face: a rejected send (500) keeps the draft and toasts', async ({ pa
 
   await expect.poll(() => posts).toBe(1);
   await expect(input).toHaveValue(CHIEF_DRAFT);
-  // #635: the surface owns the failure feedback — the toast carries the
-  // server reason verbatim.
   const toast = page.locator('[data-sonner-toast]');
   await expect(toast).toBeVisible();
   await expect(toast).toContainText('发送失败，请重试。');
-  await expect(toast).toContainText('upstream refused');
+  await expect(toast).toContainText('服务暂时异常，请稍后重试。');
+  await expect(toast).not.toContainText('upstream refused');
   await evidenceShot(page, 'chief-reject-keeps-draft.png');
 });
 

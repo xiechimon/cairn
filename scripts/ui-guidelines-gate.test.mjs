@@ -192,7 +192,52 @@ const NEGATIVE_CASES = [
     },
   ],
   ['V31', { 'apps/web/src/page.tsx': '<span className="font-light">Text</span>' }],
+  ['C5', { 'apps/web/src/page.ts': "import { toast } from 'sonner';" }],
+  [
+    'C5',
+    {
+      'apps/web/src/picker.tsx':
+        'export const P = ({ device }) => <p>{t("Open the link")} {device.verificationUri} {device.userCode}</p>;',
+    },
+  ],
+  ['C5', { 'apps/web/src/page.ts': 'toastError(describeError(err, t) ?? t("Failed"), err);' }],
+  ['C5', { 'apps/web/src/page.ts': 'toast.error(t("Failed"), { description: err.message });' }],
+  [
+    'C5',
+    {
+      'apps/web/src/picker.tsx':
+        'export const P = ({ device }) => { const { userCode } = device; return <code>{userCode}</code>; };',
+    },
+  ],
+  ['C5', { 'apps/web/src/page.ts': 'toast.error (t("Failed"), { description: err.message });' }],
+  ['C5', { 'apps/web/src/api.ts': 'const save = useMutation({ mutationFn: () => post() });' }],
+  [
+    'C5',
+    { 'apps/web/src/api.ts': 'const save = useMutation(\n  { mutationFn: () => post() },\n);' },
+  ],
+  [
+    'C5',
+    {
+      'apps/web/src/api.ts':
+        "const save = useMutation({ meta: { action: '保存不存在的东西' }, mutationFn: () => post() });",
+    },
+  ],
 ];
+
+test('the shared sign-in view, toaster and labelled mutations pass C5', () => {
+  assert.deepEqual(
+    rulesFor({
+      'apps/web/src/components/ui/toaster.tsx': "import { toast as sonnerToast } from 'sonner';",
+      'apps/web/src/components/sign-in-view.tsx':
+        'export const V = ({ device }) => <code>{device.userCode}</code>;',
+      'apps/web/src/api.ts':
+        "const save = useMutation({ meta: { action: '处理中…' }, mutationFn: () => post() });",
+      'apps/web/src/page.ts':
+        'toastError(t("Failed"), err); toast.error(t("Failed"), { description: describeError(err, t, { serverText: false }) }); toast.dismiss(item.message);',
+    }),
+    [],
+  );
+});
 
 for (const [rule, overrides] of NEGATIVE_CASES) {
   test(`rule ${rule} rejects its negative fixture`, () => {

@@ -202,7 +202,13 @@ export function RemoteAccessPage() {
   const decideRequest = (id: string, decision: 'approve' | 'deny') =>
     mutations.decidePairRequest.mutate(
       { id, decision },
-      { onError: (error) => toastError(t('操作失败，请重试。'), error) },
+      {
+        onError: (error) =>
+          toastError(
+            decision === 'approve' ? t('批准失败，请重试。') : t('拒绝失败，请重试。'),
+            error,
+          ),
+      },
     );
   const handleSignOut = async () => {
     if (signingOut) return;

@@ -18,6 +18,8 @@ const T1_ALLOWED_LATIN = new Set([
   'openai',
   'gemini',
   'chatgpt',
+  'supergrok',
+  'premium',
   'copilot',
   'devin',
   'antigravity',
@@ -441,7 +443,83 @@ function checkDetailCodeTags(rel, text, push) {
   }
 }
 
+const SIGN_IN_VIEW_FILES = new Set([
+  'components/sign-in-view.tsx',
+  'resources/device-sign-in.tsx',
+  'resources/mcp-github-device-dialog.tsx',
+  'pages/github-connection-device-dialog.tsx',
+]);
+
+function enKeys(vfs) {
+  const en = vfs.read('apps/web/src/i18n/en.ts');
+  if (en === null) return null;
+  const keys = new Set();
+  for (const m of en.matchAll(/^\s*(?:'((?:[^'\\]|\\.)+)'|([^\s:'"]+))\s*:/gm))
+    keys.add(m[1] ?? m[2]);
+  return keys;
+}
+
+function checkSignInAndToasts(rel, sub, text, keys, push) {
+  if (sub !== 'components/ui/toaster.tsx') {
+    for (const match of text.matchAll(/\bfrom\s+['"]sonner['"]/g)) {
+      push(
+        'C5',
+        rel,
+        lineNumberAt(text, match.index),
+        "import toast from components/ui/toaster.js, not 'sonner'",
+      );
+    }
+  }
+  if (rel.endsWith('.tsx') && !SIGN_IN_VIEW_FILES.has(sub)) {
+    for (const match of text.matchAll(/\b(?:userCode|verificationUri)\b/g)) {
+      push(
+        'C5',
+        rel,
+        lineNumberAt(text, match.index),
+        'device codes and sign-in links render through SignInView (components/sign-in-view.tsx)',
+      );
+    }
+  }
+  for (const call of text.matchAll(
+    /\b(?:toast(?:\s*\.\s*(?!dismiss\b)\w+)?|toastError|toastSuccess)\s*\(/g,
+  )) {
+    const openParen = call.index + call[0].length - 1;
+    const callBody = readBalanced(text, openParen, '(', ')');
+    for (const match of callBody.matchAll(
+      /\bdescribeError\((?![^()]*serverText:\s*false)|\.message\b/g,
+    )) {
+      push(
+        'C5',
+        rel,
+        lineNumberAt(text, openParen + match.index),
+        'toast text must not carry server text (describeError needs { serverText: false })',
+      );
+    }
+  }
+  for (const call of text.matchAll(/\buseMutation(?:<[^>]*>)?\s*\(\s*\{/g)) {
+    const openBrace = call.index + call[0].length - 1;
+    const options = readBalanced(text, openBrace, '{', '}');
+    const action = options.match(/^\{\s*meta:\s*\{\s*action:\s*'([^']+)'\s*\}/);
+    if (action === null) {
+      push(
+        'C5',
+        rel,
+        lineNumberAt(text, call.index),
+        "useMutation must open with meta: { action: '<what failed>' }",
+      );
+    } else if (keys !== null && !keys.has(action[1])) {
+      push(
+        'C5',
+        rel,
+        lineNumberAt(text, call.index),
+        `mutation action '${action[1]}' has no en.ts entry`,
+      );
+    }
+  }
+}
+
 function checkWebSources(vfs, push) {
+  const keys = enKeys(vfs);
   for (const rel of vfs.list('apps/web/src/', ['.ts', '.tsx', '.css'])) {
     if (rel.includes('.test.')) continue;
     const sub = rel.slice('apps/web/src/'.length);
@@ -453,6 +531,7 @@ function checkWebSources(vfs, push) {
     if (rel.endsWith('.ts') || rel.endsWith('.tsx')) {
       checkOutlineNone(rel, lines, push);
       checkKeydownGuards(rel, text, push);
+      checkSignInAndToasts(rel, sub, text, keys, push);
 
       for (const match of text.matchAll(/\b(?:[a-z0-9-]+:)*overscroll-none\b/g)) {
         if (/(?:^|:)pointer-fine:/.test(match[0])) continue;

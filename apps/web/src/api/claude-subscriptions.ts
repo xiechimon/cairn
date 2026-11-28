@@ -24,6 +24,7 @@ export function useClaudeSubscriptions(teamId: string | undefined, live: boolean
 export function useRefreshClaudeQuota(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '刷新 Claude 用量' },
     mutationFn: () =>
       api.post<ClaudeSubscriptionListEntry[]>(`/api/teams/${teamId}/claude-subscriptions/quota`),
     onSuccess: () => client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] }),
@@ -33,6 +34,7 @@ export function useRefreshClaudeQuota(teamId: string | undefined) {
 export function useCreateClaudeSubscription(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '添加 Claude 订阅' },
     mutationFn: (body: CreateClaudeSubscription) =>
       api.post<ClaudeSubscription>(`/api/teams/${teamId}/claude-subscriptions`, body),
     onSuccess: () => client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] }),
@@ -43,6 +45,7 @@ export function useCreateClaudeSubscription(teamId: string | undefined) {
 export function useDeleteClaudeSubscription(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '移除 Claude 订阅' },
     mutationFn: (id: string) => api.del<void>(`/api/teams/${teamId}/claude-subscriptions/${id}`),
     onSuccess: () => client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] }),
   });
@@ -51,6 +54,7 @@ export function useDeleteClaudeSubscription(teamId: string | undefined) {
 export function useRenameClaudeSubscription(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '重命名订阅' },
     mutationFn: (input: { id: string; label: string }) =>
       api.patch<ClaudeSubscription>(`/api/teams/${teamId}/claude-subscriptions/${input.id}`, {
         label: input.label,
@@ -62,6 +66,7 @@ export function useRenameClaudeSubscription(teamId: string | undefined) {
 export function useUpdateClaudeSubscriptionModels(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '更新订阅模型' },
     mutationFn: (input: { id: string; models: ClaudeSubscriptionModel[] }) =>
       api.patch<ClaudeSubscription>(`/api/teams/${teamId}/claude-subscriptions/${input.id}`, {
         models: input.models,

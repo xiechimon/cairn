@@ -71,6 +71,7 @@ export function useAntigravitySubscriptions(teamId: string | undefined, live: bo
 export function useRefreshAntigravityQuota(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '刷新 Antigravity 用量' },
     mutationFn: () =>
       api.post<AntigravitySubscriptionListEntry[]>(
         `/api/teams/${teamId}/antigravity-subscriptions/quota`,
@@ -86,6 +87,7 @@ const HOST_LOGIN_VERIFY_TIMEOUT_MS =
 
 export function useCreateAntigravitySubscription(teamId: string | undefined) {
   return useMutation({
+    meta: { action: '添加 Antigravity 订阅' },
     mutationFn: (body: CreateAntigravitySubscription) =>
       api.post<AntigravitySubscription>(`/api/teams/${teamId}/antigravity-subscriptions`, body),
     gcTime: 0,
@@ -111,6 +113,7 @@ export function saveAntigravitySignIn(
 export function useDeleteAntigravitySubscription(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '移除 Antigravity 订阅' },
     mutationFn: (id: string) =>
       api.del<void>(`/api/teams/${teamId}/antigravity-subscriptions/${id}`),
     onSuccess: () => {
@@ -124,6 +127,7 @@ export function useDeleteAntigravitySubscription(teamId: string | undefined) {
 export function useRenameAntigravitySubscription(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '重命名订阅' },
     mutationFn: (input: { id: string; label: string }) =>
       api.patch<AntigravitySubscription>(
         `/api/teams/${teamId}/antigravity-subscriptions/${input.id}`,
@@ -278,6 +282,7 @@ export function fetchAntigravityUpstreamModels(
 export function useUpdateAntigravitySubscriptionModels(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
+    meta: { action: '更新订阅模型' },
     mutationFn: (input: { id: string; models: SubscriptionModel[] }) =>
       api.patch<AntigravitySubscription>(
         `/api/teams/${teamId}/antigravity-subscriptions/${input.id}`,

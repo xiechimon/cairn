@@ -27,6 +27,7 @@ import {
 import { useI18n } from '../i18n/provider.js';
 import { PlusSmall } from '../icons/index.js';
 import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
+import type { SignInParts } from './device-sign-in.js';
 import { ProviderConnectionDisclosure } from './provider-connection-disclosure.js';
 import { ProviderModelChips, pickedModels } from './provider-model-list.js';
 import { ProviderPresetIcon } from './provider-preset-icon.js';
@@ -216,13 +217,8 @@ interface CreateProviderDialogProps {
   onPickDevinSubscription?: () => void;
   onPickAntigravitySubscription?: () => void;
   onXaiSignIn?: () => void;
-  xaiSignInPending?: boolean;
-  xaiDevice?: { userCode: string; verificationUri: string } | null;
-  xaiDeviceError?: string | null;
   onCodexSignIn?: () => void;
-  codexSignInPending?: boolean;
-  codexDevice?: { userCode: string; verificationUri: string } | null;
-  codexDeviceError?: string | null;
+  signIn?: SignInParts | null;
 }
 
 export function CreateProviderDialog({
@@ -241,13 +237,8 @@ export function CreateProviderDialog({
   onPickDevinSubscription,
   onPickAntigravitySubscription,
   onXaiSignIn,
-  xaiSignInPending,
-  xaiDevice,
-  xaiDeviceError,
   onCodexSignIn,
-  codexSignInPending,
-  codexDevice,
-  codexDeviceError,
+  signIn = null,
 }: CreateProviderDialogProps) {
   const { t } = useI18n();
   const [view, setView] = useState<'picker' | 'form'>('picker');
@@ -363,18 +354,6 @@ export function CreateProviderDialog({
           />
         </InputGroup>
         {connectError != null && connectError !== '' && <FieldError>{connectError}</FieldError>}
-        {codexDevice != null && (
-          <FieldDescription data-testid="codex-device-login">
-            {t('在浏览器打开这个链接，输入验证码。')}{' '}
-            <a href={codexDevice.verificationUri} target="_blank" rel="noreferrer">
-              {codexDevice.verificationUri}
-            </a>{' '}
-            <span className="font-mono">{codexDevice.userCode}</span>
-          </FieldDescription>
-        )}
-        {codexDeviceError != null && codexDeviceError !== '' && (
-          <FieldError>{codexDeviceError}</FieldError>
-        )}
         <div className="flex flex-col">
           {PRESET_GROUPS.map((group) => {
             const groupRows = rows.filter((row) => row.group === group);
@@ -439,7 +418,7 @@ export function CreateProviderDialog({
                     variant="ghost"
                     data-preset-id={row.id}
                     className={PICKER_ROW_CLS}
-                    disabled={row.oauth && (connectPending === true || codexSignInPending === true)}
+                    disabled={row.oauth && connectPending === true}
                     onClick={() => {
                       if (!row.oauth) enterForm({ id: row.id, label: row.label });
                       else if (row.id === PROVIDER_CODEX_PRESET.id)
@@ -478,28 +457,14 @@ export function CreateProviderDialog({
           {t('返回')}
         </Button>
         {preset?.id === PROVIDER_XAI_PRESET.id && (
-          <div className="flex flex-col gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={xaiSignInPending === true || onXaiSignIn == null}
-              onClick={onXaiSignIn}
-            >
-              {PROVIDER_XAI_PRESET.oauthLabel}
-            </Button>
-            {xaiDevice != null && (
-              <FieldDescription>
-                {t('在浏览器打开这个链接，输入验证码。')}{' '}
-                <a href={xaiDevice.verificationUri} target="_blank" rel="noreferrer">
-                  {xaiDevice.verificationUri}
-                </a>{' '}
-                <span className="font-mono">{xaiDevice.userCode}</span>
-              </FieldDescription>
-            )}
-            {xaiDeviceError != null && xaiDeviceError !== '' && (
-              <FieldError>{xaiDeviceError}</FieldError>
-            )}
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={onXaiSignIn == null}
+            onClick={onXaiSignIn}
+          >
+            {t('用 SuperGrok 或 X Premium 登录')}
+          </Button>
         )}
         <FormField label={t('名称')} htmlFor="dlg-provider-label">
           <Input
@@ -611,15 +576,25 @@ export function CreateProviderDialog({
     );
   if (inline) {
     return (
-      <section data-testid={testId} aria-label={t('添加服务商')} className="flex flex-col gap-4">
-        {body}
-        {footer}
+      <section
+        data-testid={testId}
+        aria-label={signIn?.title ?? t('添加服务商')}
+        className="flex flex-col gap-4"
+      >
+        {signIn?.body ?? body}
+        {signIn?.footer ?? footer}
       </section>
     );
   }
   return (
-    <DialogShell title={t('添加服务商')} open={open} onClose={onClose} size="l" footer={footer}>
-      {body}
+    <DialogShell
+      title={signIn?.title ?? t('添加服务商')}
+      open={open}
+      onClose={signIn?.onCancel ?? onClose}
+      size={signIn !== null ? 's' : 'l'}
+      footer={signIn?.footer ?? footer}
+    >
+      {signIn?.body ?? body}
     </DialogShell>
   );
 }

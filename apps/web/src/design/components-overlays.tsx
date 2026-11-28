@@ -9,7 +9,6 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useId, useState } from 'react';
-import { toast } from 'sonner';
 import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
 import {
   KeyedMenuCheckboxItem,
@@ -52,7 +51,7 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '../components/ui/popover.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toast, toastError, toastSuccess } from '../components/ui/toaster.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const DIALOG_COPY: Record<DialogSize, { title: string; use: string }> = {

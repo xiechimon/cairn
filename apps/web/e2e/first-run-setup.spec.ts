@@ -250,6 +250,28 @@ test('a vendor opens its form in place, and Cancel goes back to the list', async
   await expect(picker.locator('[data-preset-id="anthropic"]')).toBeVisible();
 });
 
+test('ChatGPT subscription signs in in place, and Cancel goes back to the list', async ({ page }) => {
+  await open(page, { ...fresh(), bound: false });
+  await page.route('**/api/teams/t1/providers/oauth/openai-codex/device', (route) =>
+    route.fulfill({
+      json: {
+        state: 'first-run-state',
+        userCode: 'FRST-0001',
+        verificationUri: 'https://auth.example.test/device',
+        intervalSeconds: 60,
+      },
+    }),
+  );
+  const picker = page.getByTestId('first-run-add-provider');
+  await picker.locator('[data-preset-id="openai-codex"]').click();
+  await expect(picker).toHaveAccessibleName('登录 ChatGPT');
+  await expect(picker.getByTestId('sign-in-code')).toHaveText('FRST-0001');
+  await expect(picker.getByTestId('device-sign-in-open')).toBeEnabled();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await picker.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(picker.locator('[data-preset-id="openai-codex"]')).toBeVisible();
+});
+
 test('reloading the setup page never flashes the Coordinator home', async ({ page }) => {
   await open(page, { ...fresh(), bound: false });
   await expect(page.getByTestId('first-run-add-provider')).toBeVisible();

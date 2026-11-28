@@ -11,10 +11,10 @@ import { UpdateCairnNotice } from '../board/desktop-update.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { InfoTip } from '../components/info-tip.js';
 import { withCodeSpans } from '../components/notice-banner.js';
+import { SignInView } from '../components/sign-in-view.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { devinBridge, devinCapabilityState } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
@@ -158,20 +158,11 @@ export function AddDevinSubscriptionDialog({
       <UpdateCairnNotice message={t('更新 Cairn 后即可在这里直接登录。')} />
     ) : capability === 'allowed' && local !== null && (local.loggedIn || local.canLogin) ? (
       phase === 'waiting' ? (
-        <p className="m-0 flex items-center gap-2">
-          <RingSpinner className="size-4" />
-          <span className="min-w-0 flex-1">
-            {t('已在浏览器中打开 Devin 登录页，完成后会自动继续。')}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="devin-local-login-cancel"
-            onClick={() => void bridge?.cancelLogin()}
-          >
-            {t('取消')}
-          </Button>
-        </p>
+        <SignInView
+          waiting={t('已在浏览器中打开 Devin 登录页，完成后会自动继续。')}
+          onCancel={() => void bridge?.cancelLogin()}
+          cancelTestId="devin-local-login-cancel"
+        />
       ) : local.loggedIn && reloginTarget === undefined ? (
         <p className="m-0 flex items-center gap-2">
           <span className="min-w-0 flex-1">{t('这台 Mac 已登录 Devin。')}</span>

@@ -2,13 +2,14 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
 import { FormStack } from '../components/form-layout.js';
+import { DeviceCode } from '../components/sign-in-view.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { copyTextWithFeedback } from '../lib/clipboard.js';
@@ -17,7 +18,6 @@ import {
   openGithubWindow,
   useGithubDevicePoll,
 } from '../lib/github-device-flow.js';
-import { DeviceCode } from '../resources/mcp-github-device-dialog.js';
 
 function ended(
   t: TFunc,

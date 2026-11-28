@@ -87,7 +87,11 @@ export function isServerUnreachable(error: unknown): boolean {
   return isNetworkFailure(error);
 }
 
-export function describeError(error: unknown, t: TFunc): string | null {
+export function describeError(
+  error: unknown,
+  t: TFunc,
+  options: { serverText?: boolean } = {},
+): string | null {
   if (error == null) return null;
   if (error instanceof SendTimeoutError) return t('不确定是否送达，重发前请先看对话里有没有这条。');
   if (error instanceof ServerUnreachableError) return t('网络连接异常，请检查网络后重试。');
@@ -97,6 +101,7 @@ export function describeError(error: unknown, t: TFunc): string | null {
     const byReason = error.reason !== undefined ? REASON_COPY[error.reason] : undefined;
     if (byReason !== undefined) return t(byReason);
     if (
+      options.serverText !== false &&
       !error.hideServerText &&
       !MASKED_GATEWAY_STATUSES.has(error.status) &&
       isSafeServerMessage(error.message)
@@ -129,7 +134,9 @@ export function describeError(error: unknown, t: TFunc): string | null {
   return null;
 }
 
-export function describeErrorDefault(error: unknown): string | null {
+export function describeErrorForToast(error: unknown): string | null {
   const locale = activeLocale(safeLocalStorage());
-  return describeError(error, (source, vars) => translate(locale, EN, source, vars));
+  return describeError(error, (source, vars) => translate(locale, EN, source, vars), {
+    serverText: false,
+  });
 }

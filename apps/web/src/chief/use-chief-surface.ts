@@ -17,7 +17,6 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
 import { ApiError } from '../api/client.js';
 import { isCoordinatorNotReady, toastCoordinatorNotReady } from '../api/coordinator-not-ready.js';
@@ -42,7 +41,7 @@ import { useConversationStream } from '../api/sse.js';
 import { MESSAGE_PARAM } from '../board/message-jump.js';
 import { THREAD_PARAM } from '../board/thread-copy.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toast, toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import { chiefDefault } from '../fixtures/chief.js';
 import type { ChiefContent, FixtureSet } from '../fixtures/records.js';

@@ -1,5 +1,5 @@
 import { COORDINATOR_NOT_READY } from '@cairn/shared';
-import { toast } from 'sonner';
+import { toast } from '../components/ui/toaster.js';
 import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 import { ApiError } from './client.js';
 

@@ -113,7 +113,7 @@ test('api_key row enters its preset key form prefilled; xai form shows the oauth
   await dialog.getByRole('button', { name: '返回' }).click();
   await dialog.locator('[data-preset-id="xai"]').click();
   await expect(dialog.locator('#dlg-provider-label')).toHaveValue('xAI');
-  await expect(dialog.getByText('Sign in with SuperGrok or X Premium')).toBeVisible();
+  await expect(dialog.getByText('用 SuperGrok 或 X Premium 登录')).toBeVisible();
 });
 
 test('Anthropic folds its pi route behind a summary and picks the newest Claude of each family', async ({

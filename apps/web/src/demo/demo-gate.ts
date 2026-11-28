@@ -1,4 +1,4 @@
-import { toast } from 'sonner';
+import { toast } from '../components/ui/toaster.js';
 import { EN } from '../i18n/en.js';
 import { readStoredLocale } from '../i18n/locale.js';
 import { translate } from '../i18n/translate.js';

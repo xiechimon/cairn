@@ -47,6 +47,8 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
     name: locale === 'zh' ? '添加 Claude 订阅' : 'Add Claude subscription',
   });
   await expect(dialog).toContainText('claude setup-token');
+  await expect(dialog.getByTestId('sign-in-code')).toHaveText('claude setup-token');
+  await expect(dialog.getByTestId('sign-in-copy')).toBeVisible();
   await expect(dialog.locator('input[type="date"]')).toHaveCount(0);
   await dialog.getByTestId('subscription-label').fill('Personal Claude');
   await expect(dialog.getByTestId('subscription-token')).toHaveAttribute('type', 'password');

@@ -4,17 +4,16 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
 import { FormStack } from '../components/form-layout.js';
+import { DeviceCode } from '../components/sign-in-view.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
   DIALOG_TEXT_BUTTON,
   DialogShell,
 } from '../components/ui/dialog-shell.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { copyTextWithFeedback } from '../lib/clipboard.js';
 import {
   githubDeviceEndedCopy,
   openGithubWindow,
@@ -285,73 +284,5 @@ export function GithubDeviceDialog({
     >
       <FormStack className={DIALOG_FORM_CLS}>{body}</FormStack>
     </DialogShell>
-  );
-}
-
-export function DeviceCode({
-  code,
-  cells = false,
-  expired = false,
-}: {
-  code: string;
-  cells?: boolean;
-  expired?: boolean;
-}) {
-  const { t } = useI18n();
-  if (cells) {
-    return (
-      <div
-        data-testid="mcp-github-code"
-        className={cn('flex items-center justify-center gap-1.5', expired && 'opacity-40')}
-      >
-        <span className="sr-only">{code}</span>
-        {code.split('').map((char, i) =>
-          /[A-Za-z0-9]/.test(char) ? (
-            <span
-              key={i}
-              aria-hidden="true"
-              className={cn(
-                'flex h-12 w-9 items-center justify-center rounded-(--radius-control) border border-input bg-card font-mono text-brand text-foreground',
-                expired && 'line-through',
-              )}
-            >
-              {char}
-            </span>
-          ) : (
-            <span
-              key={i}
-              aria-hidden="true"
-              className="flex h-12 w-2 items-center justify-center font-mono text-heading text-content-tertiary"
-            >
-              {char}
-            </span>
-          ),
-        )}
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-3 rounded-(--radius-control) bg-muted px-4 py-3">
-      <code
-        data-testid="mcp-github-code"
-        className="min-w-0 flex-1 font-mono text-heading text-foreground"
-      >
-        {code}
-      </code>
-      <Button
-        variant="outline"
-        size="xs"
-        className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
-        onClick={() =>
-          copyTextWithFeedback(
-            code,
-            () => toastSuccess(t('已复制')),
-            (error) => toastError(t('复制失败，请重试。'), error),
-          )
-        }
-      >
-        {t('复制')}
-      </Button>
-    </div>
   );
 }

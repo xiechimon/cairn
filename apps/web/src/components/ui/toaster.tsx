@@ -3,15 +3,51 @@
 import { Info, OctagonX, TriangleAlert, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
+import {
+  type ExternalToast,
+  Toaster as Sonner,
+  toast as sonnerToast,
+  type ToasterProps,
+} from 'sonner';
 import { useI18n } from '../../i18n/provider.js';
-import { describeErrorDefault } from '../../lib/error-copy.js';
+import { describeErrorForToast } from '../../lib/error-copy.js';
 import { markErrorSurfaced } from '../../lib/mutation-error-report.js';
 import { RingSpinner } from './ring-spinner.js';
 
+type ToastTitle = Parameters<typeof sonnerToast>[0];
+type ToastKind = 'message' | 'error' | 'success' | 'info' | 'warning';
+
+function collapsing(
+  kind: ToastKind,
+  title: ToastTitle,
+  data?: ExternalToast,
+): ExternalToast | undefined {
+  if (typeof title !== 'string') return data;
+  if (data?.id !== undefined || data?.action !== undefined || data?.cancel !== undefined)
+    return data;
+  const description = typeof data?.description === 'string' ? data.description : '';
+  return { ...data, id: JSON.stringify([kind, title, description]) };
+}
+
+export const toast = Object.assign(
+  (title: ToastTitle, data?: ExternalToast) =>
+    sonnerToast(title, collapsing('message', title, data)),
+  {
+    error: (title: ToastTitle, data?: ExternalToast) =>
+      sonnerToast.error(title, collapsing('error', title, data)),
+    success: (title: ToastTitle, data?: ExternalToast) =>
+      sonnerToast.success(title, collapsing('success', title, data)),
+    info: (title: ToastTitle, data?: ExternalToast) =>
+      sonnerToast.info(title, collapsing('info', title, data)),
+    warning: (title: ToastTitle, data?: ExternalToast) =>
+      sonnerToast.warning(title, collapsing('warning', title, data)),
+    dismiss: (id?: string | number) => sonnerToast.dismiss(id),
+  },
+);
+
 export function toastError(title: string, error: unknown): void {
   markErrorSurfaced(error);
-  const reason = describeErrorDefault(error);
+  const reason = describeErrorForToast(error);
   toast.error(title, reason !== null && reason !== title ? { description: reason } : undefined);
 }
 

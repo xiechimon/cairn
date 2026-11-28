@@ -1,4 +1,4 @@
-import { toast } from 'sonner';
+import { toast } from '../components/ui/toaster.js';
 
 type Listener = () => void;
 

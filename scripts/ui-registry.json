@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "a3263e48bc43ddcad2103da0343dc67c0d227542",
+    "sha": "6953c3b03dbda6adb3df9679f83b220ad8e9e6d0",
     "date": "2026-11-28"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -233,7 +233,7 @@
     "toaster.tsx": {
       "kind": "adapter",
       "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). Foundation C5: toastError maps errors through lib/error-copy.ts so raw server/network strings do not leak to users. The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer. Motion pick: the dormant loading icon is the shared RingSpinner (ring-spinner.tsx), not a lucide loader. C13/C4: toastError marks mutation errors already surfaced so the QueryClient fallback does not duplicate them; the close button gets the close label as its native tooltip because sonner exposes aria text but no title hook.",
-      "hash": "7765cbecc1abdea474427a623d1039a477e3641660107f12517a4bbc1cb88c94"
+      "hash": "ede95228fcf7056d9377553cd73b01164f96e3d3b81888ed4fae7dcc22856b05"
     },
     "tooltip.tsx": {
       "kind": "registry",

@@ -55,14 +55,27 @@ export function useLiveData(): LiveData {
   return useContext(LiveDataContext);
 }
 
+declare module '@tanstack/react-query' {
+  interface Register {
+    mutationMeta: { action: string };
+  }
+}
+
 export function createProductQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
       mutations: {
-        onError: (error) => {
+        onError: (error, _variables, _result, context) => {
           setTimeout(() => {
-            if (!errorWasSurfaced(error))
-              toastError(translate(activeLocale(), EN, '操作失败，请重试。'), error);
+            if (errorWasSurfaced(error)) return;
+            const locale = activeLocale();
+            const action = context?.meta?.action;
+            toastError(
+              action === undefined
+                ? translate(locale, EN, '操作失败，请重试。')
+                : translate(locale, EN, '{action}失败', { action: translate(locale, EN, action) }),
+              error,
+            );
           }, 0);
         },
       },
