@@ -263,15 +263,91 @@ function commandOfCall(args: Record<string, unknown>): string {
   return '';
 }
 
+function cleanedCommand(cmd: string): string {
+  return cmd
+    .replace(/(?:^|\s)\d*>&\d+(?=\s|$|;|&|\|)/g, ' ')
+    .replace(/(?:^|\s)\d*>\s*\/dev\/null(?=\s|$|;|&|\|)/g, ' ');
+}
+
 function isMutatingCall(call: ParsedToolCall): boolean {
   if (EDIT_TOOL_NAMES.has(call.name)) return true;
   if (COMMAND_TOOL_NAMES.has(call.name)) {
-    const cleaned = commandOfCall(call.args)
-      .replace(/(?:^|\s)\d*>&\d+(?=\s|$|;|&|\|)/g, ' ')
-      .replace(/(?:^|\s)\d*>\s*\/dev\/null(?=\s|$|;|&|\|)/g, ' ');
-    return SHELL_WRITE_RE.test(cleaned);
+    return SHELL_WRITE_RE.test(cleanedCommand(commandOfCall(call.args)));
   }
   return false;
+}
+
+const REDIRECT_TARGET_RE = /(?:^|[\s;&|])\d*>>?\s*([^\s;&|]+)/g;
+const TEE_TARGET_RE = /\btee\s+(?:-\w+\s+)*([^;&|]+)/g;
+const OPERAND_MUTATION_RE = /(?:^|[;&|]\s*)(?:rm|mv|cp)\s+([^;&|\n]+)/g;
+const UNPARSED_IN_PLACE_EDIT_RE = /\bsed\s+-i|\bpatch\b|\bgit\s+apply\b/;
+const TARGET_FLAGS = new Set(['-r', '-rf', '-f', '-R', '-a', '-p', '-v', '-n']);
+
+function targetOperands(raw: string): string[] {
+  return raw
+    .split(/\s+/)
+    .map((part) => part.replace(/^['"]|['"]$/g, ''))
+    .filter((part) => part !== '' && !TARGET_FLAGS.has(part) && !part.startsWith('-'));
+}
+
+function shellWriteTargets(cmd: string): string[] | null {
+  const cleaned = cleanedCommand(cmd);
+  if (UNPARSED_IN_PLACE_EDIT_RE.test(cleaned)) return null;
+  const targets: string[] = [];
+  for (const match of cleaned.matchAll(REDIRECT_TARGET_RE)) {
+    const target = match[1]?.trim();
+    if (target !== undefined && target !== '' && !target.startsWith('/dev/')) targets.push(target);
+  }
+  for (const match of cleaned.matchAll(TEE_TARGET_RE)) {
+    const raw = match[1];
+    if (raw !== undefined) targets.push(...targetOperands(raw));
+  }
+  for (const match of cleaned.matchAll(OPERAND_MUTATION_RE)) {
+    const raw = match[1];
+    if (raw !== undefined) targets.push(...targetOperands(raw));
+  }
+  return targets;
+}
+
+function normalizePath(filePath: string): string {
+  return filePath
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/^\.\//, '')
+    .replace(/\/+$/, '');
+}
+
+function pathTargets(filePath: string, effectivePaths: readonly string[]): boolean {
+  const target = normalizePath(filePath);
+  if (target === '') return false;
+  const targetBase = target.split('/').pop() ?? target;
+  return effectivePaths.some((edited) => {
+    const path = normalizePath(edited);
+    return (
+      path === target ||
+      path.startsWith(`${target}/`) ||
+      path.endsWith(`/${target}`) ||
+      target.endsWith(`/${path}`) ||
+      (path.split('/').pop() ?? path) === targetBase
+    );
+  });
+}
+
+const DANGEROUS_TARGETS = new Set(['.', '..', '/', '*', '~', '$HOME', '${HOME}']);
+
+function isContentMutation(call: ParsedToolCall, effectivePaths: readonly string[]): boolean {
+  if (EDIT_TOOL_NAMES.has(call.name)) {
+    if (effectivePaths.length === 0) return true;
+    const paths = parsedPathsFromToolArgs(call.name, call.args);
+    return paths.length === 0 || paths.some((path) => pathTargets(path, effectivePaths));
+  }
+  if (!COMMAND_TOOL_NAMES.has(call.name)) return false;
+  const cmd = commandOfCall(call.args);
+  if (!SHELL_WRITE_RE.test(cleanedCommand(cmd))) return false;
+  if (effectivePaths.length === 0) return true;
+  const targets = shellWriteTargets(cmd);
+  if (targets === null || targets.length === 0) return true;
+  if (targets.some((target) => DANGEROUS_TARGETS.has(normalizePath(target)))) return true;
+  return targets.some((target) => pathTargets(target, effectivePaths));
 }
 
 function isLintOnlyCommand(cmd: string): boolean {
@@ -614,10 +690,16 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
     }
   }
 
+  const effectivePaths =
+    input.editedPaths.length > 0
+      ? input.editedPaths
+      : extractEditedPathsFromMessages(input.messages);
+  const madeCodeOrDocEdits = effectivePaths.length > 0 || input.hasChanges === true;
+
   let lastEditIdx = -1;
   let lastEditAt = -1;
   for (const call of calls) {
-    if (isMutatingCall(call)) {
+    if (isContentMutation(call, effectivePaths)) {
       lastEditIdx = call.idx;
       lastEditAt = Math.max(lastEditAt, call.createdAt);
     }
@@ -639,12 +721,6 @@ export function evaluateStepAcceptance(input: EvaluateStepAcceptanceInput): Acce
       'Resolve the environment/sandbox blocker or run verification on an unblocked runner.',
     );
   }
-
-  const effectivePaths =
-    input.editedPaths.length > 0
-      ? input.editedPaths
-      : extractEditedPathsFromMessages(input.messages);
-  const madeCodeOrDocEdits = effectivePaths.length > 0 || input.hasChanges === true;
 
   if (!madeCodeOrDocEdits) {
     const lastCmd = cmdCalls.findLast(
