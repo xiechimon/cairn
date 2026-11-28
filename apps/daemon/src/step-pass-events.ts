@@ -61,7 +61,19 @@ export interface StepPassEventContext {
   toolStartedAt: Map<string, number>;
 }
 
-const CHANGE_TOOLS = new Set(['edit', 'write', 'bash']);
+const CHANGE_TOOLS = new Set([
+  'edit',
+  'write',
+  'bash',
+  'write_file',
+  'edit_file',
+  'create_file',
+  'delete_file',
+  'apply_patch',
+  'notebookedit',
+  'replace_file_content',
+  'multi_replace_file_content',
+]);
 
 async function withRetries<T>(
   fn: () => Promise<T>,

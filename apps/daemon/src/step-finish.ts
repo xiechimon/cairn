@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { lstatSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   type AgentSessionHandle,
   type CommitIdentity,
@@ -45,6 +48,62 @@ export interface StepFinishInput
   env?: NodeJS.ProcessEnv;
   now: () => number;
   reap?: () => Promise<void>;
+  noRepoFilesBefore?: ReadonlyMap<string, string> | null;
+}
+
+const SNAPSHOT_MAX_ENTRIES = 10_000;
+const SNAPSHOT_HASH_MAX_BYTES = 65_536;
+
+export function snapshotWorkspaceFiles(cwd: string): Map<string, string> {
+  const entries = new Map<string, string>();
+  const walk = (dir: string, prefix: string): void => {
+    if (entries.size >= SNAPSHOT_MAX_ENTRIES) return;
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      if (entries.size >= SNAPSHOT_MAX_ENTRIES) return;
+      if (name.startsWith('.cairn') || name === '.git' || name === 'node_modules') continue;
+      const full = join(dir, name);
+      const rel = prefix === '' ? name : `${prefix}/${name}`;
+      let st: ReturnType<typeof lstatSync>;
+      try {
+        st = lstatSync(full);
+      } catch {
+        continue;
+      }
+      if (st.isSymbolicLink()) continue;
+      if (st.isDirectory()) {
+        walk(full, rel);
+        continue;
+      }
+      if (!st.isFile()) continue;
+      let fp = `${st.size}:${st.mtimeMs}`;
+      if (st.size <= SNAPSHOT_HASH_MAX_BYTES) {
+        try {
+          const sha = createHash('sha1').update(readFileSync(full)).digest('hex');
+          fp = `${st.size}:${st.mtimeMs}:${sha}`;
+        } catch {
+          void 0;
+        }
+      }
+      entries.set(rel, fp);
+    }
+  };
+  walk(cwd, '');
+  return entries;
+}
+
+function hasWorkspaceFileChanges(before: ReadonlyMap<string, string>, cwd: string): boolean {
+  const after = snapshotWorkspaceFiles(cwd);
+  if (after.size !== before.size) return true;
+  for (const [path, fp] of after) {
+    if (before.get(path) !== fp) return true;
+  }
+  return false;
 }
 
 export async function finishStepRun(input: StepFinishInput): Promise<void> {
@@ -95,6 +154,13 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     log: (message) => logger.step(message),
   });
 
+  const noRepoDiskChanged =
+    ws === null &&
+    !isReview &&
+    !attachmentVerify &&
+    input.noRepoFilesBefore != null &&
+    hasWorkspaceFileChanges(input.noRepoFilesBefore, input.cwd);
+
   const settledGit = await settleStepGit({
     git: input.workspace,
     ws,
@@ -107,7 +173,7 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     stepStartMs: input.stepStartMs,
     runGit: input.runGit,
     headCommit: attachmentVerify ? input.headAtStart : null,
-    hasChanges: isReview || attachmentVerify ? false : passState.sawChangeTool,
+    hasChanges: isReview || attachmentVerify ? false : passState.sawChangeTool || noRepoDiskChanged,
     lastError: outcome.lastError,
     stopped,
     closes: outcome.lastError === null && !stopped && !isReview && !attachmentVerify,

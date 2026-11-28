@@ -349,4 +349,54 @@ describe('hasChanges transcript inference (gate 2 truth surface, no-repo degrade
     const { client } = await setup(claimed, backend);
     expect(client.doneBodies[0]?.body.hasChanges).toBe(false);
   });
+
+  test('write_file tool name → hasChanges=true', async () => {
+    const claimed = claimedNoRepoStep('build');
+    const { backend } = writingBackend(
+      [
+        {
+          type: 'toolcall_end',
+          call: { id: 'call-wf1', name: 'write_file', arguments: {}, result: 'ok', endedAt: 1 },
+        },
+        DONE_EVENT,
+      ],
+      () => {},
+    );
+    const { client } = await setup(claimed, backend);
+    expect(client.doneBodies[0]?.body.hasChanges).toBe(true);
+  });
+
+  test('non-CHANGE_TOOLS tool writing dogfood-b7.md on disk → hasChanges=true', async () => {
+    const claimed = claimedNoRepoStep('build');
+    const { backend } = writingBackend(
+      [
+        {
+          type: 'toolcall_end',
+          call: { id: 'call-rc1', name: 'run_command', arguments: {}, result: 'ok', endedAt: 1 },
+        },
+        DONE_EVENT,
+      ],
+      (cwd) => {
+        writeFileSync(join(cwd, 'dogfood-b7.md'), 'plan approval check\n');
+      },
+    );
+    const { client } = await setup(claimed, backend);
+    expect(client.doneBodies[0]?.body.hasChanges).toBe(true);
+  });
+
+  test('read-only run_command without disk changes → hasChanges=false', async () => {
+    const claimed = claimedNoRepoStep('build');
+    const { backend } = writingBackend(
+      [
+        {
+          type: 'toolcall_end',
+          call: { id: 'call-rc2', name: 'run_command', arguments: {}, result: 'ok', endedAt: 1 },
+        },
+        DONE_EVENT,
+      ],
+      () => {},
+    );
+    const { client } = await setup(claimed, backend);
+    expect(client.doneBodies[0]?.body.hasChanges).toBe(false);
+  });
 });

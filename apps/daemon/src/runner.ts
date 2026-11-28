@@ -39,7 +39,7 @@ import type { StatePaths } from './state.js';
 import { GitHubAppTokenUnavailableError } from './step-app-credential.js';
 import { prepareStepEnv, READONLY_GIT_ENV } from './step-env.js';
 import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
-import { finishStepRun } from './step-finish.js';
+import { finishStepRun, snapshotWorkspaceFiles } from './step-finish.js';
 import { runLocalFolderActionStep } from './step-local-folder-action.js';
 import { runLocalMergeStep } from './step-local-merge.js';
 import { createStepPassControls } from './step-pass-controls.js';
@@ -723,6 +723,8 @@ async function runClaimedStep(
     now,
     log: (line) => logger.step(line),
   });
+  const noRepoFilesBefore =
+    ws === null && !isReview && !attachmentVerify && !isChief ? snapshotWorkspaceFiles(cwd) : null;
   const passes = await runStepPasses({
     stepId,
     client,
@@ -817,6 +819,7 @@ async function runClaimedStep(
     env: treeEnv,
     now,
     reap: reapTree,
+    noRepoFilesBefore,
   });
 }
 
