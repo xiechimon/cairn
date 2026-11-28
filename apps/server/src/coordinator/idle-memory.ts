@@ -61,7 +61,7 @@ class IdleFlushTimeout extends Error {
   }
 }
 
-const THREAD_READY = sql`
+export const THREAD_READY = sql`
   t.archivedAt is null
   and not exists (
     select 1 from step s where s.buildId = t.id and s.kind = 'chief'

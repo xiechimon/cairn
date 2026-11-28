@@ -76,7 +76,7 @@ export function contextWindowOf(db: Db, teamId: string, usageModel: string): num
   );
 }
 
-function activeRouterModel(db: Db, teamId: string): string | null {
+export function activeRouterModel(db: Db, teamId: string): string | null {
   const profile = coordinatorProfile(db, teamId);
   const providerId = profile?.provider?.trim() ?? '';
   const modelId = profile?.modelId?.trim() ?? '';

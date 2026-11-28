@@ -1,16 +1,25 @@
 import {
   COORDINATOR_COMPACT_AT,
   COORDINATOR_MEMORY_FLUSH_TRANSCRIPT_MAX_CHARS,
+  COORDINATOR_SUMMARY_CONTEXT_ASK,
   COORDINATOR_SUMMARY_MAX_CHARS,
   COORDINATOR_SUMMARY_PROMPT_HEAD,
   COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS,
   shortEvent,
 } from '@cairn/shared';
-import type { AssistantMessage, Message, ModelThinkingLevel } from '@earendil-works/pi-ai';
+import type {
+  Api,
+  AssistantMessage,
+  Context,
+  Message,
+  Model,
+  ModelThinkingLevel,
+} from '@earendil-works/pi-ai';
 import type { Models } from '@earendil-works/pi-ai/models';
 import {
   type CompactionSettings,
   CompactionTask,
+  type ConversationId,
   defineExtension,
   hook,
 } from '@earendil-works/pi-durable';
@@ -183,49 +192,116 @@ export function summarizerFor(
   ref: ModelRef | null,
   scope: FailureScope & { stage?: string; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Summarize {
+  const { model, reasoning } = summaryModelOf(models, ref);
+  return async (prompt) => {
+    const request: Context = {
+      systemPrompt: SUMMARY_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
+    };
+    return completeSummary(models, model, reasoning, request, scope, undefined);
+  };
+}
+
+/**
+ * Summarize the conversation itself: the live model context followed by the instruction, so the
+ * provider reads its prompt cache instead of a fresh transcript.
+ */
+export function summarizerOverContext(
+  models: Pick<Models, 'getModel' | 'completeSimple'>,
+  ref: ModelRef | null,
+  scope: FailureScope & {
+    stage?: string;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    maxTokens?: number;
+  } = {},
+  cacheRetention?: 'short' | 'long',
+): (messages: readonly Message[]) => Promise<string> {
+  const { model, reasoning } = summaryModelOf(models, ref);
+  return async (messages) =>
+    completeSummary(
+      models,
+      model,
+      reasoning,
+      { messages: contextSummaryRequest(messages, Date.now()) },
+      scope,
+      cacheRetention,
+    );
+}
+
+export function contextSummaryRequest(messages: readonly Message[], now: number): Message[] {
+  return [
+    ...messages,
+    {
+      role: 'user',
+      content: [{ type: 'text', text: COORDINATOR_SUMMARY_CONTEXT_ASK }],
+      timestamp: now,
+    },
+  ];
+}
+
+function summaryModelOf(
+  models: Pick<Models, 'getModel'>,
+  ref: ModelRef | null,
+): { model: Model<Api>; reasoning: ModelThinkingLevel } {
   const model = ref === null ? undefined : models.getModel(ref.provider, ref.modelId);
   if (model === undefined) {
     throw new Error(`summary model ${ref?.provider}/${ref?.modelId} is not available`);
   }
-  return async (prompt) => {
-    const report = startSummaryCall(scope, scope.stage ?? 'summary-fold', model);
-    let reply: AssistantMessage | undefined;
-    let failure: unknown;
-    let httpStatus: number | undefined;
-    try {
-      const reasoning = ref?.thinkingLevel ?? 'low';
-      reply = await models.completeSimple(
-        model,
-        {
-          systemPrompt: SUMMARY_SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-        },
-        {
-          ...(reasoning === 'off' ? {} : { reasoning }),
-          ...(scope.timeoutMs === undefined ? {} : { timeoutMs: scope.timeoutMs }),
-          ...(scope.signal === undefined ? {} : { signal: scope.signal }),
-          onResponse: (response) => {
-            httpStatus = response.status;
-          },
-        },
-      );
-      if (reply.stopReason !== 'stop') {
-        throw new Error(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
-      }
-      return textOf(reply.content);
-    } catch (error) {
-      failure = error;
-      throw error;
-    } finally {
-      report(reply, failure, httpStatus);
+  return { model, reasoning: ref?.thinkingLevel ?? 'low' };
+}
+
+async function completeSummary(
+  models: Pick<Models, 'completeSimple'>,
+  model: Model<Api>,
+  reasoning: ModelThinkingLevel,
+  request: Context,
+  scope: FailureScope & {
+    stage?: string;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    maxTokens?: number;
+  },
+  cacheRetention: 'short' | 'long' | undefined,
+): Promise<string> {
+  const report = startSummaryCall(scope, scope.stage ?? 'summary-fold', model);
+  let reply: AssistantMessage | undefined;
+  let failure: unknown;
+  let httpStatus: number | undefined;
+  try {
+    reply = await models.completeSimple(model, request, {
+      ...(reasoning === 'off' ? {} : { reasoning }),
+      ...(scope.timeoutMs === undefined ? {} : { timeoutMs: scope.timeoutMs }),
+      ...(scope.maxTokens === undefined ? {} : { maxTokens: scope.maxTokens }),
+      ...(scope.signal === undefined ? {} : { signal: scope.signal }),
+      ...(cacheRetention === undefined ? {} : { cacheRetention }),
+      onResponse: (response) => {
+        httpStatus = response.status;
+      },
+    });
+    if (reply.stopReason !== 'stop') {
+      throw new Error(`summary request ended ${reply.stopReason}: ${reply.errorMessage ?? ''}`);
     }
-  };
+    return textOf(reply.content);
+  } catch (error) {
+    failure = error;
+    throw error;
+  } finally {
+    report(reply, failure, httpStatus);
+  }
+}
+
+export interface WarmSummary {
+  summary: string;
+  /** Newest entry of the context the summary was computed from, so a later entry makes it stale. */
+  tail: string | null;
 }
 
 export function coordinatorCompactionExtension(
   summaryModel: () => ModelRef | null,
   flush: () => MemoryFlush | null = () => null,
   threadId?: string,
+  pendingSummary: (conversationId: ConversationId) => WarmSummary | null = () => null,
 ) {
   const scope = threadId === undefined ? {} : { threadId };
   return defineExtension({
@@ -256,9 +332,20 @@ export function coordinatorCompactionExtension(
               await api.memo(FLUSH_MEMO, true, context);
             }
             startAt = Date.now();
-            const summary = await foldSummary(previous, summaryBatches(lines), summarize);
+            const warm = pendingSummary(api.conversationId);
+            let warmSummary: string | null = null;
+            if (warm !== null) {
+              const newest = (await api.entries({}, 1, undefined, context)).items[0];
+              const tail = newest === undefined ? null : String(newest.id);
+              if (tail === warm.tail) {
+                const trimmed = warm.summary.trim();
+                if (trimmed !== '') warmSummary = trimmed.slice(0, COORDINATOR_SUMMARY_MAX_CHARS);
+              }
+            }
+            const summary =
+              warmSummary ?? (await foldSummary(previous, summaryBatches(lines), summarize));
             const result = { summary: await api.memo(SUMMARY_MEMO, summary, context) };
-            recordCompactionSuccess(scope, 'summary-fold', startAt);
+            if (warmSummary === null) recordCompactionSuccess(scope, 'summary-fold', startAt);
             return result;
           } catch (error) {
             reportCompactionFailure(scope, 'summary-fold', error, startAt);

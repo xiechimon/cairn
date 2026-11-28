@@ -6,7 +6,9 @@ export type CompactionStage =
   | 'memory-flush'
   | 'idle-memory-flush'
   | 'summary-fold'
-  | 'background-compaction';
+  | 'background-compaction'
+  | 'idle-compaction'
+  | 'cache-expiry-compaction';
 
 export interface FailureScope {
   threadId?: string;
