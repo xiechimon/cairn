@@ -3,10 +3,11 @@ import {
   BUILD_FAILURE_ROW_KIND,
   chiefTurnErrorContentSchema,
   RUN_TRACE_VALUE_CAP,
+  type RunListPage,
+  type RunListRow,
+  type RunStatus,
   type RunTrace,
   type RunTraceItem,
-  type RunTurnPage,
-  type RunTurnProblem,
   type RunUsage,
   redactSecrets,
   systemRowOf,
@@ -22,12 +23,24 @@ import {
   isNotNull,
   lt,
   lte,
+  notLike,
   or,
   type SQL,
   sql,
 } from 'drizzle-orm';
+import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';
-import { chiefMessage, chiefTurnUsage, message, step, tokenUsage } from '../db/schema.js';
+import {
+  build,
+  chiefMessage,
+  chiefThread,
+  chiefTurnUsage,
+  message,
+  project,
+  step,
+  todo,
+  tokenUsage,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { classifyBuildCause } from '../reliability-report.js';
@@ -142,33 +155,6 @@ function boundToStep(id: string, stepId: string): boolean {
   );
 }
 
-function neighbourTurn(db: Db, row: StepRow, direction: 'previous' | 'next') {
-  const before = direction === 'previous';
-  return db
-    .select({ id: step.id, claimedAt: step.claimedAt })
-    .from(step)
-    .where(
-      and(
-        eq(step.buildId, row.buildId),
-        eq(step.kind, 'chief'),
-        before
-          ? or(
-              lt(step.createdAt, row.createdAt),
-              and(eq(step.createdAt, row.createdAt), lt(step.id, row.id)),
-            )
-          : or(
-              gt(step.createdAt, row.createdAt),
-              and(eq(step.createdAt, row.createdAt), gt(step.id, row.id)),
-            ),
-      ),
-    )
-    .orderBy(
-      before ? desc(step.createdAt) : asc(step.createdAt),
-      before ? desc(step.id) : asc(step.id),
-    )
-    .get();
-}
-
 function turnWindow(db: Db, row: StepRow) {
   if (row.claimedAt === null) return { start: 0, end: 0 };
   const next = db
@@ -185,8 +171,6 @@ function turnWindow(db: Db, row: StepRow) {
 function turnTrace(db: Db, thread: TeamThread, stepId: string, capResults: boolean): RunTrace {
   const row = db.select().from(step).where(eq(step.id, stepId)).get();
   if (row === undefined) throw new HttpError(404, `run ${stepId}`);
-  const previous = neighbourTurn(db, row, 'previous');
-  const next = neighbourTurn(db, row, 'next');
   const { start, end } = turnWindow(db, row);
   const owners = new Set(row.ownerMessageIds ?? []);
   const rows = db
@@ -249,13 +233,11 @@ function turnTrace(db: Db, thread: TeamThread, stepId: string, capResults: boole
     title: owner?.kind === 'user' ? firstLineOf(owner.text) : thread.title,
     threadId: thread.id,
     todoId: null,
-    status: row.status,
+    status: turnStatus(db, row),
     startedAt: row.claimedAt ?? row.createdAt,
     finishedAt: row.claimedAt === null ? null : row.finishedAt,
     models: [...new Set(usageRows.map((u) => u.model))],
     usage: sumUsage(usageRows),
-    previousId: previous?.id ?? null,
-    nextId: next?.id ?? null,
     failure: failureOf(items),
     items,
   };
@@ -361,13 +343,11 @@ function buildTrace(db: Db, owner: TeamBuild, capResults: boolean): RunTrace {
     title: `#${owner.seqNum} ${owner.title}`,
     threadId: null,
     todoId: owner.todoId,
-    status: last?.status ?? 'pending',
+    status: buildStatus(steps, owner),
     startedAt: steps[0]?.claimedAt ?? owner.createdAt,
     finishedAt: finished,
     models: [...new Set(usage.map((u) => u.model))],
     usage: sumUsage(usage),
-    previousId: null,
-    nextId: null,
     failure: failureOf(items),
     items,
   };
@@ -394,94 +374,208 @@ function turnError(db: Db, stepId: string): string | null {
   return row === undefined ? null : turnErrorText(row.content);
 }
 
-function problemOf(db: Db, row: StepRow): RunTurnProblem | null {
-  if (row.quotaBlock !== null) return 'quota';
+function turnStatus(db: Db, row: StepRow): RunStatus {
+  if (row.quotaBlock !== null || row.status === 'waiting_quota') return 'quota';
   if (row.status === 'stopped') return 'stopped';
-  if (row.status !== 'failed') return null;
-  const cause = classifyBuildCause({
-    errorMessage: turnError(db, row.id) ?? 'turn failed without a recorded error',
-    prNumber: null,
-    ageMs: nowMs() - row.createdAt,
-  });
-  return cause === 'quota' ? 'quota' : 'failed';
+  if (row.status === 'failed') {
+    const cause = classifyBuildCause({
+      errorMessage: turnError(db, row.id) ?? 'turn failed without a recorded error',
+      prNumber: null,
+      ageMs: nowMs() - row.createdAt,
+    });
+    return cause === 'quota' ? 'quota' : 'failed';
+  }
+  return row.status === 'done' ? 'done' : 'running';
 }
 
-export interface RunTurnsQuery {
+export interface RunListQuery {
+  thread?: string | undefined;
   limit: number;
   before?: string | undefined;
   problems: boolean;
 }
 
-export function listRunTurns(
+type Cursor = { at: number; id: string };
+
+const VISIBLE_THREAD = and(
+  notLike(chiefThread.id, 'chief-digest-%'),
+  notLike(chiefThread.id, 'chief-memory-%'),
+) as SQL;
+
+const stepOf = (column: AnySQLiteColumn) =>
+  sql`select 1 from ${step} where ${step.buildId} = ${column}`;
+const BUILD_QUOTA = sql`exists (${stepOf(build.id)} and (${step.status} = 'waiting_quota' or ${step.quotaBlock} is not null))`;
+const BUILD_STOPPED = sql`(${build.stop} is not null or exists (${stepOf(build.id)} and ${step.status} = 'stopped'))`;
+const BUILD_RUNNING = sql`exists (${stepOf(build.id)} and ${step.status} in ('pending', 'claimed'))`;
+const BUILD_FAILED = sql`((${build.errorMessage} is not null and ${build.errorMessage} <> '') or exists (${stepOf(build.id)} and ${step.status} = 'failed'))`;
+
+function olderThan(at: AnySQLiteColumn, id: AnySQLiteColumn, cursor: Cursor): SQL {
+  return or(lt(at, cursor.at), and(eq(at, cursor.at), lt(id, cursor.id))) as SQL;
+}
+
+function parseCursor(value: string): Cursor {
+  const match = /^(\d+):(.+)$/.exec(value);
+  if (match === null) throw new HttpError(400, `cursor ${value}`);
+  return { at: Number(match[1]), id: match[2] ?? '' };
+}
+
+function turnRows(
   db: Db,
   teamId: string,
-  threadId: string,
-  query: RunTurnsQuery,
-): RunTurnPage {
-  const thread = teamThread(db, threadId, teamId);
-  if (thread === undefined) throw new HttpError(404, `thread ${threadId}`);
-  const conditions: SQL[] = [eq(step.buildId, thread.id), eq(step.kind, 'chief')];
+  query: RunListQuery,
+  cursor: Cursor | null,
+): RunListRow[] {
+  const conditions: SQL[] = [
+    eq(step.kind, 'chief'),
+    eq(chiefThread.teamId, teamId),
+    VISIBLE_THREAD,
+    ...(query.thread === undefined ? [] : [eq(chiefThread.id, query.thread)]),
+  ];
   if (query.problems)
     conditions.push(
-      or(inArray(step.status, ['failed', 'stopped']), isNotNull(step.quotaBlock)) as SQL,
-    );
-  if (query.before !== undefined) {
-    const cursor = db
-      .select({ createdAt: step.createdAt })
-      .from(step)
-      .where(and(eq(step.id, query.before), eq(step.buildId, thread.id)))
-      .get();
-    if (cursor === undefined) throw new HttpError(404, `turn ${query.before}`);
-    conditions.push(
       or(
-        lt(step.createdAt, cursor.createdAt),
-        and(eq(step.createdAt, cursor.createdAt), lt(step.id, query.before)),
+        inArray(step.status, ['failed', 'stopped', 'waiting_quota']),
+        isNotNull(step.quotaBlock),
       ) as SQL,
     );
-  }
+  if (cursor !== null) conditions.push(olderThan(step.createdAt, step.id, cursor));
   const rows = db
-    .select()
+    .select({ row: step, source: project.name })
     .from(step)
+    .innerJoin(chiefThread, eq(chiefThread.id, step.buildId))
+    .leftJoin(project, eq(project.id, chiefThread.projectId))
     .where(and(...conditions))
     .orderBy(desc(step.createdAt), desc(step.id))
     .limit(query.limit + 1)
     .all();
-  const page = rows.slice(0, query.limit);
-  return {
-    turns: page.map((row) => {
-      const { start, end } = turnWindow(db, row);
-      const ownerId = row.ownerMessageIds?.[0] ?? row.id;
-      const owner = db
-        .select({ content: chiefMessage.content })
+  return rows.map(({ row, source }) => {
+    const threadId = row.buildId;
+    const { start, end } = turnWindow(db, row);
+    const ownerId = row.ownerMessageIds?.[0] ?? row.id;
+    const owner = db
+      .select({ content: chiefMessage.content })
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.threadId, threadId), eq(chiefMessage.id, ownerId)))
+      .get();
+    const toolCount =
+      db
+        .select({ n: sql<number>`count(*)` })
         .from(chiefMessage)
-        .where(and(eq(chiefMessage.threadId, thread.id), eq(chiefMessage.id, ownerId)))
-        .get();
-      const toolCount =
-        db
-          .select({ n: sql<number>`count(*)` })
-          .from(chiefMessage)
-          .where(
-            and(
-              eq(chiefMessage.threadId, thread.id),
-              gt(chiefMessage.createdAt, start),
-              lte(chiefMessage.createdAt, end),
-              sql`json_valid(${chiefMessage.content}) and json_extract(${chiefMessage.content}, '$.kind') = 'toolcall'`,
-            ),
-          )
-          .get()?.n ?? 0;
-      return {
-        stepId: row.id,
-        at: row.createdAt,
-        problem: problemOf(db, row),
-        firstLine: firstLineOf(
-          redactSecrets(owner === undefined ? '' : textOf(owner.content)).value as string,
-        ),
-        woke: parseChiefTrigger(row.prompt) !== 'user',
-        toolCount,
-        durationMs:
-          row.claimedAt !== null && row.finishedAt !== null ? row.finishedAt - row.claimedAt : null,
-      };
-    }),
-    nextCursor: rows.length > query.limit ? (page.at(-1)?.id ?? null) : null,
+        .where(
+          and(
+            eq(chiefMessage.threadId, threadId),
+            gt(chiefMessage.createdAt, start),
+            lte(chiefMessage.createdAt, end),
+            sql`json_valid(${chiefMessage.content}) and json_extract(${chiefMessage.content}, '$.kind') = 'toolcall'`,
+          ),
+        )
+        .get()?.n ?? 0;
+    return {
+      id: row.id,
+      kind: 'coordinator',
+      threadId,
+      at: row.createdAt,
+      status: turnStatus(db, row),
+      firstLine: firstLineOf(
+        redactSecrets(owner === undefined ? '' : textOf(owner.content)).value as string,
+      ),
+      woke: parseChiefTrigger(row.prompt) !== 'user',
+      source,
+      toolCount,
+      durationMs:
+        row.claimedAt !== null && row.finishedAt !== null ? row.finishedAt - row.claimedAt : null,
+    };
+  });
+}
+
+function buildStatus(
+  steps: readonly StepRow[],
+  owner: { stop: unknown; errorMessage: string | null },
+): RunStatus {
+  if (steps.some((s) => s.status === 'waiting_quota' || s.quotaBlock !== null)) return 'quota';
+  if (owner.stop !== null || steps.some((s) => s.status === 'stopped')) return 'stopped';
+  if (steps.some((s) => s.status === 'pending' || s.status === 'claimed')) return 'running';
+  if ((owner.errorMessage ?? '') !== '' || steps.some((s) => s.status === 'failed'))
+    return 'failed';
+  return 'done';
+}
+
+function taskRows(
+  db: Db,
+  teamId: string,
+  query: RunListQuery,
+  cursor: Cursor | null,
+): RunListRow[] {
+  const conditions: SQL[] = [eq(todo.teamId, teamId)];
+  if (query.problems)
+    conditions.push(
+      sql`(${BUILD_QUOTA} or ${BUILD_STOPPED} or (${BUILD_FAILED} and not ${BUILD_RUNNING}))`,
+    );
+  if (cursor !== null) conditions.push(olderThan(build.createdAt, build.id, cursor));
+  const rows = db
+    .select({
+      id: build.id,
+      at: build.createdAt,
+      stop: build.stop,
+      errorMessage: build.errorMessage,
+      title: todo.title,
+      source: project.name,
+    })
+    .from(build)
+    .innerJoin(todo, eq(todo.id, build.todoId))
+    .innerJoin(project, eq(project.id, todo.projectId))
+    .where(and(...conditions))
+    .orderBy(desc(build.createdAt), desc(build.id))
+    .limit(query.limit + 1)
+    .all();
+  return rows.map((row) => {
+    const steps = db.select().from(step).where(eq(step.buildId, row.id)).all();
+    const claims = steps.flatMap((s) => (s.claimedAt === null ? [] : [s.claimedAt]));
+    const finished = steps.length > 0 && steps.every((s) => s.finishedAt !== null);
+    const toolCount =
+      db
+        .select({ n: sql<number>`count(*)` })
+        .from(message)
+        .where(
+          and(
+            eq(message.conversationId, row.id),
+            sql`json_valid(${message.content}) and json_extract(${message.content}, '$.kind') = 'toolcall'`,
+          ),
+        )
+        .get()?.n ?? 0;
+    return {
+      id: row.id,
+      kind: 'task',
+      threadId: null,
+      at: row.at,
+      status: buildStatus(steps, row),
+      firstLine: firstLineOf(row.title),
+      woke: false,
+      source: row.source,
+      toolCount,
+      durationMs:
+        finished && claims.length > 0
+          ? Math.max(...steps.map((s) => s.finishedAt ?? 0)) - Math.min(...claims)
+          : null,
+    };
+  });
+}
+
+const newestFirst = (a: RunListRow, b: RunListRow) =>
+  b.at - a.at || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+
+export function listRuns(db: Db, teamId: string, query: RunListQuery): RunListPage {
+  if (query.thread !== undefined && teamThread(db, query.thread, teamId) === undefined)
+    throw new HttpError(404, `thread ${query.thread}`);
+  const cursor = query.before === undefined ? null : parseCursor(query.before);
+  const rows = [
+    ...turnRows(db, teamId, query, cursor),
+    ...(query.thread === undefined ? taskRows(db, teamId, query, cursor) : []),
+  ].sort(newestFirst);
+  const page = rows.slice(0, query.limit);
+  const last = page.at(-1);
+  return {
+    runs: page,
+    nextCursor: rows.length > query.limit && last !== undefined ? `${last.at}:${last.id}` : null,
   };
 }

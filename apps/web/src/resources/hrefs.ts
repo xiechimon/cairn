@@ -9,6 +9,6 @@ export const SKILLS_HREF = '/app/resources/skills';
 export const ROUTING_SETTINGS_HREF = '/app/resources/routing-settings';
 export const USAGE_PATH = '/app/usage';
 export const RUN_PATH_PREFIX = '/app/runs/';
-export const RUN_PATH = '/app/runs/:runId';
+export const RUN_PATH = '/app/runs/:runId?';
 export const COORDINATOR_ROUTE_ANCHOR = 'route-coordinator';
 export const COORDINATOR_ROUTING_HREF = `${settingsHref('routing')}#${COORDINATOR_ROUTE_ANCHOR}`;

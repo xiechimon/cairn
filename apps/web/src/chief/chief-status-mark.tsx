@@ -6,8 +6,8 @@ import { formatClock, useLiveSeconds } from '../components/chat/live-row.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { RunLogButton } from '../runs/run-log-button.js';
 import { turnRunIdOf } from '../runs/run-trace-link.js';
-import { RunTurnsTrigger } from '../runs/run-turns-popover.js';
 import { useQuestionPending } from './chief-question.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import {
@@ -166,7 +166,7 @@ export function StatusMarkFloat({
             </TooltipContent>
           </Tooltip>
         ) : (
-          <RunTurnsTrigger
+          <RunLogButton
             threadId={runs.threadId}
             state={name}
             tooltip={tooltip}
@@ -175,7 +175,7 @@ export function StatusMarkFloat({
             className="grid size-15.5 place-items-center"
           >
             {glyph}
-          </RunTurnsTrigger>
+          </RunLogButton>
         )}
         {live}
       </div>
@@ -198,7 +198,7 @@ export function StatusMarkFloat({
           {glyph}
         </div>
       ) : (
-        <RunTurnsTrigger
+        <RunLogButton
           threadId={runs.threadId}
           state={name}
           tooltip={tooltip}
@@ -207,7 +207,7 @@ export function StatusMarkFloat({
           className="grid size-11 place-items-center"
         >
           {glyph}
-        </RunTurnsTrigger>
+        </RunLogButton>
       )}
       <div
         aria-hidden="true"

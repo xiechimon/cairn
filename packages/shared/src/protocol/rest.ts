@@ -130,9 +130,9 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   },
   {
     method: 'GET',
-    path: '/api/teams/{id}/chief/threads/{tid}/turns',
-    query: ['limit', 'before', 'problems'],
-    note: 'RunTurnPage: the thread turns newest first, 20 a page, with a cursor; problems=1 keeps the turns that went wrong',
+    path: '/api/teams/{id}/runs',
+    query: ['thread', 'limit', 'before', 'problems'],
+    note: 'RunListPage: Coordinator turns of one thread (thread=) or of every team thread merged with task builds, newest first, 20 a page, with a cursor; problems=1 keeps failed, stopped and quota runs',
   },
   {
     method: 'GET',

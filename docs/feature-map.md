@@ -421,11 +421,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### run-log
 
-**Run log** (shipped). Every Coordinator turn and task run kept as a full trace: the run page (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls, previous/next turn and JSON export; reached from the Run log link on a failed or stopped turn, the Coordinator mark's turn list, or the task menu.
+**Run log** (shipped). Every Coordinator turn and task run kept as a full trace in one run window: a left list of runs (this conversation or every conversation and task run in the team, an optional problems filter) and the selected run's trace on the right (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls and JSON export; reached from the Coordinator mark, the Run log link on a failed or stopped turn, or the task menu.
 
 - Research: [docs/research/dsh-sig-walk-2026-11.md](research/dsh-sig-walk-2026-11.md)
 - Frontend design: [docs/design/references/coordinator-chat](design/references/coordinator-chat)
-- Backend design: [docs/design/run-trace.md](design/run-trace.md)
+- Backend design: [docs/design/run-trace.md](design/run-trace.md), [docs/design/run-log-window.md](design/run-log-window.md)
 
 ### tailnet-login
 

@@ -149,6 +149,12 @@
       "pattern": "\\bmergeVerdict\\b",
       "canary": "BuildDeps.mergeVerdict",
       "reason": "the unwired build dependency was removed; the retired merge-gate verdict settlement has no read-side hook on a build"
+    },
+    {
+      "id": "run-turn-list",
+      "pattern": "\\bchief/threads/(?::tid|\\{tid\\})/turns\\b|\\bturn list popover\\b",
+      "canary": "GET /api/teams/:id/chief/threads/:tid/turns",
+      "reason": "the run window lists runs through GET /api/teams/:id/runs; the Coordinator mark opens that window, not a popover"
     }
   ],
   "baseline": {
@@ -203,6 +209,7 @@
     "rule-ab-doc": {},
     "base-ui-theme-spec": {},
     "retired-design-rule-skills": {},
-    "hygiene-draft-release-deletion": {}
+    "hygiene-draft-release-deletion": {},
+    "run-turn-list": {}
   }
 }

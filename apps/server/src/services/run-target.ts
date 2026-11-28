@@ -12,6 +12,7 @@ export function teamBuild(db: Db, buildId: string, teamId: string) {
       title: todo.title,
       createdAt: build.createdAt,
       errorMessage: build.errorMessage,
+      stop: build.stop,
       failureCode: build.failureCode,
       failureDetail: build.failureDetail,
       prNumber: build.prNumber,

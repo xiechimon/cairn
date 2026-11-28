@@ -1,9 +1,10 @@
 import type { RunTrace, RunTraceItem } from '@cairn/shared';
-import { ChevronLeft, ChevronRight, Download, ScrollText, TriangleAlert } from 'lucide-react';
+import { ChevronLeft, Download, ScrollText, TriangleAlert } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
 import { useLiveData } from '../api/provider.js';
+import { useNarrow } from '../board/use-narrow.js';
 import { NoticeLine } from '../components/chat/notice-line.js';
 import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -23,7 +24,8 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import { fullText, isProblem, oneLine, type RunRow, runRows } from './run-items.js';
-import { downloadRunTrace, useRunLinkTo, useRunTrace } from './run-trace-api.js';
+import { RunList, type RunScope } from './run-list.js';
+import { downloadRunTrace, useRunLinkTo, useRunList, useRunTrace } from './run-trace-api.js';
 
 type ToolItem = Extract<RunTraceItem, { kind: 'tool' }>;
 
@@ -37,6 +39,7 @@ const STATUS_WORD: Record<string, string> = {
   pending: '尚未开始',
   claimed: '运行中',
   running: '运行中',
+  quota: '额度用尽',
 };
 
 function seconds(ms: number, t: TFunc): string {
@@ -303,33 +306,10 @@ function RunBody({ trace }: { trace: RunTrace }) {
 
 function RunActions({ trace }: { trace: RunTrace }) {
   const { t } = useI18n();
-  const navigate = useNavigate();
-  const linkTo = useRunLinkTo();
   const { live, teamId } = useLiveData();
   const [exporting, setExporting] = useState(false);
-  const step = (id: string | null, label: string, Icon: typeof ChevronLeft, testId: string) =>
-    trace.kind !== 'coordinator' ? null : (
-      <IconTooltip
-        label={label}
-        side="bottom"
-        trigger={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            data-testid={testId}
-            disabled={id === null}
-            className="text-content-tertiary hover:text-foreground pointer-coarse:size-11"
-            onClick={() => id !== null && navigate(linkTo(id), { replace: true })}
-          />
-        }
-      >
-        <Icon />
-      </IconTooltip>
-    );
   return (
     <div className="desktop-titlebar-no-drag flex items-center gap-1">
-      {step(trace.previousId, t('上一轮'), ChevronLeft, 'run-previous')}
-      {step(trace.nextId, t('下一轮'), ChevronRight, 'run-next')}
       <IconTooltip
         label={t('导出')}
         side="bottom"
@@ -356,48 +336,119 @@ function RunActions({ trace }: { trace: RunTrace }) {
   );
 }
 
-export function RunPage() {
+function TracePane({ query }: { query: ReturnType<typeof useRunTrace> }) {
   const { t } = useI18n();
-  const { runId = '' } = useParams();
-  const query = useRunTrace(runId);
   const trace = query.data;
   const missing = query.error instanceof ApiError && query.error.status === 404;
+  if (trace !== undefined) return <RunBody key={trace.id} trace={trace} />;
+  if (missing)
+    return (
+      <EmptyState
+        testId="run-missing"
+        icon={ScrollText}
+        title={t('找不到这条运行记录')}
+        className="h-full"
+      />
+    );
+  if (query.isError)
+    return (
+      <EmptyState
+        testId="run-error"
+        icon={TriangleAlert}
+        title={t('未能加载运行记录')}
+        action={{
+          label: t('重试'),
+          onClick: () => void query.refetch(),
+          disabled: query.isFetching,
+        }}
+        className="h-full"
+      />
+    );
+  return (
+    <div className="flex flex-col gap-3" aria-busy="true">
+      <span role="status" className="sr-only">
+        {t('正在加载运行记录…')}
+      </span>
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-16 w-full" />
+      <Skeleton className="h-6 w-2/3" />
+      <Skeleton className="h-6 w-3/5" />
+    </div>
+  );
+}
+
+export function RunPage() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const linkTo = useRunLinkTo();
+  const narrow = useNarrow();
+  const { runId = null } = useParams();
+  const [params] = useSearchParams();
+  const problems = params.get('problems') === '1';
+  const picked = useRunTrace(runId);
+  const threadId = params.get('thread') ?? picked.data?.threadId ?? null;
+  const threadSettled = params.has('thread') || runId === null || !picked.isPending;
+  const scope: RunScope = threadId === null || params.get('scope') === 'all' ? 'all' : 'thread';
+  const list = useRunList(scope === 'all' ? null : threadId, problems, threadSettled);
+  const firstId = list.data?.pages[0]?.runs[0]?.id ?? null;
+  const fallback = useRunTrace(runId === null && !narrow ? firstId : null);
+  const shown = runId === null ? fallback : picked;
+  const selectedId = runId ?? (narrow ? null : firstId);
+  const threadEmpty = runId === null && !problems && list.isSuccess && firstId === null;
+  const team = useRunList(null, false, threadEmpty && scope === 'thread');
+  const nothing =
+    threadEmpty && (scope === 'all' || (team.isSuccess && team.data.pages[0]?.runs.length === 0));
+  const rowLink = (id: string | null, change: Parameters<typeof linkTo>[1] = {}) =>
+    linkTo(id, { thread: threadId, ...change });
+  const reshape = (change: Parameters<typeof linkTo>[1]) =>
+    navigate(rowLink(runId ?? selectedId, change), { replace: true });
+  const showList = !narrow || runId === null;
+  const showTrace = !narrow || runId !== null;
   return (
     <RouteDialog
-      title={trace?.title ?? t('运行记录')}
+      title={(showTrace ? shown.data?.title : undefined) ?? t('运行记录')}
       size="page"
-      {...(trace === undefined ? {} : { actions: <RunActions trace={trace} /> })}
+      bleed
+      {...(showTrace && shown.data !== undefined
+        ? { actions: <RunActions trace={shown.data} /> }
+        : {})}
     >
-      {trace !== undefined ? (
-        <RunBody key={trace.id} trace={trace} />
-      ) : missing ? (
-        <EmptyState
-          testId="run-missing"
-          icon={ScrollText}
-          title={t('找不到这条运行记录')}
-          className="h-full"
-        />
-      ) : query.isError ? (
-        <EmptyState
-          testId="run-error"
-          icon={TriangleAlert}
-          title={t('未能加载运行记录')}
-          action={{
-            label: t('重试'),
-            onClick: () => void query.refetch(),
-            disabled: query.isFetching,
-          }}
-          className="h-full"
-        />
+      {nothing ? (
+        <p className="m-0 px-4 pt-4 text-ui text-content-secondary" data-testid="run-list-nothing">
+          {t('暂无运行记录')}
+        </p>
       ) : (
-        <div className="flex flex-col gap-3" aria-busy="true">
-          <span role="status" className="sr-only">
-            {t('正在加载运行记录…')}
-          </span>
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-6 w-2/3" />
-          <Skeleton className="h-6 w-3/5" />
+        <div className="flex h-full min-h-0">
+          {showList && (
+            <RunList
+              query={list}
+              scope={scope}
+              scopes={threadId !== null}
+              problems={problems}
+              selectedId={selectedId}
+              linkTo={(id) => rowLink(id)}
+              onScope={(next) => reshape({ scope: next === 'all' ? 'all' : null })}
+              onProblems={(next) => reshape({ problems: next ? '1' : null })}
+              className={narrow ? 'w-full' : 'w-80 flex-none border-r border-border'}
+            />
+          )}
+          {showTrace && (
+            <div className="min-h-0 min-w-0 flex-auto overflow-y-auto px-4 pt-4 pb-5">
+              <div className="mx-auto flex w-full max-w-192 flex-col gap-3">
+                {narrow && (
+                  <Link
+                    to={rowLink(null)}
+                    data-testid="run-back"
+                    className="-ml-1 flex w-fit items-center gap-1 rounded-md px-1 text-meta text-content-secondary outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-11"
+                  >
+                    <ChevronLeft className="size-4" />
+                    {t('运行记录')}
+                  </Link>
+                )}
+                {(runId !== null || firstId !== null) && <TracePane query={shown} />}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </RouteDialog>

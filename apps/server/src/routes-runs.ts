@@ -1,10 +1,10 @@
-import { runTurnsQuerySchema } from '@cairn/shared';
+import { runListQuerySchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { attachmentDownloadDisposition } from './lib/attachment-disposition.js';
 import { parseWith } from './lib/errors.js';
 import { requireTeam } from './routes-helpers.js';
-import { listRunTurns, readRunTrace } from './services/run-trace.js';
+import { listRuns, readRunTrace } from './services/run-trace.js';
 
 const NO_STORE = { 'cache-control': 'no-store' };
 
@@ -24,12 +24,13 @@ export function registerRunRoutes(app: Hono, ctx: AppContext): void {
     });
   });
 
-  app.get('/api/teams/:id/chief/threads/:tid/turns', (c) => {
+  app.get('/api/teams/:id/runs', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const query = parseWith(runTurnsQuerySchema, c.req.query(), 'turns query');
+    const query = parseWith(runListQuerySchema, c.req.query(), 'runs query');
     return c.json(
-      listRunTurns(ctx.db, teamId, c.req.param('tid'), {
+      listRuns(ctx.db, teamId, {
+        thread: query.thread,
         limit: query.limit,
         before: query.before,
         problems: query.problems === '1',

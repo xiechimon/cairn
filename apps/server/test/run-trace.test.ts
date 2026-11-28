@@ -1,9 +1,10 @@
 import {
   RUN_TRACE_VALUE_CAP,
+  type RunListPage,
   type RunTrace,
-  type RunTurnPage,
   transcriptPromptRowId,
 } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
   build,
@@ -162,8 +163,6 @@ describe('run trace', () => {
       id: 'turn-b',
       threadId: H.threadId,
       status: 'failed',
-      previousId: 'turn-a',
-      nextId: 'turn-c',
       models: ['stub-gw/stub-model'],
       usage: { input: 40, output: 5 },
       failure: { text: 'Runner error: ENOSPC', itemId: 'call_b2' },
@@ -198,8 +197,6 @@ describe('run trace', () => {
     expect(a).toMatchObject({
       title: '看看项目',
       failure: null,
-      previousId: null,
-      nextId: 'turn-b',
     });
     const b = await getJson<RunTrace>(`/api/teams/${H.teamId}/runs/turn-b`);
     expect(b.items.filter((i) => i.kind === 'tool').map((i) => i.id)).toEqual([
@@ -279,10 +276,8 @@ describe('run trace', () => {
     const q = await getJson<RunTrace>(`/api/teams/${H.teamId}/runs/turn-q`);
     expect(q).toMatchObject({ startedAt: T0 + 10_000, finishedAt: null });
     expect(q.items.filter((i) => i.kind === 'tool')).toEqual([]);
-    const list = await getJson<RunTurnPage>(
-      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/turns`,
-    );
-    expect(list.turns.map((t) => [t.stepId, t.toolCount])).toEqual([
+    const list = await getJson<RunListPage>(`/api/teams/${H.teamId}/runs?thread=${H.threadId}`);
+    expect(list.runs.map((r) => [r.id, r.toolCount])).toEqual([
       ['turn-r', 1],
       ['turn-q', 0],
       ['turn-p', 1],
@@ -293,7 +288,7 @@ describe('run trace', () => {
     seedTurns();
     const trace = await getJson<RunTrace>(`/api/teams/${H.teamId}/runs/turn-c`);
     expect(trace.items.map((i) => i.kind)).toEqual(['user', 'thinking', 'reply']);
-    expect(trace.nextId).toBeNull();
+    expect(trace.finishedAt).toBeNull();
   });
 
   test('a task build reads as one run with its steps, tools, thinking and failure', async () => {
@@ -404,12 +399,10 @@ describe('run trace', () => {
     await getJson(`/api/teams/${H.teamId}/runs/turn-a`);
     for (const id of ['turn-theirs', 'chief-other', H.threadId, 'no-such-run'])
       await getJson(`/api/teams/${H.teamId}/runs/${id}`, 404);
-    await getJson(`/api/teams/${H.teamId}/chief/threads/${H.threadId}/turns`);
-    await getJson(`/api/teams/${H.teamId}/chief/threads/chief-other/turns`, 404);
-    await getJson(
-      `/api/teams/${H.teamId}/chief/threads/${H.threadId}/turns?before=turn-theirs`,
-      404,
-    );
+    await getJson(`/api/teams/${H.teamId}/runs?thread=${H.threadId}`);
+    await getJson(`/api/teams/${H.teamId}/runs?thread=chief-other`, 404);
+    const all = await getJson<RunListPage>(`/api/teams/${H.teamId}/runs`);
+    expect(all.runs.map((r) => r.id)).not.toContain('turn-theirs');
   });
 
   test('a reply or thought that starts with blank lines reads without the leading gap', async () => {
@@ -455,23 +448,25 @@ describe('run trace', () => {
       .insert(chiefMessage)
       .values(chiefRow('owner-t44', T0 + 44_000, 'user', '最后一条\n第二行'))
       .run();
-    const base = `/api/teams/${H.teamId}/chief/threads/${H.threadId}/turns`;
-    const first = await getJson<RunTurnPage>(base);
-    expect(first.turns).toHaveLength(20);
-    expect(first.turns[0]).toMatchObject({
-      stepId: 't44',
-      problem: 'quota',
+    const base = `/api/teams/${H.teamId}/runs?thread=${H.threadId}`;
+    const first = await getJson<RunListPage>(base);
+    expect(first.runs).toHaveLength(20);
+    expect(first.runs[0]).toMatchObject({
+      id: 't44',
+      kind: 'coordinator',
+      threadId: H.threadId,
+      status: 'quota',
       firstLine: '最后一条',
       woke: false,
       durationMs: 4_990,
     });
-    const second = await getJson<RunTurnPage>(`${base}?before=${first.nextCursor}`);
-    expect(second.turns[0]?.stepId).toBe('t24');
-    const third = await getJson<RunTurnPage>(`${base}?before=${second.nextCursor}`);
-    expect(third.turns.map((t) => t.stepId)).toEqual(['t04', 't03', 't02', 't01', 't00']);
+    const second = await getJson<RunListPage>(`${base}&before=${first.nextCursor}`);
+    expect(second.runs[0]?.id).toBe('t24');
+    const third = await getJson<RunListPage>(`${base}&before=${second.nextCursor}`);
+    expect(third.runs.map((r) => r.id)).toEqual(['t04', 't03', 't02', 't01', 't00']);
     expect(third.nextCursor).toBeNull();
-    const problems = await getJson<RunTurnPage>(`${base}?problems=1`);
-    expect(problems.turns.map((t) => [t.stepId, t.problem])).toEqual([
+    const problems = await getJson<RunListPage>(`${base}&problems=1`);
+    expect(problems.runs.map((r) => [r.id, r.status])).toEqual([
       ['t44', 'quota'],
       ['t37', 'stopped'],
       ['t36', 'failed'],
@@ -484,5 +479,185 @@ describe('run trace', () => {
       ['t01', 'stopped'],
       ['t00', 'failed'],
     ]);
+  });
+  test('全部 merges every team thread with task runs newest first, pages across both without gaps, and skips hidden or foreign threads', async () => {
+    const thread = (id: string, over: Partial<typeof chiefThread.$inferInsert> = {}) => ({
+      id,
+      chiefId: `chief-of-${id}`,
+      userId: H.userId,
+      teamId: H.teamId,
+      title: id,
+      createdAt: T0,
+      updatedAt: T0,
+      sessionRuntime: 'pi',
+      sessionId: '',
+      sessionOpenedAt: T0,
+      toolDefHashes: {},
+      toolResultHashes: {},
+      ...over,
+    });
+    seedOtherTeam();
+    H.s.db
+      .insert(chiefThread)
+      .values([
+        thread('chief-channel', { projectId: H.projectId }),
+        thread('chief-archived', { archivedAt: T0 }),
+        thread('chief-digest-x'),
+        thread('chief-memory-x'),
+      ])
+      .run();
+    H.s.db
+      .insert(todo)
+      .values({
+        id: 'todo-r',
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: '修复设置页 390 宽度下的横向滚动',
+        phaseAt: T0,
+        seqNum: 7,
+      })
+      .run();
+    H.s.db
+      .insert(build)
+      .values([
+        {
+          id: 'b-done',
+          todoId: 'todo-r',
+          withPlan: false,
+          triggerSource: 'user',
+          createdAt: T0 + 3_000,
+        },
+        {
+          id: 'b-live',
+          todoId: 'todo-r',
+          withPlan: false,
+          triggerSource: 'user',
+          createdAt: T0 + 5_000,
+        },
+        {
+          id: 'b-fail',
+          todoId: 'todo-r',
+          withPlan: false,
+          triggerSource: 'user',
+          errorMessage: 'push failed',
+          createdAt: T0 + 1_000,
+        },
+      ])
+      .run();
+    H.s.db
+      .insert(step)
+      .values([
+        chiefStep('m-1', T0 + 1_000, { status: 'failed' }),
+        chiefStep('m-run', T0 + 6_000, { status: 'claimed', finishedAt: null }),
+        chiefStep('c-1', T0 + 2_000, { buildId: 'chief-channel' }),
+        chiefStep('a-1', T0 + 4_000, { buildId: 'chief-archived', status: 'stopped' }),
+        chiefStep('c-2', T0 + 3_000, { buildId: 'chief-channel' }),
+        chiefStep('d-1', T0 + 4_500, { buildId: 'chief-digest-x' }),
+        chiefStep('mem-1', T0 + 4_550, { buildId: 'chief-memory-x' }),
+        chiefStep('gone-1', T0 + 4_600, { buildId: 'chief-deleted' }),
+        {
+          id: 'bs-done',
+          buildId: 'b-done',
+          kind: 'build',
+          status: 'done',
+          createdAt: T0 + 3_000,
+          claimedAt: T0 + 3_100,
+          finishedAt: T0 + 9_100,
+        },
+        {
+          id: 'bs-live',
+          buildId: 'b-live',
+          kind: 'build',
+          status: 'claimed',
+          createdAt: T0 + 5_000,
+          claimedAt: T0 + 5_100,
+        },
+        {
+          id: 'bs-fail',
+          buildId: 'b-fail',
+          kind: 'build',
+          status: 'failed',
+          createdAt: T0 + 1_000,
+          claimedAt: T0 + 1_100,
+          finishedAt: T0 + 2_000,
+        },
+      ])
+      .run();
+    H.s.db
+      .insert(message)
+      .values(
+        ['tc-x', 'tc-y'].map((id, n) => ({
+          id,
+          conversationId: 'b-done',
+          role: 'assistant' as const,
+          content: {
+            kind: 'toolcall',
+            call: { id, name: 'Bash', arguments: {}, result: '', isError: false },
+          },
+          createdAt: T0 + 3_200 + n,
+        })),
+      )
+      .run();
+    const base = `/api/teams/${H.teamId}/runs`;
+    const all = await getJson<RunListPage>(base);
+    expect(all.runs.map((r) => [r.id, r.kind, r.status])).toEqual([
+      ['m-run', 'coordinator', 'running'],
+      ['b-live', 'task', 'running'],
+      ['a-1', 'coordinator', 'stopped'],
+      ['c-2', 'coordinator', 'done'],
+      ['b-done', 'task', 'done'],
+      ['c-1', 'coordinator', 'done'],
+      ['m-1', 'coordinator', 'failed'],
+      ['b-fail', 'task', 'failed'],
+    ]);
+    expect(all.runs.find((r) => r.id === 'b-done')).toMatchObject({
+      threadId: null,
+      firstLine: '修复设置页 390 宽度下的横向滚动',
+      source: 'demo',
+      toolCount: 2,
+      durationMs: 6_000,
+    });
+    expect(all.runs.find((r) => r.id === 'm-run')).toMatchObject({
+      durationMs: null,
+      source: null,
+    });
+    expect(all.runs.find((r) => r.id === 'c-1')).toMatchObject({
+      threadId: 'chief-channel',
+      source: 'demo',
+    });
+    const pages: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page: RunListPage = await getJson<RunListPage>(
+        `${base}?limit=2${cursor === null ? '' : `&before=${cursor}`}`,
+      );
+      expect(page.runs.length).toBeLessThanOrEqual(2);
+      pages.push(...page.runs.map((r) => r.id));
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    expect(pages).toEqual(all.runs.map((r) => r.id));
+    const problems = await getJson<RunListPage>(`${base}?problems=1`);
+    expect(problems.runs.map((r) => r.id)).toEqual(['a-1', 'm-1', 'b-fail']);
+    const mine = await getJson<RunListPage>(`${base}?thread=${H.threadId}`);
+    expect(mine.runs.map((r) => r.id)).toEqual(['m-run', 'm-1']);
+    for (const internal of ['chief-digest-x', 'chief-memory-x'])
+      expect((await getJson<RunListPage>(`${base}?thread=${internal}`)).runs).toEqual([]);
+    expect((await getJson<{ status: string }>(`/api/teams/${H.teamId}/runs/b-fail`)).status).toBe(
+      'failed',
+    );
+    expect((await getJson<{ status: string }>(`/api/teams/${H.teamId}/runs/m-run`)).status).toBe(
+      'running',
+    );
+    const head = await getJson<RunListPage>(`${base}?limit=3`);
+    expect(head.runs.at(-1)?.id).toBe('a-1');
+    H.s.db.delete(step).where(eq(step.id, 'a-1')).run();
+    const rest = await getJson<RunListPage>(`${base}?limit=3&before=${head.nextCursor}`);
+    expect(rest.runs.map((r) => r.id)).toEqual(['c-2', 'b-done', 'c-1']);
+    await getJson(`${base}?before=a-1`, 400);
+  });
+
+  test('a team with no runs gets an empty first page', async () => {
+    const empty = await getJson<RunListPage>(`/api/teams/${H.teamId}/runs`);
+    expect(empty).toEqual({ runs: [], nextCursor: null });
   });
 });

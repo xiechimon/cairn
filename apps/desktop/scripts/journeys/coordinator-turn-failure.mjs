@@ -38,9 +38,9 @@ async function openRunLog(window, mode, evidenceDir) {
   await window.keyboard.press('Escape');
   await window.getByTestId('run-page').waitFor({ state: 'detached', timeout: 30_000 });
   await window.getByTestId('chief-status-mark-button').first().click();
-  const turn = window.getByTestId('run-turns').locator('a[data-run-turn]').first();
+  const turn = window.getByTestId('run-list').locator('a[data-run-row]').first();
   await turn.waitFor({ timeout: 30_000 });
-  await turn.click();
+  assert.equal(await turn.getAttribute('aria-current'), 'page', 'the newest turn is selected');
   await window.getByTestId('run-page').waitFor({ timeout: 30_000 });
   await window.keyboard.press('Escape');
 }

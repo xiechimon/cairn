@@ -50,8 +50,6 @@ export const runTraceSchema = z.object({
   finishedAt: at.nullable(),
   models: z.array(z.string()),
   usage: runUsageSchema,
-  previousId: z.string().nullable(),
-  nextId: z.string().nullable(),
   failure: z.object({ text: z.string(), itemId: z.string().nullable() }).nullable(),
   items: z.array(runTraceItemSchema),
 });
@@ -59,30 +57,35 @@ export const runTraceSchema = z.object({
 export const RUN_TRACE_VALUE_CAP = 4_000;
 export type RunTrace = z.infer<typeof runTraceSchema>;
 
-export const RUN_TURN_PROBLEMS = ['failed', 'stopped', 'quota'] as const;
-export type RunTurnProblem = (typeof RUN_TURN_PROBLEMS)[number];
+export const RUN_STATUSES = ['running', 'done', 'failed', 'stopped', 'quota'] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];
+export const RUN_PROBLEM_STATUSES: readonly RunStatus[] = ['failed', 'stopped', 'quota'];
 
-export const runTurnRowSchema = z.object({
-  stepId: z.string(),
+export const runListRowSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['coordinator', 'task']),
+  threadId: z.string().nullable(),
   at,
-  problem: z.enum(RUN_TURN_PROBLEMS).nullable(),
+  status: z.enum(RUN_STATUSES),
   firstLine: z.string(),
   woke: z.boolean(),
+  source: z.string().nullable(),
   toolCount: z.number().int(),
   durationMs: z.number().int().nullable(),
 });
-export type RunTurnRow = z.infer<typeof runTurnRowSchema>;
+export type RunListRow = z.infer<typeof runListRowSchema>;
 
-export const runTurnPageSchema = z.object({
-  turns: z.array(runTurnRowSchema),
+export const runListPageSchema = z.object({
+  runs: z.array(runListRowSchema),
   nextCursor: z.string().nullable(),
 });
-export type RunTurnPage = z.infer<typeof runTurnPageSchema>;
+export type RunListPage = z.infer<typeof runListPageSchema>;
 
-export const RUN_TURN_PAGE_SIZE = 20;
+export const RUN_LIST_PAGE_SIZE = 20;
 
-export const runTurnsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).default(RUN_TURN_PAGE_SIZE),
+export const runListQuerySchema = z.object({
+  thread: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(RUN_LIST_PAGE_SIZE),
   before: z.string().min(1).optional(),
   problems: z.enum(['0', '1']).default('0'),
 });

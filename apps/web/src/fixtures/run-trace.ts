@@ -1,4 +1,4 @@
-import type { RunTrace, RunTraceItem, RunTurnRow } from '@cairn/shared';
+import type { RunListRow, RunTrace, RunTraceItem } from '@cairn/shared';
 import { chiefThread } from './chief.js';
 import type { ChiefContent, FixtureSet } from './records.js';
 
@@ -78,8 +78,6 @@ const failedTrace: RunTrace = {
   finishedAt: base + 7_000,
   models: ['claude-sonnet-5'],
   usage: { input: 18_400, output: 1_250, cacheRead: 12_000, cacheWrite: 0 },
-  previousId: 'turn-a',
-  nextId: 'turn-s',
   failure: { text: 'Runner error: ENOSPC', itemId: 'call_write' },
   items: failedItems,
 };
@@ -89,8 +87,6 @@ const doneTrace: RunTrace = {
   id: 'turn-a',
   title: '帮 r3-lifecycle 写一份 CONTRIBUTING.md 贡献指南',
   status: 'done',
-  previousId: null,
-  nextId: 'turn-b',
   failure: null,
   startedAt: base - HOUR,
   finishedAt: base - HOUR + 4_000,
@@ -122,8 +118,6 @@ const stoppedTrace: RunTrace = {
   id: 'turn-s',
   title: '顺便检查一下 README',
   status: 'stopped',
-  previousId: 'turn-b',
-  nextId: null,
   failure: null,
   startedAt: base + HOUR / 2,
   finishedAt: base + HOUR / 2 + 2_000,
@@ -134,47 +128,113 @@ const stoppedTrace: RunTrace = {
   ],
 };
 
+const taskTrace: RunTrace = {
+  kind: 'task',
+  id: 'build-r',
+  title: '#12 修复设置页 390 宽度下的横向滚动',
+  threadId: null,
+  todoId: 'todo-r',
+  status: 'done',
+  startedAt: base - HOUR / 2,
+  finishedAt: base - HOUR / 2 + 660_000,
+  models: ['claude-sonnet-5'],
+  usage: { input: 52_000, output: 4_100, cacheRead: 30_000, cacheWrite: 0 },
+  failure: null,
+  items: [
+    { kind: 'step', id: 'step-build-r', at: base - HOUR / 2, stepKind: 'build', status: 'done' },
+    {
+      kind: 'prompt',
+      id: 'user-build-r',
+      at: base - HOUR / 2 + 100,
+      text: '修复设置页 390 宽度下的横向滚动',
+    },
+    tool(
+      'call_r1',
+      base - HOUR / 2 + 1_000,
+      'bash',
+      { command: 'rg -n overflow-x apps/web/src/settings' },
+      'settings-list.tsx:41',
+    ),
+    {
+      kind: 'reply',
+      id: 'msg-build-r-1',
+      at: base - HOUR / 2 + 660_000,
+      text: '去掉了设置列表的固定最小宽度，390 下不再横向滚动。',
+    },
+  ],
+};
+
 const DAY = 24 * HOUR;
 const LINES = ['看一下今天的任务', '把测试跑一遍', '整理 issue 列表', '更新依赖', '回顾昨天的改动'];
+const THREAD = 'thread-run-trace';
 
-const olderTurns: RunTurnRow[] = Array.from({ length: 22 }, (_, n) => ({
-  stepId: `turn-old-${n}`,
-  at: base - DAY * (n < 4 ? 1 : 2) - n * HOUR,
-  problem: n % 5 === 2 ? ('failed' as const) : n % 7 === 3 ? ('quota' as const) : null,
-  firstLine: n % 6 === 4 ? '' : (LINES[n % LINES.length] ?? ''),
-  woke: n % 6 === 4,
-  toolCount: (n * 3) % 9,
-  durationMs: 4_000 + n * 500,
-}));
+const turn = (row: Partial<RunListRow> & Pick<RunListRow, 'id' | 'at'>): RunListRow => ({
+  kind: 'coordinator',
+  threadId: THREAD,
+  status: 'done',
+  firstLine: '',
+  woke: false,
+  source: null,
+  toolCount: 0,
+  durationMs: 4_000,
+  ...row,
+});
 
-const runTurns: RunTurnRow[] = [
-  {
-    stepId: 'turn-s',
+const olderTurns: RunListRow[] = Array.from({ length: 22 }, (_, n) =>
+  turn({
+    id: `turn-old-${n}`,
+    at: base - DAY * (n < 4 ? 1 : 2) - n * HOUR,
+    status: n % 5 === 2 ? 'failed' : n % 7 === 3 ? 'quota' : 'done',
+    firstLine: n % 6 === 4 ? '' : (LINES[n % LINES.length] ?? ''),
+    woke: n % 6 === 4,
+    toolCount: (n * 3) % 9,
+    durationMs: 4_000 + n * 500,
+  }),
+);
+
+const runs: RunListRow[] = [
+  turn({
+    id: 'turn-s',
     at: stoppedTrace.startedAt,
-    problem: 'stopped',
+    status: 'stopped',
     firstLine: stoppedTrace.title,
-    woke: false,
-    toolCount: 0,
     durationMs: 2_000,
-  },
-  {
-    stepId: 'turn-b',
+  }),
+  turn({
+    id: 'turn-b',
     at: failedTrace.startedAt,
-    problem: 'failed',
+    status: 'failed',
     firstLine: failedTrace.title,
-    woke: false,
     toolCount: 5,
     durationMs: 7_000,
-  },
+  }),
+  turn({
+    id: 'turn-channel',
+    threadId: 'thread-channel',
+    at: failedTrace.startedAt - HOUR / 3,
+    firstLine: '这个项目的发布说明写到哪了',
+    source: 'r3-lifecycle',
+    toolCount: 2,
+    durationMs: 48_000,
+  }),
   {
-    stepId: 'turn-a',
-    at: doneTrace.startedAt,
-    problem: null,
-    firstLine: doneTrace.title,
+    id: 'build-r',
+    kind: 'task',
+    threadId: null,
+    at: taskTrace.startedAt,
+    status: 'done',
+    firstLine: '修复设置页 390 宽度下的横向滚动',
     woke: false,
+    source: 'r3-lifecycle',
     toolCount: 1,
-    durationMs: 4_000,
+    durationMs: 660_000,
   },
+  turn({
+    id: 'turn-a',
+    at: doneTrace.startedAt,
+    firstLine: doneTrace.title,
+    toolCount: 1,
+  }),
   ...olderTurns,
 ];
 
@@ -183,7 +243,7 @@ export const RUN_TRACE_SCENARIOS: Record<string, FixtureSet> = {
     ...chiefThread,
     chief: {
       ...settled,
-      threadId: 'thread-run-trace',
+      threadId: THREAD,
       stream: [
         ...(settled.stream ?? []),
         { kind: 'user', text: '再把 CONTRIBUTING.md 的验收部分补全', id: 'user-turn-b' },
@@ -192,7 +252,18 @@ export const RUN_TRACE_SCENARIOS: Record<string, FixtureSet> = {
         { kind: 'stopped', todos: [], id: 'chief-stop-turn-s' },
       ],
     },
-    runTurns,
-    runTraces: { 'turn-a': doneTrace, 'turn-b': failedTrace, 'turn-s': stoppedTrace },
+    runs,
+    runTraces: {
+      'turn-a': doneTrace,
+      'turn-b': failedTrace,
+      'turn-s': stoppedTrace,
+      'build-r': taskTrace,
+    },
+  },
+  'run-trace-empty': {
+    ...chiefThread,
+    chief: { ...settled, threadId: THREAD, stream: settled.stream ?? [] },
+    runs: [],
+    runTraces: {},
   },
 };

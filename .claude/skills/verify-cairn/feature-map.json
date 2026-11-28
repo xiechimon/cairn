@@ -1856,8 +1856,8 @@
     {
       "id": "run-log",
       "name": "Run log",
-      "summary": "Every Coordinator turn and task run kept as a full trace: the run page (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls, previous/next turn and JSON export; reached from the Run log link on a failed or stopped turn, the Coordinator mark's turn list, or the task menu.",
-      "states": "Loading skeleton, not found, failed to load with retry, a done turn, a failed turn with a failing tool and a recovered tool error, a stopped turn, a task build, a long tool output shortened with the export holding the full text; the turn list with problems only (default) or all, grouped today, yesterday and earlier, empty, paging on scroll, failed page with retry; the one-time hint beside the mark; desktop and 390px, light and dark.",
+      "summary": "Every Coordinator turn and task run kept as a full trace in one run window: a left list of runs (this conversation or every conversation and task run in the team, an optional problems filter) and the selected run's trace on the right (prompt, thinking, each tool call with arguments and output, replies, errors) with the failure up front, folded quiet tool calls and JSON export; reached from the Coordinator mark, the Run log link on a failed or stopped turn, or the task menu.",
+      "states": "Loading skeleton, not found, failed to load with retry, a done turn, a failed turn with a failing tool and a recovered tool error, a stopped turn, a task build, a long tool output shortened with the export holding the full text; the run list on this conversation or all, problems filter off (default) or on, grouped today, yesterday and by date, no runs at all, no problem runs, paging on scroll, failed page with retry; the one-time hint beside the mark; desktop two columns and 390px list then trace with a back link, light and dark.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1872,11 +1872,11 @@
       },
       "routes": {
         "web": [
-          "/app/runs/:runId"
+          "/app/runs/:runId?"
         ],
         "server": [
           "/api/teams/:id/runs/:runId",
-          "/api/teams/:id/chief/threads/:tid/turns"
+          "/api/teams/:id/runs"
         ]
       },
       "reach": [
@@ -1891,7 +1891,8 @@
         "docs/design/references/coordinator-chat"
       ],
       "backendDesign": [
-        "docs/design/run-trace.md"
+        "docs/design/run-trace.md",
+        "docs/design/run-log-window.md"
       ],
       "evidence": [
         "apps/web/e2e/run-trace.spec.ts",
