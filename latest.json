@@ -2,8 +2,8 @@
   "version": 1,
   "dataset": "cairn-eval-suite",
   "suiteVersion": 1,
-  "date": "2026-11-27T21:16:40.527Z",
-  "sha": "60a4b7339bcdbcec551b68ba65f164a3ddfcd58d",
+  "date": "2026-11-28T02:34:49.953Z",
+  "sha": "338fe19b30266c2bb26b0139dfcbc5a4d57b95d0",
   "status": "ok",
   "summary": {
     "total": 96,
@@ -40,7 +40,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "add-fn",
@@ -50,7 +50,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "add-test",
@@ -60,7 +60,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "bump-version",
@@ -70,7 +70,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "comment",
@@ -80,7 +80,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "fix-bug",
@@ -90,7 +90,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "fix-typo",
@@ -100,7 +100,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "gitignore",
@@ -110,7 +110,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "rename-var",
@@ -120,7 +120,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "write-doc",
@@ -130,7 +130,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "Devin CLI · model not recorded"
+      "model": "Devin CLI · swe-2-high"
     },
     {
       "caseId": "answer-read-01",
@@ -140,7 +140,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "answer-read-02",
@@ -150,7 +150,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "answer-read-03",
@@ -160,7 +160,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "answer-read-04",
@@ -170,7 +170,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "ask-ambiguous-01",
@@ -180,7 +180,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "ask-ambiguous-02",
@@ -190,7 +190,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "ask-ambiguous-03",
@@ -200,7 +200,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "ask-ambiguous-04",
@@ -210,7 +210,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "contract-bad-call-01",
@@ -220,7 +220,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "contract-repair-01",
@@ -230,7 +230,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "event-failed",
@@ -240,7 +240,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "event-review",
@@ -250,7 +250,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "event-settle",
@@ -260,7 +260,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "prompt-contract-01",
@@ -270,7 +270,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "prompt-contract-02",
@@ -280,7 +280,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "prompt-contract-03",
@@ -290,7 +290,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-deps-01",
@@ -300,7 +300,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-deps-02",
@@ -310,7 +310,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-deps-03",
@@ -320,7 +320,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-single-01",
@@ -330,7 +330,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-single-02",
@@ -340,7 +340,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-single-03",
@@ -350,7 +350,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-single-04",
@@ -360,7 +360,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-single-05",
@@ -370,7 +370,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-split-01",
@@ -380,7 +380,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-split-02",
@@ -390,7 +390,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-split-03",
@@ -400,7 +400,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "route-split-04",
@@ -410,7 +410,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 3,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "canary-answer",
@@ -420,7 +420,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     },
     {
       "caseId": "canary-route",
@@ -430,7 +430,7 @@
       "failed": 0,
       "incomplete": 0,
       "trials": 1,
-      "model": "fauxProvider replay"
+      "model": "Recorded replay"
     }
   ]
 }
