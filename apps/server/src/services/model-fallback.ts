@@ -1,4 +1,5 @@
 import {
+  type ChiefModelFallbackReason,
   classifyStepFailure,
   claudeCodeUpdateRequired,
   claudeRateBlock,
@@ -7,6 +8,7 @@ import {
   type MachineDoneBody,
   type ModelRef,
   type StepKind,
+  tierFallbackOrder,
 } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -31,16 +33,22 @@ import {
 import { doubaoSubscriptionAllowsRunner } from './doubao-subscriptions.js';
 import { getModelLiveness, mergedCatalogModels } from './model-liveness.js';
 import { providerHealth } from './provider-health.js';
-import { antigravityQuotaExhausted, isKeylessEndpoint } from './source-tiers.js';
+import {
+  antigravityQuotaExhausted,
+  isKeylessEndpoint,
+  listConnectedTierSources,
+  tierFallbackChain,
+} from './source-tiers.js';
 import type { StepQuota } from './step-groups/quota.js';
 
-interface AgentRow {
+export interface FallbackAgentRow {
   teamId: string;
   machineId: string | null;
   provider: string | null;
   modelId: string | null;
   fallbackModels: (typeof routingRule.$inferSelect)['fallbackModels'];
 }
+type AgentRow = FallbackAgentRow;
 type StepRow = typeof step.$inferSelect & Pick<StepQuota, 'fallback' | 'ranModel'>;
 
 export const FALLBACK_STEP_KINDS: readonly StepKind[] = ['plan', 'build', 'session'];
@@ -52,13 +60,7 @@ const MODEL_FALLBACK_STEP_KINDS: readonly StepKind[] = [
   'verify',
 ];
 
-export type FallbackTrigger =
-  | 'quota'
-  | 'model_unavailable'
-  | 'auth'
-  | 'capacity'
-  | 'provider_outage'
-  | 'network';
+export type FallbackTrigger = ChiefModelFallbackReason;
 
 const TRIGGER_TEXT: Record<FallbackTrigger, string> = {
   quota: '额度用完',
@@ -68,6 +70,8 @@ const TRIGGER_TEXT: Record<FallbackTrigger, string> = {
   provider_outage: '服务暂时不可用',
   network: 'network connection failed',
 };
+
+const PROVIDER_WIDE_TRIGGERS: readonly FallbackTrigger[] = ['quota', 'auth', 'provider_outage'];
 
 export function modelKey(m: ModelRef): string {
   return `${m.provider}/${m.modelId}`;
@@ -183,7 +187,7 @@ export function planModelFallback(
   const claudeSubOk = hasActiveClaudeSubscription({ db: deps.db }, agentRow.teamId);
   const devinSubOk = hasActiveDevinSubscription({ db: deps.db }, agentRow.teamId);
   const antigravityBlocked = antigravityQuotaExhausted(deps.db, agentRow.teamId, now);
-  const accountQuotaExhausted = outcome.quotaBlock?.kind === 'quota';
+  const providerWide = PROVIDER_WIDE_TRIGGERS.includes(trigger);
   const piProviders = new Map(
     deps.db
       .select({
@@ -226,7 +230,7 @@ export function planModelFallback(
   const to = chain.find(
     (m) =>
       !tried.has(modelKey(m)) &&
-      !(accountQuotaExhausted && m.provider === from.provider) &&
+      !(providerWide && m.provider === from.provider) &&
       hosts.some((host) => canHostRun(host, m)) &&
       getModelLiveness(agentRow.teamId, m.provider, m.modelId) !== 'dead' &&
       providerHealth.canAcquire(`${agentRow.teamId}/${m.provider}`),
@@ -246,6 +250,23 @@ export function planModelFallback(
       zeroUsageRetried: stepRow.fallback?.zeroUsageRetried ?? false,
     },
   };
+}
+
+export function withBackupChain<T extends FallbackAgentRow>(db: Db, agentRow: T): T {
+  if (agentRow.fallbackModels !== null) return agentRow;
+  const { provider, modelId } = agentRow;
+  if (provider === null || modelId === null) return agentRow;
+  const sources = listConnectedTierSources(db, agentRow.teamId, provider, modelId);
+  const chain =
+    sources[0]?.provider === provider
+      ? tierFallbackChain(sources, 'standard', null)
+      : sources.flatMap((source) =>
+          tierFallbackOrder(source.tiers, 'standard').map((id) => ({
+            provider: source.provider,
+            modelId: id,
+          })),
+        );
+  return { ...agentRow, fallbackModels: chain };
 }
 
 export function isZeroUsageSilentSuccess(kind: StepKind, outcome: MachineDoneBody): boolean {

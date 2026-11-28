@@ -71,13 +71,16 @@ interface ThreadView {
   waitingRerun?: 'ready' | 'held' | null;
 }
 
-async function setupWorld(fallbackModels: { provider: string; modelId: string }[] | null = null) {
+async function setupWorld(
+  fallbackModels: { provider: string; modelId: string }[] | null = null,
+  providerIds: readonly string[] = ['relay-a', 'relay-b'],
+) {
   const s: TestServer = bootServer({ claimHoldMs: 100, pingIntervalMs: 3_600_000 });
   insertClaudeSubscription(s);
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
   const key = await issueApiKey(s);
-  for (const p of ['relay-a', 'relay-b']) {
+  for (const p of providerIds) {
     s.db
       .insert(providerTable)
       .values({
@@ -824,6 +827,7 @@ const REQUEUES = [
     fallback: [{ provider: 'relay-b', modelId: 'model-b' }],
     waiting: 'ready',
   },
+  // A turn parks only when no backup model can take it, so these worlds hold one provider.
   { cause: 'was held for quota', errorMessage: QUOTA_ERROR, fallback: null, waiting: 'held' },
   {
     cause: 'is waiting on capacity',
@@ -832,6 +836,12 @@ const REQUEUES = [
     waiting: 'held',
   },
 ] as const;
+
+function requeueWorld(fallback: readonly { provider: string; modelId: string }[] | null) {
+  return fallback === null
+    ? setupWorld(null, ['relay-a'])
+    : setupWorld([...(fallback as readonly { provider: string; modelId: string }[])]);
+}
 
 type World = Awaited<ReturnType<typeof setupWorld>>;
 
@@ -854,7 +864,7 @@ describe('a Stop press never deletes a message', () => {
   test.each(REQUEUES)(
     'stop ends a turn that $cause, keeps the message and marks it stopped',
     async ({ errorMessage, fallback, waiting }) => {
-      const w = await setupWorld(fallback === null ? null : [...fallback]);
+      const w = await requeueWorld(fallback);
       const first = await requeued(w, errorMessage);
       const view = await w.thread();
       expect(view.waitingRerun).toBe(waiting);
@@ -876,7 +886,7 @@ describe('a Stop press never deletes a message', () => {
   test.each(REQUEUES)(
     'the message of a turn that $cause can no longer be withdrawn',
     async ({ errorMessage, fallback }) => {
-      const w = await setupWorld(fallback === null ? null : [...fallback]);
+      const w = await requeueWorld(fallback);
       const first = await requeued(w, errorMessage);
       const refused = await w.withdraw(first);
       expect(refused.status).toBe(409);
@@ -946,7 +956,7 @@ describe('a Stop press never deletes a message', () => {
   });
 
   test('a later message held behind a waiting turn stays withdrawable', async () => {
-    const w = await setupWorld();
+    const w = await setupWorld(null, ['relay-a']);
     await requeued(w, QUOTA_ERROR);
     const second = w.queue('第二句');
     expect((await w.thread()).pending).toEqual([{ messageId: second, state: 'held' }]);
@@ -994,8 +1004,8 @@ describe('a message sent to a dead turn starts a new turn at once', () => {
 });
 
 describe('chief unavailable (T4)', () => {
-  test('a quota failure parks the turn, reports an outage, and the held messages resume together', async () => {
-    const w = await setupWorld();
+  test('a quota failure with no backup parks the turn, reports an outage, and the held messages resume together', async () => {
+    const w = await setupWorld(null, ['relay-a']);
     const first = await w.send('第一句');
     const running = await w.claim();
     await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
@@ -1015,7 +1025,7 @@ describe('chief unavailable (T4)', () => {
   });
 
   test('capacity without a backup parks the chief with the effective provider', async () => {
-    const w = await setupWorld();
+    const w = await setupWorld(null, ['relay-a']);
     await w.send('第一句');
     const running = await w.claim();
     expect(running).not.toBeNull();
@@ -1075,6 +1085,7 @@ describe('chief unavailable (T4)', () => {
       from: 'relay-a/model-a',
       to: 'relay-b/model-b',
       stepId: running!.step.id,
+      reason: 'quota',
       announced: true,
     });
   });

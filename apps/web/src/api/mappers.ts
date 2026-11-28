@@ -3,6 +3,7 @@ import type {
   AgentTodoItem,
   BuildRecord,
   ChiefGetResponse,
+  ChiefModelFallbackReason,
   ChiefOutage,
   ChiefPendingMessage,
   ChiefThread,
@@ -136,6 +137,15 @@ import { inlineSegments } from '../lib/markdown.js';
 import { activityLabel } from './activity.js';
 import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, StepRow } from './hooks.js';
+
+const FALLBACK_NOTE_TEXT: Record<ChiefModelFallbackReason, string> = {
+  quota: '主模型 {from} 额度用完，这轮改用 {to}',
+  model_unavailable: '主模型 {from} 不再可用，这轮改用 {to}',
+  auth: '主模型 {from} 认证失败，这轮改用 {to}',
+  capacity: '主模型 {from} 被限流，这轮改用 {to}',
+  provider_outage: '主模型 {from} 的服务暂时不可用，这轮改用 {to}',
+  network: '主模型 {from} 网络不通，这轮改用 {to}',
+};
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
   'runner-outdated': '排队中：{machine} 上的 Cairn 版本过旧，更新后自动继续',
@@ -2354,7 +2364,10 @@ function collectChiefStream(
         if (switched.data.announced === true) {
           items.push({
             kind: 'note',
-            text: '主模型 {from} 暂时不可用，这轮改用 {to}',
+            text:
+              switched.data.reason === undefined
+                ? '主模型 {from} 暂时不可用，这轮改用 {to}'
+                : FALLBACK_NOTE_TEXT[switched.data.reason],
             vars: { from: switched.data.from, to: switched.data.to },
             id: m.id,
           });

@@ -37,7 +37,7 @@ import {
   withFencedTransaction,
 } from './machine-deps.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
-import { planModelFallback } from './model-fallback.js';
+import { planModelFallback, withBackupChain } from './model-fallback.js';
 import { notifyWatchdogFlag } from './notifications.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { applyQuotaWaitStep, publishStepRow, QUOTA_PROBE_BASE_MS } from './quota-wait.js';
@@ -449,7 +449,11 @@ function handleQuotaDiagnosis(
       reason: diagnosis.detail ?? diagnosis.signal,
     },
   };
-  const fallback = planModelFallback(txDeps, { ...current, ...quota }, context.agentRow, outcome);
+  const agentRow =
+    context.kind === 'chief' && context.agentRow !== null
+      ? withBackupChain(txDeps.db, context.agentRow)
+      : context.agentRow;
+  const fallback = planModelFallback(txDeps, { ...current, ...quota }, agentRow, outcome);
   if (fallback !== null) {
     requeueTurn(txDeps, current, context, 'quota', now, fallback.note, {
       freshSession: true,

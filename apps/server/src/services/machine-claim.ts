@@ -93,7 +93,7 @@ import {
   hydrateMissingConnectorTools,
   mcpConnectorDepsOf,
 } from './mcp-servers.js';
-import { effectiveModel, modelKey } from './model-fallback.js';
+import { effectiveModel, modelKey, withBackupChain } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { coordinatorProfile, type RouteProfile, routeForStep } from './routing-rules.js';
 import { readQuota, type StepQuota } from './step-groups/quota.js';
@@ -607,7 +607,7 @@ async function tryClaim(
         if (baseModel.provider !== null && baseModel.modelId !== null) {
           tried.add(modelKey({ provider: baseModel.provider, modelId: baseModel.modelId }));
         }
-        const fromChain = (agentRow.fallbackModels ?? []).find(
+        const fromChain = (withBackupChain(db, agentRow).fallbackModels ?? []).find(
           (candidate) =>
             !tried.has(modelKey(candidate)) &&
             onlineHosts.some(

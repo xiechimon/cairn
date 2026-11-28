@@ -323,6 +323,7 @@ test.describe('chief unavailable (T4)', () => {
             from: 'relay-a/claude-opus',
             to: 'relay-b/glm-4.6',
             stepId: 'm1',
+            reason: 'auth',
             announced: true,
           }),
           createdAt: 11,
@@ -347,7 +348,7 @@ test.describe('chief unavailable (T4)', () => {
     const notes = page.getByTestId('home-c').getByTestId('chief-note');
     await expect(notes).toHaveCount(2);
     await expect(notes.nth(0)).toHaveText(
-      '主模型 relay-a/claude-opus 暂时不可用，这轮改用 relay-b/glm-4.6',
+      '主模型 relay-a/claude-opus 认证失败，这轮改用 relay-b/glm-4.6',
     );
     await expect(notes.nth(1)).toHaveText(
       '主模型 relay-a/claude-opus 恢复了，这轮起改回 relay-a/claude-opus',
@@ -358,6 +359,75 @@ test.describe('chief unavailable (T4)', () => {
         'separator',
       );
     await evidenceShot(page, 'fallback-switch-lines.png');
+  });
+
+  test('a fallback row written before this change still reads as temporarily unavailable', async ({
+    page,
+  }) => {
+    await mockLive(page, {
+      activeRun: null,
+      pending: [],
+      fallbackModel: null,
+      outage: null,
+      messages: [
+        FIRST,
+        {
+          id: 'chief-fallback-s1-1',
+          role: 'system',
+          content: JSON.stringify({
+            kind: 'chief_model_fallback',
+            from: 'relay-a/claude-opus',
+            to: 'relay-b/glm-4.6',
+            stepId: 'm1',
+            announced: true,
+          }),
+          createdAt: 11,
+        },
+        { id: 'm2', role: 'assistant', content: '好，我先看一下看板的计数逻辑。', createdAt: 12 },
+      ],
+    });
+    await page.goto('/app');
+    const note = page.getByTestId('home-c').getByTestId('chief-note');
+    await expect(note).toHaveCount(1);
+    await expect(note).toHaveText(
+      '主模型 relay-a/claude-opus 暂时不可用，这轮改用 relay-b/glm-4.6',
+    );
+  });
+});
+
+test.describe('chief fallback line in English', () => {
+  test.use({ locale: 'en-US' });
+
+  test('the line names the main model, the reason and the backup in English', async ({ page }) => {
+    await mockLive(page, {
+      activeRun: null,
+      pending: [],
+      fallbackModel: null,
+      outage: null,
+      messages: [
+        FIRST,
+        {
+          id: 'chief-fallback-s1-2',
+          role: 'system',
+          content: JSON.stringify({
+            kind: 'chief_model_fallback',
+            from: 'relay-a/claude-opus',
+            to: 'relay-b/glm-4.6',
+            stepId: 'm1',
+            reason: 'auth',
+            announced: true,
+          }),
+          createdAt: 11,
+        },
+        { id: 'm2', role: 'assistant', content: '看完了，计数在拖拽结束后重算。', createdAt: 12 },
+      ],
+    });
+    await page.goto('/app');
+    const note = page.getByTestId('home-c').getByTestId('chief-note');
+    await expect(note).toHaveCount(1);
+    await expect(note).toHaveText(
+      'Main model relay-a/claude-opus failed to authenticate, so this turn uses relay-b/glm-4.6',
+    );
   });
 });
 

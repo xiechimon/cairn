@@ -33,7 +33,13 @@ import {
   upsertChiefRow,
   upsertMessage,
 } from './machine-deps.js';
-import { modelKey, planModelFallback, ranModel, recordProviderOutcome } from './model-fallback.js';
+import {
+  modelKey,
+  planModelFallback,
+  ranModel,
+  recordProviderOutcome,
+  withBackupChain,
+} from './model-fallback.js';
 import { markModelDead } from './model-liveness.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { coordinatorProfile, type RouteProfile } from './routing-rules.js';
@@ -246,7 +252,7 @@ export function requeueChiefStepOnFallback(
   const plan = planModelFallback(
     deps,
     { ...stepRow, ...readQuota(deps.db, stepRow.id) },
-    agentRow,
+    withBackupChain(deps.db, agentRow),
     outcome,
   );
   if (plan === null) return false;
@@ -256,6 +262,7 @@ export function requeueChiefStepOnFallback(
     from: modelKey(plan.from),
     to: modelKey(plan.to),
     stepId: stepRow.id,
+    reason: plan.trigger,
     announced: fallbackAnnounced(deps.db, stepRow.buildId, modelKey(plan.to)),
   };
   requeueTurnStep(deps, stepRow, plan.row, {

@@ -196,11 +196,21 @@ export const chiefTurnStoppedContentSchema = z.object({
 export type ChiefTurnStoppedContent = z.infer<typeof chiefTurnStoppedContentSchema>;
 
 export const CHIEF_MODEL_FALLBACK_KIND = 'chief_model_fallback';
+export const chiefModelFallbackReasonSchema = z.enum([
+  'quota',
+  'model_unavailable',
+  'auth',
+  'capacity',
+  'provider_outage',
+  'network',
+]);
+export type ChiefModelFallbackReason = z.infer<typeof chiefModelFallbackReasonSchema>;
 export const chiefModelFallbackContentSchema = z.object({
   kind: z.literal(CHIEF_MODEL_FALLBACK_KIND),
   from: z.string(),
   to: z.string(),
   stepId: z.string(),
+  reason: chiefModelFallbackReasonSchema.optional(),
   announced: z.boolean().optional(),
 });
 export type ChiefModelFallbackContent = z.infer<typeof chiefModelFallbackContentSchema>;

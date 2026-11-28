@@ -19,6 +19,7 @@ import {
   notification as notificationTable,
   project as projectTable,
   provider as providerTable,
+  routingRule,
   step as stepTable,
   stopPending,
   todo as todoTable,
@@ -644,6 +645,47 @@ describe('stall-monitor', () => {
     expect(plainFirst).toBeGreaterThan(0);
     sweepStallMonitor(s.svc, plainFirst + QUOTA_LOOP_GRACE_MS + 1_000);
     expect(getStep(s, wPlainRetry.stepId).status).toBe('claimed');
+  });
+
+  test('quota: a Coordinator with no backup list of its own moves to a connected model', () => {
+    s = bootServer();
+    setupProjectAndProvider(s, 'anthropic');
+    setupProjectAndProvider(s, 'openai');
+    const now = Date.now();
+    const machine = seedMachine(s, {
+      id: 'm-derived',
+      name: 'mac',
+      online: true,
+      capabilities: { claimGeneration: true },
+    });
+    const chief = seedChiefStep(s, {
+      suffix: 'q-derived',
+      machineId: machine.id,
+      provider: 'anthropic',
+      claimedAt: now - 2 * MINUTE,
+      lastHeartbeatAt: now,
+      lastProgressAt: now - 2 * MINUTE,
+    });
+    s.db
+      .update(routingRule)
+      .set({ fallbackModels: null })
+      .where(eq(routingRule.id, 'route-chief-q-derived'))
+      .run();
+    reportActivity(machineDeps(s), machine.id, chief.stepId, {
+      phase: 'retrying',
+      attempt: 2,
+      stallSignal: 'quota',
+      detail: 'quota exceeded',
+    } as StepActivityReport);
+    const firstAt = getStep(s, chief.stepId).stallState?.activity?.firstSeenAt ?? 0;
+    expect(firstAt).toBeGreaterThan(0);
+    sweepStallMonitor(s.svc, firstAt + QUOTA_LOOP_GRACE_MS + 1_000);
+    const row = getStep(s, chief.stepId);
+    expect(row.status).toBe('pending');
+    expect(row.ranModel).toBeNull();
+    expect(row.fallback?.model).toEqual({ provider: 'openai', modelId: 'm1' });
+    expect(row.freshSession).toBe(true);
+    expect(chiefSystemMessages(s, chief.threadId)).toHaveLength(1);
   });
 
   test('dead_turn: respects 60s grace and admitPresence reconnect, requeues once, and terminates on repeat', () => {

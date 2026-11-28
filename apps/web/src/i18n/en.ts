@@ -1589,6 +1589,18 @@ export const EN: Record<string, string> = {
   '由备用模型 {model} 回答': 'Answered by backup model {model}',
   '主模型 {from} 暂时不可用，这轮改用 {to}':
     'Main model {from} is unavailable for now, so this turn uses {to}',
+  '主模型 {from} 额度用完，这轮改用 {to}':
+    'Main model {from} is out of quota, so this turn uses {to}',
+  '主模型 {from} 不再可用，这轮改用 {to}':
+    'Main model {from} is no longer available, so this turn uses {to}',
+  '主模型 {from} 认证失败，这轮改用 {to}':
+    'Main model {from} failed to authenticate, so this turn uses {to}',
+  '主模型 {from} 被限流，这轮改用 {to}':
+    'Main model {from} is rate limited, so this turn uses {to}',
+  '主模型 {from} 的服务暂时不可用，这轮改用 {to}':
+    'The service behind main model {from} is temporarily down, so this turn uses {to}',
+  '主模型 {from} 网络不通，这轮改用 {to}':
+    'Main model {from} could not be reached over the network, so this turn uses {to}',
   '主模型 {model} 恢复了，这轮起改回 {model}':
     'Main model {model} is back, and replies use it again from this turn',
   'Coordinator 用的模型 {model} 额度已用完': "The Coordinator's model {model} is out of quota",
