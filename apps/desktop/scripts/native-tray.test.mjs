@@ -163,8 +163,9 @@ test('the keep-awake choices show main state, not the page snapshot', () => {
     lidClosedAvailable: true,
     runner: 'on',
   });
-  assert.equal(merged.items.find((item) => item.id === 'keep-awake-lid-closed').on, true);
-  assert.equal(merged.items.find((item) => item.id === 'keep-awake-system').on, false);
+  const choices = merged.items.flatMap((item) => (item.kind === 'disclosure' ? item.children : []));
+  assert.equal(choices.find((item) => item.id === 'keep-awake-lid-closed').on, true);
+  assert.equal(choices.find((item) => item.id === 'keep-awake-system').on, false);
 });
 
 test('a crash brings the fallback at once and a restart takes it away', async () => {

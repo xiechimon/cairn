@@ -193,6 +193,33 @@ describe('native keep-awake mode rows', () => {
   });
 });
 
+test('flat legacy choice rows stay actionable before the host upgrades them', () => {
+  const flat = {
+    label: 'Cairn',
+    items: [
+      {
+        kind: 'choice' as const,
+        id: 'keep-awake-screen-on' as const,
+        title: 'Screen on',
+        on: true,
+        enabled: true,
+      },
+      {
+        kind: 'choice' as const,
+        id: 'keep-awake-system' as const,
+        title: 'System',
+        on: false,
+        enabled: false,
+      },
+    ],
+  };
+  expect(nativeTrayAction(flat, 'keep-awake-screen-on')).toEqual({
+    kind: 'keep-awake',
+    mode: 'screen-on',
+  });
+  expect(nativeTrayAction(flat, 'keep-awake-system')).toBeNull();
+});
+
 test('host upgrades missing legacy lid choice and rejects disabled actions', () => {
   const legacy = {
     label: 'Cairn',
