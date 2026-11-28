@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n/provider.js';
 import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { Button } from './ui/button.js';
@@ -9,43 +9,65 @@ import { toastError } from './ui/toaster.js';
 
 const COPIED_MS = 1600;
 
-function useCopied(): [boolean, (value: string) => void] {
+export function useCodeCopy(code: string | null, autoCopy = false) {
   const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const mounted = useRef(true);
+  const active = useRef<{ code: string } | null>(null);
+  const attempted = useRef<string | null>(null);
   useEffect(() => {
-    mounted.current = true;
+    active.current = code === null ? null : { code };
     return () => {
-      mounted.current = false;
+      active.current = null;
       clearTimeout(timer.current);
     };
-  }, []);
-  const copy = (value: string) =>
-    copyTextWithFeedback(
-      value,
-      () => {
-        if (!mounted.current) return;
-        setCopied(true);
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => setCopied(false), COPIED_MS);
-      },
-      (error) => toastError(t('复制失败，请重试。'), error),
-    );
-  return [copied, copy];
+  }, [code]);
+  const copy = useCallback(
+    (reportError: boolean) => {
+      const attempt = active.current;
+      if (attempt === null || attempt.code !== code) return;
+      copyTextWithFeedback(
+        attempt.code,
+        () => {
+          if (active.current !== attempt) return;
+          setCopiedCode(attempt.code);
+          clearTimeout(timer.current);
+          timer.current = setTimeout(() => setCopiedCode(null), COPIED_MS);
+        },
+        (error) => {
+          if (reportError && active.current === attempt) toastError(t('复制失败，请重试。'), error);
+        },
+      );
+    },
+    [code, t],
+  );
+  useEffect(() => {
+    if (code === null) {
+      attempted.current = null;
+    } else if (autoCopy && attempted.current !== code) {
+      attempted.current = code;
+      copy(false);
+    }
+  }, [autoCopy, code, copy]);
+  return { copied: code !== null && copiedCode === code, copy };
 }
+
+type CodeCopy = ReturnType<typeof useCodeCopy>;
 
 export function DeviceCode({
   code,
   cells = false,
   expired = false,
+  clipboard,
 }: {
   code: string;
   cells?: boolean;
   expired?: boolean;
+  clipboard?: CodeCopy;
 }) {
   const { t } = useI18n();
-  const [copied, copy] = useCopied();
+  const manual = useCodeCopy(clipboard === undefined && !cells && !expired ? code : null);
+  const { copied, copy } = clipboard ?? manual;
   if (cells) {
     return (
       <div
@@ -101,7 +123,7 @@ export function DeviceCode({
           size="xs"
           data-testid="sign-in-copy"
           className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
-          onClick={() => copy(code)}
+          onClick={() => copy(true)}
         >
           {copied ? t('已复制') : t('复制')}
         </Button>
@@ -120,7 +142,7 @@ export function SignInView({
   testId = 'sign-in-view',
 }: {
   instruction?: ReactNode;
-  code?: { value: string; expired?: boolean } | 'loading';
+  code?: { value: string; expired?: boolean; clipboard?: CodeCopy } | 'loading';
   waiting?: string | null;
   failure?: string | null;
   onCancel?: () => void;
@@ -137,7 +159,7 @@ export function SignInView({
           className="h-14 w-full rounded-(--radius-control) pointer-coarse:h-17"
         />
       ) : code !== undefined ? (
-        <DeviceCode code={code.value} expired={code.expired === true} />
+        <DeviceCode code={code.value} expired={code.expired === true} clipboard={code.clipboard} />
       ) : null}
       {waiting != null && waiting !== '' && (
         <div className="flex min-h-8 items-center gap-2 pointer-coarse:min-h-11">

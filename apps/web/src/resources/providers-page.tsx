@@ -81,7 +81,7 @@ import { type ProviderItem, ProviderPanel } from '../components/providers/provid
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { isDesktopShell } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
@@ -406,15 +406,24 @@ export function ProvidersSection() {
   useEffect(() => {
     const oauth = searchParams.get('oauth');
     if (oauth === null) return;
+    const presetId = searchParams.get('provider');
+    if (oauth === 'connected' && live && providersQ.isPending) return;
     if (oauth === 'error') {
       setConnectError(oauthReasonCopy(searchParams.get('reason'), t));
       setAddView('picker');
+    } else if (
+      oauth === 'connected' &&
+      live &&
+      providersQ.data?.providers.some((record) => record.providerId === presetId) === true
+    ) {
+      toastSuccess(t('已连接服务商'));
     }
     const next = new URLSearchParams(searchParams);
+    if (oauth === 'connected') next.delete('provider');
     next.delete('oauth');
     next.delete('reason');
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams, t]);
+  }, [live, providersQ.data, providersQ.isPending, searchParams, setSearchParams, t]);
 
   useEffect(() => {
     const add = searchParams.get('add');
@@ -573,6 +582,7 @@ export function ProvidersSection() {
         : {}),
       remove: () =>
         mutations.deleteProvider.mutate(record.id, {
+          onSuccess: () => toastSuccess(t('已移除服务商')),
           onError: (error) => toastError(t('移除失败，请重试。'), error),
         }),
     };
@@ -1004,6 +1014,7 @@ export function ProvidersSection() {
                   : antigravitySubscriptionModelSchema.shape.id
           }
           testable={false}
+          subscription
           {...(pickingSubscription.vendor === 'antigravity'
             ? {
                 fallbackReasons: antigravityOAuthIds.has(pickingSubscription.id)
@@ -1054,8 +1065,10 @@ export function ProvidersSection() {
               if (target === null || !live) return;
               const remove = deleteByVendor[target.vendor] ?? deleteSubscription;
               remove.mutate(target.id, {
-                onSuccess: () =>
-                  void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] }),
+                onSuccess: () => {
+                  void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+                  toastSuccess(t('已移除服务商'));
+                },
                 onError: (error) => toastError(t('移除失败，请重试。'), error),
               });
             }}

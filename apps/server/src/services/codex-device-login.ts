@@ -73,7 +73,7 @@ const postJson = (fetchImpl: FetchLike, url: string, payload: Record<string, str
 const postForm = (fetchImpl: FetchLike, url: string, fields: Record<string, string>) =>
   postDeviceForm(fetchImpl, url, fields, { label: DEVICE_LABEL });
 
-function accountIdOf(accessToken: string): string {
+export function accountIdOf(accessToken: string): string {
   const payload = accessToken.split('.')[1];
   let accountId: unknown;
   if (payload !== undefined) {
@@ -257,7 +257,7 @@ export async function pollCodexDeviceLogin(
   input: { teamId: string; state: string },
 ): Promise<
   | { status: 'pending'; intervalSeconds: number }
-  | { status: 'complete' }
+  | { status: 'complete'; created: boolean }
   | { status: 'superseded' }
   | { status: 'denied' }
   | { status: 'expired' }
@@ -278,7 +278,9 @@ export async function pollCodexDeviceLogin(
   if (response.ok) {
     deps.states.delete(input.state);
     const saved = await completeLogin(deps, entry, response.body);
-    return saved ? { status: 'complete' } : { status: 'superseded' };
+    return saved
+      ? { status: 'complete', created: entry.baselineCipher === null }
+      : { status: 'superseded' };
   }
   if (response.status === 403 || response.status === 404) {
     return { status: 'pending', intervalSeconds: entry.intervalSeconds };

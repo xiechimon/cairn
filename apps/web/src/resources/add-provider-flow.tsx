@@ -6,7 +6,7 @@ import { useCreateDevinSubscription } from '../api/devin-subscriptions.js';
 import { useCreateDoubaoSubscription } from '../api/doubao-subscriptions.js';
 import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { describeError } from '../lib/error-copy.js';
 import {
@@ -64,6 +64,7 @@ export function AddProviderFlow({
   lead?: ReactNode;
 }) {
   const { t } = useI18n();
+  const added = () => toastSuccess(t('已添加服务商'));
   const mutations = useApiMutations(teamId);
   const client = useQueryClient();
   const createSubscription = useCreateClaudeSubscription(teamId);
@@ -87,7 +88,9 @@ export function AddProviderFlow({
     kind: signInKind,
     start: { codex: mutations.startCodexDevice, xai: mutations.startXaiDevice },
     poll: { codex: mutations.pollCodexDevice, xai: mutations.pollXaiDevice },
-    onComplete: () => {
+    onComplete: (created) => {
+      if (created) added();
+      else toastSuccess(t('已连接服务商'));
       setPicked(null);
       onViewChange('closed');
     },
@@ -107,14 +110,21 @@ export function AddProviderFlow({
     };
   }, []);
 
-  const finishSubscription = (created: CreatedSubscription, source: SubscriptionSource) => {
-    onViewChange('closed');
+  const refreshSubscription = (source: SubscriptionSource) => {
     void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
     void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
     if (source !== 'claude') {
       void client.invalidateQueries({ queryKey: [`${source}-subscriptions`, teamId] });
     }
+  };
+  const closeSubscription = (created: CreatedSubscription, source: SubscriptionSource) => {
+    onViewChange('closed');
     onSubscriptionCreated?.(created, source);
+  };
+  const finishSubscription = (created: CreatedSubscription, source: SubscriptionSource) => {
+    if (relogin?.source !== source) added();
+    refreshSubscription(source);
+    closeSubscription(created, source);
   };
 
   return (
@@ -138,7 +148,10 @@ export function AddProviderFlow({
             live
               ? (body) =>
                   mutations.createProvider.mutate(body, {
-                    onSuccess: () => onViewChange('closed'),
+                    onSuccess: () => {
+                      added();
+                      onViewChange('closed');
+                    },
                     onError: (error) => toastError(t('添加服务商失败，请重试。'), error),
                   })
               : undefined
@@ -203,10 +216,7 @@ export function AddProviderFlow({
             createSubscription.mutate(body, {
               onSuccess: (created) => {
                 createSubscription.reset();
-                onViewChange('closed');
-                void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
-                void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
-                onSubscriptionCreated?.(created, 'claude');
+                finishSubscription(created, 'claude');
               },
             })
           }
@@ -275,9 +285,8 @@ export function AddProviderFlow({
               onSuccess: (created) => {
                 createDoubaoSubscription.reset();
                 if (onSaved !== undefined) {
-                  void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
-                  void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
-                  void client.invalidateQueries({ queryKey: ['doubao-subscriptions', teamId] });
+                  added();
+                  refreshSubscription('doubao');
                   onSaved(created);
                   return;
                 }
@@ -285,7 +294,10 @@ export function AddProviderFlow({
               },
             })
           }
-          onFinish={(created) => finishSubscription(created, 'doubao')}
+          onFinish={(created) => {
+            refreshSubscription('doubao');
+            closeSubscription(created, 'doubao');
+          }}
           pending={createDoubaoSubscription.isPending}
           error={createDoubaoSubscription.isError}
         />

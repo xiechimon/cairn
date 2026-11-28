@@ -171,6 +171,7 @@ export const PROVIDER_XAI_PRESET = {
 
 export const PROVIDER_CODEX_PRESET = {
   id: 'openai-codex',
+  modelsUrl: 'https://chatgpt.com/backend-api/codex/models?client_version=0.166.0',
 } as const;
 
 export const providerPresetSchema = z.object({
@@ -218,7 +219,7 @@ export type XaiDeviceStartResponse = z.infer<typeof xaiDeviceStartResponseSchema
 
 export const xaiDevicePollResponseSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('pending'), intervalSeconds: z.number().positive() }),
-  z.object({ status: z.literal('complete') }),
+  z.object({ status: z.literal('complete'), created: z.boolean().optional() }),
   z.object({ status: z.literal('superseded') }),
   z.object({ status: z.literal('denied') }),
   z.object({ status: z.literal('expired') }),

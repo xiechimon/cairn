@@ -1143,7 +1143,8 @@ describe('upstream model picker', () => {
       expect.stringContaining('Refresh 2: using the fallback list'),
       expect.stringContaining('Refresh 3: could not fetch the upstream list'),
     ]);
-    expect(opening.textContent).toContain('Refresh 0: using the fallback list');
+    expect(opening.textContent).toContain('Using the fallback list');
+    expect(opening.textContent).not.toContain('Refresh 0');
     expect(success.textContent).toContain('Fetched the upstream model list.');
     expect(opening.textContent).toBe(openingText);
     expect(success.textContent).toBe(successText);

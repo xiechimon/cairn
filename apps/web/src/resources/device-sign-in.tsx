@@ -1,7 +1,8 @@
+import type { CodexDevicePollResponse } from '@cairn/shared';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { FormActions } from '../components/form-layout.js';
-import { SignInView } from '../components/sign-in-view.js';
+import { SignInView, useCodeCopy } from '../components/sign-in-view.js';
 import { useI18n } from '../i18n/provider.js';
 import { markErrorSurfaced } from '../lib/mutation-error-report.js';
 
@@ -17,7 +18,7 @@ interface DeviceLogin {
 type DevicePollStatus = 'pending' | 'complete' | 'superseded' | 'denied' | 'expired';
 
 type DeviceStart = UseMutationResult<DeviceLogin, Error, void>;
-type DevicePoll = UseMutationResult<{ status: DevicePollStatus }, Error, string>;
+type DevicePoll = UseMutationResult<CodexDevicePollResponse, Error, string>;
 
 type Phase =
   | { step: 'starting' }
@@ -41,7 +42,7 @@ export function useDeviceSignIn({
   kind: DeviceSignInKind | null;
   start: Record<DeviceSignInKind, DeviceStart>;
   poll: Record<DeviceSignInKind, DevicePoll>;
-  onComplete: () => void;
+  onComplete: (created: boolean) => void;
   onCancel: () => void;
 }): SignInParts | null {
   const { t } = useI18n();
@@ -87,7 +88,7 @@ export function useDeviceSignIn({
             if (result.status === 'pending') wait(device);
             else if (result.status === 'complete') {
               setPhase({ step: 'starting' });
-              latest.current.onComplete();
+              latest.current.onComplete(result.created === true);
             } else fail(device, endedRef.current[result.status]);
           },
           (error: unknown) => {
@@ -115,9 +116,10 @@ export function useDeviceSignIn({
     };
   }, [kind, attempt]);
 
-  if (kind === null) return null;
   const device = phase.step === 'starting' ? null : phase.device;
   const failed = phase.step === 'failed';
+  const clipboard = useCodeCopy(kind !== null && !failed ? (device?.userCode ?? null) : null, true);
+  if (kind === null) return null;
   return {
     title: t('登录 {product}', { product }),
     onCancel: cancel,
@@ -130,7 +132,7 @@ export function useDeviceSignIn({
             ? failed
               ? undefined
               : 'loading'
-            : { value: device.userCode, expired: failed }
+            : { value: device.userCode, expired: failed, clipboard }
         }
         waiting={
           phase.step === 'starting'
@@ -162,8 +164,9 @@ export function useDeviceSignIn({
                 testId: 'device-sign-in-open',
                 disabled: device === null,
                 onClick: () => {
-                  if (device !== null)
-                    window.open(device.verificationUri, '_blank', 'noopener,noreferrer');
+                  if (device === null) return;
+                  clipboard.copy(false);
+                  window.open(device.verificationUri, '_blank', 'noopener,noreferrer');
                 },
               }
         }

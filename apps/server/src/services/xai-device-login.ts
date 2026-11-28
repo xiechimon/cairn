@@ -240,7 +240,7 @@ export async function pollXaiDeviceLogin(
   input: { teamId: string; state: string },
 ): Promise<
   | { status: 'pending'; intervalSeconds: number }
-  | { status: 'complete' }
+  | { status: 'complete'; created: boolean }
   | { status: 'superseded' }
   | { status: 'denied' }
   | { status: 'expired' }
@@ -268,7 +268,9 @@ export async function pollXaiDeviceLogin(
       baselineCipher: entry.baselineCipher,
     });
     deps.states.delete(input.state);
-    return saved ? { status: 'complete' } : { status: 'superseded' };
+    return saved
+      ? { status: 'complete', created: entry.baselineCipher === null }
+      : { status: 'superseded' };
   }
   const error = response.body.error;
   if (error === 'authorization_pending') {

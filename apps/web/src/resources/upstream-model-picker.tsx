@@ -287,6 +287,7 @@ export function UpstreamModelPicker<Model extends UpstreamOption = UpstreamOptio
   groupModels,
   modelIdSchema = providerModelSchema.shape.id,
   testable = true,
+  subscription = false,
   fallbackReasons,
   opener,
   onClose,
@@ -298,6 +299,7 @@ export function UpstreamModelPicker<Model extends UpstreamOption = UpstreamOptio
   groupModels?: GroupModels;
   modelIdSchema?: Pick<typeof providerModelSchema.shape.id, 'safeParse'>;
   testable?: boolean;
+  subscription?: boolean;
   fallbackReasons?: Partial<Record<ProviderFailure, string>>;
   opener?: HTMLButtonElement;
   onClose: () => void;
@@ -565,12 +567,14 @@ export function UpstreamModelPicker<Model extends UpstreamOption = UpstreamOptio
                   className="m-0 py-2 text-meta text-content-tertiary"
                 >
                   <span>{notice.empty ? t('上游返回了空清单。') : t('已获取上游模型清单。')}</span>
-                  <span className="block wrap-anywhere tabular-nums">
-                    {t('第 {attempt} 次刷新：上游清单未列出 {n} 个模型', {
-                      attempt: number.format(notice.attempt),
-                      n: number.format(notice.omittedCount),
-                    })}
-                  </span>
+                  {notice.attempt > 0 && (
+                    <span className="block wrap-anywhere tabular-nums">
+                      {t('第 {attempt} 次刷新：上游清单未列出 {n} 个模型', {
+                        attempt: number.format(notice.attempt),
+                        n: number.format(notice.omittedCount),
+                      })}
+                    </span>
+                  )}
                 </p>
               ) : (
                 <div
@@ -588,17 +592,25 @@ export function UpstreamModelPicker<Model extends UpstreamOption = UpstreamOptio
                     <CircleAlert aria-hidden className="mt-0.5 size-4 flex-none text-destructive" />
                     {notice.status === 'fallback'
                       ? t(fallbackReasons?.[notice.failure] ?? FALLBACK_REASON[notice.failure])
-                      : t(LIST_FAILURE[notice.failure])}
+                      : t(
+                          subscription && notice.failure === 'auth'
+                            ? FALLBACK_REASON.auth
+                            : LIST_FAILURE[notice.failure],
+                        )}
                   </p>
-                  <p className="m-0 wrap-anywhere text-meta text-content-tertiary tabular-nums">
-                    {notice.status === 'fallback'
-                      ? t('第 {attempt} 次刷新：使用备用清单', {
-                          attempt: number.format(notice.attempt),
-                        })
-                      : t('第 {attempt} 次刷新：未能获取上游清单', {
-                          attempt: number.format(notice.attempt),
-                        })}
-                  </p>
+                  {(notice.attempt > 0 || notice.status === 'fallback') && (
+                    <p className="m-0 wrap-anywhere text-meta text-content-tertiary tabular-nums">
+                      {notice.attempt === 0
+                        ? t('使用备用清单')
+                        : notice.status === 'fallback'
+                          ? t('第 {attempt} 次刷新：使用备用清单', {
+                              attempt: number.format(notice.attempt),
+                            })
+                          : t('第 {attempt} 次刷新：未能获取上游清单', {
+                              attempt: number.format(notice.attempt),
+                            })}
+                    </p>
+                  )}
                 </div>
               ),
             )}

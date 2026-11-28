@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { stepProvider } from '../src/coordinator/runtime/provider.js';
 import {
   CODEX_DEVICE_REDIRECT_URI,
@@ -86,6 +86,58 @@ function seedCodex(s: TestServer, apiKey: string) {
   );
 }
 
+it('lists selectable ChatGPT models through the subscription catalog after device sign-in', async () => {
+  // Minimal projection of a Codex 0.166.0 upstream models cache; no account or prompt fields.
+  const catalog = {
+    models: [
+      { slug: 'gpt-6.2-sol', display_name: 'GPT-6.2-Sol', visibility: 'list' },
+      { slug: 'gpt-6.1-terra', display_name: 'GPT-6.1 Terra', visibility: 'list' },
+      { slug: 'gpt-reserve', display_name: 'GPT-Reserve', visibility: 'hide' },
+    ],
+  };
+  const upstream = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    const headers = new Headers(init?.headers);
+    const endpoint = new URL(String(url));
+    if (
+      endpoint.origin !== 'https://chatgpt.com' ||
+      endpoint.pathname !== '/backend-api/codex/models'
+    ) {
+      return new Response(null, { status: 404 });
+    }
+    if (
+      headers.get('authorization') !== `Bearer ${ACCESS}` ||
+      headers.get('chatgpt-account-id') !== 'acct-1' ||
+      !endpoint.searchParams.get('client_version') ||
+      init?.redirect !== 'error'
+    ) {
+      return new Response(null, { status: 401 });
+    }
+    return Response.json(catalog);
+  });
+  try {
+    const { s } = boot([{ json: deviceJson }, { json: grantJson }, { json: tokenJson }]);
+    const { body } = await start(s);
+    expect(await (await poll(s, body.state)).json()).toEqual({ status: 'complete', created: true });
+    const path = `/api/teams/${s.team.id}/providers`;
+    const { providers } = (await (await req(s.app, 'GET', path)).json()) as {
+      providers: { id: string; providerId: string }[];
+    };
+    const row = providers.find(({ providerId }) => providerId === 'openai-codex');
+    expect(row).toBeDefined();
+    const text = await (await req(s.app, 'GET', `${path}/${row?.id}/upstream-models`)).text();
+    expect(text).not.toContain(ACCESS);
+    expect(JSON.parse(text)).toEqual({
+      status: 'ok',
+      models: [
+        { id: 'gpt-6.1-terra', name: 'GPT-6.1 Terra' },
+        { id: 'gpt-6.2-sol', name: 'GPT-6.2-Sol' },
+      ],
+    });
+  } finally {
+    upstream.mockRestore();
+  }
+});
+
 const expiredSecret = (access = ACCESS) =>
   JSON.stringify({
     kind: 'codex-oauth',
@@ -150,7 +202,7 @@ describe('OpenAI Codex device login', () => {
     const { body } = await start(s);
     const res = await poll(s, body.state);
     const text = await res.text();
-    expect(JSON.parse(text)).toEqual({ status: 'complete' });
+    expect(JSON.parse(text)).toEqual({ status: 'complete', created: true });
     for (const secret of [ACCESS, REFRESH, AUTH_CODE, VERIFIER, DEVICE_AUTH_ID]) {
       expect(text).not.toContain(secret);
     }

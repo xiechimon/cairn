@@ -1,4 +1,5 @@
 import {
+  PROVIDER_CODEX_PRESET,
   PROVIDER_OAUTH_PRESET_IDS,
   PROVIDER_PRESET_IDS,
   type ProviderApi,
@@ -49,7 +50,7 @@ const PROTOCOL_LABELS: Record<ProviderApi, string> = {
   'openai-responses': 'OpenAI Responses',
 };
 
-const SUBSCRIPTION_PRESET_IDS: readonly string[] = ['openai-codex'];
+const SUBSCRIPTION_PRESET_IDS: readonly string[] = [PROVIDER_CODEX_PRESET.id];
 
 const isOAuthPreset = (providerId: string) =>
   (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(providerId);
@@ -597,6 +598,8 @@ export function ModelChip({
 }
 
 function modelsEndpoint(record: ProviderRecord): string {
+  if (record.providerId === PROVIDER_CODEX_PRESET.id)
+    return `GET ${PROVIDER_CODEX_PRESET.modelsUrl}`;
   const root = record.baseUrl.replace(/(?<!\/)\/+$/, '');
   return `GET ${/\/v\d+$/.test(root) ? `${root}/models` : `${root}/v1/models`}`;
 }
@@ -866,6 +869,7 @@ export function TeamProviderEditor({
       {actions.listUpstream !== undefined && picker !== null && (
         <UpstreamModelPicker
           endpoint={modelsEndpoint(record)}
+          subscription={SUBSCRIPTION_PRESET_IDS.includes(record.providerId)}
           selected={ids}
           load={actions.listUpstream}
           {...(picker.opener === undefined ? {} : { opener: picker.opener })}

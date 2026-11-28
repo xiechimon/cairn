@@ -4,7 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
 import { FormStack } from '../components/form-layout.js';
-import { DeviceCode } from '../components/sign-in-view.js';
+import { DeviceCode, useCodeCopy } from '../components/sign-in-view.js';
 import { Button } from '../components/ui/button.js';
 import {
   DIALOG_PRIMARY_BUTTON,
@@ -110,6 +110,7 @@ export function GithubDeviceDialog({
         : fixtureStep(t, fixture, fixtureConnector),
   );
   const primaryRef = useRef<HTMLButtonElement>(null);
+  const clipboard = useCodeCopy(step.kind === 'code' ? step.userCode : null, live);
   const reconnect = connectorId !== undefined || fixture === 'reconnect';
 
   useEffect(() => {
@@ -183,11 +184,17 @@ export function GithubDeviceDialog({
         <p className="m-0 text-ui text-foreground">
           {t('打开 GitHub，输入下面的代码，然后点授权。')}
         </p>
-        <DeviceCode code={step.userCode} />
+        <DeviceCode code={step.userCode} clipboard={clipboard} />
       </>
     );
     hint = t('授权后自动继续');
-    primary = { label: t('打开 GitHub'), onClick: () => openGithubWindow(step.verificationUri) };
+    primary = {
+      label: t('打开 GitHub'),
+      onClick: () => {
+        clipboard.copy(false);
+        openGithubWindow(step.verificationUri);
+      },
+    };
   } else if (step.kind === 'ended') {
     title = step.title;
     body = <p className="m-0 text-ui text-foreground">{step.body}</p>;

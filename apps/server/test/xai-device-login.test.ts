@@ -122,7 +122,7 @@ describe('xAI SuperGrok device login', () => {
     );
     const text = await res.text();
     expect(res.status).toBe(200);
-    expect(JSON.parse(text)).toEqual({ status: 'complete' });
+    expect(JSON.parse(text)).toEqual({ status: 'complete', created: true });
     expect(text).not.toContain(ACCESS);
     expect(text).not.toContain(REFRESH);
     expect(text).not.toContain(DEVICE);

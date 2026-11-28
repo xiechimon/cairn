@@ -23,14 +23,14 @@ const XAI = '/api/teams/t1/providers/oauth/xai/device';
 async function serve(page: Page, base: string, server: DeviceServer) {
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/providers') {
-      return json({ presets: [], providers: server.completed ? [signedIn(base)] : [] });
+      return json({ canTestConnection: true, presets: [], providers: server.completed ? [signedIn(base)] : [] });
     }
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     if (path === '/api/teams/t1/model-routing') {
       return json({
         edges: [],
         connections: server.completed
-          ? [{ id: 'prov-signed-in', vendor: 'openai', kind: 'subscription', models: ['m-1'], available: true }]
+          ? [{ id: 'prov-signed-in', vendor: 'openai', kind: 'subscription', models: ['gpt-6.1-sol'], available: true }]
           : [],
         quota: [],
       });
@@ -97,14 +97,14 @@ function device(overrides: Partial<DeviceServer> = {}): DeviceServer {
 function signedIn(base: string) {
   return {
     id: 'prov-signed-in',
-    label: base === CODEX ? 'ChatGPT' : 'xAI',
+    label: base === CODEX ? 'ChatGPT' : base === XAI ? 'xAI' : 'GitHub Copilot',
     kind: 'custom',
-    providerId: base === CODEX ? 'openai-codex' : 'xai',
+    providerId: base === CODEX ? 'openai-codex' : base === XAI ? 'xai' : 'github-copilot',
     baseUrl: 'https://provider.example.test',
     api: 'openai-responses',
     authHeader: false,
     compat: {},
-    models: [{ id: 'm-1', name: 'Model One' }],
+    models: [{ id: 'gpt-6.1-sol', name: 'GPT-6.1-Sol' }],
     createdBy: 'owner',
     createdAt: 1,
     updatedAt: 1,
@@ -143,11 +143,13 @@ test('picking ChatGPT subscription opens one sign-in view: instruction, large co
   await expect(dialog.getByRole('status')).toHaveText('正在等你在浏览器里完成登录…');
   await expect(dialog.getByTestId('device-sign-in-open')).toBeEnabled();
 
-  await dialog.getByTestId('sign-in-copy').click();
   await expect(dialog.getByTestId('sign-in-copy')).toHaveText('已复制');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('WXYZ-0001');
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
   await expect(dialog.getByTestId('sign-in-copy')).toHaveText('复制', { timeout: 4000 });
+  await dialog.getByTestId('sign-in-copy').click();
+  await expect(dialog.getByTestId('sign-in-copy')).toHaveText('已复制');
+  await page.evaluate(() => navigator.clipboard.writeText('another clipboard value'));
 
   await page.evaluate(() => {
     const w = window as Window & { __opened?: string[] };
@@ -161,6 +163,7 @@ test('picking ChatGPT subscription opens one sign-in view: instruction, large co
   expect(
     await page.evaluate(() => (window as Window & { __opened?: string[] }).__opened),
   ).toEqual(['https://auth.example.test/device']);
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('WXYZ-0001');
 
   await expect.poll(() => server.polls).toBeGreaterThanOrEqual(1);
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -171,7 +174,7 @@ test('picking ChatGPT subscription opens one sign-in view: instruction, large co
 });
 
 test('a completed sign-in closes the view and the new provider appears in the list', async ({ page }) => {
-  const server = device({ nextPoll: [{ status: 200, body: { status: 'complete' } }] });
+  const server = device({ nextPoll: [{ status: 200, body: { status: 'complete', created: true } }] });
   await serve(page, CODEX, server);
   const picker = await openPicker(page);
   await picker.locator('[data-preset-id="openai-codex"]').click();
@@ -179,7 +182,139 @@ test('a completed sign-in closes the view and the new provider appears in the li
   await expect(page.locator('[data-instance-id="provider:prov-signed-in"]')).toBeVisible();
   await expect(page.getByRole('dialog', { name: '登录 ChatGPT' })).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: '添加服务商' })).toHaveCount(0);
+  await expect(page.locator('[data-sonner-toast]')).toContainText('已添加服务商');
 });
+
+test('device sign-in on an existing provider reports connection, not addition', async ({ page }) => {
+  const server = device({ completed: true, nextPoll: [{ status: 200, body: { status: 'complete', created: false } }] });
+  await serve(page, CODEX, server);
+  const picker = await openPicker(page);
+  await picker.locator('[data-preset-id="openai-codex"]').click();
+  const toast = page.locator('[data-sonner-toast]');
+  await expect(toast).toContainText('已连接服务商');
+  await expect(toast).not.toContainText('已添加服务商');
+});
+
+test('OAuth return confirms the provider once and clears its result from the URL', async ({ page }) => {
+  const server = device();
+  await serve(page, 'oauth', server);
+  const callback = '/app/settings/routing?oauth=connected&provider=github-copilot';
+  await page.goto(callback);
+  await expect(page).not.toHaveURL(/[?&]oauth=/);
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+  server.completed = true;
+  await page.goto(callback);
+  await expect(page.locator('[data-sonner-toast]')).toContainText('已连接服务商');
+  await expect(page).not.toHaveURL(/[?&]oauth=/);
+  await page.reload();
+  await expect(page.getByTestId('routing-add-provider')).toBeVisible();
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
+});
+
+test('ChatGPT model picker reports the first failure plainly and loads selectable options on retry', async ({ page }) => {
+  await serve(page, CODEX, device({ completed: true }));
+  let calls = 0;
+  await page.route('**/providers/prov-signed-in/upstream-models', (route) => {
+    calls += 1;
+    return route.fulfill({ json: calls === 1
+      ? { status: 'failed', failure: 'auth', httpStatus: 401 }
+      : { status: 'ok', models: [{ id: 'gpt-6.2-sol', name: 'GPT-6.2-Sol' }] } });
+  });
+  await page.goto('/app/settings/routing');
+  await page.locator('[data-instance-id="provider:prov-signed-in"]').click();
+  await page.getByRole('button', { name: '从上游选择' }).click();
+  const picker = page.getByRole('dialog', { name: '从上游选择模型' });
+  await expect(picker.getByTestId('upstream-error')).not.toContainText('第 0 次刷新');
+  await expect(picker.getByRole('alert')).toContainText('请重新登录后重试');
+  await expect(picker).toContainText('/backend-api/codex/models');
+  await picker.getByRole('button', { name: '重试' }).click();
+  const row = picker.locator('[data-model-id="gpt-6.2-sol"]');
+  await row.click();
+  await expect(row.getByRole('checkbox')).toBeChecked();
+  await expect(picker.getByRole('status')).toContainText('第 1 次刷新');
+});
+
+test('provider removal shows an error on refusal and success after confirmation', async ({ page }) => {
+  const server = device({ completed: true });
+  await serve(page, CODEX, server);
+  let calls = 0;
+  await page.route('**/providers/prov-signed-in', (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback();
+    if (++calls === 1) return route.fulfill({ status: 409, json: { error: 'cannot remove yet' } });
+    server.completed = false;
+    return route.fulfill({ status: 204 });
+  });
+  await page.goto('/app/settings/routing');
+  await page.locator('[data-instance-id="provider:prov-signed-in"]').click();
+  const remove = async () => {
+    await page.getByTestId('provider-editor').getByRole('button', { name: '移除', exact: true }).click();
+    const dialog = page.getByRole('alertdialog');
+    await dialog.getByRole('button', { name: '移除', exact: true }).click();
+    await expect(dialog).toBeHidden();
+  };
+  await remove();
+  const toasts = page.locator('[data-sonner-toast]');
+  await expect(toasts).toContainText(['移除失败，请重试。']);
+  await remove();
+  await expect(toasts.filter({ hasText: '已移除服务商' })).toHaveCount(1);
+  await expect(page.locator('[data-instance-id="provider:prov-signed-in"]')).toHaveCount(0);
+});
+
+const evidenceDir = process.env.PROVIDER_EVIDENCE_DIR;
+if (evidenceDir !== undefined) {
+  for (const width of [1440, 390]) for (const theme of ['light', 'dark'] as const) {
+    test(`provider fixture screenshots at ${width}px in ${theme}`, async ({ page, context }) => {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+      await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      const capture = async (state: string) => {
+        await page.evaluate(() => document.fonts.ready);
+        await page.screenshot({ path: `${evidenceDir}/fixture-${width}-${theme}-${state}.png`, animations: 'disabled' });
+      };
+      const server = device({ startDelayMs: 1600 });
+      await serve(page, CODEX, server);
+      let succeed = false;
+      let settle!: () => void;
+      const loading = new Promise<void>((resolve) => { settle = resolve; });
+      await page.route('**/providers/prov-signed-in/upstream-models', async (route) => {
+        await loading;
+        await route.fulfill({ json: succeed
+          ? { status: 'ok', models: [{ id: 'gpt-6.2-sol', name: 'GPT-6.2-Sol' }, { id: 'gpt-6.1-terra', name: 'GPT-6.1 Terra' }] }
+          : { status: 'failed', failure: 'not-found', httpStatus: 404 } });
+      });
+      const picker = await openPicker(page);
+      const choose = () => picker.locator('[data-preset-id="openai-codex"]').click();
+      await choose();
+      const dialog = page.getByRole('dialog', { name: '登录 ChatGPT' });
+      await expect(dialog.getByText('正在获取验证码…')).toBeVisible();
+      await capture('login-waiting');
+      await expect(dialog.getByTestId('sign-in-copy')).toHaveText('已复制');
+      await capture('code-copied');
+      server.nextPoll.push({ status: 200, body: { status: 'expired' } });
+      await expect(dialog.getByRole('alert')).toBeVisible();
+      await capture('login-failed');
+      server.startDelayMs = 0;
+      server.nextPoll.push({ status: 200, body: { status: 'complete', created: true } });
+      await dialog.getByTestId('device-sign-in-restart').click();
+      await expect(page.locator('[data-sonner-toast]')).toContainText('已添加服务商');
+      await capture('success-toast');
+      await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 10_000 });
+      await page.locator('[data-instance-id="provider:prov-signed-in"]').click();
+      await page.getByRole('button', { name: '从上游选择' }).click();
+      await expect(page.getByTestId('upstream-loading')).toBeVisible();
+      await capture('picker-loading');
+      settle();
+      await expect(page.getByTestId('upstream-error')).toBeVisible();
+      await capture('picker-failed');
+      await page.keyboard.press('Escape');
+      succeed = true;
+      await page.getByRole('button', { name: '从上游选择' }).click();
+      await expect(page.getByTestId('upstream-model')).toHaveCount(3);
+      await capture('picker-loaded');
+    });
+  }
+}
 
 test('a lost sign-in (poll 404) stops polling, says so in the view and raises no toast', async ({
   page,
@@ -311,15 +446,28 @@ test('cancelling while the code is still coming, then picking again, runs one po
 test('a refused clipboard never shows Copied and says the copy failed', async ({ page }) => {
   await serve(page, CODEX, device());
   await page.addInitScript(() => {
+    window.open = () => {
+      document.documentElement.dataset.loginOpened = 'yes';
+      return null;
+    };
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
-      value: { writeText: () => Promise.reject(new DOMException('denied', 'NotAllowedError')) },
+      value: { writeText: () => {
+        const data = document.documentElement.dataset;
+        data.copyAttempts = String(Number(data.copyAttempts ?? '0') + 1);
+        return Promise.reject(new DOMException('denied', 'NotAllowedError'));
+      } },
     });
   });
   const picker = await openPicker(page);
   await picker.locator('[data-preset-id="openai-codex"]').click();
   const dialog = page.getByRole('dialog', { name: '登录 ChatGPT' });
   await expect(dialog.getByTestId('sign-in-code')).toHaveText('WXYZ-0001');
+  await expect(page.locator('html')).toHaveAttribute('data-copy-attempts', '1');
+  await dialog.getByTestId('device-sign-in-open').click();
+  await expect(page.locator('html')).toHaveAttribute('data-copy-attempts', '2');
+  await expect(page.locator('html')).toHaveAttribute('data-login-opened', 'yes');
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
   await dialog.getByTestId('sign-in-copy').click();
   await expect(page.locator('[data-sonner-toast]')).toContainText('复制失败，请重试。');
   await expect(dialog.getByTestId('sign-in-copy')).toHaveText('复制');

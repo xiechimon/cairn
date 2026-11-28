@@ -699,13 +699,17 @@ test('adds Doubao subscription on clean runner -> shows QR dialog -> handles exp
   const qrDialog = page.getByRole('dialog', { name: 'mac-mini 豆包扫码登录' });
   await expect(qrDialog).toBeVisible();
   await expect(qrDialog).toContainText('二维码已过期');
+  const addToast = page.locator('[data-sonner-toast]').filter({ hasText: '已添加服务商' });
+  await expect(addToast).toHaveCount(1);
   await qrDialog.getByTestId('doubao-qr-retry').click();
   await expect(qrDialog.getByTestId('doubao-qr-image')).toHaveAttribute(
     'src',
     `data:image/png;base64,${PNG_B}`,
   );
+  await expect(addToast).toHaveCount(0, { timeout: 10_000 });
   await qrDialog.getByRole('button', { name: '稍后扫码' }).click();
   await expect(detail(page)).toContainText('豆包订阅');
+  await expect(addToast).toHaveCount(0);
 
   await page.reload();
   await expect(detail(page)).toBeVisible();

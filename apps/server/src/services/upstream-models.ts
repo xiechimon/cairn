@@ -1,4 +1,4 @@
-import type { ProviderApi, ProviderFailure } from '@cairn/shared';
+import { PROVIDER_CODEX_PRESET, type ProviderApi, type ProviderFailure } from '@cairn/shared';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 const MAX_MODELS = 2000;
@@ -54,19 +54,63 @@ function parseModels(raw: unknown): { id: string; name: string }[] | null {
     .slice(0, MAX_MODELS);
 }
 
-export async function fetchUpstreamModels(input: {
-  baseUrl: string;
-  api: ProviderApi;
-  authHeader: boolean;
-  apiKey: string | null;
-  fetch: typeof globalThis.fetch;
-  timeoutMs: number;
-}): Promise<UpstreamModelList> {
+type FetchOptions = { fetch: typeof globalThis.fetch; timeoutMs: number };
+
+export function fetchUpstreamModels(
+  input: FetchOptions & {
+    baseUrl: string;
+    api: ProviderApi;
+    authHeader: boolean;
+    apiKey: string | null;
+  },
+): Promise<UpstreamModelList> {
+  return fetchCatalog(input, modelsUrl(input.baseUrl, input.api), authHeaders(input), parseModels);
+}
+
+export function fetchCodexModels(
+  input: FetchOptions & {
+    apiKey: string;
+    accountId: string;
+  },
+): Promise<UpstreamModelList> {
+  return fetchCatalog(
+    input,
+    PROVIDER_CODEX_PRESET.modelsUrl,
+    { Authorization: `Bearer ${input.apiKey}`, 'ChatGPT-Account-Id': input.accountId },
+    (raw) => {
+      if (
+        typeof raw !== 'object' ||
+        raw === null ||
+        !('models' in raw) ||
+        !Array.isArray(raw.models)
+      ) {
+        return null;
+      }
+      return parseModels(
+        raw.models.flatMap((model: unknown) => {
+          if (typeof model !== 'object' || model === null) return [];
+          const { slug, display_name, visibility } = model as Record<string, unknown>;
+          return visibility === 'list' ? [{ id: slug, display_name }] : [];
+        }),
+      );
+    },
+    'error',
+  );
+}
+
+async function fetchCatalog(
+  input: FetchOptions,
+  url: string,
+  headers: Record<string, string>,
+  parse: typeof parseModels,
+  redirect: RequestInit['redirect'] = 'follow',
+): Promise<UpstreamModelList> {
   const signal = AbortSignal.timeout(input.timeoutMs);
   let response: Response;
   try {
-    response = await input.fetch(modelsUrl(input.baseUrl, input.api), {
-      headers: { accept: 'application/json', ...authHeaders(input) },
+    response = await input.fetch(url, {
+      headers: { accept: 'application/json', ...headers },
+      redirect,
       signal,
     });
   } catch {
@@ -81,7 +125,7 @@ export async function fetchUpstreamModels(input: {
   } catch {
     return { ok: false, failure: signal.aborted ? 'timeout' : 'invalid', httpStatus: null };
   }
-  const models = parseModels(raw);
+  const models = parse(raw);
   if (models === null) return { ok: false, failure: 'invalid', httpStatus: null };
   return { ok: true, models };
 }

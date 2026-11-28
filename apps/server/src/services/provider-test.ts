@@ -1,4 +1,5 @@
 import {
+  PROVIDER_CODEX_PRESET,
   type ProviderFailure,
   redactSecrets,
   replaceTags,
@@ -12,6 +13,7 @@ import { probeProvider } from '../coordinator/runtime/provider-probe.js';
 import { provider } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
+import { accountIdOf } from './codex-device-login.js';
 import { providerAccessToken } from './provider-access-token.js';
 import {
   providerConfigurationFingerprint,
@@ -19,7 +21,7 @@ import {
   publicProviderCompat,
 } from './provider-configuration.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
-import { failureForStatus, fetchUpstreamModels } from './upstream-models.js';
+import { failureForStatus, fetchCodexModels, fetchUpstreamModels } from './upstream-models.js';
 
 const MODEL_TEST_WINDOW_MS = 10_000;
 const DETAIL_MAX = 160;
@@ -201,20 +203,29 @@ export async function listUpstreamModels(
   input: { teamId: string; id: string },
 ): Promise<UpstreamModelsResult> {
   const row = providerRow(deps, input.teamId, input.id);
+  const codex = row.providerId === PROVIDER_CODEX_PRESET.id;
   let apiKey: string | null;
+  let accountId: string | null = null;
   try {
     apiKey = await accessKey(deps, input.teamId, row.providerId);
+    if (codex && apiKey !== null) accountId = accountIdOf(apiKey);
   } catch {
     return { status: 'failed', failure: 'auth', httpStatus: null };
   }
-  const listed = await fetchUpstreamModels({
-    baseUrl: row.baseUrl,
-    api: row.api,
-    authHeader: row.authHeader,
-    apiKey,
-    fetch: deps.fetch,
-    timeoutMs: deps.timeoutMs ?? 10_000,
-  });
+  if (codex && (apiKey === null || accountId === null)) {
+    return { status: 'failed', failure: 'auth', httpStatus: null };
+  }
+  const options = { fetch: deps.fetch, timeoutMs: deps.timeoutMs ?? 10_000 };
+  const listed =
+    codex && apiKey !== null && accountId !== null
+      ? await fetchCodexModels({ ...options, apiKey, accountId })
+      : await fetchUpstreamModels({
+          ...options,
+          baseUrl: row.baseUrl,
+          api: row.api,
+          authHeader: row.authHeader,
+          apiKey,
+        });
   return upstreamModelsResultSchema.parse(
     listed.ok
       ? { status: 'ok', models: listed.models }
