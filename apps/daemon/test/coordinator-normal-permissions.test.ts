@@ -291,23 +291,29 @@ describe('normal Coordinator permissions across runtimes', () => {
       abortController: new AbortController(),
     });
     expect(sdkOptions.permissionMode).toBe('bypassPermissions');
-    expect(sdkOptions.tools).toEqual([
-      'Read',
-      'Glob',
-      'Grep',
-      'Bash',
-      'PowerShell',
-      'Edit',
-      'Write',
-      'NotebookEdit',
+    expect(sdkOptions.tools).toBeUndefined();
+    expect(sdkOptions.disallowedTools).toEqual([
+      'AskUserQuestion',
+      'CronCreate',
+      'CronDelete',
+      'CronList',
+      'ScheduleWakeup',
+      'RemoteTrigger',
+      'Workflow',
     ]);
-    expect(sdkOptions.disallowedTools).toContain('AskUserQuestion');
     expect(sdkOptions.settingSources).toEqual(['user', 'project', 'local']);
 
-    expect(claudeAcpSessionMeta(acpTurnPolicy(claudeOpts))).toMatchObject({
+    expect(claudeAcpSessionMeta(acpTurnPolicy(claudeOpts))).toEqual({
       claudeCode: {
         options: {
-          disallowedTools: expect.arrayContaining(['CronCreate', 'ScheduleWakeup']),
+          disallowedTools: [
+            'CronCreate',
+            'CronDelete',
+            'CronList',
+            'ScheduleWakeup',
+            'RemoteTrigger',
+            'Workflow',
+          ],
         },
       },
     });

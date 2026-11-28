@@ -7,7 +7,7 @@ A user who just connected a model asks for a daily competitor brief, or sends a 
 ## Scope
 
 1. The Coordinator uses Cairn's existing schedule operation for recurring work. For a reversible missing detail it uses project references or a well-known default, stores that choice in the schedule prompt, and tells the user. Genuine directions and irreversible/external approvals still belong to the user.
-2. Claude Code launches with a finite `tools` list, never its default tool preset: normal Runner turns get `Read`, `Glob`, `Grep`, `Bash`, `PowerShell`, `Edit`, `Write`, and `NotebookEdit`; read-only and locked turns get only `Read`, `Glob`, and `Grep`; relay-only gets none of these. Add `ToolSearch` only for deferred Cairn tools. Preserve scoped MCP, file operations and Runner shell; provider background orchestration and the native `Skill` launcher are not exposed because neither is a workspace primitive. Use Cairn-managed tasks and skills instead. Keep the existing pure relay and locked permission/MCP contract; managed and inherited MCP behavior is unchanged and is outside the provider-built-in guarantee. Use the same builder on new and resumed sessions. Backstop known harness actions with `CronCreate`, `CronDelete`, `CronList`, `ScheduleWakeup`, `RemoteTrigger`, and `Workflow` in `disallowedTools`. This is a vendor tool boundary, not a filesystem sandbox.
+2. Claude Code keeps its default tool preset for normal Runner turns so Cairn's team skills, subagents, todo mirror and web tools keep working, and names the provider's own actions — `CronCreate`, `CronDelete`, `CronList`, `ScheduleWakeup`, `RemoteTrigger`, `Workflow` — in `disallowedTools` for new and resumed sessions. Read-only workspace turns keep today's surface with `Edit` and `Write` denied; locked review turns expose only `Read`, `Glob`, `Grep`; relay-only exposes none of these, with `ToolSearch` added only for deferred Cairn tools. The same deny-list rides on the Claude ACP session meta, and normal ACP turns keep their existing permission setting. Keep managed and inherited MCP behavior unchanged. This is a vendor tool boundary, not a filesystem sandbox.
 3. Keep configured models selectable: leave Runner `backendFor`, server runtime selection and provider routes untouched. Pi registers Cairn-selected tools in `apps/daemon/src/backend/pi.ts` and `apps/server/src/coordinator/runtime/tools.ts`; the Codex API transport in `apps/server/src/coordinator/runtime/provider.ts` does not start a vendor CLI. Doubao CLI stays prompt-only pending a real vendor switch; the acceptance checklist keeps its row open. Its ACP permission mode is not a boundary for server-side tools. Do not claim end-to-end isolation on any unchanged adapter.
 
 ## Edge cases
@@ -15,9 +15,9 @@ A user who just connected a model asks for a daily competitor brief, or sends a 
 | Edge case | What the user sees | Proving test | Slice/Status |
 |---|---|---|---|
 | Recurring brief without a competitor list | The reply names the defaults and confirms only a Cairn schedule record | `apps/server/test/coordinator/responsiveness.test.ts` | this change |
-| Claude normal new and resumed task, with and without deferred tools | Replace the prior default-preset assertion with exact finite argv and native-action deny-list assertions; the resumed launch retains the session id and its surface | `apps/daemon/test/claude-mcp-strict.test.ts` | this change |
-| Claude read-only, locked and relay-only | Read-only retains only the named reads; locked retains `dontAsk`, host-only MCP, and disabled hooks; relay-only stays empty or ToolSearch only. Cairn and managed connector configuration stay available as before | `apps/daemon/test/claude-mcp-strict.test.ts` | this change |
-| Locked and ordinary host skills policy | Existing default-preset assertion is replaced; plugin configuration, hooks and permissions outside built-in selection remain as before | `apps/daemon/test/skills-hard-block.test.ts` | this change |
+| Claude normal new and resumed task, with and without deferred tools | The default preset stays, the six provider actions are denied, and the resumed launch retains the session id and its surface | `apps/daemon/test/claude-mcp-strict.test.ts` | this change |
+| Claude locked and relay-only | Locked retains `dontAsk`, the named reads, host-only MCP and disabled hooks; relay-only stays empty or ToolSearch only. Read-only workspace turns keep today's Edit/Write denial. Cairn and managed connector configuration stay available as before | `apps/daemon/test/claude-mcp-strict.test.ts` | this change |
+| Locked and ordinary host skills policy | Ordinary host builds keep the default preset, hooks and plugins while the deny-list carries the provider actions; locked turns keep their existing surface | `apps/daemon/test/skills-hard-block.test.ts` | this change |
 | Opaque ACP server-side tool | The configured model remains selectable; a prompt is not an enforcement guarantee | `apps/daemon/test/doubao-acp.test.ts` | later: verified vendor execution controls |
 
 ## Out of scope
@@ -28,10 +28,12 @@ A user who just connected a model asks for a daily competitor brief, or sends a 
 ## Review
 
 - Verdict: CONCERNS
-- Plan-SHA256: ac4d591481dd576f8eba75459bb43029901e3dc7b330969b2539c7928559240f
+- Plan-SHA256: b331e67b3d8e3f0b65f1eee8caf5419cc2657bebfd874cbd0f581fe51e7eb1b2
 - Author-Model: openai-codex/gpt-6.2-sol
 - Reviewer: independent reviewer subagent (first completed plan review; wrapper exited with no verdict)
 - Reviewer-Model: claude-sonnet-5-5
 - Fix-check: PASS
-- Fix-check-Plan-SHA256: 75bdaeb1ea17572bcfb42fb3cd50a870c102ce3547a7bec2ce8e325613cf11b1
+- Fix-check-Plan-SHA256: b331e67b3d8e3f0b65f1eee8caf5419cc2657bebfd874cbd0f581fe51e7eb1b2
 - Findings: (1) Replace the default-preset assertion. (2) Enumerate local primitives and background implications. (3) Address native Skill and MCP inheritance. (4) Add known scheduler deny backstop. (5) Assert the actual read-only surface. (6) Test locked and relay-only invariants. (7) Test resume and deferred lookup. (8) Cite Pi/Codex selection and keep Doubao open.
+- Review-Note: The head review (Opus, 2026-11-29) found that a finite `tools` list dropped Cairn's team skills, subagents, todo mirror and web tools; scope 2 and the two Edge cases rows were rewritten to keep the default preset with the provider-action deny-list, and both recorded hashes were recomputed over that rewritten body.
+- Review-Note: The `pi-review.sh` wrapper wrote its marker but exited without a verdict on both the plan and head reviews; each review was completed directly with Opus on the recorded target and its full output is under `~/Pictures/cairn-review/coordinator-own-tools/`.

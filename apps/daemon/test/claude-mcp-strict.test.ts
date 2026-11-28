@@ -202,24 +202,10 @@ describe('claude-code remote-only sessions (#1939)', () => {
     expect(args).toContain('--strict-mcp-config');
   });
 
-  test('new and resumed sessions never expose the default provider tool set', async () => {
-    const workspace = [
-      'Read',
-      'Glob',
-      'Grep',
-      'Bash',
-      'PowerShell',
-      'Edit',
-      'Write',
-      'NotebookEdit',
-    ];
+  test('new and resumed sessions deny the provider schedulers and keep the default preset tools', async () => {
     for (const resumeId of [null, 'prior-session']) {
-      const { options, args } = await spawnArgs(
-        parts({ resumeId, deferredTools: resumeId !== null }),
-      );
-      const tools = resumeId === null ? workspace : [...workspace, 'ToolSearch'];
-      expect(options.tools).toEqual(tools);
-      expect(args).toContain(`--tools=${tools.join(',')}`);
+      const { options } = await spawnArgs(parts({ resumeId }));
+      expect('tools' in options).toBe(false);
       expect(options.resume).toBe(resumeId ?? undefined);
       expect(options.disallowedTools).toEqual([
         'AskUserQuestion',
@@ -233,9 +219,8 @@ describe('claude-code remote-only sessions (#1939)', () => {
     }
   });
 
-  test('read-only, locked and relay-only invocations do not expand the workspace tool set', () => {
+  test('locked and relay-only invocations do not expand the built-in tool set', () => {
     const reads = ['Read', 'Glob', 'Grep'];
-    expect(buildClaudeSdkOptions(parts({ readOnly: true })).tools).toEqual(reads);
     const locked = buildClaudeSdkOptions(parts({ lockedDown: true, mcpServers: withSeam() }));
     expect(locked.tools).toEqual(reads);
     expect(locked.permissionMode).toBe('dontAsk');

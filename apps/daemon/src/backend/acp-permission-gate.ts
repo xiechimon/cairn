@@ -84,7 +84,7 @@ export function claudeAcpSessionMeta(policy: AcpTurnPolicy): Record<string, unkn
               ? CLAUDE_BUILTIN_WRITE_TOOLS
               : []),
         ],
-        allowDangerouslySkipPermissions: false,
+        ...(policy === 'normal' ? {} : { allowDangerouslySkipPermissions: false }),
       },
     },
   };
