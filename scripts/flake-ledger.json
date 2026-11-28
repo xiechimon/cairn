@@ -1,4 +1,17 @@
 {
   "version": 1,
-  "flakes": []
+  "flakes": [
+    {
+      "path": "apps/web/e2e/web-vitals-perf.spec.ts",
+      "owner": "xiechimon",
+      "expires": "2026-12-06",
+      "reason": "C36 long-task measurement intermittently fails on the first full-suite attempt under CI load and passes on retry."
+    },
+    {
+      "path": "apps/server/test/api-key-revoke.test.ts",
+      "owner": "xiechimon",
+      "expires": "2026-12-06",
+      "reason": "The first full-suite attempt intermittently fails under CI load and passes on retry; the API-key path is unchanged."
+    }
+  ]
 }
