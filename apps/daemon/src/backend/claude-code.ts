@@ -80,7 +80,15 @@ const USAGE_MODEL_PREFIX = 'claude-code';
 
 const EFFORT_LEVELS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
-const SDK_WRITE_TOOLS = ['Edit', 'Write'];
+const SDK_WORKSPACE_ACTIONS = ['Bash', 'PowerShell', 'Edit', 'Write', 'NotebookEdit'] as const;
+const SDK_UNMANAGED_ACTIONS = [
+  'CronCreate',
+  'CronDelete',
+  'CronList',
+  'ScheduleWakeup',
+  'RemoteTrigger',
+  'Workflow',
+] as const;
 const SDK_ASK_TOOL = 'AskUserQuestion';
 
 function isRetryableError(message: string): boolean {
@@ -1465,6 +1473,7 @@ export interface ClaudeSdkOptionParts {
   disallowedTools: string[];
   builtinTools?: string[];
   deferredTools?: boolean;
+  readOnly?: boolean;
   lockedDown: boolean;
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
@@ -1537,18 +1546,16 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
           ],
         }
       : { permissionMode: 'bypassPermissions' as const }),
-    disallowedTools: locked ? [...parts.disallowedTools, 'Bash', 'Agent'] : parts.disallowedTools,
-    ...(locked
-      ? {
-          tools:
-            parts.builtinTools ??
-            (parts.deferredTools === true
-              ? [...HOST_BUILTIN_TOOLS, TOOL_SEARCH_BUILTIN]
-              : [...HOST_BUILTIN_TOOLS]),
-        }
-      : parts.builtinTools !== undefined
-        ? { tools: parts.builtinTools }
-        : {}),
+    disallowedTools: [
+      ...parts.disallowedTools,
+      ...SDK_UNMANAGED_ACTIONS,
+      ...(locked ? ['Bash', 'Agent'] : []),
+    ],
+    tools: parts.builtinTools ?? [
+      ...HOST_BUILTIN_TOOLS,
+      ...(!locked && parts.readOnly !== true ? SDK_WORKSPACE_ACTIONS : []),
+      ...(parts.deferredTools === true ? [TOOL_SEARCH_BUILTIN] : []),
+    ],
     includePartialMessages: true,
     settingSources: locked ? ['project'] : [...CLAUDE_SETTING_SOURCES],
     ...mcpSection,
@@ -1682,7 +1689,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       }
       const effort = toEffort(opts.thinkingLevel);
       const append = opts.systemPrompt;
-      const disallowedTools = [SDK_ASK_TOOL, ...(opts.readOnly === true ? SDK_WRITE_TOOLS : [])];
+      const disallowedTools = [SDK_ASK_TOOL];
       const abort = new AbortController();
       const sessionProcess: SessionProcess = { child: null, marker: randomUUID() };
       const sessionId = resumeId ?? randomUUID();
@@ -1710,6 +1717,7 @@ export class ClaudeCodeBackend implements AgentBackend {
         resumeId,
         sessionId,
         disallowedTools,
+        readOnly: opts.readOnly === true,
         lockedDown: opts.lockedDown === true,
         ...(opts.remoteToolsOnly === true
           ? { builtinTools: deferredTools ? [TOOL_SEARCH_BUILTIN] : [] }

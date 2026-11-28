@@ -229,6 +229,23 @@ describe('Coordinator responsiveness contracts, prompt, tools, mirror, and runti
     expect(COORDINATOR_SYSTEM_PROMPT).toMatch(/user_computer_shell|attach_file/);
   });
 
+  it('defaults reversible choices and uses Cairn schedules for recurring briefs', () => {
+    const asking = COORDINATOR_SYSTEM_PROMPT.match(/<asking>([\s\S]*?)<\/asking>/)?.[1] ?? '';
+    const tools = COORDINATOR_SYSTEM_PROMPT.match(/<tools>([\s\S]*?)<\/tools>/)?.[1] ?? '';
+
+    expect(asking).toMatch(/choose and state a reasonable, reversible default/i);
+    expect(asking).toMatch(/project references first/i);
+    expect(asking).toMatch(/well-known context-appropriate choices/i);
+    expect(asking).toMatch(/do not ask for a competitor list just because/i);
+    expect(asking).toMatch(/need itself is ambiguous/i);
+    expect(asking).toMatch(/spend money.*credentials.*irreversible.*other people/i);
+    expect(tools).toMatch(/recurring requests.*Cairn's schedule_todo.*deferred.*tool_search/i);
+    expect(tools).toMatch(/recurring brief or research.*current Coordinator thread/i);
+    expect(tools).toMatch(/not in a separate task or in a provider's scheduler/i);
+    expect(tools).toMatch(/defaults you chose in the scheduled instructions/i);
+    expect(tools).toMatch(/confirm.*only after Cairn returns the schedule record/i);
+  });
+
   it('notify_user in user turns dedupes by toolCallId and relays to IM without desktop notification banners while keeping event-turn provenance and legacy fallback', async () => {
     const w = await world('查一下');
     const imCalls: { threadId: string; text: string }[] = [];

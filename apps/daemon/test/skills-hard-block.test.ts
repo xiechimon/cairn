@@ -276,7 +276,7 @@ describe('buildClaudeSdkOptions permission mode by lockdown state', () => {
     ).toEqual([]);
   });
 
-  test('a host build step keeps the main behaviour: no lockdown, bypass permissions, tools/hooks/plugins intact', () => {
+  test('a host build keeps workspace tools, hooks and plugins without the default vendor tool set', () => {
     const opts = buildClaudeSdkOptions({
       ...baseParts(),
       lockedDown: false,
@@ -285,10 +285,19 @@ describe('buildClaudeSdkOptions permission mode by lockdown state', () => {
     expect(opts.permissionMode).toBe('bypassPermissions');
     expect(opts.allowDangerouslySkipPermissions).toBeUndefined();
     expect(opts.allowedTools).toBeUndefined();
-    expect(opts.tools).toBeUndefined();
+    expect(opts.tools).toEqual([
+      'Read',
+      'Glob',
+      'Grep',
+      'Bash',
+      'PowerShell',
+      'Edit',
+      'Write',
+      'NotebookEdit',
+    ]);
     expect(opts.settingSources).toEqual(['user', 'project', 'local']);
     expect(opts.settings).not.toHaveProperty('disableAllHooks');
-    expect(opts.disallowedTools).toEqual(['AskUserQuestion']);
+    expect(opts.disallowedTools).toContain('AskUserQuestion');
     expect(opts.plugins).toEqual([{ type: 'local', path: '/skills' }]);
   });
 });
@@ -350,7 +359,7 @@ describe('buildClaudeSdkOptions (spec 14 §post-ruling scope 1/2: settingSources
   test('existing surfaces unregressed: bypass / disallowedTools / partial / model / cwd / sessionId', () => {
     const opts = buildClaudeSdkOptions(baseParts());
     expect(opts.permissionMode).toBe('bypassPermissions');
-    expect(opts.disallowedTools).toEqual(['AskUserQuestion']);
+    expect(opts.disallowedTools).toContain('AskUserQuestion');
     expect(opts.includePartialMessages).toBe(true);
     expect(opts.model).toBe('claude-test');
     expect(opts.cwd).toBe('/work/tree');

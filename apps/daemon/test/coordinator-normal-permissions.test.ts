@@ -291,8 +291,17 @@ describe('normal Coordinator permissions across runtimes', () => {
       abortController: new AbortController(),
     });
     expect(sdkOptions.permissionMode).toBe('bypassPermissions');
-    expect(sdkOptions.tools).toBeUndefined();
-    expect(sdkOptions.disallowedTools).toEqual(['AskUserQuestion']);
+    expect(sdkOptions.tools).toEqual([
+      'Read',
+      'Glob',
+      'Grep',
+      'Bash',
+      'PowerShell',
+      'Edit',
+      'Write',
+      'NotebookEdit',
+    ]);
+    expect(sdkOptions.disallowedTools).toContain('AskUserQuestion');
     expect(sdkOptions.settingSources).toEqual(['user', 'project', 'local']);
 
     expect(claudeAcpSessionMeta(acpTurnPolicy(claudeOpts))).toBeUndefined();
