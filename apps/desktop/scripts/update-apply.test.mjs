@@ -374,6 +374,8 @@ test('exit 0 applies the staged build and keeps the previous bundle for rollback
       previousVersion: initial.staged.previousVersion,
       previousApp,
       at: installed.installed.at,
+      guardOwner: 'desktop',
+      guardPid: process.pid,
     },
     knownVersion: initial.staged.version,
   });
