@@ -931,7 +931,7 @@ describe('coordinator diagnostics and shared tool resolution', () => {
     expect(normalClaim).not.toBeNull();
     const normalTools = normalClaim!.remoteTools ?? [];
     for (const def of normalTools) {
-      if (CORE_COORDINATOR_TOOLS.has(def.name) || def.name === SUGGEST_REPLIES_TOOL_NAME) {
+      if (CORE_COORDINATOR_TOOLS.has(def.name)) {
         expect(def.deferred).toBeUndefined();
       } else {
         expect(def.deferred).toBe(true);

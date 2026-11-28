@@ -75,6 +75,13 @@ describe('Coordinator project channels (docs/design/coordinator-project-channels
     expect(stepsOf(first.body.id)).toHaveLength(1);
   });
 
+  test('a greeting writes its greeting before it asks for reply chips', async () => {
+    const channel = await openChannel();
+    const prompt = stepsOf(channel.body.id)[0]!.prompt;
+    expect(prompt).toMatch(/问候写完后调用 suggest_replies/);
+    expect(prompt).not.toMatch(/写问候之前必须先调用/);
+  });
+
   test('the thread list puts the main thread first, then project channels', async () => {
     const channel = await openChannel();
     const res = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`);

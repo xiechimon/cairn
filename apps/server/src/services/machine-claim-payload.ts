@@ -371,9 +371,7 @@ export function buildChiefClaimPayload(
               teamId: threadRow.teamId,
               threadRow,
             }).tools.map((def) =>
-              CORE_COORDINATOR_TOOLS.has(def.name) || def.name === SUGGEST_REPLIES_TOOL_NAME
-                ? def
-                : { ...def, deferred: true },
+              CORE_COORDINATOR_TOOLS.has(def.name) ? def : { ...def, deferred: true },
             )),
     ],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),

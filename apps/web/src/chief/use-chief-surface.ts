@@ -305,6 +305,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         liveText,
         liveThinking,
         activity,
+        hasEarlier,
       }),
       hasEarlier,
     };

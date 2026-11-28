@@ -8,6 +8,7 @@ import {
   CHIEF_ROUTER_TOOLS,
   COMPUTER_REMOTE_TOOLS,
   REQUEST_SECRET_TOOL_DEF,
+  SUGGEST_REPLIES_TOOL_NAME,
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import {
@@ -237,6 +238,19 @@ describe('coordinator tools', () => {
     for (const browser of ['browser_navigate', 'browser_act']) {
       expect(tools.find((t) => t.name === browser)?.replay).toBe('unsafe');
     }
+  });
+
+  it('keeps suggest_replies loaded so a greeting needs no tool_search', () => {
+    const extension = coordinatorToolsExtension(fakeMachineApi(), createStepGate(), {
+      loaded: CORE_COORDINATOR_TOOLS,
+    });
+    const tools = extension.tools ?? [];
+    const replies = tools.find((t) => t.name === SUGGEST_REPLIES_TOOL_NAME) as
+      | { deferred?: boolean }
+      | undefined;
+    expect(replies?.deferred).not.toBe(true);
+    const search = tools.find((t) => t.name === 'tool_search');
+    expect(search?.description).not.toContain(`- ${SUGGEST_REPLIES_TOOL_NAME}: `);
   });
 
   it('relays a model tool call to the server under the claimed step and feeds back the result', async () => {

@@ -59,6 +59,7 @@ export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
   'attach_file',
   SHOW_DIFF_TOOL,
   SHOW_CHART_TOOL,
+  SUGGEST_REPLIES_TOOL_NAME,
 ]);
 
 export const machineToolRelayBodySchema = z.object({

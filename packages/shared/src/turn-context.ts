@@ -1,5 +1,13 @@
 export const TURN_STATE_OPEN = '<turn_state>';
 export const PICKED_PROJECT_OPEN = '【输入框选定项目：';
+export const CHANNEL_GREETING_OPEN = '【新频道】';
+
+export function isChannelGreetingPrompt(prompt: string | null | undefined): boolean {
+  return (
+    prompt?.startsWith(PICKED_PROJECT_OPEN) === true &&
+    prompt.split('\n')[1]?.startsWith(CHANNEL_GREETING_OPEN) === true
+  );
+}
 
 export const PROJECT_INSTRUCTIONS_HEADING = '## 项目说明（';
 

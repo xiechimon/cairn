@@ -47,6 +47,7 @@ import {
   GATE_ANNOUNCEMENTS,
   GIT_CREDENTIAL_ROW_KIND,
   infoReportMessageSchema,
+  isChannelGreetingPrompt,
   isChiefPromptEcho,
   isOwnComputerTool,
   liveQuickReplies,
@@ -2205,12 +2206,14 @@ function dropThinkingOfFailedTurns(items: ChiefStreamItem[], itemsAt: number[]):
 function collectChiefStream(
   messages: MessageRow[],
   pendingIds: ReadonlyMap<string, ChiefPendingMessage['state']> = new Map(),
+  opts: { opening?: boolean } = {},
 ): {
   items: ChiefStreamItem[];
   itemsAt: number[];
   trailingTools: ChiefToolRow[];
   pending: ChiefStreamItem[];
   eventTurn: boolean;
+  sawUser: boolean;
 } {
   const items: ChiefStreamItem[] = [];
   const itemsAt: number[] = [];
@@ -2219,11 +2222,25 @@ function collectChiefStream(
   let fallback: { model: string; stepId: string } | null = null;
   let pendingTools: ChiefToolRow[] = [];
   let pendingCards: ChiefStreamItem[] = [];
+  let opening = opts.opening === true;
+  let openingFailed = false;
+  let openingRobots: number[] = [];
   const flushCards = () => {
     items.push(...pendingCards);
     pendingCards = [];
   };
+  const finishOpening = () => {
+    if (!opening) return;
+    opening = false;
+    const drop = openingFailed ? openingRobots : openingRobots.slice(0, -1);
+    for (const index of [...drop].reverse()) {
+      items.splice(index, 1);
+      itemsAt.splice(index, 1);
+    }
+    openingRobots = [];
+  };
   let eventTurn = false;
+  let sawUser = false;
   for (const m of messages) {
     while (itemsAt.length < items.length) itemsAt.push(lastAt);
     lastAt = m.createdAt;
@@ -2245,13 +2262,17 @@ function collectChiefStream(
       if (stepOfRow !== fallback.stepId) fallback = null;
     }
     if (m.role === 'user' && isChiefPromptEcho(m)) {
-      eventTurn = WAKE_MARKER_PREFIX_RE.test(textOfContent(m.content).trim());
+      const echo = textOfContent(m.content).trim();
+      eventTurn = WAKE_MARKER_PREFIX_RE.test(echo);
       if (eventTurn) pendingTools = [];
+      if (!isChannelGreetingPrompt(echo)) finishOpening();
       continue;
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
     if (m.role === 'user' && pendingState === undefined) eventTurn = false;
     if (pendingState !== undefined) {
+      finishOpening();
+      sawUser = true;
       const text = textOfContent(m.content).trim();
       pendingById.set(m.id, {
         kind: 'user',
@@ -2268,6 +2289,7 @@ function collectChiefStream(
     }
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
+      if (opening) openingFailed = true;
       pendingTools = [];
       const last = items.at(-1);
       if (last?.kind === 'error' && last.error === undefined) items.pop();
@@ -2459,6 +2481,8 @@ function collectChiefStream(
     if (m.role === 'user') {
       const visible = visibleChiefMessageText(m);
       if (visible === null) continue;
+      finishOpening();
+      sawUser = true;
       pendingTools = [];
       flushCards();
       items.push({
@@ -2475,6 +2499,7 @@ function collectChiefStream(
     }
     if (m.role === 'system') continue;
     if (RAW_API_ERROR_RE.test(rawText)) {
+      if (opening) openingFailed = true;
       pendingTools = [];
       items.push({ kind: 'error', text: rawText, id: m.id });
       continue;
@@ -2492,11 +2517,16 @@ function collectChiefStream(
       ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
       ...rowProject(m),
     });
+    if (opening) {
+      openingRobots.push(items.length - 1);
+      openingFailed = false;
+    }
     pendingTools = [];
     flushCards();
   }
   flushCards();
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  finishOpening();
   dropThinkingOfFailedTurns(items, itemsAt);
   items.forEach((item, index) => {
     if (
@@ -2512,7 +2542,7 @@ function collectChiefStream(
     const item = pendingById.get(id);
     return item === undefined ? [] : [item];
   });
-  return { items, itemsAt, trailingTools: pendingTools, pending, eventTurn };
+  return { items, itemsAt, trailingTools: pendingTools, pending, eventTurn, sawUser };
 }
 
 function autoCloseStrong(text: string): string {
@@ -2536,6 +2566,7 @@ export function mapChief(
     liveText?: string;
     liveThinking?: string;
     activity?: StepActivity | null;
+    hasEarlier?: boolean;
   },
 ): ChiefContent {
   const bound = env.chief.agent !== null;
@@ -2548,12 +2579,16 @@ export function mapChief(
     active?.turnRunning !== true &&
     (active?.waitingRerun === 'held' || [...pendingIds.values()].includes('held'));
   const running = active?.activeRun != null && !parked;
-  const collected = active === null ? null : collectChiefStream(opts.messages, pendingIds);
+  const opening = active?.projectId != null && opts.hasEarlier !== true;
+  const collected =
+    active === null ? null : collectChiefStream(opts.messages, pendingIds, { opening });
   const chiefStream: ChiefStreamItem[] = collected?.items ?? [];
   const trailingTools = collected?.trailingTools ?? [];
   let waitingTurn: ChiefContent['waitingTurn'];
   const liveReply: ChiefStreamItem | null =
-    collected?.eventTurn === true || (opts.liveText ?? '').trim() === ''
+    collected?.eventTurn === true ||
+    (opening && collected?.sawUser !== true) ||
+    (opts.liveText ?? '').trim() === ''
       ? null
       : {
           kind: 'robot',
