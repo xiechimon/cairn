@@ -10,6 +10,7 @@ export const OWNED_PROCESS_CLI = import.meta.filename;
 export const OWNER_ENV = 'CAIRN_OWNER_ID';
 const MODE_ENV = 'CAIRN_OWNED_MODE';
 const POLL_MS = 500;
+const OWNER_MISS_LIMIT = 3;
 const GRACE_MS = 5_000;
 const DEFAULT_MAX_RUNTIME_SEC = 12 * 3600;
 const AGENT_COMMANDS = new Set(['claude', 'codex']);
@@ -374,6 +375,30 @@ function parseCli(argv) {
   return { options, command: [] };
 }
 
+export async function watchOwnerChain({
+  chain,
+  deadline,
+  isHelperGone,
+  info = processInfo,
+  pollMs = POLL_MS,
+  missLimit = OWNER_MISS_LIMIT,
+  sleepFn = sleep,
+  nowFn = Date.now,
+}) {
+  let consecutiveMisses = 0;
+  while (true) {
+    if (isHelperGone()) return 'helper_gone';
+    if (nowFn() >= deadline) return 'deadline';
+    if (chain.every(({ pid, start }) => info(pid)?.start === start)) {
+      consecutiveMisses = 0;
+    } else {
+      consecutiveMisses += 1;
+      if (consecutiveMisses >= missLimit) return 'owner_lost';
+    }
+    await sleepFn(pollMs);
+  }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   if (process.argv[2] === '--sentinel') {
     const { target, chain, deadline } = JSON.parse(process.argv[3]);
@@ -383,12 +408,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     });
     process.stdin.resume();
     for (const signal of FORWARDED_SIGNALS) process.on(signal, () => {});
-    while (
-      !helperGone &&
-      Date.now() < deadline &&
-      chain.every(({ pid, start }) => processInfo(pid)?.start === start)
-    )
-      await sleep(POLL_MS);
+    await watchOwnerChain({ chain, deadline, isHelperGone: () => helperGone });
     await killTarget(target);
     process.exit(0);
   }

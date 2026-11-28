@@ -11,6 +11,7 @@ import {
   parsePsInfo,
   processInfo,
   spawnOwned,
+  watchOwnerChain,
 } from './owned-process.mjs';
 import { makeTestTempDir } from './test-tmpdir.mjs';
 
@@ -347,4 +348,45 @@ test('a detached session job stays bound to the session when the helper starts s
   );
   session.kill('SIGKILL');
   assert.ok(await waitFor(() => pidsRunning(marker).length === 0), 'job died with its session');
+});
+
+test('watchOwnerChain tolerates transient ps misses and stops after consecutive misses', async () => {
+  const sequence = [{ start: 'ok' }, null, null, { start: 'ok' }, null, { start: 'ok' }];
+  let idx = 0;
+  let now = 0;
+  const pollsBeforeDeadline = await watchOwnerChain({
+    chain: [{ pid: 100, start: 'ok' }],
+    deadline: 600,
+    isHelperGone: () => false,
+    info: () => sequence[idx++] ?? { start: 'ok' },
+    pollMs: 100,
+    missLimit: 3,
+    sleepFn: async (ms) => {
+      now += ms;
+    },
+    nowFn: () => now,
+  });
+  assert.equal(pollsBeforeDeadline, 'deadline');
+  assert.equal(now, 600);
+
+  let failPolls = 0;
+  let failNow = 0;
+  const reason = await watchOwnerChain({
+    chain: [{ pid: 100, start: 'ok' }],
+    deadline: 1000,
+    isHelperGone: () => false,
+    info: () => {
+      failPolls += 1;
+      return failPolls === 1 ? { start: 'ok' } : null;
+    },
+    pollMs: 100,
+    missLimit: 3,
+    sleepFn: async (ms) => {
+      failNow += ms;
+    },
+    nowFn: () => failNow,
+  });
+  assert.equal(reason, 'owner_lost');
+  assert.equal(failPolls, 4);
+  assert.equal(failNow, 300);
 });

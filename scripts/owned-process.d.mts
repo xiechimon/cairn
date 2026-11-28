@@ -16,3 +16,14 @@ export function spawnOwned(
   exited: Promise<{ code: number | null; signal: NodeJS.Signals | null; error?: Error }>;
   stop(): Promise<{ code: number | null; signal: NodeJS.Signals | null; error?: Error }>;
 };
+
+export function watchOwnerChain(options: {
+  chain: { pid: number; start: string }[];
+  deadline: number;
+  isHelperGone: () => boolean;
+  info?: (pid: number) => { start: string } | null;
+  pollMs?: number;
+  missLimit?: number;
+  sleepFn?: (ms: number) => Promise<void>;
+  nowFn?: () => number;
+}): Promise<'helper_gone' | 'deadline' | 'owner_lost'>;
