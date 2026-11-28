@@ -383,6 +383,27 @@ describe('the owner’s Chrome when a call goes wrong or overlaps', () => {
     expect((outcome as ComputerRefusal).delivery).toBe('not_delivered');
   });
 
+  test('a checkbox verification failure after Browser MCP clicked is unsafe to repeat', async () => {
+    const { call } = recording((commands) =>
+      commands[0] === 'check e7'
+        ? {
+            text: '✗ step 1: check e7 — Clicking e7 didn’t check it',
+            isError: true,
+          }
+        : '✓',
+    );
+    const outcome = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'check', ref: '@e7' }] },
+      options(call),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(outcome).toBeInstanceOf(ComputerRefusal);
+    expect((outcome as ComputerRefusal).delivery).toBe('unknown');
+  });
+
   test('a successful read-only line in a failed batch does not make it unsafe to repeat', async () => {
     const { call } = recording((commands) => {
       const command = commands[0] ?? '';

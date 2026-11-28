@@ -167,12 +167,12 @@ async function runCommands(
       `${answer.text}. Ask the owner to click Resume in the Browser MCP extension's popup; nothing was opened in another browser.`,
     );
   if (kind === 'failed') {
-    const abandonedMutation =
+    const uncertainMutation =
       commands.some((command) => MUTATING_COMMAND.test(command)) &&
-      /^✗ step \d+: .*?(?:timed out|abandoned).*$/im.test(answer.text);
+      /^✗ step \d+: .*?(?:timed out|abandoned|didn.t (?:check|uncheck) it).*$/im.test(answer.text);
     throw new ComputerRefusal(
       answer.text === '' ? 'Browser MCP refused this step' : answer.text,
-      abandonedMutation ? 'unknown' : 'not_delivered',
+      uncertainMutation ? 'unknown' : 'not_delivered',
     );
   }
   return answer.text;
