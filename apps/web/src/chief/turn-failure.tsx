@@ -47,17 +47,33 @@ function translatedCopy(copy: TurnErrorCopy, t: TFunc) {
   return { title: t(copy.title, vars), why: t(copy.why, vars), vars };
 }
 
-export function turnErrorDetail(error: TurnErrorFacts, t: TFunc): NoticeDetail {
-  const copy = turnErrorCopy(error, ON_MAC);
-  const text = translatedCopy(copy, t);
+function detailOf(
+  copy: TurnErrorCopy,
+  text: ReturnType<typeof translatedCopy>,
+  error: TurnErrorFacts,
+  t: TFunc,
+): NoticeDetail {
   const why =
     copy.kind === 'unknown' ? t('请重试；如果持续出现，请复制下方错误并联系支持。') : text.why;
   return { lines: [text.title, why], raw: error.message };
 }
 
-function useCopyText() {
-  const { t } = useI18n();
-  return (copy: TurnErrorCopy) => translatedCopy(copy, t);
+export function turnErrorDetail(error: TurnErrorFacts, t: TFunc): NoticeDetail {
+  const copy = turnErrorCopy(error, ON_MAC);
+  return detailOf(copy, translatedCopy(copy, t), error, t);
+}
+
+export function failureCardNotice(error: TurnErrorFacts, t: TFunc) {
+  const copy = turnErrorCopy(error, ON_MAC);
+  const text = translatedCopy(copy, t);
+  return {
+    kind: copy.kind,
+    actions: copy.actions,
+    vars: text.vars,
+    title: text.title,
+    why: text.why,
+    detail: detailOf(copy, text, error, t),
+  };
 }
 
 export const CardFailureContext = createContext<string | null>(null);
@@ -148,9 +164,8 @@ export function TurnFailureCard({
   onDismiss: () => void;
 }) {
   const { t } = useI18n();
-  const copy = turnErrorCopy(error, ON_MAC);
-  const text = useCopyText()(copy);
-  const actions = copy.actions.filter((action) =>
+  const notice = failureCardNotice(error, t);
+  const actions = notice.actions.filter((action) =>
     action === 'update'
       ? canUpdateDesktop()
       : (action !== 'retry' && action !== 'continue') || onRetry !== undefined,
@@ -158,19 +173,19 @@ export function TurnFailureCard({
   return (
     <NoticeCard
       testId="chief-turn-error-card"
-      kind={copy.kind}
+      kind={notice.kind}
       tone="fail"
-      title={text.title}
-      why={text.why}
+      title={notice.title}
+      why={notice.why}
       className={className}
       onDismiss={onDismiss}
-      detail={{ lines: [], raw: error.message }}
+      detail={notice.detail}
       detailTestId="chief-turn-error-raw"
     >
       <span className="flex min-w-0 flex-wrap items-center gap-2">
         {actions.map((action, n) => {
           const href = actionHref(action, error);
-          const label = t(ACTION_LABELS[action], text.vars);
+          const label = t(ACTION_LABELS[action], notice.vars);
           const variant = n === 0 ? 'default' : 'outline';
           return href === null ? (
             <Button

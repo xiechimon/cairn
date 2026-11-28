@@ -1,16 +1,32 @@
 import { expect, test } from 'vitest';
 import { turnErrorCopy } from '../src/api/mappers.js';
-import { turnErrorDetail } from '../src/chief/turn-failure.js';
+import { failureCardNotice, turnErrorDetail } from '../src/chief/turn-failure.js';
 import { EN } from '../src/i18n/en.js';
-import { translate } from '../src/i18n/translate.js';
+import { type TFunc, translate } from '../src/i18n/translate.js';
+
+const translateFor =
+  (locale: 'zh' | 'en'): TFunc =>
+  (source, vars) =>
+    translate(locale, EN, source, vars);
 
 test.each(['zh', 'en'] as const)('expanded unknown failure gives next steps in %s', (locale) => {
   const error = { message: 'an unexpected problem' };
-  const detail = turnErrorDetail(error, (source, vars) => translate(locale, EN, source, vars));
+  const detail = turnErrorDetail(error, translateFor(locale));
   expect(detail.lines.join(' ')).not.toMatch(/点击「详情」|open Details/i);
   expect(detail.lines.join(' ')).toMatch(locale === 'zh' ? /重试/ : /try again/i);
   expect(detail.raw).toBe(error.message);
 });
+
+test.each(['zh', 'en'] as const)(
+  'the failure card carries those next steps into Details in %s',
+  (locale) => {
+    const error = { message: 'an unexpected problem' };
+    const notice = failureCardNotice(error, translateFor(locale));
+    expect(notice.detail.lines.join(' ')).not.toMatch(/点击「详情」|open Details/i);
+    expect(notice.detail.lines.join(' ')).toMatch(locale === 'zh' ? /重试/ : /try again/i);
+    expect(notice.detail.raw).toBe(error.message);
+  },
+);
 
 test('a disk-full runner failure is explained as a machine problem with a retry', () => {
   expect(

@@ -83,6 +83,22 @@ test('the card carries the latest failure alone; older failures stay expandable 
   expect(sent).toEqual([]);
 });
 
+test('the card tells the user what to do inside Details when the cause is unrecognized', async ({
+  page,
+}) => {
+  await open(page, [
+    { id: 'm1', role: 'user', content: '帮我查一下这个任务的进度', createdAt: 10 },
+    failure('m2', 11, { message: 'an unexpected problem' }),
+  ]);
+  const card = page.getByTestId('chief-turn-error-card');
+  await expect(card).toHaveAttribute('data-kind', 'unknown');
+  await card.getByRole('button', { name: '详情' }).click();
+  const detail = card.getByTestId('chief-turn-error-raw');
+  await expect(detail).toContainText('an unexpected problem');
+  await expect(detail).toContainText('请重试');
+  await expect(detail).not.toContainText('点击「详情」');
+});
+
 test('closing the card leaves an expandable marker', async ({ page }) => {
   await open(page, [
     { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
