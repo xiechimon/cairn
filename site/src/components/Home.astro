@@ -19,11 +19,8 @@ const site = 'https://cairn.xmon.me';
 const hasPromoVideo =
   existsSync(resolve(process.cwd(), 'public/media/promo.mp4')) ||
   existsSync(resolve(process.cwd(), 'site/public/media/promo.mp4'));
-const heroShot = (theme: 'light' | 'dark') => `/img/placeholder-hero-${theme}.svg`;
-const stepShot = (name: string, theme: 'light' | 'dark') =>
-  name === 'ios-home'
-    ? `/img/placeholder-ios-home-${theme}.svg`
-    : `/img/placeholder-thread-${theme}.svg`;
+const heroShot = (theme: 'light' | 'dark') => `/img/hero-${lang}-${theme}.webp`;
+const stepShot = (name: string, theme: 'light' | 'dark') => `/img/${name}-${lang}-${theme}.webp`;
 const stepSize: Record<string, [number, number]> = {
   'ios-home': [880, 1912],
   work: [780, 1520],

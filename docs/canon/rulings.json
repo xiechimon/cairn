@@ -4,7 +4,7 @@
     {
       "id": "positioning.thesis",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "date": "2026-11-14"
+      "date": "2026-11-28"
     },
     {
       "id": "positioning.second-person",
@@ -12,9 +12,9 @@
       "date": "2026-11-14"
     },
     {
-      "id": "positioning.merge-gate-axis",
+      "id": "positioning.capability-axis",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "date": "2026-11-01"
+      "date": "2026-11-28"
     },
     {
       "id": "positioning.runtime-axis",
@@ -59,12 +59,12 @@
     {
       "id": "positioning.eval-scope",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "date": "2026-11-16"
+      "date": "2026-11-28"
     },
     {
       "id": "positioning.shape",
       "spec": "docs/spec/18-positioning-and-differentiation.md",
-      "date": "2026-10-24"
+      "date": "2026-11-28"
     },
     {
       "id": "eval.data-loop",

@@ -2,7 +2,7 @@
   <img src="apps/web/public/icon-512.png" alt="Cairn" width="64" height="64">
   <h1>Cairn</h1>
 
-  <p><b>给写代码的人用的自托管个人助理。</b></p>
+  <p><b>开源、越干越会干的 agent harness。</b></p>
 
   <p>
     <a href="https://cairn.xmon.me">官网</a> ·
@@ -24,35 +24,26 @@
   </picture>
 </div>
 
-从写代码到你自己的事，你跟一个 Coordinator 说要做什么。它在你自己的机器上为每件活开一个 thread，只有需要你拍板时才找你。在桌前开始的活，在手机上接着拍板。
+Cairn 让你的 agent 跑在你自己的机器上、用你自己的订阅，并且一次比一次更会干你的活。今天它已经会：记住你纠正过的事，把同一个重复出现的错变成你仓库里的一道检查，把失败那一轮的教训交给下一次重试。它还在做有评测的那一半：提示词、技能、路由和工具用法上的改动，要在这套 agent 自己改不了的评测上得分更高，才会被留下。你只跟一个 Coordinator 说要做什么；它给每件活开一个 thread，只有需要你拍板时才回来找你。
 
 ## 你会得到什么
 
-- **用你自己的订阅。** Claude Code、Codex，或任意服务商的 API key（包括 Google 的 Gemini）。Cairn 目前不转售算力。
-- **先研究，再动手。** thread 改东西之前，先看几个强的开源项目是怎么解决的，细节自己定。
-- **只在需要你时打扰。** 首页只置顶等你拍板的事，推送也只发需要你动手的事。
-- **结果可信。** agent 合并前，合并闸只认绑定当前补丁的审核结论。撤不回的动作都等你点头。
-- **你的机器，你的数据。** 每台机器跑一个 daemon，thread 直接在这台主机上各自的 git worktree 里干活。代码和凭据留在你自己的机器上。
-- **你自己的事（计划中）。** 邮件、日程、求职作为一个不挂仓库的项目：agent 负责读、分类、起草；发出去、投出去都等你。
+- **记住你纠正过的事。** 值得留下的纠正会变成记忆，之后相关的时候会被带回来；失败那一轮的教训会写进下一次重试。
+- **同一个错再犯，就加一道检查。** 同一个错第二次出现时，agent 会指回那条规则，提议建一个仓库检查任务。你不点头，它不会自己装。
+- **用一套它改不了的评测量自己。** Coordinator 回合回放、真实编码任务和哨兵用例每天跑一遍；题目和评分代码是受保护路径，运行时从合并基点读取，agent 改不了自己要被考的那张卷子（[eval/](./eval/README.md)，[公开结果](https://cairn.xmon.me/zh-cn/eval/)）。
+- **得分更高，才留下（正在做）。** 提示词、技能、路由和工具用法上的改动，要在这套评测上赢过现在的 harness，并守住交付和打扰次数，才会被保留。这一步现在还只是方案，没有上线（[方案](./docs/design/harness-self-improve.md)）。
+- **先研究，再动手。** 动手之前，thread 先看几个强的开源项目是怎么解决的，细节自己定。
+- **你的机器，你的订阅。** 每台机器一个 Runner，每件事在自己的 git worktree 里跑；ChatGPT / Codex 订阅、Claude Code 或任意 API key 直接用。Cairn 不转售算力，代码和凭据留在你自己的机器上。
+- **撤不回的事，先停下来问你。** 合并、发送、删除和改凭据，都等你点头。
 
-<table>
-  <tr>
-    <td width="33%"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/board-dark.png">
-    <img alt="Mac 上的 Cairn 工作台：任务按待开始、执行中、待处理、已完成分列" src="docs/assets/readme/board-light.png" width="100%">
-  </picture></td>
-    <td width="33%"><picture>
+今天真正在用的是学习本身，不是那个承诺：记忆、重复犯错的检查提议、重试教训，以及带受保护评分代码的评测。只留更好的那一步正在做。邮件、日程和求职这类不挂仓库的项目，还在计划里。
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/work-zh-dark.webp">
-    <img alt="干活中的 thread：读了三个实现、改了一个文件、跑了测试" src="docs/assets/readme/work-zh-light.webp" width="100%">
-  </picture></td>
-    <td width="33%"><img src="docs/assets/readme/shot-merge.svg" alt="截图待补：PR 和合并闸的结论"></td>
-  </tr>
-  <tr>
-    <td>说一句，在手机上拍板</td>
-    <td>旁观或插话指挥 thread</td>
-    <td>合并闸决定能不能合</td>
-  </tr>
-</table>
+    <img alt="干活中的 thread：搜到导出实现、读了两个开源项目、改了一个文件、跑了测试" src="docs/assets/readme/work-zh-light.webp" width="360">
+  </picture>
+</p>
 
 ## 它自己查、自己定
 
@@ -60,18 +51,7 @@
 
 1. **先看别人怎么做。** 找两三个强的开源实现，读源码而不是只看 README，再做比较。
 2. **细节自己定。** 用哪个库、文件怎么放、怎么命名、怎么测，都由它决定，除非你的规则写了要先问。
-3. **报告分两栏。** 每份报告最后都有「我已自行决定」，每一项附理由；还有「需要你定的」，最多三项，每项附选项、证据和推荐。
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/report-zh-dark.webp">
-    <img alt="thread 报告最后的「我已自行决定」和「需要你定的」" src="docs/assets/readme/report-zh-light.webp" width="360">
-  </picture>
-</p>
-
-## 看它干活
-
-<img src="docs/assets/readme/demo-video.svg" alt="视频待补：约 90 秒，从手机上的一句需求到合并的 PR" width="100%">
+3. **只问真正该你定的。** 架构、产品方向或撤不回的动作，回来时是一个问题：选项、证据、推荐都齐；其余它自己定，并说清为什么。
 
 ## 安装
 
@@ -79,7 +59,9 @@
 
 内置 Runner 自带 **pi**，可以用你的 Codex 订阅或服务商 API key 跑任务，不需要另装 pi 或 Codex CLI。Claude Code 是可选的独立运行时，不是安装前提。
 
-**Linux 上**可以用下面的 npm 服务端和 Runner，也可以[从源码构建 Linux x64 桌面归档](./apps/desktop/README.md#linux-x64-archive)。目前没有公开提供的 Linux 桌面安装包或自动更新。归档需要图形会话和 Git；它和 Mac 应用一样会自带服务端、Runner 并自动登录本机。
+**Windows 上**，从同一个[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 x64 安装包或 ZIP。它会自带服务端和 Runner、自动登录本机，并原地自动更新。
+
+**Linux 上**，从同一个[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 x64 便携归档，也可以[从源码构建](./apps/desktop/README.md#linux-x64-archive)。Linux 没有自动更新。归档需要图形会话和 Git；它和 Mac 应用一样会自带服务端、Runner 并自动登录本机。
 
 **用 npm 跑服务端或增加 Runner**，需要 Node.js 22.19+（22 或 24 LTS）和 Git：
 
@@ -136,6 +118,7 @@ Cairn 是给一个人用的，不是给团队用的：你装一份自己用，�
 | [docs/getting-started.md](./docs/getting-started.md) | 跑起 server、登记机器、Docker、公网部署、从源码构建 |
 | [docs/configuration.md](./docs/configuration.md) | 全部 server 与 daemon 环境变量 |
 | [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md) | 用 Tailscale 从手机私网访问 |
+| [eval/README.md](./eval/README.md) | 公开评测：题目、评分代码、每日运行和「只留更好」的方案 |
 | [CONTEXT.md](./CONTEXT.md) | 领域模型与术语表 |
 | [docs/spec/](./docs/spec/) | 实现规范 |
 

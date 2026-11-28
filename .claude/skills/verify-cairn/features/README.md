@@ -65,7 +65,7 @@ The map does not write implementation details, only user paths, stable handles, 
 - [GitHub auth emulator](./github-auth-emulator.md): device sign-in, profile adoption, refresh and revocation against the in-repo fake over loopback HTTP.
 
 - [Control Glass five journeys](./glass-journeys.md) new task, dispatch to chief, review diff, request changes, merge. One-shot script `node .cursor/skills/verify-cairn/scripts/glass.mjs`.
-- [New task (workbench)](./board-new-task.md) workbench shell rendering (4 columns since #351), new-task dialog, automatic default-project creation when none, persistence triple truth.
+- [New task (workbench)](./board-new-task.md) home surface rendering (tasks in phase sections), new-task dialog, automatic default-project creation when none, persistence triple truth.
 - [API keys](./api-keys.md) empty-state key creation, one-time plaintext, masked rows, DB stores the hash not the plaintext.
 - [API evidence card](./api-evidence-card.md) live-stack driver for backend Proof cards (calls screenshot, transcript, Before/After request table).
 - [Search](./search.md) sidebar entry -> panel input -> hit task rows.

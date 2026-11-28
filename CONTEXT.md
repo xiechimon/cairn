@@ -1,6 +1,6 @@
 # Cairn domain model and vocabulary
 
-This file fixes, for each domain concept, a three-column mapping between the Chinese UI word, the English word and the internal code name, and settles the boundaries between concepts (positioning is in `docs/spec/18-positioning-and-differentiation.md`). Implementation contracts are not here. The phase enum and board columns live in `packages/shared/src/phase.ts`, record shapes in `packages/shared/src/records/`, and REST, SSE and machine wire in `packages/shared/src/protocol/`.
+This file fixes, for each domain concept, a three-column mapping between the Chinese UI word, the English word and the internal code name, and settles the boundaries between concepts (positioning is in `docs/spec/18-positioning-and-differentiation.md`). Implementation contracts are not here. The phase enum and its labels live in `packages/shared/src/phase.ts`, the task panel's sections in `apps/web/src/board/tasks-sections.ts`, record shapes in `packages/shared/src/records/`, and REST, SSE and machine wire in `packages/shared/src/protocol/`.
 
 Internal names are renamed only where a word is overloaded, and each rename is marked (see `密钥`).
 
@@ -18,8 +18,8 @@ _Avoid_: **Workspace** — it is not a domain entity; it only means the task che
 
 | Chinese UI word | English word | Internal name | Definition / boundary |
 |---|---|---|---|
-| `任务` | Todo | `todo` | One thing the user wants done; persistent and sequenced (`#seqNum`); a card on the board is one todo. |
-| `阶段` | Phase | `phase` | The todo's current state. The board's columns are only one view of the phases, not independent entities. |
+| `任务` | Todo | `todo` | One thing the user wants done; persistent and sequenced (`#seqNum`); a row in the `任务` panel is one todo. |
+| `阶段` | Phase | `phase` | The todo's current state. The task panel's sections are only one view of the phases, not independent entities. |
 | `运行` | Build | `build` | One execution of a todo: one run = one build = one conversation = one worktree + branch. Its id equals `conversationId`. |
 | `对话` | Conversation | `conversation` | An alias view of the message stream a build produces, sharing its UUID; not an independent entity. |
 | `方案` | Plan | `plan` | The typed planning artifact card inside a build (Context / Changes / Edge cases / Verification); not an independent entity. |
@@ -29,7 +29,7 @@ _Avoid_: **Workspace** — it is not a domain entity; it only means the task che
 
 Boundary rulings:
 - **No Goal concept** — there is only one work unit, the `todo`; "Goal" is not introduced.
-- Chip words live in `apps/web/src/phase.ts` and board columns in `packages/shared/src/phase.ts` (`BOARD_COLUMNS`). Use those values; do not invent column names. The review phase has two words for one phase, and `done` is an action, not a phase name.
+- Chip words live in `apps/web/src/phase.ts`, phase labels in `packages/shared/src/phase.ts`, and the task panel's section order and labels in `apps/web/src/board/tasks-sections.ts`. Use those values; do not invent section names. The review phase has two words for one phase, and `done` is an action, not a phase name.
 - Build and Conversation are two faces of one entity (execution vs message stream); they are not split into two id systems.
 - **New todos have no "title" input surface** — the user only writes the task body; title = placeholder title → agent back-fills, in two stages (**local projects only**; GitHub-project todos take the title from the issue); the label state axis is not introduced, having been subsumed by `phase`.
 - **The source of truth for labels and titles forks by repo form** — `githubRepo` projects take metadata truth from the issue, `local` projects keep it inside cairn. The fork is driven by constraints, not preference: local projects have no external source of truth to defer to. Do not assume the two forms behave identically when reading this vocabulary.

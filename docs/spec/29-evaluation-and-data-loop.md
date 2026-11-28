@@ -2,9 +2,8 @@
 
 > Status: **drafting landed** (2026-10-25, ticket #1510). Source: the 2026-10-22 plan (claude.ai artifact `4cjTdsVFN6ZP8TccM3ZWcE`), with the 2026-10-23 observability supplement (artifact `NrfYjm1yd3CJLKWR5DmKHA`) and the 2026-10-24 E1 criteria additions from RAVEN's research (#1605, #1606). Scope decision (2026-10-22): "training" means optimizing the harness only — prompts, skills, tool descriptions, context assembly, routing; never model weights.
 >
-> Removed (owner decision, 2026-11-16): the in-repo eval directory `integration/eval/`, the `.claude/hillclimb/` flows, the harness-regression merge gate, the weekly eval jobs and failure-replay candidate generation were deleted. Sections below that name them are history. What remains is trajectory capture and export (E0, the pack schema, outcome and attribution fields) and the Langfuse observability line (§3).
+> Removed (owner decisions, 2026-11-16 and 2026-11-21): the in-repo eval directory `integration/eval/`, the `.claude/hillclimb/` flows, the harness-regression merge gate, the weekly eval jobs, failure-replay candidate generation, the trajectory pack schema and its exporter. Sections below that name them are history. What remains is the system-level eval suite (`docs/design/eval-gate.md`, `eval/**`) with its daily run, and the Langfuse observability line (§3). The keep rule this spec's E3 describes is planned in `docs/design/harness-self-improve.md`.
 >
-> Removed (owner decision, 2026-11-21): the trajectory pack schema, exporter and outcome fields this spec built were deleted with the eval-gate v1; the replacement mechanism is `docs/design/eval-gate.md`. The rest is history.
 >
 > Related: ADR 0021 D4 (protected paths, amended for the eval surface by ADR 0025), ADR 0022 (evidence pruning — nothing here depends on merged evidence staying on main), `docs/research/eval-methods.md` (methodology survey). Tickets: §4 ledger.
 
@@ -48,7 +47,7 @@ Completion criteria:
 
 ### E2 · pacman-bench: the harness measured on real work (#1517, #1518, #1519, #1532)
 
-Status (owner decision, 2026-11-12): shelved, not voided. The coding bench waits and nothing below is scheduled. The evaluation line runs on Langfuse only (`docs/design/eval-on-langfuse.md`): it measures Coordinator routing today, and scorers for other assistant behavior are added to the same Langfuse setup later. Its first step is PR #4010 (Coordinator turn snapshots). The ruler, the adoption judge and the trajectory capture are not shelved; only the coding bench content is.
+Status (2026-11-28): the coding bench below is not scheduled as its own task set. The live eval line is the system-level suite in `eval/` — recorded Coordinator turns, real coding tasks and canaries, run daily on a macOS host (`docs/ops/eval-daily.md`) — plus Langfuse for Coordinator routing (`docs/design/eval-on-langfuse.md`). The ruler and the exam protection are not shelved, and the keep rule is planned in `docs/design/harness-self-improve.md`; only the coding bench content waits.
 
 A bench of ~30 tasks distilled from merged PRs (issue text + base SHA as the prompt, the PR's own tests hidden in the grading container), run under Harbor for isolation, wired into CI as a regression gate, plus a same-model cross-harness page-generation comparison.
 
@@ -59,9 +58,9 @@ Completion criteria:
 - Every harness-touching PR runs the bench holdout slice plus the chief-dispatch suite in CI; the gate blocks only on differences exceeding the confidence interval; a deliberately-broken-dispatch negative control is blocked, and non-harness PRs do not trigger it (#1519).
 - The page-generation comparison suite has its question bank and grading rubric in `integration/eval/`, a bare-pi-loop baseline round on the weak model tier, and per-batch human calibration (#1532).
 
-### E3 · The harness optimizes itself (no tickets yet; candidates #1579, #1614, #1576)
+### E3 · The harness optimizes itself (planned: `docs/design/harness-self-improve.md`, 2026-11-28)
 
-Close the outer loop: candidate generation reads failed trajectories, evaluation dispatches itself, and adoption runs per change. GEPA drives prompt mutation with variants and scores (including failures) archived under `.claude/hillclimb/` (#1579); the merge gate dispatches a regression-eval agent when a result file is missing instead of waiting for a human (#1614); memory gets the same regression-eval treatment (#1576). Ticket split is pending; the phase is sequenced after E2 because the optimizer is only as good as the bench it optimizes against.
+Close the outer loop: a candidate change to prompts, skills, routing or tool use is scored on paired trials of the protected exam, and is retained only if it wins, with delivery and interruption guards. The 2026-11-28 ruling makes this the product's centre and records the narrow exception to `positioning.eval-scope`: the agent may propose and test policy changes, but it never edits the exam, the grader or the controller. The plan's slices are all `later`; nothing is retained automatically today, and the earlier GEPA / hillclimb / regression-eval-agent route (#1579, #1614, #1576) was removed on 2026-11-16.
 
 Completion criteria (draft, to be confirmed when ticketed):
 

@@ -957,9 +957,9 @@ Reach:
 
 ### quota-wait
 
-**Quota wait** (shipped, centrality 3). When a subscription hits its limit, threads wait for the reset and the board says so.
+**Quota wait** (shipped, centrality 3). When a subscription hits its limit, threads wait for the reset and the home page says so.
 
-States: A banner on the board while a subscription waits for its reset; threads show they are waiting for quota.
+States: A banner on the home page while a subscription waits for its reset; threads show they are waiting for quota.
 
 Reach:
 

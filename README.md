@@ -2,7 +2,7 @@
   <img src="apps/web/public/icon-512.png" alt="Cairn" width="64" height="64">
   <h1>Cairn</h1>
 
-  <p><b>A self-hosted personal assistant for people who write code.</b></p>
+  <p><b>An open-source agent harness that gets better at your work.</b></p>
 
   <p>
     <a href="https://cairn.xmon.me">Website</a> ·
@@ -24,35 +24,26 @@
   </picture>
 </div>
 
-Tell one Coordinator what you want, from code to your own affairs. It opens a thread for each piece of work on your own machines, and comes to you only when a decision is yours. Start at your desk; make the call from your phone.
+Cairn runs your coding agents on your own machines, with your own subscriptions, and works to make them better at your work over time. Today it remembers what you correct, turns a mistake that repeats into a check in your repo, and carries a failed run's lessons into the retry. It is also building the measured half: a change to prompts, skills, routing or tool use is kept only when it scores better on an exam the agent cannot edit. You tell one Coordinator what you want; it opens a thread for each piece of work and comes back when a decision is yours.
 
 ## What you get
 
-- **Your own subscriptions.** Claude Code, Codex, or an API key from any provider, Google's Gemini included. Today Cairn resells no compute.
-- **Research, then build.** A thread reads how strong open-source projects solved the problem before it changes anything, and decides the details itself.
-- **Only what needs you.** The home page pins the decisions waiting on you, and a push goes out only when you must act.
-- **Results you can trust.** Before an agent merges, the gate counts only review verdicts bound to the current patch. Anything that cannot be undone waits for your yes.
-- **Your machines, your data.** A daemon on each machine runs threads directly on that host in their own git worktree. Code and credentials stay on your machines.
-- **Your own affairs (planned).** Mail, calendar and job search as a project with no repository: agents read, sort and draft; sending and submitting wait for you.
+- **It remembers your corrections.** A correction worth keeping becomes memory the Coordinator brings back when it matters, and a failed run writes its lessons into the next attempt.
+- **A mistake you correct twice becomes a check.** The second time you correct the same thing, the Coordinator points at the saved rule and offers to add a repository check as a task. It never installs one unasked.
+- **It is measured on an exam it cannot edit.** Recorded Coordinator turns, real coding tasks and canaries run daily; the cases and scorers are a protected path read from the merge base, so an agent change cannot rewrite the exam it is judged by ([eval/](./eval/README.md), [public results](https://cairn.xmon.me/eval/)).
+- **Improvements are kept only after they pass (being built).** A change to prompts, skills, routing or tool use is kept only when it beats the current harness on that exam, with guards for delivery and your interruptions. That loop is a plan today, not shipped ([plan](./docs/design/harness-self-improve.md)).
+- **Research, then build.** Before it changes anything, a thread reads how strong open-source projects solved the problem, then decides the details itself.
+- **Your machines, your subscriptions.** One Runner per machine runs threads in their own git worktree, on your ChatGPT / Codex subscription, Claude Code, or an API key. Cairn resells no compute, and code and credentials stay on your machines.
+- **Nothing irreversible without your yes.** Merges, sends, deletes and credential changes wait for you.
 
-<table>
-  <tr>
-    <td width="33%"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/board-dark.png">
-    <img alt="The Cairn board on a Mac (Chinese interface): tasks in columns for to start, running, needs you and done" src="docs/assets/readme/board-light.png" width="100%">
-  </picture></td>
-    <td width="33%"><picture>
+What ships today is the learning itself, not the promise: memory, the repeat-mistake check proposal, retry lessons, and the exam with its protected scorers. The keep-only-if-better rule is being built. Mail, calendar and job search as projects with no repository are still planned.
+
+<p align="center">
+  <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/work-en-dark.webp">
-    <img alt="A thread at work: it read three implementations, edited one file and ran the tests" src="docs/assets/readme/work-en-light.webp" width="100%">
-  </picture></td>
-    <td width="33%"><img src="docs/assets/readme/shot-merge.svg" alt="Screenshot coming soon: the pull request and the merge gate verdict"></td>
-  </tr>
-  <tr>
-    <td>Say it, decide from your phone</td>
-    <td>Watch or steer the thread</td>
-    <td>The gate decides the merge</td>
-  </tr>
-</table>
+    <img alt="A thread at work: it searched an export implementation, read two open-source projects, edited one file and ran the tests" src="docs/assets/readme/work-en-light.webp" width="360">
+  </picture>
+</p>
 
 ## It researches and decides on its own
 
@@ -60,18 +51,7 @@ You decide what you want and the architecture. The thread does the rest:
 
 1. **Reads the prior art.** It finds two or three strong open-source implementations, reads their source rather than their README, and compares them.
 2. **Decides the details.** Libraries, file layout, naming and tests are its call, unless your rules say to ask.
-3. **Reports both lists.** Every report ends with *Decided myself*, each choice with its reason, and *Needs your decision*: at most three items, each with options, evidence and a recommendation.
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/report-en-dark.webp">
-    <img alt="A thread report ending with Decided myself and Needs your decision" src="docs/assets/readme/report-en-light.webp" width="360">
-  </picture>
-</p>
-
-## See it work
-
-<img src="docs/assets/readme/demo-video.svg" alt="Video coming soon: about 90 seconds, from a request on the phone to a merged pull request" width="100%">
+3. **Asks only what is yours.** A real architecture, product or irreversible call comes back as one question with options, evidence and a recommendation; the rest it decides and says why.
 
 ## Install
 
@@ -79,7 +59,9 @@ You decide what you want and the architecture. The thread does the rest:
 
 The bundled Runner includes **pi**, which can run tasks with your Codex subscription or a provider API key. You do not need to install pi or the Codex CLI. Claude Code is an optional separate runtime, not a prerequisite.
 
-**On Linux**, use the npm server and Runner below, or [build the Linux x64 desktop archive](./apps/desktop/README.md#linux-x64-archive) from source. There is no published Linux desktop download or Linux automatic update. The archive needs a graphical Linux session and Git. Like the Mac app, it starts its own server and Runner and signs you in locally.
+**On Windows**, download the x64 installer or ZIP from the same [latest release](https://github.com/xiechimon/cairn/releases/latest). It starts its own server and Runner and signs you in, and updates itself in place.
+
+**On Linux**, download the x64 portable archive from the same [latest release](https://github.com/xiechimon/cairn/releases/latest), or [build it from source](./apps/desktop/README.md#linux-x64-archive). There is no Linux automatic update. The archive needs a graphical Linux session and Git, and like the Mac app it starts its own server and Runner and signs you in locally.
 
 **For the npm server or an extra Runner**, use Node.js 22.19+ on the 22 or 24 LTS line, and Git:
 
@@ -136,6 +118,7 @@ It is not the right fit if you want:
 | [docs/getting-started.md](./docs/getting-started.md) | Run the server, enroll a machine, Docker, deploy publicly, build from source |
 | [docs/configuration.md](./docs/configuration.md) | Every server and daemon environment variable |
 | [docs/deploy/tailscale-mobile.md](./docs/deploy/tailscale-mobile.md) | Private access from your phone over Tailscale |
+| [eval/README.md](./eval/README.md) | The public exam: its cases, scorers and the daily run. The keep rule's plan is [docs/design/harness-self-improve.md](./docs/design/harness-self-improve.md) |
 | [CONTEXT.md](./CONTEXT.md) | Domain model and glossary |
 | [docs/spec/](./docs/spec/) | Implementation canon |
 

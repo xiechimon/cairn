@@ -94,7 +94,7 @@ Room, historical measurement on the retired `omarchy` host on 2026-10-29: a DB c
 
 ## Monitoring (#2162)
 
-A stopped or failing backup shows up as a warning banner above the home page and the board. It sits in the banner slot rather than the daily brief because the brief only renders once the home chat has messages from an earlier day. Every run records its result, and the server reads that record:
+A stopped or failing backup shows up as a warning banner above the home page. It sits in the banner slot rather than the daily brief because the brief only renders once the home chat has messages from an earlier day. Every run records its result, and the server reads that record:
 
 - For an operator-managed systemd job, run `scripts/ops/record-backup-status.sh --status <server data dir>/backup-status.json` as `ExecStopPost=`. systemd runs it after every run, including failures and timeout kills, and passes the run's result in `SERVICE_RESULT` / `EXIT_STATUS`. The script atomically writes the host, the run time, the result and the last successful run time; a failed run keeps the previous success time.
 - The status file sits next to `server.db`, in the data dir of the server it describes. A server that moves with its data dir brings a status that then goes stale, and a backup of a leftover DB copy writes its status next to that copy, not next to the live one.

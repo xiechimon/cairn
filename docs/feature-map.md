@@ -575,7 +575,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### quota-wait
 
-**Quota wait** (shipped). When a subscription hits its limit, threads wait for the reset and the board says so.
+**Quota wait** (shipped). When a subscription hits its limit, threads wait for the reset and the home page says so.
 
 - Research: [docs/research/2330-claude-entrypoint-and-setup-token-quota.md](research/2330-claude-entrypoint-and-setup-token-quota.md)
 - Frontend design: **gap**: the quota banner and waiting thread state have no design

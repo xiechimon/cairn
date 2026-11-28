@@ -1,15 +1,16 @@
 ---
 title: What Cairn is
-description: A self-hosted personal assistant for people who write code, and how its three pieces fit together.
+description: An open-source agent harness that gets better at your work, and how its three pieces fit together.
 ---
 
 import { LinkCard, CardGrid } from '@astrojs/starlight/components';
 
-Cairn is a Mac desktop app and open-source personal assistant for people who write code, with an advanced self-hosted server path for Linux and extra machines. You tell one Coordinator what you want, in one conversation. It opens a thread for each piece of work, the thread runs on your own machine with your own model subscription, and it comes back to you only when a decision is yours.
+Cairn is an open-source agent harness for your own machines: a desktop app for macOS, Windows x64 and Linux x64, with a self-hosted server path for extra machines. You tell one Coordinator what you want, in one conversation. It opens a thread for each piece of work, the thread runs on your own machine with your own model subscription, and it comes back to you only when a decision is yours. Over time it gets better at your work.
 
-- **A thread researches before it builds.** It reads how two or three strong open-source projects solved the problem, then decides libraries, layout, naming and tests itself.
-- **Every report ends with two lists.** *Decided myself*, each choice with its reason, and *Needs your decision*, at most three items with options and a recommendation.
-- **Merging is your call.** A finished code task stays on its own branch; to merge it, say so in the conversation. Anything that cannot be undone waits for your yes.
+- **It remembers what you correct.** A correction worth keeping becomes memory, brought back when it matters; a failed run writes its lessons into the next attempt.
+- **A repeated mistake becomes a check.** When the same mistake comes back, the agent points at the rule and offers to add a repository check as a task; it never installs one unasked.
+- **Its changes are measured.** The eval suite's cases and scorers are a protected path read from the merge base, so an agent change cannot rewrite the exam it is judged by. Keeping a change only after it beats the current harness on that exam is being built.
+- **Nothing irreversible without your yes.** Merging, sending, deleting and credential changes wait for you.
 
 Cairn is for one person. You run your own copy; someone else who wants it runs theirs.
 
@@ -34,6 +35,7 @@ You need all three before the Coordinator can answer. The pages below walk throu
 
 ## What is planned, not shipped
 
+- **Keep it only if it scores better.** A change to prompts, skills, routing or tool use is kept only when it beats the current harness on the protected eval exam, with guards for delivery and your interruptions. The memory, check proposals and retry lessons it builds on work today. Plan: `docs/design/harness-self-improve.md`.
 - **Your own affairs.** Mail, calendar and job search as a project with no repository, where agents read, sort and draft, and sending and submitting wait for you. Not available yet.
 - **Showcase recordings.** End-to-end recordings of real work, with the pull requests and numbers you can trace.
 

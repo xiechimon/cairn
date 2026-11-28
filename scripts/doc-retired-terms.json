@@ -251,6 +251,12 @@
       "pattern": "\\bCAIRN_TSNET=socket\\b",
       "canary": "CAIRN_TSNET=socket",
       "reason": "the system-tailscaled socket mode is retired; remote access uses the embedded tsnet sidecar or tailscale serve"
+    },
+    {
+      "id": "orb-executor",
+      "pattern": "\\borb executor\\b|CAIRN_EXECUTOR=orb|apps/daemon/src/orb",
+      "canary": "CAIRN_EXECUTOR=orb",
+      "reason": "the orb executor and its nspawn provider were removed; agents run as the operator's OS user in a per-task worktree, with no container boundary"
     }
   ],
   "baseline": {
@@ -326,6 +332,9 @@
     "tailscale-users-env": {},
     "tailnet-allowed-logins": {},
     "tsnet-socket-mode": {},
-    "favorites-task-model-gate": {}
+    "favorites-task-model-gate": {},
+    "orb-executor": {
+      "docs/spec/18-positioning-and-differentiation.md": 1
+    }
   }
 }

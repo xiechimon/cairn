@@ -5,13 +5,15 @@ description: 启动 Cairn 服务端，打开网页应用。
 
 import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-在 Mac 上推荐直接使用 Cairn 桌面应用：它内置了网页应用、Coordinator、SQLite 数据库和本地 pi 执行机，并自动完成 owner 登录。只有在需要独立常驻 Linux 服务端或挂载多台服务器时，才需要走下面的 `npx @xiechimon/cairn` 或 Docker 进阶自托管路线。
+推荐直接使用 Cairn 桌面应用：它内置了网页应用、Coordinator、SQLite 数据库和本地 pi 执行机，并自动完成 owner 登录；macOS、Windows x64 和 Linux x64 都有安装包。只有在需要独立常驻 Linux 服务端或挂载多台服务器时，才需要走下面的 `npx @xiechimon/cairn` 或 Docker 进阶自托管路线。
 
-## 桌面应用（Mac 首选）
+## 桌面应用（macOS、Windows、Linux）
 
 macOS 从[最新发布](https://github.com/xiechimon/cairn/releases/latest)下载 DMG：Apple 芯片用 arm64，Intel 用 x64。拖进“应用程序”再打开。应用还没有公证；被拦时到“系统设置 → 隐私与安全性”点“仍要打开”（macOS 14 及更早：右键应用选“打开”）。它会启动服务端和 pi Runner，并以 owner 身份登录。不需要 Node.js、单独安装 pi 或 Codex CLI。接着看[接入模型](/zh-cn/docs/models/)。
 
-Linux x64 桌面端目前是 **本地源码构建**，没有公开下载包或自动更新。按[桌面构建和解压步骤](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive)操作，需要图形会话和 Git。应用自带服务端和 Runner，退出会停止两者。无图形界面的 Linux 服务端用下面的 npm 路线。
+**Windows x64**：从同一个发布页下载 `-win-x64.exe` 安装包或 ZIP 并运行。它自带服务端和 Runner、自动登录本机，并原地自动更新。
+
+**Linux x64**：从同一个发布页下载 `-linux-x64.tar.gz` 便携归档并解压，或按[桌面构建和解压步骤](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive)从源码构建。Linux 没有自动更新。需要图形会话和 Git。应用自带服务端和 Runner，退出会停止两者。无图形界面的 Linux 服务端用下面的 npm 路线。
 
 ## 进阶：独立服务端运行环境
 
@@ -54,7 +56,7 @@ Linux x64 桌面端目前是 **本地源码构建**，没有公开下载包或�
 
 界面跟随浏览器语言。首次向导依次显示 **接入模型** 和 **确认设置**（核对 Coordinator 模型，任务默认复用该模型）。按[接入模型](/zh-cn/docs/models/)操作后确认选择。独立的 npm 安装还要[连接 Runner](/zh-cn/docs/runner/) 并确认其在线。
 
-macOS 和 Windows 的 npm 浏览器配对不是 owner 会话，目前不能添加模型连接或批准 Runner。按[上手指南](https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#run-the-server)用 owner-token API，或改用自带 owner 登录的 Mac 桌面应用。浏览器配对成功不等于模型设置完成。
+macOS 和 Windows 的 npm 浏览器配对不是 owner 会话，目前不能添加模型连接或批准 Runner。按[上手指南](https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#run-the-server)用 owner-token API，或改用自带 owner 登录的桌面应用。浏览器配对成功不等于模型设置完成。
 
 <Aside type="caution">
 服务端只监听 `127.0.0.1`，非浏览器的客户端一律要带令牌。不要在没有令牌的情况下把它绑到公网地址；见下面的 [用 Docker 跑](#用-docker-跑) 和 [在手机上访问](#在手机上访问)。

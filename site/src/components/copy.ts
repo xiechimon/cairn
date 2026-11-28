@@ -25,9 +25,9 @@ export const copy = {
     skipToContent: '跳到正文',
     navLabel: '主导航',
     footerNavLabel: '页脚导航',
-    title: 'Cairn：从你身上学，也从自己的任务里学',
+    title: 'Cairn：越干越会干的 agent harness',
     description:
-      'Cairn 是开源（Apache-2.0）的 Mac 个人开发助理桌面应用，也支持服务端自托管进阶部署：在一个对话里说清目标，agent 在你自己的电脑上用你现有的模型订阅独立查资料、改代码并验证，只在要拍板时找你。',
+      'Cairn 是开源（Apache-2.0）的桌面 agent harness（macOS、Windows、Linux），也可自托管：agent 跑在你自己的电脑上、用你已有的模型订阅；你纠正过的事、重复犯的错和失败的教训，会变成它下一次的本事。',
     nav: {
       docs: '文档',
       github: 'GitHub',
@@ -35,8 +35,8 @@ export const copy = {
       themeToDark: '切换到深色',
       themeToLight: '切换到浅色',
     },
-    h1: ['从你身上学，', '也从自己的任务里学'],
-    lede: 'Cairn 是会自己变好的个人 agent：你纠正过的事会变成它之后每个对话都带着的记忆；同一个错再犯，它会提议在你的仓库里加一道检查；失败的任务会把教训交给下一次重试。',
+    h1: ['越干越会干，', '越用越懂你'],
+    lede: 'Cairn 跑在你自己的机器上，用你已有的模型订阅，让 agent 一次比一次更会干你的活：你纠正过的事会变成之后带回来的记忆；同一个错再犯，它会提议在你的仓库里加一道检查；失败那一轮的教训会交给下一次重试。按评测只留更好的那种改法，正在做。',
     proof: {
       label: '「变好」怎么量',
       cases: '个固定用例',
@@ -87,7 +87,7 @@ export const copy = {
           alt: 'Coordinator 对话截图（手机）',
         },
         {
-          title: '隔离副本里先查后改',
+          title: '自己的 worktree 里先查后改',
           img: 'work',
           alt: '任务执行过程截图',
         },
@@ -102,29 +102,29 @@ export const copy = {
       title: '为什么是 Cairn',
       items: [
         {
-          title: '用你已经在付的订阅',
-          body: '登录 ChatGPT / Codex、Claude Code 订阅，或任意服务商的 API key（含 Google Gemini）。不转售算力，不买第二份额度。',
+          title: '记住你纠正过的事',
+          body: '值得留下的纠正会存成记忆，之后相关的时候会被带回来；失败那一轮的教训也会写进下一次重试。',
         },
         {
-          title: '代码和密钥留在本地',
-          body: '每项任务都在你这台主机各自独立的 git worktree 副本里改代码、跑测试，源码与访问凭证不出你自己的机器。',
+          title: '同一个错再犯，就加一道检查',
+          body: '你第二次纠正同一个错时，Coordinator 会指回那条已存的规则，提议建一个仓库检查任务；你不点头，它不会自己装。',
         },
         {
-          title: '只在要你定夺时打断你',
-          body: '常规实现自动按规范推进；遇到架构选择或待审批结果直接置顶到列表顶部，非你确认不可时才推送通知。',
+          title: '用一套它改不了的评测量自己',
+          body: 'Coordinator 回合回放、真实编码任务和哨兵用例每天跑一遍；题目和评分代码是受保护路径，运行时从合并基点读取，agent 改不了自己要被考的那张卷子。',
+        },
+        {
+          title: '得分更高，才留下',
+          tag: '正在做',
+          body: '提示词、技能、路由和工具用法上的改动，要在这套评测上赢过现在的 harness，并守住交付和打扰次数，才会被保留。这一步还在建；今天真正在用的是记忆、检查和重试。',
+        },
+        {
+          title: '你的机器，你的订阅',
+          body: '每台机器一个 Runner，每件事在自己的 git worktree 里干；ChatGPT / Codex、Claude Code 订阅或任意 API key 直接用。Cairn 不转售算力。',
         },
         {
           title: '撤不回的事，先停下来问你',
-          body: '删数据、付款、改凭证、推送远端或对外发布前一律先征求明确同意，不越界操作。',
-        },
-        {
-          title: '电脑派活，手机随时拍板',
-          body: '同一个对话实时同步到手机端；通过 Tailscale 走加密私有访问，不用把服务端端口暴露到公网。',
-        },
-        {
-          title: '个人事务也能托管',
-          tag: '规划中',
-          body: '邮件、日程与求职材料可建为无代码仓库的项目：agent 先读取、归类并起草，发送和提交仍由你点确认。',
+          body: '合并、发送、删除和改凭据，都等你点头。',
         },
       ],
     },
@@ -195,9 +195,9 @@ export const copy = {
     skipToContent: 'Skip to content',
     navLabel: 'Primary',
     footerNavLabel: 'Footer',
-    title: 'Cairn: Learns from you, and from its own runs.',
+    title: 'Cairn: an agent harness that gets better at your work',
     description:
-      'Cairn is an open-source (Apache-2.0) Mac desktop app and personal coding assistant, with an advanced self-hosted server path. Describe what you want in one conversation; agents research, build, and verify on your own hardware with your own subscriptions.',
+      'Cairn is an open-source (Apache-2.0) desktop agent harness for macOS, Windows and Linux, also self-hostable: agents run on your own hardware with your own subscriptions, and what you correct, the mistakes that repeat and the runs that fail become what the next attempt knows.',
     nav: {
       docs: 'Docs',
       github: 'GitHub',
@@ -205,8 +205,8 @@ export const copy = {
       themeToDark: 'Switch to dark theme',
       themeToLight: 'Switch to light theme',
     },
-    h1: ['Learns from you, ', 'and from its own runs.'],
-    lede: 'Cairn is a self-improving personal agent. What you correct becomes memory it brings to every later conversation; when a mistake repeats, it offers to add a check to your repo; a failed run hands its lessons to the retry.',
+    h1: ['Better at your work,', 'better at working with you'],
+    lede: 'Cairn runs your agents on your own machines with your own subscriptions, and makes them better at your job each run: what you correct comes back as memory, a mistake you correct twice gets a check proposed in your repo, and a failed run hands its lessons to the retry. The measured “keep only if it scores better” half is being built.',
     proof: {
       label: 'How “better” is measured',
       cases: 'fixed cases',
@@ -257,7 +257,7 @@ export const copy = {
           alt: 'Coordinator conversation screenshot (mobile)',
         },
         {
-          title: 'Research and build in isolation',
+          title: 'Research, then build in its worktree',
           img: 'work',
           alt: 'Thread work trace screenshot',
         },
@@ -272,29 +272,29 @@ export const copy = {
       title: 'Why Cairn',
       items: [
         {
-          title: 'Use the subscriptions you already pay for',
-          body: 'Sign in with ChatGPT / Codex, Claude Code, or an API key from any provider (Google Gemini included). Cairn never resells compute.',
+          title: 'Remembers what you correct',
+          body: 'A correction worth keeping becomes memory, brought back when it matters; a failed run writes its lessons into the next attempt.',
         },
         {
-          title: 'Code and keys stay on your machines',
-          body: 'Each task edits and verifies inside an isolated git worktree on your own host. Source code and credentials never leave your hardware.',
+          title: 'A repeat mistake becomes a check',
+          body: 'The second time you correct the same thing, the Coordinator points at the saved rule and offers to add a repository check as a task. It never installs one unasked.',
         },
         {
-          title: 'Interruptions reserved for real choices',
-          body: 'Routine engineering details follow repo conventions automatically; genuine architecture calls rise to the top of your inbox.',
+          title: 'Measured on an exam it cannot edit',
+          body: 'Recorded Coordinator turns, real coding tasks and canaries run daily; the cases and scorers are a protected path read from the merge base, so an agent change cannot rewrite the exam it is judged by.',
         },
         {
-          title: 'Nothing irreversible without approval',
-          body: 'Deletes, payments, credential changes, and public pushes stop and wait for your explicit sign-off every time.',
+          title: 'Kept only when it scores better',
+          tag: 'Being built',
+          body: 'Changes to prompts, skills, routing or tool use are kept only when they beat the current harness on that exam while delivery and interruption guards hold. That step is being built; memory, checks and retries are what work today.',
         },
         {
-          title: 'Start at your desk, decide from your phone',
-          body: 'The same conversation stays live on mobile over private Tailscale access with no public ports exposed.',
+          title: 'On your machines, with your subscriptions',
+          body: 'One Runner per machine, each task in its own git worktree, on your ChatGPT / Codex subscription, Claude Code or an API key. Cairn resells no compute.',
         },
         {
-          title: 'Non-code personal affairs too',
-          tag: 'Planned',
-          body: 'Track mail, scheduling, or job searches as projects without a git repo: agents sort and draft, while sending waits for you.',
+          title: 'Nothing irreversible without your yes',
+          body: 'Merges, sends, deletes and credential changes wait for you.',
         },
       ],
     },

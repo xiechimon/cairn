@@ -5,13 +5,15 @@ description: Start the Cairn server and open the web app.
 
 import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
-The Mac desktop app is the recommended starting point: it bundles the web app, Coordinator, SQLite database, and local pi Runner with owner sign-in built in. Running a standalone server with `npx @xiechimon/cairn` or Docker on a headless host is the advanced path once you want to separate the server or attach extra machines.
+The desktop app is the recommended starting point: it bundles the web app, Coordinator, SQLite database, and local pi Runner with owner sign-in built in, and ships for macOS, Windows x64 and Linux x64. Running a standalone server with `npx @xiechimon/cairn` or Docker on a headless host is the advanced path once you want to separate the server or attach extra machines.
 
-## Desktop app (recommended on Mac)
+## Desktop app (recommended)
 
 On macOS, download the appropriate DMG from the [latest release](https://github.com/xiechimon/cairn/releases/latest): arm64 for Apple silicon, x64 for Intel. Drag Cairn to Applications and open it. It is not notarized: if macOS blocks it, use System Settings → Privacy & Security → Open Anyway (on macOS 14 and earlier, right-click the app and choose Open). The app starts its server and pi Runner and signs you in as the owner. Node.js, a separate pi installation and the Codex CLI are not required. Continue with [Connect a model](/docs/models/).
 
-Linux x64 desktop is currently a **local source build**, not a published download or automatic update. Follow the [desktop build and extraction commands](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive). It requires a graphical Linux session and Git. It starts its own server and Runner; quit the app to stop them. For a headless Linux server, use npm below.
+On **Windows x64**, download the `-win-x64.exe` installer or ZIP from the same release and run it. It starts its own server and Runner, signs you in as the owner, and updates itself in place.
+
+On **Linux x64**, download the `-linux-x64.tar.gz` portable archive from the same release and extract it, or follow the [desktop build and extraction commands](https://github.com/xiechimon/cairn/blob/main/apps/desktop/README.md#linux-x64-archive) to build it. There is no Linux automatic update. It requires a graphical Linux session and Git. It starts its own server and Runner; quit the app to stop them. For a headless Linux server, use npm below.
 
 ## Advanced: self-hosted server requirements
 
@@ -54,7 +56,7 @@ Linux x64 desktop is currently a **local source build**, not a published downloa
 
 The interface follows your browser's language. The first-run wizard shows **Connect models**, then **Confirm settings** for Coordinator (tasks default to the Coordinator model). Follow [Connect a model](/docs/models/), then confirm the selection. A separate npm install also needs [a Runner](/docs/runner/) online.
 
-On macOS and Windows the paired npm browser is not an owner session: it cannot yet add model connections or approve Runners. Use the owner-token API as described in [getting started](https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#run-the-server), or use the Mac desktop app for owner access. Do not interpret browser pairing as completion of model setup.
+On macOS and Windows the paired npm browser is not an owner session: it cannot yet add model connections or approve Runners. Use the owner-token API as described in [getting started](https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#run-the-server), or use the desktop app for owner access. Do not interpret browser pairing as completion of model setup.
 
 <Aside type="caution">
 The server listens on `127.0.0.1` only and always requires a token for non-browser clients. Do not bind it to a public address without a token; see [Run it in Docker](#run-it-in-docker) and [Reach it from your phone](#reach-it-from-your-phone).

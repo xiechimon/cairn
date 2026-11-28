@@ -8,9 +8,13 @@ On a Mac, the desktop app is the whole install. Download it from the [latest rel
 
 The app runs the server and a Runner on this Mac, approves that Runner and signs you in as the owner. The Runner includes pi: connect your ChatGPT subscription inside Cairn or add a provider API key; neither the Codex CLI nor Claude Code is required for this route. Follow [Connect a model and get your first result](../README.md#connect-a-model-and-get-your-first-result). Claude Code is optional; its subscription setup is below.
 
-## Linux desktop from source
+## Cairn for Windows
 
-There is no published Linux desktop package or Linux automatic update. To build the portable x64 archive, follow [the desktop build and extraction commands](../apps/desktop/README.md#linux-x64-archive). It needs a graphical Linux session and Git. The app starts its own server and pi Runner, signs you in locally, and uses the same model-connection wizard as the Mac app. Quit stops both services. For a headless server or separate Runner, use npm below.
+The desktop app is the whole install on Windows too. Download `-win-x64.exe` or `-win-x64.zip` from the [latest release](https://github.com/xiechimon/cairn/releases/latest) and run it. The app runs the server and a Runner on this PC, approves that Runner, signs you in as the owner, and updates itself in place. The model connection is the same wizard as the Mac app.
+
+## Cairn for Linux
+
+Download `-linux-x64.tar.gz` from the [latest release](https://github.com/xiechimon/cairn/releases/latest) and extract it, or [build the portable archive from source](../apps/desktop/README.md#linux-x64-archive). There is no Linux automatic update. It needs a graphical Linux session and Git. The app starts its own server and pi Runner, signs you in locally, and uses the same model-connection wizard as the Mac app. Quit stops both services. For a headless server or separate Runner, use npm below.
 
 ## Run the server
 

@@ -2311,8 +2311,8 @@
     {
       "id": "quota-wait",
       "name": "Quota wait",
-      "summary": "When a subscription hits its limit, threads wait for the reset and the board says so.",
-      "states": "A banner on the board while a subscription waits for its reset; threads show they are waiting for quota.",
+      "summary": "When a subscription hits its limit, threads wait for the reset and the home page says so.",
+      "states": "A banner on the home page while a subscription waits for its reset; threads show they are waiting for quota.",
       "centrality": 3,
       "status": "shipped",
       "code": {
