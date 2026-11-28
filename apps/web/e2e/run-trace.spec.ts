@@ -95,6 +95,9 @@ test('the avatar list shows problem turns first, can show all, pages on scroll, 
   await expect(list.getByRole('list', { name: '昨天' })).toBeVisible();
   await list.locator('[aria-hidden="true"]').last().scrollIntoViewIfNeeded();
   await expect(rows).toHaveCount(25);
+  const older = list.getByRole('list', { name: '更早' }).locator('a[data-run-turn]').first();
+  await expect(older).toBeVisible();
+  expect((await older.boundingBox())?.height).toBe((await rows.first().boundingBox())?.height);
   await rows.first().focus();
   await page.keyboard.press('ArrowDown');
   await expect(rows.nth(1)).toBeFocused();

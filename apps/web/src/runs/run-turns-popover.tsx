@@ -29,7 +29,17 @@ function groupOf(at: number, now: number): '今天' | '昨天' | '更早' {
 function timeOf(at: number, group: string): string {
   const d = new Date(at);
   const clock = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  return group === '更早' ? `${d.getMonth() + 1}/${d.getDate()} ${clock}` : clock;
+  if (group !== '更早') return clock;
+  const day = d.toLocaleDateString([], { month: '2-digit', day: '2-digit' });
+  return `${day} ${clock}`;
+}
+
+export function RunTurnTime({ at, group }: { at: number; group: string }) {
+  return (
+    <span className="min-w-16 flex-none whitespace-nowrap text-meta text-content-tertiary tabular-nums">
+      {timeOf(at, group)}
+    </span>
+  );
 }
 
 function rowLabel(row: RunTurnRow, t: TFunc): string {
@@ -149,9 +159,7 @@ function TurnList({ threadId, onPick }: { threadId: string; onPick: () => void }
                     onClick={onPick}
                     className="flex min-h-8 items-center gap-2 rounded-md px-2 text-ui outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 pointer-coarse:min-h-11"
                   >
-                    <span className="w-16 flex-none text-meta text-content-tertiary tabular-nums">
-                      {timeOf(row.at, group.label)}
-                    </span>
+                    <RunTurnTime at={row.at} group={group.label} />
                     <span className="min-w-0 flex-1 truncate text-foreground">
                       {rowLabel(row, t)}
                     </span>
