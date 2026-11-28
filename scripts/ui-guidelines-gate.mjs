@@ -459,9 +459,54 @@ function enKeys(vfs) {
   return keys;
 }
 
+function blankComments(text) {
+  let out = '';
+  let i = 0;
+  let quote = null;
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (quote !== null) {
+      out += ch;
+      if (ch === '\\') {
+        out += next ?? '';
+        i += 2;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      while (i < text.length && text[i] !== '\n') {
+        out += ' ';
+        i += 1;
+      }
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      const close = text.indexOf('*/', i + 2);
+      const stop = close === -1 ? text.length : close + 2;
+      out += text.slice(i, stop).replace(/[^\n]/g, ' ');
+      i = stop;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') quote = ch;
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+const DEVICE_FIELD_READ =
+  /(?:\?\.|\.)\s*(?:userCode|verificationUri)\b|\[\s*['"](?:userCode|verificationUri)['"]\s*\]|\{[^{}]*\b(?:userCode|verificationUri)\b[^{}]*\}\s*=(?![=>])|\{[^{}:]*\b(?:userCode|verificationUri)\b[^{}:]*\}\s*\)/g;
+const SERVER_TEXT_READ =
+  /\bdescribeError\s*\((?![^()]*\bserverText\s*:\s*false\s*[,}])|(?:\?\.|\.)\s*message\b|\[\s*['"]message['"]\s*\]/g;
+
 function checkSignInAndToasts(rel, sub, text, keys, push) {
+  const code = blankComments(text);
   if (sub !== 'components/ui/toaster.tsx') {
-    for (const match of text.matchAll(/\bfrom\s+['"]sonner['"]/g)) {
+    for (const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*)['"]sonner['"]/g)) {
       push(
         'C5',
         rel,
@@ -471,7 +516,7 @@ function checkSignInAndToasts(rel, sub, text, keys, push) {
     }
   }
   if (rel.endsWith('.tsx') && !SIGN_IN_VIEW_FILES.has(sub)) {
-    for (const match of text.matchAll(/\b(?:userCode|verificationUri)\b/g)) {
+    for (const match of code.matchAll(DEVICE_FIELD_READ)) {
       push(
         'C5',
         rel,
@@ -480,14 +525,12 @@ function checkSignInAndToasts(rel, sub, text, keys, push) {
       );
     }
   }
-  for (const call of text.matchAll(
+  for (const call of code.matchAll(
     /\b(?:toast(?:\s*\.\s*(?!dismiss\b)\w+)?|toastError|toastSuccess)\s*\(/g,
   )) {
     const openParen = call.index + call[0].length - 1;
-    const callBody = readBalanced(text, openParen, '(', ')');
-    for (const match of callBody.matchAll(
-      /\bdescribeError\((?![^()]*serverText:\s*false)|\.message\b/g,
-    )) {
+    const callBody = readBalanced(code, openParen, '(', ')');
+    for (const match of callBody.matchAll(SERVER_TEXT_READ)) {
       push(
         'C5',
         rel,
@@ -496,16 +539,16 @@ function checkSignInAndToasts(rel, sub, text, keys, push) {
       );
     }
   }
-  for (const call of text.matchAll(/\buseMutation(?:<[^>]*>)?\s*\(\s*\{/g)) {
-    const openBrace = call.index + call[0].length - 1;
-    const options = readBalanced(text, openBrace, '{', '}');
-    const action = options.match(/^\{\s*meta:\s*\{\s*action:\s*'([^']+)'\s*\}/);
+  for (const call of code.matchAll(/\buseMutation(?:<[^>]*>)?\s*\(\s*/g)) {
+    const openBrace = call.index + call[0].length;
+    const options = code[openBrace] === '{' ? readBalanced(code, openBrace, '{', '}') : '';
+    const action = options.match(/^\{\s*meta\s*:\s*\{\s*action\s*:\s*'([^']+)'\s*,?\s*\}/);
     if (action === null) {
       push(
         'C5',
         rel,
         lineNumberAt(text, call.index),
-        "useMutation must open with meta: { action: '<what failed>' }",
+        "useMutation must take an inline options object that opens with meta: { action: '<what failed>' }",
       );
     } else if (keys !== null && !keys.has(action[1])) {
       push(

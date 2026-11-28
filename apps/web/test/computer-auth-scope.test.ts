@@ -2,7 +2,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { redeemPairingCode, useAuth } from '../src/api/auth.js';
 import { api } from '../src/api/client.js';
 
-vi.mock('react', () => ({
+vi.mock('react', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
 }));
 

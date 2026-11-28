@@ -210,6 +210,36 @@ const NEGATIVE_CASES = [
     },
   ],
   ['C5', { 'apps/web/src/page.ts': 'toast.error (t("Failed"), { description: err.message });' }],
+  [
+    'C5',
+    {
+      'apps/web/src/page.ts': 'toast.error(t("Failed"), { description: describeError (err, t) });',
+    },
+  ],
+  [
+    'C5',
+    {
+      'apps/web/src/page.ts':
+        'toast.error(t("Failed"), { description: describeError(err, t, { serverText: false || true }) });',
+    },
+  ],
+  [
+    'C5',
+    { 'apps/web/src/page.ts': 'toast.error(t(\'Failed\'), { description: err["message"] });' },
+  ],
+  [
+    'C5',
+    { 'apps/web/src/api.ts': 'const save = useMutation(/* options */ { mutationFn: post });' },
+  ],
+  ['C5', { 'apps/web/src/api.ts': 'const save = useMutation(options);' }],
+  ['C5', { 'apps/web/src/page.ts': "import 'sonner';" }],
+  [
+    'C5',
+    {
+      'apps/web/src/picker.tsx':
+        'export const P = ({ device }) => { const { userCode: c } = device; return <code>{c}</code>; };',
+    },
+  ],
   ['C5', { 'apps/web/src/api.ts': 'const save = useMutation({ mutationFn: () => post() });' }],
   [
     'C5',
@@ -234,6 +264,18 @@ test('the shared sign-in view, toaster and labelled mutations pass C5', () => {
         "const save = useMutation({ meta: { action: '处理中…' }, mutationFn: () => post() });",
       'apps/web/src/page.ts':
         'toastError(t("Failed"), err); toast.error(t("Failed"), { description: describeError(err, t, { serverText: false }) }); toast.dismiss(item.message);',
+    }),
+    [],
+  );
+});
+
+test('a device field named only in a string, or a call named in a comment, passes C5', () => {
+  assert.deepEqual(
+    rulesFor({
+      'apps/web/src/labels.tsx':
+        'export const FIELD = "userCode"; export const L = () => <p>{FIELD}</p>;',
+      'apps/web/src/api.ts':
+        "// useMutation(post)\nconst save = useMutation({ /* why */ meta: { action: '处理中…' }, mutationFn: () => post() });",
     }),
     [],
   );

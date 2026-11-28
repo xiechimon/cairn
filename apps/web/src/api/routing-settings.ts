@@ -36,7 +36,7 @@ export function useRoutingSettingsMutations(teamId: string | undefined) {
   const invalidate = () => client.invalidateQueries({ queryKey: key });
   return {
     patchRule: useMutation({
-      meta: { action: '保存模型路由' },
+      meta: { action: '保存模型规则' },
       mutationFn: ({ use, body }: { use: RouteUse; body: PatchRoutingRuleBody }) =>
         api.patch<RoutingRuleRecord>(`/api/teams/${teamId}/routing-rules/${use}`, body),
       onSuccess: (_data, vars) => {
@@ -50,7 +50,7 @@ export function useRoutingSettingsMutations(teamId: string | undefined) {
       },
     }),
     fixRule: useMutation({
-      meta: { action: '修复模型路由' },
+      meta: { action: '修复模型规则' },
       mutationFn: ({ use, fix }: { use: RouteUse; fix: RuleFix }) =>
         api.patch<RoutingRuleRecord>(`/api/teams/${teamId}/routing-rules/${use}`, fix),
       onSettled: (_data, _error, vars) => {

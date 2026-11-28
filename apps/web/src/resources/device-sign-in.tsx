@@ -59,7 +59,7 @@ export function useDeviceSignIn({
   const endedRef = useRef(endedCopy);
   endedRef.current = endedCopy;
   const lostCopy = t('登录已过期，请重新开始');
-  const startFailedCopy = t('没能拿到验证码，请重新开始。');
+  const startFailedCopy = t('获取验证码失败，请重新开始。');
   const copyRef = useRef({ lostCopy, startFailedCopy });
   copyRef.current = { lostCopy, startFailedCopy };
   const generation = useRef(0);
@@ -151,7 +151,11 @@ export function useDeviceSignIn({
             ? {
                 label: t('重新开始'),
                 testId: 'device-sign-in-restart',
-                onClick: () => setAttempt((n) => n + 1),
+                onClick: () => {
+                  generation.current += 1;
+                  setPhase({ step: 'starting' });
+                  setAttempt((n) => n + 1);
+                },
               }
             : {
                 label: t('打开登录页'),

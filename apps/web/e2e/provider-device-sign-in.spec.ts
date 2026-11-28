@@ -8,6 +8,10 @@ interface DeviceServer {
   polls: number;
   polledStates: string[];
   startDelayMs: number;
+  startDelays: number[];
+  pollDelayMs: number;
+  inflightPolls: number;
+  maxInflightPolls: number;
   startFails: boolean;
   nextPoll: PollReply[];
   completed: boolean;
@@ -49,7 +53,7 @@ async function serve(page: Page, base: string, server: DeviceServer) {
                 intervalSeconds: 1,
               }),
             ),
-          server.startDelayMs,
+          server.startDelays[attempt - 1] ?? server.startDelayMs,
         ),
       );
     }
@@ -58,7 +62,16 @@ async function serve(page: Page, base: string, server: DeviceServer) {
       server.polls += 1;
       const reply = server.nextPoll.shift() ?? { status: 200, body: { status: 'pending' } };
       if ((reply.body as { status?: string }).status === 'complete') server.completed = true;
-      return json(reply.body, reply.status);
+      server.inflightPolls += 1;
+      server.maxInflightPolls = Math.max(server.maxInflightPolls, server.inflightPolls);
+      const delay = server.pollDelayMs;
+      server.pollDelayMs = 0;
+      return new Promise<void>((resolve) =>
+        setTimeout(() => {
+          server.inflightPolls -= 1;
+          resolve(json(reply.body, reply.status));
+        }, delay),
+      );
     }
     return undefined;
   });
@@ -70,6 +83,10 @@ function device(overrides: Partial<DeviceServer> = {}): DeviceServer {
     polls: 0,
     polledStates: [],
     startDelayMs: 0,
+    startDelays: [],
+    pollDelayMs: 0,
+    inflightPolls: 0,
+    maxInflightPolls: 0,
     startFails: false,
     nextPoll: [],
     completed: false,
@@ -129,6 +146,7 @@ test('picking ChatGPT subscription opens one sign-in view: instruction, large co
   await dialog.getByTestId('sign-in-copy').click();
   await expect(dialog.getByTestId('sign-in-copy')).toHaveText('已复制');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('WXYZ-0001');
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
   await expect(dialog.getByTestId('sign-in-copy')).toHaveText('复制', { timeout: 4000 });
 
   await page.evaluate(() => {
@@ -192,7 +210,7 @@ test('a failed start says it could not get a code, raises no toast, and Start ov
   const picker = await openPicker(page);
   await picker.locator('[data-preset-id="openai-codex"]').click();
   const dialog = page.getByRole('dialog', { name: '登录 ChatGPT' });
-  await expect(dialog.getByRole('alert')).toHaveText('没能拿到验证码，请重新开始。');
+  await expect(dialog.getByRole('alert')).toHaveText('获取验证码失败，请重新开始。');
   await expect(dialog.getByTestId('sign-in-code')).toHaveCount(0);
   await page.waitForTimeout(300);
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0);
@@ -272,7 +290,7 @@ test('a completed xAI sign-in closes the view', async ({ page }) => {
 test('cancelling while the code is still coming, then picking again, runs one poll loop for the new code only', async ({
   page,
 }) => {
-  const server = device({ startDelayMs: 800 });
+  const server = device({ startDelays: [2500, 100], pollDelayMs: 2500 });
   await serve(page, CODEX, server);
   const picker = await openPicker(page);
   await picker.locator('[data-preset-id="openai-codex"]').click();
@@ -281,11 +299,13 @@ test('cancelling while the code is still coming, then picking again, runs one po
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await picker.locator('[data-preset-id="openai-codex"]').click();
   await expect(dialog.getByTestId('sign-in-code')).toHaveText('WXYZ-0002');
-  await page.waitForTimeout(3500);
+  await page.waitForTimeout(5000);
+  await expect(dialog.getByTestId('sign-in-code')).toHaveText('WXYZ-0002');
   expect(server.starts).toBe(2);
-  expect(server.polledStates.length).toBeGreaterThanOrEqual(1);
+  expect(server.polledStates.length).toBeGreaterThanOrEqual(2);
   expect(server.polledStates.length).toBeLessThanOrEqual(4);
   expect(new Set(server.polledStates)).toEqual(new Set(['state-2']));
+  expect(server.maxInflightPolls).toBe(1);
 });
 
 test('a refused clipboard never shows Copied and says the copy failed', async ({ page }) => {
@@ -320,4 +340,22 @@ test('at 390 px the sign-in view fits the window with the code and both buttons 
   await expect(dialog.getByTestId('device-sign-in-open')).toBeInViewport();
   await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test.describe('on a touch screen', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test('the code row keeps the height of its loading placeholder', async ({ page }) => {
+    const server = device({ startDelayMs: 600 });
+    await serve(page, CODEX, server);
+    const picker = await openPicker(page);
+    expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+    await picker.locator('[data-preset-id="openai-codex"]').click();
+    const dialog = page.getByRole('dialog', { name: '登录 ChatGPT' });
+    await expect(dialog.getByRole('status')).toHaveText('正在获取验证码…');
+    const before = await dialog.getByTestId('device-sign-in').boundingBox();
+    await expect(dialog.getByTestId('sign-in-code')).toHaveText('WXYZ-0001');
+    const after = await dialog.getByTestId('device-sign-in').boundingBox();
+    expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(4);
+  });
 });
