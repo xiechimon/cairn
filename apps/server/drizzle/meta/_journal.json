@@ -1877,6 +1877,13 @@
       "when": 1795865793270,
       "tag": "0272_step_side_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 273,
+      "version": "6",
+      "when": 1795887507212,
+      "tag": "0273_spicy_preak",
+      "breakpoints": true
     }
   ]
 }

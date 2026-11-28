@@ -62,6 +62,8 @@ import type {
   ManagedUpdateRuntime,
   McpConnectorRecord,
   McpServerRecord,
+  MemoryConsolidationRecord,
+  MemoryConsolidationsResponse,
   MemoryEditBody,
   MemoryEditRecord,
   MemoryImportBody,
@@ -643,6 +645,22 @@ export const useMemories = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['memories', teamId],
     queryFn: () => api.get<MemoryRecord[]>(`/api/teams/${teamId}/memories`),
+    enabled: enabled && teamId !== undefined,
+  });
+
+export const useMemoryConsolidations = (
+  teamId: string | undefined,
+  projectId: string | null,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: ['memory-consolidation', teamId, projectId ?? 'team'],
+    queryFn: () =>
+      api.get<MemoryConsolidationsResponse>(
+        `/api/teams/${teamId}/memory-consolidation${
+          projectId === null ? '' : `?projectId=${encodeURIComponent(projectId)}`
+        }`,
+      ),
     enabled: enabled && teamId !== undefined,
   });
 
@@ -2119,6 +2137,14 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (body: ImportSkillBody) =>
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
       onSuccess: invalidateAll,
+    }),
+    undoMemoryConsolidation: useMutation({
+      meta: { action: '撤销记忆整理' },
+      mutationFn: (input: { consolidationId: string }) =>
+        api.post<MemoryConsolidationRecord>(
+          `/api/teams/${teamId}/memory-consolidation/${input.consolidationId}/undo`,
+        ),
+      onSuccess: () => invalidateAll(),
     }),
     deleteMemory: useMutation({
       meta: { action: '删除记忆' },

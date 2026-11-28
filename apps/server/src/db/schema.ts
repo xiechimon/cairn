@@ -39,6 +39,8 @@ import type {
   McpConnectorStatus,
   McpConnectorTool,
   McpConnectorTransport,
+  MemoryConsolidationEdit,
+  MemoryConsolidationStatus,
   MemoryLayer,
   ModelRef,
   NotificationType,
@@ -866,6 +868,35 @@ export const memoryCorrection = sqliteTable(
     index('memory_correction_exchange_idx').on(t.teamId, t.ownerMessageId),
     index('memory_correction_team_created_idx').on(t.teamId, t.createdAt),
   ],
+);
+
+export interface MemoryConsolidationDroppedFile {
+  title: string;
+  memoryId: string | null;
+  content: string;
+  why: string;
+}
+
+export const memoryConsolidation = sqliteTable(
+  'memory_consolidation',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId').notNull(),
+    agentId: text('agentId').notNull(),
+    projectId: text('projectId'),
+    status: text('status').$type<MemoryConsolidationStatus>().notNull(),
+    summary: text('summary').notNull().default(''),
+    provider: text('provider'),
+    modelId: text('modelId'),
+    edits: json<MemoryConsolidationEdit[]>('edits').notNull().default(sql`'[]'`),
+    dropFiles: json<MemoryConsolidationDroppedFile[]>('dropFiles').notNull().default(sql`'[]'`),
+    beforeText: text('beforeText').notNull().default(''),
+    afterText: text('afterText').notNull().default(''),
+    startedAt: epochMs('startedAt').notNull(),
+    finishedAt: epochMs('finishedAt').notNull(),
+    undoneAt: epochMs('undoneAt'),
+  },
+  (t) => [index('memory_consolidation_scope_idx').on(t.teamId, t.projectId, t.startedAt)],
 );
 
 export const dataMigration = sqliteTable('data_migration', {

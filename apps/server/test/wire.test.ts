@@ -25,6 +25,8 @@ import { setTodoPhase } from '../src/services/todos.js';
 import { bootServer, insertMachine, postProject, req, startLegacyBuild } from './helpers.js';
 
 const INFERRED_ROUTES = [
+  'GET /api/teams/{id}/memory-consolidation',
+  'POST /api/teams/{id}/memory-consolidation/{cid}/undo',
   'POST /api/server/backup/run',
   'POST /api/server/backup/export',
   'POST /api/server/backup/import',

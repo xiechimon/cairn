@@ -703,6 +703,7 @@ export const EN: Record<string, string> = {
   '这里暂无可以定时的任务。先新建一个任务，或让 Coordinator 帮你新建定时。':
     'There is no task to schedule here. Add a task first, or ask the Coordinator to set up the schedule.',
   '{mo}月{d}日': '{monthShort} {d}',
+  '{mo}月{d}日 {hh}:{mm}': '{monthShort} {d} {hh}:{mm}',
   '下次 {when}': 'Next {when}',
   自动: 'Auto',
   新建定时: 'New schedule',
@@ -1404,6 +1405,23 @@ export const EN: Record<string, string> = {
   '像 AGENTS.md：本项目的每个对话和 Coordinator 都会读到并遵守。':
     'Like an AGENTS.md: every thread and the Coordinator in this project read and follow it.',
   自动记忆: 'Auto memory',
+  自动整理: 'Auto tidy',
+  '空闲时 Coordinator 会把这里的笔记和最近的对话对照一遍，合并重复、改写被推翻的说法、删掉没用的条目。每次改动都能撤销。':
+    'When you are away, the Coordinator re-reads these notes against recent messages: it merges duplicates, rewrites what a newer message overturned, and removes what a cited message disproves. Every change can be undone.',
+  '这次没有需要整理的内容。': 'Nothing needed tidying this time.',
+  '这次没有改动记忆：{why}': 'Memory was left unchanged this time: {why}',
+  '合并 {n} 条': 'Merged {n}',
+  '改写 {n} 条': 'Rewrote {n}',
+  '删除 {n} 条': 'Deleted {n}',
+  '收起 {n} 个文件': 'Archived {n#file|files}',
+  '没有改动。': 'No changes.',
+  改写: 'Rewrite',
+  '收起的文件：{files}': 'Archived files: {files}',
+  '撤销中…': 'Undoing…',
+  '没有撤销，记忆保持不变。若之后又改过记忆，需要告诉 Coordinator 恢复哪一句。':
+    'Could not undo; memory is unchanged. If memory changed afterwards, ask the Coordinator which line to restore.',
+  '这段整理前的笔记已恢复。': 'The notes from before this tidy were restored.',
+  撤销记忆整理: 'Undo memory consolidation',
   'Coordinator 在这个项目里工作时自己写下的笔记。':
     'Notes the Coordinator writes itself as it works in this project.',
   'Coordinator 尚未记录团队笔记。': 'The Coordinator has not written team notes yet.',

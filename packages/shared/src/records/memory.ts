@@ -21,6 +21,56 @@ export const MEMORY_VERIFY_NOTE =
 
 export const MEMORY_CORRECTION_WORDS_MAX_CHARS = 1_000;
 
+export const CONSOLIDATION_MIN_ENTRIES = 3;
+export const CONSOLIDATION_INDEX_MAX_LINES = 120;
+export const CONSOLIDATION_INDEX_MAX_BYTES = 12 * 1024;
+export const CONSOLIDATION_MAX_EDITS = 12;
+export const CONSOLIDATION_MAX_DROPS = 3;
+export const CONSOLIDATION_EVIDENCE_MESSAGES = 30;
+export const CONSOLIDATION_EVIDENCE_MAX_CHARS = 8_000;
+export const CONSOLIDATION_FILE_EXCERPT_CHARS = 1_024;
+export const CONSOLIDATION_SOURCE = 'consolidation';
+
+export const MEMORY_CONSOLIDATION_STATUSES = ['applied', 'empty', 'rejected'] as const;
+export type MemoryConsolidationStatus = (typeof MEMORY_CONSOLIDATION_STATUSES)[number];
+
+export const memoryConsolidationEditSchema = z.object({
+  kind: z.enum(['merge', 'rewrite', 'delete']),
+  lines: z.array(z.number().int().positive()),
+  before: z.string(),
+  after: z.string(),
+  why: z.string(),
+});
+export type MemoryConsolidationEdit = z.infer<typeof memoryConsolidationEditSchema>;
+
+export const memoryConsolidationDropSchema = z.object({
+  title: z.string(),
+  memoryId: recordId.nullable(),
+  why: z.string(),
+});
+export type MemoryConsolidationDrop = z.infer<typeof memoryConsolidationDropSchema>;
+
+export const memoryConsolidationRecordSchema = z.object({
+  id: recordId,
+  teamId: recordId,
+  projectId: recordId.nullable(),
+  status: z.enum(MEMORY_CONSOLIDATION_STATUSES),
+  summary: z.string(),
+  provider: z.string().nullable(),
+  modelId: z.string().nullable(),
+  edits: z.array(memoryConsolidationEditSchema),
+  dropFiles: z.array(memoryConsolidationDropSchema),
+  startedAt: epochMs,
+  finishedAt: epochMs,
+  undoneAt: epochMs.nullable(),
+});
+export type MemoryConsolidationRecord = z.infer<typeof memoryConsolidationRecordSchema>;
+
+export const memoryConsolidationsResponseSchema = z.object({
+  consolidations: z.array(memoryConsolidationRecordSchema),
+});
+export type MemoryConsolidationsResponse = z.infer<typeof memoryConsolidationsResponseSchema>;
+
 export const memoryCorrectionRecordSchema = z.object({
   id: recordId,
   projectId: recordId.nullable(),

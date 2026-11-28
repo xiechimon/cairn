@@ -62,11 +62,17 @@ vi.mock('../src/api/hooks.js', () => {
   const memories = { data: [memory], isError: false, isFetching: false };
   const none = { data: undefined };
   return {
-    useApiMutations: () => ({ deleteMemory: idle, updateMemory: idle, importMemoryFile: idle }),
+    useApiMutations: () => ({
+      deleteMemory: idle,
+      updateMemory: idle,
+      importMemoryFile: idle,
+      undoMemoryConsolidation: idle,
+    }),
     useMemories: () => memories,
     useProjects: () => none,
     useChiefMemoryUsage: () => none,
     useCurrentMemoryEdit: () => none,
+    useMemoryConsolidations: () => none,
     useMemoryImportCandidates: () => none,
   };
 });

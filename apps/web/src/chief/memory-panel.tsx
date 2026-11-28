@@ -1,4 +1,5 @@
 import type {
+  MemoryConsolidationRecord,
   MemoryImportCandidate,
   MemoryRecord,
   PatchMemoryBody,
@@ -12,6 +13,7 @@ import {
   useChiefMemoryUsage,
   useCurrentMemoryEdit,
   useMemories,
+  useMemoryConsolidations,
   useMemoryImportCandidates,
   useProjects,
 } from '../api/hooks.js';
@@ -103,6 +105,143 @@ const updatedOn = (at: number, t: TFunc) => {
     monthShort: date.toLocaleString('en', { month: 'short' }),
   });
 };
+
+const editedOn = (at: number, t: TFunc) => {
+  const date = new Date(at);
+  return t('{mo}月{d}日 {hh}:{mm}', {
+    mo: date.getMonth() + 1,
+    d: date.getDate(),
+    hh: String(date.getHours()).padStart(2, '0'),
+    mm: String(date.getMinutes()).padStart(2, '0'),
+  });
+};
+
+const kindLabel = (kind: 'merge' | 'rewrite' | 'delete', t: TFunc) =>
+  kind === 'merge' ? t('合并') : kind === 'rewrite' ? t('改写') : t('删除');
+
+const consolidationSummary = (record: MemoryConsolidationRecord, t: TFunc) => {
+  if (record.status === 'empty') return t('这次没有需要整理的内容。');
+  if (record.status === 'rejected') return t('这次没有改动记忆：{why}', { why: record.summary });
+  const counts = { merge: 0, rewrite: 0, delete: 0 };
+  for (const edit of record.edits) counts[edit.kind] += 1;
+  const parts = [
+    counts.merge > 0 ? t('合并 {n} 条', { n: counts.merge }) : null,
+    counts.rewrite > 0 ? t('改写 {n} 条', { n: counts.rewrite }) : null,
+    counts.delete > 0 ? t('删除 {n} 条', { n: counts.delete }) : null,
+    record.dropFiles.length > 0 ? t('收起 {n} 个文件', { n: record.dropFiles.length }) : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length === 0 ? t('没有改动。') : parts.join('，');
+};
+
+function MemoryConsolidationList({
+  teamId,
+  projectId,
+  connected,
+}: {
+  teamId: string | undefined;
+  projectId: string | null;
+  connected: boolean;
+}) {
+  const { t } = useI18n();
+  const consolidationsQ = useMemoryConsolidations(teamId, projectId, true);
+  const mutations = useApiMutations(teamId);
+  const undoing = mutations.undoMemoryConsolidation;
+  const records = consolidationsQ.data?.consolidations ?? [];
+  const undoableId =
+    records.find((record) => record.status === 'applied' && record.undoneAt === null)?.id ?? null;
+  if (records.length === 0) return null;
+  return (
+    <div className="mt-6" data-testid="memory-consolidation">
+      <h3 className={HEAD_CLS}>{t('自动整理')}</h3>
+      <p className={HINT_CLS}>
+        {t(
+          '空闲时 Coordinator 会把这里的笔记和最近的对话对照一遍，合并重复、改写被推翻的说法、删掉没用的条目。每次改动都能撤销。',
+        )}
+      </p>
+      <ul className="-mx-3 mt-2 border-t border-border">
+        {records.map((record) => {
+          const undone = record.undoneAt !== null;
+          return (
+            <li
+              key={record.id}
+              className="border-b border-border px-3 py-3"
+              data-slot="consolidation-row"
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-ui text-foreground">{consolidationSummary(record, t)}</span>
+                <span className="whitespace-nowrap text-content-secondary text-meta">
+                  {editedOn(record.startedAt, t)}
+                </span>
+              </div>
+              {record.edits.length > 0 && (
+                <ul className="mt-2 space-y-1 text-meta">
+                  {record.edits.map((edit, index) => (
+                    <li key={`${record.id}-${index}`} data-slot="consolidation-edit">
+                      <span className="text-content-tertiary">{kindLabel(edit.kind, t)} </span>
+                      {edit.before.split('\n').map((line) => (
+                        <s key={`b-${line}`} className="mr-1 break-words text-content-secondary">
+                          {line}
+                        </s>
+                      ))}
+                      {edit.after !== '' && (
+                        <span className="break-words text-foreground">→ {edit.after}</span>
+                      )}
+                      {edit.why !== '' && (
+                        <span className="ml-1 text-content-tertiary">（{edit.why}）</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {record.dropFiles.length > 0 && (
+                <p className="mt-1 text-meta text-content-secondary">
+                  {t('收起的文件：{files}', {
+                    files: record.dropFiles.map((file) => file.title).join('、'),
+                  })}
+                </p>
+              )}
+              <div className="mt-2 flex items-center gap-2">
+                {undone ? (
+                  <span className="text-meta text-content-tertiary">{t('已撤销')}</span>
+                ) : (
+                  record.id === undoableId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!connected || undoing.isPending}
+                      data-testid="memory-consolidation-undo"
+                      onClick={() =>
+                        undoing.mutate(
+                          { consolidationId: record.id },
+                          {
+                            onError: (error) =>
+                              toastError(
+                                t(
+                                  '没有撤销，记忆保持不变。若之后又改过记忆，需要告诉 Coordinator 恢复哪一句。',
+                                ),
+                                error,
+                              ),
+                          },
+                        )
+                      }
+                    >
+                      {undoing.isPending ? t('撤销中…') : t('撤销')}
+                    </Button>
+                  )
+                )}
+                {undone && record.edits.length > 0 && (
+                  <span className="text-meta text-content-tertiary">
+                    {t('这段整理前的笔记已恢复。')}
+                  </span>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 function useCloseBeforeOpen<Layer>(layer: Layer | null): Layer | null {
   const [committed, setCommitted] = useState(layer);
@@ -413,6 +552,13 @@ export function MemoryPanel({
         )}
       </div>
       {autoMemory}
+      {live && (
+        <MemoryConsolidationList
+          teamId={teamId}
+          projectId={project?.id ?? null}
+          connected={connected}
+        />
+      )}
       {live && teamId !== undefined && importQ.data !== undefined && (
         <MemoryImportCard teamId={teamId} candidates={importQ.data} />
       )}

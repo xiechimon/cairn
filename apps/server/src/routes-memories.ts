@@ -18,6 +18,7 @@ import {
   memoryDocumentVersion,
   updateMemoryEntry,
 } from './services/memory.js';
+import { listConsolidations, undoConsolidation } from './services/memory-consolidation.js';
 import { executeMemoryDocumentTool } from './services/memory-documents.js';
 import {
   currentMemoryEdit,
@@ -44,6 +45,21 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
       c.req.query('includeInvalid') === 'true',
     );
     return c.json(rows.map(toMemoryRecord));
+  });
+
+  app.get('/api/teams/:id/memory-consolidation', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const requested = c.req.query('projectId');
+    const projectId =
+      requested === undefined || requested === '' || requested === 'team' ? null : requested;
+    return c.json({ consolidations: listConsolidations(ctx.db, teamId, projectId) });
+  });
+
+  app.post('/api/teams/:id/memory-consolidation/:cid/undo', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(undoConsolidation(ctx.db, teamId, c.req.param('cid')));
   });
 
   app.post('/api/teams/:id/memory-edits', async (c) => {

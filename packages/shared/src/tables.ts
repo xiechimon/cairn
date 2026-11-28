@@ -76,6 +76,7 @@ export const DB_TABLES = [
   'coordinator_turn_snapshot',
   'team_memory_entry',
   'memory_correction',
+  'memory_consolidation',
   'data_migration',
   'task_issue_close',
   'deploy_lease',
@@ -99,6 +100,7 @@ export type DbTable = (typeof DB_TABLES)[number];
 export const JOIN_ONLY_TABLES = ['todo_github_label'] as const;
 
 export const INTERNAL_ONLY_TABLES = [
+  'memory_consolidation',
   'team_top_models',
   'action_journal',
   'action_proposal',

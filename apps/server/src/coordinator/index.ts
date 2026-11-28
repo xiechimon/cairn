@@ -76,6 +76,7 @@ import {
 } from './idle-memory.js';
 import { acquireLease, type Lease, LeaseHeldError } from './lease.js';
 import { settleInterruptedMailConversation } from './mail-owner.js';
+import { createMemoryConsolidationSweep } from './memory-consolidation.js';
 import { createMemoryFlush } from './memory-flush.js';
 import { providerBinding } from './provider-binding.js';
 import {
@@ -123,6 +124,10 @@ export interface CoordinatorOptions {
   idleMemoryFlushMs?: number;
   idleMemoryRetryMs?: number;
   idleMemoryTimeoutMs?: number;
+  memoryConsolidationIdleMs?: number;
+  memoryConsolidationIntervalMs?: number;
+  memoryConsolidationTimeoutMs?: number;
+  memoryConsolidationRetryMs?: number;
   stopPollMs?: number;
   owner?: string;
 }
@@ -875,6 +880,18 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     }
   };
 
+  const consolidation = createMemoryConsolidationSweep(
+    { db: machine.db, box: machine.box },
+    {
+      idleMs: options.memoryConsolidationIdleMs,
+      minIntervalMs: options.memoryConsolidationIntervalMs,
+      timeoutMs: options.memoryConsolidationTimeoutMs,
+      retryMs: options.memoryConsolidationRetryMs,
+      fixedProviders: options.fixedProviders,
+      logger,
+    },
+  );
+
   const tick = (): void => {
     if (closing) return;
     for (const [threadId, lease] of leases) {
@@ -889,6 +906,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     for (const threadId of liveThreads()) wake(threadId);
     idleMemory.sweep();
     sweepIdleCompaction();
+    consolidation.sweep();
     void runtime
       .closeIdle(options.idleCloseMs ?? IDLE_CLOSE_MS)
       .then((closed) => {
@@ -913,12 +931,14 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       await idleMemory.drain();
       while (idleCompactions.size > 0) await Promise.allSettled([...idleCompactions.values()]);
+      await consolidation.drain();
     },
     close: async (): Promise<void> => {
       closing = true;
       clearInterval(timer);
       try {
         await idleMemory.close();
+        await consolidation.close();
         await runtime.close();
         while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       } finally {
