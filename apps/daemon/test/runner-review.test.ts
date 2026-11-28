@@ -499,9 +499,13 @@ describe('chief remote-tools-only execution surface', () => {
     expect(captured[0]!.localTools).toBeUndefined();
   });
 
-  test('host lockdown: chief and review sessions are locked down, verify and build sessions are not', async () => {
-    const chief = await setup(claimedRemoteOnly);
-    expect(chief.captured[0]!.lockedDown).toBe(true);
+  test('host lockdown: remote-only chief and review sessions are locked down; normal chief, verify and build sessions are not', async () => {
+    const remoteChief = await setup(claimedRemoteOnly);
+    expect(remoteChief.captured[0]!.lockedDown).toBe(true);
+    const { remoteToolsOnly: _ignored, ...normalChiefClaim } = claimedRemoteOnly;
+    const normalChief = await setup(normalChiefClaim);
+    expect(normalChief.captured[0]!.lockedDown).toBeUndefined();
+    expect(normalChief.captured[0]!.readOnly).toBeUndefined();
     const review = await setup(claimedReview('review', HOSTED_REPO));
     expect(review.captured[0]!.lockedDown).toBe(true);
     const base = claimedReview('review', HOSTED_REPO);

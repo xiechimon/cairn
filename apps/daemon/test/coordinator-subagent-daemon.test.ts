@@ -79,7 +79,6 @@ const PARENT_OPTS: SessionOpts = {
   provider: { kind: 'oauth', providerId: 'claude-code' },
   modelId: 'claude-sonnet-4-6',
   cwd: '/tmp',
-  lockedDown: true,
   remoteTools: PARENT_REMOTE_TOOLS,
   executeRemoteTool: async (name) => `ok:${name}`,
 };

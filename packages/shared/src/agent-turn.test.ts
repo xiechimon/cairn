@@ -22,8 +22,23 @@ describe('agentTurnPolicyFor', () => {
       kind: 'coordinator',
       compactAt: COORDINATOR_COMPACT_AT,
       readOnly: false,
-      lockedDown: true,
+      lockedDown: false,
       remoteToolsOnly: false,
+      allowSkillLists: false,
+    });
+
+    expect(
+      agentTurnPolicyFor({
+        stepKind: 'chief',
+        conversationId: 'chief-1',
+        remoteToolsOnly: true,
+      }),
+    ).toEqual({
+      kind: 'coordinator',
+      compactAt: COORDINATOR_COMPACT_AT,
+      readOnly: false,
+      lockedDown: true,
+      remoteToolsOnly: true,
       allowSkillLists: false,
     });
 

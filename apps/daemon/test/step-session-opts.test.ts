@@ -68,13 +68,21 @@ describe('composeStepSessionOpts', () => {
     expect(opts({ isReview: true })).toMatchObject({ readOnly: true, lockedDown: true });
   });
 
-  test('a chief step is locked down and ignores the agent skill lists', () => {
+  test('a normal chief step uses normal task permissions while keeping compaction and ignoring worker skill lists', () => {
     const result = opts({ isChief: true, skillsAllowlist: ['a'], injectedSkills: ['b'] });
-    expect(result.lockedDown).toBe(true);
+    expect(result.lockedDown).toBeUndefined();
+    expect(result.readOnly).toBeUndefined();
+    expect(result.remoteToolsOnly).toBeUndefined();
     expect(result.skillsAllowlist).toBeUndefined();
     expect(result.injectedSkills).toBeUndefined();
     expect(result.compactAt).toBe(COORDINATOR_COMPACT_AT);
     expect(opts({}).compactAt).toBeUndefined();
+  });
+
+  test('a remote-only chief step stays locked down', () => {
+    const result = opts({ isChief: true, remoteToolsOnly: true });
+    expect(result.lockedDown).toBe(true);
+    expect(result.remoteToolsOnly).toBe(true);
   });
 
   test('a worker step keeps its skill lists, prompt and environment', () => {

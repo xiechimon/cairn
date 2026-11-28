@@ -66,7 +66,7 @@ export function agentTurnPolicyFor(opts: {
     kind,
     ...(kind === 'coordinator' ? { compactAt: COORDINATOR_COMPACT_AT } : {}),
     readOnly,
-    lockedDown: kind === 'coordinator' || Boolean(opts.isReview) || remoteToolsOnly,
+    lockedDown: Boolean(opts.isReview) || remoteToolsOnly,
     remoteToolsOnly,
     allowSkillLists: kind !== 'coordinator',
   };

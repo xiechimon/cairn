@@ -10,6 +10,8 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/backend/acp.ts:GEMMA_4_MODELS': 'constant lookup table',
   'apps/daemon/src/backend/acp-permission-gate.ts:PERMISSIVE_MODES': 'constant lookup table',
   'apps/daemon/src/backend/acp-permission-gate.ts:READ_KINDS': 'constant lookup table',
+  'apps/daemon/src/backend/antigravity-hooks.ts:activeHooks':
+    'refcounted process-wide lease registry keyed on resolved cwd/.agents/hooks.json filesystem path',
   'apps/daemon/src/backend/image-support.ts:learnedNoVision':
     'learned capability memo keyed on model id; an environment fact, not instance state',
   'apps/daemon/src/backend/pi.ts:learnedCompat':
