@@ -15,6 +15,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium, _electron as electron } from '@playwright/test';
 import { mainWindow } from '../../apps/desktop/scripts/main-window.mjs';
+import { LOBEHUB_MONO } from '../../apps/web/src/icons/lobehub-mono.ts';
 
 const DEFAULT_BASE = 'http://127.0.0.1:54400';
 const DEFAULT_USER_DATA = join(homedir(), 'Library', 'Application Support', '@cairn', 'desktop');
@@ -88,16 +89,16 @@ export function buildStartTaskSeedPrompt(todo) {
   );
 }
 
-const SWE2 = {
+export const SWE2 = {
   name: 'SWE-2',
   vendor: 'Devin',
-  iconPrefix: 'M2.033 9.867',
+  iconPath: LOBEHUB_MONO.devin.paths[0],
   levels: ['Default (High)', 'Medium', 'High', 'Max'],
 };
-const CLAUDE = {
+export const CLAUDE = {
   name: 'Claude Sonnet 5.5',
   vendor: 'Claude Code',
-  iconPrefix: 'M52.4285 162.873',
+  iconPath: LOBEHUB_MONO.claude.paths[0],
   levels: ['Default (Medium)', 'Low', 'Medium', 'High', 'Xhigh', 'Max'],
 };
 
@@ -635,7 +636,7 @@ async function assertModelRow(section, model) {
     text.includes(model.vendor),
     `${model.name} row does not show vendor "${model.vendor}": ${text}`,
   );
-  const icon = row.locator(`svg path[d^="${model.iconPrefix}"]`);
+  const icon = row.locator(`svg path[d="${model.iconPath}"]`);
   assert.ok((await icon.count()) > 0, `${model.name} row missing its vendor icon`);
   const trigger = row.locator('.frequent-model-level');
   assert.ok((await trigger.count()) > 0, `${model.name} row has no thinking level selector`);
