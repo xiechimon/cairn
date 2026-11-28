@@ -89,25 +89,36 @@ export function normalizeModelId(raw) {
 export function scanPlan(content) {
   const lines = content.replace(/\r\n/g, '\n').split('\n');
   const sections = new Map();
-  let [fence, cur, revAt, revEnd] = [null, null, -1, lines.length];
+  const headings = [];
+  let [fence, cur, revAt] = [null, null, -1];
   for (let i = 0; i < lines.length; i += 1) {
-    const mark = /^\s*(```|~~~)/.exec(lines[i])?.[1];
-    if (mark) fence = fence === null ? mark : fence === mark ? null : fence;
-    else if (fence === null) {
-      const h = /^##\s+(.+?)\s*$/.exec(lines[i]);
-      if (h) {
-        if (revAt === -1 && /^review$/i.test(h[1])) revAt = i;
-        else if (revAt !== -1 && revEnd === lines.length) revEnd = i;
-        cur = [];
-        sections.set(h[1].toLowerCase(), cur);
-        continue;
-      }
+    const line = i === 0 ? lines[i].replace(/^\uFEFF/, '') : lines[i];
+    const mark = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (mark && mark[1][0] === fence[0] && mark[1].length >= fence.length && !mark[2].trim())
+        fence = null;
+      continue;
     }
-    if (cur && fence === null && !mark) cur.push(lines[i]);
+    if (mark && !(mark[1][0] === '`' && mark[2].includes('`'))) {
+      fence = mark[1];
+      continue;
+    }
+    const h = /^ {0,3}##[ \t]+(.+?)[ \t]*$/.exec(line);
+    const setext = /^ {0,3}[^\s#>|*+`~-]/.test(line) && /^ {0,3}-+[ \t]*$/.test(lines[i + 1] ?? '');
+    if (h || setext) {
+      const name = (h ? h[1].replace(/[ \t]+#+[ \t]*$/, '') : line.trim()).toLowerCase();
+      headings.push(name);
+      if (revAt === -1 && name === 'review') revAt = i;
+      cur = [];
+      sections.set(name, cur);
+      if (!h) i += 1;
+      continue;
+    }
+    if (cur) cur.push(line);
   }
   const body = `${(revAt === -1 ? lines : lines.slice(0, revAt)).join('\n').trimEnd()}\n`;
-  const review = revAt === -1 ? null : lines.slice(revAt + 1, revEnd).join('\n');
-  return { sections, body, review };
+  const review = revAt === -1 ? null : (sections.get('review') ?? []).join('\n');
+  return { sections, body, review, headings };
 }
 
 export const computePlanHash = (content) =>
@@ -165,7 +176,14 @@ export function validatePlanContent(content) {
   const pushOnce = (msg) => {
     if (!errors.includes(msg)) errors.push(msg);
   };
-  const { sections, body, review } = scanPlan(content);
+  const { sections, body, review, headings } = scanPlan(content);
+  for (const name of ['user scenario', 'scope', 'edge cases', 'out of scope', 'review']) {
+    if (headings.filter((heading) => heading === name).length > 1)
+      errors.push(`Duplicate ## ${name} section`);
+  }
+  const reviewIndex = headings.indexOf('review');
+  if (reviewIndex !== -1 && reviewIndex !== headings.length - 1)
+    errors.push('## Review must be the final level-two section');
   const expectedHash = createHash('sha256').update(body, 'utf8').digest('hex');
   const list = (key, rx) => (sections.get(key) ?? []).map((l) => rx.exec(l)?.[1]).filter(Boolean);
   if (isHollow((sections.get('user scenario') ?? []).join(' '), 40))
@@ -199,14 +217,34 @@ export function validatePlanContent(content) {
     errors.push('Out of scope must list at least one concrete bullet item');
   if (review === null) errors.push('Missing ## Review section');
   else {
-    const field = (n) =>
-      new RegExp(`^[ \\t]*-[ \\t]*${n}:[ \\t]*([^\\n]*)$`, 'im').exec(review)?.[1] ?? '';
-    if (field('Verdict').trim().toUpperCase() !== 'PASS')
-      errors.push('## Review must record Verdict: PASS');
+    const fields = new Map();
+    const metadata =
+      /^\s*(?:[-*+]\s+)?(Verdict|Plan-SHA256|Author-Model|Reviewer|Reviewer-Model|Findings|Fix-check|Fix-check-Plan-SHA256):[ \t]*(.*)$/i;
+    for (const line of review.split('\n')) {
+      const match = metadata.exec(line);
+      if (!match) continue;
+      const key = match[1].toLowerCase();
+      if (fields.has(key)) errors.push(`Duplicate ## Review ${match[1]} field`);
+      else fields.set(key, match[2]);
+    }
+    const field = (name) => fields.get(name.toLowerCase()) ?? '';
+    const verdict = field('Verdict').trim().toUpperCase();
+    if (!['PASS', 'CONCERNS', 'BLOCK', 'FAIL'].includes(verdict))
+      errors.push('## Review must record a valid Verdict');
     const hm = /^([0-9a-f]{64})$/i.exec(field('Plan-SHA256').trim());
     if (!hm) errors.push('## Review missing 64-char Plan-SHA256');
-    else if (hm[1].toLowerCase() !== expectedHash)
+    else if (verdict === 'PASS' && hm[1].toLowerCase() !== expectedHash)
       errors.push(`Plan-SHA256 mismatch (expected ${expectedHash})`);
+    const fixCheck = field('Fix-check').trim().toUpperCase();
+    if (fields.has('fix-check') && fixCheck !== 'PASS' && fixCheck !== 'FAIL')
+      errors.push('## Review Fix-check must be PASS or FAIL');
+    if (['CONCERNS', 'BLOCK', 'FAIL'].includes(verdict)) {
+      if (fixCheck !== 'PASS') errors.push('## Review must record Fix-check: PASS');
+      const fixHash = /^([0-9a-f]{64})$/i.exec(field('Fix-check-Plan-SHA256').trim());
+      if (!fixHash) errors.push('## Review missing 64-char Fix-check-Plan-SHA256');
+      else if (fixHash[1].toLowerCase() !== expectedHash)
+        errors.push(`Fix-check-Plan-SHA256 mismatch (expected ${expectedHash})`);
+    }
     if (isHollow(field('Reviewer'), 3)) errors.push('## Review must name Reviewer');
     const authorModel = field('Author-Model');
     const reviewerModel = field('Reviewer-Model');

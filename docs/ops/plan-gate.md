@@ -7,14 +7,17 @@ Scale planning to risk so missing edge cases and contradictions are caught befor
 | Tier | Applies to | Required artifact | Machine check |
 |---|---|---|---|
 | **Tier 0** | Small single-path `fix`, `docs`, `test`, `ops`, `ci`, `chore`, `security`, or behavior-preserving `refactor` touching neither persisted state nor wire/step protocols | No plan file | `scripts/plan-gate.mjs` skips |
-| **Tier 1** | `feat`, user-visible behavior change, new mechanism, persisted-state change (`apps/server/drizzle/`, `apps/server/src/db/schema.ts`), wire/step protocol change (`packages/shared/src/protocol/`), or concurrency change | Plan at `docs/design/<slug>.md` with `Slice/Status` on every edge row, real proving tests that pass on the commit and fail on the parent source, independent `Reviewer-Model` != `Author-Model`, `Verdict: PASS`, and matching `Plan-SHA256` | `scripts/plan-gate.mjs` (fast gate and CI `check-core`) + `scripts/regression-inversion-gate.mjs` (CI light and integration) refuse missing proving test files, any unmodified `"this change"` runnable test, tests failing on the commit or passing on the parent, and same-model reviews |
+| **Tier 1** | `feat`, user-visible behavior change, new mechanism, persisted-state change (`apps/server/drizzle/`, `apps/server/src/db/schema.ts`), wire/step protocol change (`packages/shared/src/protocol/`), or concurrency change | Plan at `docs/design/<slug>.md` with `Slice/Status` on every edge row, real proving tests that pass on the commit and fail on the parent source, and one independent review (`Reviewer-Model` != `Author-Model`) with a current hash as described below | `scripts/plan-gate.mjs` (fast gate and CI `check-core`) + `scripts/regression-inversion-gate.mjs` (CI light and integration) refuse missing proving test files, any unmodified `"this change"` runnable test, tests failing on the commit or passing on the parent, and same-model reviews |
 
 ## Workflow
 
 1. **Draft the plan** at `docs/design/<slug>.md` using the template below before writing implementation code. For persisted-state, protocol, or concurrency changes, `## Edge cases` must cover states, transitions, every reader and writer, and each failure path. Every `## Edge cases` row must name a repo-relative `Proving test` file path and set `Slice/Status` to `this change` or `later: <ticket or slice>`.
-2. **Fresh-context analyze** (Clarify + Analyze): hand the plan file (with read-only codebase access, no implementation context) to an independent model different from the author's (`Reviewer-Model` != `Author-Model`) whose sole job is hunting missing edges, untestable rows, and contradictions. Fix any finding, compute `node scripts/plan-gate.mjs --hash docs/design/<slug>.md`, record `## Review` with `Verdict: PASS`, `Author-Model`, `Reviewer-Model`, and verify with `node scripts/plan-gate.mjs --check-file docs/design/<slug>.md`.
-3. **Implement**: reference `Plan: docs/design/<slug>.md` in the commit trailer of every Tier 1 commit. At least one `Edge cases` row must be marked `this change`, every file named in `this change` rows must exist at the commit, and every `"this change"` runnable proving test file must be added or modified in that commit, pass on the commit itself, and fail when run against the parent product source (`scripts/regression-inversion-gate.mjs`). Editing anything above `## Review` invalidates `Plan-SHA256` until re-reviewed.
-4. **Row-by-row code review**: code review checks the diff row by row against `## Scope` and `## Edge cases`, confirming every scope row is met, every edge row is proven by its named test (or tracked under `later: <ticket or slice>`), and unrequested behavior is absent.
+2. **Fresh-context analyze** (Clarify + Analyze): hand the plan file (with read-only codebase access, no implementation context) to an independent model different from the author's (`Reviewer-Model` != `Author-Model`) for one full review of missing edges, untestable rows, and contradictions. Record the original verdict, findings and body hash from `node scripts/plan-gate.mjs --hash docs/design/<slug>.md` in the final `## Review`. `PASS` needs that original `Plan-SHA256` to match the current body. `CONCERNS` means should-fix findings; `BLOCK` is reserved for a real exploit, data loss, or the wrong requirement. Read legacy `FAIL` as `BLOCK` without rewriting landed records.
+3. **Resolve findings and verify**: for `CONCERNS`, `BLOCK`, or legacy `FAIL`, fix the numbered findings together, preserving the original verdict, findings and `Plan-SHA256`. Run `pi-review.sh check plan <file>` with the original reviewer model (`REVIEW_MODEL`); it checks only those numbered findings and raises nothing new. Record `Fix-check: PASS` and `Fix-check-Plan-SHA256` for the current body. After any later body edit, use confirmation only, update the fix-check fields for the current body, and let the wrapper enforce its two-attempt cap. Never start another full review, including after a later hash change. For an originally passing review whose body later changes, use confirmation only and refresh `Plan-SHA256` to the current body after confirmation. Check the file with `node scripts/plan-gate.mjs --check-file docs/design/<slug>.md`.
+4. **Implement**: reference `Plan: docs/design/<slug>.md` in the commit trailer of every Tier 1 commit. At least one `Edge cases` row must be marked `this change`, every file named in `this change` rows must exist at the commit, and every `"this change"` runnable proving test file must be added or modified in that commit, pass on the commit itself, and fail when run against the parent product source (`scripts/regression-inversion-gate.mjs`).
+5. **Row-by-row code review**: code review checks the diff row by row against `## Scope` and `## Edge cases`, confirming every scope row is met, every edge row is proven by its named test (or tracked under `later: <ticket or slice>`), and unrequested behavior is absent.
+
+`## Review` must be the final H2 section; use one verdict and at most one of each recognized metadata field. Do not duplicate required body headings. Hashes record which body versions were reviewed or checked; they do not authenticate the reviewer, prove the wrapper ran, or judge finding severity or coverage. Those are human/model judgments.
 
 ## Plan Template (`docs/design/<slug>.md`)
 
@@ -49,6 +52,13 @@ Newcomer first: where a first-time user meets this change, what they already nee
 - Reviewer: <fresh-context reviewer name/session>
 - Reviewer-Model: <independent model id different from Author-Model, e.g. openai-codex/gpt-6.2-sol>
 - Findings: <0 blocking; edges and contradictions checked>
+```
+
+For a non-PASS review, replace the template verdict with the original `CONCERNS` or `BLOCK`, retain its original findings and hash, and add these fields once in the same final `## Review` after confirmation (refresh them after a later changed body):
+
+```markdown
+- Fix-check: PASS
+- Fix-check-Plan-SHA256: <output of node scripts/plan-gate.mjs --hash docs/design/<slug>.md for the checked body>
 ```
 
 ## Anti-Rationalization Table

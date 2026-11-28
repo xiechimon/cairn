@@ -1,6 +1,12 @@
 {
   "terms": [
     {
+      "id": "plan-full-re-review",
+      "pattern": "`?Plan-SHA256`?[^\\n]*until re-reviewed",
+      "canary": "Editing invalidates `Plan-SHA256` until re-reviewed.",
+      "reason": "plan body changes use confirmation only, not another full review"
+    },
+    {
       "id": "desktop-release-whole-run-lock",
       "pattern": "one workflow-level concurrency (?:group|slot)",
       "canary": "desktop-release uses one workflow-level concurrency group",
@@ -236,6 +242,7 @@
     }
   ],
   "baseline": {
+    "plan-full-re-review": {},
     "desktop-release-whole-run-lock": {},
     "adr-number": {
       ".claude/skills/verify-cairn/features/agent-detail.md": 2,

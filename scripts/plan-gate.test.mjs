@@ -41,6 +41,160 @@ const sign = (
 ) =>
   `${body}\n\n## Review\n\n- Verdict: PASS\n- Plan-SHA256: ${computePlanHash(body)}\n- Author-Model: ${authorModel}\n- Reviewer: ${reviewer}\n- Reviewer-Model: ${reviewerModel}\n- Findings: 0 blocking\n`;
 
+const reviewWith = (verdict, fixCheck = '') =>
+  sign().replace('- Verdict: PASS', `- Verdict: ${verdict}${fixCheck}`);
+const currentFixCheck = `\n- Fix-check: PASS\n- Fix-check-Plan-SHA256: ${computePlanHash(BODY)}`;
+const expectReview = (plan, ok, label) => {
+  const result = validatePlanContent(plan);
+  assert.equal(result.ok, ok, `${label}: ${result.errors.join('; ') || 'unexpectedly accepted'}`);
+};
+
+test('CONCERNS with a passing fix-check bound to the current plan is accepted', () => {
+  expectReview(reviewWith('CONCERNS', currentFixCheck), true, 'current CONCERNS fix-check');
+});
+
+test('a second Verdict is rejected even when unbulleted and the first is valid', () => {
+  for (const second of ['Verdict: BLOCK', '- Verdict: BLOCK', 'Verdict:']) {
+    expectReview(sign().replace('- Verdict: PASS', `- Verdict: PASS\n${second}`), false, second);
+  }
+});
+
+test('BLOCK and legacy FAIL need a current passing fix-check', () => {
+  for (const verdict of ['BLOCK', 'FAIL']) {
+    expectReview(reviewWith(verdict), false, `${verdict}: missing fix-check`);
+    expectReview(
+      reviewWith(verdict, currentFixCheck.replace('Fix-check: PASS', 'Fix-check: FAIL')),
+      false,
+      `${verdict}: failed fix-check`,
+    );
+    expectReview(reviewWith(verdict, currentFixCheck), true, `${verdict}: current fix-check`);
+  }
+});
+
+test('refreshing the ordinary plan hash does not refresh a stale fix-check', () => {
+  const editedBody = BODY.replace('Unknown machine', 'Unrecognized machine');
+  const plan = sign(editedBody).replace('- Verdict: PASS', `- Verdict: CONCERNS${currentFixCheck}`);
+  expectReview(plan, false, 'stale fix-check after body edit and Plan-SHA256 refresh');
+});
+
+test('CONCERNS preserves the historical review hash while checking the edited body', () => {
+  const editedBody = BODY.replace('Unknown machine', 'Unrecognized machine');
+  const historical = sign(editedBody)
+    .replace(computePlanHash(editedBody), computePlanHash(BODY))
+    .replace('- Verdict: PASS', '- Verdict: CONCERNS');
+  const fix = (hash) => `\n- Fix-check: PASS\n- Fix-check-Plan-SHA256: ${hash}`;
+  expectReview(
+    historical.replace(
+      '- Verdict: CONCERNS',
+      `- Verdict: CONCERNS${fix(computePlanHash(editedBody))}`,
+    ),
+    true,
+    'current fix hash',
+  );
+  expectReview(
+    historical.replace('- Verdict: CONCERNS', `- Verdict: CONCERNS${fix(computePlanHash(BODY))}`),
+    false,
+    'stale fix hash',
+  );
+  expectReview(
+    historical.replace('- Verdict: CONCERNS', '- Verdict: CONCERNS\n- Fix-check: PASS'),
+    false,
+    'missing fix hash',
+  );
+});
+
+for (const field of [
+  'Plan-SHA256',
+  'Author-Model',
+  'Reviewer',
+  'Reviewer-Model',
+  'Findings',
+  'Fix-check',
+  'Fix-check-Plan-SHA256',
+]) {
+  test(`duplicate ${field} metadata is rejected`, () => {
+    const plan = reviewWith('PASS', currentFixCheck);
+    const line = plan.split('\n').find((entry) => entry.startsWith(`- ${field}:`));
+    expectReview(`${plan}${line}\n`, false, `duplicate ${field}`);
+  });
+}
+
+for (const heading of ['User scenario', 'Scope', 'Edge cases', 'Out of scope']) {
+  test(`duplicate ${heading} heading is rejected`, () => {
+    const section = BODY.split(`## ${heading}\n`)[1].split('\n## ')[0];
+    const body = `${BODY}\n\n## ${heading}\n${section}`;
+    expectReview(sign(body), false, `duplicate ${heading}`);
+  });
+}
+
+test('a level-two section after Review is rejected', () => {
+  expectReview(`${sign()}\n## Appendix\nUnhashed content.\n`, false, 'unhashed suffix');
+  expectReview(`${sign()}\nAppendix\n--------\nUnhashed content.\n`, false, 'setext suffix');
+});
+
+test('PASS stays valid; unknown and empty verdicts are rejected', () => {
+  expectReview(sign(), true, 'legacy PASS');
+  for (const verdict of ['MAYBE', ''])
+    expectReview(reviewWith(verdict), false, `verdict ${JSON.stringify(verdict)}`);
+});
+
+test('duplicate Review headings are rejected', () => {
+  expectReview(`${sign()}\n## Review\n\n- Verdict: PASS\n`, false, 'duplicate Review section');
+});
+
+test('fenced examples neither supply nor duplicate review metadata', () => {
+  const example = '```markdown\n- Verdict: PASS\n```';
+  expectReview(sign().replace('- Verdict: PASS', example), false, 'only fenced verdict');
+  expectReview(
+    sign().replace('- Verdict: PASS', `- Verdict: PASS\n${example}`),
+    true,
+    'fenced example after verdict',
+  );
+});
+
+test('tilde and unclosed fences cannot supply metadata; inline prose is ignored', () => {
+  for (const fence of [
+    '~~~markdown\n- Verdict: PASS\n~~~',
+    '```markdown\n- Verdict: PASS',
+    '~~~markdown\n- Verdict: PASS',
+  ]) {
+    expectReview(sign().replace('- Verdict: PASS', fence), false, fence);
+  }
+  expectReview(
+    sign().replace('- Verdict: PASS', '- Verdict: PASS\nAn example says Verdict: BLOCK in prose.'),
+    true,
+    'inline prose',
+  );
+  expectReview(
+    sign().replace('- Verdict: PASS', '- Verdict: PASS\n~~~markdown\n- Verdict: BLOCK\n~~~'),
+    true,
+    'tilde example',
+  );
+});
+
+test('lowercase statuses and BOM/CRLF are accepted', () => {
+  const body = `\uFEFF${BODY.replaceAll('\n', '\r\n')}`;
+  const hash = computePlanHash(body);
+  const plan = sign(body).replace(
+    '- Verdict: PASS',
+    `- Verdict: concerns\n- Fix-check: pass\n- Fix-check-Plan-SHA256: ${hash}`,
+  );
+  expectReview(plan.replace(/(?<!\r)\n/g, '\r\n'), true, 'BOM CRLF lowercase');
+});
+
+test('status tokens reject trailing text', () => {
+  expectReview(
+    sign().replace('Verdict: PASS', 'Verdict: PASS trailing'),
+    false,
+    'verdict trailing text',
+  );
+  expectReview(
+    reviewWith('PASS', currentFixCheck.replace('Fix-check: PASS', 'Fix-check: PASS trailing')),
+    false,
+    'fix-check trailing text',
+  );
+});
+
 function initTempRepo(t) {
   const dir = makeTestTempDir('plan-gate-');
   t.after(() => releaseTestTempDir(dir));
@@ -90,6 +244,56 @@ test('temp repo passes with hash-verified plan and fails when edited without re-
   const tampered = run([]);
   assert.equal(tampered.status, 1);
   assert.match(tampered.stderr, /Plan-SHA256 mismatch/);
+});
+
+test('file, commit and range check original and later fix-checks independently', (t) => {
+  const { dir, git, write } = initTempRepo(t);
+  const run = (...args) =>
+    spawnSync(process.execPath, [CLI, ...args], { cwd: dir, encoding: 'utf8' });
+  const path = 'docs/design/sample.md';
+  const plan = reviewWith('CONCERNS', currentFixCheck);
+  write(path, plan);
+  write('apps/web/src/sample.ts', 'export const s = 1;\n');
+  write('apps/server/test/todo.test.ts', 'export const ok = true;\n');
+  git(['add', path, 'apps/web/src/sample.ts', 'apps/server/test/todo.test.ts']);
+  git(['commit', '-m', 'feat(sample): launch', '-m', `Plan: ${path}`]);
+  const launch = git(['rev-parse', 'HEAD']);
+  assert.equal(run('--check-file', path).status, 0);
+  assert.equal(run('--commit', launch).status, 0);
+  assert.equal(evaluatePlanCommit(dir, launch).ok, true);
+  assert.equal(run().status, 0);
+
+  const editedBody = BODY.replace('Unknown machine', 'Unrecognized machine');
+  const updated = plan
+    .replace(BODY, editedBody)
+    .replace(
+      `Fix-check-Plan-SHA256: ${computePlanHash(BODY)}`,
+      `Fix-check-Plan-SHA256: ${computePlanHash(editedBody)}`,
+    );
+  write(path, updated);
+  git(['add', path]);
+  git(['commit', '-m', 'docs: update checked plan']);
+  assert.equal(run('--check-file', path).status, 0);
+  assert.equal(run().status, 0);
+  write(path, `${updated}- Verdict: BLOCK\n`);
+  git(['add', path]);
+  git(['commit', '--amend', '--no-edit']);
+  assert.equal(run().status, 1);
+});
+
+test('a later valid fix-check cannot repair an invalid launch commit', (t) => {
+  const { dir, git, write } = initTempRepo(t);
+  const path = 'docs/design/sample.md';
+  write(path, reviewWith('CONCERNS'));
+  write('apps/web/src/sample.ts', 'export const s = 1;\n');
+  write('apps/server/test/todo.test.ts', 'export const ok = true;\n');
+  git(['add', path, 'apps/web/src/sample.ts', 'apps/server/test/todo.test.ts']);
+  git(['commit', '-m', 'feat(sample): launch', '-m', `Plan: ${path}`]);
+  write(path, reviewWith('CONCERNS', currentFixCheck));
+  git(['add', path]);
+  git(['commit', '-m', 'docs: confirm plan']);
+  assert.equal(spawnSync(process.execPath, [CLI, '--check-file', path], { cwd: dir }).status, 0);
+  assert.equal(spawnSync(process.execPath, [CLI], { cwd: dir }).status, 1);
 });
 
 test('hollow satisfiers, invalid paths, classifier tiers, and missing merge-base fail closed', (t) => {

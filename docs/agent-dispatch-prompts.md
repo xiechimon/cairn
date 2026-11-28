@@ -50,7 +50,7 @@ node scripts/design-rules-for.mjs apps/web/src/chief/chief-conversation.tsx apps
 
 ## Plan gate
 
-Follow `docs/ops/plan-gate.md`: small fixes need no plan; features, user-visible behavior changes, new mechanisms, persisted state, wire/step protocols, and concurrency require a `docs/design/<slug>.md` plan reviewed by an independent model (`Reviewer-Model` != `Author-Model`, `Verdict: PASS`, matching `Plan-SHA256`) with `Slice/Status` (`this change` or `later: <ticket or slice>`) on every edge row, real proving tests that exist at the commit and fail on the parent source (`scripts/plan-gate.mjs` + `scripts/regression-inversion-gate.mjs`), and a `Plan: docs/design/<slug>.md` trailer on Tier 1 commits. Code review checks the diff row by row against the plan.
+Follow `docs/ops/plan-gate.md` for risk tiers, the independent one-review contract, edge rows, proving tests and Tier 1 commit trailers. Code review checks the diff row by row against the plan.
 
 ## Worker prompt
 

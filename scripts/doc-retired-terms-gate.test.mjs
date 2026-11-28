@@ -221,6 +221,24 @@ test('the command CI runs fails on a mention the base commit does not have', (t)
   assert.match(again.stderr, /docs\/ops\/a\.md has 1/);
 });
 
+test('retired plan re-review wording is rejected in living docs', (t) => {
+  const committed = JSON.parse(
+    readFileSync(resolve(import.meta.dirname, '..', REGISTRY_REL), 'utf8'),
+  );
+  const planTerm = committed.terms.find((entry) => entry.id === 'plan-full-re-review');
+  assert.ok(planTerm, 'registry must retire the old full re-review requirement');
+  const r = repo(
+    t,
+    { 'docs/ops/a.md': 'Current guidance.\n' },
+    { terms: [planTerm], baseline: {} },
+  );
+  r.write({
+    'docs/ops/a.md':
+      'Editing anything above `## Review` invalidates `Plan-SHA256` until re-reviewed.\n',
+  });
+  assert.match(r.check(), /docs\/ops\/a\.md.*plan-full-re-review/);
+});
+
 test('the committed registry keeps the four retired mechanisms', () => {
   const { terms } = JSON.parse(
     readFileSync(resolve(import.meta.dirname, '..', REGISTRY_REL), 'utf8'),
