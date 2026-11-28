@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "escalation-approval-order",
+  "instruction": "In apps/server/src/services/action-proposals.ts, when a host-shell escalation or action approval card settles, its createdAt timestamp is not adjusted cleanly relative to the request turn messages and subsequent wake results: decided cards should sort after existing thread messages at settle time, while cancelled/expired/superseded cards without a user decision should sit right after the last assistant message of that turn before the next user message. Fix settled card timestamp ordering in action-proposals.ts.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "d4376d6e563d83610c083f9b9c09d36bea8bf6ea",
+    "fixCommit": "5f839c2b1bcf06c735e1525a84dd40a24eb9a750",
+    "testFiles": [
+      "apps/server/test/host-shell-escalation.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/host-shell-escalation.test.ts"
+    ]
+  },
+  "gate": true
+}

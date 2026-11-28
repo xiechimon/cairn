@@ -1,0 +1,22 @@
+{
+  "kind": "lane",
+  "id": "schedule-note-timezone",
+  "instruction": "When a scheduled Coordinator turn runs, the injected [Now] context note formats the timestamp using the server host timezone instead of the schedule configured timezone (falling back to the server timezone only if the schedule has no valid timezone), and scheduled pending Coordinator steps must not be folded together with queued owner-message steps. Fix scheduled Coordinator turn timezone formatting and folding in apps/server/src/services/coordinator-steps.ts and schedules.ts.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "9b5778a0c22a24ddb951986af7e249a9d1fa84a6",
+    "fixCommit": "0562b1b9eeea6bdb4a884b4a35f1138e08091965",
+    "testFiles": [
+      "apps/server/test/chief-schedule.test.ts",
+      "apps/server/test/coordinator/schedule-timezone.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/chief-schedule.test.ts apps/server/test/coordinator/schedule-timezone.test.ts"
+    ]
+  },
+  "gate": true
+}

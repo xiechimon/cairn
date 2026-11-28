@@ -1,0 +1,22 @@
+{
+  "kind": "lane",
+  "id": "machine-grants-auth-off",
+  "instruction": "In apps/server/src/routes-computers.ts and routes-resources.ts, owner-only computer and machine grant endpoints (POST/PATCH /api/computers and browserOverride/desktopOverride/isDefault on machine PATCH) check c.get(\"ownerIdentity\") directly, returning 403 on auth-off stacks where ownerIdentity is unset even though isOwnerSession(c) / requireOwnerSession(c) is true. Switch those gates to use isOwnerSession(c) / requireOwnerSession(c).",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "08d09f4df72f6c210d023b6edfec8c56fee7ce71",
+    "fixCommit": "72f0b53174898f1494a0f789ee4361d9e2bc29b3",
+    "testFiles": [
+      "apps/server/test/cloak-license.test.ts",
+      "apps/server/test/machine-grants.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/cloak-license.test.ts apps/server/test/machine-grants.test.ts"
+    ]
+  },
+  "gate": true
+}

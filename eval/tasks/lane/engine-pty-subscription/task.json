@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "engine-pty-subscription",
+  "instruction": "In apps/daemon/src/engine/claude-tui.ts and pty.ts, ptyEligible refuses host runs whose session env sets CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 (which dispatch sets on subscription-bound runs), preventing interactive engine PTY from starting. Pass the subscription OAuth token to the PTY child over file descriptor 3 (CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR=3) while omitting CLAUDE_CODE_SUBPROCESS_ENV_SCRUB and CLAUDE_CODE_OAUTH_TOKEN from the child env, and allow subscription-bound host runs in ptyEligible (still refusing nested scrubbed daemon envs and orb sessions).",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "4eaec4ccb28a54b2bd5c33004200a25c882a6173",
+    "fixCommit": "c2b6185034255f711d990b463adea4f4b50b1ec4",
+    "testFiles": [
+      "apps/daemon/test/engine-pty-subscription.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/daemon/test/engine-pty-subscription.test.ts"
+    ]
+  },
+  "gate": true
+}

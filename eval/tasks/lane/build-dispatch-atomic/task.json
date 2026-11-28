@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "build-dispatch-atomic",
+  "instruction": "In apps/server/src/services/build-start.ts, startBuilds inserts the build row, enqueues the initial session step, and updates the todo phase outside a database transaction, so a mid-operation failure leaves partial orphaned rows in the database. Wrap the per-todo build creation, step enqueue, and todo phase update inside deps.db.transaction(...).",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "c7fbeec23b46d36af6ac38fb077cab923aa49273",
+    "fixCommit": "f446f7261d7969c0e120109cd688845fdad2c93e",
+    "testFiles": [
+      "apps/server/test/settle-atomicity.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/settle-atomicity.test.ts"
+    ]
+  },
+  "gate": true
+}

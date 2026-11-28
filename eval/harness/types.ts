@@ -33,10 +33,11 @@ export const expected = z
   .strict();
 
 const taskId = z.string().regex(/^[a-z0-9][a-z0-9-]*$/);
+const commitSha = z.string().regex(/^[0-9a-f]{40}$/);
 const safeRelPath = z
   .string()
   .min(1)
-  .refine((p) => !p.startsWith('/') && !p.split('/').includes('..'));
+  .refine((p) => !p.startsWith('/') && !p.includes('\\') && !p.split('/').includes('..'));
 
 export const runtimeTask = z
   .object({
@@ -51,18 +52,28 @@ export const runtimeTask = z
   })
   .strict();
 
+export const laneSource = z
+  .object({
+    parentCommit: commitSha,
+    fixCommit: commitSha,
+    testFiles: z.array(safeRelPath).min(1),
+    existingTestFiles: z.array(safeRelPath).default([]),
+  })
+  .strict();
+
 export const laneTask = z
   .object({
     kind: z.literal('lane'),
     id: taskId,
     instruction: z.string().min(1),
-    timeoutMs: z.number().int().min(10_000).default(600_000),
+    timeoutMs: z.number().int().min(10_000).max(240_000).default(240_000),
+    source: laneSource,
     checks: z
       .object({
         files: z
           .array(z.object({ path: safeRelPath, contains: z.string().optional() }))
           .default([]),
-        commands: z.array(z.string()).default([]),
+        commands: z.array(z.string().min(1)).min(1),
         allowPaths: z.array(z.string()).optional(),
       })
       .strict(),

@@ -1,5 +1,5 @@
-import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import BetterSqlite from 'better-sqlite3';
@@ -9,6 +9,8 @@ import type {
   existingTurnCapture,
 } from '../apps/server/src/services/coordinator-turn-capture.js';
 import { cleanupTestTempDirs, makeTestTempDir } from '../scripts/test-tmpdir.mjs';
+import type { LaneTask } from './harness/types.js';
+import { runCli, verifyLaneTask } from './harvest-git.js';
 
 type ClaimView = Parameters<typeof captureClaimInputs>[1];
 type ToolView = NonNullable<ReturnType<typeof existingTurnCapture>>['views'][number];
@@ -17,6 +19,61 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HARVEST = join(ROOT, 'eval', 'harvest.ts');
 
 afterAll(cleanupTestTempDirs);
+
+function gitIn(cwd: string, args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+}
+
+function makeSyntheticGitTaskRepo(baseDir: string): {
+  repoRoot: string;
+  examDir: string;
+  task: LaneTask;
+} {
+  const repoRoot = join(baseDir, 'repo');
+  mkdirSync(repoRoot, { recursive: true });
+  writeFileSync(join(repoRoot, 'calc.mjs'), 'export function mul(a, b) { return a + b; }\n');
+  writeFileSync(
+    join(repoRoot, 'calc.test.mjs'),
+    "import assert from 'node:assert/strict';\nimport test from 'node:test';\nimport { mul } from './calc.mjs';\ntest('is function', () => { assert.equal(typeof mul, 'function'); });\n",
+  );
+  gitIn(repoRoot, ['init', '-q']);
+  gitIn(repoRoot, ['config', 'user.email', 'eval@cairn.dev']);
+  gitIn(repoRoot, ['config', 'user.name', 'eval']);
+  gitIn(repoRoot, ['add', '-A']);
+  gitIn(repoRoot, ['commit', '-qm', 'parent commit']);
+  const parentCommit = gitIn(repoRoot, ['rev-parse', 'HEAD']);
+
+  writeFileSync(join(repoRoot, 'calc.mjs'), 'export function mul(a, b) { return a * b; }\n');
+  writeFileSync(
+    join(repoRoot, 'calc.test.mjs'),
+    "import assert from 'node:assert/strict';\nimport test from 'node:test';\nimport { mul } from './calc.mjs';\ntest('multiplies', () => { assert.equal(mul(3, 4), 12); });\n",
+  );
+  gitIn(repoRoot, ['add', '-A']);
+  gitIn(repoRoot, ['commit', '-qm', 'fix(calc): multiply instead of add']);
+  const fixCommit = gitIn(repoRoot, ['rev-parse', 'HEAD']);
+
+  const task: LaneTask = {
+    kind: 'lane',
+    id: 'mul-fix',
+    instruction: 'Fix mul so mul(3, 4) returns 12.',
+    timeoutMs: 60_000,
+    source: {
+      parentCommit,
+      fixCommit,
+      testFiles: ['calc.test.mjs'],
+      existingTestFiles: [],
+    },
+    checks: {
+      files: [],
+      commands: ['node --test calc.test.mjs'],
+    },
+    gate: true,
+  };
+  const examDir = join(repoRoot, 'eval');
+  mkdirSync(join(examDir, 'tasks', 'lane', 'mul-fix'), { recursive: true });
+  writeFileSync(join(examDir, 'tasks', 'lane', 'mul-fix', 'task.json'), JSON.stringify(task));
+  return { repoRoot, examDir, task };
+}
 
 describe('eval/harvest', () => {
   it('turns a sealed claim-shaped snapshot row into one dataset item', () => {
@@ -180,5 +237,44 @@ describe('eval/harvest', () => {
       .filter(Boolean)
       .map((line) => JSON.parse(line));
     expect(zeroItems).toHaveLength(0);
+  });
+});
+
+describe('eval/harvest-git', () => {
+  it('passes verifyLaneTask for baseline/nop/oracle and rejects invalid tasks or in-repo --out', () => {
+    const dir = makeTestTempDir('cairn-harvest-git-');
+    const { repoRoot, examDir, task } = makeSyntheticGitTaskRepo(dir);
+
+    const ok = verifyLaneTask(task, repoRoot);
+    expect(ok.ok, ok.reason).toBe(true);
+
+    const badParent = verifyLaneTask(
+      { ...task, source: { ...task.source, parentCommit: task.source.fixCommit } },
+      repoRoot,
+    );
+    expect(badParent.ok).toBe(false);
+    expect(badParent.reason).toContain('!== fixCommit^');
+
+    const nopPasses = verifyLaneTask(
+      { ...task, checks: { ...task.checks, commands: ['node -e "process.exit(0)"'] } },
+      repoRoot,
+    );
+    expect(nopPasses.ok).toBe(false);
+    expect(nopPasses.reason).toContain('nop unexpectedly passed');
+
+    expect(runCli(['--repo', repoRoot, '--exam', examDir, '--verify', 'does-not-exist'])).toBe(1);
+    expect(() =>
+      runCli([
+        '--repo',
+        repoRoot,
+        '--exam',
+        examDir,
+        '--scan',
+        '--ref',
+        'HEAD',
+        '--out',
+        join(repoRoot, 'out.jsonl'),
+      ]),
+    ).toThrow(/outside the repository/);
   });
 });

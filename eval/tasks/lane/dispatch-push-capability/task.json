@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "dispatch-push-capability",
+  "instruction": "In apps/server/src/services/dispatch-eligibility.ts, githubPushCapable currently disqualifies a Runner whenever its githubPush capability report is missing, stale, unknown, or lacks an entry for the target repository. Runners should remain eligible unless they explicitly report login === \"unauthenticated\" or report state === \"no-write\" or \"unauthenticated\" for the target repository within the freshness window. Fix githubPushCapable so missing, stale, or unknown reports do not block dispatch.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "282b935124fbfb474f99b73d6ec634cd257fa693",
+    "fixCommit": "1107bafcc7a5b6f3f9ffc7f8a332ba4225265462",
+    "testFiles": [
+      "apps/server/test/github-push-capability.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/github-push-capability.test.ts"
+    ]
+  },
+  "gate": true
+}

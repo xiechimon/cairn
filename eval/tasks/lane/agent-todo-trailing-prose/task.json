@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "agent-todo-trailing-prose",
+  "instruction": "In packages/shared/src/agent-todo.ts, parseAgentTodoText resets the active checklist run to null whenever it sees a non-checklist prose line, so a checklist followed by trailing explanation prose returns null instead of the last completed checklist run. Preserve the last non-empty checklist run when trailing prose appears after it.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "495e36e42a5d8afccefb776728fd10a5723f59e9",
+    "fixCommit": "d6cd1bd7f2dcb93ca016c78c88162f962259c42f",
+    "testFiles": [
+      "apps/daemon/test/agent-todo.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/daemon/test/agent-todo.test.ts"
+    ]
+  },
+  "gate": true
+}

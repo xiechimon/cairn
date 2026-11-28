@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "daemon-non-git-changes",
+  "instruction": "In apps/daemon, when a step runs in a non-git workspace (no workspace repo), Cairn infers hasChanges from transcript tool calls and file diffs. Currently, cross-runtime file-mutating tool names such as write_file, edit_file, create_file, delete_file, apply_patch, notebookedit, replace_file_content, and multi_replace_file_content are not recognized as change tools, and if a shell/command tool modifies files directly on disk without using a recognized edit tool name, hasChanges stays false. Fix non-git workspace change detection and cross-runtime write tool recognition so both cases report hasChanges=true while read-only commands without disk changes still report hasChanges=false.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "338fe19b30266c2bb26b0139dfcbc5a4d57b95d0",
+    "fixCommit": "58c9e0c618d680f87e7f69f3fcf5ae742cdfe03f",
+    "testFiles": [
+      "apps/daemon/test/runner-artifact.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/daemon/test/runner-artifact.test.ts"
+    ]
+  },
+  "gate": true
+}

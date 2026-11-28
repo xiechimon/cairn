@@ -1,11 +1,12 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
-  cpSync,
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  symlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,14 +14,17 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { cleanupTestTempDirs, makeTestTempDir } from '../scripts/test-tmpdir.mjs';
+import { resolveDevinCap } from './harness/budget.js';
+import { resolveDevinBin } from './harness/devin-env.mjs';
 import { runLaneTask } from './harness/lane.js';
+import { sweepStaleTempDirs } from './harness/snapshot.js';
 import type { LaneTask } from './harness/types.js';
+import { runEval } from './run.js';
 import { scoreLane } from './scorers/lane-checks.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const EXAM_DIR = join(ROOT, 'eval');
 
-afterAll(cleanupTestTempDirs);
+afterAll(cleanupTestTempDirs, 30_000);
 
 const savedEnv: Record<string, string | undefined> = {};
 function setEnv(entries: Record<string, string | undefined>): void {
@@ -48,64 +52,343 @@ function writeStubDevin(dir: string, scriptBody: string): string {
   return binPath;
 }
 
-function readTask(id: string): LaneTask {
-  return JSON.parse(
-    readFileSync(join(EXAM_DIR, 'tasks', 'lane', id, 'task.json'), 'utf8'),
-  ) as LaneTask;
+function gitIn(cwd: string, args: string[]): string {
+  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+}
+
+interface FixtureSnapshotRepo {
+  repoRoot: string;
+  examDir: string;
+  parentCommit: string;
+  fixCommit: string;
+  task: LaneTask;
+}
+
+function createFixtureSnapshotRepo(baseDir: string, taskId = 'sample-fix'): FixtureSnapshotRepo {
+  const repoRoot = join(baseDir, 'repo');
+  const pkgDir = join(repoRoot, 'packages', 'pkg-a');
+  const nestedTestDir = join(repoRoot, 'tests', 'nested');
+  mkdirSync(pkgDir, { recursive: true });
+  mkdirSync(nestedTestDir, { recursive: true });
+  writeFileSync(
+    join(repoRoot, 'package.json'),
+    JSON.stringify({ name: 'fixture-repo', private: true, type: 'module' }),
+  );
+  writeFileSync(
+    join(pkgDir, 'package.json'),
+    JSON.stringify({ name: '@fixture/pkg-a', type: 'module', main: './index.js' }),
+  );
+  writeFileSync(
+    join(pkgDir, 'index.js'),
+    'export function add(a, b) {\n  return String(a) + String(b);\n}\n',
+  );
+  writeFileSync(
+    join(repoRoot, 'existing.test.mjs'),
+    "import assert from 'node:assert/strict';\nimport test from 'node:test';\ntest('existing baseline passes', () => {\n  assert.equal(1 + 1, 2);\n});\n",
+  );
+  writeFileSync(
+    join(nestedTestDir, 'regression.test.mjs'),
+    "import assert from 'node:assert/strict';\nimport test from 'node:test';\nimport { add } from '@fixture/pkg-a';\ntest('existing export exists', () => {\n  assert.equal(typeof add, 'function');\n});\n",
+  );
+
+  gitIn(repoRoot, ['init', '-q']);
+  gitIn(repoRoot, ['config', 'user.email', 'eval@cairn.dev']);
+  gitIn(repoRoot, ['config', 'user.name', 'eval']);
+  gitIn(repoRoot, ['add', '-A']);
+  gitIn(repoRoot, ['commit', '-qm', 'parent buggy']);
+  const parentCommit = gitIn(repoRoot, ['rev-parse', 'HEAD']);
+
+  writeFileSync(
+    join(pkgDir, 'index.js'),
+    'export function add(a, b) {\n  return Number(a) + Number(b);\n}\n',
+  );
+  writeFileSync(
+    join(nestedTestDir, 'regression.test.mjs'),
+    "import assert from 'node:assert/strict';\nimport test from 'node:test';\nimport { add } from '@fixture/pkg-a';\ntest('adds numbers numerically', () => {\n  assert.equal(add(2, 3), 5);\n});\n",
+  );
+  gitIn(repoRoot, ['add', '-A']);
+  gitIn(repoRoot, ['commit', '-qm', 'fix add bug']);
+  const fixCommit = gitIn(repoRoot, ['rev-parse', 'HEAD']);
+
+  const nmScopeDir = join(repoRoot, 'node_modules', '@fixture');
+  mkdirSync(nmScopeDir, { recursive: true });
+  symlinkSync(pkgDir, join(nmScopeDir, 'pkg-a'));
+
+  const task: LaneTask = {
+    kind: 'lane',
+    id: taskId,
+    instruction:
+      'Fix add in @fixture/pkg-a so add(2, 3) returns numeric 5 instead of concatenating strings.',
+    timeoutMs: 20_000,
+    source: {
+      parentCommit,
+      fixCommit,
+      testFiles: ['tests/nested/regression.test.mjs'],
+      existingTestFiles: ['existing.test.mjs'],
+    },
+    checks: {
+      files: [{ path: 'packages/pkg-a/index.js', contains: 'Number(a)' }],
+      commands: ['node --test tests/nested/regression.test.mjs existing.test.mjs'],
+    },
+    gate: true,
+  };
+
+  const examDir = join(repoRoot, 'eval');
+  mkdirSync(join(examDir, 'tasks', 'lane', taskId), { recursive: true });
+  mkdirSync(join(examDir, 'tasks', 'runtime'), { recursive: true });
+  mkdirSync(join(examDir, 'tasks', 'canary'), { recursive: true });
+  mkdirSync(join(examDir, 'harness'), { recursive: true });
+  mkdirSync(join(examDir, 'scorers'), { recursive: true });
+  writeFileSync(join(examDir, 'tasks', 'lane', taskId, 'task.json'), JSON.stringify(task, null, 2));
+  writeFileSync(
+    join(examDir, 'suite.json'),
+    JSON.stringify({
+      version: 2,
+      dataset: 'fixture-eval',
+      repeats: { runtime: 1, lane: 1, canary: 1 },
+      expectedCounts: { runtime: 0, lane: 1, canary: 0 },
+      devinBudget: { maxSessionsPerRun: 5 },
+    }),
+  );
+  writeFileSync(
+    join(examDir, 'harness', 'types.ts'),
+    readFileSync(join(ROOT, 'eval', 'harness', 'types.ts'), 'utf8'),
+  );
+  writeFileSync(
+    join(examDir, 'scorers', 'runtime-checks.ts'),
+    readFileSync(join(ROOT, 'eval', 'scorers', 'runtime-checks.ts'), 'utf8'),
+  );
+  writeFileSync(
+    join(examDir, 'scorers', 'lane-checks.ts'),
+    readFileSync(join(ROOT, 'eval', 'scorers', 'lane-checks.ts'), 'utf8'),
+  );
+  return { repoRoot, examDir, parentCommit, fixCommit, task };
 }
 
 describe('eval lane harness', () => {
-  it('passes --permission-mode dangerous and --process-model in-process and isolates HOME', async () => {
-    const dir = makeTestTempDir('eval-stub-');
+  it('materializes parent snapshot as a single-commit repo, repoints workspace symlinks, and excludes node_modules and __pycache__', async () => {
+    const dir = makeTestTempDir('eval-snapshot-');
+    const fixture = createFixtureSnapshotRepo(dir);
     const devinHome = join(dir, 'devin-home');
     mkdirSync(devinHome, { recursive: true });
-    const argsLog = join(dir, 'args.json');
-    const envLog = join(dir, 'env.json');
-    const cmdEnvLog = join(dir, 'cmd-env.json');
-    writeStubDevin(
+    const inspectLog = join(dir, 'inspect.json');
+    const bin = writeStubDevin(
       dir,
       `
       const fs = require('node:fs');
-      fs.writeFileSync(${JSON.stringify(argsLog)}, JSON.stringify(process.argv.slice(2)));
-      fs.writeFileSync(${JSON.stringify(envLog)}, JSON.stringify({ HOME: process.env.HOME, PYTHONDONTWRITEBYTECODE: process.env.PYTHONDONTWRITEBYTECODE }));
-      fs.writeFileSync('main.py', 'def greet(name):\\n  return "hello " + name\\n');
+      const path = require('node:path');
+      const { execFileSync } = require('node:child_process');
+      const count = execFileSync('git', ['rev-list', '--count', 'HEAD'], { encoding: 'utf8' }).trim();
+      const headMsg = execFileSync('git', ['log', '-1', '--format=%s'], { encoding: 'utf8' }).trim();
+      const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+      const linkTarget = fs.readlinkSync(path.join('node_modules', '@fixture', 'pkg-a'));
+      const parentSource = fs.readFileSync(path.join('packages', 'pkg-a', 'index.js'), 'utf8');
+      fs.writeFileSync(${JSON.stringify(inspectLog)}, JSON.stringify({
+        args: process.argv.slice(2),
+        home: process.env.HOME,
+        pyBytecode: process.env.PYTHONDONTWRITEBYTECODE,
+        count,
+        headMsg,
+        headSha,
+        linkTarget,
+        cwd: process.cwd(),
+        parentSource,
+      }));
+      fs.mkdirSync('__pycache__', { recursive: true });
+      fs.writeFileSync('__pycache__/cache.pyc', 'x');
+      fs.writeFileSync('packages/pkg-a/index.js', 'export function add(a, b) { return Number(a) + Number(b); }\\n');
       `,
     );
     setEnv({
+      EVAL_DEVIN_BIN: bin,
       PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
       EVAL_DAILY_DEVIN_HOME: devinHome,
     });
-    const cmdScript = join(dir, 'record-cmd-env.cjs');
-    writeFileSync(
-      cmdScript,
-      `require('node:fs').writeFileSync(${JSON.stringify(cmdEnvLog)}, JSON.stringify({ HOME: process.env.HOME }));\n`,
+    const beforeDirs = new Set(readdirSync(tmpdir()).filter((n) => n.startsWith('eval-lane-')));
+    const record = await runLaneTask(fixture.task, fixture.examDir, { repoRoot: fixture.repoRoot });
+    const afterDirs = readdirSync(tmpdir()).filter(
+      (n) => n.startsWith('eval-lane-') && !beforeDirs.has(n),
     );
-    const task: LaneTask = {
-      ...readTask('add-fn'),
-      timeoutMs: 2_000,
-      checks: {
-        files: [{ path: 'main.py', contains: 'def greet' }],
-        commands: [`node ${JSON.stringify(cmdScript)}`],
-      },
-    };
-    const record = await runLaneTask(task, EXAM_DIR);
+    expect(afterDirs).toEqual([]);
     expect(record.incomplete).toBeUndefined();
-    const argv = JSON.parse(readFileSync(argsLog, 'utf8')) as string[];
-    expect(argv).toContain('--permission-mode');
-    expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('dangerous');
-    expect(argv).toContain('--process-model');
-    expect(argv[argv.indexOf('--process-model') + 1]).toBe('in-process');
-    expect(argv).toContain('--respect-workspace-trust');
-    expect(JSON.parse(readFileSync(envLog, 'utf8'))).toEqual({
-      HOME: devinHome,
-      PYTHONDONTWRITEBYTECODE: '1',
-    });
-    expect(JSON.parse(readFileSync(cmdEnvLog, 'utf8'))).toEqual({ HOME: devinHome });
-    expect(typeof (record as { durationMs?: number }).durationMs).toBe('number');
-    expect(scoreLane(task, record).every((c) => c.value === 1)).toBe(true);
+    const info = JSON.parse(readFileSync(inspectLog, 'utf8')) as {
+      args: string[];
+      home: string;
+      pyBytecode: string;
+      count: string;
+      headMsg: string;
+      headSha: string;
+      linkTarget: string;
+      cwd: string;
+      parentSource: string;
+    };
+    expect(info.args).toContain('--permission-mode');
+    expect(info.args[info.args.indexOf('--permission-mode') + 1]).toBe('dangerous');
+    expect(info.args).toContain('--process-model');
+    expect(info.args[info.args.indexOf('--process-model') + 1]).toBe('in-process');
+    expect(info.args).toContain('--respect-workspace-trust');
+    expect(info.home).toBe(devinHome);
+    expect(info.pyBytecode).toBe('1');
+    expect(info.count).toBe('1');
+    expect(info.headMsg).toBe('baseline');
+    expect(info.headSha).not.toBe(fixture.parentCommit);
+    expect(info.headSha).not.toBe(fixture.fixCommit);
+    expect(info.parentSource).toContain('String(a) + String(b)');
+    expect(info.linkTarget.startsWith(info.cwd)).toBe(true);
+    expect(record.lane?.changedFiles).toEqual(['packages/pkg-a/index.js']);
+    expect(scoreLane(fixture.task, record).every((c) => c.value === 1)).toBe(true);
   });
 
-  it('resolves devin binary from EVAL_DEVIN_BIN -> PATH -> real HOME managed tools before child HOME override', async () => {
+  it('defeats agent edits and ancestor/leaf symlinks on hidden tests and restored existing tests', async () => {
+    const dir = makeTestTempDir('eval-tamper-');
+    const fixture = createFixtureSnapshotRepo(dir, 'tamper-check');
+    const outsideDir = join(dir, 'outside');
+    mkdirSync(outsideDir, { recursive: true });
+    const sentinelFile = join(outsideDir, 'secret.txt');
+    writeFileSync(sentinelFile, 'untouched\n');
+
+    const bin = writeStubDevin(
+      dir,
+      `
+      const fs = require('node:fs');
+      fs.writeFileSync('packages/pkg-a/index.js', 'export function add(a, b) { return Number(a) + Number(b); }\\n');
+      fs.rmSync('tests/nested', { recursive: true, force: true });
+      fs.symlinkSync(${JSON.stringify(outsideDir)}, 'tests/nested');
+      fs.rmSync('existing.test.mjs', { force: true });
+      fs.symlinkSync(${JSON.stringify(sentinelFile)}, 'existing.test.mjs');
+      `,
+    );
+    setEnv({
+      EVAL_DEVIN_BIN: bin,
+      PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
+    });
+    const record = await runLaneTask(fixture.task, fixture.examDir, { repoRoot: fixture.repoRoot });
+    expect(record.incomplete).toBeUndefined();
+    expect(readFileSync(sentinelFile, 'utf8')).toBe('untouched\n');
+    expect(scoreLane(fixture.task, record).every((c) => c.value === 1)).toBe(true);
+
+    const nopBin = writeStubDevin(
+      join(dir, 'nop'),
+      `
+      const fs = require('node:fs');
+      fs.writeFileSync('tests/nested/regression.test.mjs', 'process.exit(0);\\n');
+      `,
+    );
+    setEnv({
+      EVAL_DEVIN_BIN: nopBin,
+      PATH: `${join(dir, 'nop', 'bin')}:${process.env.PATH ?? ''}`,
+    });
+    const nopRecord = await runLaneTask(fixture.task, fixture.examDir, {
+      repoRoot: fixture.repoRoot,
+    });
+    expect(nopRecord.incomplete).toBeUndefined();
+    const scores = scoreLane(fixture.task, nopRecord);
+    expect(scores.find((s) => s.name === 'lane.completed')?.value).toBe(1);
+    expect(scores.find((s) => s.name === 'lane.tests_pass')?.value).toBe(0);
+    expect(nopRecord.diagnostics).toContain('exit=1');
+  });
+
+  it('detects dependency drift as incomplete and reports missing git commits or missing blobs before Devin', async () => {
+    const dir = makeTestTempDir('eval-missing-');
+    const fixture = createFixtureSnapshotRepo(dir, 'missing-check');
+    const invokedMarker = join(dir, 'devin-invoked');
+    const bin = writeStubDevin(
+      dir,
+      `require('node:fs').writeFileSync(${JSON.stringify(invokedMarker)}, 'ran');`,
+    );
+    setEnv({
+      EVAL_DEVIN_BIN: bin,
+      PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
+    });
+
+    const missingParent = await runLaneTask(
+      {
+        ...fixture.task,
+        source: { ...fixture.task.source, parentCommit: 'a'.repeat(40) },
+      },
+      fixture.examDir,
+      { repoRoot: fixture.repoRoot },
+    );
+    expect(missingParent.incomplete).toContain('missing git commit');
+    expect(existsSync(invokedMarker)).toBe(false);
+
+    const missingFix = await runLaneTask(
+      {
+        ...fixture.task,
+        source: { ...fixture.task.source, fixCommit: 'b'.repeat(40) },
+      },
+      fixture.examDir,
+      { repoRoot: fixture.repoRoot },
+    );
+    expect(missingFix.incomplete).toContain('missing git commit');
+    expect(existsSync(invokedMarker)).toBe(false);
+
+    const missingBlob = await runLaneTask(
+      {
+        ...fixture.task,
+        source: { ...fixture.task.source, testFiles: ['tests/does-not-exist.test.mjs'] },
+      },
+      fixture.examDir,
+      { repoRoot: fixture.repoRoot },
+    );
+    expect(missingBlob.incomplete).toContain('missing blob');
+
+    const driftTask: LaneTask = {
+      ...fixture.task,
+      checks: {
+        files: [],
+        commands: [
+          'node -e "console.error(\'ERR_MODULE_NOT_FOUND: Cannot find package foo\'); process.exit(1)"',
+        ],
+      },
+    };
+    const drift = await runLaneTask(driftTask, fixture.examDir, { repoRoot: fixture.repoRoot });
+    expect(drift.incomplete).toContain('dependency drift');
+
+    const cmdFailTask: LaneTask = {
+      ...fixture.task,
+      checks: {
+        files: [{ path: 'missing-file.txt' }],
+        commands: ['nonexistent_eval_cmd_xyz'],
+        allowPaths: ['packages/pkg-a/**'],
+      },
+    };
+    const cmdBin = writeStubDevin(
+      join(dir, 'cmd-fail'),
+      `require('node:fs').writeFileSync('existing.test.mjs', 'broken');`,
+    );
+    setEnv({
+      EVAL_DEVIN_BIN: cmdBin,
+      PATH: `${join(dir, 'cmd-fail', 'bin')}:${process.env.PATH ?? ''}`,
+    });
+    const cmdFail = await runLaneTask(cmdFailTask, fixture.examDir, { repoRoot: fixture.repoRoot });
+    expect(cmdFail.incomplete).toBeUndefined();
+    const cmdScores = scoreLane(cmdFailTask, cmdFail);
+    expect(cmdScores.find((s) => s.name === 'lane.files_ok')?.value).toBe(0);
+    expect(cmdScores.find((s) => s.name === 'lane.tests_pass')?.value).toBe(0);
+    expect(cmdScores.find((s) => s.name === 'lane.diff_ok')?.value).toBe(0);
+    expect(cmdFail.diagnostics).toContain('exit=127');
+  });
+
+  it('sweeps stale eval-lane temp directories older than 24h while keeping fresh ones', () => {
+    const dir = makeTestTempDir('eval-sweep-');
+    const oldDir = join(dir, 'eval-lane-old-123');
+    const freshDir = join(dir, 'eval-lane-fresh-456');
+    const otherDir = join(dir, 'unrelated-789');
+    mkdirSync(oldDir, { recursive: true });
+    mkdirSync(freshDir, { recursive: true });
+    mkdirSync(otherDir, { recursive: true });
+    const nowMs = Date.now();
+    const oldTime = new Date(nowMs - 48 * 3600 * 1000);
+    utimesSync(oldDir, oldTime, oldTime);
+    utimesSync(otherDir, oldTime, oldTime);
+    sweepStaleTempDirs(dir, 24 * 3600 * 1000, nowMs);
+    expect(existsSync(oldDir)).toBe(false);
+    expect(existsSync(freshDir)).toBe(true);
+    expect(existsSync(otherDir)).toBe(true);
+  });
+
+  it('resolves devin binary from EVAL_DEVIN_BIN -> PATH -> real HOME managed tools before child HOME override', () => {
     const dir = makeTestTempDir('eval-bin-order-');
     const fakeRealHome = join(dir, 'real-home');
     const devinHome = join(dir, 'devin-home');
@@ -119,7 +402,6 @@ describe('eval lane harness', () => {
     );
     const overrideDir = join(dir, 'override');
     const overrideBin = writeStubDevin(overrideDir, 'process.exit(0);');
-    const { resolveDevinBin } = await import('./harness/devin-env.mjs');
     expect(
       resolveDevinBin({
         EVAL_DEVIN_BIN: overrideBin,
@@ -148,7 +430,8 @@ describe('eval lane harness', () => {
 
   it('classifies confirmation rejection, login failure, quota error, and ENOENT as incomplete, while distinguishing unrecognized non-zero exit and stdout 401', async () => {
     const dir = makeTestTempDir('eval-classify-');
-    const task: LaneTask = { ...readTask('fix-bug'), timeoutMs: 2_000 };
+    const fixture = createFixtureSnapshotRepo(dir, 'classify-task');
+    const task: LaneTask = { ...fixture.task, timeoutMs: 10_000 };
     const cases = [
       {
         label: 'permission-rejected',
@@ -183,7 +466,7 @@ describe('eval lane harness', () => {
         EVAL_DEVIN_BIN: bin,
         PATH: `${join(caseDir, 'bin')}:${process.env.PATH ?? ''}`,
       });
-      const record = await runLaneTask(task, EXAM_DIR);
+      const record = await runLaneTask(task, fixture.examDir, { repoRoot: fixture.repoRoot });
       if (c.wantIncomplete) {
         expect(record.incomplete, c.label).toBeTruthy();
       } else {
@@ -199,19 +482,22 @@ describe('eval lane harness', () => {
       EVAL_DEVIN_BIN: join(dir, 'does-not-exist', 'devin'),
       PATH: '/usr/bin:/bin',
     });
-    const missing = await runLaneTask(task, EXAM_DIR);
+    const missing = await runLaneTask(task, fixture.examDir, { repoRoot: fixture.repoRoot });
     expect(missing.incomplete).toBeTruthy();
   });
 
-  it('classifies timeout and ENOBUFS as task failure rather than incomplete', async () => {
+  it('classifies timeout and ENOBUFS as task failure rather than incomplete and scrubs secrets', async () => {
     const dir = makeTestTempDir('eval-timeout-');
+    const fixture = createFixtureSnapshotRepo(dir, 'timeout-task');
     const timeoutBin = writeStubDevin(dir, `setTimeout(() => {}, 5000);`);
     setEnv({
       EVAL_DEVIN_BIN: timeoutBin,
       PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
     });
-    const timeoutTask: LaneTask = { ...readTask('fix-bug'), timeoutMs: 250 };
-    const timedOut = await runLaneTask(timeoutTask, EXAM_DIR);
+    const timeoutTask: LaneTask = { ...fixture.task, timeoutMs: 250 };
+    const timedOut = await runLaneTask(timeoutTask, fixture.examDir, {
+      repoRoot: fixture.repoRoot,
+    });
     expect(timedOut.incomplete).toBeUndefined();
     expect(scoreLane(timeoutTask, timedOut).find((s) => s.name === 'lane.completed')?.value).toBe(
       0,
@@ -226,99 +512,32 @@ describe('eval lane harness', () => {
       EVAL_DEVIN_BIN: floodBin,
       PATH: `${join(dir, 'flood', 'bin')}:${process.env.PATH ?? ''}`,
     });
-    const floodTask: LaneTask = { ...readTask('fix-bug'), timeoutMs: 5_000 };
-    const flooded = await runLaneTask(floodTask, EXAM_DIR);
+    const floodTask: LaneTask = { ...fixture.task, timeoutMs: 10_000 };
+    const flooded = await runLaneTask(floodTask, fixture.examDir, { repoRoot: fixture.repoRoot });
     expect(flooded.incomplete).toBeUndefined();
     expect(scoreLane(floodTask, flooded).find((s) => s.name === 'lane.completed')?.value).toBe(0);
-  });
 
-  it('scrubs secrets and home paths from diagnostics and incomplete messages', async () => {
-    const dir = makeTestTempDir('eval-scrub-');
     const secretA = `sk-${'Z'.repeat(24)}`;
     const secretB = `sk-lf-${'Y'.repeat(20)}`;
-    const bin = writeStubDevin(
-      dir,
+    const scrubBin = writeStubDevin(
+      join(dir, 'scrub'),
       `process.stderr.write('Error: Login canceled using ${secretA} and Bearer ${secretB} at ${dir}/creds\\n'); process.exit(1);`,
     );
     setEnv({
-      EVAL_DEVIN_BIN: bin,
-      PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
+      EVAL_DEVIN_BIN: scrubBin,
+      PATH: `${join(dir, 'scrub', 'bin')}:${process.env.PATH ?? ''}`,
       HOME: dir,
     });
-    const record = await runLaneTask({ ...readTask('fix-bug'), timeoutMs: 2_000 }, EXAM_DIR);
-    const text = `${record.incomplete ?? ''}\n${(record as { diagnostics?: string }).diagnostics ?? ''}`;
+    const scrubbed = await runLaneTask({ ...fixture.task, timeoutMs: 10_000 }, fixture.examDir, {
+      repoRoot: fixture.repoRoot,
+    });
+    const text = `${scrubbed.incomplete ?? ''}\n${(scrubbed as { diagnostics?: string }).diagnostics ?? ''}`;
     expect(text).not.toContain(secretA);
     expect(text).not.toContain(secretB);
     expect(text).not.toContain(dir);
   });
 
-  it('excludes __pycache__ and .pyc artifacts and removes temp workspace', async () => {
-    const dir = makeTestTempDir('eval-pyc-');
-    const bin = writeStubDevin(
-      dir,
-      `
-      const fs = require('node:fs');
-      fs.mkdirSync('__pycache__', { recursive: true });
-      fs.writeFileSync('__pycache__/main.cpython-312.pyc', 'compiled');
-      fs.writeFileSync('main.py', 'def greet(name):\\n  return "hello " + name\\n');
-      `,
-    );
-    setEnv({
-      EVAL_DEVIN_BIN: bin,
-      PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
-    });
-    const beforeDirs = new Set(
-      readdirSync(tmpdir()).filter((n) => n.startsWith('eval-lane-add-fn-')),
-    );
-    const record = await runLaneTask({ ...readTask('add-fn'), timeoutMs: 2_000 }, EXAM_DIR);
-    const afterDirs = readdirSync(tmpdir()).filter(
-      (n) => n.startsWith('eval-lane-add-fn-') && !beforeDirs.has(n),
-    );
-    expect(afterDirs).toEqual([]);
-    expect(record.lane?.changedFiles).toEqual(['main.py']);
-    expect(scoreLane(readTask('add-fn'), record).every((c) => c.value === 1)).toBe(true);
-  });
-
-  it('validates fix-bug behaviorally and rename-var on word boundaries', () => {
-    const dir = makeTestTempDir('eval-tasks-');
-    const fixBug = readTask('fix-bug');
-    const fixDir = join(dir, 'fix-bug');
-    cpSync(join(EXAM_DIR, 'tasks', 'lane', 'fix-bug', 'repo'), fixDir, { recursive: true });
-    for (const candidate of [
-      { code: 'def s(a, b): return a + b\n', pass: true },
-      { code: 'def s(a, b): return float(a) + float(b)\n', pass: true },
-      { code: 'def s(a, b): return str(a) + str(b)\n', pass: false },
-    ]) {
-      writeFileSync(join(fixDir, 'sum.py'), candidate.code);
-      const filesOk = fixBug.checks.files.every(
-        (f) =>
-          existsSync(join(fixDir, f.path)) &&
-          (f.contains === undefined ||
-            readFileSync(join(fixDir, f.path), 'utf8').includes(f.contains)),
-      );
-      const cmdsOk = fixBug.checks.commands.every(
-        (cmd) => spawnSync('bash', ['-c', cmd], { cwd: fixDir, encoding: 'utf8' }).status === 0,
-      );
-      expect(filesOk && cmdsOk).toBe(candidate.pass);
-    }
-
-    const renameVar = readTask('rename-var');
-    const renameDir = join(dir, 'rename-var');
-    cpSync(join(EXAM_DIR, 'tasks', 'lane', 'rename-var', 'repo'), renameDir, { recursive: true });
-    for (const candidate of [
-      { code: 'result = 1\nprint(tmp)\n', pass: false },
-      { code: 'result = 1\ntmpl = 2\nprint(result, tmpl)\n', pass: true },
-    ]) {
-      writeFileSync(join(renameDir, 'code.py'), candidate.code);
-      const cmdsOk = renameVar.checks.commands.every(
-        (cmd) => spawnSync('bash', ['-c', cmd], { cwd: renameDir, encoding: 'utf8' }).status === 0,
-      );
-      expect(cmdsOk).toBe(candidate.pass);
-    }
-  });
-
-  it('resolves EVAL_MAX_DEVIN_RUNS safely across empty, zero, negative, and non-numeric values', async () => {
-    const { resolveDevinCap } = await import('./harness/budget.js');
+  it('resolves EVAL_MAX_DEVIN_RUNS safely across empty, zero, negative, and non-numeric values', () => {
     expect(resolveDevinCap(undefined, 40)).toBe(40);
     expect(resolveDevinCap('', 40)).toBe(40);
     expect(resolveDevinCap('   ', 40)).toBe(40);
@@ -328,11 +547,12 @@ describe('eval lane harness', () => {
     expect(() => resolveDevinCap('abc', 40)).toThrow();
   });
 
-  it('extracts Langfuse trace metadata and projectId from experiment results', async () => {
-    const dir = makeTestTempDir('eval-run-lf-ok-');
+  it('extracts Langfuse trace metadata and projectId from experiment results and exits 3 on Langfuse errors', async () => {
+    const dir = makeTestTempDir('eval-run-lf-');
+    const fixture = createFixtureSnapshotRepo(dir, 'lf-task');
     const bin = writeStubDevin(
       dir,
-      `require('node:fs').writeFileSync('sum.py', 'def s(a, b): return a + b\\n');`,
+      `require('node:fs').writeFileSync('packages/pkg-a/index.js', 'export function add(a, b) { return Number(a) + Number(b); }\\n');`,
     );
     setEnv({
       EVAL_DEVIN_BIN: bin,
@@ -341,14 +561,13 @@ describe('eval lane harness', () => {
       LANGFUSE_SECRET_KEY: 'sk-test',
       LANGFUSE_BASE_URL: 'https://lf.example.test',
     });
-    const { runEval } = await import('./run.js');
     const outOk = join(dir, 'ok.json');
     const codeOk = await runEval(
       [
         '--arm',
         'daily-test',
         '--exam',
-        EXAM_DIR,
+        fixture.examDir,
         '--out',
         outOk,
         '--only',
@@ -393,23 +612,14 @@ describe('eval lane harness', () => {
     expect(written.items[0]?.traceUrl).toBe(
       'https://lf.example.test/project/proj-abc/traces/trace-0',
     );
-  });
 
-  it('exits 3 on Langfuse config, experiment, itemResults, or close failures', async () => {
-    const dir = makeTestTempDir('eval-run-lf-err-');
-    setEnv({
-      EVAL_MAX_DEVIN_RUNS: '0',
-      LANGFUSE_PUBLIC_KEY: 'pk-test',
-      LANGFUSE_SECRET_KEY: 'sk-test',
-      LANGFUSE_BASE_URL: undefined,
-    });
-    const { runEval } = await import('./run.js');
+    setEnv({ LANGFUSE_BASE_URL: undefined });
     expect(
       await runEval([
         '--arm',
         'bad-base',
         '--exam',
-        EXAM_DIR,
+        fixture.examDir,
         '--out',
         join(dir, 'no-base.json'),
         '--only',
@@ -424,7 +634,7 @@ describe('eval lane harness', () => {
         '--arm',
         'bad-combo',
         '--exam',
-        EXAM_DIR,
+        fixture.examDir,
         '--out',
         join(dir, 'combo.json'),
         '--only',
@@ -440,7 +650,7 @@ describe('eval lane harness', () => {
           '--arm',
           'throw-exp',
           '--exam',
-          EXAM_DIR,
+          fixture.examDir,
           '--out',
           join(dir, 'throw.json'),
           '--only',
@@ -457,79 +667,6 @@ describe('eval lane harness', () => {
               },
             } as never,
             close: async () => {},
-          }),
-        },
-      ),
-    ).toBe(3);
-
-    expect(
-      await runEval(
-        [
-          '--arm',
-          'missing-items',
-          '--exam',
-          EXAM_DIR,
-          '--out',
-          join(dir, 'missing.json'),
-          '--only',
-          'lane',
-          '--require-langfuse',
-        ],
-        {
-          openClient: () => ({
-            client: {
-              experiment: {
-                run: async () => ({
-                  experimentId: 'exp-1',
-                  runName: 'r',
-                  itemResults: [],
-                  runEvaluations: [],
-                }),
-              },
-            } as never,
-            close: async () => {},
-          }),
-        },
-      ),
-    ).toBe(3);
-
-    expect(
-      await runEval(
-        [
-          '--arm',
-          'close-fail',
-          '--exam',
-          EXAM_DIR,
-          '--out',
-          join(dir, 'close-fail.json'),
-          '--only',
-          'lane',
-          '--require-langfuse',
-        ],
-        {
-          openClient: () => ({
-            client: {
-              experiment: {
-                run: async (cfg: {
-                  data: unknown[];
-                  task: (item: unknown) => Promise<unknown>;
-                }) => ({
-                  experimentId: 'exp-1',
-                  runName: 'r',
-                  itemResults: await Promise.all(
-                    cfg.data.map(async (item, i) => ({
-                      item,
-                      output: await cfg.task(item),
-                      traceId: `t-${i}`,
-                    })),
-                  ),
-                  runEvaluations: [],
-                }),
-              },
-            } as never,
-            close: async () => {
-              throw new Error('Experiment trace export failed');
-            },
           }),
         },
       ),

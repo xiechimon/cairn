@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "cli-login-fragment-chars",
+  "instruction": "In apps/daemon/src/token-command.ts, runTokenCommand formats the CLI login URL fragment using URLSearchParams({ token }).toString(), which encodes spaces as \"+\" instead of \"%20\" and fails to round-trip reserved characters such as spaces, \"+\", \"&\", \"=\", \"%\", and \"#\" when parsed back by consumeLoginFragment. Build the login URL fragment with encodeURIComponent(token) so reserved characters round-trip accurately.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "c0da66410e9d2655775ad06a57bd05632a4fd8c4",
+    "fixCommit": "0582b813f4ab87893bcf8f90659000471ad80c3f",
+    "testFiles": [
+      "apps/web/test/token-command-login.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/web/test/token-command-login.test.ts"
+    ]
+  },
+  "gate": true
+}

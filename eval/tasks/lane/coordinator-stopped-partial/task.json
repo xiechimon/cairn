@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "coordinator-stopped-partial",
+  "instruction": "In apps/server/src/coordinator/runtime/mirror.ts and turn.ts, when a user stops an active Coordinator turn, the transcript mirror skips every aborted assistant entry so the streamed partial reply vanishes. When a turn is stopped, mirror the text from its last aborted assistant entry while still excluding earlier aborted attempts and aborted tool calls.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "e4979e7d321171b34bd54a142e5d3e6d9f1ccec6",
+    "fixCommit": "9b9116af81d19418730863a8e766ef7c14c0aa38",
+    "testFiles": [
+      "apps/server/test/coordinator/turn.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/coordinator/turn.test.ts"
+    ]
+  },
+  "gate": true
+}

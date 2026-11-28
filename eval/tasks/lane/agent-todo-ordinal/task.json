@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "agent-todo-ordinal",
+  "instruction": "In packages/shared/src/agent-todo.ts, when a model outputs checklist items with a leading ordinal such as \"- [x] 1. Schema\" or \"- [ ] 2) add subcommand\", parseAgentTodoText keeps \"1. \" or \"2) \" in the item text (while quantities like \"- [ ] 3 items\" without punctuation after the digit should stay intact). Strip leading numbered ordinals followed by ., ), or 、 and whitespace from parsed checklist items.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "d6cd1bd7f2dcb93ca016c78c88162f962259c42f",
+    "fixCommit": "aa69609c9b067ca7a0c5f3ea921f45f2ea2cda69",
+    "testFiles": [
+      "apps/daemon/test/agent-todo.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/daemon/test/agent-todo.test.ts"
+    ]
+  },
+  "gate": true
+}

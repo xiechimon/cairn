@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "pi-retryable-errors",
+  "instruction": "In apps/daemon/src/backend/pi.ts, isRetryableError matches any 5xx digit substring (such as request IDs like req-abc503def or localhost:5030) and retries permanent 404 / model-not-found / model-not-supported errors when the message also contains words like timeout or status 503. Fix isRetryableError so permanent 404 / model-not-found / not-supported errors return false and 5xx matching only triggers on genuine HTTP/status 5xx error phrases.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "dfd922693e1d9157b61f71fbed777b931b72b370",
+    "fixCommit": "f0e472ebe6e54e22ad5681d0eb1094d13a62a7e9",
+    "testFiles": [
+      "apps/daemon/test/map-pi-event.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/daemon/test/map-pi-event.test.ts"
+    ]
+  },
+  "gate": true
+}

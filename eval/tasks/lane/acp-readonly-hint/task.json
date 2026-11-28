@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "acp-readonly-hint",
+  "instruction": "In apps/daemon/src/backend/acp-tools.ts, when openAcpTools registers host tool definitions for locked turns (lockedDown, readOnly, or remoteToolsOnly per acpTurnPolicy), the MCP tool definitions omit annotations. Annotate every registered host tool with { annotations: { readOnlyHint: true } } whenever the turn policy is not normal.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "66e47d781614042546fd863ab38c8aba259caa68",
+    "fixCommit": "65d27c947124fc28867f5a06f23caf898477646a",
+    "testFiles": [
+      "apps/daemon/test/acp-tools.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/daemon/test/acp-tools.test.ts"
+    ]
+  },
+  "gate": true
+}

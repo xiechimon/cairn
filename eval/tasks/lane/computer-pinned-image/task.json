@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "computer-pinned-image",
+  "instruction": "In apps/daemon/src/computer/vm-desktop.ts, when an app update pins a new computer VM image, existing running or stopped VMs running an older image are adopted or restarted as-is instead of being updated. When a call acquires a VM whose image does not match the pinned image (and neither this daemon already holds it nor the owner took over), pull the new image first and if the pull succeeds, stop/discard the old VM while keeping its home volume and recorded packages so it recreates on the new image; if the pull fails, keep the existing VM.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "a86e9e31c1dbca598cac03d0d6051f28f6b4bf80",
+    "fixCommit": "ef558ab33ff5ddfd84e2c7985fd26e36c08d34bc",
+    "testFiles": [
+      "apps/daemon/test/computer-vm-desktop.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/daemon/test/computer-vm-desktop.test.ts"
+    ]
+  },
+  "gate": true
+}

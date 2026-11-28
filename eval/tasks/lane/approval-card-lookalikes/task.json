@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "approval-card-lookalikes",
+  "instruction": "In apps/server/src/services/action-registry.ts and action-proposals.ts, fullwidth or small-form lookalike brackets/punctuation in task titles or project names survive approval-card sanitization, and if a pending proposal approval card row is deleted from the transcript, subsequent proposeAction calls reuse the stale proposal instead of superseding it with a new proposal and card. NFKC-normalize card text before stripping punctuation, and supersede a pending proposal if its card row is missing when a card is requested.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "e1eeac65a784fbc59d1dc8283e885b82411c9c19",
+    "fixCommit": "556675f1237645cc21fd27f55bd7cc3a12ec8a3b",
+    "testFiles": [
+      "apps/server/test/action-proposals.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/action-proposals.test.ts"
+    ]
+  },
+  "gate": true
+}

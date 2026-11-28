@@ -1,7 +1,9 @@
+import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { compare } from '../../../eval/compare.js';
+import { commitExists, parentOfCommit } from '../../../eval/harness/snapshot.js';
 import { laneTask, runtimeTask, suiteTask } from '../../../eval/harness/types.js';
 import { scoreRuntime } from '../../../eval/scorers/runtime-checks.js';
 
@@ -36,9 +38,14 @@ describe('eval suite tasks', () => {
     return acc;
   }, {});
 
-  test('counts match suite.json expectations and the 30-50 starter range', () => {
-    const suite = JSON.parse(readFileSync(join(EVAL, 'suite.json'), 'utf8'));
+  test('counts match suite.json v2 expectations and the 30-50 range', () => {
+    const suite = JSON.parse(readFileSync(join(EVAL, 'suite.json'), 'utf8')) as {
+      version: number;
+      expectedCounts: Record<string, number>;
+    };
+    expect(suite.version).toBe(2);
     expect(counts).toEqual(suite.expectedCounts);
+    expect(counts.lane).toBe(20);
     expect(tasks.length).toBeGreaterThanOrEqual(30);
     expect(tasks.length).toBeLessThanOrEqual(50);
   });
@@ -90,12 +97,67 @@ describe('eval suite tasks', () => {
     }
   });
 
-  test('lane tasks declare an instruction and at least one file or command check', () => {
-    for (const task of tasks.filter((t) => t.kind === 'lane')) {
-      const lane = laneTask.parse(task);
-      expect(lane.instruction.length).toBeGreaterThan(8);
-      expect(lane.checks.files.length + lane.checks.commands.length).toBeGreaterThan(0);
+  test('lane tasks declare valid git-snapshot sources, budget bounds, and build valid public results', () => {
+    const lanes = tasks.filter((t) => t.kind === 'lane').map((t) => laneTask.parse(t));
+    expect(lanes).toHaveLength(20);
+    let totalBudgetMs = 0;
+    for (const lane of lanes) {
+      expect(lane.instruction.length).toBeGreaterThan(20);
+      expect(lane.source.testFiles.length).toBeGreaterThan(0);
+      expect(lane.checks.commands).toHaveLength(1);
+      expect(lane.timeoutMs).toBeLessThanOrEqual(240_000);
+      totalBudgetMs += lane.timeoutMs + 60_000;
+      if (commitExists(ROOT, lane.source.fixCommit)) {
+        expect(commitExists(ROOT, lane.source.parentCommit)).toBe(true);
+        expect(parentOfCommit(ROOT, lane.source.fixCommit)).toBe(lane.source.parentCommit);
+      }
     }
+    expect(totalBudgetMs).toBeLessThanOrEqual(6_000_000);
+
+    const suite = JSON.parse(readFileSync(join(EVAL, 'suite.json'), 'utf8')) as {
+      repeats: Record<string, number>;
+    };
+    const items = tasks.flatMap((task) => {
+      const repeats = suite.repeats[task.kind] ?? 1;
+      return Array.from({ length: repeats }, (_, repeat) => ({
+        caseId: task.id,
+        kind: task.kind,
+        repeat,
+        ...(task.kind === 'lane' ? { ranModel: 'swe-2-high' } : {}),
+        scores: { [task.kind === 'lane' ? 'lane.completed' : 'turn.completed']: 1 },
+      }));
+    });
+    const run = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `import { buildPublicResults } from './scripts/ops/eval-public-results.mjs';
+         const record = JSON.parse(process.argv[1]);
+         console.log(JSON.stringify(buildPublicResults(record, { repoDir: process.cwd(), env: {} })));`,
+        JSON.stringify({
+          sha: 'a'.repeat(40),
+          finishedAt: '2026-11-28T05:00:00.000Z',
+          status: 'ok',
+          evalExitCode: 0,
+          items,
+        }),
+      ],
+      { cwd: ROOT, encoding: 'utf8' },
+    );
+    expect(run.status, run.stderr).toBe(0);
+    const built = JSON.parse(run.stdout) as {
+      skipReason?: string;
+      payload?: {
+        suiteVersion: number;
+        summary: { byKind: { lane: { total: number } } };
+        cases: unknown[];
+      };
+    };
+    expect(built.skipReason).toBeUndefined();
+    expect(built.payload?.suiteVersion).toBe(2);
+    expect(built.payload?.summary.byKind.lane.total).toBe(20);
+    expect(built.payload?.cases).toHaveLength(tasks.length);
   });
 });
 

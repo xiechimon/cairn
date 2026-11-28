@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "dataset": "cairn-eval-suite",
   "repeats": {
     "runtime": 3,
@@ -8,7 +8,7 @@
   },
   "expectedCounts": {
     "runtime": 28,
-    "lane": 10,
+    "lane": 20,
     "canary": 2
   },
   "devinBudget": {

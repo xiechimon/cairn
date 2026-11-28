@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "webhook-pr-issue-events",
+  "instruction": "In apps/server/src/services/github-webhook.ts, GitHub issues webhook events triggered on pull requests (payload.issue.pull_request defined) are processed instead of ignored, sender triage ignores the app-first githubReadToken helper, and transient upstream GitHub HTTP or rate-limit errors during import fail as errors instead of returning 202 ignored. Fix all three issues in the webhook handler.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "5deb92ff5043dec30953d5b80bcdc8d4d3030b57",
+    "fixCommit": "479ba0a662287c7cdb34549f22dcc0c5be668d1a",
+    "testFiles": [
+      "apps/server/test/github-webhook.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/github-webhook.test.ts"
+    ]
+  },
+  "gate": true
+}

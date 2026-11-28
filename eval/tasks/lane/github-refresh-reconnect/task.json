@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "github-refresh-reconnect",
+  "instruction": "In apps/server/src/services/github-device-core.ts, when GitHub returns error: \"incorrect_client_credentials\" (even inside an HTTP 200 response) during token refresh, refreshGithubDeviceToken treats it as a temporary 502 error instead of a terminal 401 requiring reconnection. Classify incorrect_client_credentials as HttpError 401 with \"GitHub authorization expired; reconnect GitHub\" while preserving temporary failures.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "ae8e86f82bc712ced7f56bc217331fd257878f23",
+    "fixCommit": "4f238e29aabcf2dde48a572b1cd64699c56da3c1",
+    "testFiles": [
+      "apps/server/test/github-device-core.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/github-device-core.test.ts"
+    ]
+  },
+  "gate": true
+}

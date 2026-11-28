@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "workspace-shadow-merge",
+  "instruction": "Fix two plain-folder workspace issues: (1) in apps/daemon/src/shadow-repo.ts, shadowGitEnv uses the reserved .local domain (shadow@cairn.local) instead of an RFC 2606 invalid domain (shadow@cairn.invalid); (2) in apps/server/src/services/build-merge-request.ts, requestMerge only reads plainFolder build state when the project directory is not a git repo, so plain-folder builds whose directory contains or gained a .git folder bypass the plain-folder in-place/merged/undone guards. Always check current.plainFolder whenever defined on the build.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "04f7bd89398844450d5b6706fce1cbb4b936e242",
+    "fixCommit": "83d26c25ceca4157ac9b6742e121d022a2bc1c3f",
+    "testFiles": [
+      "apps/server/test/plain-folder-project.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/server/test/plain-folder-project.test.ts"
+    ]
+  },
+  "gate": true
+}

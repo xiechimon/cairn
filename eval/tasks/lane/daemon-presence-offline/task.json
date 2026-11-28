@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "id": "daemon-presence-offline",
+  "instruction": "In apps/daemon/src/machine-loop.ts and apps/daemon/src/computer/presence.ts, runtime, install, and phone callbacks trigger presence announcements without handling rejected fetches, so when the server is unreachable an unhandled rejection exits the daemon. Route those callbacks through a fire-and-forget ComputerPresenceReporter.notify() helper that skips when closed and forwards errors to onError so the Runner stays alive offline.",
+  "timeoutMs": 240000,
+  "source": {
+    "parentCommit": "4bd22b3aabadbe7d68e0db877f0daf20c5ad5a2c",
+    "fixCommit": "8f8e3b31e7d0f37607d36e50c52045bfd6c931e6",
+    "testFiles": [
+      "apps/daemon/test/computer-presence-loop.test.ts"
+    ],
+    "existingTestFiles": []
+  },
+  "checks": {
+    "files": [],
+    "commands": [
+      "pnpm exec vitest run --maxWorkers=1 apps/daemon/test/computer-presence-loop.test.ts"
+    ]
+  },
+  "gate": true
+}
