@@ -27,6 +27,7 @@ import {
   fetchDevinSubscriptionModels,
 } from './devin-subscription-models.js';
 import { verifyDevinSubscription } from './devin-subscription-verification.js';
+import { machineRuntimeAvailable } from './dispatch-eligibility.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { timedCheck } from './subscription-check.js';
 import {
@@ -441,8 +442,8 @@ export async function testDevinSubscriptionModel(
       .all();
   const eligible = (runner: typeof machine.$inferSelect) =>
     isRegisteredMachine(runner) &&
-    runner.capabilities?.modelTurnProbe === true &&
-    runner.capabilities.devin?.installed === true;
+    machineRuntimeAvailable(runner, 'devin') &&
+    runner.capabilities?.modelTurnProbe === true;
   const current = runners();
   const catalog = devinCatalogFamilies(
     row.models.length > 0

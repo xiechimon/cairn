@@ -1,8 +1,8 @@
+import type { MachineCapabilities, MachineStreamEvent } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { machine as machineTable } from '../src/db/schema.js';
 import { sha256Hex } from '../src/lib/crypto.js';
-import type { MachineStreamEvent } from '@cairn/shared';
 import {
   bootServer,
   insertDevinSubscription,
@@ -28,7 +28,7 @@ let runnerSeq = 0;
 
 function attachRunner(
   s: TestServer,
-  capabilities: Parameters<typeof insertMachine>[1]['capabilities'],
+  capabilities: MachineCapabilities,
   events: string[],
   onEvent?: (event: MachineStreamEvent) => void,
 ): { id: string; token: string; connectionId: string } {
@@ -73,7 +73,7 @@ describe('Devin subscription model tests', () => {
     });
   });
 
-  test('runs the family at its chosen effort and only on an eligible Runner', async () => {
+  test('reaches the same open Runner set a task claim uses, with no grant, at the chosen effort', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const ineligibleEvents: string[] = [];
@@ -94,10 +94,7 @@ describe('Devin subscription model tests', () => {
     ).toBe(200);
     const result = req(s.app, 'POST', `${path}/${id}/test`, { model: 'swe-2-1' });
     const requestId = await sent.promise;
-    const machineRequest = (
-      machine: { token: string; connectionId: string },
-      body: object,
-    ) =>
+    const machineRequest = (machine: { token: string; connectionId: string }, body: object) =>
       s.app.request(`/api/machine/provider/model-test/${requestId}`, {
         method: 'POST',
         headers: { authorization: `Bearer ${machine.token}`, 'content-type': 'application/json' },
