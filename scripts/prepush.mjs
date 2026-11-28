@@ -60,6 +60,7 @@ export const selfTests = [
   'scripts/ops/secret-scan.test.mjs',
   'scripts/ops/install-gitleaks.test.mjs',
   'scripts/ops/ci-capacity-gate.test.mjs',
+  'scripts/ops/cross-os-test.test.mjs',
   'scripts/regression-inversion-gate.test.mjs',
   'scripts/flake-ledger.test.mjs',
   'scripts/test-integrity-gate.test.mjs',
