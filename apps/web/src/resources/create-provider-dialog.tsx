@@ -10,6 +10,7 @@ import {
 } from '@cairn/shared';
 import { ChevronLeft, Search } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { DoubaoMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -427,7 +428,7 @@ export function CreateProviderDialog({
                     onClick={onPickDoubaoSubscription}
                   >
                     <span aria-hidden className={PICKER_TILE_CLS}>
-                      <MonoMark mark={LOBEHUB_MONO.doubao} />
+                      <DoubaoMark width={14} height={14} />
                     </span>
                     <span className="min-w-0 truncate">{t('豆包订阅')}</span>
                   </Button>
