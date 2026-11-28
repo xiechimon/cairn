@@ -11,29 +11,14 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   TURN_STATE_OPEN,
 } from '@cairn/shared';
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  inArray,
-  isNotNull,
-  isNull,
-  lte,
-  notInArray,
-  notLike,
-  or,
-  sql,
-} from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, notLike, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { runAfterCommit } from '../db/commit-effects.js';
 import {
   chiefMessage,
   chiefThread,
   chiefTurnUsage,
-  claudeSubscription,
   coordinatorInput,
-  devinSubscription,
   provider,
   type StepFallbackRow,
   type StepRanModel,
@@ -81,6 +66,7 @@ import { reportAnsweredIn, reportRefCurrent, reportRefOfPrompt } from './report-
 import { coordinatorProfile } from './routing-rules.js';
 import { finishScheduledStep, isValidTimezone, serverTimezone } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
+import { acquireChiefStepLease, nextClaimGeneration } from './step-lease.js';
 import { setTodoPhase } from './todos.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
 import { insertGateAnnouncement } from './transcript.js';
@@ -115,7 +101,7 @@ export function claimPendingChiefStep(
       : (options.bind ?? null);
   if (options.model?.provider === 'antigravity' && bind?.runtime !== 'antigravity') return null;
   const claimed = db.transaction(() => {
-    const claimedAt = Math.max(nowMs(), (stepRow.claimedAt ?? 0) + 1);
+    const claimedAt = nextClaimGeneration(stepRow, nowMs());
     if (options.stillAuthorized !== undefined && !options.stillAuthorized()) return null;
     const antigravitySubscriptionId =
       bind?.runtime === 'antigravity'
@@ -129,55 +115,20 @@ export function claimPendingChiefStep(
     ) {
       return null;
     }
-    const res = db
-      .update(step)
-      .set({
-        status: 'claimed',
-        machineId: options.machineId,
-        claudeSubscriptionId:
-          bind?.runtime === 'claude-code'
-            ? sql<
-                string | null
-              >`(select ${claudeSubscription.id} from ${claudeSubscription} where ${claudeSubscription.teamId} = ${bind.teamId} and ${claudeSubscription.enabledAt} is not null and (${claudeSubscription.expiresAt} is null or ${claudeSubscription.expiresAt} > ${claimedAt}))`
-            : null,
-        devinSubscriptionId:
-          bind?.runtime === 'devin'
-            ? sql<
-                string | null
-              >`(select ${devinSubscription.id} from ${devinSubscription} where ${devinSubscription.teamId} = ${bind.teamId} and ${devinSubscription.enabledAt} is not null and (${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${claimedAt}))`
-            : null,
-        antigravitySubscriptionId,
-        claimedAt,
-        lastHeartbeatAt: claimedAt,
-        holdReason: null,
-        holdUntil: null,
-        ranModel: options.model ?? null,
-        ...(options.fallback !== undefined ? { fallback: options.fallback } : {}),
-        mcpGrant: options.mcpGrant ?? null,
-        ...(options.routedFromMachineId !== undefined
-          ? { routedFromMachineId: options.routedFromMachineId }
-          : {}),
-        ...(options.routedReason !== undefined ? { routedReason: options.routedReason } : {}),
-      })
-      .where(
-        and(
-          eq(step.id, stepRow.id),
-          eq(step.status, 'pending'),
-          or(isNull(step.holdUntil), lte(step.holdUntil, claimedAt)),
-          stepRow.claimedAt === null
-            ? isNull(step.claimedAt)
-            : eq(step.claimedAt, stepRow.claimedAt),
-          notInArray(
-            step.id,
-            db
-              .select({ id: coordinatorInput.id })
-              .from(coordinatorInput)
-              .where(eq(coordinatorInput.state, 'pending')),
-          ),
-        ),
-      )
-      .run();
-    if (res.changes === 0) return null;
+    const lease = acquireChiefStepLease(db, stepRow, {
+      machineId: options.machineId,
+      claimedAt,
+      bind,
+      antigravitySubscriptionId,
+      model: options.model ?? null,
+      ...(options.fallback !== undefined ? { fallback: options.fallback } : {}),
+      mcpGrant: options.mcpGrant ?? null,
+      ...(options.routedFromMachineId !== undefined
+        ? { routedFromMachineId: options.routedFromMachineId }
+        : {}),
+      ...(options.routedReason !== undefined ? { routedReason: options.routedReason } : {}),
+    });
+    if (lease === null) return null;
     foldQueuedChiefSteps(db, stepRow, claimedAt);
     return db.select().from(step).where(eq(step.id, stepRow.id)).get() ?? null;
   });

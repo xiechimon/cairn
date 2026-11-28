@@ -13,6 +13,13 @@ export class HttpError extends Error {
   }
 }
 
+export class NotFoundError extends Error {
+  constructor(what: string) {
+    super(`${what} not found`);
+    this.name = 'NotFoundError';
+  }
+}
+
 export function notFound(what: string): HttpError {
   return new HttpError(404, `${what} not found`);
 }

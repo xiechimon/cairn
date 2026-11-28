@@ -7,7 +7,6 @@ import {
   antigravityProbedModelSchema,
 } from '../antigravity-subscription.js';
 import { backgroundTaskSchema } from '../background-task.js';
-import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { MACHINE_TOKEN_PATTERN } from '../brand.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
@@ -19,12 +18,9 @@ import {
   transcriptRowSchema,
 } from '../records/message.js';
 import { claudeCodeReportSchema, managedUpdateRuntimeSchema } from '../records/model-source.js';
-import { PROJECT_REPO_KINDS } from '../records/project.js';
 import { providerFailureSchema } from '../records/provider.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
-import { taskRequestSchema } from '../records/task-request.js';
-import { taskDecisionSchema } from '../records/todo.js';
 import { verifyVerdictSchema } from '../records/verify.js';
 import { skillInjectionFactsSchema } from '../skill-injection-check.js';
 import {
@@ -32,11 +28,25 @@ import {
   stepFailureCodeSchema,
   stepFailureDetailSchema,
 } from '../task-failure.js';
+import { machineToolRelayBodySchema, machineToolRelayResponseSchema } from './chief-tools.js';
 import {
-  machineToolRelayBodySchema,
-  machineToolRelayResponseSchema,
-  remoteToolDefSchema,
-} from './chief-tools.js';
+  CLAIM_PAYLOAD_VERSION,
+  type ClaimedStep,
+  type ClaimPayloadVersion,
+  claimedStepSchema,
+  claimedStepV1Schema,
+  claimPayloadVersionOf,
+  claimPayloadVersionSchema,
+  LOCAL_TOOL_CREATE_TAG,
+  type LocalFolderActionCommand,
+  type LocalMergeCommand,
+  localFolderActionCommandSchema,
+  localMergeCommandSchema,
+  type MachineClaimBody,
+  type MachineClaimResponse,
+  machineClaimBodySchema,
+  machineClaimResponseSchema,
+} from './claim-payload.js';
 import {
   computerCallSchema,
   machineComputerFramesBodySchema,
@@ -150,31 +160,24 @@ export const machineRecoverResponseSchema = z.object({
 });
 export type MachineRecoverResponse = z.infer<typeof machineRecoverResponseSchema>;
 
-export const machineClaimBodySchema = z.object({
-  verifyAttachments: z.literal(true).optional(),
-  maxWorkers: z.number().int().min(1).optional(),
-  role: z.literal('coordinator').optional(),
-});
-export type MachineClaimBody = z.infer<typeof machineClaimBodySchema>;
-
-export const localMergeCommandSchema = z.object({
-  projectId: recordId,
-  buildId: recordId,
-  defaultBranch: z.string().min(1),
-  workBranch: z.string().min(1),
-  judgedBase: z.string().regex(/^[0-9a-f]{40}$/),
-  judgedHead: z.string().regex(/^[0-9a-f]{40}$/),
-  judgedPatchDigest: z.string().regex(/^pd2:[0-9a-f]{64}$/),
-  localChecks: z.array(
-    z
-      .string()
-      .min(1)
-      .refine((command) => command.trim().length > 0),
-  ),
-  message: z.string().min(1),
-  identity: z.object({ name: z.string().min(1), email: z.string().min(1) }),
-});
-export type LocalMergeCommand = z.infer<typeof localMergeCommandSchema>;
+export {
+  CLAIM_PAYLOAD_VERSION,
+  type ClaimedStep,
+  type ClaimPayloadVersion,
+  claimedStepSchema,
+  claimedStepV1Schema,
+  claimPayloadVersionOf,
+  claimPayloadVersionSchema,
+  LOCAL_TOOL_CREATE_TAG,
+  type LocalFolderActionCommand,
+  type LocalMergeCommand,
+  localFolderActionCommandSchema,
+  localMergeCommandSchema,
+  type MachineClaimBody,
+  type MachineClaimResponse,
+  machineClaimBodySchema,
+  machineClaimResponseSchema,
+};
 
 export const localMergeInstructionSchema = z.object({
   kind: z.literal('local-merge'),
@@ -250,13 +253,6 @@ export const buildChangesPlainFolderStateSchema = z.object({
 });
 export type BuildChangesPlainFolderState = z.infer<typeof buildChangesPlainFolderStateSchema>;
 
-export const localFolderActionCommandSchema = z.object({
-  action: z.enum(['undo', 'merge']),
-  projectId: recordId,
-  buildId: recordId,
-});
-export type LocalFolderActionCommand = z.infer<typeof localFolderActionCommandSchema>;
-
 export const localFolderActionInstructionSchema = z.object({
   kind: z.literal('local-folder-action'),
   command: localFolderActionCommandSchema,
@@ -322,89 +318,6 @@ export const DELIVERABLE_LIMITS = {
   maxNameChars: 120,
   maxSkipped: 20,
 } as const;
-
-export const claimedStepSchema = z.object({
-  localMerge: localMergeCommandSchema.optional(),
-  localFolderAction: localFolderActionCommandSchema.optional(),
-  step: stepRecordSchema,
-  conversationId: recordId,
-  session: z.object({
-    action: z.enum(['new', 'continue']),
-    sessionId: z.string().nullable(),
-    priorMachineId: z.string().optional(),
-  }),
-  instruction: z.string().nullable().optional(),
-  answerIds: z.array(z.string().min(1)).optional(),
-  todo: z
-    .object({
-      id: recordId,
-      seqNum: z.number().int(),
-      title: z.string(),
-      spec: z.string(),
-      meta: z
-        .object({
-          titleFinal: z.boolean(),
-          vocab: z.array(z.object({ name: z.string() })),
-        })
-        .optional(),
-      sourceKind: z.string().nullable().optional(),
-      sourceRef: z.string().nullable().optional(),
-      request: taskRequestSchema.optional(),
-      blockerHandoff: blockerHandoffSchema.optional(),
-      decisions: z.array(taskDecisionSchema).optional(),
-      output: z.string().nullable().optional(),
-    })
-    .optional(),
-  project: z
-    .object({
-      id: recordId,
-      name: z.string(),
-      instructions: z.string().optional(),
-      repo: z
-        .object({
-          kind: z.enum(PROJECT_REPO_KINDS),
-          cloneUrl: z.string(),
-          baseBranch: z.string().nullable().optional(),
-        })
-        .nullable(),
-    })
-    .optional(),
-  agent: z
-    .object({
-      id: recordId,
-      displayName: z.string(),
-      description: z.string().nullable(),
-      provider: z.string().nullable(),
-      modelId: z.string().nullable(),
-      thinkingLevel: z.string().nullable(),
-      memories: z.array(z.object({ title: z.string(), content: z.string() })).optional(),
-      skillsAllowlist: z.array(z.string()).nullable().optional(),
-      defaultSkill: z.string().nullable().optional(),
-      injectedSkills: z.array(z.string()).optional(),
-      tools: z.array(z.string()).optional(),
-    })
-    .nullable(),
-  chief: z
-    .object({
-      threadId: recordId,
-      systemPrompt: z.string(),
-      trigger: z.enum(['user', 'gate', 'settle', 'failed', 'wake']),
-      history: z.string().optional(),
-    })
-    .optional(),
-  remoteTools: z.array(remoteToolDefSchema).optional(),
-  localTools: z.array(z.string()).optional(),
-  mcpServers: z.array(z.string()).optional(),
-  remoteToolsOnly: z.literal(true).optional(),
-});
-export type ClaimedStep = z.infer<typeof claimedStepSchema>;
-
-export const LOCAL_TOOL_CREATE_TAG = 'create_tag';
-
-export const machineClaimResponseSchema = z.object({
-  step: claimedStepSchema.nullable(),
-});
-export type MachineClaimResponse = z.infer<typeof machineClaimResponseSchema>;
 
 export const machineAntigravityModelProbeResultSchema = z.discriminatedUnion('status', [
   z.object({

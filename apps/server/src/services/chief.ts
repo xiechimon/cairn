@@ -155,6 +155,7 @@ import {
   coordinatorProfile,
   type RouteProfile,
 } from './routing-rules.js';
+import { releaseStepLease } from './step-lease.js';
 import { isStepWaitingPermission } from './step-permission-wait.js';
 import { stepQueueProjector } from './step-queue.js';
 import { rewriteGivenClaims } from './terminal-claims.js';
@@ -2823,11 +2824,15 @@ export function sweepAbandonedChiefSteps(
       stopAbandonedChiefTurn(deps, thread, row, now);
       continue;
     }
-    deps.db
-      .update(step)
-      .set({ status: 'pending', machineId: null, mcpGrant: null, claimCount: claims })
-      .where(eq(step.id, row.id))
-      .run();
+    if (
+      !releaseStepLease(deps.db, row.id, {
+        claimCount: claims,
+        expectedMachineId: row.machineId,
+        expectedClaimedAt: row.claimedAt,
+      })
+    ) {
+      continue;
+    }
     deps.convHub?.publishStep(thread.id, {
       id: row.id,
       buildId: row.buildId,

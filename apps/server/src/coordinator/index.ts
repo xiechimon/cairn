@@ -10,7 +10,7 @@ import {
   transcriptPromptRowId,
   withHistoryMarker,
 } from '@cairn/shared';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   chief,
   chiefMessage,
@@ -484,7 +484,19 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             },
       activeModel: routerModel,
     });
-    db.update(step).set({ memoryTrace: context.memoryTrace }).where(eq(step.id, row.id)).run();
+    const memoryTraceUpdate = db
+      .update(step)
+      .set({ memoryTrace: context.memoryTrace })
+      .where(
+        and(
+          eq(step.id, row.id),
+          eq(step.status, 'claimed'),
+          isNull(step.machineId),
+          row.claimedAt === null ? isNull(step.claimedAt) : eq(step.claimedAt, row.claimedAt),
+        ),
+      )
+      .run();
+    if (memoryTraceUpdate.changes === 0) return null;
     logger.info(
       {
         threadId: row.buildId,
@@ -580,7 +592,17 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       if (closing) return;
       const payload = await claimedPayload(row, providers, stagedUploads);
       if (closing) return;
-      if (payload === null) throw new Error('Coordinator step has no chief thread');
+      if (payload === null) {
+        const current = db.select().from(step).where(eq(step.id, row.id)).get();
+        if (
+          current?.status !== 'claimed' ||
+          current.machineId !== null ||
+          current.claimedAt !== row.claimedAt
+        ) {
+          return;
+        }
+        throw new Error('Coordinator step has no chief thread');
+      }
       await runtime.runTurn({
         claimed: payload.claimed,
         volatileText: payload.volatileText,

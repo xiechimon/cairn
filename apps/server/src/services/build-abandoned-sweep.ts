@@ -5,6 +5,7 @@ import { nowMs } from '../lib/ids.js';
 import { applyStoppedStep, stopStepKeepPhase } from './build-stop.js';
 import { applyStepFailure, type BuildDeps } from './builds.js';
 import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
+import { releaseStepLease } from './step-lease.js';
 import { isStepWaitingPermission } from './step-permission-wait.js';
 
 export const BUILD_ABANDONED_STEP_MS = 120_000;
@@ -110,12 +111,14 @@ function releaseClaimedStep(
       undefined,
       { code: 'runner_disconnect' },
     );
-  } else {
-    deps.db
-      .update(step)
-      .set({ status: 'pending', machineId: null, claimCount: claims, mcpGrant: null })
-      .where(eq(step.id, row.id))
-      .run();
+  } else if (
+    !releaseStepLease(deps.db, row.id, {
+      claimCount: claims,
+      expectedMachineId: row.machineId,
+      expectedClaimedAt: row.claimedAt,
+    })
+  ) {
+    return;
   }
   const released = deps.db.select().from(step).where(eq(step.id, row.id)).get();
   if (released) {

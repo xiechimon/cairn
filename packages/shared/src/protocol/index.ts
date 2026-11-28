@@ -1,4 +1,5 @@
 export * from './chief-tools.js';
+export * from './claim-payload.js';
 export * from './client-state.js';
 export * from './computer.js';
 export * from './computer-presence.js';

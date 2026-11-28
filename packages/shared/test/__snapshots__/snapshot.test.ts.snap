@@ -261,6 +261,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "payloadVersion": {
+      "const": 1,
+      "type": "number",
+    },
     "project": {
       "additionalProperties": false,
       "properties": {
@@ -1304,6 +1308,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "type": "string",
               },
               "type": "array",
+            },
+            "payloadVersion": {
+              "const": 1,
+              "type": "number",
             },
             "project": {
               "additionalProperties": false,

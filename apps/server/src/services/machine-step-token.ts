@@ -26,7 +26,7 @@ import {
 import { projectOfTodo } from './git.js';
 import { appTokenOrNull } from './github-app-token.js';
 import { softwareCommitIdentity } from './github-autonomous-token.js';
-import { stepMcpGrant } from './machine-claim.js';
+import { stepMcpGrant } from './machine-claim-payload.js';
 import { claimGenerationAccepted } from './machine-claim-scope.js';
 import {
   isChiefConversation,

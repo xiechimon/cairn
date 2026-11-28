@@ -93,6 +93,7 @@ export {
 export { finishStep } from './machine-finish-step.js';
 export { MERGE_NOT_LANDED_NOTE } from './machine-merge-landing.js';
 export { stepToken, toProviderConfig } from './machine-step-token.js';
+export { heartbeatStep } from './step-lease.js';
 
 export const STEER_SENT_STALE_MS = 30_000;
 
@@ -1228,14 +1229,6 @@ function toStepRecord(r: typeof step.$inferSelect): StepRecord {
     createdAt: r.createdAt,
     generation: r.claimedAt ?? undefined,
   };
-}
-
-export function heartbeatStep(deps: MachineDeps, machineId: string | null, stepId: string): void {
-  if (!deps.db.select({ id: step.id }).from(step).where(eq(step.id, stepId)).get()) {
-    throw new HttpError(410, `step ${stepId} no longer exists`);
-  }
-  const row = ownedStep(deps, machineId, stepId);
-  deps.db.update(step).set({ lastHeartbeatAt: nowMs() }).where(eq(step.id, row.id)).run();
 }
 
 const MISSING_HOST_TOOL_RE =

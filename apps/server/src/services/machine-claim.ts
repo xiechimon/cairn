@@ -1,34 +1,14 @@
 import type { ClaimedStep, MachineClaimBody } from '@cairn/shared';
 import {
-  AGENT_TOOL_TAG,
-  appendMergedPrGuard,
-  buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
-  buildTaskPromptText,
   CHIEF_MODEL_FALLBACK_KIND,
-  CORE_COORDINATOR_TOOLS,
-  fencedTitle,
   isBuildStepKind,
-  LOCAL_TOOL_CREATE_TAG,
-  MCP_MIN_CLI_VERSION,
   mergedPrGuardNoteRowId,
   parseLocalFolderActionInstruction,
   parseLocalMergeInstruction,
   parseVerifyPromptMeta,
-  type RemoteToolDef,
-  type SkillInjectionRecord,
-  type StepKind,
-  SUGGEST_REPLIES_TOOL_NAME,
-  selectSkillsForTask,
-  WORKER_ASK_USER_TOOL,
-  WORKER_CLOSE_AS_DUPLICATE_TOOL,
-  WORKER_MEMORY_REMOTE_TOOLS,
-  WORKER_REMOTE_TOOLS,
-  WORKER_REMOTE_TOOLS_GITHUB,
-  WORKER_THREAD_REPORT_TOOL,
 } from '@cairn/shared';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
-import type { Db } from '../db/client.js';
 import {
   build,
   chief,
@@ -44,7 +24,6 @@ import { HttpError } from '../lib/errors.js';
 import { githubRepoReachable } from '../lib/github.js';
 import { type AppTokenReason, tokenValue } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import {
   antigravitySubscriptionAllowsRunner,
   enabledAntigravitySubscriptionId,
@@ -53,16 +32,13 @@ import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
 import { greetingReadmeSection } from './chief.js';
-import { chiefHistoryFor } from './chief-claim-history.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
-import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
+import { accountHeld } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
-import { coordinatorInServerEnabled, rotatesPastCompaction } from './coordinator-context.js';
-import { resolveCoordinatorRemoteTools } from './coordinator-diagnostics.js';
+import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
-import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
-import { captureCoordinatorClaim } from './coordinator-turn-capture.js';
+import { claimPendingChiefStep } from './coordinator-steps.js';
 import { readDeployLease } from './deploy-lease.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import {
@@ -73,13 +49,22 @@ import {
   stepRuntimeFor,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
-import { interruptedEffectsNote } from './external-effects.js';
-import { githubRepoOfProject, projectOfTodo, projectRepoRef } from './git.js';
+import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
-import { listProjectGithubLabelVocab } from './github-labels.js';
-import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { localFolderActionAuthorizationRefusal } from './local-folder-action.js';
 import { localMergeAuthorizationRefusal } from './local-merge.js';
+import {
+  buildChiefClaimPayload,
+  buildWorkerClaimPayload,
+  CHIEF_MAIL_MIN_CLI_VERSION,
+  chiefTurnLocked,
+  cliVersionAtLeast,
+  meetsMcpVersionGate,
+  stepMcpGrant,
+  TASK_SEGMENTS_MIN_CLI_VERSION,
+  workerRemoteTools,
+  workerSkillInjection,
+} from './machine-claim-payload.js';
 import { stageTurnAttachments } from './machine-computer.js';
 import {
   type MachineDeps,
@@ -100,47 +85,35 @@ import {
 } from './machine-routing.js';
 import {
   CONNECTOR_TOOL_HYDRATE_BOUND_MS,
-  connectorSlugs,
   hydrateMissingConnectorTools,
   mcpConnectorDepsOf,
 } from './mcp-servers.js';
-import { injectMemoryDocuments } from './memory.js';
-import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel, modelKey } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
+import { coordinatorProfile, type RouteProfile } from './routing-rules.js';
 import {
-  coordinatorMemoryOwner,
-  coordinatorProfile,
-  memoryOpsAreTeamScoped,
-  memoryOwnerOf,
-  type RouteProfile,
-} from './routing-rules.js';
-import { scanLocalSkills } from './skills.js';
+  acquireWorkerStepLease,
+  heartbeatStep,
+  nextClaimGeneration,
+  pendingClaimPredicate,
+  releaseStepLease,
+} from './step-lease.js';
 import { recordStepRoute, routedModelRunsOn } from './step-route.js';
-import { stepNamesTask } from './task-naming.js';
-import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
 import { turnProvenance } from './turn-provenance.js';
 
-function workerSkillInjection(
-  deps: MachineDeps,
-  agentRow: { defaultSkill: string | null; skillsAllowlist: readonly string[] | null },
-  todoRow: { title: string; spec: string },
-): SkillInjectionRecord {
-  const scanned = new Map(scanLocalSkills(deps.skillsDir).map((s) => [s.id, s]));
-  const granted =
-    agentRow.skillsAllowlist === null
-      ? [...scanned.keys()]
-      : [...new Set(agentRow.skillsAllowlist)];
-  const candidates = granted.map((id) => {
-    const s = scanned.get(id);
-    return s === undefined
-      ? { id, name: id, description: null }
-      : { id: s.id, name: s.name, description: s.description };
-  });
-  const hits = selectSkillsForTask(buildTaskPromptText(todoRow.title, todoRow.spec), candidates);
-  return { hits };
-}
+export {
+  buildChiefClaimPayload,
+  buildWorkerClaimPayload,
+  CHIEF_MAIL_MIN_CLI_VERSION,
+  chiefTurnLocked,
+  heartbeatStep,
+  meetsMcpVersionGate,
+  releaseStepLease,
+  stepMcpGrant,
+  TASK_SEGMENTS_MIN_CLI_VERSION,
+  workerRemoteTools,
+};
 
 interface ClaimCandidate {
   stepRow: typeof step.$inferSelect;
@@ -232,52 +205,6 @@ function chiefThreadProject(db: MachineDeps['db'], threadId: string): string | n
   );
 }
 
-export const TASK_SEGMENTS_MIN_CLI_VERSION = '0.2.4';
-export const CHIEF_MAIL_MIN_CLI_VERSION = '0.2.2';
-
-export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
-  return cliVersionAtLeast(latestCliVersion, MCP_MIN_CLI_VERSION);
-}
-
-function cliVersionAtLeast(latestCliVersion: string | null, min: string): boolean {
-  if (!latestCliVersion) return false;
-  const parse = (v: string): number[] => v.split('.').map((n) => Number.parseInt(n, 10) || 0);
-  const [a, b] = [parse(latestCliVersion), parse(min)];
-  for (let i = 0; i < 3; i++) {
-    const d = (a[i] ?? 0) - (b[i] ?? 0);
-    if (d !== 0) return d > 0;
-  }
-  return true;
-}
-
-export function stepMcpGrant(
-  db: MachineDeps['db'],
-  machineRow: Pick<typeof machine.$inferSelect, 'teamId' | 'latestCliVersion' | 'capabilities'>,
-  locked = false,
-): string[] | undefined {
-  if (locked) return [];
-  if (!meetsMcpVersionGate(machineRow.latestCliVersion)) return undefined;
-  const local = machineRow.capabilities?.mcpServers ?? [];
-  const connectors =
-    machineRow.capabilities?.mcpConnectors === true ? connectorSlugs(db, machineRow.teamId) : [];
-  return [...new Set([...local, ...connectors].map((slug) => slug.toLowerCase()))];
-}
-
-export function chiefTurnLocked(stepRow: typeof step.$inferSelect): boolean {
-  return (
-    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true ||
-    memoryEditIdOfPrompt(stepRow.prompt) !== null
-  );
-}
-
-function claimLocalTools(agentTools: readonly string[]): string[] {
-  const tools: string[] = [];
-  if (agentTools.includes(AGENT_TOOL_TAG)) {
-    tools.push(LOCAL_TOOL_CREATE_TAG);
-  }
-  return tools;
-}
-
 async function buildChiefClaim(
   deps: MachineDeps,
   machineId: string,
@@ -327,6 +254,8 @@ async function buildChiefClaim(
           ],
           zeroUsageRetried: false,
         };
+  const locked = chiefTurnLocked(stepRow);
+  const chiefMcp = stepMcpGrant(deps.db, freshMachine, locked);
   const claimed = claimPendingChiefStep(deps.db, stepRow, {
     machineId,
     bind: bindSubscription,
@@ -340,7 +269,7 @@ async function buildChiefClaim(
               stepRow.fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
           },
     ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
-    mcpGrant: stepMcpGrant(deps.db, freshMachine, chiefTurnLocked(stepRow)) ?? null,
+    mcpGrant: chiefMcp ?? null,
     ...(failover !== undefined
       ? { routedFromMachineId: failover.fromMachineId, routedReason: failover.reason }
       : {}),
@@ -374,162 +303,17 @@ async function buildChiefClaim(
           () => null,
         )
       : null;
-  return chiefClaimPayload(
-    deps,
+  return buildChiefClaimPayload(deps, {
     machineId,
-    claimed,
+    stepRow: claimed,
     threadRow,
     agentRow,
     readmeSection,
     stagedUploads,
-    freshMachine,
-  );
-}
-
-const DAEMON_QUICK_REPLIES_GUIDANCE = [
-  '<quick_replies>',
-  `On user turns (never on [wake:…] event turns), answer the user directly first; never call ${SUGGEST_REPLIES_TOOL_NAME} before answering, and skip it on simple questions, short replies, or if you called ask_user. Only after finishing a substantive multi-step reply where 1 to 3 concrete next actions genuinely help, optionally call ${SUGGEST_REPLIES_TOOL_NAME} once in the conversation's language (never suggest destructive or irreversible actions).`,
-  '</quick_replies>',
-].join('\n');
-
-function chiefClaimPayload(
-  deps: MachineDeps,
-  machineId: string,
-  stepRow: typeof step.$inferSelect,
-  threadRow: typeof chiefThread.$inferSelect,
-  agentRow: RouteProfile,
-  readmeSection: string | null,
-  stagedUploads: string | null,
-  machineRow?: typeof machine.$inferSelect,
-): ClaimedStep {
-  const model = effectiveModel(agentRow, stepRow);
-  const { trigger, systemPrompt, memories, instruction, sections, memoryTrace } = chiefTurnContext(
-    deps,
-    stepRow,
-    threadRow,
-    coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
-  );
-  const baseInstruction =
-    instruction !== null && readmeSection !== null
-      ? `${instruction}\n\n${readmeSection}`
-      : (instruction ?? readmeSection);
-  const fullInstruction =
-    stagedUploads === null
-      ? baseInstruction
-      : baseInstruction !== null && baseInstruction !== ''
-        ? `${baseInstruction}\n\n${stagedUploads}`
-        : stagedUploads;
-  deps.db.update(step).set({ memoryTrace }).where(eq(step.id, stepRow.id)).run();
-  const runtime = stepRuntimeFor(model.provider);
-  const boundSubscriptionId =
-    runtime === 'claude-code'
-      ? (deps.db
-          .select({ id: step.claudeSubscriptionId })
-          .from(step)
-          .where(eq(step.id, stepRow.id))
-          .get()?.id ?? null)
-      : runtime === 'devin'
-        ? (deps.db
-            .select({ id: step.devinSubscriptionId })
-            .from(step)
-            .where(eq(step.id, stepRow.id))
-            .get()?.id ?? null)
-        : runtime === 'antigravity'
-          ? (deps.db
-              .select({ id: step.antigravitySubscriptionId })
-              .from(step)
-              .where(eq(step.id, stepRow.id))
-              .get()?.id ?? null)
-          : null;
-  const continuesSession =
-    !stepRow.freshSession &&
-    threadRow.sessionId !== '' &&
-    threadRow.sessionRuntime === runtime &&
-    !rotatesPastCompaction(deps.db, threadRow.id, runtime) &&
-    (runtime !== 'claude-code' && runtime !== 'devin' && runtime !== 'antigravity'
-      ? true
-      : !chiefLastRanOnOtherAccount(
-          deps.db,
-          threadRow.id,
-          stepRow.id,
-          boundSubscriptionId,
-          runtime,
-        ));
-  const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
-  const memoryEditTurn = memoryEditIdOfPrompt(stepRow.prompt) !== null;
-  const effectiveSystemPrompt =
-    mailTurn || memoryEditTurn
-      ? systemPrompt
-      : `${systemPrompt}\n\n${DAEMON_QUICK_REPLIES_GUIDANCE}`;
-  const volatileParts = [
-    ...sections,
-    ...(readmeSection !== null ? [readmeSection] : []),
-    ...(stagedUploads !== null ? [stagedUploads] : []),
-  ];
-  captureCoordinatorClaim(deps.db, stepRow.id, threadRow.teamId, {
-    systemPrompt: effectiveSystemPrompt,
-    instruction: stepRow.prompt,
-    trigger,
-    memories: memories.map((m) => `- ${m.title}：${m.content}`),
-    provider: model.provider ?? '',
-    modelId: model.modelId ?? '',
-    thinkingLevel: stepRow.fallback?.model ? null : (agentRow.thinkingLevel ?? null),
-    volatileText: volatileParts.length === 0 ? null : volatileParts.join('\n\n'),
-  });
-  const locked = chiefTurnLocked(stepRow);
-  const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
-  const chiefMcp = machineRow ? stepMcpGrant(deps.db, machineRow, locked) : locked ? [] : undefined;
-  return {
-    step: {
-      id: stepRow.id,
-      buildId: stepRow.buildId,
-      kind: 'chief',
-      machineId,
-      createdAt: stepRow.createdAt,
-      generation: stepRow.claimedAt ?? undefined,
-    },
-    conversationId: stepRow.buildId,
-    session: {
-      action: continuesSession ? 'continue' : 'new',
-      sessionId: continuesSession ? threadRow.sessionId : null,
-    },
-    ...(fullInstruction !== null
-      ? {
-          instruction: fullInstruction,
-        }
-      : {}),
-    agent: {
-      id: agentRow.id,
-      displayName: agentRow.displayName,
-      description: agentRow.description,
-      provider: model.provider,
-      modelId: model.modelId,
-      thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
-      memories,
-    },
-    chief: {
-      threadId: threadRow.id,
-      systemPrompt: effectiveSystemPrompt,
-      trigger,
-      ...(history !== null ? { history } : {}),
-    },
-    remoteTools: [
-      ...(mailTurn
-        ? []
-        : memoryEditTurn
-          ? [...WORKER_MEMORY_REMOTE_TOOLS]
-          : resolveCoordinatorRemoteTools(deps, {
-              teamId: threadRow.teamId,
-              threadRow,
-            }).tools.map((def) =>
-              CORE_COORDINATOR_TOOLS.has(def.name) || def.name === SUGGEST_REPLIES_TOOL_NAME
-                ? def
-                : { ...def, deferred: true },
-            )),
-    ],
+    machineRow: freshMachine,
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
-    ...(locked ? { remoteToolsOnly: true as const } : {}),
-  };
+    hasMcpServers: true,
+  });
 }
 
 function runnerFull(
@@ -641,17 +425,12 @@ async function claimChiefTurn(
   return null;
 }
 
-function pendingClaim(stepRow: typeof step.$inferSelect, now: number) {
-  return and(
-    eq(step.id, stepRow.id),
-    eq(step.status, 'pending'),
-    stepRow.claimedAt === null ? isNull(step.claimedAt) : eq(step.claimedAt, stepRow.claimedAt),
-    or(isNull(step.holdUntil), lte(step.holdUntil, now)),
-  );
-}
-
 function failPendingClaim(deps: MachineDeps, candidate: typeof step.$inferSelect, reason: string) {
-  const current = deps.db.select().from(step).where(pendingClaim(candidate, nowMs())).get();
+  const current = deps.db
+    .select()
+    .from(step)
+    .where(pendingClaimPredicate(candidate, nowMs()))
+    .get();
   if (current === undefined) return false;
   failStepWithEvents(deps, current, reason);
   return true;
@@ -833,7 +612,6 @@ async function tryClaim(
     if (!stillAuthorized()) return null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     if (!stillAuthorized()) return null;
-    const workerMcp = stepMcpGrant(db, machineRow, false);
     const claimRepoRef = githubRepoOfProject(projectOfTodo(db, cand.todoRow));
     const repoResolution =
       claimRepoRef === null
@@ -842,6 +620,8 @@ async function tryClaim(
     let won: boolean | Error;
     let claimedAt = 0;
     let claimProject: ReturnType<typeof projectOfTodo>;
+    let resolvedMachine = machineRow;
+    let workerMcp: string[] | undefined;
     try {
       won = withFencedTransaction(deps, (settleDeps) => {
         const tx = settleDeps.db;
@@ -901,6 +681,9 @@ async function tryClaim(
         holdBlockedBuild(tx, cand.stepRow.buildId);
         claimProject = projectOfTodo(tx, latestTodo);
         const freshMachine = tx.select().from(machine).where(eq(machine.id, machineId)).get();
+        if (!freshMachine) return false;
+        resolvedMachine = freshMachine;
+        workerMcp = stepMcpGrant(tx, freshMachine, false);
         const txGithubPushRepo = requiredGithubPushRepoForStep({
           project: claimProject,
           step: cand.stepRow,
@@ -921,41 +704,33 @@ async function tryClaim(
               `${claimRepoRef.owner}/${claimRepoRef.repo}`.toLowerCase())
         )
           return false;
-        claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
+        claimedAt = nextClaimGeneration(cand.stepRow, nowMs());
         if (repoResolution.error !== null) {
           return failPendingClaim(settleDeps, cand.stepRow, repoResolution.error.message)
             ? repoResolution.error
             : false;
         }
-        const res = tx
-          .update(step)
-          .set({
-            status: 'claimed',
-            machineId,
-            claimedAt,
-            claimedRepo: claimRepo === null ? null : `${claimRepo.owner}/${claimRepo.repo}`,
-            claimedRepoId: repoResolution.id,
-            lastHeartbeatAt: claimedAt,
-            skillInjection,
-            blockerHandoff,
-            claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
-            devinSubscriptionId: claimRuntimeIsDevin ? boundDevinId : null,
-            antigravitySubscriptionId: claimRuntimeIsAntigravity ? boundAntigravityId : null,
-            holdReason: null,
-            holdUntil: null,
-            ranModel: pinnedModel,
-            ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
-            mcpGrant: workerMcp ?? null,
-            ...(resolution.failover !== undefined
-              ? {
-                  routedFromMachineId: resolution.failover.fromMachineId,
-                  routedReason: resolution.failover.reason,
-                }
-              : {}),
-          })
-          .where(pendingClaim(cand.stepRow, claimedAt))
-          .run();
-        if (res.changes === 0) return false;
+        const lease = acquireWorkerStepLease(tx, cand.stepRow, {
+          machineId,
+          claimedAt,
+          claimedRepo: claimRepo === null ? null : `${claimRepo.owner}/${claimRepo.repo}`,
+          claimedRepoId: repoResolution.id,
+          skillInjection,
+          blockerHandoff,
+          claudeSubscriptionId: claimRuntimeIsClaudeCode ? boundId : null,
+          devinSubscriptionId: claimRuntimeIsDevin ? boundDevinId : null,
+          antigravitySubscriptionId: claimRuntimeIsAntigravity ? boundAntigravityId : null,
+          ranModel: pinnedModel,
+          ...(switchedFallback !== null ? { fallback: switchedFallback } : {}),
+          mcpGrant: workerMcp ?? null,
+          ...(resolution.failover !== undefined
+            ? {
+                routedFromMachineId: resolution.failover.fromMachineId,
+                routedReason: resolution.failover.reason,
+              }
+            : {}),
+        });
+        if (lease === null) return false;
         if (switchedFallback !== null && routeSwitch !== null && pinnedModel !== null) {
           upsertMessage(settleDeps, {
             id: `route-fallback-${cand.stepRow.id}`,
@@ -1021,117 +796,30 @@ async function tryClaim(
       if (won instanceof HttpError) throw won;
       continue;
     }
-    const session = freshSession
-      ? { action: 'new' as const, sessionId: null }
-      : {
-          action: priorSessionId ? ('continue' as const) : ('new' as const),
-          sessionId: priorSessionId,
-          ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
-        };
-    const projectRow = claimProject;
-    const repoRef = projectRepoRef(projectRow, origin);
-    const mergeTarget =
-      cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
-    const repo =
-      repoRef?.kind === 'hosted' && mergeTarget !== null
-        ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
-        : repoRef;
-    const segmentsDaemon = cliVersionAtLeast(
-      machineRow.latestCliVersion,
-      TASK_SEGMENTS_MIN_CLI_VERSION,
-    );
-    const isGithubProject = projectRow?.repoKind === 'github';
-    const namesTask = stepNamesTask(db, cand.stepRow);
-    const taskMeta =
-      isGithubProject && namesTask && projectRow
-        ? {
-            titleFinal: cand.todoRow.sourceKind === 'github-issue' || cand.todoRow.request !== null,
-            vocab: listProjectGithubLabelVocab(db, projectRow.id),
-          }
-        : undefined;
-    const guardInstruction =
-      guardPr === null
-        ? cand.stepRow.prompt
-        : cand.stepRow.prompt !== null
-          ? appendMergedPrGuard(cand.stepRow.prompt, {
-              prNumber: guardPr.prNumber,
-              prUrl: guardPr.prUrl,
-            })
-          : buildMergedPrGuardInstruction({ prNumber: guardPr.prNumber, prUrl: guardPr.prUrl });
-    const effectNote = interruptedEffectsNote(db, cand.todoRow.id);
-    const instruction =
-      guardInstruction !== null && effectNote !== null
-        ? `${guardInstruction}\n\n${effectNote}`
-        : (guardInstruction ?? effectNote);
-    const decided = new Set(cand.todoRow.decisions.map((decision) => decision.requestId));
-    const answerIds = receivesAnswers(cand.stepRow.kind)
-      ? undeliveredAnswers(db, cand.stepRow.buildId)
-          .map((answer) => answer.requestId)
-          .filter((requestId) => decided.has(requestId))
-      : [];
-    return {
-      step: {
-        id: cand.stepRow.id,
-        buildId: cand.stepRow.buildId,
-        kind: cand.stepRow.kind,
-        machineId,
-        createdAt: cand.stepRow.createdAt,
-        generation: claimedAt,
-      },
-      conversationId: cand.stepRow.buildId,
-      ...(localMerge !== null ? { localMerge } : {}),
-      ...(localFolderAction !== null ? { localFolderAction } : {}),
-      session,
-      ...(instruction !== null ? { instruction } : {}),
-      ...(answerIds.length > 0 ? { answerIds } : {}),
-      todo: {
-        id: cand.todoRow.id,
-        seqNum: cand.todoRow.seqNum,
-        title:
-          cand.todoRow.request !== null && !segmentsDaemon
-            ? fencedTitle(cand.todoRow.title, cand.todoRow)
-            : cand.todoRow.title,
-        spec: cand.todoRow.spec,
-        ...(cand.todoRow.decisions.length > 0 ? { decisions: cand.todoRow.decisions } : {}),
-        ...(taskMeta !== undefined ? { meta: taskMeta } : {}),
-        sourceKind: cand.todoRow.sourceKind,
-        sourceRef: cand.todoRow.sourceRef,
-        ...(cand.todoRow.request !== null && segmentsDaemon
-          ? { request: cand.todoRow.request }
-          : {}),
-        ...(blockerHandoff !== null ? { blockerHandoff } : {}),
-        output: cand.todoRow.output,
-      },
-      project: {
-        id: cand.todoRow.projectId,
-        name: projectRow?.name ?? '',
-        ...(projectRow?.instructions != null ? { instructions: projectRow.instructions } : {}),
-        repo,
-      },
-      agent: {
-        id: agentRow.id,
-        displayName: agentRow.displayName,
-        description: agentRow.description,
-        provider: model.provider,
-        modelId: model.modelId,
-        thinkingLevel:
-          cand.stepRow.fallback?.model || switchedFallback !== null ? null : agentRow.thinkingLevel,
-        memories: injectWorkerStepMemories(db, cand.stepRow.id, {
-          agentId: memoryOwnerOf(db, teamId, cand.stepRow.kind),
-          teamId,
-          teamScoped: memoryOpsAreTeamScoped(cand.stepRow.kind),
-          threadId: cand.todoRow.id,
-          projectId: cand.todoRow.projectId,
-        }),
-        defaultSkill: agentRow.defaultSkill,
-        skillsAllowlist: agentRow.skillsAllowlist === null ? null : [...agentRow.skillsAllowlist],
-        injectedSkills: skillInjection.hits.map((h) => h.id),
-        tools: [...agentRow.tools],
-      },
-      remoteTools: workerRemoteTools(cand.stepRow.kind, isGithubProject, namesTask),
-      localTools: claimLocalTools(agentRow.tools),
-      ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
-    };
+    return buildWorkerClaimPayload(deps, {
+      machineId,
+      teamId,
+      origin,
+      stepRow: cand.stepRow,
+      buildRow: cand.buildRow,
+      todoRow: cand.todoRow,
+      projectRow: claimProject,
+      machineRow: resolvedMachine,
+      agentRow,
+      model,
+      claimedAt,
+      switchedFallback,
+      skillInjection,
+      blockerHandoff,
+      guardPr,
+      localMerge,
+      localFolderAction,
+      priorSessionId,
+      priorMachineId,
+      freshSession,
+      sessionOnOtherMachine,
+      mcpServers: workerMcp,
+    });
   }
   if (!stillAuthorized()) return null;
   return claimChiefTurn(
@@ -1143,49 +831,6 @@ async function tryClaim(
     stillAuthorized,
     signal,
   );
-}
-
-function injectWorkerStepMemories(
-  db: Db,
-  stepId: string,
-  scope: Parameters<typeof injectMemoryDocuments>[1],
-) {
-  const { memories, indexes } = injectMemoryDocuments(db, scope);
-  const teamIndexes = indexes.filter((index) => index.projectId === null);
-  const projectIndexes = indexes.filter((index) => index.projectId !== null);
-  const total = (rows: typeof indexes) => rows.reduce((sum, index) => sum + index.omitted, 0);
-  db.update(step)
-    .set({
-      memoryTrace: {
-        teamMemoryIds: teamIndexes.map((index) => index.id),
-        teamMemoriesOmitted: total(teamIndexes),
-        projectMemoryIds: projectIndexes.map((index) => index.id),
-        projectMemoriesOmitted: total(projectIndexes),
-        recalledMemoryIds: [],
-      },
-    })
-    .where(eq(step.id, stepId))
-    .run();
-  return memories.map(({ title, content }) => ({ title, content }));
-}
-
-export function workerRemoteTools(
-  kind: StepKind,
-  isGithubProject: boolean,
-  namesTask: boolean,
-): RemoteToolDef[] {
-  const base = (isGithubProject ? WORKER_REMOTE_TOOLS_GITHUB : WORKER_REMOTE_TOOLS).filter(
-    (tool) =>
-      (kind === 'plan' || isBuildStepKind(kind) || !isThreadScheduleTool(tool.name)) &&
-      (namesTask || tool.name !== 'set_task_meta'),
-  );
-  if (kind !== 'session') return [...base];
-  return [
-    ...base,
-    WORKER_ASK_USER_TOOL,
-    WORKER_THREAD_REPORT_TOOL,
-    ...(isGithubProject ? [WORKER_CLOSE_AS_DUPLICATE_TOOL] : []),
-  ];
 }
 
 async function resolveClaimRepoId(

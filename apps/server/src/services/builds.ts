@@ -12,7 +12,7 @@ import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import type { CommitEffects } from '../db/commit-effects.js';
 import { build, steerPending, step, todo } from '../db/schema.js';
-import { HttpError } from '../lib/errors.js';
+import { HttpError, NotFoundError } from '../lib/errors.js';
 import type { systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -356,16 +356,10 @@ function stepRouteView(route: BuildStepRoute | undefined): StepJournalRow['route
   return route === undefined ? null : { harness: route.harness, modelId: route.modelId };
 }
 
-export class NotFoundError extends Error {
-  constructor(what: string) {
-    super(`${what} not found`);
-    this.name = 'NotFoundError';
-  }
-}
-
 export {
   applyStepFailure,
   failStepWithEvents,
   noteDeliveredPlanResidual,
   settleParkedStep,
 } from './build-step-failure.js';
+export { NotFoundError };
