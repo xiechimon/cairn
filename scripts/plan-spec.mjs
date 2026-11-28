@@ -12,7 +12,7 @@ const PLACEHOLDER =
 const HOLLOW_MODEL =
   /^(?:same|self|author|subagent|agent|reviewer|fresh(?:[- ]context)?(?:\s+subagent)?|plan\s+gate\s+reviewer|model|unknown|auto|default)$/i;
 const PROVING_TEST_RX =
-  /(?:^|[\s`"'([+,;])((?:apps|packages|integration|eval)\/[A-Za-z0-9._/@-]+\.(?:test\.(?:ts|tsx|mts)|spec\.(?:ts|tsx))|scripts\/[A-Za-z0-9._/@-]+\.test\.mjs)(?=$|[\s`"'()\]+,;:])/g;
+  /(?:^|[\s`"'([+,;])((?:apps|packages|integration|eval)\/[A-Za-z0-9._/@-]+\.(?:test|spec)\.(?:ts|tsx|mts|mjs)|scripts\/[A-Za-z0-9._/@-]+\.test\.mjs)(?=$|[\s`"'()\]+,;:])/g;
 
 const stripOuter = (text) =>
   String(text ?? '')
