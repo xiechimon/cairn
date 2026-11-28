@@ -17,7 +17,11 @@ import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { readDeployStatus } from './deploy-status.js';
 import { teamOffersDesktop } from './machine-computer.js';
 import type { MachineDeps } from './machine-deps.js';
-import { ownComputerOffered, ownComputerTarget } from './own-computer.js';
+import {
+  ownComputerOffered,
+  ownComputerTarget,
+  ownComputerWorkspaceOffered,
+} from './own-computer.js';
 import { offeredPhoneNames } from './phone-computer.js';
 import { readServerVersionInfo } from './server-version.js';
 
@@ -121,6 +125,7 @@ export function resolveCoordinatorRemoteTools(
       ...(options.routerTools === undefined ? {} : { routerTools: options.routerTools }),
       desktopTools: desktop,
       ownComputer,
+      ownComputerWorkspace: threadRow !== null && ownComputerWorkspaceOffered(deps, threadRow.id),
       ...browserOffer,
       phoneComputer: phones,
       ...(options.includeSubagent === undefined

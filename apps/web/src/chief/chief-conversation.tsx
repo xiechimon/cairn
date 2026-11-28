@@ -48,6 +48,7 @@ import {
 } from '../components/ui/message-scroller.js';
 import { toastError } from '../components/ui/toaster.js';
 import { ThreadUnreadContext, type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
+import { WorkspaceFileConversationContext } from '../detail/workspace-file-link.js';
 import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
@@ -780,24 +781,26 @@ export function ChiefConversation({
                       }
                     >
                       <CardFailureContext.Provider value={cardFailure}>
-                        {lead}
-                        {day == null ? (
-                          <VirtualStream
-                            cacheKey={chief.threadId ?? ''}
-                            keys={streamLayout.keys}
-                            pinned={streamLayout.pinned}
-                            focusIndex={focusStreamIndex}
-                            renderRow={(n) => streamEntry(streamLayout, n)}
-                          />
-                        ) : (
-                          <>
-                            <div data-testid="chief-earlier" className="opacity-60">
-                              {renderRows(earlierLayout)}
-                            </div>
-                            {day.today}
-                            {renderRows(streamLayout)}
-                          </>
-                        )}
+                        <WorkspaceFileConversationContext.Provider value={chief.threadId ?? null}>
+                          {lead}
+                          {day == null ? (
+                            <VirtualStream
+                              cacheKey={chief.threadId ?? ''}
+                              keys={streamLayout.keys}
+                              pinned={streamLayout.pinned}
+                              focusIndex={focusStreamIndex}
+                              renderRow={(n) => streamEntry(streamLayout, n)}
+                            />
+                          ) : (
+                            <>
+                              <div data-testid="chief-earlier" className="opacity-60">
+                                {renderRows(earlierLayout)}
+                              </div>
+                              {day.today}
+                              {renderRows(streamLayout)}
+                            </>
+                          )}
+                        </WorkspaceFileConversationContext.Provider>
                       </CardFailureContext.Provider>
                     </ReplySourceHighlightContext.Provider>
                   </ThreadUnreadContext.Provider>

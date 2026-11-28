@@ -28,6 +28,10 @@
       "features": ["coordinator-chat", "run-log"],
       "modes": ["local-server", "remote-server"]
     },
+    "message-workspace-files": {
+      "features": ["message-workspace-files"],
+      "modes": ["local-server", "remote-server"]
+    },
     "cloud-account": {
       "features": ["cloud-account"],
       "modes": ["local-server", "remote-server"]

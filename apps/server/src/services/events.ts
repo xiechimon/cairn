@@ -9,6 +9,7 @@ import type {
   TodoRecord,
   TranscriptRow,
 } from '@cairn/shared';
+import { publicFileSourceRow } from './file-source.js';
 
 export interface TeamStreamConnection<Data = object> {
   nextSeq(): number;
@@ -255,10 +256,13 @@ export class ConversationStreamHub {
 
   publishMessage(
     conversationId: string,
-    message: TranscriptRow,
+    published: TranscriptRow,
     deliveredQueue?: ConversationMessageEvent['deliveredQueue'],
     clientMessageId?: string,
   ): void {
+    // Rows may arrive straight from the database; the private source never reaches a browser.
+    const message: TranscriptRow =
+      'fileSource' in published ? (publicFileSourceRow(published) as TranscriptRow) : published;
     if (endsLiveTextBuffer(message)) {
       this.textBuffers.delete(conversationId);
       this.lastActivity.delete(conversationId);

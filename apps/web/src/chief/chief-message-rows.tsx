@@ -766,6 +766,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       {markdown != null ? (
         <ChatMarkdown
           text={markdown}
+          fileMessageId={settled && item.workspaceFileLinks === true ? item.id : undefined}
+          filePaths={item.workspaceFilePaths}
           streaming={!settled}
           bubbles
           bubbleFooter={<BubbleReports todoIds={reports} />}

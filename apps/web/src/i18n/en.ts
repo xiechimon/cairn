@@ -3548,4 +3548,9 @@ export const EN: Record<string, string> = {
     'Queued: {machine} is not signed in to Doubao yet—scan the QR code to continue',
   '排队中：目标执行机尚未登录豆包，扫码后自动继续':
     'Queued: target computer is not signed in to Doubao yet—scan the QR code to continue',
+  '正在打开文件…': 'Opening file…',
+  这个文件已不在该步骤的工作区中: 'This file is no longer in the step’s workspace',
+  这台执行机已离线: 'The runner is offline',
+  这个文件无法预览: 'This file cannot be previewed',
+  暂时无法打开这个文件: 'This file is unavailable right now',
 };

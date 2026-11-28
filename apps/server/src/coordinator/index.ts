@@ -49,7 +49,7 @@ import {
   hydrateMissingConnectorTools,
   mcpConnectorDepsOf,
 } from '../services/mcp-servers.js';
-import { ownComputerOffered } from '../services/own-computer.js';
+import { ownComputerOffered, ownComputerWorkspaceOffered } from '../services/own-computer.js';
 import { offeredPhoneNames } from '../services/phone-computer.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
 import { markProviderModelTextOnly } from '../services/providers.js';
@@ -314,6 +314,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         return teamId === null ? [] : connectorToolDefsForTeam(db, teamId);
       },
       ownComputer: (threadId) => ownComputerOffered(db, threadId),
+      ownComputerWorkspace: (threadId) =>
+        ownComputerWorkspaceOffered({ db, machineHub: machine.machineHub }, threadId),
       browserOffer: (threadId) => {
         const threadRow = db
           .select({ teamId: chiefThread.teamId, userId: chiefThread.userId })

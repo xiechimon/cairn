@@ -38,6 +38,7 @@ import {
 import { getChiefThread } from './services/chief.js';
 import { ClientMessageConflict, findClientMessage } from './services/client-message.js';
 import { createSerialConnection } from './services/events.js';
+import { workspaceFileLinksOf } from './services/file-source.js';
 import { readBuildChangeFile, readBuildChanges } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
 import { latestAgentTodo, newestMessagePage } from './services/message-page.js';
@@ -110,6 +111,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
           projectId: r.projectId,
           origin: r.origin,
           ...(r.clientMessageId != null ? { clientMessageId: r.clientMessageId } : {}),
+          ...workspaceFileLinksOf(r.fileSource, r.content, r.role),
         })),
         chips: [],
         historyEpoch: 0,
@@ -128,6 +130,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
         actor: r.actor,
         origin: r.origin,
         ...(r.clientMessageId != null ? { clientMessageId: r.clientMessageId } : {}),
+        ...workspaceFileLinksOf(r.fileSource, r.content, r.role),
       })),
       chips: [],
       historyEpoch: 0,

@@ -415,7 +415,7 @@ Reach:
 
 - Web routes: `/app/todo/:id`
 - Keyboard shortcuts in its code: `A`
-- Test ids in its code: `agent-text`, `agent-todo`, `artifact-diagram`, `artifact-diagram-notice`, `automation-completed`, `bg-task`, `bg-task-detail`, `bg-task-running-dot`, `bg-task-stop`, `bg-tasks`, `chat-artifact-card`, `chat-artifact-image`, `chat-artifact-meta`, `chat-artifact-video`, `chat-artifact-video-open`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `info-report`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-mermaid`, `md-mermaid-diagram`, `md-mermaid-notice`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-task-note`, `md-tasks`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `task-mention`, `task-mention-tip`, `thinking-body`, `tool-output`, `transcript-automatic-retry`, `transcript-col`, `transcript-fail`, `transcript-note`, `transcript-question`, `transcript-quota-wait`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `user-msg-sending`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-say-line`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`
+- Test ids in its code: `agent-text`, `agent-todo`, `artifact-diagram`, `artifact-diagram-notice`, `automation-completed`, `bg-task`, `bg-task-detail`, `bg-task-running-dot`, `bg-task-stop`, `bg-tasks`, `chat-artifact-card`, `chat-artifact-image`, `chat-artifact-meta`, `chat-artifact-video`, `chat-artifact-video-open`, `chief-reply-bubble`, `composer-card`, `composer-placeholder`, `composer-plus`, `composer-toolbar`, `diff-fold`, `diff-full`, `doc-body`, `doc-pane`, `edit-error`, `info-report`, `live-row`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-mermaid`, `md-mermaid-diagram`, `md-mermaid-notice`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-task-note`, `md-tasks`, `message-file-link`, `schedule-wake-marker`, `scheduled-turn`, `side-chat-action`, `skills-summary`, `source-issue-drift`, `source-issue-echo`, `source-issue-pending`, `source-issue-retry`, `source-orchestration`, `source-orchestration-link`, `step-prompt-raw`, `task-mention`, `task-mention-tip`, `thinking-body`, `tool-output`, `transcript-automatic-retry`, `transcript-col`, `transcript-fail`, `transcript-note`, `transcript-question`, `transcript-quota-wait`, `transcript-step-prompt`, `transcript-time-divider`, `user-bubble`, `user-msg-sending`, `verify-evidence`, `work-block`, `work-call`, `work-cancelled`, `work-earlier`, `work-say-line`, `work-spinner`, `work-summary`, `work-think`, `work-unfinished`, `workspace-file-body`, `workspace-file-notice`, `workspace-file-text`
 - Verify recipes: [.claude/skills/verify-cairn/features/board-new-task.md](features/board-new-task.md), [.claude/skills/verify-cairn/features/agent-detail.md](features/agent-detail.md)
 - Research: [docs/research/r12-save-and-start-behavior.md](../../../docs/research/r12-save-and-start-behavior.md), [docs/research/r14-orchestration-parent-card.md](../../../docs/research/r14-orchestration-parent-card.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [docs/design/references/thread-review](../../../docs/design/references/thread-review), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
@@ -512,6 +512,25 @@ Reach:
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings), [docs/design/settings-trim.md](../../../docs/design/settings-trim.md), [docs/design/runner-token-rotation.md](../../../docs/design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
 - Backend design: [docs/design/settings-trim.md](../../../docs/design/settings-trim.md), [docs/design/runner-token-rotation.md](../../../docs/design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
 - Evidence: `apps/web/e2e/machine-detail.spec.ts`, `apps/web/e2e/machines-local.spec.ts`, `apps/web/e2e/machine-rotate-token.spec.ts`, `apps/server/test/machine-revoke.test.ts`, `apps/server/test/machine-rotate-token.test.ts`, `apps/daemon/test/machine-rotate-token.test.ts`
+
+### message-workspace-files
+
+**File names in replies** (shipped, centrality 2). Open a filename in a task or Coordinator reply to read it from that step's workspace on the original Runner, without asking the agent to attach it.
+
+States: Opening, current text, missing file or workspace, Runner offline, and unsupported or unavailable preview. Older replies without a known workspace remain plain text.
+
+Reach:
+
+1. `open /app`
+2. `click testid:message-file-link`
+
+- Web routes: `/app`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `chief-reply-bubble`, `md-checkbox`, `md-code`, `md-code-block`, `md-code-copy`, `md-code-dialog-body`, `md-code-dialog-copy`, `md-code-done`, `md-code-expand`, `md-code-lang`, `md-item-bullet`, `md-item-ordered`, `md-item-task`, `md-list-bullet`, `md-list-ordered`, `md-list-task`, `md-quote`, `md-table`, `md-task`, `md-task-children`, `md-task-note`, `md-tasks`
+- Research: [docs/research/task-file-links-2026-11-28.md](../../../docs/research/task-file-links-2026-11-28.md)
+- Frontend design: [docs/design/task-file-links.md](../../../docs/design/task-file-links.md)
+- Backend design: [docs/design/task-file-links.md](../../../docs/design/task-file-links.md)
+- Evidence: `apps/web/e2e/message-file-open.spec.ts`, `apps/server/test/message-file-open.test.ts`, `apps/daemon/test/workspace-file-read.test.ts`
 
 ### mobile-web
 

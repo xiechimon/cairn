@@ -13,6 +13,7 @@ import { runAfterCommit } from '../db/commit-effects.js';
 import {
   chiefMessage,
   chiefThread,
+  type MessageFileSource,
   message,
   type StepFallbackRow,
   step,
@@ -56,6 +57,8 @@ export function emitTurnRow(
   opts?: {
     origin?: TranscriptUserOrigin | null;
     flushChiefShield?: boolean;
+    /** Server-stamped provenance; omitted or null clears any stamp a rewritten row carried. */
+    fileSource?: MessageFileSource | null;
   },
 ): void {
   if (isChiefConversation(stepRow.buildId)) {
@@ -71,6 +74,7 @@ export function emitTurnRow(
       createdAt: row.createdAt,
       projectId: stepScopeProjectId(stepRow),
       ...(opts?.origin !== undefined ? { origin: opts.origin } : {}),
+      ...(opts?.fileSource !== undefined ? { fileSource: opts.fileSource } : {}),
     });
     return;
   }
@@ -81,6 +85,7 @@ export function emitTurnRow(
     content: row.content,
     createdAt: row.createdAt,
     ...(opts?.origin !== undefined ? { origin: opts.origin } : {}),
+    ...(opts?.fileSource !== undefined ? { fileSource: opts.fileSource } : {}),
   });
 }
 

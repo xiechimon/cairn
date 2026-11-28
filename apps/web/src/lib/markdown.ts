@@ -1,4 +1,4 @@
-import { type AgentTodoItem, ATTACHMENT_KEY_SOURCE } from '@cairn/shared';
+import { type AgentTodoItem, ATTACHMENT_KEY_SOURCE, workspaceFilePathSchema } from '@cairn/shared';
 import { Lexer, Marked, type Token, type Tokens } from 'marked';
 import markedCjkFriendly from 'marked-cjk-friendly';
 import type { DocSegment } from '../fixtures/records.js';
@@ -198,6 +198,12 @@ function linkSegment(target: string, label: string, raw: string, flags: Flags): 
       { text: label !== '' ? label : target, style: 'anchor', href: target, internal: true },
       flags,
     );
+  const fileTarget = workspaceFilePathSchema.safeParse(target);
+  if (fileTarget.success)
+    return {
+      ...textSegment(raw, flags),
+      workspaceFile: { path: fileTarget.data, label: label !== '' ? label : target },
+    };
   return textSegment(raw, flags);
 }
 
@@ -250,7 +256,9 @@ function mergeText(segments: DocSegment[]): DocSegment[] {
   for (const seg of segments) {
     const last = out.at(-1);
     const plainRun = (s: DocSegment) =>
-      (s.style === undefined || s.style === 'strong') && s.href === undefined;
+      (s.style === undefined || s.style === 'strong') &&
+      s.href === undefined &&
+      s.workspaceFile === undefined;
     if (
       last !== undefined &&
       plainRun(last) &&

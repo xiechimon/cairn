@@ -80,6 +80,27 @@
   ],
   "features": [
     {
+      "id": "message-workspace-files",
+      "name": "File names in replies",
+      "summary": "Open a filename in a task or Coordinator reply to read it from that step's workspace on the original Runner, without asking the agent to attach it.",
+      "states": "Opening, current text, missing file or workspace, Runner offline, and unsupported or unavailable preview. Older replies without a known workspace remain plain text.",
+      "centrality": 2,
+      "status": "shipped",
+      "code": {
+        "web": ["apps/web/src/detail/chat-markdown.tsx"],
+        "server": ["apps/server/src/routes-message-files.ts", "apps/server/src/services/workspace-file-read.ts"]
+      },
+      "routes": {
+        "web": ["/app"],
+        "server": ["/api/conversations/:id/messages/:messageId/file"]
+      },
+      "reach": ["open /app", "click testid:message-file-link"],
+      "research": ["docs/research/task-file-links-2026-11-28.md"],
+      "frontendDesign": ["docs/design/task-file-links.md"],
+      "backendDesign": ["docs/design/task-file-links.md"],
+      "evidence": ["apps/web/e2e/message-file-open.spec.ts", "apps/server/test/message-file-open.test.ts", "apps/daemon/test/workspace-file-read.test.ts"]
+    },
+    {
       "id": "coordinator-chat",
       "name": "Coordinator chat",
       "summary": "The one never-ending Coordinator conversation on the home page, where the user dispatches work and reads reports.",

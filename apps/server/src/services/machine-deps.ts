@@ -8,13 +8,22 @@ import {
   type ScheduleEffect,
   withCommitEffects,
 } from '../db/commit-effects.js';
-import { build, chiefThread, message, type StepStallMeta, step, todo } from '../db/schema.js';
+import {
+  build,
+  chiefThread,
+  type MessageFileSource,
+  message,
+  type StepStallMeta,
+  step,
+  todo,
+} from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import type { KeySecretBox } from '../lib/secret-box.js';
 import { NotFoundError } from './builds.js';
 import { upsertChiefMessage } from './chief.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { publicFileSourceRow, resolveFileSource } from './file-source.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { SendMail } from './mail-smtp.js';
 import type { McpOAuthState } from './mcp-servers.js';
@@ -154,11 +163,21 @@ type MessageRowInput = {
 
 export function upsertMessage(
   deps: { db: Db; convHub?: ConversationStreamHub },
-  row: MessageRowInput & { conversationId: string; origin?: TranscriptUserOrigin | null },
+  row: MessageRowInput & {
+    conversationId: string;
+    origin?: TranscriptUserOrigin | null;
+    fileSource?: MessageFileSource | null;
+  },
 ): void {
+  const existing = deps.db
+    .select({ fileSource: message.fileSource })
+    .from(message)
+    .where(eq(message.id, row.id))
+    .get();
+  const fileSource = resolveFileSource(existing?.fileSource, row.fileSource);
   deps.db
     .insert(message)
-    .values(row)
+    .values({ ...row, fileSource })
     .onConflictDoUpdate({
       target: message.id,
       set: {
@@ -167,10 +186,19 @@ export function upsertMessage(
         createdAt: row.createdAt,
         actor: null,
         origin: sql`coalesce(excluded.origin, ${message.origin})`,
+        fileSource,
       },
     })
     .run();
-  deps.convHub?.publishMessage(row.conversationId, row);
+  const persisted = deps.db
+    .select({ fileSource: message.fileSource })
+    .from(message)
+    .where(eq(message.id, row.id))
+    .get();
+  deps.convHub?.publishMessage(
+    row.conversationId,
+    publicFileSourceRow({ ...row, fileSource: persisted?.fileSource ?? null }),
+  );
 }
 
 export function upsertChiefRow(
@@ -179,10 +207,11 @@ export function upsertChiefRow(
     threadId: string;
     projectId?: string | null;
     origin?: TranscriptUserOrigin | null;
+    fileSource?: MessageFileSource | null;
   },
 ): void {
   const stored = upsertChiefMessage(deps.db, row);
-  deps.convHub?.publishMessage(row.threadId, stored);
+  deps.convHub?.publishMessage(row.threadId, publicFileSourceRow(stored));
 }
 
 const PROGRESS_WRITE_INTERVAL_MS = 30_000;

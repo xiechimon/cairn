@@ -19,3 +19,4 @@ export * from './secret-request.js';
 export * from './sse.js';
 export * from './subagent.js';
 export * from './tool-parameters.js';
+export * from './workspace-file.js';

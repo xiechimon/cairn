@@ -1,6 +1,7 @@
 import { matchesInOrderWithinSegment, replaceDelimitedSpans } from '../linear-text.js';
 import type { RemoteToolDef } from './chief-tools.js';
 import { toolObjectSchema as obj, toolStringSchema as str } from './tool-parameters.js';
+import { WORKSPACE_FILE_CWD } from './workspace-file.js';
 
 export const OWN_COMPUTER_TOOL_NAMES = [
   'user_computer_shell',
@@ -443,6 +444,39 @@ export const OWN_COMPUTER_TOOLS: readonly RemoteToolDef[] = [
     ),
   },
 ];
+
+const OWN_COMPUTER_WORKSPACE_CWD_NOTE = ` Pass ${WORKSPACE_FILE_CWD} as cwd to run in this step's own managed workspace folder (every call of the step with that value shares it); do that when you create a file that you name in your reply so the user can open it.`;
+
+/**
+ * The own-computer tools. `workspaceCwd` advertises the `:step-workspace` cwd and must be set only
+ * when the exact host runner that will run the call supports it; an older runner keeps the plain
+ * working-folder wording and never sees the sentinel.
+ */
+export function ownComputerTools(
+  options: { workspaceCwd?: boolean } = {},
+): readonly RemoteToolDef[] {
+  if (options.workspaceCwd !== true) return OWN_COMPUTER_TOOLS;
+  return OWN_COMPUTER_TOOLS.map((def) => {
+    if (def.name !== 'user_computer_shell') return def;
+    const parameters = def.parameters as {
+      properties: Record<string, { description?: string }>;
+    };
+    const properties = parameters.properties;
+    return {
+      ...def,
+      parameters: {
+        ...parameters,
+        properties: {
+          ...properties,
+          cwd: {
+            ...properties.cwd,
+            description: `${properties.cwd?.description ?? ''}${OWN_COMPUTER_WORKSPACE_CWD_NOTE}`,
+          },
+        },
+      },
+    };
+  });
+}
 
 export const COORDINATOR_ATTACH_FILE_TOOL: RemoteToolDef = {
   name: 'attach_file',

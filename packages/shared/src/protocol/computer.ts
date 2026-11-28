@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { epochMs, recordId } from '../records/common.js';
+import { workspaceFileInstanceSchema } from './workspace-file.js';
 
 export const COMPUTER_TOOLS = [
   'shell',
@@ -134,6 +135,7 @@ export const computerFrameSchema = z.discriminatedUnion('kind', [
     images: z.array(computerImageSchema).max(COMPUTER_IMAGES_MAX).optional(),
     exitCode: z.number().int().nullable().optional(),
     loginForm: loginFormSchema.optional(),
+    workspace: workspaceFileInstanceSchema.optional(),
     sandboxDenied: z
       .strictObject({
         reason: z.string().min(1).max(500),

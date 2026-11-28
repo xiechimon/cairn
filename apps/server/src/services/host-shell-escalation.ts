@@ -25,6 +25,7 @@ import {
   storedComputerParams,
 } from './computer-call-store.js';
 import { isOwnerDecider } from './instance-owner.js';
+import { workspaceCwdRefusal } from './own-computer.js';
 
 export const HOST_SHELL_ESCALATION_ACTION = 'host.shell.escalate';
 export const HOST_SHELL_ESCALATION_TOOL_CALL_ID = 'host-shell-escalate';
@@ -296,6 +297,8 @@ export function pollOrStartApprovedHostShellEscalation(
     ...(binding.cwd !== undefined ? { cwd: binding.cwd } : {}),
     ...(binding.timeoutMs !== undefined ? { timeoutMs: binding.timeoutMs } : {}),
   };
+  const unsupported = workspaceCwdRefusal(deps.db, binding.machineId, callParams);
+  if (unsupported !== null) return { state: 'ready', resultText: unsupported };
   const deadlineAt = now + computerDeadlineMs('user_computer_shell', callParams);
 
   const inserted = deps.db

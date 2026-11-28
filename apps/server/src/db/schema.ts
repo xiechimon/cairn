@@ -91,6 +91,18 @@ const epochMs = (name: string) => integer(name);
 const bool = (name: string) => integer(name, { mode: 'boolean' });
 const json = <T>(name: string) => text(name, { mode: 'json' }).$type<T>();
 
+/**
+ * Server-stamped provenance of an assistant row: the step that produced it, the runner that holds
+ * its workspace and that runner's opaque workspace instance token. Private; never projected to the
+ * browser. A row without `workspace` or `machineId` grants no file access.
+ */
+export interface MessageFileSource {
+  stepId: string;
+  machineId: string | null;
+  generation: number | null;
+  workspace?: string;
+}
+
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),
   displayName: text('displayName').notNull(),
@@ -406,6 +418,7 @@ export const message = sqliteTable(
     typedAt: epochMs('typedAt'),
     sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
     clientMessageId: text('clientMessageId'),
+    fileSource: json<MessageFileSource | null>('fileSource'),
   },
   (t) => [
     index('message_createdAt_idx').on(t.createdAt),
@@ -519,6 +532,7 @@ export const computerCall = sqliteTable(
     exitCode: integer('exitCode'),
     errorMessage: text('errorMessage'),
     errorDelivery: text('errorDelivery').$type<'not_delivered' | 'unknown'>(),
+    workspace: text('workspace'),
     deadlineAt: epochMs('deadlineAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),
     startedAt: epochMs('startedAt'),
@@ -1340,6 +1354,7 @@ export const chiefMessage = sqliteTable(
     typedAt: epochMs('typedAt'),
     sentByAgent: integer('sentByAgent', { mode: 'boolean' }),
     clientMessageId: text('clientMessageId'),
+    fileSource: json<MessageFileSource | null>('fileSource'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [

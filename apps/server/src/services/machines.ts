@@ -69,6 +69,7 @@ import { NotFoundError } from './builds.js';
 import { ackChiefSteer, chiefSteerSentBatch, takeChiefSteer } from './chief-turns.js';
 import { availableRuntimes } from './dispatch-eligibility.js';
 import type { ConversationStreamHub } from './events.js';
+import { turnFileSource } from './file-source.js';
 import { applyComputerPresence } from './machine-computer-presence.js';
 import {
   isChiefConversation,
@@ -1392,6 +1393,7 @@ export function storeTranscriptRow(
   owned: ReturnType<typeof ownedStepRow>,
   stepId: string,
   row: TranscriptRow,
+  proof?: { workspace?: string | undefined; generation?: number | undefined },
 ): void {
   markProgress(deps, owned);
   const origin =
@@ -1405,7 +1407,11 @@ export function storeTranscriptRow(
       content: row.content,
       createdAt: row.createdAt,
     },
-    { origin, flushChiefShield: true },
+    {
+      origin,
+      flushChiefShield: true,
+      fileSource: turnFileSource(deps.db, owned, row.role, proof),
+    },
   );
 }
 
@@ -1414,8 +1420,9 @@ export function reportTranscriptRow(
   machineId: string | null,
   stepId: string,
   row: TranscriptRow,
+  proof?: { workspace?: string | undefined; generation?: number | undefined },
 ): void {
-  storeTranscriptRow(deps, ownedStep(deps, machineId, stepId), stepId, row);
+  storeTranscriptRow(deps, ownedStep(deps, machineId, stepId), stepId, row, proof);
 }
 
 export function reportActivity(

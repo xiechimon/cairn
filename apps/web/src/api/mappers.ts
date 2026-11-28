@@ -259,6 +259,19 @@ export interface MessageRow {
   origin?: TranscriptUserOrigin | null;
   projectId?: string | null;
   clientMessageId?: string | null;
+  workspaceFileLinks?: true;
+  workspaceFilePaths?: string[];
+}
+
+function fileLinks(row: MessageRow): { workspaceFileLinks?: true; workspaceFilePaths?: string[] } {
+  return row.role === 'assistant' && row.workspaceFileLinks === true
+    ? {
+        workspaceFileLinks: true,
+        ...(row.workspaceFilePaths === undefined
+          ? {}
+          : { workspaceFilePaths: row.workspaceFilePaths }),
+      }
+    : {};
 }
 
 function rowProject(row: MessageRow): { projectId?: string | null } {
@@ -908,7 +921,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       if (markdown.trim() !== '') {
         entries.push({
           at: m.createdAt,
-          item: { kind: 'robot', markdown, id: m.id, createdAt: m.createdAt },
+          item: { kind: 'robot', markdown, id: m.id, createdAt: m.createdAt, ...fileLinks(m) },
         });
       }
       continue;
@@ -982,7 +995,19 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
           (lastWorkAt(items) ?? Number.NEGATIVE_INFINITY) >= running.createdAt))
     ) {
       const id = entry.item.id ?? `say-${entry.at}`;
-      const say: WorkStep = { kind: 'say', id, text: entry.item.markdown };
+      const say: WorkStep = {
+        kind: 'say',
+        id,
+        text: entry.item.markdown,
+        ...(entry.item.id !== undefined && entry.item.workspaceFileLinks === true
+          ? {
+              workspaceFileLinks: true as const,
+              ...(entry.item.workspaceFilePaths === undefined
+                ? {}
+                : { workspaceFilePaths: entry.item.workspaceFilePaths }),
+            }
+          : {}),
+      };
       const previous = items.at(-1);
       if (previous?.kind === 'work') {
         previous.steps.push(say);
@@ -2462,6 +2487,7 @@ function collectChiefStream(
       seconds: '',
       id: m.id,
       createdAt: m.createdAt,
+      ...fileLinks(m),
       ...(pendingTools.length > 0 ? { tools: pendingTools.map(settleToolRow) } : {}),
       ...(fallback !== null ? { fallbackModel: fallback.model } : {}),
       ...rowProject(m),

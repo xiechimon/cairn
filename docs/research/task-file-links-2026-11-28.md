@@ -1,0 +1,13 @@
+# Task file links: prior art (2026-11-28)
+
+A user reading a task reply needs to open the named file without seeing the machine's absolute path. The task may have run on a different machine, and historical workspaces can disappear. The existing Cairn artifact panel opens stored attachments; it does not open a runner path.
+
+| Source | Approach | Implication |
+|---|---|---|
+| [VS Code Remote Development](https://code.visualstudio.com/docs/remote/remote-overview.md) | Verified: a server on the remote OS runs commands and extensions where the files live; source need not exist on the client. | Derived: the runner, not the browser or server, must resolve its own workspace files. |
+| [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html) | Verified: deny by default, validate permissions on every request, and protect object lookups against tampered identifiers. | Derived: bind each request to an authorized task, the actual producing step and its machine; do not trust a browser-supplied runner or path as authority. |
+| [OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal) | Verified: absolute paths, traversal and encoded variants can escape intended directories; use known-good inputs and constrain the root. | Derived: the runner must enforce the actual workspace boundary, including symlinks and races, not just strip path prefixes. |
+| [Node.js file-system API](https://nodejs.org/api/fs.html) | Verified: `realpath` resolves filesystem paths; filesystem calls expose symlinks and file descriptors. | Derived: path resolution alone is not a complete authorization or race defense. |
+| Cairn [`prepareFileAttachment`](../../apps/daemon/src/attach-file.ts) and [`ArtifactAttachment`](../../apps/web/src/detail/artifact-attachment.tsx) | Verified: the runner's attachment preparation checks the resolved worktree and opened file; the panel opens an attachment key, not a local path. | Derived: reuse the guarded reader and existing viewer where their lifecycle and authorization contracts actually fit; do not infer a match by basename. |
+
+The preferred direction is a runner-scoped, task-authorized operation with a provable message-to-producing-step relationship and bounded reads, using Cairn's existing artifact viewer. This is a design constraint, not proof that historical messages can be associated: the current message schema does not record the producing step. Unknown or ambiguous provenance must fail closed rather than selecting the current runner. Offline, removed workspaces, unsupported files and mixed-version runners need explicit outcomes. Reusing a stored attachment is safe only when the exact source association is known; filename equality is insufficient.

@@ -41,6 +41,7 @@ import { DiffFileBody } from '../detail/docpane.js';
 import { taskStatusInk } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
+import { WorkspaceFileConversationContext } from '../detail/workspace-file-link.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { baseName, dirName } from '../lib/path-name.js';
@@ -617,69 +618,71 @@ function ThreadBody({
         <EngineRawView key={todo.id} run={engine.run} />
       ) : (
         <ReportThreadContext.Provider value={reportThread}>
-          <TranscriptColumn
-            transcript={[
-              ...chat.transcript,
-              ...(engine === undefined || engine.eventsInTranscript === true
-                ? []
-                : engineTranscript(engine.run)),
-            ]}
-            blockedActions={(kind, waitingFor) =>
-              kind === 'doubao-login-required' && waitingFor !== undefined ? (
-                <DoubaoQrLoginCard
-                  teamId={teamId}
-                  machineId={waitingFor.machineId}
-                  machineName={waitingFor.name}
-                  autoStart
-                  canManage={canManageDoubao}
+          <WorkspaceFileConversationContext.Provider value={chat.buildId}>
+            <TranscriptColumn
+              transcript={[
+                ...chat.transcript,
+                ...(engine === undefined || engine.eventsInTranscript === true
+                  ? []
+                  : engineTranscript(engine.run)),
+              ]}
+              blockedActions={(kind, waitingFor) =>
+                kind === 'doubao-login-required' && waitingFor !== undefined ? (
+                  <DoubaoQrLoginCard
+                    teamId={teamId}
+                    machineId={waitingFor.machineId}
+                    machineName={waitingFor.name}
+                    autoStart
+                    canManage={canManageDoubao}
+                  />
+                ) : (
+                  <CoordinatorFixLinks kind={kind} />
+                )
+              }
+              lead={
+                <ThreadLead
+                  todo={todo}
+                  showSpec={!chat.hasEarlier}
+                  origin={origin}
+                  onJumpToOrigin={onJumpToOrigin}
                 />
-              ) : (
-                <CoordinatorFixLinks kind={kind} />
-              )
-            }
-            lead={
-              <ThreadLead
-                todo={todo}
-                showSpec={!chat.hasEarlier}
-                origin={origin}
-                onJumpToOrigin={onJumpToOrigin}
-              />
-            }
-            result={
-              engine !== undefined ||
-              pr != null ||
-              chat.changes.status === 'ready' ||
-              chat.changes.status === 'error' ? (
-                <>
-                  {pr}
-                  {engine?.controls}
-                  {engine !== undefined && (
-                    <div data-testid="engine-run" data-state={engine.run.state}>
-                      <EngineQuestion run={engine.run} actions={engine.actions} />
-                    </div>
-                  )}
-                  {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
-                    <ChangesCard
-                      key={todo.id}
-                      changes={chat.changes}
-                      buildId={chat.buildId}
-                      open={changesOpen}
-                      onOpenChange={onChangesOpen}
-                      onRetry={chat.retryChanges}
-                      undoSubmitting={chat.undoSubmitting === true}
-                      {...(chat.undoChanges !== undefined ? { onUndo: chat.undoChanges } : {})}
-                    />
-                  )}
-                </>
-              ) : undefined
-            }
-            hasEarlier={chat.hasEarlier}
-            {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
-            autoScroll={chat.transcript.length > 0}
-            running={threadStatus(todo) === 'running'}
-            settled={chat.transcriptSettled}
-            threadKey={todo.id}
-          />
+              }
+              result={
+                engine !== undefined ||
+                pr != null ||
+                chat.changes.status === 'ready' ||
+                chat.changes.status === 'error' ? (
+                  <>
+                    {pr}
+                    {engine?.controls}
+                    {engine !== undefined && (
+                      <div data-testid="engine-run" data-state={engine.run.state}>
+                        <EngineQuestion run={engine.run} actions={engine.actions} />
+                      </div>
+                    )}
+                    {(chat.changes.status === 'ready' || chat.changes.status === 'error') && (
+                      <ChangesCard
+                        key={todo.id}
+                        changes={chat.changes}
+                        buildId={chat.buildId}
+                        open={changesOpen}
+                        onOpenChange={onChangesOpen}
+                        onRetry={chat.retryChanges}
+                        undoSubmitting={chat.undoSubmitting === true}
+                        {...(chat.undoChanges !== undefined ? { onUndo: chat.undoChanges } : {})}
+                      />
+                    )}
+                  </>
+                ) : undefined
+              }
+              hasEarlier={chat.hasEarlier}
+              {...(chat.earlier !== undefined ? { earlier: chat.earlier } : {})}
+              autoScroll={chat.transcript.length > 0}
+              running={threadStatus(todo) === 'running'}
+              settled={chat.transcriptSettled}
+              threadKey={todo.id}
+            />
+          </WorkspaceFileConversationContext.Provider>
         </ReportThreadContext.Provider>
       )}
       <UnsentSendNotice chat={chat} showText={!takesText} />

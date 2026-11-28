@@ -249,6 +249,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/builds/{id}' },
   { method: 'GET', path: '/api/builds/{id}/steps' },
   { method: 'GET', path: '/api/conversations/{id}/messages', note: 'chief 会话同族（r5 §3.6）' },
+  {
+    method: 'POST',
+    path: '/api/conversations/{id}/messages/{messageId}/file',
+    note: 'Read a file named in a reply from the producing workspace (docs/design/task-file-links.md)',
+  },
   { method: 'GET', path: '/api/conversations/{id}/stream', note: 'SSE，见 protocol/sse.ts' },
   {
     method: 'PUT',

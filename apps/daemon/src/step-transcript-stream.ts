@@ -15,6 +15,7 @@ export interface StepTranscriptStreamOptions {
   now: () => number;
   log: (line: string) => void;
   leadingFirstDelta?: boolean;
+  workspace?: string | null;
 }
 
 export class StepTranscriptStream {
@@ -71,7 +72,7 @@ export class StepTranscriptStream {
   }
 
   private async emitSegment(seg: SealedSegment): Promise<void> {
-    const { client, stepId, transcript, agentTodo, log } = this.options;
+    const { client, stepId, transcript, agentTodo, log, workspace } = this.options;
     await this.thinkingDeltas.flushNow();
     await this.textDeltas.flushNow();
     const row = {
@@ -82,7 +83,11 @@ export class StepTranscriptStream {
     };
     transcript.upsert(row);
     try {
-      await client.transcriptRow?.(stepId, row);
+      if (seg.kind === 'text' && typeof workspace === 'string') {
+        await client.transcriptRow?.(stepId, row, workspace);
+      } else {
+        await client.transcriptRow?.(stepId, row);
+      }
     } catch (err: unknown) {
       log(`segment row relay failed: ${errorMessage(err)}`);
     }

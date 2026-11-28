@@ -3572,6 +3572,38 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     {
       "additionalProperties": false,
       "properties": {
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string",
+        },
+        "requestId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "type": {
+          "const": "workspace.file.read",
+          "type": "string",
+        },
+        "workspace": {
+          "maxLength": 8192,
+          "minLength": 32,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "requestId",
+        "path",
+        "workspace",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
         "checkId": {
           "maxLength": 64,
           "minLength": 1,
@@ -4673,6 +4705,18 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               ],
               "type": "string",
             },
+            "workspaceFileLinks": {
+              "const": true,
+              "type": "boolean",
+            },
+            "workspaceFilePaths": {
+              "items": {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
+            },
           },
           "required": [
             "role",
@@ -4681,6 +4725,12 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "createdAt",
           ],
           "type": "object",
+        },
+        "workspace": {
+          "maxLength": 8192,
+          "minLength": 32,
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string",
         },
       },
       "required": [
@@ -5947,6 +5997,18 @@ exports[`body/envelope schema snapshots > conversationMessagesResponse > convers
             ],
             "type": "string",
           },
+          "workspaceFileLinks": {
+            "const": true,
+            "type": "boolean",
+          },
+          "workspaceFilePaths": {
+            "items": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string",
+            },
+            "type": "array",
+          },
         },
         "required": [
           "role",
@@ -6109,6 +6171,18 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                 "assistant",
               ],
               "type": "string",
+            },
+            "workspaceFileLinks": {
+              "const": true,
+              "type": "boolean",
+            },
+            "workspaceFilePaths": {
+              "items": {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
             },
           },
           "required": [
@@ -10461,6 +10535,18 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                           ],
                           "type": "string",
                         },
+                        "workspaceFileLinks": {
+                          "const": true,
+                          "type": "boolean",
+                        },
+                        "workspaceFilePaths": {
+                          "items": {
+                            "maxLength": 1024,
+                            "minLength": 1,
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
                       },
                       "required": [
                         "role",
@@ -12543,6 +12629,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/conversations/{id}/messages",
   },
   {
+    "method": "POST",
+    "note": "Read a file named in a reply from the producing workspace (docs/design/task-file-links.md)",
+    "path": "/api/conversations/{id}/messages/{messageId}/file",
+  },
+  {
     "method": "GET",
     "note": "SSE，见 protocol/sse.ts",
     "path": "/api/conversations/{id}/stream",
@@ -14488,6 +14579,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "type": "array",
             },
             "stealthBrowser": {
+              "const": true,
+              "type": "boolean",
+            },
+            "workspaceFileRead": {
               "const": true,
               "type": "boolean",
             },

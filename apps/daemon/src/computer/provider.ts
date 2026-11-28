@@ -10,6 +10,7 @@ export interface ComputerExecuteRequest {
   timeoutMs: number;
   signal: AbortSignal;
   unsandboxed?: boolean;
+  managedCwd?: true;
 }
 
 export interface ComputerFileEntry {

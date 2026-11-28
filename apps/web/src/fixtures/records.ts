@@ -381,6 +381,7 @@ export interface DocSegment {
   del?: boolean;
   mentionKind?: 'todo' | 'skill' | 'agent' | 'project' | 'machine';
   mentionId?: string;
+  workspaceFile?: { path: string; label: string };
 }
 
 export interface DocBlock {
@@ -396,7 +397,13 @@ export interface FailFacts {
 
 export type WorkStep =
   | { kind: 'think'; id: string; text: string; seconds: number | null; running?: boolean }
-  | { kind: 'say'; id: string; text: string }
+  | {
+      kind: 'say';
+      id: string;
+      text: string;
+      workspaceFileLinks?: true;
+      workspaceFilePaths?: string[];
+    }
   | {
       kind: 'call';
       id: string;
@@ -451,6 +458,8 @@ export type TranscriptItem =
       footer?: RobotFooter;
       id?: string;
       createdAt?: number;
+      workspaceFileLinks?: true;
+      workspaceFilePaths?: string[];
     }
   | {
       kind: 'streaming';
@@ -700,6 +709,8 @@ export type ChiefStreamItem =
       tools?: ChiefToolRow[];
       id?: string;
       createdAt?: number;
+      workspaceFileLinks?: true;
+      workspaceFilePaths?: string[];
       fallbackModel?: string;
       projectId?: string | null;
       report?: { todoId: string; buildId: string };

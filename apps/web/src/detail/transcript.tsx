@@ -349,7 +349,11 @@ function Row({
           >
             <div className={AGENT_TEXT_CLS} data-testid="agent-text">
               {item.markdown != null ? (
-                <ChatMarkdown text={item.markdown} />
+                <ChatMarkdown
+                  text={item.markdown}
+                  fileMessageId={item.workspaceFileLinks === true ? item.id : undefined}
+                  filePaths={item.workspaceFilePaths}
+                />
               ) : (
                 (item.paragraphs ?? []).map((raw, i) => (
                   <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />

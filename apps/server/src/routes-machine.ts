@@ -40,6 +40,7 @@ import {
   machineTranscriptDeltaBodySchema,
   machineTranscriptRowBodySchema,
   machineUploadUrlsBodySchema,
+  machineWorkspaceFileReplySchema,
   normalizeEnrollCode,
   PLAN_FILE_NAME,
   parseReportedCapabilities,
@@ -138,6 +139,7 @@ import {
 import { phoneRowsForPresence } from './services/phone-computer.js';
 import { resumeRuntimeHeldBuilds } from './services/runtime-holds.js';
 import { readServerVersionInfo } from './services/server-version.js';
+import { acceptWorkspaceFile } from './services/workspace-file-read.js';
 
 function resolvePresenceTargetVersion(
   latestRelease: string | null,
@@ -752,6 +754,21 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
+  app.post('/api/machine/workspace-file/:requestId', async (c) => {
+    const requestId = c.req.param('requestId');
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      (row, decoded) => {
+        const body = parseWith(machineWorkspaceFileReplySchema, decoded, 'body');
+        if (!acceptWorkspaceFile(ctx.machineHub, row.id, requestId, body)) {
+          throw new HttpError(404, 'Workspace file request not found');
+        }
+        return c.json({ ok: true as const });
+      },
+    );
+  });
+
   app.post('/api/machine/antigravity/verify', async (c) => {
     return executeMachineCommand(
       c,
@@ -864,7 +881,10 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         }
         if (isTranscriptRowBody(raw)) {
           const seg = parseWith(machineTranscriptRowBodySchema, raw, 'body');
-          reportTranscriptRow(deps, row.id, stepId, seg.row);
+          reportTranscriptRow(deps, row.id, stepId, seg.row, {
+            workspace: seg.workspace,
+            generation: generationOf(c),
+          });
           return c.json({ ok: true as const });
         }
         if (isComputerRelayBody(raw)) {

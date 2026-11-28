@@ -55,6 +55,7 @@ export interface HostComputerOptions {
   browserEnvironment?: (argv: readonly string[]) => Promise<Record<string, string>>;
   agentBrowserBinary?: string;
   confinement?: HostShellConfinement;
+  managedCwdRoot?: string;
 }
 
 export function hostCommandEnvironment(
@@ -201,6 +202,33 @@ export class HostComputerProvider implements ComputerProvider {
     return target;
   }
 
+  private async resolveManagedCwd(
+    requested: string | undefined,
+    signal: AbortSignal,
+    skipConfinement: boolean,
+  ): Promise<string> {
+    const managedRoot = this.options.managedCwdRoot;
+    if (managedRoot === undefined || requested === undefined || !path.isAbsolute(requested)) {
+      throw new ComputerRefusal('cwd is not a managed workspace');
+    }
+    let real: string;
+    let realRoot: string;
+    try {
+      realRoot = await awaitWithSignal(realpath(managedRoot), signal);
+      real = await awaitWithSignal(realpath(requested), signal);
+    } catch {
+      signal.throwIfAborted();
+      throw new ComputerRefusal('cwd is not a managed workspace');
+    }
+    if (real !== path.resolve(requested) || real === realRoot || !isInside(realRoot, real)) {
+      throw new ComputerRefusal('cwd is not a managed workspace');
+    }
+    if (!skipConfinement && this.options.confinement?.denied(real) === true) {
+      throw new ComputerRefusal('cwd is inside a protected directory');
+    }
+    return real;
+  }
+
   async execute(request: ComputerExecuteRequest): Promise<AsyncIterable<ComputerProcessEvent>> {
     const deadlineAt = Date.now() + request.timeoutMs;
     const timeoutMessage = `command timed out after ${request.timeoutMs} ms; process tree killed`;
@@ -236,7 +264,10 @@ export class HostComputerProvider implements ComputerProvider {
     let browserEnv: Record<string, string> = {};
     try {
       signal.throwIfAborted();
-      cwd = await this.resolveInHome(request.cwd, 'cwd', signal, request.unsandboxed === true);
+      cwd =
+        request.managedCwd === true
+          ? await this.resolveManagedCwd(request.cwd, signal, request.unsandboxed === true)
+          : await this.resolveInHome(request.cwd, 'cwd', signal, request.unsandboxed === true);
       const info = await awaitWithSignal(
         stat(cwd).catch(() => undefined),
         signal,

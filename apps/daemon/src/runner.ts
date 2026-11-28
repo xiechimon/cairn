@@ -70,6 +70,7 @@ import {
   STREAM_FIRST_EVENT_ENV,
   STREAM_IDLE_ENV,
 } from './stream-watchdog.js';
+import type { WorkspaceFileService } from './workspace-file-read.js';
 
 export interface RunStepDeps {
   client: MachineApi;
@@ -89,6 +90,7 @@ export interface RunStepDeps {
   stepSteeringSupport?: Map<string, boolean>;
   stepTranscripts?: Map<string, TranscriptBuffer>;
   stepTreeMarkers?: Map<string, string>;
+  workspaceFiles?: Pick<WorkspaceFileService, 'bind'>;
   stops?: StepStops;
   heartbeatIntervalMs?: number;
   skillsDir?: string;
@@ -225,6 +227,11 @@ export async function runStep(
         .map((error) => (error instanceof Error ? error.message : String(error)))
         .join('; ')}`,
     );
+}
+
+function bindStepWorkspace(deps: RunStepDeps, cwd: string, eligible: boolean): string | null {
+  if (!eligible || deps.workspaceFiles === undefined) return null;
+  return deps.workspaceFiles.bind(cwd);
 }
 
 async function runClaimedStep(
@@ -468,6 +475,7 @@ async function runClaimedStep(
     return;
   }
   const { ws, cwd, headAtStart, stepStartMs } = setup;
+  const workspaceInstance = bindStepWorkspace(deps, cwd, !isChief && !attachmentVerify);
   if (deliveryPrompt !== null && ws?.hooks && ws.hooks.length > 0) {
     deliveryPrompt = prependFailedSetupHookContext(deliveryPrompt, ws.hooks, redact);
   }
@@ -732,6 +740,7 @@ async function runClaimedStep(
     agentTodo,
     now,
     log: (line) => logger.step(line),
+    ...(workspaceInstance !== null ? { workspace: workspaceInstance } : {}),
   });
   const noRepoFilesBefore =
     ws === null && !isReview && !attachmentVerify && !isChief ? snapshotWorkspaceFiles(cwd) : null;

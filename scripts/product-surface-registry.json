@@ -9,6 +9,11 @@
     },
     {
       "type": "runner-device-field",
+      "key": "machine.capabilities.workspaceFileRead",
+      "userScenario": "Click a filename in a reply to open it on the Runner that wrote it. Cairn shows a clear unavailable notice when that Runner cannot preview files."
+    },
+    {
+      "type": "runner-device-field",
       "key": "machine.capabilities.githubPush",
       "userScenario": "Nothing to set: each Runner reports whether its GitHub sign-in can push to the team's GitHub repositories, so a task waits with a clear login hint instead of failing after an hour of work."
     },

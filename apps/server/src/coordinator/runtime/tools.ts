@@ -484,6 +484,7 @@ export function coordinatorToolsExtension(
     routerTools?: boolean;
     desktopTools?: boolean;
     ownComputer?: boolean;
+    ownComputerWorkspace?: boolean;
     ownerChrome?: boolean;
     browser?: boolean;
     takeover?: boolean;

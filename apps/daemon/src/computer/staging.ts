@@ -22,6 +22,7 @@ import type { HostShellConfinement } from '../backend/host-shell-confinement.js'
 import { ComputerRefusal } from './provider.js';
 
 export const STAGED_UPLOADS_TTL_MS = 72 * 60 * 60 * 1000;
+export const STEP_WORKSPACES_DIR_NAME = '.step-workspaces';
 
 const SAFE_SEGMENT = /^[A-Za-z0-9_-]{1,128}$/;
 const FORMAT_CHAR = /^\p{Cf}$/u;
@@ -67,6 +68,44 @@ function ensureSafeStagingRoot(stagingRoot: string): string {
     );
   }
   return realpathSync(stagingRoot);
+}
+
+export function stepWorkspacesRoot(stagingRoot: string): string {
+  return join(stagingRoot, STEP_WORKSPACES_DIR_NAME);
+}
+
+function ensureOwnedPrivateDirectory(path: string): void {
+  try {
+    mkdirSync(path, { mode: 0o700 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+      throw new ComputerRefusal('step workspace directory cannot be created');
+    }
+  }
+  const info = lstatSync(path);
+  const uid = process.getuid?.();
+  if (
+    info.isSymbolicLink() ||
+    !info.isDirectory() ||
+    (uid !== undefined && (info.uid !== uid || (info.mode & 0o077) !== 0))
+  ) {
+    throw new ComputerRefusal('step workspace directory is unsafe');
+  }
+}
+
+export function ensureStepWorkspace(stagingRoot: string, stepId: string): string {
+  const realRoot = ensureSafeStagingRoot(stagingRoot);
+  const container = stepWorkspacesRoot(realRoot);
+  ensureOwnedPrivateDirectory(container);
+  const workspace = join(
+    container,
+    createHash('sha256').update(`cairn.step-workspace:${stepId}`).digest('hex').slice(0, 32),
+  );
+  ensureOwnedPrivateDirectory(workspace);
+  if (realpathSync(workspace) !== workspace) {
+    throw new ComputerRefusal('step workspace directory is unsafe');
+  }
+  return workspace;
 }
 
 export function sanitizeStageSegment(value: string, prefix: string): string {
@@ -156,6 +195,7 @@ export function sweepStagedUploads(
   const now = opts?.now ?? Date.now();
   const removed: string[] = [];
   for (const entry of readdirSync(stagingRoot)) {
+    if (entry === STEP_WORKSPACES_DIR_NAME) continue;
     const full = join(stagingRoot, entry);
     let mtimeMs: number | undefined;
     try {

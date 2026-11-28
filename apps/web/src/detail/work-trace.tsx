@@ -179,7 +179,17 @@ function sayHeadline(text: string): { line: string; more: boolean } {
   return { line, more: lines.length > 1 || line !== raw.trim() };
 }
 
-function WorkSayRow({ text, t }: { text: string; t: TFunc }) {
+function WorkSayRow({
+  text,
+  fileMessageId,
+  filePaths,
+  t,
+}: {
+  text: string;
+  fileMessageId: string | undefined;
+  filePaths: string[] | undefined;
+  t: TFunc;
+}) {
   const [open, setOpen] = useState(false);
   const { line, more } = sayHeadline(text);
   if (!more)
@@ -188,14 +198,14 @@ function WorkSayRow({ text, t }: { text: string; t: TFunc }) {
         data-slot="work-say"
         className="px-3 py-2 text-ui leading-5 text-(--text-secondary) [overflow-wrap:anywhere]"
       >
-        <ChatMarkdown text={text} />
+        <ChatMarkdown text={text} fileMessageId={fileMessageId} filePaths={filePaths} />
       </div>
     );
   if (open)
     return (
       <div data-slot="work-say" data-open="" className="relative">
         <div className="py-2 pr-10 pl-3 text-ui leading-5 text-(--text-secondary) [overflow-wrap:anywhere]">
-          <ChatMarkdown text={text} />
+          <ChatMarkdown text={text} fileMessageId={fileMessageId} filePaths={filePaths} />
         </div>
         <IconTooltip
           label={t('收起这段话')}
@@ -487,7 +497,13 @@ export function WorkTrace({
           )}
           {shown.map((step) =>
             step.kind === 'say' ? (
-              <WorkSayRow key={step.id} text={step.text} t={t} />
+              <WorkSayRow
+                key={step.id}
+                text={step.text}
+                fileMessageId={step.workspaceFileLinks === true ? step.id : undefined}
+                filePaths={step.workspaceFilePaths}
+                t={t}
+              />
             ) : (
               <WorkStepRow key={step.id} step={step} enter={entering.has(step.id)} t={t} />
             ),

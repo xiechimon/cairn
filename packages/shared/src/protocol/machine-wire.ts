@@ -59,6 +59,7 @@ import {
 import { computerPresenceListSchema } from './computer-presence.js';
 import { computerScreenRequestSchema } from './computer-screen.js';
 import { machineJsonSchema } from './executor.js';
+import { workspaceFileInstanceSchema, workspaceFileReadEventSchema } from './workspace-file.js';
 
 const legacyHostKeysSchema = z.array(hostKeySchema).max(8);
 const retireMachineTokenSchema = z.string().regex(MACHINE_TOKEN_PATTERN);
@@ -406,6 +407,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('antigravity.models'), requestId: z.string().uuid() }),
   z.object({ type: z.literal('antigravity.usage'), requestId: z.string().uuid() }),
+  workspaceFileReadEventSchema,
   z.object({ type: z.literal('antigravity.verify'), checkId: antigravityCheckIdSchema }),
   z.object({ type: z.literal('doubao.verify'), checkId: antigravityCheckIdSchema }),
   z.object({
@@ -569,6 +571,7 @@ export type MachineActivityBody = z.infer<typeof machineActivityBodySchema>;
 export const machineTranscriptRowBodySchema = z.object({
   kind: z.literal('transcript_row'),
   row: transcriptRowSchema,
+  workspace: workspaceFileInstanceSchema.optional(),
 });
 export type MachineTranscriptRowBody = z.infer<typeof machineTranscriptRowBodySchema>;
 
@@ -810,6 +813,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'POST',
     path: '/api/machine/antigravity/usage/{requestId}/result',
     reason: '[design] Report the result of an Antigravity usage probe on its assigned connection',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/workspace-file/{requestId}',
+    reason:
+      '[design] Correlated runner response for a bounded read in the producing step workspace',
   },
   {
     method: 'POST',

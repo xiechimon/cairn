@@ -117,6 +117,7 @@ function chiefMessagesWithTurnBoundaries(
         typedAt: null,
         sentByAgent: null,
         clientMessageId: null,
+        fileSource: null,
       },
     ];
   });

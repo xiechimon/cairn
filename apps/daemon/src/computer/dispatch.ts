@@ -8,6 +8,7 @@ import {
   OWN_COMPUTER_TOOL_NAMES,
   OWNER_CHROME_UNAVAILABLE_PREFIX,
   ownComputerHardlineRefusal,
+  WORKSPACE_FILE_CWD,
 } from '@cairn/shared';
 import { z } from 'zod';
 import type { HostShellConfinement } from '../backend/host-shell-confinement.js';
@@ -15,6 +16,7 @@ import { detectHostShellSandboxDenial } from '../backend/sandbox-denial.js';
 import type { DaemonLogger } from '../log.js';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
 import { STEP_TREE_ENV } from '../process-tree.js';
+import type { WorkspaceFileService } from '../workspace-file-read.js';
 import {
   AUTO_STEALTH_NOTE,
   type BrowserToolName,
@@ -42,7 +44,12 @@ import {
   type LazyBrowser,
   type ScopedComputerProviders,
 } from './provider.js';
-import { defaultStagingRoot, readHostFileForAttach, writeStagedUpload } from './staging.js';
+import {
+  defaultStagingRoot,
+  ensureStepWorkspace,
+  readHostFileForAttach,
+  writeStagedUpload,
+} from './staging.js';
 
 const OWN_MAC_TOOLS: ReadonlySet<string> = new Set(OWN_COMPUTER_TOOL_NAMES);
 
@@ -130,6 +137,7 @@ export interface ComputerDispatcherOptions {
   hostConfinement?: Pick<HostShellConfinement, 'denied'>;
   hostHome?: string;
   stagingRoot?: string;
+  workspaceFiles?: Pick<WorkspaceFileService, 'bind'>;
   screen?: HostScreen;
   orb?: ScopedComputerProviders;
   browser?: LazyBrowser;
@@ -280,6 +288,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     timeoutMs: number,
     executionDeadline: number,
     controller: AbortController,
+    managedDir?: string,
   ): Promise<void> {
     const poster = posterFor(call, controller);
     const unsandboxed =
@@ -296,7 +305,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         const treeMarker = options.stepTreeMarkers?.get(call.stepId);
         events = await host.execute({
           argv: ['bash', '-lc', params.command],
-          ...(params.cwd !== undefined ? { cwd: params.cwd } : {}),
+          ...(managedDir !== undefined
+            ? { cwd: managedDir, managedCwd: true as const }
+            : params.cwd !== undefined
+              ? { cwd: params.cwd }
+              : {}),
           ...(treeMarker !== undefined ? { env: { [STEP_TREE_ENV]: treeMarker } } : {}),
           timeoutMs,
           signal: controller.signal,
@@ -379,11 +392,14 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
             isDeniedPath: (candidate) => options.hostConfinement?.denied(candidate) === true,
           })
         : null;
+      const workspace =
+        managedDir !== undefined ? options.workspaceFiles?.bind(managedDir) : undefined;
       await poster.finish({
         kind: 'done',
         text: `exit code: ${code ?? 'unknown'}`,
         exitCode: code,
         ...(sandboxDenied !== null ? { sandboxDenied } : {}),
+        ...(workspace !== null && workspace !== undefined ? { workspace } : {}),
       });
     }
   }
@@ -418,7 +434,33 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
       return;
     }
-    await runShell(call, route.provider, params.data, timeoutMs, executionDeadline, controller);
+    let managedDir: string | undefined;
+    if (call.tool === 'user_computer_shell' && params.data.cwd === WORKSPACE_FILE_CWD) {
+      try {
+        managedDir = ensureStepWorkspace(options.stagingRoot ?? defaultStagingRoot(), call.stepId);
+      } catch (error) {
+        await refuse(
+          call,
+          error instanceof ComputerRefusal
+            ? error.message
+            : 'The step workspace folder could not be prepared',
+        );
+        return;
+      }
+      if (call.hostShellEscalation !== 'approved' && options.hostConfinement?.denied(managedDir)) {
+        await refuse(call, 'The step workspace folder is inside a protected path');
+        return;
+      }
+    }
+    await runShell(
+      call,
+      route.provider,
+      params.data,
+      timeoutMs,
+      executionDeadline,
+      controller,
+      managedDir,
+    );
   }
 
   async function fileText(

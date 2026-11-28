@@ -31,6 +31,7 @@ import {
   type SecretBox,
   STAGE_ATTACHMENT_TIMEOUT_MS,
   TAKEOVER_HANDED_BACK,
+  WORKSPACE_FILE_CWD,
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -124,7 +125,7 @@ import { isOwner } from './instance-owner.js';
 import { type MachineDeps, ownedStepRow } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
-import { ownComputerTarget } from './own-computer.js';
+import { ownComputerTarget, workspaceCwdRefusal } from './own-computer.js';
 import {
   acquirePhoneLease,
   cancelPhoneCalls,
@@ -279,6 +280,12 @@ function applyFrames(
                   sandboxDeniedReason: redact(frame.sandboxDenied.reason, secrets),
                 },
               }
+            : {}),
+          ...(frame.workspace !== undefined &&
+          row.state !== 'cancelled' &&
+          row.tool === 'user_computer_shell' &&
+          row.params.cwd === WORKSPACE_FILE_CWD
+            ? { workspace: frame.workspace }
             : {}),
           finishedAt: now,
           ...(row.state === 'cancelled' ? {} : { state: 'done' as const }),
@@ -1278,6 +1285,10 @@ export async function forwardComputerCall(
         }
       }
       own = { machineId: target.machineId };
+      if (tool === 'user_computer_shell') {
+        const unsupported = workspaceCwdRefusal(db, target.machineId, body.params);
+        if (unsupported !== null) return { text: unsupported };
+      }
       if (tool === 'user_computer_shell' && body.params.escalate === true) {
         if (turnForcesOutboundApproval(db, stepRow.prompt)) {
           throw new HttpError(403, 'untrusted turn cannot escalate host shell commands');

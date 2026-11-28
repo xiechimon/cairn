@@ -77,6 +77,7 @@ import {
   coordinatorEntry,
   devinSubscription,
   doubaoSubscription,
+  type MessageFileSource,
   machine,
   memoryCorrection,
   message,
@@ -135,6 +136,7 @@ import {
 import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
 import { activeDoubaoSource } from './doubao-subscriptions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { resolveFileSource } from './file-source.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoryDocuments } from './memory.js';
@@ -2743,6 +2745,7 @@ type ChiefMessageWrite = {
   createdAt: number;
   projectId?: string | null;
   origin?: TranscriptUserOrigin | null;
+  fileSource?: MessageFileSource | null;
 };
 
 function storedChiefMessage(db: Db, row: ChiefMessageWrite) {
@@ -2765,21 +2768,33 @@ export function insertChiefMessageOnce(db: Db, row: ChiefMessageWrite) {
 }
 
 export function upsertChiefMessage(db: Db, row: ChiefMessageWrite) {
-  const stored = storedChiefMessage(db, row);
+  const written = storedChiefMessage(db, row);
+  const existing = db
+    .select({ fileSource: chiefMessage.fileSource })
+    .from(chiefMessage)
+    .where(eq(chiefMessage.id, row.id))
+    .get();
+  const fileSource = resolveFileSource(existing?.fileSource, row.fileSource);
   db.insert(chiefMessage)
-    .values(stored)
+    .values({ ...written, fileSource })
     .onConflictDoUpdate({
       target: chiefMessage.id,
       set: {
-        role: stored.role,
-        content: stored.content,
-        createdAt: stored.createdAt,
+        role: written.role,
+        content: written.content,
+        createdAt: written.createdAt,
         origin: sql`coalesce(excluded.origin, ${chiefMessage.origin})`,
+        fileSource,
       },
     })
     .run();
   db.update(chiefThread).set({ updatedAt: nowMs() }).where(eq(chiefThread.id, row.threadId)).run();
-  return stored;
+  const persisted = db
+    .select({ fileSource: chiefMessage.fileSource })
+    .from(chiefMessage)
+    .where(eq(chiefMessage.id, row.id))
+    .get();
+  return { ...written, fileSource: persisted?.fileSource ?? null };
 }
 
 export function notifyChiefTurn(

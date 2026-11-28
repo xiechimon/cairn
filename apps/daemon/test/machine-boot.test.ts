@@ -6,6 +6,7 @@ import { releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
 import { MachineApiError } from '../src/machine-client.js';
+import * as workspaceFileRead from '../src/workspace-file-read.js';
 import { boot, FakeMachineApi, startMachine, waitFor } from './machine-loop-harness.js';
 import { testTempDir } from './test-temp-dir.js';
 
@@ -71,6 +72,15 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     api.me = async () => {
       throw new MachineApiError(401, 'unauthorized');
     };
+    let supportChanged = () => {};
+    const createService = workspaceFileRead.createWorkspaceFileService;
+    const spy = vi
+      .spyOn(workspaceFileRead, 'createWorkspaceFileService')
+      .mockImplementation((opts) => {
+        supportChanged = opts.onSupportChange ?? (() => {});
+        return createService(opts);
+      });
+    onTestFinished(() => spy.mockRestore());
     const started = startMachine({ api, preEnrolled: { serverUrl: 'http://other-host:60805' } });
     onTestFinished(() => {
       releaseTestTempDir(started.home);
@@ -87,7 +97,9 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
     const notice = started.lines.find((l) => l.includes('rejected them'));
     expect(notice).toContain('http://other-host:60805');
     expect(notice).toContain('http://server');
+    supportChanged();
     await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(api.presenceBodies).toHaveLength(0);
     expect(settled).toBe(false);
     expect(started.lines.filter((l) => l.includes('rejected them'))).toHaveLength(1);
     writeFileSync(
@@ -100,6 +112,48 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
       }),
     );
     expect(await outcome).toContain('machine.json changed');
+  });
+
+  test('workspace support discovered during startup presence is reported after authentication', async () => {
+    let supportChanged = () => {};
+    let supported = false;
+    const createService = workspaceFileRead.createWorkspaceFileService;
+    const spy = vi
+      .spyOn(workspaceFileRead, 'createWorkspaceFileService')
+      .mockImplementation((opts) => {
+        supportChanged = opts.onSupportChange ?? (() => {});
+        return { ...createService(opts), supported: () => supported, probe: async () => false };
+      });
+    onTestFinished(() => spy.mockRestore());
+    const api = Object.assign(new FakeMachineApi(), { replyWorkspaceFile: vi.fn() });
+    const presence = api.presence.bind(api);
+    let releasePresence = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      releasePresence = resolve;
+    });
+    let first = true;
+    api.presence = async (body) => {
+      const result = await presence(body);
+      if (first) {
+        first = false;
+        await blocked;
+      }
+      return result;
+    };
+    const started = startMachine({ api });
+    onTestFinished(() => {
+      releaseTestTempDir(started.home);
+    });
+    await waitFor(() => api.presenceBodies.length === 1);
+    supported = true;
+    supportChanged();
+    releasePresence();
+    const handle = await started.handlePromise;
+    await waitFor(() => api.presenceBodies.length >= 2);
+    const body = api.presenceBodies.at(-1) as { capabilities: { workspaceFileRead?: boolean } };
+    expect(body.capabilities.workspaceFileRead).toBe(true);
+    await handle.stop();
+    await handle.done;
   });
 
   test('rejected credentials for the configured server name that server once', async () => {

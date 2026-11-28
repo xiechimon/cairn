@@ -307,6 +307,7 @@ export const machineCapabilitiesSchema = z.object({
   secretGateway: z.literal(true).optional(),
   mcpConnectors: z.literal(true).optional(),
   claimGeneration: z.literal(true).optional(),
+  workspaceFileRead: z.literal(true).optional(),
   runnerProtocolVersion: z.number().int().nonnegative().max(1_000_000).optional(),
   runnerReleaseVersion: z.string().min(1).max(64).optional(),
   runnerAutoUpdate: runnerAutoUpdateReportSchema.optional(),
@@ -401,6 +402,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
     ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
     ...(rec.claimGeneration === true ? { claimGeneration: true as const } : {}),
+    ...(rec.workspaceFileRead === true ? { workspaceFileRead: true as const } : {}),
     ...(runnerProtocolVersion.success && runnerProtocolVersion.data !== undefined
       ? { runnerProtocolVersion: runnerProtocolVersion.data }
       : {}),

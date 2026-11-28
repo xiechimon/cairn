@@ -7,7 +7,7 @@ import {
   type ComputerTool,
   computerRemoteTools,
   isComputerBrowserTool,
-  OWN_COMPUTER_TOOLS,
+  ownComputerTools,
   PHONE_TOOLS,
   REQUEST_SECRET_TOOL_DEF,
   type RemoteToolDef,
@@ -113,6 +113,7 @@ export function coordinatorToolDefs(
     routerTools?: boolean;
     desktopTools?: boolean;
     ownComputer?: boolean;
+    ownComputerWorkspace?: boolean;
     ownerChrome?: boolean;
     browser?: boolean;
     takeover?: boolean;
@@ -137,7 +138,12 @@ export function coordinatorToolDefs(
     REQUEST_SECRET_TOOL_DEF,
     ...browserTools,
     ...(options.desktopTools === true ? COMPUTER_DESKTOP_TOOLS : []),
-    ...(options.ownComputer === true ? [...OWN_COMPUTER_TOOLS, COORDINATOR_ATTACH_FILE_TOOL] : []),
+    ...(options.ownComputer === true
+      ? [
+          ...ownComputerTools({ workspaceCwd: options.ownComputerWorkspace === true }),
+          COORDINATOR_ATTACH_FILE_TOOL,
+        ]
+      : []),
     ...(options.phoneComputer !== undefined && options.phoneComputer.length > 0
       ? phoneToolDefs(options.phoneComputer)
       : []),

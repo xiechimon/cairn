@@ -4,6 +4,7 @@ import type {
   ComputerScreenRequest,
   MachineStreamEvent,
   ManagedUpdateRuntime,
+  WorkspaceFileReadEvent,
 } from '@cairn/shared';
 
 export const MACHINE_OFFLINE_GRACE_MS = 45_000;
@@ -276,6 +277,20 @@ export class MachineWakeHub {
     } catch {
       return false;
     }
+  }
+
+  pushWorkspaceFileRead(
+    teamId: string,
+    machineId: string,
+    connectionId: string,
+    event: WorkspaceFileReadEvent,
+  ): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    return (
+      entry?.teamId === teamId &&
+      entry.connectionId === connectionId &&
+      this.sendToMachine(machineId, event)
+    );
   }
 
   isConnected(machineId: string): boolean {

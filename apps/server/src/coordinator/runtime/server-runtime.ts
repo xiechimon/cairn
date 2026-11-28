@@ -63,6 +63,7 @@ export interface ServerRuntimeConfig {
   desktopTools?(threadId: string): boolean;
   connectorTools?(threadId: string): RemoteToolDef[];
   ownComputer?(threadId: string): boolean;
+  ownComputerWorkspace?(threadId: string): boolean;
   browserOffer?(threadId: string): BrowserOffer | undefined;
   phoneComputer?(threadId: string): readonly string[];
   providersFor?(threadId: string): readonly ProviderBinding[];
@@ -161,6 +162,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS }
           : { loaded: CORE_COORDINATOR_TOOLS }),
         ownComputer: config.ownComputer?.(threadId) === true,
+        ownComputerWorkspace: config.ownComputerWorkspace?.(threadId) === true,
         ...config.browserOffer?.(threadId),
         phoneComputer: config.phoneComputer?.(threadId) ?? [],
         shuttingDown: () => shuttingDown,

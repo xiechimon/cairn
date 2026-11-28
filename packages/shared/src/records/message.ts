@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { agentTodoItemSchema } from '../agent-todo.js';
+import { workspaceFilePathSchema } from '../protocol/workspace-file.js';
 import { activeRunSchema } from './chief.js';
 import { epochMs, recordId } from './common.js';
 
@@ -23,6 +24,8 @@ export const transcriptRowSchema = messageRecordSchema.extend({
   actor: z.string().nullish(),
   origin: z.enum(TRANSCRIPT_USER_ORIGINS).nullish(),
   clientMessageId: z.string().nullish(),
+  workspaceFileLinks: z.literal(true).optional(),
+  workspaceFilePaths: z.array(workspaceFilePathSchema).optional(),
 });
 export type TranscriptRow = z.infer<typeof transcriptRowSchema>;
 

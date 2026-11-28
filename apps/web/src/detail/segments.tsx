@@ -1,3 +1,4 @@
+import { workspaceFileReferences } from '@cairn/shared';
 import { cn } from 'cn';
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
@@ -17,6 +18,7 @@ import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { PHASE_UI } from '../phase.js';
 import { AttachmentChip } from './attachment-chip.js';
+import { WorkspaceFileLink, WorkspaceFileSourceContext } from './workspace-file-link.js';
 
 const CODE_SKIN: Record<string, string> = {
   'chat-code':
@@ -303,22 +305,80 @@ function MentionChip({ seg }: { seg: DocSegment }) {
   );
 }
 
+function wholeFileReference(text: string, enabled: boolean): boolean {
+  if (!enabled) return false;
+  const [only, ...rest] = workspaceFileReferences(text);
+  return only !== undefined && rest.length === 0 && only.start === 0 && only.end === text.length;
+}
+
+function fileReferenceParts(text: string): { text: string; path?: string }[] {
+  const parts: { text: string; path?: string }[] = [];
+  let cursor = 0;
+  for (const { path, start, end } of workspaceFileReferences(text)) {
+    if (start > cursor) parts.push({ text: text.slice(cursor, start) });
+    parts.push({ text: text.slice(start, end), path });
+    cursor = end;
+  }
+  if (cursor < text.length) parts.push({ text: text.slice(cursor) });
+  return parts;
+}
+
 function decorate(seg: DocSegment, key: number, node: ReactNode): ReactNode {
   if (seg.em !== true && seg.del !== true) return node;
   const struck = seg.del === true ? <del className="text-(--text-tertiary)">{node}</del> : node;
   return seg.em === true ? <em key={key}>{struck}</em> : <Fragment key={key}>{struck}</Fragment>;
 }
 
+function withTaskLinks(text: string, glances: ReadonlyMap<string, TodoGlance> | null): ReactNode {
+  return (
+    (glances === null ? null : linkTaskNumbers(text, glances))?.map((part, n) =>
+      part.style === 'mention' ? <MentionChip key={n} seg={part} /> : part.text,
+    ) ?? text
+  );
+}
+
 export function Segments({ segments, codeClassName }: SegmentsProps) {
   const openFile = useContext(OpenFileContext);
   const glances = useContext(TodoGlanceContext);
+  const fileSource = useContext(WorkspaceFileSourceContext);
+  const fileSkin = codeClassName === 'chat-code' ? CHAT_ANCHOR_SKIN : ANCHOR_SKIN;
+  const fileLink = (path: string, key: number | string, body: ReactNode) =>
+    fileSource === null || !fileSource.mentions.has(path) ? (
+      body
+    ) : (
+      <WorkspaceFileLink key={key} source={fileSource} path={path} skin={fileSkin}>
+        {body}
+      </WorkspaceFileLink>
+    );
+  const textWithFiles = (text: string, plain: (piece: string) => ReactNode) =>
+    fileSource === null
+      ? plain(text)
+      : fileReferenceParts(text).map((part, n) =>
+          part.path === undefined ? (
+            <Fragment key={n}>{plain(part.text)}</Fragment>
+          ) : (
+            fileLink(part.path, n, part.text)
+          ),
+        );
   return (
     <>
       {segments.map((seg, j) =>
         decorate(
           seg,
           j,
-          seg.style === 'break' ? (
+          seg.workspaceFile !== undefined &&
+            fileSource !== null &&
+            fileSource.mentions.has(seg.workspaceFile.path) ? (
+            fileLink(seg.workspaceFile.path, j, seg.workspaceFile.label)
+          ) : seg.style === 'code' && wholeFileReference(seg.text, fileSource !== null) ? (
+            fileLink(
+              seg.text,
+              j,
+              <code translate="no" className={cn(codeClassName, CODE_SKIN[codeClassName])}>
+                {seg.text}
+              </code>,
+            )
+          ) : seg.style === 'break' ? (
             <br key={j} />
           ) : seg.style === 'mention' ? (
             <MentionChip key={j} seg={seg} />
@@ -360,7 +420,7 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
               </a>
             )
           ) : seg.style === 'strong' ? (
-            <strong key={j}>{seg.text}</strong>
+            <strong key={j}>{textWithFiles(seg.text, (piece) => piece)}</strong>
           ) : seg.style != null ? (
             <code
               key={j}
@@ -375,11 +435,7 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
               {seg.text}
             </code>
           ) : (
-            <span key={j}>
-              {(glances === null ? null : linkTaskNumbers(seg.text, glances))?.map((part, n) =>
-                part.style === 'mention' ? <MentionChip key={n} seg={part} /> : part.text,
-              ) ?? seg.text}
-            </span>
+            <span key={j}>{textWithFiles(seg.text, (piece) => withTaskLinks(piece, glances))}</span>
           ),
         ),
       )}

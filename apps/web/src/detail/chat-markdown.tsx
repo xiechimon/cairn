@@ -36,6 +36,10 @@ import { attachmentIdFromKey, COMPOSER_CHIP_LABEL } from './attachment-chip.js';
 import { type CodeToken, useCodeTokens } from './code-highlight.js';
 import { MermaidBlock } from './mermaid-block.js';
 import { Segments } from './segments.js';
+import {
+  WorkspaceFileConversationContext,
+  WorkspaceFileSourceContext,
+} from './workspace-file-link.js';
 
 export { attachmentIdFromKey, COMPOSER_CHIP_LABEL };
 
@@ -585,13 +589,29 @@ export function ChatMarkdown({
   bubbleFooter,
   highlight,
   streaming = false,
+  fileMessageId,
+  filePaths,
 }: {
   text: string;
+  fileMessageId?: string | undefined;
+  filePaths?: string[] | undefined;
   streaming?: boolean;
   bubbles?: boolean;
   bubbleFooter?: ReactNode;
   highlight?: (group: ChatBubbleGroup) => boolean;
 }) {
+  const conversationId = useContext(WorkspaceFileConversationContext);
+  const fileSource = useMemo(
+    () =>
+      fileMessageId === undefined || conversationId === null || filePaths === undefined
+        ? null
+        : {
+            conversationId,
+            messageId: fileMessageId,
+            mentions: new Set(filePaths),
+          },
+    [conversationId, fileMessageId, filePaths],
+  );
   const groups = useMemo(() => (bubbles ? chatBubbleGroups(text) : null), [bubbles, text]);
   const blocks = useMemo(() => (bubbles ? null : parseChatMarkdown(text)), [bubbles, text]);
   const body =
@@ -611,7 +631,11 @@ export function ChatMarkdown({
     );
   return (
     <StreamingContext.Provider value={streaming}>
-      <ReplyContext.Provider value={bubbles}>{body}</ReplyContext.Provider>
+      <ReplyContext.Provider value={bubbles}>
+        <WorkspaceFileSourceContext.Provider value={fileSource}>
+          {body}
+        </WorkspaceFileSourceContext.Provider>
+      </ReplyContext.Provider>
     </StreamingContext.Provider>
   );
 }

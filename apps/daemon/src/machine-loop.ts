@@ -11,6 +11,7 @@ import type {
   DeliveredImage,
   MachineCapabilities,
   ModelSourceModel,
+  WorkspaceFileReadEvent,
 } from '@cairn/shared';
 import {
   appendAnswers,
@@ -89,7 +90,7 @@ import { ComputerPresenceReporter, type ComputerPresenceSource } from './compute
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import { OutboundComputerScreens } from './computer/screen-channel.js';
 import { createComputerScreenProvider } from './computer/screen-provider.js';
-import { defaultStagingRoot, sweepStagedUploads } from './computer/staging.js';
+import { defaultStagingRoot, stepWorkspacesRoot, sweepStagedUploads } from './computer/staging.js';
 import type { DaemonConfig } from './config.js';
 import { GithubPushProbe } from './github-push-probe.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
@@ -141,6 +142,7 @@ import { createTaskSleepPrevention, type TaskSleepPrevention } from './task-slee
 import { DAEMON_VERSION } from './version.js';
 import { agentReachEnabled, readScrapling, ScraplingProbe } from './web-tools.js';
 import { WorkspaceManager } from './workspace.js';
+import { createWorkspaceFileService, type WorkspaceFileService } from './workspace-file-read.js';
 
 export interface MachineLoopOpts {
   config: DaemonConfig;
@@ -161,6 +163,7 @@ export interface MachineLoopOpts {
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
   capabilitiesProbe?: () => MachineCapabilities;
+  workspaceFiles?: WorkspaceFileService;
   hostIdentitySources?: HostIdentitySources;
   legacyRunnerHomes?: readonly string[];
   hostPermissionsProbe?: HostPermissionsProbe;
@@ -395,7 +398,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let claudeLogin: ClaudeLogin | null = null;
   let loginProbe: Promise<ClaudeCodeAuthProbe> | null = null;
   const claudeHome = claudeConfigHome(paths.home);
-  let announcePresence: () => void = () => {};
+  let presencePending = false;
+  let announcePresence: () => void = () => {
+    presencePending = true;
+  };
   const installStop = new AbortController();
   const installFetch: typeof fetch = (url, init) =>
     fetch(url, {
@@ -500,6 +506,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       skillsDir: config.skillsDir,
     });
   const stagingRoot = defaultStagingRoot();
+  const workspaceFiles =
+    opts.workspaceFiles ??
+    createWorkspaceFileService({
+      keyPath: join(paths.home, 'workspace-file.key'),
+      log: (line) => logger.workspace(line),
+      onSupportChange: () => announcePresence(),
+    });
+  void workspaceFiles.probe().catch(() => false);
   const hostConfinement =
     capEnv.CAIRN_OWN_COMPUTER === '1'
       ? runnerHostShellConfinement({
@@ -512,7 +526,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const hostComputer =
     opts.hostComputer ??
     (hostConfinement !== undefined
-      ? new HostComputerProvider({ confinement: hostConfinement })
+      ? new HostComputerProvider({
+          confinement: hostConfinement,
+          managedCwdRoot: stepWorkspacesRoot(stagingRoot),
+        })
       : undefined);
   const hostPermissionsProbe = opts.hostPermissionsProbe ?? createHostPermissionsProbe(capEnv);
   const cairnOrigins = [
@@ -828,6 +845,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         : {}),
       mcpConnectors: true,
       claimGeneration: true,
+      ...(workspaceFiles.supported() && client.replyWorkspaceFile !== undefined
+        ? { workspaceFileRead: true as const }
+        : {}),
       runnerProtocolVersion: RUNNER_PROTOCOL_VERSION,
       ...(runnerReleaseVersion !== null ? { runnerReleaseVersion } : {}),
       runnerAutoUpdate: selfUpdater.report(),
@@ -1260,7 +1280,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
     },
   });
-  announcePresence = () => presenceReporter.notify();
   const probeHarnesses = async () => {
     const claudeBin = activeClaudeBin();
     logger.machine(
@@ -1343,6 +1362,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       try {
         await replayPendingTokenRotation();
         await client.me();
+        presencePending = false;
         await presenceReporter.send();
         break;
       } catch (error) {
@@ -1366,6 +1386,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         await sleep(backoff);
       }
     }
+    announcePresence = () => presenceReporter.notify();
+    if (presencePending) announcePresence();
     await probeHarnesses();
   } catch (error) {
     await presenceReporter.close();
@@ -1710,6 +1732,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(hostComputer ? { host: hostComputer } : {}),
     ...(hostConfinement ? { hostConfinement } : {}),
     stagingRoot,
+    workspaceFiles,
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
     ...(macBrowser ? { browser: macBrowser } : {}),
@@ -1719,6 +1742,20 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   });
   cancelComputerStep = (stepId) => computerDispatcher.cancelStep(stepId);
   const imsgBridge = createImsgBridge({ api: client, logger, home: config.home });
+  const deliverWorkspaceFile = async (
+    event: WorkspaceFileReadEvent,
+    connectionId: string,
+    signal: AbortSignal,
+  ) => {
+    if (client.replyWorkspaceFile === undefined) return;
+    const deadline = AbortSignal.any([signal, AbortSignal.timeout(15_000)]);
+    try {
+      const result = await workspaceFiles.read(event.workspace, event.path, deadline);
+      await client.replyWorkspaceFile(event.requestId, connectionId, result, deadline);
+    } catch {
+      if (!signal.aborted) logger.machine('workspace file reply failed');
+    }
+  };
   const deliverAntigravityModelProbe = async (
     requestId: string,
     connectionId: string,
@@ -2067,6 +2104,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'doubao.login.cancel') {
               doubaoLoginRunner.cancel(ev.loginId);
             }
+            if (ev.type === 'workspace.file.read' && connectionId !== null) {
+              void deliverWorkspaceFile(ev, connectionId, probeSignal);
+            }
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
             if (ev.type === 'runtime.update') {
@@ -2243,6 +2283,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       stepSteeringSupport,
       stepTranscripts,
       stepTreeMarkers,
+      workspaceFiles,
       stops,
       machineName: config.name,
       ...(daemonOtel !== null ? { otel: daemonOtel } : {}),

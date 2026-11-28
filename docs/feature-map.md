@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 57 |
-| status shipped | 47 |
+| Features | 58 |
+| status shipped | 48 |
 | status partial | 8 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 31 |
+| research, frontend design and backend design all present or not applicable | 32 |
 | Research gaps | 12 |
 | Frontend design gaps | 13 |
 | Backend design gaps | 17 |
@@ -54,6 +54,7 @@
 | [First run](#first-run) | 2 | shipped | yes (not on main) | yes | gap | B6 |
 | [Machine enrollment](#machine-enrollment) | 2 | shipped | yes | gap | gap | B5 |
 | [Machines](#machines) | 2 | shipped | yes | yes | yes |  |
+| [File names in replies](#message-workspace-files) | 2 | shipped | yes | yes | yes |  |
 | [Mobile web and PWA](#mobile-web) | 2 | shipped | gap | yes | n/a | B6 |
 | [Phone computers](#phones) | 2 | partial | yes | yes | yes |  |
 | [Model providers and subscriptions](#providers) | 2 | shipped | yes | yes | yes |  |
@@ -395,6 +396,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: [docs/research/machine-execution-plane.md](research/machine-execution-plane.md), [docs/research/t3code-devices-and-scope-2026-11-06.md](research/t3code-devices-and-scope-2026-11-06.md) (not on main), [docs/research/runner-token-rotation-2026-11-27.md](research/runner-token-rotation-2026-11-27.md)
 - Frontend design: [docs/design/references/settings](design/references/settings), [docs/design/settings-trim.md](design/settings-trim.md), [docs/design/runner-token-rotation.md](design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
 - Backend design: [docs/design/settings-trim.md](design/settings-trim.md), [docs/design/runner-token-rotation.md](design/runner-token-rotation.md), [docs/spec/11-model-service-and-machine-localization.md](spec/11-model-service-and-machine-localization.md)
+
+### message-workspace-files
+
+**File names in replies** (shipped). Open a filename in a task or Coordinator reply to read it from that step's workspace on the original Runner, without asking the agent to attach it.
+
+- Research: [docs/research/task-file-links-2026-11-28.md](research/task-file-links-2026-11-28.md)
+- Frontend design: [docs/design/task-file-links.md](design/task-file-links.md)
+- Backend design: [docs/design/task-file-links.md](design/task-file-links.md)
 
 ### mobile-web
 

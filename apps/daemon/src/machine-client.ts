@@ -39,6 +39,7 @@ import {
   type MachineStreamEvent,
   type MachineTokenResponse,
   type MachineUploadUrlsResponse,
+  type MachineWorkspaceFileReply,
   machineAntigravityModelProbeCredentialSchema,
   machineAntigravityUsageProbeClaimSchema,
   machineAskResponseSchema,
@@ -69,6 +70,7 @@ import {
   type ToolCallRecord,
   type TranscriptRow,
   type TranscriptUpload,
+  type WorkspaceFileResult,
 } from '@cairn/shared';
 
 export class MachineApiError extends Error {
@@ -135,7 +137,7 @@ export interface MachineApi {
   tool(stepId: string, call: ToolCallRecord): Promise<void>;
   transcriptDelta(stepId: string, text: string): Promise<void>;
   thinkingDelta?(stepId: string, text: string): Promise<void>;
-  transcriptRow?(stepId: string, row: TranscriptRow): Promise<void>;
+  transcriptRow?(stepId: string, row: TranscriptRow, workspace?: string): Promise<void>;
   activity?(stepId: string, activity: StepActivityReport): Promise<void>;
   agentTodo?(stepId: string, todo: AgentTodoReport): Promise<void>;
   backgroundTask?(stepId: string, task: BackgroundTask): Promise<void>;
@@ -201,6 +203,12 @@ export interface MachineApi {
   reportAntigravityVerify?(body: MachineAntigravityVerifyBody, signal?: AbortSignal): Promise<void>;
   reportDoubaoVerify?(body: MachineDoubaoVerifyBody, signal?: AbortSignal): Promise<void>;
   reportDoubaoLoginEvent?(body: MachineDoubaoLoginEventBody, signal?: AbortSignal): Promise<void>;
+  replyWorkspaceFile?(
+    requestId: string,
+    connectionId: string,
+    result: WorkspaceFileResult,
+    signal: AbortSignal,
+  ): Promise<void>;
   steer(stepId: string): Promise<MachineSteerResponse | null>;
   steerAck?(stepId: string, body?: MachineSteerAckBody): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
@@ -457,6 +465,20 @@ export class MachineClient implements MachineApi {
     );
   }
 
+  async replyWorkspaceFile(
+    requestId: string,
+    connectionId: string,
+    result: WorkspaceFileResult,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const reply: MachineWorkspaceFileReply = { connectionId, result };
+    await this.request('POST', `/api/machine/workspace-file/${encodeURIComponent(requestId)}`, {
+      body: reply,
+      signal,
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
   async heartbeat(stepId: string, body: MachineHeartbeatBody = {}): Promise<void> {
     await this.request('POST', `/api/machine/heartbeat/${stepId}`, {
       body,
@@ -514,9 +536,13 @@ export class MachineClient implements MachineApi {
     });
   }
 
-  async transcriptRow(stepId: string, row: TranscriptRow): Promise<void> {
+  async transcriptRow(stepId: string, row: TranscriptRow, workspace?: string): Promise<void> {
     await this.request('POST', `/api/machine/tool/${stepId}`, {
-      body: { kind: 'transcript_row' as const, row },
+      body: {
+        kind: 'transcript_row' as const,
+        row,
+        ...(workspace !== undefined ? { workspace } : {}),
+      },
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }
