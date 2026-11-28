@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "338fe19b30266c2bb26b0139dfcbc5a4d57b95d0",
+    "sha": "a3263e48bc43ddcad2103da0343dc67c0d227542",
     "date": "2026-11-28"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -12,7 +12,7 @@
     },
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
-      "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer). Optional finalFocus forwards the Base UI focus target so memory deletion can return to a surviving row or its stable summary after the refreshed list settles (#3666). The backdrop force-renders so a confirm nested in a route dialog (Project settings delete) keeps its own backdrop close.",
+      "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer). Optional finalFocus forwards the Base UI focus target so memory deletion can return to a surviving row or its stable summary after the refreshed list settles (#3666). The backdrop force-renders so a confirm nested in a route dialog (Project settings delete) keeps its own backdrop close. Viewport popups own their dismissal here instead of leaning on the backdrop: one click on the layer outside the content and one Escape close the topmost dialog, even while the query field composes, while presses inside nested floating surfaces and stacked dialogs stay with the surface that owns them.",
       "hash": "851fe97d74862063255f082965d27fecb7f2fe2ac365ac880532b1af4eefb7aa"
     },
     "alert-dialog.tsx": {
@@ -83,7 +83,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (docs/design/surfaces/chrome.md dialogs) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box with stable scrollbar gutter and disabled browser scroll anchoring, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog / overlay/route-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes, and bare forwards initialFocus. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces. info puts an InfoTip beside the title for a background sentence that is not visible copy. stacked forces the registry overlay for a regular face opened over another dialog, as AlertDialogShell does, so the dialog underneath is dimmed. Programmatic return focus (including explicit returnFocusTo) prevents scrolling so closing a dialog preserves the underlying view's position.",
-      "hash": "1ad1f2bccb2d742addc3a9a0d3c5fe948d47351d5164e57533e389cf8a3e415e"
+      "hash": "d7dbaa2a5e35a88495f9404c8b90d5c5c175741bf34b3572a99265d1c0922b48"
     },
     "dialog.tsx": {
       "kind": "registry",

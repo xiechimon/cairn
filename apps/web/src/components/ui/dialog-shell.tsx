@@ -22,6 +22,11 @@ const SHELL_EXIT_BRIDGE_CLS =
 const VIEWPORT_MECHANISM_CLS =
   'fixed inset-0 pointer-events-none [&>*]:pointer-events-auto data-[ending-style]:[transition:opacity_0s_linear_var(--dur-fast)] data-[ending-style]:opacity-0';
 
+const DIALOG_LAYER_SEL = '[data-slot="dialog-content"],[data-slot="alert-dialog-content"]';
+
+const FLOATING_LAYER_SEL =
+  '[data-slot="popover-content"],[data-slot="select-content"],[data-slot="dropdown-menu-content"],[data-slot="context-menu-content"],[data-slot="combobox-content"]';
+
 export const VIEWPORT_POP_ANIM =
   'duration-100 ease-(--ease-out-expo) group-data-open/dlgvp:animate-in group-data-open/dlgvp:fade-in-0 group-data-open/dlgvp:zoom-in-98';
 
@@ -124,6 +129,54 @@ function useReturnFocus(open: boolean, returnFocusTo: HTMLElement | undefined) {
   return { shellId, restore };
 }
 
+function useViewportDismissal(
+  shellId: string,
+  enabled: boolean,
+  onClose: (details?: { reason?: string; event?: Event }) => void,
+) {
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
+  useEffect(() => {
+    if (!enabled) return;
+    const ownLayer = () => document.querySelector(`[data-shell-id="${CSS.escape(shellId)}"]`);
+    const ownsTopLayer = () => {
+      const layers = document.querySelectorAll(DIALOG_LAYER_SEL);
+      return layers.length > 0 && layers[layers.length - 1] === ownLayer();
+    };
+    const outsideOwnLayer = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      const layer = ownLayer();
+      if (layer == null) return false;
+      if (target === layer) return true;
+      if (layer.contains(target)) return false;
+      return target.closest(FLOATING_LAYER_SEL) == null;
+    };
+    const dismissOutside = (event: MouseEvent) => {
+      if (!ownsTopLayer() || !outsideOwnLayer(event.target)) return;
+      close.current({ reason: 'outside-press', event });
+    };
+    const dismissEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !ownsTopLayer()) return;
+      close.current({ reason: 'escape-key', event });
+    };
+    let attached = false;
+    const attach = () => {
+      attached = true;
+      document.addEventListener('click', dismissOutside);
+      document.addEventListener('keydown', dismissEscape);
+    };
+    const opening = window.setTimeout(attach, 0);
+    return () => {
+      window.clearTimeout(opening);
+      if (!attached) return;
+      document.removeEventListener('click', dismissOutside);
+      document.removeEventListener('keydown', dismissEscape);
+    };
+  }, [shellId, enabled]);
+}
+
 export function DialogShell({
   title,
   subtitle,
@@ -152,6 +205,7 @@ export function DialogShell({
 }: DialogShellProps) {
   const { t } = useI18n();
   const { shellId, restore } = useReturnFocus(open, returnFocusTo);
+  useViewportDismissal(shellId, viewportRoot && dismissible && open, onClose);
 
   const handleOpenChange = (next: boolean, details?: { reason?: string; event?: Event }) => {
     if (next || !dismissible) return;
