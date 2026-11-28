@@ -240,4 +240,8 @@ test('390px dark: the row menu, the confirm and both of its buttons stay usable'
   expect(Math.abs((cancelBox?.y ?? 0) - (confirmBox?.y ?? 1))).toBeLessThan(8);
   const dialogBox = await dialog.boundingBox();
   expect(dialogBox?.width ?? 0).toBeLessThanOrEqual(390);
+  const summary = dialog.locator('.delete-confirm-summary');
+  await expect(summary).toContainText('你自己的文件夹不动。');
+  const clipped = await summary.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(clipped).toBeLessThanOrEqual(1);
 });

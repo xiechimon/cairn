@@ -35,7 +35,7 @@ export function DeleteConfirm({
         />
       }
     >
-      <div className="delete-confirm-summary flex items-center gap-2 overflow-hidden text-ui whitespace-nowrap text-foreground">
+      <div className="delete-confirm-summary flex min-w-0 items-center gap-2 text-ui text-foreground">
         {summary}
       </div>
     </AlertDialogShell>
