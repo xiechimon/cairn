@@ -148,7 +148,7 @@ function workingRowLast(stream: readonly ChiefStreamItem[]): readonly ChiefStrea
   return [...stream.slice(0, at), ...after, working];
 }
 
-export const CHIEF_DRAFT_STORAGE_KEY = 'cairn.chief-draft';
+import { CHIEF_DRAFT_STORAGE_KEY } from './draft-keys.js';
 
 export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolean) => void }) {
   const scrollable = useMessageScrollerScrollable();

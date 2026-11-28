@@ -12,7 +12,6 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import {
-  CHIEF_DRAFT_STORAGE_KEY,
   ChiefConversation,
   ChiefScrollProvider,
   useMentionGroups,
@@ -20,6 +19,7 @@ import {
 import { QuestionScopeContext } from '../chief/chief-question.js';
 import { ChiefStatusMark } from '../chief/chief-status-mark.js';
 import { todoGlanceOf } from '../chief/chief-task-refs.js';
+import { chiefDraftKeys } from '../chief/draft-keys.js';
 import { questionState } from '../chief/question-state.js';
 import type { ChiefSurface } from '../chief/use-chief-surface.js';
 import { ConversationSkeleton } from '../components/conversation-skeleton.js';
@@ -107,6 +107,7 @@ interface HomeCProps {
   todos: readonly TodoRecord[];
   now: number;
   projectId: string | null;
+  draftProjectId?: string | null;
   projectName: string | null;
   banner?: ReactNode;
   machines?: readonly MachineRow[];
@@ -178,6 +179,7 @@ export function HomeC({
   todos,
   now,
   projectId,
+  draftProjectId,
   projectName,
   banner,
   machines,
@@ -681,12 +683,8 @@ export function HomeC({
               onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
               showBindGate={!live}
               todoGlances={todoGlances}
-              draftScope={projectId === null ? 'chief' : `chief:${projectId}`}
-              draftStorageKey={
-                projectId === null
-                  ? CHIEF_DRAFT_STORAGE_KEY
-                  : `${CHIEF_DRAFT_STORAGE_KEY}.${projectId}`
-              }
+              draftScope={chiefDraftKeys(draftProjectId ?? projectId).scope}
+              draftStorageKey={chiefDraftKeys(draftProjectId ?? projectId).localKey}
               prefill={prefill}
               placeholder={composerPlaceholder}
               notice={setupStep !== null && <SetupPrompt step={setupStep} empty={setupEmpty} />}

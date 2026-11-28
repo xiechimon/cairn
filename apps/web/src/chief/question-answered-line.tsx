@@ -9,7 +9,6 @@ import { answerLineOf } from './question-lifecycle.js';
 
 export function QuestionReceipt({ item }: { item: ChiefQuestionItem }) {
   const { t } = useI18n();
-  const skipped = item.status === 'cancelled';
   return (
     <div
       data-testid="chief-question-receipt"
@@ -18,7 +17,7 @@ export function QuestionReceipt({ item }: { item: ChiefQuestionItem }) {
       className="flex w-fit max-w-[min(var(--container-reply),100%)] flex-col gap-2 rounded-xl px-3 py-2 font-sans shadow-[0_0_0_1px_var(--border)] wrap-anywhere dark:bg-card"
     >
       {item.questions.map((question, n) => {
-        const answer = skipped ? '' : answerLineOf(item.answers?.[n]);
+        const answer = answerLineOf(item.answers?.[n]);
         return (
           <div key={n} className="flex min-w-0 flex-col">
             <div

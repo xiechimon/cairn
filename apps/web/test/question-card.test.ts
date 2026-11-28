@@ -114,6 +114,22 @@ describe('an answered question leaves one receipt', () => {
     expect(text(html)).toBe('Which order should the export columns use?Alphabetical、by date');
   });
 
+  test('a card cancelled after the owner answered keeps the answers it recorded', () => {
+    const html = page(
+      createElement(QuestionReceipt, {
+        item: {
+          ...ask(),
+          status: 'cancelled',
+          cancelReason: '回合已结束',
+          answers: [{ header: 'Order', choices: ['Alphabetical'] }],
+        },
+      }),
+    );
+    const copy = text(html);
+    expect(copy).toContain('Alphabetical');
+    expect(copy).not.toContain('已跳过');
+  });
+
   test('a skipped question says so', () => {
     const html = page(createElement(QuestionReceipt, { item: { ...ask(), status: 'cancelled' } }));
     expect(text(html)).toContain('已跳过');
